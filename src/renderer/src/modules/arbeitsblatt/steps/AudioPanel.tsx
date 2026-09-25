@@ -195,7 +195,9 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
       const stimmen = namen.map((n) => voiceFor(block, n))
       if (new Set(stimmen.filter(Boolean)).size < namen.length) {
         notifyError(
-          new Error(`${namen.join(' und ')} hätten dieselbe Stimme – der Dialog klänge wie eine einzige Person. Weise oben je Sprecher eine eigene Stimme zu.`),
+          new Error(
+            `${namen.join(' und ')} hätten dieselbe Stimme – der Dialog klänge wie eine einzige Person. Bitte oben jeder Person eine eigene Stimme zuweisen.`
+          ),
           'Vertonen abgebrochen'
         )
         return
@@ -214,7 +216,7 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
     if (gesperrteWahl.length) {
       const v = gesperrteWahl[0]!
       notifyError(
-        new Error(`„${v.name}" ist mit deinem ElevenLabs-Tarif nicht nutzbar. ${v.unusableReason ?? ''} Wähle oben eine andere Stimme.`),
+        new Error(`„${v.name}" ist mit dem hinterlegten ElevenLabs-Tarif nicht nutzbar. ${v.unusableReason ?? ''} Bitte oben eine andere Stimme wählen.`),
         'Vertonen abgebrochen'
       )
       return
@@ -256,8 +258,8 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
             <Title order={4}>Hörtexte</Title>
           </Group>
           <Text size="sm" c="dimmed">
-            Dieses Arbeitsblatt enthält noch keinen Hörtext. Füge im Arbeitsblatt den Baustein „Hörtext“ hinzu oder wähle beim Erstellen eine Aufgabe zum
-            Hörverstehen – die KI schreibt dann ein Skript, das hier vertont werden kann.
+            Dieses Arbeitsblatt enthält noch keinen Hörtext. Dafür im Arbeitsblatt den Baustein „Hörtext“ einfügen oder beim Erstellen eine Aufgabe zum
+            Hörverstehen wählen – die KI schreibt dann ein Skript, das hier vertont werden kann.
           </Text>
         </Stack>
       </Card>
@@ -332,7 +334,7 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
           <Text size="xs" c="dimmed" style={{ flex: 1 }}>
             {sprachfilter && !sprachfilterGriff
               ? 'Zu wenige passende Stimmen – es werden alle gezeigt.'
-              : 'Jede Stimme kann den Text sprechen; die Angabe beschreibt nur den Akzent. Eigene Stimmen deines Kontos bleiben immer sichtbar.'}
+              : 'Jede Stimme kann den Text sprechen; die Angabe beschreibt nur den Akzent. Eigene Stimmen des ElevenLabs-Kontos bleiben immer sichtbar.'}
           </Text>
         </Group>
       )}
@@ -514,7 +516,7 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
 
               <TextInput
                 label="Adresse für den QR-Code auf dem Blatt (optional)"
-                description="Lege die MP3 z. B. in einen Cloud-Ordner und trage den Link ein; dann können die Lernenden den Text selbst noch einmal hören."
+                description="Die MP3 z. B. in einen Cloud-Ordner legen und den Link hier eintragen; dann können die Lernenden den Text selbst noch einmal hören."
                 placeholder="https://…"
                 defaultValue={block.url ?? ''}
                 onBlur={(e) => setBlock(block.id, (b) => (b.url = e.currentTarget.value.trim() || undefined))}

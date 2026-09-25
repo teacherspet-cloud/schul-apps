@@ -133,7 +133,7 @@ export default function FrameStep(): React.JSX.Element {
   }, [exam?.meta.subjectId, exam?.meta.stateId, exam?.meta.schoolTypeId, exam?.meta.grade, exam?.meta.courseLevel, exam?.meta.cefrLevel])
 
   const available = useMemo(() => (exam ? formatsFor(exam.meta.subjectId, exam.meta.grade) : []), [exam])
-  if (!exam) return <Container py="xl">Lade …</Container>
+  if (!exam) return <Container py="xl">Wird geladen …</Container>
 
   const meta = exam.meta
   // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe

@@ -226,7 +226,7 @@ export default function ExamVocabPicker({
         description={
           lists.length
             ? 'Listen aus dem Programm Vokabellisten – die Vokabeln dürfen in der Arbeit vorkommen.'
-            : 'Noch keine Vokabellisten gespeichert. Lege sie im Programm Vokabellisten an, dann erscheinen sie hier.'
+            : 'Noch keine Vokabellisten gespeichert. Im Programm Vokabellisten angelegte Listen erscheinen hier.'
         }
         placeholder={lists.length ? 'Liste wählen' : 'keine Listen vorhanden'}
         disabled={!lists.length}

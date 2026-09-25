@@ -133,8 +133,8 @@ export default function VocabFocusModal({
     <Modal opened={opened} onClose={onClose} title="Vokabeln für dieses Arbeitsblatt" size="xl">
       <Stack gap="sm">
         <Text size="sm" c="dimmed">
-          Wähle die Listen oder Abschnitte, um die es gerade geht, und daraus die Wörter, die auf dem Blatt besonders vorkommen sollen – in Texten, Hörtexten
-          und Aufgaben.
+          Zuerst die Listen oder Abschnitte wählen, um die es gerade geht, dann daraus die Wörter, die auf dem Blatt besonders vorkommen sollen – in Texten,
+          Hörtexten und Aufgaben.
         </Text>
 
         <TextbookPicker
@@ -154,7 +154,7 @@ export default function VocabFocusModal({
           description={
             usable.length
               ? 'Die Wörter der gewählten Listen erscheinen unten – grau markierte bleiben außen vor.'
-              : 'Noch keine Vokabellisten für dieses Fach. Lege sie im Programm Vokabellisten an, dann erscheinen sie hier.'
+              : 'Noch keine Vokabellisten für dieses Fach. Im Programm Vokabellisten angelegte Listen erscheinen hier.'
           }
           placeholder={usable.length ? 'Liste wählen' : 'keine Listen vorhanden'}
           disabled={!usable.length}
@@ -239,7 +239,7 @@ export default function VocabFocusModal({
 
         <Text size="xs" c="dimmed">
           Die Wörter sind vorrangig, nicht verpflichtend: Die KI baut so viele ein, wie Texte und Aufgaben natürlich tragen. Der Schwerpunkt des Blattes bleibt,
-          was du eingestellt hast.
+          was eingestellt ist.
         </Text>
 
         <Group justify="space-between">

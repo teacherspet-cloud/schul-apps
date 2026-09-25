@@ -63,7 +63,7 @@ export default function SetupStep(): React.JSX.Element {
   }, [test === null])
 
   const topics = useMemo(() => (test ? chosenGrammarTopics({ ...test.meta, grammarTopics: test.meta.topics } as never) : []), [test])
-  if (!test) return <Container py="xl">Lade …</Container>
+  if (!test) return <Container py="xl">Wird geladen …</Container>
 
   const meta = test.meta
   // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe

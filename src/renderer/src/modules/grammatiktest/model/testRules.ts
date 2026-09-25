@@ -41,7 +41,7 @@ export function testingRules(meta: GrammarTestMeta): TestingRule[] {
       text: 'In Niedersachsen wird das Verfügen über sprachliche Mittel nicht isoliert bewertet; das Kerncurriculum weist Grammatik funktional aus.',
       suggestion: meta.embedded
         ? undefined
-        : 'Setze den Schalter „In einen Zusammenhang einbetten": Der Test prüft die Form dann in einem zusammenhängenden Text statt in Einzelsätzen und lässt sich einer Teilkompetenz zurechnen.'
+        : 'Abhilfe: den Schalter „In einen Zusammenhang einbetten" setzen. Der Test prüft die Form dann in einem zusammenhängenden Text statt in Einzelsätzen und lässt sich einer Teilkompetenz zurechnen.'
     })
   }
 
@@ -55,7 +55,7 @@ export function testingRules(meta: GrammarTestMeta): TestingRule[] {
         : {
             severity: 'wichtig',
             text: `Nordrhein-Westfalen, ${year}. Lernjahr: Ab dem fünften Lernjahr darf ein Grammatikteil eine kommunikative Teilkompetenz nur noch ergänzen, nicht ersetzen.`,
-            suggestion: 'Plane den Test als zusätzlichen Teil einer Arbeit oder als Lernkontrolle ohne eigene Note.'
+            suggestion: 'Den Test besser als zusätzlichen Teil einer Arbeit oder als Lernkontrolle ohne eigene Note planen.'
           }
     )
   }

@@ -134,7 +134,7 @@ export default function WartungCard(): React.JSX.Element {
           </Alert>
 
           <Text size="sm">
-            Wenn du die Materialien behalten möchtest, sichere sie zuerst. Die Sicherung lässt sich danach im Einrichtungsassistenten oder hier wieder einlesen.
+            Sollen die Materialien erhalten bleiben, vorher sichern. Die Sicherung lässt sich danach im Einrichtungsassistenten oder hier wieder einlesen.
           </Text>
           <Group>
             <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={() => void sichern()}>
@@ -143,7 +143,7 @@ export default function WartungCard(): React.JSX.Element {
           </Group>
 
           <TextInput
-            label={`Tippe ${BESTAETIGUNG}, um fortzufahren`}
+            label={`Zum Fortfahren ${BESTAETIGUNG} eingeben`}
             placeholder={BESTAETIGUNG}
             value={wort}
             onChange={(e) => setWort(e.currentTarget.value)}

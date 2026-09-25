@@ -296,7 +296,7 @@ export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding
       out.push({
         blockId: img.id,
         message:
-          'Auf dieses Bild verweist nichts: Es hat weder Beschriftung noch Bildunterschrift, und keine Aufgabe nennt es. Binde es an eine Aufgabe an oder lass es weg.',
+          'Auf dieses Bild verweist nichts: Es hat weder Beschriftung noch Bildunterschrift, und keine Aufgabe nennt es. Besser an eine Aufgabe anbinden oder weglassen.',
         severity: 'mittel'
       })
     }
@@ -318,7 +318,7 @@ export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding
       if (fehlt.length) {
         out.push({
           blockId: img.id,
-          message: `Zu diesem Bild fehlt ${fehlt.join(' und ')}. Für eine quellenkritische Einleitung braucht es beides – ergänze die Angaben oder nimm ein Bild, bei dem sie bekannt sind.`,
+          message: `Zu diesem Bild fehlt ${fehlt.join(' und ')}. Für eine quellenkritische Einleitung braucht es beides – die Angaben ergänzen oder ein Bild nehmen, bei dem sie bekannt sind.`,
           severity: 'mittel'
         })
       }
@@ -404,7 +404,7 @@ export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding
       out.push({
         blockId: nearby.id,
         message:
-          'Beschriftung über eine nummerierte Liste unter dem Bild: Das ist die am schwersten verständliche Form. Setze die Beschriftungen direkt an die Bildelemente (Beschriftungsebene).',
+          'Beschriftung über eine nummerierte Liste unter dem Bild: Das ist die am schwersten verständliche Form. Besser die Beschriftungen direkt an die Bildelemente setzen (Beschriftungsebene).',
         severity: 'mittel'
       })
     }

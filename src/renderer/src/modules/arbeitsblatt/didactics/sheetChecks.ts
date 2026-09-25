@@ -100,7 +100,7 @@ export function checkTaskMix(sheet: Sheet): DidacticWarning[] {
     out.push({ kind: 'taskMix', message: 'Ein Arbeitsblatt sollte mindestens zwei verschiedene Aufgabenstellungen enthalten.' })
   const formats = new Set(list.map(taskFormat))
   if (list.length >= 3 && formats.size < 2)
-    out.push({ kind: 'taskMix', message: 'Alle Aufgaben haben dieselbe Antwortform – mische geschlossene, halboffene und offene Formate.' })
+    out.push({ kind: 'taskMix', message: 'Alle Aufgaben haben dieselbe Antwortform – besser geschlossene, halboffene und offene Formate mischen.' })
   return out
 }
 
@@ -121,7 +121,7 @@ export function checkTaskCount(sheet: Sheet, meta: WorksheetMeta, profile?: Lear
   if (wanted > 0 && !simplified && list.length !== wanted) {
     out.push({
       kind: 'taskCount',
-      message: `${list.length} Aufgaben, vorgegeben waren ${wanted}. ${list.length > wanted ? 'Fasse zusammen, was ein Denkschritt ist' : 'Es fehlt eine Aufgabe'}.`
+      message: `${list.length} Aufgaben, vorgegeben waren ${wanted}. ${list.length > wanted ? 'Aufgaben zusammenfassen, die einen Denkschritt bilden' : 'Es fehlt eine Aufgabe'}.`
     })
   }
   if (profile && !simplified && wanted === 0) {
@@ -130,7 +130,7 @@ export function checkTaskCount(sheet: Sheet, meta: WorksheetMeta, profile?: Lear
     if (list.length > max) {
       out.push({
         kind: 'taskCount',
-        message: `${list.length} Aufgaben auf ${seitenText(meta)} – das wirkt kleinschrittig. Auf normalem Niveau sind höchstens ${max} Aufgaben vorgesehen; fasse zusammen, was ein Denkschritt ist.`
+        message: `${list.length} Aufgaben auf ${seitenText(meta)} – das wirkt kleinschrittig. Auf normalem Niveau sind höchstens ${max} Aufgaben vorgesehen; Aufgaben zusammenfassen, die einen Denkschritt bilden.`
       })
     }
     const manyParts = list.filter((t) => t.parts.length > 4)

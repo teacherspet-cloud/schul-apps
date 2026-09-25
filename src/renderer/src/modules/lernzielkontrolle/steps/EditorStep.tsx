@@ -277,7 +277,8 @@ export default function EditorStep(): React.JSX.Element {
             <Accordion.Panel>
               <BefundListe befunde={befunde} />
               <Text size="xs" c="dimmed" mt="sm">
-                Nichts davon hindert am Ausdrucken. Die Zeitgrenzen sind nur für fünf Bundesländer belegt, und Sie kennen Ihre Schule besser als eine Tabelle.
+                Nichts davon hindert am Ausdrucken. Die Zeitgrenzen sind nur für fünf Bundesländer belegt – die eigene Schule kennt die Lehrkraft besser als
+                eine Tabelle.
               </Text>
             </Accordion.Panel>
           </Accordion.Item>

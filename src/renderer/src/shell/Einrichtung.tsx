@@ -61,10 +61,10 @@ export default function Einrichtung(): React.JSX.Element | null {
   const schritte = [
     {
       label: 'Schule',
-      beschreibung: 'Wo unterrichtest du?',
+      beschreibung: 'Wo wird unterrichtet?',
       icon: <IconSchool size={18} />,
       hinweis:
-        'Bundesland und Schulform bestimmen, welche Jahrgänge zur Auswahl stehen, welche Niveaus erwartet werden und wie der Lehrplan im jeweiligen Land heißt. Ohne diese Angaben arbeitet die App mit Voreinstellungen, die zu deiner Schule nicht passen müssen.',
+        'Bundesland und Schulform bestimmen, welche Jahrgänge zur Auswahl stehen, welche Niveaus erwartet werden und wie der Lehrplan im jeweiligen Land heißt. Ohne diese Angaben arbeitet die App mit Voreinstellungen, die nicht zur eigenen Schule passen müssen.',
       inhalt: <SchoolCard settings={settings} update={update} />
     },
     {
@@ -98,7 +98,7 @@ export default function Einrichtung(): React.JSX.Element | null {
       <Stack gap="lg">
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="sm" c="dimmed">
-            Drei kurze Schritte, danach kannst du loslegen. Jeden davon kannst du überspringen und später in den Einstellungen nachholen.
+            Drei kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen nachholen.
           </Text>
           {/* Nach einem Zurücksetzen der naheliegende Weg zurück (Wunsch vom 25.09.2026) */}
           <SicherungEinlesen variant="subtle" />

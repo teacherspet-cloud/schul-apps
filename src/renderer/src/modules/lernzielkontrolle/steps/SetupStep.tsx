@@ -116,7 +116,7 @@ export default function SetupStep(): React.JSX.Element {
   const eigeneGrenzen = test?.meta.bewertung.eigeneGrenzen
   const schluesselImFenster = useMemo(() => (eigeneGrenzen ? [...eigeneGrenzen, 0] : schwellen), [eigeneGrenzen, schwellen])
 
-  if (!test) return <Container py="xl">Lade …</Container>
+  if (!test) return <Container py="xl">Wird geladen …</Container>
   const current = test
   const m = current.meta
 

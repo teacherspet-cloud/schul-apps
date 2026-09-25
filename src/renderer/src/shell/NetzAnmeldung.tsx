@@ -40,7 +40,8 @@ export default function NetzAnmeldung({ onFertig }: { onFertig: () => void | Pro
           <IconDeviceTablet size={36} opacity={0.6} />
           <Title order={3}>Schul-Apps</Title>
           <Text size="sm" c="dimmed" ta="center">
-            Dieses Gerät greift über das Netz auf deinen Rechner zu. Gib einmalig die PIN ein, die dort unter <b>Einstellungen → Netzwerk</b> steht.
+            Dieses Gerät greift über das Netz auf den Rechner mit Schul-Apps zu. Einmalig die PIN eingeben, die dort unter <b>Einstellungen → Netzwerk</b>{' '}
+            steht.
           </Text>
           <PinInput
             length={6}
@@ -62,7 +63,7 @@ export default function NetzAnmeldung({ onFertig }: { onFertig: () => void | Pro
             Anmelden
           </Button>
           <Text size="xs" c="dimmed" ta="center">
-            Gerechnet wird auf deinem Rechner. Er muss eingeschaltet sein und das Programm geöffnet haben.
+            Gerechnet wird auf diesem Rechner. Er muss eingeschaltet sein und das Programm geöffnet haben.
           </Text>
         </Stack>
       </Card>

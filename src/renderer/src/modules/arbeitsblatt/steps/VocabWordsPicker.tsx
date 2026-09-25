@@ -80,7 +80,7 @@ export default function VocabWordsPicker({
         description={
           usable.length
             ? 'Die Wörter der gewählten Listen werden unten eingetragen – grau markierte bleiben außen vor.'
-            : 'Noch keine Vokabellisten gespeichert. Lege sie im Programm Vokabellisten an, dann erscheinen sie hier.'
+            : 'Noch keine Vokabellisten gespeichert. Im Programm Vokabellisten angelegte Listen erscheinen hier.'
         }
         placeholder={usable.length ? 'Liste wählen' : 'keine Listen vorhanden'}
         disabled={!usable.length}

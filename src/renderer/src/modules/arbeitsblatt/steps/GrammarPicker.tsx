@@ -55,7 +55,8 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
         <Alert color="gray" p="xs">
           <Text size="xs">
             {sequenceLabel(sequence)} in Klasse {meta.grade} = <b>{year}. Lernjahr</b>. Danach richtet sich die Auswahl – der Jahrgang allein genügt nicht:
-            Dieselbe Klasse {meta.grade} steht je nach Folge im ersten oder im dritten Lernjahr. Die Fremdsprachenfolge änderst du oben unter „Fremdsprache".
+            Dieselbe Klasse {meta.grade} steht je nach Folge im ersten oder im dritten Lernjahr. Die Fremdsprachenfolge lässt sich oben unter „Fremdsprache"
+            ändern.
           </Text>
           {meta.grade >= 10 && (
             <Switch
@@ -161,7 +162,7 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
           ))}
           {!visible.length && (
             <Text size="xs" c="dimmed" py="sm">
-              Kein Thema gefunden. Setze den Schalter „Alle Themen des Fachs", um die gesamte Liste zu sehen.
+              Kein Thema gefunden. Mit dem Schalter „Alle Themen des Fachs" erscheint die gesamte Liste.
             </Text>
           )}
         </Stack>
@@ -182,8 +183,8 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
             )}
             {t.contested && (
               <Text size="xs" c="orange">
-                Die ausgewerteten Lehrpläne und Lehrwerke setzen dieses Thema zwischen {scaleWord} {topicStart(t, sequence)} und {t.to} an – prüfe, ob es zu
-                deiner Lerngruppe passt.
+                Die ausgewerteten Lehrpläne und Lehrwerke setzen dieses Thema zwischen {scaleWord} {topicStart(t, sequence)} und {t.to} an – bitte prüfen, ob es
+                zur Lerngruppe passt.
               </Text>
             )}
             {t.receptive && (

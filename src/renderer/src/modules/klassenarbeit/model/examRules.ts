@@ -151,11 +151,11 @@ export function examWarnings(stateId: string, subjectId: string, grade: number, 
     )
   }
   if (stateId === 'NW' && subjectId === 'englisch' && !formatIds.includes('en-writing')) {
-    out.push('In Nordrhein-Westfalen ist Schreiben Bestandteil jeder Klassenarbeit im Fach Englisch – ergänze einen Schreibteil.')
+    out.push('In Nordrhein-Westfalen ist Schreiben Bestandteil jeder Klassenarbeit im Fach Englisch – ein Schreibteil gehört dazu.')
   }
   if (stateId === 'NI' && subjectId === 'englisch' && (formatIds.includes('en-grammar') || formatIds.includes('en-language'))) {
     out.push(
-      'In Niedersachsen wird das Verfügen über sprachliche Mittel nicht isoliert bewertet. Prüfe die Grammatik eingebettet in eine andere Teilkompetenz.'
+      'In Niedersachsen wird das Verfügen über sprachliche Mittel nicht isoliert bewertet. Die Grammatik wird deshalb eingebettet in eine andere Teilkompetenz geprüft.'
     )
   }
   const rules = stateRules(stateId)

@@ -11,7 +11,7 @@ import { notifyError } from '../shared/util'
  * Zugriff aus dem lokalen Netz.
  *
  * Bewusst nüchtern gehalten: Der Schalter ist aus, bis man ihn einschaltet, und beim Beenden
- * des Programms wieder aus. Was unter „Was du wissen solltest" steht, sind keine Warnhinweise
+ * des Programms wieder aus. Was unter „Gut zu wissen" steht, sind keine Warnhinweise
  * zur Zierde – es sind die drei Dinge, an denen es in der Praxis scheitert, und die sonst wie
  * ein Fehler des Programms aussähen.
  */
@@ -84,8 +84,8 @@ export default function NetzwerkCard({
           )}
         </Group>
         <Text size="sm" c="dimmed" mb="md">
-          Öffne die Programme im Browser eines anderen Geräts im selben Netz – Tablet, Handy, zweiter Rechner – und erstelle dort Arbeitsblätter. Gerechnet wird
-          weiterhin auf diesem Rechner.
+          Die Programme lassen sich im Browser eines anderen Geräts im selben Netz öffnen – Tablet, Handy, zweiter Rechner – und dort Arbeitsblätter erstellen.
+          Gerechnet wird weiterhin auf diesem Rechner.
         </Text>
 
         <Switch
@@ -130,12 +130,12 @@ export default function NetzwerkCard({
             {status.port !== status.wunschPort && (
               <Alert color="yellow" icon={<IconAlertTriangle size={16} />}>
                 Port {status.wunschPort} war belegt – der Zugang läuft auf {status.port}. Läuft Schul-Apps vielleicht noch ein zweites Mal? Dann beantwortet die
-                ältere Fassung weiterhin Port {status.wunschPort}. Schließe sie und schalte den Zugang neu ein.
+                ältere Fassung weiterhin Port {status.wunschPort}. Diese Fassung beenden und den Zugang neu einschalten.
               </Alert>
             )}
             {status.gesperrt && (
               <Alert color="red" icon={<IconAlertTriangle size={16} />}>
-                Der Zugang ist nach zu vielen Fehlversuchen gesperrt. Schalte ihn aus und wieder ein.
+                Der Zugang ist nach zu vielen Fehlversuchen gesperrt. Zum Entsperren aus- und wieder einschalten.
               </Alert>
             )}
           </Stack>
@@ -181,15 +181,15 @@ export default function NetzwerkCard({
 
       <Card withBorder padding="lg">
         <Title order={4} mb="sm">
-          Was du wissen solltest
+          Gut zu wissen
         </Title>
         <List spacing="xs" size="sm" icon={<IconDeviceTablet size={16} />}>
           <List.Item>
             <b>Nur im selben Netz, nur während dieses Programm läuft.</b> Von außerhalb ist nichts erreichbar; es gibt keinen Cloud-Dienst.
           </List.Item>
           <List.Item>
-            <b>Es ist dasselbe Programm.</b> Eine gemeinsame Bibliothek, ein KI-Kontingent – das dieses Rechners. Wer vom Tablet aus erstellt, verbraucht dein
-            Guthaben.
+            <b>Es ist dasselbe Programm.</b> Eine gemeinsame Bibliothek, ein KI-Kontingent – das dieses Rechners. Wer vom Tablet aus erstellt, verbraucht
+            dasselbe Guthaben.
           </List.Item>
           <List.Item>
             <b>Vom Gerät aus geht nicht alles.</b> API-Schlüssel, Dateien dieses Rechners und das Löschen von Material bleiben gesperrt. Arbeitsblätter
@@ -204,7 +204,7 @@ export default function NetzwerkCard({
           </List.Item>
           <List.Item>
             <b>Die Verbindung ist unverschlüsselt.</b> Im lokalen Netz ist das üblich; ein eigenes Zertifikat würde in jedem Browser eine Warnung erzeugen. Wer
-            im selben Netz mitliest, könnte die PIN sehen – schalte den Zugang aus, wenn du ihn nicht brauchst.
+            im selben Netz mitliest, könnte die PIN sehen – den Zugang deshalb ausschalten, wenn er nicht gebraucht wird.
           </List.Item>
         </List>
       </Card>

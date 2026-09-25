@@ -40,8 +40,8 @@ export default function QuellenAuswahl({ treffer, thema, onWaehlen }: QuellenAus
       <Stack>
         <Text size="sm" c="dimmed">
           Gefunden zu „{thema}", geladen und geprüft. Unbrauchbare Funde (Register, Scans, Navigationsseiten) sind schon aussortiert; die Reihenfolge richtet
-          sich nach Umfang und sprachlicher Passung. In der Oberstufe entscheidest du, welche Quelle genommen wird – sie bestimmt, was sich an der Aufgabe
-          zeigen lässt.
+          sich nach Umfang und sprachlicher Passung. In der Oberstufe entscheidet die Lehrkraft, welche Quelle genommen wird – sie bestimmt, was sich an der
+          Aufgabe zeigen lässt.
         </Text>
         <ScrollArea.Autosize mah={420}>
           <Radio.Group value={gewaehlt} onChange={setGewaehlt}>

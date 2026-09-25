@@ -221,7 +221,7 @@ export default function TopicStep(): React.JSX.Element {
   }, [languageOfSubject])
 
   const profile = useMemo(() => (worksheet ? profileFromMeta(worksheet.meta) : null), [worksheet])
-  if (!worksheet || !profile) return <Container py="xl">Lade …</Container>
+  if (!worksheet || !profile) return <Container py="xl">Wird geladen …</Container>
 
   const meta = worksheet.meta
   const subject = subjectById(meta.subjectId)
@@ -526,7 +526,7 @@ export default function TopicStep(): React.JSX.Element {
                         <Text size="xs" c="dimmed" mt={4}>
                           {vocabCount
                             ? `Diese Wörter kommen in Texten, Hörtexten und Aufgaben bevorzugt vor${meta.knownVocab ? `; Wortschatz nach „${meta.knownVocab.source}" wird vorausgesetzt` : ''}.`
-                            : 'Aus dem Schulbuch oder deinen gespeicherten Listen – die KI baut sie dann bevorzugt ein.'}
+                            : 'Aus dem Schulbuch oder den gespeicherten Listen – die KI baut sie dann bevorzugt ein.'}
                         </Text>
                       </div>
                     )}

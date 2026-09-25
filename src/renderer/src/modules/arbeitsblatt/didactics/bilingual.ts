@@ -332,7 +332,7 @@ export function checkBilingual(sheet: Sheet, meta: WorksheetMeta): DidacticWarni
   if (!glossare.length && !meta.bilingual?.pruefung)
     out.push({
       kind: 'bilingual',
-      message: 'Das zweisprachige Fachglossar fehlt. Füge einen Baustein „Nützliche Ausdrücke“ hinzu und lass ihn von der KI füllen.'
+      message: 'Das zweisprachige Fachglossar fehlt. Abhilfe: einen Baustein „Nützliche Ausdrücke“ einfügen und von der KI füllen lassen.'
     })
   const ohneDeutsch = glossare.flatMap((g) => g.groups.flatMap((gr) => gr.items)).filter((i) => i.text.trim() && !i.german.trim())
   if (ohneDeutsch.length)

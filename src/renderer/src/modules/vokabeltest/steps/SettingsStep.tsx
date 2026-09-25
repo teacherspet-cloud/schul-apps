@@ -125,7 +125,7 @@ export default function SettingsStep(): React.JSX.Element {
     return settings.variantCount * perVariant * (review ? 2 : 1) + pictures
   }, [settings, review, economy])
 
-  if (!settings) return <Container py="xl">Lade …</Container>
+  if (!settings) return <Container py="xl">Wird geladen …</Container>
 
   const toggleTask = (type: TaskTypeId, on: boolean): void => {
     const tasks = on

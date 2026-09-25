@@ -448,7 +448,8 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
         const token = req.headers['x-schulapps-token']
 
         if (req.method === 'POST' && url.pathname === '/anmelden') {
-          if (fehlversuche >= MAX_FEHLVERSUCHE) return json(res, 429, { fehler: 'Zu viele Fehlversuche. Schalte den Zugang in den Einstellungen neu ein.' })
+          if (fehlversuche >= MAX_FEHLVERSUCHE)
+            return json(res, 429, { fehler: 'Zu viele Fehlversuche. Der Zugang muss am Rechner in den Einstellungen neu eingeschaltet werden.' })
           const koerper = JSON.parse((await leseKoerper(req)) || '{}') as { pin?: string }
           if (!gleich(String(koerper.pin ?? ''), pin)) {
             fehlversuche++
@@ -481,7 +482,7 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
              * gebaut. Ohne die Nummer sieht das genauso aus wie ein echter Fehler.
              */
             return json(res, 403, {
-              fehler: `„${kanal}" ist über das Netz nicht freigegeben (Schul-Apps ${fassung()}). Erledige das am Rechner selbst. Falls diese Fassung veraltet ist: Schul-Apps am Rechner schließen, neu starten und die Seite hier neu laden.`
+              fehler: `„${kanal}" ist über das Netz nicht freigegeben (Schul-Apps ${fassung()}). Das geht nur am Rechner selbst. Falls diese Fassung veraltet ist: Schul-Apps am Rechner schließen, neu starten und die Seite hier neu laden.`
             })
           }
           if (!aufrufen) return json(res, 500, { fehler: 'Der Zugang ist nicht bereit.' })

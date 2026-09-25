@@ -143,7 +143,7 @@ export function checkMediation(sheet: Sheet, meta: WorksheetMeta): DidacticWarni
         if (germanGloss.length) {
           out.push({
             kind: 'mediation',
-            message: `${label}: Die Worterklärung zu „${germanGloss[0].term}" ist auf Deutsch. Gib stattdessen die Entsprechung auf ${meta.subjectLabel} an – gebraucht werden die zielsprachlichen Wörter, nicht die Bedeutung des deutschen Ausdrucks.`
+            message: `${label}: Die Worterklärung zu „${germanGloss[0].term}" ist auf Deutsch. Stattdessen die Entsprechung auf ${meta.subjectLabel} angeben – gebraucht werden die zielsprachlichen Wörter, nicht die Bedeutung des deutschen Ausdrucks.`
           })
         }
       }
@@ -206,7 +206,7 @@ function contextWarnings(t: TaskBlock, kind: 'mediation' | 'writing', label: str
   if (!isContextualized(instruction) && !isContextualized(situation)) {
     out.push({
       kind,
-      message: `${label}: Die Aufgabe ist nicht in eine Situation eingebettet. Erzähle in zwei bis drei Sätzen, wer schreibt, aus welchem Anlass und an wen – z. B. „Your friend from England has been telling you about extreme sports. You have found this article and want to write him an email …“.`
+      message: `${label}: Die Aufgabe ist nicht in eine Situation eingebettet. Zwei bis drei Sätze sollten erzählen, wer schreibt, aus welchem Anlass und an wen – z. B. „Your friend from England has been telling you about extreme sports. You have found this article and want to write him an email …“.`
     })
   }
   /*

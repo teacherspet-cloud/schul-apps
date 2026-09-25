@@ -60,9 +60,8 @@ export function BoardPanel({ ws, profile }: { ws: Worksheet; profile: LearnerPro
             <Title order={4}>Tafelbild zur Ergebnissicherung</Title>
           </Group>
           <Text size="sm" c="dimmed">
-            Die KI vergleicht die Aufgaben {ws.sheets.length > 1 ? 'aller Niveaustufen ' : ''}und schlägt ein Tafelbild vor, das Sie im Unterrichtsgespräch aus
-            den Ergebnissen entwickeln – mit Impulsen und erwarteten Schülerbeiträgen. Es ist Material für die Lehrkraft und erscheint nicht auf den
-            Arbeitsblättern.
+            Die KI vergleicht die Aufgaben {ws.sheets.length > 1 ? 'aller Niveaustufen ' : ''}und schlägt ein Tafelbild vor, das im Unterrichtsgespräch aus den
+            Ergebnissen entsteht – mit Impulsen und erwarteten Schülerbeiträgen. Es ist Material für die Lehrkraft und erscheint nicht auf den Arbeitsblättern.
           </Text>
           <Textarea
             label="Wünsche (optional)"

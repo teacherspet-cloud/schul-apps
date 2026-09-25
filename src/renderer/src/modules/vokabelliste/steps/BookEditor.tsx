@@ -141,7 +141,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
     }
   }
 
-  if (!book) return <Text c="dimmed">Lade …</Text>
+  if (!book) return <Text c="dimmed">Wird geladen …</Text>
 
   const unitMeta = book.units.find((u) => u.name === unit)
 

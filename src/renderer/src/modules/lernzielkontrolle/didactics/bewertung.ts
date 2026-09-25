@@ -188,7 +188,7 @@ export function pruefeBewertung(blocks: { type: string; points?: number }[], ein
       out.push({ message: `Der Punktebereich ist verdreht: von ${b.min} bis ${b.max}.` })
     } else if (summe > 0 && !imBereich(summe, b)) {
       out.push({
-        message: `Der Test hat ${summe} Punkte, gewünscht waren ${b.min} bis ${b.max}. Die Punkte lassen sich in der Aufgabenliste einzeln ändern – oder Sie passen die Spanne an.`
+        message: `Der Test hat ${summe} Punkte, gewünscht waren ${b.min} bis ${b.max}. Die Punkte lassen sich in der Aufgabenliste einzeln ändern – oder die Spanne anpassen.`
       })
     }
   }

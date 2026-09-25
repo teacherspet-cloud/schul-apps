@@ -42,7 +42,7 @@ export function keyProblem(k: string): string | null {
   const v = k.trim()
   if (!v) return null
   if (/^[0-9a-f]{32,}$/i.test(v)) {
-    return 'Das ist die Kennung des Schlüssels, nicht der Schlüssel selbst. Der Schlüssel beginnt mit „sk_" und wird bei ElevenLabs nur einmal angezeigt – beim Anlegen oder Erneuern. Lege dort einen neuen Schlüssel an und kopiere den angezeigten Wert.'
+    return 'Das ist die Kennung des Schlüssels, nicht der Schlüssel selbst. Der Schlüssel beginnt mit „sk_" und wird bei ElevenLabs nur einmal angezeigt – beim Anlegen oder Erneuern. Dort einen neuen Schlüssel anlegen und den angezeigten Wert kopieren.'
   }
   if (!v.startsWith('sk_')) return 'Ein ElevenLabs-Schlüssel beginnt mit „sk_". Bitte prüfen, ob der ganze Wert kopiert wurde.'
   return null
@@ -50,7 +50,7 @@ export function keyProblem(k: string): string | null {
 
 function key(): string {
   const k = getSecret('elevenlabs')
-  if (!k) throw new Error('Es ist kein ElevenLabs-Schlüssel hinterlegt. Trage ihn in den Einstellungen unter „Hörtexte“ ein.')
+  if (!k) throw new Error('Es ist kein ElevenLabs-Schlüssel hinterlegt. Er wird in den Einstellungen unter „Hörtexte“ eingetragen.')
   const problem = keyProblem(k)
   if (problem) throw new Error(problem)
   return k
