@@ -37,6 +37,7 @@
  */
 import { stageForGrade } from '../../arbeitsblatt/didactics/profile'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
+import { aufgabenIn, punkteNachTeilaufgaben, skalierePunkte } from '../../../shared/punkte'
 import { formatById } from './formats'
 import type { Exam, ExamPart } from './types'
 
@@ -207,4 +208,50 @@ export function laengenHinweis(vorlage: WsBlock[], fassung: WsBlock[]): string |
   const b = materialWoerter(fassung)
   if (!a || !b) return null
   return Math.abs(b - a) / a > 0.2 ? `Der Paralleltext hat ${b} statt etwa ${a} Wörter – die Lesezeit der Gruppen unterscheidet sich.` : null
+}
+
+/**
+ * Die Punkte der Aufgaben eines Teils auf die Punkte des Teils bringen.
+ *
+ * Der Auftrag an die KI nennt die Punkte des Teils und verlangt Punkte je Aufgabe. Bis Paket 6
+ * gingen diese auf dem Weg `convertBlock` verloren (fest 0); seitdem kommen sie an – aber
+ * die Summe ist eine Bitte, keine Zusage. Hier wird sie zur Zusage, mit erhaltener
+ * Gewichtung. Ein Teil ohne Punktvorgabe (Englisch ohne Punkte: 0) bleibt, wie die KI ihn
+ * bepunktet hat. Verändert die Bausteine an Ort und Stelle.
+ */
+export function punkteAufTeil(blocks: WsBlock[], ziel: number): void {
+  const aufgaben = aufgabenIn(blocks)
+  if (!aufgaben.length || ziel <= 0) return
+  punkteNachTeilaufgaben(aufgaben)
+  skalierePunkte(aufgaben, ziel)
+}
+
+/**
+ * Ein Teil, nachdem EINE Fassung überarbeitet wurde (Auftrag der Lehrkraft in Schritt 2).
+ *
+ * - Punkte: Fassung A wird auf die Punkte des Teils gebracht; eine weitere Fassung übernimmt
+ *   die Punkte ihres Gegenstücks in A (`gleichePunkte`).
+ * - Gemeinsames Material: Wird Fassung A eines Teils mit übernommenem Material (Hörtext,
+ *   Quelle) überarbeitet, kann dabei neues Material entstehen. Bis Paket 6 stand in B dann
+ *   noch das alte – bei einem Hörtext, der der ganzen Klasse vorgespielt wird, ein grober
+ *   Fehler. Deshalb zieht die Überarbeitung von A das Material in allen Fassungen mit.
+ *   Umgekehrt behält eine überarbeitete weitere Fassung das Material ihrer bisherigen Fassung.
+ */
+export function teilNachUeberarbeitung(exam: Exam, part: ExamPart, f: number, blocks: WsBlock[]): ExamPart {
+  const gleich = materialweg(exam, part) === 'gleich'
+  if (f <= 0) {
+    const a = structuredClone(blocks)
+    punkteAufTeil(a, part.points)
+    // Kopien: Die Listen gehören dem Store und dürfen nicht an Ort und Stelle geändert werden
+    const weitere = part.weitereFassungen?.map((alt) => {
+      const liste = structuredClone(alt)
+      const neu = gleich && a.some((b) => b.type === 'task') ? uebernimmMaterial(a, liste) : liste
+      gleichePunkte(a, neu)
+      return neu
+    })
+    return { ...part, blocks: a, ...(weitere ? { weitereFassungen: weitere } : {}) }
+  }
+  const neu = gleich ? uebernimmMaterial(bloeckeDerFassung(part, f), structuredClone(blocks)) : structuredClone(blocks)
+  gleichePunkte(part.blocks, neu)
+  return mitBloecken(part, f, neu)
 }

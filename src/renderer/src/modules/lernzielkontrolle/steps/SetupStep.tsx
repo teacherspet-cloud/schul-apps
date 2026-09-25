@@ -1,6 +1,7 @@
 import {
   Alert,
   Badge,
+  Box,
   Button,
   Card,
   Checkbox,
@@ -8,6 +9,7 @@ import {
   Grid,
   Group,
   NumberInput,
+  ScrollArea,
   SegmentedControl,
   Select,
   Stack,
@@ -34,7 +36,15 @@ import { gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/sc
 import { STATES } from '../../arbeitsblatt/didactics/states'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import { AUSGLEICH_HILFEN, type AusgleichHilfe } from '../didactics/bausteine'
-import { gesamtpunkte, grenzenFuer, SCHLUESSEL, schluesselById, type Bewertungseinstellung, type SchluesselId } from '../didactics/bewertung'
+import {
+  gesamtpunkte,
+  grenzenFuer,
+  SCHLUESSEL,
+  schluesselById,
+  STANDARD_BEWERTUNG,
+  type Bewertungseinstellung,
+  type SchluesselId
+} from '../didactics/bewertung'
 import { formateFuer, KURZTEST_FORMATE, standardMinuten, zeitWarnung } from '../didactics/formate'
 import { istBelegt, namenAus, profilFuer } from '../didactics/operatoren'
 import { themenAusZeile, themenFuer, themenHinweis, themenZeile, zweigeFuer } from '../didactics/themen'
@@ -46,6 +56,10 @@ import { variantenLabel } from '../model/types'
 import { aiCall, useLernzielkontrolle } from '../store'
 import VorwissenChips from '../../arbeitsblatt/steps/VorwissenChips'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
+import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
+import MehrText from '../../../shared/components/MehrText'
+import WeitereOptionen from '../../../shared/components/WeitereOptionen'
+import { useKiZugang } from '../../../shared/useKiZugang'
 
 /**
  * Schritt 1: Lerngruppe, Landesformat, Umfang.
@@ -68,6 +82,7 @@ export default function SetupStep(): React.JSX.Element {
   // Reiner Anzeigefilter fuer die Themenvorschlaege – gehoert nicht in den gespeicherten Test
   const [zweigWahl, setZweig] = useState('')
   const [schluesselOffen, setSchluesselOffen] = useState(false)
+  const kiDa = useKiZugang()
   /*
    * MUSS vor jedem frühen `return` stehen: Hooks müssen bei jedem Rendern in gleicher Zahl
    * und Reihenfolge laufen. Im Grammatiktest lief ein Hook hinter dem frühen Return nur
@@ -159,526 +174,570 @@ export default function SetupStep(): React.JSX.Element {
     })
   }
 
-  return (
-    <Container size="xl" py="md">
-      <Grid>
-        <Grid.Col span={{ base: 12, md: 7 }}>
-          <Stack>
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Lerngruppe
-              </Title>
-              <Stack gap="sm">
-                <Group grow>
-                  <HaeufigSelect
-                    art="fach"
-                    label="Fach"
-                    data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
-                    value={m.subjectId}
-                    onChange={(v) => v && patch({ subjectId: v, subjectLabel: subjectById(v).label })}
-                    allowDeselect={false}
-                    searchable
-                  />
-                  <Select
-                    label="Jahrgang"
-                    data={grades.map((g) => ({ value: String(g), label: `Klasse ${g}` }))}
-                    value={String(m.grade)}
-                    onChange={(v) => v && patch({ grade: Number(v), stufe: stufeFuerJahrgang(Number(v)) })}
-                    allowDeselect={false}
-                  />
-                </Group>
-                <SchulAngabe
-                  stateId={m.stateId}
-                  stateName={STATES.find((s) => s.id === m.stateId)?.name ?? m.stateId}
-                  schoolTypeId={m.schoolTypeId}
-                  schoolTypeName={m.schoolTypeName}
-                >
-                  <Group grow>
-                    <HaeufigSelect
-                      art="bundesland"
-                      label="Bundesland"
-                      data={STATES.map((s) => ({ value: s.id, label: s.name }))}
-                      value={m.stateId}
-                      onChange={(v) => {
-                        if (!v) return
-                        const list = schoolTypesForState(table, v)
-                        const keep = list.some((t) => t.value === m.schoolTypeId)
-                        const neuFormat = formateFuer(v)[0]
-                        patch({
-                          stateId: v,
-                          schoolTypeId: keep ? m.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
-                          schoolTypeName: keep ? m.schoolTypeName : (list[0]?.label ?? 'Gymnasium'),
-                          formatId: neuFormat?.id ?? '',
-                          bezeichnung: neuFormat?.bezeichnung ?? 'Lernzielkontrolle',
-                          minutes: standardMinuten(neuFormat)
-                        })
-                      }}
-                      allowDeselect={false}
-                      searchable
-                    />
-                    <HaeufigSelect
-                      art="schulform"
-                      label="Schulform"
-                      data={types}
-                      value={m.schoolTypeId}
-                      onChange={(v) => v && patch({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
-                      allowDeselect={false}
-                    />
-                  </Group>
-                </SchulAngabe>
-                <div>
-                  <Text size="sm" fw={500} mb={4}>
-                    Stufe
-                  </Text>
-                  <SegmentedControl
-                    fullWidth
-                    size="sm"
-                    value={m.stufe}
-                    onChange={(v) => patch({ stufe: v as 'sek1' | 'sek2' })}
-                    data={[
-                      { value: 'sek1', label: 'Sekundarstufe I' },
-                      { value: 'sek2', label: 'Sekundarstufe II' }
-                    ]}
-                  />
-                  <Text size="xs" c="dimmed" mt={4}>
-                    Bestimmt die Operatorengrundlage und die Anrede. Die Länderlisten sind fast alle Abiturdokumente – für Klasse 7 gilt eine andere Grundlage
-                    als für Klasse 12.
-                  </Text>
-                </div>
-              </Stack>
-            </Card>
+  // Der Hauptknopf steht fest unten und sagt, was fehlt (Paket 6)
+  const sperrgrund = ersterGrund([!bereit, 'Thema fehlt'], [!kiDa, <KeinKiZugang key="ki" />])
+  const fuss = (
+    <Formularfuss grund={sperrgrund}>
+      <Button size="md" leftSection={<IconSparkles size={18} />} disabled={Boolean(sperrgrund)} onClick={create}>
+        {m.varianten > 1 ? `${m.varianten} Fassungen erstellen` : 'Lernzielkontrolle erstellen'}
+      </Button>
+    </Formularfuss>
+  )
 
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Format
-              </Title>
-              <Stack gap="sm">
-                {formate.length > 0 ? (
-                  <Select
-                    label={`So heißt das Format in ${STATES.find((s) => s.id === m.stateId)?.name}`}
-                    data={formate.map((f) => ({ value: f.id, label: f.bezeichnung }))}
-                    value={m.formatId}
-                    onChange={(v) => {
-                      const f = KURZTEST_FORMATE.find((x) => x.id === v)
-                      if (f) patch({ formatId: f.id, bezeichnung: f.bezeichnung, minutes: standardMinuten(f) })
-                    }}
-                    allowDeselect={false}
-                  />
-                ) : (
-                  <Alert color="gray" icon={<IconInfoCircle size={16} />}>
-                    Für dieses Bundesland wurde kein eigenes Kurztestformat ermittelt. Die Bezeichnung auf dem Blatt lässt sich frei wählen.
-                  </Alert>
-                )}
-                <TextInput
-                  label="Bezeichnung auf dem Blatt"
-                  value={m.bezeichnung}
-                  onChange={(e) => patch({ bezeichnung: e.currentTarget.value })}
-                  placeholder="Lernzielkontrolle"
-                />
-                {format && (
-                  <Card withBorder padding="xs" bg="var(--mantine-color-gray-0)">
-                    <Stack gap={4}>
-                      <Group gap="xs">
-                        <Badge
+  return (
+    <FormularSeite fuss={fuss}>
+      <ScrollArea h="100%">
+        <Container size="xl" py="md">
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 7 }}>
+              <Stack>
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Lerngruppe
+                  </Title>
+                  <Stack gap="sm">
+                    <Group grow>
+                      <HaeufigSelect
+                        art="fach"
+                        label="Fach"
+                        data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
+                        value={m.subjectId}
+                        onChange={(v) => v && patch({ subjectId: v, subjectLabel: subjectById(v).label })}
+                        allowDeselect={false}
+                        searchable
+                      />
+                      <Select
+                        label="Jahrgang"
+                        data={grades.map((g) => ({ value: String(g), label: `Klasse ${g}` }))}
+                        value={String(m.grade)}
+                        onChange={(v) => v && patch({ grade: Number(v), stufe: stufeFuerJahrgang(Number(v)) })}
+                        allowDeselect={false}
+                      />
+                    </Group>
+                    <SchulAngabe
+                      stateId={m.stateId}
+                      stateName={STATES.find((s) => s.id === m.stateId)?.name ?? m.stateId}
+                      schoolTypeId={m.schoolTypeId}
+                      schoolTypeName={m.schoolTypeName}
+                    >
+                      <Group grow>
+                        <HaeufigSelect
+                          art="bundesland"
+                          label="Bundesland"
+                          data={STATES.map((s) => ({ value: s.id, label: s.name }))}
+                          value={m.stateId}
+                          onChange={(v) => {
+                            if (!v) return
+                            const list = schoolTypesForState(table, v)
+                            const keep = list.some((t) => t.value === m.schoolTypeId)
+                            const neuFormat = formateFuer(v)[0]
+                            patch({
+                              stateId: v,
+                              schoolTypeId: keep ? m.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
+                              schoolTypeName: keep ? m.schoolTypeName : (list[0]?.label ?? 'Gymnasium'),
+                              formatId: neuFormat?.id ?? '',
+                              bezeichnung: neuFormat?.bezeichnung ?? 'Lernzielkontrolle',
+                              minutes: standardMinuten(neuFormat)
+                            })
+                          }}
+                          allowDeselect={false}
+                          searchable
+                        />
+                        <HaeufigSelect
+                          art="schulform"
+                          label="Schulform"
+                          data={types}
+                          value={m.schoolTypeId}
+                          onChange={(v) => v && patch({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
+                          allowDeselect={false}
+                        />
+                      </Group>
+                    </SchulAngabe>
+                  </Stack>
+                </Card>
+
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Format
+                  </Title>
+                  <Stack gap="sm">
+                    {formate.length > 0 ? (
+                      <Select
+                        label={`So heißt das Format in ${STATES.find((s) => s.id === m.stateId)?.name}`}
+                        data={formate.map((f) => ({ value: f.id, label: f.bezeichnung }))}
+                        value={m.formatId}
+                        onChange={(v) => {
+                          const f = KURZTEST_FORMATE.find((x) => x.id === v)
+                          if (f) patch({ formatId: f.id, bezeichnung: f.bezeichnung, minutes: standardMinuten(f) })
+                        }}
+                        allowDeselect={false}
+                      />
+                    ) : (
+                      <Alert color="gray" icon={<IconInfoCircle size={16} />}>
+                        Für dieses Bundesland wurde kein eigenes Kurztestformat ermittelt. Die Bezeichnung auf dem Blatt lässt sich frei wählen.
+                      </Alert>
+                    )}
+                    {format && (
+                      <Card withBorder padding="xs" bg="var(--mantine-color-gray-0)">
+                        <Stack gap={4}>
+                          <Group gap="xs">
+                            <Badge
+                              size="sm"
+                              variant="light"
+                              color={format.ankuendigung === 'unangekuendigt' ? 'orange' : format.ankuendigung === 'pflicht' ? 'blue' : 'gray'}
+                            >
+                              {format.ankuendigung === 'unangekuendigt'
+                                ? 'darf unangekündigt sein'
+                                : format.ankuendigung === 'pflicht'
+                                  ? `${format.fristTage} Tage vorher ankündigen`
+                                  : 'Ankündigung nicht geregelt'}
+                            </Badge>
+                            <Badge size="sm" variant="light" color="gray">
+                              {format.maxMinuten ? `höchstens ${format.maxMinuten} Minuten` : 'Dauer nicht normiert'}
+                            </Badge>
+                            {format.stoffStunden && (
+                              <Badge size="sm" variant="light" color="gray">
+                                Stoff aus höchstens {format.stoffStunden} Stunden
+                              </Badge>
+                            )}
+                            {!format.amtlich && (
+                              <Tooltip label="Die Fundstelle stammt von einem privaten Spiegel, nicht aus einer amtlichen Verkündung.">
+                                <Badge size="sm" variant="light" color="yellow">
+                                  nicht amtlich abgerufen
+                                </Badge>
+                              </Tooltip>
+                            )}
+                          </Group>
+                          {/* Rechtliche Einzelheiten hinter „Mehr“ – vollständig, nur nicht mehr alle auf einmal (Paket 6) */}
+                          <MehrText kurz={format.anzahl}>
+                            <Text size="xs" c="dimmed">
+                              Quelle: {format.fundstelle}
+                            </Text>
+                            {format.hinweis && (
+                              <Text size="xs" c="orange.8" mt={4}>
+                                {format.hinweis}
+                              </Text>
+                            )}
+                          </MehrText>
+                        </Stack>
+                      </Card>
+                    )}
+                  </Stack>
+                </Card>
+
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Inhalt und Umfang
+                  </Title>
+                  <Stack gap="sm">
+                    {/*
+                     * Themenfeld mit Vorschlaegen – aber FREI beschreibbar.
+                     *
+                     * `TagsInput` erlaubt beides: aus der Liste waehlen und eigenes eintippen.
+                     * Gibt es fuer Land, Fach und Jahrgang keine erhobenen Themen, bleibt es
+                     * ein gewoehnliches Eingabefeld ohne Liste – eine leere Auswahlliste waere
+                     * schlimmer als keine.
+                     */}
+                    <div>
+                      {/*
+                       * Zweig-Auswahl – nur dort, wo der Lehrplan wirklich trennt.
+                       *
+                       * Sachsen teilt die Oberschule ab Klasse 7 in Haupt- und
+                       * Realschulbildungsgang, Bayern die Realschule in
+                       * Wahlpflichtfaechergruppen und die Mittelschule in Regel- und M-Klasse –
+                       * jeweils mit ANDEREN Themen. Ohne diese Auswahl stuenden beide Listen
+                       * vermischt da. Standard bleibt „alle Zweige": Wer den Unterschied nicht
+                       * kennt, bekommt lieber zu viel als das Falsche.
+                       */}
+                      {zweige.length > 1 && (
+                        <Select
+                          size="xs"
+                          label="Zweig laut Lehrplan"
+                          description="Bestimmt nur, welche Themen vorgeschlagen werden."
+                          data={[{ value: '', label: 'Alle Zweige' }, ...zweige.map((z) => ({ value: z, label: z }))]}
+                          value={zweig}
+                          onChange={(v) => setZweig(v ?? '')}
+                          allowDeselect={false}
+                          mb="xs"
+                          style={{ maxWidth: 360 }}
+                        />
+                      )}
+                      <TagsInput
+                        label="Thema"
+                        placeholder={m.thema ? '' : 'z. B. Potenzgesetze'}
+                        data={vorschlaege.map((v) => v.thema)}
+                        value={themenAusZeile(m.thema)}
+                        onChange={(werte) => patch({ thema: themenZeile(werte) })}
+                        maxDropdownHeight={280}
+                        clearable
+                        acceptValueOnBlur
+                        required
+                      />
+                      {themenText && <MehrText text={themenText} mt={4} />}
+                    </div>
+                    <Textarea
+                      label="Was wurde unmittelbar vorher behandelt?"
+                      description="Die Stoffgrenze des Formats – in Bayern höchstens zwei, in Rheinland-Pfalz höchstens zehn vorangegangene Unterrichtsstunden."
+                      placeholder="z. B. Produkt- und Quotientenregel bei gleicher Basis, Potenzieren einer Potenz"
+                      autosize
+                      minRows={2}
+                      value={m.stoff}
+                      onChange={(e) => patch({ stoff: e.currentTarget.value })}
+                    />
+                    {/* Hier meint das Feld den geprüften Stoff: typische Inhalte der Einheit statt Vorwissen */}
+                    <VorwissenChips
+                      modus="stoff"
+                      anfrage={{ subjectId: m.subjectId, topic: m.thema, grade: m.grade, stateId: m.stateId, schoolTypeId: m.schoolTypeId }}
+                      wert={m.stoff}
+                      onChange={(stoff) => patch({ stoff })}
+                      ai={aiCall}
+                    />
+                    {/* Tafelbild, Buchseite, Hefteintrag – dieselbe Fläche wie in der Klassenarbeit (shared/components/StoffQuellen) */}
+                    <StoffQuellen
+                      quellen={m.stoffQuellen ?? []}
+                      onHinzu={(neu) =>
+                        update((d) => {
+                          d.meta.stoffQuellen = [...(d.meta.stoffQuellen ?? []), ...neu]
+                        })
+                      }
+                      onAktiv={(id, aktiv) =>
+                        update((d) => {
+                          const t = d.meta.stoffQuellen.find((x) => x.id === id)
+                          if (t) t.aktiv = aktiv
+                        })
+                      }
+                      onEntfernen={(id) =>
+                        update((d) => {
+                          d.meta.stoffQuellen = d.meta.stoffQuellen.filter((x) => x.id !== id)
+                        })
+                      }
+                      title="Tafelbild, Buchseite oder Hefteintrag hierher ziehen"
+                      hint="Foto, PDF, Word – auch handschriftlich"
+                      erklaerung="Die KI bleibt innerhalb dessen, was hier steht – Schreibweise, Beispiele und Reihenfolge werden übernommen."
+                    />
+                    <Group grow align="flex-start">
+                      <NumberInput
+                        label="Bearbeitungszeit (Minuten)"
+                        min={5}
+                        max={60}
+                        value={m.minutes}
+                        onChange={(v) => patch({ minutes: Number(v) || 20 })}
+                      />
+                      <div>
+                        <Text size="sm" fw={500} mb={4}>
+                          Fassungen
+                        </Text>
+                        <SegmentedControl
+                          fullWidth
                           size="sm"
-                          variant="light"
-                          color={format.ankuendigung === 'unangekuendigt' ? 'orange' : format.ankuendigung === 'pflicht' ? 'blue' : 'gray'}
-                        >
-                          {format.ankuendigung === 'unangekuendigt'
-                            ? 'darf unangekündigt sein'
-                            : format.ankuendigung === 'pflicht'
-                              ? `${format.fristTage} Tage vorher ankündigen`
-                              : 'Ankündigung nicht geregelt'}
-                        </Badge>
-                        <Badge size="sm" variant="light" color="gray">
-                          {format.maxMinuten ? `höchstens ${format.maxMinuten} Minuten` : 'Dauer nicht normiert'}
-                        </Badge>
-                        {format.stoffStunden && (
-                          <Badge size="sm" variant="light" color="gray">
-                            Stoff aus höchstens {format.stoffStunden} Stunden
+                          value={String(m.varianten)}
+                          onChange={(v) => patch({ varianten: Number(v) })}
+                          data={[
+                            { value: '1', label: 'eine' },
+                            { value: '2', label: 'A / B' },
+                            { value: '3', label: 'A / B / C' }
+                          ]}
+                        />
+                      </div>
+                    </Group>
+                    {zeit && (
+                      <Alert
+                        color={zeit.ueberschritten ? 'orange' : 'gray'}
+                        icon={zeit.ueberschritten ? <IconAlertTriangle size={16} /> : <IconInfoCircle size={16} />}
+                      >
+                        {zeit.message}
+                      </Alert>
+                    )}
+                  </Stack>
+                </Card>
+              </Stack>
+            </Grid.Col>
+
+            <Grid.Col span={{ base: 12, md: 5 }}>
+              <Stack>
+                <Card withBorder>
+                  <Group justify="space-between" mb="sm">
+                    <Title order={4}>Operatoren</Title>
+                    {profil && (
+                      <Group gap={6}>
+                        {/* Eine Anhoerfassung ist ein Entwurf und kann sich noch aendern – das gehoert sichtbar hierher */}
+                        {/anhörfassung|entwurf|arbeitsfassung/i.test(profil.stand) && (
+                          <Badge size="sm" variant="filled" color="yellow">
+                            Entwurf
                           </Badge>
                         )}
-                        {!format.amtlich && (
-                          <Tooltip label="Die Fundstelle stammt von einem privaten Spiegel, nicht aus einer amtlichen Verkündung.">
-                            <Badge size="sm" variant="light" color="yellow">
-                              nicht amtlich abgerufen
+                        <Badge size="sm" variant="light" color={istBelegt(profil) ? 'teal' : 'yellow'}>
+                          {istBelegt(profil) ? 'amtliche Liste' : 'ohne Landesliste'}
+                        </Badge>
+                      </Group>
+                    )}
+                  </Group>
+                  {profil ? (
+                    <Stack gap={6}>
+                      <Text size="xs" c="dimmed">
+                        {profil.quelle}
+                        {profil.stand ? ` · Stand ${profil.stand}` : ''}
+                      </Text>
+                      {/*
+                       * Anklickbar: Die Lehrkraft wählt die Operatoren aus, die sie in diesem Test
+                       * sehen möchte. Die Auswahl ist ein VORSCHLAG an die KI, kein Zwang – manche
+                       * Antwortformen verlangen einen bestimmten Operator, und ein erzwungener
+                       * erzeugte genau den Fehler, den die App sonst meldet.
+                       */}
+                      <Group gap={4}>
+                        {namenAus(profil).map((n) => {
+                          const gewaehlt = (m.bevorzugteOperatoren ?? []).includes(n)
+                          return (
+                            <Badge
+                              key={n}
+                              size="xs"
+                              variant={gewaehlt ? 'filled' : 'outline'}
+                              color={gewaehlt ? 'grape' : 'gray'}
+                              tt="none"
+                              style={{ cursor: 'pointer' }}
+                              role="checkbox"
+                              aria-checked={gewaehlt}
+                              onClick={() =>
+                                patch({
+                                  bevorzugteOperatoren: gewaehlt
+                                    ? (m.bevorzugteOperatoren ?? []).filter((x) => x !== n)
+                                    : [...(m.bevorzugteOperatoren ?? []), n]
+                                })
+                              }
+                            >
+                              {n}
                             </Badge>
-                          </Tooltip>
+                          )
+                        })}
+                      </Group>
+                      <Group gap="xs" justify="space-between">
+                        <Text size="xs" c="dimmed">
+                          {(m.bevorzugteOperatoren ?? []).length
+                            ? `${(m.bevorzugteOperatoren ?? []).length} bevorzugt – als Vorschlag, nicht als Zwang`
+                            : 'Anklicken, um Operatoren für diesen Test vorzuschlagen'}
+                        </Text>
+                        {(m.bevorzugteOperatoren ?? []).length > 0 && (
+                          <Button size="compact-xs" variant="subtle" color="gray" onClick={() => patch({ bevorzugteOperatoren: [] })}>
+                            Auswahl aufheben
+                          </Button>
                         )}
                       </Group>
-                      <Text size="xs" c="dimmed">
-                        {format.anzahl}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        Quelle: {format.fundstelle}
-                      </Text>
-                      {format.hinweis && (
-                        <Text size="xs" c="orange.8" mt={4}>
-                          {format.hinweis}
+                      {!profil.oeffnungsklausel && (
+                        <Text size="xs" c="orange.8">
+                          Diese Liste hat keine Öffnungsklausel – nur die genannten Operatoren sind zulässig.
                         </Text>
                       )}
+                      {profil.hinweis && <MehrText text={profil.hinweis} />}
+                    </Stack>
+                  ) : (
+                    <Text size="sm" c="dimmed">
+                      Keine Grundlage gefunden.
+                    </Text>
+                  )}
+                </Card>
+              </Stack>
+            </Grid.Col>
+          </Grid>
+
+          {/*
+           * Selten Geändertes eingeklappt (Paket 6): Stufe und Bezeichnung folgen aus Jahrgang und
+           * Land, Bewertung und Nachteilsausgleich haben feste Vorgaben. Die Überschrift nennt, was
+           * davon abweicht.
+           */}
+          <Box mt="md">
+            <WeitereOptionen modul="lernzielkontrolle" geaendert={geaenderteOptionen(m, format?.bezeichnung)}>
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Stack>
+                    <Card withBorder>
+                      <Stack gap="sm">
+                        <div>
+                          <Text size="sm" fw={500} mb={4}>
+                            Stufe
+                          </Text>
+                          <SegmentedControl
+                            fullWidth
+                            size="sm"
+                            value={m.stufe}
+                            onChange={(v) => patch({ stufe: v as 'sek1' | 'sek2' })}
+                            data={[
+                              { value: 'sek1', label: 'Sekundarstufe I' },
+                              { value: 'sek2', label: 'Sekundarstufe II' }
+                            ]}
+                          />
+                          <Text size="xs" c="dimmed" mt={4}>
+                            Bestimmt die Operatorengrundlage und die Anrede. Die Länderlisten sind fast alle Abiturdokumente – für Klasse 7 gilt eine andere
+                            Grundlage als für Klasse 12.
+                          </Text>
+                        </div>
+                        <TextInput
+                          label="Bezeichnung auf dem Blatt"
+                          value={m.bezeichnung}
+                          onChange={(e) => patch({ bezeichnung: e.currentTarget.value })}
+                          placeholder="Lernzielkontrolle"
+                        />
+                      </Stack>
+                    </Card>
+                    <Card withBorder>
+                      <Title order={4} mb="sm">
+                        Nachteilsausgleich
+                      </Title>
+                      <Stack gap="sm">
+                        <Switch
+                          label="Sprachliche Hilfen zulassen"
+                          description="Sonst enthält das Blatt nur Aufgaben und Material – keine Wortspeicher, keine Satzanfänge."
+                          checked={m.nachteilsausgleich.aktiv}
+                          onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, aktiv: e.currentTarget.checked } })}
+                        />
+                        {m.nachteilsausgleich.aktiv && (
+                          <>
+                            <Checkbox.Group
+                              value={m.nachteilsausgleich.hilfen}
+                              onChange={(v) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, hilfen: v as AusgleichHilfe[] } })}
+                            >
+                              <Stack gap={6}>
+                                {AUSGLEICH_HILFEN.map((h) => (
+                                  <Checkbox key={h} value={h} label={h === 'wortspeicher' ? 'Wortspeicher' : 'Satzanfänge'} />
+                                ))}
+                              </Stack>
+                            </Checkbox.Group>
+                            <TextInput
+                              label="Vermerk für die Lehrkraft"
+                              placeholder="z. B. für zwei Lernende mit DaZ-Förderung"
+                              value={m.nachteilsausgleich.vermerk ?? ''}
+                              onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, vermerk: e.currentTarget.value } })}
+                            />
+                            <MehrText text="Der Ausgleich passt die Bedingungen an, nicht die Anforderungen. Tipp- und Hilfekarten bleiben deshalb auch hier gesperrt – sie nähmen einen Teil der geprüften Leistung vorweg." />
+                          </>
+                        )}
+                      </Stack>
+                    </Card>
+                  </Stack>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Bewertung
+                    </Title>
+                    <Stack gap="sm">
+                      <Switch
+                        label="Punkte je Aufgabe auf dem Blatt"
+                        checked={m.bewertung.punkteAufBlatt}
+                        onChange={(e) => patch({ bewertung: { ...m.bewertung, punkteAufBlatt: e.currentTarget.checked } })}
+                      />
+                      {m.bewertung.punkteAufBlatt && (
+                        <>
+                          <Switch
+                            label="Punktzahl vorgeben"
+                            description="Ohne Vorgabe richtet sich die Bepunktung allein nach dem Aufwand der Aufgaben."
+                            checked={Boolean(m.bewertung.bereich)}
+                            onChange={(e) => patch({ bewertung: { ...m.bewertung, bereich: e.currentTarget.checked ? { min: 8, max: 12 } : undefined } })}
+                          />
+                          {m.bewertung.bereich && (
+                            <Group grow>
+                              <NumberInput
+                                label="von"
+                                min={1}
+                                max={100}
+                                value={m.bewertung.bereich.min}
+                                onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
+                              />
+                              <NumberInput
+                                label="bis"
+                                min={1}
+                                max={100}
+                                value={m.bewertung.bereich.max}
+                                onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, max: Number(v) || 1 } } })}
+                              />
+                            </Group>
+                          )}
+                        </>
+                      )}
+                      <Select
+                        label="Notenschlüssel (nur auf dem Lösungsblatt)"
+                        data={[
+                          { value: 'keiner', label: 'keiner' },
+                          ...SCHLUESSEL.map((s) => ({ value: s.id, label: s.name })),
+                          { value: 'eigen', label: 'eigener Schlüssel' }
+                        ]}
+                        value={m.bewertung.schluessel}
+                        onChange={(v) => {
+                          if (!v) return
+                          const next: Bewertungseinstellung = { ...m.bewertung, schluessel: v as SchluesselId }
+                          /*
+                           * „Eigener Schlüssel" hatte bis 25.09.2026 keine Wirkung: Die Grenzen wurden
+                           * nirgends gesetzt, und auf dem Lösungsblatt stand gar kein Schlüssel. Jetzt
+                           * startet er mit dem bisher gewählten und öffnet das Fenster zum Anpassen.
+                           */
+                          if (v === 'eigen' && !m.bewertung.eigeneGrenzen) {
+                            const bisher = grenzenFuer(m.bewertung, schwellen) ?? schwellen
+                            next.eigeneGrenzen = [bisher[0], bisher[1], bisher[2], bisher[3], bisher[4]]
+                          }
+                          patch({ bewertung: next })
+                          if (v === 'eigen') setSchluesselOffen(true)
+                        }}
+                        allowDeselect={false}
+                      />
+                      {m.bewertung.schluessel === 'eigen' && (
+                        <Group gap="xs" wrap="nowrap">
+                          <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                            {(m.bewertung.eigeneGrenzen ?? []).map((p, i) => `${i + 1} ab ${p} %`).join(' · ') || 'Noch keine Grenzen festgelegt.'}
+                          </Text>
+                          <Button size="compact-xs" variant="light" onClick={() => setSchluesselOffen(true)}>
+                            Grenzen festlegen …
+                          </Button>
+                        </Group>
+                      )}
+                      {schluesselById(m.bewertung.schluessel) && (
+                        <MehrText
+                          text={schluesselById(m.bewertung.schluessel)!.herkunft}
+                          c={schluesselById(m.bewertung.schluessel)!.verbindlich ? 'teal.8' : 'dimmed'}
+                        />
+                      )}
+                      <Switch label="Lösungsblatt für die Lehrkraft" checked={m.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                      <Switch label="Felder für Name, Klasse und Datum" checked={m.nameFeld} onChange={(e) => patch({ nameFeld: e.currentTarget.checked })} />
                     </Stack>
                   </Card>
-                )}
-              </Stack>
-            </Card>
+                </Grid.Col>
+              </Grid>
+            </WeitereOptionen>
+          </Box>
+          <Box h="md" />
 
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Inhalt und Umfang
-              </Title>
-              <Stack gap="sm">
-                {/*
-                 * Themenfeld mit Vorschlaegen – aber FREI beschreibbar.
-                 *
-                 * `TagsInput` erlaubt beides: aus der Liste waehlen und eigenes eintippen.
-                 * Gibt es fuer Land, Fach und Jahrgang keine erhobenen Themen, bleibt es
-                 * ein gewoehnliches Eingabefeld ohne Liste – eine leere Auswahlliste waere
-                 * schlimmer als keine.
-                 */}
-                <div>
-                  {/*
-                   * Zweig-Auswahl – nur dort, wo der Lehrplan wirklich trennt.
-                   *
-                   * Sachsen teilt die Oberschule ab Klasse 7 in Haupt- und
-                   * Realschulbildungsgang, Bayern die Realschule in
-                   * Wahlpflichtfaechergruppen und die Mittelschule in Regel- und M-Klasse –
-                   * jeweils mit ANDEREN Themen. Ohne diese Auswahl stuenden beide Listen
-                   * vermischt da. Standard bleibt „alle Zweige": Wer den Unterschied nicht
-                   * kennt, bekommt lieber zu viel als das Falsche.
-                   */}
-                  {zweige.length > 1 && (
-                    <Select
-                      size="xs"
-                      label="Zweig laut Lehrplan"
-                      description="Bestimmt nur, welche Themen vorgeschlagen werden."
-                      data={[{ value: '', label: 'Alle Zweige' }, ...zweige.map((z) => ({ value: z, label: z }))]}
-                      value={zweig}
-                      onChange={(v) => setZweig(v ?? '')}
-                      allowDeselect={false}
-                      mb="xs"
-                      style={{ maxWidth: 360 }}
-                    />
-                  )}
-                  <TagsInput
-                    label="Thema"
-                    placeholder={m.thema ? '' : 'z. B. Potenzgesetze'}
-                    data={vorschlaege.map((v) => v.thema)}
-                    value={themenAusZeile(m.thema)}
-                    onChange={(werte) => patch({ thema: themenZeile(werte) })}
-                    maxDropdownHeight={280}
-                    clearable
-                    acceptValueOnBlur
-                    required
-                  />
-                  {themenText && (
-                    <Text size="xs" c="dimmed" mt={4}>
-                      {themenText}
-                    </Text>
-                  )}
-                </div>
-                <Textarea
-                  label="Was wurde unmittelbar vorher behandelt?"
-                  description="Die Stoffgrenze des Formats – in Bayern höchstens zwei, in Rheinland-Pfalz höchstens zehn vorangegangene Unterrichtsstunden."
-                  placeholder="z. B. Produkt- und Quotientenregel bei gleicher Basis, Potenzieren einer Potenz"
-                  autosize
-                  minRows={2}
-                  value={m.stoff}
-                  onChange={(e) => patch({ stoff: e.currentTarget.value })}
-                />
-                {/* Hier meint das Feld den geprüften Stoff: typische Inhalte der Einheit statt Vorwissen */}
-                <VorwissenChips
-                  modus="stoff"
-                  anfrage={{ subjectId: m.subjectId, topic: m.thema, grade: m.grade, stateId: m.stateId, schoolTypeId: m.schoolTypeId }}
-                  wert={m.stoff}
-                  onChange={(stoff) => patch({ stoff })}
-                  ai={aiCall}
-                />
-                {/* Tafelbild, Buchseite, Hefteintrag – dieselbe Fläche wie in der Klassenarbeit (shared/components/StoffQuellen) */}
-                <StoffQuellen
-                  quellen={m.stoffQuellen ?? []}
-                  onHinzu={(neu) =>
-                    update((d) => {
-                      d.meta.stoffQuellen = [...(d.meta.stoffQuellen ?? []), ...neu]
-                    })
-                  }
-                  onAktiv={(id, aktiv) =>
-                    update((d) => {
-                      const t = d.meta.stoffQuellen.find((x) => x.id === id)
-                      if (t) t.aktiv = aktiv
-                    })
-                  }
-                  onEntfernen={(id) =>
-                    update((d) => {
-                      d.meta.stoffQuellen = d.meta.stoffQuellen.filter((x) => x.id !== id)
-                    })
-                  }
-                  title="Tafelbild, Buchseite oder Hefteintrag hierher ziehen"
-                  hint="Foto, PDF, Word – auch handschriftlich"
-                  erklaerung="Die KI bleibt innerhalb dessen, was hier steht – Schreibweise, Beispiele und Reihenfolge werden übernommen."
-                />
-                <Group grow align="flex-start">
-                  <NumberInput label="Bearbeitungszeit (Minuten)" min={5} max={60} value={m.minutes} onChange={(v) => patch({ minutes: Number(v) || 20 })} />
-                  <div>
-                    <Text size="sm" fw={500} mb={4}>
-                      Fassungen
-                    </Text>
-                    <SegmentedControl
-                      fullWidth
-                      size="sm"
-                      value={String(m.varianten)}
-                      onChange={(v) => patch({ varianten: Number(v) })}
-                      data={[
-                        { value: '1', label: 'eine' },
-                        { value: '2', label: 'A / B' },
-                        { value: '3', label: 'A / B / C' }
-                      ]}
-                    />
-                  </div>
-                </Group>
-                {zeit && (
-                  <Alert
-                    color={zeit.ueberschritten ? 'orange' : 'gray'}
-                    icon={zeit.ueberschritten ? <IconAlertTriangle size={16} /> : <IconInfoCircle size={16} />}
-                  >
-                    {zeit.message}
-                  </Alert>
-                )}
-              </Stack>
-            </Card>
-          </Stack>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, md: 5 }}>
-          <Stack>
-            <Card withBorder>
-              <Group justify="space-between" mb="sm">
-                <Title order={4}>Operatoren</Title>
-                {profil && (
-                  <Group gap={6}>
-                    {/* Eine Anhoerfassung ist ein Entwurf und kann sich noch aendern – das gehoert sichtbar hierher */}
-                    {/anhörfassung|entwurf|arbeitsfassung/i.test(profil.stand) && (
-                      <Badge size="sm" variant="filled" color="yellow">
-                        Entwurf
-                      </Badge>
-                    )}
-                    <Badge size="sm" variant="light" color={istBelegt(profil) ? 'teal' : 'yellow'}>
-                      {istBelegt(profil) ? 'amtliche Liste' : 'ohne Landesliste'}
-                    </Badge>
-                  </Group>
-                )}
-              </Group>
-              {profil ? (
-                <Stack gap={6}>
-                  <Text size="xs" c="dimmed">
-                    {profil.quelle}
-                    {profil.stand ? ` · Stand ${profil.stand}` : ''}
-                  </Text>
-                  {/*
-                   * Anklickbar: Die Lehrkraft wählt die Operatoren aus, die sie in diesem Test
-                   * sehen möchte. Die Auswahl ist ein VORSCHLAG an die KI, kein Zwang – manche
-                   * Antwortformen verlangen einen bestimmten Operator, und ein erzwungener
-                   * erzeugte genau den Fehler, den die App sonst meldet.
-                   */}
-                  <Group gap={4}>
-                    {namenAus(profil).map((n) => {
-                      const gewaehlt = (m.bevorzugteOperatoren ?? []).includes(n)
-                      return (
-                        <Badge
-                          key={n}
-                          size="xs"
-                          variant={gewaehlt ? 'filled' : 'outline'}
-                          color={gewaehlt ? 'grape' : 'gray'}
-                          tt="none"
-                          style={{ cursor: 'pointer' }}
-                          role="checkbox"
-                          aria-checked={gewaehlt}
-                          onClick={() =>
-                            patch({
-                              bevorzugteOperatoren: gewaehlt ? (m.bevorzugteOperatoren ?? []).filter((x) => x !== n) : [...(m.bevorzugteOperatoren ?? []), n]
-                            })
-                          }
-                        >
-                          {n}
-                        </Badge>
-                      )
-                    })}
-                  </Group>
-                  <Group gap="xs" justify="space-between">
-                    <Text size="xs" c="dimmed">
-                      {(m.bevorzugteOperatoren ?? []).length
-                        ? `${(m.bevorzugteOperatoren ?? []).length} bevorzugt – als Vorschlag, nicht als Zwang`
-                        : 'Anklicken, um Operatoren für diesen Test vorzuschlagen'}
-                    </Text>
-                    {(m.bevorzugteOperatoren ?? []).length > 0 && (
-                      <Button size="compact-xs" variant="subtle" color="gray" onClick={() => patch({ bevorzugteOperatoren: [] })}>
-                        Auswahl aufheben
-                      </Button>
-                    )}
-                  </Group>
-                  {!profil.oeffnungsklausel && (
-                    <Text size="xs" c="orange.8">
-                      Diese Liste hat keine Öffnungsklausel – nur die genannten Operatoren sind zulässig.
-                    </Text>
-                  )}
-                  {profil.hinweis && (
-                    <Text size="xs" c="dimmed">
-                      {profil.hinweis}
-                    </Text>
-                  )}
-                </Stack>
-              ) : (
-                <Text size="sm" c="dimmed">
-                  Keine Grundlage gefunden.
-                </Text>
-              )}
-            </Card>
-
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Bewertung
-              </Title>
-              <Stack gap="sm">
-                <Switch
-                  label="Punkte je Aufgabe auf dem Blatt"
-                  checked={m.bewertung.punkteAufBlatt}
-                  onChange={(e) => patch({ bewertung: { ...m.bewertung, punkteAufBlatt: e.currentTarget.checked } })}
-                />
-                {m.bewertung.punkteAufBlatt && (
-                  <>
-                    <Switch
-                      label="Punktzahl vorgeben"
-                      description="Ohne Vorgabe richtet sich die Bepunktung allein nach dem Aufwand der Aufgaben."
-                      checked={Boolean(m.bewertung.bereich)}
-                      onChange={(e) => patch({ bewertung: { ...m.bewertung, bereich: e.currentTarget.checked ? { min: 8, max: 12 } : undefined } })}
-                    />
-                    {m.bewertung.bereich && (
-                      <Group grow>
-                        <NumberInput
-                          label="von"
-                          min={1}
-                          max={100}
-                          value={m.bewertung.bereich.min}
-                          onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
-                        />
-                        <NumberInput
-                          label="bis"
-                          min={1}
-                          max={100}
-                          value={m.bewertung.bereich.max}
-                          onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, max: Number(v) || 1 } } })}
-                        />
-                      </Group>
-                    )}
-                  </>
-                )}
-                <Select
-                  label="Notenschlüssel (nur auf dem Lösungsblatt)"
-                  data={[
-                    { value: 'keiner', label: 'keiner' },
-                    ...SCHLUESSEL.map((s) => ({ value: s.id, label: s.name })),
-                    { value: 'eigen', label: 'eigener Schlüssel' }
-                  ]}
-                  value={m.bewertung.schluessel}
-                  onChange={(v) => {
-                    if (!v) return
-                    const next: Bewertungseinstellung = { ...m.bewertung, schluessel: v as SchluesselId }
-                    /*
-                     * „Eigener Schlüssel" hatte bis 25.09.2026 keine Wirkung: Die Grenzen wurden
-                     * nirgends gesetzt, und auf dem Lösungsblatt stand gar kein Schlüssel. Jetzt
-                     * startet er mit dem bisher gewählten und öffnet das Fenster zum Anpassen.
-                     */
-                    if (v === 'eigen' && !m.bewertung.eigeneGrenzen) {
-                      const bisher = grenzenFuer(m.bewertung, schwellen) ?? schwellen
-                      next.eigeneGrenzen = [bisher[0], bisher[1], bisher[2], bisher[3], bisher[4]]
-                    }
-                    patch({ bewertung: next })
-                    if (v === 'eigen') setSchluesselOffen(true)
-                  }}
-                  allowDeselect={false}
-                />
-                {m.bewertung.schluessel === 'eigen' && (
-                  <Group gap="xs" wrap="nowrap">
-                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      {(m.bewertung.eigeneGrenzen ?? []).map((p, i) => `${i + 1} ab ${p} %`).join(' · ') || 'Noch keine Grenzen festgelegt.'}
-                    </Text>
-                    <Button size="compact-xs" variant="light" onClick={() => setSchluesselOffen(true)}>
-                      Grenzen festlegen …
-                    </Button>
-                  </Group>
-                )}
-                {schluesselById(m.bewertung.schluessel) && (
-                  <Text size="xs" c={schluesselById(m.bewertung.schluessel)!.verbindlich ? 'teal.8' : 'dimmed'}>
-                    {schluesselById(m.bewertung.schluessel)!.herkunft}
-                  </Text>
-                )}
-                <Switch label="Lösungsblatt für die Lehrkraft" checked={m.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                <Switch label="Felder für Name, Klasse und Datum" checked={m.nameFeld} onChange={(e) => patch({ nameFeld: e.currentTarget.checked })} />
-              </Stack>
-            </Card>
-
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Nachteilsausgleich
-              </Title>
-              <Stack gap="sm">
-                <Switch
-                  label="Sprachliche Hilfen zulassen"
-                  description="Sonst enthält das Blatt nur Aufgaben und Material – keine Wortspeicher, keine Satzanfänge."
-                  checked={m.nachteilsausgleich.aktiv}
-                  onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, aktiv: e.currentTarget.checked } })}
-                />
-                {m.nachteilsausgleich.aktiv && (
-                  <>
-                    <Checkbox.Group
-                      value={m.nachteilsausgleich.hilfen}
-                      onChange={(v) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, hilfen: v as AusgleichHilfe[] } })}
-                    >
-                      <Stack gap={6}>
-                        {AUSGLEICH_HILFEN.map((h) => (
-                          <Checkbox key={h} value={h} label={h === 'wortspeicher' ? 'Wortspeicher' : 'Satzanfänge'} />
-                        ))}
-                      </Stack>
-                    </Checkbox.Group>
-                    <TextInput
-                      label="Vermerk für die Lehrkraft"
-                      placeholder="z. B. für zwei Lernende mit DaZ-Förderung"
-                      value={m.nachteilsausgleich.vermerk ?? ''}
-                      onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, vermerk: e.currentTarget.value } })}
-                    />
-                    <Text size="xs" c="dimmed">
-                      Der Ausgleich passt die Bedingungen an, nicht die Anforderungen. Tipp- und Hilfekarten bleiben deshalb auch hier gesperrt – sie nähmen
-                      einen Teil der geprüften Leistung vorweg.
-                    </Text>
-                  </>
-                )}
-              </Stack>
-            </Card>
-
-            <Card withBorder>
-              <Stack gap="sm">
-                <Button size="md" leftSection={<IconSparkles size={18} />} disabled={!bereit} onClick={create}>
-                  {m.varianten > 1 ? `${m.varianten} Fassungen erstellen` : 'Lernzielkontrolle erstellen'}
-                </Button>
-                {!bereit && (
-                  <Text size="xs" c="dimmed">
-                    Bitte zuerst ein Thema angeben.
-                  </Text>
-                )}
-              </Stack>
-            </Card>
-          </Stack>
-        </Grid.Col>
-      </Grid>
-
-      {/* Dasselbe Fenster wie im Grammatiktest und in den Einstellungen; die Sechs gilt immer ab 0 % */}
-      <GradeScaleModal
-        opened={schluesselOffen}
-        onClose={() => setSchluesselOffen(false)}
-        points={gesamtpunkte(current.varianten[0]?.blocks ?? [])}
-        thresholds={schluesselImFenster}
-        onChange={(t) => patch({ bewertung: { ...m.bewertung, schluessel: 'eigen', eigeneGrenzen: [t[0], t[1], t[2], t[3], t[4]] } })}
-      />
-    </Container>
+          {/* Dasselbe Fenster wie im Grammatiktest und in den Einstellungen; die Sechs gilt immer ab 0 % */}
+          <GradeScaleModal
+            opened={schluesselOffen}
+            onClose={() => setSchluesselOffen(false)}
+            points={gesamtpunkte(current.varianten[0]?.blocks ?? [])}
+            thresholds={schluesselImFenster}
+            onChange={(t) => patch({ bewertung: { ...m.bewertung, schluessel: 'eigen', eigeneGrenzen: [t[0], t[1], t[2], t[3], t[4]] } })}
+          />
+        </Container>
+      </ScrollArea>
+    </FormularSeite>
   )
+}
+
+/**
+ * Was unter „Weitere Optionen“ vom Standard abweicht (model/defaults.ts) – für die
+ * Zusammenfassung in der eingeklappten Überschrift.
+ */
+export function geaenderteOptionen(m: KurztestMeta, formatBezeichnung?: string): string[] {
+  const b = m.bewertung
+  return [
+    m.stufe !== stufeFuerJahrgang(m.grade) ? (m.stufe === 'sek2' ? 'Sekundarstufe II' : 'Sekundarstufe I') : '',
+    formatBezeichnung && m.bezeichnung.trim() !== formatBezeichnung ? `Bezeichnung „${m.bezeichnung.trim() || 'leer'}“` : '',
+    b.punkteAufBlatt ? '' : 'ohne Punkte',
+    b.punkteAufBlatt && b.bereich ? `${b.bereich.min}–${b.bereich.max} Punkte` : '',
+    b.schluessel !== STANDARD_BEWERTUNG.schluessel
+      ? b.schluessel === 'keiner'
+        ? 'kein Notenschlüssel'
+        : b.schluessel === 'eigen'
+          ? 'eigener Notenschlüssel'
+          : `Schlüssel ${schluesselById(b.schluessel)?.name ?? b.schluessel}`
+      : '',
+    m.answerKey ? '' : 'ohne Lösungsblatt',
+    m.nameFeld ? '' : 'ohne Namensfelder',
+    m.nachteilsausgleich.aktiv ? 'Nachteilsausgleich' : ''
+  ].filter(Boolean)
 }

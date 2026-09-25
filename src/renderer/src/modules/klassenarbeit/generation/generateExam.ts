@@ -59,6 +59,7 @@ import {
   MAX_FASSUNGEN,
   mitBloecken,
   parallelAuftrag,
+  punkteAufTeil,
   teileDerFassung,
   uebernimmMaterial
 } from '../model/fassungen'
@@ -609,6 +610,8 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
     }
 
     blocks ??= await generateExamPart(exam, part, i + 1, ai, material)
+    // Punkte VOR den weiteren Fassungen angleichen – ihr Auftrag nennt die Punkte der Vorlage
+    punkteAufTeil(blocks, part.points)
     let fertig: ExamPart = { ...part, blocks }
     for (let f = 1; f < anzahl; f++) {
       onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label} (Fassung ${label(f)}) …`)
@@ -797,9 +800,12 @@ async function pruefeFassung(
  *   Nachbesserung Fassung A ersetzt oder die Oberstufenprüfung ihr Material ergänzt, stünde
  *   in B sonst ein anderer Hörtext als in A – bei einem Text, der der ganzen Klasse vorgespielt
  *   wird, ein grober Fehler.
- * - Gleiche Punkte als Zusage (model/fassungen.ts, `gleichePunkte`).
+ * - Punkte: Fassung A auf die Punkte des Teils (`punkteAufTeil`), die weiteren Fassungen
+ *   übernehmen sie als Zusage (model/fassungen.ts, `gleichePunkte`).
  */
 function fassungenAbschliessen(exam: Exam, part: ExamPart, index: number, notes: string[], label: (f: number) => string): ExamPart {
+  // Die Nachbesserung kann Fassung A ersetzt haben – ihre Punkte erst wieder auf den Teil bringen
+  punkteAufTeil(part.blocks, part.points)
   if (!part.weitereFassungen?.length) return part
   const gleich = materialweg(exam, part) === 'gleich' && part.blocks.some((b) => b.type === 'task')
   const weitere = part.weitereFassungen.map((liste, k) => {

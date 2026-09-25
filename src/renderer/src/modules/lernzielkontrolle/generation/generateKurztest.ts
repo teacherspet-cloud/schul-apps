@@ -14,6 +14,7 @@
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { AiCall } from '../../../shared/imageChoice'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
+import { aufgabenIn, punkteNachTeilaufgaben, skalierePunkte } from '../../../shared/punkte'
 import { createRng, newId } from '../../vokabeltest/model/random'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { subjectById } from '../../arbeitsblatt/model/subjects'
@@ -208,49 +209,36 @@ export async function generateKurztest(test: Kurztest, variante: string, ai: AiC
     throw new Error('Die KI hat keine Aufgaben geliefert. Versuche es erneut oder gib das Thema genauer an.')
   }
   if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)
+  // Ohne Punkte auf dem Blatt auch keine im Erwartungshorizont – die KI hält sich nicht immer an „0"
+  else for (const a of aufgabenIn(blocks)) a.points = 0
   return blocks
 }
 
 /**
- * Verteilt Punkte, wenn die KI keine vergeben hat.
+ * Verteilt Punkte, wenn wirklich keine ankamen, und bringt die Summe in die gewünschte Spanne.
  *
- * Im ersten Prüfdurchlauf mit echter KI (23.09.2026) kam ein fachlich sauberer Test zurück –
- * aber mit null Punkten an jeder Aufgabe, obwohl der Auftrag sie ausdrücklich verlangte.
- * Eine Regel im Auftrag ist eine Bitte; hier braucht es eine Zusage. Verteilt wird nach der
- * Zahl der Teilaufgaben, weil das der beste verfügbare Hinweis auf den Aufwand ist.
+ * Im ersten Prüfdurchlauf mit echter KI (23.09.2026) stand an jeder Aufgabe null Punkte. Das
+ * lag NICHT an der KI: Der gemeinsame Umwandlungsweg `convertBlock` setzte die Punkte fest auf 0
+ * (seit Paket 6 behoben, arbeitsblatt/generation/convert.ts). Diese Verteilung nach der Zahl
+ * der Teilaufgaben bleibt als Rückfall für den Fall, dass die KI wirklich keine Punkte nennt.
  */
 export function verteilePunkte(blocks: WsBlock[], bereich?: Punktebereich): void {
-  const aufgaben = blocks.filter((b): b is Extract<WsBlock, { type: 'task' }> => b.type === 'task')
+  const aufgaben = aufgabenIn(blocks)
   if (!aufgaben.length) return
-  if (!aufgaben.some((a) => a.points > 0)) {
-    for (const a of aufgaben) a.points = Math.max(1, a.parts.length || 1)
-  }
+  punkteNachTeilaufgaben(aufgaben)
   if (bereich) skaliereAufBereich(aufgaben, bereich)
 }
 
 /**
- * Bringt die Punktsumme in die gewünschte Spanne, ohne die Gewichtung zu zerstören.
- *
- * Die Verhältnisse zwischen den Aufgaben bleiben erhalten: Wer doppelt so viel Arbeit hat,
- * bekommt weiterhin doppelt so viele Punkte. Verändert wird nur der gemeinsame Maßstab.
+ * Bringt die Punktsumme in die gewünschte Spanne (Rechnung in shared/punkte.ts).
  * Liegt die Summe schon in der Spanne, passiert nichts – die Bepunktung der KI ist näher am
  * tatsächlichen Aufwand als jede Rechnung hier.
  */
-function skaliereAufBereich(aufgaben: Extract<WsBlock, { type: 'task' }>[], bereich: Punktebereich): void {
+function skaliereAufBereich(aufgaben: ReturnType<typeof aufgabenIn>, bereich: Punktebereich): void {
   const summe = aufgaben.reduce((s, a) => s + a.points, 0)
   if (summe <= 0 || bereich.min > bereich.max) return
   if (summe >= bereich.min && summe <= bereich.max) return
-  const ziel = summe < bereich.min ? bereich.min : bereich.max
-  for (const a of aufgaben) a.points = Math.max(1, Math.round((a.points * ziel) / summe))
-  /*
-   * Rundung kann die Summe um ein paar Punkte danebenlegen. Der Rest wandert auf die
-   * umfangreichste Aufgabe – dort fällt ein Punkt mehr oder weniger am wenigsten ins Gewicht.
-   */
-  const rest = ziel - aufgaben.reduce((s, a) => s + a.points, 0)
-  if (rest !== 0) {
-    const groesste = aufgaben.reduce((a, b) => (b.points > a.points ? b : a))
-    groesste.points = Math.max(1, groesste.points + rest)
-  }
+  skalierePunkte(aufgaben, summe < bereich.min ? bereich.min : bereich.max)
 }
 
 /** Wie lange der fertige Test schätzungsweise dauert. */

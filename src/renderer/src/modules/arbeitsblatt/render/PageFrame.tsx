@@ -23,6 +23,9 @@ export interface PageInfo {
   canary?: string
 }
 
+/** Titel im Kopf; im Lösungsteil mit dem Begriff des Moduls („– Lösungen", „– Erwartungshorizont"). */
+export const kopfTitel = (meta: WorksheetMeta, isKey: boolean): string => (meta.title || meta.topic) + (isKey ? ` – ${meta.loesungsBegriff || 'Lösungen'}` : '')
+
 export function sidebarText(info: PageInfo): string {
   const s = info.design.sidebar
   if (s.content === 'subject') return info.meta.subjectLabel
@@ -135,7 +138,7 @@ function Logo({ info, heightMm }: { info: PageInfo; heightMm: number }): React.J
 
 function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
   const h = info.design.header
-  const title = (info.meta.title || info.meta.topic) + (info.isKey ? ' – Lösungen' : '')
+  const title = kopfTitel(info.meta, info.isKey)
   const subjectLine = [h.showSubject ? info.meta.subjectLabel : '', info.meta.grade ? pageLabels(info).grade(info.meta.grade) : ''].filter(Boolean).join(' · ')
   const meta = (
     <div className="ws-head-text">
@@ -199,7 +202,7 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
 }
 
 function CompactHeader({ info }: { info: PageInfo }): React.JSX.Element {
-  const title = (info.meta.title || info.meta.topic) + (info.isKey ? ' – Lösungen' : '')
+  const title = kopfTitel(info.meta, info.isKey)
   return (
     <header className="ws-header ws-header-compact">
       {info.design.header.showLogo && info.logo && <img className="ws-logo" src={info.logo} alt="" style={{ height: '7mm' }} />}

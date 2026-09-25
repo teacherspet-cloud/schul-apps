@@ -151,8 +151,9 @@ describe('Prüfung der Bepunktung', () => {
 
 /*
  * Aus dem ersten Prüfdurchlauf mit echter KI (23.09.2026): Der erzeugte Test war fachlich
- * sauber, trug aber an jeder Aufgabe null Punkte – obwohl der Auftrag sie ausdrücklich
- * verlangt hatte. Eine Regel im Prompt ist eine Bitte; hier braucht es eine Zusage im Code.
+ * sauber, trug aber an jeder Aufgabe null Punkte. Ursache war nicht die KI, sondern der
+ * gemeinsame Umwandlungsweg (fest `points: 0`, behoben in Paket 6 – tests/punkte.test.ts).
+ * Die Verteilung hier bleibt der Rückfall, wenn wirklich keine Punkte kommen.
  */
 describe('Punkte notfalls selbst verteilen', () => {
   const task = (points: number, parts: number) =>

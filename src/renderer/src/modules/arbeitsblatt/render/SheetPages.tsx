@@ -40,7 +40,8 @@ export function pageInfoFor(ws: Worksheet, sheet: Sheet, logo: string | null, sc
   // unabhängig von der Designvorlage.
   const school = ws.meta.showSchool !== false
   return {
-    design: ws.design,
+    // Ein Blatt mit eigener Kopfzeile (Fassung B, C …) überschreibt die des Dokuments
+    design: sheet.kopfzeile === undefined ? ws.design : { ...ws.design, header: { ...ws.design.header, customText: sheet.kopfzeile } },
     meta: ws.meta,
     logo: school ? logo : null,
     schoolName: school ? schoolName : '',

@@ -198,10 +198,21 @@ export async function generateSheet(
   return buildSheet(data, level, images)
 }
 
+/**
+ * Arbeitsblätter tragen keine Punkte (Schema: „Immer 0"). Seit `convertBlock` die Punkte der
+ * KI übernimmt – LZK und Klassenarbeit brauchen sie –, wird das hier ausdrücklich
+ * durchgesetzt: Schickt die KI doch welche, stünden sie sonst im Erwartungshorizont.
+ */
+export function ohnePunkte<T extends WsBlock | null>(block: T, punkte = 0): T {
+  return block && block.type === 'task' ? ({ ...block, points: punkte } as T) : block
+}
+
 function buildSheet(data: any, level: Stars | null, images: ReturnType<typeof embeddableImages>): Sheet {
   const rng = createRng(randomSeed())
   const blocks = sortViewingTasks(
-    (Array.isArray(data?.blocks) ? data.blocks : []).map((b: any) => convertBlock(b, rng, images)).filter((b: WsBlock | null): b is WsBlock => Boolean(b))
+    (Array.isArray(data?.blocks) ? data.blocks : [])
+      .map((b: any) => ohnePunkte(convertBlock(b, rng, images)))
+      .filter((b: WsBlock | null): b is WsBlock => Boolean(b))
   )
   // Hier, weil JEDER Weg durch buildSheet läuft – auch der Sparmodus, der die Prüfrunde
   // überspringt. Ohne die Zuordnung liefe die Lösungsprüfung gegen alle Skripte zugleich.
@@ -367,7 +378,8 @@ export async function regenerateBlock(
     schemaName: 'worksheet_block',
     schema: obj({ block: FLAT_BLOCK })
   })
-  const block = convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images)
+  // Von Hand vergebene Punkte bleiben stehen; die KI vergibt auf Arbeitsblättern keine
+  const block = ohnePunkte(convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images), old.type === 'task' ? old.points : 0)
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
   return { ...block, id: old.id, stars: old.stars }
 }
@@ -422,7 +434,8 @@ ${describeSheet(sheet)}`,
     schemaName: 'worksheet_block',
     schema: obj({ block: FLAT_BLOCK })
   })
-  const block = convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images)
+  // Von Hand vergebene Punkte bleiben stehen; die KI vergibt auf Arbeitsblättern keine
+  const block = ohnePunkte(convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images), old.type === 'task' ? old.points : 0)
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
   return { ...block, id: old.id, stars: old.stars }
 }

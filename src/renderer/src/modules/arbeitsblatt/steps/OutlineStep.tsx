@@ -18,8 +18,8 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowDown, IconArrowLeft, IconArrowUp, IconPlus, IconRefresh, IconSparkles, IconTrash, IconWand } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { IconArrowDown, IconArrowLeft, IconArrowUp, IconCopy, IconPlus, IconRefresh, IconSparkles, IconTrash, IconWand } from '@tabler/icons-react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
@@ -31,6 +31,7 @@ import { profileFromMeta } from '../render/SheetPages'
 import { aiCall, useArbeitsblatt } from '../store'
 import { formuliereAus, planeNeu } from '../auftraege'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
+import { EinfuegeStelle } from './EinfuegenMenue'
 
 const ANSWER_LABELS: Record<AnswerKind, string> = {
   lines: 'Schreiblinien',
@@ -75,6 +76,21 @@ export default function OutlineStep(): React.JSX.Element {
     const items = [...outline.items]
     const [x] = items.splice(i, 1)
     items.splice(i + d, 0, x)
+    setItems(items)
+  }
+
+  /*
+   * An beliebiger Stelle einfügen und duplizieren (Paket 6) – vorher ging Hinzufügen nur am
+   * Ende. Jede Änderung ist ein Verlaufsschritt (Strg+Z).
+   */
+  const einfuegen = (i: number, type: WsBlockType): void => {
+    const items = [...outline.items]
+    items.splice(i, 0, neuerPunkt(type))
+    setItems(items)
+  }
+  const duplizieren = (i: number): void => {
+    const items = [...outline.items]
+    items.splice(i + 1, 0, { ...structuredClone(outline.items[i]), id: newId() })
     setItems(items)
   }
 
@@ -157,101 +173,132 @@ export default function OutlineStep(): React.JSX.Element {
           </Stack>
         </Card>
 
-        <Stack gap="xs">
+        <Stack gap={0}>
           {outline.items.map((it, i) => (
-            <Card key={it.id} withBorder padding="sm">
-              <Group align="start" wrap="nowrap">
-                <Stack gap={2}>
-                  <ActionIcon size="sm" variant="default" aria-label="Nach oben" disabled={i === 0} onClick={() => move(i, -1)}>
-                    <IconArrowUp size={14} />
-                  </ActionIcon>
-                  <ActionIcon size="sm" variant="default" aria-label="Nach unten" disabled={i === outline.items.length - 1} onClick={() => move(i, 1)}>
-                    <IconArrowDown size={14} />
-                  </ActionIcon>
-                </Stack>
-                <Stack gap={6} style={{ flex: 1 }}>
-                  <Group gap="xs" wrap="wrap">
-                    <Select
-                      size="xs"
-                      w={200}
-                      data={Object.entries(BLOCK_LABELS).map(([value, label]) => ({ value, label }))}
-                      value={it.type}
-                      onChange={(v) => v && patchItem(i, { type: v as WsBlockType })}
-                      allowDeselect={false}
-                    />
-                    {it.type === 'task' && (
-                      <>
-                        <Select
-                          size="xs"
-                          w={90}
-                          data={['I', 'II', 'III']}
-                          value={it.afb ?? null}
-                          placeholder="AFB"
-                          onChange={(v) => patchItem(i, { afb: (v as OutlineItem['afb']) ?? undefined })}
-                        />
-                        <TextInput
-                          size="xs"
-                          w={130}
-                          placeholder="Operator"
-                          value={it.operator}
-                          onChange={(e) => patchItem(i, { operator: e.currentTarget.value })}
-                        />
-                        <Select
-                          size="xs"
-                          w={150}
-                          data={[
-                            { value: 'EA', label: 'Einzelarbeit' },
-                            { value: 'PA', label: 'Partnerarbeit' },
-                            { value: 'GA', label: 'Gruppenarbeit' },
-                            { value: 'Plenum', label: 'Klassengespräch' }
-                          ]}
-                          value={it.socialForm}
-                          onChange={(v) => v && patchItem(i, { socialForm: v as SocialForm })}
-                          allowDeselect={false}
-                        />
-                        <Select
-                          size="xs"
-                          w={160}
-                          data={Object.entries(ANSWER_LABELS).map(([value, label]) => ({ value, label }))}
-                          value={it.answerKind}
-                          onChange={(v) => v && patchItem(i, { answerKind: v as AnswerKind })}
-                          allowDeselect={false}
-                        />
-                      </>
-                    )}
-                    {combined && (
+            <Fragment key={it.id}>
+              <EinfuegeStelle position={i} onWaehlen={(typ) => einfuegen(i, typ)} />
+              <Card withBorder padding="sm">
+                <Group align="start" wrap="nowrap">
+                  <Stack gap={2}>
+                    <ActionIcon size="sm" variant="default" aria-label="Nach oben" disabled={i === 0} onClick={() => move(i, -1)}>
+                      <IconArrowUp size={14} />
+                    </ActionIcon>
+                    <ActionIcon size="sm" variant="default" aria-label="Nach unten" disabled={i === outline.items.length - 1} onClick={() => move(i, 1)}>
+                      <IconArrowDown size={14} />
+                    </ActionIcon>
+                  </Stack>
+                  <Stack gap={6} style={{ flex: 1 }}>
+                    <Group gap="xs" wrap="wrap">
                       <Select
                         size="xs"
-                        w={110}
-                        data={[
-                          { value: '0', label: 'für alle' },
-                          { value: '2', label: '★★' },
-                          { value: '3', label: '★★★' }
-                        ]}
-                        value={String(it.stars ?? 0)}
-                        onChange={(v) => patchItem(i, { stars: v === '2' ? 2 : v === '3' ? 3 : undefined })}
+                        w={200}
+                        aria-label="Art des Bausteins"
+                        data={Object.entries(BLOCK_LABELS).map(([value, label]) => ({ value, label }))}
+                        value={it.type}
+                        onChange={(v) => v && patchItem(i, { type: v as WsBlockType })}
                         allowDeselect={false}
                       />
-                    )}
-                  </Group>
-                  <Textarea size="sm" autosize minRows={1} value={it.purpose} onChange={(e) => patchItem(i, { purpose: e.currentTarget.value })} />
-                </Stack>
-                <Stack gap={4}>
-                  {/* Neu beschreiben lassen: Art, Anforderungsbereich, Operator, Sozialform und
+                      {it.type === 'task' && (
+                        <>
+                          <Select
+                            size="xs"
+                            w={90}
+                            aria-label="Anforderungsbereich"
+                            data={['I', 'II', 'III']}
+                            value={it.afb ?? null}
+                            placeholder="AFB"
+                            onChange={(v) => patchItem(i, { afb: (v as OutlineItem['afb']) ?? undefined })}
+                          />
+                          <TextInput
+                            size="xs"
+                            w={130}
+                            placeholder="Operator"
+                            aria-label="Operator"
+                            value={it.operator}
+                            onChange={(e) => patchItem(i, { operator: e.currentTarget.value })}
+                          />
+                          <Select
+                            size="xs"
+                            w={150}
+                            aria-label="Sozialform"
+                            data={[
+                              { value: 'EA', label: 'Einzelarbeit' },
+                              { value: 'PA', label: 'Partnerarbeit' },
+                              { value: 'GA', label: 'Gruppenarbeit' },
+                              { value: 'Plenum', label: 'Klassengespräch' }
+                            ]}
+                            value={it.socialForm}
+                            onChange={(v) => v && patchItem(i, { socialForm: v as SocialForm })}
+                            allowDeselect={false}
+                          />
+                          <Select
+                            size="xs"
+                            w={160}
+                            aria-label="Antwortform"
+                            data={Object.entries(ANSWER_LABELS).map(([value, label]) => ({ value, label }))}
+                            value={it.answerKind}
+                            onChange={(v) => v && patchItem(i, { answerKind: v as AnswerKind })}
+                            allowDeselect={false}
+                          />
+                        </>
+                      )}
+                      {combined && (
+                        <Select
+                          size="xs"
+                          w={110}
+                          aria-label="Niveau"
+                          data={[
+                            { value: '0', label: 'für alle' },
+                            { value: '2', label: '★★' },
+                            { value: '3', label: '★★★' }
+                          ]}
+                          value={String(it.stars ?? 0)}
+                          onChange={(v) => patchItem(i, { stars: v === '2' ? 2 : v === '3' ? 3 : undefined })}
+                          allowDeselect={false}
+                        />
+                      )}
+                    </Group>
+                    <Textarea
+                      size="sm"
+                      autosize
+                      minRows={1}
+                      aria-label="Beschreibung des Bausteins"
+                      value={it.purpose}
+                      onChange={(e) => patchItem(i, { purpose: e.currentTarget.value })}
+                    />
+                  </Stack>
+                  <Stack gap={4}>
+                    {/* Neu beschreiben lassen: Art, Anforderungsbereich, Operator, Sozialform und
                       Antwortform bleiben, wie die Lehrkraft sie gesetzt hat. */}
-                  <Tooltip label={it.purpose.trim() ? 'Diesen Baustein von der KI neu beschreiben lassen' : 'Von der KI ausfüllen lassen'}>
-                    <ActionIcon variant="subtle" loading={neu === it.id} onClick={() => void beschreiben(i)}>
-                      <IconWand size={16} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Entfernen (Strg+Z holt ihn zurück)">
-                    <ActionIcon variant="subtle" color="red" aria-label="Baustein entfernen" onClick={() => setItems(outline.items.filter((_, j) => j !== i))}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Stack>
-              </Group>
-            </Card>
+                    <Tooltip label={it.purpose.trim() ? 'Diesen Baustein von der KI neu beschreiben lassen' : 'Von der KI ausfüllen lassen'}>
+                      <ActionIcon
+                        variant="subtle"
+                        loading={neu === it.id}
+                        aria-label={it.purpose.trim() ? 'Von der KI neu beschreiben lassen' : 'Von der KI ausfüllen lassen'}
+                        onClick={() => void beschreiben(i)}
+                      >
+                        <IconWand size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Duplizieren – die Kopie steht direkt darunter">
+                      <ActionIcon variant="subtle" aria-label="Baustein duplizieren" onClick={() => duplizieren(i)}>
+                        <IconCopy size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Entfernen (Strg+Z holt ihn zurück)">
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        aria-label="Baustein entfernen"
+                        onClick={() => setItems(outline.items.filter((_, j) => j !== i))}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Stack>
+                </Group>
+              </Card>
+            </Fragment>
           ))}
         </Stack>
 
@@ -263,23 +310,7 @@ export default function OutlineStep(): React.JSX.Element {
           </Menu.Target>
           <Menu.Dropdown>
             {Object.entries(BLOCK_LABELS).map(([type, label]) => (
-              <Menu.Item
-                key={type}
-                onClick={() =>
-                  setItems([
-                    ...outline.items,
-                    {
-                      id: newId(),
-                      type: type as WsBlockType,
-                      purpose: '',
-                      operator: '',
-                      socialForm: 'EA',
-                      answerKind: 'lines',
-                      afb: type === 'task' ? 'II' : undefined
-                    }
-                  ])
-                }
-              >
+              <Menu.Item key={type} onClick={() => setItems([...outline.items, neuerPunkt(type as WsBlockType)])}>
                 {label}
               </Menu.Item>
             ))}
@@ -318,6 +349,11 @@ export default function OutlineStep(): React.JSX.Element {
       </Container>
     </ScrollArea>
   )
+}
+
+/** Ein neuer, noch leerer Gliederungspunkt. */
+function neuerPunkt(type: WsBlockType): OutlineItem {
+  return { id: newId(), type, purpose: '', operator: '', socialForm: 'EA', answerKind: 'lines', afb: type === 'task' ? 'II' : undefined }
 }
 
 function AfbBar({ label, mix }: { label: string; mix: { I: number; II: number; III: number } }): React.JSX.Element {

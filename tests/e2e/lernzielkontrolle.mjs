@@ -175,6 +175,11 @@ else {
   if (!liste7.length) problems.push('Berlin Chemie 7 schlägt keine Themen vor')
   if (liste7.join('|') !== liste8.join('|')) problems.push('Der Doppeljahrgang 7/8 schlägt in Klasse 8 andere Themen vor als in Klasse 7')
   if (!berlin7.hinweis.includes('gelten für beide Jahre')) problems.push('Beim Doppeljahrgang fehlt der Hinweis, dass die Themen für beide Jahre gelten')
+  // Seit Paket 6 steht der Themenhinweis nach seinem ersten Satz hinter „Mehr“
+  // Ein geklicktes „Mehr“ heißt danach „Weniger“ – deshalb immer das erste verbleibende
+  const mehr = page.getByRole('button', { name: 'Mehr', exact: true }).filter({ visible: true })
+  for (let i = 0; i < 10 && (await mehr.count()); i++) await mehr.first().click()
+  await page.waitForTimeout(300)
   const hinweisSichtbar = await page.evaluate(() => (document.body.textContent ?? '').includes('gelten für beide Jahre'))
   if (!hinweisSichtbar) problems.push('Der Doppeljahrgangs-Hinweis steht nicht in der Oberfläche')
   await page.screenshot({ path: join(out, '1d-themen.png'), fullPage: false })

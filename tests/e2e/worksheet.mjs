@@ -3,7 +3,7 @@ import { _electron as electron } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'fs'
 import { resolve, join } from 'path'
 import { tmpdir } from 'os'
-import { oeffneLerngruppe } from './warten.mjs'
+import { oeffneLerngruppe, weitereOptionen } from './warten.mjs'
 import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/arbeitsblatt')
 mkdirSync(out, { recursive: true })
@@ -106,7 +106,8 @@ try {
   )
     throw new Error('In Biologie darf die Hörtext-Auswahl nicht erscheinen')
 
-  // Bildregeln: Schmuckbild und Piktogramme sind in „Art & Umfang“ einstellbar
+  // Bildregeln: Schmuckbild und Piktogramme stehen seit Paket 6 unter „Weitere Optionen“
+  await weitereOptionen(page)
   const schmuck = page
     .getByRole('switch', { name: /Ein Schmuckbild zulassen/ })
     .filter({ visible: true })

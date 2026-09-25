@@ -158,3 +158,21 @@ export function istLeer(block: WsBlock): boolean {
       return false
   }
 }
+
+/**
+ * Kopie eines Bausteins zum Duplizieren (Paket 6, Wunsch der Lehrkraft: „Baustein duplizieren"
+ * in Gliederung und Editor).
+ *
+ * Neu ist nur die Kennung des Bausteins selbst; innere Kennungen (Teilaufgaben, Einzelbilder)
+ * gelten ohnehin nur innerhalb ihres Bausteins. Nicht mit kopiert werden:
+ * - die früheren Entwürfe – die Kopie beginnt mit dem Stand, der zu sehen ist; die Entwürfe
+ *   tragen die alte Kennung, und ein Blättern darin machte aus der Kopie wieder das Original,
+ * - eine freie Lage auf der Seite – sonst läge die Kopie genau über dem Original.
+ */
+export function dupliziereBaustein(block: WsBlock): WsBlock {
+  const kopie = structuredClone(block)
+  delete kopie.versions
+  delete kopie.versionIndex
+  delete kopie.free
+  return { ...kopie, id: newId() }
+}

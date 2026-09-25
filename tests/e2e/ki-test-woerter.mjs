@@ -12,7 +12,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { warteAufOberflaeche, blattoptionen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/ki-test-woerter')
 mkdirSync(out, { recursive: true })
@@ -54,6 +54,7 @@ const satzAufBlatt = async () =>
 pruefe((await satzAufBlatt()) === '', 'Ohne eingeschalteten Test steht nichts auf dem Blatt')
 
 // --- Einschalten: Die Frage muss kommen
+await blattoptionen(page)
 await schalter.click()
 await page.waitForTimeout(800)
 const dialog = page.locator('.mantine-Modal-content', {
@@ -80,6 +81,7 @@ pruefe(nachAbbruch === false, 'Nach Abbrechen bleibt der KI-Test aus')
 pruefe((await satzAufBlatt()) === '', 'Nach Abbrechen steht nichts auf dem Blatt')
 
 // --- Eigene Wörter eingeben
+await blattoptionen(page)
 await schalter.click()
 await page.waitForTimeout(800)
 const feld = dialog.getByRole('textbox').first()

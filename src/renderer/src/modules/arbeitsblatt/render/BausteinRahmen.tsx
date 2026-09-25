@@ -1,5 +1,5 @@
 import { ActionIcon, Menu, Tooltip } from '@mantine/core'
-import { IconArrowDown, IconArrowUp, IconArrowsMove, IconLayoutAlignTop, IconLayoutDistributeHorizontal } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconArrowsMove, IconDots, IconLayoutAlignTop, IconLayoutDistributeHorizontal } from '@tabler/icons-react'
 import { useRef } from 'react'
 import type { PlacedItem } from './paginate'
 import type { WsBlock } from '../model/types'
@@ -57,6 +57,7 @@ export function BausteinRahmen({
   extras,
   onUpdate,
   onMove,
+  menue,
   busy
 }: {
   block: WsBlock
@@ -71,6 +72,12 @@ export function BausteinRahmen({
   onUpdate: (fn: (d: WsBlock) => void, gruppe?: string) => void
   /** Eine Stelle nach oben (-1) oder unten (+1); fehlt, wenn das Programm es nicht kann */
   onMove?: (richtung: -1 | 1) => void
+  /**
+   * Einträge des „⋯“-Menüs (Menu.Item) für seltene Aktionen – Duplizieren, darüber/darunter
+   * einfügen, Löschen … (Paket 6: vorher stand jede Aktion als eigenes Symbol am Rand, bis zu
+   * zehn übereinander). Fehlt es, gibt es kein „⋯“.
+   */
+  menue?: React.ReactNode
   busy?: boolean
 }): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
@@ -257,9 +264,11 @@ export function BausteinRahmen({
           {(block.type === 'image' || block.type === 'table') && !block.free && (
             <Menu position="right-start" withArrow>
               <Menu.Target>
-                <ActionIcon size="sm" variant="default" aria-label="Anordnung">
-                  <IconLayoutDistributeHorizontal size={14} />
-                </ActionIcon>
+                <Tooltip label="Anordnung auf dem Blatt" position="right">
+                  <ActionIcon size="sm" variant="default" aria-label="Anordnung">
+                    <IconLayoutDistributeHorizontal size={14} />
+                  </ActionIcon>
+                </Tooltip>
               </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>Anordnung auf dem Blatt</Menu.Label>
@@ -297,6 +306,18 @@ export function BausteinRahmen({
             </>
           )}
           {extras}
+          {menue && (
+            <Menu position="left-start" withArrow shadow="md">
+              <Menu.Target>
+                <Tooltip label="Weitere Aktionen" position="right">
+                  <ActionIcon size="sm" variant="default" aria-label="Weitere Aktionen">
+                    <IconDots size={14} />
+                  </ActionIcon>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>{menue}</Menu.Dropdown>
+            </Menu>
+          )}
         </div>
       )}
       {children}

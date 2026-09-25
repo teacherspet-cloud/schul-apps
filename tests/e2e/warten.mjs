@@ -58,3 +58,26 @@ export async function schliesseAssistent(page) {
   await spaeter.click()
   await page.waitForTimeout(500)
 }
+
+/**
+ * Das Fenster „Blattoptionen“ im Arbeitsblatt-Editor öffnen, falls es zu ist (seit Paket 6
+ * stehen Korrekturrand, Notizrand, Blocksatz, Deckblatt, KI-Test und Design dort statt
+ * einzeln in der Leiste). `name` ist ein Schalter darin, an dem sich „offen“ erkennen lässt.
+ */
+export async function blattoptionen(page, name = 'Blocksatz') {
+  if (await page.locator('label', { hasText: name }).first().isVisible()) return
+  await page.getByRole('button', { name: 'Blattoptionen' }).click()
+  await page.waitForTimeout(400)
+}
+
+/**
+ * „Weitere Optionen“ im sichtbaren Formular aufklappen, falls zu (seit Paket 6 stehen
+ * Sozialformen, Differenzierung, Bilder, Design u. Ä. dort eingeklappt).
+ */
+export async function weitereOptionen(page) {
+  const kopf = page.locator('.weitere-optionen-kopf').filter({ visible: true }).first()
+  if (!(await kopf.count())) return
+  if ((await kopf.getAttribute('aria-expanded')) === 'true') return
+  await kopf.click()
+  await page.waitForTimeout(500)
+}

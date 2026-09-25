@@ -35,6 +35,16 @@
   border-color: #adb5bd;
 }
 
+/*
+ * Der überfahrene Baustein liegt oben (Paket 6). Bei kurzen Bausteinen ist die Werkzeugleiste
+ * länger als der Baustein und reicht in den nächsten hinein – dort lag sonst dessen Leiste
+ * über dem „⋯“, und der Klick traf den falschen Baustein.
+ */
+.editor-block:hover,
+.editor-block:focus-within {
+  z-index: 5;
+}
+
 /* KI-Überarbeitung: kleines Symbol oben rechts am Baustein, Entwurfswechsel darüber */
 .editor-ai-revise-slot {
   position: absolute;

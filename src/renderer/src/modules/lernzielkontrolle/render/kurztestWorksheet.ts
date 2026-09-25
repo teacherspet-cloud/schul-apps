@@ -118,6 +118,8 @@ export function kurztestToWorksheetAlle(test: Kurztest, ausEinstellungen?: numbe
   const sheets: Sheet[] = test.varianten.map((v, i) => ({
     id: `lzk-${v.id}`,
     label: varianteLabel(test, i),
+    // Jedes Blatt seinen eigenen Gruppenbuchstaben – die Kopfzeile des Dokuments nennt nur A
+    kopfzeile: kopfzeile(test, v.label ?? ''),
     blocks: schluessel && test.meta.answerKey ? [...v.blocks, schluessel] : [...v.blocks]
   }))
   const erste = kurztestToWorksheet(test, 0, ausEinstellungen)

@@ -1,5 +1,5 @@
-import { ActionIcon, Button, Chip, Group, Popover, Stack, Text, Textarea, Tooltip } from '@mantine/core'
-import { IconChevronLeft, IconChevronRight, IconSparkles } from '@tabler/icons-react'
+import { ActionIcon, Button, Chip, Group, Menu, Popover, Stack, Text, Textarea, Tooltip } from '@mantine/core'
+import { IconChevronLeft, IconChevronRight, IconRefresh, IconSparkles } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { WsBlock } from '../model/types'
 import { versionInfo } from '../model/versions'
@@ -13,10 +13,29 @@ const SUGGESTIONS: Partial<Record<WsBlock['type'], string[]>> = {
 }
 
 /**
- * Kleines KI-Symbol am Material: Die Lehrkraft beschreibt, was geändert werden soll; nur dieser Baustein
- * bekommt einen neuen Entwurf.
+ * Das KI-Menü eines Bausteins: überarbeiten (mit eigenem Auftrag), neu erzeugen und – je nach
+ * Baustein – weitere KI-Aktionen.
+ *
+ * Bis Paket 6 standen hier zwei fast gleiche Symbole übereinander: Funken für „überarbeiten“
+ * und ein Kreispfeil für „neu erzeugen“, dazu das gelöste Beispiel. Welches was tut, zeigte nur
+ * der Tooltip (Befund der Lehrkraft, 25.09.2026). Jetzt gibt es EINEN beschrifteten Knopf „KI“
+ * mit einem Menü, in dem jede Aktion ausgeschrieben steht. „Überarbeiten …“ öffnet wie bisher
+ * das Feld für den Auftrag, am selben Knopf.
  */
-export function AiReviseButton({ block, busy, onRevise }: { block: WsBlock; busy: boolean; onRevise: (instruction: string) => void }): React.JSX.Element {
+export function KiMenue({
+  block,
+  busy,
+  onRevise,
+  onRegenerate,
+  children
+}: {
+  block: WsBlock
+  busy: boolean
+  onRevise: (instruction: string) => void
+  onRegenerate: () => void
+  /** Weitere KI-Einträge des Bausteins (Menu.Item), z. B. das gelöste Beispiel */
+  children?: React.ReactNode
+}): React.JSX.Element {
   const [opened, setOpened] = useState(false)
   const [text, setText] = useState('')
   const suggestions = SUGGESTIONS[block.type] ?? ['einfacher formulieren', 'kürzer fassen', 'ausführlicher']
@@ -29,18 +48,27 @@ export function AiReviseButton({ block, busy, onRevise }: { block: WsBlock; busy
   return (
     <Popover opened={opened} onChange={setOpened} width={340} position="left-start" withArrow shadow="md" trapFocus>
       <Popover.Target>
-        <Tooltip label="Mit KI überarbeiten (eigener Auftrag)" position="left" disabled={opened}>
-          <ActionIcon
-            className="editor-ai-revise"
-            size="sm"
-            variant="filled"
-            loading={busy}
-            aria-label="Mit KI überarbeiten"
-            onClick={() => setOpened((o) => !o)}
-          >
-            <IconSparkles size={14} />
-          </ActionIcon>
-        </Tooltip>
+        <div>
+          <Menu position="left-start" withArrow shadow="md">
+            <Menu.Target>
+              <Tooltip label="KI-Aktionen: überarbeiten, neu erzeugen" position="left" disabled={opened}>
+                <Button className="editor-ai-revise" size="compact-xs" px={4} variant="filled" loading={busy} aria-label="KI-Aktionen">
+                  KI
+                </Button>
+              </Tooltip>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>KI-Aktionen für diesen Baustein</Menu.Label>
+              <Menu.Item leftSection={<IconSparkles size={14} />} onClick={() => setOpened(true)}>
+                Mit KI überarbeiten …
+              </Menu.Item>
+              <Menu.Item leftSection={<IconRefresh size={14} />} onClick={onRegenerate}>
+                Mit KI neu erzeugen
+              </Menu.Item>
+              {children}
+            </Menu.Dropdown>
+          </Menu>
+        </div>
       </Popover.Target>
       <Popover.Dropdown>
         <Stack gap="xs">
@@ -48,7 +76,7 @@ export function AiReviseButton({ block, busy, onRevise }: { block: WsBlock; busy
             Diesen Baustein mit KI überarbeiten
           </Text>
           <Textarea
-            placeholder="Was soll geändert werden? z. B. „Formuliere den Text für schwächere Leser einfacher.“"
+            placeholder="Was soll geändert werden? z. B. „Den Text für schwächere Leser einfacher formulieren.“"
             autosize
             minRows={2}
             value={text}
@@ -66,7 +94,7 @@ export function AiReviseButton({ block, busy, onRevise }: { block: WsBlock; busy
             ))}
           </Group>
           <Text size="xs" c="dimmed">
-            Der bisherige Stand bleibt als Entwurf erhalten – mit den Pfeilen über dem Baustein wechselst du zwischen den Entwürfen. Andere Bausteine bleiben
+            Der bisherige Stand bleibt als Entwurf erhalten – die Pfeile über dem Baustein wechseln zwischen den Entwürfen. Andere Bausteine bleiben
             unverändert.
           </Text>
           <Button size="xs" leftSection={<IconSparkles size={14} />} disabled={!text.trim()} onClick={run}>

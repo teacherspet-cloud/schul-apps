@@ -37,7 +37,7 @@ import { generateExam, reviseExamPart, upperSecondary } from '../generation/gene
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam, ExamPart } from '../model/types'
 import { examGrades } from '../model/types'
-import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, materialweg, mitBloecken, uebernimmMaterial } from '../model/fassungen'
+import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, teilNachUeberarbeitung } from '../model/fassungen'
 import { examHasContent, examToWorksheet, examToWorksheetAlle } from '../render/examWorksheet'
 import { AudioPanel } from '../../arbeitsblatt/steps/AudioPanel'
 import type { Worksheet } from '../../arbeitsblatt/model/types'
@@ -180,12 +180,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
       ablegen: (blocks, e) =>
         legeArbeitAb(docId, e, (aktuell) => ({
           ...aktuell,
-          parts: aktuell.parts.map((p) => {
-            if (p.id !== part.id) return p
-            // Weitere Fassung mit übernommenem Material (Hörtext, Quelle): Das Material bleibt dasselbe
-            const neu = f > 0 && materialweg(aktuell, p) === 'gleich' ? uebernimmMaterial(bloeckeDerFassung(p, f), blocks) : blocks
-            return mitBloecken(p, f, neu)
-          })
+          // Punkte auf den Teil bringen, gemeinsames Material in allen Fassungen gleich halten (model/fassungen.ts)
+          parts: aktuell.parts.map((p) => (p.id === part.id ? teilNachUeberarbeitung(aktuell, p, f, blocks) : p))
         }))
     })
   }

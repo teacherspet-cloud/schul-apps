@@ -91,16 +91,19 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
           </Button>
         </Group>
       </Group>
-      <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-        {auftrag ? (
-          <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Test" onNeu={startNew} />
-        ) : (
-          <>
-            {step === 0 && <SetupStep />}
-            {step === 1 && hasTasks && <TestEditorStep />}
-          </>
-        )}
-      </ScrollArea>
+      {/*
+        Schritt 1 scrollt selbst: Sein Hauptknopf steht in einer festen Fußleiste unter dem
+        scrollenden Formular (shared/components/Formularfuss.tsx, Paket 6).
+      */}
+      {!auftrag && step === 0 ? (
+        <Box style={{ flex: 1, minHeight: 0 }}>
+          <SetupStep />
+        </Box>
+      ) : (
+        <ScrollArea style={{ flex: 1, minHeight: 0 }}>
+          {auftrag ? <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Test" onNeu={startNew} /> : step === 1 && hasTasks && <TestEditorStep />}
+        </ScrollArea>
+      )}
     </Box>
   )
 }

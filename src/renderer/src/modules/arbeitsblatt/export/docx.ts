@@ -48,7 +48,7 @@ import { INFO_VARIANTS, SOCIAL_FORM_SVG } from '../render/icons'
 import { pictogramForSocialForm } from '../render/pictograms'
 import { istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../render/mcGrid'
 import { imageCredits, isHelpCard, isPhraseSheet } from '../render/SheetPages'
-import { contentInsets, footerSlotText, PageInfo, sidebarBox, sidebarText } from '../render/PageFrame'
+import { contentInsets, footerSlotText, kopfTitel, PageInfo, sidebarBox, sidebarText } from '../render/PageFrame'
 import { audioLength, galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraphs } from '../render/BlockView'
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../didactics/audioRules'
@@ -510,9 +510,10 @@ async function sidebarRun(ctx: Ctx): Promise<ImageRun | null> {
 }
 
 async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
-  const d = ctx.ws.design
+  // Aus `info`: Ein Blatt kann eine eigene Kopfzeile haben (Fassung B, C …)
+  const d = ctx.info.design
   const h = d.header
-  const title = (ctx.ws.meta.title || ctx.ws.meta.topic) + (ctx.key ? ' – Lösungen' : '')
+  const title = kopfTitel(ctx.ws.meta, ctx.key)
   const children: Child[] = []
   const sidebar = await sidebarRun(ctx)
   const mode = first ? 'full' : h.followingPages

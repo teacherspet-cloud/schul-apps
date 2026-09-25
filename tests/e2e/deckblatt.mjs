@@ -12,7 +12,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { warteAufOberflaeche, blattoptionen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/deckblatt')
 mkdirSync(out, { recursive: true })
@@ -41,6 +41,7 @@ await page.evaluate(() => window.__selftest.wsMaterialtext(30))
 await page.waitForTimeout(2500)
 
 // Deckblatt einschalten
+await blattoptionen(page)
 const schalter = page.locator('label', { hasText: 'Deckblatt' }).first()
 pruefe((await schalter.count()) > 0, 'Der Schalter „Deckblatt" ist da')
 await schalter.click()

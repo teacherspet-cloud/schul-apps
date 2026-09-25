@@ -585,6 +585,12 @@ export interface Sheet {
    * ablesen können, dass er etwas anderes bekommen hat.
    */
   observerGroup?: string
+  /**
+   * Eigene Kopfzeile dieses Blattes – ersetzt `design.header.customText`. Für Dokumente mit
+   * mehreren Fassungen (LZK „alle Fassungen"): Die Kopfzeile gehört sonst zum ganzen Dokument,
+   * und auf jedem Blatt stand „Gruppe A" (Paket 6, 25.09.2026).
+   */
+  kopfzeile?: string
   blocks: WsBlock[]
 }
 
@@ -800,6 +806,12 @@ export interface WorksheetMeta {
    * durchgehend englisch beschriftet sind.
    */
   labelLanguage?: 'de' | 'en'
+  /**
+   * Wort hinter dem Titel im Lösungsteil („– Lösungen"). Fehlt = „Lösungen". Die
+   * Klassenarbeit setzt „Erwartungshorizont" – das ist dort der Fachbegriff, auch in
+   * Englischarbeiten, denn der Lösungsteil ist für die Lehrkraft (Paket 6, 25.09.2026).
+   */
+  loesungsBegriff?: string
   /** Originalquellen (Text- und Bildquellen aus frei zugänglichen Archiven); fehlt = automatisch */
   originalSources?: OriginalSourcesMode
   /**

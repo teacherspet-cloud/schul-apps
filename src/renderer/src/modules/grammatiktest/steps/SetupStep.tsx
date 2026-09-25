@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Container, Grid, Group, NumberInput, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Box, Button, Card, Container, Grid, Group, NumberInput, ScrollArea, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
 import { IconAlertTriangle, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
@@ -22,6 +22,10 @@ import { starteAuftrag } from '../../../shared/auftraege'
 import { defaultTestName, legeTestAb, testOffen } from '../library'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
+import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
+import MehrText from '../../../shared/components/MehrText'
+import WeitereOptionen from '../../../shared/components/WeitereOptionen'
+import { useKiZugang } from '../../../shared/useKiZugang'
 
 /** Fächer, für die es eine Grammatikliste gibt. */
 const TEST_SUBJECTS = SUBJECTS.filter((s) => hasGrammar(s.id))
@@ -39,6 +43,7 @@ export default function SetupStep(): React.JSX.Element {
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
   const [scaleOpen, setScaleOpen] = useState(false)
+  const kiDa = useKiZugang()
 
   useEffect(() => {
     Promise.all([window.api.cefr.get(), window.api.designs.list()])
@@ -105,246 +110,296 @@ export default function SetupStep(): React.JSX.Element {
     })
   }
 
+  // Der Hauptknopf steht fest unten und sagt, was fehlt (Paket 6)
+  const sperrgrund = ersterGrund([!topics.length, 'Zuerst eine Form wählen, die geprüft werden soll'], [!kiDa, <KeinKiZugang key="ki" />])
+  const fuss = (
+    <Formularfuss grund={sperrgrund}>
+      <Button size="md" leftSection={<IconSparkles size={18} />} disabled={Boolean(sperrgrund)} onClick={create}>
+        Test erstellen
+      </Button>
+    </Formularfuss>
+  )
+
   return (
-    <Container size="xl" py="md">
-      <Grid>
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Stack>
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Lerngruppe
-              </Title>
-              <Stack gap="sm">
-                <Group grow>
-                  <HaeufigSelect
-                    art="fach"
-                    label="Fach"
-                    data={TEST_SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
-                    value={meta.subjectId}
-                    onChange={(v) => {
-                      if (!v) return
-                      const s = subjectById(v)
-                      // Fachwechsel: Die Themen des alten Fachs gelten nicht weiter
-                      patch({ subjectId: v, subjectLabel: s.label, topics: [], formats: [], languageOrder: v === 'englisch' ? 1 : 2 })
-                    }}
-                    allowDeselect={false}
-                  />
-                  <Select
-                    label="Jahrgang"
-                    data={grades.map((g) => ({ value: String(g), label: `Klasse ${g}` }))}
-                    value={String(meta.grade)}
-                    onChange={(v) => v && patch({ grade: Number(v) })}
-                    allowDeselect={false}
-                  />
-                </Group>
-                <SchulAngabe
-                  stateId={meta.stateId}
-                  stateName={STATES.find((s) => s.id === meta.stateId)?.name ?? meta.stateId}
-                  schoolTypeId={meta.schoolTypeId}
-                  schoolTypeName={meta.schoolTypeName}
-                >
-                  <Group grow>
-                    <HaeufigSelect
-                      art="bundesland"
-                      label="Bundesland"
-                      data={STATES.map((s) => ({ value: s.id, label: s.name }))}
-                      value={meta.stateId}
+    <FormularSeite fuss={fuss}>
+      <ScrollArea h="100%">
+        <Container size="xl" py="md">
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Stack>
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Lerngruppe
+                  </Title>
+                  <Stack gap="sm">
+                    <Group grow>
+                      <HaeufigSelect
+                        art="fach"
+                        label="Fach"
+                        data={TEST_SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
+                        value={meta.subjectId}
+                        onChange={(v) => {
+                          if (!v) return
+                          const s = subjectById(v)
+                          // Fachwechsel: Die Themen des alten Fachs gelten nicht weiter
+                          patch({ subjectId: v, subjectLabel: s.label, topics: [], formats: [], languageOrder: v === 'englisch' ? 1 : 2 })
+                        }}
+                        allowDeselect={false}
+                      />
+                      <Select
+                        label="Jahrgang"
+                        data={grades.map((g) => ({ value: String(g), label: `Klasse ${g}` }))}
+                        value={String(meta.grade)}
+                        onChange={(v) => v && patch({ grade: Number(v) })}
+                        allowDeselect={false}
+                      />
+                    </Group>
+                    <SchulAngabe
+                      stateId={meta.stateId}
+                      stateName={STATES.find((s) => s.id === meta.stateId)?.name ?? meta.stateId}
+                      schoolTypeId={meta.schoolTypeId}
+                      schoolTypeName={meta.schoolTypeName}
+                    >
+                      <Group grow>
+                        <HaeufigSelect
+                          art="bundesland"
+                          label="Bundesland"
+                          data={STATES.map((s) => ({ value: s.id, label: s.name }))}
+                          value={meta.stateId}
+                          onChange={(v) => {
+                            if (!v) return
+                            const list = schoolTypesForState(table, v)
+                            const keep = list.some((t) => t.value === meta.schoolTypeId)
+                            patch({
+                              stateId: v,
+                              schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
+                              schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
+                            })
+                          }}
+                          allowDeselect={false}
+                        />
+                        <HaeufigSelect
+                          art="schulform"
+                          label="Schulform"
+                          data={types}
+                          value={meta.schoolTypeId}
+                          onChange={(v) => v && patch({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
+                          allowDeselect={false}
+                        />
+                      </Group>
+                    </SchulAngabe>
+                    <Group grow>
+                      {subjectById(meta.subjectId).foreignLanguage && (
+                        <Select
+                          label="Fremdsprache"
+                          data={[1, 2, 3].map((n) => ({ value: String(n), label: `${n}. Fremdsprache` }))}
+                          value={String(meta.languageOrder)}
+                          onChange={(v) => v && patch({ languageOrder: Number(v) })}
+                          allowDeselect={false}
+                        />
+                      )}
+                      <Select
+                        label="Sprachniveau (GER)"
+                        data={[...CEFR_SCALE]}
+                        value={meta.cefrLevel}
+                        onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
+                        allowDeselect={false}
+                      />
+                    </Group>
+                  </Stack>
+                </Card>
+
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Geprüfte Formen
+                  </Title>
+                  <GrammarPicker meta={{ ...meta, grammarTopics: meta.topics } as unknown as WorksheetMeta} onChange={patchFromPicker} />
+                </Card>
+              </Stack>
+            </Grid.Col>
+
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Stack>
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Anlage des Tests
+                  </Title>
+                  <Stack gap="sm">
+                    <TextInput
+                      label="Titel (optional)"
+                      placeholder={meta.subjectId === 'englisch' ? 'Grammar test' : 'Grammatiktest'}
+                      value={meta.title}
+                      onChange={(e) => patch({ title: e.currentTarget.value })}
+                    />
+                    <Group grow>
+                      <NumberInput
+                        label="Bearbeitungszeit (Minuten)"
+                        min={5}
+                        max={90}
+                        value={meta.minutes}
+                        onChange={(v) => patch({ minutes: Number(v) || 20 })}
+                      />
+                      <NumberInput label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
+                    </Group>
+
+                    <Switch
+                      label="In einen Zusammenhang einbetten"
+                      description="Die Aufgaben hängen an einem durchlaufenden Text statt an unverbundenen Einzelsätzen – näher am Sprachgebrauch und in mehr Ländern als Leistung verwendbar."
+                      checked={meta.embedded}
+                      onChange={(e) => patch({ embedded: e.currentTarget.checked })}
+                    />
+                  </Stack>
+                </Card>
+
+                {/*
+                 * Landesvorgaben: Was „wichtig“ ist, bleibt als Hinweis sichtbar; der Vorschlag dazu
+                 * und reine Hinweise stehen hinter „Mehr“ (Paket 6 – Inhalt unverändert).
+                 */}
+                {rules.map((rule, i) =>
+                  rule.severity === 'wichtig' ? (
+                    <Alert key={i} color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
+                      <Text size="sm">{rule.text}</Text>
+                      {rule.suggestion && <MehrText text={rule.suggestion} mt={4} />}
+                    </Alert>
+                  ) : (
+                    <MehrText key={i} text={[rule.text, rule.suggestion].filter(Boolean).join(' ')} size="sm" />
+                  )
+                )}
+
+                {topics.length > 0 && (
+                  <Text size="xs" c="dimmed" ta="right">
+                    {topics.length === 1 ? 'Geprüft wird' : 'Geprüft werden'}: {topics.map((t) => t.label).join(', ')} ·{' '}
+                    {meta.formats.map(grammarFormatLabel).join(', ') || 'Formate von der KI gewählt'}
+                  </Text>
+                )}
+              </Stack>
+            </Grid.Col>
+          </Grid>
+
+          {/* Selten Geändertes eingeklappt (Paket 6); die Überschrift nennt, was vom Standard abweicht */}
+          <Box mt="md">
+            <WeitereOptionen modul="grammatiktest" geaendert={geaenderteOptionen(test, designs, topics)}>
+              <Grid>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Stack gap="sm">
+                    <Switch
+                      label="Test wird benotet"
+                      description={meta.graded ? 'Der Notenschlüssel steht im Lösungsteil.' : 'Ohne Note – als Übung oder zur Diagnose.'}
+                      checked={meta.graded}
+                      onChange={(e) => patch({ graded: e.currentTarget.checked })}
+                    />
+                    {meta.graded && (
+                      <Group gap="xs" align="center">
+                        <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                          Notenschlüssel: {gradeScaleLine(meta.points, meta.gradeScaleThresholds)}
+                        </Text>
+                        <Button size="compact-xs" variant="light" onClick={() => setScaleOpen(true)}>
+                          Bearbeiten
+                        </Button>
+                      </Group>
+                    )}
+                    {meta.graded && (
+                      <Switch
+                        label="Notenschlüssel auch auf dem Testblatt"
+                        description="Er steht ohnehin im Lösungsteil – hier zusätzlich auf dem Material der Lernenden."
+                        checked={meta.gradeScaleOnSheet}
+                        onChange={(e) => patch({ gradeScaleOnSheet: e.currentTarget.checked })}
+                      />
+                    )}
+                    <Switch
+                      label="Fehlerprofil im Lösungsteil"
+                      description="Zeigt, welche Aufgabe auf welche bekannte Stolperstelle zielt – mit einer Spalte zum Eintragen beim Durchsehen."
+                      checked={meta.errorProfile}
+                      onChange={(e) => patch({ errorProfile: e.currentTarget.checked })}
+                    />
+                    <Group>
+                      <Switch label="Lösungsblatt" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                      <Switch label="Kopfkasten" checked={meta.infoBox} onChange={(e) => patch({ infoBox: e.currentTarget.checked })} />
+                      {subjectById(meta.subjectId).foreignLanguage && (
+                        <Switch
+                          label="Anweisungen auf Deutsch"
+                          checked={meta.instructionsInGerman}
+                          onChange={(e) => patch({ instructionsInGerman: e.currentTarget.checked })}
+                        />
+                      )}
+                    </Group>
+
+                    <Select
+                      label="Designvorlage"
+                      data={designs.map((d) => ({ value: d.id, label: d.name + (d.isDefault ? ' (Standard)' : '') }))}
+                      value={test.design?.id}
                       onChange={(v) => {
-                        if (!v) return
-                        const list = schoolTypesForState(table, v)
-                        const keep = list.some((t) => t.value === meta.schoolTypeId)
-                        patch({
-                          stateId: v,
-                          schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
-                          schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
-                        })
+                        const d = designs.find((x) => x.id === v)
+                        if (d) setTest({ ...test, design: d })
                       }}
                       allowDeselect={false}
                     />
-                    <HaeufigSelect
-                      art="schulform"
-                      label="Schulform"
-                      data={types}
-                      value={meta.schoolTypeId}
-                      onChange={(v) => v && patch({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
-                      allowDeselect={false}
-                    />
-                  </Group>
-                </SchulAngabe>
-                <Group grow>
-                  {subjectById(meta.subjectId).foreignLanguage && (
-                    <Select
-                      label="Fremdsprache"
-                      data={[1, 2, 3].map((n) => ({ value: String(n), label: `${n}. Fremdsprache` }))}
-                      value={String(meta.languageOrder)}
-                      onChange={(v) => v && patch({ languageOrder: Number(v) })}
-                      allowDeselect={false}
-                    />
-                  )}
-                  <Select
-                    label="Sprachniveau (GER)"
-                    data={[...CEFR_SCALE]}
-                    value={meta.cefrLevel}
-                    onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
-                    allowDeselect={false}
-                  />
-                </Group>
-              </Stack>
-            </Card>
-
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Geprüfte Formen
-              </Title>
-              <GrammarPicker meta={{ ...meta, grammarTopics: meta.topics } as unknown as WorksheetMeta} onChange={patchFromPicker} />
-            </Card>
-          </Stack>
-        </Grid.Col>
-
-        <Grid.Col span={{ base: 12, md: 6 }}>
-          <Stack>
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Anlage des Tests
-              </Title>
-              <Stack gap="sm">
-                <TextInput
-                  label="Titel (optional)"
-                  placeholder={meta.subjectId === 'englisch' ? 'Grammar test' : 'Grammatiktest'}
-                  value={meta.title}
-                  onChange={(e) => patch({ title: e.currentTarget.value })}
-                />
-                <Group grow>
-                  <NumberInput label="Bearbeitungszeit (Minuten)" min={5} max={90} value={meta.minutes} onChange={(v) => patch({ minutes: Number(v) || 20 })} />
-                  <NumberInput label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
-                </Group>
-
-                <Switch
-                  label="In einen Zusammenhang einbetten"
-                  description="Die Aufgaben hängen an einem durchlaufenden Text statt an unverbundenen Einzelsätzen – näher am Sprachgebrauch und in mehr Ländern als Leistung verwendbar."
-                  checked={meta.embedded}
-                  onChange={(e) => patch({ embedded: e.currentTarget.checked })}
-                />
-                <Switch
-                  label="Test wird benotet"
-                  description={meta.graded ? 'Der Notenschlüssel steht im Lösungsteil.' : 'Ohne Note – als Übung oder zur Diagnose.'}
-                  checked={meta.graded}
-                  onChange={(e) => patch({ graded: e.currentTarget.checked })}
-                />
-                {meta.graded && (
-                  <Group gap="xs" align="center">
-                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      Notenschlüssel: {gradeScaleLine(meta.points, meta.gradeScaleThresholds)}
+                  </Stack>
+                </Grid.Col>
+                <Grid.Col span={{ base: 12, md: 6 }}>
+                  <Card withBorder>
+                    <Title order={4} mb="sm">
+                      Aufgabenformen
+                    </Title>
+                    <Text size="xs" c="dimmed" mb="xs">
+                      Vorbelegt aus den gewählten Formen – hier änderbar. Rein rezeptive Themen bekommen keine offenen Formate.
                     </Text>
-                    <Button size="compact-xs" variant="light" onClick={() => setScaleOpen(true)}>
-                      Bearbeiten
-                    </Button>
-                  </Group>
-                )}
-                {meta.graded && (
-                  <Switch
-                    label="Notenschlüssel auch auf dem Testblatt"
-                    description="Er steht ohnehin im Lösungsteil – hier zusätzlich auf dem Material der Lernenden."
-                    checked={meta.gradeScaleOnSheet}
-                    onChange={(e) => patch({ gradeScaleOnSheet: e.currentTarget.checked })}
-                  />
-                )}
-                <Switch
-                  label="Fehlerprofil im Lösungsteil"
-                  description="Zeigt, welche Aufgabe auf welche bekannte Stolperstelle zielt – mit einer Spalte zum Eintragen beim Durchsehen."
-                  checked={meta.errorProfile}
-                  onChange={(e) => patch({ errorProfile: e.currentTarget.checked })}
-                />
-                <Group>
-                  <Switch label="Lösungsblatt" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                  <Switch label="Kopfkasten" checked={meta.infoBox} onChange={(e) => patch({ infoBox: e.currentTarget.checked })} />
-                  {subjectById(meta.subjectId).foreignLanguage && (
-                    <Switch
-                      label="Anweisungen auf Deutsch"
-                      checked={meta.instructionsInGerman}
-                      onChange={(e) => patch({ instructionsInGerman: e.currentTarget.checked })}
-                    />
-                  )}
-                </Group>
+                    <Group gap="xs">
+                      {GRAMMAR_FORMATS.map((f) => (
+                        <Switch
+                          key={f.id}
+                          size="xs"
+                          label={f.label}
+                          checked={meta.formats.includes(f.id)}
+                          onChange={(e) => patch({ formats: e.currentTarget.checked ? [...meta.formats, f.id] : meta.formats.filter((x) => x !== f.id) })}
+                        />
+                      ))}
+                    </Group>
+                    {!meta.formats.length && (
+                      <Text size="xs" c="orange" mt="xs">
+                        Ohne gewählte Form entscheidet die KI selbst – die belegten Zuordnungen bleiben dann ungenutzt.
+                      </Text>
+                    )}
+                  </Card>
+                </Grid.Col>
+              </Grid>
+            </WeitereOptionen>
+          </Box>
+          <Box h="md" />
 
-                <Select
-                  label="Designvorlage"
-                  data={designs.map((d) => ({ value: d.id, label: d.name + (d.isDefault ? ' (Standard)' : '') }))}
-                  value={test.design?.id}
-                  onChange={(v) => {
-                    const d = designs.find((x) => x.id === v)
-                    if (d) setTest({ ...test, design: d })
-                  }}
-                  allowDeselect={false}
-                />
-              </Stack>
-            </Card>
-
-            <Card withBorder>
-              <Title order={4} mb="sm">
-                Aufgabenformen
-              </Title>
-              <Text size="xs" c="dimmed" mb="xs">
-                Vorbelegt aus den gewählten Formen – hier änderbar. Rein rezeptive Themen bekommen keine offenen Formate.
-              </Text>
-              <Group gap="xs">
-                {GRAMMAR_FORMATS.map((f) => (
-                  <Switch
-                    key={f.id}
-                    size="xs"
-                    label={f.label}
-                    checked={meta.formats.includes(f.id)}
-                    onChange={(e) => patch({ formats: e.currentTarget.checked ? [...meta.formats, f.id] : meta.formats.filter((x) => x !== f.id) })}
-                  />
-                ))}
-              </Group>
-              {!meta.formats.length && (
-                <Text size="xs" c="orange" mt="xs">
-                  Ohne gewählte Form entscheidet die KI selbst – die belegten Zuordnungen bleiben dann ungenutzt.
-                </Text>
-              )}
-            </Card>
-
-            {rules.map((rule, i) => (
-              <Alert key={i} color={rule.severity === 'wichtig' ? 'orange' : 'gray'} icon={<IconAlertTriangle size={16} />} p="xs">
-                <Text size="sm">{rule.text}</Text>
-                {rule.suggestion && (
-                  <Text size="xs" c="dimmed" mt={4}>
-                    {rule.suggestion}
-                  </Text>
-                )}
-              </Alert>
-            ))}
-
-            <Group justify="flex-end">
-              <Button leftSection={<IconSparkles size={16} />} disabled={!topics.length} onClick={create}>
-                Test erstellen
-              </Button>
-            </Group>
-            {!topics.length && (
-              <Text size="xs" c="dimmed" ta="right">
-                Wähle zuerst mindestens eine Form, die geprüft werden soll.
-              </Text>
-            )}
-            {topics.length > 0 && (
-              <Text size="xs" c="dimmed" ta="right">
-                {topics.length === 1 ? 'Geprüft wird' : 'Geprüft werden'}: {topics.map((t) => t.label).join(', ')} ·{' '}
-                {meta.formats.map(grammarFormatLabel).join(', ') || 'Formate von der KI gewählt'}
-              </Text>
-            )}
-          </Stack>
-        </Grid.Col>
-      </Grid>
-
-      <GradeScaleModal
-        opened={scaleOpen}
-        onClose={() => setScaleOpen(false)}
-        points={meta.points}
-        thresholds={meta.gradeScaleThresholds}
-        onChange={(gradeScaleThresholds) => patch({ gradeScaleThresholds })}
-      />
-    </Container>
+          <GradeScaleModal
+            opened={scaleOpen}
+            onClose={() => setScaleOpen(false)}
+            points={meta.points}
+            thresholds={meta.gradeScaleThresholds}
+            onChange={(gradeScaleThresholds) => patch({ gradeScaleThresholds })}
+          />
+        </Container>
+      </ScrollArea>
+    </FormularSeite>
   )
+}
+
+/**
+ * Was unter „Weitere Optionen“ vom Standard abweicht (model/defaults.ts) – für die
+ * Zusammenfassung in der eingeklappten Überschrift. Bei den Aufgabenformen ist der Standard
+ * der Vorschlag aus den gewählten Formen.
+ */
+export function geaenderteOptionen(test: GrammarTest, designs: DesignTemplate[], topics: ReturnType<typeof chosenGrammarTopics>): string[] {
+  const m = test.meta
+  const standardDesign = designs.find((x) => x.isDefault) ?? designs[0]
+  const vorschlag = suggestedFormats(topics)
+  const formenAnders = m.formats.length !== vorschlag.length || m.formats.some((f) => !vorschlag.includes(f))
+  return [
+    m.graded ? 'benotet' : '',
+    m.graded && m.gradeScaleOnSheet ? 'Notenschlüssel auf dem Testblatt' : '',
+    m.errorProfile ? '' : 'ohne Fehlerprofil',
+    m.answerKey ? '' : 'ohne Lösungsblatt',
+    m.infoBox ? '' : 'ohne Kopfkasten',
+    m.instructionsInGerman ? 'Anweisungen auf Deutsch' : '',
+    test.design && standardDesign && test.design.id !== standardDesign.id ? `Design „${test.design.name}“` : '',
+    formenAnders ? 'Aufgabenformen angepasst' : ''
+  ].filter(Boolean)
 }
 
 /** Für den Test wiederverwendet: der Test als Arbeitsblatt (Anzeige und Export). */

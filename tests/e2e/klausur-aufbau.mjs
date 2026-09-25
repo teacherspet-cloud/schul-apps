@@ -14,7 +14,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { warteAufOberflaeche, blattoptionen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/klausur-aufbau')
 mkdirSync(out, { recursive: true })
@@ -103,6 +103,7 @@ pruefe(
 )
 
 // --- mit Notizrand: die Reihenfolge muss bleiben, der Umbruch sauber
+await blattoptionen(page)
 await page.locator('label', { hasText: 'Notizrand' }).first().click()
 await page.waitForTimeout(2500)
 const mit = await messen()

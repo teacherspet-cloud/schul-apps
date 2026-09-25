@@ -38,10 +38,15 @@ await page.evaluate(() => window.__selftest.wsMaterialtext(4))
 await page.waitForTimeout(2500)
 
 // --- Neu erzeugen muss angeboten werden (geklickt wird nicht: das riefe die KI)
-const neu = page.locator('[aria-label="Mit KI neu erzeugen"]')
+// Seit Paket 6 stehen beide im beschrifteten KI-Menü des Bausteins
+await page.locator('.ws-editor-pages [aria-label="KI-Aktionen"]').first().click()
+await page.waitForTimeout(400)
+const neu = page.getByRole('menuitem', { name: 'Mit KI neu erzeugen' })
 pruefe((await neu.count()) > 0, 'Jeder Baustein lässt sich neu erzeugen')
-const ueberarbeiten = page.locator('[aria-label="Mit KI überarbeiten"]')
+const ueberarbeiten = page.getByRole('menuitem', { name: /Mit KI überarbeiten/ })
 pruefe((await ueberarbeiten.count()) > 0, 'Daneben steht das Überarbeiten mit eigenem Auftrag')
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
 
 // Ohne zweiten Entwurf gibt es nichts zu blättern
 pruefe((await page.locator('.editor-version-bar').count()) === 0, 'Bei nur einem Entwurf erscheinen keine Pfeile')

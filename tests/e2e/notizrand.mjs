@@ -13,7 +13,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
-import { warteAufOberflaeche } from './warten.mjs'
+import { warteAufOberflaeche, blattoptionen } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/notizrand')
 mkdirSync(out, { recursive: true })
@@ -74,6 +74,7 @@ pruefe(ohne.breite > 0, 'Es gibt einen Materialtext zum Messen')
 pruefe(ohne.randPx < 5, 'Ohne Schalter ist kein Rand gesetzt')
 
 // --- Notizrand einschalten
+await blattoptionen(page)
 const schalter = page.locator('label', { hasText: 'Notizrand' }).first()
 pruefe((await schalter.count()) > 0, 'Der Schalter „Notizrand" ist da')
 await schalter.click()
@@ -107,6 +108,7 @@ pruefe(mit.seiten >= ohne.seiten, `Die Seitenzahl wurde neu berechnet (${ohne.se
 await page.screenshot({ path: join(out, 'notizrand.png') })
 
 // --- und wieder aus: der Rand muss verschwinden
+await blattoptionen(page)
 await schalter.click()
 await page.waitForTimeout(2000)
 const zurueck = await messen()

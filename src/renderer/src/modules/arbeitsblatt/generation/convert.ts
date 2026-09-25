@@ -87,6 +87,18 @@ export function stripManualLineNumbers(body: string): string {
 const strings = (v: any): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) : [])
 const starsOf = (v: any): Stars | undefined => (v === 1 || v === 2 || v === 3 ? v : undefined)
 const afbOf = (v: any): Afb | undefined => (v === 'I' || v === 'II' || v === 'III' ? v : undefined)
+/**
+ * Punkte, wie die KI sie geliefert hat – ganzzahlig und nie negativ.
+ *
+ * Bis Paket 6 (25.09.2026) stand hier fest `points: 0`. Das passte zum Arbeitsblatt (dort
+ * „Immer 0"), aber LZK und Klassenarbeit verlangen ausdrücklich Punkte je Aufgabe – und
+ * verloren sie auf diesem gemeinsamen Weg. Was ein Modul mit den Punkten macht, entscheidet
+ * es selbst (Arbeitsblatt setzt sie wieder auf 0, `ohnePunkte` in generate.ts).
+ */
+export const punkteOf = (v: any): number => {
+  const n = Math.round(Number(v))
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
 
 export function convertOutline(data: any): Outline {
   return {
@@ -284,7 +296,7 @@ export function convertBlock(b: any, rng: Rng, images: { index: number; dataUrl:
         afbReason: text(b.afbReason),
         socialForm: pick<SocialForm>(b.socialForm, SOCIAL_FORMS, 'EA'),
         minutes: Number(b.minutes) || 0,
-        points: 0,
+        points: punkteOf(b.points),
         solution: text(b.solution),
         answer: convertAnswer(b.answer, rng),
         parts: (Array.isArray(b.parts) ? b.parts : [])

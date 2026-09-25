@@ -1,6 +1,7 @@
 import { Badge, Button, Card, Group, List, NumberInput, Popover, Select, Stack, Text, Title } from '@mantine/core'
 import { IconAdjustments, IconSchool } from '@tabler/icons-react'
 import type { LearnerProfile } from '../didactics/profile'
+import MehrText from '../../../shared/components/MehrText'
 import type { WorksheetMeta } from '../model/types'
 
 /** Zeigt, wie Jahrgang, Schulform und Bundesland das Arbeitsblatt steuern; Werte sind überschreibbar. */
@@ -89,10 +90,11 @@ export function ProfileCard({
           <List.Item key={i}>{s}</List.Item>
         ))}
       </List>
-      <Text size="xs" c="dimmed" mt={6}>
-        Grundlage: KMK-Bildungsstandards (Anforderungsbereiche, Operatoren), Lesbarkeitsforschung (Schriftgröße, Satzlänge, LIX), Differenzierungs- und
-        Sprachbildungsdidaktik. Werte mit Faustregel-Charakter sind als Vorschlag zu verstehen.
-      </Text>
+      {/* Herkunft der Werte hinter „Mehr“ (Paket 6) – vollständig, nur kürzer im Formular */}
+      <MehrText
+        mt={6}
+        text="Grundlage: KMK-Bildungsstandards (Anforderungsbereiche, Operatoren), Lesbarkeitsforschung (Schriftgröße, Satzlänge, LIX), Differenzierungs- und Sprachbildungsdidaktik. Werte mit Faustregel-Charakter sind als Vorschlag zu verstehen."
+      />
     </Card>
   )
 }

@@ -437,3 +437,85 @@ body {
 :root[data-auftraege] .app-main {
   padding-bottom: 60px;
 }
+
+/*
+ * Formulare mit festem Hauptknopf (shared/components/Formularfuss.tsx, Paket 6).
+ * Der Inhalt scrollt, die Fußleiste bleibt unten stehen – Farben aus dem Thema.
+ */
+.formular-seite {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.formular-inhalt {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.formular-fuss {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--app-border, var(--mantine-color-default-border));
+  background: var(--app-surface, var(--mantine-color-body));
+  padding: 8px 16px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.formular-fuss-innen {
+  max-width: 1320px;
+  margin-inline: auto;
+}
+
+.formular-fuss-grund {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weitere-optionen-kopf:hover {
+  background: var(--mantine-color-default-hover);
+}
+
+.weitere-optionen-inhalt {
+  padding: 4px 16px 16px;
+}
+
+/* Schmal: Der Sperrgrund darf umbrechen, statt abgeschnitten zu werden */
+@media (max-width: 700px) {
+  .formular-fuss-grund {
+    white-space: normal;
+  }
+}
+
+/*
+ * Einfügestelle zwischen zwei Gliederungspunkten (arbeitsblatt/steps/EinfuegenMenue.tsx):
+ * Das „+“ erscheint beim Überfahren der Lücke oder mit der Tastatur; ohne Maus (Tablet)
+ * steht es dauernd da, sonst wäre es dort nie zu sehen.
+ */
+.einfuege-stelle {
+  display: flex;
+  justify-content: center;
+  height: 10px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.einfuege-stelle .mantine-ActionIcon-root {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.einfuege-stelle:hover .mantine-ActionIcon-root,
+.einfuege-stelle:focus-within .mantine-ActionIcon-root,
+.einfuege-stelle .mantine-ActionIcon-root[data-expanded] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .einfuege-stelle .mantine-ActionIcon-root {
+    opacity: 0.8;
+  }
+}

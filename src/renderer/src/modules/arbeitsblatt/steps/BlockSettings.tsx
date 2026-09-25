@@ -400,7 +400,7 @@ export function BlockSettings({
   return (
     <Popover width={320} position="left-start" shadow="md" withArrow trapFocus={false}>
       <Popover.Target>
-        <Button size="compact-xs" variant="default" px={4} title="Baustein einstellen">
+        <Button size="compact-xs" variant="default" px={4} title="Baustein einstellen" aria-label="Baustein einstellen">
           <IconAdjustments size={14} />
         </Button>
       </Popover.Target>
