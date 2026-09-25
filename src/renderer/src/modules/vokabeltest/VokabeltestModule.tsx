@@ -7,12 +7,13 @@ import EditorStep from './steps/EditorStep'
 import SettingsStep from './steps/SettingsStep'
 import VocabStep from './steps/VocabStep'
 import { TestLibraryModal } from './steps/TestLibrary'
-import { newTestSafely, useAutosave } from './library'
+import { newTestSafely, openSavedTest, useAutosave } from './library'
 import { sichereAlles } from '../../shared/autosave'
 import { useUndoKeys } from '../../shared/useUndoKeys'
 import { parseProjectFile } from './project'
 import { includedVocab } from './model/vocab'
 import { useVokabeltest } from './store'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo } = useVokabeltest()
@@ -20,6 +21,12 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
   useAutosave()
   // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt (vorher hing es am Editor, auch im Hintergrund)
   useUndoKeys(active && !libraryOpen, undo, redo)
+
+  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
+  useDokumentOeffner('vokabeltest', async (id) => {
+    await openSavedTest(id)
+    setLibraryOpen(false)
+  })
 
   // Beim Öffnen einer .vokabeltest-Datei per Doppelklick direkt laden
   useEffect(() => {

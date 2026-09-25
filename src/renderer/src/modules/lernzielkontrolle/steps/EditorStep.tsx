@@ -1,6 +1,6 @@
 import { Accordion, ActionIcon, Alert, Badge, Button, Card, Container, Group, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core'
 import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconDownload, IconFileTypeDocx, IconInfoCircle, IconPrinter } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, notifySuccess } from '../../../shared/util'
@@ -18,6 +18,7 @@ import { pruefeKurztest, teilaufgaben, zaehleBefunde, type Befund } from '../did
 import { dauerSchaetzung } from '../generation/generateKurztest'
 import { kurztestToWorksheet, kurztestToWorksheetAlle, schluesselHerkunft } from '../render/kurztestWorksheet'
 import { useLernzielkontrolle } from '../store'
+import { useDruck } from '../../../shared/navigation'
 
 /**
  * Schritt 2: ansehen, bearbeiten, ausgeben.
@@ -100,6 +101,9 @@ export default function EditorStep(): React.JSX.Element {
   const ws = useMemo(() => (test ? kurztestToWorksheet(test, variante, schwellen) : null), [test, variante, schwellen])
   const befunde = useMemo(() => (test ? pruefeKurztest(test, variante) : []), [test, variante])
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
+  // Strg+P druckt wie der Knopf „Drucken" (mit Rückfrage bei mehreren Fassungen); vor dem frühen return, weil es ein Hook ist
+  const drucken = useRef<() => void>(() => undefined)
+  useDruck('lernzielkontrolle', test && ws ? () => drucken.current() : null)
   if (!test || !ws) return <Container py="xl">Keine Lernzielkontrolle geladen.</Container>
 
   const sheet = ws.sheets[0]
@@ -169,6 +173,7 @@ export default function EditorStep(): React.JSX.Element {
     if (mehrereFassungen) setFrage(was)
     else ausfuehren(was, false)
   }
+  drucken.current = () => starte('print')
 
   /*
    * Bausteine von Hand ordnen und frei platzieren – derselbe Rahmen wie im Arbeitsblatt.

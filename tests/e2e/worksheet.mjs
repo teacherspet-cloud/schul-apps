@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync } from 'fs'
 import { resolve, join } from 'path'
 import { tmpdir } from 'os'
 import { oeffneLerngruppe } from './warten.mjs'
+import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/arbeitsblatt')
 mkdirSync(out, { recursive: true })
 // Eigener Datenordner: Die Tests dürfen nichts in den gespeicherten Tests,
@@ -15,7 +16,8 @@ const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 await page.setViewportSize({ width: 1500, height: 1000 })
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 try {
   await page.click('[aria-label="Arbeitsblatt"]')
   // Sind schon Arbeitsblätter gespeichert, öffnet sich die Bibliothek – dann neu anfangen

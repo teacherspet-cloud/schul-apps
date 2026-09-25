@@ -49,6 +49,7 @@ import type { KurztestMeta, StoffQuelle } from '../model/types'
 import { variantenLabel } from '../model/types'
 import { aiCall, trackedAiCall, useLernzielkontrolle } from '../store'
 import VorwissenChips from '../../arbeitsblatt/steps/VorwissenChips'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
 /**
  * Schritt 1: Lerngruppe, Landesformat, Umfang.
@@ -220,7 +221,8 @@ export default function SetupStep(): React.JSX.Element {
               </Title>
               <Stack gap="sm">
                 <Group grow>
-                  <Select
+                  <HaeufigSelect
+                    art="fach"
                     label="Fach"
                     data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
                     value={m.subjectId}
@@ -243,7 +245,8 @@ export default function SetupStep(): React.JSX.Element {
                   schoolTypeName={m.schoolTypeName}
                 >
                   <Group grow>
-                    <Select
+                    <HaeufigSelect
+                      art="bundesland"
                       label="Bundesland"
                       data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                       value={m.stateId}
@@ -264,7 +267,8 @@ export default function SetupStep(): React.JSX.Element {
                       allowDeselect={false}
                       searchable
                     />
-                    <Select
+                    <HaeufigSelect
+                      art="schulform"
                       label="Schulform"
                       data={types}
                       value={m.schoolTypeId}

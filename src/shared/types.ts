@@ -213,6 +213,12 @@ export interface AppSettings {
   /** Nach welchem Regelwerk Quellen auf den Materialien angegeben werden */
   citationStyle: CitationStyle
   /**
+   * Zeitpunkt der letzten gespeicherten Sicherung (ISO). Die Startseite erinnert daran, wenn
+   * sie lange zurückliegt – eine Sicherung, an die niemand denkt, fehlt genau dann, wenn der
+   * Rechner ausfällt.
+   */
+  letzteSicherung?: string
+  /**
    * Zugriff aus dem lokalen Netz (Browser auf Tablet, Handy, zweitem Rechner).
    *
    * Hier steht nur, WOMIT der Zugang liefe – Port und PIN. Ob er laeuft, steht bewusst

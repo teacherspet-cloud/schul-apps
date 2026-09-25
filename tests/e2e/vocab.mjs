@@ -4,6 +4,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/vokabeltest')
 mkdirSync(out, { recursive: true })
@@ -16,7 +17,8 @@ const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 await page.setViewportSize({ width: 1500, height: 1100 })
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 await page.click('[aria-label="Vokabeltest"]')
 await page.waitForSelector('text=Vokabelliste')
 

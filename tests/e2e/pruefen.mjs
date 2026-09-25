@@ -3,6 +3,7 @@
 import { _electron as electron } from 'playwright-core'
 import { mkdirSync, writeFileSync } from 'fs'
 import { resolve, join } from 'path'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/pruefung')
 mkdirSync(out, { recursive: true })
@@ -76,7 +77,8 @@ function checkListening(area, audios, tasks) {
 
 const app = await electron.launch({ args: ['.'] })
 const page = await app.firstWindow()
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 
 const sheetId = arg('--sheet')
 if (sheetId) {

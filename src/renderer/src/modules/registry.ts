@@ -11,7 +11,13 @@ import VokabeltestModule from './vokabeltest/VokabeltestModule'
 /**
  * Jedes Programm der Schul-Apps ist ein Modul.
  * Neues Programm: Ordner unter modules/ anlegen und hier eintragen –
- * es erscheint dann automatisch als Kachel auf der Startseite.
+ * es erscheint dann automatisch als Kachel auf der Startseite und in der Leiste.
+ *
+ * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+6.
+ *
+ * Die Kacheltexte sagen, WANN man welches Programm nimmt – vor allem bei Lernzielkontrolle,
+ * Grammatiktest und Klassenarbeit, die sich auf den ersten Blick ähneln (Rückmeldung der
+ * Lehrkraft, 25.09.2026). Deshalb haben LZK und Klassenarbeit auch nicht mehr dieselbe Farbe.
  */
 export interface SchulModule {
   id: string
@@ -21,28 +27,24 @@ export interface SchulModule {
   color: string
   /** active: das Programm ist gerade geöffnet (Module bleiben im Hintergrund erhalten) */
   component: ComponentType<{ active: boolean }>
-  /** Dateitypen, die das Modul per Drag & Drop verarbeitet (nur zur Anzeige) */
-  acceptedFiles?: string[]
 }
 
 export const modules: SchulModule[] = [
   {
     id: 'vokabeltest',
     name: 'Vokabeltest',
-    description: 'Kontextbasierte Vokabeltests aus Vokabellisten erstellen, auch aus Fotos, PDF- und Word-Dateien.',
+    description: 'Vokabeltests mit Aufgaben im Satzzusammenhang – aus eigenen Listen, Schulbuchvokabeln, Fotos, PDF- oder Word-Dateien.',
     icon: IconLanguage,
     color: 'teal',
-    component: VokabeltestModule,
-    acceptedFiles: ['Bild', 'PDF', 'DOCX', 'CSV', 'XLSX']
+    component: VokabeltestModule
   },
   {
     id: 'vokabelliste',
     name: 'Vokabellisten',
-    description: 'Eigene Vokabellisten anlegen und pflegen – mit grau markierten Wörtern, die nicht abgefragt werden müssen.',
+    description: 'Schulbuchvokabeln und eigene Listen anlegen und pflegen – Grundlage für Vokabeltests und Klassenarbeiten.',
     icon: IconListLetters,
     color: 'cyan',
-    component: VokabellisteModule,
-    acceptedFiles: ['Bild', 'PDF', 'DOCX', 'CSV', 'XLSX']
+    component: VokabellisteModule
   },
   {
     id: 'arbeitsblatt',
@@ -50,22 +52,20 @@ export const modules: SchulModule[] = [
     description: 'Didaktisch aufbereitete Arbeitsblätter zu jedem Thema – passend zu Jahrgang, Schulform und Bundesland, mit eigenem Design.',
     icon: IconFileText,
     color: 'indigo',
-    component: ArbeitsblattModule,
-    acceptedFiles: ['Bild', 'PDF', 'DOCX', 'TXT']
+    component: ArbeitsblattModule
   },
   {
     id: 'lernzielkontrolle',
     name: 'Lernzielkontrolle',
-    description:
-      'Kurze schriftliche Leistungskontrollen – im Format des eigenen Bundeslandes, mit dessen Zeitgrenze und Operatorenliste. Nur Aufgaben und Material, keine Lernhilfen.',
+    description: 'Kurze schriftliche Überprüfung in jedem Fach – im Format des Bundeslandes (Bezeichnung, Zeitgrenze, Operatoren). Nur Aufgaben und Material.',
     icon: IconClipboardCheck,
-    color: 'grape',
+    color: 'blue',
     component: LernzielkontrolleModule
   },
   {
     id: 'grammatiktest',
     name: 'Grammatiktest',
-    description: 'Kurze Tests zu einer Grammatikform – mit Notenschlüssel und einem Fehlerprofil, das zeigt, woran als Nächstes zu arbeiten ist.',
+    description: 'Test zu einer Grammatikform zur Diagnose – das Fehlerprofil zeigt, woran als Nächstes zu arbeiten ist. Benotet oder ohne Note.',
     icon: IconAbc,
     color: 'orange',
     component: GrammatiktestModule
@@ -73,10 +73,9 @@ export const modules: SchulModule[] = [
   {
     id: 'klassenarbeit',
     name: 'Klassenarbeiten',
-    description: 'Klassenarbeiten für Englisch und Geschichte entwerfen – mit Aufgabenformaten, Punkteverteilung und Erwartungshorizont.',
+    description: 'Große schriftliche Arbeit in Englisch oder Geschichte – mit Material, Punkteverteilung und Erwartungshorizont.',
     icon: IconPencilCheck,
     color: 'grape',
-    component: KlassenarbeitModule,
-    acceptedFiles: ['PDF', 'DOCX', 'TXT']
+    component: KlassenarbeitModule
   }
 ]

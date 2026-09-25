@@ -11,6 +11,7 @@ import { newId } from '../../vokabeltest/model/random'
 import { LANGUAGES } from '../../vokabeltest/model/types'
 import type { VocabEntry } from '../../vokabeltest/model/types'
 import { aiCall } from '../../vokabeltest/store'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
 /** Vorgaben, die der Wizard mitnimmt (Land, Schulform, Fach kommen aus der Übersicht) */
 export interface WizardDefaults {
@@ -149,7 +150,8 @@ export default function NewListWizard({
               schoolTypeName={schoolTypes.find((t) => t.value === schoolTypeId)?.label ?? ''}
             >
               <Group grow align="flex-start">
-                <Select
+                <HaeufigSelect
+                  art="bundesland"
                   label="Bundesland"
                   data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                   value={stateId}
@@ -157,7 +159,8 @@ export default function NewListWizard({
                   allowDeselect={false}
                   searchable
                 />
-                <Select
+                <HaeufigSelect
+                  art="schulform"
                   label="Schulform"
                   data={schoolTypes}
                   value={schoolTypes.some((t) => t.value === schoolTypeId) ? schoolTypeId : (schoolTypes[0]?.value ?? '')}

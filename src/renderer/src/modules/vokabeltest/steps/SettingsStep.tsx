@@ -38,6 +38,8 @@ import { includedVocab } from '../model/vocab'
 import { aiCall, useVokabeltest } from '../store'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
+import EinstellungenLink from '../../../shared/components/EinstellungenLink'
 
 const DEFAULT_TASKS: TaskTypeId[] = ['gapSentences', 'matchDefinitions', 'multipleChoice']
 /*
@@ -221,8 +223,8 @@ export default function SettingsStep(): React.JSX.Element {
 
         {!hasKey && (
           <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">
-            Zum Erstellen der Aufgaben wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt. Bitte links unten unter „Einstellungen" die KI
-            einrichten.
+            Zum Erstellen der Aufgaben wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt.{' '}
+            <EinstellungenLink tab="ki">KI-Zugang einrichten</EinstellungenLink>
           </Alert>
         )}
 
@@ -275,7 +277,8 @@ export default function SettingsStep(): React.JSX.Element {
                         schoolTypeName={state?.schoolTypes.find((t) => t.id === settings.schoolTypeId)?.name ?? ''}
                       >
                         <Group grow>
-                          <Select
+                          <HaeufigSelect
+                            art="bundesland"
                             label="Bundesland"
                             maxDropdownHeight={400}
                             data={table.states.map((s) => ({ value: s.id, label: s.name }))}
@@ -285,7 +288,8 @@ export default function SettingsStep(): React.JSX.Element {
                             }
                             allowDeselect={false}
                           />
-                          <Select
+                          <HaeufigSelect
+                            art="schulform"
                             label="Schulform"
                             data={(state?.schoolTypes ?? []).map((s) => ({ value: s.id, label: s.name }))}
                             value={settings.schoolTypeId}
@@ -424,7 +428,8 @@ export default function SettingsStep(): React.JSX.Element {
                   />
                   {economy && (
                     <Text size="xs" c="dimmed">
-                      Sparmodus ist eingeschaltet (Einstellungen → Künstliche Intelligenz): Die Aufgaben einer Variante entstehen in einer einzigen Anfrage.
+                      Sparmodus ist eingeschaltet (<EinstellungenLink tab="ki">Einstellungen → KI-Zugang</EinstellungenLink>): Die Aufgaben einer Variante
+                      entstehen in einer einzigen Anfrage.
                     </Text>
                   )}
                 </Stack>

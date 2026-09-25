@@ -8,11 +8,12 @@ import EditorStep from './steps/EditorStep'
 import OutlineStep from './steps/OutlineStep'
 import TopicStep from './steps/TopicStep'
 import WorksheetLibrary from './steps/WorksheetLibrary'
-import { cleanWorksheetImages, newWorksheetSafely, useWorksheetAutosave } from './library'
+import { cleanWorksheetImages, newWorksheetSafely, openSavedWorksheet, useWorksheetAutosave } from './library'
 import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useUndoKeys } from '../../shared/useUndoKeys'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 export default function ArbeitsblattModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, worksheet, loadWorksheet, undo, redo } = useArbeitsblatt()
@@ -24,11 +25,18 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
   // Gesichert wird ab Schritt 1 – deshalb hängt das Sichern hier und nicht erst am Editor
   useWorksheetAutosave(logo, schoolName)
 
+  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
+  const vonAussen = useDokumentOeffner('arbeitsblatt', async (id) => {
+    await openSavedWorksheet(id)
+    setArea('create')
+    setLibrary(false)
+  })
+
   useEffect(() => {
     if (worksheet?.sheets.length) return
     window.api.sheets
       .list()
-      .then((list) => setLibrary(list.length > 0))
+      .then((list) => !vonAussen.current && setLibrary(list.length > 0))
       .catch(() => setLibrary(false))
   }, [])
 

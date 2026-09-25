@@ -1,7 +1,7 @@
 import { Box, Button, Group, ScrollArea, Stepper, Text, Tooltip } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { hatInhalt, newKurztestSafely, useKurztestAutosave } from './library'
+import { hatInhalt, newKurztestSafely, openSavedKurztest, useKurztestAutosave } from './library'
 import { notifyError } from '../../shared/util'
 import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../shared/useUndoKeys'
@@ -9,6 +9,7 @@ import EditorStep from './steps/EditorStep'
 import KurztestLibrary from './steps/KurztestLibrary'
 import SetupStep from './steps/SetupStep'
 import { useLernzielkontrolle } from './store'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
@@ -38,11 +39,17 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
     newKurztestSafely().catch(notifyError)
   }
 
+  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
+  const vonAussen = useDokumentOeffner('lernzielkontrolle', async (id) => {
+    await openSavedKurztest(id)
+    setLibrary(false)
+  })
+
   useEffect(() => {
     if (hatInhalt(useLernzielkontrolle.getState().test)) return
     window.api.kurztests
       .list()
-      .then((list) => setLibrary(list.length > 0))
+      .then((list) => !vonAussen.current && setLibrary(list.length > 0))
       .catch(() => setLibrary(false))
   }, [])
 

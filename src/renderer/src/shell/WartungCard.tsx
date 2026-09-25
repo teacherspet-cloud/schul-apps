@@ -3,6 +3,7 @@ import { IconAlertTriangle, IconDeviceFloppy, IconTrash } from '@tabler/icons-re
 import { useEffect, useState } from 'react'
 import { notifyError, notifySuccess } from '../shared/util'
 import SicherungEinlesen from './SicherungEinlesen'
+import { useAppSettings } from '../shared/settingsStore'
 
 /**
  * Sichern und Zurücksetzen.
@@ -50,7 +51,11 @@ export default function WartungCard(): React.JSX.Element {
     try {
       const { name, daten } = await window.api.wartung.sicherung()
       const pfad = await window.api.files.save(name, [{ name: 'Sicherung', extensions: ['json'] }], daten)
-      if (pfad) notifySuccess('Sicherung gespeichert.')
+      if (pfad) {
+        notifySuccess('Sicherung gespeichert.')
+        // Für die Erinnerung auf der Startseite („letzte Sicherung vor … Tagen")
+        await useAppSettings.getState().update({ letzteSicherung: new Date().toISOString() })
+      }
     } catch (e) {
       notifyError(e, 'Die Sicherung konnte nicht erstellt werden')
     }

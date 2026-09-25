@@ -7,6 +7,7 @@ import { _electron as electron } from 'playwright-core'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve('test-results/probe-klick')
 mkdirSync(out, { recursive: true })
@@ -29,7 +30,8 @@ await app.evaluate(async ({ BrowserWindow }) => {
     win.center()
   }
 })
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 
 await page.click('[aria-label="Grammatiktest"]')
 await page.waitForTimeout(800)

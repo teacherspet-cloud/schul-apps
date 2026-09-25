@@ -2,9 +2,10 @@
 // grau markieren, speichern – und der Wizard für neue Listen.
 // Vorher: npm run build. Aufruf: node tests/e2e/vocablist.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
-import { mkdirSync, mkdtempSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/vokabellisten')
 mkdirSync(out, { recursive: true })
@@ -30,7 +31,8 @@ const quiet = async () => {
 }
 
 await page.setViewportSize({ width: 1500, height: 1100 })
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 await page.click('[aria-label="Vokabellisten"]')
 await page.waitForSelector('text=Für welche Lerngruppe?')
 
@@ -133,3 +135,5 @@ console.log('Wizard öffnet mit Einfügebereich')
 console.log('Konsolenfehler:', errors.length ? errors.join(' | ') : 'keine')
 await app.close()
 if (errors.length) throw new Error('Fehler in der Konsole')
+// Temporären Datenordner wegräumen – nichts bleibt liegen
+rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })

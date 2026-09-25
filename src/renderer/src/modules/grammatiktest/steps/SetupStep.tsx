@@ -20,6 +20,7 @@ import type { GrammarTest, GrammarTestMeta } from '../model/types'
 import { trackedAiCall, useGrammatiktest } from '../store'
 import { AiProgressTracker, neverBackwards, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
 /** Fächer, für die es eine Grammatikliste gibt. */
 const TEST_SUBJECTS = SUBJECTS.filter((s) => hasGrammar(s.id))
@@ -146,7 +147,8 @@ export default function SetupStep(): React.JSX.Element {
               </Title>
               <Stack gap="sm">
                 <Group grow>
-                  <Select
+                  <HaeufigSelect
+                    art="fach"
                     label="Fach"
                     data={TEST_SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
                     value={meta.subjectId}
@@ -173,7 +175,8 @@ export default function SetupStep(): React.JSX.Element {
                   schoolTypeName={meta.schoolTypeName}
                 >
                   <Group grow>
-                    <Select
+                    <HaeufigSelect
+                      art="bundesland"
                       label="Bundesland"
                       data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                       value={meta.stateId}
@@ -189,7 +192,8 @@ export default function SetupStep(): React.JSX.Element {
                       }}
                       allowDeselect={false}
                     />
-                    <Select
+                    <HaeufigSelect
+                      art="schulform"
                       label="Schulform"
                       data={types}
                       value={meta.schoolTypeId}

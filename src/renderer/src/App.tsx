@@ -1,5 +1,6 @@
-import { ActionIcon, AppShell, ScrollArea, Tooltip } from '@mantine/core'
-import { IconHome, IconSettings } from '@tabler/icons-react'
+import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
+import { IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useEffect, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
@@ -10,6 +11,17 @@ import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
+import { druckeAktives, openModule, useNavigation } from './shared/navigation'
+
+/** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
+const LEISTE_KEY = 'schul-apps-leiste-breit'
+const leseLeiste = (): boolean => {
+  try {
+    return localStorage.getItem(LEISTE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 export default function App(): React.JSX.Element {
   /*
@@ -18,17 +30,27 @@ export default function App(): React.JSX.Element {
    * lauter Fehlermeldungen aufbauen.
    */
   const [angemeldet, setAngemeldet] = useState(() => !imNetz() || !abgemeldet())
-  const [active, setActiveRaw] = useState<string>('home')
+  // Wohin die App zeigt, steht im Navigations-Store – so können auch Hinweise und die Startseite dorthin führen
+  const active = useNavigation((s) => s.active)
+  const laufpunkte = useNavigation((s) => s.laufpunkte)
   const current = modules.find((m) => m.id === active)
 
   /*
-   * Beim Wechsel des Programms anstehende Sicherungen sofort ausführen. Die Programme bleiben
-   * zwar im Hintergrund erhalten – aber wer danach das Fenster schließt oder der Rechner
-   * ausgeht, soll nicht die letzten Sekunden Arbeit verlieren.
+   * Ausklappbare Leiste (Wunsch der Lehrkraft, 25.09.2026): Die Symbole allein waren nicht
+   * für jedes Programm selbsterklärend. Auf schmalen Bildschirmen (Tablet hochkant, kleines
+   * Fenster) bleibt sie schmal – dort braucht das Blatt jeden Zentimeter.
    */
-  const setActive = (id: string): void => {
-    if (id !== active) void sichereAlles()
-    setActiveRaw(id)
+  const [breitGewuenscht, setBreitGewuenscht] = useState(leseLeiste)
+  const schmalerBildschirm = useMediaQuery('(max-width: 1100px)') ?? false
+  const breit = breitGewuenscht && !schmalerBildschirm
+  const umschalten = (): void => {
+    const neu = !breitGewuenscht
+    setBreitGewuenscht(neu)
+    try {
+      localStorage.setItem(LEISTE_KEY, neu ? '1' : '0')
+    } catch {
+      // ohne lokalen Speicher gilt die Wahl nur für diese Sitzung
+    }
   }
 
   // Vor dem Schließen des Fensters: alles sichern und dem Hauptprozess Bescheid geben
@@ -44,6 +66,30 @@ export default function App(): React.JSX.Element {
     const weg = (): void => void sichereAlles()
     window.addEventListener('pagehide', weg)
     return () => window.removeEventListener('pagehide', weg)
+  }, [])
+
+  /*
+   * Tastenkürzel der Hauptapp: Strg+1 … Strg+6 öffnen die Programme in der Reihenfolge der
+   * Leiste, Strg+0 die Startseite, Strg+P den Druck des vorderen Programms – aber nur, wenn
+   * dort ein Editor mit Druck offen ist. Sonst bleibt Strg+P ohne Wirkung (am Rechner) bzw.
+   * beim Browser (Zugang aus dem Netz).
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.defaultPrevented) return
+      const ziffer = /^(Digit|Numpad)(\d)$/.exec(e.code)?.[2]
+      if (ziffer !== undefined) {
+        const n = Number(ziffer)
+        const ziel = n === 0 ? 'home' : modules[n - 1]?.id
+        if (!ziel) return
+        e.preventDefault()
+        openModule(ziel)
+        return
+      }
+      if (e.code === 'KeyP' && druckeAktives()) e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   // Hinweis, wenn die Modellliste im Hintergrund die KI-Auswahl aktualisiert hat
@@ -74,22 +120,43 @@ export default function App(): React.JSX.Element {
     )
 
   return (
-    <AppShell navbar={{ width: 76, breakpoint: 0 }} padding={0}>
-      <AppShell.Navbar p={10}>
+    <AppShell navbar={{ width: breit ? 232 : 76, breakpoint: 0 }} padding={0}>
+      <AppShell.Navbar p={10} className="app-leiste" data-breit={breit}>
         <AppShell.Section>
-          <NavIcon label="Startseite" active={active === 'home'} onClick={() => setActive('home')}>
+          <NavIcon label="Startseite" breit={breit} active={active === 'home'} onClick={() => openModule('home')}>
             <IconHome size={22} />
           </NavIcon>
         </AppShell.Section>
-        <AppShell.Section grow component={ScrollArea} mt="md">
+        {/*
+          Die Programmliste rollt nur senkrecht und ohne eigenen Balken-Rahmen. Vorher lag sie in
+          einer ScrollArea, deren waagerechter Balken unten als grauer Streifen über dem
+          Einstellungs-Symbol stehen blieb.
+        */}
+        <AppShell.Section grow className="leiste-liste" mt="md">
           {modules.map((m) => (
-            <NavIcon key={m.id} label={m.name} active={active === m.id} onClick={() => setActive(m.id)}>
+            <NavIcon key={m.id} label={m.name} breit={breit} active={active === m.id} badge={laufpunkte[m.id]} onClick={() => openModule(m.id)}>
               <m.icon size={22} />
             </NavIcon>
           ))}
         </AppShell.Section>
         <AppShell.Section>
-          <NavIcon label="Einstellungen" active={active === 'settings'} onClick={() => setActive('settings')}>
+          {!schmalerBildschirm && (
+            <Tooltip label={breit ? 'Leiste einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                className="leiste-umschalter"
+                onClick={umschalten}
+                aria-label={breit ? 'Leiste einklappen' : 'Leiste ausklappen'}
+                aria-expanded={breit}
+                size={36}
+                mb={6}
+              >
+                {breit ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
+              </ActionIcon>
+            </Tooltip>
+          )}
+          <NavIcon label="Einstellungen" breit={breit} active={active === 'settings'} onClick={() => openModule('settings')}>
             <IconSettings size={22} />
           </NavIcon>
         </AppShell.Section>
@@ -99,7 +166,8 @@ export default function App(): React.JSX.Element {
       <Einrichtung />
 
       <AppShell.Main className="app-main">
-        {active === 'home' && <Home onOpen={setActive} />}
+        {/* Die Startseite wird bei jedem Zurückkommen neu aufgebaut – damit ist „Zuletzt bearbeitet" aktuell */}
+        {active === 'home' && <Home />}
         {active === 'settings' && <SettingsPage />}
         {modules.map((m) => (
           // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
@@ -112,7 +180,45 @@ export default function App(): React.JSX.Element {
   )
 }
 
-function NavIcon(props: { label: string; active: boolean; onClick: () => void; children: React.ReactNode }): React.JSX.Element {
+/**
+ * Ein Eintrag der Leiste: schmal nur das Symbol mit Tooltip, breit Symbol und Name.
+ * `badge` setzt einen Punkt ans Symbol (z. B. solange im Programm ein Auftrag läuft).
+ */
+function NavIcon(props: {
+  label: string
+  active: boolean
+  breit: boolean
+  badge?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}): React.JSX.Element {
+  // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
+  const variant = props.active ? 'filled' : 'light'
+  const color = props.active ? undefined : 'gray'
+  const symbol = (
+    <Indicator disabled={!props.badge} size={10} offset={4} processing color="orange" position="top-end">
+      {props.children}
+    </Indicator>
+  )
+  if (props.breit)
+    return (
+      <Button
+        onClick={props.onClick}
+        aria-label={props.label}
+        className="nav-icon nav-breit"
+        data-active={props.active}
+        variant={variant}
+        color={color}
+        leftSection={symbol}
+        justify="flex-start"
+        fullWidth
+        h={48}
+        radius="md"
+        mb={8}
+      >
+        {props.label}
+      </Button>
+    )
   return (
     <Tooltip label={props.label} position="right" withArrow>
       <ActionIcon
@@ -120,14 +226,13 @@ function NavIcon(props: { label: string; active: boolean; onClick: () => void; c
         aria-label={props.label}
         className="nav-icon"
         data-active={props.active}
-        // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
-        variant={props.active ? 'filled' : 'light'}
-        color={props.active ? undefined : 'gray'}
+        variant={variant}
+        color={color}
         size={56}
         radius="md"
         mb={8}
       >
-        {props.children}
+        {symbol}
       </ActionIcon>
     </Tooltip>
   )

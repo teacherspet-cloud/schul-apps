@@ -53,6 +53,13 @@ export default function SicherungEinlesen({ variant = 'light' }: { variant?: 'li
     setLaeuft(true)
     try {
       await window.api.wartung.wiederherstellen(datei.data)
+      /*
+       * Die eingelesene Datei IST die jüngste bekannte Sicherung. Ohne diesen Eintrag erinnerte
+       * die Startseite auf einem neuen Rechner gleich wieder ans Sichern – oder nannte das
+       * Datum der Sicherung davor, das mit den Einstellungen in der Datei steckt.
+       */
+      if (datei.vorschau.erstellt && !Number.isNaN(Date.parse(datei.vorschau.erstellt)))
+        await window.api.settings.set({ letzteSicherung: new Date(datei.vorschau.erstellt).toISOString() }).catch(() => undefined)
       // Wie beim Zurücksetzen: Nur ein Neuladen zeigt überall den neuen Stand
       window.location.reload()
     } catch (e) {

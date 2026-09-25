@@ -1,7 +1,7 @@
 import { Box, Button, Group, Stepper } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { newExamSafely, useExamAutosave } from './library'
+import { newExamSafely, openSavedExam, useExamAutosave } from './library'
 import { notifyError } from '../../shared/util'
 import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../shared/useUndoKeys'
@@ -9,6 +9,7 @@ import ExamLibrary from './steps/ExamLibrary'
 import FrameStep from './steps/FrameStep'
 import TasksStep from './steps/TasksStep'
 import { useKlassenarbeit } from './store'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 /**
  * Programm „Klassenarbeiten“ – zunächst für Englisch und Geschichte.
@@ -28,11 +29,17 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
     newExamSafely().catch(notifyError)
   }
 
+  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
+  const vonAussen = useDokumentOeffner('klassenarbeit', async (id) => {
+    await openSavedExam(id)
+    setLibrary(false)
+  })
+
   useEffect(() => {
     if (useKlassenarbeit.getState().exam?.parts.length) return
     window.api.exams
       .list()
-      .then((list) => setLibrary(list.length > 0))
+      .then((list) => !vonAussen.current && setLibrary(list.length > 0))
       .catch(() => setLibrary(false))
   }, [])
 

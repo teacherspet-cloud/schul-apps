@@ -15,6 +15,7 @@ import type { Herkunft } from '../../../shared/voiceFilter'
 import { settingsFuerNiveau } from '@shared/voiceSettings'
 import { listeningRules } from '../didactics/listeningFormats'
 import { VoiceSettings } from './VoiceSettings'
+import EinstellungenLink from '../../../shared/components/EinstellungenLink'
 
 /** Sprecherzeilen „Name: Text“ aus dem Skript lesen; ohne Namen gilt der erste Sprecher. */
 export function scriptTurns(block: AudioBlock): { name: string; text: string }[] {
@@ -317,7 +318,7 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
       </Group>
       {voicesError && (
         <Alert color="orange" title="Keine Stimmen geladen">
-          {voicesError} Der Schlüssel steht in den Einstellungen unter „Hörtexte“.
+          {voicesError} Der Schlüssel steht in den Einstellungen unter <EinstellungenLink tab="dienste">Bilder und Hörtexte</EinstellungenLink>.
         </Alert>
       )}
       {!voicesError && voices.length > 0 && language && (

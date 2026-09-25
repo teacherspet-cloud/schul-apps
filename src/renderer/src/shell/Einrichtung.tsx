@@ -15,7 +15,7 @@ import SicherungEinlesen from './SicherungEinlesen'
  *
  * Drei Entscheidungen aus der Rücksprache:
  *
- * - Drei Schritte: Schule und Lerngruppe, KI-Zugang, Logo und Design.
+ * - Drei Schritte: Schule und Lerngruppe (mit Logo), KI-Zugang, Aussehen der Oberfläche.
  * - JEDER Schritt ist überspringbar. Wer den Schlüssel gerade nicht zur Hand hat, soll nicht
  *   festsitzen – die Programme sagen später ohnehin, was fehlt.
  * - Eine Sicherung lässt sich hier direkt einlesen – nach dem Zurücksetzen der naheliegende Weg
@@ -77,9 +77,15 @@ export default function Einrichtung(): React.JSX.Element | null {
     },
     {
       label: 'Aussehen',
-      beschreibung: 'Logo und Design',
+      beschreibung: 'Farben der Oberfläche',
       icon: <IconPalette size={18} />,
-      hinweis: 'Betrifft nur das Aussehen der Blätter, nicht die Funktion. Lässt sich jederzeit in den Einstellungen ändern.',
+      /*
+       * Bis 25.09.2026 stand hier „Logo und Design" und „Betrifft nur das Aussehen der
+       * Blätter" – beides falsch: Die Karte stellt Modus und Thema der OBERFLÄCHE ein, Blätter
+       * und Tests bleiben unberührt, und das Logo gehört zu Schritt 1.
+       */
+      hinweis:
+        'Betrifft nur die Oberfläche des Programms – Blätter und Tests sehen unverändert aus. Das Schullogo steht in Schritt 1. Lässt sich jederzeit in den Einstellungen ändern.',
       inhalt: <AppearanceCard settings={settings} update={update} />
     }
   ]

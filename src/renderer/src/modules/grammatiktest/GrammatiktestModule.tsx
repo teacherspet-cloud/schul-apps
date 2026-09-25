@@ -1,7 +1,7 @@
 import { Box, Button, Group, ScrollArea, Stepper, Text, Tooltip } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { newTestSafely, useTestAutosave } from './library'
+import { newTestSafely, openSavedTest, useTestAutosave } from './library'
 import { notifyError } from '../../shared/util'
 import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../shared/useUndoKeys'
@@ -9,6 +9,7 @@ import SetupStep from './steps/SetupStep'
 import TestEditorStep from './steps/TestEditorStep'
 import TestLibrary from './steps/TestLibrary'
 import { useGrammatiktest } from './store'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
@@ -31,11 +32,17 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
     newTestSafely().catch(notifyError)
   }
 
+  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
+  const vonAussen = useDokumentOeffner('grammatiktest', async (id) => {
+    await openSavedTest(id)
+    setLibrary(false)
+  })
+
   useEffect(() => {
     if (useGrammatiktest.getState().test?.blocks.length) return
     window.api.grammarTests
       .list()
-      .then((list) => setLibrary(list.length > 0))
+      .then((list) => !vonAussen.current && setLibrary(list.length > 0))
       .catch(() => setLibrary(false))
   }, [])
 

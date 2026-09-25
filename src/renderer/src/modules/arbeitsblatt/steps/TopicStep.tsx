@@ -98,6 +98,8 @@ import { aiCall, useArbeitsblatt } from '../store'
 import { sichereAlles } from '../../../shared/autosave'
 import { ProfileCard } from './ProfileCard'
 import { isSensitiveForRolePlay, rolePlayTypeById, rolePlayTypesFor, WITHOUT_ESTABLISHED_PRACTICE } from '../didactics/rolePlay'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
+import EinstellungenLink from '../../../shared/components/EinstellungenLink'
 import {
   duringPolicy,
   observationFoci,
@@ -390,7 +392,7 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
 
         {!hasKey && (
           <Alert color="orange" icon={<IconAlertTriangle />} mb="md" title="Die gewählte KI ist noch nicht eingerichtet">
-            Bitte links unten unter „Einstellungen" einen API-Schlüssel eintragen oder den Abo-Zugang einrichten.
+            Zum Erzeugen wird ein API-Schlüssel oder ein freigegebener Abo-Zugang benötigt. <EinstellungenLink tab="ki">KI-Zugang einrichten</EinstellungenLink>
           </Alert>
         )}
 
@@ -403,7 +405,8 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
                 </Title>
                 <Stack gap="sm">
                   <Group grow>
-                    <Select
+                    <HaeufigSelect
+                      art="fach"
                       label="Fach"
                       data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
                       value={meta.subjectId}
@@ -441,7 +444,8 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
                     schoolTypeName={schoolTypesForState(table, meta.stateId).find((t) => t.value === meta.schoolTypeId)?.label ?? ''}
                   >
                     <Group grow>
-                      <Select
+                      <HaeufigSelect
+                        art="bundesland"
                         label="Bundesland"
                         data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                         value={meta.stateId}
@@ -449,7 +453,8 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
                         allowDeselect={false}
                         maxDropdownHeight={400}
                       />
-                      <Select
+                      <HaeufigSelect
+                        art="schulform"
                         label="Schulform"
                         data={schoolTypesForState(table, meta.stateId)}
                         value={meta.schoolTypeId}

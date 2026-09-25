@@ -15,6 +15,7 @@ import { _electron as electron } from 'playwright-core'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { resolve, join } from 'path'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/gruendlich')
 mkdirSync(out, { recursive: true })
@@ -57,7 +58,8 @@ await app.evaluate(async ({ BrowserWindow }) => {
   win.center()
 })
 await page.waitForTimeout(300)
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 
 const shot = (name) => page.screenshot({ path: join(out, `${name}.png`), fullPage: true })
 const field = (name) => page.getByLabel(name).filter({ visible: true }).first()

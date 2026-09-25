@@ -3,6 +3,7 @@ import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/gitternetze')
 mkdirSync(out, { recursive: true })
@@ -11,7 +12,8 @@ mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-grids-'))
 const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], env: { ...process.env, SCHULAPPS_SELFTEST: '1' } })
 const page = await app.firstWindow()
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 
 const grids = await page.evaluate(() => window.__selftest.grids(170))
 writeFileSync(

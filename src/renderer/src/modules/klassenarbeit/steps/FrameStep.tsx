@@ -53,6 +53,7 @@ import { GLOSSAR_HILFSMITTEL } from '../generation/glossar'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import GradeScaleModal from '../../../shared/components/GradeScaleModal'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
 const SUBJECTS: { value: ExamSubjectId; label: string }[] = [
   { value: 'englisch', label: 'Englisch' },
@@ -219,7 +220,8 @@ export default function FrameStep({ onLibrary }: { onLibrary: () => void }): Rea
                 </Title>
                 <Stack gap="sm">
                   <Group grow>
-                    <Select
+                    <HaeufigSelect
+                      art="fach"
                       label="Fach"
                       data={SUBJECTS}
                       value={meta.subjectId}
@@ -338,14 +340,16 @@ export default function FrameStep({ onLibrary }: { onLibrary: () => void }): Rea
                     schoolTypeName={meta.schoolTypeName}
                   >
                     <Group grow>
-                      <Select
+                      <HaeufigSelect
+                        art="bundesland"
                         label="Bundesland"
                         data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                         value={meta.stateId}
                         onChange={(v) => v && patch({ stateId: v })}
                         allowDeselect={false}
                       />
-                      <Select
+                      <HaeufigSelect
+                        art="schulform"
                         label="Schulform"
                         data={schoolTypesForState(table, meta.stateId)}
                         value={meta.schoolTypeId}

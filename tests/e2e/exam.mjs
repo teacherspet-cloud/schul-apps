@@ -1,8 +1,9 @@
 // Oberflächentest Klassenarbeiten (vorher: npm run build). Aufruf: node tests/e2e/exam.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
-import { mkdirSync, mkdtempSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
+import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/klassenarbeit')
 mkdirSync(out, { recursive: true })
 // Eigener Datenordner: Die Tests dürfen nichts in den gespeicherten Tests,
@@ -14,7 +15,8 @@ const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 await page.setViewportSize({ width: 1500, height: 1200 })
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 await page.click('[aria-label="Klassenarbeiten"]')
 await page.waitForSelector('text=Rahmen der Arbeit')
 // Vokabeln aus dem Schulbuch zuordnen: Buch → Unit → Abschnitte, Kästen zuschaltbar
@@ -84,3 +86,5 @@ if (left !== saved - 1) throw new Error('Die Eingabetaste hat die Arbeit nicht g
 console.log('Konsolenfehler:', errors.length ? errors.join(' | ') : 'keine')
 if (errors.length) throw new Error('Fehler in der Konsole')
 await app.close()
+// Temporären Datenordner wegräumen – nichts bleibt liegen
+rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })

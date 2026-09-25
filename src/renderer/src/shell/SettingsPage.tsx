@@ -1,11 +1,11 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Box,
   Button,
   Card,
   Checkbox,
-  Collapse,
   Container,
   Divider,
   Group,
@@ -26,7 +26,6 @@ import {
 } from '@mantine/core'
 import {
   IconCheck,
-  IconChevronDown,
   IconDeviceDesktop,
   IconDeviceTablet,
   IconTool,
@@ -55,6 +54,7 @@ import {
   SUBSCRIPTIONS
 } from '@shared/types'
 import { useAppSettings } from '../shared/settingsStore'
+import { openSettings, SettingsTab, useNavigation } from '../shared/navigation'
 import SubscriptionSetup, { ImageTestRow } from './SubscriptionSetup'
 import { AppTheme, mix, THEMES } from '../shared/themes'
 import DropZone, { FILE_TYPES } from '../shared/components/DropZone'
@@ -67,6 +67,7 @@ import { imNetz } from '../shared/netzZugang'
 import PictogramStudio from './PictogramStudio'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
+import HaeufigSelect from '../shared/components/HaeufigSelect'
 
 /**
  * Die Einstellungen in Reitern.
@@ -78,13 +79,25 @@ import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
  *
  * Der gewählte Reiter wird NICHT gespeichert: Man kommt fast immer wegen einer bestimmten
  * Sache her, und dann ist der erste Reiter der bessere Startpunkt als der letzte, den man
- * vor drei Wochen offen hatte.
+ * vor drei Wochen offen hatte. Kommt man über einen Hinweis in einem Programm her
+ * („KI-Zugang einrichten"), öffnet der Navigations-Store gleich den passenden Reiter.
  */
 export default function SettingsPage(): React.JSX.Element {
   const { settings, update } = useAppSettings()
+  const gewuenscht = useNavigation((s) => s.settingsTab)
+  const setTab = useNavigation((s) => s.setSettingsTab)
+  // KI-Zugang, Netzwerk und Wartung gibt es nur am Rechner – vom Tablet aus gilt dann der erste Reiter
+  const tab = imNetz() && ['ki', 'netzwerk', 'wartung'].includes(gewuenscht) ? 'schule' : gewuenscht
 
   return (
-    <Tabs defaultValue="schule" orientation="horizontal" keepMounted={false} h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
+    <Tabs
+      value={tab}
+      onChange={(v) => v && setTab(v as SettingsTab)}
+      orientation="horizontal"
+      keepMounted={false}
+      h="100%"
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
       <Container size="md" pt={40} pb={0} w="100%">
         <Title order={2} mb="md">
           Einstellungen
@@ -178,6 +191,12 @@ export default function SettingsPage(): React.JSX.Element {
 
           <Tabs.Panel value="dienste">
             <Stack gap="lg">
+              {/*
+                Die Bild-KI stand bis 25.09.2026 im Reiter „KI-Zugang". Gesucht wurde sie aber hier,
+                bei Bildern und Hörtexten – und die Piktogramm-Werkstatt verwies auf sie. Am Tablet
+                nicht: Die Anmeldung beim Anbieter läuft auf dem Rechner.
+              */}
+              {!imNetz() && <ImageAiCard settings={settings} update={update} />}
               <Card withBorder padding="lg">
                 <Title order={4} mb="md">
                   Bildsuche
@@ -238,79 +257,65 @@ type Update = (patch: Parameters<ReturnType<typeof useAppSettings.getState>['upd
 
 export function AppearanceCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
   const scheme = useComputedColorScheme('light')
-  // Offen: Die Karte hat einen eigenen Reiter, zugeklappt stünde dort fast nichts
-  const [open, setOpen] = useState(true)
+  /*
+   * Ohne Einklappen: Die Karte steht allein in ihrem Reiter (und allein im Schritt der
+   * Einrichtung). Zugeklappt stand dort nur eine Überschrift, und der Pfeil war ein Klick
+   * mehr ohne Nutzen.
+   */
   return (
     <Card withBorder padding="lg">
-      <Group
-        justify="space-between"
-        mb={open ? 'md' : 0}
-        style={{ cursor: 'pointer' }}
-        role="button"
-        tabIndex={0}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setOpen((v) => !v)}
-      >
-        <Title order={4}>Darstellung</Title>
-        <Group gap="xs">
-          <Text size="xs" c="dimmed">
-            {THEMES.find((t) => t.id === settings.appearance.theme)?.label ?? 'Farbthema'}
-          </Text>
-          <IconChevronDown size={18} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 150ms' }} />
-        </Group>
-      </Group>
-      <Collapse expanded={open}>
-        <div>
-          <Text size="sm" fw={500} mb={4}>
-            Modus
-          </Text>
-          <SegmentedControl
-            value={settings.appearance.colorScheme}
-            onChange={(v) => update({ appearance: { colorScheme: v as ColorSchemeSetting } })}
-            data={[
-              {
-                value: 'light',
-                label: <ModeLabel icon={<IconSun size={16} />} text="Hell" />
-              },
-              {
-                value: 'dark',
-                label: <ModeLabel icon={<IconMoon size={16} />} text="Dunkel" />
-              },
-              {
-                value: 'auto',
-                label: <ModeLabel icon={<IconDeviceDesktop size={16} />} text="Wie Windows" />
-              }
-            ]}
-          />
-          <Text size="sm" fw={500} mt="lg" mb={6}>
-            Thema
-          </Text>
-          <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
-            {THEMES.map((t) => (
-              <UnstyledButton
-                key={t.id}
-                className="theme-swatch"
-                data-active={settings.appearance.theme === t.id}
-                onClick={() => update({ appearance: { theme: t.id } })}
-                p="sm"
-                style={{ borderRadius: 10 }}
-              >
-                <ThemePreview theme={t} scheme={scheme} />
-                <Text size="sm" fw={600} mt={8}>
-                  {t.label}
-                </Text>
-                <Text size="xs" c="dimmed" lh={1.3}>
-                  {t.description}
-                </Text>
-              </UnstyledButton>
-            ))}
-          </SimpleGrid>
-          <Text size="xs" c="dimmed" mt="sm">
-            Das Thema ändert Farben, Schriften, Ecken, Navigation und Karten der Oberfläche. Tests und Arbeitsblätter werden davon nicht verändert.
-          </Text>
-        </div>
-      </Collapse>
+      <Title order={4} mb="md">
+        Darstellung
+      </Title>
+      <div>
+        <Text size="sm" fw={500} mb={4}>
+          Modus
+        </Text>
+        <SegmentedControl
+          value={settings.appearance.colorScheme}
+          onChange={(v) => update({ appearance: { colorScheme: v as ColorSchemeSetting } })}
+          data={[
+            {
+              value: 'light',
+              label: <ModeLabel icon={<IconSun size={16} />} text="Hell" />
+            },
+            {
+              value: 'dark',
+              label: <ModeLabel icon={<IconMoon size={16} />} text="Dunkel" />
+            },
+            {
+              value: 'auto',
+              label: <ModeLabel icon={<IconDeviceDesktop size={16} />} text="Wie Windows" />
+            }
+          ]}
+        />
+        <Text size="sm" fw={500} mt="lg" mb={6}>
+          Thema
+        </Text>
+        <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="sm">
+          {THEMES.map((t) => (
+            <UnstyledButton
+              key={t.id}
+              className="theme-swatch"
+              data-active={settings.appearance.theme === t.id}
+              onClick={() => update({ appearance: { theme: t.id } })}
+              p="sm"
+              style={{ borderRadius: 10 }}
+            >
+              <ThemePreview theme={t} scheme={scheme} />
+              <Text size="sm" fw={600} mt={8}>
+                {t.label}
+              </Text>
+              <Text size="xs" c="dimmed" lh={1.3}>
+                {t.description}
+              </Text>
+            </UnstyledButton>
+          ))}
+        </SimpleGrid>
+        <Text size="xs" c="dimmed" mt="sm">
+          Das Thema ändert Farben, Schriften, Ecken, Navigation und Karten der Oberfläche. Tests und Arbeitsblätter werden davon nicht verändert.
+        </Text>
+      </div>
     </Card>
   )
 }
@@ -424,8 +429,6 @@ function ModeLabel({ icon, text }: { icon: React.ReactNode; text: string }): Rea
 export function AiCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
   const { ai } = settings
   const textInfo = AI_PROVIDERS.find((p) => p.id === ai.textProvider)!
-  const imageProvider = ai.imageProvider === 'none' ? null : ai.imageProvider
-  const imageAccess = imageProvider ? ai.imageAccess[imageProvider] : 'api'
   const [reloadKey, setReloadKey] = useState(0)
 
   return (
@@ -434,9 +437,13 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
         Künstliche Intelligenz
       </Title>
       <Text size="sm" c="dimmed" mb="md">
-        Die KI erstellt Aufgaben, liest Vokabellisten aus Fotos und erzeugt auf Wunsch Bilder. Zugang entweder über einen API-Schlüssel (schnell,
-        nutzungsabhängig bezahlt; Schlüssel werden verschlüsselt auf diesem PC gespeichert) oder über ein privates Abo mithilfe des offiziellen Programms des
-        Anbieters (langsamer, mit Nutzungsgrenzen des Abos). Für Texte und Bilder lässt sich der Zugang getrennt wählen.
+        Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang entweder über einen API-Schlüssel (schnell, nutzungsabhängig bezahlt; Schlüssel
+        werden verschlüsselt auf diesem PC gespeichert) oder über ein privates Abo mithilfe des offiziellen Programms des Anbieters (langsamer, mit
+        Nutzungsgrenzen des Abos). Die KI für Bilder steht im Reiter{' '}
+        <Anchor component="button" size="sm" onClick={() => openSettings('dienste')}>
+          Bilder und Hörtexte
+        </Anchor>
+        .
       </Text>
 
       <Stack gap="md">
@@ -505,6 +512,36 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
 
         <Divider />
 
+        <Checkbox
+          checked={ai.autoLatest}
+          onChange={(e) => update({ ai: { autoLatest: e.currentTarget.checked } })}
+          label="Modelle automatisch aktuell halten"
+          description="Die Modellliste wird beim Start und alle 12 Stunden direkt beim Anbieter abgefragt. Ist diese Option aktiv, wird immer das empfohlene neueste Modell genutzt. Abgekündigte Modelle werden in jedem Fall automatisch ersetzt."
+        />
+      </Stack>
+    </Card>
+  )
+}
+
+/**
+ * KI für Bilder – eigene Karte im Reiter „Bilder und Hörtexte" (vorher im Reiter „KI-Zugang").
+ * Die Einstellungen selbst sind unverändert: Anbieter, Zugang per Schlüssel oder Abo, Modell.
+ */
+export function ImageAiCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
+  const { ai } = settings
+  const imageProvider = ai.imageProvider === 'none' ? null : ai.imageProvider
+  const imageAccess = imageProvider ? ai.imageAccess[imageProvider] : 'api'
+  const [reloadKey, setReloadKey] = useState(0)
+
+  return (
+    <Card withBorder padding="lg">
+      <Title order={4} mb={4}>
+        Bilder mit KI
+      </Title>
+      <Text size="sm" c="dimmed" mb="md">
+        Erzeugt auf Wunsch Bilder für Arbeitsblätter und gestaltet Piktogramme neu. Der Zugang lässt sich getrennt von der KI für Texte wählen.
+      </Text>
+      <Stack gap="md">
         <Select
           label="KI für Bilder"
           data={[
@@ -540,7 +577,10 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
             />
             {imageAccess === 'subscription' ? (
               ai.access[ai.textProvider] === 'subscription' && ai.textProvider === imageProvider ? (
-                <ImageTestRow provider={imageProvider} note={`Nutzt den oben eingerichteten Abo-Zugang. ${SUBSCRIPTIONS[imageProvider].imageNote}`} />
+                <ImageTestRow
+                  provider={imageProvider}
+                  note={`Nutzt den im Reiter „KI-Zugang“ eingerichteten Abo-Zugang. ${SUBSCRIPTIONS[imageProvider].imageNote}`}
+                />
               ) : (
                 <SubscriptionSetup key={`sub-image-${imageProvider}`} provider={imageProvider} settings={settings} update={update} purpose="image" />
               )
@@ -559,7 +599,7 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
                 )}
                 {imageProvider === 'anthropic' ? (
                   <Text size="xs" c="dimmed">
-                    Für Zeichnungen wird das oben bzw. zuletzt gewählte Claude-Textmodell verwendet ({ai.textModels.anthropic}).
+                    Für Zeichnungen wird das im Reiter „KI-Zugang“ zuletzt gewählte Claude-Textmodell verwendet ({ai.textModels.anthropic}).
                   </Text>
                 ) : (
                   <ModelSelect
@@ -582,15 +622,6 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
             )}
           </>
         )}
-
-        <Divider />
-
-        <Checkbox
-          checked={ai.autoLatest}
-          onChange={(e) => update({ ai: { autoLatest: e.currentTarget.checked } })}
-          label="Modelle automatisch aktuell halten"
-          description="Die Modellliste wird beim Start und alle 12 Stunden direkt beim Anbieter abgefragt. Ist diese Option aktiv, wird immer das empfohlene neueste Modell genutzt. Abgekündigte Modelle werden in jedem Fall automatisch ersetzt."
-        />
       </Stack>
     </Card>
   )
@@ -866,7 +897,8 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
         />
         <LogoField />
         <Group grow>
-          <Select
+          <HaeufigSelect
+            art="bundesland"
             label="Bundesland"
             data={(table?.states ?? []).map((s) => ({
               value: s.id,
@@ -881,7 +913,8 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
             allowDeselect={false}
             maxDropdownHeight={400}
           />
-          <Select
+          <HaeufigSelect
+            art="schulform"
             label="Schulform"
             data={(state?.schoolTypes ?? []).map((s) => ({
               value: s.id,

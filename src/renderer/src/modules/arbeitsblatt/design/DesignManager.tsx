@@ -28,6 +28,7 @@ import { newId } from '../../vokabeltest/model/random'
 import { defaultMeta } from '../model/defaults'
 import type { Worksheet } from '../model/types'
 import { SheetPages, contextFor, pageInfoFor } from '../render/SheetPages'
+import EinstellungenLink from '../../../shared/components/EinstellungenLink'
 import '../render/ws.css'
 
 const FOOTER_SLOTS: { value: FooterSlot; label: string }[] = [
@@ -349,7 +350,7 @@ export default function DesignManager(): React.JSX.Element {
               </Group>
               {!logo && design.header.showLogo && (
                 <Text size="xs" c="orange">
-                  Noch kein Schullogo hinterlegt (Einstellungen → Schule).
+                  Noch kein Schullogo hinterlegt – <EinstellungenLink tab="schule">Logo in den Einstellungen hinterlegen</EinstellungenLink>.
                 </Text>
               )}
               <Group grow>

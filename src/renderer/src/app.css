@@ -79,6 +79,12 @@ body {
 
 .home-tile {
   cursor: pointer;
+  /* Die Kacheln sind Knöpfe (Tastatur) – ohne das stünde der Text zentriert und in Knopfschrift */
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
   transition:
     transform 120ms ease,
     box-shadow 120ms ease;
@@ -122,6 +128,54 @@ body {
 }
 
 /* Navigationsleiste */
+
+/*
+ * Programmliste der Leiste: rollt nur senkrecht, ohne sichtbaren Balken. Vorher lag sie in
+ * einer ScrollArea, deren waagerechter Balken als grauer Streifen über dem
+ * Einstellungs-Symbol stehen blieb (Screenshot der Lehrkraft, 25.09.2026).
+ */
+.leiste-liste {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  min-height: 0;
+}
+.leiste-liste::-webkit-scrollbar {
+  display: none;
+}
+
+.app-leiste .leiste-umschalter {
+  display: flex;
+  margin-inline: auto;
+}
+.app-leiste[data-breit='true'] .leiste-umschalter {
+  margin-inline: 10px auto;
+}
+
+/* Breite Leiste: Symbol und Name nebeneinander, lange Namen werden gekürzt statt umbrochen */
+.nav-breit .mantine-Button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-breit .mantine-Button-section {
+  margin-inline-end: 12px;
+}
+
+/*
+ * Flache Bildschirme (Tablet quer, Notebook mit vergrößerter Schrift): kleinere Symbole,
+ * damit alle Programme ohne Rollen in die Leiste passen.
+ */
+@media (max-height: 700px) {
+  .app-leiste .nav-icon:not(.nav-breit) {
+    --ai-size: 44px !important;
+    margin-bottom: 4px !important;
+  }
+  .app-leiste .nav-breit {
+    height: 40px !important;
+    margin-bottom: 4px !important;
+  }
+}
+
 .mantine-AppShell-navbar {
   background: var(--app-nav-bg);
   border-color: var(--app-border);
@@ -193,6 +247,25 @@ body {
 
 .home-hero .mantine-Title-root {
   color: #fff;
+}
+
+.home-tile:focus-visible,
+.home-material:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* Zuletzt bearbeitet / Suchergebnis auf der Startseite */
+.home-material {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--mantine-radius-default);
+  background: var(--app-surface);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.home-material:hover {
+  border-color: var(--mantine-primary-color-filled);
 }
 
 .home-tile:hover {

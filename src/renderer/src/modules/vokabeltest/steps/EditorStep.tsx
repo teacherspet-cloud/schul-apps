@@ -55,6 +55,7 @@ import { PROJECT_FILTER, serializeProject } from '../project'
 import { aiCall, useVokabeltest } from '../store'
 import { SaveTestButton } from './TestLibrary'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
+import { useDruck } from '../../../shared/navigation'
 import './editor.css'
 
 export default function EditorStep(): React.JSX.Element {
@@ -63,6 +64,8 @@ export default function EditorStep(): React.JSX.Element {
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<{ blockId: string; itemId: string; keywords: string[] } | null>(null)
   const [exportOpen, setExportOpen] = useState<null | 'docx' | 'pdf' | 'print'>(null)
+  // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken“
+  useDruck('vokabeltest', () => setExportOpen('print'))
   const [adding, setAdding] = useState(false)
 
   const variant = doc?.variants.find((v) => v.id === activeVariantId) ?? doc?.variants[0]

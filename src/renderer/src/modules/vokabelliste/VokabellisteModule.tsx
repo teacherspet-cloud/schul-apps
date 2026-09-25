@@ -1,4 +1,4 @@
-import { ActionIcon, Alert, Badge, Button, Card, Container, Group, ScrollArea, Select, Stack, Text, Title } from '@mantine/core'
+import { ActionIcon, Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Text, Title } from '@mantine/core'
 import { IconBook2, IconFilePlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
@@ -12,6 +12,8 @@ import { LANGUAGES } from '../vokabeltest/model/types'
 import BookEditor from './steps/BookEditor'
 import ListEditor from './steps/ListEditor'
 import NewListWizard from './steps/NewListWizard'
+import HaeufigSelect from '../../shared/components/HaeufigSelect'
+import { useDokumentOeffner } from '../../shared/navigation'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -43,6 +45,17 @@ export default function VokabellisteModule(): React.JSX.Element {
   const [openBook, setOpenBook] = useState<string | null>(null)
   const [wizard, setWizard] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<SavedVocabList | null>(null)
+
+  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
+  useDokumentOeffner('vokabelliste', async (id) => {
+    const alle = await window.api.library.list()
+    setLists(alle)
+    const liste = alle.find((l) => l.id === id)
+    if (!liste) throw new Error('Die Liste gibt es nicht mehr.')
+    setOpenBook(null)
+    setWizard(false)
+    setOpenList(liste)
+  })
 
   useEffect(() => {
     window.api.cefr.get().then(setTable).catch(notifyError)
@@ -145,7 +158,8 @@ export default function VokabellisteModule(): React.JSX.Element {
             schoolTypeName={schoolTypes.find((t) => t.value === schoolTypeId)?.label ?? ''}
           >
             <Group grow>
-              <Select
+              <HaeufigSelect
+                art="bundesland"
                 label="Bundesland"
                 data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                 value={choice.stateId}
@@ -153,7 +167,8 @@ export default function VokabellisteModule(): React.JSX.Element {
                 allowDeselect={false}
                 searchable
               />
-              <Select
+              <HaeufigSelect
+                art="schulform"
                 label="Schulform"
                 data={schoolTypes}
                 value={schoolTypeId}
@@ -163,7 +178,8 @@ export default function VokabellisteModule(): React.JSX.Element {
             </Group>
           </SchulAngabe>
           <Group grow>
-            <Select
+            <HaeufigSelect
+              art="fach"
               label="Fach"
               data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
               value={choice.language}

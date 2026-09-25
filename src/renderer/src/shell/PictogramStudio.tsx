@@ -8,6 +8,7 @@ import { generateAiImage, imageGenerationAvailable } from '../shared/images'
 import { useAppSettings } from '../shared/settingsStore'
 import { notifyError, notifySuccess } from '../shared/util'
 import { useEffect } from 'react'
+import EinstellungenLink from '../shared/components/EinstellungenLink'
 
 /**
  * Werkstatt für die Piktogramme.
@@ -59,8 +60,11 @@ export default function PictogramStudio({ opened, onClose }: { opened: boolean; 
         {canGenerate === false && (
           <Alert color="orange" p="xs">
             <Text size="xs">
-              Es ist keine Bild-KI eingerichtet. Trage in den Einstellungen einen Anbieter mit Bilderzeugung ein, dann lassen sich die Symbole hier neu
-              gestalten. Der mitgelieferte Satz funktioniert auch ohne.
+              Es ist keine Bild-KI eingerichtet.{' '}
+              <EinstellungenLink tab="dienste" vorher={onClose}>
+                Bild-KI einrichten
+              </EinstellungenLink>{' '}
+              – danach lassen sich die Symbole hier neu gestalten. Der mitgelieferte Satz funktioniert auch ohne.
             </Text>
           </Alert>
         )}

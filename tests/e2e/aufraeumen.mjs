@@ -2,11 +2,13 @@
 // Aufruf: node tests/e2e/aufraeumen.mjs [--loeschen]
 // Ohne Schalter wird nur aufgelistet – gelöscht wird erst auf ausdrückliche Ansage.
 import { _electron as electron } from 'playwright-core'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const doDelete = process.argv.includes('--loeschen')
 const app = await electron.launch({ args: ['.'] })
 const page = await app.firstWindow()
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 
 const state = await page.evaluate(async () => ({
   sheets: await window.api.sheets.list(),

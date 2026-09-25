@@ -74,6 +74,7 @@ import { completeWorksheetImages } from '../generation/worksheetImages'
 import { CANARY_MAX, CANARY_WORDS, canaryNote, canaryText, canaryWordFor, canaryWords } from '../../../shared/aiCanary'
 import { CoverPage } from '../render/CoverPage'
 import { COVER_DESIGNS, foxPrompt } from '../render/coverDesigns'
+import { useDruck } from '../../../shared/navigation'
 
 export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): React.JSX.Element {
   const { worksheet: ws, update, updateBlock, undo, redo, verlauf, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
@@ -99,6 +100,8 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<string | null>(null)
   const [exportMode, setExportMode] = useState<null | 'docx' | 'pdf' | 'print'>(null)
+  // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken“
+  useDruck('arbeitsblatt', () => setExportMode('print'))
   const [printHtml, setPrintHtml] = useState<string | null>(null)
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
   // Beim Einschalten des KI-Tests fragt die App nach den Wörtern (siehe CanaryDialog)

@@ -4,6 +4,7 @@ import { _electron as electron } from 'playwright-core'
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const live = join(process.env.APPDATA ?? '', 'schul-apps')
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-probe-'))
@@ -14,7 +15,8 @@ for (const f of ['settings.json', 'secrets.json', 'model-cache.json', 'worksheet
 
 const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`] })
 const page = await app.firstWindow()
-await page.waitForSelector('text=Schul-Apps')
+// Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+await warteAufOberflaeche(page)
 
 const result = await page.evaluate(async () => {
   const started = Date.now()

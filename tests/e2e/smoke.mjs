@@ -1,26 +1,32 @@
 // Oberflächentest der gebauten App (vorher: npm run build).
 // Aufruf: node tests/e2e/smoke.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
-import { existsSync, mkdirSync, mkdtempSync, statSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const outDir = resolve(process.argv[2] ?? 'test-results')
 mkdirSync(outDir, { recursive: true })
 const fixture = resolve('tests/fixtures/beispiel.vokabeltest')
 const shot = (page, name) => page.screenshot({ path: join(outDir, `${name}.png`) })
 
+/** Temporäre Datenordner – am Ende weggeräumt, damit nichts liegen bleibt */
+const datenordner = []
+
 async function launch(args = []) {
   // Eigener Datenordner: Die Tests dürfen nichts in den gespeicherten Tests,
   // Arbeitsblättern und Klassenarbeiten des Nutzers hinterlassen.
   const userData = mkdtempSync(join(tmpdir(), 'schulapps-smoke-'))
+  datenordner.push(userData)
   const app = await electron.launch({ args: ['.', ...args, `--user-data-dir=${userData}`] })
   const page = await app.firstWindow()
   await page.setViewportSize({ width: 1400, height: 900 })
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
-  await page.waitForSelector('text=Schul-Apps')
+  // Wartet auf die Oberfläche und schließt den Einrichtungsassistenten, der im leeren Profil erscheint
+  await warteAufOberflaeche(page)
   return { app, page, errors }
 }
 
@@ -28,7 +34,8 @@ async function launch(args = []) {
 {
   const { app, page, errors } = await launch()
   await shot(page, '1-start')
-  await page.click('text=Vokabeltest >> nth=0')
+  // Über die Leiste: Auf der Startseite steht „Vokabeltest" inzwischen auch in Kacheltexten und der Materialliste
+  await page.click('[aria-label="Vokabeltest"]')
   await page.click('button:has-text("Tabelle einfügen")')
   await page.getByRole('dialog').locator('textarea').fill('ladder\tLeiter\nto explore\terkunden\ncastle\tBurg\nbrave\tmutig\numbrella\tRegenschirm')
   await page.click('button:has-text("Übernehmen")')
@@ -108,7 +115,7 @@ async function launch(args = []) {
   // Einblendung abwarten, sonst ist der Abzug halbdurchsichtig
   await page.waitForTimeout(900)
   const dialog = page.locator('.mantine-Modal-content').first()
-  await dialog.screenshot({ path: 'test-results/4b-piktogramme.png' })
+  await dialog.screenshot({ path: join(outDir, '4b-piktogramme.png') })
   await page.getByRole('button', { name: 'Schließen' }).click()
   await page.waitForTimeout(200)
   console.log('Piktogramm-Werkstatt geöffnet, Symbole und Knöpfe vorhanden')
@@ -171,3 +178,5 @@ async function launch(args = []) {
   console.log('Durchlauf 2 – Fehler in der Konsole:', errors.length ? errors : 'keine')
   await app.close()
 }
+
+for (const d of datenordner) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })

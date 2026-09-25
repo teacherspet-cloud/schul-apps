@@ -1,5 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { readFileSync, writeFileSync } from 'fs'
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from 'electron'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import {
@@ -50,6 +50,7 @@ import { deleteTest, getTest, listTests, saveTest } from './services/storage/voc
 import { deleteVocabList, getSecret, getSettings, listVocabLists, saveVocabList, setSecret, setSettings } from './services/storage/settings'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { lanStatus, startLan, stopLan } from './services/lanServer'
+import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -63,22 +64,50 @@ const SICHERN_BEIM_SCHLIESSEN_MS = 3000
 /** Meldung der Oberfläche „alles gesichert" – gesetzt, solange auf sie gewartet wird. */
 let gesichert: (() => void) | null = null
 
+/** Gemerkte Fenstergröße und -lage (siehe fensterStand.ts) – je Rechner, nicht in der Sicherung */
+const fensterDatei = (): string => join(app.getPath('userData'), 'fenster.json')
+
+function ladeFensterStand(): FensterStand | null {
+  try {
+    if (!existsSync(fensterDatei())) return null
+    const stand = leseStand(JSON.parse(readFileSync(fensterDatei(), 'utf-8')))
+    return begrenzeStand(
+      stand,
+      screen.getAllDisplays().map((d) => d.workArea)
+    )
+  } catch {
+    return null
+  }
+}
+
+function merkeFensterStand(win: BrowserWindow): void {
+  try {
+    // getNormalBounds: die Größe VOR dem Maximieren – damit das Fenster beim Verkleinern wieder so wird
+    const stand: FensterStand = { bounds: win.getNormalBounds(), maximiert: win.isMaximized() }
+    writeFileSync(fensterDatei(), JSON.stringify(stand))
+  } catch {
+    // Merken ist Komfort – ein Fehler darf das Schließen nicht aufhalten
+  }
+}
+
 function createWindow(): void {
+  const stand = ladeFensterStand()
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1000,
-    minHeight: 700,
+    ...(stand ? stand.bounds : STANDARD_GROESSE),
+    minWidth: MINDEST_GROESSE.width,
+    minHeight: MINDEST_GROESSE.height,
     show: false,
     title: 'Schul-Apps',
-    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true
     }
   })
-  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('ready-to-show', () => {
+    if (stand?.maximiert) mainWindow?.maximize()
+    mainWindow?.show()
+  })
 
   /*
    * Vor dem Schließen die Oberfläche sichern lassen.
@@ -91,6 +120,7 @@ function createWindow(): void {
   let schliessenErlaubt = false
   mainWindow.on('close', (e) => {
     const win = mainWindow
+    if (win && !win.isDestroyed()) merkeFensterStand(win)
     if (schliessenErlaubt || !win || win.webContents.isDestroyed() || win.webContents.isCrashed()) return
     e.preventDefault()
     if (gesichert) return // Es wird schon gewartet – ein zweiter Klick aufs Kreuz ändert daran nichts
@@ -475,7 +505,31 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('de.schulapps.app')
-    app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
+    /*
+     * Kein Menü. Electron bringt sonst ein englisches Standardmenü mit („File, Edit, View …"),
+     * das mit der Alt-Taste aufklappte – in einer sonst deutschen Oberfläche und ohne einen
+     * Eintrag, den die Lehrkraft braucht.
+     *
+     * Kopieren, Einfügen, Ausschneiden, Alles markieren und Rückgängig in Textfeldern hängen
+     * unter Windows NICHT am Menü, sondern an Chromium selbst (geprüft in
+     * tests/e2e/hauptapp.mjs). Was das Menü zusätzlich lieferte – Neu laden und die
+     * Entwicklerwerkzeuge –, gibt es im Entwicklungsmodus weiter über die Tasten unten.
+     */
+    Menu.setApplicationMenu(null)
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+      if (is.dev)
+        window.webContents.on('before-input-event', (event, input) => {
+          if (input.type !== 'keyDown' || !input.control) return
+          if (input.shift && input.code === 'KeyI') {
+            window.webContents.toggleDevTools()
+            event.preventDefault()
+          } else if (!input.shift && input.code === 'KeyR') {
+            window.webContents.reload()
+            event.preventDefault()
+          }
+        })
+    })
     registerIpc()
     createWindow()
     // Liegengebliebene Arbeitsordner der KI-Programme entfernen. Sie entstehen, wenn die App

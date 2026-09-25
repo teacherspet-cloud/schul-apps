@@ -1,6 +1,6 @@
 import { ActionIcon, Button, Container, Group, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core'
 import { IconArrowLeft, IconDownload, IconFileTypeDocx, IconPrinter } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, notifySuccess } from '../../../shared/util'
@@ -14,6 +14,7 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { testToWorksheet } from '../render/testWorksheet'
 import { testPoints, testTaskCount } from '../model/types'
 import { useGrammatiktest } from '../store'
+import { useDruck } from '../../../shared/navigation'
 
 /**
  * Schritt 2: Test ansehen, bearbeiten und ausgeben.
@@ -39,6 +40,9 @@ export default function TestEditorStep(): React.JSX.Element {
    */
   const ws = useMemo(() => (test ? testToWorksheet(test) : null), [test])
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
+  // Strg+P druckt wie der Knopf „Drucken"; vor dem frühen return, weil es ein Hook ist
+  const drucken = useRef<() => void>(() => undefined)
+  useDruck('grammatiktest', test && ws ? () => drucken.current() : null)
   if (!test || !ws) return <Container py="xl">Kein Test geladen.</Container>
 
   const sheet = ws.sheets[0]
@@ -63,6 +67,7 @@ export default function TestEditorStep(): React.JSX.Element {
   const print = (): void => {
     window.api.exporter.print(html()).catch((e: unknown) => notifyError(e, 'Das Drucken ist fehlgeschlagen'))
   }
+  drucken.current = print
 
   const exportPdf = async (): Promise<void> => {
     try {
