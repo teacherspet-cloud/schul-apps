@@ -4,6 +4,7 @@ import * as pdfjs from 'pdfjs-dist'
 import { useRef } from 'react'
 import type { SavedWorksheetStats } from '@shared/types'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import { buildWorksheetHtml } from './render/printHtml'
 import type { PagePlan } from './render/paginate'
@@ -80,6 +81,44 @@ export async function openSavedWorksheet(id: string): Promise<void> {
   useArbeitsblatt.getState().openSaved(saved.id, saved.name, saved.payload as Worksheet, saved.updatedAt)
   void cleanWorksheetImages()
   void loadAudioFiles()
+}
+
+/** Ist genau dieses Blatt gerade im Programm offen? */
+export const blattOffen = (docId: string): boolean => {
+  const s = useArbeitsblatt.getState()
+  return s.docId === docId && s.worksheet !== null
+}
+
+/**
+ * Ergebnis eines Hintergrund-Auftrags im Blatt `docId` ablegen (siehe shared/auftraege.ts).
+ *
+ * Ist das Blatt offen, wird es als ein Rückgängig-Schritt übernommen und der passende
+ * Schritt gezeigt – gesprungen wird nur INNERHALB dieses Blattes, nie zu einem anderen
+ * Programm oder Dokument. Sonst geht es direkt in die Bibliothek.
+ */
+export function legeArbeitsblattAb(docId: string, schnappschuss: Worksheet, einarbeiten: (ws: Worksheet) => Worksheet, schritt?: number): Promise<void> {
+  return legeAb<Worksheet>(
+    {
+      istOffen: blattOffen,
+      imOffenen: (f) => {
+        const s = useArbeitsblatt.getState()
+        if (!s.worksheet) return
+        // Ohne Schritt (ein einzelner Baustein): bleiben, wo die Lehrkraft gerade ist
+        if (schritt === undefined) s.setWorksheet(f(s.worksheet))
+        else s.applyGenerated(f(s.worksheet), schritt)
+      },
+      laden: async (id) => {
+        const w = await window.api.sheets.get(id)
+        return { name: w.name, dok: w.payload as Worksheet }
+      },
+      speichern: async (id, name, ws) => {
+        await window.api.sheets.save({ id, name: name ?? defaultWorksheetName(ws), stats: worksheetStats(ws), payload: withoutAudioData(ws) })
+      }
+    },
+    docId,
+    schnappschuss,
+    einarbeiten
+  )
 }
 
 /** Neues Arbeitsblatt beginnen – das bisherige vorher sichern. */

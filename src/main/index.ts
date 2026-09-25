@@ -27,6 +27,9 @@ import {
 } from '@shared/types'
 import { cleanupWorkDirs, createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
 import { generateSvgImage } from './services/ai/svg'
+import { KiPlaetze } from './services/ai/kiPlaetze'
+import { attrappeAktiv } from './services/ai/attrappe'
+import { istAbbruch } from '@shared/abbruch'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
 import { createProvider, createTextProvider, getModelList, healModelSelection, refreshProvider } from './services/ai/models'
 import { htmlToPdf, PrintOptions, printHtml } from './services/export/pdf'
@@ -54,6 +57,11 @@ import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROES
 
 let mainWindow: BrowserWindow | null = null
 
+/** Höchstens drei KI-Anfragen zugleich; wer wartet, erfährt es (Auftragsleiste der Oberfläche) */
+const kiPlaetze = new KiPlaetze(3, (id, zustand) => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ai:platz', { id, zustand })
+})
+
 /**
  * Wie lange das Fenster beim Schließen auf die Oberfläche wartet, bis alles gesichert ist.
  * Reagiert sie nicht (etwa weil sie hängt), geht das Fenster trotzdem zu – sonst ließe sich
@@ -63,6 +71,12 @@ const SICHERN_BEIM_SCHLIESSEN_MS = 3000
 
 /** Meldung der Oberfläche „alles gesichert" – gesetzt, solange auf sie gewartet wird. */
 let gesichert: (() => void) | null = null
+/**
+ * Die Oberfläche fragt nach (es laufen noch Aufträge): Die Frist von drei Sekunden hält an,
+ * bis die Lehrkraft entschieden hat. `bleiben` bricht das Schließen ab.
+ */
+let rueckfrage: (() => void) | null = null
+let bleiben: (() => void) | null = null
 
 /** Gemerkte Fenstergröße und -lage (siehe fensterStand.ts) – je Rechner, nicht in der Sicherung */
 const fensterDatei = (): string => join(app.getPath('userData'), 'fenster.json')
@@ -124,14 +138,24 @@ function createWindow(): void {
     if (schliessenErlaubt || !win || win.webContents.isDestroyed() || win.webContents.isCrashed()) return
     e.preventDefault()
     if (gesichert) return // Es wird schon gewartet – ein zweiter Klick aufs Kreuz ändert daran nichts
-    const zu = (): void => {
+    const aufraeumen = (): void => {
       clearTimeout(zeit)
-      gesichert = null
+      gesichert = rueckfrage = bleiben = null
+    }
+    const zu = (): void => {
+      aufraeumen()
       schliessenErlaubt = true
       if (!win.isDestroyed()) win.close()
     }
     const zeit = setTimeout(zu, SICHERN_BEIM_SCHLIESSEN_MS)
     gesichert = zu
+    /*
+     * Laufen noch Hintergrund-Aufträge, fragt die Oberfläche nach („trotzdem beenden?").
+     * Solange die Frage offen ist, gilt die Frist nicht – sonst ginge das Fenster zu, während
+     * die Lehrkraft noch liest.
+     */
+    rueckfrage = () => clearTimeout(zeit)
+    bleiben = aufraeumen
     win.webContents.send('fenster:schliessen')
   })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -167,7 +191,9 @@ function aiStatus(): AiStatus {
     textProvider: ai.textProvider,
     textModel: ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionModels[ai.textProvider] : ai.textModels[ai.textProvider],
     textAccess: ai.access[ai.textProvider],
-    hasTextKey: ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionAccepted[ai.textProvider] : Boolean(getSecret(ai.textProvider)),
+    // Mit der Attrappe der Oberflächentests (nie im Betrieb) gilt die KI als eingerichtet
+    hasTextKey:
+      attrappeAktiv() || (ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionAccepted[ai.textProvider] : Boolean(getSecret(ai.textProvider))),
     imageProvider: ai.imageProvider,
     imageModel,
     imageAccess,
@@ -190,7 +216,7 @@ function textOptions(ai: AppSettings['ai']): AiStatus['textOptions'] {
 }
 
 /** Bild erzeugen – über API-Schlüssel oder Abo; Claude zeichnet in beiden Fällen eine Vektorgrafik. */
-async function generateImage(prompt: string): Promise<string> {
+async function generateImage(prompt: string, signal?: AbortSignal): Promise<string> {
   const { ai } = getSettings()
   const img = ai.imageProvider
   if (img === 'none') throw new Error('Es ist keine KI für Bilder ausgewählt (Einstellungen).')
@@ -199,12 +225,12 @@ async function generateImage(prompt: string): Promise<string> {
       throw new Error('Der Abo-Zugang für Bilder ist noch nicht freigegeben. Bitte in den Einstellungen den Hinweis bestätigen.')
     }
     const cli = createCliProvider(img)
-    return cli.generateImage!(prompt, ai.subscriptionModels[img])
+    return cli.generateImage!(prompt, ai.subscriptionModels[img], signal)
   }
-  if (img === 'anthropic') return generateSvgImage(createProvider('anthropic'), ai.textModels.anthropic, prompt)
+  if (img === 'anthropic') return generateSvgImage(createProvider('anthropic'), ai.textModels.anthropic, prompt, signal)
   const provider = createProvider(img)
   if (!provider.generateImage) throw new Error('Dieser Anbieter kann keine Bilder erzeugen.')
-  return provider.generateImage(prompt, ai.imageModels[img])
+  return provider.generateImage(prompt, ai.imageModels[img], signal)
 }
 
 /** Modelllisten im Hintergrund aktualisieren und die Oberfläche über Modellwechsel informieren. */
@@ -273,6 +299,8 @@ function registerIpc(): void {
   registerLan()
   // Die Oberfläche hat vor dem Schließen alles gesichert (siehe createWindow)
   handle('fenster:gesichert', () => gesichert?.())
+  handle('fenster:rueckfrage', () => rueckfrage?.())
+  handle('fenster:bleiben', () => bleiben?.())
   handle('settings:get', () => getSettings())
   handle('settings:set', (patch: DeepPartial<AppSettings>) => setSettings(patch))
   handle('secrets:set', (name: SecretName, value: string) => {
@@ -338,38 +366,49 @@ function registerIpc(): void {
     return Math.round((Date.now() - started) / 100) / 10
   })
   handle('ai:models', (provider: AiProviderId, kind: ModelKind, refresh: boolean) => getModelList(provider, kind, refresh))
+  /*
+   * KI-Anfragen laufen über die gemeinsame Begrenzung (höchstens drei zugleich, siehe
+   * services/ai/kiPlaetze.ts). Wer warten muss, wird der Oberfläche gemeldet; mit der
+   * Kennung der Anfrage lässt sie sich über `ai:cancel` abbrechen.
+   */
   handle('ai:structured', (req: StructuredRequest) => {
     // Ein Auftrag darf ein anderes (stärkeres) Modell verlangen als das eingestellte
     const { provider, model } = createTextProvider(req.provider ?? getSettings().ai.textProvider)
-    if (!req.progressId) return provider.structured(req, req.model || model)
-    // Fortschritt melden, aber höchstens fünfmal je Sekunde – sonst überflutet es die Oberfläche
     const id = req.progressId
+    // Fortschritt melden, aber höchstens fünfmal je Sekunde – sonst überflutet es die Oberfläche
     let last = 0
-    const onChunk = (chars: number): void => {
-      const now = Date.now()
-      if (now - last < 200) return
-      last = now
-      mainWindow?.webContents.send('ai:progress', { id, chars })
-    }
-    return provider.structured(req, req.model || model, onChunk)
+    const onChunk = id
+      ? (chars: number): void => {
+          const now = Date.now()
+          if (now - last < 200) return
+          last = now
+          mainWindow?.webContents.send('ai:progress', { id, chars })
+        }
+      : undefined
+    return kiPlaetze.platz(id, (signal) => provider.structured(req, req.model || model, onChunk, signal))
+  })
+  handle('ai:cancel', (id: string) => {
+    kiPlaetze.abbrechen(id)
   })
   /*
    * Websuche nach Fundstellen fuer Originalmaterial.
    *
    * Nicht jeder Anbieter kann das. Fehlt die Faehigkeit oder scheitert die Suche, bleibt es
    * bei den Archiven, die die App selbst durchsucht – dann gibt es weniger Auswahl, aber
-   * keinen Fehler. Eine leere Liste ist hier eine Antwort, kein Defekt.
+   * keinen Fehler. Eine leere Liste ist hier eine Antwort, kein Defekt. Ein ABBRUCH dagegen
+   * wird weitergereicht: Der Auftrag, zu dem die Suche gehört, soll enden.
    */
-  handle('ai:websuche', async (auftrag: string) => {
+  handle('ai:websuche', async (auftrag: string, id?: string) => {
     const { provider, model } = createTextProvider(getSettings().ai.textProvider)
     if (!provider.websuche) return []
     try {
-      return await provider.websuche(auftrag, model)
-    } catch {
+      return await kiPlaetze.platz(id, (signal) => provider.websuche!(auftrag, model, signal))
+    } catch (e) {
+      if (istAbbruch(e)) throw e
       return []
     }
   })
-  handle('ai:image', (prompt: string) => generateImage(prompt))
+  handle('ai:image', (prompt: string, id?: string) => kiPlaetze.platz(id, (signal) => generateImage(prompt, signal)))
 
   handle('cefr:get', () => getCefrTable())
 

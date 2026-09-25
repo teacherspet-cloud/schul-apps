@@ -14,18 +14,22 @@ import { findVocabPictures, vocabClipartPrompt } from './pictures'
  *   3. erst wenn die KI keines davon als eindeutig bewertet: ein KI-Bild.
  * Jedes Bild wird von der KI auf Eindeutigkeit geprüft.
  */
-export async function pictureOptions(source: TestSettings['pictureSource'] | undefined): Promise<Pick<GenerateOptions, 'findImage' | 'findImages'>> {
+export async function pictureOptions(
+  source: TestSettings['pictureSource'] | undefined,
+  /** KI-Aufrufe eines Hintergrund-Auftrags – dann lassen sie sich mit ihm abbrechen */
+  auftrag?: { ai: GenerateOptions['ai']; bild: (prompt: string) => Promise<string> }
+): Promise<Pick<GenerateOptions, 'findImage' | 'findImages'>> {
   if (source === 'none') return {}
   const canGenerate = await imageGenerationAvailable()
   if (source === 'ai' && canGenerate) {
-    return { findImage: async (item) => generateAiImage(vocabClipartPrompt(item, undefined)) }
+    return { findImage: async (item) => generateAiImage(vocabClipartPrompt(item, undefined), undefined, auftrag?.bild) }
   }
   return {
     findImages: (items, vocab, settings) =>
       findVocabPictures(items, vocab, settings, {
-        ai: aiCall,
+        ai: auftrag?.ai ?? aiCall,
         services: browserImageServices(),
-        generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt)).dataUrl : undefined
+        generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt, undefined, auftrag?.bild)).dataUrl : undefined
       })
   }
 }

@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() } }))
 vi.mock('../src/main/services/storage/settings', () => ({
@@ -10,9 +10,20 @@ vi.mock('../src/main/services/storage/settings', () => ({
 
 const { parseJsonText, resolveShim } = await import('../src/main/services/ai/cli')
 
+/*
+ * Angelegte Ordner werden am Ende entfernt. Bis 25.09.2026 blieb bei jedem Lauf einer liegen –
+ * über zweitausend hatten sich im Temp-Ordner angesammelt.
+ */
+const angelegt: string[] = []
+afterAll(() => {
+  for (const dir of angelegt) rmSync(dir, { recursive: true, force: true })
+})
+
 /** Nachbau einer globalen npm-Installation mit .cmd-Startdatei */
 function npmDir(): string {
-  return mkdtempSync(join(tmpdir(), 'schulapps-npm-'))
+  const dir = mkdtempSync(join(tmpdir(), 'schulapps-npm-'))
+  angelegt.push(dir)
+  return dir
 }
 
 function touch(file: string): void {

@@ -7,9 +7,7 @@ import {
   Container,
   Grid,
   Group,
-  Modal,
   NumberInput,
-  Progress,
   Radio,
   ScrollArea,
   SegmentedControl,
@@ -27,15 +25,14 @@ import { useAppSettings } from '../../../shared/settingsStore'
 import { CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import { distributeEvenly, requestedCount } from '../generation/distribute'
-import { defaultHeader, generateTest } from '../generation/generate'
-import { pictureOptions } from '../generation/pictureOptions'
+import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
 import { istLatein, passtZurSprache } from '../didactics/latein'
 import { gradeOptions, languageTracks, levelAtLeast, suggestLevel } from '../model/cefr'
 import { randomSeed } from '../model/random'
 import { LANGUAGES, PageLimit, TaskTypeId, TestSettings } from '../model/types'
 import { includedVocab } from '../model/vocab'
-import { aiCall, useVokabeltest } from '../store'
+import { useVokabeltest } from '../store'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
@@ -49,7 +46,7 @@ const DEFAULT_TASKS: TaskTypeId[] = ['gapSentences', 'matchDefinitions', 'multip
 const DEFAULT_TASKS_LATEIN: TaskTypeId[] = ['latinForms', 'latinContext']
 
 export default function SettingsStep(): React.JSX.Element {
-  const { vocab, settings: stored, setSettings, setStep, loadDocument, doc, updateDoc, listContext } = useVokabeltest()
+  const { vocab, settings: stored, setSettings, setStep, doc, updateDoc, listContext } = useVokabeltest()
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [settings, setLocal] = useState<TestSettings | null>(stored)
   const [review, setReview] = useState(true)
@@ -67,7 +64,6 @@ export default function SettingsStep(): React.JSX.Element {
       .catch(() => undefined)
   }, [aiSettings])
   const [hasKey, setHasKey] = useState(true)
-  const [progress, setProgress] = useState<{ done: number; total: number; message: string } | null>(null)
   // Nur die in der Vokabelliste markierten Vokabeln werden abgefragt
   const usable = includedVocab(vocab)
 
@@ -185,30 +181,15 @@ export default function SettingsStep(): React.JSX.Element {
     if (doc) updateDoc((d) => (d.settings.pageLimit = next))
   }
 
-  const start = async (): Promise<void> => {
-    const images = await pictureOptions(settings.pictureSource)
+  /*
+   * Erstellen läuft als Hintergrund-Auftrag (../auftraege.ts): Das Programm zeigt bis dahin
+   * einen Hinweis, das Ergebnis landet in DIESEM Test (Strg+Z holt einen vorigen zurück).
+   */
+  const start = (): void => {
     // Neuer Seed: jeder Durchlauf ergibt eine neue Auswahl und Reihenfolge
     const runSettings: TestSettings = { ...settings, vocabCount: requested, seed: randomSeed() }
     setLocal(runSettings)
-    setProgress({ done: 0, total: 1, message: 'Start …' })
-    try {
-      const app = await window.api.settings.get()
-      const header = doc?.header ?? defaultHeader(app.schoolName)
-      const result = await generateTest(usable, runSettings, header, {
-        ai: aiCall,
-        review,
-        combined: economy,
-        // Wortschatz früherer Units/Bände: Die Sätze bleiben in dem, was die Klasse kennt
-        known: listContext?.known,
-        ...images,
-        onProgress: (done, total, message) => setProgress({ done, total, message })
-      })
-      loadDocument(result)
-    } catch (e) {
-      notifyError(e, 'Test konnte nicht erstellt werden')
-    } finally {
-      setProgress(null)
-    }
+    erstelleVokabeltest({ art: doc ? 'Test neu erstellen' : 'Test erstellen', usable, settings: runSettings, review, economy, known: listContext?.known })
   }
 
   return (
@@ -241,12 +222,7 @@ export default function SettingsStep(): React.JSX.Element {
                   Zum bestehenden Test
                 </Button>
               )}
-              <Button
-                size="md"
-                leftSection={<IconSparkles size={18} />}
-                disabled={!hasKey || settings.tasks.length === 0 || requested === 0}
-                onClick={() => void start()}
-              >
+              <Button size="md" leftSection={<IconSparkles size={18} />} disabled={!hasKey || settings.tasks.length === 0 || requested === 0} onClick={start}>
                 {doc ? 'Test neu erstellen' : 'Test erstellen'}
               </Button>
             </Group>
@@ -528,18 +504,6 @@ export default function SettingsStep(): React.JSX.Element {
           </Grid.Col>
         </Grid>
       </Container>
-
-      <Modal opened={progress !== null} onClose={() => {}} withCloseButton={false} centered title="Test wird erstellt">
-        {progress && (
-          <Stack>
-            <Progress value={(progress.done / Math.max(1, progress.total)) * 100} animated />
-            <Text size="sm">{progress.message}</Text>
-            <Text size="xs" c="dimmed">
-              Das dauert je nach Umfang ein bis drei Minuten.
-            </Text>
-          </Stack>
-        )}
-      </Modal>
     </ScrollArea>
   )
 }

@@ -4,6 +4,7 @@
  */
 import type { SavedExamStats } from '@shared/types'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import type { Exam } from './model/types'
 import { examHasContent } from './render/examWorksheet'
@@ -53,6 +54,40 @@ export async function openSavedExam(id: string): Promise<void> {
   await sichereAlles()
   const saved = await window.api.exams.get(id)
   useKlassenarbeit.getState().openSaved(saved.id, saved.name, saved.payload as Exam, saved.updatedAt)
+}
+
+/** Ist genau diese Arbeit gerade im Programm offen? */
+export const arbeitOffen = (docId: string): boolean => {
+  const s = useKlassenarbeit.getState()
+  return s.docId === docId && s.exam !== null
+}
+
+/**
+ * Ergebnis eines Hintergrund-Auftrags in der Arbeit `docId` ablegen (siehe
+ * shared/auftraege.ts): in der offenen Arbeit als Rückgängig-Schritt, sonst in der Bibliothek.
+ */
+export function legeArbeitAb(docId: string, schnappschuss: Exam, einarbeiten: (e: Exam) => Exam, schritt?: number): Promise<void> {
+  return legeAb<Exam>(
+    {
+      istOffen: arbeitOffen,
+      imOffenen: (f) => {
+        const s = useKlassenarbeit.getState()
+        if (!s.exam) return
+        s.setExam(f(s.exam))
+        if (schritt !== undefined) s.setStep(schritt)
+      },
+      laden: async (id) => {
+        const e = await window.api.exams.get(id)
+        return { name: e.name, dok: e.payload as Exam }
+      },
+      speichern: async (id, name, exam) => {
+        await window.api.exams.save({ id, name: name ?? defaultExamName(exam), stats: examStats(exam), payload: exam })
+      }
+    },
+    docId,
+    schnappschuss,
+    einarbeiten
+  )
 }
 
 /** Neue Arbeit beginnen – die bisherige vorher sichern. */

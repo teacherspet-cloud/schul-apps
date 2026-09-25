@@ -8,9 +8,7 @@ import {
   Container,
   Grid,
   Group,
-  Loader,
   NumberInput,
-  Progress,
   SegmentedControl,
   Select,
   Stack,
@@ -23,8 +21,9 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconAlertTriangle, IconInfoCircle, IconSparkles } from '@tabler/icons-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AiProgressTracker, neverBackwards, overallRatio, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
+import { useEffect, useMemo, useState } from 'react'
+import { starteAuftrag } from '../../../shared/auftraege'
+import { defaultKurztestName, kurztestOffen, legeKurztestAb } from '../library'
 import GradeScaleModal from '../../../shared/components/GradeScaleModal'
 import { thresholdsForSubject } from '../../../shared/gradeScale'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -47,7 +46,7 @@ import { emptyKurztest, stufeFuerJahrgang } from '../model/defaults'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import type { KurztestMeta, StoffQuelle } from '../model/types'
 import { variantenLabel } from '../model/types'
-import { aiCall, trackedAiCall, useLernzielkontrolle } from '../store'
+import { aiCall, useLernzielkontrolle } from '../store'
 import VorwissenChips from '../../arbeitsblatt/steps/VorwissenChips'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
@@ -66,36 +65,13 @@ import HaeufigSelect from '../../../shared/components/HaeufigSelect'
  * sehen, bevor man auf „Erstellen" drückt, nicht erst hinterher.
  */
 export default function SetupStep(): React.JSX.Element {
-  const { test, setTest, setStep, update } = useLernzielkontrolle()
+  const { test, setTest, update } = useLernzielkontrolle()
   const settings = useAppSettings((s) => s.settings)
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
-  const [busy, setBusy] = useState(false)
-  const [stepMessage, setStepMessage] = useState<string | null>(null)
-  const [chunkRatio, setChunkRatio] = useState(0)
   const [lese, setLese] = useState<string | null>(null)
   // Reiner Anzeigefilter fuer die Themenvorschlaege – gehoert nicht in den gespeicherten Test
   const [zweigWahl, setZweig] = useState('')
-  const startedAt = useRef(0)
-  /*
-   * Fortschritt über ALLE Fassungen: Wie viele sind fertig? Vorher zeigte der Balken nur den
-   * Anteil der laufenden Anfrage – bei drei Fassungen sprang er zweimal auf null zurück.
-   */
-  const [fertigeFassungen, setFertigeFassungen] = useState(0)
-  const shown = useRef(0)
-  // Eigener Notenschlüssel: Das Fenster war bisher gar nicht erreichbar
   const [schluesselOffen, setSchluesselOffen] = useState(false)
-  /*
-   * Sekundentakt, solange erzeugt wird – wie im Grammatiktest. Ohne ihn stand die Anzeige
-   * still, wenn der Anbieter keinen Fortschritt meldet: nichts löste ein neues Rendern aus,
-   * und der Balken blieb bei 0 %. Steht vor dem frühen `return` (Hook-Regel).
-   */
-  const [, tick] = useState(0)
-  useEffect(() => {
-    if (!busy) return
-    const timer = setInterval(() => tick((n) => n + 1), 1000)
-    return () => clearInterval(timer)
-  }, [busy])
-
   /*
    * MUSS vor jedem frühen `return` stehen: Hooks müssen bei jedem Rendern in gleicher Zahl
    * und Reihenfolge laufen. Im Grammatiktest lief ein Hook hinter dem frühen Return nur
@@ -175,39 +151,41 @@ export default function SetupStep(): React.JSX.Element {
   const themenText = themenHinweis(m.stateId, m.subjectId, m.grade, m.schoolTypeId, zweig)
   const bereit = Boolean(m.thema.trim())
 
-  const create = async (): Promise<void> => {
-    setBusy(true)
-    startedAt.current = Date.now()
-    shown.current = 0
-    setFertigeFassungen(0)
-    setChunkRatio(0)
-    const tracker = new AiProgressTracker(() => setChunkRatio(tracker.ratio()))
-    try {
-      /*
-       * Die Varianten werden NACHEINANDER erzeugt, nicht parallel.
-       * Parallel wäre schneller, aber jede Anfrage kostet Kontingent, und bei einem Fehler
-       * in der dritten wären die ersten beiden schon bezahlt. Nacheinander bricht sauber ab.
-       */
-      const varianten: { id: string; label: string; blocks: WsBlock[] }[] = []
-      for (let i = 0; i < m.varianten; i++) {
-        const label = variantenLabel(i, m.varianten)
-        const blocks = await generateKurztest(current, label, trackedAiCall(tracker), setStepMessage)
-        varianten.push({ id: `v${i + 1}`, label, blocks })
-        setFertigeFassungen(i + 1)
-      }
+  /*
+   * Erstellen läuft als Hintergrund-Auftrag (shared/auftraege.ts) – mit einer Kopie der
+   * Angaben von jetzt, abgelegt in DIESER Kontrolle. Das Programm zeigt bis dahin einen
+   * Hinweis; die Auftragsleiste zeigt den Fortschritt über alle Fassungen.
+   */
+  const create = (): void => {
+    const docId = useLernzielkontrolle.getState().docId
+    void starteAuftrag({
+      moduleId: 'lernzielkontrolle',
+      docId,
+      titel: defaultKurztestName(current),
+      art: m.varianten > 1 ? `${m.varianten} Fassungen erstellen` : 'Lernzielkontrolle erstellen',
+      eingabe: current,
+      istOffen: () => kurztestOffen(docId),
+      fehlerTitel: 'Die Lernzielkontrolle konnte nicht erstellt werden',
+      arbeit: async (t, k) => {
+        /*
+         * Die Varianten werden NACHEINANDER erzeugt, nicht parallel.
+         * Parallel wäre schneller, aber jede Anfrage kostet Kontingent, und bei einem Fehler
+         * in der dritten wären die ersten beiden schon bezahlt. Nacheinander bricht sauber ab.
+         */
+        const varianten: { id: string; label: string; blocks: WsBlock[] }[] = []
+        const anzahl = t.meta.varianten
+        for (let i = 0; i < anzahl; i++) {
+          const label = variantenLabel(i, anzahl)
+          // Fortschritt über ALLE Fassungen – sonst spränge der Balken je Fassung auf null zurück
+          const blocks = await generateKurztest(t, label, k.ai, (msg) => k.melde(anzahl > 1 ? `${label}: ${msg}` : msg, i, anzahl))
+          varianten.push({ id: `v${i + 1}`, label, blocks })
+          k.melde(`${i + 1} von ${anzahl} Fassungen fertig`, i + 1, anzahl)
+        }
+        return varianten
+      },
       // Ein eigener Verlaufsschritt: Strg+Z holt die vorige Fassung zurück (Rückfragen sind abgewählt)
-      update((d) => {
-        d.varianten = varianten
-      })
-      setStep(1)
-    } catch (e) {
-      notifyError(e, 'Die Lernzielkontrolle konnte nicht erstellt werden')
-    } finally {
-      tracker.dispose()
-      setBusy(false)
-      setStepMessage(null)
-      setChunkRatio(0)
-    }
+      ablegen: (varianten, t) => legeKurztestAb(docId, t, (aktuell) => ({ ...aktuell, varianten }), 1)
+    })
   }
 
   return (
@@ -735,7 +713,7 @@ export default function SetupStep(): React.JSX.Element {
 
             <Card withBorder>
               <Stack gap="sm">
-                <Button size="md" leftSection={<IconSparkles size={18} />} loading={busy} disabled={!bereit} onClick={() => void create()}>
+                <Button size="md" leftSection={<IconSparkles size={18} />} disabled={!bereit} onClick={create}>
                   {m.varianten > 1 ? `${m.varianten} Fassungen erstellen` : 'Lernzielkontrolle erstellen'}
                 </Button>
                 {!bereit && (
@@ -743,23 +721,6 @@ export default function SetupStep(): React.JSX.Element {
                     Bitte zuerst ein Thema angeben.
                   </Text>
                 )}
-                {busy &&
-                  (() => {
-                    // Über alle Fassungen gerechnet und ohne Rücksprung
-                    const ratio = neverBackwards(shown.current, overallRatio(fertigeFassungen, m.varianten, chunkRatio))
-                    shown.current = ratio
-                    const sekunden = Math.round((Date.now() - startedAt.current) / 1000)
-                    const rest = remainingLabel(remainingSeconds(ratio, Date.now() - startedAt.current))
-                    return (
-                      <Stack gap={4}>
-                        {/* Meldet der Anbieter nichts, wäre ein Balken bei 0 % eine Behauptung – dann der Kreisel */}
-                        {ratio > 0 ? <Progress value={ratio * 100} animated size="sm" /> : <Loader size="sm" type="dots" />}
-                        <Text size="xs" c="dimmed">
-                          {stepMessage} {ratio > 0 ? `${Math.round(ratio * 100)} %${rest ? ` · ${rest}` : ''}` : `läuft seit ${sekunden} Sek.`}
-                        </Text>
-                      </Stack>
-                    )
-                  })()}
               </Stack>
             </Card>
           </Stack>

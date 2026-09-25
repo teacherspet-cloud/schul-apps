@@ -10,6 +10,7 @@ import { getSettings } from '../storage/settings'
 import { AiProvider, ChunkListener, Netzfund, RawModel, splitDataUrl } from './provider'
 import { generateSvgImage } from './svg'
 import { textSammler } from './textstrom'
+import { AbbruchFehler } from '@shared/abbruch'
 
 // ---------- Programm finden ----------
 
@@ -100,20 +101,28 @@ interface RunResult {
   stderr: string
 }
 
-/** Höchstens so viele Programmaufrufe gleichzeitig (schont Rechner und Abo-Kontingent). */
-const MAX_PARALLEL = 3
-let running = 0
-const waiting: (() => void)[] = []
+/*
+ * Die Begrenzung auf drei gleichzeitige Programmaufrufe stand bis 25.09.2026 hier (`slot()`)
+ * und galt nur für den Abo-Weg. Sie sitzt jetzt eine Ebene höher (kiPlaetze.ts) und gilt für
+ * alle Wege zugleich – eine zweite Schlange hier würde sich mit der ersten gegenseitig
+ * blockieren: Eine Anfrage hielte oben einen Platz und wartete unten auf den nächsten.
+ */
 
-async function slot<T>(fn: () => Promise<T>): Promise<T> {
-  if (running >= MAX_PARALLEL) await new Promise<void>((r) => waiting.push(r))
-  running++
-  try {
-    return await fn()
-  } finally {
-    running--
-    waiting.shift()?.()
+/**
+ * Beendet ein Programm SAMT allem, was es gestartet hat.
+ *
+ * Unter Windows beendet `child.kill()` nur den obersten Prozess. Claude Code und Codex
+ * starten aber eigene Unterprozesse – die liefen nach einem Abbruch weiter und verbrauchten
+ * Kontingent für eine Antwort, die niemand mehr haben will. `taskkill /T` nimmt den ganzen
+ * Prozessbaum mit (ohne zusätzliches Paket).
+ */
+export function beendeProzessbaum(child: { pid?: number; kill: (signal?: NodeJS.Signals) => boolean }): void {
+  if (process.platform === 'win32' && child.pid) {
+    const killer = spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+    killer.on('error', () => child.kill())
+    return
   }
+  child.kill('SIGKILL')
 }
 
 /** Umgebung ohne API-Schlüssel, damit die Programme wirklich die Abo-Anmeldung verwenden. */
@@ -143,9 +152,21 @@ export function cliEnv(): NodeJS.ProcessEnv {
  *   einmal. Dort springt die Meldung erst am Ende. Die Oberfläche darf deshalb keinen
  *   Balken zeigen, der stillsteht; sie zeigt stattdessen die verstrichene Zeit.
  */
-function run(exe: string, args: string[], opts: { cwd: string; stdin?: string; timeoutMs: number; onData?: (chars: number) => void }): Promise<RunResult> {
+function run(
+  exe: string,
+  args: string[],
+  opts: { cwd: string; stdin?: string; timeoutMs: number; onData?: (chars: number) => void; signal?: AbortSignal }
+): Promise<RunResult> {
   return new Promise((resolvePromise, reject) => {
+    if (opts.signal?.aborted) return reject(new AbbruchFehler())
     const child = spawn(exe, args, { cwd: opts.cwd, env: cliEnv(), windowsHide: true })
+    // Abbruch durch die Lehrkraft: Programm samt Unterprozessen beenden
+    const beiAbbruch = (): void => {
+      clearTimeout(timer)
+      beendeProzessbaum(child)
+      reject(new AbbruchFehler())
+    }
+    opts.signal?.addEventListener('abort', beiAbbruch, { once: true })
     /*
      * Sammler statt `stdout += d`: Die Ausgabe kommt in Stücken, deren Grenzen an beliebigen
      * Bytes liegen. Jedes Stück für sich umzuwandeln zerriss Zeichen, die über die Grenze
@@ -154,7 +175,7 @@ function run(exe: string, args: string[], opts: { cwd: string; stdin?: string; t
     const aus = textSammler()
     const fehler = textSammler()
     const timer = setTimeout(() => {
-      child.kill()
+      beendeProzessbaum(child)
       reject(new Error(`Das Programm hat nicht innerhalb von ${Math.round(opts.timeoutMs / 60000)} Minuten geantwortet.`))
     }, opts.timeoutMs)
     child.stdout.on('data', (d: Buffer) => {
@@ -164,10 +185,12 @@ function run(exe: string, args: string[], opts: { cwd: string; stdin?: string; t
     child.stderr.on('data', (d: Buffer) => fehler.push(d))
     child.on('error', (e) => {
       clearTimeout(timer)
+      opts.signal?.removeEventListener('abort', beiAbbruch)
       reject(new Error(`Programm konnte nicht gestartet werden: ${e.message}`))
     })
     child.on('close', (code) => {
       clearTimeout(timer)
+      opts.signal?.removeEventListener('abort', beiAbbruch)
       resolvePromise({ code, stdout: aus.text(), stderr: fehler.text() })
     })
     child.stdin.on('error', () => undefined)
@@ -297,53 +320,51 @@ export class CodexCliProvider implements AiProvider {
   constructor(private exe: string) {}
 
   /** Nutzt die Bildgenerierung von ChatGPT; Codex legt das Bild unter CODEX_HOME/generated_images/<Sitzung> ab. */
-  generateImage(prompt: string): Promise<string> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        const text = `Erzeuge mit deinem Bildgenerierungswerkzeug genau ein Bild nach dieser Beschreibung:\n\n${prompt}\n\n${IMAGE_ONLY}`
-        const args = [
-          'exec',
-          '--skip-git-repo-check',
-          '--ephemeral',
-          '--sandbox',
-          'read-only',
-          '--color',
-          'never',
-          '--json',
-          ...codexLeanArgs({
-            keepImageGeneration: true,
-            cwd,
-            instructions: 'You create exactly one image with your image generation tool when asked. Do nothing else and answer briefly.'
-          }),
-          '-'
-        ]
-        const res = await run(this.exe, args, { cwd, stdin: text, timeoutMs: IMAGE_TIMEOUT_MS })
-        const threadId = /"thread_id"\s*:\s*"([^"]+)"/.exec(res.stdout)?.[1]
-        const dir = threadId ? join(codexHome(), 'generated_images', threadId) : null
-        try {
-          const file = dir ? newestImage(dir) : null
-          if (file) return imageFileAsDataUrl(file)
-        } finally {
-          if (dir) rmSync(dir, { recursive: true, force: true })
-        }
-        if (res.code !== 0) throw new Error(describeCodexError(res))
-        const said = res.stdout
-          .split(/\r?\n/)
-          .map((line) => {
-            try {
-              const ev = JSON.parse(line) as { item?: { type?: string; text?: string } }
-              return ev.item?.type === 'agent_message' ? ev.item.text : undefined
-            } catch {
-              return undefined
-            }
-          })
-          .filter(Boolean)
-          .pop()
-        throw new Error(
-          `Codex hat kein Bild erzeugt${said ? ` (Antwort: „${said}")` : ''}. Möglicherweise ist die Bildgenerierung im Abo gerade nicht verfügbar oder das Kontingent erschöpft.`
-        )
-      })
-    )
+  generateImage(prompt: string, _model?: string, signal?: AbortSignal): Promise<string> {
+    return withWorkDir(async (cwd) => {
+      const text = `Erzeuge mit deinem Bildgenerierungswerkzeug genau ein Bild nach dieser Beschreibung:\n\n${prompt}\n\n${IMAGE_ONLY}`
+      const args = [
+        'exec',
+        '--skip-git-repo-check',
+        '--ephemeral',
+        '--sandbox',
+        'read-only',
+        '--color',
+        'never',
+        '--json',
+        ...codexLeanArgs({
+          keepImageGeneration: true,
+          cwd,
+          instructions: 'You create exactly one image with your image generation tool when asked. Do nothing else and answer briefly.'
+        }),
+        '-'
+      ]
+      const res = await run(this.exe, args, { cwd, stdin: text, timeoutMs: IMAGE_TIMEOUT_MS, signal })
+      const threadId = /"thread_id"\s*:\s*"([^"]+)"/.exec(res.stdout)?.[1]
+      const dir = threadId ? join(codexHome(), 'generated_images', threadId) : null
+      try {
+        const file = dir ? newestImage(dir) : null
+        if (file) return imageFileAsDataUrl(file)
+      } finally {
+        if (dir) rmSync(dir, { recursive: true, force: true })
+      }
+      if (res.code !== 0) throw new Error(describeCodexError(res))
+      const said = res.stdout
+        .split(/\r?\n/)
+        .map((line) => {
+          try {
+            const ev = JSON.parse(line) as { item?: { type?: string; text?: string } }
+            return ev.item?.type === 'agent_message' ? ev.item.text : undefined
+          } catch {
+            return undefined
+          }
+        })
+        .filter(Boolean)
+        .pop()
+      throw new Error(
+        `Codex hat kein Bild erzeugt${said ? ` (Antwort: „${said}")` : ''}. Möglicherweise ist die Bildgenerierung im Abo gerade nicht verfügbar oder das Kontingent erschöpft.`
+      )
+    })
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -357,28 +378,26 @@ export class CodexCliProvider implements AiProvider {
     })
   }
 
-  structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        const images = writeImages(cwd, req.images)
-        writeFileSync(join(cwd, 'schema.json'), JSON.stringify(req.schema))
-        const args = ['exec']
-        for (const img of images) args.push('--image', img)
-        args.push('--skip-git-repo-check', '--ephemeral', '--sandbox', 'read-only', '--color', 'never', '--output-schema', 'schema.json', '-o', 'antwort.txt')
-        args.push(
-          ...codexLeanArgs({ cwd, instructions: 'You answer requests directly and only in the requested JSON format. Do not use tools, do not run commands.' }),
-          '-c',
-          'model_reasoning_effort="low"'
-        )
-        if (model) args.push('--model', model)
-        args.push('-')
-        const prompt = `${req.system}\n\n${JSON_ONLY}\n\n---\n\n${req.user}`
-        const res = await run(this.exe, args, { cwd, stdin: prompt, timeoutMs: TIMEOUT_MS, onData: onChunk })
-        const answerFile = join(cwd, 'antwort.txt')
-        if (res.code === 0 && existsSync(answerFile)) return parseJsonText<T>(readFileSync(answerFile, 'utf8'))
-        throw new Error(describeCodexError(res))
-      })
-    )
+  structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
+    return withWorkDir(async (cwd) => {
+      const images = writeImages(cwd, req.images)
+      writeFileSync(join(cwd, 'schema.json'), JSON.stringify(req.schema))
+      const args = ['exec']
+      for (const img of images) args.push('--image', img)
+      args.push('--skip-git-repo-check', '--ephemeral', '--sandbox', 'read-only', '--color', 'never', '--output-schema', 'schema.json', '-o', 'antwort.txt')
+      args.push(
+        ...codexLeanArgs({ cwd, instructions: 'You answer requests directly and only in the requested JSON format. Do not use tools, do not run commands.' }),
+        '-c',
+        'model_reasoning_effort="low"'
+      )
+      if (model) args.push('--model', model)
+      args.push('-')
+      const prompt = `${req.system}\n\n${JSON_ONLY}\n\n---\n\n${req.user}`
+      const res = await run(this.exe, args, { cwd, stdin: prompt, timeoutMs: TIMEOUT_MS, onData: onChunk, signal })
+      const answerFile = join(cwd, 'antwort.txt')
+      if (res.code === 0 && existsSync(answerFile)) return parseJsonText<T>(readFileSync(answerFile, 'utf8'))
+      throw new Error(describeCodexError(res))
+    })
   }
 
   /**
@@ -392,34 +411,32 @@ export class CodexCliProvider implements AiProvider {
    * App anschließend selbst von der genannten Adresse und misst ihn. Eine erfundene Adresse
    * fällt dabei auf, ein „ungefähr richtig" wiedergegebener Text nicht.
    */
-  websuche(auftrag: string, model: string): Promise<Netzfund[]> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        writeFileSync(join(cwd, 'schema.json'), JSON.stringify(NETZFUND_SCHEMA))
-        const args = ['exec', '--skip-git-repo-check', '--ephemeral', '--sandbox', 'read-only', '--color', 'never']
-        args.push('--output-schema', 'schema.json', '-o', 'antwort.txt')
-        args.push(
-          ...codexLeanArgs({
-            cwd,
-            webSearch: true,
-            instructions: 'You search the web for real, published sources and report only where they are. You never quote or reproduce their text.'
-          }),
-          /*
-           * Mittlere statt niedriger Denkstufe: Eine gruendliche Suche heisst mehrere
-           * Anfragen, geoeffnete Seiten und ein Abwaegen zwischen den Funden. Auf der
-           * niedrigsten Stufe bricht Codex nach dem ersten Treffer ab.
-           */
-          '-c',
-          'model_reasoning_effort="medium"'
-        )
-        if (model) args.push('--model', model)
-        args.push('-')
-        const res = await run(this.exe, args, { cwd, stdin: `${auftrag}\n\n${NETZFUND_HINWEIS}`, timeoutMs: TIMEOUT_MS })
-        const answerFile = join(cwd, 'antwort.txt')
-        if (res.code !== 0 || !existsSync(answerFile)) throw new Error(describeCodexError(res))
-        return netzfunde(parseJsonText(readFileSync(answerFile, 'utf8')))
-      })
-    )
+  websuche(auftrag: string, model: string, signal?: AbortSignal): Promise<Netzfund[]> {
+    return withWorkDir(async (cwd) => {
+      writeFileSync(join(cwd, 'schema.json'), JSON.stringify(NETZFUND_SCHEMA))
+      const args = ['exec', '--skip-git-repo-check', '--ephemeral', '--sandbox', 'read-only', '--color', 'never']
+      args.push('--output-schema', 'schema.json', '-o', 'antwort.txt')
+      args.push(
+        ...codexLeanArgs({
+          cwd,
+          webSearch: true,
+          instructions: 'You search the web for real, published sources and report only where they are. You never quote or reproduce their text.'
+        }),
+        /*
+         * Mittlere statt niedriger Denkstufe: Eine gruendliche Suche heisst mehrere
+         * Anfragen, geoeffnete Seiten und ein Abwaegen zwischen den Funden. Auf der
+         * niedrigsten Stufe bricht Codex nach dem ersten Treffer ab.
+         */
+        '-c',
+        'model_reasoning_effort="medium"'
+      )
+      if (model) args.push('--model', model)
+      args.push('-')
+      const res = await run(this.exe, args, { cwd, stdin: `${auftrag}\n\n${NETZFUND_HINWEIS}`, timeoutMs: TIMEOUT_MS, signal })
+      const answerFile = join(cwd, 'antwort.txt')
+      if (res.code !== 0 || !existsSync(answerFile)) throw new Error(describeCodexError(res))
+      return netzfunde(parseJsonText(readFileSync(answerFile, 'utf8')))
+    })
   }
 }
 
@@ -590,8 +607,8 @@ export class ClaudeCliProvider implements AiProvider {
   constructor(private exe: string) {}
 
   /** Claude erzeugt keine Rasterbilder, sondern zeichnet eine Vektorgrafik. */
-  generateImage(prompt: string, model: string): Promise<string> {
-    return generateSvgImage(this, model, prompt)
+  generateImage(prompt: string, model: string, signal?: AbortSignal): Promise<string> {
+    return generateSvgImage(this, model, prompt, signal)
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -602,58 +619,56 @@ export class ClaudeCliProvider implements AiProvider {
     ]
   }
 
-  structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        const schema = JSON.stringify(req.schema)
-        const inline = schema.length <= MAX_INLINE_SCHEMA
-        const system = inline ? `${req.system}\n\n${JSON_ONLY}` : `${req.system}\n\n${JSON_ONLY}\n\nJSON-Schema:\n${schema}`
-        writeFileSync(join(cwd, 'system.txt'), system)
-        const args = [
-          '-p',
-          '--input-format',
-          'stream-json',
-          '--output-format',
-          'stream-json',
-          '--verbose',
-          '--system-prompt-file',
-          'system.txt',
-          '--tools',
-          '',
-          '--no-session-persistence',
-          '--setting-sources',
-          '',
-          '--strict-mcp-config',
-          '--disable-slash-commands'
-        ]
-        if (inline) args.push('--json-schema', schema)
-        if (model) args.push('--model', model)
-        const content: unknown[] = (req.images ?? []).map((url) => {
-          const { mimeType, data } = splitDataUrl(url)
-          return { type: 'image', source: { type: 'base64', media_type: mimeType, data } }
-        })
-        content.push({ type: 'text', text: req.user })
-        const message = JSON.stringify({ type: 'user', message: { role: 'user', content } })
-        const res = await run(this.exe, args, { cwd, stdin: `${message}\n`, timeoutMs: TIMEOUT_MS, onData: onChunk })
-
-        const events = res.stdout
-          .split(/\r?\n/)
-          .filter((l) => l.startsWith('{'))
-          .map((l) => {
-            try {
-              return JSON.parse(l) as { type?: string }
-            } catch {
-              return {}
-            }
-          })
-        const result = events.reverse().find((e): e is ClaudeResult => e.type === 'result')
-        if (result && !result.is_error && result.subtype === 'success') {
-          if (result.structured_output !== undefined && result.structured_output !== null) return result.structured_output as T
-          if (result.result) return parseJsonText<T>(result.result)
-        }
-        throw new Error(describeClaudeError(res, result))
+  structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
+    return withWorkDir(async (cwd) => {
+      const schema = JSON.stringify(req.schema)
+      const inline = schema.length <= MAX_INLINE_SCHEMA
+      const system = inline ? `${req.system}\n\n${JSON_ONLY}` : `${req.system}\n\n${JSON_ONLY}\n\nJSON-Schema:\n${schema}`
+      writeFileSync(join(cwd, 'system.txt'), system)
+      const args = [
+        '-p',
+        '--input-format',
+        'stream-json',
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--system-prompt-file',
+        'system.txt',
+        '--tools',
+        '',
+        '--no-session-persistence',
+        '--setting-sources',
+        '',
+        '--strict-mcp-config',
+        '--disable-slash-commands'
+      ]
+      if (inline) args.push('--json-schema', schema)
+      if (model) args.push('--model', model)
+      const content: unknown[] = (req.images ?? []).map((url) => {
+        const { mimeType, data } = splitDataUrl(url)
+        return { type: 'image', source: { type: 'base64', media_type: mimeType, data } }
       })
-    )
+      content.push({ type: 'text', text: req.user })
+      const message = JSON.stringify({ type: 'user', message: { role: 'user', content } })
+      const res = await run(this.exe, args, { cwd, stdin: `${message}\n`, timeoutMs: TIMEOUT_MS, onData: onChunk, signal })
+
+      const events = res.stdout
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith('{'))
+        .map((l) => {
+          try {
+            return JSON.parse(l) as { type?: string }
+          } catch {
+            return {}
+          }
+        })
+      const result = events.reverse().find((e): e is ClaudeResult => e.type === 'result')
+      if (result && !result.is_error && result.subtype === 'success') {
+        if (result.structured_output !== undefined && result.structured_output !== null) return result.structured_output as T
+        if (result.result) return parseJsonText<T>(result.result)
+      }
+      throw new Error(describeClaudeError(res, result))
+    })
   }
 
   /**
@@ -662,51 +677,49 @@ export class ClaudeCliProvider implements AiProvider {
    * Sonst sind ALLE Werkzeuge abgeschaltet (`--tools ''`). Hier wird genau eines freigegeben,
    * und auch nur, um Fundstellen zu bekommen – den Wortlaut lädt die App selbst.
    */
-  websuche(auftrag: string, model: string): Promise<Netzfund[]> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        const schema = JSON.stringify(NETZFUND_SCHEMA)
-        writeFileSync(
-          join(cwd, 'system.txt'),
-          `You search the web for real, published sources and report only where they are. You never quote or reproduce their text.\n\n${JSON_ONLY}`
-        )
-        const args = [
-          '-p',
-          '--output-format',
-          'stream-json',
-          '--verbose',
-          '--system-prompt-file',
-          'system.txt',
-          '--tools',
-          'WebSearch,WebFetch',
-          '--no-session-persistence',
-          '--setting-sources',
-          '',
-          '--strict-mcp-config',
-          '--disable-slash-commands',
-          '--json-schema',
-          schema
-        ]
-        if (model) args.push('--model', model)
-        const res = await run(this.exe, args, { cwd, stdin: `${auftrag}\n\n${NETZFUND_HINWEIS}`, timeoutMs: TIMEOUT_MS })
-        const events = res.stdout
-          .split(/\r?\n/)
-          .filter((l) => l.startsWith('{'))
-          .map((l) => {
-            try {
-              return JSON.parse(l) as { type?: string }
-            } catch {
-              return {}
-            }
-          })
-        const result = events.reverse().find((e): e is ClaudeResult => e.type === 'result')
-        if (result && !result.is_error && result.subtype === 'success') {
-          if (result.structured_output !== undefined && result.structured_output !== null) return netzfunde(result.structured_output)
-          if (result.result) return netzfunde(parseJsonText(result.result))
-        }
-        throw new Error(describeClaudeError(res, result))
-      })
-    )
+  websuche(auftrag: string, model: string, signal?: AbortSignal): Promise<Netzfund[]> {
+    return withWorkDir(async (cwd) => {
+      const schema = JSON.stringify(NETZFUND_SCHEMA)
+      writeFileSync(
+        join(cwd, 'system.txt'),
+        `You search the web for real, published sources and report only where they are. You never quote or reproduce their text.\n\n${JSON_ONLY}`
+      )
+      const args = [
+        '-p',
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--system-prompt-file',
+        'system.txt',
+        '--tools',
+        'WebSearch,WebFetch',
+        '--no-session-persistence',
+        '--setting-sources',
+        '',
+        '--strict-mcp-config',
+        '--disable-slash-commands',
+        '--json-schema',
+        schema
+      ]
+      if (model) args.push('--model', model)
+      const res = await run(this.exe, args, { cwd, stdin: `${auftrag}\n\n${NETZFUND_HINWEIS}`, timeoutMs: TIMEOUT_MS, signal })
+      const events = res.stdout
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith('{'))
+        .map((l) => {
+          try {
+            return JSON.parse(l) as { type?: string }
+          } catch {
+            return {}
+          }
+        })
+      const result = events.reverse().find((e): e is ClaudeResult => e.type === 'result')
+      if (result && !result.is_error && result.subtype === 'success') {
+        if (result.structured_output !== undefined && result.structured_output !== null) return netzfunde(result.structured_output)
+        if (result.result) return netzfunde(parseJsonText(result.result))
+      }
+      throw new Error(describeClaudeError(res, result))
+    })
   }
 }
 
@@ -751,22 +764,20 @@ export class AgyCliProvider implements AiProvider {
   constructor(private exe: string) {}
 
   /** Experimentell: Antigravity soll das Bild mit seiner Bildgenerierung erzeugen und im Arbeitsordner ablegen. */
-  generateImage(prompt: string, model: string): Promise<string> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        const text = `Erzeuge mit deinem Bildgenerierungswerkzeug genau ein Bild nach dieser Beschreibung und speichere es als „bild.png" im aktuellen Arbeitsordner:\n\n${prompt}\n\n${IMAGE_ONLY}`
-        const args = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--mode', 'accept-edits', '--print-timeout', '6m']
-        if (model) args.push('--model', model)
-        const message = JSON.stringify({ event: 'user', message: { content: [{ type: 'text', text }] } })
-        const res = await run(this.exe, args, { cwd, stdin: `${message}\n`, timeoutMs: IMAGE_TIMEOUT_MS })
-        // Bild im Arbeitsordner oder an einem in der Ausgabe genannten Ort
-        const mentioned = [...res.stdout.matchAll(/[A-Za-z]:\\\\?[^"'\s]+?\.(?:png|jpe?g|webp)/g)].map((m) => m[0].replace(/\\\\/g, '\\'))
-        const file = newestImage(cwd) ?? mentioned.find((p) => isFile(p)) ?? null
-        if (file) return imageFileAsDataUrl(file)
-        if (res.code !== 0) throw new Error(describeAgyError(res))
-        throw new Error('Antigravity hat kein Bild erzeugt. Die Bildgenerierung über die Antigravity CLI ist experimentell.')
-      })
-    )
+  generateImage(prompt: string, model: string, signal?: AbortSignal): Promise<string> {
+    return withWorkDir(async (cwd) => {
+      const text = `Erzeuge mit deinem Bildgenerierungswerkzeug genau ein Bild nach dieser Beschreibung und speichere es als „bild.png" im aktuellen Arbeitsordner:\n\n${prompt}\n\n${IMAGE_ONLY}`
+      const args = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--mode', 'accept-edits', '--print-timeout', '6m']
+      if (model) args.push('--model', model)
+      const message = JSON.stringify({ event: 'user', message: { content: [{ type: 'text', text }] } })
+      const res = await run(this.exe, args, { cwd, stdin: `${message}\n`, timeoutMs: IMAGE_TIMEOUT_MS, signal })
+      // Bild im Arbeitsordner oder an einem in der Ausgabe genannten Ort
+      const mentioned = [...res.stdout.matchAll(/[A-Za-z]:\\\\?[^"'\s]+?\.(?:png|jpe?g|webp)/g)].map((m) => m[0].replace(/\\\\/g, '\\'))
+      const file = newestImage(cwd) ?? mentioned.find((p) => isFile(p)) ?? null
+      if (file) return imageFileAsDataUrl(file)
+      if (res.code !== 0) throw new Error(describeAgyError(res))
+      throw new Error('Antigravity hat kein Bild erzeugt. Die Bildgenerierung über die Antigravity CLI ist experimentell.')
+    })
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -780,36 +791,34 @@ export class AgyCliProvider implements AiProvider {
       .map((m) => ({ id: m[1], label: m[2].trim() ? `${m[1]} – ${m[2].trim()}` : m[1] }))
   }
 
-  structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T> {
-    return slot(() =>
-      withWorkDir(async (cwd) => {
-        writeFileSync(join(cwd, 'schema.json'), JSON.stringify(req.schema))
-        const images = writeImages(cwd, req.images).map((f) => f.slice(cwd.length + 1))
-        const imageNote = images.length ? `\n\nDie Bilder zu dieser Anfrage liegen im Arbeitsordner: ${images.join(', ')}. Sieh sie dir genau an.` : ''
-        const text = `${req.system}\n\n${JSON_ONLY}${imageNote}\n\n---\n\n${req.user}`
-        const args = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--json-schema', join(cwd, 'schema.json'), '--print-timeout', '11m']
-        if (model) args.push('--model', model)
-        const message = JSON.stringify({ event: 'user', message: { content: [{ type: 'text', text }] } })
-        const res = await run(this.exe, args, { cwd, stdin: `${message}\n`, timeoutMs: TIMEOUT_MS, onData: onChunk })
+  structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
+    return withWorkDir(async (cwd) => {
+      writeFileSync(join(cwd, 'schema.json'), JSON.stringify(req.schema))
+      const images = writeImages(cwd, req.images).map((f) => f.slice(cwd.length + 1))
+      const imageNote = images.length ? `\n\nDie Bilder zu dieser Anfrage liegen im Arbeitsordner: ${images.join(', ')}. Sieh sie dir genau an.` : ''
+      const text = `${req.system}\n\n${JSON_ONLY}${imageNote}\n\n---\n\n${req.user}`
+      const args = ['--input-format', 'stream-json', '--output-format', 'stream-json', '--json-schema', join(cwd, 'schema.json'), '--print-timeout', '11m']
+      if (model) args.push('--model', model)
+      const message = JSON.stringify({ event: 'user', message: { content: [{ type: 'text', text }] } })
+      const res = await run(this.exe, args, { cwd, stdin: `${message}\n`, timeoutMs: TIMEOUT_MS, onData: onChunk, signal })
 
-        const events = res.stdout
-          .split(/\r?\n/)
-          .filter((l) => l.startsWith('{'))
-          .map((l) => {
-            try {
-              return JSON.parse(l) as AgyResult
-            } catch {
-              return {}
-            }
-          })
-        const result = events.reverse().find((e) => e.type === 'result' || e.event === 'result' || e.status !== undefined)
-        if (result && (!result.status || result.status === 'SUCCESS')) {
-          if (result.structured_output !== undefined && result.structured_output !== null) return result.structured_output as T
-          if (result.response) return parseJsonText<T>(result.response)
-        }
-        throw new Error(describeAgyError(res, result))
-      })
-    )
+      const events = res.stdout
+        .split(/\r?\n/)
+        .filter((l) => l.startsWith('{'))
+        .map((l) => {
+          try {
+            return JSON.parse(l) as AgyResult
+          } catch {
+            return {}
+          }
+        })
+      const result = events.reverse().find((e) => e.type === 'result' || e.event === 'result' || e.status !== undefined)
+      if (result && (!result.status || result.status === 'SUCCESS')) {
+        if (result.structured_output !== undefined && result.structured_output !== null) return result.structured_output as T
+        if (result.response) return parseJsonText<T>(result.response)
+      }
+      throw new Error(describeAgyError(res, result))
+    })
   }
 }
 

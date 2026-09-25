@@ -13,15 +13,16 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { generateExam, reviseExamPart, upperSecondary } from '../generation/generateExam'
-import type { GepruefterTreffer } from '../../arbeitsblatt/generation/originalmaterial'
-import QuellenAuswahl from '../../arbeitsblatt/steps/QuellenAuswahl'
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam, ExamPart } from '../model/types'
 import { examGrades } from '../model/types'
 import { examHasContent, examToWorksheet } from '../render/examWorksheet'
 import { AudioPanel } from '../../arbeitsblatt/steps/AudioPanel'
 import type { Worksheet } from '../../arbeitsblatt/model/types'
-import { aiCall, useKlassenarbeit } from '../store'
+import { useKlassenarbeit } from '../store'
+import { starteAuftrag, useLaufendeSchluessel } from '../../../shared/auftraege'
+import { arbeitOffen, defaultExamName, legeArbeitAb } from '../library'
+import { QUELLENAUSWAHL, type QuellenFrage } from '../../arbeitsblatt/auftraege'
 import type { AudioBlock } from '../../arbeitsblatt/model/types'
 
 /**
@@ -29,7 +30,7 @@ import type { AudioBlock } from '../../arbeitsblatt/model/types'
  * Für Darstellung und Export wird die Arbeit in die Struktur des Arbeitsblatts übersetzt.
  */
 export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: () => void }): React.JSX.Element {
-  const { setStep, setExam } = useKlassenarbeit()
+  const { setStep } = useKlassenarbeit()
   const updateExam = useKlassenarbeit((s) => s.update)
   /**
    * Der Hörtexte-Reiter arbeitet auf dem Arbeitsblatt-Abbild der Arbeit. Geändert wird
@@ -45,7 +46,8 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
     }, gruppe)
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
-  const [busy, setBusy] = useState('')
+  // Teile, an denen gerade ein Auftrag „überarbeiten" arbeitet
+  const busy = useLaufendeSchluessel(useKlassenarbeit((s) => s.docId))
   const [revise, setRevise] = useState<string | null>(null)
   const [instruction, setInstruction] = useState('')
   const meta = exam.meta
@@ -64,45 +66,68 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
     [worksheet, sheet, logo, settings.schoolName, settings.citationStyle]
   )
 
-  /** Einen einzelnen Teil mit einem eigenen Auftrag neu erzeugen. */
-  const revisePart = async (part: Exam['parts'][number], index: number): Promise<void> => {
+  /*
+   * Beides läuft als Hintergrund-Auftrag (shared/auftraege.ts) mit einer Kopie der Arbeit von
+   * jetzt und landet in DIESER Arbeit – auch wenn inzwischen eine andere offen ist.
+   */
+  const docId = useKlassenarbeit.getState().docId
+  const titel = defaultExamName(exam)
+
+  /**
+   * Einen einzelnen Teil mit einem eigenen Auftrag neu erzeugen. Sperrt die Arbeit nicht:
+   * Am Ende ändert er nur die Bausteine seines Teils (Strg+Z holt die alten zurück).
+   */
+  const revisePart = (part: Exam['parts'][number], index: number): void => {
     const wish = instruction.trim()
     if (!wish) return
     setRevise(null)
-    setBusy(`Teil ${index + 1} wird überarbeitet …`)
-    try {
-      const blocks = await reviseExamPart(exam, part, index + 1, wish, aiCall)
-      setExam({ ...exam, parts: exam.parts.map((p) => (p.id === part.id ? { ...p, blocks } : p)) })
-      setInstruction('')
-      notifySuccess(`Teil ${index + 1} wurde überarbeitet.`)
-    } catch (e) {
-      notifyError(e, 'Der Teil konnte nicht überarbeitet werden')
-    } finally {
-      setBusy('')
-    }
+    setInstruction('')
+    void starteAuftrag({
+      moduleId: 'klassenarbeit',
+      docId,
+      titel,
+      art: `Teil ${index + 1} überarbeiten`,
+      eingabe: exam,
+      istOffen: () => arbeitOffen(docId),
+      sperrt: false,
+      schluessel: part.id,
+      fehlerTitel: 'Der Teil konnte nicht überarbeitet werden',
+      arbeit: (e, k) => {
+        k.melde(`Teil ${index + 1} wird überarbeitet …`)
+        return reviseExamPart(e, e.parts.find((p) => p.id === part.id) ?? part, index + 1, wish, k.ai)
+      },
+      abschluss: () => `Teil ${index + 1} wurde überarbeitet.`,
+      ablegen: (blocks, e) => legeArbeitAb(docId, e, (aktuell) => ({ ...aktuell, parts: aktuell.parts.map((p) => (p.id === part.id ? { ...p, blocks } : p)) }))
+    })
   }
 
-  /** Trefferliste der Materialsuche: wartet auf die Entscheidung der Lehrkraft */
-  const [auswahl, setAuswahl] = useState<{ treffer: GepruefterTreffer[]; fertig: (url: string | null) => void } | null>(null)
-
-  const run = async (): Promise<void> => {
-    setBusy('Die Arbeit wird erzeugt …')
-    try {
-      const next = await generateExam(exam, aiCall, (m) => setBusy(m), {
-        /*
-         * In der Oberstufe waehlt die Lehrkraft die Quelle aus (Entscheidung vom 24.09.2026).
-         * Dort ist die Quelle Gegenstand der Pruefung – welcher Text genommen wird, entscheidet
-         * darueber, was sich daran ueberhaupt zeigen laesst.
-         */
-        auswahl: upperSecondary(exam.meta) ? (treffer) => new Promise<string | null>((fertig) => setAuswahl({ treffer, fertig })) : undefined
-      })
-      setExam(next)
-      notifySuccess('Die Klassenarbeit wurde erzeugt.')
-    } catch (e) {
-      notifyError(e, 'Die Arbeit konnte nicht erzeugt werden')
-    } finally {
-      setBusy('')
-    }
+  /** Die ganze Arbeit erzeugen – sperrt sie bis dahin (Hinweis statt Aufgaben). */
+  const run = (): void => {
+    void starteAuftrag({
+      moduleId: 'klassenarbeit',
+      docId,
+      titel,
+      art: hasContent ? 'Arbeit neu erzeugen' : 'Arbeit erzeugen',
+      eingabe: exam,
+      istOffen: () => arbeitOffen(docId),
+      fehlerTitel: 'Die Arbeit konnte nicht erzeugt werden',
+      arbeit: (e, k) =>
+        generateExam(e, k.ai, (m) => k.melde(m), {
+          /*
+           * In der Oberstufe waehlt die Lehrkraft die Quelle aus (Entscheidung vom 24.09.2026).
+           * Dort ist die Quelle Gegenstand der Pruefung – welcher Text genommen wird, entscheidet
+           * darueber, was sich daran ueberhaupt zeigen laesst. Die Frage wartet im Auftrag, bis
+           * die Arbeit offen ist (KlassenarbeitModule zeigt dann die Trefferliste).
+           */
+          auswahl: upperSecondary(e.meta)
+            ? (treffer) => k.frage<string | null>(QUELLENAUSWAHL, { treffer, thema: e.meta.topic } satisfies QuellenFrage)
+            : undefined,
+          websuche: k.websuche,
+          bild: k.bild
+        }),
+      // Die erzeugte Arbeit ersetzt den Stand, aus dem sie entstand (während des Laufs gesperrt)
+      ablegen: (next, e) => legeArbeitAb(docId, e, () => next)
+    })
   }
 
   const exportDocx = async (): Promise<void> => {
@@ -202,17 +227,11 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
             <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
               Zurück zum Rahmen
             </Button>
-            <Button leftSection={hasContent ? <IconRefresh size={16} /> : <IconSparkles size={16} />} loading={Boolean(busy)} onClick={() => void run()}>
+            <Button leftSection={hasContent ? <IconRefresh size={16} /> : <IconSparkles size={16} />} onClick={run}>
               {hasContent ? 'Neu erzeugen' : 'Arbeit erzeugen'}
             </Button>
           </Group>
         </Group>
-
-        {busy && (
-          <Alert color="blue" mb="md" p="xs">
-            <Text size="sm">{busy}</Text>
-          </Alert>
-        )}
 
         <Card withBorder mb="md">
           <Title order={4} mb="sm">
@@ -241,11 +260,7 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
                     <Popover width={320} position="bottom-end" withArrow opened={revise === part.id} onChange={(o) => setRevise(o ? part.id : null)}>
                       <Popover.Target>
                         <Tooltip label="Diesen Teil mit einem eigenen Auftrag überarbeiten">
-                          <ActionIcon
-                            variant="subtle"
-                            loading={busy.startsWith(`Teil ${i + 1}`)}
-                            onClick={() => setRevise(revise === part.id ? null : part.id)}
-                          >
+                          <ActionIcon variant="subtle" loading={busy.has(part.id)} onClick={() => setRevise(revise === part.id ? null : part.id)}>
                             <IconSparkles size={16} />
                           </ActionIcon>
                         </Tooltip>
@@ -261,7 +276,7 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
                             value={instruction}
                             onChange={(e) => setInstruction(e.currentTarget.value)}
                           />
-                          <Button size="xs" disabled={!instruction.trim()} onClick={() => void revisePart(part, i)}>
+                          <Button size="xs" disabled={!instruction.trim()} onClick={() => revisePart(part, i)}>
                             Teil überarbeiten
                           </Button>
                         </Stack>
@@ -298,7 +313,7 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
           </Text>
         </Card>
 
-        {!hasContent && !busy && (
+        {!hasContent && (
           <Alert color="blue" icon={<IconInfoCircle size={18} />} title="Noch keine Aufgaben erzeugt">
             <Text size="sm">
               „Arbeit erzeugen“ schreibt Material, Aufgaben und – wenn eingeschaltet – den Erwartungshorizont für jeden Teil. Jeder Teil wird einzeln erzeugt,
@@ -354,15 +369,6 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
         )}
         {measure}
       </Container>
-
-      <QuellenAuswahl
-        treffer={auswahl?.treffer ?? null}
-        thema={exam.meta.topic}
-        onWaehlen={(url) => {
-          auswahl?.fertig(url)
-          setAuswahl(null)
-        }}
-      />
     </ScrollArea>
   )
 }

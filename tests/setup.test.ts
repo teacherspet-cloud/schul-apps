@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { gzipSync } from 'zlib'
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { getPath: () => tmpdir() }, shell: { openExternal: vi.fn() } }))
 vi.mock('../src/main/services/storage/settings', () => ({
@@ -10,6 +10,20 @@ vi.mock('../src/main/services/storage/settings', () => ({
 }))
 
 const { extractTgz, findLoginUrl } = await import('../src/main/services/ai/setup')
+
+/*
+ * Angelegte Ordner werden am Ende entfernt. Bis 25.09.2026 blieb bei jedem Lauf einer liegen –
+ * über zweitausend hatten sich im Temp-Ordner angesammelt.
+ */
+const angelegt: string[] = []
+afterAll(() => {
+  for (const dir of angelegt) rmSync(dir, { recursive: true, force: true })
+})
+const tempOrdner = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), 'schulapps-tgz-'))
+  angelegt.push(dir)
+  return dir
+}
 
 /** Minimaler tar-Eintrag (ustar) */
 function tarEntry(name: string, content: Buffer, type = '0'): Buffer {
@@ -28,7 +42,7 @@ function tarEntry(name: string, content: Buffer, type = '0'): Buffer {
 
 describe('Einrichtung: npm-Paket entpacken', () => {
   it('entpackt nur den Programmordner, auch mit langen Namen (PAX) und großen Dateien', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'schulapps-tgz-'))
+    const dir = tempOrdner()
     const big = Buffer.alloc(3 * 1024 * 1024 + 123, 7)
     const longPath = `package/vendor/x86_64-pc-windows-msvc/codex-resources/${'sehr-langer-name-'.repeat(8)}.exe`
     const pax = Buffer.from(`${(`path=${longPath}\n`.length + 4).toString()} path=${longPath}\n`)
@@ -52,7 +66,7 @@ describe('Einrichtung: npm-Paket entpacken', () => {
   })
 
   it('verweigert Pfade außerhalb des Zielordners', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'schulapps-tgz-'))
+    const dir = tempOrdner()
     const file = join(dir, 'boese.tgz')
     writeFileSync(file, gzipSync(Buffer.concat([tarEntry('package/vendor/x/../../../../boese.exe', Buffer.from('x')), Buffer.alloc(1024)])))
     await expect(extractTgz(file, 'package/vendor/x/', join(dir, 'ziel'))).rejects.toThrow(/Ungültiger Pfad/)

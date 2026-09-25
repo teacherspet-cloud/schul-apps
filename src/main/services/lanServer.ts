@@ -64,6 +64,8 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   // --- Erstellen: KI, Bildsuche, Quellenprüfung, Hörtexte ---
   'ai:structured',
   'ai:image',
+  // Einen eigenen Auftrag abbrechen – betrifft nur die Anfrage mit dieser Kennung
+  'ai:cancel',
   'images:online-search',
   'images:openmoji-search',
   'images:openmoji-svg',

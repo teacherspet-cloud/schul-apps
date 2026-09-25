@@ -14,13 +14,17 @@ import { parseProjectFile } from './project'
 import { includedVocab } from './model/vocab'
 import { useVokabeltest } from './store'
 import { useDokumentOeffner } from '../../shared/navigation'
+import { useSperrenderAuftrag } from '../../shared/auftraege'
+import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo } = useVokabeltest()
+  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, testId } = useVokabeltest()
   const [libraryOpen, setLibraryOpen] = useState(false)
+  // Läuft für diesen Test ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
+  const auftrag = useSperrenderAuftrag(testId)
   useAutosave()
   // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt (vorher hing es am Editor, auch im Hintergrund)
-  useUndoKeys(active && !libraryOpen, undo, redo)
+  useUndoKeys(active && !libraryOpen && !auftrag, undo, redo)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   useDokumentOeffner('vokabeltest', async (id) => {
@@ -72,9 +76,15 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
       </Group>
       <TestLibraryModal opened={libraryOpen} onClose={() => setLibraryOpen(false)} />
       <Box style={{ flex: 1, minHeight: 0 }}>
-        {step === 0 && <VocabStep />}
-        {step === 1 && <SettingsStep />}
-        {step === 2 && doc && <EditorStep />}
+        {auftrag ? (
+          <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Vokabeltest" onNeu={() => newTestSafely().catch(notifyError)} />
+        ) : (
+          <>
+            {step === 0 && <VocabStep />}
+            {step === 1 && <SettingsStep />}
+            {step === 2 && doc && <EditorStep />}
+          </>
+        )}
       </Box>
     </Box>
   )

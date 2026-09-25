@@ -27,7 +27,7 @@ export function sanitizeSvg(raw: string): string {
   return svg
 }
 
-export async function generateSvgImage(provider: AiProvider, model: string, prompt: string): Promise<string> {
+export async function generateSvgImage(provider: AiProvider, model: string, prompt: string, signal?: AbortSignal): Promise<string> {
   const res = await provider.structured<{ svg: string }>(
     {
       system: SVG_SYSTEM,
@@ -35,7 +35,9 @@ export async function generateSvgImage(provider: AiProvider, model: string, prom
       schemaName: 'zeichnung',
       schema: { type: 'object', properties: { svg: { type: 'string' } }, required: ['svg'], additionalProperties: false }
     },
-    model
+    model,
+    undefined,
+    signal
   )
   const svg = sanitizeSvg(res.svg ?? '')
   return `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import { create } from 'zustand'
 import { sichereAlles } from './autosave'
+import { laeuft, useAuftraege } from './auftraege'
 import { notifyError } from './util'
 
 /**
@@ -23,8 +24,8 @@ import { notifyError } from './util'
  * geöffneter Editor seine Druckfunktion an (`useDruck`) – Strg+P ruft sie für das vordere
  * Programm auf und tut sonst nichts.
  *
- * Für spätere Hintergrund-Aufträge gibt es schon den Laufpunkt je Programm (`laufpunkte`):
- * Die Seitenleiste zeigt dann einen Punkt am Symbol, solange dort etwas läuft.
+ * Der Laufpunkt je Programm (`laufpunkte`) folgt den Hintergrund-Aufträgen (auftraege.ts):
+ * Die Seitenleiste zeigt einen Punkt am Symbol, solange dort etwas erzeugt wird.
  */
 
 /** Reiter der Einstellungsseite */
@@ -34,13 +35,12 @@ interface NavigationState {
   /** 'home', 'settings' oder die Kennung eines Programms aus modules/registry.ts */
   active: string
   settingsTab: SettingsTab
-  /** Programme, an deren Symbol ein Punkt steht (z. B. laufender Auftrag) */
+  /** Programme, an deren Symbol ein Punkt steht (laufender Auftrag, abgeleitet aus auftraege.ts) */
   laufpunkte: Record<string, boolean>
   openModule: (id: string) => void
   openSettings: (tab?: SettingsTab) => void
   setSettingsTab: (tab: SettingsTab) => void
   openDocument: (moduleId: string, docId: string) => Promise<void>
-  setLaufpunkt: (moduleId: string, an: boolean) => void
 }
 
 type Oeffner = (docId: string) => Promise<void>
@@ -77,9 +77,22 @@ export const useNavigation = create<NavigationState>((set, get) => ({
     } catch (e) {
       notifyError(e, 'Das Dokument ließ sich nicht öffnen')
     }
-  },
-  setLaufpunkt: (moduleId, an) => set((s) => ({ laufpunkte: { ...s.laufpunkte, [moduleId]: an } }))
+  }
 }))
+
+/*
+ * Laufpunkte aus den Aufträgen ableiten: Ein Programm hat einen Punkt, solange dort ein
+ * Auftrag läuft oder auf einen freien Platz wartet. Fertige, abgebrochene und gescheiterte
+ * zählen nicht – die stehen in der Auftragsleiste.
+ */
+useAuftraege.subscribe((s, prev) => {
+  if (s.auftraege === prev.auftraege) return
+  const punkte: Record<string, boolean> = {}
+  for (const a of s.auftraege) if (laeuft(a)) punkte[a.moduleId] = true
+  const bisher = useNavigation.getState().laufpunkte
+  const gleich = Object.keys(punkte).length === Object.keys(bisher).filter((k) => bisher[k]).length && Object.keys(punkte).every((k) => bisher[k])
+  if (!gleich) useNavigation.setState({ laufpunkte: punkte })
+})
 
 /** Kurzformen für Stellen außerhalb von React (und für Knöpfe, die nur auslösen) */
 export const openModule = (id: string): void => useNavigation.getState().openModule(id)

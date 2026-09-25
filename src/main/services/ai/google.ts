@@ -27,7 +27,7 @@ export class GoogleProvider implements AiProvider {
     }
   }
 
-  async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T> {
+  async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
     const parts: Part[] = [{ text: req.user }]
     for (const url of req.images ?? []) {
       const { mimeType, data } = splitDataUrl(url)
@@ -39,7 +39,8 @@ export class GoogleProvider implements AiProvider {
       config: {
         systemInstruction: req.system,
         responseMimeType: 'application/json',
-        responseJsonSchema: req.schema
+        responseJsonSchema: req.schema,
+        abortSignal: signal
       }
     }
     try {
@@ -65,10 +66,10 @@ export class GoogleProvider implements AiProvider {
     }
   }
 
-  async generateImage(prompt: string, model: string): Promise<string> {
+  async generateImage(prompt: string, model: string, signal?: AbortSignal): Promise<string> {
     try {
       if (model.startsWith('imagen')) {
-        const res = await this.client.models.generateImages({ model, prompt, config: { numberOfImages: 1 } })
+        const res = await this.client.models.generateImages({ model, prompt, config: { numberOfImages: 1, abortSignal: signal } })
         const img = res.generatedImages?.[0]?.image
         if (!img?.imageBytes) throw new Error('Kein Bild erhalten (evtl. vom Sicherheitsfilter blockiert).')
         return `data:${img.mimeType ?? 'image/png'};base64,${img.imageBytes}`
@@ -77,7 +78,7 @@ export class GoogleProvider implements AiProvider {
       const res = await this.client.models.generateContent({
         model,
         contents: prompt,
-        config: { responseModalities: ['IMAGE', 'TEXT'] }
+        config: { responseModalities: ['IMAGE', 'TEXT'], abortSignal: signal }
       })
       const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)
       if (!part?.inlineData?.data) throw new Error('Kein Bild erhalten.')

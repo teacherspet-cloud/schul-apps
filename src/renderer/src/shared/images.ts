@@ -88,9 +88,16 @@ export function aiImagePrompt(subject: string): string {
   return `A simple black-and-white line drawing in pictogram style showing: ${subject}. For a school vocabulary test. One single, clearly recognisable motif, thick clean outlines, no text, no letters, no numbers. ${GREEN_SCREEN_PROMPT}`
 }
 
-/** Erzeugt ein KI-Bild und stellt es frei (der neongrüne Hintergrund wird transparent). */
-export async function generateAiImage(prompt: string, size = 512): Promise<PickedImage> {
-  const raw = await window.api.ai.image(prompt)
+/**
+ * Erzeugt ein KI-Bild und stellt es frei (der neongrüne Hintergrund wird transparent).
+ * `erzeuge`: der Bildaufruf eines Hintergrund-Auftrags (abbrechbar) – sonst der allgemeine.
+ */
+export async function generateAiImage(
+  prompt: string,
+  size = 512,
+  erzeuge: (prompt: string) => Promise<string> = (p) => window.api.ai.image(p)
+): Promise<PickedImage> {
+  const raw = await erzeuge(prompt)
   const cleaned = await cleanImageBackground(raw)
   return { dataUrl: await normalizeImage(cleaned.dataUrl, size, 'png'), source: 'ai', credit: 'KI-generiert' }
 }

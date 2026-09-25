@@ -5,6 +5,7 @@
  */
 import type { SavedGrammarTestStats } from '@shared/types'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import { chosenGrammarTopics } from '../arbeitsblatt/didactics/grammar'
 import type { GrammarTest } from './model/types'
@@ -64,6 +65,40 @@ export async function openSavedTest(id: string): Promise<void> {
   await sichereAlles()
   const saved = await window.api.grammarTests.get(id)
   useGrammatiktest.getState().openSaved(saved.id, saved.name, saved.payload as GrammarTest, saved.updatedAt)
+}
+
+/** Ist genau dieser Test gerade im Programm offen? */
+export const testOffen = (docId: string): boolean => {
+  const s = useGrammatiktest.getState()
+  return s.docId === docId && s.test !== null
+}
+
+/**
+ * Ergebnis eines Hintergrund-Auftrags im Test `docId` ablegen (siehe shared/auftraege.ts):
+ * im offenen Test als Rückgängig-Schritt (und zum Editor), sonst direkt in der Bibliothek.
+ */
+export function legeTestAb(docId: string, schnappschuss: GrammarTest, einarbeiten: (t: GrammarTest) => GrammarTest, schritt?: number): Promise<void> {
+  return legeAb<GrammarTest>(
+    {
+      istOffen: testOffen,
+      imOffenen: (f) => {
+        const s = useGrammatiktest.getState()
+        if (!s.test) return
+        s.setTest(f(s.test))
+        if (schritt !== undefined) s.setStep(schritt)
+      },
+      laden: async (id) => {
+        const t = await window.api.grammarTests.get(id)
+        return { name: t.name, dok: t.payload as GrammarTest }
+      },
+      speichern: async (id, name, test) => {
+        await window.api.grammarTests.save({ id, name: name ?? defaultTestName(test), stats: testStats(test), payload: test })
+      }
+    },
+    docId,
+    schnappschuss,
+    einarbeiten
+  )
 }
 
 /** Neuen Test beginnen – den bisherigen vorher sichern. */

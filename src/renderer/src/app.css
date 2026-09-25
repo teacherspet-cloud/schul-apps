@@ -363,3 +363,77 @@ body {
     display: none;
   }
 }
+
+/*
+ * Auftragsleiste unten rechts (shell/AuftragsLayer.tsx): über dem Inhalt, unter Dialogen
+ * (Mantine-Modale liegen bei 200). Farben kommen aus dem Thema über die Mantine-Variablen,
+ * damit sie im Dunkelmodus und in jedem Farbschema stimmen.
+ */
+.auftrags-layer {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 150;
+  max-width: calc(100vw - 32px);
+}
+
+.auftrags-liste {
+  width: 380px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.auftrags-kopf {
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-default-hover);
+}
+
+.auftrags-zeile {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.auftrags-zeile:last-child {
+  border-bottom: none;
+}
+
+.auftrags-pille {
+  display: block;
+  border-radius: 999px;
+}
+
+.auftrags-pille[data-puls='true'] > * {
+  animation: auftrags-puls 0.8s ease-in-out 3;
+}
+
+@keyframes auftrags-puls {
+  0%,
+  100% {
+    box-shadow: var(--mantine-shadow-md);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--mantine-primary-color-light);
+  }
+}
+
+/* Am Tablet und in schmalen Fenstern schmal: Die Leiste darf das Blatt nicht verdecken */
+@media (max-width: 900px) {
+  .auftrags-layer {
+    right: 8px;
+    bottom: 8px;
+  }
+  .auftrags-liste {
+    width: 300px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auftrags-pille[data-puls='true'] > * {
+    animation: none;
+  }
+}
+
+/* Platz für die eingeklappte Auftragsleiste, damit sie keine Knöpfe unten rechts verdeckt */
+:root[data-auftraege] .app-main {
+  padding-bottom: 60px;
+}

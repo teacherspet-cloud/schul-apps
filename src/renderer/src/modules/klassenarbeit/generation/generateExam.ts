@@ -451,6 +451,9 @@ export interface ExamOptions {
    * Fehlt die Rueckfrage, nimmt die App die bestbewertete.
    */
   auswahl?: (treffer: GepruefterTreffer[]) => Promise<string | null>
+  /** Websuche und Bild-KI eines Hintergrund-Auftrags – dann lassen sie sich mit ihm abbrechen */
+  websuche?: Parameters<typeof browserMaterialDienste>[0]
+  bild?: (prompt: string) => Promise<string>
 }
 
 export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgress = () => undefined, opts: ExamOptions = {}): Promise<Exam> {
@@ -481,7 +484,7 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
           // Klausur: kein Ausweichen auf einen Autorentext
           pruefung: true
         },
-        dienste: browserMaterialDienste(),
+        dienste: browserMaterialDienste(opts.websuche),
         ai,
         fortschritt: (text) => onProgress(`Teil ${i + 1}: ${text}`),
         auswahl: opts.auswahl
@@ -603,7 +606,12 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
       // Bilder, die die Lerngruppe von Arbeitsblättern zum selben Thema kennt, kommen zuerst:
       // Dasselbe Motiv in Übung und Abfrage wirkt als Abrufhilfe (Schneider u. a. 2020).
       const reuse = await worksheetImagePool(meta.subjectId, meta.topic, meta.grade)
-      const images = await completeWorksheetImages(blocks, meta, { ...(await browserWorksheetImageDeps()), reuse }, (message) => onProgress(message))
+      const images = await completeWorksheetImages(
+        blocks,
+        meta,
+        { ...(await browserWorksheetImageDeps(opts.bild ? { ai, bild: opts.bild } : undefined)), reuse },
+        (message) => onProgress(message)
+      )
       const notes = [
         found.texts ? `${found.texts} Textquelle(n) geprüft – Wortlaut und Fundstelle vor dem Einsatz kontrollieren.` : '',
         images.web || images.missing || images.reused

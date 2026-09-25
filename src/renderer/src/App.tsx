@@ -9,6 +9,7 @@ import Home from './shell/Home'
 import SettingsPage from './shell/SettingsPage'
 import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
+import AuftragsLayer from './shell/AuftragsLayer'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
 import { druckeAktives, openModule, useNavigation } from './shared/navigation'
@@ -53,14 +54,11 @@ export default function App(): React.JSX.Element {
     }
   }
 
-  // Vor dem Schließen des Fensters: alles sichern und dem Hauptprozess Bescheid geben
-  useEffect(
-    () =>
-      window.api.fenster.onSchliessen(() => {
-        void sichereAlles().finally(() => void window.api.fenster.gesichert().catch(() => undefined))
-      }),
-    []
-  )
+  /*
+   * Vor dem Schließen des Fensters alles sichern und dem Hauptprozess Bescheid geben – das
+   * übernimmt die Auftragsleiste (shell/AuftragsLayer.tsx), weil sie vorher fragen muss,
+   * wenn noch Aufträge laufen.
+   */
   // Im Browser (Zugang aus dem Netz) gibt es kein Schließen-Ereignis – dort zumindest anstoßen
   useEffect(() => {
     const weg = (): void => void sichereAlles()
@@ -176,6 +174,9 @@ export default function App(): React.JSX.Element {
           </div>
         ))}
       </AppShell.Main>
+
+      {/* Laufende und fertige Hintergrund-Aufträge – unten rechts über allen Programmen */}
+      <AuftragsLayer />
     </AppShell>
   )
 }

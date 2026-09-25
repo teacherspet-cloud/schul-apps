@@ -1,10 +1,13 @@
 import { notifications } from '@mantine/notifications'
+import { istAbbruch } from '@shared/abbruch'
 
 export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
 }
 
 export function notifyError(e: unknown, title = 'Fehler'): void {
+  // Ein abgebrochener Auftrag ist gewollt, kein Fehler – kein roter Hinweis (siehe shared/auftraege.ts)
+  if (istAbbruch(e)) return
   notifications.show({ color: 'red', title, message: e instanceof Error ? e.message : String(e), autoClose: 10000 })
 }
 

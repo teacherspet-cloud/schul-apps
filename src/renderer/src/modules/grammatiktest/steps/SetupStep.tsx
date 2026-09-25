@@ -1,6 +1,6 @@
-import { Alert, Button, Card, Container, Grid, Group, Loader, Modal, NumberInput, Progress, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Button, Card, Container, Grid, Group, NumberInput, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
 import { IconAlertTriangle, IconSparkles } from '@tabler/icons-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import { CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import GradeScaleModal from '../../../shared/components/GradeScaleModal'
@@ -17,8 +17,9 @@ import { generateTest } from '../generation/generateTest'
 import { newTest } from '../model/defaults'
 import { suggestedFormats, testingRules } from '../model/testRules'
 import type { GrammarTest, GrammarTestMeta } from '../model/types'
-import { trackedAiCall, useGrammatiktest } from '../store'
-import { AiProgressTracker, neverBackwards, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
+import { useGrammatiktest } from '../store'
+import { starteAuftrag } from '../../../shared/auftraege'
+import { defaultTestName, legeTestAb, testOffen } from '../library'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
@@ -32,43 +33,12 @@ const TEST_SUBJECTS = SUBJECTS.filter((s) => hasGrammar(s.id))
  * Fehler und passende Aufgabenformen. Aus den gewählten Themen werden die Formate vorbelegt;
  * die Lehrkraft kann sie ändern.
  */
-/** Verstrichene Zeit als m:ss – ehrlicher als eine erfundene Prozentzahl. */
-function elapsedLabel(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000))
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')} min`
-}
-
 export default function SetupStep(): React.JSX.Element {
-  const { test, setTest, setStep, update } = useGrammatiktest()
+  const { test, setTest } = useGrammatiktest()
   const settings = useAppSettings((s) => s.settings)
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
-  const [busy, setBusy] = useState(false)
   const [scaleOpen, setScaleOpen] = useState(false)
-  /*
-   * Fortschritt der einen KI-Anfrage.
-   *
-   * Ein Grammatiktest ist EIN Aufruf, der je nach Anbieter mehrere Minuten braucht. Vorher
-   * drehte sich nur der Knopf: Die Lehrkraft sah minutenlang nicht, ob überhaupt etwas
-   * geschieht. Der Balken folgt der Länge der eintreffenden Antwort und läuft nie zurück.
-   */
-  const [step, setStepMessage] = useState<string | null>(null)
-  const [chunkRatio, setChunkRatio] = useState(0)
-  const shown = useRef(0)
-  const startedAt = useRef(0)
-  // Sekundentakt, solange erzeugt wird: Ohne ihn stünde die verstrichene Zeit still, wenn
-  // der Anbieter keinen Fortschritt meldet – nichts würde dann ein neues Rendern auslösen.
-  const [, tick] = useState(0)
-
-  // MUSS vor jedem frühen `return` stehen: Hooks müssen bei jedem Rendern in gleicher Zahl
-  // und Reihenfolge laufen. Hinter dem `return (!test)` lief dieser hier nur manchmal – die
-  // Oberfläche brach dann beim ersten Rendern ab (React #310), und zwar die ganze App, weil
-  // die Programme im Hintergrund mitlaufen.
-  useEffect(() => {
-    if (step === null) return
-    const timer = setInterval(() => tick((n) => n + 1), 1000)
-    return () => clearInterval(timer)
-  }, [step])
 
   useEffect(() => {
     Promise.all([window.api.cefr.get(), window.api.designs.list()])
@@ -113,27 +83,26 @@ export default function SetupStep(): React.JSX.Element {
   const range = gradeRange(table, meta.stateId, meta.schoolTypeId)
   const grades = Array.from({ length: range.max - range.min + 1 }, (_, i) => range.min + i)
 
-  const create = async (): Promise<void> => {
-    setBusy(true)
-    startedAt.current = Date.now()
-    shown.current = 0
-    setChunkRatio(0)
-    setStepMessage('Start …')
-    const tracker = new AiProgressTracker(() => setChunkRatio(tracker.ratio()))
-    try {
-      const blocks = await generateTest(test, trackedAiCall(tracker), setStepMessage)
-      update((d) => {
-        d.blocks = blocks
-      })
-      setStep(1)
-    } catch (e) {
-      notifyError(e, 'Der Test konnte nicht erstellt werden')
-    } finally {
-      tracker.dispose()
-      setBusy(false)
-      setStepMessage(null)
-      setChunkRatio(0)
-    }
+  /*
+   * „Test erstellen" läuft als Hintergrund-Auftrag (shared/auftraege.ts): Ein Grammatiktest ist
+   * EINE lange Anfrage, die je nach Anbieter Minuten dauert. Bis 25.09.2026 lag solange ein
+   * Fenster ohne Schließen-Knopf über dem Programm. Jetzt zeigt das Programm einen Hinweis,
+   * die Auftragsleiste den Fortschritt – und das Ergebnis landet in DIESEM Test.
+   */
+  const create = (): void => {
+    const docId = useGrammatiktest.getState().docId
+    void starteAuftrag({
+      moduleId: 'grammatiktest',
+      docId,
+      titel: defaultTestName(test),
+      art: 'Test erstellen',
+      eingabe: test,
+      istOffen: () => testOffen(docId),
+      fehlerTitel: 'Der Test konnte nicht erstellt werden',
+      arbeit: (t, k) => generateTest(t, k.ai, (m) => k.melde(m)),
+      // Ein eigener Verlaufsschritt: Strg+Z holt die vorigen Aufgaben zurück
+      ablegen: (blocks, t) => legeTestAb(docId, t, (aktuell) => ({ ...aktuell, blocks }), 1)
+    })
   }
 
   return (
@@ -348,7 +317,7 @@ export default function SetupStep(): React.JSX.Element {
             ))}
 
             <Group justify="flex-end">
-              <Button leftSection={<IconSparkles size={16} />} loading={busy} disabled={!topics.length} onClick={() => void create()}>
+              <Button leftSection={<IconSparkles size={16} />} disabled={!topics.length} onClick={create}>
                 Test erstellen
               </Button>
             </Group>
@@ -366,34 +335,6 @@ export default function SetupStep(): React.JSX.Element {
           </Stack>
         </Grid.Col>
       </Grid>
-
-      <Modal opened={step !== null} onClose={() => {}} withCloseButton={false} centered title="Test wird erstellt">
-        {step !== null &&
-          (() => {
-            const ratio = neverBackwards(shown.current, chunkRatio)
-            shown.current = ratio
-            const rest = remainingLabel(remainingSeconds(ratio, Date.now() - startedAt.current))
-            return (
-              <Stack>
-                {/* Ein Balken nur, wenn es wirklich etwas zu zeigen gibt. Codex schreibt seine
-                    Antwort erst am Ende – ein Balken, der bei 0 % klebt, sähe aus wie ein
-                    Absturz. Der Kreisel heißt ehrlich „es läuft, Dauer unbekannt". */}
-                {ratio > 0 ? <Progress value={ratio * 100} animated /> : <Loader size="sm" type="dots" />}
-                <Group justify="space-between" gap="xs">
-                  <Text size="sm">{step}</Text>
-                  {/* Solange nichts eingetroffen ist, waere eine Prozentzahl eine Behauptung –
-                      dann lieber die verstrichene Zeit, die stimmt immer. */}
-                  <Text size="sm" c="dimmed">
-                    {ratio > 0 ? `${Math.round(ratio * 100)} %${rest ? ` · ${rest}` : ''}` : `läuft seit ${elapsedLabel(Date.now() - startedAt.current)}`}
-                  </Text>
-                </Group>
-                <Text size="xs" c="dimmed">
-                  Ein Grammatiktest entsteht in einer einzigen Anfrage. Je nach Anbieter dauert das einige Minuten.
-                </Text>
-              </Stack>
-            )
-          })()}
-      </Modal>
 
       <GradeScaleModal
         opened={scaleOpen}

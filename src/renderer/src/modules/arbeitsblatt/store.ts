@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { Worksheet, WsBlock } from './model/types'
-import { AiProgressTracker, trackingAiCall } from '../../shared/aiProgress'
 import { leererVerlauf, merke, rueckgaengig, schliesseGruppe, type Verlauf, wiederholen } from '../../shared/undo'
 import { newId } from '../vokabeltest/model/random'
 
@@ -150,11 +149,7 @@ export const useArbeitsblatt = create<ArbeitsblattState>((set, get) => ({
 
 export const aiCall = <T>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
-/**
- * KI-Aufruf, der seinen Fortschritt meldet.
- * Damit füllt sich der Balken während der Erstellung, statt bis zum Schluss still zu stehen.
+/*
+ * Den Fortschritt einer Erzeugung verfolgt jetzt der Hintergrund-Auftrag selbst (k.ai in
+ * shared/auftraege.ts) – mit Warteplatz und Abbruch. Die frühere Hülle `trackedAiCall` ist weg.
  */
-export const trackedAiCall =
-  (tracker: AiProgressTracker) =>
-  <T>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> =>
-    trackingAiCall(tracker, (r: Parameters<typeof window.api.ai.structured>[0]) => window.api.ai.structured<T>(r))(req)

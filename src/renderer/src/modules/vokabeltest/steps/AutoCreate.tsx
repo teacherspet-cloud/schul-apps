@@ -1,33 +1,16 @@
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Group,
-  Loader,
-  Modal,
-  NumberInput,
-  Progress,
-  SegmentedControl,
-  Select,
-  SimpleGrid,
-  Stack,
-  Text,
-  TextInput
-} from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Loader, Modal, NumberInput, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import { gradeOptions, suggestLevel } from '../../../shared/cefr'
-import { notifyError, notifySuccess } from '../../../shared/util'
+import { notifyError } from '../../../shared/util'
 import { planAutoTasks, suggestLevelFromVocab, VocabLevelSuggestion, vocabCountFor } from '../generation/autoPlan'
-import { defaultHeader, generateTest } from '../generation/generate'
-import { pictureOptions } from '../generation/pictureOptions'
+import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPES } from '../generation/taskTypes'
 import { formatPoints, variantPoints } from '../model/blocks'
 import { randomSeed } from '../model/random'
 import { LANGUAGES, TestSettings } from '../model/types'
 import { includedVocab } from '../model/vocab'
-import { saveCurrentTest } from '../library'
 import { aiCall, useVokabeltest } from '../store'
 import type { VocabListContext } from '../store'
 import { collectKnownVocab } from '../../../shared/knownVocab'
@@ -123,7 +106,7 @@ export function AutoCreateButton({ selection }: { selection?: BookSelection | nu
 const analysisCache = new Map<string, VocabLevelSuggestion | null>()
 
 function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => void }): React.JSX.Element {
-  const { vocab, settings: stored, loadDocument, doc, listName, listContext } = useVokabeltest()
+  const { vocab, settings: stored, listName, listContext } = useVokabeltest()
   const [analysis, setAnalysis] = useState<{ running: boolean; result: VocabLevelSuggestion | null; failed?: boolean }>({ running: false, result: null })
   /** Hat die Lehrkraft Klasse oder Niveau selbst geändert, überschreibt die Analyse das nicht mehr */
   const touched = useRef(false)
@@ -132,8 +115,6 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
   const [base, setBase] = useState<TestSettings | null>(null)
   const [table, setTable] = useState<CefrTable | null>(null)
   const [economy, setEconomy] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [progress, setProgress] = useState<{ done: number; total: number; message: string } | null>(null)
 
   useEffect(() => {
     if (!opened) return
@@ -191,41 +172,36 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
   const differentPossible = usable.length >= tested * (base?.variantCount ?? 1)
   const language = LANGUAGES.find((l) => l.value === base?.targetLanguage)?.label ?? base?.targetLanguage
 
-  const start = async (): Promise<void> => {
+  /*
+   * Erstellen läuft als Hintergrund-Auftrag (../auftraege.ts): Das Fenster schließt sofort,
+   * die Auftragsleiste zeigt den Fortschritt, und der Test landet in DIESEM Vokabeltest (auch
+   * in der Bibliothek). Die Wahl der Aufgabenformate gehört mit zum Auftrag.
+   */
+  const start = (): void => {
     if (!base) return
-    setError(null)
-    setProgress({ done: 0, total: 1, message: 'Passende Aufgabenformate werden ausgewählt …' })
-    try {
-      const { tasks, vocabCount } = await planAutoTasks(usable, base, points, aiCall)
-      const variantMode = base.variantMode === 'differentVocab' && differentPossible ? 'differentVocab' : 'sameVocab'
-      const runSettings: TestSettings = { ...base, variantMode, tasks, vocabCount, seed: randomSeed() }
-      const app = await window.api.settings.get()
-      const result = await generateTest(usable, runSettings, doc?.header ?? defaultHeader(app.schoolName), {
-        ai: aiCall,
-        review: true,
-        combined: economy,
-        known: listContext?.known,
-        ...(await pictureOptions(runSettings.pictureSource)),
-        onProgress: (done, total, message) => setProgress({ done, total, message })
-      })
-      loadDocument(result)
-      // Direkt in der App sichern, damit der Test in der Auswahl auftaucht
-      await saveCurrentTest().catch(notifyError)
-      const total = result.variants[0] ? variantPoints(result.variants[0]) : 0
-      notifySuccess(
-        `Test erstellt: ${tasks.map((t) => `${TASK_TYPES[t.type].label} (${t.count})`).join(', ')} – ${formatPoints(total)} Punkte${total !== points ? ` (Vorgabe ${points})` : ''}.`
-      )
-      onClose()
-    } catch (e) {
-      // Fehler gut sichtbar im Fenster anzeigen (z. B. erreichte Nutzungsgrenze des Abos)
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setProgress(null)
-    }
+    const variantMode = base.variantMode === 'differentVocab' && differentPossible ? 'differentVocab' : 'sameVocab'
+    erstelleVokabeltest({
+      art: 'Test automatisch erstellen',
+      usable,
+      settings: { ...base, variantMode },
+      review: true,
+      economy,
+      known: listContext?.known,
+      vorbereiten: async (settings, k) => {
+        k.melde('Passende Aufgabenformate werden ausgewählt …')
+        const { tasks, vocabCount } = await planAutoTasks(usable, settings, points, k.ai)
+        return { ...settings, tasks, vocabCount, seed: randomSeed() }
+      },
+      abschluss: (result) => {
+        const total = result.variants[0] ? variantPoints(result.variants[0]) : 0
+        return `Test erstellt: ${result.settings.tasks.map((t) => `${TASK_TYPES[t.type].label} (${t.count})`).join(', ')} – ${formatPoints(total)} Punkte${total !== points ? ` (Vorgabe ${points})` : ''}.`
+      }
+    })
+    onClose()
   }
 
   return (
-    <Modal opened={opened} onClose={() => !progress && onClose()} title="Test automatisch erstellen" closeOnClickOutside={!progress}>
+    <Modal opened={opened} onClose={onClose} title="Test automatisch erstellen">
       <Stack>
         <Text size="sm">
           Die KI wählt passende Aufgabenformate für die {usable.length} markierten Vokabeln und verteilt die Punkte. Den fertigen Test kannst du anschließend
@@ -238,7 +214,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
           step={1}
           value={points}
           onChange={(v) => setPoints(Math.max(2, Number(v) || 2))}
-          disabled={Boolean(progress)}
+
           data-autofocus
         />
         <Text size="xs" c="dimmed">
@@ -257,10 +233,9 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                   value={String(base.grade)}
                   onChange={(v) => v && setGrade(Number(v))}
                   allowDeselect={false}
-                  disabled={Boolean(progress)}
                 />
               ) : (
-                <NumberInput label="Klassenstufe" min={1} max={13} value={base.grade} onChange={(v) => setGrade(Number(v) || 1)} disabled={Boolean(progress)} />
+                <NumberInput label="Klassenstufe" min={1} max={13} value={base.grade} onChange={(v) => setGrade(Number(v) || 1)} />
               )}
               <Select
                 label="Schwierigkeit (GER-Niveau)"
@@ -271,7 +246,6 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                   if (v) patch({ level: v as CefrLevel })
                 }}
                 allowDeselect={false}
-                disabled={Boolean(progress)}
               />
             </SimpleGrid>
             {analysis.running ? (
@@ -302,11 +276,11 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
               placeholder={analysis.result?.topic ? `z. B. ${analysis.result.topic}` : 'z. B. Urlaub am Meer, Schule in England'}
               value={base.topic}
               onChange={(e) => patch({ topic: e.currentTarget.value })}
-              disabled={Boolean(progress)}
+
               rightSectionWidth={analysis.result?.topic && !base.topic ? 90 : undefined}
               rightSection={
                 analysis.result?.topic && !base.topic ? (
-                  <Button size="compact-xs" variant="subtle" onClick={() => patch({ topic: analysis.result!.topic })} disabled={Boolean(progress)}>
+                  <Button size="compact-xs" variant="subtle" onClick={() => patch({ topic: analysis.result!.topic })}>
                     übernehmen
                   </Button>
                 ) : undefined
@@ -326,7 +300,6 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                 ]}
                 value={String(base.variantCount)}
                 onChange={(v) => patch({ variantCount: Number(v) })}
-                disabled={Boolean(progress)}
               />
               {base.variantCount > 1 && (
                 <Checkbox
@@ -334,7 +307,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                   size="xs"
                   label="Unterschiedliche Vokabeln je Variante (sonst gleiche Vokabeln, andere Sätze und Reihenfolge)"
                   checked={base.variantMode === 'differentVocab' && differentPossible}
-                  disabled={!differentPossible || Boolean(progress)}
+                  disabled={!differentPossible}
                   description={!differentPossible ? `Dafür werden mindestens ${tested * base.variantCount} markierte Vokabeln benötigt.` : undefined}
                   onChange={(e) => patch({ variantMode: e.currentTarget.checked ? 'differentVocab' : 'sameVocab' })}
                 />
@@ -342,29 +315,16 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
             </div>
           </>
         )}
-        {progress && (
-          <Stack gap={4}>
-            <Progress value={progress.total ? (progress.done / progress.total) * 100 : 5} animated />
-            <Text size="xs" c="dimmed">
-              {progress.message}
-            </Text>
-          </Stack>
-        )}
-        {error && (
-          <Alert color="red" title="Test konnte nicht erstellt werden" withCloseButton onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
         {usable.length < 2 && (
           <Alert color="orange" p="xs">
             Bitte mindestens zwei Vokabeln für den Test markieren.
           </Alert>
         )}
         <Group justify="flex-end">
-          <Button variant="default" onClick={onClose} disabled={Boolean(progress)}>
+          <Button variant="default" onClick={onClose}>
             Abbrechen
           </Button>
-          <Button leftSection={<IconSparkles size={16} />} onClick={() => void start()} loading={Boolean(progress)} disabled={!base || usable.length < 2}>
+          <Button leftSection={<IconSparkles size={16} />} onClick={start} disabled={!base || usable.length < 2}>
             Test erstellen
           </Button>
         </Group>

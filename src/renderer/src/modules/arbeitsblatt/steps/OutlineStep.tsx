@@ -8,7 +8,6 @@ import {
   Container,
   Group,
   Menu,
-  Modal,
   Progress,
   ScrollArea,
   Select,
@@ -20,22 +19,18 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconArrowDown, IconArrowLeft, IconArrowUp, IconPlus, IconRefresh, IconSparkles, IconTrash, IconWand } from '@tabler/icons-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
 import { actualAfbMix } from '../didactics/checks'
-import { browserWorksheetImageDeps } from '../generation/browserImages'
-import { finishWorksheet } from '../generation/finish'
-import { browserSourceServices } from '../generation/originalSources'
-import { generateOutline, generateWorksheet, suggestOutlineItem } from '../generation/generate'
+import { suggestOutlineItem } from '../generation/generate'
 import { BLOCK_LABELS } from '../model/factory'
 import type { AnswerKind, OutlineItem, SocialForm, WsBlockType } from '../model/types'
 import { profileFromMeta } from '../render/SheetPages'
-import { aiCall, trackedAiCall, useArbeitsblatt } from '../store'
+import { aiCall, useArbeitsblatt } from '../store'
+import { formuliereAus, planeNeu } from '../auftraege'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
-import { AiProgressTracker, neverBackwards, phaseRatio, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
-import type { RunPhase } from '../../../shared/aiProgress'
 
 const ANSWER_LABELS: Record<AnswerKind, string> = {
   lines: 'Schreiblinien',
@@ -52,7 +47,7 @@ const ANSWER_LABELS: Record<AnswerKind, string> = {
 }
 
 export default function OutlineStep(): React.JSX.Element {
-  const { worksheet, setWorksheet, setStep, applyGenerated, undo, redo, verlauf } = useArbeitsblatt()
+  const { worksheet, setWorksheet, setStep, undo, redo, verlauf } = useArbeitsblatt()
   const [review, setReview] = useState(true)
   // Sparmodus (Einstellungen → Künstliche Intelligenz): alle Niveaustufen in einer Anfrage, ohne Prüfrunde
   const [economy, setEconomy] = useState(false)
@@ -63,14 +58,6 @@ export default function OutlineStep(): React.JSX.Element {
       .then((s) => setEconomy(s.economy))
       .catch(() => undefined)
   }, [aiSettings])
-  const [progress, setProgress] = useState<{ message: string; done: number; total: number; phase: RunPhase } | null>(null)
-  // Fortschritt der laufenden KI-Anfrage: Der Balken folgt der Länge der eintreffenden Antwort
-  const [chunkRatio, setChunkRatio] = useState(0)
-  // Der angezeigte Anteil läuft nie zurück – das läse sich wie ein Fehler
-  const shown = useRef(0)
-  const startedAt = useRef(0)
-  const tracker = useRef<AiProgressTracker | null>(null)
-  const [replanning, setReplanning] = useState(false)
   /** Baustein, den die KI gerade beschreibt */
   const [neu, setNeu] = useState('')
   const profile = useMemo(() => (worksheet ? profileFromMeta(worksheet.meta) : null), [worksheet])
@@ -110,37 +97,13 @@ export default function OutlineStep(): React.JSX.Element {
     }
   }
 
-  const formulate = async (): Promise<void> => {
-    setProgress({ message: 'Start …', done: 0, total: 1, phase: 'formulate' })
-    startedAt.current = Date.now()
-    setChunkRatio(0)
-    shown.current = 0
-    const t = new AiProgressTracker(() => setChunkRatio(t.ratio()))
-    tracker.current = t
-    const ai = trackedAiCall(t)
-    try {
-      // Die inhaltliche Prüfung läuft auch im Sparmodus: Ein Blatt mit falschen Verweisen
-      // oder unlösbaren Aufgaben spart kein Kontingent, sondern kostet Unterrichtszeit.
-      const result = await generateWorksheet(worksheet, profile, {
-        ai,
-        review,
-        combined: economy,
-        onProgress: (message, done, total) => setProgress({ message, done, total, phase: 'formulate' })
-      })
-      await finishWorksheet(result, profile, { ai, images: await browserWorksheetImageDeps(), sources: browserSourceServices() }, (message, done, total) =>
-        setProgress({ message, done, total, phase: 'finish' })
-      )
-      // Bleibt dasselbe Dokument wie der Entwurf; Strg+Z führt zur Gliederung zurück
-      applyGenerated(result, 2)
-    } catch (e) {
-      notifyError(e, 'Arbeitsblatt konnte nicht erstellt werden')
-    } finally {
-      t.dispose()
-      tracker.current = null
-      setProgress(null)
-      setChunkRatio(0)
-    }
-  }
+  /*
+   * Ausformulieren läuft als Hintergrund-Auftrag (../auftraege.ts) – mit einer Kopie der
+   * Gliederung von jetzt. Das Programm zeigt bis dahin einen Hinweis statt dieser Seite; das
+   * Ergebnis landet in diesem Blatt, auch wenn inzwischen ein anderes offen ist.
+   */
+  const docId = (): string => useArbeitsblatt.getState().docId
+  const formulate = (): void => formuliereAus(worksheet, docId(), { review, economy })
 
   return (
     <ScrollArea h="100%">
@@ -157,28 +120,8 @@ export default function OutlineStep(): React.JSX.Element {
             <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
               Zurück
             </Button>
-            <Button
-              variant="light"
-              leftSection={<IconRefresh size={16} />}
-              loading={replanning}
-              onClick={async () => {
-                setReplanning(true)
-                try {
-                  /*
-                   * Mit dem Originalmaterial, das beim ersten Planen gefunden wurde. Vorher fehlte
-                   * es hier: Die neue Gliederung plante Aufgaben zu einem gedachten Text, obwohl
-                   * ein echter bereitlag. Die alte Gliederung bleibt über Strg+Z erreichbar.
-                   */
-                  const neu = await generateOutline(worksheet.meta, profile, worksheet.sources, aiCall, worksheet.originalMaterial ?? null)
-                  const aktuell = useArbeitsblatt.getState().worksheet ?? worksheet
-                  setWorksheet({ ...aktuell, outline: neu })
-                } catch (e) {
-                  notifyError(e)
-                } finally {
-                  setReplanning(false)
-                }
-              }}
-            >
+            {/* Mit dem Originalmaterial vom ersten Planen; die alte Gliederung bleibt über Strg+Z erreichbar */}
+            <Button variant="light" leftSection={<IconRefresh size={16} />} onClick={() => planeNeu(worksheet, docId())}>
               Neu planen
             </Button>
           </Group>
@@ -373,33 +316,6 @@ export default function OutlineStep(): React.JSX.Element {
           </Group>
         </Card>
       </Container>
-
-      <Modal opened={progress !== null} onClose={() => {}} withCloseButton={false} centered title="Arbeitsblatt wird erstellt">
-        {progress && (
-          <Stack>
-            {(() => {
-              // Zwei Abschnitte mit eigener Zählung – zusammengeführt und ohne Rücksprung
-              const ratio = neverBackwards(shown.current, phaseRatio(progress.phase, progress.done, progress.total, chunkRatio))
-              shown.current = ratio
-              const rest = remainingLabel(remainingSeconds(ratio, Date.now() - startedAt.current))
-              return (
-                <>
-                  <Progress value={ratio * 100} animated />
-                  <Group justify="space-between" gap="xs">
-                    <Text size="sm">{progress.message}</Text>
-                    <Text size="sm" c="dimmed">
-                      {Math.round(ratio * 100)} %
-                    </Text>
-                  </Group>
-                  <Text size="xs" c="dimmed">
-                    {rest || 'Das dauert je nach Umfang ein bis drei Minuten.'}
-                  </Text>
-                </>
-              )
-            })()}
-          </Stack>
-        )}
-      </Modal>
     </ScrollArea>
   )
 }

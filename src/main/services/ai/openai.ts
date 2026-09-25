@@ -19,7 +19,7 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T> {
+  async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
     const content: OpenAI.Responses.ResponseInputContent[] = [{ type: 'input_text', text: req.user }]
     for (const url of req.images ?? []) {
       content.push({ type: 'input_image', image_url: url, detail: 'high' })
@@ -35,11 +35,11 @@ export class OpenAiProvider implements AiProvider {
     try {
       // Ohne Zuhörer der einfache Weg; mit Zuhörer im Strom, damit der Fortschritt sichtbar wird
       if (!onChunk) {
-        const response = await this.client.responses.create(params)
+        const response = await this.client.responses.create(params, { signal })
         if (!response.output_text) throw new Error('Die KI hat keine Antwort geliefert.')
         return JSON.parse(response.output_text) as T
       }
-      const stream = await this.client.responses.create({ ...params, stream: true })
+      const stream = await this.client.responses.create({ ...params, stream: true }, { signal })
       let text = ''
       for await (const event of stream) {
         if (event.type === 'response.output_text.delta') {
@@ -54,14 +54,14 @@ export class OpenAiProvider implements AiProvider {
     }
   }
 
-  async generateImage(prompt: string, model: string): Promise<string> {
+  async generateImage(prompt: string, model: string, signal?: AbortSignal): Promise<string> {
     try {
-      const res = await this.client.images.generate({ model, prompt, size: '1024x1024', n: 1 })
+      const res = await this.client.images.generate({ model, prompt, size: '1024x1024', n: 1 }, { signal })
       const b64 = res.data?.[0]?.b64_json
       if (b64) return `data:image/png;base64,${b64}`
       const url = res.data?.[0]?.url
       if (url) {
-        const buf = Buffer.from(await (await fetch(url)).arrayBuffer())
+        const buf = Buffer.from(await (await fetch(url, { signal })).arrayBuffer())
         return `data:image/png;base64,${buf.toString('base64')}`
       }
       throw new Error('Kein Bild erhalten.')

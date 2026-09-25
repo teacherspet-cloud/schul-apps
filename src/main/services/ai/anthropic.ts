@@ -34,7 +34,7 @@ export class AnthropicProvider implements AiProvider {
     }
   }
 
-  async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T> {
+  async structured<T>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
     const content: Anthropic.Beta.BetaContentBlockParam[] = (req.images ?? []).map((url) => {
       const { mimeType, data } = splitDataUrl(url)
       return { type: 'image', source: { type: 'base64', media_type: mimeType as ImageMediaType, data } }
@@ -54,7 +54,7 @@ export class AnthropicProvider implements AiProvider {
       // Mit Zuhörer im Strom: So lässt sich anzeigen, wie weit die Antwort gediehen ist.
       const response = onChunk
         ? await (() => {
-            const stream = this.client.beta.messages.stream(params)
+            const stream = this.client.beta.messages.stream(params, { signal })
             let chars = 0
             stream.on('text', (delta) => {
               chars += delta.length
@@ -62,7 +62,7 @@ export class AnthropicProvider implements AiProvider {
             })
             return stream.finalMessage()
           })()
-        : await this.client.beta.messages.create(params)
+        : await this.client.beta.messages.create(params, { signal })
 
       if (response.stop_reason === 'refusal') {
         throw new Error('Claude hat die Anfrage abgelehnt. Bitte die Vokabeln oder das Thema prüfen.')

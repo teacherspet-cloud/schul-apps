@@ -7,7 +7,6 @@ import {
   Container,
   Grid,
   Group,
-  Modal,
   MultiSelect,
   NumberInput,
   Radio,
@@ -30,7 +29,7 @@ import DropZone from '../../../shared/components/DropZone'
 import { suggestLevel, languageTracks } from '../../../shared/cefr'
 import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractContent'
 import { useAppSettings } from '../../../shared/settingsStore'
-import { notifyError, notifyInfo } from '../../../shared/util'
+import { notifyError } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
 import { comprehensionFormatById, comprehensionFormatsFor, defaultComprehensionFormats } from '../didactics/comprehensionFormats'
 import { istDeutschZuhoeren, ZUHOEREN_MODES, type ZuhoerenMode } from '../didactics/zuhoeren'
@@ -40,11 +39,7 @@ import { LANGUAGE_MODES, LanguageMode } from '../didactics/language'
 import { CourseLevel, courseLevelOptions, gradeRange, schoolTypesForState } from '../didactics/schoolProfiles'
 import { STATES } from '../didactics/states'
 import { appendCompetence, suggestCompetence } from '../generation/competences'
-import { generateOutline } from '../generation/generate'
-import { alsAblage, beschaffeOriginalmaterial, materialSprache } from '../generation/originalmaterial'
-import type { GepruefterTreffer } from '../generation/originalmaterial'
-import { browserMaterialDienste } from '../generation/originalSources'
-import QuellenAuswahl from './QuellenAuswahl'
+import { planeGliederung } from '../auftraege'
 import AbiturCard from './AbiturCard'
 import BilingualSchalter from './BilingualSchalter'
 import VorwissenChips from './VorwissenChips'
@@ -69,7 +64,6 @@ import {
   MATERIAL_WARN_CHARS,
   MATERIAL_WORDS,
   STUDENT_WORDS,
-  originalSourcesActive,
   originalSourcesHint,
   SHEET_TYPES,
   skillFocusOptions,
@@ -82,7 +76,6 @@ import { subjectById, SUBJECTS } from '../model/subjects'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import type {
   LanguageSkill,
-  OriginalMaterialAblage,
   OriginalSourcesMode,
   SheetType,
   VideoSetup,
@@ -122,11 +115,6 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
   const [hasKey, setHasKey] = useState(true)
   const [reading, setReading] = useState<string | null>(null)
-  const [planning, setPlanning] = useState(false)
-  /** Zwischenstand der Materialsuche – sie dauert und soll nicht als Stillstand wirken */
-  const [suche, setSuche] = useState<string | null>(null)
-  /** Trefferliste in Sek II: wartet auf die Entscheidung der Lehrkraft */
-  const [auswahl, setAuswahl] = useState<{ treffer: GepruefterTreffer[]; fertig: (url: string | null) => void } | null>(null)
   const [competenceBusy, setCompetenceBusy] = useState(false)
   // Hörtexte: Die Option erscheint nur, wenn eine Stimme eingerichtet ist (ElevenLabs)
   const [tts, setTts] = useState(false)
@@ -292,69 +280,12 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
     }
   }
 
-  /**
-   * Originalmaterial beschaffen, bevor geplant wird.
-   *
-   * Wunsch der Lehrkraft (24.09.2026): „Hier soll die KI im Hintergrund nach geeigneten
-   * Originalmaterialien im Internet suchen."
-   *
-   * VOR der Gliederung, nicht danach: Die Aufgaben müssen zu dem Text passen, der wirklich
-   * gefunden wurde. Plant man erst und sucht dann, entstehen Aufgaben zu einem gedachten Text
-   * – und die Lehrkraft merkt es erst beim Lesen.
+  /*
+   * „Gliederung planen" läuft als Hintergrund-Auftrag (../auftraege.ts): mit einer Kopie der
+   * Angaben von jetzt, abgelegt in DIESEM Blatt. Bis dahin zeigt das Programm statt dieses
+   * Formulars einen Hinweis mit „Abbrechen" – und über „Neues Arbeitsblatt" geht es weiter.
    */
-  const materialBeschaffen = async (): Promise<OriginalMaterialAblage | null> => {
-    if (!originalSourcesActive(meta)) return null
-    const ergebnis = await beschaffeOriginalmaterial({
-      wunsch: {
-        thema: meta.topic,
-        fach: meta.subjectLabel,
-        fachId: meta.subjectId,
-        // Sprachmittlung geht vom DEUTSCHEN Ausgangstext aus – sonst faellt die gepruefte Leistung weg
-        sprache: materialSprache(subject, meta.skillFocus === 'mediation'),
-        jahrgang: meta.grade,
-        zielWortzahl: sourceTextWords(meta),
-        // Arbeitsblätter dürfen ausweichen, Klausuren nicht – entschieden am 24.09.2026
-        pruefung: false
-      },
-      dienste: browserMaterialDienste(),
-      ai: aiCall,
-      fortschritt: setSuche,
-      // Ab Jahrgang 11 wählt die Lehrkraft: Dort ist die Quelle selbst Gegenstand des Unterrichts
-      auswahl: meta.grade >= 11 ? (treffer) => new Promise<string | null>((fertig) => setAuswahl({ treffer, fertig })) : undefined
-    })
-    if (ergebnis.art === 'gefunden') return alsAblage(ergebnis.material)
-    /*
-     * Kein Fund heißt nicht „Fehler". Das Blatt entsteht mit einem als Autorentext
-     * erkennbaren Text – aber die Lehrkraft erfährt, woran es lag, statt sich zu wundern,
-     * warum keine Quelle darauf steht.
-     */
-    notifyInfo(`Kein Originaltext übernommen: ${ergebnis.grund} Das Blatt entsteht mit einem eigenen Text.`)
-    return null
-  }
-
-  const plan = async (): Promise<void> => {
-    setPlanning(true)
-    try {
-      const material = await materialBeschaffen().catch((e) => {
-        notifyInfo(`Die Materialsuche ist fehlgeschlagen (${e instanceof Error ? e.message : String(e)}). Das Blatt entsteht mit einem eigenen Text.`)
-        return null
-      })
-      setSuche(null)
-      const outline = await generateOutline(meta, profile, worksheet.sources, aiCall, material)
-      setWorksheet({
-        ...worksheet,
-        outline,
-        originalMaterial: material ?? undefined,
-        meta: { ...meta, title: meta.title || outline.title, teacherNote: outline.teacherNote }
-      })
-      setStep(1)
-    } catch (e) {
-      notifyError(e, 'Gliederung konnte nicht erstellt werden')
-    } finally {
-      setSuche(null)
-      setPlanning(false)
-    }
-  }
+  const plan = (): void => planeGliederung(worksheet, useArbeitsblatt.getState().docId)
 
   return (
     <ScrollArea h="100%">
@@ -1279,35 +1210,11 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
               Zur bestehenden Gliederung
             </Button>
           )}
-          <Button
-            size="md"
-            leftSection={<IconListDetails size={18} />}
-            disabled={!meta.topic.trim() || !hasKey || !meta.subjectLabel.trim()}
-            loading={planning}
-            onClick={plan}
-          >
+          <Button size="md" leftSection={<IconListDetails size={18} />} disabled={!meta.topic.trim() || !hasKey || !meta.subjectLabel.trim()} onClick={plan}>
             Gliederung planen
           </Button>
         </Group>
       </Container>
-
-      {/*
-        Während die Trefferliste offen ist, muss dieses Fenster weichen – sonst läge es
-        darüber und die Lehrkraft könnte nichts auswählen.
-      */}
-      <Modal opened={planning && !auswahl} onClose={() => {}} withCloseButton={false} centered title="Gliederung wird geplant">
-        {/* Die Materialsuche dauert; ohne Zwischenstand sieht sie aus wie ein Stillstand */}
-        <Text size="sm">{suche ?? 'Die KI plant Lernziele, Bausteine und Aufgaben passend zur Lerngruppe …'}</Text>
-      </Modal>
-
-      <QuellenAuswahl
-        treffer={auswahl?.treffer ?? null}
-        thema={meta.topic}
-        onWaehlen={(url) => {
-          auswahl?.fertig(url)
-          setAuswahl(null)
-        }}
-      />
 
       <VocabFocusModal
         opened={vocabOpen}

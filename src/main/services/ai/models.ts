@@ -5,6 +5,7 @@ import { createCliProvider } from './cli'
 import { builtinOptions, filterModels } from './catalog'
 import { GoogleProvider } from './google'
 import { OpenAiProvider } from './openai'
+import { AttrappeProvider, attrappeAktiv } from './attrappe'
 import { AiProvider, RawModel } from './provider'
 
 const CACHE_FILE = 'model-cache.json'
@@ -24,6 +25,8 @@ export function createProvider(id: AiProviderId): AiProvider {
 
 /** Anbieter für Texte und Texterkennung – je nach Einstellung über API-Schlüssel oder privates Abo. */
 export function createTextProvider(id: AiProviderId): { provider: AiProvider; model: string } {
+  // Nur in den Oberflächentests (Umgebungsvariable, siehe attrappe.ts) – nie im Betrieb
+  if (attrappeAktiv()) return { provider: new AttrappeProvider(), model: 'attrappe' }
   const { ai } = getSettings()
   if (ai.access[id] === 'subscription') {
     if (!ai.subscriptionAccepted[id]) {

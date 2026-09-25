@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import type { StructuredRequest } from '@shared/types'
 import type { GrammarTest } from './model/types'
-import { AiProgressTracker, trackingAiCall } from '../../shared/aiProgress'
 import { leererVerlauf, merke, rueckgaengig, schliesseGruppe, type Verlauf, wiederholen } from '../../shared/undo'
 import { newId } from '../vokabeltest/model/random'
 
@@ -73,13 +72,7 @@ export const useGrammatiktest = create<GrammatiktestState>((set, get) => ({
 /** KI-Aufruf über den Hauptprozess (gleiche Schnittstelle wie in den anderen Programmen). */
 export const aiCall = <T>(req: StructuredRequest): Promise<T> => window.api.ai.structured<T>(req)
 
-/**
- * KI-Aufruf, der seinen Fortschritt meldet.
- *
- * Ein Grammatiktest ist eine einzige, lange Anfrage. Ohne diese Rückmeldung stand die
- * Oberfläche minutenlang still, und man konnte nicht unterscheiden, ob sie arbeitet oder hängt.
+/*
+ * Den Fortschritt einer Erzeugung verfolgt jetzt der Hintergrund-Auftrag selbst (k.ai in
+ * shared/auftraege.ts) – mit Warteplatz und Abbruch. Die frühere Hülle `trackedAiCall` ist weg.
  */
-export const trackedAiCall =
-  (tracker: AiProgressTracker) =>
-  <T>(req: StructuredRequest): Promise<T> =>
-    trackingAiCall(tracker, (r: StructuredRequest) => window.api.ai.structured<T>(r))(req)

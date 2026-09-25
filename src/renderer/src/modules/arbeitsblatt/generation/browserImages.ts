@@ -3,13 +3,19 @@ import { aiCall } from '../store'
 import type { WorksheetImageDeps } from './worksheetImages'
 import { reusePool, type ReusableImage } from '../../../shared/imageReuse'
 
-/** Bildsuche, KI-Prüfung und KI-Bilder über die App */
-export async function browserWorksheetImageDeps(): Promise<WorksheetImageDeps> {
+/**
+ * Bildsuche, KI-Prüfung und KI-Bilder über die App.
+ * In einem Hintergrund-Auftrag kommen dessen KI-Aufrufe hinein – dann lassen sie sich mit ihm abbrechen.
+ */
+export async function browserWorksheetImageDeps(auftrag?: {
+  ai: WorksheetImageDeps['ai']
+  bild: (prompt: string) => Promise<string>
+}): Promise<WorksheetImageDeps> {
   const canGenerate = await imageGenerationAvailable()
   return {
-    ai: aiCall,
+    ai: auftrag?.ai ?? aiCall,
     services: browserImageServices(),
-    generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt)).dataUrl : undefined,
+    generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt, undefined, auftrag?.bild)).dataUrl : undefined,
     variants: sourceSearchVariants
   }
 }

@@ -10,20 +10,28 @@ import FrameStep from './steps/FrameStep'
 import TasksStep from './steps/TasksStep'
 import { useKlassenarbeit } from './store'
 import { useDokumentOeffner } from '../../shared/navigation'
+import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
+import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
+import QuellenAuswahl from '../arbeitsblatt/steps/QuellenAuswahl'
+import { QUELLENAUSWAHL, type QuellenFrage } from '../arbeitsblatt/auftraege'
 
 /**
  * Programm „Klassenarbeiten“ – zunächst für Englisch und Geschichte.
  * Beim Öffnen erscheinen die gespeicherten Arbeiten, sofern es welche gibt.
  */
 export default function KlassenarbeitModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, exam, undo, redo, verlauf } = useKlassenarbeit()
+  const { step, setStep, exam, undo, redo, verlauf, docId } = useKlassenarbeit()
   const [library, setLibrary] = useState(false)
+  // Läuft für diese Arbeit ein Auftrag, steht statt der Aufgaben ein Hinweis da (shared/auftraege.ts)
+  const auftrag = useSperrenderAuftrag(docId)
+  // Oberstufe: Der Auftrag wartet auf die Wahl der Quelle
+  const quellenFrage = useRueckfrage(docId, QUELLENAUSWAHL)
   useExamAutosave()
   /*
    * Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt. Zurückholen lässt sich damit auch,
    * was Teile ersetzt oder leert (Vorschlag erzeugen, Fach- oder Jahrgangswechsel, Neu erzeugen).
    */
-  useUndoKeys(active && !library, undo, redo)
+  useUndoKeys(active && !library && !auftrag, undo, redo)
   const startNew = (): void => {
     setLibrary(false)
     newExamSafely().catch(notifyError)
@@ -71,9 +79,23 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
         </Button>
       </Group>
       <Box style={{ flex: 1, minHeight: 0 }}>
-        {step === 0 && <FrameStep onLibrary={() => setLibrary(true)} />}
-        {step === 1 && exam && <TasksStep exam={exam} onLibrary={() => setLibrary(true)} />}
+        {auftrag ? (
+          <AuftragsHinweis auftrag={auftrag} neuLabel="Neue Klassenarbeit" onNeu={startNew} />
+        ) : (
+          <>
+            {step === 0 && <FrameStep onLibrary={() => setLibrary(true)} />}
+            {step === 1 && exam && <TasksStep exam={exam} onLibrary={() => setLibrary(true)} />}
+          </>
+        )}
       </Box>
+      {/* Nur im vorderen Programm – ein Dialog aus einem Programm im Hintergrund käme ungefragt nach vorn */}
+      {active && quellenFrage && (
+        <QuellenAuswahl
+          treffer={(quellenFrage.daten as QuellenFrage).treffer}
+          thema={(quellenFrage.daten as QuellenFrage).thema}
+          onWaehlen={(url) => quellenFrage.antworte(url)}
+        />
+      )}
     </Box>
   )
 }

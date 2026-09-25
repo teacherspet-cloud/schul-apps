@@ -1,24 +1,62 @@
 import { cleanImageBackground } from '../../shared/imageCleanup'
 import type { SavedTestStats } from '@shared/types'
 import { sichereAlles } from '../../shared/autosave'
+import { legeAb } from '../../shared/auftraege'
+import type { TestDocument } from './model/types'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import { variantPoints } from './model/blocks'
 import { includedVocab } from './model/vocab'
 import { TestPayload, useVokabeltest } from './store'
 
+function statsVon({ vocab, doc }: TestPayload): SavedTestStats {
+  return {
+    vocabCount: vocab.filter((v) => v.term.trim()).length,
+    includedCount: includedVocab(vocab).length,
+    hasTest: Boolean(doc),
+    variantCount: doc?.variants.length ?? 0,
+    totalPoints: doc?.variants[0] ? variantPoints(doc.variants[0]) : 0
+  }
+}
+
 function currentPayload(): { payload: TestPayload; stats: SavedTestStats } {
   const { vocab, settings, doc } = useVokabeltest.getState()
   const payload: TestPayload = { vocab, settings, doc }
-  return {
-    payload,
-    stats: {
-      vocabCount: vocab.filter((v) => v.term.trim()).length,
-      includedCount: includedVocab(vocab).length,
-      hasTest: Boolean(doc),
-      variantCount: doc?.variants.length ?? 0,
-      totalPoints: doc?.variants[0] ? variantPoints(doc.variants[0]) : 0
-    }
-  }
+  return { payload, stats: statsVon(payload) }
+}
+
+/** Ist genau dieser Test gerade im Programm offen? */
+export const vokabeltestOffen = (docId: string): boolean => useVokabeltest.getState().testId === docId
+
+/**
+ * Einen erzeugten Test im Vokabeltest `docId` ablegen (siehe shared/auftraege.ts).
+ *
+ * Offen: wie bisher über `loadDocument` – der vorige Test bleibt über Strg+Z erreichbar, und
+ * der Editor erscheint (innerhalb dieses Tests, kein Sprung woandershin). Sonst direkt in der
+ * Bibliothek; die Vokabelliste des gespeicherten Stands bleibt dabei erhalten.
+ */
+export function legeVokabeltestAb(docId: string, schnappschuss: TestPayload, ergebnis: TestDocument, name: string): Promise<void> {
+  const einarbeiten = (p: TestPayload): TestPayload => ({ ...p, doc: ergebnis, settings: ergebnis.settings, vocab: p.vocab.length ? p.vocab : ergebnis.vocab })
+  return legeAb<TestPayload>(
+    {
+      istOffen: vokabeltestOffen,
+      imOffenen: () => useVokabeltest.getState().loadDocument(ergebnis),
+      laden: async (id) => {
+        const t = await window.api.tests.get(id)
+        return { name: t.name, dok: t.payload as TestPayload }
+      },
+      speichern: async (id, gespeichert, payload) => {
+        await window.api.tests.save({
+          id,
+          name: gespeichert ?? (name.trim() || `Vokabeltest vom ${new Date().toLocaleDateString('de-DE')}`),
+          stats: statsVon(payload),
+          payload
+        })
+      }
+    },
+    docId,
+    schnappschuss,
+    einarbeiten
+  )
 }
 
 export function hasContent(): boolean {

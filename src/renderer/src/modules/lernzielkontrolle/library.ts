@@ -5,6 +5,7 @@
  */
 import type { SavedKurztestStats } from '@shared/types'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import { gesamtpunkte } from './didactics/bewertung'
 import { teilaufgaben } from './didactics/pruefungen'
@@ -62,6 +63,40 @@ export async function openSavedKurztest(id: string): Promise<void> {
   await sichereAlles()
   const saved = await window.api.kurztests.get(id)
   useLernzielkontrolle.getState().openSaved(saved.id, saved.name, saved.payload as Kurztest, saved.updatedAt)
+}
+
+/** Ist genau diese Kontrolle gerade im Programm offen? */
+export const kurztestOffen = (docId: string): boolean => {
+  const s = useLernzielkontrolle.getState()
+  return s.docId === docId && s.test !== null
+}
+
+/**
+ * Ergebnis eines Hintergrund-Auftrags in der Kontrolle `docId` ablegen (siehe
+ * shared/auftraege.ts): im offenen Dokument als Rückgängig-Schritt, sonst in der Bibliothek.
+ */
+export function legeKurztestAb(docId: string, schnappschuss: Kurztest, einarbeiten: (t: Kurztest) => Kurztest, schritt?: number): Promise<void> {
+  return legeAb<Kurztest>(
+    {
+      istOffen: kurztestOffen,
+      imOffenen: (f) => {
+        const s = useLernzielkontrolle.getState()
+        if (!s.test) return
+        s.setTest(f(s.test))
+        if (schritt !== undefined) s.setStep(schritt)
+      },
+      laden: async (id) => {
+        const t = await window.api.kurztests.get(id)
+        return { name: t.name, dok: t.payload as Kurztest }
+      },
+      speichern: async (id, name, test) => {
+        await window.api.kurztests.save({ id, name: name ?? defaultKurztestName(test), stats: kurztestStats(test), payload: test })
+      }
+    },
+    docId,
+    schnappschuss,
+    einarbeiten
+  )
 }
 
 /** Neue Kontrolle beginnen – die bisherige vorher sichern. */

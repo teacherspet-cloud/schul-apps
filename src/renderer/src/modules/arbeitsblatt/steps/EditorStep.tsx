@@ -34,7 +34,7 @@ import {
   IconTrash,
   IconWand
 } from '@tabler/icons-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
@@ -58,7 +58,9 @@ import { buildWorksheetHtml } from '../render/printHtml'
 import { tafelbildHinweis, tafelbildZiel } from '../export/tafelbildZiel'
 import { contextFor, layoutKey, pageInfoFor, profileFromMeta, SheetPages, useSheetLayouts, vorschauSeiten } from '../render/SheetPages'
 import '../render/ws.css'
-import { aiCall, useArbeitsblatt } from '../store'
+import { useArbeitsblatt } from '../store'
+import { bausteinAuftrag } from '../auftraege'
+import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { defaultWorksheetName, setPreviewLayouts } from '../library'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import '../../vokabeltest/steps/editor.css'
@@ -97,7 +99,8 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
   }
   const citationStyle = useAppSettings((s) => s.settings.citationStyle)
   const [view, setView] = useState<'student' | 'key' | 'board' | 'audio'>('student')
-  const [busy, setBusy] = useState<Set<string>>(new Set())
+  // Bausteine, an denen gerade ein kleiner Auftrag arbeitet (überarbeiten, füllen, Beispiel)
+  const busy = useLaufendeSchluessel(useArbeitsblatt((s) => s.docId))
   const [picker, setPicker] = useState<string | null>(null)
   const [exportMode, setExportMode] = useState<null | 'docx' | 'pdf' | 'print'>(null)
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken“
@@ -148,21 +151,6 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
     }
   }
 
-  const withBusy = useCallback(async (id: string, fn: () => Promise<void>) => {
-    setBusy((b) => new Set(b).add(id))
-    try {
-      await fn()
-    } catch (e) {
-      notifyError(e)
-    } finally {
-      setBusy((b) => {
-        const n = new Set(b)
-        n.delete(id)
-        return n
-      })
-    }
-  }, [])
-
   if (!ws || !sheet || !profile) return <Box p="xl">Noch kein Arbeitsblatt.</Box>
 
   const plans = layouts.get(layoutKey(sheet.id, key))
@@ -194,24 +182,31 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
       blocks.splice(j, 0, b)
     })
 
+  /*
+   * Die KI-Aktionen an einem Baustein laufen als kleine Aufträge (../auftraege.ts): Sie
+   * erscheinen in der Auftragsleiste, blockieren nichts und ändern am Ende nur ihren Baustein
+   * – auch wenn inzwischen ein anderes Blatt offen ist.
+   */
+  const docId = useArbeitsblatt.getState().docId
+
   /** Ersetzt den Baustein durch einen neuen Entwurf; der bisherige Stand bleibt abrufbar. */
-  const reviseBlock = (block: WsBlock, instruction = ''): void => {
-    void withBusy(block.id, async () => {
-      const fresh = await regenerateBlock(ws, sheet, block.id, profile, aiCall, '', instruction)
+  const reviseBlock = (block: WsBlock, instruction = ''): void =>
+    bausteinAuftrag(ws, docId, 'Baustein neu erzeugen', block.id, block.id, async (w, k) => {
+      const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
+      const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction)
       await completeOriginalSources([fresh], browserSourceServices())
       // Neuer Bild-Entwurf: passendes Bild suchen (auch bei „selbst wählen“, weil die Lehrkraft den Entwurf ausdrücklich anfordert)
       if (fresh.type === 'image')
         await completeWorksheetImages(
           [fresh],
           {
-            ...ws.meta,
-            imageSource: ws.meta.imageSource === 'placeholder' ? 'auto' : ws.meta.imageSource
+            ...w.meta,
+            imageSource: w.meta.imageSource === 'placeholder' ? 'auto' : w.meta.imageSource
           },
-          await browserWorksheetImageDeps()
+          await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild })
         )
-      replaceBlock(block.id, (current) => addVersion(current, fresh))
+      return (current) => addVersion(current, fresh)
     })
-  }
   /**
    * Füllt einen noch leeren Baustein mit KI-Inhalt.
    *
@@ -222,34 +217,31 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
    * schon gefasst – der Zusammenhang steht ringsum. Passt das Ergebnis nicht, führt der
    * Überarbeiten-Knopf daneben mit einem eigenen Auftrag weiter.
    */
-  const fillBlock = (block: WsBlock): void => {
-    void withBusy(block.id, async () => {
-      const fresh = await fuelleBaustein(ws, sheet, block.id, profile, aiCall)
+  const fillBlock = (block: WsBlock): void =>
+    bausteinAuftrag(ws, docId, 'Baustein füllen', block.id, block.id, async (w, k) => {
+      const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
+      const fresh = await fuelleBaustein(w, blatt, block.id, profile, k.ai)
       await completeOriginalSources([fresh], browserSourceServices())
       if (fresh.type === 'image')
         await completeWorksheetImages(
           [fresh],
-          { ...ws.meta, imageSource: ws.meta.imageSource === 'placeholder' ? 'auto' : ws.meta.imageSource },
-          await browserWorksheetImageDeps()
+          { ...w.meta, imageSource: w.meta.imageSource === 'placeholder' ? 'auto' : w.meta.imageSource },
+          await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild })
         )
-      replaceBlock(block.id, (current) => addVersion(current, fresh))
-      notifySuccess('Der Baustein wurde gefüllt.')
+      return (current) => addVersion(current, fresh)
     })
-  }
 
   /**
    * Lässt die KI ein gelöstes Beispiel (Punkt 0) zur Aufgabe schreiben.
    *
-   * Eigener Busy-Schlüssel, damit der Knopf lädt und nicht der ganze Baustein ausgraut –
+   * Eigener Schlüssel, damit der Knopf lädt und nicht der ganze Baustein ausgraut –
    * die Aufgabe selbst bleibt dabei unverändert.
    */
   const addExample = (block: WsBlock): void => {
     if (block.type !== 'task') return
-    void withBusy(`beispiel-${block.id}`, async () => {
-      const example = await generateExample(block, ws.meta, aiCall)
-      updateBlock(sheet.id, block.id, (d) => {
-        if (d.type === 'task') d.example = example
-      })
+    bausteinAuftrag(ws, docId, 'Beispiel schreiben', `beispiel-${block.id}`, block.id, async (w, k) => {
+      const example = await generateExample(block, w.meta, k.ai)
+      return (current) => (current.type === 'task' ? { ...current, example } : current)
     })
   }
 

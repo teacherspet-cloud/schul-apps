@@ -39,16 +39,20 @@ export interface Netzfund {
 export interface AiProvider {
   /** Fragt die aktuell verfügbaren Modelle direkt beim Anbieter ab. */
   listModels(): Promise<RawModel[]>
-  structured<T = unknown>(req: StructuredRequest, model: string, onChunk?: ChunkListener): Promise<T>
+  /**
+   * `signal` bricht die Anfrage ab (Hintergrund-Aufträge lassen sich abbrechen). Die
+   * Schnittstellen der Anbieter nehmen es direkt entgegen; im Abo-Weg wird das Programm beendet.
+   */
+  structured<T = unknown>(req: StructuredRequest, model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T>
   /** Liefert ein Bild als data:-URL; nicht jeder Anbieter kann Bilder erzeugen. */
-  generateImage?(prompt: string, model: string): Promise<string>
+  generateImage?(prompt: string, model: string, signal?: AbortSignal): Promise<string>
   /**
    * Sucht im offenen Netz nach Fundstellen. Nicht jeder Anbieter kann das.
    *
    * Fehlt die Fähigkeit oder scheitert die Suche, bleibt es bei den Archiven, die die App
    * selbst durchsucht – das Programm funktioniert dann weiter, nur mit weniger Auswahl.
    */
-  websuche?(auftrag: string, model: string): Promise<Netzfund[]>
+  websuche?(auftrag: string, model: string, signal?: AbortSignal): Promise<Netzfund[]>
 }
 
 /** Trennt eine data:-URL in MIME-Typ und Base64-Daten. */

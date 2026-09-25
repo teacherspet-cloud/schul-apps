@@ -2,6 +2,7 @@ import type { MediaCheck, QuoteCheck } from '@shared/types'
 import { plainText } from '../../../shared/richtext/parse'
 import type { TextBlock, VideoBlock, Worksheet, WsBlock } from '../model/types'
 import type { MaterialDienste } from './originalmaterial'
+import type { Netzfund } from '../../../../../main/services/ai/provider'
 
 export interface SourceServices {
   checkQuote: (url: string, quote: string) => Promise<QuoteCheck>
@@ -20,7 +21,10 @@ export const browserSourceServices = (): SourceServices => ({
  * Gesucht und geladen wird im Hauptprozess: Nur dort lässt sich der Wortlaut wirklich aus dem
  * Netz holen. Die Oberfläche bekommt ausschließlich Texte, die die App selbst gelesen hat.
  */
-export const browserMaterialDienste = (): MaterialDienste => ({
+export const browserMaterialDienste = (
+  /** Websuche eines Hintergrund-Auftrags (abbrechbar, zählt zur Begrenzung) – sonst die allgemeine */
+  websuche: (auftrag: string) => Promise<Netzfund[]> = (auftrag) => window.api.ai.websuche(auftrag)
+): MaterialDienste => ({
   suche: (anfrage) => window.api.sources.suche(anfrage),
   laden: async (url) => {
     const quelle = await window.api.sources.laden(url)
@@ -48,7 +52,7 @@ export const browserMaterialDienste = (): MaterialDienste => ({
     }
   },
   netzsuche: async (auftrag) => {
-    const funde = await window.api.ai.websuche(auftrag)
+    const funde = await websuche(auftrag)
     return funde.map((f) => ({ ...f, herkunft: 'netz' as const, lizenz: 'siehe Seite – Nutzung nach § 60a UrhG für Unterricht und Prüfung' }))
   }
 })

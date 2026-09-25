@@ -14,9 +14,21 @@ import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useUndoKeys } from '../../shared/useUndoKeys'
 import { useDokumentOeffner } from '../../shared/navigation'
+import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
+import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
+import QuellenAuswahl from './steps/QuellenAuswahl'
+import { QUELLENAUSWAHL, type QuellenFrage } from './auftraege'
 
 export default function ArbeitsblattModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, worksheet, loadWorksheet, undo, redo } = useArbeitsblatt()
+  const { step, setStep, worksheet, loadWorksheet, undo, redo, docId } = useArbeitsblatt()
+  /*
+   * Läuft für DIESES Blatt ein Auftrag (planen, ausformulieren), steht statt des Formulars ein
+   * Hinweis da. Über „Neues Arbeitsblatt" geht es trotzdem weiter; das Ergebnis landet in
+   * diesem Blatt und in der Bibliothek (shared/auftraege.ts).
+   */
+  const auftrag = useSperrenderAuftrag(docId)
+  // Sek II: Der Auftrag wartet auf die Wahl der Quelle
+  const quellenFrage = useRueckfrage(docId, QUELLENAUSWAHL)
   const [area, setArea] = useState<'create' | 'designs'>('create')
   // Beim Öffnen die Bibliothek zeigen, wenn schon Arbeitsblätter gespeichert sind
   const [library, setLibrary] = useState(false)
@@ -56,7 +68,7 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
 
   const showLibrary = area === 'create' && library
   // Strg+Z gilt in allen drei Schritten, aber nur, solange dieses Programm vorn liegt
-  useUndoKeys(active && area === 'create' && !showLibrary, undo, redo)
+  useUndoKeys(active && area === 'create' && !showLibrary && !auftrag, undo, redo)
 
   const startNew = (): void => {
     setLibrary(false)
@@ -102,6 +114,8 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
           <DesignManager />
         ) : showLibrary ? (
           <WorksheetLibrary onNew={startNew} onOpenFile={openFile} onOpened={() => setLibrary(false)} />
+        ) : auftrag ? (
+          <AuftragsHinweis auftrag={auftrag} neuLabel="Neues Arbeitsblatt" onNeu={startNew} />
         ) : (
           <>
             {step === 0 && <TopicStep onLibrary={() => setLibrary(true)} />}
@@ -110,6 +124,14 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
           </>
         )}
       </Box>
+      {/* Nur im vorderen Programm – ein Dialog aus einem Programm im Hintergrund käme ungefragt nach vorn */}
+      {active && quellenFrage && (
+        <QuellenAuswahl
+          treffer={(quellenFrage.daten as QuellenFrage).treffer}
+          thema={(quellenFrage.daten as QuellenFrage).thema}
+          onWaehlen={(url) => quellenFrage.antworte(url)}
+        />
+      )}
     </Box>
   )
 }

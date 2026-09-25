@@ -10,6 +10,8 @@ import TestEditorStep from './steps/TestEditorStep'
 import TestLibrary from './steps/TestLibrary'
 import { useGrammatiktest } from './store'
 import { useDokumentOeffner } from '../../shared/navigation'
+import { useSperrenderAuftrag } from '../../shared/auftraege'
+import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
 const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
@@ -21,12 +23,14 @@ const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
  * Programmen. Gespeichert wird von selbst, sobald Aufgaben da sind.
  */
 export default function GrammatiktestModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, test, savedAt, docName, undo, redo, verlauf } = useGrammatiktest()
+  const { step, setStep, test, savedAt, docName, undo, redo, verlauf, docId } = useGrammatiktest()
   const [library, setLibrary] = useState(false)
   const hasTasks = Boolean(test?.blocks.length)
+  // Läuft für diesen Test ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
+  const auftrag = useSperrenderAuftrag(docId)
   useTestAutosave()
   // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt – in beiden Schritten
-  useUndoKeys(active && !library, undo, redo)
+  useUndoKeys(active && !library && !auftrag, undo, redo)
   const startNew = (): void => {
     setLibrary(false)
     newTestSafely().catch(notifyError)
@@ -80,8 +84,14 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
         </Group>
       </Group>
       <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-        {step === 0 && <SetupStep />}
-        {step === 1 && hasTasks && <TestEditorStep />}
+        {auftrag ? (
+          <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Test" onNeu={startNew} />
+        ) : (
+          <>
+            {step === 0 && <SetupStep />}
+            {step === 1 && hasTasks && <TestEditorStep />}
+          </>
+        )}
       </ScrollArea>
     </Box>
   )

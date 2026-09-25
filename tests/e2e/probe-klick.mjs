@@ -66,6 +66,8 @@ for (let i = 0; i < seconds; i++) {
   if ((i + 1) % 30 === 0) console.log(`  ... ${Math.round((Date.now() - t0) / 60000)} min, noch am Warten`)
   const state = await page.evaluate(() => ({
     modal: document.querySelector('.mantine-Modal-title')?.textContent ?? '',
+    // Seit 25.09.2026 kein Fenster mehr: Der Auftrag läuft im Hintergrund, das Programm zeigt einen Hinweis
+    hinweis: document.querySelector('[data-auftrag-hinweis]')?.textContent?.slice(0, 80) ?? '',
     // Die Anzeige rechts im Fenster: Prozentzahl oder verstrichene Zeit
     stand: [...document.querySelectorAll('[role="dialog"] p, [role="dialog"] div')].map((e) => e.textContent).find((t) => /%|läuft seit/.test(t ?? '')) ?? '',
     balken: document.querySelector('[role="dialog"] .mantine-Progress-section')?.getAttribute('style') ?? '',

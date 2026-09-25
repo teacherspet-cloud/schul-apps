@@ -82,11 +82,15 @@ export class AiProgressTracker {
     return id
   }
 
-  /** Schließt eine Anfrage ab und merkt sich ihre Länge für die nächste Schätzung. */
-  end(id: string): void {
+  /**
+   * Schließt eine Anfrage ab und merkt sich ihre Länge für die nächste Schätzung.
+   * Eine abgebrochene oder gescheiterte Antwort ist unvollständig (`merken = false`) – sie
+   * würde die Erwartung für die nächste Anfrage dieser Art verfälschen.
+   */
+  end(id: string, merken = true): void {
     const kind = this.kinds.get(id)
     const chars = this.chars.get(id) ?? 0
-    if (kind) rememberLength(kind, chars)
+    if (kind && merken) rememberLength(kind, chars)
     this.kinds.delete(id)
     this.chars.delete(id)
     this.onChange?.()

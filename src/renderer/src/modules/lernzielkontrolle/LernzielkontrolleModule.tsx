@@ -10,6 +10,8 @@ import KurztestLibrary from './steps/KurztestLibrary'
 import SetupStep from './steps/SetupStep'
 import { useLernzielkontrolle } from './store'
 import { useDokumentOeffner } from '../../shared/navigation'
+import { useSperrenderAuftrag } from '../../shared/auftraege'
+import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
 const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
@@ -28,12 +30,14 @@ const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
  * wäre das alles unsichtbar gewesen.
  */
 export default function LernzielkontrolleModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, test, savedAt, docName, undo, redo, verlauf } = useLernzielkontrolle()
+  const { step, setStep, test, savedAt, docName, undo, redo, verlauf, docId } = useLernzielkontrolle()
+  // Läuft für diese Kontrolle ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
+  const auftrag = useSperrenderAuftrag(docId)
   const [library, setLibrary] = useState(false)
   const hatAufgaben = hatInhalt(test)
   useKurztestAutosave()
   // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt – in beiden Schritten
-  useUndoKeys(active && !library, undo, redo)
+  useUndoKeys(active && !library && !auftrag, undo, redo)
   const startNew = (): void => {
     setLibrary(false)
     newKurztestSafely().catch(notifyError)
@@ -87,8 +91,14 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
         </Group>
       </Group>
       <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-        {step === 0 && <SetupStep />}
-        {step === 1 && hatAufgaben && <EditorStep />}
+        {auftrag ? (
+          <AuftragsHinweis auftrag={auftrag} neuLabel="Neue Kontrolle" onNeu={startNew} />
+        ) : (
+          <>
+            {step === 0 && <SetupStep />}
+            {step === 1 && hatAufgaben && <EditorStep />}
+          </>
+        )}
       </ScrollArea>
     </Box>
   )

@@ -127,7 +127,11 @@ export function buildApi(call: Call, extras: ApiExtras) {
      */
     fenster: {
       onSchliessen: (cb: () => void) => extras.subscribe('fenster:schliessen', () => cb()),
-      gesichert: () => call<void>('fenster:gesichert')
+      gesichert: () => call<void>('fenster:gesichert'),
+      /** Es laufen noch Aufträge und die Oberfläche fragt nach: Das Schließen wartet auf die Antwort */
+      rueckfrage: () => call<void>('fenster:rueckfrage'),
+      /** Die Lehrkraft will weiterarbeiten: Das Fenster bleibt offen */
+      bleiben: () => call<void>('fenster:bleiben')
     },
     ai: {
       status: () => call<AiStatus>('ai:status'),
@@ -152,8 +156,15 @@ export function buildApi(call: Call, extras: ApiExtras) {
       onModelsUpdated: (cb: (notes: string[]) => void) => extras.subscribe('models:updated', cb as (value: unknown) => void),
       structured: <T>(req: StructuredRequest) => call<T>('ai:structured', req),
       /** Sucht im offenen Netz nach Fundstellen; leere Liste, wenn der Anbieter das nicht kann */
-      websuche: (auftrag: string) => call<Netzfund[]>('ai:websuche', auftrag),
-      image: (prompt: string) => call<string>('ai:image', prompt)
+      websuche: (auftrag: string, anfrageId?: string) => call<Netzfund[]>('ai:websuche', auftrag, anfrageId),
+      image: (prompt: string, anfrageId?: string) => call<string>('ai:image', prompt, anfrageId),
+      /**
+       * Bricht eine laufende oder wartende Anfrage ab (Kennung = `progressId` bzw. `anfrageId`).
+       * Die Anfrage endet dann mit der Abbruchmeldung aus @shared/abbruch – kein Fehler.
+       */
+      cancel: (anfrageId: string) => call<void>('ai:cancel', anfrageId),
+      /** Meldet, ob eine Anfrage auf einen freien Platz wartet (höchstens drei laufen zugleich) */
+      onPlatz: (cb: (platz: { id: string; zustand: 'wartend' | 'laufend' }) => void) => extras.subscribe('ai:platz', cb as (value: unknown) => void)
     },
     cefr: {
       get: () => call<CefrTable>('cefr:get')
