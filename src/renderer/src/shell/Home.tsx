@@ -167,9 +167,14 @@ export default function Home(): React.JSX.Element {
         {modules.map((m) => (
           // Als Knopf: mit Tab erreichbar, mit Enter oder Leertaste zu öffnen
           <Card key={m.id} component="button" type="button" withBorder padding="xl" className="home-tile" onClick={() => openModule(m.id)}>
-            <ThemeIcon size={64} variant="light" color={m.color} mb="md">
-              <m.icon size={36} />
-            </ThemeIcon>
+            {/* Illustration, sobald eine vorliegt (registry.ts); sonst das Vektorsymbol in gleicher Größe */}
+            {m.illustration ? (
+              <img src={m.illustration} className="home-illustration" width={96} height={96} alt="" draggable={false} />
+            ) : (
+              <ThemeIcon size={96} radius="lg" variant="light" color={m.color} className="home-illustration">
+                <m.icon size={56} />
+              </ThemeIcon>
+            )}
             <Text fw={700} size="lg">
               {m.name}
             </Text>

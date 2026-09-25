@@ -55,6 +55,8 @@ import { deleteVocabList, getSecret, getSettings, listVocabLists, saveVocabList,
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
 import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
+// Kopiert electron-vite beim Bauen nach out/ und liefert den Pfad (liegt damit auch in der .exe)
+import fensterSymbol from '../../build/icon.ico?asset'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -128,6 +130,8 @@ function createWindow(): void {
     minHeight: MINDEST_GROESSE.height,
     show: false,
     title: 'Schul-Apps',
+    // Ohne eigenes Symbol zeigt das Fenster beim Entwickeln (npm run dev) das Electron-Symbol
+    icon: fensterSymbol,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

@@ -79,8 +79,15 @@ body {
 
 .home-tile {
   cursor: pointer;
-  /* Die Kacheln sind Knöpfe (Tastatur) – ohne das stünde der Text zentriert und in Knopfschrift */
-  display: block;
+  /*
+   * Die Kacheln sind Knöpfe (Tastatur) – ohne das stünde der Text zentriert und in Knopfschrift.
+   * Als Spalte oben ausgerichtet: Ein Knopf zentriert seinen Inhalt sonst auch senkrecht, und
+   * Kacheln mit kürzerem Text standen tiefer als ihre Nachbarn.
+   */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
   width: 100%;
   text-align: left;
   font: inherit;
@@ -275,6 +282,40 @@ body {
 
 :root[data-app-cards='bold'] .home-tile:hover {
   box-shadow: 7px 7px 0 var(--mantine-primary-color-filled);
+}
+
+/* Illustration bzw. Symbolfläche oben auf der Programmkachel (die Symbolfläche zentriert selbst) */
+.home-illustration {
+  margin-bottom: var(--mantine-spacing-md);
+}
+img.home-illustration {
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.12));
+}
+
+/*
+ * Programmsymbole (shared/components/ProgrammSymbol.tsx): Flächen in der Programmfarbe,
+ * im Dunkelmodus eine Stufe heller. Wo sie auf farbigem Grund stehen würden – aktiver
+ * Leistenknopf, farbige Leiste, getönte Symbolfläche (ThemeIcon) – nimmt die Fläche die
+ * Strichfarbe halbtransparent an, sonst verschwimmt sie mit dem Hintergrund.
+ */
+.programm-symbol .sym-akzent {
+  fill: var(--sym-akzent);
+}
+:root[data-mantine-color-scheme='dark'] .programm-symbol .sym-akzent {
+  fill: var(--sym-akzent-dunkel);
+}
+:root .mantine-ThemeIcon-root .programm-symbol .sym-akzent,
+:root .nav-icon[data-active='true'] .programm-symbol .sym-akzent,
+:root[data-app-nav='filled'] .nav-icon .programm-symbol .sym-akzent {
+  fill: currentColor;
+  fill-opacity: 0.4;
+}
+/* Farbige Leiste: der aktive Knopf ist weiß – dort trägt die Fläche wieder die Programmfarbe */
+:root[data-app-nav='filled'] .nav-icon[data-active='true'] .programm-symbol .sym-akzent {
+  fill: var(--sym-akzent);
+  fill-opacity: 1;
 }
 
 /* Vorschau der Themen in den Einstellungen */

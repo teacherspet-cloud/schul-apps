@@ -18,6 +18,8 @@ electronLanguages:
   - en-US
 # Nur eine einzelne, direkt startbare .exe – kein Installer nötig
 win:
+  # Programmsymbol mit mehreren Größen und durchsichtigen Ecken (erzeugt von scripts/splash.mjs aus icon.png)
+  icon: build/icon.ico
   target:
     - target: portable
       arch: [x64]
