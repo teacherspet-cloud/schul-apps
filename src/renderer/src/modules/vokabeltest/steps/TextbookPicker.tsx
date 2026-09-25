@@ -47,13 +47,14 @@ const TEMPLATE_CSV =
 const languageLabel = (code: string): string => LANGUAGES.find((l) => l.value === code)?.label ?? code
 
 /**
- * Welche besonders gekennzeichneten Vokabeln mitkommen. Alle drei sind standardmäßig aus:
- * Abgefragt wird zunächst nur der laufende Wortschatz.
+ * Welche besonders gekennzeichneten Vokabeln mitkommen. Kästen und erklärte Begriffe sind
+ * standardmäßig aus. Grau gedruckte kommen im Vokabeltest seit Paket 7 IMMER mit – gekennzeichnet
+ * und nicht abgefragt (siehe `grau` am TextbookPicker); nur beim Arbeitsblatt bleiben sie weg.
  */
 export interface TextbookFilter {
   /** Vokabeln aus Kästen (z. B. „Numbers 0-12“) */
   boxes: boolean
-  /** grau gedruckte Vokabeln (müssen die Schüler nicht unbedingt lernen) */
+  /** Zusatzwortschatz (im Buch grau gedruckt, muss nicht unbedingt gelernt werden) */
   grey: boolean
   /** Einträge mit Erklärung statt Übersetzung (im Buch farbig gedruckt) */
   explained: boolean
@@ -98,7 +99,7 @@ export function textbookEntries(book: Textbook, unitName: string, sectionNames: 
           ...(e.grey ? { grey: true } : {}),
           ...(e.inBox ? { inBox: true } : {}),
           ...(e.explained ? { explained: true } : {}),
-          // Markiert ist alles außer den grau gedruckten Vokabeln
+          // Abgefragt wird alles außer dem Zusatzwortschatz (im Buch grau) – einzeln einschaltbar
           include: !e.grey
         }))
     )
@@ -170,7 +171,9 @@ export function TextbookPicker({
   onSelection,
   prefer,
   title,
-  multiUnit
+  multiUnit,
+  grau = 'kennzeichnen',
+  rahmen = true
 }: {
   onEntries: (entries: VocabEntry[], name: string, context: BookContext) => void
   /** Meldet die aktuelle Auswahl, damit „Test automatisch erstellen" sie schon nutzen kann */
@@ -187,12 +190,23 @@ export function TextbookPicker({
    * zunächst vollständig dabei, weil man bei mehreren Units meist den ganzen Stoff will.
    */
   multiUnit?: boolean
+  /**
+   * Zusatzwortschatz (im Buch grau): „kennzeichnen" übernimmt ihn immer – gekennzeichnet und
+   * nicht abgefragt (Vokabeltest, Vokabellisten; Paket 7, eine Regel für alle Wege). „filtern"
+   * lässt ihn wie bisher weg, zuschaltbar (Zielwörter fürs Arbeitsblatt – dort gibt es kein
+   * „abfragen", ein graues Wort wäre dort einfach ein weiteres Zielwort).
+   */
+  grau?: 'kennzeichnen' | 'filtern'
+  /** Eigene Karte drumherum – ohne, wenn der Auswähler schon in einer Karte steht (Reiter) */
+  rahmen?: boolean
 }): React.JSX.Element {
   const [books, setBooks] = useState<TextbookMeta[]>([])
   const [bookId, setBookId] = useState<string | null>(null)
   const [units, setUnits] = useState<string[]>([])
   const [sectionsByUnit, setSectionsByUnit] = useState<Record<string, string[]>>({})
-  const [filter, setFilter] = useState<TextbookFilter>(NO_MARKS)
+  const [filterWahl, setFilter] = useState<TextbookFilter>(NO_MARKS)
+  // Graue Wörter kommen beim Kennzeichnen immer mit – der Schalter dafür entfällt
+  const filter: TextbookFilter = grau === 'kennzeichnen' ? { ...filterWahl, grey: true } : filterWahl
   const [loading, setLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
@@ -265,8 +279,8 @@ export function TextbookPicker({
     {
       bit: MARK_GREY,
       key: 'grey' as const,
-      label: 'Grau gedruckte Vokabeln einbeziehen',
-      hint: 'Im Buch grau gedruckt – müssen die Schüler nicht unbedingt lernen'
+      label: 'Zusatzwortschatz (im Buch grau) einbeziehen',
+      hint: 'Im Buch grau gedruckt – muss nicht unbedingt gelernt werden'
     },
     {
       bit: MARK_EXPLAINED,
@@ -279,6 +293,8 @@ export function TextbookPicker({
     inSelection: chosen.reduce((n, s) => n + markCount(s, m.bit), 0),
     inUnit: unitMetas.reduce((n, u) => n + u.sections.reduce((k, s) => k + markCount(s, m.bit), 0), 0)
   }))
+
+  const greyInSelection = marks.find((m) => m.key === 'grey')?.inSelection ?? 0
 
   // Auswahl nach außen melden: „Test automatisch erstellen" kann sie nutzen, ohne dass
   // die Vokabeln vorher in die Liste übernommen wurden.
@@ -360,13 +376,15 @@ export function TextbookPicker({
     }
   }
 
-  return (
-    <Card withBorder padding="md" h="100%">
-      <Group justify="space-between" mb="xs" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap">
-          <IconBook2 size={20} />
-          <Text fw={600}>{title ?? 'Vokabeln aus dem Schulbuch'}</Text>
-        </Group>
+  const inhalt = (
+    <>
+      <Group justify={rahmen ? 'space-between' : 'flex-end'} mb="xs" wrap="nowrap">
+        {rahmen && (
+          <Group gap="xs" wrap="nowrap">
+            <IconBook2 size={20} />
+            <Text fw={600}>{title ?? 'Vokabeln aus dem Schulbuch'}</Text>
+          </Group>
+        )}
         <Menu shadow="md" position="bottom-end">
           <Menu.Target>
             <ActionIcon variant="subtle" aria-label="Lehrwerke verwalten">
@@ -387,8 +405,8 @@ export function TextbookPicker({
       {books.length === 0 ? (
         <Stack gap="xs">
           <Text size="sm" c="dimmed">
-            Noch keine Schulbuch-Vokabeln vorhanden. Importiere die Vokabelliste eines Lehrwerks als CSV- oder Excel-Datei (Spalten z. B. Lehrwerk, Unit,
-            Abschnitt, Englisch, Deutsch).
+            Noch keine Schulbuch-Vokabeln vorhanden. Die Vokabelliste eines Lehrwerks lässt sich als CSV- oder Excel-Datei importieren (Spalten z. B. Lehrwerk,
+            Unit, Abschnitt, Englisch, Deutsch).
           </Text>
           <Button variant="light" leftSection={<IconFileImport size={16} />} onClick={() => setImportOpen(true)}>
             Lehrwerk-Vokabeln importieren
@@ -465,7 +483,7 @@ export function TextbookPicker({
               )
             })}
           {marks
-            .filter((m) => m.inUnit > 0)
+            .filter((m) => m.inUnit > 0 && !(grau === 'kennzeichnen' && m.key === 'grey'))
             .map((m) => (
               <Switch
                 key={m.key}
@@ -477,6 +495,12 @@ export function TextbookPicker({
                 onChange={(e) => setFilter({ ...filter, [m.key]: e.currentTarget.checked })}
               />
             ))}
+          {grau === 'kennzeichnen' && greyInSelection > 0 && (
+            <Text size="xs" c="dimmed" data-testid="zusatzwortschatz-hinweis">
+              Darunter {greyInSelection} {greyInSelection === 1 ? 'Wort' : 'Wörter'} Zusatzwortschatz (im Buch grau): übernommen und gekennzeichnet, aber
+              zunächst nicht abgefragt.
+            </Text>
+          )}
           <Button leftSection={<IconBook2 size={16} />} disabled={!count} loading={loading} onClick={take}>
             {count ? `${count} Vokabeln anzeigen und auswählen` : 'Unit und Abschnitte wählen'}
           </Button>
@@ -527,7 +551,14 @@ export function TextbookPicker({
             ))}
         </Stack>
       </Modal>
+    </>
+  )
+  return rahmen ? (
+    <Card withBorder padding="md" h="100%">
+      {inhalt}
     </Card>
+  ) : (
+    <div>{inhalt}</div>
   )
 }
 
@@ -623,7 +654,7 @@ function TextbookImportModal({
       ) : (
         <Stack>
           <Text size="sm">
-            <b>{fileName}</b>: {rows.length} Zeilen. Bitte prüfe die Zuordnung der Spalten.
+            <b>{fileName}</b>: {rows.length} Zeilen. Zuordnung der Spalten prüfen.
           </Text>
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
             {COLUMN_ROLES.map((role) => (

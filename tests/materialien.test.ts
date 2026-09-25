@@ -87,3 +87,37 @@ describe('Materialien der Startseite', () => {
     expect(suche(listen, '   ')).toHaveLength(0)
   })
 })
+
+describe('Vokabeltests mit Fach und Jahrgang (Paket 7)', () => {
+  const mitFach = vereinige({
+    tests: [
+      {
+        id: 't2',
+        name: 'Unit 3',
+        createdAt: '',
+        updatedAt: '2026-09-25T10:00:00Z',
+        vocabCount: 12,
+        includedCount: 10,
+        hasTest: true,
+        variantCount: 2,
+        totalPoints: 20,
+        language: 'fr',
+        subjectLabel: 'Französisch',
+        grade: 8
+      }
+    ],
+    sheets: [],
+    kurztests: [],
+    grammarTests: [],
+    exams: [],
+    vokabellisten: [{ id: 'v2', name: 'Wörter Leçon 2', updatedAt: '2026-09-21T08:00:00Z', language: 'fr', entries: [] }]
+  })
+  it('die Suche findet Tests und Listen über Fach und Klasse', () => {
+    expect(suche(mitFach, 'französisch klasse 8').map((m) => m.id)).toEqual(['t2'])
+    expect(suche(mitFach, 'französisch').map((m) => m.id)).toEqual(['t2', 'v2'])
+    expect(mitFach.find((m) => m.id === 't2')?.detail).toBe('Französisch · Klasse 8 · 12 Vokabeln')
+  })
+  it('ältere Tests ohne diese Angaben bleiben wie bisher', () => {
+    expect(listen.find((m) => m.id === 't1')?.detail).toBe('30 Vokabeln · noch kein Test')
+  })
+})

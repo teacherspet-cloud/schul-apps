@@ -24,7 +24,8 @@ export function defaultMeta(stateId: string, schoolTypeId: string, schoolTypeNam
     grammarTopic: '',
     comprehensionFormats: [],
     sheetType: 'erarbeitung',
-    pages: 2,
+    // 0 = automatisch: Die KI legt die Seitenzahl selbst fest (didactics/seiten.ts, Paket 7)
+    pages: 0,
     minutes: 45,
     socialForms: [],
     differentiation: { levels: 1, mode: 'separate' },

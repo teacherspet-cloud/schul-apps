@@ -48,7 +48,8 @@ export default function TestLibrary({
     geloescht: () => useVokabeltest.getState().forgetSaved()
   })
   const tests = bib.eintraege ?? []
-  const treffer = bib.treffer((t) => [t.hasTest ? 'Test erstellt' : 'noch kein Test'])
+  // Fach und Klasse seit Paket 7 (ältere Tests haben sie nicht – dort zählt nur der Name)
+  const treffer = bib.treffer((t) => [t.subjectLabel, t.grade ? `Klasse ${t.grade}` : '', t.hasTest ? 'Test erstellt' : 'noch kein Test'])
 
   const open = async (id: string): Promise<void> => {
     try {
@@ -76,7 +77,7 @@ export default function TestLibrary({
           onZurueck={onClose}
           suche={bib.suche}
           onSuche={bib.setSuche}
-          suchHinweis="Name, z. B. Green Line 5"
+          suchHinweis="Name, Fach, Klasse"
         >
           <Button
             variant="default"
@@ -133,7 +134,9 @@ export default function TestLibrary({
                 )
               }
               info={[
-                `${t.vocabCount} Vokabeln (${t.includedCount} im Test)`,
+                t.subjectLabel,
+                t.grade ? `Klasse ${t.grade}` : '',
+                `${t.vocabCount} Vokabeln (${t.includedCount} abgefragt)`,
                 t.hasTest ? `Test erstellt${t.variantCount > 1 ? `, ${t.variantCount} Varianten` : ''}, ${formatPoints(t.totalPoints)} Punkte` : '',
                 dateFormat.format(new Date(t.updatedAt))
               ]

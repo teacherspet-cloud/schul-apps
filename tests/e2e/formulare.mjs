@@ -1,4 +1,4 @@
-// Wache für die Formulare (Paket 6) – ohne KI (vorher: npm run build).
+// Wache für die Formulare (Paket 6, Nachträge Paket 7) – ohne KI (vorher: npm run build).
 // Aufruf: node tests/e2e/formulare.mjs <Ausgabeordner>
 //
 // Wunsch der Lehrkraft (25.09.2026):
@@ -85,16 +85,46 @@ pruefe(grundDanach === '' || grundDanach.includes('KI-Zugang'), 'Arbeitsblatt: �
 const kopf = weitereKopf(page)
 pruefe((await kopf.getAttribute('aria-expanded')) === 'false', 'Arbeitsblatt: „Weitere Optionen“ ist anfangs eingeklappt')
 pruefe(!(await page.getByText('Bevorzugte Sozialformen (optional)').isVisible()), 'Arbeitsblatt: Sozialformen stehen eingeklappt nicht im Formular')
+// Paket 7: Lösungsblatt, Hilfekarten, Tafelbild, Differenzierung und Bilder bleiben IMMER sichtbar
+for (const t of ['Lösungsblatt erstellen', 'Tipp- und Hilfekarten anlegen', 'Tafelbild zur Sicherung mit erstellen']) {
+  pruefe(await page.getByText(t, { exact: true }).first().isVisible(), `Arbeitsblatt: „${t}“ steht eingeklappt sichtbar im Formular`)
+}
+pruefe(await page.getByText('Differenzierung', { exact: true }).first().isVisible(), 'Arbeitsblatt: Differenzierung steht sichtbar im Formular')
+pruefe(await page.getByRole('combobox', { name: 'Bilder auf dem Blatt' }).isVisible(), 'Arbeitsblatt: „Bilder auf dem Blatt“ steht sichtbar im Formular')
+pruefe(await page.getByRole('combobox', { name: 'Woher die Bilder kommen' }).isVisible(), 'Arbeitsblatt: „Woher die Bilder kommen“ steht sichtbar im Formular')
+pruefe(await page.getByText('Ein Schmuckbild zulassen').isVisible(), 'Arbeitsblatt: Schmuckbild-Schalter steht sichtbar im Formular')
+// Seitenzahl automatisch (Paket 7)
+const seitenHinweis = (await page.locator('[data-testid="seiten-hinweis"]:visible').first().innerText()).trim()
+pruefe(/legt die Seitenzahl selbst fest/.test(seitenHinweis), `Arbeitsblatt: Seitenzahl ist standardmäßig automatisch („${seitenHinweis}“)`)
+// Die Anpassungs-Karte steht in „Weitere Optionen“ – eingeklappt also nicht sichtbar
+pruefe(!(await page.locator('[data-testid="profil-karte"]').isVisible()), 'Arbeitsblatt: Profilkarte steht eingeklappt nicht im Formular')
+// Etwas vom Standard abweichen lassen: Differenzierung zählt NICHT mehr (steht oben)
+await page.getByText('★ / ★★', { exact: true }).first().click()
+await page.waitForTimeout(300)
+pruefe(
+  !(await page.locator('[data-testid="weitere-optionen-zusammenfassung"]:visible').count()),
+  'Arbeitsblatt: sichtbare Felder erscheinen nicht in der Zusammenfassung'
+)
 await kopf.click()
 await page.waitForTimeout(500)
 pruefe((await kopf.getAttribute('aria-expanded')) === 'true', 'Arbeitsblatt: „Weitere Optionen“ klappt auf')
-// Etwas vom Standard abweichen lassen: Differenzierung ★/★★
-await page.getByText('★ / ★★', { exact: true }).first().click()
+pruefe(
+  await page.locator('[data-testid="profil-karte"]').isVisible(),
+  'Arbeitsblatt: Profilkarte „So wird das Arbeitsblatt angepasst“ steht in „Weitere Optionen“'
+)
+pruefe(await page.getByText('Schrift & Satz').isVisible(), 'Arbeitsblatt: Profilkarte gegliedert (Schrift & Satz)')
+await page.locator('[data-testid="profil-karte"]').scrollIntoViewIfNeeded()
+await page.waitForTimeout(300)
+await page.screenshot({ path: join(out, 'paket7-arbeitsblatt-weitere-optionen.png') })
+// Piktogramme einschalten – das steht eingeklappt in der Zusammenfassung
+await page.getByRole('switch', { name: 'Piktogramme an den Arbeitsanweisungen' }).check({ force: true })
 await page.waitForTimeout(300)
 await kopf.click()
 await page.waitForTimeout(500)
 const zusammenfassung = (await page.locator('[data-testid="weitere-optionen-zusammenfassung"]:visible').first().innerText()).trim()
-pruefe(/1 geändert: Differenzierung ★\/★★/.test(zusammenfassung), `Arbeitsblatt: eingeklappt steht, was geändert ist („${zusammenfassung}“)`)
+pruefe(/1 geändert: Piktogramme/.test(zusammenfassung), `Arbeitsblatt: eingeklappt steht, was geändert ist („${zusammenfassung}“)`)
+await page.evaluate(() => document.querySelector('.formular-inhalt .mantine-ScrollArea-viewport')?.scrollTo(0, 0))
+await page.screenshot({ path: join(out, 'paket7-arbeitsblatt-formular.png') })
 await kopf.click()
 await page.waitForTimeout(400)
 await page.screenshot({ path: join(out, 'paket6-weitere-optionen.png') })
@@ -106,6 +136,9 @@ k = await imBild(page, 'Lernzielkontrolle erstellen')
 pruefe(k.da && k.sichtbar, 'LZK: „Lernzielkontrolle erstellen“ ist ohne Scrollen sichtbar')
 pruefe(k.gesperrt && (await sperrgrund(page)).includes('Thema fehlt'), `LZK: gesperrt mit Grund „Thema fehlt“ (${await sperrgrund(page)})`)
 pruefe((await weitereKopf(page).getAttribute('aria-expanded')) === 'false', 'LZK: eigener Zustand – eingeklappt, obwohl im Arbeitsblatt offen')
+for (const t of ['Punkte je Aufgabe auf dem Blatt', 'Lösungsblatt für die Lehrkraft', 'Sprachliche Hilfen zulassen']) {
+  pruefe(await page.getByText(t, { exact: true }).first().isVisible(), `LZK: „${t}“ steht eingeklappt sichtbar im Formular`)
+}
 await page.screenshot({ path: join(out, 'paket6-lzk-formular.png') })
 
 // ---------- Grammatiktest ----------
@@ -114,6 +147,7 @@ await page.waitForTimeout(1200)
 k = await imBild(page, 'Test erstellen')
 pruefe(k.da && k.sichtbar, 'Grammatiktest: „Test erstellen“ ist ohne Scrollen sichtbar')
 pruefe(k.gesperrt && (await sperrgrund(page)).includes('Form'), `Grammatiktest: gesperrt mit Grund (${await sperrgrund(page)})`)
+pruefe(await page.getByText('Test wird benotet', { exact: true }).isVisible(), 'Grammatiktest: „Test wird benotet“ steht eingeklappt sichtbar im Formular')
 await page.screenshot({ path: join(out, 'paket6-grammatiktest-formular.png') })
 
 // ---------- Klassenarbeit ----------
@@ -122,11 +156,20 @@ await page.waitForTimeout(1200)
 k = await imBild(page, 'Weiter zu den Aufgaben')
 pruefe(k.da && k.sichtbar, 'Klassenarbeit: „Weiter zu den Aufgaben“ ist ohne Scrollen sichtbar')
 pruefe(k.gesperrt && (await sperrgrund(page)).length > 0, `Klassenarbeit: gesperrt mit Grund (${await sperrgrund(page)})`)
+pruefe(
+  await page.getByText('Erwartungshorizont erstellen', { exact: true }).isVisible(),
+  'Klassenarbeit: „Erwartungshorizont erstellen“ steht eingeklappt sichtbar im Formular'
+)
+pruefe(
+  await page.getByRole('combobox', { name: 'Ausführlichkeit des Erwartungshorizonts' }).isVisible(),
+  'Klassenarbeit: Ausführlichkeit steht sichtbar im Formular'
+)
 await page.screenshot({ path: join(out, 'paket6-klassenarbeit-formular.png') })
 
 // ---------- Vokabeltest (Schritt 2: Test einstellen) ----------
 await page.click('[aria-label="Vokabeltest"]')
 await page.waitForSelector('text=Vokabelliste')
+await page.getByRole('tab', { name: 'Schulbuch' }).click()
 await page.getByRole('combobox', { name: 'Lehrwerk' }).click()
 await page.getByRole('option', { name: 'Green Line 4', exact: true }).click()
 await page.getByRole('combobox', { name: 'Unit', exact: true }).click()
@@ -134,7 +177,7 @@ await page.getByRole('option', { name: 'Unit 1', exact: true }).click()
 await page.waitForTimeout(400)
 await page.getByRole('button', { name: 'alle' }).click()
 await page.getByRole('button', { name: /Vokabeln anzeigen und auswählen/ }).click()
-await page.waitForSelector('text=Erkannte Vokabeln prüfen')
+await page.waitForSelector('text=Vokabeln prüfen und festlegen, was abgefragt wird')
 await page.getByRole('button', { name: 'Bisherige Liste ersetzen' }).click()
 await page.waitForTimeout(600)
 await page.getByRole('button', { name: /Weiter zu den Testeinstellungen/ }).click()

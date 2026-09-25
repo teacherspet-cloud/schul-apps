@@ -10,6 +10,7 @@ import { importVocabFromFile } from '../../vokabeltest/input/importVocab'
 import { newId } from '../../vokabeltest/model/random'
 import { LANGUAGES } from '../../vokabeltest/model/types'
 import type { VocabEntry } from '../../vokabeltest/model/types'
+import { alsListenEintrag } from '../../vokabeltest/model/vocab'
 import { aiCall } from '../../vokabeltest/store'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 
@@ -87,16 +88,7 @@ export default function NewListWizard({
         source: [STATES.find((s) => s.id === stateId)?.name, schoolTypesForState(table, stateId).find((t) => t.value === schoolTypeId)?.label]
           .filter(Boolean)
           .join(' · '),
-        entries: entries
-          .filter((e) => e.term.trim())
-          .map((e) => ({
-            term: e.term.trim(),
-            translation: e.translation.trim(),
-            ...(e.pos ? { pos: e.pos } : {}),
-            ...(e.note ? { note: e.note } : {}),
-            ...(e.grey ? { grey: true } : {}),
-            ...(e.inBox ? { inBox: true } : {})
-          }))
+        entries: entries.filter((e) => e.term.trim()).map(alsListenEintrag)
       }
       onCreated(list)
     } catch (e) {
@@ -121,6 +113,18 @@ export default function NewListWizard({
         />
         {progress && progress.total > 1 && <Progress value={(progress.done / progress.total) * 100} size="sm" />}
 
+        {/* Name und Fach auch ohne Datei: Eine leere Liste lässt sich von Hand füllen (Paket 7) */}
+        <Group grow align="flex-start">
+          <TextInput label="Name der Liste" placeholder="z. B. Unit 3 – Station 2" value={name} onChange={(e) => setName(e.currentTarget.value)} />
+          <Select
+            label="Fach / Sprache"
+            data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
+            value={language}
+            onChange={(v) => v && setLanguage(v)}
+            allowDeselect={false}
+          />
+        </Group>
+
         {entries.length > 0 && (
           <>
             <Group gap="xs">
@@ -128,20 +132,10 @@ export default function NewListWizard({
                 {entries.length} Vokabeln erkannt
               </Badge>
               <Text size="xs" c="dimmed">
-                Im nächsten Schritt lässt sich jede Zeile ändern, ergänzen oder als „grau" markieren.
+                Im nächsten Schritt lässt sich jede Zeile ändern, ergänzen oder als Zusatzwortschatz (im Buch grau) kennzeichnen.
               </Text>
             </Group>
 
-            <Group grow align="flex-start">
-              <TextInput label="Name der Liste" placeholder="z. B. Unit 3 – Station 2" value={name} onChange={(e) => setName(e.currentTarget.value)} />
-              <Select
-                label="Fach / Sprache"
-                data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
-                value={language}
-                onChange={(v) => v && setLanguage(v)}
-                allowDeselect={false}
-              />
-            </Group>
             {/* Bundesland und Schulform stehen eingeklappt, solange sie den Einstellungen entsprechen */}
             <SchulAngabe
               stateId={stateId}
@@ -211,7 +205,10 @@ export default function NewListWizard({
 
         {!entries.length && !progress && (
           <Alert color="gray" p="xs">
-            <Text size="sm">Es lassen sich mehrere Dateien auf einmal hineinziehen – die Vokabeln aller Dateien landen in derselben Liste.</Text>
+            <Text size="sm">
+              Es lassen sich mehrere Dateien auf einmal hineinziehen – die Vokabeln aller Dateien landen in derselben Liste. Ohne Datei entsteht eine leere
+              Liste zum Eintippen.
+            </Text>
           </Alert>
         )}
 
@@ -219,8 +216,9 @@ export default function NewListWizard({
           <Button variant="default" onClick={onClose}>
             Abbrechen
           </Button>
-          <Button disabled={!entries.length} loading={saving} onClick={() => void save()}>
-            Liste anlegen und bearbeiten
+          {/* Bis Paket 7 ging es nur mit erkannten Vokabeln – eine Liste von Hand ließ sich nicht anlegen */}
+          <Button loading={saving} disabled={Boolean(progress)} onClick={() => void save()}>
+            {entries.length ? 'Liste anlegen und bearbeiten' : 'Leere Liste anlegen'}
           </Button>
         </Group>
       </Stack>

@@ -51,7 +51,8 @@ import WarningButton from '../../../shared/components/WarningButton'
 import { RenderContext, RenderContextValue } from '../render/RenderContext'
 import '../render/test.css'
 import { TestPage } from '../render/TestPage'
-import { TestLayouts, useTestLayout } from '../render/useTestLayout'
+import { DEFAULT_PAGE_LIMIT, pageLimitMin, pageLimitText, TestLayouts, useTestLayout } from '../render/useTestLayout'
+import SeitenVorgabe from './SeitenVorgabe'
 import { PROJECT_FILTER, serializeProject } from '../project'
 import { aiCall, useVokabeltest } from '../store'
 import { SaveTestButton } from './TestLibrary'
@@ -143,12 +144,18 @@ export default function EditorStep(): React.JSX.Element {
           <WarningButton warnings={block.warnings} onDismiss={() => updateBlock(variant.id, block.id, (d) => (d.warnings = []))} />
         )}
         <Tooltip label="Nach oben">
-          <ActionIcon size="sm" variant="default" disabled={index === 0} onClick={() => moveBlock(index, -1)}>
+          <ActionIcon size="sm" variant="default" aria-label={`Aufgabe ${index + 1} nach oben`} disabled={index === 0} onClick={() => moveBlock(index, -1)}>
             <IconArrowUp size={14} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label="Nach unten">
-          <ActionIcon size="sm" variant="default" disabled={index === variant.blocks.length - 1} onClick={() => moveBlock(index, 1)}>
+          <ActionIcon
+            size="sm"
+            variant="default"
+            aria-label={`Aufgabe ${index + 1} nach unten`}
+            disabled={index === variant.blocks.length - 1}
+            onClick={() => moveBlock(index, 1)}
+          >
             <IconArrowDown size={14} />
           </ActionIcon>
         </Tooltip>
@@ -158,6 +165,7 @@ export default function EditorStep(): React.JSX.Element {
             <ActionIcon
               size="sm"
               variant="default"
+              aria-label={`Aufgabe ${index + 1} ganz neu generieren`}
               loading={busy.has(block.id)}
               onClick={() =>
                 withBusy(block.id, async () => {
@@ -184,6 +192,7 @@ export default function EditorStep(): React.JSX.Element {
             size="sm"
             variant="default"
             color="red"
+            aria-label={`Aufgabe ${index + 1} löschen`}
             onClick={() =>
               updateDoc(
                 (d) =>
@@ -374,7 +383,7 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
     <Popover width={300} position="left-start" shadow="md" withArrow>
       <Popover.Target>
         <Tooltip label="Aufgabe einstellen">
-          <ActionIcon size="sm" variant="default">
+          <ActionIcon size="sm" variant="default" aria-label="Aufgabe einstellen">
             <IconAdjustments size={14} />
           </ActionIcon>
         </Tooltip>
@@ -538,31 +547,7 @@ function HeaderSettings({ doc, onChange }: { doc: TestDocument; onChange: (fn: (
           <Text size="xs" fw={500}>
             Seitenumfang je Test
           </Text>
-          <Group gap={6} wrap="nowrap">
-            <SegmentedControl
-              size="xs"
-              data={[
-                { value: 'auto', label: 'automatisch' },
-                { value: 'max', label: 'höchstens' },
-                { value: 'exact', label: 'genau' }
-              ]}
-              value={doc.settings.pageLimit?.mode ?? 'auto'}
-              onChange={(v) => onChange((d) => (d.settings.pageLimit = { pages: d.settings.pageLimit?.pages ?? 2, mode: v as 'auto' | 'max' | 'exact' }))}
-            />
-            {(doc.settings.pageLimit?.mode ?? 'auto') !== 'auto' && (
-              <NumberInput
-                size="xs"
-                w={60}
-                min={1}
-                max={10}
-                aria-label="Seiten"
-                value={doc.settings.pageLimit?.pages ?? 2}
-                onChange={(v) =>
-                  onChange((d) => (d.settings.pageLimit = { mode: d.settings.pageLimit?.mode ?? 'max', pages: Math.max(1, Math.min(10, Number(v) || 1)) }))
-                }
-              />
-            )}
-          </Group>
+          <SeitenVorgabe size="xs" limit={doc.settings.pageLimit ?? DEFAULT_PAGE_LIMIT} onChange={(next) => onChange((d) => (d.settings.pageLimit = next))} />
         </Stack>
       </Popover.Dropdown>
     </Popover>
@@ -573,14 +558,14 @@ function HeaderSettings({ doc, onChange }: { doc: TestDocument; onChange: (fn: (
 function PageLimitNotice({ layouts }: { layouts: TestLayouts }): React.JSX.Element | null {
   const { limit, fits, shrunk, pageCount } = layouts
   if (limit.mode === 'auto') return null
-  const target = `${limit.mode === 'exact' ? 'genau' : 'höchstens'} ${limit.pages} ${limit.pages === 1 ? 'Seite' : 'Seiten'}`
+  const target = pageLimitText(limit)
   const font = layouts.student.values().next().value?.fontSize
   if (!fits) {
     return (
       <Alert color="orange" mx="xl" mt="md" title={`Vorgabe „${target}“ nicht erreicht`}>
         {pageCount > limit.pages
           ? `Der Test braucht auch mit kleinerer Schrift (${font} pt) und engeren Abständen ${pageCount} Seiten. Bitte Aufgaben entfernen, Schreiblinien verringern oder weniger Vokabeln abfragen.`
-          : `Der Test hat zu wenige Aufgaben, um ${limit.pages} Seiten zu füllen (${pageCount} ${pageCount === 1 ? 'Seite' : 'Seiten'}). Bitte Aufgaben hinzufügen.`}
+          : `Der Test hat zu wenige Aufgaben, um ${pageLimitMin(limit)} Seiten zu füllen (${pageCount} ${pageCount === 1 ? 'Seite' : 'Seiten'}). Bitte Aufgaben hinzufügen.`}
       </Alert>
     )
   }

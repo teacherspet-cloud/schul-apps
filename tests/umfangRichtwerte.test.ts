@@ -34,7 +34,7 @@ describe('Umfangsangaben sind Richtwerte', () => {
   })
 
   it('nennt die eingestellte Seitenzahl', () => {
-    expect(umfangRegeln(meta({ pages: 3 }))).toContain('(3)')
+    expect(umfangRegeln(meta({ pages: 3 }))).toContain('Seitenzahl (3;')
   })
 
   it('begrenzt das Überschreiten', () => {
@@ -47,9 +47,10 @@ describe('Umfangsangaben sind Richtwerte', () => {
     expect(r).toContain('ein Viertel mehr Wörter')
   })
 
-  it('verbietet das Unterschreiten', () => {
+  it('verbietet das Unterschreiten der Wortvorgaben – die Seitenzahl darf nach Bedarf auch kleiner sein (Paket 7)', () => {
     // Weniger als gewünscht wäre keine Hilfe, sondern eine stillschweigende Kürzung
-    expect(umfangRegeln(meta())).toContain('UNTERSCHREITE die Vorgaben nicht')
+    expect(umfangRegeln(meta())).toContain('UNTERSCHREITE die Wortvorgaben nicht')
+    expect(umfangRegeln(meta())).toContain('darf das Blatt auch kürzer sein')
   })
 
   it('verlangt eine Begründung im Lehrkraft-Hinweis', () => {

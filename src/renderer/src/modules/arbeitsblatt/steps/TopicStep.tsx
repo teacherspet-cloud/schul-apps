@@ -59,6 +59,8 @@ import {
 } from '../didactics/listeningFormats'
 import { hasStateRules, listeningStateRules } from '../didactics/listeningStates'
 import { stageForGrade } from '../didactics/profile'
+import { seitenBereich, seitenText } from '../didactics/seiten'
+import SeitenWahl from './SeitenWahl'
 import VocabWordsPicker from './VocabWordsPicker'
 import VocabFocusModal, { splitWords } from './VocabFocusModal'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
@@ -728,8 +730,6 @@ export default function TopicStep(): React.JSX.Element {
                     />
                   </Stack>
                 </Card>
-
-                <ProfileCard profile={profile} meta={meta} onOverrides={(overrides) => patch({ overrides })} />
               </Stack>
             </Grid.Col>
 
@@ -747,33 +747,25 @@ export default function TopicStep(): React.JSX.Element {
                       onChange={(v) => v && patch({ sheetType: v as SheetType })}
                       allowDeselect={false}
                     />
-                    <Group grow>
-                      <Select
-                        label="Seiten (Richtwert)"
-                        description="Die KI darf eine Seite mehr nehmen, wenn Material oder Aufgaben es verlangen – mit Begründung im Lehrkraft-Hinweis."
-                        data={['1', '2', '3', '4']}
-                        value={String(meta.pages)}
-                        onChange={(v) => v && patch({ pages: Number(v) })}
-                        allowDeselect={false}
-                      />
-                      <NumberInput
-                        label="Bearbeitungszeit (Min.)"
-                        min={5}
-                        max={180}
-                        step={5}
-                        value={meta.minutes}
-                        onChange={(v) => patch({ minutes: Number(v) || 45 })}
-                      />
-                    </Group>
+                    {/* Seitenzahl: automatisch, genau oder von–bis (Paket 7, didactics/seiten.ts) */}
+                    <SeitenWahl meta={meta} patch={patch} />
+                    <NumberInput
+                      label="Bearbeitungszeit (Min.)"
+                      min={5}
+                      max={180}
+                      step={5}
+                      value={meta.minutes}
+                      onChange={(v) => patch({ minutes: Number(v) || 45 })}
+                    />
                     {/* Leer lassen heißt „Richtwert des Altersbands" – eine eingetragene Zahl gilt genau. */}
                     <NumberInput
                       label="Zahl der Aufgaben"
                       description={
                         meta.taskCount
                           ? `Es entstehen genau ${meta.taskCount} Aufgaben. Leeren, um wieder den Richtwert zu nutzen.`
-                          : `Leer lassen: Richtwert für Klasse ${meta.grade} sind ${profile.tasks.perPage[0] * meta.pages}–${profile.tasks.perPage[1] * meta.pages} Aufgaben auf ${meta.pages} Seite(n).`
+                          : `Leer lassen: Richtwert für Klasse ${meta.grade} sind ${profile.tasks.perPage[0] * seitenBereich(meta).min}–${profile.tasks.perPage[1] * seitenBereich(meta).max} Aufgaben auf ${seitenText(meta)}.`
                       }
-                      placeholder={`automatisch (${profile.tasks.perPage[0] * meta.pages}–${profile.tasks.perPage[1] * meta.pages})`}
+                      placeholder={`automatisch (${profile.tasks.perPage[0] * seitenBereich(meta).min}–${profile.tasks.perPage[1] * seitenBereich(meta).max})`}
                       min={1}
                       max={20}
                       value={meta.taskCount || ''}
@@ -941,6 +933,112 @@ export default function TopicStep(): React.JSX.Element {
                   </Stack>
                 </Card>
 
+                {/*
+                 * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Lösungsblatt, Hilfekarten, Tafelbild,
+                 * Differenzierung und Bilder entscheidet man bei fast jedem Blatt neu – unter „Weitere
+                 * Optionen“ eingeklappt, wurden sie leicht übersehen.
+                 */}
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Lösung, Differenzierung &amp; Bilder
+                  </Title>
+                  <Stack gap="sm">
+                    <Stack gap={6}>
+                      <Checkbox label="Lösungsblatt erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                      <Checkbox
+                        label="Tipp- und Hilfekarten anlegen"
+                        description="gestufte Karten auf einer eigenen Schlussseite, nicht zwischen den Aufgaben"
+                        checked={meta.helpCards !== false}
+                        onChange={(e) => patch({ helpCards: e.currentTarget.checked })}
+                      />
+                      <Checkbox
+                        label="Tafelbild zur Sicherung mit erstellen"
+                        description="aus dem Vergleich der Aufgaben, für die Lehrkraft"
+                        checked={Boolean(meta.boardPlan)}
+                        onChange={(e) => patch({ boardPlan: e.currentTarget.checked })}
+                      />
+                    </Stack>
+                    <div>
+                      <Text size="sm" fw={500} mb={4}>
+                        Differenzierung{' '}
+                        {profile.suggestDifferentiation && (
+                          <Text span c="teal" size="xs">
+                            (für gemischte Lerngruppen empfohlen)
+                          </Text>
+                        )}
+                      </Text>
+                      <SegmentedControl
+                        data={[
+                          { value: '1', label: 'ein Niveau' },
+                          { value: '2', label: '★ / ★★' },
+                          { value: '3', label: '★ / ★★ / ★★★' }
+                        ]}
+                        value={String(meta.differentiation.levels)}
+                        onChange={(v) => patch({ differentiation: { ...meta.differentiation, levels: Number(v) as 1 | 2 | 3 } })}
+                      />
+                    </div>
+                    {meta.differentiation.levels > 1 && (
+                      <Radio.Group
+                        value={meta.differentiation.mode}
+                        onChange={(v) => patch({ differentiation: { ...meta.differentiation, mode: v as 'separate' | 'combined' } })}
+                      >
+                        <Stack gap={6}>
+                          <Radio value="separate" label="Getrennte Blätter je Niveau (gleiches Layout, gleiches Lernziel)" />
+                          <Radio value="combined" label="Ein Blatt mit ★-markierten Zusatzaufgaben" />
+                        </Stack>
+                      </Radio.Group>
+                    )}
+                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                      {/*
+                       * Wie viele Bilder – getrennt davon, WOHER sie kommen.
+                       *
+                       * Ohne diese Wahl entschied allein die KI, und sie entschied oft gegen
+                       * ein Bild. Bildersuche und KI-Erzeugung liefen dann ins Leere: Es gab
+                       * schlicht keinen Bedarf zu füllen.
+                       */}
+                      <Select
+                        label="Bilder auf dem Blatt"
+                        description={
+                          (meta.imageAmount ?? 'auto') === 'min1'
+                            ? 'Die KI plant ein Bild an der Stelle ein, an der es am meisten trägt.'
+                            : 'Ohne Wunsch entscheidet die KI – und entscheidet sich oft gegen ein Bild.'
+                        }
+                        data={[
+                          { value: 'auto', label: 'Nur wo die KI eines für nötig hält' },
+                          { value: 'min1', label: 'Mindestens ein Bild je Seite' },
+                          { value: 'keine', label: 'Keine Bilder' }
+                        ]}
+                        value={meta.imageAmount ?? 'auto'}
+                        onChange={(v) => v && patch({ imageAmount: v as 'auto' | 'min1' | 'keine' })}
+                        allowDeselect={false}
+                      />
+                      <Select
+                        label="Woher die Bilder kommen"
+                        disabled={meta.imageAmount === 'keine'}
+                        data={[
+                          { value: 'auto', label: 'Automatisch: freie Bilder aus dem Internet, sonst KI-Bild' },
+                          { value: 'web', label: 'Nur freie Bilder aus dem Internet' },
+                          { value: 'ai', label: 'Nur KI-Bilder' },
+                          { value: 'placeholder', label: 'Platzhalter (selbst wählen)' }
+                        ]}
+                        value={meta.imageSource}
+                        onChange={(v) => v && patch({ imageSource: v as WorksheetImageSource })}
+                        allowDeselect={false}
+                      />
+                    </SimpleGrid>
+                    <Switch
+                      label="Ein Schmuckbild zulassen"
+                      description={
+                        meta.decorImage === false
+                          ? 'Jedes Bild trägt Information, die eine Aufgabe braucht.'
+                          : 'Höchstens eines, thematisch gebunden, freundlich und nie am Blattanfang – nur unter diesen Bedingungen ist es unschädlich.'
+                      }
+                      checked={meta.decorImage !== false}
+                      onChange={(e) => patch({ decorImage: e.currentTarget.checked })}
+                    />
+                  </Stack>
+                </Card>
+
                 <Card withBorder>
                   <Title order={4} mb={4}>
                     Eigenes Material (optional)
@@ -1034,6 +1132,9 @@ export default function TopicStep(): React.JSX.Element {
           <Box mt="lg">
             <WeitereOptionen modul="arbeitsblatt" geaendert={geaenderteOptionen(meta, worksheet.design, designs)}>
               <Grid gap="lg">
+                <Grid.Col span={12}>
+                  <ProfileCard profile={profile} meta={meta} onOverrides={(overrides) => patch({ overrides })} />
+                </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <Stack gap="sm">
                     <MultiSelect
@@ -1086,36 +1187,6 @@ export default function TopicStep(): React.JSX.Element {
                         )}
                       </Card>
                     )}
-                    <div>
-                      <Text size="sm" fw={500} mb={4}>
-                        Differenzierung{' '}
-                        {profile.suggestDifferentiation && (
-                          <Text span c="teal" size="xs">
-                            (für gemischte Lerngruppen empfohlen)
-                          </Text>
-                        )}
-                      </Text>
-                      <SegmentedControl
-                        data={[
-                          { value: '1', label: 'ein Niveau' },
-                          { value: '2', label: '★ / ★★' },
-                          { value: '3', label: '★ / ★★ / ★★★' }
-                        ]}
-                        value={String(meta.differentiation.levels)}
-                        onChange={(v) => patch({ differentiation: { ...meta.differentiation, levels: Number(v) as 1 | 2 | 3 } })}
-                      />
-                    </div>
-                    {meta.differentiation.levels > 1 && (
-                      <Radio.Group
-                        value={meta.differentiation.mode}
-                        onChange={(v) => patch({ differentiation: { ...meta.differentiation, mode: v as 'separate' | 'combined' } })}
-                      >
-                        <Stack gap={6}>
-                          <Radio value="separate" label="Getrennte Blätter je Niveau (gleiches Layout, gleiches Lernziel)" />
-                          <Radio value="combined" label="Ein Blatt mit ★-markierten Zusatzaufgaben" />
-                        </Stack>
-                      </Radio.Group>
-                    )}
                     <Stack gap="sm">
                       <TextInput
                         label="Nummer des Arbeitsblatts (optional)"
@@ -1123,21 +1194,6 @@ export default function TopicStep(): React.JSX.Element {
                         value={meta.sheetNumber}
                         onChange={(e) => patch({ sheetNumber: e.currentTarget.value })}
                       />
-                      <Stack gap={6}>
-                        <Checkbox label="Lösungsblatt erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
-                        <Checkbox
-                          label="Tipp- und Hilfekarten anlegen"
-                          description="gestufte Karten auf einer eigenen Schlussseite, nicht zwischen den Aufgaben"
-                          checked={meta.helpCards !== false}
-                          onChange={(e) => patch({ helpCards: e.currentTarget.checked })}
-                        />
-                        <Checkbox
-                          label="Tafelbild zur Sicherung mit erstellen"
-                          description="aus dem Vergleich der Aufgaben, für die Lehrkraft"
-                          checked={Boolean(meta.boardPlan)}
-                          onChange={(e) => patch({ boardPlan: e.currentTarget.checked })}
-                        />
-                      </Stack>
                     </Stack>
                   </Stack>
                 </Grid.Col>
@@ -1154,54 +1210,8 @@ export default function TopicStep(): React.JSX.Element {
                         }}
                         allowDeselect={false}
                       />
-                      {/*
-                       * Wie viele Bilder – getrennt davon, WOHER sie kommen.
-                       *
-                       * Ohne diese Wahl entschied allein die KI, und sie entschied oft gegen
-                       * ein Bild. Bildersuche und KI-Erzeugung liefen dann ins Leere: Es gab
-                       * schlicht keinen Bedarf zu füllen.
-                       */}
-                      <Select
-                        label="Bilder auf dem Blatt"
-                        description={
-                          (meta.imageAmount ?? 'auto') === 'min1'
-                            ? 'Die KI plant ein Bild an der Stelle ein, an der es am meisten trägt.'
-                            : 'Ohne Wunsch entscheidet die KI – und entscheidet sich oft gegen ein Bild.'
-                        }
-                        data={[
-                          { value: 'auto', label: 'Nur wo die KI eines für nötig hält' },
-                          { value: 'min1', label: 'Mindestens ein Bild je Seite' },
-                          { value: 'keine', label: 'Keine Bilder' }
-                        ]}
-                        value={meta.imageAmount ?? 'auto'}
-                        onChange={(v) => v && patch({ imageAmount: v as 'auto' | 'min1' | 'keine' })}
-                        allowDeselect={false}
-                      />
-                      <Select
-                        label="Woher die Bilder kommen"
-                        disabled={meta.imageAmount === 'keine'}
-                        data={[
-                          { value: 'auto', label: 'Automatisch: freie Bilder aus dem Internet, sonst KI-Bild' },
-                          { value: 'web', label: 'Nur freie Bilder aus dem Internet' },
-                          { value: 'ai', label: 'Nur KI-Bilder' },
-                          { value: 'placeholder', label: 'Platzhalter (selbst wählen)' }
-                        ]}
-                        value={meta.imageSource}
-                        onChange={(v) => v && patch({ imageSource: v as WorksheetImageSource })}
-                        allowDeselect={false}
-                      />
                     </SimpleGrid>
                     <Stack gap="sm">
-                      <Switch
-                        label="Ein Schmuckbild zulassen"
-                        description={
-                          meta.decorImage === false
-                            ? 'Jedes Bild trägt Information, die eine Aufgabe braucht.'
-                            : 'Höchstens eines, thematisch gebunden, freundlich und nie am Blattanfang – nur unter diesen Bedingungen ist es unschädlich.'
-                        }
-                        checked={meta.decorImage !== false}
-                        onChange={(e) => patch({ decorImage: e.currentTarget.checked })}
-                      />
                       <Switch
                         label="Piktogramme an den Arbeitsanweisungen"
                         description="Symbole für schreiben, lesen, markieren, vergleichen … Bewusst nicht automatisch nach Jahrgang: Ob sie der Lerngruppe helfen, entscheidet die Lehrkraft."
@@ -1413,27 +1423,22 @@ const SOZIALFORM_KURZ: Record<string, string> = { EA: 'EA', PA: 'PA', GA: 'GA', 
  * Was unter „Weitere Optionen" vom Standard abweicht – für die Zusammenfassung in der
  * eingeklappten Überschrift. Standard ist, was ein neues Blatt mitbringt (model/defaults.ts)
  * und die Designvorlage, die als Standard markiert ist.
+ *
+ * Nur eingeklappte Felder zählen: Lösungsblatt, Hilfekarten, Tafelbild, Differenzierung und
+ * Bilder stehen seit Paket 7 sichtbar oben – dort sieht man ihren Stand ohnehin.
  */
 export function geaenderteOptionen(meta: WorksheetMeta, design: DesignTemplate | undefined, designs: DesignTemplate[]): string[] {
   const standardDesign = designs.find((d) => d.isDefault) ?? designs[0]
-  const d = meta.differentiation
+  const o = meta.overrides
   return [
+    o.afbMix || o.fontPt || o.scaffolding ? 'Lerngruppen-Anpassung' : '',
     meta.socialForms.length ? `Sozialformen ${meta.socialForms.map((f) => SOZIALFORM_KURZ[f] ?? f).join('/')}` : '',
-    d.levels > 1 ? `Differenzierung ${d.levels === 2 ? '★/★★' : '★/★★/★★★'}${d.mode === 'combined' ? ' auf einem Blatt' : ''}` : '',
     design && standardDesign && design.id !== standardDesign.id ? `Design „${design.name}“` : '',
-    meta.imageAmount === 'min1' ? 'mind. ein Bild je Seite' : meta.imageAmount === 'keine' ? 'keine Bilder' : '',
-    meta.imageAmount !== 'keine' && meta.imageSource !== 'auto'
-      ? `Bilder ${meta.imageSource === 'web' ? 'nur aus dem Internet' : meta.imageSource === 'ai' ? 'nur KI' : 'als Platzhalter'}`
-      : '',
-    meta.decorImage === false ? 'kein Schmuckbild' : '',
     meta.pictograms ? 'Piktogramme' : '',
     meta.skillFocus !== 'vocabulary' && meta.originalSources && meta.originalSources !== 'auto'
       ? `Originalquellen ${meta.originalSources === 'on' ? 'ja' : 'nein'}`
       : '',
     meta.sheetNumber.trim() ? `Nummer ${meta.sheetNumber.trim()}` : '',
-    meta.answerKey ? '' : 'ohne Lösungsblatt',
-    meta.helpCards === false ? 'ohne Hilfekarten' : '',
-    meta.boardPlan ? 'Tafelbild' : '',
     meta.video ? 'Video' : ''
   ].filter(Boolean)
 }

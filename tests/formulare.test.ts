@@ -3,7 +3,8 @@
  *
  * - „Mehr“: Der erste Satz eines Erklärtextes steht da, der Rest klappt auf. Die Hinweise sind
  *   voller Abkürzungen („§ 21 Abs. 2 S. 8“) – daran darf der Satz nicht zerbrechen.
- * - „Weitere Optionen“: Die eingeklappte Überschrift nennt, was vom Standard abweicht.
+ * - „Weitere Optionen“: Die eingeklappte Überschrift nennt, was vom Standard abweicht – seit
+ *   Paket 7 nur noch die Felder, die dort wirklich eingeklappt stehen.
  * - Duplizieren: neue Kennung, ohne frühere Entwürfe und ohne freie Lage.
  */
 import { describe, expect, it } from 'vitest'
@@ -41,20 +42,28 @@ describe('„Weitere Optionen“: was vom Standard abweicht', () => {
   it('Arbeitsblatt: ein frisches Blatt hat nichts geändert', () => {
     expect(abOptionen(defaultMeta('NI', 'gymnasium', 'Gymnasium'), designs[0], designs)).toEqual([])
   })
-  it('Arbeitsblatt: nennt Differenzierung, Piktogramme und ein fehlendes Lösungsblatt', () => {
+  it('Arbeitsblatt: nennt nur Eingeklapptes – Differenzierung und Lösungsblatt stehen seit Paket 7 oben', () => {
     const m = {
       ...defaultMeta('NI', 'gymnasium', 'Gymnasium'),
       differentiation: { levels: 2 as const, mode: 'separate' as const },
       pictograms: true,
-      answerKey: false
+      answerKey: false,
+      imageAmount: 'keine' as const,
+      overrides: { fontPt: 14 }
     }
-    expect(abOptionen(m, designs[0], designs)).toEqual(['Differenzierung ★/★★', 'Piktogramme', 'ohne Lösungsblatt'])
+    expect(abOptionen(m, designs[0], designs)).toEqual(['Lerngruppen-Anpassung', 'Piktogramme'])
   })
-  it('LZK: eine frische Kontrolle hat nichts geändert, ein Nachteilsausgleich zählt', () => {
+  it('LZK: eine frische Kontrolle hat nichts geändert; Punkte, Lösungsblatt und Hilfen stehen oben und zählen nicht', () => {
     const t = emptyKurztest('NI', 'gymnasium', 'Gymnasium')
     expect(lzkOptionen(t.meta, t.meta.bezeichnung)).toEqual([])
-    const m = { ...t.meta, nachteilsausgleich: { ...t.meta.nachteilsausgleich, aktiv: true }, nameFeld: false }
-    expect(lzkOptionen(m, t.meta.bezeichnung)).toEqual(['ohne Namensfelder', 'Nachteilsausgleich'])
+    const m = {
+      ...t.meta,
+      nachteilsausgleich: { ...t.meta.nachteilsausgleich, aktiv: true },
+      answerKey: false,
+      bewertung: { ...t.meta.bewertung, punkteAufBlatt: false },
+      nameFeld: false
+    }
+    expect(lzkOptionen(m, t.meta.bezeichnung)).toEqual(['ohne Namensfelder'])
   })
 })
 

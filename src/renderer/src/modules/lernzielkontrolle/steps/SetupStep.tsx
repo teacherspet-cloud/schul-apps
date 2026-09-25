@@ -535,14 +535,87 @@ export default function SetupStep(): React.JSX.Element {
                     </Text>
                   )}
                 </Card>
+
+                {/*
+                 * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Punkte, Lösungsblatt und sprachliche
+                 * Hilfen werden fast bei jeder Kontrolle entschieden – eingeklappt suchte man sie jedes Mal.
+                 */}
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Blatt und Hilfen
+                  </Title>
+                  <Stack gap="sm">
+                    <Switch
+                      label="Punkte je Aufgabe auf dem Blatt"
+                      checked={m.bewertung.punkteAufBlatt}
+                      onChange={(e) => patch({ bewertung: { ...m.bewertung, punkteAufBlatt: e.currentTarget.checked } })}
+                    />
+                    {m.bewertung.punkteAufBlatt && (
+                      <>
+                        <Switch
+                          label="Punktzahl vorgeben"
+                          description="Ohne Vorgabe richtet sich die Bepunktung allein nach dem Aufwand der Aufgaben."
+                          checked={Boolean(m.bewertung.bereich)}
+                          onChange={(e) => patch({ bewertung: { ...m.bewertung, bereich: e.currentTarget.checked ? { min: 8, max: 12 } : undefined } })}
+                        />
+                        {m.bewertung.bereich && (
+                          <Group grow>
+                            <NumberInput
+                              label="von"
+                              min={1}
+                              max={100}
+                              value={m.bewertung.bereich.min}
+                              onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
+                            />
+                            <NumberInput
+                              label="bis"
+                              min={1}
+                              max={100}
+                              value={m.bewertung.bereich.max}
+                              onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, max: Number(v) || 1 } } })}
+                            />
+                          </Group>
+                        )}
+                      </>
+                    )}
+                    <Switch label="Lösungsblatt für die Lehrkraft" checked={m.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                    <Switch
+                      label="Sprachliche Hilfen zulassen"
+                      description="Nachteilsausgleich – sonst enthält das Blatt nur Aufgaben und Material, keine Wortspeicher und keine Satzanfänge."
+                      checked={m.nachteilsausgleich.aktiv}
+                      onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, aktiv: e.currentTarget.checked } })}
+                    />
+                    {m.nachteilsausgleich.aktiv && (
+                      <>
+                        <Checkbox.Group
+                          value={m.nachteilsausgleich.hilfen}
+                          onChange={(v) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, hilfen: v as AusgleichHilfe[] } })}
+                        >
+                          <Stack gap={6}>
+                            {AUSGLEICH_HILFEN.map((h) => (
+                              <Checkbox key={h} value={h} label={h === 'wortspeicher' ? 'Wortspeicher' : 'Satzanfänge'} />
+                            ))}
+                          </Stack>
+                        </Checkbox.Group>
+                        <TextInput
+                          label="Vermerk für die Lehrkraft"
+                          placeholder="z. B. für zwei Lernende mit DaZ-Förderung"
+                          value={m.nachteilsausgleich.vermerk ?? ''}
+                          onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, vermerk: e.currentTarget.value } })}
+                        />
+                        <MehrText text="Der Ausgleich passt die Bedingungen an, nicht die Anforderungen. Tipp- und Hilfekarten bleiben deshalb auch hier gesperrt – sie nähmen einen Teil der geprüften Leistung vorweg." />
+                      </>
+                    )}
+                  </Stack>
+                </Card>
               </Stack>
             </Grid.Col>
           </Grid>
 
           {/*
            * Selten Geändertes eingeklappt (Paket 6): Stufe und Bezeichnung folgen aus Jahrgang und
-           * Land, Bewertung und Nachteilsausgleich haben feste Vorgaben. Die Überschrift nennt, was
-           * davon abweicht.
+           * Land, der Notenschlüssel hat eine feste Vorgabe. Die Überschrift nennt, was davon
+           * abweicht. Punkte, Lösungsblatt und Hilfen stehen seit Paket 7 wieder oben.
            */}
           <Box mt="md">
             <WeitereOptionen modul="lernzielkontrolle" geaendert={geaenderteOptionen(m, format?.bezeichnung)}>
@@ -578,40 +651,6 @@ export default function SetupStep(): React.JSX.Element {
                         />
                       </Stack>
                     </Card>
-                    <Card withBorder>
-                      <Title order={4} mb="sm">
-                        Nachteilsausgleich
-                      </Title>
-                      <Stack gap="sm">
-                        <Switch
-                          label="Sprachliche Hilfen zulassen"
-                          description="Sonst enthält das Blatt nur Aufgaben und Material – keine Wortspeicher, keine Satzanfänge."
-                          checked={m.nachteilsausgleich.aktiv}
-                          onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, aktiv: e.currentTarget.checked } })}
-                        />
-                        {m.nachteilsausgleich.aktiv && (
-                          <>
-                            <Checkbox.Group
-                              value={m.nachteilsausgleich.hilfen}
-                              onChange={(v) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, hilfen: v as AusgleichHilfe[] } })}
-                            >
-                              <Stack gap={6}>
-                                {AUSGLEICH_HILFEN.map((h) => (
-                                  <Checkbox key={h} value={h} label={h === 'wortspeicher' ? 'Wortspeicher' : 'Satzanfänge'} />
-                                ))}
-                              </Stack>
-                            </Checkbox.Group>
-                            <TextInput
-                              label="Vermerk für die Lehrkraft"
-                              placeholder="z. B. für zwei Lernende mit DaZ-Förderung"
-                              value={m.nachteilsausgleich.vermerk ?? ''}
-                              onChange={(e) => patch({ nachteilsausgleich: { ...m.nachteilsausgleich, vermerk: e.currentTarget.value } })}
-                            />
-                            <MehrText text="Der Ausgleich passt die Bedingungen an, nicht die Anforderungen. Tipp- und Hilfekarten bleiben deshalb auch hier gesperrt – sie nähmen einen Teil der geprüften Leistung vorweg." />
-                          </>
-                        )}
-                      </Stack>
-                    </Card>
                   </Stack>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
@@ -620,39 +659,6 @@ export default function SetupStep(): React.JSX.Element {
                       Bewertung
                     </Title>
                     <Stack gap="sm">
-                      <Switch
-                        label="Punkte je Aufgabe auf dem Blatt"
-                        checked={m.bewertung.punkteAufBlatt}
-                        onChange={(e) => patch({ bewertung: { ...m.bewertung, punkteAufBlatt: e.currentTarget.checked } })}
-                      />
-                      {m.bewertung.punkteAufBlatt && (
-                        <>
-                          <Switch
-                            label="Punktzahl vorgeben"
-                            description="Ohne Vorgabe richtet sich die Bepunktung allein nach dem Aufwand der Aufgaben."
-                            checked={Boolean(m.bewertung.bereich)}
-                            onChange={(e) => patch({ bewertung: { ...m.bewertung, bereich: e.currentTarget.checked ? { min: 8, max: 12 } : undefined } })}
-                          />
-                          {m.bewertung.bereich && (
-                            <Group grow>
-                              <NumberInput
-                                label="von"
-                                min={1}
-                                max={100}
-                                value={m.bewertung.bereich.min}
-                                onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
-                              />
-                              <NumberInput
-                                label="bis"
-                                min={1}
-                                max={100}
-                                value={m.bewertung.bereich.max}
-                                onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, max: Number(v) || 1 } } })}
-                              />
-                            </Group>
-                          )}
-                        </>
-                      )}
                       <Select
                         label="Notenschlüssel (nur auf dem Lösungsblatt)"
                         data={[
@@ -694,7 +700,6 @@ export default function SetupStep(): React.JSX.Element {
                           c={schluesselById(m.bewertung.schluessel)!.verbindlich ? 'teal.8' : 'dimmed'}
                         />
                       )}
-                      <Switch label="Lösungsblatt für die Lehrkraft" checked={m.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
                       <Switch label="Felder für Name, Klasse und Datum" checked={m.nameFeld} onChange={(e) => patch({ nameFeld: e.currentTarget.checked })} />
                     </Stack>
                   </Card>
@@ -720,15 +725,14 @@ export default function SetupStep(): React.JSX.Element {
 
 /**
  * Was unter „Weitere Optionen“ vom Standard abweicht (model/defaults.ts) – für die
- * Zusammenfassung in der eingeklappten Überschrift.
+ * Zusammenfassung in der eingeklappten Überschrift. Nur eingeklappte Felder: Punkte,
+ * Lösungsblatt und sprachliche Hilfen stehen sichtbar oben und brauchen keine Erwähnung.
  */
 export function geaenderteOptionen(m: KurztestMeta, formatBezeichnung?: string): string[] {
   const b = m.bewertung
   return [
     m.stufe !== stufeFuerJahrgang(m.grade) ? (m.stufe === 'sek2' ? 'Sekundarstufe II' : 'Sekundarstufe I') : '',
     formatBezeichnung && m.bezeichnung.trim() !== formatBezeichnung ? `Bezeichnung „${m.bezeichnung.trim() || 'leer'}“` : '',
-    b.punkteAufBlatt ? '' : 'ohne Punkte',
-    b.punkteAufBlatt && b.bereich ? `${b.bereich.min}–${b.bereich.max} Punkte` : '',
     b.schluessel !== STANDARD_BEWERTUNG.schluessel
       ? b.schluessel === 'keiner'
         ? 'kein Notenschlüssel'
@@ -736,8 +740,6 @@ export function geaenderteOptionen(m: KurztestMeta, formatBezeichnung?: string):
           ? 'eigener Notenschlüssel'
           : `Schlüssel ${schluesselById(b.schluessel)?.name ?? b.schluessel}`
       : '',
-    m.answerKey ? '' : 'ohne Lösungsblatt',
-    m.nameFeld ? '' : 'ohne Namensfelder',
-    m.nachteilsausgleich.aktiv ? 'Nachteilsausgleich' : ''
+    m.nameFeld ? '' : 'ohne Namensfelder'
   ].filter(Boolean)
 }

@@ -36,6 +36,11 @@ interface VokabeltestState {
   settings: TestSettings | null
   doc: TestDocument | null
   verlauf: Verlauf<TestDocument>
+  /**
+   * Verlauf der Vokabelliste (Schritt 1, Paket 7): Zeile löschen und „Liste leeren" fragen nicht
+   * mehr nach, sondern lassen sich mit Strg+Z zurückholen – wie überall seit Paket 1.
+   */
+  vokabelVerlauf: Verlauf<VocabEntry[]>
   activeVariantId: string | null
   /**
    * Kennung des offenen Tests – von Anfang an, nicht erst nach dem ersten Speichern. Unter ihr
@@ -45,7 +50,10 @@ interface VokabeltestState {
   lastSavedAt: string | null
 
   setStep: (step: number) => void
-  setVocab: (vocab: VocabEntry[]) => void
+  /** `gruppe`: fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z */
+  setVocab: (vocab: VocabEntry[], gruppe?: string) => void
+  undoVocab: () => void
+  redoVocab: () => void
   setListName: (name: string) => void
   setListContext: (context: VocabListContext | null) => void
   setSettings: (settings: TestSettings) => void
@@ -72,12 +80,21 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
   settings: null,
   doc: null,
   verlauf: leererVerlauf(),
+  vokabelVerlauf: leererVerlauf(),
   activeVariantId: null,
   testId: newId(),
   lastSavedAt: null,
 
   setStep: (step) => set({ step }),
-  setVocab: (vocab) => set({ vocab }),
+  setVocab: (vocab, gruppe) => set({ vocab, vokabelVerlauf: merke(get().vokabelVerlauf, get().vocab, gruppe ?? null) }),
+  undoVocab: () => {
+    const r = rueckgaengig(get().vokabelVerlauf, get().vocab)
+    if (r) set({ vocab: r.stand, vokabelVerlauf: r.verlauf })
+  },
+  redoVocab: () => {
+    const r = wiederholen(get().vokabelVerlauf, get().vocab)
+    if (r) set({ vocab: r.stand, vokabelVerlauf: r.verlauf })
+  },
   setListName: (listName) => set({ listName }),
   setListContext: (listContext) => set({ listContext }),
   setSettings: (settings) => set({ settings }),
@@ -138,6 +155,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       settings: null,
       doc: null,
       verlauf: leererVerlauf(),
+      vokabelVerlauf: leererVerlauf(),
       activeVariantId: null,
       testId: newId(),
       lastSavedAt: null
@@ -152,6 +170,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       settings: payload.settings ?? payload.doc?.settings ?? null,
       doc: payload.doc,
       verlauf: leererVerlauf(),
+      vokabelVerlauf: leererVerlauf(),
       activeVariantId: payload.doc?.variants[0]?.id ?? null,
       step: payload.doc ? 2 : 0
     }),

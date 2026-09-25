@@ -241,6 +241,31 @@ export default function SetupStep(): React.JSX.Element {
                       />
                       <NumberInput label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
                     </Group>
+                    {/* Immer sichtbar (Paket 7, Nachtrag der Lehrkraft) – samt Notenschlüssel, der an der Benotung hängt */}
+                    <Switch
+                      label="Test wird benotet"
+                      description={meta.graded ? 'Der Notenschlüssel steht im Lösungsteil.' : 'Ohne Note – als Übung oder zur Diagnose.'}
+                      checked={meta.graded}
+                      onChange={(e) => patch({ graded: e.currentTarget.checked })}
+                    />
+                    {meta.graded && (
+                      <Group gap="xs" align="center">
+                        <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                          Notenschlüssel: {gradeScaleLine(meta.points, meta.gradeScaleThresholds)}
+                        </Text>
+                        <Button size="compact-xs" variant="light" onClick={() => setScaleOpen(true)}>
+                          Bearbeiten
+                        </Button>
+                      </Group>
+                    )}
+                    {meta.graded && (
+                      <Switch
+                        label="Notenschlüssel auch auf dem Testblatt"
+                        description="Er steht ohnehin im Lösungsteil – hier zusätzlich auf dem Material der Lernenden."
+                        checked={meta.gradeScaleOnSheet}
+                        onChange={(e) => patch({ gradeScaleOnSheet: e.currentTarget.checked })}
+                      />
+                    )}
 
                     <Switch
                       label="In einen Zusammenhang einbetten"
@@ -282,30 +307,6 @@ export default function SetupStep(): React.JSX.Element {
               <Grid>
                 <Grid.Col span={{ base: 12, md: 6 }}>
                   <Stack gap="sm">
-                    <Switch
-                      label="Test wird benotet"
-                      description={meta.graded ? 'Der Notenschlüssel steht im Lösungsteil.' : 'Ohne Note – als Übung oder zur Diagnose.'}
-                      checked={meta.graded}
-                      onChange={(e) => patch({ graded: e.currentTarget.checked })}
-                    />
-                    {meta.graded && (
-                      <Group gap="xs" align="center">
-                        <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                          Notenschlüssel: {gradeScaleLine(meta.points, meta.gradeScaleThresholds)}
-                        </Text>
-                        <Button size="compact-xs" variant="light" onClick={() => setScaleOpen(true)}>
-                          Bearbeiten
-                        </Button>
-                      </Group>
-                    )}
-                    {meta.graded && (
-                      <Switch
-                        label="Notenschlüssel auch auf dem Testblatt"
-                        description="Er steht ohnehin im Lösungsteil – hier zusätzlich auf dem Material der Lernenden."
-                        checked={meta.gradeScaleOnSheet}
-                        onChange={(e) => patch({ gradeScaleOnSheet: e.currentTarget.checked })}
-                      />
-                    )}
                     <Switch
                       label="Fehlerprofil im Lösungsteil"
                       description="Zeigt, welche Aufgabe auf welche bekannte Stolperstelle zielt – mit einer Spalte zum Eintragen beim Durchsehen."
@@ -383,7 +384,8 @@ export default function SetupStep(): React.JSX.Element {
 /**
  * Was unter „Weitere Optionen“ vom Standard abweicht (model/defaults.ts) – für die
  * Zusammenfassung in der eingeklappten Überschrift. Bei den Aufgabenformen ist der Standard
- * der Vorschlag aus den gewählten Formen.
+ * der Vorschlag aus den gewählten Formen. Benotung und Notenschlüssel stehen seit Paket 7
+ * sichtbar oben und zählen hier nicht mehr.
  */
 export function geaenderteOptionen(test: GrammarTest, designs: DesignTemplate[], topics: ReturnType<typeof chosenGrammarTopics>): string[] {
   const m = test.meta
@@ -391,8 +393,6 @@ export function geaenderteOptionen(test: GrammarTest, designs: DesignTemplate[],
   const vorschlag = suggestedFormats(topics)
   const formenAnders = m.formats.length !== vorschlag.length || m.formats.some((f) => !vorschlag.includes(f))
   return [
-    m.graded ? 'benotet' : '',
-    m.graded && m.gradeScaleOnSheet ? 'Notenschlüssel auf dem Testblatt' : '',
     m.errorProfile ? '' : 'ohne Fehlerprofil',
     m.answerKey ? '' : 'ohne Lösungsblatt',
     m.infoBox ? '' : 'ohne Kopfkasten',

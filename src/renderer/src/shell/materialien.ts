@@ -10,6 +10,7 @@
  * lässt (tests/materialien.test.ts).
  */
 import type { SavedExamMeta, SavedGrammarTestMeta, SavedKurztestMeta, SavedTestMeta, SavedVocabList, SavedWorksheetMeta } from '@shared/types'
+import { LANGUAGES } from '../modules/vokabeltest/model/types'
 
 export interface Material {
   /** Programm aus modules/registry.ts */
@@ -35,6 +36,8 @@ export interface Listen {
 }
 
 const klasse = (g?: number): string => (g ? `Klasse ${g}` : '')
+/** Fach einer Vokabelliste (en → Englisch) – damit die Suche „englisch“ sie findet */
+const sprache = (code?: string): string => (code ? (LANGUAGES.find((l) => l.value === code)?.label ?? code) : '')
 const zeile = (...teile: (string | undefined)[]): string => teile.filter((t) => t && t.trim()).join(' · ')
 
 function material(moduleId: string, id: string, name: string, updatedAt: string, entwurf: boolean, detail: string, weitere: string[]): Material {
@@ -53,7 +56,16 @@ function material(moduleId: string, id: string, name: string, updatedAt: string,
 export function vereinige(l: Listen): Material[] {
   return [
     ...l.tests.map((t) =>
-      material('vokabeltest', t.id, t.name, t.updatedAt, !t.hasTest, zeile(`${t.vocabCount} Vokabeln`, t.hasTest ? '' : 'noch kein Test'), [])
+      // Fach und Klasse seit Paket 7 – ältere Tests haben sie nicht, dann bleibt es bei der Vokabelzahl
+      material(
+        'vokabeltest',
+        t.id,
+        t.name,
+        t.updatedAt,
+        !t.hasTest,
+        zeile(t.subjectLabel, klasse(t.grade), `${t.vocabCount} Vokabeln`, t.hasTest ? '' : 'noch kein Test'),
+        []
+      )
     ),
     ...l.sheets.map((s) =>
       material('arbeitsblatt', s.id, s.name, s.updatedAt, s.sheetCount === 0, zeile(s.subjectLabel, klasse(s.grade), s.topic), [s.schoolTypeName])
@@ -64,7 +76,7 @@ export function vereinige(l: Listen): Material[] {
     ...l.grammarTests.map((t) => material('grammatiktest', t.id, t.name, t.updatedAt, t.taskCount === 0, zeile(t.subjectLabel, klasse(t.grade), t.topics), [])),
     ...l.exams.map((e) => material('klassenarbeit', e.id, e.name, e.updatedAt, !e.hasTasks, zeile(e.subjectLabel, klasse(e.grade), e.topic), [])),
     ...l.vokabellisten.map((v) =>
-      material('vokabelliste', v.id, v.name, v.updatedAt, false, zeile(`${v.entries.length} Vokabeln`, klasse(v.grade), v.source), [])
+      material('vokabelliste', v.id, v.name, v.updatedAt, false, zeile(`${v.entries.length} Vokabeln`, klasse(v.grade), v.source), [sprache(v.language)])
     )
   ]
 }

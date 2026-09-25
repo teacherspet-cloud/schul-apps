@@ -191,6 +191,30 @@ export const FLAT_BLOCK = obj({
 
 export const SHEET_SCHEMA = obj({ blocks: arr(FLAT_BLOCK) })
 
+export const SEITEN_ARTEN = ['hilfenAufKarten', 'zusammenlegen', 'materialKuerzen', 'vertiefung', 'sicherung', 'transfer', 'sonstiges']
+
+/**
+ * Arbeitsblatt: dazu die Angabe zur Seitenzahl (Paket 7). Im SELBEN Lauf wie das Blatt – ein
+ * eigener Aufruf nur für Grund und Vorschläge kostete Kontingent. Die Klassenarbeit nutzt
+ * weiter SHEET_SCHEMA; sie hat keine Seitenvorgabe.
+ */
+export const WORKSHEET_SCHEMA = obj({
+  blocks: arr(FLAT_BLOCK),
+  seiten: obj({
+    geplant: int('Voraussichtliche Zahl der Aufgaben- und Materialseiten (ohne Hilfekarten, Lösungen, Tafelbild, Deckblatt, Hörtext-Skripte)'),
+    grund: str('Nur wenn das von der Seitenvorgabe abweicht: Grund, bezogen auf Material und Lernziel; sonst leer'),
+    vorschlaege: arr(
+      obj({
+        richtung: enumOf(['weniger', 'mehr']),
+        art: enumOf(SEITEN_ARTEN),
+        text: str('Konkreter Vorschlag, der dem Lernziel dient (1 Satz)'),
+        baustein: int('Index des betroffenen Bausteins in blocks (ab 0), sonst -1')
+      }),
+      'Nur bei Abweichung: 1–3 Vorschläge, wie sich die Seitenzahl zur Vorgabe hin verändern ließe; sonst leer'
+    )
+  })
+})
+
 export const REVIEW_SCHEMA = obj({
   problems: arr(
     obj({

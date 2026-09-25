@@ -896,6 +896,46 @@ export default function FrameStep(): React.JSX.Element {
                   </Card>
                 )}
 
+                {/*
+                 * Immer sichtbar (Paket 7, Nachtrag der Lehrkraft): Ob und wie ausführlich ein
+                 * Erwartungshorizont entsteht und ob die Schreibaufgabe Formulierungshilfen bekommt,
+                 * wird bei jeder Arbeit entschieden – eingeklappt ging das unter.
+                 */}
+                <Card withBorder>
+                  <Title order={4} mb="sm">
+                    Erwartungshorizont und Hilfen
+                  </Title>
+                  <Stack gap="sm">
+                    <Switch label="Erwartungshorizont erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                    {meta.answerKey && (
+                      <Select
+                        label="Ausführlichkeit des Erwartungshorizonts"
+                        description={ANSWER_KEY_DETAILS.find((d) => d.value === meta.answerKeyDetail)?.description}
+                        data={ANSWER_KEY_DETAILS.map((d) => ({
+                          value: d.value,
+                          label: d.label
+                        }))}
+                        value={meta.answerKeyDetail}
+                        onChange={(v) =>
+                          v &&
+                          patch({
+                            answerKeyDetail: v as ExamMeta['answerKeyDetail']
+                          })
+                        }
+                        allowDeselect={false}
+                      />
+                    )}
+                    {exam.parts.some((p) => p.formatId?.startsWith('en-writing') || p.formatId === 'en-mediation') && (
+                      <Checkbox
+                        label="Formulierungshilfen zur Schreibaufgabe mit abdrucken"
+                        description="In den Abschlussprüfungen gibt es sie nicht; in Bayern zählen übernommene Wendungen ausdrücklich nicht für die sprachliche Bandbreite. Für eine Übungsarbeit kann es trotzdem sinnvoll sein."
+                        checked={Boolean(meta.writingScaffold)}
+                        onChange={(e) => patch({ writingScaffold: e.currentTarget.checked })}
+                      />
+                    )}
+                  </Stack>
+                </Card>
+
                 {(warnings.length > 0 || rules) && (
                   <Card withBorder>
                     <Title order={4} mb="sm">
@@ -936,8 +976,9 @@ export default function FrameStep(): React.JSX.Element {
           </Grid>
 
           {/*
-           * Selten Geändertes eingeklappt (Paket 6): Darstellung, Erwartungshorizont und
-           * Hilfen zur Schreibaufgabe. Die Überschrift nennt, was vom Standard abweicht.
+           * Selten Geändertes eingeklappt (Paket 6): Darstellung, Notenschlüssel, Design und
+           * Wortzahl. Die Überschrift nennt, was vom Standard abweicht. Erwartungshorizont und
+           * Formulierungshilfen stehen seit Paket 7 wieder oben.
            */}
           <Box mt="md">
             <WeitereOptionen modul="klassenarbeit" geaendert={geaenderteOptionen(exam, designs)}>
@@ -952,29 +993,10 @@ export default function FrameStep(): React.JSX.Element {
                         checked={meta.gradeScale}
                         onChange={(e) => patch({ gradeScale: e.currentTarget.checked })}
                       />
-                      <Switch label="Erwartungshorizont erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
                       <Button size="compact-sm" variant="light" onClick={() => setScaleOpen(true)}>
                         Notenschlüssel bearbeiten
                       </Button>
                     </Group>
-                    {meta.answerKey && (
-                      <Select
-                        label="Ausführlichkeit des Erwartungshorizonts"
-                        description={ANSWER_KEY_DETAILS.find((d) => d.value === meta.answerKeyDetail)?.description}
-                        data={ANSWER_KEY_DETAILS.map((d) => ({
-                          value: d.value,
-                          label: d.label
-                        }))}
-                        value={meta.answerKeyDetail}
-                        onChange={(v) =>
-                          v &&
-                          patch({
-                            answerKeyDetail: v as ExamMeta['answerKeyDetail']
-                          })
-                        }
-                        allowDeselect={false}
-                      />
-                    )}
                   </Stack>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
@@ -1010,14 +1032,6 @@ export default function FrameStep(): React.JSX.Element {
                         onChange={(e) => patch({ wordLimit: e.currentTarget.checked })}
                       />
                     )}
-                    {exam.parts.some((p) => p.formatId?.startsWith('en-writing') || p.formatId === 'en-mediation') && (
-                      <Checkbox
-                        label="Formulierungshilfen zur Schreibaufgabe mit abdrucken"
-                        description="In den Abschlussprüfungen gibt es sie nicht; in Bayern zählen übernommene Wendungen ausdrücklich nicht für die sprachliche Bandbreite. Für eine Übungsarbeit kann es trotzdem sinnvoll sein."
-                        checked={Boolean(meta.writingScaffold)}
-                        onChange={(e) => patch({ writingScaffold: e.currentTarget.checked })}
-                      />
-                    )}
                   </Stack>
                 </Grid.Col>
               </Grid>
@@ -1039,7 +1053,7 @@ export default function FrameStep(): React.JSX.Element {
 
 /**
  * Was unter „Weitere Optionen“ vom Standard abweicht (model/defaults.ts) – für die
- * Zusammenfassung in der eingeklappten Überschrift.
+ * Zusammenfassung in der eingeklappten Überschrift. Nur eingeklappte Felder zählen.
  */
 export function geaenderteOptionen(exam: Exam, designs: DesignTemplate[]): string[] {
   const m = exam.meta
@@ -1048,12 +1062,9 @@ export function geaenderteOptionen(exam: Exam, designs: DesignTemplate[]): strin
   return [
     m.infoBox ? '' : 'ohne Kopfkasten',
     m.gradeScale ? 'Notenschlüssel auf der Arbeit' : '',
-    m.answerKey ? '' : 'ohne Erwartungshorizont',
-    m.answerKey && m.answerKeyDetail !== 'ausfuehrlich' ? `Erwartungshorizont ${m.answerKeyDetail === 'kurz' ? 'knapp' : 'mit Raster'}` : '',
     m.gradeScaleThresholds ? 'eigener Notenschlüssel' : '',
     exam.design && standardDesign && exam.design.id !== standardDesign.id ? `Design „${exam.design.name}“` : '',
-    schreiben && m.wordLimit ? 'Wortzahl genannt' : '',
-    schreiben && m.writingScaffold ? 'Formulierungshilfen' : ''
+    schreiben && m.wordLimit ? 'Wortzahl genannt' : ''
   ].filter(Boolean)
 }
 

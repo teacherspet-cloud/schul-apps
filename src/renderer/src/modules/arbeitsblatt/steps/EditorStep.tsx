@@ -52,7 +52,7 @@ import { hoerenIstPruefgegenstand } from '../didactics/audioRules'
 import { plainText } from '../../../shared/richtext/parse'
 import { estimateSeconds } from '../generation/convert'
 import { BLOCK_LABELS, dupliziereBaustein, istLeer, newBlock } from '../model/factory'
-import type { TaskBlock, Worksheet, WsBlock, WsBlockType } from '../model/types'
+import type { SeitenVorschlag, TaskBlock, Worksheet, WsBlock, WsBlockType } from '../model/types'
 import { serializeWorksheet, WORKSHEET_FILTER } from '../project'
 import { BausteinRahmen } from '../render/BausteinRahmen'
 import type { PlacedItem } from '../render/paginate'
@@ -73,6 +73,8 @@ import { EinfuegenUntermenue } from './EinfuegenMenue'
 import { AudioPanel } from './AudioPanel'
 import { BoardPanel } from './BoardPanel'
 import { addVersion, switchVersion } from '../model/versions'
+import { seitenAbweichung } from '../didactics/seiten'
+import SeitenHinweis from './SeitenHinweis'
 import { browserSourceServices, completeOriginalSources } from '../generation/originalSources'
 import { browserWorksheetImageDeps } from '../generation/browserImages'
 import { completeWorksheetImages } from '../generation/worksheetImages'
@@ -102,6 +104,8 @@ export default function EditorStep(): React.JSX.Element {
   }
   const citationStyle = useAppSettings((s) => s.settings.citationStyle)
   const [view, setView] = useState<'student' | 'key' | 'board' | 'audio'>('student')
+  // Ausgeblendete Hinweise zur Seitenzahl („Blatt:Seitenzahl“) – eine neue Abweichung erscheint wieder
+  const [seitenAus, setSeitenAus] = useState<string[]>([])
   // Bausteine, an denen gerade ein kleiner Auftrag arbeitet (überarbeiten, füllen, Beispiel)
   const busy = useLaufendeSchluessel(useArbeitsblatt((s) => s.docId))
   const [picker, setPicker] = useState<string | null>(null)
@@ -179,6 +183,13 @@ export default function EditorStep(): React.JSX.Element {
     )
   ]
   const combined = ws.meta.differentiation.levels > 1 && ws.meta.differentiation.mode === 'combined'
+  /*
+   * Seitenvorgabe eingehalten? Gezählt werden die gesetzten Aufgaben- und Materialseiten des
+   * Schülerblatts – die Schlussseiten (Hilfekarten usw.) plant `paginate` nicht mit (Paket 7).
+   */
+  const gezaehlteSeiten = (layouts.get(layoutKey(sheet.id, false)) ?? []).length
+  const abweichung = seitenAbweichung(ws.meta, sheet, gezaehlteSeiten)
+  const abweichungsSchluessel = `${sheet.id}:${gezaehlteSeiten}`
   const baseName = safeFileName(`${ws.meta.subjectLabel} - ${ws.meta.title || ws.meta.topic}`)
 
   const moveBlock = (id: string, delta: number): void =>
@@ -216,6 +227,45 @@ export default function EditorStep(): React.JSX.Element {
         )
       return (current) => addVersion(current, fresh)
     })
+  /**
+   * Vorschlag aus dem Hinweis zur Seitenzahl umsetzen (Paket 7) – nur über vorhandene Wege:
+   * Hilfen auf die Hilfekarten legen (lokal, Strg+Z), einen Baustein überarbeiten lassen oder
+   * eine Aufgabe anfügen, die die KI nach dem Vorschlag schreibt (beides Hintergrund-Aufträge,
+   * der vorige Stand bleibt als Entwurf abrufbar).
+   */
+  const seitenUmsetzbar = (v: SeitenVorschlag): boolean =>
+    v.art === 'hilfenAufKarten'
+      ? sheet.blocks.some((b) => b.type === 'scaffold' && b.variant !== 'hilfekarten')
+      : v.art === 'vertiefung' || v.art === 'sicherung' || v.art === 'transfer'
+        ? true
+        : Boolean(v.blockId && sheet.blocks.some((b) => b.id === v.blockId))
+  const seitenUebernehmen = (v: SeitenVorschlag): void => {
+    if (v.art === 'hilfenAufKarten') {
+      update((d) => {
+        for (const b of d.sheets.find((x) => x.id === sheet.id)!.blocks) if (b.type === 'scaffold' && b.variant !== 'hilfekarten') b.variant = 'hilfekarten'
+      })
+      notifySuccess('Die Hilfen stehen jetzt auf den Hilfekarten. Strg+Z nimmt es zurück.')
+      return
+    }
+    const ziel = v.blockId ? sheet.blocks.find((b) => b.id === v.blockId) : undefined
+    if (ziel) {
+      reviseBlock(ziel, v.text)
+      return
+    }
+    // Ergänzen: eine leere Aufgabe ans Ende, dann schreibt die KI sie nach dem Vorschlag
+    const neu = newBlock('task')
+    update((d) => {
+      d.sheets.find((x) => x.id === sheet.id)!.blocks.push(neu)
+    })
+    const mitNeu = useArbeitsblatt.getState().worksheet
+    if (!mitNeu) return
+    bausteinAuftrag(mitNeu, docId, 'Aufgabe ergänzen', neu.id, neu.id, async (w, k) => {
+      const blatt = w.sheets.find((x) => x.id === sheet.id) ?? sheet
+      const fresh = await regenerateBlock(w, blatt, neu.id, profile, k.ai, '', v.text)
+      return (current) => addVersion(current, fresh)
+    })
+  }
+
   /**
    * Füllt einen noch leeren Baustein mit KI-Inhalt.
    *
@@ -663,6 +713,14 @@ export default function EditorStep(): React.JSX.Element {
                 ))}
               />
             </FitToWidth>
+          )}
+          {view === 'student' && abweichung && !seitenAus.includes(abweichungsSchluessel) && (
+            <SeitenHinweis
+              abweichung={abweichung}
+              umsetzbar={seitenUmsetzbar}
+              onUebernehmen={seitenUebernehmen}
+              onAusblenden={() => setSeitenAus((a) => [...a, abweichungsSchluessel])}
+            />
           )}
           {view !== 'board' && view !== 'audio' && (
             <FitToWidth className={`ws-editor-pages ${key ? 'editor-sheet-key' : ''}`}>

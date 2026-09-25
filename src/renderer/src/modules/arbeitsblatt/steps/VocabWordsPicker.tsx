@@ -66,6 +66,7 @@ export default function VocabWordsPicker({
     <Stack gap="xs">
       <TextbookPicker
         title="Zielwörter aus dem Schulbuch"
+        grau="filtern"
         prefer={{ stateId: meta.stateId, schoolTypeId: meta.schoolTypeId, grade: meta.grade, language }}
         // Die Wörter erscheinen erst im Auswahlfenster – ein ganzer Abschnitt wäre zu viel
         onEntries={(entries, _name, context) => {

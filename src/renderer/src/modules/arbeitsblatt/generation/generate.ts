@@ -28,7 +28,8 @@ import {
   systemPrompt,
   taskContext
 } from './prompts'
-import { FLAT_BLOCK, OUTLINE_SCHEMA, REVIEW_SCHEMA, SHEET_SCHEMA } from './schemas'
+import { FLAT_BLOCK, OUTLINE_SCHEMA, REVIEW_SCHEMA, WORKSHEET_SCHEMA } from './schemas'
+import { seitenPlanAus, seitenPlanRegeln } from '../didactics/seiten'
 import { linkListeningTasks, scriptForSheet, wantsListening, writeListeningScripts } from './listening'
 import type { ListeningScript } from './listening'
 import { listeningCount } from '../didactics/listeningFormats'
@@ -185,6 +186,7 @@ export async function generateSheet(
       originalSourceRules(meta, level, ws.originalMaterial),
       originalMaterialVorgabe(ws.originalMaterial),
       scriptForSheet(script ?? null),
+      seitenPlanRegeln(meta),
       images.length ? `Übernehmbare Bilder (sourceImageIndex): ${images.map((i) => `${i.index}: ${i.fileName}`).join('; ')}.` : '',
       'Für alle nicht benötigten Felder leere Werte verwenden (leerer Text, leere Liste, 0 bzw. -1).',
       materialText(sources)
@@ -193,7 +195,7 @@ export async function generateSheet(
       .join('\n\n'),
     images: materialImages(sources),
     schemaName: 'worksheet',
-    schema: SHEET_SCHEMA
+    schema: WORKSHEET_SCHEMA
   })
   return buildSheet(data, level, images)
 }
@@ -209,16 +211,18 @@ export function ohnePunkte<T extends WsBlock | null>(block: T, punkte = 0): T {
 
 function buildSheet(data: any, level: Stars | null, images: ReturnType<typeof embeddableImages>): Sheet {
   const rng = createRng(randomSeed())
-  const blocks = sortViewingTasks(
-    (Array.isArray(data?.blocks) ? data.blocks : [])
-      .map((b: any) => ohnePunkte(convertBlock(b, rng, images)))
-      .filter((b: WsBlock | null): b is WsBlock => Boolean(b))
-  )
+  const roh: (WsBlock | null)[] = (Array.isArray(data?.blocks) ? data.blocks : []).map((b: any) => ohnePunkte(convertBlock(b, rng, images)))
+  const blocks = sortViewingTasks(roh.filter((b: WsBlock | null): b is WsBlock => Boolean(b)))
   // Hier, weil JEDER Weg durch buildSheet läuft – auch der Sparmodus, der die Prüfrunde
   // überspringt. Ohne die Zuordnung liefe die Lösungsprüfung gegen alle Skripte zugleich.
   linkListeningTasks(blocks)
   linkVideoTasks(blocks)
-  return { id: newId(), stars: level ?? undefined, label: level ? STAR_LABELS[level] : 'Arbeitsblatt', blocks }
+  // Angabe zur Seitenzahl: Die KI nennt Bausteine nach ihrer Stelle in ihrer Antwort – hier in Kennungen übersetzt
+  const seitenPlan = seitenPlanAus(
+    data?.seiten,
+    roh.map((b) => b?.id)
+  )
+  return { id: newId(), stars: level ?? undefined, label: level ? STAR_LABELS[level] : 'Arbeitsblatt', blocks, ...(seitenPlan ? { seitenPlan } : {}) }
 }
 
 /** Nur für Tests: dasselbe Bauen eines Blattes aus einer KI-Antwort. */

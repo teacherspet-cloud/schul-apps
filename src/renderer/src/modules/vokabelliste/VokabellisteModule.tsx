@@ -1,9 +1,8 @@
-import { ActionIcon, Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Text, Title } from '@mantine/core'
-import { IconBook2, IconFilePlus, IconTrash } from '@tabler/icons-react'
+import { Alert, Badge, Button, Card, Container, Group, Menu, ScrollArea, Stack, Text, TextInput, Title } from '@mantine/core'
+import { IconBook2, IconFilePlus, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
 import { notifyError } from '../../shared/util'
-import { useConfirmKeys } from '../../shared/useConfirmKeys'
 import { schoolTypesForState } from '../arbeitsblatt/didactics/schoolProfiles'
 import { STATES } from '../arbeitsblatt/didactics/states'
 import SchulAngabe from '../../shared/components/SchulAngabe'
@@ -14,6 +13,11 @@ import ListEditor from './steps/ListEditor'
 import NewListWizard from './steps/NewListWizard'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { useDokumentOeffner } from '../../shared/navigation'
+import { EintragMenue, EintragRueckfragen, Oeffnen, useBibliothek } from '../../shared/components/Bibliothek'
+import { passtZurSuche } from '../../shared/bibliothek'
+import { testAusListe } from '../vokabeltest/library'
+import { ZUSATZ } from '../vokabeltest/steps/VokabelTabelle'
+import { vokabellistenApi } from './listenApi'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -34,22 +38,20 @@ const readChoice = (): { stateId: string; schoolTypeId: string; language: string
  *
  * Zuerst stehen Bundesland, Schulform und Fach – erst danach erscheinen die passenden
  * Lehrwerke und Listen. Die Listen stehen anschließend im Vokabeltest und bei den
- * Klassenarbeiten zur Auswahl. Grau markierte Vokabeln sind dort standardmäßig abgewählt.
+ * Klassenarbeiten zur Auswahl. Zusatzwortschatz (im Buch grau) wird dort übernommen, aber
+ * zunächst nicht abgefragt.
  */
-export default function VokabellisteModule(): React.JSX.Element {
+export default function VokabellisteModule({ active = true }: { active?: boolean }): React.JSX.Element {
   const [choice, setChoice] = useState(readChoice)
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [books, setBooks] = useState<TextbookMeta[]>([])
-  const [lists, setLists] = useState<SavedVocabList[]>([])
   const [openList, setOpenList] = useState<SavedVocabList | null>(null)
   const [openBook, setOpenBook] = useState<string | null>(null)
   const [wizard, setWizard] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState<SavedVocabList | null>(null)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   useDokumentOeffner('vokabelliste', async (id) => {
     const alle = await window.api.library.list()
-    setLists(alle)
     const liste = alle.find((l) => l.id === id)
     if (!liste) throw new Error('Die Liste gibt es nicht mehr.')
     setOpenBook(null)
@@ -59,7 +61,6 @@ export default function VokabellisteModule(): React.JSX.Element {
 
   useEffect(() => {
     window.api.cefr.get().then(setTable).catch(notifyError)
-    window.api.library.list().then(setLists).catch(notifyError)
     window.api.textbooks.list().then(setBooks).catch(notifyError)
   }, [])
 
@@ -71,27 +72,13 @@ export default function VokabellisteModule(): React.JSX.Element {
     }
   }, [choice])
 
-  const removeList = async (): Promise<void> => {
-    if (!confirmDelete) return
-    try {
-      setLists(await window.api.library.delete(confirmDelete.id))
-      setConfirmDelete(null)
-    } catch (e) {
-      notifyError(e)
-    }
-  }
-  useConfirmKeys(
-    confirmDelete !== null,
-    () => void removeList(),
-    () => setConfirmDelete(null)
-  )
-
   if (openBook) {
     return (
       <ScrollArea h="100%">
         <Container size="lg" py="lg">
           <BookEditor
             bookId={openBook}
+            aktiv={active}
             onBack={() => {
               setOpenBook(null)
               window.api.textbooks.list().then(setBooks).catch(notifyError)
@@ -108,13 +95,14 @@ export default function VokabellisteModule(): React.JSX.Element {
         <Container size="lg" py="lg">
           <ListEditor
             list={openList}
-            onSaved={(all, saved) => {
-              setLists(all)
+            onSaved={(_alle, saved) => {
               // Nur die offene Liste nachführen: Die letzte Sicherung kann eintreffen, nachdem
               // schon zurück zur Übersicht gewechselt wurde – dann bleibt die Übersicht stehen
               setOpenList((offen) => (offen?.id === saved.id ? saved : offen))
             }}
             onBack={() => setOpenList(null)}
+            onTest={(l) => void testAusListe(l.id)}
+            aktiv={active}
           />
         </Container>
       </ScrollArea>
@@ -128,7 +116,6 @@ export default function VokabellisteModule(): React.JSX.Element {
     (b) => b.language === choice.language && (!b.stateId || b.stateId === choice.stateId) && (!b.schoolTypeId || b.schoolTypeId === schoolTypeId)
   )
   const others = books.filter((b) => b.language === choice.language && !matching.includes(b))
-  const ownLists = lists.filter((l) => !l.language || l.language === choice.language)
   const languageLabel = LANGUAGES.find((l) => l.value === choice.language)?.label ?? choice.language
 
   return (
@@ -234,62 +221,7 @@ export default function VokabellisteModule(): React.JSX.Element {
           </Stack>
         )}
 
-        <Title order={4} mb="xs">
-          Eigene Listen
-        </Title>
-        {ownLists.length === 0 ? (
-          <Alert color="gray">Noch keine eigene Vokabelliste für {languageLabel}. „Neue Liste" legt die erste an.</Alert>
-        ) : (
-          <Stack gap="xs">
-            {ownLists.map((l) => (
-              <Card key={l.id} withBorder padding="sm">
-                <Group justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0 }}>
-                    <Group gap="xs">
-                      <Text fw={600} truncate>
-                        {l.name}
-                      </Text>
-                      <Badge variant="light">{l.entries.length} Vokabeln</Badge>
-                      {l.entries.some((e) => e.grey) && (
-                        <Badge variant="light" color="gray">
-                          {l.entries.filter((e) => e.grey).length} grau
-                        </Badge>
-                      )}
-                      {l.grade ? <Badge variant="outline">Klasse {l.grade}</Badge> : null}
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      {dateFormat.format(new Date(l.updatedAt))}
-                      {l.source ? ` · ${l.source}` : ''}
-                    </Text>
-                  </div>
-                  <Group gap={4} wrap="nowrap">
-                    <Button size="xs" onClick={() => setOpenList(l)}>
-                      Bearbeiten
-                    </Button>
-                    <ActionIcon variant="subtle" color="red" aria-label={`${l.name} löschen`} onClick={() => setConfirmDelete(l)}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Group>
-                {confirmDelete?.id === l.id && (
-                  <Alert color="red" mt="xs" p="xs">
-                    <Group justify="space-between">
-                      <Text size="sm">„{l.name}" endgültig löschen?</Text>
-                      <Group gap="xs">
-                        <Button size="xs" variant="default" onClick={() => setConfirmDelete(null)}>
-                          Abbrechen
-                        </Button>
-                        <Button size="xs" color="red" autoFocus onClick={() => void removeList()}>
-                          Löschen
-                        </Button>
-                      </Group>
-                    </Group>
-                  </Alert>
-                )}
-              </Card>
-            ))}
-          </Stack>
-        )}
+        <EigeneListen sprache={choice.language} languageLabel={languageLabel} onBearbeiten={setOpenList} />
 
         <NewListWizard
           opened={wizard}
@@ -303,7 +235,7 @@ export default function VokabellisteModule(): React.JSX.Element {
              * dort ohne „Speichern" zurückging, hatte die ganze Texterkennung umsonst bezahlt.
              */
             try {
-              setLists(await window.api.library.save(list))
+              await window.api.library.save(list)
             } catch (e) {
               notifyError(e, 'Die Liste konnte nicht gespeichert werden')
             }
@@ -314,5 +246,120 @@ export default function VokabellisteModule(): React.JSX.Element {
         />
       </Container>
     </ScrollArea>
+  )
+}
+
+/**
+ * „Eigene Listen" der Übersicht – mit dem Verhalten der gemeinsamen Bibliothek (Suche,
+ * Umbenennen, Kopie anlegen, Löschen mit Inline-Rückfrage) und dem Knopf „Test aus dieser
+ * Liste" (Paket 7). Vorher Löschen über eine eigene Rückfrage und kein Duplizieren.
+ *
+ * Wird beim Zurückkommen aus dem Editor neu aufgebaut – die Liste ist dann aktuell.
+ */
+function EigeneListen({
+  sprache,
+  languageLabel,
+  onBearbeiten
+}: {
+  sprache: string
+  languageLabel: string
+  onBearbeiten: (l: SavedVocabList) => void
+}): React.JSX.Element {
+  const bib = useBibliothek<SavedVocabList>(vokabellistenApi, { offeneId: () => null })
+  const eigene = (bib.eintraege ?? []).filter((l) => !l.language || l.language === sprache)
+  const treffer = eigene.filter((l) => passtZurSuche([l.name, l.source, l.grade ? `Klasse ${l.grade}` : ''], bib.suche))
+  return (
+    <>
+      <Group justify="space-between" mb="xs" align="flex-end">
+        <Title order={4}>Eigene Listen</Title>
+        {eigene.length > 3 && (
+          <TextInput
+            size="xs"
+            leftSection={<IconSearch size={14} />}
+            placeholder="Suchen (Name, Klasse)"
+            aria-label="Eigene Listen durchsuchen"
+            value={bib.suche}
+            onChange={(e) => bib.setSuche(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === 'Escape' && bib.setSuche('')}
+            w={240}
+          />
+        )}
+      </Group>
+      {bib.eintraege && eigene.length === 0 ? (
+        <Alert color="gray">Noch keine eigene Vokabelliste für {languageLabel}. „Neue Liste“ legt die erste an.</Alert>
+      ) : (
+        <Stack gap="xs">
+          {treffer.map((l) => {
+            const grau = l.entries.filter((e) => e.grey).length
+            return (
+              <Card
+                key={l.id}
+                withBorder
+                padding="sm"
+                data-liste={l.name}
+                style={bib.neuId === l.id ? { borderColor: 'var(--mantine-color-teal-5)' } : undefined}
+              >
+                <Group justify="space-between" wrap="nowrap">
+                  <Oeffnen name={l.name} onOeffnen={() => onBearbeiten(l)}>
+                    <Group gap="xs">
+                      <Text fw={600} truncate>
+                        {l.name}
+                      </Text>
+                      <Badge variant="light">
+                        {l.entries.length} {l.entries.length === 1 ? 'Vokabel' : 'Vokabeln'}
+                      </Badge>
+                      {grau > 0 && (
+                        <Badge variant="light" color="gray" tt="none" title={ZUSATZ}>
+                          {grau} grau
+                        </Badge>
+                      )}
+                      {l.grade ? <Badge variant="outline">Klasse {l.grade}</Badge> : null}
+                      {bib.neuId === l.id && (
+                        <Badge size="sm" variant="light" color="teal">
+                          neu
+                        </Badge>
+                      )}
+                    </Group>
+                    <Text size="xs" c="dimmed">
+                      {dateFormat.format(new Date(l.updatedAt))}
+                      {l.source ? ` · ${l.source}` : ''}
+                    </Text>
+                  </Oeffnen>
+                  <Group gap={4} wrap="nowrap">
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconSparkles size={14} />}
+                      disabled={!l.entries.length}
+                      onClick={() => void testAusListe(l.id)}
+                    >
+                      Test aus dieser Liste
+                    </Button>
+                    <Button size="xs" onClick={() => onBearbeiten(l)}>
+                      Bearbeiten
+                    </Button>
+                    <EintragMenue
+                      bib={bib}
+                      eintrag={l}
+                      vorne={
+                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => onBearbeiten(l)}>
+                          Vokabeln bearbeiten
+                        </Menu.Item>
+                      }
+                    />
+                  </Group>
+                </Group>
+                <EintragRueckfragen bib={bib} eintrag={l} />
+              </Card>
+            )
+          })}
+          {bib.eintraege && eigene.length > 0 && treffer.length === 0 && (
+            <Text c="dimmed" size="sm" ta="center" py="md">
+              Nichts gefunden. Anderen Suchbegriff versuchen.
+            </Text>
+          )}
+        </Stack>
+      )}
+    </>
   )
 }

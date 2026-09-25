@@ -139,6 +139,7 @@ export default function VocabFocusModal({
 
         <TextbookPicker
           title="Aus dem Schulbuch"
+          grau="filtern"
           multiUnit
           prefer={{ stateId: meta.stateId, schoolTypeId: meta.schoolTypeId, grade: meta.grade, language }}
           onEntries={(entries, name, context) => {

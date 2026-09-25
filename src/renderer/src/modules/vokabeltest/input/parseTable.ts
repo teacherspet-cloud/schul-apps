@@ -27,7 +27,7 @@ export function rowsToEntries(rows: string[][]): VocabEntry[] {
       translation: r[1] ?? '',
       pos: r[2] || undefined,
       note: r[3] || undefined,
-      // Eingelesene Vokabeln sind markiert; grau gedruckte müssen die Schüler nicht lernen
+      // Eingefügte Vokabeln werden abgefragt; eine Tabelle kennt keinen Zusatzwortschatz (grau)
       include: true
     }))
 }

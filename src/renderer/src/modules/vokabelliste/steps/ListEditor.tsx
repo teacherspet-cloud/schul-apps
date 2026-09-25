@@ -1,20 +1,28 @@
-import { Button, Card, Group, NumberInput, Select, Stack, Text, TextInput, Title } from '@mantine/core'
-import { IconCheck, IconClipboard, IconDeviceFloppy } from '@tabler/icons-react'
+import { Badge, Button, Card, Group, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { IconCheck, IconClipboard, IconDeviceFloppy, IconSparkles } from '@tabler/icons-react'
 import { useRef, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
 import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
+import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { useVerzoegertesSichern } from '../../../shared/useAutosave'
+import { useUndoKeys } from '../../../shared/useUndoKeys'
+import { useVerlauf } from '../../../shared/useVerlauf'
 import { importVocabFromFile } from '../../vokabeltest/input/importVocab'
-import { parseDelimited } from '../../vokabeltest/input/parseTable'
 import { newId } from '../../vokabeltest/model/random'
-import { LANGUAGES } from '../../vokabeltest/model/types'
+import { LANGUAGES, type VocabEntry } from '../../vokabeltest/model/types'
+import { alsListenEintrag } from '../../vokabeltest/model/vocab'
 import { aiCall } from '../../vokabeltest/store'
 import { TextbookPicker } from '../../vokabeltest/steps/TextbookPicker'
-import VocabRows, { emptyRow } from './VocabRows'
-import type { VocabRow } from './VocabRows'
+import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
+import { EinfuegenFenster, PruefFenster } from '../../vokabeltest/steps/VokabelUebernahme'
+import type { VocabRow } from './VocabRow'
 
-const toRows = (list: SavedVocabList): VocabRow[] => [...list.entries.map((e) => ({ ...e, id: newId() })), emptyRow()]
+/** Eine leere Liste bekommt gleich eine Zeile zum Eintippen */
+const toRows = (list: SavedVocabList): VocabRow[] => {
+  const rows = list.entries.map((e) => ({ ...alsListenEintrag(e), id: newId() }))
+  return rows.length ? rows : [leereZeile<VocabRow>()]
+}
 
 /**
  * Eine eigene Vokabelliste bearbeiten.
@@ -22,64 +30,90 @@ const toRows = (list: SavedVocabList): VocabRow[] => [...list.entries.map((e) =>
  * Gespeichert wird von selbst, kurz nach jeder Änderung – wie in den übrigen Programmen.
  * Vorher musste „Speichern" gedrückt werden; „Zurück zur Übersicht" verwarf alles andere
  * ohne Nachfrage.
+ *
+ * Seit Paket 7: dieselbe Tabelle und dieselbe Prüfansicht wie im Vokabeltest, Zeile löschen
+ * mit Strg+Z statt Rückfrage, und „Test aus dieser Liste" führt direkt in den Vokabeltest.
  */
 export default function ListEditor({
   list,
   onSaved,
-  onBack
+  onBack,
+  onTest,
+  aktiv = true
 }: {
   list: SavedVocabList
   onSaved: (lists: SavedVocabList[], saved: SavedVocabList) => void
   onBack: () => void
+  /** „Test aus dieser Liste" – nach dem Sichern */
+  onTest?: (list: SavedVocabList) => void
+  /** Liegt das Programm vorn? Nur dann gilt Strg+Z hier */
+  aktiv?: boolean
 }): React.JSX.Element {
-  const [rows, setRows] = useState<VocabRow[]>(() => toRows(list))
+  const verlauf = useVerlauf<VocabRow[]>(() => toRows(list))
+  const rows = verlauf.stand
   const [name, setName] = useState(list.name)
   const [language, setLanguage] = useState(list.language ?? 'en')
   const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
   const [dirty, setDirty] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
+  const [review, setReview] = useState<VocabEntry[] | null>(null)
+  const [pasteOpen, setPasteOpen] = useState(false)
   // Zählt Änderungen – so bleibt eine Eingabe WÄHREND des Speicherns als ungesichert markiert
   const stand = useRef(0)
+  // Die Sicherung liest immer den neuesten Stand (sie läuft verzögert)
+  const aktuell = useRef({ rows, name, language, grade })
+  aktuell.current = { rows, name, language, grade }
 
-  const save = async (vonHand = false): Promise<void> => {
-    const entries = rows.filter((r) => r.term.trim()).map(({ id: _id, ...e }) => ({ ...e, term: e.term.trim(), translation: e.translation.trim() }))
-    if (!entries.length) {
-      // Von selbst wird eine leere Liste still übergangen; nur auf Knopfdruck gibt es den Hinweis
-      if (vonHand) notifyError('Die Liste enthält noch keine Vokabeln.')
-      return
-    }
+  const save = async (vonHand = false): Promise<SavedVocabList | null> => {
+    const { rows: r, name: n, language: l, grade: g } = aktuell.current
+    const entries = r.filter((x) => x.term.trim()).map(({ id: _id, ...e }) => alsListenEintrag(e))
     const gesichert = stand.current
     try {
       const next: SavedVocabList = {
         ...list,
-        name: name.trim() || `Liste vom ${new Date().toLocaleDateString('de-DE')}`,
-        language,
-        ...(grade === '' ? {} : { grade: Number(grade) }),
+        name: n.trim() || `Liste vom ${new Date().toLocaleDateString('de-DE')}`,
+        language: l,
+        ...(g === '' ? {} : { grade: Number(g) }),
         entries,
         updatedAt: new Date().toISOString()
       }
+      if (g === '') delete next.grade
       const lists = await window.api.library.save(next)
       if (stand.current === gesichert) setDirty(false)
       onSaved(lists, next)
       if (vonHand) notifySuccess(`„${next.name}" gespeichert – ${entries.length} Vokabeln.`)
+      return next
     } catch (e) {
       // Beim automatischen Sichern meldet der gemeinsame Mechanismus den Fehler
       if (!vonHand) throw e
       notifyError(e)
+      return null
     }
   }
-  const sicherung = useVerzoegertesSichern(() => save())
+  const sicherung = useVerzoegertesSichern(() => save().then(() => undefined))
   /** Jede Änderung: als ungesichert markieren und kurz danach von selbst speichern. */
   const geaendert = (): void => {
     stand.current++
     setDirty(true)
     sicherung.plane(1200)
   }
-
-  const addRows = (entries: { term: string; translation: string; pos?: string; note?: string; grey?: boolean; inBox?: boolean }[]): void => {
-    setRows((r) => [...r.filter((x) => x.term.trim() || x.translation.trim()), ...entries.map((e) => ({ ...e, id: newId() })), emptyRow()])
+  const setRows = (next: VocabRow[], gruppe?: string): void => {
+    verlauf.setze(next, gruppe)
     geaendert()
   }
+  useUndoKeys(
+    aktiv && review === null && !pasteOpen,
+    () => verlauf.undo() && geaendert(),
+    () => verlauf.redo() && geaendert()
+  )
+
+  const addRows = (entries: VocabEntry[], replace = false): void => {
+    const neu = entries.map(({ id: _id, include: _i, ...e }) => ({ ...alsListenEintrag(e), id: newId() }))
+    setRows(replace ? neu : [...rows.filter((x) => x.term.trim() || x.translation.trim()), ...neu])
+  }
+
+  const filled = rows.filter((r) => r.term.trim()).length
+  const grau = rows.filter((r) => r.grey && r.term.trim()).length
 
   return (
     <Stack>
@@ -87,7 +121,7 @@ export default function ListEditor({
         <div style={{ minWidth: 0 }}>
           <Title order={3}>Vokabelliste bearbeiten</Title>
           <Text c="dimmed" size="sm">
-            Grau markierte Vokabeln müssen die Schüler nicht unbedingt lernen – sie sind im Test und in der Klassenarbeit standardmäßig abgewählt.
+            {ZUSATZ} wird im Test übernommen und gekennzeichnet, aber zunächst nicht abgefragt.
           </Text>
         </div>
         <Group wrap="nowrap">
@@ -101,6 +135,21 @@ export default function ListEditor({
           >
             Zurück zur Übersicht
           </Button>
+          {onTest && (
+            <Button
+              variant="light"
+              leftSection={<IconSparkles size={16} />}
+              disabled={filled === 0}
+              onClick={async () => {
+                // Erst sichern, damit der Test mit dem neuesten Stand beginnt
+                await sicherung.sofort()
+                const gespeichert = await save(false).catch(() => null)
+                if (gespeichert) onTest(gespeichert)
+              }}
+            >
+              Test aus dieser Liste
+            </Button>
+          )}
           {/* Zeigt den Stand; ein Klick sichert sofort, statt die kurze Wartezeit abzuwarten */}
           <Button
             variant={dirty ? 'filled' : 'light'}
@@ -154,63 +203,83 @@ export default function ListEditor({
         <Title order={5} mb="xs">
           Vokabeln hinzufügen
         </Title>
-        <Group align="flex-start" grow>
-          <DropZone
-            onFiles={async (files) => {
-              const file = files[0]
-              if (!file) return
-              setImporting('Die Datei wird gelesen …')
-              try {
-                addRows(await importVocabFromFile(file, aiCall, (m) => setImporting(m)))
-              } catch (e) {
-                notifyError(e)
-              } finally {
-                setImporting(null)
-              }
-            }}
-            accept={[...FILE_TYPES.image, ...FILE_TYPES.pdf, ...FILE_TYPES.docx, ...FILE_TYPES.csv, ...FILE_TYPES.xlsx]}
-            title={importing ?? 'Datei hierher ziehen (Foto, PDF, Word, Excel, CSV)'}
-            loading={Boolean(importing)}
-            minHeight={120}
-          />
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+          <Stack gap="xs">
+            <DropZone
+              onFiles={async (files) => {
+                const found: VocabEntry[] = []
+                try {
+                  for (const file of files) {
+                    setImporting(`${file.name} wird gelesen …`)
+                    found.push(...(await importVocabFromFile(file, aiCall, (m) => setImporting(m))))
+                  }
+                  if (found.length) setReview(found)
+                  else notifyError('In der Datei wurden keine Vokabeln gefunden.')
+                } catch (e) {
+                  notifyError(e)
+                } finally {
+                  setImporting(null)
+                }
+              }}
+              accept={[...FILE_TYPES.image, ...FILE_TYPES.pdf, ...FILE_TYPES.docx, ...FILE_TYPES.csv, ...FILE_TYPES.xlsx]}
+              title={importing ?? 'Datei hierher ziehen (Foto, PDF, Word, Excel, CSV)'}
+              loading={Boolean(importing)}
+              minHeight={120}
+            />
+            <Button variant="light" leftSection={<IconClipboard size={16} />} onClick={() => setPasteOpen(true)}>
+              Tabelle einfügen …
+            </Button>
+          </Stack>
           <TextbookPicker
             onEntries={(entries, selectionName) => {
-              addRows(entries)
+              setReview(entries)
               if (!name.trim()) setName(selectionName)
-              geaendert()
             }}
           />
-        </Group>
-        <TextInput
-          mt="sm"
-          label="Tabelle einfügen"
-          description="Aus Word oder Excel kopieren: Spalte 1 Wort, Spalte 2 Übersetzung – oder je Zeile „word – Wort“"
-          placeholder="hier einfügen (Strg+V)"
-          leftSection={<IconClipboard size={16} />}
-          onPaste={(e) => {
-            const text = e.clipboardData.getData('text')
-            if (!text.trim()) return
-            e.preventDefault()
-            const entries = parseDelimited(text)
-            if (!entries.length) {
-              notifyError('In der Zwischenablage stehen keine erkennbaren Vokabeln.')
-              return
-            }
-            addRows(entries)
-            notifySuccess(`${entries.length} Vokabeln übernommen.`)
-          }}
-        />
+        </SimpleGrid>
       </Card>
 
       <Card withBorder>
-        <VocabRows
-          rows={rows}
-          onChange={(r) => {
-            setRows(r)
-            geaendert()
-          }}
-        />
+        <Group justify="space-between" mb="xs">
+          <Group gap="xs">
+            <Text fw={600}>
+              {filled} {filled === 1 ? 'Vokabel' : 'Vokabeln'}
+            </Text>
+            {grau > 0 && (
+              <Badge variant="light" color="gray" tt="none">
+                {grau} {ZUSATZ}
+              </Badge>
+            )}
+          </Group>
+          <UndoRedoButtons
+            size="sm"
+            canUndo={verlauf.kannUndo}
+            canRedo={verlauf.kannRedo}
+            onUndo={() => verlauf.undo() && geaendert()}
+            onRedo={() => verlauf.redo() && geaendert()}
+          />
+        </Group>
+        <VokabelTabelle zeilen={rows} onChange={setRows} mitVerlauf />
       </Card>
+
+      <PruefFenster
+        entries={review}
+        abfragen={false}
+        onClose={() => setReview(null)}
+        onApply={(entries, replace) => {
+          addRows(entries, replace)
+          setReview(null)
+          notifySuccess(`${entries.length} Vokabeln übernommen.`)
+        }}
+      />
+      <EinfuegenFenster
+        opened={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        onParsed={(entries) => {
+          setPasteOpen(false)
+          setReview(entries)
+        }}
+      />
     </Stack>
   )
 }

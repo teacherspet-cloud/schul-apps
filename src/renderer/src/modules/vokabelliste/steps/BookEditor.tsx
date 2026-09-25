@@ -1,12 +1,15 @@
 import { Alert, Badge, Button, Card, Chip, Group, Stack, Text, Title } from '@mantine/core'
 import { IconCheck, IconDeviceFloppy } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
+import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
+import { useUndoKeys } from '../../../shared/useUndoKeys'
+import { useVerlauf } from '../../../shared/useVerlauf'
 import type { Textbook, TextbookEntry } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { useVerzoegertesSichern } from '../../../shared/useAutosave'
 import { newId } from '../../vokabeltest/model/random'
-import VocabRows, { emptyRow } from './VocabRows'
-import type { VocabRow } from './VocabRows'
+import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
+import type { VocabRow } from './VocabRow'
 
 /** Zeile in einen Lehrwerks-Eintrag überführen: getrimmt und ohne leere Felder. */
 function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
@@ -28,11 +31,13 @@ function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
  * Gespeichert wird von selbst, kurz nach jeder Änderung. Vorher verwarf schon der Wechsel
  * der Unit alles Getippte – ohne Hinweis.
  */
-export default function BookEditor({ bookId, onBack }: { bookId: string; onBack: () => void }): React.JSX.Element {
+export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: string; onBack: () => void; aktiv?: boolean }): React.JSX.Element {
   const [book, setBook] = useState<Textbook | null>(null)
   const [unit, setUnit] = useState('')
   const [section, setSection] = useState('')
-  const [rows, setRows] = useState<VocabRow[]>([])
+  // Zeilen mit Verlauf: „Zeile löschen" fragt nicht nach, Strg+Z holt sie zurück (Paket 7)
+  const verlauf = useVerlauf<VocabRow[]>(() => [])
+  const rows = verlauf.stand
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -61,7 +66,8 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
   useEffect(() => {
     if (!book) return
     const entries = book.units.find((u) => u.name === unit)?.sections.find((s) => s.name === section)?.entries ?? []
-    setRows([...entries.map((e) => ({ ...e, id: newId() })), emptyRow()])
+    const neu = entries.map((e) => ({ ...e, id: newId() }))
+    verlauf.lade(neu.length ? neu : [leereZeile<VocabRow>()])
     setDirty(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geladen, unit, section])
@@ -104,6 +110,16 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
     }
   }
   const sicherung = useVerzoegertesSichern(() => save())
+  const geaendert = (): void => {
+    stand.current++
+    setDirty(true)
+    sicherung.plane(1200)
+  }
+  useUndoKeys(
+    aktiv,
+    () => verlauf.undo() && geaendert(),
+    () => verlauf.redo() && geaendert()
+  )
 
   /** Vor einem Wechsel (Unit, Abschnitt, zurück) erst das Getippte sichern. */
   const wechsle = async (fn: () => void): Promise<void> => {
@@ -233,22 +249,39 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
       {book.builtIn && (
         <Alert color="gray" p="xs">
           <Text size="xs">
-            Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die du jederzeit wieder verwerfen kannst.
+            Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die sich jederzeit wieder verwerfen lässt.
           </Text>
         </Alert>
       )}
 
       <Card withBorder>
-        <VocabRows
-          title={`${unit} · ${section}`}
-          // Schulbücher führen den Beispielsatz in einem eigenen Feld, nicht im Hinweis
-          withExample
-          rows={rows}
-          onChange={(r) => {
-            setRows(r)
-            stand.current++
-            setDirty(true)
-            sicherung.plane(1200)
+        <Group justify="space-between" mb="xs">
+          <Group gap="xs">
+            <Text fw={600}>
+              {unit} · {section}: {rows.filter((r) => r.term.trim()).length} Vokabeln
+            </Text>
+            {rows.some((r) => r.grey && r.term.trim()) && (
+              <Badge variant="light" color="gray" tt="none">
+                {rows.filter((r) => r.grey && r.term.trim()).length} {ZUSATZ}
+              </Badge>
+            )}
+          </Group>
+          <UndoRedoButtons
+            size="sm"
+            canUndo={verlauf.kannUndo}
+            canRedo={verlauf.kannRedo}
+            onUndo={() => verlauf.undo() && geaendert()}
+            onRedo={() => verlauf.redo() && geaendert()}
+          />
+        </Group>
+        {/* Schulbücher führen den Beispielsatz in einem eigenen Feld, nicht im Hinweis */}
+        <VokabelTabelle
+          zeilen={rows}
+          mitBeispiel
+          mitVerlauf
+          onChange={(r, gruppe) => {
+            verlauf.setze(r, gruppe)
+            geaendert()
           }}
         />
       </Card>

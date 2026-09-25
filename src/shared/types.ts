@@ -561,6 +561,11 @@ export interface SavedVocabList {
     note?: string
     grey?: boolean
     inBox?: boolean
+    /**
+     * Veraltet: Bis Paket 7 schrieb der Vokabeltest seine Abfrage-Wahl mit in die Liste.
+     * Beim Laden wird es ignoriert (vokabeltest/model/vocab.ts `ausListe`), neu gespeichert
+     * wird es nicht mehr – welche Wörter abgefragt werden, entscheidet der Test.
+     */
     include?: boolean
   }[]
 }
@@ -576,6 +581,13 @@ export interface SavedTestStats {
   hasTest: boolean
   variantCount: number
   totalPoints: number
+  /**
+   * Sprache, Fach und Jahrgang (Paket 7) – für Suche und „Zuletzt bearbeitet". Ältere Tests
+   * haben sie nicht; dort bleiben die Felder leer.
+   */
+  language?: string
+  subjectLabel?: string
+  grade?: number
 }
 
 export interface SavedTestMeta extends SavedTestStats {

@@ -30,23 +30,19 @@ import { notifyError } from '../../../shared/util'
 import { distributeEvenly, requestedCount } from '../generation/distribute'
 import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
-import { istLatein, passtZurSprache } from '../didactics/latein'
+import { passtZurSprache } from '../didactics/latein'
 import { gradeOptions, languageTracks, levelAtLeast, suggestLevel } from '../model/cefr'
 import { randomSeed } from '../model/random'
 import { LANGUAGES, PageLimit, TaskTypeId, TestSettings } from '../model/types'
 import { includedVocab } from '../model/vocab'
 import { useVokabeltest } from '../store'
-import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
+import { saveLastChoice } from '../../../shared/lastChoice'
+import { grundEinstellungen } from '../model/grundeinstellungen'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import EinstellungenLink from '../../../shared/components/EinstellungenLink'
-
-const DEFAULT_TASKS: TaskTypeId[] = ['gapSentences', 'matchDefinitions', 'multipleChoice']
-/*
- * In Latein ist die Nennform-Aufgabe der eigentliche Vokabeltest (amtlicher Mustertest,
- * Leitfaden Latein SH 2016, S. 25) – deshalb steht sie dort von vornherein bereit.
- */
-const DEFAULT_TASKS_LATEIN: TaskTypeId[] = ['latinForms', 'latinContext']
+import { pageLimitText } from '../render/useTestLayout'
+import SeitenVorgabe from './SeitenVorgabe'
 
 export default function SettingsStep(): React.JSX.Element {
   const { vocab, settings: stored, setSettings, setStep, doc, updateDoc, listContext } = useVokabeltest()
@@ -67,7 +63,7 @@ export default function SettingsStep(): React.JSX.Element {
       .catch(() => undefined)
   }, [aiSettings])
   const [hasKey, setHasKey] = useState(true)
-  // Nur die in der Vokabelliste markierten Vokabeln werden abgefragt
+  // Nur die Vokabeln, die in der Liste auf „abfragen“ stehen
   const usable = includedVocab(vocab)
 
   useEffect(() => {
@@ -77,44 +73,8 @@ export default function SettingsStep(): React.JSX.Element {
         setHasKey(status.hasTextKey)
         setEconomy(status.economy)
         if (!stored) {
-          const count = Math.min(12, usable.length)
-          // Stammt die Liste aus einem Schulbuch, gelten dessen Angaben (änderbar):
-          // Green Line 1 → Klasse 5, Niedersachsen, Gymnasium.
-          // Sonst die zuletzt getroffene Auswahl, erst danach die Vorgabe aus den Einstellungen.
-          const last = loadLastChoice('vokabeltest')
-          const sprache = listContext?.language || last.targetLanguage || app.defaults.targetLanguage
-          const tasks = distributeEvenly(
-            (istLatein(sprache) ? DEFAULT_TASKS_LATEIN : DEFAULT_TASKS).map((type) => ({
-              type,
-              count: 0,
-              pointsPerItem: TASK_TYPES[type].defaultPoints
-            })),
-            count
-          )
-          const initial: TestSettings = {
-            targetLanguage: sprache,
-            stateId: listContext?.stateId || last.stateId || app.defaults.stateId,
-            schoolTypeId: listContext?.schoolTypeId || last.schoolTypeId || app.defaults.schoolTypeId,
-            languageOrder: last.languageOrder ?? 1,
-            grade: 6,
-            level: 'A2',
-            vocabCount: count,
-            variantCount: 2,
-            variantMode: 'sameVocab',
-            tasks,
-            topic: '',
-            pictureSource: 'auto',
-            answerKey: true,
-            seed: randomSeed(),
-            pageLimit: { mode: 'auto', pages: 2 }
-          }
-          const grades = gradeOptions(cefr, initial.stateId, initial.schoolTypeId, 1)
-          if (grades.length) {
-            const wanted = String(listContext?.grade ?? last.grade ?? 6)
-            const g = grades.find((x) => x.value === wanted) ?? grades.find((x) => x.value === '6') ?? grades[0]
-            initial.grade = Number(g.value)
-            initial.level = g.level
-          }
+          // Dieselben Vorgaben wie „Test automatisch erstellen" (model/grundeinstellungen.ts)
+          const initial = grundEinstellungen(app, cefr, listContext, usable.length)
           setLocal(initial)
         }
       })
@@ -332,7 +292,7 @@ export default function SettingsStep(): React.JSX.Element {
                     <Group align="end">
                       <NumberInput
                         label="Anzahl abzufragender Vokabeln"
-                        description={`${usable.length} Vokabeln sind für den Test markiert`}
+                        description={`${usable.length} Vokabeln stehen in der Liste auf „abfragen“`}
                         min={1}
                         max={usable.length}
                         value={settings.vocabCount}
@@ -387,33 +347,10 @@ export default function SettingsStep(): React.JSX.Element {
                       <Text size="sm" fw={500} mb={4}>
                         Seitenumfang je Test
                       </Text>
-                      <Group gap="sm" align="center">
-                        <SegmentedControl
-                          data={[
-                            { value: 'auto', label: 'so viele wie nötig' },
-                            { value: 'max', label: 'höchstens' },
-                            { value: 'exact', label: 'genau' }
-                          ]}
-                          value={pageLimit.mode}
-                          onChange={(v) => setPageLimit({ ...pageLimit, mode: v as PageLimit['mode'] })}
-                        />
-                        {pageLimit.mode !== 'auto' && (
-                          <Group gap={6} align="center">
-                            <NumberInput
-                              aria-label="Anzahl Seiten"
-                              min={1}
-                              max={10}
-                              w={70}
-                              value={pageLimit.pages}
-                              onChange={(v) => setPageLimit({ ...pageLimit, pages: Math.max(1, Math.min(10, Number(v) || 1)) })}
-                            />
-                            <Text size="sm">{pageLimit.pages === 1 ? 'Seite' : 'Seiten'}</Text>
-                          </Group>
-                        )}
-                      </Group>
+                      <SeitenVorgabe limit={pageLimit} onChange={setPageLimit} />
                       <MehrText
                         mt={4}
-                        text="Gilt für das Schülerblatt jeder Variante. Passt der Test nicht, werden Abstände und Schrift verkleinert; bei „genau“ wird der Inhalt gleichmäßig auf die Seiten verteilt. Die Vorgabe lässt sich auch später im Editor ändern."
+                        text="Gilt für das Schülerblatt jeder Variante. Passt der Test nicht, werden Abstände und Schrift verkleinert; bei „genau“ wird der Inhalt gleichmäßig auf die Seiten verteilt, bei „von–bis“ nur dann, wenn er die Untergrenze nicht erreicht. Die Vorgabe lässt sich auch später im Editor ändern."
                       />
                     </div>
                     <Checkbox label="Lösungsblatt erstellen" checked={settings.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
@@ -536,10 +473,6 @@ export default function SettingsStep(): React.JSX.Element {
 
 /** Was unter „Weitere Optionen“ vom Standard abweicht – für die Zusammenfassung in der eingeklappten Überschrift. */
 export function geaenderteOptionen(s: TestSettings, review: boolean): string[] {
-  const seiten = s.pageLimit ?? { mode: 'auto', pages: 2 }
-  return [
-    seiten.mode === 'auto' ? '' : `${seiten.mode === 'max' ? 'höchstens' : 'genau'} ${seiten.pages} ${seiten.pages === 1 ? 'Seite' : 'Seiten'}`,
-    s.answerKey ? '' : 'ohne Lösungsblatt',
-    review ? '' : 'ohne KI-Prüfung'
-  ].filter(Boolean)
+  const seiten: PageLimit = s.pageLimit ?? { mode: 'auto', pages: 2 }
+  return [seiten.mode === 'auto' ? '' : pageLimitText(seiten), s.answerKey ? '' : 'ohne Lösungsblatt', review ? '' : 'ohne KI-Prüfung'].filter(Boolean)
 }

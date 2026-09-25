@@ -2,26 +2,37 @@ import { cleanImageBackground } from '../../shared/imageCleanup'
 import type { SavedTestStats } from '@shared/types'
 import { sichereAlles } from '../../shared/autosave'
 import { legeAb } from '../../shared/auftraege'
-import type { TestDocument } from './model/types'
+import { LANGUAGES, type TestDocument } from './model/types'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import { variantPoints } from './model/blocks'
-import { includedVocab } from './model/vocab'
-import { TestPayload, useVokabeltest } from './store'
+import { ausListe, includedVocab } from './model/vocab'
+import { openDocument } from '../../shared/navigation'
+import { TestPayload, useVokabeltest, type VocabListContext } from './store'
 
-function statsVon({ vocab, doc }: TestPayload): SavedTestStats {
+/**
+ * Kennzahlen für die Bibliothek. Seit Paket 7 mit Sprache, Fach und Jahrgang – vorher fand
+ * die Suche einen Test nur über seinen Namen. Sie stammen aus den Testeinstellungen, sonst
+ * aus der Herkunft der Liste (Schulbuch, gespeicherte Liste).
+ */
+export function statsVon({ vocab, doc, settings }: TestPayload, herkunft?: VocabListContext | null): SavedTestStats {
+  const s = settings ?? doc?.settings ?? null
+  const language = s?.targetLanguage || herkunft?.language || undefined
+  const grade = s?.grade ?? herkunft?.grade
   return {
     vocabCount: vocab.filter((v) => v.term.trim()).length,
     includedCount: includedVocab(vocab).length,
     hasTest: Boolean(doc),
     variantCount: doc?.variants.length ?? 0,
-    totalPoints: doc?.variants[0] ? variantPoints(doc.variants[0]) : 0
+    totalPoints: doc?.variants[0] ? variantPoints(doc.variants[0]) : 0,
+    ...(language ? { language, subjectLabel: LANGUAGES.find((l) => l.value === language)?.label ?? language } : {}),
+    ...(grade ? { grade } : {})
   }
 }
 
 function currentPayload(): { payload: TestPayload; stats: SavedTestStats } {
-  const { vocab, settings, doc } = useVokabeltest.getState()
+  const { vocab, settings, doc, listContext } = useVokabeltest.getState()
   const payload: TestPayload = { vocab, settings, doc }
-  return { payload, stats: statsVon(payload) }
+  return { payload, stats: statsVon(payload, listContext) }
 }
 
 /** Ist genau dieser Test gerade im Programm offen? */
@@ -143,4 +154,32 @@ export async function cleanTestImages(): Promise<number> {
     }
   })
   return cleaned.size
+}
+
+/** Kennung, unter der „Test aus dieser Liste" über `openDocument` eine Vokabelliste übergibt */
+export const LISTE_PRAEFIX = 'liste:'
+
+/**
+ * „Test aus dieser Liste" (Vokabellisten-Übersicht und Listen-Editor, Paket 7): Vokabeltest
+ * öffnen und einen NEUEN Test mit den Wörtern dieser Liste beginnen. Vorher musste man dafür
+ * in den Vokabeltest wechseln und die Liste in einem kleinen Menü wiederfinden.
+ *
+ * Läuft über den gemeinsamen Weg `openDocument` – der sichert vorher alles, was ansteht
+ * (auch die gerade bearbeitete Liste).
+ */
+export function testAusListe(listId: string): Promise<void> {
+  return openDocument('vokabeltest', LISTE_PRAEFIX + listId)
+}
+
+/** Im Vokabeltest: die übergebene Liste als neuen Test übernehmen (bisheriger Test wird gesichert) */
+export async function oeffneListeAlsTest(listId: string): Promise<void> {
+  const liste = (await window.api.library.list()).find((l) => l.id === listId)
+  if (!liste) throw new Error('Die Vokabelliste gibt es nicht mehr.')
+  await newTestSafely()
+  const s = useVokabeltest.getState()
+  // Zusatzwortschatz (grau) kommt mit, wird aber nicht abgefragt – wie überall (model/vocab.ts)
+  s.setVocab(ausListe(liste.entries))
+  s.setListName(liste.name)
+  s.setListContext({ bookName: liste.source || liste.name, language: liste.language, grade: liste.grade })
+  s.setStep(0)
 }

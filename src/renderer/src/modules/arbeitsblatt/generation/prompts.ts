@@ -2,6 +2,7 @@ import type { LearnerProfile } from '../didactics/profile'
 import { stageForGrade } from '../didactics/profile'
 import type { Stars } from '../didactics/differentiation'
 import type { OriginalMaterialAblage, SheetType, SourceMaterial, WorksheetMeta } from '../model/types'
+import { GEZAEHLTE_SEITEN, seitenBereich, seitenText, seitenVorgabe } from '../didactics/seiten'
 import { subjectById } from '../model/subjects'
 import { mediaSourceRules, textSourceRules } from '../didactics/mediaArchives'
 import { sourceHeaderRules } from '../didactics/sourceHeader'
@@ -217,7 +218,9 @@ export const wantedTasks = (meta: WorksheetMeta): number => Math.max(0, Math.rou
 
 export function taskCountRules(meta: WorksheetMeta, profile: LearnerProfile): string {
   const [min, max] = profile.tasks.perPage
-  const total = `${min * meta.pages}–${max * meta.pages}`
+  // Ohne Seitenvorgabe (Paket 7) rechnet der Richtwert mit der geschätzten Seitenzahl, bei einer Spanne mit ihren Grenzen
+  const seiten = seitenBereich(meta)
+  const total = `${min * seiten.min}–${max * seiten.max}`
   const foreign = subjectById(meta.subjectId).foreignLanguage
   if (singleTaskFocus(meta)) {
     return [
@@ -235,7 +238,9 @@ export function taskCountRules(meta: WorksheetMeta, profile: LearnerProfile): st
     'ZAHL DER AUFGABEN (gut überlegen):',
     wanted > 0
       ? `- Das Blatt hat GENAU ${wanted} Aufgaben – nicht mehr und nicht weniger. Die Lehrkraft hat diese Zahl vorgegeben; teile den Stoff so ein, dass er auf ${wanted} tragfähige Aufgaben passt.`
-      : `- Plane ${total} Aufgaben für ${meta.pages} Seite(n) und bleibe im Zweifel am unteren Rand. Wenige, tragfähige Aufgaben sind besser als viele kleine Schritte.`,
+      : seitenVorgabe(meta)
+        ? `- Plane ${total} Aufgaben für ${seitenText(meta)} und bleibe im Zweifel am unteren Rand. Wenige, tragfähige Aufgaben sind besser als viele kleine Schritte.`
+        : `- Plane etwa ${total} Aufgaben (Richtwert für ${meta.minutes} Minuten Bearbeitungszeit) und bleibe im Zweifel am unteren Rand. Wenige, tragfähige Aufgaben sind besser als viele kleine Schritte.`,
     '- Eine Aufgabe umfasst einen vollständigen Denkschritt. Zerlege nicht, was zusammengehört, und mache aus einem Arbeitsauftrag nicht drei.',
     '- Teilaufgaben a), b), c) nur, wenn die Schritte inhaltlich verschieden sind – höchstens drei, sonst ist die Aufgabe falsch zugeschnitten.',
     '- Kleinschrittigkeit ist ein Mittel der VEREINFACHUNG: vorgegebene Teilschritte, Zwischenfragen und Lückenlösungen gehören zur Stufe ★ bzw. zu sprachlich vereinfachten Fassungen, nicht zum normalen Niveau.',
@@ -737,8 +742,20 @@ export function singleTaskFocus(meta: WorksheetMeta): boolean {
 
 /** Beschreibung des Auftrags (Thema, Art, Umfang) für Gliederung und Ausformulierung. */
 export function taskContext(meta: WorksheetMeta, profile: LearnerProfile): string {
-  const tasksMin = profile.tasks.perPage[0] * meta.pages
-  const tasksMax = profile.tasks.perPage[1] * meta.pages
+  const seiten = seitenBereich(meta)
+  const vorgabe = seitenVorgabe(meta)
+  const tasksMin = profile.tasks.perPage[0] * seiten.min
+  const tasksMax = profile.tasks.perPage[1] * seiten.max
+  /*
+   * Ohne Seitenvorgabe (Paket 7, Wunsch der Lehrkraft) wählt die KI die Seitenzahl selbst; die
+   * geschätzte Zahl steht nur als Anhaltspunkt dabei. Mit Vorgabe bleibt es beim Richtwert.
+   */
+  // Gezählt werden nur Aufgaben- und Materialseiten – Hilfekarten, Lösungen, Tafelbild usw. nicht (Paket 7)
+  const umfang = !vorgabe
+    ? `Seitenzahl nicht vorgegeben – wähle sie selbst passend zu Jahrgang, Bearbeitungszeit und Aufgaben (Anhaltspunkt: etwa ${seiten.min} DIN-A4-Seite(n) mit Aufgaben und Material)`
+    : vorgabe.max > vorgabe.min
+      ? `zwischen ${vorgabe.min} und ${vorgabe.max} DIN-A4-Seiten, nach Bedarf des Materials (gezählt nur ${GEZAEHLTE_SEITEN})`
+      : `RICHTWERT ${vorgabe.min} DIN-A4-Seite(n) (gezählt nur ${GEZAEHLTE_SEITEN})`
   // Sprachmittlung und Schreiben füllen das Blatt mit einer einzigen Aufgabe
   const single = singleTaskFocus(meta)
   return [
@@ -753,8 +770,8 @@ export function taskContext(meta: WorksheetMeta, profile: LearnerProfile): strin
     meta.priorKnowledge ? (meta.sheetType === 'lernkontrolle' ? `Vorwissen der Lerngruppe: ${meta.priorKnowledge}` : vorwissenRegeln(meta.priorKnowledge)) : '',
     `Art des Arbeitsblatts: ${sheetTypePrompt(meta.sheetType)}`,
     single
-      ? `Umfang: RICHTWERT ${meta.pages} DIN-A4-Seite(n) mit GENAU EINER Aufgabe, Bearbeitungszeit ca. ${meta.minutes} Minuten. Der Platz gehört dem Ausgangstext und den Schreiblinien, nicht weiteren Aufgaben.`
-      : `Umfang: RICHTWERT ${meta.pages} DIN-A4-Seite(n), insgesamt ${tasksMin}–${tasksMax} Aufgaben (${tasksMax} ist die Obergrenze der Aufgabenzahl, nicht das Ziel), Bearbeitungszeit ca. ${meta.minutes} Minuten.`,
+      ? `Umfang: ${umfang} mit GENAU EINER Aufgabe, Bearbeitungszeit ca. ${meta.minutes} Minuten. Der Platz gehört dem Ausgangstext und den Schreiblinien, nicht weiteren Aufgaben.`
+      : `Umfang: ${umfang}, insgesamt ${tasksMin}–${tasksMax} Aufgaben (${tasksMax} ist die Obergrenze der Aufgabenzahl, nicht das Ziel), Bearbeitungszeit ca. ${meta.minutes} Minuten.`,
     meta.socialForms.length ? `Bevorzugte Sozialformen: ${meta.socialForms.join(', ')}.` : ''
   ]
     .filter(Boolean)
@@ -1256,13 +1273,20 @@ export function writingBriefRules(meta: WorksheetMeta): string {
  * erst beim Ausdrucken, dass aus zwei Seiten vier geworden sind.
  */
 export function umfangRegeln(meta: WorksheetMeta): string {
+  const vorgabe = seitenVorgabe(meta)
   return [
     'UMFANG – RICHTWERTE, KEINE OBERGRENZEN:',
-    `- Seitenzahl (${meta.pages}), Umfang des Schülertextes und Umfang des Ausgangstextes sind VORSCHLÄGE. Verlangt der Inhalt mehr, darfst du darüber hinausgehen.`,
+    vorgabe
+      ? `- Seitenzahl (${vorgabe.max > vorgabe.min ? `zwischen ${vorgabe.min} und ${vorgabe.max} Seiten, nach Bedarf des Materials` : vorgabe.min}; gezählt nur ${GEZAEHLTE_SEITEN}), Umfang des Schülertextes und Umfang des Ausgangstextes sind VORSCHLÄGE. Verlangt der Inhalt mehr, darfst du darüber hinausgehen; verlangt er weniger Seiten, darf das Blatt auch kürzer sein.`
+      : '- Die Seitenzahl ist nicht vorgegeben: Wähle sie selbst so, wie Jahrgang, Bearbeitungszeit und Aufgaben es brauchen. Umfang des Schülertextes und Umfang des Ausgangstextes sind VORSCHLÄGE. Verlangt der Inhalt mehr, darfst du darüber hinausgehen.',
     '- Überschreite nur, wenn es die Sache verlangt: eine Quelle, die sich nicht sinnvoll kürzen lässt; Inhaltspunkte, die in der vorgegebenen Wortzahl nicht zu behandeln sind; Material, das sonst unleserlich klein würde.',
-    '- Höchstens EINE Seite mehr als vorgegeben, und höchstens ein Viertel mehr Wörter. Darüber hinaus kürze lieber die Aufgabenstellung.',
-    '- UNTERSCHREITE die Vorgaben nicht. Weniger wäre keine Hilfe, sondern eine stillschweigende Kürzung.',
-    '- Jede Abweichung gehört in teacherNote, mit Grund und Zahl: „Drei statt zwei Seiten: Der Originalauszug umfasst 480 Wörter und lässt sich nicht kürzen."'
+    vorgabe
+      ? `- Höchstens EINE Seite mehr als vorgegeben${vorgabe.max > vorgabe.min ? ` (also höchstens ${vorgabe.max + 1})` : ''}, und höchstens ein Viertel mehr Wörter. Darüber hinaus kürze lieber die Aufgabenstellung.`
+      : '- Höchstens ein Viertel mehr Wörter als vorgegeben. Darüber hinaus kürze lieber die Aufgabenstellung.',
+    '- UNTERSCHREITE die Wortvorgaben nicht. Weniger wäre keine Hilfe, sondern eine stillschweigende Kürzung.',
+    vorgabe
+      ? '- Jede Abweichung gehört in teacherNote, mit Grund und Zahl: „Drei statt zwei Seiten: Der Originalauszug umfasst 480 Wörter und lässt sich nicht kürzen." Bei der Seitenzahl dazu Grund und Vorschläge unter seiten.'
+      : '- Jede Abweichung gehört in teacherNote, mit Grund und Zahl: „180 statt 150 Wörter: Der Originalauszug lässt sich nicht kürzen."'
   ].join('\n')
 }
 

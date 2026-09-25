@@ -35,7 +35,8 @@ describe('Zahl der Aufgaben', () => {
   it('nennt ohne Vorgabe den Richtwert als Spanne', () => {
     const m = meta()
     const rules = taskCountRules(m, profileFromMeta(m))
-    expect(rules).toMatch(/Plane \d+–\d+ Aufgaben/)
+    // Ohne Seitenvorgabe (Paket 7) steht „etwa“ davor – die Seitenzahl legt die KI dann selbst fest
+    expect(rules).toMatch(/Plane (etwa )?\d+–\d+ Aufgaben/)
     // „GENAU EINE Aufgabe" steht dort ohnehin für Sprachmittlung und Schreiben – gemeint ist
     // hier nur, dass keine feste Gesamtzahl vorgegeben wird
     expect(rules).not.toMatch(/GENAU \d+ Aufgaben/)

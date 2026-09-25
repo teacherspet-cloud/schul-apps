@@ -15,7 +15,7 @@ export interface VocabEntry {
   grey?: boolean
   /** In der Vorlage in einem Kasten (z. B. Info- oder Wortfeld-Kasten) */
   inBox?: boolean
-  /** Für den Test markiert (fehlt = ja) */
+  /** Wird im Test abgefragt (fehlt = ja) – gehört zum Test, nicht zur gespeicherten Liste */
   include?: boolean
   /**
    * LATEIN: Wortart und Nennform.
@@ -360,9 +360,15 @@ export interface TestSettings {
 }
 
 export interface PageLimit {
-  /** auto = so viele Seiten wie nötig, max = höchstens, exact = genau */
-  mode: 'auto' | 'max' | 'exact'
+  /**
+   * auto = so viele Seiten wie nötig, max = höchstens, exact = genau, range = von–bis
+   * (Paket 7, Wunsch der Lehrkraft: „2–3 Seiten")
+   */
+  mode: 'auto' | 'max' | 'exact' | 'range'
+  /** Seitenzahl bzw. bei „range" die Obergrenze */
   pages: number
+  /** Nur bei „range": die Untergrenze */
+  pagesMin?: number
 }
 
 export interface TestDocument {

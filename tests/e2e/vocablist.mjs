@@ -1,5 +1,6 @@
 // Oberflächentest „Vokabellisten": Lerngruppe wählen, Schulbuch-Vokabeln bearbeiten,
-// grau markieren, speichern – und der Wizard für neue Listen.
+// als Zusatzwortschatz (grau) kennzeichnen, speichern – und der Wizard für neue Listen.
+// Seit Paket 7 dieselbe Tabelle wie im Vokabeltest: „grau“ ist ein Kennzeichen, umgeschaltet über das ⋯-Menü der Zeile.
 // Vorher: npm run build. Aufruf: node tests/e2e/vocablist.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
@@ -79,16 +80,21 @@ await page.waitForTimeout(400)
 await page.getByRole('button', { name: 'Vokabeln bearbeiten' }).first().click()
 await page.waitForSelector('text=Unit und Abschnitt wählen')
 // Der Beispielsatz des Schulbuchs steht in einem eigenen Feld und muss sichtbar sein
-const beispiele = page.getByRole('textbox', { name: 'Beispielsatz', exact: true })
+const beispiele = page.getByRole('textbox', { name: /^Beispielsatz in Zeile/ })
 const mitBeispiel = await beispiele.evaluateAll((els) => els.filter((e) => e.value.trim()).length)
 console.log('Zeilen mit Beispielsatz:', mitBeispiel, 'von', await beispiele.count())
 if (!mitBeispiel) throw new Error('Im Schulbuch-Editor werden die Beispielsätze nicht angezeigt')
 const ersterSatz = await beispiele.first().inputValue()
-await page
-  .getByRole('checkbox', { name: /grau markieren/ })
-  .first()
-  .check()
-await page.getByRole('textbox', { name: 'Wort' }).first().fill('bearbeitet')
+const graueVorher = await page.locator('tr[data-zusatz]').count()
+const ersteZeile = page.locator('table.vokabel-tabelle tbody tr').first()
+const warGrau = (await ersteZeile.getAttribute('data-zusatz')) !== null
+await ersteZeile.getByRole('button', { name: /^Weitere Aktionen für/ }).click()
+await page.getByRole('menuitem', { name: warGrau ? /Nicht mehr als Zusatzwortschatz/ : /Als Zusatzwortschatz/ }).click()
+await page.waitForTimeout(200)
+if ((await page.locator('tr[data-zusatz]').count()) === graueVorher)
+  throw new Error('Das Kennzeichen „Zusatzwortschatz (im Buch grau)“ ließ sich nicht umschalten')
+const grauSoll = !warGrau
+await page.getByRole('textbox', { name: /^Wort in Zeile 1$/ }).fill('bearbeitet')
 await page.waitForTimeout(300)
 await page.screenshot({ path: join(out, '2-schulbuch.png'), fullPage: true })
 // Kein Klick auf „Speichern" mehr (seit 25.09.2026): Gespeichert wird von selbst, und
@@ -107,19 +113,17 @@ console.log('Schulbuch bearbeitet und gespeichert (eigene Fassung)')
 // Die Änderung steht beim erneuten Öffnen da
 await page.getByRole('button', { name: 'Vokabeln bearbeiten' }).first().click()
 await page.waitForSelector('text=Unit und Abschnitt wählen')
-const again = await page.getByRole('textbox', { name: 'Wort' }).first().inputValue()
+const again = await page.getByRole('textbox', { name: /^Wort in Zeile 1$/ }).inputValue()
 console.log('nach erneutem Öffnen steht dort:', again)
 if (again !== 'bearbeitet') throw new Error(`Die Änderung wurde nicht gespeichert (gelesen: ${again})`)
 // Beim Speichern dürfen weder die Beispielsätze noch die graue Markierung verlorengehen
-const satzDanach = await page.getByRole('textbox', { name: 'Beispielsatz', exact: true }).first().inputValue()
+const satzDanach = await page
+  .getByRole('textbox', { name: /^Beispielsatz in Zeile/ })
+  .first()
+  .inputValue()
 if (satzDanach !== ersterSatz) throw new Error(`Der Beispielsatz ging beim Speichern verloren (vorher „${ersterSatz}", jetzt „${satzDanach}")`)
-if (
-  !(await page
-    .getByRole('checkbox', { name: /grau markieren/ })
-    .first()
-    .isChecked())
-)
-  throw new Error('Die graue Markierung wurde nicht gespeichert')
+if (((await page.locator('table.vokabel-tabelle tbody tr').first().getAttribute('data-zusatz')) !== null) !== grauSoll)
+  throw new Error('Das Kennzeichen „grau“ wurde nicht gespeichert')
 console.log('Beispielsatz und graue Markierung bleiben erhalten')
 await page.getByRole('button', { name: 'Zurück zur Übersicht' }).click()
 await page.getByRole('button', { name: 'Neue Liste' }).waitFor()

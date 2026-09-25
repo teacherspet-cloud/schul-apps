@@ -59,15 +59,14 @@ pruefe(lernziele < vorwissen, 'Die Reihenfolge der beiden Felder bleibt erhalten
  * Und die Umfangsangaben müssen als Richtwert erkennbar sein – sonst hält die Lehrkraft sie
  * für eine feste Obergrenze und wundert sich über ein Blatt mit einer Seite mehr.
  */
-const richtwerte = await page.evaluate(() => {
-  const text = document.body.textContent ?? ''
-  return {
-    seiten: text.includes('Seiten (Richtwert)'),
-    hinweis: text.includes('darf eine Seite mehr nehmen')
-  }
-})
-pruefe(richtwerte.seiten, 'Die Seitenzahl ist als Richtwert beschriftet')
-pruefe(richtwerte.hinweis, 'Der Hinweis zum Überschreiten steht dabei')
+// Seit Paket 7 ist die Seitenzahl standardmäßig automatisch; eine eingestellte Zahl gilt als Richtwert
+const seitenHinweis = page.locator('[data-testid="seiten-hinweis"]').filter({ visible: true }).first()
+pruefe((await seitenHinweis.innerText()).includes('legt die Seitenzahl selbst fest'), 'Ohne Vorgabe legt die KI die Seitenzahl selbst fest')
+await page.getByText('genau', { exact: true }).filter({ visible: true }).first().click()
+await page.waitForTimeout(300)
+const richtwert = await seitenHinweis.innerText()
+pruefe(richtwert.startsWith('Richtwert'), 'Die eingestellte Seitenzahl ist als Richtwert beschriftet')
+pruefe(richtwert.includes('eine Seite mehr oder weniger'), 'Der Hinweis zum Abweichen steht dabei')
 
 await page.screenshot({ path: join(out, 'schritt1.png') })
 await app.close()

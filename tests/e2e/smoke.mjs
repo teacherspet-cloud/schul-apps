@@ -36,13 +36,14 @@ async function launch(args = []) {
   await shot(page, '1-start')
   // Über die Leiste: Auf der Startseite steht „Vokabeltest" inzwischen auch in Kacheltexten und der Materialliste
   await page.click('[aria-label="Vokabeltest"]')
-  await page.click('button:has-text("Tabelle einfügen")')
+  // Quellen stehen seit Paket 7 in Reitern; Einfügen geht wie überall über ein Fenster mit Prüfansicht
+  await page.getByRole('tab', { name: 'Tabelle einfügen' }).click()
+  await page.getByRole('button', { name: 'Tabelle einfügen …' }).click()
   await page.getByRole('dialog').locator('textarea').fill('ladder\tLeiter\nto explore\terkunden\ncastle\tBurg\nbrave\tmutig\numbrella\tRegenschirm')
-  await page.click('button:has-text("Übernehmen")')
+  await page.click('button:has-text("Prüfen und übernehmen")')
   await page.click('button:has-text("Bisherige Liste ersetzen")')
-  await page.waitForSelector('text=5 Vokabeln')
-  // Eingefügte Vokabeln sind zunächst unmarkiert – erst markieren, dann weiter
-  await page.click('button:has-text("Alle markieren")')
+  await page.waitForSelector('text=5 von 5 werden abgefragt')
+  await page.click('button:has-text("Alle abfragen")')
   await shot(page, '2-vokabeln')
   await page.click('button:has-text("Weiter zu den Testeinstellungen")')
   await page.waitForSelector('text=Aufgabentypen')

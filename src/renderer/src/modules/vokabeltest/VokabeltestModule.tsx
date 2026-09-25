@@ -7,7 +7,7 @@ import EditorStep from './steps/EditorStep'
 import SettingsStep from './steps/SettingsStep'
 import VocabStep from './steps/VocabStep'
 import TestLibrary from './steps/TestLibrary'
-import { hasContent, newTestSafely, openSavedTest, useAutosave } from './library'
+import { hasContent, LISTE_PRAEFIX, newTestSafely, oeffneListeAlsTest, openSavedTest, useAutosave } from './library'
 import { sichereAlles } from '../../shared/autosave'
 import { useUndoKeys } from '../../shared/useUndoKeys'
 import { parseProjectFile } from './project'
@@ -18,17 +18,20 @@ import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, testId, listName, lastSavedAt } = useVokabeltest()
+  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, undoVocab, redoVocab, testId, listName, lastSavedAt } = useVokabeltest()
   const [libraryOpen, setLibraryOpen] = useState(false)
   // Läuft für diesen Test ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(testId)
   useAutosave()
   // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt (vorher hing es am Editor, auch im Hintergrund)
-  useUndoKeys(active && !libraryOpen && !auftrag, undo, redo)
+  // In Schritt 1 gilt die Taste der Vokabelliste (Zeile gelöscht, Liste geleert – Paket 7), danach dem Test
+  useUndoKeys(active && !libraryOpen && !auftrag, step === 0 ? undoVocab : undo, step === 0 ? redoVocab : redo)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   const vonAussen = useDokumentOeffner('vokabeltest', async (id) => {
-    await openSavedTest(id)
+    // „Test aus dieser Liste“ (Vokabellisten) kommt mit Präfix – sonst ein gespeicherter Test
+    if (id.startsWith(LISTE_PRAEFIX)) await oeffneListeAlsTest(id.slice(LISTE_PRAEFIX.length))
+    else await openSavedTest(id)
     setLibraryOpen(false)
   })
 
@@ -68,7 +71,11 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
         <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
           <Stepper.Step
             label="Vokabelliste"
-            description={vocab.length ? `${includedVocab(vocab).length} von ${vocab.length} markiert` : 'eingeben oder importieren'}
+            description={
+              vocab.some((v) => v.term.trim())
+                ? `${includedVocab(vocab).length} von ${vocab.filter((v) => v.term.trim()).length} werden abgefragt`
+                : 'eingeben oder importieren'
+            }
           />
           <Stepper.Step label="Test einstellen" description="Niveau, Aufgaben, Varianten" allowStepSelect={includedVocab(vocab).length > 1} />
           <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(doc && settings)} />

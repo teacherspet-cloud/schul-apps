@@ -49,7 +49,7 @@ export function toEntries(res: ExtractResult): VocabEntry[] {
       note: e.note.trim() || undefined,
       ...(e.appearance === 'grey' ? { grey: true } : {}),
       ...(e.inBox ? { inBox: true } : {}),
-      // Markiert ist alles außer den grau gedruckten Vokabeln
+      // Abgefragt wird alles außer dem Zusatzwortschatz (im Buch grau) – einzeln einschaltbar
       include: e.appearance !== 'grey'
     }))
 }

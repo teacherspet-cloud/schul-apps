@@ -35,6 +35,29 @@ export function pageLimitOf(doc: TestDocument): PageLimit {
   return doc.settings.pageLimit ?? DEFAULT_PAGE_LIMIT
 }
 
+/** Untergrenze einer Spanne – fehlt sie oder ist sie zu groß, gilt eine Seite weniger als die Obergrenze */
+export function pageLimitMin(limit: PageLimit): number {
+  if (limit.mode === 'exact') return limit.pages
+  if (limit.mode !== 'range') return 1
+  const min = Math.round(limit.pagesMin ?? 0)
+  return min >= 1 && min <= limit.pages ? min : Math.max(1, limit.pages - 1)
+}
+
+/** „höchstens 2 Seiten", „genau 1 Seite", „2–3 Seiten" – für Hinweise und die Zusammenfassung */
+export function pageLimitText(limit: PageLimit): string {
+  const n = limit.pages
+  if (limit.mode === 'range') return `${pageLimitMin(limit)}–${n} Seiten`
+  return `${limit.mode === 'exact' ? 'genau' : 'höchstens'} ${n} ${n === 1 ? 'Seite' : 'Seiten'}`
+}
+
+/** Hält ein fertiges Layout die Vorgabe ein? */
+export function pageLimitFits(limit: PageLimit, pageCounts: number[]): boolean {
+  if (limit.mode === 'auto') return true
+  if (limit.mode === 'max') return pageCounts.every((n) => n <= limit.pages)
+  if (limit.mode === 'exact') return pageCounts.every((n) => n === limit.pages)
+  return pageCounts.every((n) => n >= pageLimitMin(limit) && n <= limit.pages)
+}
+
 /** Reihenfolge der Versuche: erst normale Darstellung, dann engere Abstände, dann schrittweise kleinere Schrift. */
 function candidatesFor(doc: TestDocument): Candidate[] {
   const base = doc.fontSize
@@ -124,10 +147,16 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
       setTrial({ doc, index: index + 1 })
       return
     }
-    if (limit.mode === 'exact') {
+    /*
+     * „genau N": auf N Seiten verteilen. „von–bis": Passt der Test auf weniger Seiten als die
+     * Untergrenze, auf die Untergrenze verteilen – mehr als nötig wird nie gestreckt.
+     */
+    if (limit.mode === 'exact' || limit.mode === 'range') {
+      const ziel = pageLimitMin(limit)
       for (const v of doc.variants) {
+        if (limit.mode === 'range' && student.get(v.id)!.pages.length >= ziel) continue
         const m = measured.get(v.id)!
-        const spread: PagePlan[] | null = paginateSpread(m.items, m.first, m.other, limit.pages)
+        const spread: PagePlan[] | null = paginateSpread(m.items, m.first, m.other, ziel)
         if (spread) student.set(v.id, { ...candidate, pages: spread })
       }
     }
@@ -136,7 +165,10 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
       if (m) keyLayouts.set(v.id, { ...candidate, pages: paginate(m.items, m.first, m.other) })
     }
     const pageCount = Math.max(...[...student.values()].map((l) => l.pages.length), 1)
-    const fits = limit.mode === 'auto' || (limit.mode === 'max' ? pageCount <= limit.pages : [...student.values()].every((l) => l.pages.length === limit.pages))
+    const fits = pageLimitFits(
+      limit,
+      [...student.values()].map((l) => l.pages.length)
+    )
     setLayouts({ student, key: keyLayouts, pageCount, limit, fits, shrunk: index > 0 })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, index, tick])

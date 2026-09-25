@@ -47,6 +47,17 @@ export interface LearnerProfile {
   topicTimingHint: string
   promptRules: string[]
   summary: string[]
+  /** Dieselben Angaben wie `summary`, gegliedert für die Anzeige im Formular (Paket 7) */
+  kennwerte: ProfilGruppe[]
+  /** Orientierung an Bildungsstandards und Lehrplan – steht in der Anzeige hinter „Mehr" */
+  orientierung: string
+}
+
+/** Eine Gruppe der Profilanzeige: kurze Kennwerte als Chips, dazu ein erläuternder Satz */
+export interface ProfilGruppe {
+  titel: 'Lerngruppe' | 'Anforderungen' | 'Schrift & Satz' | 'Aufgaben & Hilfen'
+  werte: { text: string; angepasst?: boolean }[]
+  hinweis?: string
 }
 
 const clampMix = (mix: AfbMix): AfbMix => {
@@ -199,6 +210,55 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
     ...(suggestDifferentiation ? ['Gemischte Lerngruppe: Differenzierung in 2–3 Niveaustufen empfohlen (★ = G, ★★ = M, ★★★ = E).'] : [])
   ]
 
+  /*
+   * Gegliederte Anzeige (Paket 7, Wunsch der Lehrkraft): Die Aufzählung war eine lange grüne
+   * Liste. Jetzt kurze Kennwerte in vier Gruppen – inhaltlich dieselben Angaben wie `summary`,
+   * nichts fällt weg. Überschriebene Werte sind markiert, damit man sieht, was von Hand kommt.
+   */
+  const hilfenText = scaffolding === 'hoch' ? 'umfangreich' : scaffolding === 'mittel' ? 'gezielt' : 'nur optional'
+  const kennwerte: ProfilGruppe[] = [
+    {
+      titel: 'Lerngruppe',
+      werte: [
+        { text: `Klasse ${input.grade}` },
+        { text: input.schoolTypeName },
+        { text: state.name },
+        ...(courseProfileId ? [{ text: input.courseLevel.replace('BB-', 'Niveaustufe ') }] : [])
+      ],
+      hinweis: `Abschlussorientierung: ${targetDegree}${gymTiming ? ` · ${gymTiming}` : ''}`
+    },
+    {
+      titel: 'Anforderungen',
+      werte: [
+        { text: `AFB I ${afbMix.I} %`, angepasst: Boolean(overrides.afbMix) },
+        { text: `AFB II ${afbMix.II} %`, angepasst: Boolean(overrides.afbMix) },
+        { text: `AFB III ${afbMix.III} %`, angepasst: Boolean(overrides.afbMix) }
+      ],
+      hinweis:
+        stage === 'primar'
+          ? `Handlungsverben: ${operators.I.slice(0, 5).join(', ')} …`
+          : `Operatoren z. B.: ${[operators.I[0], operators.II[0], operators.II[2], operators.III[0]].join(', ')} …`
+    },
+    {
+      titel: 'Schrift & Satz',
+      werte: [
+        { text: `Schrift ${typography.fontPt.toString().replace('.', ',')} pt`, angepasst: Boolean(overrides.fontPt) },
+        { text: `Zeilenabstand ${typography.lineHeight.toString().replace('.', ',')}` },
+        { text: `Sätze ≈ ${Math.round(language.avgSentenceWords)} Wörter` },
+        { text: `LIX ≤ ${language.lixMax}` }
+      ]
+    },
+    {
+      titel: 'Aufgaben & Hilfen',
+      werte: [
+        { text: `${ageBand.tasksPerPage[0]}–${ageBand.tasksPerPage[1]} Aufgaben pro Seite` },
+        { text: `Hilfen ${hilfenText}`, angepasst: Boolean(overrides.scaffolding) }
+      ],
+      hinweis: suggestDifferentiation ? 'Gemischte Lerngruppe: Differenzierung in 2–3 Niveaustufen empfohlen (★ = G, ★★ = M, ★★★ = E).' : undefined
+    }
+  ]
+  const orientierung = `Orientierung: KMK-Bildungsstandards und ${state.curriculumName} (${topicTimingHint}) – bitte mit dem schulinternen Curriculum abgleichen.`
+
   return {
     grade: input.grade,
     stage,
@@ -224,6 +284,8 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
     suggestDifferentiation,
     topicTimingHint,
     promptRules: rules,
-    summary
+    summary,
+    kennwerte,
+    orientierung
   }
 }

@@ -7,6 +7,7 @@
 import { plainText } from '../../../shared/richtext/parse'
 import type { Afb, Sheet, TaskBlock, WorksheetMeta, WsBlock } from '../model/types'
 import type { DidacticWarning } from './checks'
+import { seitenBereich, seitenText } from './seiten'
 import type { LearnerProfile } from './profile'
 import { checkLanguageSkills } from './languageChecks'
 import { checkSubjectOperator } from './subjectOperators'
@@ -124,11 +125,12 @@ export function checkTaskCount(sheet: Sheet, meta: WorksheetMeta, profile?: Lear
     })
   }
   if (profile && !simplified && wanted === 0) {
-    const max = profile.tasks.perPage[1] * Math.max(1, meta.pages)
+    // Ohne Seitenvorgabe zählt die geschätzte Seitenzahl, bei einer Spanne die Obergrenze (didactics/seiten.ts, Paket 7)
+    const max = profile.tasks.perPage[1] * seitenBereich(meta).max
     if (list.length > max) {
       out.push({
         kind: 'taskCount',
-        message: `${list.length} Aufgaben auf ${meta.pages} Seite(n) – das wirkt kleinschrittig. Auf normalem Niveau sind höchstens ${max} Aufgaben vorgesehen; fasse zusammen, was ein Denkschritt ist.`
+        message: `${list.length} Aufgaben auf ${seitenText(meta)} – das wirkt kleinschrittig. Auf normalem Niveau sind höchstens ${max} Aufgaben vorgesehen; fasse zusammen, was ein Denkschritt ist.`
       })
     }
     const manyParts = list.filter((t) => t.parts.length > 4)
@@ -223,14 +225,15 @@ export function checkReceptiveAfb(sheet: Sheet, meta: WorksheetMeta): DidacticWa
 export function checkImageWish(sheet: Sheet, meta: WorksheetMeta): DidacticWarning[] {
   if ((meta.imageAmount ?? 'auto') !== 'min1') return []
   const bilder = sheet.blocks.filter((b) => b.type === 'image').length
-  if (bilder >= Math.max(1, meta.pages)) return []
+  // Bei einer Seitenspanne genügt ein Bild je Seite der Untergrenze
+  if (bilder >= seitenBereich(meta).min) return []
   return [
     {
       kind: 'image',
       message:
         bilder === 0
           ? 'Es wurde kein Bild eingeplant, obwohl mindestens eines je Seite gewünscht war. Über „Baustein hinzufügen → Bild" lässt sich eines ergänzen; die App sucht dann selbst ein passendes.'
-          : `Es wurden ${bilder} Bilder eingeplant, gewünscht war mindestens eines je Seite (${meta.pages}).`
+          : `Es wurden ${bilder} Bilder eingeplant, gewünscht war mindestens eines je Seite (${seitenText(meta)}).`
     }
   ]
 }

@@ -71,8 +71,8 @@ export default function ExamVocabPicker({
       bit: MARK_GREY,
       key: 'grey' as const,
       short: 'mit grauen',
-      label: 'Grau gedruckte Vokabeln einbeziehen',
-      hint: 'Im Buch grau gedruckt – müssen die Schüler nicht unbedingt lernen'
+      label: 'Zusatzwortschatz (im Buch grau) einbeziehen',
+      hint: 'Im Buch grau gedruckt – muss nicht unbedingt gelernt werden'
     },
     {
       bit: MARK_EXPLAINED,
@@ -242,8 +242,8 @@ export default function ExamVocabPicker({
       {listGrey > 0 && (
         <Switch
           size="xs"
-          label={`Grau gedruckte Vokabeln einbeziehen (${listGrey})`}
-          description="In den gewählten Listen grau markiert – die Schüler müssen sie nicht unbedingt lernen"
+          label={`Zusatzwortschatz (im Buch grau) einbeziehen (${listGrey})`}
+          description="In den gewählten Listen als grau gekennzeichnet – muss nicht unbedingt gelernt werden"
           checked={listsWithGrey}
           onChange={(e) => {
             setListsWithGrey(e.currentTarget.checked)

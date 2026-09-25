@@ -519,3 +519,42 @@ body {
     opacity: 0.8;
   }
 }
+
+/*
+ * Profilkarte des Arbeitsblatts (arbeitsblatt/steps/ProfileCard.tsx, Paket 7): ruhig statt
+ * grüner Vollfläche – Gruppentitel links, Kennwerte rechts, dünne Trennlinien dazwischen.
+ * Nur Theme-Variablen, damit hell und dunkel gleichermaßen passen.
+ */
+.profil-karte {
+  background: var(--app-surface, var(--mantine-color-body));
+}
+
+.profil-karte-symbol {
+  color: var(--mantine-primary-color-filled);
+}
+
+.profil-gruppe {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-top: 1px solid var(--app-border, var(--mantine-color-default-border));
+}
+
+.profil-gruppe:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.profil-gruppe-titel {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Schmal: Titel über den Kennwerten statt daneben */
+@media (max-width: 600px) {
+  .profil-gruppe {
+    grid-template-columns: 1fr;
+  }
+}

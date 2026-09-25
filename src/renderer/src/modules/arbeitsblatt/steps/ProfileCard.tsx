@@ -1,10 +1,17 @@
-import { Badge, Button, Card, Group, List, NumberInput, Popover, Select, Stack, Text, Title } from '@mantine/core'
+import { Badge, Button, Card, Group, NumberInput, Popover, Select, Stack, Text } from '@mantine/core'
 import { IconAdjustments, IconSchool } from '@tabler/icons-react'
 import type { LearnerProfile } from '../didactics/profile'
 import MehrText from '../../../shared/components/MehrText'
 import type { WorksheetMeta } from '../model/types'
 
-/** Zeigt, wie Jahrgang, Schulform und Bundesland das Arbeitsblatt steuern; Werte sind überschreibbar. */
+/**
+ * Zeigt, wie Jahrgang, Schulform und Bundesland das Arbeitsblatt steuern; Werte sind überschreibbar.
+ *
+ * Seit Paket 7 (Wunsch der Lehrkraft) steht die Karte unter „Weitere Optionen“ und ist ruhiger
+ * gestaltet: statt einer grünen Vollfläche mit langer Aufzählung vier Zeilen mit kurzen Kennwerten
+ * (Lerngruppe · Anforderungen · Schrift & Satz · Aufgaben & Hilfen). Inhaltlich dieselben Angaben;
+ * Orientierung und Grundlagen stehen hinter „Mehr“. Von Hand geänderte Werte sind markiert.
+ */
 export function ProfileCard({
   profile,
   meta,
@@ -17,12 +24,16 @@ export function ProfileCard({
   const o = meta.overrides
   const customized = Boolean(o.afbMix || o.fontPt || o.scaffolding)
   return (
-    <Card withBorder padding="md" className="task-card-selected">
-      <Group justify="space-between" mb={6}>
-        <Group gap={8}>
-          <IconSchool size={20} />
-          <Title order={5}>So wird das Arbeitsblatt angepasst</Title>
-          {customized && <Badge color="orange">angepasst</Badge>}
+    <Card withBorder padding="md" className="profil-karte" data-testid="profil-karte">
+      <Group justify="space-between" mb="sm" wrap="nowrap">
+        <Group gap={8} wrap="nowrap">
+          <IconSchool size={20} className="profil-karte-symbol" />
+          <Text fw={600}>So wird das Arbeitsblatt angepasst</Text>
+          {customized && (
+            <Badge size="sm" variant="light" color="orange">
+              angepasst
+            </Badge>
+          )}
         </Group>
         <Popover width={320} position="bottom-end" shadow="md" withArrow>
           <Popover.Target>
@@ -85,16 +96,45 @@ export function ProfileCard({
           </Popover.Dropdown>
         </Popover>
       </Group>
-      <List size="sm" spacing={2}>
-        {profile.summary.map((s, i) => (
-          <List.Item key={i}>{s}</List.Item>
+      <div className="profil-gruppen">
+        {profile.kennwerte.map((g) => (
+          <div key={g.titel} className="profil-gruppe">
+            <Text size="xs" fw={600} c="dimmed" className="profil-gruppe-titel">
+              {g.titel}
+            </Text>
+            <div>
+              <Group gap={6}>
+                {g.werte.map((w) => (
+                  <Badge
+                    key={w.text}
+                    size="md"
+                    radius="sm"
+                    tt="none"
+                    fw={500}
+                    variant={w.angepasst ? 'light' : 'default'}
+                    color={w.angepasst ? 'orange' : undefined}
+                    title={w.angepasst ? 'von Hand angepasst' : undefined}
+                  >
+                    {w.text}
+                  </Badge>
+                ))}
+              </Group>
+              {g.hinweis && (
+                <Text size="xs" c="dimmed" mt={4}>
+                  {g.hinweis}
+                </Text>
+              )}
+            </div>
+          </div>
         ))}
-      </List>
-      {/* Herkunft der Werte hinter „Mehr“ (Paket 6) – vollständig, nur kürzer im Formular */}
-      <MehrText
-        mt={6}
-        text="Grundlage: KMK-Bildungsstandards (Anforderungsbereiche, Operatoren), Lesbarkeitsforschung (Schriftgröße, Satzlänge, LIX), Differenzierungs- und Sprachbildungsdidaktik. Werte mit Faustregel-Charakter sind als Vorschlag zu verstehen."
-      />
+      </div>
+      {/* Orientierung und Herkunft der Werte hinter „Mehr“ – vollständig, nur kürzer im Formular */}
+      <MehrText mt="sm" kurz={profile.orientierung}>
+        <Text size="xs" c="dimmed">
+          Grundlage: KMK-Bildungsstandards (Anforderungsbereiche, Operatoren), Lesbarkeitsforschung (Schriftgröße, Satzlänge, LIX), Differenzierungs- und
+          Sprachbildungsdidaktik. Werte mit Faustregel-Charakter sind als Vorschlag zu verstehen.
+        </Text>
+      </MehrText>
     </Card>
   )
 }

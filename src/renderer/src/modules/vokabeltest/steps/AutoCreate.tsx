@@ -9,6 +9,7 @@ import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPES } from '../generation/taskTypes'
 import { formatPoints, variantPoints } from '../model/blocks'
 import { randomSeed } from '../model/random'
+import { grundEinstellungen } from '../model/grundeinstellungen'
 import { LANGUAGES, TestSettings } from '../model/types'
 import { includedVocab } from '../model/vocab'
 import { aiCall, useVokabeltest } from '../store'
@@ -18,46 +19,23 @@ import { textbookEntries } from './TextbookPicker'
 import type { BookSelection } from './TextbookPicker'
 
 /**
- * Grundeinstellungen für einen automatisch erstellten Test: letzte Einstellungen oder
- * App-Vorgaben. Stammt die Liste aus einem Schulbuch, gelten dessen Jahrgang, Bundesland
- * und Schulform (Green Line 1 → Klasse 5, Niedersachsen, Gymnasium).
+ * Grundeinstellungen für einen automatisch erstellten Test: die bisherigen Einstellungen, sonst
+ * dieselben Vorgaben wie beim Weg über Schritt 2 (model/grundeinstellungen.ts – Paket 7: vorher
+ * hier eine Variante statt zwei und ohne die zuletzt gewählte Lerngruppe).
  */
-async function baseSettings(previous: TestSettings | null, context: VocabListContext | null): Promise<TestSettings> {
+async function baseSettings(previous: TestSettings | null, context: VocabListContext | null, vokabeln: number): Promise<TestSettings> {
   if (previous) return { ...previous }
   const [app, table] = await Promise.all([window.api.settings.get(), window.api.cefr.get()])
-  const settings: TestSettings = {
-    targetLanguage: context?.language || app.defaults.targetLanguage,
-    stateId: context?.stateId || app.defaults.stateId,
-    schoolTypeId: context?.schoolTypeId || app.defaults.schoolTypeId,
-    languageOrder: 1,
-    grade: 6,
-    level: 'A2',
-    vocabCount: 0,
-    variantCount: 1,
-    variantMode: 'sameVocab',
-    tasks: [],
-    topic: '',
-    pictureSource: 'auto',
-    answerKey: true,
-    seed: randomSeed(),
-    pageLimit: { mode: 'auto', pages: 2 }
-  }
-  const grades = gradeOptions(table, settings.stateId, settings.schoolTypeId, 1)
-  const wanted = String(context?.grade ?? 6)
-  const g = grades.find((x) => x.value === wanted) ?? grades.find((x) => x.value === '6') ?? grades[0]
-  if (g) {
-    settings.grade = Number(g.value)
-    settings.level = g.level
-  }
-  return settings
+  return grundEinstellungen(app, table, context, vokabeln)
 }
 
 /**
  * Knopf „Test automatisch erstellen": fragt nur die Punktzahl ab und wählt die Aufgabenformate selbst.
  *
- * Steht schon eine Liste da, zählen deren markierte Vokabeln. Ist die Liste leer, genügt
- * eine Auswahl in der Karte „Vokabeln aus dem Schulbuch" – sie wird dann beim Klick
- * übernommen und markiert.
+ * Steht schon eine Liste da, zählen deren abgefragte Vokabeln. Ist die Liste leer, genügt
+ * eine Auswahl im Reiter „Schulbuch" – sie wird dann beim Klick übernommen. Zusatzwortschatz
+ * (im Buch grau) kommt mit, wird aber wie überall nicht abgefragt (Paket 7; vorher setzte
+ * dieser Weg ALLES auf „abfragen").
  */
 export function AutoCreateButton({ selection }: { selection?: BookSelection | null }): React.JSX.Element {
   const { vocab, setVocab, listName, setListName, setListContext } = useVokabeltest()
@@ -73,7 +51,7 @@ export function AutoCreateButton({ selection }: { selection?: BookSelection | nu
       setLoading(true)
       try {
         const book = await window.api.textbooks.get(selection.bookId)
-        const entries = textbookEntries(book, selection.unit, selection.sections, selection.filter).map((e) => ({ ...e, include: true }))
+        const entries = textbookEntries(book, selection.unit, selection.sections, selection.filter)
         setVocab(entries)
         if (!listName.trim()) setListName(selection.name)
         // Wortschatz der früheren Units und Bände mitnehmen: Die Aufgaben bleiben in dem, was die Klasse kennt
@@ -94,7 +72,7 @@ export function AutoCreateButton({ selection }: { selection?: BookSelection | nu
 
   return (
     <>
-      <Button leftSection={<IconSparkles size={16} />} disabled={!ready} loading={loading} onClick={() => void open()}>
+      <Button variant="light" leftSection={<IconSparkles size={16} />} disabled={!ready} loading={loading} onClick={() => void open()}>
         Test automatisch erstellen
       </Button>
       <AutoCreateModal opened={opened} onClose={() => setOpened(false)} />
@@ -120,7 +98,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
     if (!opened) return
     // Erst neu laden, dann analysieren (sonst überschreiben alte Einstellungen den Vorschlag)
     setBase(null)
-    baseSettings(stored, listContext).then(setBase).catch(notifyError)
+    baseSettings(stored, listContext, usable.length).then(setBase).catch(notifyError)
     window.api.cefr.get().then(setTable).catch(notifyError)
     window.api.ai
       .status()
@@ -204,7 +182,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
     <Modal opened={opened} onClose={onClose} title="Test automatisch erstellen">
       <Stack>
         <Text size="sm">
-          Die KI wählt passende Aufgabenformate für die {usable.length} markierten Vokabeln und verteilt die Punkte. Den fertigen Test kannst du anschließend
+          Die KI wählt passende Aufgabenformate für die {usable.length} abgefragten Vokabeln und verteilt die Punkte. Der fertige Test lässt sich anschließend
           bearbeiten.
         </Text>
         <NumberInput
@@ -308,7 +286,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                   label="Unterschiedliche Vokabeln je Variante (sonst gleiche Vokabeln, andere Sätze und Reihenfolge)"
                   checked={base.variantMode === 'differentVocab' && differentPossible}
                   disabled={!differentPossible}
-                  description={!differentPossible ? `Dafür werden mindestens ${tested * base.variantCount} markierte Vokabeln benötigt.` : undefined}
+                  description={!differentPossible ? `Dafür werden mindestens ${tested * base.variantCount} abgefragte Vokabeln benötigt.` : undefined}
                   onChange={(e) => patch({ variantMode: e.currentTarget.checked ? 'differentVocab' : 'sameVocab' })}
                 />
               )}
@@ -317,7 +295,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
         )}
         {usable.length < 2 && (
           <Alert color="orange" p="xs">
-            Bitte mindestens zwei Vokabeln für den Test markieren.
+            Mindestens zwei Vokabeln auf „abfragen“ stellen.
           </Alert>
         )}
         <Group justify="flex-end">

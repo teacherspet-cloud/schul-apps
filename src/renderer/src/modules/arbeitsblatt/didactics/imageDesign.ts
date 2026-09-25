@@ -59,6 +59,7 @@
 import type { IntegrityFinding } from './integrity'
 import type { ImageBlock, Sheet, WorksheetMeta, WsBlock } from '../model/types'
 import { bildmasse, bildzugriff, mindestbreite } from './bildarbeit'
+import { seitenBereich, seitenText, seitenVorgabe } from './seiten'
 
 /**
  * Breite des Satzspiegels in Millimetern.
@@ -205,7 +206,7 @@ export function imageDesignRules(meta: WorksheetMeta): string {
     wunsch === 'keine'
       ? '- Dieses Blatt trägt KEIN Bild. Setze keinen Baustein „image".'
       : wunsch === 'min1'
-        ? `- Die Lehrkraft wünscht Bilder: Plane MINDESTENS EIN lernwirksames Bild je Seite ein (bei ${meta.pages} Seiten also mindestens ${meta.pages}). Wähle dafür die Stelle, an der ein Bild am meisten trägt – ein Schema, eine Karte, ein Versuchsaufbau, ein Foto des Gegenstands. Lass es nie weg, weil dir kein perfektes einfällt.`
+        ? `- Die Lehrkraft wünscht Bilder: Plane MINDESTENS EIN lernwirksames Bild je Seite ein${seitenVorgabe(meta) ? ` (bei ${seitenText(meta)} also mindestens ${seitenVorgabe(meta)!.min})` : ''}. Wähle dafür die Stelle, an der ein Bild am meisten trägt – ein Schema, eine Karte, ein Versuchsaufbau, ein Foto des Gegenstands. Lass es nie weg, weil dir kein perfektes einfällt.`
         : '- Weniger ist erlaubt: Ein Blatt ohne Bild ist besser als eines mit einem überflüssigen.',
     '',
     'FUNKTION – setze sie in imageFunction:',
@@ -385,7 +386,7 @@ export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding
   }
 
   // Mehr Bilder, als das Blatt trägt (Faustregel, an der Anzahl orientiert)
-  if (images.length > budget.perPage * Math.max(1, meta.pages)) {
+  if (images.length > budget.perPage * seitenBereich(meta).max) {
     out.push({
       blockId: images[images.length - 1].id,
       message: `${images.length} Bilder sind für Klasse ${meta.grade} viel. Vorgesehen sind etwa ${budget.perPage} je Seite; mehrere gleichzeitig sichtbare Bilder ohne eindeutigen Verweis senken die Behaltensleistung.`,

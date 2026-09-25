@@ -592,6 +592,36 @@ export interface Sheet {
    */
   kopfzeile?: string
   blocks: WsBlock[]
+  /**
+   * Was die KI zur Seitenzahl sagt (Paket 7): geplante Zahl der Aufgaben- und Materialseiten,
+   * bei Abweichung von der Vorgabe der Grund und Vorschläge. Die App prüft die tatsächliche
+   * Seitenzahl selbst (didactics/seiten.ts) – auch wenn die KI eine Abweichung verschweigt.
+   */
+  seitenPlan?: SeitenPlan
+}
+
+/** Ein Vorschlag, die Seitenzahl dem Lernziel dienlich zu verringern oder zu erhöhen */
+export interface SeitenVorschlag {
+  richtung: 'weniger' | 'mehr'
+  /**
+   * Was zu tun ist – bestimmt, ob die App es mit einem Klick umsetzen kann:
+   * hilfenAufKarten (lokal), materialKuerzen/zusammenlegen (Baustein überarbeiten),
+   * vertiefung/sicherung/transfer (Aufgabe anfügen und von der KI schreiben lassen), sonstiges (nur Text).
+   */
+  art: 'hilfenAufKarten' | 'zusammenlegen' | 'materialKuerzen' | 'vertiefung' | 'sicherung' | 'transfer' | 'sonstiges'
+  text: string
+  /** Betroffener Baustein (Kennung) – bei Kürzen und Zusammenlegen */
+  blockId?: string
+  /** Aus den Faustregeln der App statt von der KI */
+  lokal?: boolean
+}
+
+export interface SeitenPlan {
+  /** Von der KI geplante Aufgaben- und Materialseiten (0 = keine Angabe) */
+  geplant: number
+  /** Grund einer Abweichung von der Vorgabe (leer = keine genannt) */
+  grund: string
+  vorschlaege: SeitenVorschlag[]
 }
 
 export type SheetType = 'erarbeitung' | 'uebung' | 'wiederholung' | 'lesetext' | 'hausaufgabe' | 'lernkontrolle'
@@ -749,7 +779,14 @@ export interface WorksheetMeta {
   /** Beobachtungsauftrag zu einem Film, Lernvideo oder Netzvideo (fehlt = keiner) */
   video?: VideoSetup
   sheetType: SheetType
+  /**
+   * Vorgegebene Seitenzahl als Richtwert bzw. Untergrenze einer Spanne – 0 = automatisch, die
+   * KI legt sie selbst fest (Paket 7, didactics/seiten.ts). Ältere Blätter haben hier noch ihre
+   * Zahl und behalten damit ihre Vorgabe.
+   */
   pages: number
+  /** Obergrenze einer Seitenspanne („2–3 Seiten"); fehlt oder ≤ `pages` = genaue Zahl */
+  pagesBis?: number
   /**
    * Gewünschte Zahl der Aufgaben auf dem Blatt (0 oder fehlend = Richtwert nach Jahrgang).
    *
