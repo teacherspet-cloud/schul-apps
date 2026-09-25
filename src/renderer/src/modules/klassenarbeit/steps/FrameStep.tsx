@@ -13,6 +13,7 @@ import {
   MultiSelect,
   NumberInput,
   ScrollArea,
+  SegmentedControl,
   Select,
   Stack,
   Switch,
@@ -54,6 +55,7 @@ import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import GradeScaleModal from '../../../shared/components/GradeScaleModal'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
+import StoffQuellen from '../../../shared/components/StoffQuellen'
 
 const SUBJECTS: { value: ExamSubjectId; label: string }[] = [
   { value: 'englisch', label: 'Englisch' },
@@ -307,6 +309,33 @@ export default function FrameStep(): React.JSX.Element {
                     ai={aiCall}
                   />
                   {/*
+                    Unterlagen aus dem Unterricht hineinziehen – wie in der Lernzielkontrolle
+                    (Wunsch der Lehrkraft, 25.09.2026). Text und Seitenbilder gehen in jede
+                    Anfrage der Erzeugung mit (generation/generateExam.ts, unterlagenTeil).
+                  */}
+                  <StoffQuellen
+                    quellen={meta.materialQuellen ?? []}
+                    onHinzu={(neu) =>
+                      update((d) => {
+                        d.meta.materialQuellen = [...(d.meta.materialQuellen ?? []), ...neu]
+                      })
+                    }
+                    onAktiv={(id, aktiv) =>
+                      update((d) => {
+                        const q = d.meta.materialQuellen?.find((x) => x.id === id)
+                        if (q) q.aktiv = aktiv
+                      })
+                    }
+                    onEntfernen={(id) =>
+                      update((d) => {
+                        d.meta.materialQuellen = (d.meta.materialQuellen ?? []).filter((x) => x.id !== id)
+                      })
+                    }
+                    title="Material aus dem Unterricht hierher ziehen"
+                    hint="Arbeitsblatt, Buchseite, Tafelbild, Text – PDF, Word, Foto oder Textdatei"
+                    erklaerung="Die KI prüft nur, was im Unterricht dran war – Begriffe und Beispiele aus diesen Unterlagen werden übernommen, Texte daraus aber nicht wörtlich abgedruckt."
+                  />
+                  {/*
                     Bilingual (nur Sachfächer, hier also Geschichte). Das Glossar liegt der Arbeit als
                     Hilfsmittel bei und steht deshalb von selbst bei den erlaubten Hilfsmitteln.
                   */}
@@ -342,7 +371,21 @@ export default function FrameStep(): React.JSX.Element {
                         label="Bundesland"
                         data={STATES.map((s) => ({ value: s.id, label: s.name }))}
                         value={meta.stateId}
-                        onChange={(v) => v && patch({ stateId: v })}
+                        onChange={(v) => {
+                          if (!v) return
+                          /*
+                           * Die Schulform mitziehen, wie in Lernzielkontrolle und Grammatiktest: Bis
+                           * 25.09.2026 blieb sie stehen, auch wenn es sie im neuen Land nicht gibt –
+                           * die Auswahl zeigte dann nichts an, gerechnet wurde mit der alten.
+                           */
+                          const list = schoolTypesForState(table, v)
+                          const keep = list.some((t) => t.value === meta.schoolTypeId)
+                          patch({
+                            stateId: v,
+                            schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
+                            schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
+                          })
+                        }}
                         allowDeselect={false}
                       />
                       <HaeufigSelect
@@ -422,8 +465,35 @@ export default function FrameStep(): React.JSX.Element {
                     {meta.subjectId !== 'englisch' && (
                       <NumberInput label="Gesamtpunkte" min={10} max={200} step={5} value={meta.points} onChange={(v) => patch({ points: Number(v) || 60 })} />
                     )}
-                    <NumberInput label="Varianten (A/B)" min={1} max={2} value={meta.variants} onChange={(v) => patch({ variants: Number(v) || 1 })} />
                   </Group>
+                  {/*
+                    Fassungen wie in der Lernzielkontrolle. Bis 25.09.2026 stand hier ein Feld
+                    „Varianten (A/B)", das nichts bewirkte. Was „gleichwertig" heißt, steht in
+                    model/fassungen.ts.
+                  */}
+                  <div>
+                    <Text size="sm" fw={500} mb={4}>
+                      Fassungen
+                    </Text>
+                    <SegmentedControl
+                      fullWidth
+                      size="sm"
+                      aria-label="Fassungen"
+                      value={String(Math.min(3, Math.max(1, meta.variants)))}
+                      onChange={(v) => patch({ variants: Number(v) })}
+                      data={[
+                        { value: '1', label: 'eine' },
+                        { value: '2', label: 'A / B' },
+                        { value: '3', label: 'A / B / C' }
+                      ]}
+                    />
+                    {meta.variants > 1 && (
+                      <Text size="xs" c="dimmed" mt={4}>
+                        Gleichwertige Parallelaufgaben: gleiche Operatoren, Anforderungsbereiche und Punkte. Hörtexte und Quellen bleiben für alle gleich, Lese-
+                        und Sprachmittlungstexte werden als Paralleltexte gleicher Länge geschrieben. Jede Fassung hat ihren eigenen Erwartungshorizont.
+                      </Text>
+                    )}
+                  </div>
                   <Autocomplete
                     label="Erlaubte Hilfsmittel"
                     description="Vorschlag wählen oder frei eintragen"
@@ -446,7 +516,7 @@ export default function FrameStep(): React.JSX.Element {
                       label="Wortzahl auf der Arbeit nennen"
                       description={
                         wortzahlErlaubt(meta.stateId, meta.subjectId)
-                          ? 'Der geplante Umfang steuert immer Schreibraum und Erwartungshorizont. Ob er den Lernenden auch genannt wird, entscheidest du hier.'
+                          ? 'Der geplante Umfang steuert immer Schreibraum und Erwartungshorizont. Ob er den Lernenden auch genannt wird, wird hier entschieden.'
                           : WORTZAHL_GRUND
                       }
                       checked={wortzahlErlaubt(meta.stateId, meta.subjectId) && Boolean(meta.wordLimit)}

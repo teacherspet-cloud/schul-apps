@@ -13,6 +13,7 @@ import { translateAids } from '../model/aids'
 import { gradeScaleGroups, gradeScaleLine } from '../model/examRules'
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam } from '../model/types'
+import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
 import { examGrades, examPoints } from '../model/types'
 
 /**
@@ -68,20 +69,33 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
   }
 }
 
-/** Übersetzt die Arbeit in ein Arbeitsblatt, das sich anzeigen und exportieren lässt. */
-export function examToWorksheet(exam: Exam): Worksheet {
+/**
+ * Übersetzt die Arbeit in ein Arbeitsblatt, das sich anzeigen und exportieren lässt.
+ *
+ * `fassung` wählt bei A/B-Arbeiten die Fassung (0 = A). Sie steht dann oben auf dem Blatt –
+ * im Titel des Kopfkastens bzw., ohne Kopfkasten, als eigene Zeile –, damit jedes Blatt
+ * sagt, welche Fassung es ist.
+ */
+export function examToWorksheet(exam: Exam, fassung = 0): Worksheet {
   const meta = worksheetMetaFor(exam)
+  const english = exam.meta.subjectId === 'englisch'
+  const gesamt = fassungsZahl(exam)
+  const f = Math.min(Math.max(0, fassung), gesamt - 1)
+  const label = fassungsLabel(f, gesamt)
+  const gruppe = label ? `${english ? 'Group' : 'Gruppe'} ${label}` : ''
   const head = examHeadBlock(exam)
-  const blocks: WsBlock[] = head ? [head] : []
-  exam.parts.forEach((part, i) => {
+  const kopf: WsBlock[] = head ? [gruppe && head.type === 'infoBox' ? { ...head, title: `${head.title} – ${gruppe}` } : head] : []
+  if (!head && gruppe) kopf.push({ id: 'exam-gruppe', type: 'divider', title: gruppe })
+  const blocks: WsBlock[] = kopf
+  teileDerFassung(exam, f).forEach((part, i) => {
     const format = formatById(part.formatId)
     // Überschrift der Teile in der Sprache des Faches
-    const english = exam.meta.subjectId === 'englisch'
     const points = part.points > 0 ? ` (${part.points} ${english ? 'points' : 'Punkte'})` : ''
     blocks.push({ id: `part-${part.id}`, type: 'divider', title: `${english ? 'Part' : 'Teil'} ${i + 1}: ${format?.label ?? part.label}${points}` })
     blocks.push(...part.blocks.map((b) => ({ ...b, id: b.id || newId() })))
   })
-  const sheet: Sheet = { id: 'exam', label: 'Klassenarbeit', blocks }
+  // Fassung A behält die bisherige Blattkennung – so bleibt alles gültig, was sich darauf bezieht
+  const sheet: Sheet = { id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`, label: label ? `Fassung ${label}` : 'Klassenarbeit', blocks }
   return {
     version: 1,
     meta: {
@@ -101,6 +115,16 @@ export function examToWorksheet(exam: Exam): Worksheet {
     sources: [],
     createdAt: exam.createdAt
   }
+}
+
+/**
+ * Alle Fassungen in EINEM Dokument – je Fassung ein Blatt (wie `kurztestToWorksheetAlle`).
+ * Gedacht zum Ausdrucken in einem Zug; jedes Blatt trägt seinen Gruppenbuchstaben selbst.
+ */
+export function examToWorksheetAlle(exam: Exam): Worksheet {
+  const erste = examToWorksheet(exam, 0)
+  const sheets = Array.from({ length: fassungsZahl(exam) }, (_, f) => (f === 0 ? erste.sheets[0] : examToWorksheet(exam, f).sheets[0]))
+  return { ...erste, sheets }
 }
 
 /** Sind schon Aufgaben erzeugt? */

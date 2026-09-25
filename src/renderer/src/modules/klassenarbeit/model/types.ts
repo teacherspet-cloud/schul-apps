@@ -12,6 +12,7 @@ import type { AfbMix } from '../../arbeitsblatt/didactics/ageBands'
 import type { CourseLevel } from '../../arbeitsblatt/didactics/schoolProfiles'
 import type { BilingualVorgaben, WsBlock } from '../../arbeitsblatt/model/types'
 import type { KnownVocab } from '../../../shared/knownVocab'
+import type { StoffQuelle } from '../../../shared/files/stoffQuelle'
 
 /** Fächer, die das Modul zunächst abdeckt */
 export type ExamSubjectId = 'englisch' | 'geschichte'
@@ -82,8 +83,21 @@ export interface ExamPart {
   notes?: string
   /** Produktive Teile: Textsorte, in der die Lernenden schreiben ('' = die KI wählt passend) */
   studentTextType?: string
-  /** Material und Aufgaben des Teils */
+  /** Material und Aufgaben des Teils – bei mehreren Fassungen die der Fassung A */
   blocks: WsBlock[]
+  /**
+   * Bausteine der weiteren Fassungen: [0] = Fassung B, [1] = Fassung C.
+   *
+   * Fassung A bleibt bewusst in `blocks`. So bleibt jede bis 25.09.2026 gespeicherte Arbeit
+   * (eine Fassung) unverändert gültig, und alles, was nur eine Fassung kennt – Hörtexte,
+   * Glossar, Bibliotheksübersicht –, arbeitet weiter mit `blocks`. Aufbau, Punkte, Zeit und
+   * Anteile des Teils gelten für ALLE Fassungen gleich; nur Material und Aufgaben sind je
+   * Fassung verschieden (siehe model/fassungen.ts).
+   *
+   * Übernommenes Material (derselbe Hörtext, dieselbe Quelle) steht in jeder Fassung mit
+   * DERSELBEN id – eine Änderung daran gilt in allen Fassungen.
+   */
+  weitereFassungen?: WsBlock[][]
 }
 
 /** Eine der Arbeit zugeordnete Vokabelliste */
@@ -163,8 +177,18 @@ export interface ExamMeta {
   /** Stärkere KI nur für den Hörtext: Anbieter und Modell ('' = wie eingestellt) */
   audioProvider?: AiProviderId
   audioModel?: string
-  /** Zahl der Varianten (A/B gegen Abschreiben) */
+  /**
+   * Zahl der Fassungen: 1 = eine, 2 = A/B, 3 = A/B/C (gegen Abschreiben).
+   *
+   * Bis 25.09.2026 war das Feld wirkungslos – es stand im Formular, erzeugt wurde trotzdem
+   * nur eine Fassung. Wie sie entstehen, steht in model/fassungen.ts.
+   */
   variants: number
+  /**
+   * Hineingezogene Unterlagen aus dem Unterricht (Tafelbilder, Buchseiten, Arbeitsblätter).
+   * Dieselbe Form wie in der Lernzielkontrolle; sie gehen in jede Anfrage der Erzeugung mit.
+   */
+  materialQuellen?: StoffQuelle[]
   /** Kopfkasten mit Zeit, Hilfsmitteln und Bewertung auf der Arbeit abdrucken */
   infoBox: boolean
   /**

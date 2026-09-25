@@ -9,6 +9,7 @@ import { useStoreAutosave } from '../../shared/useAutosave'
 import type { Exam } from './model/types'
 import { examHasContent } from './render/examWorksheet'
 import { useKlassenarbeit } from './store'
+import { normalisiereArbeit } from './model/fassungen'
 
 export function examStats(exam: Exam): SavedExamStats {
   return {
@@ -78,7 +79,8 @@ export function legeArbeitAb(docId: string, schnappschuss: Exam, einarbeiten: (e
       },
       laden: async (id) => {
         const e = await window.api.exams.get(id)
-        return { name: e.name, dok: e.payload as Exam }
+        // Ältere Arbeiten auf den heutigen Stand (Fassungen) – wie beim Öffnen
+        return { name: e.name, dok: normalisiereArbeit(e.payload as Exam) }
       },
       speichern: async (id, name, exam) => {
         await window.api.exams.save({ id, name: name ?? defaultExamName(exam), stats: examStats(exam), payload: exam })

@@ -28,22 +28,13 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import type { Bewertungseinstellung } from '../didactics/bewertung'
 import type { Nachteilsausgleich } from '../didactics/bausteine'
 import type { Stufe } from '../didactics/operatoren'
+import type { StoffQuelle } from '../../../shared/files/stoffQuelle'
 
-/** Eine hineingezogene Datei als Beleg dafür, was im Unterricht behandelt wurde. */
-export interface StoffQuelle {
-  id: string
-  fileName: string
-  kind: 'pdf' | 'docx' | 'image' | 'text'
-  /** Der ausgelesene Text; bei einem reinen Tafelbild leer */
-  text: string
-  /**
-   * Seiten als Bilder – bei Fotos das Bild selbst, bei gescannten PDFs die Seiten.
-   * Sie gehen als Bild an die KI, damit sie auch handschriftliche Tafelbilder lesen kann.
-   */
-  bilder: string[]
-  /** Wird diese Quelle der KI mitgegeben? */
-  aktiv: boolean
-}
+/**
+ * Eine hineingezogene Datei als Beleg dafür, was im Unterricht behandelt wurde.
+ * Der Typ steht seit 25.09.2026 in shared/files/stoffQuelle.ts – auch die Klassenarbeit nutzt ihn.
+ */
+export type { StoffQuelle }
 
 export interface KurztestMeta {
   subjectId: string

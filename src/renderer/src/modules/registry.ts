@@ -73,7 +73,8 @@ export const modules: SchulModule[] = [
   {
     id: 'klassenarbeit',
     name: 'Klassenarbeiten',
-    description: 'Große schriftliche Arbeit in Englisch oder Geschichte – mit Material, Punkteverteilung und Erwartungshorizont.',
+    description:
+      'Große schriftliche Arbeit in Englisch oder Geschichte – mit Material, Punkteverteilung, Erwartungshorizont und A/B-Fassungen, auch aus eigenen Unterlagen (PDF, Word, Foto).',
     icon: IconPencilCheck,
     color: 'grape',
     component: KlassenarbeitModule

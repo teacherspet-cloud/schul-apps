@@ -15,7 +15,7 @@
  * lässt sich wie jede echte Anfrage abbrechen. Die Programmversion für die Lehrkraft setzt
  * die Variable nie.
  */
-import { readFileSync } from 'fs'
+import { appendFileSync, readFileSync } from 'fs'
 import type { StructuredRequest } from '@shared/types'
 import { AbbruchFehler } from '@shared/abbruch'
 import type { AiProvider, ChunkListener, Netzfund, RawModel } from './provider'
@@ -28,8 +28,22 @@ interface AttrappenDatei {
    * Wartende erfahren, warum der Platz noch belegt ist.
    */
   abbruchTaub?: boolean
+  /**
+   * Je Auftragsart die Antwort. Steht dort `{ "folge": [a, b, …] }`, kommen die Antworten der
+   * Reihe nach (danach wieder von vorn) – so bekommen z. B. Fassung A und B einer
+   * Klassenarbeit verschiedene Inhalte, und ein Test sieht, welche Fassung er vor sich hat.
+   */
   antworten?: Record<string, unknown>
+  /**
+   * Pfad einer Datei, an die jede Anfrage als JSON-Zeile angehängt wird (Auftragsart, Text,
+   * Zahl der Bilder). Damit prüft ein Test, WAS die App der KI geschickt hätte – etwa, dass
+   * hineingezogenes Material im Auftrag steht.
+   */
+  protokoll?: string
 }
+
+/** Wie oft je Auftragsart schon geantwortet wurde – für `folge` */
+const zaehler = new Map<string, number>()
 
 export const attrappeAktiv = (): boolean => Boolean(process.env.SCHULAPPS_KI_ATTRAPPE)
 
@@ -68,8 +82,22 @@ export class AttrappeProvider implements AiProvider {
 
   async structured<T>(req: StructuredRequest, _model: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<T> {
     const datei = lies()
-    const antwort = datei.antworten?.[req.schemaName]
-    if (antwort === undefined) throw new Error(`Attrappe: keine Antwort für „${req.schemaName}" hinterlegt.`)
+    const eintrag = datei.antworten?.[req.schemaName]
+    if (eintrag === undefined) throw new Error(`Attrappe: keine Antwort für „${req.schemaName}" hinterlegt.`)
+    const folge = (eintrag as { folge?: unknown[] } | null)?.folge
+    const n = zaehler.get(req.schemaName) ?? 0
+    zaehler.set(req.schemaName, n + 1)
+    const antwort = Array.isArray(folge) && folge.length ? folge[n % folge.length] : eintrag
+    if (datei.protokoll) {
+      try {
+        appendFileSync(
+          datei.protokoll,
+          `${JSON.stringify({ schemaName: req.schemaName, system: req.system, user: req.user, bilder: req.images?.length ?? 0 })}\n`
+        )
+      } catch {
+        // Nur für Tests – ein fehlendes Protokoll darf die Antwort nicht verhindern
+      }
+    }
     await warte(datei.verzoegerungMs ?? 2000, JSON.stringify(antwort).length, onChunk, datei.abbruchTaub ? undefined : signal)
     return structuredClone(antwort) as T
   }

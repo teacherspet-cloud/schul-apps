@@ -1,4 +1,4 @@
-import { Box, Button, Group, Stepper } from '@mantine/core'
+import { Box, Button, Group, Stepper, Text, Tooltip } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { defaultExamName, newExamSafely, openSavedExam, useExamAutosave } from './library'
@@ -15,12 +15,14 @@ import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import QuellenAuswahl from '../arbeitsblatt/steps/QuellenAuswahl'
 import { QUELLENAUSWAHL, type QuellenFrage } from '../arbeitsblatt/auftraege'
 
+const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
+
 /**
  * Programm „Klassenarbeiten“ – zunächst für Englisch und Geschichte.
  * Beim Öffnen erscheinen die gespeicherten Arbeiten, sofern es welche gibt.
  */
 export default function KlassenarbeitModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, exam, undo, redo, verlauf, docId, docName } = useKlassenarbeit()
+  const { step, setStep, exam, undo, redo, verlauf, docId, docName, savedAt } = useKlassenarbeit()
   const [library, setLibrary] = useState(false)
   // Läuft für diese Arbeit ein Auftrag, steht statt der Aufgaben ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(docId)
@@ -71,20 +73,34 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
         einem Tablet stapelte sie sich auf mehrere Zeilen und nahm dem Blatt den Platz.
       */}
       <Group px="lg" py="sm" align="flex-start" className="app-toolbar">
+        {/*
+          Zwei Schritte wie in Lernzielkontrolle und Grammatiktest. Bis 25.09.2026 stand hier
+          ein dritter Schritt „Bearbeiten & Export", der fest gesperrt war – erreichbar war er
+          nie. Bearbeiten und Ausgeben gehören jetzt zum zweiten Schritt.
+        */}
         <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
-          <Stepper.Step label="Rahmen" description="Fach, Lerngruppe, Aufbau" />
-          <Stepper.Step label="Aufgaben" description="Material und Aufgaben" disabled={!exam?.parts.length} />
-          <Stepper.Step label="Bearbeiten & Export" description="Erwartungshorizont, Word, PDF" disabled />
+          <Stepper.Step label="Rahmen" description="Fach, Lerngruppe, Aufbau, Material" />
+          <Stepper.Step label="Bearbeiten & Export" description="Aufgaben, Erwartungshorizont, Word, PDF" disabled={!exam?.parts.length} />
         </Stepper>
-        <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
-        {/* Zurueck zur Uebersicht – beschriftet und immer sichtbar, wie in den anderen Programmen */}
-        <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
-          Meine Klassenarbeiten
-        </Button>
-        {/* Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen */}
-        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
-          Neue Klassenarbeit
-        </Button>
+        <Group gap="xs">
+          <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
+          {/* Wie in Lernzielkontrolle und Grammatiktest: sichtbar, dass die Arbeit gesichert ist */}
+          {savedAt && (
+            <Tooltip label={`Zuletzt gespeichert um ${timeFormat.format(new Date(savedAt))}`}>
+              <Text size="xs" c="dimmed" maw={180} truncate>
+                Gespeichert: {docName}
+              </Text>
+            </Tooltip>
+          )}
+          {/* Zurueck zur Uebersicht – beschriftet und immer sichtbar, wie in den anderen Programmen */}
+          <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
+            Meine Klassenarbeiten
+          </Button>
+          {/* Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen */}
+          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
+            Neue Klassenarbeit
+          </Button>
+        </Group>
       </Group>
       <Box style={{ flex: 1, minHeight: 0 }}>
         {auftrag ? (

@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -29,10 +28,8 @@ import { thresholdsForSubject } from '../../../shared/gradeScale'
 import { useAppSettings } from '../../../shared/settingsStore'
 import type { CefrTable } from '@shared/types'
 import { notifyError } from '../../../shared/util'
-import DropZone from '../../../shared/components/DropZone'
+import StoffQuellen from '../../../shared/components/StoffQuellen'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
-import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractContent'
-import { IconFileText, IconPhoto, IconX } from '@tabler/icons-react'
 import { gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { STATES } from '../../arbeitsblatt/didactics/states'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
@@ -44,7 +41,7 @@ import { themenAusZeile, themenFuer, themenHinweis, themenZeile, zweigeFuer } fr
 import { generateKurztest } from '../generation/generateKurztest'
 import { emptyKurztest, stufeFuerJahrgang } from '../model/defaults'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
-import type { KurztestMeta, StoffQuelle } from '../model/types'
+import type { KurztestMeta } from '../model/types'
 import { variantenLabel } from '../model/types'
 import { aiCall, useLernzielkontrolle } from '../store'
 import VorwissenChips from '../../arbeitsblatt/steps/VorwissenChips'
@@ -68,7 +65,6 @@ export default function SetupStep(): React.JSX.Element {
   const { test, setTest, update } = useLernzielkontrolle()
   const settings = useAppSettings((s) => s.settings)
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
-  const [lese, setLese] = useState<string | null>(null)
   // Reiner Anzeigefilter fuer die Themenvorschlaege – gehoert nicht in den gespeicherten Test
   const [zweigWahl, setZweig] = useState('')
   const [schluesselOffen, setSchluesselOffen] = useState(false)
@@ -111,31 +107,6 @@ export default function SetupStep(): React.JSX.Element {
 
   // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
   const patch = (next: Partial<KurztestMeta>): void => update((d) => Object.assign(d.meta, next), `angaben:${Object.keys(next).sort().join(',')}`)
-
-  /**
-   * Tafelbilder, Buchseiten und Hefteinträge einlesen.
-   *
-   * Bei einem Foto bleibt der Text leer – dort trägt allein das Bild die Information, und
-   * die KI bekommt es als Bild. Bei einem PDF mit Textebene wird beides mitgegeben.
-   */
-  const dateienLesen = async (files: File[]): Promise<void> => {
-    setLese('wird gelesen …')
-    try {
-      const neu: StoffQuelle[] = []
-      for (const f of files) {
-        setLese(`${f.name} wird gelesen …`)
-        const c = await extractContent(f, (msg) => setLese(`${f.name}: ${msg}`))
-        neu.push({ id: `q${Date.now()}-${neu.length}`, fileName: c.fileName, kind: c.kind, text: c.text, bilder: c.pageImages, aktiv: true })
-      }
-      update((d) => {
-        d.meta.stoffQuellen = [...(d.meta.stoffQuellen ?? []), ...neu]
-      })
-    } catch (e) {
-      notifyError(e, 'Die Datei konnte nicht gelesen werden')
-    } finally {
-      setLese(null)
-    }
-  }
 
   const types = schoolTypesForState(table, m.stateId)
   const range = gradeRange(table, m.stateId, m.schoolTypeId)
@@ -423,56 +394,29 @@ export default function SetupStep(): React.JSX.Element {
                   onChange={(stoff) => patch({ stoff })}
                   ai={aiCall}
                 />
-                <DropZone
-                  onFiles={(f) => void dateienLesen(f)}
-                  accept={MATERIAL_ACCEPT}
-                  title={lese ?? 'Tafelbild, Buchseite oder Hefteintrag hierher ziehen'}
+                {/* Tafelbild, Buchseite, Hefteintrag – dieselbe Fläche wie in der Klassenarbeit (shared/components/StoffQuellen) */}
+                <StoffQuellen
+                  quellen={m.stoffQuellen ?? []}
+                  onHinzu={(neu) =>
+                    update((d) => {
+                      d.meta.stoffQuellen = [...(d.meta.stoffQuellen ?? []), ...neu]
+                    })
+                  }
+                  onAktiv={(id, aktiv) =>
+                    update((d) => {
+                      const t = d.meta.stoffQuellen.find((x) => x.id === id)
+                      if (t) t.aktiv = aktiv
+                    })
+                  }
+                  onEntfernen={(id) =>
+                    update((d) => {
+                      d.meta.stoffQuellen = d.meta.stoffQuellen.filter((x) => x.id !== id)
+                    })
+                  }
+                  title="Tafelbild, Buchseite oder Hefteintrag hierher ziehen"
                   hint="Foto, PDF, Word – auch handschriftlich"
-                  loading={Boolean(lese)}
-                  minHeight={70}
+                  erklaerung="Die KI bleibt innerhalb dessen, was hier steht – Schreibweise, Beispiele und Reihenfolge werden übernommen."
                 />
-                {(m.stoffQuellen ?? []).length > 0 && (
-                  <Stack gap={4}>
-                    {(m.stoffQuellen ?? []).map((q) => (
-                      <Group key={q.id} gap="xs" wrap="nowrap">
-                        <Checkbox
-                          size="xs"
-                          checked={q.aktiv}
-                          onChange={(e) =>
-                            update((d) => {
-                              const t = d.meta.stoffQuellen.find((x) => x.id === q.id)
-                              if (t) t.aktiv = e.currentTarget.checked
-                            })
-                          }
-                        />
-                        {q.kind === 'image' ? <IconPhoto size={15} /> : <IconFileText size={15} />}
-                        <Text size="xs" style={{ flex: 1 }} truncate>
-                          {q.fileName}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {q.text.trim() ? `${Math.round(q.text.length / 100) / 10}k Zeichen` : 'nur Bild'}
-                          {q.bilder.length ? ` · ${q.bilder.length} Seite${q.bilder.length > 1 ? 'n' : ''}` : ''}
-                        </Text>
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          color="gray"
-                          aria-label="Entfernen"
-                          onClick={() =>
-                            update((d) => {
-                              d.meta.stoffQuellen = d.meta.stoffQuellen.filter((x) => x.id !== q.id)
-                            })
-                          }
-                        >
-                          <IconX size={14} />
-                        </ActionIcon>
-                      </Group>
-                    ))}
-                    <Text size="xs" c="dimmed">
-                      Die KI bleibt innerhalb dessen, was hier steht – Schreibweise, Beispiele und Reihenfolge werden übernommen.
-                    </Text>
-                  </Stack>
-                )}
                 <Group grow align="flex-start">
                   <NumberInput label="Bearbeitungszeit (Minuten)" min={5} max={60} value={m.minutes} onChange={(v) => patch({ minutes: Number(v) || 20 })} />
                   <div>

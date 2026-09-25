@@ -49,6 +49,19 @@ import { glossarFuerArbeit } from './glossar'
 import { scriptForSheet, wantsListening, writeListeningScript } from '../../arbeitsblatt/generation/listening'
 import type { ListeningScript } from '../../arbeitsblatt/generation/listening'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
+import { stoffBilder } from '../../../shared/files/stoffQuelle'
+import {
+  alleFassungen,
+  fassungsLabel,
+  gleichePunkte,
+  laengenHinweis,
+  materialweg,
+  MAX_FASSUNGEN,
+  mitBloecken,
+  parallelAuftrag,
+  teileDerFassung,
+  uebernimmMaterial
+} from '../model/fassungen'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 
@@ -257,6 +270,35 @@ export function vocabRules(exam: Exam): string {
     .join('\n')
 }
 
+/**
+ * Hineingezogene Unterlagen aus dem Unterricht (Schritt „Rahmen", unter den Inhalten).
+ *
+ * Dieselbe Idee wie in der Lernzielkontrolle: Eine getippte Inhaltsangabe bleibt grob, ein
+ * Arbeitsblatt oder Tafelbild zeigt genau die Begriffe, Texte und Beispiele, die die Klasse
+ * kennt. Der Text steht im Auftrag; Seitenbilder gehen zusätzlich als Bild mit (`unterlagenBilder`).
+ */
+export function unterlagenTeil(exam: Exam): string {
+  const quellen = (exam.meta.materialQuellen ?? []).filter((q) => q.aktiv)
+  if (!quellen.length) return ''
+  const out = [
+    'UNTERLAGEN AUS DEM UNTERRICHT (von der Lehrkraft beigefügt):',
+    '- Sie zeigen, was tatsächlich behandelt wurde: Begriffe, Texte, Beispiele, Schreibweisen.',
+    '- Geprüft wird nur, was dort oder in den Inhalten der Unterrichtseinheit vorkommt. Übernimm die Bezeichnungen der Unterlagen.',
+    '- Übernimm Material NICHT wörtlich aus den Unterlagen: Ein im Unterricht besprochener Text wäre in der Arbeit keine neue Leistung mehr.'
+  ]
+  for (const q of quellen) {
+    out.push(`--- ${q.fileName} ---`)
+    out.push(q.text.trim() ? q.text.trim().slice(0, 6000) : '(kein auslesbarer Text – siehe das beigefügte Bild)')
+  }
+  return out.join('\n')
+}
+
+/** Die Seitenbilder der Unterlagen als Zusatz einer Anfrage (leer, wenn es keine gibt). */
+export function unterlagenBilder(exam: Exam): { images?: string[] } {
+  const images = stoffBilder(exam.meta.materialQuellen)
+  return images.length ? { images } : {}
+}
+
 /** Auftrag für einen Teil der Arbeit. */
 export function partPrompt(exam: Exam, part: ExamPart, number: number, material?: OriginalMaterialAblage | null): string {
   const m = exam.meta
@@ -269,6 +311,7 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
     `Erstelle Teil ${number} einer Klassenarbeit im Fach ${m.subjectLabel}.`,
     `Thema der Arbeit: ${m.topic}`,
     m.content ? `Inhalte der Unterrichtseinheit, auf die sich die Arbeit bezieht: ${m.content}` : '',
+    unterlagenTeil(exam),
     `Teil ${number}: ${format?.label ?? part.label} – Kompetenzbereich ${part.competence}.`,
     format?.description ? `Was der Teil verlangt: ${format.description}` : '',
     `Bearbeitungszeit für diesen Teil: ${part.minutes} Minuten.`,
@@ -395,7 +438,8 @@ export async function generateExamPart(
     system: systemPrompt(meta, profile),
     user: [partPrompt(exam, part, number), originalMaterialVorgabe(material), scriptForSheet(script)].filter(Boolean).join('\n\n'),
     schema: SHEET_SCHEMA,
-    schemaName: 'exam_part'
+    schemaName: 'exam_part',
+    ...unterlagenBilder(exam)
   })
   const rng = createRng(randomSeed())
   const blocks = (res.blocks ?? [])
@@ -438,10 +482,64 @@ export async function reviseExamPart(exam: Exam, part: ExamPart, number: number,
       .filter(Boolean)
       .join('\n'),
     schema: SHEET_SCHEMA,
-    schemaName: 'exam_part'
+    schemaName: 'exam_part',
+    ...unterlagenBilder(exam)
   })
   const rng = createRng(randomSeed())
   return (res.blocks ?? []).map((b) => convertBlock(b, rng, [])).filter((b): b is WsBlock => Boolean(b))
+}
+
+/**
+ * Einen Teil in einer WEITEREN Fassung (B, C) erzeugen – als gleichwertiges Gegenstück zu
+ * Fassung A (Regeln und Begründung in model/fassungen.ts).
+ *
+ * Fehlt in Fassung A der Originaltext (Oberstufe, nichts gefunden), gibt es auch für B nichts
+ * zu erzeugen: Der Hinweisbaustein wird übernommen, ohne eine Anfrage zu verbrauchen.
+ */
+export async function generateParallelPart(
+  exam: Exam,
+  part: ExamPart,
+  number: number,
+  fassung: number,
+  vorlage: WsBlock[],
+  ai: AiCall,
+  material?: OriginalMaterialAblage | null
+): Promise<{ blocks: WsBlock[]; hinweise: string[] }> {
+  if (!vorlage.some((b) => b.type === 'task')) return { blocks: structuredClone(vorlage), hinweise: [] }
+  const label = fassungsLabel(fassung, Math.max(2, exam.meta.variants))
+  const meta = worksheetMetaFor(exam, part)
+  const profile = profileFor(meta)
+  const weg = materialweg(exam, part)
+  const res = await ai<{ blocks: unknown[] }>({
+    system: systemPrompt(meta, profile),
+    user: [
+      partPrompt(exam, part, number, material),
+      '',
+      // Steht zuletzt und geht dem „Gib die Bausteine zurück" im Auftrag darüber vor
+      parallelAuftrag(exam, part, label, vorlage, vorlage.map((b) => describeBlock(b)).join('\n\n'))
+    ].join('\n'),
+    schema: SHEET_SCHEMA,
+    schemaName: 'exam_part',
+    ...unterlagenBilder(exam)
+  })
+  const rng = createRng(randomSeed())
+  const neu = (res.blocks ?? [])
+    .map((b) => convertBlock(b, rng, []))
+    .filter((b): b is WsBlock => Boolean(b))
+    .map((b) => (b.id ? b : { ...b, id: newId(rng) }))
+  // Dasselbe Material setzt die App selbst ein – mit derselben id wie in Fassung A
+  const blocks = weg === 'gleich' ? uebernimmMaterial(vorlage, neu) : neu
+  // Die Punkte gleicht `fassungenAbschliessen` am Ende an – nach der Nachbesserung, die sie sonst wieder verschöbe
+  const laenge = weg === 'parallel' ? laengenHinweis(vorlage, blocks) : null
+  const hinweise = laenge ? [laenge] : []
+  return { blocks, hinweise }
+}
+
+/** Ein Teil ohne weitere Fassungen – für eine Arbeit, die (wieder) nur eine Fassung hat. */
+function nurFassungA(part: ExamPart): ExamPart {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { weitereFassungen, ...rest } = part
+  return rest
 }
 
 /** Erzeugt alle Teile nacheinander und gibt die ergänzte Arbeit zurück. */
@@ -457,11 +555,18 @@ export interface ExamOptions {
 }
 
 export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgress = () => undefined, opts: ExamOptions = {}): Promise<Exam> {
+  /*
+   * Fassungen (A/B, A/B/C): Je Teil entsteht zuerst Fassung A, gleich danach ihre
+   * Gegenstücke – so liegt die Vorlage vor, zu der B gleichwertig sein muss (model/fassungen.ts).
+   */
+  const anzahl = Math.min(MAX_FASSUNGEN, Math.max(1, Math.round(exam.meta.variants || 1)))
+  const label = (f: number): string => fassungsLabel(f, anzahl)
   const parts: ExamPart[] = []
   const materialNotizen: string[] = []
+  const notes: string[] = []
   for (let i = 0; i < exam.parts.length; i++) {
-    const part = exam.parts[i]
-    onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label} …`)
+    const part = nurFassungA(exam.parts[i])
+    onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label}${anzahl > 1 ? ' (Fassung A)' : ''} …`)
 
     /*
      * Oberstufe: Der Ausgangstext wird beschafft, BEVOR die Aufgaben entstehen.
@@ -471,6 +576,7 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
      * bleibt dieser eine Teil offen – die uebrigen entstehen normal.
      */
     let material: OriginalMaterialAblage | null = null
+    let blocks: WsBlock[] | null = null
     if (brauchtOriginaltext(exam, part)) {
       const teilMeta = worksheetMetaFor(exam, part)
       const ergebnis = await beschaffeOriginalmaterial({
@@ -496,22 +602,153 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
           `Teil ${i + 1} (${part.label}): Originalquelle „${material.titel}". ${material.wortlautGeprueft ? 'Wortlaut geprueft.' : 'ACHTUNG – Abweichungen beim Wortlautabgleich.'} ${material.protokoll.join(' ')}`
         )
       } else {
-        // Nur dieser Teil bleibt offen; der Grund steht sichtbar im Blatt
-        parts.push({ ...part, blocks: [fehlenderTextBaustein(part, ergebnis.grund)] })
+        // Nur dieser Teil bleibt offen; der Grund steht sichtbar im Blatt (in jeder Fassung)
+        blocks = [fehlenderTextBaustein(part, ergebnis.grund)]
         materialNotizen.push(`Teil ${i + 1} (${part.label}): KEIN Originaltext gefunden. ${ergebnis.grund}`)
-        continue
       }
     }
 
-    const blocks = await generateExamPart(exam, part, i + 1, ai, material)
-    parts.push({ ...part, blocks })
+    blocks ??= await generateExamPart(exam, part, i + 1, ai, material)
+    let fertig: ExamPart = { ...part, blocks }
+    for (let f = 1; f < anzahl; f++) {
+      onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label} (Fassung ${label(f)}) …`)
+      const r = await generateParallelPart(exam, part, i + 1, f, blocks, ai, material)
+      fertig = mitBloecken(fertig, f, r.blocks)
+      if (r.hinweise.length) notes.push(`Fassung ${label(f)}, Teil ${i + 1}: ${r.hinweise.join(' ')}`)
+    }
+    parts.push(fertig)
   }
+
   // Prüfung und Nachbesserung: Verweise auf Material, das es nicht gibt, leeres Material,
-  // Vergleichslisten in gleicher Reihenfolge. Läuft für jede Arbeit.
-  onProgress('Die Arbeit wird geprüft …')
-  const notes: string[] = []
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]
+  // Vergleichslisten in gleicher Reihenfolge. Läuft für JEDE Fassung – eine eigene Prüfkette
+  // nur für A liesse B ungeprüft (getrennte Erzeugungswege, siehe Projektnotizen).
+  onProgress(anzahl > 1 ? `Die ${anzahl} Fassungen werden geprüft …` : 'Die Arbeit wird geprüft …')
+  const fassungen: ExamPart[][] = []
+  for (let f = 0; f < anzahl; f++) {
+    fassungen.push(await pruefeFassung(exam, teileDerFassung({ ...exam, parts }, f), f, anzahl > 1 ? `Fassung ${label(f)}, ` : '', ai, onProgress, notes))
+  }
+
+  /*
+   * Bilingual (nur Geschichte): zielsprachliche Operatoren prüfen, auf die Prüfungssprache
+   * hinweisen und das Glossar EINMAL am Ende beilegen – Entscheidungen vom 25.09.2026.
+   * Das Glossar entsteht aus Fassung A und liegt jeder Fassung bei (derselbe Baustein).
+   */
+  if (bilingualAktiv(worksheetMetaFor(exam))) {
+    fassungen.forEach((teile, f) =>
+      teile.forEach((part, i) => {
+        const befunde = checkBilingualOperatoren({ id: part.id, label: part.label, blocks: part.blocks }, worksheetMetaFor(exam, part))
+        if (befunde.length) notes.push(`${anzahl > 1 ? `Fassung ${label(f)}, ` : ''}Teil ${i + 1} – Operatoren: ${befunde.map((b) => b.message).join(' ')}`)
+      })
+    )
+    notes.push(`Prüfungssprache: ${PRUEFUNGSSPRACHE_HINWEIS}`)
+    onProgress('Das zweisprachige Glossar wird erstellt …')
+    try {
+      const glossar = await glossarFuerArbeit(exam, fassungen[0], ai)
+      const letzter = parts.length - 1
+      if (glossar && letzter >= 0) {
+        for (const teile of fassungen) teile[letzter] = { ...teile[letzter], blocks: [...teile[letzter].blocks, structuredClone(glossar)] }
+      } else notes.push('Das zweisprachige Glossar blieb leer – bitte in Schritt 2 einen Baustein „Nützliche Ausdrücke“ ergänzen.')
+    } catch {
+      notes.push('Das zweisprachige Glossar konnte nicht erstellt werden – bitte in Schritt 2 einen Baustein „Nützliche Ausdrücke“ ergänzen.')
+    }
+  }
+
+  // Die geprüften Fassungen wieder zu Teilen zusammensetzen: A in `blocks`, B/C daneben
+  let result: Exam = {
+    ...exam,
+    parts: parts.map((p, i) =>
+      fassungen.slice(1).reduce((teil, teile, k) => mitBloecken(teil, k + 1, teile[i].blocks), { ...p, blocks: fassungen[0][i].blocks })
+    )
+  }
+  if (materialNotizen.length) {
+    result.meta = {
+      ...result.meta,
+      teacherNote: [result.meta.teacherNote, `Originalmaterial: ${materialNotizen.join(' | ')}`].filter(Boolean).join('\n')
+    }
+  }
+
+  // Oberstufe: Das Material muss echt sein. Die Wortlaute werden gegen die angegebene
+  // Fundstelle geprüft und Bilder aus Wikimedia Commons geholt – nie KI-erzeugt.
+  if (upperSecondary(exam.meta)) {
+    const blocks = result.parts.flatMap((p) => alleFassungen(p).flat())
+    const meta = worksheetMetaFor(exam)
+    try {
+      onProgress('Originalquellen werden geprüft …')
+      const found = await completeOriginalSources(blocks, browserSourceServices(), (done, total) =>
+        onProgress(`Originalquellen werden geprüft (${done} von ${total}) …`)
+      )
+      onProgress('Bildquellen werden gesucht …')
+      // Bilder, die die Lerngruppe von Arbeitsblättern zum selben Thema kennt, kommen zuerst:
+      // Dasselbe Motiv in Übung und Abfrage wirkt als Abrufhilfe (Schneider u. a. 2020).
+      const reuse = await worksheetImagePool(meta.subjectId, meta.topic, meta.grade)
+      const images = await completeWorksheetImages(
+        blocks,
+        meta,
+        { ...(await browserWorksheetImageDeps(opts.bild ? { ai, bild: opts.bild } : undefined)), reuse },
+        (message) => onProgress(message)
+      )
+      const hinweise = [
+        found.texts ? `${found.texts} Textquelle(n) geprüft – Wortlaut und Fundstelle vor dem Einsatz kontrollieren.` : '',
+        images.web || images.missing || images.reused
+          ? `Bilder: ${images.web} aus dem Internet${images.reused ? `, ${images.reused} aus einem Arbeitsblatt derselben Klasse übernommen (bekanntes Motiv hilft beim Abruf)` : ''}${images.missing ? `, ${images.missing} noch auszuwählen` : ''}.`
+          : ''
+      ].filter(Boolean)
+      if (hinweise.length) {
+        result.meta = {
+          ...result.meta,
+          teacherNote: [result.meta.teacherNote, `Oberstufe – nur Originalmaterial: ${hinweise.join(' ')}`].filter(Boolean).join('\n')
+        }
+      }
+    } catch (e) {
+      result.meta = {
+        ...result.meta,
+        teacherNote: [result.meta.teacherNote, `Die Originalquellen konnten nicht geprüft werden: ${e instanceof Error ? e.message : String(e)}`]
+          .filter(Boolean)
+          .join('\n')
+      }
+    }
+  }
+
+  // Abschluss der Fassungen: übernommenes Material auf den Stand von A, gleiche Punkte
+  result = { ...result, parts: result.parts.map((p, i) => fassungenAbschliessen(exam, p, i, notes, label)) }
+
+  /*
+   * Zuordnung der Höraufgaben zum Hörtext – ABSCHLIESSEND und für JEDE Fassung.
+   *
+   * Die Nachbesserung ersetzt die Bausteine eines Teils durch frisch erzeugte. Die Zuordnung
+   * aus der Prüfschleife galt dann für Bausteine, die es nicht mehr gibt: In der fertigen Arbeit
+   * stand bei keiner einzigen Höraufgabe, zu welchem Hörtext sie gehört. Aufgefallen ist das
+   * erst im Lauf mit echter KI. Deshalb hier am Ende, wo jeder Weg vorbeikommt – und seit es
+   * Fassungen gibt, für jede von ihnen: Fassung B hat ihre eigenen Höraufgaben.
+   */
+  for (const part of result.parts) for (const liste of alleFassungen(part)) linkListeningTasks(liste)
+
+  if (notes.length) {
+    result.meta = { ...result.meta, teacherNote: [result.meta.teacherNote, `Prüfung der Arbeit: ${notes.join(' | ')}`].filter(Boolean).join('\n') }
+  }
+
+  onProgress('fertig')
+  return result
+}
+
+/**
+ * Prüfung und Nachbesserung EINER Fassung.
+ *
+ * Bis 25.09.2026 stand diese Schleife direkt in `generateExam` und kannte nur die eine
+ * Fassung. Mit A/B muss sie für jede laufen – sonst ginge Fassung B ungeprüft hinaus.
+ */
+async function pruefeFassung(
+  exam: Exam,
+  teile: ExamPart[],
+  fassung: number,
+  praefix: string,
+  ai: AiCall,
+  onProgress: ExamProgress,
+  notes: string[]
+): Promise<ExamPart[]> {
+  const out = [...teile]
+  for (let i = 0; i < out.length; i++) {
+    const part = out[i]
     // Hörverstehen: Erst die Aufgaben ihrem Hörtext zuordnen, dann prüfen – sonst liefe
     // die Lösungsprüfung gegen alle Skripte des Teils zugleich.
     linkListeningTasks(part.blocks)
@@ -531,109 +768,45 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
       ...checkSourceHeaders(sheet, teilMeta),
       ...checkNarration(sheet, teilMeta)
     ]
-    if (wortlaut.length) notes.push(`Teil ${i + 1} – Fragewortlaut: ${wortlaut.map((w) => w.message).join(' ')}`)
+    if (wortlaut.length) notes.push(`${praefix}Teil ${i + 1} – Fragewortlaut: ${wortlaut.map((w) => w.message).join(' ')}`)
     const findings = checkIntegrity(sheet)
     if (!findings.length) continue
     const severe = findings.filter((f) => f.severity === 'hoch')
     if (severe.length) {
-      onProgress(`Teil ${i + 1} wird nachgebessert …`)
+      onProgress(`${praefix}Teil ${i + 1} wird nachgebessert …`)
       try {
-        const blocks = await reviseExamPart(exam, part, i + 1, `Behebe diese Mängel: ${severe.map((f) => f.message).join(' ')}`, ai)
-        parts[i] = { ...part, blocks }
-        notes.push(`Teil ${i + 1} nachgebessert: ${severe.map((f) => f.message).join(' ')}`)
+        let blocks = await reviseExamPart(exam, part, i + 1, `Behebe diese Mängel: ${severe.map((f) => f.message).join(' ')}`, ai)
+        // Weitere Fassung mit übernommenem Material: Das Material bleibt, nur die Aufgaben sind neu
+        if (fassung > 0 && materialweg(exam, part) === 'gleich') blocks = uebernimmMaterial(part.blocks, blocks)
+        out[i] = { ...part, blocks }
+        notes.push(`${praefix}Teil ${i + 1} nachgebessert: ${severe.map((f) => f.message).join(' ')}`)
         continue
       } catch {
         // Konnte nicht nachgebessert werden – der Befund bleibt als Hinweis stehen
       }
     }
-    notes.push(`Teil ${i + 1}: ${findings.map((f) => f.message).join(' ')}`)
+    notes.push(`${praefix}Teil ${i + 1}: ${findings.map((f) => f.message).join(' ')}`)
   }
+  return out
+}
 
-  /*
-   * Zuordnung der Höraufgaben zum Hörtext – ABSCHLIESSEND, nicht nur in der Prüfschleife.
-   *
-   * Die Nachbesserung ersetzt die Bausteine eines Teils durch frisch erzeugte. Die Zuordnung
-   * von oben galt dann für Bausteine, die es nicht mehr gibt: In der fertigen Arbeit stand bei
-   * keiner einzigen Höraufgabe, zu welchem Hörtext sie gehört. Aufgefallen ist das erst im
-   * Lauf mit echter KI – die Prüfung fiel dadurch still auf „gegen alle Skripte zugleich"
-   * zurück und ging durch. Deshalb hier am Ende, wo jeder Weg vorbeikommt.
-   */
-  /*
-   * Bilingual (nur Geschichte): zielsprachliche Operatoren prüfen, auf die Prüfungssprache
-   * hinweisen und das Glossar EINMAL am Ende beilegen – Entscheidungen vom 25.09.2026.
-   */
-  if (bilingualAktiv(worksheetMetaFor(exam))) {
-    parts.forEach((part, i) => {
-      const befunde = checkBilingualOperatoren({ id: part.id, label: part.label, blocks: part.blocks }, worksheetMetaFor(exam, part))
-      if (befunde.length) notes.push(`Teil ${i + 1} – Operatoren: ${befunde.map((b) => b.message).join(' ')}`)
-    })
-    notes.push(`Prüfungssprache: ${PRUEFUNGSSPRACHE_HINWEIS}`)
-    onProgress('Das zweisprachige Glossar wird erstellt …')
-    try {
-      const glossar = await glossarFuerArbeit(exam, parts, ai)
-      const letzter = parts.length - 1
-      if (glossar && letzter >= 0) parts[letzter] = { ...parts[letzter], blocks: [...parts[letzter].blocks, glossar] }
-      else notes.push('Das zweisprachige Glossar blieb leer – bitte in Schritt 3 einen Baustein „Nützliche Ausdrücke“ ergänzen.')
-    } catch {
-      notes.push('Das zweisprachige Glossar konnte nicht erstellt werden – bitte in Schritt 3 einen Baustein „Nützliche Ausdrücke“ ergänzen.')
-    }
-  }
-
-  for (const part of parts) linkListeningTasks(part.blocks)
-
-  const result = { ...exam, parts }
-  if (materialNotizen.length) {
-    result.meta = {
-      ...result.meta,
-      teacherNote: [result.meta.teacherNote, `Originalmaterial: ${materialNotizen.join(' | ')}`].filter(Boolean).join('\n')
-    }
-  }
-  if (notes.length) {
-    result.meta = { ...result.meta, teacherNote: [result.meta.teacherNote, `Prüfung der Arbeit: ${notes.join(' | ')}`].filter(Boolean).join('\n') }
-  }
-
-  // Oberstufe: Das Material muss echt sein. Die Wortlaute werden gegen die angegebene
-  // Fundstelle geprüft und Bilder aus Wikimedia Commons geholt – nie KI-erzeugt.
-  if (upperSecondary(exam.meta)) {
-    const blocks = parts.flatMap((p) => p.blocks)
-    const meta = worksheetMetaFor(exam)
-    try {
-      onProgress('Originalquellen werden geprüft …')
-      const found = await completeOriginalSources(blocks, browserSourceServices(), (done, total) =>
-        onProgress(`Originalquellen werden geprüft (${done} von ${total}) …`)
-      )
-      onProgress('Bildquellen werden gesucht …')
-      // Bilder, die die Lerngruppe von Arbeitsblättern zum selben Thema kennt, kommen zuerst:
-      // Dasselbe Motiv in Übung und Abfrage wirkt als Abrufhilfe (Schneider u. a. 2020).
-      const reuse = await worksheetImagePool(meta.subjectId, meta.topic, meta.grade)
-      const images = await completeWorksheetImages(
-        blocks,
-        meta,
-        { ...(await browserWorksheetImageDeps(opts.bild ? { ai, bild: opts.bild } : undefined)), reuse },
-        (message) => onProgress(message)
-      )
-      const notes = [
-        found.texts ? `${found.texts} Textquelle(n) geprüft – Wortlaut und Fundstelle vor dem Einsatz kontrollieren.` : '',
-        images.web || images.missing || images.reused
-          ? `Bilder: ${images.web} aus dem Internet${images.reused ? `, ${images.reused} aus einem Arbeitsblatt derselben Klasse übernommen (bekanntes Motiv hilft beim Abruf)` : ''}${images.missing ? `, ${images.missing} noch auszuwählen` : ''}.`
-          : ''
-      ].filter(Boolean)
-      if (notes.length) {
-        result.meta = {
-          ...result.meta,
-          teacherNote: [result.meta.teacherNote, `Oberstufe – nur Originalmaterial: ${notes.join(' ')}`].filter(Boolean).join('\n')
-        }
-      }
-    } catch (e) {
-      result.meta = {
-        ...result.meta,
-        teacherNote: [result.meta.teacherNote, `Die Originalquellen konnten nicht geprüft werden: ${e instanceof Error ? e.message : String(e)}`]
-          .filter(Boolean)
-          .join('\n')
-      }
-    }
-  }
-
-  onProgress('fertig')
-  return result
+/**
+ * Die weiteren Fassungen eines Teils abschließen.
+ *
+ * - Übernommenes Material (Hörtext, Quelle) wird aus Fassung A neu eingesetzt. Hat die
+ *   Nachbesserung Fassung A ersetzt oder die Oberstufenprüfung ihr Material ergänzt, stünde
+ *   in B sonst ein anderer Hörtext als in A – bei einem Text, der der ganzen Klasse vorgespielt
+ *   wird, ein grober Fehler.
+ * - Gleiche Punkte als Zusage (model/fassungen.ts, `gleichePunkte`).
+ */
+function fassungenAbschliessen(exam: Exam, part: ExamPart, index: number, notes: string[], label: (f: number) => string): ExamPart {
+  if (!part.weitereFassungen?.length) return part
+  const gleich = materialweg(exam, part) === 'gleich' && part.blocks.some((b) => b.type === 'task')
+  const weitere = part.weitereFassungen.map((liste, k) => {
+    const neu = gleich ? uebernimmMaterial(part.blocks, liste) : liste
+    const hinweis = gleichePunkte(part.blocks, neu)
+    if (hinweis) notes.push(`Fassung ${label(k + 1)}, Teil ${index + 1}: ${hinweis}`)
+    return neu
+  })
+  return { ...part, weitereFassungen: weitere }
 }
