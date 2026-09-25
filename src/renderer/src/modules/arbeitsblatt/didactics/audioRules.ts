@@ -19,6 +19,7 @@
  *
  * Entscheidung der Lehrkraft (22.09.2026): je Fach unterschiedlich, genau so.
  */
+import { anredeText, type Anrede } from '../../../shared/anrede'
 import { subjectById } from '../model/subjects'
 
 export interface AudioRules {
@@ -58,9 +59,9 @@ export function audioRulesFor(subjectId: string): AudioRules {
   }
 }
 
-/** Beschriftung der Abspielzahl auf dem Blatt. */
-export function playsLabelFor(subjectId: string, plays: number): string {
-  if (!hoerenIstPruefgegenstand(subjectId)) return 'so oft anhören, wie du möchtest'
+/** Beschriftung der Abspielzahl auf dem Blatt; die Anrede folgt der Stufe (Paket 8b). */
+export function playsLabelFor(subjectId: string, plays: number, anrede: Anrede = 'du'): string {
+  if (!hoerenIstPruefgegenstand(subjectId)) return anredeText('anhoeren', anrede)
   return plays === 1 ? 'einmal hören' : plays === 2 ? 'zweimal hören' : `${plays}-mal hören`
 }
 

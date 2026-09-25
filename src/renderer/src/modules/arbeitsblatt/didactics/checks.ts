@@ -58,6 +58,8 @@ export interface DidacticWarning {
     | 'image'
     // Bilingualer Sachfachunterricht (didactics/bilingual.ts)
     | 'bilingual'
+    // Anrede der Lernenden: Sek I du, Sek II Sie (didactics/anrede.ts, Paket 8b)
+    | 'anrede'
   message: string
 }
 

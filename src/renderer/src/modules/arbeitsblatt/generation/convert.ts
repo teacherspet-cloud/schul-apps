@@ -2,6 +2,7 @@
 import { newId, Rng, shuffle } from '../../vokabeltest/model/random'
 import type { Stars } from '../didactics/differentiation'
 import { emptyAnswer } from '../model/factory'
+import { anredeText, type Anrede } from '../../../shared/anrede'
 import { defaultAxes, gridDefaults, sanitizeAxes } from '../model/grid'
 import type {
   Afb,
@@ -182,14 +183,20 @@ export function convertAnswer(a: any, rng: Rng): Answer {
  */
 const seite = (v: unknown): 'left' | 'right' | 'none' | undefined => (v === 'left' || v === 'right' || v === 'none' ? v : undefined)
 
-export function convertBlock(b: any, rng: Rng, images: { index: number; dataUrl: string; fileName: string }[]): WsBlock | null {
+export function convertBlock(
+  b: any,
+  rng: Rng,
+  images: { index: number; dataUrl: string; fileName: string }[],
+  /** Anrede der Lernenden – nur für feste Texte, die die App selbst einsetzt (Paket 8b) */
+  anrede: Anrede = 'du'
+): WsBlock | null {
   const id = newId(rng)
   const type = pick<WsBlockType>(b?.type, BLOCK_TYPES, 'task')
   const stars = starsOf(b?.stars)
   const base = { id, ...(stars ? { stars } : {}) }
   switch (type) {
     case 'learningGoals':
-      return { ...base, type, title: text(b.title) || 'Das lernst du', goals: strings(b.items) }
+      return { ...base, type, title: text(b.title) || anredeText('lernziele', anrede), goals: strings(b.items) }
     case 'infoBox':
       return {
         ...base,

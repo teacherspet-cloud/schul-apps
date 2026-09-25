@@ -18,6 +18,8 @@ import { obj, str, arr, int } from '../../../shared/aiSchema'
 import { emptyAnswer } from '../model/factory'
 import type { TaskBlock, TaskPart, WorksheetMeta } from '../model/types'
 import type { AiCall } from './generate'
+import { anredeRegel } from '../../../shared/anrede'
+import { anredeFuerMeta, anweisungenDeutsch } from '../didactics/anrede'
 
 const EXAMPLE_SCHEMA = obj({
   instruction: str('Der Beispielpunkt: bei Ankreuzfragen die Beispielfrage, sonst der Beispielsatz – in der Sprache der Aufgabe'),
@@ -49,8 +51,12 @@ export async function generateExample(block: TaskBlock, meta: WorksheetMeta, ai:
     system: [
       `Du bist eine erfahrene Lehrkraft für das Fach ${meta.subjectLabel}.`,
       'Du schreibst zu einer FERTIGEN Aufgabe ein gelöstes Beispiel, das ihr als Punkt „0" vorangestellt wird.',
-      'Es zeigt den Lernenden, WIE geantwortet wird – es ist selbst keine Aufgabe.'
-    ].join('\n'),
+      'Es zeigt den Lernenden, WIE geantwortet wird – es ist selbst keine Aufgabe.',
+      // Eigener Auftrag ohne den Systemtext des Blattes – die Anrede muss deshalb hier stehen (Paket 8b)
+      anweisungenDeutsch(meta) ? anredeRegel(anredeFuerMeta(meta)) : ''
+    ]
+      .filter(Boolean)
+      .join('\n'),
     user: [
       aufgabenBild(block),
       '',

@@ -9,6 +9,8 @@ import { checkDemand } from '../didactics/demand'
 import { checkImages } from '../didactics/imageDesign'
 import { checkAfbMix, checkOperators, checkStyle, checkText, DidacticWarning } from '../didactics/checks'
 import { checkSheet } from '../didactics/sheetChecks'
+import { anredeBefundeBaustein, anredeFuerMeta } from '../didactics/anrede'
+import type { Anrede } from '../../../shared/anrede'
 import { subjectById } from '../model/subjects'
 import { COMBINED_RULES, DIFFERENTIATION_PRINCIPLES, LEVEL_RULES, STAR_LABELS, Stars } from '../didactics/differentiation'
 import type { LearnerProfile } from '../didactics/profile'
@@ -197,7 +199,7 @@ export async function generateSheet(
     schemaName: 'worksheet',
     schema: WORKSHEET_SCHEMA
   })
-  return buildSheet(data, level, images)
+  return buildSheet(data, level, images, anredeFuerMeta(meta))
 }
 
 /**
@@ -209,9 +211,9 @@ export function ohnePunkte<T extends WsBlock | null>(block: T, punkte = 0): T {
   return block && block.type === 'task' ? ({ ...block, points: punkte } as T) : block
 }
 
-function buildSheet(data: any, level: Stars | null, images: ReturnType<typeof embeddableImages>): Sheet {
+function buildSheet(data: any, level: Stars | null, images: ReturnType<typeof embeddableImages>, anrede: Anrede = 'du'): Sheet {
   const rng = createRng(randomSeed())
-  const roh: (WsBlock | null)[] = (Array.isArray(data?.blocks) ? data.blocks : []).map((b: any) => ohnePunkte(convertBlock(b, rng, images)))
+  const roh: (WsBlock | null)[] = (Array.isArray(data?.blocks) ? data.blocks : []).map((b: any) => ohnePunkte(convertBlock(b, rng, images, anrede)))
   const blocks = sortViewingTasks(roh.filter((b: WsBlock | null): b is WsBlock => Boolean(b)))
   // Hier, weil JEDER Weg durch buildSheet läuft – auch der Sparmodus, der die Prüfrunde
   // überspringt. Ohne die Zuordnung liefe die Lösungsprüfung gegen alle Skripte zugleich.
@@ -344,6 +346,23 @@ export async function reviewSheet(
 }
 
 /**
+ * Anrede im einzeln erzeugten Baustein prüfen (Paket 8b).
+ *
+ * Die Blattprüfung (`localChecks`) läuft nur beim Erzeugen des ganzen Blattes. Ein einzeln
+ * neu erzeugter oder überarbeiteter Baustein ginge sonst ungeprüft aufs Blatt – ein eigener
+ * Erzeugungsweg mit eigener Lücke. Gemeldet wird am Baustein, korrigiert wird nichts.
+ */
+function mitAnredePruefung(block: WsBlock, sheet: Sheet, meta: WorksheetMeta): WsBlock {
+  let nummer = 0
+  for (const b of sheet.blocks) {
+    if (b.type === 'task') nummer++
+    if (b.id === block.id) break
+  }
+  const befunde = anredeBefundeBaustein(block, meta, block.type === 'task' ? nummer : undefined)
+  return befunde.length ? { ...block, warnings: [...(block.warnings ?? []), ...befunde.map((m) => `[Prüfung] ${m}`)] } : block
+}
+
+/**
  * Erzeugt einen einzelnen Baustein neu (mit dem übrigen Blatt als Zusammenhang).
  * `instruction`: eigener Auftrag der Lehrkraft (z. B. „einfacher formulieren“); `feedback`: zu behebende Probleme.
  */
@@ -383,9 +402,12 @@ export async function regenerateBlock(
     schema: obj({ block: FLAT_BLOCK })
   })
   // Von Hand vergebene Punkte bleiben stehen; die KI vergibt auf Arbeitsblättern keine
-  const block = ohnePunkte(convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images), old.type === 'task' ? old.points : 0)
+  const block = ohnePunkte(
+    convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images, anredeFuerMeta(ws.meta)),
+    old.type === 'task' ? old.points : 0
+  )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  return { ...block, id: old.id, stars: old.stars }
+  return mitAnredePruefung({ ...block, id: old.id, stars: old.stars }, sheet, ws.meta)
 }
 
 /**
@@ -439,9 +461,12 @@ ${describeSheet(sheet)}`,
     schema: obj({ block: FLAT_BLOCK })
   })
   // Von Hand vergebene Punkte bleiben stehen; die KI vergibt auf Arbeitsblättern keine
-  const block = ohnePunkte(convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images), old.type === 'task' ? old.points : 0)
+  const block = ohnePunkte(
+    convertBlock({ ...data?.block, type: old.type }, createRng(randomSeed()), images, anredeFuerMeta(ws.meta)),
+    old.type === 'task' ? old.points : 0
+  )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  return { ...block, id: old.id, stars: old.stars }
+  return mitAnredePruefung({ ...block, id: old.id, stars: old.stars }, sheet, ws.meta)
 }
 
 // ---------- Gesamtablauf ----------

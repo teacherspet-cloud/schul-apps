@@ -18,12 +18,14 @@ import { formatById, zeitWarnung } from './formate'
 import { bedeutungsHinweise, operatorenIn, pruefeOperatoren, type AufgabeZurPruefung } from './operatorPruefung'
 import { KERN_OPERATOREN, namenAus, PRAXIS_OPERATOREN, profilFuer, ZU_AUFWENDIG, type Laenderprofil } from './operatoren'
 import type { Kurztest } from '../model/types'
+import { anredeBefundeBaustein } from '../../arbeitsblatt/didactics/anrede'
+import { worksheetMetaForKurztest } from '../render/kurztestWorksheet'
 
 export type Schwere = 'hinweis' | 'warnung'
 
 export interface Befund {
   /** Wonach die Oberfläche gruppiert */
-  bereich: 'Umfang und Zeit' | 'Aufbau' | 'Operatoren' | 'Bewertung' | 'Bedeutung'
+  bereich: 'Umfang und Zeit' | 'Aufbau' | 'Operatoren' | 'Anrede' | 'Bewertung' | 'Bedeutung'
   schwere: Schwere
   message: string
   /** Baustein, auf den sich der Befund bezieht */
@@ -126,6 +128,19 @@ export function pruefeKurztest(test: Kurztest, varianteIndex = 0): Befund[] {
   for (const w of pruefeOperatoren(alsAufgaben(blocks, profil), profil)) {
     // „zu aufwendig" ist ein Hinweis, kein Fehler – kein Land verbietet AFB III im Kurztest
     out.push({ bereich: 'Operatoren', schwere: w.art === 'aufwendig' ? 'hinweis' : 'warnung', message: w.message, blockId: w.blockId.split(':')[0] })
+  }
+
+  /*
+   * Anrede (Paket 8b): Sek I du, Sek II Sie – nach der gewählten Stufe. Der Auftrag an die KI
+   * sagt es; ob sie sich daran hält, zeigt erst diese Prüfung. Gemeldet, nicht korrigiert.
+   */
+  const blattMeta = worksheetMetaForKurztest(test)
+  let nummer = 0
+  for (const b of blocks) {
+    if (b.type === 'task') nummer++
+    for (const message of anredeBefundeBaustein(b, blattMeta, b.type === 'task' ? nummer : undefined)) {
+      out.push({ bereich: 'Anrede', schwere: 'hinweis', message, blockId: b.id })
+    }
   }
 
   // Bedeutungsunterschiede zwischen Ländern

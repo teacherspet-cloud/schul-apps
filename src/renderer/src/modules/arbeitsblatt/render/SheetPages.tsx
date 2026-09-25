@@ -14,6 +14,8 @@ import { gradeScaleRows } from '../../../shared/gradeScale'
 import { GRAMMAR_TOPICS } from '../didactics/grammar'
 import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
+import { anredeFuerMeta } from '../didactics/anrede'
+import { anredeText } from '../../../shared/anrede'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -139,6 +141,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     answerLanguage: subjectById(ws.meta.subjectId).foreignLanguage ?? 'de',
     wordLimit: ws.meta.wordLimit,
     subjectId: ws.meta.subjectId,
+    anrede: anredeFuerMeta(ws.meta),
     ...extra
   }
 }
@@ -329,7 +332,7 @@ export function SheetPages({
         <PageFrame info={info} page={pages.length + 1} pages={total}>
           <div className="ws-helpcards-page">
             <h2>Tipp- und Hilfekarten</h2>
-            <p className="ws-helpcards-hint">Nimm eine Karte erst, wenn du allein nicht weiterkommst – und immer nur die nächste.</p>
+            <p className="ws-helpcards-hint">{anredeText('hilfekarten', anredeFuerMeta(ws.meta))}</p>
             {helpCards.map((block) => (
               <BlockView key={block.id} block={block} />
             ))}
@@ -372,8 +375,8 @@ export function SheetPages({
               <>
                 <h2>Fehlerprofil</h2>
                 <p className="ws-teacher-hint">
-                  Jede Aufgabe zielt auf eine bekannte Stolperstelle. Tragen Sie ein, wie viele Lernende sie getroffen haben – das zeigt, woran als Nächstes zu
-                  arbeiten ist.
+                  Jede Aufgabe zielt auf eine bekannte Stolperstelle. In die Spalte „Anzahl“ gehört, wie viele Lernende sie getroffen haben – das zeigt, woran
+                  als Nächstes zu arbeiten ist.
                 </p>
                 <table className="ws-errorprofile">
                   <thead>

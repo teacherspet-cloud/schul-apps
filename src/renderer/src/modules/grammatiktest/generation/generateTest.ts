@@ -17,6 +17,8 @@ import { convertBlock } from '../../arbeitsblatt/generation/convert'
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { knownVocabRulesDe } from '../../../shared/knownVocab'
+import { anredeRegel } from '../../../shared/anrede'
+import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { errorTargets, testingRules } from '../model/testRules'
 import type { GrammarTest } from '../model/types'
 
@@ -45,6 +47,8 @@ export function testPrompt(test: GrammarTest): string {
     '- Keine unbekannte Lexik: Der Test prüft die Form, nicht den Wortschatz. Wer ein Wort nicht kennt, scheitert sonst aus dem falschen Grund.',
     german ? '' : `- Die Aufgabentexte stehen auf ${target}.`,
     m.instructionsInGerman ? '- Die Arbeitsanweisungen stehen auf Deutsch.' : '',
+    // Anrede der Lernenden (Paket 8b): nur wo die Anweisungen deutsch sind – Sek I du, Sek II Sie
+    german || m.instructionsInGerman ? anredeRegel(anredeFuer(m.grade, m.schoolTypeId)) : '',
     '',
     formats.length ? `AUFGABENFORMEN – nutze genau diese: ${formats.join(', ')}.` : '',
     '- Steigere die Anforderung: erst Erkennen und Zuordnen, dann Umformen und Ergänzen, zuletzt eigenes Bilden.',
@@ -168,7 +172,7 @@ export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (messa
    * leere Seite – ohne ein Wort. Die Lehrkraft sah nur, dass nichts passiert.
    */
   if (!blocks.some((b) => b.type === 'task')) {
-    throw new Error('Die KI hat keine Aufgaben geliefert. Versuche es erneut oder wähle eine andere Form.')
+    throw new Error('Die KI hat keine Aufgaben geliefert. Bitte erneut versuchen oder eine andere Form wählen.')
   }
   spreadPoints(blocks, test.meta.points)
   return blocks

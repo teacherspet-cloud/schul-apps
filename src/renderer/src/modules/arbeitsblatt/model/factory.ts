@@ -1,6 +1,7 @@
 import { newId } from '../../vokabeltest/model/random'
 import { defaultAxes } from './grid'
 import type { Answer, AnswerKind, TaskBlock, WsBlock, WsBlockType } from './types'
+import { ANREDE_TEXTE, anredeText, type Anrede } from '../../../shared/anrede'
 
 export function emptyAnswer(kind: AnswerKind = 'lines'): Answer {
   return {
@@ -23,12 +24,15 @@ export function emptyAnswer(kind: AnswerKind = 'lines'): Answer {
   }
 }
 
-/** Neuer, leerer Baustein zum Hinzufügen im Editor. */
-export function newBlock(type: WsBlockType): WsBlock {
+/**
+ * Neuer, leerer Baustein zum Hinzufügen im Editor.
+ * `anrede`: Die Platzhalter für die Lernenden duzen in der Sek I und siezen in der Sek II (Paket 8b).
+ */
+export function newBlock(type: WsBlockType, anrede: Anrede = 'du'): WsBlock {
   const id = newId()
   switch (type) {
     case 'learningGoals':
-      return { id, type, title: 'Das lernst du', goals: ['Ich kann …'] }
+      return { id, type, title: anredeText('lernziele', anrede), goals: ['Ich kann …'] }
     case 'infoBox':
       return { id, type, variant: 'merke', title: 'Merke', body: '' }
     case 'text':
@@ -38,7 +42,7 @@ export function newBlock(type: WsBlockType): WsBlock {
         id,
         type,
         title: 'Useful phrases',
-        hint: 'Diese Wendungen helfen dir bei den Aufgaben.',
+        hint: anredeText('wendungen', anrede),
         groups: [{ label: '', items: [{ text: '', german: '' }] }]
       }
     case 'image':
@@ -115,7 +119,19 @@ export const BLOCK_LABELS: Record<WsBlockType, string> = {
  * Wörter, die `newBlock` als Platzhalter einsetzt. Sie stehen auf dem Blatt, sind aber kein
  * Inhalt – ein Kasten mit der Überschrift „Merke" und nichts darunter ist leer.
  */
-const PLATZHALTER = ['Ich kann …', 'Das lernst du', 'Merke', 'Tipp', 'Abschnitt', 'Spalte 1', 'Spalte 2', 'Hörtext', 'Film', 'Useful phrases']
+const PLATZHALTER = [
+  'Ich kann …',
+  ANREDE_TEXTE.lernziele.du,
+  ANREDE_TEXTE.lernziele.sie,
+  'Merke',
+  'Tipp',
+  'Abschnitt',
+  'Spalte 1',
+  'Spalte 2',
+  'Hörtext',
+  'Film',
+  'Useful phrases'
+]
 
 const leererText = (s: string | undefined): boolean => !s?.trim() || PLATZHALTER.includes(s.trim())
 

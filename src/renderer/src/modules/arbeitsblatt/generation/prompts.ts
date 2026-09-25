@@ -1,5 +1,6 @@
 import type { LearnerProfile } from '../didactics/profile'
 import { stageForGrade } from '../didactics/profile'
+import { anredeFuerStufe, anredeRegel } from '../../../shared/anrede'
 import type { Stars } from '../didactics/differentiation'
 import type { OriginalMaterialAblage, SheetType, SourceMaterial, WorksheetMeta } from '../model/types'
 import { GEZAEHLTE_SEITEN, seitenBereich, seitenText, seitenVorgabe } from '../didactics/seiten'
@@ -81,10 +82,13 @@ export function sheetTypePrompt(type: SheetType): string {
 
 /** Systemprompt: Rolle, Lerngruppen-Profil und allgemeine didaktische Qualitätskriterien. */
 export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): string {
-  const address =
-    profile.stage === 'sek2'
-      ? 'Sprich die Lernenden mit „Sie“ an (Imperativ, z. B. „Erläutern Sie …“).'
-      : 'Sprich die Lernenden mit „du“ an (Imperativ, z. B. „Erkläre …“).'
+  /*
+   * Anrede der Lernenden (Paket 8b): Sek II Sie, sonst du – aus `profile.stage`, also über
+   * dieselbe Stufengrenze wie alle übrigen Regeln. Der Satz steht in `shared/anrede.ts`, weil
+   * Grammatiktest, Lernzielkontrolle und Vokabeltest (Latein) ihn ebenso brauchen; er sagt
+   * auch, dass die du-Beispiele in diesem Auftrag in der Oberstufe umzuformen sind.
+   */
+  const address = anredeRegel(meta.anrede ?? anredeFuerStufe(profile.stage))
   return [
     `Du bist eine erfahrene Lehrkraft und Fachdidaktikerin für das Fach ${meta.subjectLabel} an deutschen Schulen. Du erstellst pädagogisch und didaktisch hochwertige Arbeitsblätter.`,
     '',
@@ -101,7 +105,8 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     '- Fachlich korrekt, altersgerecht, inklusiv, ohne Stereotype, keine realen Privatpersonen.',
     '- Zu jeder Aufgabe gibt es eine vollständige Lösung bzw. einen Erwartungshorizont für die Lehrkraft.',
     loesungsspracheRegel(meta),
-    `- ${address}`,
+    '',
+    address,
     '',
     'FORMAT:',
     '- Hervorhebungen nur mit **fett**. Keine Kursivschrift, keine Großbuchstaben-Blöcke.',

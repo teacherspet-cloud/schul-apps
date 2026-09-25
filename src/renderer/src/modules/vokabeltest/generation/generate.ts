@@ -12,6 +12,8 @@ import type { KnownVocab } from '../../../shared/knownVocab'
 import { GenContext, TASK_TYPES } from './taskTypes'
 import type { PictureFinder } from './pictures'
 import { istLatein, lateinRegeln } from '../didactics/latein'
+import { anredeMeldung, anredeRegel, falscheAnrede } from '../../../shared/anrede'
+import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 export type ImageFinder = (item: PictureItem, settings: TestSettings) => Promise<ImageRef | undefined>
@@ -63,6 +65,11 @@ export function systemPrompt(settings: TestSettings, variantLabel?: string, know
     istLatein(settings.targetLanguage)
       ? `
 ${lateinRegeln()}`
+      : '',
+    // Bei Latein stehen die Anweisungen auf Deutsch – dann gilt die Anrede nach Stufe (Paket 8b)
+    istLatein(settings.targetLanguage)
+      ? `
+${anredeRegel(anredeFuer(settings.grade, settings.schoolTypeId))}`
       : ''
   ]
     .filter(Boolean)
@@ -168,8 +175,19 @@ async function finishBlock(
     }
     issues = checkBlock(block, vocab)
   }
-  block.warnings = issues.map(formatIssue)
+  block.warnings = [...issues.map(formatIssue), ...anredeHinweise(block, ctx.settings)]
   return block
+}
+
+/**
+ * Latein: Die Anweisungen stehen auf Deutsch – passt ihre Anrede zur Stufe (Paket 8b)?
+ * Gemeldet am Block, nicht korrigiert. In den modernen Fremdsprachen gibt es nichts zu prüfen.
+ */
+export function anredeHinweise(block: Block, settings: TestSettings): string[] {
+  if (!istLatein(settings.targetLanguage)) return []
+  const soll = anredeFuer(settings.grade, settings.schoolTypeId)
+  const fund = falscheAnrede(block.instruction ?? '', soll)
+  return fund ? [anredeMeldung('Arbeitsanweisung', fund, soll)] : []
 }
 
 const localIssues = (block: Block, vocab: VocabEntry[]): Issue[] =>

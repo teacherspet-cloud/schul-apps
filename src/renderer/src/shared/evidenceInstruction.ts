@@ -22,6 +22,8 @@
  * das Format dort nicht vor (DELE benutzt es gar nicht). Die Fassungen sind sinngemäß
  * gebildet und als Vorschlag gekennzeichnet.
  */
+import { ANREDE_TEXTE, type Anrede } from './anrede'
+
 interface EvidenceText {
   /** Die Arbeitsanweisung an die Lernenden */
   instruction: string
@@ -33,7 +35,8 @@ interface EvidenceText {
 
 const TEXTS: Record<string, EvidenceText> = {
   de: {
-    instruction: 'Kreuze an und belege deine Antwort durch ein kurzes Zitat aus dem Text. Verzichte auf Zeilenangaben.',
+    // Wortlaut der NRW-Operatorenliste (ZP10, also Sek I, daher du) – die Sie-Form für die Oberstufe setzt `evidenceInstruction`
+    instruction: ANREDE_TEXTE.textbeleg.du,
     column: 'Zitat aus dem Text',
     sourced: true
   },
@@ -59,9 +62,13 @@ const TEXTS: Record<string, EvidenceText> = {
   }
 }
 
-/** Sprachcode → Anweisung und Spaltenkopf; unbekannte Sprachen fallen auf Deutsch zurück. */
-export function evidenceInstruction(language: string | undefined): EvidenceText {
-  return TEXTS[(language ?? 'de').toLowerCase().slice(0, 2)] ?? TEXTS.de
+/**
+ * Sprachcode → Anweisung und Spaltenkopf; unbekannte Sprachen fallen auf Deutsch zurück.
+ * `anrede` gilt nur für die deutsche Fassung: Sek I du, Sek II Sie (Paket 8b).
+ */
+export function evidenceInstruction(language: string | undefined, anrede: Anrede = 'du'): EvidenceText {
+  const text = TEXTS[(language ?? 'de').toLowerCase().slice(0, 2)] ?? TEXTS.de
+  return text === TEXTS.de ? { ...text, instruction: ANREDE_TEXTE.textbeleg[anrede] } : text
 }
 
 /**

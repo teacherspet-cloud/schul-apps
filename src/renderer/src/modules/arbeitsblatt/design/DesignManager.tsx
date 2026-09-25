@@ -19,6 +19,8 @@ import {
   Title,
   UnstyledButton
 } from '@mantine/core'
+import { anredeText } from '../../../shared/anrede'
+import { anredeFuerMeta } from '../didactics/anrede'
 import { IconCopy, IconDownload, IconPlus, IconStar, IconTrash, IconUpload } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { DESIGN_FONTS, DesignTemplate, FooterSlot, normalizeDesign, presetDesigns } from '@shared/design'
@@ -63,7 +65,12 @@ function sampleWorksheet(design: DesignTemplate): Worksheet {
         id: 'sample',
         label: 'Beispiel',
         blocks: [
-          { id: 'g', type: 'learningGoals', title: 'Das lernst du', goals: ['Ich kann die Fotosynthese in einer Wortgleichung beschreiben.'] },
+          {
+            id: 'g',
+            type: 'learningGoals',
+            title: anredeText('lernziele', anredeFuerMeta(meta)),
+            goals: ['Ich kann die Fotosynthese in einer Wortgleichung beschreiben.']
+          },
           {
             id: 'i',
             type: 'infoBox',

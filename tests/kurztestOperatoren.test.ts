@@ -328,8 +328,12 @@ describe('Regelteil für die KI', () => {
     expect(operatorRegeln(profilFuer('HE', 'mathematik', 'sek2'))).toMatch(/KEINE Öffnungsklausel/)
   })
 
-  it('verlangt in der Sek I die Du-Anrede', () => {
-    expect(operatorRegeln(profilFuer('BY', 'mathematik', 'sek1'))).toMatch(/mit „du" an/)
+  it('überlässt die Anrede der eigenen Regel im Auftrag und kennzeichnet die Definitionen als Zitat', () => {
+    // Die Anrede steht seit Paket 8b als Stufenregel im kurztestPrompt (tests/anredeMaterial.test.ts),
+    // nicht mehr im Operatorenteil – dort galt die Anrede der Landesliste, die mehrfach siezt.
+    const r = operatorRegeln(profilFuer('BY', 'mathematik', 'sek1'))
+    expect(r).not.toMatch(/mit „du" an/)
+    expect(r).toMatch(/wörtlich aus der Landesliste zitiert/)
   })
 
   it('verbietet in jedem Fall zwei Operatoren und den nackten Term', () => {

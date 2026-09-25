@@ -187,7 +187,7 @@ export function BoardPage({ board, meta, accent, fontFamily, onChange }: BoardPr
         <span>{[meta.subjectLabel, meta.grade ? `Klasse ${meta.grade}` : '', meta.title || meta.topic].filter(Boolean).join(' · ')}</span>
       </div>
       <BoardCanvas board={board} onChange={onChange} />
-      {board.steps.length > 0 && <div className="ws-board-steps-title">So entwickeln Sie das Tafelbild</div>}
+      {board.steps.length > 0 && <div className="ws-board-steps-title">So entsteht das Tafelbild</div>}
       <BoardSteps board={board} onChange={onChange} />
     </div>
   )

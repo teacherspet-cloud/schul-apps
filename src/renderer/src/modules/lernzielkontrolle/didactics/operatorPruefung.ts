@@ -273,9 +273,13 @@ export function operatorRegeln(profil: Laenderprofil | undefined): string {
   return [
     ...zeilen,
     `- Maßgeblich ist: ${profil.quelle} (Stand ${profil.stand}).`,
-    profil.anrede === 'du'
-      ? '- Sprich die Lernenden mit „du" an („Berechne", „Gib an"). Diese Liste gilt für die Sekundarstufe I.'
-      : '- Die Aufgabenstellungen stehen im Imperativ ohne Anrede („Berechnen Sie" nur, wo es die Stufe verlangt).',
+    /*
+     * Die Anrede steht NICHT mehr hier, sondern als eigene Regel im Auftrag (kurztestPrompt,
+     * Paket 8b). Die Listen reden ihre Leser verschieden an – mehrere Sek-I-Listen siezen –,
+     * die Lehrkraft hat aber entschieden: Sek I du, Sek II Sie. Die Definitionen unten sind
+     * wörtliche Zitate und behalten die Form ihrer Quelle.
+     */
+    '- Die Definitionen unten sind wörtlich aus der Landesliste zitiert. Ihre Anrede ist die der Quelle; für die Aufgabenstellungen gilt die Regel unter ANREDE.',
     ...(mitDefinition.length
       ? [
           '',

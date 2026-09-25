@@ -1,4 +1,5 @@
 import type { CefrLevel } from '@shared/types'
+import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { newId, Rng, shuffle } from '../model/random'
 import type { Block, BlockKind, CategorizeBlock, GapItem, TaskTypeId, TestSettings, TextPart, VocabEntry } from '../model/types'
 import { buildCrossword, crosswordForm, isCrosswordWord, scrambleWord } from './crossword'
@@ -31,6 +32,12 @@ export interface TaskTypeDef {
   defaultPoints: number
   defaultTitle: string
   defaultInstruction: string
+  /**
+   * Dieselbe Anweisung in der Sie-Form für die Sekundarstufe II (Paket 8b). Nur bei den
+   * Latein-Aufgaben: Nur dort steht die Anweisung auf Deutsch; in den modernen Fremdsprachen
+   * steht sie in der Zielsprache und ist von der Regel nicht betroffen.
+   */
+  defaultInstructionSie?: string
   accepts?: (v: VocabEntry) => boolean
   /** JSON-Schema der KI-Antwort; ohne Schema kommt der Block ohne KI aus */
   schema?: Record<string, unknown>
@@ -51,13 +58,14 @@ function findVocab(vocab: VocabEntry[], id: string, term?: string): VocabEntry |
 const itemSchema = (props: Record<string, Record<string, unknown>>) =>
   obj({ instruction: str('Short task instruction for the students in the target language'), items: arr(obj(props)) })
 
-function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction'>, data: any, ctx: GenContext) {
+function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction' | 'defaultInstructionSie'>, data: any, ctx: GenContext) {
   const points = ctx.settings.tasks.find((t) => t.type === def.id)?.pointsPerItem ?? 1
+  const sie = def.defaultInstructionSie && anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId) === 'sie'
   return {
     id: newId(ctx.rng),
     taskType: def.id,
     title: def.defaultTitle,
-    instruction: (typeof data?.instruction === 'string' && data.instruction.trim()) || def.defaultInstruction,
+    instruction: (typeof data?.instruction === 'string' && data.instruction.trim()) || (sie ? def.defaultInstructionSie! : def.defaultInstruction),
     pointsPerItem: points
   }
 }
@@ -798,6 +806,7 @@ ${vocabLines(vocab)}`,
     defaultPoints: 2,
     defaultTitle: 'Formen und Bedeutungen',
     defaultInstruction: 'Ergänze zu jeder Vokabel die verlangte Form und alle Bedeutungen.',
+    defaultInstructionSie: 'Ergänzen Sie zu jeder Vokabel die verlangte Form und alle Bedeutungen.',
     /*
      * Ohne KI: Form und Bedeutungen stehen bereits in der Vokabelliste. Die KI zu fragen
      * hiesse, sie etwas erfinden zu lassen, was die Lehrkraft schon eingegeben hat – und
@@ -835,6 +844,7 @@ ${vocabLines(vocab)}`,
     defaultPoints: 1,
     defaultTitle: 'Fremd- und Lehnwörter',
     defaultInstruction: 'Nenne zu jedem Wort ein deutsches Fremd- oder Lehnwort und erkläre den Zusammenhang.',
+    defaultInstructionSie: 'Nennen Sie zu jedem Wort ein deutsches Fremd- oder Lehnwort und erklären Sie den Zusammenhang.',
     schema: itemSchema({
       vocabId: str(),
       prompt: str('Das lateinische Wort, wie es den Lernenden vorgelegt wird'),
@@ -858,6 +868,7 @@ ${vocabLines(vocab)}`,
     defaultPoints: 2,
     defaultTitle: 'Wortbildung',
     defaultInstruction: 'Zerlege die Wörter in ihre Bestandteile und gib die Bedeutung der Teile an.',
+    defaultInstructionSie: 'Zerlegen Sie die Wörter in ihre Bestandteile und geben Sie die Bedeutung der Teile an.',
     schema: itemSchema({
       vocabId: str(),
       prompt: str('Das zusammengesetzte oder abgeleitete Wort'),
@@ -882,6 +893,7 @@ ${vocabLines(vocab)}`,
     defaultPoints: 1,
     defaultTitle: 'Welche Bedeutung passt?',
     defaultInstruction: 'Kreuze die Bedeutung an, die im Satz passt.',
+    defaultInstructionSie: 'Kreuzen Sie die Bedeutung an, die im Satz passt.',
     schema: itemSchema({
       vocabId: str(),
       sentence: str('Kurzer, einfacher lateinischer Satz, in dem das Wort vorkommt'),

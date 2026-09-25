@@ -249,7 +249,7 @@ describe('Arbeitsblatt-Export', () => {
     expect(doc).toContain('Produkte')
     expect(doc).toContain('→ ')
     expect(doc).toContain('Merke: ')
-    expect(doc).toContain('So entwickeln Sie das Tafelbild')
+    expect(doc).toContain('So entsteht das Tafelbild')
     expect(doc).not.toContain('Absatz 1')
 
     const { buildWorksheetHtml } = await import('../src/renderer/src/modules/arbeitsblatt/render/printHtml')

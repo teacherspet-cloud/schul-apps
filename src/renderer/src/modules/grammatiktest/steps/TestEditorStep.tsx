@@ -5,6 +5,7 @@ import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
+import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
@@ -45,6 +46,8 @@ export default function TestEditorStep(): React.JSX.Element {
    */
   const ws = useMemo(() => (test ? testToWorksheet(test) : null), [test])
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
+  // Anrede der Lernenden am angezeigten Test prüfen – auch nach Änderungen von Hand (Paket 8b)
+  const anrede = useMemo(() => (ws ? anredeBefunde(ws.meta, ws.sheets) : []), [ws])
   // Strg+P druckt wie der Knopf „Drucken"; vor dem frühen return, weil es ein Hook ist
   const drucken = useRef<() => void>(() => undefined)
   useDruck('grammatiktest', test && ws ? () => drucken.current() : null)
@@ -128,6 +131,7 @@ export default function TestEditorStep(): React.JSX.Element {
       </Group>
 
       <Stack>
+        {!key && <AnredeHinweise befunde={anrede} />}
         <FitToWidth className="ws-editor-pages">
           <SheetPages
             ws={ws}

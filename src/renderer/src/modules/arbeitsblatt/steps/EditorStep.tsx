@@ -52,6 +52,7 @@ import { hoerenIstPruefgegenstand } from '../didactics/audioRules'
 import { plainText } from '../../../shared/richtext/parse'
 import { estimateSeconds } from '../generation/convert'
 import { BLOCK_LABELS, dupliziereBaustein, istLeer, newBlock } from '../model/factory'
+import { anredeFuerMeta } from '../didactics/anrede'
 import type { SeitenVorschlag, TaskBlock, Worksheet, WsBlock, WsBlockType } from '../model/types'
 import { serializeWorksheet, WORKSHEET_FILTER } from '../project'
 import { BausteinRahmen } from '../render/BausteinRahmen'
@@ -349,7 +350,7 @@ export default function EditorStep(): React.JSX.Element {
       const blocks = d.sheets.find((s) => s.id === sheet.id)?.blocks
       if (!blocks) return
       const i = blocks.findIndex((b) => b.id === nebenId)
-      blocks.splice(i < 0 ? blocks.length : i + versatz, 0, newBlock(typ))
+      blocks.splice(i < 0 ? blocks.length : i + versatz, 0, newBlock(typ, anredeFuerMeta(d.meta)))
     })
   const duplizieren = (id: string): void =>
     update((d) => {
@@ -748,7 +749,10 @@ export default function EditorStep(): React.JSX.Element {
               </Menu.Target>
               <Menu.Dropdown>
                 {Object.entries(BLOCK_LABELS).map(([type, label]) => (
-                  <Menu.Item key={type} onClick={() => update((d) => d.sheets.find((s) => s.id === sheet.id)!.blocks.push(newBlock(type as WsBlockType)))}>
+                  <Menu.Item
+                    key={type}
+                    onClick={() => update((d) => d.sheets.find((s) => s.id === sheet.id)!.blocks.push(newBlock(type as WsBlockType, anredeFuerMeta(d.meta))))}
+                  >
                     {label}
                   </Menu.Item>
                 ))}

@@ -644,6 +644,12 @@ export interface WorksheetMeta {
   cefrLevel: CefrLevel
   instructionsInGerman: boolean
   /**
+   * Anrede der Lernenden, wenn sie NICHT aus Jahrgang und Schulform folgt (Paket 8b).
+   * Nur die Lernzielkontrolle setzt sie – dort wählt die Lehrkraft die Stufe selbst.
+   * Fehlt die Angabe, gilt `anredeFuerMeta` (didactics/anrede.ts).
+   */
+  anrede?: 'du' | 'sie'
+  /**
    * Deutsch, Schwerpunkt Zuhoeren: welche Bauform.
    *
    * 'muendlich' ist die in den Bildungsstandards belegte Form (Zuhoeren - Mitschrift -

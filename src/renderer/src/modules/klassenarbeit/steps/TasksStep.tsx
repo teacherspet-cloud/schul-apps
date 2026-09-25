@@ -39,6 +39,7 @@ import type { Exam, ExamPart } from '../model/types'
 import { examGrades } from '../model/types'
 import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, teilNachUeberarbeitung } from '../model/fassungen'
 import { examHasContent, examToWorksheet, examToWorksheetAlle } from '../render/examWorksheet'
+import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import { AudioPanel } from '../../arbeitsblatt/steps/AudioPanel'
 import type { Worksheet } from '../../arbeitsblatt/model/types'
 import { useKlassenarbeit } from '../store'
@@ -117,6 +118,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    */
   const worksheet = useMemo(() => examToWorksheetAlle(exam), [exam])
   const audioSicht = useMemo(() => examToWorksheet(exam, 0), [exam])
+  // Anrede der Lernenden in allen Fassungen prüfen – auch nach Überarbeitung und Änderungen von Hand (Paket 8b)
+  const anrede = useMemo(() => (hasContent ? anredeBefunde(worksheet.meta, worksheet.sheets) : []), [hasContent, worksheet])
   const { layouts, measure } = useSheetLayouts(hasContent ? worksheet : null, logo, settings.schoolName)
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken" – sobald es etwas zu drucken gibt
   useDruck('klassenarbeit', hasContent ? () => starte('print') : null)
@@ -421,6 +424,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             </Text>
           </Alert>
         )}
+
+        <AnredeHinweise befunde={anrede} />
 
         {hasContent && meta.variants !== gesamt && (
           <Alert color="gray" icon={<IconInfoCircle size={18} />} mb="md" p="xs">

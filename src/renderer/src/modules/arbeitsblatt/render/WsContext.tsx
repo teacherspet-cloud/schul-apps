@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { WsBlock } from '../model/types'
 import type { Stars } from '../didactics/differentiation'
+import type { Anrede } from '../../../shared/anrede'
 
 /** edit = Schülerblatt bearbeiten, keyEdit = Lösungen bearbeiten, print/key = Druckansichten */
 export type WsMode = 'edit' | 'print' | 'key' | 'keyEdit' | 'measure'
@@ -50,6 +51,8 @@ export interface WsContextValue {
   answerLanguage?: string
   /** Fach des Blattes – entscheidet u. a. über die Regeln für Hörtexte */
   subjectId?: string
+  /** Anrede der Lernenden in den festen Texten der App: Sek I du, Sek II Sie (Paket 8b) */
+  anrede?: Anrede
   /** Die Hörtexte liegen als Dateianlage im PDF – nur dann der Hinweis am Baustein */
   audioAttached?: boolean
   /**

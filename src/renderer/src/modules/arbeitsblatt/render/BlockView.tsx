@@ -466,7 +466,7 @@ export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedIt
                * Die Abspielzahl folgt dem Fach: In den Sprachen wird zweimal gehört, im
                * Sachfach so oft wie nötig. Begründung in `didactics/audioRules.ts`.
                */}
-              {[block.textType, block.seconds ? audioLength(block.seconds) : '', playsLabelFor(subjectId, block.plays)].filter(Boolean).join(' · ')}
+              {[block.textType, block.seconds ? audioLength(block.seconds) : '', playsLabelFor(subjectId, block.plays, ctx.anrede)].filter(Boolean).join(' · ')}
             </span>
           </div>
           <div className="ws-audio-body">

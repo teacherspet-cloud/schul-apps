@@ -22,6 +22,7 @@ import { bausteinRegeln } from '../didactics/bausteine'
 import type { Punktebereich } from '../didactics/bewertung'
 import { formatById, geschaetzteMinuten } from '../didactics/formate'
 import { operatorRegeln } from '../didactics/operatorPruefung'
+import { anredeFuerStufe, anredeRegel } from '../../../shared/anrede'
 import { profilFuer } from '../didactics/operatoren'
 import { stateInfo } from '../../arbeitsblatt/didactics/states'
 import type { Kurztest } from '../model/types'
@@ -144,6 +145,9 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
     bausteinRegeln(m.nachteilsausgleich),
     '',
     operatorRegeln(profil),
+    '',
+    // Anrede nach der gewählten Stufe – nicht nach der Anrede der Landesliste (Paket 8b)
+    anredeRegel(anredeFuerStufe(m.stufe)),
     ...bevorzugteTeil(m.bevorzugteOperatoren ?? []),
     /*
      * Orte und interkulturelle Aspekte – dieselbe Regel wie im Arbeitsblatt. Ein Kurztest in
@@ -206,7 +210,7 @@ export async function generateKurztest(test: Kurztest, variante: string, ai: AiC
    * Grammatiktest. Eine leere Seite ohne ein Wort sieht aus wie ein Absturz.
    */
   if (!blocks.some((b) => b.type === 'task')) {
-    throw new Error('Die KI hat keine Aufgaben geliefert. Versuche es erneut oder gib das Thema genauer an.')
+    throw new Error('Die KI hat keine Aufgaben geliefert. Bitte erneut versuchen oder das Thema genauer angeben.')
   }
   if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)
   // Ohne Punkte auf dem Blatt auch keine im Erwartungshorizont – die KI hält sich nicht immer an „0"

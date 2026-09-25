@@ -63,6 +63,8 @@ import { subjectById } from '../model/subjects'
 import { boardList } from '../didactics/boardDesign'
 import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
+import { anredeFuerMeta } from '../didactics/anrede'
+import { anredeText } from '../../../shared/anrede'
 
 export interface WorksheetDocxDeps {
   logo: string | null
@@ -292,7 +294,11 @@ async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: Wo
   // Hilfekarten auf einer eigenen Schlussseite (nur im Schülerblatt)
   const helpCards = key ? [] : sheet.blocks.filter(isHelpCard)
   if (helpCards.length) {
-    children = [new Paragraph({ spacing: { after: 160 }, children: [run('Tipp- und Hilfekarten', { bold: true, size: ctx.size + 4 })] })]
+    children = [
+      new Paragraph({ spacing: { after: 160 }, children: [run('Tipp- und Hilfekarten', { bold: true, size: ctx.size + 4 })] }),
+      // Derselbe Hinweis wie in der Vorschau – bis 25.09.2026 fehlte er im Word-Export (Paket 8b)
+      new Paragraph({ spacing: { after: 160 }, children: [run(anredeText('hilfekarten', anredeFuerMeta(ctx.ws.meta)), { color: '555555' })] })
+    ]
     for (const block of helpCards) children.push(...((await blockContent(ctx, block, numbers)) as Child[]))
     flush(false)
   }
@@ -444,7 +450,7 @@ export async function boardSection(ws: Worksheet, board: BoardPlan, raster: Math
         ]
       })
     children.push(
-      new Paragraph({ spacing: { before: 300, after: 100 }, children: [run('So entwickeln Sie das Tafelbild', { bold: true, size: size + 1 })] }),
+      new Paragraph({ spacing: { before: 300, after: 100 }, children: [run('So entsteht das Tafelbild', { bold: true, size: size + 1 })] }),
       new Table({
         width: { size: width, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
@@ -949,7 +955,9 @@ async function blockContent(ctx: Ctx, block: WsBlock, numbers: Map<string, numbe
       // Abspielzahl und Transkriptpflicht folgen dem Fach – siehe `didactics/audioRules.ts`
       const fach = ctx.ws.meta.subjectId
       const audioRegeln = audioRulesFor(fach)
-      const meta = [block.textType, block.seconds ? audioLength(block.seconds) : '', playsLabelFor(fach, block.plays)].filter(Boolean).join(' · ')
+      const meta = [block.textType, block.seconds ? audioLength(block.seconds) : '', playsLabelFor(fach, block.plays, anredeFuerMeta(ctx.ws.meta))]
+        .filter(Boolean)
+        .join(' · ')
       const inner: Child[] = [
         new Paragraph({
           spacing: { after: 60 },

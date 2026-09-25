@@ -16,6 +16,7 @@ import { checkClosedFormatsHistory, checkItemWording, checkTrueFalseEvidence } f
 import { checkSourceHeaders } from './sourceHeader'
 import { checkNarration } from './narration'
 import { bilingualAktiv, checkBilingual } from './bilingual'
+import { checkAnrede } from './anrede'
 
 const tasks = (sheet: Sheet): TaskBlock[] => sheet.blocks.filter((b): b is TaskBlock => b.type === 'task')
 
@@ -260,6 +261,8 @@ export function checkSheet(sheet: Sheet, meta: WorksheetMeta, foreignLanguage?: 
     ...checkTaskCount(sheet, meta, profile),
     ...checkInstructions(sheet),
     ...checkImageWish(sheet, meta),
+    // Sek I du, Sek II Sie – nur Arbeitsanweisungen und Hilfen, nie Material (Paket 8b)
+    ...checkAnrede(sheet, meta),
     ...(foreignLanguage ? checkLanguageSkills(sheet, meta) : [])
   ]
 }
