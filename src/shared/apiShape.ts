@@ -163,8 +163,12 @@ export function buildApi(call: Call, extras: ApiExtras) {
        * Die Anfrage endet dann mit der Abbruchmeldung aus @shared/abbruch – kein Fehler.
        */
       cancel: (anfrageId: string) => call<void>('ai:cancel', anfrageId),
-      /** Meldet, ob eine Anfrage auf einen freien Platz wartet (höchstens drei laufen zugleich) */
-      onPlatz: (cb: (platz: { id: string; zustand: 'wartend' | 'laufend' }) => void) => extras.subscribe('ai:platz', cb as (value: unknown) => void)
+      /**
+       * Meldet, ob eine Anfrage auf einen freien Platz wartet (höchstens drei laufen zugleich).
+       * Beim Warten steht dabei, wie viele Plätze abgebrochene Anfragen noch halten (davon Bilder).
+       */
+      onPlatz: (cb: (platz: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number }) => void) =>
+        extras.subscribe('ai:platz', cb as (value: unknown) => void)
     },
     cefr: {
       get: () => call<CefrTable>('cefr:get')

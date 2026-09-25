@@ -22,6 +22,12 @@ import type { AiProvider, ChunkListener, Netzfund, RawModel } from './provider'
 
 interface AttrappenDatei {
   verzoegerungMs?: number
+  /**
+   * Überhört den Abbruch und rechnet zu Ende – so verhält sich die Bild-KI von OpenAI.
+   * Damit lässt sich prüfen, dass ein Auftrag trotzdem sofort als abgebrochen erscheint und
+   * Wartende erfahren, warum der Platz noch belegt ist.
+   */
+  abbruchTaub?: boolean
   antworten?: Record<string, unknown>
 }
 
@@ -64,7 +70,7 @@ export class AttrappeProvider implements AiProvider {
     const datei = lies()
     const antwort = datei.antworten?.[req.schemaName]
     if (antwort === undefined) throw new Error(`Attrappe: keine Antwort für „${req.schemaName}" hinterlegt.`)
-    await warte(datei.verzoegerungMs ?? 2000, JSON.stringify(antwort).length, onChunk, signal)
+    await warte(datei.verzoegerungMs ?? 2000, JSON.stringify(antwort).length, onChunk, datei.abbruchTaub ? undefined : signal)
     return structuredClone(antwort) as T
   }
 

@@ -66,6 +66,8 @@ export interface Auftrag {
   rueckfrage?: Rueckfrage
   /** Lässt sich mit denselben Eingaben erneut starten */
   kannErneut: boolean
+  /** Warum er wartet, falls das mehr ist als „alle Plätze belegt" (siehe `warteGrund`) */
+  wartegrund?: string
 }
 
 interface AuftraegeState {
@@ -154,13 +156,18 @@ interface Laufzeit {
   /** Anfragen, die gerade beim Hauptprozess liegen */
   anfragen: Set<string>
   beendet: boolean
+  /** Legt gerade ab – ein Abbruch käme zu spät und ließe ein halb gespeichertes Dokument zurück */
+  legtAb?: boolean
   istOffen?: () => boolean
   erneut?: () => void
 }
 
 const laufzeit = new Map<string, Laufzeit>()
-/** Anfragen, die auf einen freien Platz warten (Meldung des Hauptprozesses) */
-const wartendeAnfragen = new Set<string>()
+/**
+ * Anfragen, die auf einen freien Platz warten (Meldung des Hauptprozesses) – mit der Zahl der
+ * Plätze, die dabei noch abgebrochene Anfragen halten (davon Bilder).
+ */
+const wartendeAnfragen = new Map<string, { abgebrochen: number; bilder: number }>()
 let zaehler = 0
 
 /**
@@ -175,18 +182,36 @@ export const setzeFehlerMeldung = (fn: (e: unknown, titel: string) => void): voi
 let platzAbo: (() => void) | null = null
 function horchePlatz(): void {
   if (platzAbo || typeof window === 'undefined' || !window.api?.ai.onPlatz) return
-  platzAbo = window.api.ai.onPlatz(({ id, zustand }) => {
-    if (zustand === 'wartend') wartendeAnfragen.add(id)
+  platzAbo = window.api.ai.onPlatz(({ id, zustand, abgebrochen, abgebrocheneBilder }) => {
+    if (zustand === 'wartend') wartendeAnfragen.set(id, { abgebrochen: abgebrochen ?? 0, bilder: abgebrocheneBilder ?? 0 })
     else wartendeAnfragen.delete(id)
-    for (const [auftragId, lz] of laufzeit) if (lz.anfragen.has(id)) aendere(auftragId, (a) => ({ ...a, status: zustandAus(lz, a) }))
+    for (const [auftragId, lz] of laufzeit) if (lz.anfragen.has(id)) aendere(auftragId, (a) => ({ ...a, ...lage(lz, a) }))
   })
 }
 
 /** Wartet ein Auftrag nur noch auf Plätze, heißt er „wartend" – sonst „laufend". */
-function zustandAus(lz: Laufzeit, a: Auftrag): AuftragsStatus {
-  if (!laeuft(a)) return a.status
+function lage(lz: Laufzeit, a: Auftrag): Pick<Auftrag, 'status' | 'wartegrund'> {
+  if (!laeuft(a)) return { status: a.status, wartegrund: undefined }
   const ids = [...lz.anfragen]
-  return ids.length > 0 && ids.every((id) => wartendeAnfragen.has(id)) ? 'wartend' : 'laufend'
+  const wartet = ids.length > 0 && ids.every((id) => wartendeAnfragen.has(id))
+  return { status: wartet ? 'wartend' : 'laufend', wartegrund: wartet ? warteGrund(ids.map((id) => wartendeAnfragen.get(id)!)) : undefined }
+}
+
+/**
+ * Hält ein ABGEBROCHENER Auftrag noch einen Platz, sagt die Leiste das – leise, aber ehrlich.
+ *
+ * Anlass (Nachtrag der Lehrkraft zu Paket 3): Die Bild-KI von OpenAI lässt sich nicht
+ * unterbrechen. Der Auftrag erscheint sofort als abgebrochen, der Anbieter rechnet das Bild
+ * aber zu Ende, und so lange ist der Platz belegt. Ohne Erklärung sähe der wartende Auftrag
+ * aus, als hinge er grundlos.
+ */
+export function warteGrund(lagen: { abgebrochen: number; bilder: number }[]): string | undefined {
+  const n = Math.max(0, ...lagen.map((l) => l.abgebrochen))
+  if (!n) return undefined
+  const bilder = Math.max(0, ...lagen.map((l) => l.bilder))
+  if (n === 1)
+    return bilder ? 'Wartet – ein abgebrochener Bildauftrag gibt seinen Platz gleich frei' : 'Wartet – ein abgebrochener Auftrag gibt seinen Platz gleich frei'
+  return bilder === n ? 'Wartet – abgebrochene Bildaufträge geben ihre Plätze gleich frei' : 'Wartet – abgebrochene Aufträge geben ihre Plätze gleich frei'
 }
 
 function aendere(id: string, fn: (a: Auftrag) => Auftrag): void {
@@ -260,7 +285,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     const chunk = tracker.ratio()
     const roh = stufe.abschnitt ? phaseRatio(stufe.abschnitt, stufe.fertig, stufe.gesamt, chunk) : overallRatio(stufe.fertig, stufe.gesamt, chunk)
     gezeigt = neverBackwards(gezeigt, roh)
-    aendere(id, (a) => (laeuft(a) ? { ...a, anteil: gezeigt, meldung: meldung ?? a.meldung, status: zustandAus(lz, a) } : a))
+    aendere(id, (a) => (laeuft(a) ? { ...a, anteil: gezeigt, meldung: meldung ?? a.meldung, ...lage(lz, a) } : a))
   }
 
   const anfrage = async <T>(art: string, senden: (anfrageId: string) => Promise<T>): Promise<T> => {
@@ -315,9 +340,16 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
   return (async () => {
     try {
       // Was am Dokument noch ansteht, zuerst sichern – der Entwurf soll in der Bibliothek liegen
-      await sichereAlles()
+      await rennen(sichereAlles(), signal)
+      /*
+       * `rennen`: Der Abbruch wirkt für die Lehrkraft SOFORT – auch wenn der Anbieter die Anfrage
+       * nicht beenden kann (die Bild-KI von OpenAI nimmt kein Abbruchsignal) oder die Antwort
+       * über das Netz erst später eintrifft. Ein spätes Ergebnis landet nirgends: `arbeit`
+       * läuft ins Leere, abgelegt wird nichts.
+       */
       const ergebnis = await rennen(start.arbeit(eingabe, k), signal)
       if (signal.aborted) throw new AbbruchFehler()
+      lz.legtAb = true
       aendere(id, (a) => ({ ...a, meldung: 'Wird abgelegt …' }))
       await start.ablegen(ergebnis, eingabe)
       aendere(id, (a) => ({
@@ -348,7 +380,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
 /** Bricht einen Auftrag ab – laufende KI-Anfragen werden im Hauptprozess beendet. */
 export function brichAb(id: string): void {
   const lz = laufzeit.get(id)
-  if (!lz || lz.beendet || lz.steuerung.signal.aborted) return
+  if (!lz || lz.beendet || lz.legtAb || lz.steuerung.signal.aborted) return
   lz.steuerung.abort()
   for (const anfrageId of lz.anfragen) void window.api.ai.cancel(anfrageId).catch(() => undefined)
 }

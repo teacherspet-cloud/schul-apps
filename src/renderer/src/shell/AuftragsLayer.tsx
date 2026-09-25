@@ -221,7 +221,7 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
   }
   const farbe = a.status === 'fertig' ? 'teal' : a.status === 'fehler' ? 'red' : a.status === 'abgebrochen' ? 'gray' : (modul?.color ?? 'blue')
   return (
-    <div className="auftrags-zeile" data-status={a.status} data-auftrag={a.id}>
+    <div className="auftrags-zeile" data-status={a.status} data-auftrag={a.id} data-anteil={Math.round(a.anteil * 100)}>
       <Group gap="sm" wrap="nowrap" align="flex-start">
         <ThemeIcon variant="light" color={farbe} size={30} radius="md" aria-hidden>
           {Symbol ? <Symbol size={18} /> : null}
@@ -240,7 +240,7 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
               <Loader size="xs" type="dots" />
             ))}
           <Text size="xs" c={a.status === 'fehler' ? 'red' : undefined} lineClamp={3}>
-            {a.status === 'wartend' ? 'Wartet auf freien Platz …' : a.meldung}
+            {a.status === 'wartend' ? (a.wartegrund ?? 'Wartet auf freien Platz …') : a.meldung}
           </Text>
           <Text size="xs" c="dimmed">
             {laeuft(a) ? `${dauerLabel(vergangen)}${rest ? ` · ${rest}` : ''}` : a.status === 'fertig' ? `nach ${dauerLabel(vergangen)}` : ''}

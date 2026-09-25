@@ -53,15 +53,30 @@ import { getCefrTable } from './services/storage/cefr'
 import { deleteTest, getTest, listTests, saveTest } from './services/storage/vocabTests'
 import { deleteVocabList, getSecret, getSettings, listVocabLists, saveVocabList, setSecret, setSettings } from './services/storage/settings'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
-import { lanStatus, startLan, stopLan } from './services/lanServer'
+import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
 import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
 
 let mainWindow: BrowserWindow | null = null
 
+/**
+ * Ein Ereignis zu EINER Anfrage (Fortschritt, Warteplatz) dorthin schicken, wo sie herkam.
+ *
+ * Kam sie von einem Gerät im Netz, geht das Ereignis nur an dieses Gerät (services/lanServer.ts,
+ * `lanEreignis`) – nicht ans Fenster, damit Rechner und Tablet sich nicht in die Quere kommen.
+ */
+function sendeEreignis(kanal: string, wert: unknown): void {
+  if (lanEreignis(kanal, wert)) return
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(kanal, wert)
+}
+
+/** Ein Ereignis, das alle angeht (z. B. geänderte KI-Modelle): ans Fenster und an jedes angemeldete Gerät. */
+function rundruf(kanal: string, wert: unknown): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(kanal, wert)
+  lanRundruf(kanal, wert)
+}
+
 /** Höchstens drei KI-Anfragen zugleich; wer wartet, erfährt es (Auftragsleiste der Oberfläche) */
-const kiPlaetze = new KiPlaetze(3, (id, zustand) => {
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ai:platz', { id, zustand })
-})
+const kiPlaetze = new KiPlaetze(3, (id, zustand, info) => sendeEreignis('ai:platz', { id, zustand, ...info }))
 
 /**
  * Wie lange das Fenster beim Schließen auf die Oberfläche wartet, bis alles gesichert ist.
@@ -238,7 +253,7 @@ async function generateImage(prompt: string, signal?: AbortSignal): Promise<stri
 async function updateModelsInBackground(): Promise<void> {
   try {
     const notes = await healModelSelection()
-    if (notes.length) mainWindow?.webContents.send('models:updated', notes)
+    if (notes.length) rundruf('models:updated', notes)
   } catch {
     // Ohne Internet bleibt die zuletzt bekannte Liste aktiv
   }
@@ -383,7 +398,7 @@ function registerIpc(): void {
           const now = Date.now()
           if (now - last < 200) return
           last = now
-          mainWindow?.webContents.send('ai:progress', { id, chars })
+          sendeEreignis('ai:progress', { id, chars })
         }
       : undefined
     return kiPlaetze.platz(id, (signal) => provider.structured(req, req.model || model, onChunk, signal))
@@ -403,13 +418,13 @@ function registerIpc(): void {
     const { provider, model } = createTextProvider(getSettings().ai.textProvider)
     if (!provider.websuche) return []
     try {
-      return await kiPlaetze.platz(id, (signal) => provider.websuche!(auftrag, model, signal))
+      return await kiPlaetze.platz(id, (signal) => provider.websuche!(auftrag, model, signal), 'websuche')
     } catch (e) {
       if (istAbbruch(e)) throw e
       return []
     }
   })
-  handle('ai:image', (prompt: string, id?: string) => kiPlaetze.platz(id, (signal) => generateImage(prompt, signal)))
+  handle('ai:image', (prompt: string, id?: string) => kiPlaetze.platz(id, (signal) => generateImage(prompt, signal), 'bild'))
 
   handle('cefr:get', () => getCefrTable())
 

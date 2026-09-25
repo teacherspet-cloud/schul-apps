@@ -128,6 +128,34 @@ describe('KI-Plätze: abbrechen', () => {
     expect(s.gestartet()).toBe(false)
   })
 
+  /*
+   * Paket 3b: Die Bild-KI von OpenAI überhört den Abbruch. Die Anfrage endet für die
+   * Oberfläche sofort, der Platz bleibt belegt – und wer deshalb wartet, erfährt es.
+   */
+  it('sagt Wartenden, dass ein abgebrochenes Bild den Platz noch hält, und gibt ihn danach frei', async () => {
+    const meldungen: Record<string, unknown>[] = []
+    const plaetze = new KiPlaetze(1, (id, zustand, info) => meldungen.push({ id, zustand, ...info }))
+    // `steuerbar` beachtet das Signal nicht – genau wie der Anbieter
+    const bild = steuerbar()
+    const lauf = plaetze.platz('b', bild.arbeit, 'bild')
+    const text = steuerbar()
+    const lauf2 = plaetze.platz('t', text.arbeit)
+    await tick()
+    expect(meldungen.at(-1)).toEqual({ id: 't', zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0 })
+    plaetze.abbrechen('b')
+    await expect(lauf).rejects.toThrow(ABBRUCH_MELDUNG)
+    expect(meldungen.at(-1)).toEqual({ id: 't', zustand: 'wartend', abgebrochen: 1, abgebrocheneBilder: 1 })
+    expect(text.gestartet()).toBe(false)
+    bild.fertig('spätes Bild')
+    await tick()
+    await tick()
+    expect(text.gestartet()).toBe(true)
+    expect(meldungen.at(-1)).toMatchObject({ id: 't', zustand: 'laufend' })
+    text.fertig('ok')
+    await expect(lauf2).resolves.toBe('ok')
+    expect(plaetze.stand()).toEqual({ laufend: 0, wartend: 0 })
+  })
+
   it('erkennt den Abbruch auch am bloßen Meldungstext (so kommt er über die Brücke an)', () => {
     expect(istAbbruch(new Error(ABBRUCH_MELDUNG))).toBe(true)
     expect(istAbbruch(new Error('Anthropic: Limit erreicht (429).'))).toBe(false)

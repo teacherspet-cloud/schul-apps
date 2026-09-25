@@ -15,11 +15,13 @@ import { _electron as electron } from 'playwright-core'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { warteAufOberflaeche } from './warten.mjs'
 
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-netz-'))
 const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], env: { ...process.env, SCHULAPPS_SELFTEST: '1' } })
 const page = await app.firstWindow()
-await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
+// Mit Schließen des Einrichtungsassistenten – dessen Fenster lag sonst über „Einstellungen" (seit Paket 2)
+await warteAufOberflaeche(page)
 
 const problems = []
 const pruefe = (ok, text) => {

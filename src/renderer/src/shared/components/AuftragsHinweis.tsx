@@ -32,7 +32,9 @@ export default function AuftragsHinweis({ auftrag, neuLabel, onNeu }: { auftrag:
           {auftrag.anteil > 0 ? <Progress value={auftrag.anteil * 100} animated aria-label="Fortschritt" /> : <Loader size="sm" type="dots" />}
           <Group justify="space-between" gap="xs">
             <Text size="sm">
-              {auftrag.status === 'wartend' ? 'Höchstens drei KI-Anfragen laufen zugleich – dieser Auftrag ist gleich dran.' : auftrag.meldung}
+              {auftrag.status === 'wartend'
+                ? (auftrag.wartegrund ?? 'Höchstens drei KI-Anfragen laufen zugleich – dieser Auftrag ist gleich dran.')
+                : auftrag.meldung}
             </Text>
             {auftrag.anteil > 0 && (
               <Text size="sm" c="dimmed">

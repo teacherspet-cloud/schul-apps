@@ -11,13 +11,19 @@ import { ABBRUCH_MELDUNG } from '../src/shared/abbruch'
 // Die KI-Brücke des Hauptprozesses als Attrappe: Antworten kommen erst, wenn der Test es sagt
 const offen = new Map<string, { ok: (v: unknown) => void; weg: (e: Error) => void }>()
 const abgebrochen: string[] = []
+// Bilder: Wie die Bild-KI von OpenAI überhören sie den Abbruch und kommen später trotzdem
+const offeneBilder: ((url: string) => void)[] = []
+let platz: ((p: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number }) => void) | null = null
 ;(globalThis as unknown as { window: unknown }).window = {
   api: {
     ai: {
       onProgress: () => () => undefined,
-      onPlatz: () => () => undefined,
+      onPlatz: (cb: typeof platz) => {
+        platz = cb
+        return () => undefined
+      },
       structured: (req: StructuredRequest) => new Promise((ok, weg) => offen.set(req.progressId!, { ok, weg })),
-      image: () => Promise.reject(new Error('keine Bilder')),
+      image: () => new Promise<string>((ok) => offeneBilder.push(ok)),
       websuche: async () => [],
       cancel: async (id: string) => {
         abgebrochen.push(id)
@@ -28,7 +34,7 @@ const abgebrochen: string[] = []
   }
 }
 
-const { brichAb, legeAb, setzeFehlerMeldung, starteAuftrag, useAuftraege, versucheErneut } = await import('../src/renderer/src/shared/auftraege')
+const { brichAb, legeAb, setzeFehlerMeldung, starteAuftrag, useAuftraege, versucheErneut, warteGrund } = await import('../src/renderer/src/shared/auftraege')
 
 const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
 const auftrag = (id?: string) => (id ? useAuftraege.getState().auftraege.find((a) => a.id === id) : useAuftraege.getState().auftraege.at(-1))
@@ -45,6 +51,7 @@ beforeEach(() => {
   useAuftraege.setState({ auftraege: [] })
   offen.clear()
   abgebrochen.length = 0
+  offeneBilder.length = 0
 })
 
 describe('Hintergrund-Aufträge', () => {
@@ -98,6 +105,72 @@ describe('Hintergrund-Aufträge', () => {
     expect(auftrag(id)?.status).toBe('abgebrochen')
     expect(ablegen).not.toHaveBeenCalled()
     expect(meldung).not.toHaveBeenCalled()
+  })
+
+  /*
+   * Paket 3b: Die Bild-KI von OpenAI nimmt kein Abbruchsignal. Für die Lehrkraft muss der
+   * Auftrag trotzdem SOFORT abgebrochen sein – nicht erst, wenn das Bild fertig ist –, und das
+   * späte Bild darf nirgends landen.
+   */
+  it('bricht sofort ab, auch wenn die Anfrage den Abbruch überhört – das späte Ergebnis wird verworfen', async () => {
+    const meldung = vi.fn()
+    setzeFehlerMeldung(meldung)
+    const ablegen = vi.fn(async () => undefined)
+    const lauf = starteAuftrag({
+      moduleId: 'arbeitsblatt',
+      docId: 'd-bild',
+      titel: 'Igel',
+      art: 'Bild erzeugen',
+      eingabe: {},
+      arbeit: (_e, k) => k.bild('Ein Igel im Laub'),
+      ablegen
+    })
+    await tick()
+    await tick()
+    const id = auftrag()!.id
+    expect(offeneBilder).toHaveLength(1)
+    brichAb(id)
+    await tick()
+    // Sofort: Das Bild ist noch nicht da, der Auftrag ist trotzdem beendet
+    expect(auftrag(id)?.status).toBe('abgebrochen')
+    await expect(lauf).resolves.toBeNull()
+    expect(abgebrochen).toHaveLength(1)
+    offeneBilder.shift()!('data:image/png;base64,spaet')
+    await tick()
+    await tick()
+    expect(auftrag(id)?.status).toBe('abgebrochen')
+    expect(ablegen).not.toHaveBeenCalled()
+    expect(meldung).not.toHaveBeenCalled()
+  })
+
+  it('erklärt das Warten, wenn ein abgebrochener Bildauftrag den Platz noch hält', async () => {
+    void starteAuftrag({
+      moduleId: 'arbeitsblatt',
+      docId: 'd-wartet',
+      titel: 'Fuchs',
+      art: 'Probe',
+      eingabe: {},
+      arbeit: (_e, k) => k.ai(REQ),
+      ablegen: async () => undefined
+    })
+    await tick()
+    const anfrage = [...offen.keys()].at(-1)!
+    platz!({ id: anfrage, zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0 })
+    expect(auftrag()?.status).toBe('wartend')
+    expect(auftrag()?.wartegrund).toBeUndefined()
+    platz!({ id: anfrage, zustand: 'wartend', abgebrochen: 1, abgebrocheneBilder: 1 })
+    expect(auftrag()?.wartegrund).toMatch(/abgebrochener Bildauftrag gibt seinen Platz gleich frei/)
+    platz!({ id: anfrage, zustand: 'laufend' })
+    expect(auftrag()?.status).toBe('laufend')
+    expect(auftrag()?.wartegrund).toBeUndefined()
+    brichAb(auftrag()!.id)
+  })
+
+  it('nennt den Grund passend zu Zahl und Art der abgebrochenen Anfragen', () => {
+    expect(warteGrund([{ abgebrochen: 0, bilder: 0 }])).toBeUndefined()
+    expect(warteGrund([{ abgebrochen: 1, bilder: 0 }])).toMatch(/ein abgebrochener Auftrag/)
+    expect(warteGrund([{ abgebrochen: 2, bilder: 2 }])).toMatch(/abgebrochene Bildaufträge geben ihre Plätze/)
+    expect(warteGrund([{ abgebrochen: 2, bilder: 1 }])).toMatch(/abgebrochene Aufträge geben ihre Plätze/)
   })
 
   it('meldet einen echten Fehler und lässt sich erneut starten – mit denselben Eingaben', async () => {

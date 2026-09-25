@@ -23,6 +23,20 @@ import { AbbruchFehler } from '@shared/abbruch'
 
 export type PlatzZustand = 'wartend' | 'laufend'
 
+/**
+ * Zusatz zur Meldung „wartend": Wie viele Plätze gerade von ABGEBROCHENEN Anfragen belegt
+ * sind, die der Anbieter noch zu Ende rechnet (davon Bilder).
+ *
+ * Anlass (Nachtrag der Lehrkraft zu Paket 3): Die Bild-KI von OpenAI nimmt kein Abbruchsignal.
+ * Für die Lehrkraft ist der Auftrag sofort abgebrochen, der Platz aber bleibt bis zum Ende
+ * belegt. Wartet dadurch ein anderer Auftrag, soll die Leiste das ehrlich sagen („ein
+ * abgebrochener Bildauftrag gibt seinen Platz gleich frei") – statt scheinbar grundlos zu warten.
+ */
+export interface PlatzInfo {
+  abgebrochen: number
+  abgebrocheneBilder: number
+}
+
 interface Wartender {
   id?: string
   los: () => void
@@ -37,11 +51,22 @@ export class KiPlaetze {
   private schlange: Wartender[] = []
   private steuerung = new Map<string, AbortController>()
   private vorzeitig = new Map<string, number>()
+  /** Art je belegtem Platz einer abgebrochenen, aber noch rechnenden Anfrage */
+  private verwaist: string[] = []
 
   constructor(
     readonly max: number,
-    private melde?: (id: string, zustand: PlatzZustand) => void
+    private melde?: (id: string, zustand: PlatzZustand, info?: PlatzInfo) => void
   ) {}
+
+  private info(): PlatzInfo {
+    return { abgebrochen: this.verwaist.length, abgebrocheneBilder: this.verwaist.filter((a) => a === 'bild').length }
+  }
+
+  /** Allen Wartenden den neuen Stand sagen – etwa, dass ein Platz jetzt einer abgebrochenen Anfrage gehört. */
+  private meldeWartende(): void {
+    for (const w of this.schlange) if (w.id) this.melde?.(w.id, 'wartend', this.info())
+  }
 
   /** Laufende und wartende Anfragen (für Tests und Anzeige). */
   stand(): { laufend: number; wartend: number } {
@@ -54,8 +79,11 @@ export class KiPlaetze {
    * Mit `id` lässt sich die Anfrage abbrechen (`abbrechen(id)`): wartend wird sie aus der
    * Schlange genommen, laufend bekommt `arbeit` das Signal. In beiden Fällen endet der Aufruf
    * mit `AbbruchFehler` – gleich, was der Anbieter dabei für einen Fehler wirft.
+   *
+   * `art` (z. B. „bild") erscheint in der Meldung an Wartende, falls eine abgebrochene Anfrage
+   * dieser Art ihren Platz noch hält.
    */
-  async platz<T>(id: string | undefined, arbeit: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  async platz<T>(id: string | undefined, arbeit: (signal: AbortSignal) => Promise<T>, art = 'text'): Promise<T> {
     const steuerung = new AbortController()
     if (id) {
       if (this.vorzeitig.has(id)) {
@@ -66,7 +94,7 @@ export class KiPlaetze {
     }
     try {
       if (this.laufend >= this.max) {
-        if (id) this.melde?.(id, 'wartend')
+        if (id) this.melde?.(id, 'wartend', this.info())
         await new Promise<void>((los, weg) => {
           const eintrag: Wartender = { id, los, weg }
           this.schlange.push(eintrag)
@@ -85,12 +113,27 @@ export class KiPlaetze {
       } catch (e) {
         lauf = Promise.reject(e)
       }
+      /*
+       * Abgebrochen, aber der Anbieter rechnet weiter: Der Platz gehört jetzt einer Anfrage,
+       * auf deren Ergebnis niemand mehr wartet. Wartende erfahren es (siehe `PlatzInfo`).
+       */
+      let verwaist = false
+      const beiAbbruch = (): void => {
+        verwaist = true
+        this.verwaist.push(art)
+        this.meldeWartende()
+      }
+      if (steuerung.signal.aborted) beiAbbruch()
+      else steuerung.signal.addEventListener('abort', beiAbbruch, { once: true })
       // Der Platz wird erst frei, wenn die Arbeit wirklich endet – nicht schon beim Abbruch
       void lauf
         .catch(() => undefined)
         .then(() => {
+          steuerung.signal.removeEventListener('abort', beiAbbruch)
+          if (verwaist) this.verwaist.splice(this.verwaist.indexOf(art), 1)
           this.laufend--
           this.schlange.shift()?.los()
+          if (verwaist) this.meldeWartende()
         })
       return await mitAbbruch(lauf, steuerung.signal)
     } finally {

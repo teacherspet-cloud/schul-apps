@@ -5,6 +5,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { useEffect, useMemo, useState } from 'react'
 import type { PrinterInfo } from '../../../../preload/index'
 import { parsePageRanges } from '../printRanges'
+import { druckeImBrowser, imNetz } from '../netzZugang'
 import { notifyError, notifySuccess } from '../util'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -115,7 +116,31 @@ export default function PrintPreview({
   const loesungBlaetter = duplex === 'simplex' ? loesungSeiten : Math.ceil(loesungSeiten / 2)
   const mitLoesung = Boolean(loesung) && loesungExemplare > 0
 
+  /*
+   * Im Browser (Tablet) gibt es keinen Drucker des Rechners: Blatt und – falls gewählt –
+   * Lösungen gehen als EIN PDF in EINEN neuen Tab (netzZugang.ts, `druckeImBrowser`). Zwei
+   * Druckaufträge hießen dort zwei Tabs, und den zweiten verwirft der Popup-Blocker.
+   * Muss ohne vorheriges `await` aufgerufen werden, sonst gilt der Tab nicht mehr als Folge des Klicks.
+   */
+  const druckeImNetz = async (): Promise<void> => {
+    if (!html) return
+    setPrinting(true)
+    try {
+      const wie = await druckeImBrowser(loesung && mitLoesung ? [html, loesung.html] : [html], `${title ?? 'Druck'}.pdf`)
+      const was = loesung && mitLoesung ? `Blatt und ${loesung.titel}` : 'Blatt'
+      notifySuccess(
+        wie === 'tab' ? `Druckansicht im neuen Tab geöffnet (${was}).` : `Der Browser hat den neuen Tab blockiert – das PDF (${was}) wurde heruntergeladen.`
+      )
+      onClose()
+    } catch (e) {
+      notifyError(e, 'Drucken fehlgeschlagen')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   const print = async (): Promise<void> => {
+    if (imNetz()) return druckeImNetz()
     if (!html || !printer) return
     setPrinting(true)
     try {
@@ -314,7 +339,7 @@ export default function PrintPreview({
               leftSection={<IconPrinter size={16} />}
               onClick={() => void print()}
               loading={printing}
-              disabled={!pages || !printer || invalidRange || (Boolean(loesung) && !loesungPages)}
+              disabled={!pages || (!printer && !imNetz()) || invalidRange || (Boolean(loesung) && !loesungPages)}
             >
               Drucken
             </Button>
@@ -322,9 +347,12 @@ export default function PrintPreview({
               Abbrechen
             </Button>
           </div>
-          <Button className="pv-systemdialog" variant="subtle" size="xs" onClick={() => void systemDialog()} disabled={!html}>
-            Druckdialog von Windows öffnen
-          </Button>
+          {/* Im Browser gäbe es nur den Dialog des entfernten Rechners – dort druckt „Drucken" über den Tab */}
+          {!imNetz() && (
+            <Button className="pv-systemdialog" variant="subtle" size="xs" onClick={() => void systemDialog()} disabled={!html}>
+              Druckdialog von Windows öffnen
+            </Button>
+          )}
         </Stack>
       </Group>
     </Modal>

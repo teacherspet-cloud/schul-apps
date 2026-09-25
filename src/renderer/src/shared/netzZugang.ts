@@ -48,6 +48,8 @@ export async function anmelden(pin: string): Promise<void> {
     throw new Error(daten.fehler + (typeof daten.verbleibend === 'number' ? ` Noch ${daten.verbleibend} Versuche.` : ''))
   }
   localStorage.setItem(SCHLUESSEL, daten.token)
+  // Ein offener Strom gehört zur alten Anmeldung – Ereignisse der neuen kämen dort nie an
+  stromSteuerung?.abort()
 }
 
 export const abgemeldet = (): boolean => !token()
@@ -85,6 +87,206 @@ function packen(wert: unknown): unknown {
   return wert
 }
 
+/*
+ * ---------- Ereignisse vom Rechner (Fortschritt, Warteplatz, Modellhinweise) ----------
+ *
+ * Am Rechner kommen sie über die Electron-Brücke. Im Browser liest diese Datei einen Strom
+ * vom Server (GET /ereignisse, Server-Sent Events). Warum dieser Weg und nicht Abfragen im
+ * Takt oder EventSource, steht in main/services/lanServer.ts. Der Server schickt nur, was zu
+ * Anfragen DIESES Geräts gehört oder alle angeht.
+ */
+
+/** Ein Ereignis aus dem Strom */
+export interface StromEreignis {
+  nr: string
+  kanal: string
+  wert: unknown
+}
+
+/**
+ * Zerlegt gelesenen Text in Ereignisse; ein unvollständiger Rest bleibt für das nächste Stück.
+ *
+ * Ein Ereignis endet mit einer Leerzeile. Zeilen mit „:" am Anfang sind Herzschlag bzw.
+ * Kommentar und tragen nichts. Der Text kann an JEDER Stelle abreißen – mitten in einer Zeile
+ * oder zwischen „\n" und „\n" –, deshalb wird nur vollständig Abgeschlossenes ausgewertet.
+ */
+export function zerlegeStrom(text: string): { ereignisse: StromEreignis[]; rest: string } {
+  const ereignisse: StromEreignis[] = []
+  const bloecke = text.replace(/\r\n?/g, '\n').split('\n\n')
+  const rest = bloecke.pop() ?? ''
+  for (const block of bloecke) {
+    let nr = ''
+    const daten: string[] = []
+    for (const zeile of block.split('\n')) {
+      if (zeile.startsWith('id:')) nr = zeile.slice(3).trim()
+      else if (zeile.startsWith('data:')) daten.push(zeile.slice(5).replace(/^ /, ''))
+    }
+    if (!daten.length) continue
+    try {
+      const { kanal, wert } = JSON.parse(daten.join('\n')) as { kanal?: string; wert?: unknown }
+      if (typeof kanal === 'string') ereignisse.push({ nr, kanal, wert })
+    } catch {
+      // ein kaputtes Ereignis überspringen, der Strom geht weiter
+    }
+  }
+  return { ereignisse, rest }
+}
+
+/** Kommt so lange gar nichts – auch kein Herzschlag (alle 15 s) –, gilt die Verbindung als tot. */
+const STILLE_MS = 45_000
+
+const hoerer = new Map<string, Set<(wert: unknown) => void>>()
+let stromLaeuft = false
+/** Der gerade offene Strom – nach einer neuen Anmeldung wird er mit dem neuen Token neu geöffnet */
+let stromSteuerung: AbortController | null = null
+
+const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Hält den Strom offen – solange die Seite lebt.
+ *
+ * Reißt er ab (WLAN weg, Tablet im Ruhezustand, Rechner neu gestartet), wird er mit
+ * wachsender Pause (1 s bis 15 s) neu aufgebaut. Dabei nennt der Browser das zuletzt
+ * erhaltene Ereignis (`last-event-id`); der Server liefert nach, was dazwischen kam – vor
+ * allem „Platz frei", sonst stünde ein Auftrag für immer auf „wartet".
+ * Ohne Anmeldung wird nichts geöffnet; der Server würde ohnehin ablehnen.
+ */
+async function halteStrom(): Promise<void> {
+  let letzte = ''
+  let letzterToken = ''
+  let warte = 1000
+  for (;;) {
+    const t = token()
+    if (!t) {
+      await pause(2000)
+      continue
+    }
+    // Neue Anmeldung = neue Sitzung am Server mit eigener Zählung
+    if (t !== letzterToken) letzte = ''
+    letzterToken = t
+    const steuerung = new AbortController()
+    stromSteuerung = steuerung
+    let wache: ReturnType<typeof setTimeout> | undefined
+    const lebt = (): void => {
+      clearTimeout(wache)
+      wache = setTimeout(() => steuerung.abort(), STILLE_MS)
+    }
+    try {
+      lebt()
+      const res = await fetch('/ereignisse', {
+        headers: { 'x-schulapps-token': t, ...(letzte ? { 'last-event-id': letzte } : {}) },
+        cache: 'no-store',
+        signal: steuerung.signal
+      })
+      if (res.ok && res.body) {
+        warte = 1000
+        const leser = res.body.getReader()
+        // `stream: true`: Ein Umlaut kann auf zwei Stücke verteilt ankommen
+        const decoder = new TextDecoder()
+        let puffer = ''
+        for (;;) {
+          const { done, value } = await leser.read()
+          if (done) break
+          lebt()
+          puffer += decoder.decode(value, { stream: true })
+          const { ereignisse, rest } = zerlegeStrom(puffer)
+          puffer = rest
+          for (const e of ereignisse) {
+            if (e.nr) letzte = e.nr
+            for (const cb of hoerer.get(e.kanal) ?? []) {
+              try {
+                cb(e.wert)
+              } catch {
+                // ein fehlerhafter Hörer hält die übrigen nicht auf
+              }
+            }
+          }
+        }
+      } else if (res.status === 401) {
+        // Abgemeldet (z. B. Zugang am Rechner neu eingeschaltet): kein neuer Strom, bis wieder eine PIN eingegeben ist
+        letzte = ''
+        await pause(5000)
+      }
+    } catch {
+      // abgerissen oder zu lange still – unten neu verbinden
+    } finally {
+      clearTimeout(wache)
+      steuerung.abort()
+    }
+    await pause(warte)
+    warte = Math.min(15_000, warte * 2)
+  }
+}
+
+/** Hörer für ein Ereignis anmelden; der Strom startet mit dem ersten Hörer. */
+export function horche(kanal: string, cb: (wert: unknown) => void): () => void {
+  if (!hoerer.has(kanal)) hoerer.set(kanal, new Set())
+  hoerer.get(kanal)!.add(cb)
+  if (!stromLaeuft && typeof fetch === 'function') {
+    stromLaeuft = true
+    void halteStrom()
+  }
+  return () => {
+    hoerer.get(kanal)?.delete(cb)
+  }
+}
+
+/*
+ * ---------- Drucken im Browser ----------
+ *
+ * Drucken heißt hier: das fertige PDF in einem neuen Tab öffnen und dort drucken. Der
+ * Druckdialog des Rechners wäre der falsche – gedruckt werden soll dort, wo das Gerät steht.
+ *
+ * Zwei Fallen (Nachtrag zu Paket 4):
+ *  - Ein neuer Tab darf nur als DIREKTE Folge eines Klicks aufgehen. Die erste Fassung öffnete
+ *    ihn erst, nachdem das PDF erzeugt war – Sekunden später. Safari und strenge Popup-Blocker
+ *    verwerfen das. Deshalb geht der Tab sofort auf (noch leer) und bekommt das PDF, sobald es da ist.
+ *  - „Lösungen separat drucken" öffnete ZWEI Tabs; der zweite fällt dem Blocker sicher zum
+ *    Opfer. Jetzt entsteht EIN PDF: Blatt, dann Lösungen ab einer neuen Seite.
+ *
+ * Wird der Tab trotzdem blockiert, wird das PDF heruntergeladen – verloren geht nichts.
+ */
+export async function druckeImBrowser(teile: string[], dateiname = 'Druck.pdf'): Promise<'tab' | 'datei'> {
+  // VOR dem ersten `await`: So zählt das Öffnen noch als Folge des Klicks
+  const tab = window.open('', '_blank')
+  try {
+    tab?.document.write('<p style="font-family:sans-serif;padding:2em">Druckansicht wird erstellt …</p>')
+  } catch {
+    // nur ein Hinweis im leeren Tab
+  }
+  try {
+    const pdfs: Uint8Array[] = []
+    for (const html of teile) pdfs.push(await window.api.exporter.preview(html))
+    const bytes = pdfs.length === 1 ? pdfs[0] : await vereinePdfs(pdfs)
+    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes).slice().buffer], { type: 'application/pdf' }))
+    setTimeout(() => URL.revokeObjectURL(url), 120_000)
+    if (tab && !tab.closed) {
+      tab.location.href = url
+      return 'tab'
+    }
+    const a = document.createElement('a')
+    a.href = url
+    a.download = dateiname
+    a.click()
+    return 'datei'
+  } catch (e) {
+    tab?.close()
+    throw e
+  }
+}
+
+/** Mehrere PDFs zu einem – jedes beginnt auf einer neuen Seite. */
+export async function vereinePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
+  // Erst bei Bedarf geladen: pdf-lib braucht nur, wer im Browser Blatt und Lösungen zusammen druckt
+  const { PDFDocument } = await import('pdf-lib')
+  const ziel = await PDFDocument.create()
+  for (const bytes of pdfs) {
+    const quelle = await PDFDocument.load(bytes)
+    for (const seite of await ziel.copyPages(quelle, quelle.getPageIndices())) ziel.addPage(seite)
+  }
+  return ziel.save()
+}
+
 /**
  * Baut `window.api` für den Browser. Tut nichts, wenn die Oberfläche in der App läuft.
  *
@@ -114,12 +316,12 @@ export function netzZugangEinrichten(): void {
     // Im Browser gibt es keinen Pfad auf dem Rechner – die Datei kommt als Inhalt an
     pathOf: () => '',
     /*
-     * Ereignisse (Fortschritt einer KI-Anfrage, Einrichtungsschritte) kommen im Browser
-     * nicht an. Sie sind reine Anzeigehilfe: Ohne sie fehlt der Fortschrittsbalken, die
-     * Anfrage läuft trotzdem. Die Abmeldung gibt es trotzdem zurück, damit aufräumender
-     * Code nicht ins Leere greift.
+     * Ereignisse kommen über den Strom vom Server (`horche`, siehe oben): Fortschritt und
+     * Warteplatz der eigenen Anfragen, geänderte KI-Modelle. Was der Server nicht ins Netz
+     * lässt (Einrichtung des Abo-Zugangs, Schließen des Fensters am Rechner), kommt nie an –
+     * die Abmeldung funktioniert trotzdem.
      */
-    subscribe: () => () => undefined
+    subscribe: horche
   }) as typeof window.api
 
   /*
@@ -191,15 +393,9 @@ export function netzZugangEinrichten(): void {
    * fragt gar nicht erst danach; kommt der Aufruf doch einmal an, heißt die Antwort „abgebrochen".
    */
   api.files.chooseFolder = async () => null
+  // Drucken: PDF im neuen Tab des Geräts (siehe `druckeImBrowser`)
   api.exporter.print = async (html) => {
-    /*
-     * Drucken heisst hier: das fertige PDF im Browser oeffnen. Der Druckdialog dieses
-     * Rechners waere der falsche – gedruckt werden soll dort, wo das Geraet steht.
-     */
-    const bytes = await api.exporter.preview(html)
-    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes).slice().buffer], { type: 'application/pdf' }))
-    window.open(url, '_blank')
-    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    await druckeImBrowser([html])
   }
 
   window.api = api

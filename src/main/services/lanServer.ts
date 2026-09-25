@@ -19,6 +19,7 @@
  */
 import { app } from 'electron'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { networkInterfaces } from 'node:os'
 import { createReadStream, existsSync, statSync } from 'node:fs'
@@ -144,6 +145,80 @@ export const UMSCHREIBUNG: Record<string, (args: unknown[]) => unknown[]> = {
 /** Argumente eines Aufrufs so beschneiden, wie es über das Netz gilt. */
 export const beschneide = (kanal: string, args: unknown[]): unknown[] => (UMSCHREIBUNG[kanal] ? UMSCHREIBUNG[kanal](args) : args)
 
+/*
+ * ---------- Ereignisse vom Hauptprozess an den Browser ----------
+ *
+ * Anlass (Nachtrag der Lehrkraft zu Paket 3): Am Rechner kommen Fortschritt, Warteplatz und
+ * Modellhinweise über die Electron-Brücke an. Im Browser liefen diese Ereignisse ins Leere –
+ * der Balken stand, ein wartender Auftrag sah aus wie ein hängender.
+ *
+ * WAHL DES WEGS: Server-Sent Events (eine lange Antwort auf GET /ereignisse), gelesen per
+ * `fetch` statt per `EventSource`.
+ *  - Gegen Abfrage im Takt: Fortschritt kommt bis zu fünfmal je Sekunde und Anfrage. Eine
+ *    Abfrage, die das einfängt, hieße mehrere Anfragen je Sekunde vom Tablet – jede mit
+ *    Anmeldung, Akku und WLAN-Last –, und zwischen zwei Abfragen stünde der Balken trotzdem.
+ *    Ein offener Strom kostet eine Verbindung und liefert sofort.
+ *  - Gegen WebSocket: braucht ein eigenes Protokoll und Upgrade-Behandlung; hier fließt nur
+ *    eine Richtung, und SSE ist schlichtes HTTP.
+ *  - `fetch` statt `EventSource`: EventSource kann keine Kopfzeilen senden. Die Anmeldung
+ *    müsste dann in die Adresse (landet in Verlauf und Protokollen), oder ein Cookie wäre
+ *    nötig. Mit `fetch` gilt dieselbe Anmeldung wie für jeden anderen Aufruf
+ *    (`x-schulapps-token`); Wiederverbinden und „Last-Event-ID" übernimmt der Browser-Teil
+ *    (renderer/src/shared/netzZugang.ts) selbst.
+ *  - Herzschlag alle 15 s: Router, Proxys und WLAN-Stromsparen kappen stille Verbindungen,
+ *    ohne dass die Seite davon erfährt. Der Browser baut neu auf, wenn 45 s nichts kam.
+ *
+ * ZUORDNUNG: Die Kennungen der Anfragen (Fortschritt, Warteplatz, Abbruch) wählt der Browser
+ * selbst – am Rechner und am Tablet können sie gleich lauten. Deshalb stellt der Server jeder
+ * Kennung aus dem Netz die Sitzung voran (`netz-<sitzung>-…`, `kennzeichne`). Ereignisse mit
+ * so einer Kennung gehen NUR an diese Sitzung, ohne Vorsatz zurück; das Fenster am Rechner
+ * bekommt sie nicht. Nebenbei kann ein Gerät damit nur SEINE Anfragen abbrechen.
+ */
+
+/** Ereignisse, die überhaupt ins Netz dürfen. Einrichtung und Fenster-Schließen gehören dem Rechner. */
+export const NETZ_EREIGNISSE: readonly string[] = ['ai:progress', 'ai:platz', 'models:updated']
+
+const NETZ_VORSATZ = 'netz-'
+
+/** Wo in den Argumenten eines Aufrufs die Kennung einer Anfrage steht */
+const KENNUNG_IN: Record<string, (args: unknown[], f: (id: string) => string) => unknown[]> = {
+  'ai:structured': (args, f) => {
+    const req = args[0] as Record<string, unknown> | undefined
+    if (!req || typeof req !== 'object' || typeof req.progressId !== 'string') return args
+    return [{ ...req, progressId: f(req.progressId) }, ...args.slice(1)]
+  },
+  'ai:image': (args, f) => (typeof args[1] === 'string' ? [args[0], f(args[1]), ...args.slice(2)] : args),
+  'ai:websuche': (args, f) => (typeof args[1] === 'string' ? [args[0], f(args[1]), ...args.slice(2)] : args),
+  'ai:cancel': (args, f) => (typeof args[0] === 'string' ? [f(args[0]), ...args.slice(1)] : args)
+}
+
+/** Kennungen einer Anfrage aus dem Netz der Sitzung zuordnen (siehe oben, ZUORDNUNG). */
+export const kennzeichne = (kanal: string, args: unknown[], sitzung: string): unknown[] =>
+  KENNUNG_IN[kanal] ? KENNUNG_IN[kanal](args, (id) => `${NETZ_VORSATZ}${sitzung}-${id}`) : args
+
+interface Ereignis {
+  nr: number
+  kanal: string
+  wert: unknown
+}
+
+interface Sitzung {
+  kennung: string
+  stroeme: Set<ServerResponse>
+  /** Zuletzt gesendete Ereignisse – zum Nachliefern nach einer kurzen Unterbrechung */
+  puffer: Ereignis[]
+  nr: number
+}
+
+/** Nachgeliefert wird höchstens so viel; Fortschritt wird gar nicht gepuffert (der nächste ersetzt ihn). */
+const PUFFER = 100
+/**
+ * Jeder Tab eines Browsers teilt sich die Anmeldung und hält einen eigenen Strom. Mehr als acht
+ * je Gerät sind ein Zeichen für hängende Reste (abgerissene Verbindungen) – der älteste geht.
+ */
+const MAX_STROEME = 8
+const HERZSCHLAG_MS = 15_000
+
 export interface LanStatus {
   laeuft: boolean
   /** Der gewünschte Port – weicht er vom laufenden ab, war er belegt */
@@ -164,7 +239,9 @@ let aktuellerPort = 0
 let gewuenschterPort = 0
 let pin = ''
 let aufrufen: Aufruf | null = null
-const tokens = new Set<string>()
+/** Angemeldete Geräte: Token → Sitzung */
+const tokens = new Map<string, Sitzung>()
+let herzschlag: ReturnType<typeof setInterval> | null = null
 let fehlversuche = 0
 const MAX_FEHLVERSUCHE = 10
 
@@ -197,6 +274,68 @@ function gleich(a: string, b: string): boolean {
   const x = Buffer.from(a)
   const y = Buffer.from(b)
   return x.length === y.length && timingSafeEqual(x, y)
+}
+
+function schreibe(res: ServerResponse, e: Ereignis): void {
+  res.write(`id: ${e.nr}\ndata: ${JSON.stringify({ kanal: e.kanal, wert: e.wert })}\n\n`)
+}
+
+function zustellen(sitzung: Sitzung, kanal: string, wert: unknown): void {
+  const e: Ereignis = { nr: ++sitzung.nr, kanal, wert }
+  if (kanal !== 'ai:progress') {
+    sitzung.puffer.push(e)
+    if (sitzung.puffer.length > PUFFER) sitzung.puffer.shift()
+  }
+  for (const res of sitzung.stroeme) schreibe(res, e)
+}
+
+/**
+ * Ein Ereignis des Hauptprozesses, das zu einer Anfrage aus dem Netz gehören KANN.
+ *
+ * Liefert `true`, wenn es einem Gerät gehört – dann ist es dorthin zugestellt (oder verworfen,
+ * falls das Gerät nicht mehr angemeldet ist) und geht NICHT an das Fenster am Rechner.
+ */
+export function lanEreignis(kanal: string, wert: unknown): boolean {
+  const id = wert && typeof wert === 'object' ? (wert as { id?: unknown }).id : undefined
+  if (typeof id !== 'string' || !id.startsWith(NETZ_VORSATZ)) return false
+  const rest = id.slice(NETZ_VORSATZ.length)
+  const trenn = rest.indexOf('-')
+  const kennung = rest.slice(0, Math.max(0, trenn))
+  const sitzung = trenn > 0 ? [...tokens.values()].find((s) => s.kennung === kennung) : undefined
+  if (sitzung && NETZ_EREIGNISSE.includes(kanal)) zustellen(sitzung, kanal, { ...(wert as object), id: rest.slice(trenn + 1) })
+  return true
+}
+
+/** Ein allgemeines Ereignis (z. B. geänderte KI-Modelle) an alle angemeldeten Geräte. */
+export function lanRundruf(kanal: string, wert: unknown): void {
+  if (!NETZ_EREIGNISSE.includes(kanal)) return
+  for (const sitzung of tokens.values()) zustellen(sitzung, kanal, wert)
+}
+
+/** GET /ereignisse: der Strom eines angemeldeten Geräts. */
+function oeffneStrom(req: IncomingMessage, res: ServerResponse, sitzung: Sitzung): void {
+  res.writeHead(200, {
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    // Zwischengeschaltete Proxys sollen nicht puffern – sonst kommt der Fortschritt in Klumpen
+    'x-accel-buffering': 'no'
+  })
+  req.socket.setNoDelay(true)
+  req.socket.setKeepAlive(true, HERZSCHLAG_MS)
+  res.write(': verbunden\n\n')
+  // Nach einer Unterbrechung nachliefern, was seitdem kam (vor allem: Warteplatz frei)
+  const letzte = Number(req.headers['last-event-id'])
+  if (Number.isFinite(letzte) && letzte > 0) for (const e of sitzung.puffer) if (e.nr > letzte) schreibe(res, e)
+  sitzung.stroeme.add(res)
+  if (sitzung.stroeme.size > MAX_STROEME) {
+    const aeltester = sitzung.stroeme.values().next().value
+    if (aeltester) {
+      sitzung.stroeme.delete(aeltester)
+      aeltester.end()
+    }
+  }
+  res.on('close', () => sitzung.stroeme.delete(res))
 }
 
 /**
@@ -318,13 +457,21 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
             return json(res, 401, { fehler: 'Falsche PIN.', verbleibend: MAX_FEHLVERSUCHE - fehlversuche })
           }
           const neu = randomBytes(24).toString('hex')
-          tokens.add(neu)
+          tokens.set(neu, { kennung: randomBytes(6).toString('hex'), stroeme: new Set(), puffer: [], nr: 0 })
           fehlversuche = 0
           return json(res, 200, { token: neu })
         }
 
+        if (req.method === 'GET' && url.pathname === '/ereignisse') {
+          // Dieselbe Anmeldung wie für jeden Aufruf – ohne sie gibt es keinen Strom
+          const sitzung = typeof token === 'string' ? tokens.get(token) : undefined
+          if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' })
+          return oeffneStrom(req, res, sitzung)
+        }
+
         if (req.method === 'POST' && url.pathname === '/api') {
-          if (typeof token !== 'string' || !tokens.has(token)) return json(res, 401, { fehler: 'Nicht angemeldet.' })
+          const sitzung = typeof token === 'string' ? tokens.get(token) : undefined
+          if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' })
           const koerper = JSON.parse((await leseKoerper(req)) || '{}') as { channel?: string; args?: unknown[] }
           const kanal = String(koerper.channel ?? '')
           if (!ERLAUBTE_KANAELE.includes(kanal)) {
@@ -340,7 +487,7 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
           if (!aufrufen) return json(res, 500, { fehler: 'Der Zugang ist nicht bereit.' })
           try {
             const roh = (koerper.args ?? []).map(auspacken)
-            const wert = await aufrufen(kanal, beschneide(kanal, roh))
+            const wert = await aufrufen(kanal, kennzeichne(kanal, beschneide(kanal, roh), sitzung.kennung))
             return json(res, 200, { ok: true, value: packen(wert) })
           } catch (e) {
             return json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) })
@@ -366,7 +513,12 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
     const binden = (port: number): void => {
       s.listen(port, '0.0.0.0', () => {
         server = s
-        aktuellerPort = port
+        // Bei Port 0 (nur in den Tests) wählt das System – maßgeblich ist der tatsächliche
+        aktuellerPort = (s.address() as AddressInfo | null)?.port ?? port
+        herzschlag = setInterval(() => {
+          for (const sitzung of tokens.values()) for (const res of sitzung.stroeme) res.write(': puls\n\n')
+        }, HERZSCHLAG_MS)
+        herzschlag.unref?.()
         ok(lanStatus())
       })
     }
@@ -384,6 +536,10 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
 }
 
 export function stopLan(): void {
+  if (herzschlag) clearInterval(herzschlag)
+  herzschlag = null
+  // Offene Ströme beenden – sonst hielten sie den Server über `close()` hinaus am Leben
+  for (const sitzung of tokens.values()) for (const res of sitzung.stroeme) res.end()
   server?.close()
   server = null
   aktuellerPort = 0
