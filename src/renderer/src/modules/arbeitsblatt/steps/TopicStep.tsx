@@ -21,7 +21,7 @@ import {
   TextInput,
   Title
 } from '@mantine/core'
-import { IconAlertTriangle, IconBook2, IconFolder, IconFolderOpen, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconAlertTriangle, IconBook2, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
@@ -85,10 +85,8 @@ import type {
   Worksheet,
   WorksheetMeta
 } from '../model/types'
-import { parseWorksheetFile, WORKSHEET_FILTER } from '../project'
 import { profileFromMeta } from '../render/SheetPages'
 import { aiCall, useArbeitsblatt } from '../store'
-import { sichereAlles } from '../../../shared/autosave'
 import { ProfileCard } from './ProfileCard'
 import { isSensitiveForRolePlay, rolePlayTypeById, rolePlayTypesFor, WITHOUT_ESTABLISHED_PRACTICE } from '../didactics/rolePlay'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
@@ -108,8 +106,8 @@ import {
 /** Ein noch leerer Videoauftrag – Lernvideo, weil das im Alltag am häufigsten vorkommt. */
 const EMPTY_VIDEO: VideoSetup = { title: '', url: '', kind: 'lernvideo', platform: '', minutes: 0, section: '', summary: '', during: 'auto', groups: 0 }
 
-export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): React.JSX.Element {
-  const { worksheet, setWorksheet, setStep, loadWorksheet } = useArbeitsblatt()
+export default function TopicStep(): React.JSX.Element {
+  const { worksheet, setWorksheet, setStep } = useArbeitsblatt()
   const appSettings = useAppSettings((s) => s.settings)
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
@@ -297,28 +295,6 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
               Jahrgang, Schulform und Bundesland bestimmen Sprache, Anforderungen, Aufgabenformate und Layout.
             </Text>
           </div>
-          <Button
-            variant="default"
-            leftSection={<IconFolderOpen size={16} />}
-            onClick={async () => {
-              try {
-                const file = await window.api.files.open(WORKSHEET_FILTER)
-                if (!file) return
-                // Das bisherige Blatt zuerst sichern – das geöffnete ist ein anderes Dokument
-                await sichereAlles()
-                loadWorksheet(parseWorksheetFile(file.data))
-              } catch (e) {
-                notifyError(e)
-              }
-            }}
-          >
-            Gespeichertes Arbeitsblatt öffnen
-          </Button>
-          {onLibrary && (
-            <Button variant="default" leftSection={<IconFolder size={16} />} onClick={onLibrary}>
-              Meine Arbeitsblätter
-            </Button>
-          )}
         </Group>
 
         {!hasKey && (

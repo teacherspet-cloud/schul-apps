@@ -44,12 +44,22 @@ describe('Tafelbild beim Speichern', () => {
 
   it('bleibt beim Drucken am Ende des Stapels', () => {
     // Beim Drucken entsteht Papier und keine zweite Datei
-    for (const loesungen of ['none', 'append', 'separate'] as const) {
+    for (const loesungen of ['none', 'append'] as const) {
       const z = ziel({ ausgabe: 'print', loesungen })
       expect(z.hauptdokument).toBe(true)
       expect(z.eigeneDatei).toBe(false)
       expect(z.loesungsdatei).toBe(false)
     }
+  })
+
+  it('wird mit den Lösungen gedruckt, wenn diese ein eigener Druckauftrag sind', () => {
+    /*
+     * Seit 25.09.2026 gibt es „Lösungen separat drucken". Dieser Stapel ist für die Lehrkraft –
+     * dorthin gehört das Tafelbild, nicht an das Ende der Klassensätze.
+     */
+    const z = ziel({ ausgabe: 'print', loesungen: 'separate' })
+    expect(z).toEqual({ hauptdokument: false, loesungsdatei: true, eigeneDatei: false })
+    expect(tafelbildHinweis({ blaetter: 1, loesungen: 'separate', ausgabe: 'print' })).toContain('Lösungen')
   })
 
   it('erzeugt ohne Häkchen gar nichts', () => {
@@ -69,7 +79,7 @@ describe('Hinweis im Speichern-Dialog', () => {
   it('sagt bei jeder Lösungswahl, wohin das Tafelbild geht', () => {
     /*
      * Ohne diesen Satz sucht die Lehrkraft die Tafelanschrift später in der falschen Datei.
-     * Besonders wichtig bei „ohne Lösungen": Dort kommt ein zweiter Speichern-Dialog.
+     * Besonders wichtig bei „ohne Lösungen": Dort entsteht eine zweite Datei im selben Ordner.
      */
     expect(tafelbildHinweis({ blaetter: 1, loesungen: 'none', ausgabe: 'pdf' })).toContain('eigene Datei')
     expect(tafelbildHinweis({ blaetter: 1, loesungen: 'separate', ausgabe: 'pdf' })).toContain('Lösungsdatei')

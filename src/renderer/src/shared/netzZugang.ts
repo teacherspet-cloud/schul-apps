@@ -185,6 +185,12 @@ export function netzZugangEinrichten(): void {
     herunterladen(defaultName, await api.exporter.preview(html), 'application/pdf')
     return defaultName
   }
+  /*
+   * Einen Ordner DIESES Rechners zu wählen, hat vom Tablet aus keinen Sinn. Die Ausgabe mehrerer
+   * Dateien (shared/export/ausgabe.tsx) lädt im Browser deshalb jede Datei einzeln herunter und
+   * fragt gar nicht erst danach; kommt der Aufruf doch einmal an, heißt die Antwort „abgebrochen".
+   */
+  api.files.chooseFolder = async () => null
   api.exporter.print = async (html) => {
     /*
      * Drucken heisst hier: das fertige PDF im Browser oeffnen. Der Druckdialog dieses

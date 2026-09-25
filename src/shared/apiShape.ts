@@ -262,11 +262,23 @@ export function buildApi(call: Call, extras: ApiExtras) {
       open: (filters: FileFilter[]) => call<OpenedFile | null>('files:open', filters),
       launchFile: () => call<OpenedFile | null>('files:launch-file'),
       showInFolder: (path: string) => call<void>('files:show', path),
+      /** Ordner wählen, in den mehrere Dateien auf einmal gehen; null bei Abbruch */
+      chooseFolder: (title?: string) => call<string | null>('files:choose-folder', title),
+      /** Datei in den gewählten Ordner legen – vorhandene werden nicht überschrieben („… (2)"); liefert den Pfad */
+      saveInFolder: (folder: string, name: string, data: Uint8Array | string) => call<string>('files:save-in-folder', folder, name, data),
+      openFolder: (folder: string) => call<void>('files:open-folder', folder),
       pathOf: (file: File) => extras.pathOf(file)
     },
     exporter: {
       pdf: (html: string, defaultName: string, opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }) =>
         call<string | null>('export:pdf', html, defaultName, opts),
+      /** Wie `pdf`, aber ohne Dialog in einen schon gewählten Ordner (siehe files.chooseFolder) */
+      pdfInFolder: (
+        folder: string,
+        html: string,
+        name: string,
+        opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }
+      ) => call<string>('export:pdf-in-folder', folder, html, name, opts),
       fillablePreview: (html: string, audio?: { id: string; fileName: string; title: string; base64: string }[]) =>
         call<Uint8Array>('export:fillable-preview', html, audio),
       /** Ohne Optionen: Druckdialog von Windows; mit Optionen: direkt drucken (aus der Druckvorschau) */

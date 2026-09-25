@@ -22,7 +22,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconAlertTriangle, IconFolder, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconAlertTriangle, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
@@ -79,7 +79,7 @@ function emptyExam(stateId: string, schoolTypeId: string, schoolTypeName: string
 }
 
 /** Schritt 1: Rahmen der Arbeit und Aufbau aus den Aufgabenformaten des Fachs. */
-export default function FrameStep({ onLibrary }: { onLibrary: () => void }): React.JSX.Element {
+export default function FrameStep(): React.JSX.Element {
   const { exam, setExam, update, setStep } = useKlassenarbeit()
   const appSettings = useAppSettings((s) => s.settings)
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
@@ -206,9 +206,6 @@ export default function FrameStep({ onLibrary }: { onLibrary: () => void }): Rea
               Fach, Jahrgang und Dauer bestimmen die Aufgabenformate, die Punkteverteilung und die Anforderungsbereiche.
             </Text>
           </div>
-          <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={onLibrary}>
-            Meine Klassenarbeiten
-          </Button>
         </Group>
 
         <Grid>

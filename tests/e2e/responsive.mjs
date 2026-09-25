@@ -3,7 +3,7 @@
 // Gemessen wird waagerechtes Überlaufen der Seite und einzelner Elemente.
 // Aufruf: node tests/e2e/responsive.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
-import { mkdirSync, mkdtempSync } from 'fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
 import { warteAufOberflaeche } from './warten.mjs'
@@ -39,7 +39,10 @@ if (await neu.isVisible({ timeout: 2000 }).catch(() => false)) await neu.click()
 await app.evaluate(({ dialog }, file) => {
   dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
 }, resolve('tests/fixtures/beispiel.arbeitsblatt'))
-await page.getByRole('button', { name: 'Gespeichertes Arbeitsblatt öffnen' }).click()
+// „Datei öffnen …" steht seit Paket 4 nur noch in der Bibliothek
+const bibliothek = page.getByRole('button', { name: 'Meine Arbeitsblätter' })
+if (await bibliothek.isVisible().catch(() => false)) await bibliothek.click()
+await page.getByRole('button', { name: 'Datei öffnen …' }).click()
 await page.waitForSelector('.ws-editor-pages .ws-page')
 await page.click('[aria-label="Klassenarbeiten"]')
 await page.evaluate(() => window.__selftest.exam())
@@ -104,5 +107,7 @@ for (const size of SIZES) {
 
 console.log('Konsolenfehler:', errors.length ? errors.join(' | ') : 'keine')
 await app.close()
+// Den eigenen Datenordner wegräumen – nichts soll liegen bleiben
+rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
 if (problems) throw new Error(`${problems} Ansichten laufen waagerecht über`)
 if (errors.length) throw new Error('Fehler in der Konsole')

@@ -105,7 +105,7 @@ const klick = async (auswahl) => {
 for (const modul of ['Arbeitsblatt', 'Klassenarbeiten', 'Lernzielkontrolle', 'Grammatiktest', 'Vokabeltest', 'Vokabellisten']) {
   await klick(`[aria-label="${modul}"]`)
 }
-for (const knopf of ['Meine Arbeitsblätter', 'Meine Kontrollen', 'Meine Tests', 'Gespeichertes Arbeitsblatt öffnen']) {
+for (const knopf of ['Meine Arbeitsblätter', 'Meine Lernzielkontrollen', 'Meine Grammatiktests', 'Datei öffnen …']) {
   await klick(knopf)
 }
 // Einstellungen mit allen Reitern

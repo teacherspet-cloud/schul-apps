@@ -1,6 +1,6 @@
 // Oberflächentest Arbeitsblatt (vorher: npm run build). Aufruf: node tests/e2e/worksheet.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
-import { mkdirSync, mkdtempSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from 'fs'
 import { resolve, join } from 'path'
 import { tmpdir } from 'os'
 import { oeffneLerngruppe } from './warten.mjs'
@@ -143,7 +143,10 @@ try {
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
   }, resolve('tests/fixtures/beispiel.arbeitsblatt'))
-  await page.getByRole('button', { name: 'Gespeichertes Arbeitsblatt öffnen' }).click()
+  // „Datei öffnen …" steht seit Paket 4 nur noch in der Bibliothek
+  const bibliothek = page.getByRole('button', { name: 'Meine Arbeitsblätter' })
+  if (await bibliothek.isVisible().catch(() => false)) await bibliothek.click()
+  await page.getByRole('button', { name: 'Datei öffnen …' }).click()
   await page.waitForSelector('.ws-editor-pages .ws-page')
   await page.waitForTimeout(1500)
   const pages = page.locator('.ws-editor-pages .ws-page')
@@ -154,20 +157,28 @@ try {
   await page.waitForTimeout(1200)
   const keyPages = page.locator('.ws-editor-pages .ws-page')
   await keyPages.nth(0).screenshot({ path: join(out, '6-loesung-1.png') })
-  // Export
+  // Export – mehrere Dateien (Blatt, Lösungen, Tafelbild) gehen seit Paket 4 in EINEN gewählten Ordner
+  const exportOrdner = join(out, 'export')
+  rmSync(exportOrdner, { recursive: true, force: true })
+  mkdirSync(exportOrdner, { recursive: true })
   const set = (paths) =>
-    app.evaluate(({ dialog }, p) => {
-      let k = 0
-      dialog.showSaveDialog = async () => ({ canceled: false, filePath: p[k++ % p.length] })
-    }, paths)
+    app.evaluate(
+      ({ dialog }, { p, ordner }) => {
+        let k = 0
+        dialog.showSaveDialog = async () => ({ canceled: false, filePath: p[k++ % p.length] })
+        dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [ordner] })
+      },
+      { p: paths, ordner: exportOrdner }
+    )
   await set([join(out, 'ab.pdf'), join(out, 'ab-loesungen.pdf')])
   await page.getByRole('button', { name: 'PDF', exact: true }).click()
-  await page.click('button:has-text("Speichern …")')
+  await page.getByRole('button', { name: 'Speichern …', exact: true }).click()
   await page.waitForSelector('text=PDF gespeichert', { timeout: 60000 })
   await set([join(out, 'ab.docx'), join(out, 'ab-loesungen.docx')])
   await page.getByRole('button', { name: 'Word', exact: true }).click()
-  await page.click('button:has-text("Speichern …")')
+  await page.getByRole('button', { name: 'Speichern …', exact: true }).click()
   await page.waitForSelector('text=Word-Dokument gespeichert', { timeout: 60000 })
+  console.log('Ausgabe:', [...readdirSync(exportOrdner), ...['ab.pdf', 'ab.docx'].filter((f) => existsSync(join(out, f)))].join(', '))
 } catch (e) {
   console.log('FEHLER', e.message)
   process.exitCode = 1
@@ -176,4 +187,6 @@ try {
   console.log('Konsolenfehler:', errors.length ? errors.slice(0, 5) : 'keine')
   if (errors.length) process.exitCode = 1
   await app.close()
+  // Den eigenen Datenordner wegräumen – nichts soll liegen bleiben
+  rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
 }

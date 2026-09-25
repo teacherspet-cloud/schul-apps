@@ -1,12 +1,11 @@
-import { Accordion, ActionIcon, Alert, Badge, Button, Card, Container, Group, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core'
+import { Accordion, ActionIcon, Alert, Badge, Button, Card, Container, Group, Radio, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core'
 import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconDownload, IconFileTypeDocx, IconInfoCircle, IconPrinter } from '@tabler/icons-react'
 import { useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
-import { notifyError, notifySuccess } from '../../../shared/util'
-import { browserDocxDeps } from '../../arbeitsblatt/export/browserDeps'
-import { buildWorksheetDocx } from '../../arbeitsblatt/export/docx'
-import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
+import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
+import PrintPreview from '../../../shared/components/PrintPreview'
+import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
@@ -64,20 +63,23 @@ export default function EditorStep(): React.JSX.Element {
   const { test, setStep, update, variante, setVariante, loesung, setLoesung } = useLernzielkontrolle()
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
-  const [busy, setBusy] = useState(false)
   /*
-   * Bei mehreren Fassungen wird gefragt, BEVOR etwas passiert.
+   * Ausgabe-Dialog: Lösungen (ohne / anhängen / eigene Datei) und – bei mehreren Fassungen –
+   * welche Fassungen, beides gefragt, BEVOR etwas passiert.
    *
-   * Ohne die Rueckfrage bekam man beim Drucken stillschweigend nur die gerade angezeigte
-   * Fassung - und merkte es erst, wenn die Klasse vor einem sitzt und die Haelfte das
-   * falsche Blatt hat. Umgekehrt waere „immer alle" genauso falsch: Wer nur Gruppe B
-   * nachdrucken will, braucht nicht A und C dazu.
+   * Ohne die Frage nach den Fassungen bekam man beim Drucken stillschweigend nur die gerade
+   * angezeigte Fassung - und merkte es erst, wenn die Klasse vor einem sitzt und die Haelfte
+   * das falsche Blatt hat. Umgekehrt waere „immer alle" genauso falsch: Wer nur Gruppe B
+   * nachdrucken will, braucht nicht A und C dazu. Die Lösungen hingen bis 25.09.2026
+   * stillschweigend am Blatt, sobald sie eingeschaltet waren.
    *
    * Der Zustand steht VOR dem frühen `return` weiter unten: Hooks müssen bei jedem Rendern
    * in gleicher Zahl und Reihenfolge laufen. Dahinter lief er nur, wenn ein Test geladen war
    * – dieselbe Falle, die im Grammatiktest die ganze App abstürzen ließ (React #310).
    */
-  const [frage, setFrage] = useState<'docx' | 'pdf' | 'print' | null>(null)
+  const [ausgabeModus, setAusgabeModus] = useState<AusgabeModus | null>(null)
+  const [alleFassungen, setAlleFassungen] = useState(true)
+  const [druck, setDruck] = useState<ReturnType<typeof druckAusgabe> | null>(null)
 
   /*
    * Das Blatt NUR neu bauen, wenn sich Test oder Variante ändern.
@@ -127,51 +129,21 @@ export default function EditorStep(): React.JSX.Element {
     }
   }
 
-  const exportDocx = async (alle: boolean): Promise<void> => {
-    setBusy(true)
-    try {
-      const a = ausgabe(alle)
-      const data = await buildWorksheetDocx(a.ws, { sheetIds: a.sheetIds, includeKey: test.meta.answerKey }, browserDocxDeps(logo, settings.schoolName))
-      const path = await window.api.files.save(`${a.name}.docx`, [{ name: 'Word-Dokument', extensions: ['docx'] }], data)
-      if (path) notifySuccess('Word-Dokument gespeichert.')
-    } catch (e) {
-      notifyError(e, 'Der Export ist fehlgeschlagen')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const html = (alle: boolean): string => {
+  const quelle = (alle: boolean): BlattQuelle => {
     const a = ausgabe(alle)
-    return buildWorksheetHtml(a.ws, layouts, { sheetIds: a.sheetIds, includeKey: test.meta.answerKey }, logo, settings.schoolName)
+    return { ws: a.ws, layouts, sheetIds: a.sheetIds, name: a.name, logo, schoolName: settings.schoolName, begriff: 'Lösungen' }
   }
 
-  const print = (alle: boolean): void => {
-    window.api.exporter.print(html(alle)).catch((e: unknown) => notifyError(e, 'Das Drucken ist fehlgeschlagen'))
+  /** Word, PDF oder Druckvorschau – mit der Wahl aus dem Ausgabe-Dialog */
+  const ausfuehren = async (was: AusgabeModus, loesung: Parameters<typeof druckAusgabe>[1]): Promise<void> => {
+    const q = quelle(mehrereFassungen && alleFassungen)
+    if (was === 'print') setDruck(druckAusgabe(q, loesung))
+    else await speichereBlatt(q, was, loesung)
   }
 
-  const exportPdf = async (alle: boolean): Promise<void> => {
-    try {
-      const a = ausgabe(alle)
-      const path = await window.api.exporter.pdf(html(alle), `${a.name}.pdf`)
-      if (path) notifySuccess('PDF gespeichert.')
-    } catch (e) {
-      notifyError(e, 'Export fehlgeschlagen')
-    }
-  }
-
-  /** Fuehrt aus, was gewaehlt wurde. */
-  const ausfuehren = (was: 'docx' | 'pdf' | 'print', alle: boolean): void => {
-    setFrage(null)
-    if (was === 'docx') void exportDocx(alle)
-    else if (was === 'pdf') void exportPdf(alle)
-    else print(alle)
-  }
-
-  /** Bei einer einzigen Fassung gibt es nichts zu fragen. */
-  const starte = (was: 'docx' | 'pdf' | 'print'): void => {
-    if (mehrereFassungen) setFrage(was)
-    else ausfuehren(was, false)
+  const starte = (was: AusgabeModus): void => {
+    setAlleFassungen(true)
+    setAusgabeModus(was)
   }
   drucken.current = () => starte('print')
 
@@ -234,7 +206,7 @@ export default function EditorStep(): React.JSX.Element {
           />
         </Group>
         <Group gap="xs">
-          <Button size="compact-sm" variant="light" leftSection={<IconFileTypeDocx size={14} />} loading={busy} onClick={() => starte('docx')}>
+          <Button size="compact-sm" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => starte('docx')}>
             Word
           </Button>
           <Button size="compact-sm" variant="light" leftSection={<IconPrinter size={14} />} onClick={() => starte('print')}>
@@ -312,27 +284,6 @@ export default function EditorStep(): React.JSX.Element {
         </Accordion>
       )}
 
-      {frage && (
-        <Alert color="blue" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
-          <Group justify="space-between" wrap="nowrap">
-            <Text size="sm">
-              {test.varianten.length} Fassungen ({test.varianten.map((v) => v.label).join(', ')}) – nur die angezeigte oder alle?
-            </Text>
-            <Group gap="xs" wrap="nowrap">
-              <Button size="xs" variant="default" onClick={() => setFrage(null)}>
-                Abbrechen
-              </Button>
-              <Button size="xs" variant="light" onClick={() => ausfuehren(frage, false)}>
-                Nur Gruppe {test.varianten[variante]?.label}
-              </Button>
-              <Button size="xs" autoFocus onClick={() => ausfuehren(frage, true)}>
-                Alle in einer Datei
-              </Button>
-            </Group>
-          </Group>
-        </Alert>
-      )}
-
       {loesung && schluesselHerkunft(test, schwellen) && (
         <Alert color="gray" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
           <Text size="xs">Notenschlüssel: {schluesselHerkunft(test, schwellen)}</Text>
@@ -363,6 +314,27 @@ export default function EditorStep(): React.JSX.Element {
         </FitToWidth>
       </Stack>
       {measure}
+      <AusgabeDialog
+        modus={ausgabeModus}
+        onClose={() => setAusgabeModus(null)}
+        modul="lernzielkontrolle"
+        hatLoesungen={test.meta.answerKey}
+        onAusgabe={ausfuehren}
+      >
+        {mehrereFassungen && (
+          <Radio.Group
+            label={`${test.varianten.length} Fassungen (${test.varianten.map((v) => v.label).join(', ')}) – nur die angezeigte oder alle?`}
+            value={alleFassungen ? 'alle' : 'eine'}
+            onChange={(v) => setAlleFassungen(v === 'alle')}
+          >
+            <Stack gap={6} mt={4}>
+              <Radio value="eine" label={`Nur Gruppe ${test.varianten[variante]?.label}`} />
+              <Radio value="alle" label="Alle in einer Datei" />
+            </Stack>
+          </Radio.Group>
+        )}
+      </AusgabeDialog>
+      <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${dateiname}`} onClose={() => setDruck(null)} />
     </Container>
   )
 }

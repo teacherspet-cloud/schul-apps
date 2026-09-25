@@ -307,7 +307,8 @@ if (!/^Was der App aufgefallen ist \(\d+\)$/.test(befundBereich.text)) {
 
 /*
  * Rueckfrage beim Ausgeben mehrerer Fassungen. Ohne sie bekaeme man beim Drucken
- * stillschweigend nur die angezeigte Fassung.
+ * stillschweigend nur die angezeigte Fassung. Seit Paket 4 steht sie im Ausgabe-Dialog,
+ * zusammen mit der Frage nach den Loesungen.
  */
 await page.evaluate(() => {
   const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.trim() === 'Drucken')
@@ -318,8 +319,8 @@ const rueckfrage = await page.evaluate(() => {
   const text = document.body.textContent ?? ''
   return {
     gefragt: text.includes('nur die angezeigte oder alle?'),
-    nurEine: [...document.querySelectorAll('button')].some((b) => /^Nur Gruppe [A-Z]$/.test(b.textContent?.trim() ?? '')),
-    alle: [...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'Alle in einer Datei')
+    nurEine: [...document.querySelectorAll('.mantine-Modal-content label')].some((b) => /^Nur Gruppe [A-Z]$/.test(b.textContent?.trim() ?? '')),
+    alle: [...document.querySelectorAll('.mantine-Modal-content label')].some((b) => b.textContent?.trim() === 'Alle in einer Datei')
   }
 })
 console.log('Rückfrage:', JSON.stringify(rueckfrage))
@@ -369,7 +370,7 @@ if (gespeichert.erste && gespeichert.erste.bezeichnung !== 'Stegreifaufgabe') {
 
 // Die Übersicht öffnen und ansehen
 await page.evaluate(() => {
-  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes('Meine Kontrollen'))
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes('Meine Lernzielkontrollen'))
   b?.click()
 })
 await page.waitForTimeout(900)

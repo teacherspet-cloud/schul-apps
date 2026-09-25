@@ -6,8 +6,8 @@ import { notifyError } from '../../shared/util'
 import EditorStep from './steps/EditorStep'
 import SettingsStep from './steps/SettingsStep'
 import VocabStep from './steps/VocabStep'
-import { TestLibraryModal } from './steps/TestLibrary'
-import { newTestSafely, openSavedTest, useAutosave } from './library'
+import TestLibrary from './steps/TestLibrary'
+import { hasContent, newTestSafely, openSavedTest, useAutosave } from './library'
 import { sichereAlles } from '../../shared/autosave'
 import { useUndoKeys } from '../../shared/useUndoKeys'
 import { parseProjectFile } from './project'
@@ -18,7 +18,7 @@ import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, testId } = useVokabeltest()
+  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, testId, listName, lastSavedAt } = useVokabeltest()
   const [libraryOpen, setLibraryOpen] = useState(false)
   // Läuft für diesen Test ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(testId)
@@ -27,10 +27,23 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
   useUndoKeys(active && !libraryOpen && !auftrag, undo, redo)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
-  useDokumentOeffner('vokabeltest', async (id) => {
+  const vonAussen = useDokumentOeffner('vokabeltest', async (id) => {
     await openSavedTest(id)
     setLibraryOpen(false)
   })
+
+  /*
+   * Beim Start die Bibliothek zeigen, wenn es gespeicherte Tests gibt und noch nichts offen ist –
+   * wie in den anderen Programmen. Sie ersetzt die frühere Liste „Gespeicherten Vokabeltest
+   * weiterbearbeiten" in Schritt 1 (neueste zuerst).
+   */
+  useEffect(() => {
+    if (hasContent()) return
+    window.api.tests
+      .list()
+      .then((list) => !vonAussen.current && !hasContent() && setLibraryOpen(list.length > 0))
+      .catch(() => setLibraryOpen(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Beim Öffnen einer .vokabeltest-Datei per Doppelklick direkt laden
   useEffect(() => {
@@ -41,14 +54,17 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
         await sichereAlles()
         newTest()
         loadDocument(parseProjectFile(file.data))
+        setLibraryOpen(false)
         void cleanTestImages()
       })
       .catch(notifyError)
   }, [loadDocument, newTest])
 
+  const geladen = Boolean(doc || lastSavedAt || vocab.some((v) => v.term.trim()))
+
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Group px="lg" py="sm" className="app-toolbar">
+      <Group px="lg" py="sm" className="app-toolbar" display={libraryOpen ? 'none' : undefined}>
         <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
           <Stepper.Step
             label="Vokabelliste"
@@ -74,9 +90,14 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
           Neuer Vokabeltest
         </Button>
       </Group>
-      <TestLibraryModal opened={libraryOpen} onClose={() => setLibraryOpen(false)} />
       <Box style={{ flex: 1, minHeight: 0 }}>
-        {auftrag ? (
+        {libraryOpen ? (
+          <TestLibrary
+            onClose={() => setLibraryOpen(false)}
+            // „Zurück zu …" nur, solange ein Test offen ist (Vokabeln, Test oder schon gesichert)
+            zurueck={geladen ? listName.trim() || 'Unbenannter Vokabeltest' : null}
+          />
+        ) : auftrag ? (
           <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Vokabeltest" onNeu={() => newTestSafely().catch(notifyError)} />
         ) : (
           <>

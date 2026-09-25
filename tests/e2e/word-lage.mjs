@@ -51,7 +51,10 @@ const exportiere = async (frei, datei) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: p })
   }, datei)
   await page.getByRole('button', { name: 'Word', exact: true }).click()
-  await page.click('button:has-text("Speichern …")')
+  // Nur das Blatt: Mit „Lösungen als eigene Datei" (Vorgabe) käme statt des Speichern-Dialogs die Ordnerwahl
+  const ohne = page.getByRole('radio', { name: 'ohne Lösungen' })
+  if (await ohne.count()) await ohne.check()
+  await page.getByRole('button', { name: 'Speichern …', exact: true }).click()
   await page.waitForSelector('text=Word-Dokument gespeichert', { timeout: 120000 })
   // Die Meldung verschwinden lassen, sonst sieht der zweite Durchgang noch die alte
   await page.waitForTimeout(6000)

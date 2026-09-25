@@ -3,10 +3,9 @@ import { IconArrowLeft, IconDownload, IconFileTypeDocx, IconPrinter } from '@tab
 import { useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
-import { notifyError, notifySuccess } from '../../../shared/util'
-import { browserDocxDeps } from '../../arbeitsblatt/export/browserDeps'
-import { buildWorksheetDocx } from '../../arbeitsblatt/export/docx'
-import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
+import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
+import PrintPreview from '../../../shared/components/PrintPreview'
+import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
@@ -27,7 +26,13 @@ export default function TestEditorStep(): React.JSX.Element {
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   const [view, setView] = useState<'student' | 'key'>('student')
-  const [busy, setBusy] = useState(false)
+  /*
+   * Word, PDF und Drucken fragen jetzt nach den Lösungen (ohne / anhängen / eigene Datei) –
+   * vorher wurden sie stillschweigend angehängt, sobald sie eingeschaltet waren. Gedruckt wird
+   * über die Druckvorschau wie im Arbeitsblatt statt direkt über den Dialog von Windows.
+   */
+  const [ausgabe, setAusgabe] = useState<AusgabeModus | null>(null)
+  const [druck, setDruck] = useState<ReturnType<typeof druckAusgabe> | null>(null)
 
   /*
    * Das Blatt NUR neu bauen, wenn sich der Test ändert.
@@ -43,39 +48,21 @@ export default function TestEditorStep(): React.JSX.Element {
   // Strg+P druckt wie der Knopf „Drucken"; vor dem frühen return, weil es ein Hook ist
   const drucken = useRef<() => void>(() => undefined)
   useDruck('grammatiktest', test && ws ? () => drucken.current() : null)
+  drucken.current = () => setAusgabe('print')
   if (!test || !ws) return <Container py="xl">Kein Test geladen.</Container>
 
   const sheet = ws.sheets[0]
   const key = view === 'key'
   const points = testPoints(test)
 
-  const exportDocx = async (): Promise<void> => {
-    setBusy(true)
-    try {
-      const data = await buildWorksheetDocx(ws, { sheetIds: [sheet.id], includeKey: test.meta.answerKey }, browserDocxDeps(logo, settings.schoolName))
-      const path = await window.api.files.save(`${ws.meta.title || 'Grammatiktest'}.docx`, [{ name: 'Word-Dokument', extensions: ['docx'] }], data)
-      if (path) notifySuccess('Word-Dokument gespeichert.')
-    } catch (e) {
-      notifyError(e, 'Der Export ist fehlgeschlagen')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const html = (): string => buildWorksheetHtml(ws, layouts, { sheetIds: [sheet.id], includeKey: test.meta.answerKey }, logo, settings.schoolName)
-
-  const print = (): void => {
-    window.api.exporter.print(html()).catch((e: unknown) => notifyError(e, 'Das Drucken ist fehlgeschlagen'))
-  }
-  drucken.current = print
-
-  const exportPdf = async (): Promise<void> => {
-    try {
-      const path = await window.api.exporter.pdf(html(), `${ws.meta.title || 'Grammatiktest'}.pdf`)
-      if (path) notifySuccess('PDF gespeichert.')
-    } catch (e) {
-      notifyError(e, 'Export fehlgeschlagen')
-    }
+  const quelle: BlattQuelle = {
+    ws,
+    layouts,
+    sheetIds: [sheet.id],
+    name: ws.meta.title || 'Grammatiktest',
+    logo,
+    schoolName: settings.schoolName,
+    begriff: 'Lösungen'
   }
 
   /*
@@ -128,13 +115,13 @@ export default function TestEditorStep(): React.JSX.Element {
           </Text>
         </Group>
         <Group gap="xs">
-          <Button size="compact-sm" variant="light" leftSection={<IconFileTypeDocx size={14} />} loading={busy} onClick={() => void exportDocx()}>
+          <Button size="compact-sm" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => setAusgabe('docx')}>
             Word
           </Button>
-          <Button size="compact-sm" variant="light" leftSection={<IconPrinter size={14} />} onClick={print}>
+          <Button size="compact-sm" variant="light" leftSection={<IconPrinter size={14} />} onClick={() => setAusgabe('print')}>
             Drucken
           </Button>
-          <Button size="compact-sm" variant="light" leftSection={<IconDownload size={14} />} onClick={() => void exportPdf()}>
+          <Button size="compact-sm" variant="light" leftSection={<IconDownload size={14} />} onClick={() => setAusgabe('pdf')}>
             PDF
           </Button>
         </Group>
@@ -159,6 +146,22 @@ export default function TestEditorStep(): React.JSX.Element {
         </FitToWidth>
       </Stack>
       {measure}
+      <AusgabeDialog
+        modus={ausgabe}
+        onClose={() => setAusgabe(null)}
+        modul="grammatiktest"
+        hatLoesungen={test.meta.answerKey}
+        onAusgabe={async (modus, loesung) => {
+          if (modus === 'print') setDruck(druckAusgabe(quelle, loesung))
+          else await speichereBlatt(quelle, modus, loesung)
+        }}
+      />
+      <PrintPreview
+        html={druck?.html ?? null}
+        loesung={druck?.loesung}
+        title={`Drucken – ${ws.meta.title || 'Grammatiktest'}`}
+        onClose={() => setDruck(null)}
+      />
     </Container>
   )
 }

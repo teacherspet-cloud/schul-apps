@@ -8,7 +8,7 @@ import EditorStep from './steps/EditorStep'
 import OutlineStep from './steps/OutlineStep'
 import TopicStep from './steps/TopicStep'
 import WorksheetLibrary from './steps/WorksheetLibrary'
-import { cleanWorksheetImages, newWorksheetSafely, openSavedWorksheet, useWorksheetAutosave } from './library'
+import { cleanWorksheetImages, defaultWorksheetName, newWorksheetSafely, openSavedWorksheet, useWorksheetAutosave } from './library'
 import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -20,7 +20,7 @@ import QuellenAuswahl from './steps/QuellenAuswahl'
 import { QUELLENAUSWAHL, type QuellenFrage } from './auftraege'
 
 export default function ArbeitsblattModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, worksheet, loadWorksheet, undo, redo, docId } = useArbeitsblatt()
+  const { step, setStep, worksheet, loadWorksheet, undo, redo, docId, docName } = useArbeitsblatt()
   /*
    * Läuft für DIESES Blatt ein Auftrag (planen, ausformulieren), steht statt des Formulars ein
    * Hinweis da. Über „Neues Arbeitsblatt" geht es trotzdem weiter; das Ergebnis landet in
@@ -113,14 +113,21 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
         {area === 'designs' ? (
           <DesignManager />
         ) : showLibrary ? (
-          <WorksheetLibrary onNew={startNew} onOpenFile={openFile} onOpened={() => setLibrary(false)} />
+          <WorksheetLibrary
+            onNew={startNew}
+            onOpenFile={openFile}
+            onOpened={() => setLibrary(false)}
+            // „Zurück zu …" nur, solange ein Blatt offen ist
+            zurueck={worksheet ? docName || defaultWorksheetName(worksheet) : null}
+            onZurueck={() => setLibrary(false)}
+          />
         ) : auftrag ? (
           <AuftragsHinweis auftrag={auftrag} neuLabel="Neues Arbeitsblatt" onNeu={startNew} />
         ) : (
           <>
-            {step === 0 && <TopicStep onLibrary={() => setLibrary(true)} />}
+            {step === 0 && <TopicStep />}
             {step === 1 && <OutlineStep />}
-            {step === 2 && <EditorStep onLibrary={() => setLibrary(true)} />}
+            {step === 2 && <EditorStep />}
           </>
         )}
       </Box>

@@ -47,10 +47,10 @@ const knoepfe = async () =>
 
 const faelle = [
   { modul: 'Arbeitsblatt', aufbau: () => window.__selftest.wsGeteilteAufgabe(0), knopf: 'Meine Arbeitsblätter' },
-  { modul: 'Klassenarbeiten', aufbau: () => window.__selftest.examSheet?.(), knopf: 'Meine Arbeiten' },
+  { modul: 'Klassenarbeiten', aufbau: () => window.__selftest.examSheet?.(), knopf: 'Meine Klassenarbeiten' },
   { modul: 'Vokabeltest', aufbau: () => window.__selftest.vtLatein(), knopf: 'Meine Vokabeltests' },
-  { modul: 'Lernzielkontrolle', aufbau: () => window.__selftest.lzkSheet?.(), knopf: 'Meine Kontrollen' },
-  { modul: 'Grammatiktest', aufbau: () => window.__selftest.gtestSheet?.(), knopf: 'Meine Tests' }
+  { modul: 'Lernzielkontrolle', aufbau: () => window.__selftest.lzkSheet?.(), knopf: 'Meine Lernzielkontrollen' },
+  { modul: 'Grammatiktest', aufbau: () => window.__selftest.gtestSheet?.(), knopf: 'Meine Grammatiktests' }
 ]
 
 for (const { modul, aufbau, knopf } of faelle) {

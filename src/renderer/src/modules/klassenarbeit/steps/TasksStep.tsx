@@ -1,11 +1,12 @@
 import { ActionIcon, Alert, Badge, Button, Card, Container, Group, List, Menu, Popover, ScrollArea, Stack, Text, Textarea, Title, Tooltip } from '@mantine/core'
-import { IconArrowLeft, IconFileTypeDocx, IconFolder, IconHeadphones, IconInfoCircle, IconPrinter, IconRefresh, IconSparkles } from '@tabler/icons-react'
+import { IconArrowLeft, IconFileTypeDocx, IconFileTypePdf, IconHeadphones, IconInfoCircle, IconPrinter, IconRefresh, IconSparkles } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { comprehensionFormatById } from '../../arbeitsblatt/didactics/comprehensionFormats'
-import { browserDocxDeps } from '../../arbeitsblatt/export/browserDeps'
-import { buildWorksheetDocx } from '../../arbeitsblatt/export/docx'
-import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
+import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
+import PrintPreview from '../../../shared/components/PrintPreview'
+import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
+import { useDruck } from '../../../shared/navigation'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
@@ -29,7 +30,7 @@ import type { AudioBlock } from '../../arbeitsblatt/model/types'
  * Schritt 2: Die Arbeit erzeugen, ansehen und ausgeben.
  * Für Darstellung und Export wird die Arbeit in die Struktur des Arbeitsblatts übersetzt.
  */
-export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: () => void }): React.JSX.Element {
+export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   const { setStep } = useKlassenarbeit()
   const updateExam = useKlassenarbeit((s) => s.update)
   /**
@@ -49,6 +50,12 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
   // Teile, an denen gerade ein Auftrag „überarbeiten" arbeitet
   const busy = useLaufendeSchluessel(useKlassenarbeit((s) => s.docId))
   const [revise, setRevise] = useState<string | null>(null)
+  /*
+   * Word, PDF und Drucken fragen nach dem Erwartungshorizont (ohne / anhängen / eigene Datei);
+   * bis 25.09.2026 hing er stillschweigend an der Arbeit, und Drucken gab es gar nicht.
+   */
+  const [ausgabe, setAusgabe] = useState<AusgabeModus | null>(null)
+  const [druck, setDruck] = useState<ReturnType<typeof druckAusgabe> | null>(null)
   const [instruction, setInstruction] = useState('')
   const meta = exam.meta
   const grades = examGrades(exam)
@@ -58,6 +65,8 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
   // ein bei jedem Render neu gebautes Objekt löst sonst eine Endlosschleife aus (weiße Seite).
   const worksheet = useMemo(() => examToWorksheet(exam), [exam])
   const { layouts, measure } = useSheetLayouts(hasContent ? worksheet : null, logo, settings.schoolName)
+  // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken" – sobald es etwas zu drucken gibt
+  useDruck('klassenarbeit', hasContent ? () => setAusgabe('print') : null)
   const sheet = worksheet.sheets[0]
   const printContext = useMemo(() => contextFor(worksheet, sheet, 'print'), [worksheet, sheet])
   // Die Sprache der Beschriftungen steht am Blatt (examToWorksheet), damit PDF und Word sie mitnehmen
@@ -130,14 +139,14 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
     })
   }
 
-  const exportDocx = async (): Promise<void> => {
-    try {
-      const data = await buildWorksheetDocx(worksheet, { sheetIds: [sheet.id], includeKey: meta.answerKey }, browserDocxDeps(logo, settings.schoolName))
-      const path = await window.api.files.save(`${worksheet.meta.title}.docx`, [{ name: 'Word-Dokument', extensions: ['docx'] }], data)
-      if (path) notifySuccess('Word-Dokument gespeichert.')
-    } catch (e) {
-      notifyError(e, 'Export fehlgeschlagen')
-    }
+  const quelle: BlattQuelle = {
+    ws: worksheet,
+    layouts,
+    sheetIds: [sheet.id],
+    name: worksheet.meta.title || 'Klassenarbeit',
+    logo,
+    schoolName: settings.schoolName,
+    begriff: 'Erwartungshorizont'
   }
 
   /** Die Hörtexte der Arbeit als eigenes Dokument – zum Vorlesen und Nachschlagen. */
@@ -159,16 +168,6 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
       if (path) notifySuccess('Transkript gespeichert.')
     } catch (e) {
       notifyError(e, 'Das Transkript konnte nicht gespeichert werden')
-    }
-  }
-
-  const exportPdf = async (): Promise<void> => {
-    try {
-      const html = buildWorksheetHtml(worksheet, layouts, { sheetIds: [sheet.id], includeKey: meta.answerKey }, logo, settings.schoolName)
-      const path = await window.api.exporter.pdf(html, `${worksheet.meta.title}.pdf`)
-      if (path) notifySuccess('PDF gespeichert.')
-    } catch (e) {
-      notifyError(e, 'Export fehlgeschlagen')
     }
   }
 
@@ -221,9 +220,6 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
             </Text>
           </div>
           <Group gap="xs">
-            <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={onLibrary}>
-              Meine Klassenarbeiten
-            </Button>
             <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
               Zurück zum Rahmen
             </Button>
@@ -348,11 +344,14 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
                   </Menu.Dropdown>
                 </Menu>
               )}
-              <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => void exportPdf()}>
+              <Button variant="default" leftSection={<IconFileTypePdf size={16} />} onClick={() => setAusgabe('pdf')}>
                 PDF
               </Button>
-              <Button variant="default" leftSection={<IconFileTypeDocx size={16} />} onClick={() => void exportDocx()}>
+              <Button variant="default" leftSection={<IconFileTypeDocx size={16} />} onClick={() => setAusgabe('docx')}>
                 Word
+              </Button>
+              <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => setAusgabe('print')}>
+                Drucken
               </Button>
             </Group>
             <FitToWidth className="ws-editor-pages">
@@ -368,6 +367,23 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
           </>
         )}
         {measure}
+        <AusgabeDialog
+          modus={ausgabe}
+          onClose={() => setAusgabe(null)}
+          modul="klassenarbeit"
+          hatLoesungen={meta.answerKey}
+          erwartungshorizont
+          onAusgabe={async (modus, loesung) => {
+            if (modus === 'print') setDruck(druckAusgabe(quelle, loesung))
+            else await speichereBlatt(quelle, modus, loesung)
+          }}
+        />
+        <PrintPreview
+          html={druck?.html ?? null}
+          loesung={druck?.loesung}
+          title={`Drucken – ${worksheet.meta.title || 'Klassenarbeit'}`}
+          onClose={() => setDruck(null)}
+        />
       </Container>
     </ScrollArea>
   )

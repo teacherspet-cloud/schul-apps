@@ -10,7 +10,9 @@
  * bekommt es eine eigene Datei.
  *
  * Beim Drucken entsteht nur ein Stapel Papier und keine zweite Datei – dort bleibt es am
- * Ende des Ausdrucks, den die Lehrkraft ohnehin selbst sortiert.
+ * Ende des Ausdrucks, den die Lehrkraft ohnehin selbst sortiert. Ausnahme seit 25.09.2026:
+ * „Lösungen separat drucken" ist ein eigener Druckauftrag für die Lehrkraft – dorthin gehört
+ * das Tafelbild dann, genau wie in die Lösungsdatei.
  */
 export type Loesungswahl = 'none' | 'append' | 'separate'
 export type Ausgabeart = 'pdf' | 'docx' | 'print'
@@ -29,17 +31,17 @@ export function tafelbildZiel(opts: { tafelbild: boolean; blaetter: number; loes
   if (!opts.tafelbild) return aus
   // Ohne gewählte Arbeitsblätter IST das Tafelbild das Dokument
   if (opts.blaetter === 0) return { ...aus, hauptdokument: true }
+  if (opts.loesungen === 'separate') return { ...aus, loesungsdatei: true }
   if (opts.ausgabe === 'print') return { ...aus, hauptdokument: true }
   if (opts.loesungen === 'append') return { ...aus, hauptdokument: true }
-  if (opts.loesungen === 'separate') return { ...aus, loesungsdatei: true }
   return { ...aus, eigeneDatei: true }
 }
 
 /** Was im Speichern-Dialog unter dem Häkchen steht, damit die Lehrkraft die Datei später wiederfindet. */
 export function tafelbildHinweis(opts: { blaetter: number; loesungen: Loesungswahl; ausgabe: Ausgabeart }): string | undefined {
   if (opts.blaetter === 0) return undefined
-  if (opts.ausgabe === 'print') return 'Wird am Ende des Ausdrucks ausgegeben.'
+  if (opts.ausgabe === 'print') return opts.loesungen === 'separate' ? 'Wird mit den Lösungen gedruckt.' : 'Wird am Ende des Ausdrucks ausgegeben.'
   if (opts.loesungen === 'append') return 'Wird hinter die Lösungsseiten gehängt.'
   if (opts.loesungen === 'separate') return 'Kommt in die Lösungsdatei, nicht in die Schülerdatei.'
-  return 'Wird als eigene Datei gespeichert – du wirst danach ein zweites Mal nach dem Speicherort gefragt.'
+  return 'Wird als eigene Datei „… - Tafelbild“ gespeichert, im selben Ordner wie das Blatt.'
 }

@@ -31,9 +31,27 @@ const PRINTER_KEY = 'schulapps.printer'
 /**
  * Druckvorschau mit Seitenansicht: zeigt genau die Seiten, die gedruckt werden,
  * und druckt mit gewähltem Drucker, Exemplaren, Seitenbereich, Duplex und Farbe.
+ *
+ * `loesung`: Lösungen (bzw. Erwartungshorizont) als EIGENER Druckauftrag nach dem Blatt.
+ * Anlass (25.09.2026): „Lösungen als eigene Datei" gab es beim Drucken nicht – wer sie
+ * wählte, bekam gar keine Lösungen. Ein eigener Auftrag ist das Gegenstück zur eigenen Datei:
+ * 28 Blätter für die Klasse, aber nur ein Lösungsblatt. Deshalb eigene Exemplarzahl; der
+ * Seitenbereich gilt nur für das Blatt.
  */
-export default function PrintPreview({ html, title, onClose }: { html: string | null; title?: string; onClose: () => void }): React.JSX.Element {
+export default function PrintPreview({
+  html,
+  title,
+  onClose,
+  loesung
+}: {
+  html: string | null
+  title?: string
+  onClose: () => void
+  loesung?: { html: string; titel: string } | null
+}): React.JSX.Element {
   const [pages, setPages] = useState<string[] | null>(null)
+  const [loesungPages, setLoesungPages] = useState<string[] | null>(null)
+  const [loesungExemplare, setLoesungExemplare] = useState(1)
   const [error, setError] = useState<string | null>(null)
   const [printers, setPrinters] = useState<PrinterInfo[]>([])
   const [printer, setPrinter] = useState<string | null>(null)
@@ -48,12 +66,20 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
     if (!html) return
     let cancelled = false
     setPages(null)
+    setLoesungPages(null)
+    setLoesungExemplare(1)
     setError(null)
     window.api.exporter
       .preview(html)
       .then((data) => renderPages(data))
       .then((p) => !cancelled && setPages(p))
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
+    if (loesung)
+      window.api.exporter
+        .preview(loesung.html)
+        .then((data) => renderPages(data))
+        .then((p) => !cancelled && setLoesungPages(p))
+        .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)))
     window.api.exporter
       .printers()
       .then((list) => {
@@ -72,7 +98,7 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
     return () => {
       cancelled = true
     }
-  }, [html])
+  }, [html]) // eslint-disable-line react-hooks/exhaustive-deps -- `loesung` entsteht immer zusammen mit `html`
 
   const pageCount = pages?.length ?? 0
   const ranges = useMemo(() => (rangeMode === 'range' ? parsePageRanges(range, pageCount) : undefined), [rangeMode, range, pageCount])
@@ -85,6 +111,9 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
   }, [pages, ranges])
   const invalidRange = rangeMode === 'range' && ranges === null
   const sheets = duplex === 'simplex' ? selected.size : Math.ceil(selected.size / 2)
+  const loesungSeiten = loesungPages?.length ?? 0
+  const loesungBlaetter = duplex === 'simplex' ? loesungSeiten : Math.ceil(loesungSeiten / 2)
+  const mitLoesung = Boolean(loesung) && loesungExemplare > 0
 
   const print = async (): Promise<void> => {
     if (!html || !printer) return
@@ -96,7 +125,9 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
         // nicht kritisch
       }
       await window.api.exporter.print(html, { deviceName: printer, copies, duplex, color: color === 'color', pages: ranges ?? undefined })
-      notifySuccess('Druckauftrag gesendet.')
+      if (loesung && mitLoesung)
+        await window.api.exporter.print(loesung.html, { deviceName: printer, copies: loesungExemplare, duplex, color: color === 'color' })
+      notifySuccess(loesung && mitLoesung ? `Zwei Druckaufträge gesendet (Blatt und ${loesung.titel}).` : 'Druckauftrag gesendet.')
       onClose()
     } catch (e) {
       notifyError(e, 'Drucken fehlgeschlagen')
@@ -109,6 +140,7 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
     if (!html) return
     try {
       await window.api.exporter.print(html)
+      if (loesung && mitLoesung) await window.api.exporter.print(loesung.html)
       onClose()
     } catch (e) {
       notifyError(e, 'Drucken fehlgeschlagen')
@@ -154,6 +186,31 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
                   </Text>
                 </Box>
               ))}
+              {loesung && loesungPages && (
+                <Text size="sm" fw={600} c="dimmed" data-loesung-trenner>
+                  {loesung.titel} – eigener Druckauftrag{loesungExemplare === 0 ? ' (wird nicht gedruckt)' : ''}
+                </Text>
+              )}
+              {loesung &&
+                loesungPages?.map((src, i) => (
+                  <Box key={`l${i}`} style={{ textAlign: 'center' }}>
+                    <img
+                      src={src}
+                      alt={`${loesung.titel}, Seite ${i + 1}`}
+                      data-print-loesung={i + 1}
+                      style={{
+                        width: 'min(560px, 100%)',
+                        background: '#fff',
+                        boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
+                        filter: color === 'bw' ? 'grayscale(1)' : undefined,
+                        opacity: loesungExemplare > 0 ? 1 : 0.35
+                      }}
+                    />
+                    <Text size="xs" c="dimmed" mt={4}>
+                      {loesung.titel}, Seite {i + 1} von {loesungPages.length}
+                    </Text>
+                  </Box>
+                ))}
             </Stack>
           )}
         </ScrollArea>
@@ -179,6 +236,16 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
                 searchable
               />
               <NumberInput label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />
+              {loesung && (
+                <NumberInput
+                  label={`Exemplare ${loesung.titel}`}
+                  description="0 = nicht drucken"
+                  min={0}
+                  max={999}
+                  value={loesungExemplare}
+                  onChange={(v) => setLoesungExemplare(Math.max(0, Number(v) || 0))}
+                />
+              )}
               <div>
                 <Text size="sm" fw={500} mb={4}>
                   Seiten
@@ -235,6 +302,7 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
               {pages && (
                 <Text size="xs" c="dimmed">
                   {selected.size} {selected.size === 1 ? 'Seite' : 'Seiten'} × {copies} = {sheets * copies} {sheets * copies === 1 ? 'Blatt' : 'Blätter'}
+                  {mitLoesung && loesungPages && `, dazu ${loesungBlaetter * loesungExemplare} für ${loesung!.titel}`}
                 </Text>
               )}
             </Stack>
@@ -246,7 +314,7 @@ export default function PrintPreview({ html, title, onClose }: { html: string | 
               leftSection={<IconPrinter size={16} />}
               onClick={() => void print()}
               loading={printing}
-              disabled={!pages || !printer || invalidRange}
+              disabled={!pages || !printer || invalidRange || (Boolean(loesung) && !loesungPages)}
             >
               Drucken
             </Button>

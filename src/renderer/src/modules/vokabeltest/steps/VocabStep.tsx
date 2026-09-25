@@ -19,7 +19,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowRight, IconBooks, IconChecklist, IconClipboard, IconDeviceFloppy, IconFolderOpen, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconArrowRight, IconBooks, IconChecklist, IconClipboard, IconDeviceFloppy, IconPlus, IconTrash } from '@tabler/icons-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
 import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
@@ -31,13 +31,12 @@ import type { VocabEntry } from '../model/types'
 import { includedVocab, isIncluded, specialVocab } from '../model/vocab'
 import { aiCall, useVokabeltest } from '../store'
 import { AutoCreateButton } from './AutoCreate'
-import { RecentTests, SaveTestButton, TestLibraryModal } from './TestLibrary'
+import { SaveTestButton } from './TestLibrary'
 import { TextbookPicker } from './TextbookPicker'
 import type { BookSelection } from './TextbookPicker'
 
 export default function VocabStep(): React.JSX.Element {
   const { vocab, setVocab, listName, setListName, setListContext, setStep } = useVokabeltest()
-  const [libraryOpen, setLibraryOpen] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
   const [review, setReview] = useState<VocabEntry[] | null>(null)
   /** Name von Hand geändert? Dann folgt er der Schulbuch-Auswahl nicht mehr. */
@@ -93,15 +92,11 @@ export default function VocabStep(): React.JSX.Element {
             </Text>
           </div>
           <Group wrap="nowrap">
-            <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={() => setLibraryOpen(true)}>
-              Gespeicherten Test öffnen
-            </Button>
             <AutoCreateButton selection={bookSelection} />
             <Button rightSection={<IconArrowRight size={18} />} disabled={selected.length < 2} onClick={() => setStep(1)}>
               Weiter zu den Testeinstellungen
             </Button>
           </Group>
-          <TestLibraryModal opened={libraryOpen} onClose={() => setLibraryOpen(false)} />
         </Group>
 
         <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
@@ -131,8 +126,6 @@ export default function VocabStep(): React.JSX.Element {
             }}
           />
         </SimpleGrid>
-
-        <RecentTests onShowAll={() => setLibraryOpen(true)} />
 
         <Card withBorder mt="lg" padding="md">
           <Group justify="space-between" mb="sm">

@@ -1,7 +1,7 @@
 // Oberflächentest der gebauten App (vorher: npm run build).
 // Aufruf: node tests/e2e/smoke.mjs <Ausgabeordner>
 import { _electron as electron } from 'playwright-core'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'fs'
 import { join, resolve } from 'path'
 import { tmpdir } from 'os'
 import { warteAufOberflaeche } from './warten.mjs'
@@ -92,7 +92,7 @@ async function launch(args = []) {
   if (!roundTrip.goneAfterDelete) throw new Error('Der gelöschte Test steht weiterhin in der Übersicht')
   console.log('Grammatiktest gespeichert, gelesen und gelöscht:', roundTrip.name)
 
-  if (!(await page.getByRole('button', { name: 'Meine Tests' }).count())) throw new Error('Der Zugang zur Test-Übersicht fehlt')
+  if (!(await page.getByRole('button', { name: 'Meine Grammatiktests' }).count())) throw new Error('Der Zugang zur Test-Übersicht fehlt')
 
   await shot(page, '5-grammatiktest')
   console.log('Grammatiktest geöffnet, Themenauswahl und Landeshinweis vorhanden')
@@ -147,18 +147,26 @@ async function launch(args = []) {
   await page.waitForSelector('.editor-sheet .vt-key')
   await shot(page, '6-loesungen')
 
-  // Speicherdialog im Main-Prozess ersetzen, damit der Export ohne Klick läuft
+  /*
+   * Speicher- und Ordnerdialog im Main-Prozess ersetzen, damit der Export ohne Klick läuft.
+   * Mit „Lösungen als eigene Datei" (Vorgabe) entstehen zwei Dateien – dafür wird seit Paket 4
+   * einmal ein Ordner gewählt statt zweimal ein Dateiname.
+   */
   const pdfPath = join(outDir, 'export.pdf')
   const docxPath = join(outDir, 'export.docx')
+  const exportOrdner = join(outDir, 'export-ordner')
+  rmSync(exportOrdner, { recursive: true, force: true })
+  mkdirSync(exportOrdner, { recursive: true })
   await app.evaluate(
-    ({ dialog }, paths) => {
+    ({ dialog }, { paths, ordner }) => {
       let n = 0
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: paths[n++ % paths.length] })
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [ordner] })
     },
-    [pdfPath, join(outDir, 'export-loesungen.pdf')]
+    { paths: [pdfPath, join(outDir, 'export-loesungen.pdf')], ordner: exportOrdner }
   )
   await page.getByRole('button', { name: 'PDF', exact: true }).click()
-  await page.click('button:has-text("Speichern …")')
+  await page.getByRole('button', { name: 'Speichern …', exact: true }).click()
   await page.waitForSelector('text=PDF gespeichert', { timeout: 60000 })
 
   await app.evaluate(
@@ -169,12 +177,13 @@ async function launch(args = []) {
     [docxPath, join(outDir, 'export-loesungen.docx')]
   )
   await page.getByRole('button', { name: 'Word', exact: true }).click()
-  await page.click('button:has-text("Speichern …")')
+  await page.getByRole('button', { name: 'Speichern …', exact: true }).click()
   await page.waitForSelector('text=Word-Dokument gespeichert', { timeout: 60000 })
 
-  for (const f of [pdfPath, docxPath]) {
-    console.log(f, existsSync(f) ? `${statSync(f).size} Bytes` : 'FEHLT')
-  }
+  const imOrdner = readdirSync(exportOrdner)
+  const ausgaben = [pdfPath, docxPath].filter((f) => existsSync(f)).concat(imOrdner.map((f) => join(exportOrdner, f)))
+  for (const f of ausgaben) console.log(f, `${statSync(f).size} Bytes`)
+  if (!ausgaben.some((f) => f.endsWith('.pdf')) || !ausgaben.some((f) => f.endsWith('.docx'))) throw new Error('PDF oder Word-Datei fehlt')
   console.log('Durchlauf 2 – Fehler in der Konsole:', errors.length ? errors : 'keine')
   await app.close()
 }

@@ -162,7 +162,7 @@ note(Boolean(reise.name), `der Name steht in der Kopfzeile: „${reise.name}"`)
 
 // Die Uebersicht muss den Eintrag zeigen
 await page.evaluate(() => {
-  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes('Meine Kontrollen'))
+  const b = [...document.querySelectorAll('button')].find((x) => x.textContent?.includes('Meine Lernzielkontrollen'))
   b?.click()
 })
 await page.waitForTimeout(900)

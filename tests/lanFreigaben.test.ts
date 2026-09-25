@@ -31,7 +31,8 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
      */
     const verboten = [
       { muster: /^lan:/, warum: 'stellt den Netzzugang selbst um' },
-      { muster: /^files:(open|save|show|launch-file)$/, warum: 'öffnet Dialoge dieses Rechners' },
+      { muster: /^files:(open|save|show|launch-file|choose-folder|save-in-folder|open-folder)$/, warum: 'öffnet Dialoge oder Ordner dieses Rechners' },
+      { muster: /^export:pdf-in-folder$/, warum: 'schreibt in einen Ordner dieses Rechners' },
       { muster: /^audio:show$/, warum: 'öffnet den Explorer dieses Rechners' },
       { muster: /^secrets:set$/, warum: 'schreibt API-Schlüssel' },
       { muster: /:delete$/, warum: 'löscht gespeichertes Material' },

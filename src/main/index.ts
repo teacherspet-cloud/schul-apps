@@ -30,6 +30,7 @@ import { generateSvgImage } from './services/ai/svg'
 import { KiPlaetze } from './services/ai/kiPlaetze'
 import { attrappeAktiv } from './services/ai/attrappe'
 import { istAbbruch } from '@shared/abbruch'
+import { freierDateiname } from '@shared/dateiname'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
 import { createProvider, createTextProvider, getModelList, healModelSelection, refreshProvider } from './services/ai/models'
 import { htmlToPdf, PrintOptions, printHtml } from './services/export/pdf'
@@ -495,24 +496,67 @@ function registerIpc(): void {
   })
   handle('files:show', (path: string) => shell.showItemInFolder(path))
 
+  /*
+   * Mehrere Dateien in EINEN Ordner (Anlass 25.09.2026): Beim Arbeitsblatt entstanden Blatt,
+   * Lösungen, Tafelbild und Hörtexte – mit je einem Speichern-Dialog, bis zu fünf
+   * hintereinander. Jetzt wird einmal ein Ordner gewählt und alles dort abgelegt. Ohne den
+   * Dialog von Windows fehlt dessen Rückfrage „Ersetzen?"; vorhandene Dateien bekommen
+   * deshalb nie einen stummen Nachfolger, sondern der neue Name ein „(2)" (shared/dateiname.ts).
+   *
+   * Nicht in der Freigabe des Netzzugangs: Ein Ordner auf DIESEM Rechner hat für ein Tablet
+   * keinen Sinn, dort wird weiter heruntergeladen (renderer/shared/netzZugang.ts).
+   */
+  let letzterOrdner: string | undefined
+  handle('files:choose-folder', async (title?: string) => {
+    const res = await dialog.showOpenDialog(mainWindow!, {
+      title: title ?? 'Ordner zum Speichern wählen',
+      defaultPath: letzterOrdner,
+      buttonLabel: 'Hier speichern',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (res.canceled || res.filePaths.length === 0) return null
+    letzterOrdner = res.filePaths[0]
+    return letzterOrdner
+  })
+  const inOrdnerSchreiben = (ordner: string, name: string, daten: Buffer | string): string => {
+    const ziel = join(
+      ordner,
+      freierDateiname(basename(name), (n) => existsSync(join(ordner, n)))
+    )
+    writeFileSync(ziel, daten)
+    return ziel
+  }
+  handle('files:save-in-folder', (ordner: string, name: string, data: Uint8Array | string) =>
+    inOrdnerSchreiben(ordner, name, typeof data === 'string' ? data : Buffer.from(data))
+  )
+  handle('files:open-folder', async (ordner: string) => {
+    const fehler = await shell.openPath(ordner)
+    if (fehler) throw new Error(fehler)
+  })
+
+  type PdfExtras = { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }
+  const pdfBytes = async (html: string, opts?: PdfExtras): Promise<Buffer> => {
+    const audio = (opts?.audio ?? []).map((a) => ({ id: a.id, fileName: a.fileName, title: a.title, bytes: Buffer.from(a.base64, 'base64') }))
+    // Nur den teuren Weg gehen, wenn auch etwas hinzukommt
+    return Buffer.from(opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }) : await htmlToPdf(html))
+  }
+
   /**
    * PDF speichern. `fillable` erzeugt statt des reinen Abbilds ein Formular: Auf den
    * Schreiblinien lässt sich tippen, Kästchen lassen sich ankreuzen.
    */
-  handle(
-    'export:pdf',
-    async (html: string, defaultName: string, opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }) => {
-      const res = await dialog.showSaveDialog(mainWindow!, {
-        defaultPath: defaultName,
-        filters: [{ name: 'PDF', extensions: ['pdf'] }]
-      })
-      if (res.canceled || !res.filePath) return null
-      const audio = (opts?.audio ?? []).map((a) => ({ id: a.id, fileName: a.fileName, title: a.title, bytes: Buffer.from(a.base64, 'base64') }))
-      // Nur den teuren Weg gehen, wenn auch etwas hinzukommt
-      const bytes = opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }) : await htmlToPdf(html)
-      writeFileSync(res.filePath, bytes)
-      return res.filePath
-    }
+  handle('export:pdf', async (html: string, defaultName: string, opts?: PdfExtras) => {
+    const res = await dialog.showSaveDialog(mainWindow!, {
+      defaultPath: defaultName,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (res.canceled || !res.filePath) return null
+    writeFileSync(res.filePath, await pdfBytes(html, opts))
+    return res.filePath
+  })
+  /** Dasselbe PDF ohne Dialog in einen schon gewählten Ordner (siehe `files:choose-folder`) */
+  handle('export:pdf-in-folder', async (ordner: string, html: string, name: string, opts?: PdfExtras) =>
+    inOrdnerSchreiben(ordner, name, await pdfBytes(html, opts))
   )
   handle('export:print', (html: string, options?: PrintOptions) => printHtml(html, options))
   /** Druckvorschau: PDF-Daten zum Anzeigen der Seiten */

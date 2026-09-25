@@ -10,7 +10,6 @@ import {
   Modal,
   NumberInput,
   Popover,
-  Radio,
   ScrollArea,
   SegmentedControl,
   Stack,
@@ -36,6 +35,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
+import { LoesungsWahl, loesungsVorgabe, merkeLoesungsWahl, type LoesungsModus } from '../../../shared/components/LoesungsWahl'
+import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
 import { imageSize } from '../../../shared/images'
 import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
 import { buildDocx } from '../export/docx'
@@ -232,11 +233,11 @@ export default function EditorStep(): React.JSX.Element {
             : ''}
         </Text>
         <SaveTestButton size="xs" />
-        <Tooltip label="Als .vokabeltest-Datei speichern (z. B. zum Weitergeben)">
+        <Tooltip label="Als Datei speichern … (.vokabeltest, z. B. zum Weitergeben)">
           <ActionIcon
             variant="default"
             size="md"
-            aria-label="Als Datei speichern"
+            aria-label="Als Datei speichern …"
             onClick={async () => {
               try {
                 const path = await window.api.files.save(`${baseName}.vokabeltest`, PROJECT_FILTER, serializeProject(doc))
@@ -605,13 +606,15 @@ function ExportModal({
   onClose: () => void
 }): React.JSX.Element {
   const [variantIds, setVariantIds] = useState<string[]>(doc.variants.map((v) => v.id))
-  const [key, setKey] = useState<'none' | 'append' | 'separate'>(doc.settings.answerKey ? 'separate' : 'none')
+  // Vorwahl: zuletzt im Vokabeltest gewählt, sonst „als eigene Datei" (shared/components/LoesungsWahl)
+  const [key, setKey] = useState<LoesungsModus>(() => loesungsVorgabe('vokabeltest', doc.settings.answerKey))
   const [running, setRunning] = useState(false)
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [druck, setDruck] = useState<{ html: string; loesung: { html: string; titel: string } | null } | null>(null)
 
   useEffect(() => setVariantIds(doc.variants.map((v) => v.id)), [doc.variants])
-  // Beim Drucken gibt es keine eigene Lösungsdatei: nicht versehentlich Lösungen mitdrucken
-  const effectiveKey = mode === 'print' && key === 'separate' ? 'none' : key
+  useEffect(() => {
+    if (mode) setKey(loesungsVorgabe('vokabeltest', doc.settings.answerKey))
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const missingImages = doc.variants.some((v) => v.blocks.some((b) => b.kind === 'picture' && b.items.some((i) => !i.image)))
   const labels = doc.variants
@@ -624,25 +627,39 @@ function ExportModal({
     if (!mode) return
     setRunning(true)
     try {
+      merkeLoesungsWahl('vokabeltest', key)
       const credits = imageCredits(doc)
       if (mode === 'print') {
-        // Druckvorschau mit Seitenansicht statt direkt den Windows-Dialog
-        setPreviewHtml(buildPrintHtml(doc, { variantIds, includeKey: effectiveKey === 'append' }, layouts))
+        /*
+         * Druckvorschau mit Seitenansicht statt direkt den Windows-Dialog. „Lösungen separat
+         * drucken" ist ein eigener Druckauftrag – vorher wurde diese Wahl beim Drucken still zu
+         * „ohne Lösungen".
+         */
+        setDruck({
+          html: buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts),
+          loesung: key === 'separate' ? { html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts), titel: 'Lösungen' } : null
+        })
       } else if (mode === 'pdf') {
-        const path = await window.api.exporter.pdf(buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts), `${baseName}${suffix}.pdf`)
-        if (path && key === 'separate') {
-          await window.api.exporter.pdf(buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts), `${baseName}${suffix} - Lösungen.pdf`)
-        }
-        if (path) notifySuccess('PDF gespeichert.')
+        // Mit „als eigene Datei" zwei Dateien – dafür wird einmal ein Ordner gewählt (shared/export/ausgabe.tsx)
+        const dateien: AusgabeDatei[] = [{ name: `${baseName}${suffix}.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts) }]
+        if (key === 'separate')
+          dateien.push({ name: `${baseName}${suffix} - Lösungen.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts) })
+        await speichereAusgabe(dateien, 'PDF gespeichert.')
       } else {
-        const filters = [{ name: 'Word-Dokument', extensions: ['docx'] }]
-        const data = await buildDocx(doc, { variantIds, includeKey: key === 'append', credits, layouts }, imageSize)
-        const path = await window.api.files.save(`${baseName}${suffix}.docx`, filters, data)
-        if (path && key === 'separate') {
-          const keyData = await buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts }, imageSize)
-          await window.api.files.save(`${baseName}${suffix} - Lösungen.docx`, filters, keyData)
-        }
-        if (path) notifySuccess('Word-Dokument gespeichert.')
+        const dateien: AusgabeDatei[] = [
+          {
+            name: `${baseName}${suffix}.docx`,
+            filter: WORD_FILTER,
+            daten: () => buildDocx(doc, { variantIds, includeKey: key === 'append', credits, layouts }, imageSize)
+          }
+        ]
+        if (key === 'separate')
+          dateien.push({
+            name: `${baseName}${suffix} - Lösungen.docx`,
+            filter: WORD_FILTER,
+            daten: () => buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts }, imageSize)
+          })
+        await speichereAusgabe(dateien, 'Word-Dokument gespeichert.')
       }
       onClose()
     } catch (e) {
@@ -655,7 +672,7 @@ function ExportModal({
   const title = mode === 'docx' ? 'Als Word-Dokument speichern' : mode === 'pdf' ? 'Als PDF speichern' : 'Drucken'
   return (
     <>
-      <PrintPreview html={previewHtml} title={`Drucken – ${doc.header.title}`} onClose={() => setPreviewHtml(null)} />
+      <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${doc.header.title}`} onClose={() => setDruck(null)} />
       <Modal opened={mode !== null} onClose={onClose} title={title}>
         <Stack>
           {missingImages && (
@@ -672,13 +689,7 @@ function ExportModal({
               </Group>
             </Checkbox.Group>
           )}
-          <Radio.Group label="Lösungen" value={effectiveKey} onChange={(v) => setKey(v as typeof key)}>
-            <Stack gap={6} mt={4}>
-              <Radio value="none" label="ohne Lösungen" />
-              <Radio value="append" label="Lösungsseiten anhängen" />
-              {mode !== 'print' && <Radio value="separate" label="Lösungen als eigene Datei" />}
-            </Stack>
-          </Radio.Group>
+          <LoesungsWahl value={key} onChange={setKey} modus={mode} />
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
               Abbrechen

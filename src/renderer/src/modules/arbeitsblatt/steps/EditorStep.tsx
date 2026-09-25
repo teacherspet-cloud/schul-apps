@@ -8,7 +8,6 @@ import {
   Group,
   Menu,
   Modal,
-  Radio,
   ScrollArea,
   SegmentedControl,
   Select,
@@ -23,7 +22,6 @@ import {
   IconDeviceFloppy,
   IconFileTypeDocx,
   IconFileTypePdf,
-  IconFolder,
   IconPhoto,
   IconPlus,
   IconPrinter,
@@ -38,6 +36,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
+import { LoesungsWahl, loesungsVorgabe, merkeLoesungsWahl, type LoesungsModus } from '../../../shared/components/LoesungsWahl'
+import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
@@ -78,7 +78,7 @@ import { CoverPage } from '../render/CoverPage'
 import { COVER_DESIGNS, foxPrompt } from '../render/coverDesigns'
 import { useDruck } from '../../../shared/navigation'
 
-export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): React.JSX.Element {
+export default function EditorStep(): React.JSX.Element {
   const { worksheet: ws, update, updateBlock, undo, redo, verlauf, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
   const logo = useAppSettings((s) => s.logoDataUrl)
   const schoolName = useAppSettings((s) => s.settings.schoolName)
@@ -105,7 +105,7 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
   const [exportMode, setExportMode] = useState<null | 'docx' | 'pdf' | 'print'>(null)
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken“
   useDruck('arbeitsblatt', () => setExportMode('print'))
-  const [printHtml, setPrintHtml] = useState<string | null>(null)
+  const [druck, setDruck] = useState<{ html: string; loesung: { html: string; titel: string } | null } | null>(null)
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
   // Beim Einschalten des KI-Tests fragt die App nach den Wörtern (siehe CanaryDialog)
   const [canaryOffen, setCanaryOffen] = useState(false)
@@ -140,16 +140,21 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
   const key = view === 'key'
   const hasAudio = Boolean(ws?.sheets.some((s) => s.blocks.some((b) => b.type === 'audio')))
 
-  /** Hörtexte beim Export als MP3 neben das Dokument legen. */
-  const saveAudioFiles = async (worksheet: Worksheet, name: string): Promise<void> => {
-    const audios = worksheet.sheets.flatMap((s) => s.blocks.filter((b) => b.type === 'audio' && b.audio?.dataUrl))
-    for (const block of audios) {
-      if (block.type !== 'audio' || !block.audio?.dataUrl) continue
-      const bytes = Uint8Array.from(atob(block.audio.dataUrl.split(',')[1]), (c) => c.charCodeAt(0))
-      const saved = await window.api.files.save(`${name} - ${block.title || 'Hörtext'}.mp3`, [{ name: 'MP3-Datei', extensions: ['mp3'] }], bytes)
-      if (saved) notifySuccess('Hörtext als MP3 gespeichert.')
-    }
-  }
+  /** Hörtexte beim Export als MP3 neben das Dokument legen – als Teil derselben Ausgabe (ein Ordner). */
+  const audioDateien = (worksheet: Worksheet, name: string): AusgabeDatei[] =>
+    worksheet.sheets
+      .flatMap((s) => s.blocks)
+      .flatMap((block) =>
+        block.type === 'audio' && block.audio?.dataUrl
+          ? [
+              {
+                name: `${name} - ${safeFileName(block.title || 'Hörtext')}.mp3`,
+                filter: [{ name: 'MP3-Datei', extensions: ['mp3'] }],
+                daten: Uint8Array.from(atob(block.audio.dataUrl.split(',')[1]), (c) => c.charCodeAt(0))
+              }
+            ]
+          : []
+      )
 
   if (!ws || !sheet || !profile) return <Box p="xl">Noch kein Arbeitsblatt.</Box>
 
@@ -533,13 +538,6 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
           }}
         />
         <Box style={{ flex: 1 }} />
-        {onLibrary && (
-          <Tooltip label="Meine Arbeitsblätter">
-            <ActionIcon variant="default" onClick={onLibrary} aria-label="Meine Arbeitsblätter">
-              <IconFolder size={16} />
-            </ActionIcon>
-          </Tooltip>
-        )}
         <TextInput
           size="xs"
           w={220}
@@ -564,7 +562,7 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
             }
           }}
         >
-          Als Datei speichern
+          Als Datei speichern …
         </Button>
         <Button size="xs" leftSection={<IconFileTypeDocx size={14} />} onClick={() => setExportMode('docx')}>
           Word
@@ -687,7 +685,7 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
           setCanaryOffen(false)
         }}
       />
-      <PrintPreview html={printHtml} title={`Drucken – ${ws.meta.title || 'Arbeitsblatt'}`} onClose={() => setPrintHtml(null)} />
+      <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${ws.meta.title || 'Arbeitsblatt'}`} onClose={() => setDruck(null)} />
       <ExportModal
         mode={exportMode}
         onClose={() => setExportMode(null)}
@@ -710,21 +708,31 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
             ausgabe: exportMode ?? 'pdf'
           })
           if (exportMode === 'print') {
-            // Druckvorschau mit Seitenansicht; eigene Lösungsdatei gibt es beim Drucken nicht
-            setPrintHtml(
-              buildWorksheetHtml(
-                ws,
-                layouts,
-                {
-                  sheetIds,
-                  includeKey: keyMode === 'append',
-                  includeBoard: tafel.hauptdokument
-                },
-                logo,
-                schoolName
-              )
-            )
-          } else if (exportMode === 'pdf') {
+            /*
+             * Druckvorschau mit Seitenansicht. „Lösungen separat drucken" ist ein eigener
+             * Druckauftrag (mit eigener Exemplarzahl) – vorher war diese Wahl beim Drucken
+             * ungültig und es kamen gar keine Lösungen.
+             */
+            const loesung =
+              keyMode === 'separate'
+                ? {
+                    html: buildWorksheetHtml(ws, layouts, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, logo, schoolName),
+                    titel: 'Lösungen'
+                  }
+                : null
+            setDruck({
+              html: buildWorksheetHtml(ws, layouts, { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument }, logo, schoolName),
+              loesung
+            })
+            return
+          }
+          /*
+           * Alle Dateien dieser Ausgabe in EINEM Zug: Blatt, ggf. Lösungen, ggf. Tafelbild und die
+           * Hörtexte als MP3. Bei mehr als einer Datei wird einmal ein Ordner gewählt
+           * (shared/export/ausgabe.tsx) – vorher kam für jede Datei ein eigener Speichern-Dialog.
+           */
+          const dateien: AusgabeDatei[] = []
+          if (exportMode === 'pdf') {
             /*
              * Hörtexte wandern als Dateianlage ins PDF und bekommen dort einen Abspieler.
              * Die Anlage sehen Acrobat, Chrome, Edge, Firefox und Okular; der Abspieler
@@ -744,8 +752,9 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
                   base64: url.slice(url.indexOf(',') + 1)
                 }
               })
-            const path = await window.api.exporter.pdf(
-              buildWorksheetHtml(
+            dateien.push({
+              name: `${baseName}${suffix}${fillable ? ' - ausfuellbar' : ''}.pdf`,
+              html: buildWorksheetHtml(
                 ws,
                 layouts,
                 {
@@ -757,78 +766,51 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
                 logo,
                 schoolName
               ),
-              `${baseName}${suffix}${fillable ? ' - ausfuellbar' : ''}.pdf`,
-              { fillable, audio: hoertexte }
-            )
+              pdf: { fillable, audio: hoertexte }
+            })
             // Das Lösungsblatt bleibt immer ein Abbild – dort ist nichts auszufüllen
-            if (path && keyMode === 'separate')
-              await window.api.exporter.pdf(
-                buildWorksheetHtml(
-                  ws,
-                  layouts,
-                  {
-                    sheetIds,
-                    includeKey: false,
-                    keyOnly: true,
-                    includeBoard: tafel.loesungsdatei
-                  },
-                  logo,
-                  schoolName
-                ),
-                `${baseName}${suffix} - Lösungen.pdf`
-              )
-            if (path && tafel.eigeneDatei)
-              await window.api.exporter.pdf(
-                buildWorksheetHtml(ws, layouts, { sheetIds: [], includeKey: false, includeBoard: true }, logo, schoolName),
-                `${baseName} - Tafelbild.pdf`
-              )
-            if (path)
-              notifySuccess(
-                [fillable ? 'Ausfüllbares PDF gespeichert.' : 'PDF gespeichert.', hoertexte.length ? `${hoertexte.length} Hörtext(e) im PDF enthalten.` : '']
+            if (keyMode === 'separate')
+              dateien.push({
+                name: `${baseName}${suffix} - Lösungen.pdf`,
+                html: buildWorksheetHtml(ws, layouts, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, logo, schoolName)
+              })
+            if (tafel.eigeneDatei)
+              dateien.push({
+                name: `${baseName} - Tafelbild.pdf`,
+                html: buildWorksheetHtml(ws, layouts, { sheetIds: [], includeKey: false, includeBoard: true }, logo, schoolName)
+              })
+          } else {
+            dateien.push({
+              name: `${baseName}${suffix}.docx`,
+              filter: WORD_FILTER,
+              daten: () => buildWorksheetDocx(ws, { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument }, deps)
+            })
+            if (keyMode === 'separate')
+              dateien.push({
+                name: `${baseName}${suffix} - Lösungen.docx`,
+                filter: WORD_FILTER,
+                daten: () => buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, deps)
+              })
+            if (tafel.eigeneDatei)
+              dateien.push({
+                name: `${baseName} - Tafelbild.docx`,
+                filter: WORD_FILTER,
+                daten: () => buildWorksheetDocx(ws, { sheetIds: [], includeKey: false, includeBoard: true }, deps)
+              })
+          }
+          dateien.push(...audioDateien(ws, baseName))
+          const hoertextImPdf = exportMode === 'pdf' && ws.sheets.some((s) => s.blocks.some((b) => b.type === 'audio' && b.audio?.dataUrl))
+          await speichereAusgabe(
+            dateien,
+            exportMode === 'pdf'
+              ? [fillable ? 'Ausfüllbares PDF gespeichert.' : 'PDF gespeichert.', hoertextImPdf ? 'Hörtexte sind im PDF enthalten.' : '']
                   .filter(Boolean)
                   .join(' ')
-              )
-          } else {
-            const filters = [{ name: 'Word-Dokument', extensions: ['docx'] }]
-            const data = await buildWorksheetDocx(
-              ws,
-              {
-                sheetIds,
-                includeKey: keyMode === 'append',
-                includeBoard: tafel.hauptdokument
-              },
-              deps
-            )
-            const path = await window.api.files.save(`${baseName}${suffix}.docx`, filters, data)
-            if (path && keyMode === 'separate') {
-              await window.api.files.save(
-                `${baseName}${suffix} - Lösungen.docx`,
-                filters,
-                await buildWorksheetDocx(
-                  ws,
-                  {
-                    sheetIds,
-                    includeKey: false,
-                    keyOnly: true,
-                    includeBoard: tafel.loesungsdatei
-                  },
-                  deps
-                )
-              )
-            }
-            if (path && tafel.eigeneDatei) {
-              await window.api.files.save(
-                `${baseName} - Tafelbild.docx`,
-                filters,
-                await buildWorksheetDocx(ws, { sheetIds: [], includeKey: false, includeBoard: true }, deps)
-              )
-            }
-            if (path) notifySuccess('Word-Dokument gespeichert.')
-          }
-          if (exportMode !== 'print') await saveAudioFiles(ws, baseName)
+              : 'Word-Dokument gespeichert.'
+          )
         }}
         sheets={ws.sheets.map((s) => ({ id: s.id, label: s.label }))}
-        defaultKey={ws.meta.answerKey ? 'separate' : 'none'}
+        defaultKey={loesungsVorgabe('arbeitsblatt', ws.meta.answerKey)}
         hasBoard={Boolean(ws.board)}
         boardFirst={view === 'board'}
       />
@@ -982,15 +964,16 @@ function ExportModal({
 }: {
   mode: null | 'docx' | 'pdf' | 'print'
   onClose: () => void
-  run: (sheetIds: string[], key: 'none' | 'append' | 'separate', includeBoard: boolean, fillable: boolean) => Promise<void>
+  run: (sheetIds: string[], key: LoesungsModus, includeBoard: boolean, fillable: boolean) => Promise<void>
   sheets: { id: string; label: string }[]
-  defaultKey: 'none' | 'separate'
+  /** Vorwahl: zuletzt in diesem Programm gewählt bzw. „als eigene Datei" (LoesungsWahl.tsx) */
+  defaultKey: LoesungsModus
   hasBoard: boolean
   /** Aus dem Reiter „Tafelbild“ geöffnet: nur das Tafelbild vorauswählen */
   boardFirst: boolean
 }): React.JSX.Element {
   const [sheetIds, setSheetIds] = useState(sheets.map((s) => s.id))
-  const [key, setKey] = useState<'none' | 'append' | 'separate'>(defaultKey)
+  const [key, setKey] = useState<LoesungsModus>(defaultKey)
   const [board, setBoard] = useState(false)
   /** PDF mit Formularfeldern statt reinem Abbild */
   const [fillable, setFillable] = useState(false)
@@ -999,6 +982,7 @@ function ExportModal({
   useEffect(() => {
     if (mode === null) return
     setBoard(hasBoard && boardFirst)
+    setKey(defaultKey)
     setSheetIds(boardFirst && hasBoard ? [] : sheets.map((s) => s.id))
   }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1050,18 +1034,12 @@ function ExportModal({
           />
         )}
         {sheetIds.length > 0 && (
-          <Radio.Group label="Lösungen" value={key} onChange={(v) => setKey(v as typeof key)}>
-            <Stack gap={6} mt={4}>
-              <Radio value="none" label="ohne Lösungen" />
-              <Radio value="append" label="Lösungsseiten anhängen" />
-              {mode !== 'print' && <Radio value="separate" label="Lösungen als eigene Datei" />}
-              {mode === 'print' && key === 'separate' && (
-                <Text size="xs" c="dimmed">
-                  Beim Drucken werden Lösungen nur mit „Lösungsseiten anhängen“ ausgegeben.
-                </Text>
-              )}
-            </Stack>
-          </Radio.Group>
+          /*
+           * Dieselbe Wahl wie in allen Programmen. „separate" ist beim Drucken jetzt gültig
+           * („Lösungen separat drucken"): Vorher war es bei eingeschalteten Lösungen vorgewählt,
+           * beim Drucken aber gar nicht angeboten – nichts war gewählt, und es kamen keine Lösungen.
+           */
+          <LoesungsWahl value={key} onChange={setKey} modus={mode} />
         )}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
@@ -1073,6 +1051,7 @@ function ExportModal({
             onClick={async () => {
               setRunning(true)
               try {
+                if (sheetIds.length) merkeLoesungsWahl('arbeitsblatt', key)
                 await run(sheetIds, sheetIds.length ? key : 'none', board, fillable)
                 onClose()
               } catch (e) {

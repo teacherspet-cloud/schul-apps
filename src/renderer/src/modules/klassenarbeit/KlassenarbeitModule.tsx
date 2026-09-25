@@ -1,7 +1,7 @@
 import { Box, Button, Group, Stepper } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { newExamSafely, openSavedExam, useExamAutosave } from './library'
+import { defaultExamName, newExamSafely, openSavedExam, useExamAutosave } from './library'
 import { notifyError } from '../../shared/util'
 import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../shared/useUndoKeys'
@@ -20,7 +20,7 @@ import { QUELLENAUSWAHL, type QuellenFrage } from '../arbeitsblatt/auftraege'
  * Beim Öffnen erscheinen die gespeicherten Arbeiten, sofern es welche gibt.
  */
 export default function KlassenarbeitModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, exam, undo, redo, verlauf, docId } = useKlassenarbeit()
+  const { step, setStep, exam, undo, redo, verlauf, docId, docName } = useKlassenarbeit()
   const [library, setLibrary] = useState(false)
   // Läuft für diese Arbeit ein Auftrag, steht statt der Aufgaben ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(docId)
@@ -52,7 +52,15 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
   }, [])
 
   if (library) {
-    return <ExamLibrary onNew={startNew} onOpened={() => setLibrary(false)} />
+    // „Zurück zu …" nur, solange eine Arbeit offen ist
+    return (
+      <ExamLibrary
+        onNew={startNew}
+        onOpened={() => setLibrary(false)}
+        zurueck={exam ? docName || defaultExamName(exam) : null}
+        onZurueck={() => setLibrary(false)}
+      />
+    )
   }
 
   return (
@@ -71,7 +79,7 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
         <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
         {/* Zurueck zur Uebersicht – beschriftet und immer sichtbar, wie in den anderen Programmen */}
         <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
-          Meine Arbeiten
+          Meine Klassenarbeiten
         </Button>
         {/* Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen */}
         <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
@@ -83,8 +91,8 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
           <AuftragsHinweis auftrag={auftrag} neuLabel="Neue Klassenarbeit" onNeu={startNew} />
         ) : (
           <>
-            {step === 0 && <FrameStep onLibrary={() => setLibrary(true)} />}
-            {step === 1 && exam && <TasksStep exam={exam} onLibrary={() => setLibrary(true)} />}
+            {step === 0 && <FrameStep />}
+            {step === 1 && exam && <TasksStep exam={exam} />}
           </>
         )}
       </Box>

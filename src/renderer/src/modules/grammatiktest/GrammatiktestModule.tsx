@@ -1,7 +1,7 @@
 import { Box, Button, Group, ScrollArea, Stepper, Text, Tooltip } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { newTestSafely, openSavedTest, useTestAutosave } from './library'
+import { defaultTestName, newTestSafely, openSavedTest, useTestAutosave } from './library'
 import { notifyError } from '../../shared/util'
 import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../shared/useUndoKeys'
@@ -51,7 +51,15 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
   }, [])
 
   if (library) {
-    return <TestLibrary onNew={startNew} onOpened={() => setLibrary(false)} />
+    // „Zurück zu …" nur, solange ein Test offen ist – sonst gibt es nichts, wohin es zurückginge
+    return (
+      <TestLibrary
+        onNew={startNew}
+        onOpened={() => setLibrary(false)}
+        zurueck={test ? docName || defaultTestName(test) : null}
+        onZurueck={() => setLibrary(false)}
+      />
+    )
   }
 
   return (
@@ -76,7 +84,7 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
             </Tooltip>
           )}
           <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
-            Meine Tests
+            Meine Grammatiktests
           </Button>
           <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
             Neuer Test
