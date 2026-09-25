@@ -1,0 +1,292 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--app-bg);
+}
+
+.app-main {
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--app-bg);
+}
+
+.app-toolbar {
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
+}
+
+/*
+ * SCHMALE ODER FLACHE BILDSCHIRME – Tablet im Browser, kleines Notebook.
+ *
+ * Gemeldet von der Lehrkraft (23.09.2026): „im browser sind die blätter kaum sichtbar und
+ * nur sehr schwer scrollbar, da die leisten oben viel platz einnehmen".
+ *
+ * Nachgemessen am Tablet quer (1024×690): Die Modulleiste stapelte sich auf zwei Zeilen
+ * (113 Punkte), die Editorleiste auf drei (128) – zusammen 241 von 690 Punkten, mehr als
+ * ein Drittel des Bildschirms. Vom Arbeitsblatt blieb ein Streifen übrig.
+ *
+ * Statt umzubrechen bleiben die Leisten jetzt EINZEILIG und lassen sich seitwärts wischen.
+ * Kein Bedienelement verschwindet, aber die Höhe ist gedeckelt.
+ */
+@media (max-width: 1280px), (max-height: 820px) {
+  .app-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Mantine setzt das Polster inline – nur `!important` kommt dagegen an */
+    padding-block: 5px !important;
+    scrollbar-width: thin;
+  }
+  .app-toolbar > * {
+    flex-shrink: 0;
+  }
+  /* Die Schrittbeschreibungen sind Beiwerk; die Schrittnamen bleiben lesbar */
+  .app-toolbar .mantine-Stepper-stepDescription {
+    display: none;
+  }
+  /*
+   * Der Stepper steht mit `flex: 1` in der Leiste. Wird er schmaler als seine drei Schritte,
+   * bricht er INTERN auf zwei Zeilen um – gemessen 88 Punkte statt 36. Deshalb behält er hier
+   * seine natürliche Breite; zu sehen bekommt man ihn durch seitliches Wischen.
+   */
+  .app-toolbar .mantine-Stepper-root {
+    flex: 0 0 auto !important;
+  }
+  /* Kleinere Schrittzeichen: `min-height` muss mit, sonst gilt weiter Mantines Maß */
+  .app-toolbar .mantine-Stepper-stepIcon {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    font-size: 13px;
+  }
+  .app-toolbar .mantine-Stepper-separator {
+    margin-inline: 8px;
+  }
+}
+
+.module-container {
+  height: 100%;
+}
+
+.module-container[hidden] {
+  display: none !important;
+}
+
+.home-tile {
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.task-card-selected {
+  background: var(--mantine-primary-color-light);
+}
+
+.theme-swatch {
+  cursor: pointer;
+  border: 2px solid var(--mantine-color-default-border);
+  transition: border-color 120ms ease;
+}
+
+.theme-swatch[data-active='true'] {
+  border-color: var(--mantine-primary-color-filled);
+}
+
+.picker-tile {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+/* ---------- Oberflächenthemen (Werte aus shared/themes.ts) ---------- */
+
+/* Hintergrundmuster */
+:root[data-app-pattern='dots'] .app-main {
+  background-image: radial-gradient(var(--app-pattern-color) 1.2px, transparent 1.3px);
+  background-size: 22px 22px;
+}
+
+:root[data-app-pattern='grid'] .app-main {
+  background-image: linear-gradient(var(--app-pattern-color) 1px, transparent 1px), linear-gradient(90deg, var(--app-pattern-color) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+:root[data-app-pattern='paper'] .app-main {
+  background-image: repeating-linear-gradient(0deg, transparent 0 27px, var(--app-pattern-color) 27px 28px);
+}
+
+/* Navigationsleiste */
+.mantine-AppShell-navbar {
+  background: var(--app-nav-bg);
+  border-color: var(--app-border);
+}
+
+:root[data-app-nav='filled'] .mantine-AppShell-navbar {
+  border-color: transparent;
+}
+
+:root[data-app-nav='filled'] .nav-icon {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+}
+
+:root[data-app-nav='filled'] .nav-icon:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+:root[data-app-nav='filled'] .nav-icon[data-active='true'] {
+  background: #fff;
+  color: var(--app-nav-solid);
+}
+
+/* Karten */
+.mantine-Card-root,
+.mantine-Paper-root[data-with-border] {
+  transition:
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+
+:root[data-app-cards='shadow'] .mantine-Card-root[data-with-border] {
+  border-color: transparent;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 4px 14px rgba(0, 0, 0, 0.07);
+}
+
+:root[data-mantine-color-scheme='dark'][data-app-cards='shadow'] .mantine-Card-root[data-with-border] {
+  border-color: var(--app-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-app-cards='flat'] .mantine-Card-root[data-with-border] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--app-surface) 70%, var(--app-bg));
+}
+
+:root[data-app-cards='bold'] .mantine-Card-root[data-with-border] {
+  border: 2px solid var(--mantine-color-text);
+  box-shadow: 4px 4px 0 var(--mantine-primary-color-filled);
+}
+
+:root[data-app-cards='bold'] .app-toolbar {
+  border-bottom: 3px solid var(--mantine-primary-color-filled);
+}
+
+/* Startseite */
+.home-hero {
+  background: var(--app-hero);
+  color: #fff;
+  border-radius: var(--mantine-radius-default);
+  padding: 28px 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.home-hero .mantine-Title-root {
+  color: #fff;
+}
+
+.home-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+}
+
+:root[data-app-cards='bold'] .home-tile:hover {
+  box-shadow: 7px 7px 0 var(--mantine-primary-color-filled);
+}
+
+/* Vorschau der Themen in den Einstellungen */
+.theme-preview {
+  display: flex;
+  height: 92px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--mantine-color-default-border);
+}
+
+/*
+ * DRUCKVORSCHAU auf flachen Bildschirmen (Tablet).
+ *
+ * Gemeldet am 25.09.2026: „in der webversion wird beim druckdialog nicht alles angezeigt,
+ * insb. nicht der button zum drucken (am tablet)."
+ *
+ * Die Einstellungen bekommen einen eigenen Rollbereich; „Drucken" und „Abbrechen" stehen
+ * darunter fest. Auf schmalen Geraeten rutscht die Spalte unter die Seitenansicht, statt sie
+ * auf wenige Zentimeter zusammenzudruecken.
+ */
+.pv-raum {
+  height: 75vh;
+  min-height: 0;
+}
+.pv-seite {
+  width: 290px;
+  flex: 0 0 290px;
+  min-height: 0;
+}
+.pv-felder {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.pv-knoepfe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+}
+.pv-knoepfe > * {
+  flex: 1 1 auto;
+}
+@media (max-width: 900px) {
+  .pv-raum {
+    flex-wrap: wrap;
+    height: auto;
+  }
+  .pv-vorschau {
+    flex: 1 1 100%;
+    max-height: 45vh;
+  }
+  .pv-seite {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  /* Auf dem Tablet ist der Platz senkrecht knapp – die Felder rollen, die Knoepfe bleiben */
+  .pv-felder {
+    max-height: 32vh;
+  }
+}
+
+/*
+ * Sehr flache Fläche (Tablet quer mit vergrößerter Schrift): Hier zählt jede Zeile. Die
+ * Seitenansicht wird klein, die Einstellungen rollen, und die beiden Knöpfe teilen sich eine
+ * Zeile – so bleibt „Drucken" auch dann erreichbar.
+ */
+@media (max-height: 620px) {
+  .pv-raum {
+    height: auto;
+  }
+  .pv-vorschau {
+    max-height: 26vh;
+  }
+  .pv-felder {
+    max-height: 30vh;
+  }
+  .pv-knoepfe {
+    flex-direction: row;
+  }
+  /*
+   * Der Weg über den Windows-Druckdialog entfällt hier: Er richtet sich an den Rechner, an
+   * dem das Programm laeuft – vom Tablet aus fuehrt er ins Leere und kostet nur die Zeile,
+   * die „Drucken" braucht.
+   */
+  .pv-systemdialog {
+    display: none;
+  }
+}

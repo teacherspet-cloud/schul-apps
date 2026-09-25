@@ -1,0 +1,39 @@
+appId: de.schulapps.app
+productName: Schul-Apps
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+extraResources:
+  - from: resources/
+    to: resources/
+    # Nur die gebündelte Piktogramm-Datei, keine Einzel-SVGs (schnelleres Entpacken beim Start)
+    filter: ['**/*', '!openmoji/svg/**']
+# Nur deutsche und englische Chromium-Sprachdateien (spart ~47 MB beim Entpacken)
+electronLanguages:
+  - de
+  - en-US
+# Nur eine einzelne, direkt startbare .exe – kein Installer nötig
+win:
+  target:
+    - target: portable
+      arch: [x64]
+portable:
+  artifactName: ${productName}.exe
+  # Wird angezeigt, während sich die .exe beim Start entpackt
+  splashImage: build/splash.bmp
+  # Fester Entpack-Ordner statt Zufallsname.
+  #
+  # Gemeldet von der Lehrkraft (24.09.2026): „jedes mal, wenn der netzwerkzugriff aktiviert
+  # wird, muss man die windowsfreigabe neu aktivieren".
+  #
+  # Grund: Eine portable .exe entpackt sich beim Start in einen Temp-Ordner, dessen Name
+  # electron-builder bei JEDEM Build neu auswürfelt. Die Windows-Firewall merkt sich ihre
+  # Freigabe aber am PFAD des Programms – nach jedem neuen Build zeigt die alte Regel ins
+  # Leere, und Windows fragt wieder. Mit festem Namen bleibt der Pfad gleich und die einmal
+  # erteilte Freigabe gilt weiter.
+  unpackDirName: Schul-Apps
+npmRebuild: false

@@ -1,0 +1,136 @@
+import { Button, Group, Modal, Stack, Stepper, Text, Title } from '@mantine/core'
+import { IconPalette, IconSchool, IconSparkles } from '@tabler/icons-react'
+import { useEffect, useState } from 'react'
+import { useAppSettings } from '../shared/settingsStore'
+import { imNetz } from '../shared/netzZugang'
+import { AiCard, AppearanceCard, SchoolCard } from './SettingsPage'
+import SicherungEinlesen from './SicherungEinlesen'
+
+/**
+ * Der Einrichtungsassistent nach dem ersten Start oder nach dem Zurücksetzen.
+ *
+ * Wunsch der Lehrkraft (25.09.2026): „Füge einen Einrichtungsassistenten hinzu, der nach dem
+ * erstmaligen Start oder Zurücksetzen der App dem Nutzer hilft, alles wichtige einzurichten,
+ * damit man in den Einzelapps beginnen kann."
+ *
+ * Drei Entscheidungen aus der Rücksprache:
+ *
+ * - Drei Schritte: Schule und Lerngruppe, KI-Zugang, Logo und Design.
+ * - JEDER Schritt ist überspringbar. Wer den Schlüssel gerade nicht zur Hand hat, soll nicht
+ *   festsitzen – die Programme sagen später ohnehin, was fehlt.
+ * - Eine Sicherung lässt sich hier direkt einlesen – nach dem Zurücksetzen der naheliegende Weg
+ *   zurück (zunächst „später“, nachgeholt am 25.09.2026).
+ * - Er erscheint, „wenn nichts eingerichtet ist": also wenn weder ein Schulname noch ein
+ *   KI-Zugang vorliegt. Damit kommt er nach dem ersten Start und nach dem Zurücksetzen von
+ *   selbst, ohne dass eine zusätzliche Markierung gepflegt werden muss, die irgendwann nicht
+ *   mehr zum tatsächlichen Zustand passt.
+ *
+ * Die Schritte benutzen DIESELBEN Karten wie die Einstellungsseite. Ein zweiter, schlankerer
+ * Nachbau würde über kurz oder lang von ihr abweichen – und dann richtet der Assistent etwas
+ * anderes ein, als die Einstellungen zeigen.
+ */
+export default function Einrichtung(): React.JSX.Element | null {
+  const settings = useAppSettings((s) => s.settings)
+  const update = useAppSettings((s) => s.update)
+  const [offen, setOffen] = useState(false)
+  const [schritt, setSchritt] = useState(0)
+  const [geprueft, setGeprueft] = useState(false)
+
+  useEffect(() => {
+    /*
+     * Im Netzbetrieb nicht: Der Assistent richtet Dinge auf dem RECHNER ein (Anmeldung beim
+     * KI-Anbieter, Logo-Datei). Vom Tablet aus liefe er ins Leere.
+     */
+    if (imNetz() || geprueft) return
+    let abgebrochen = false
+    void (async () => {
+      const ki = await window.api.ai.status().catch(() => null)
+      if (abgebrochen) return
+      const ohneSchule = !settings.schoolName?.trim()
+      const ohneKi = !ki?.hasTextKey
+      setOffen(ohneSchule && ohneKi)
+      setGeprueft(true)
+    })()
+    return () => {
+      abgebrochen = true
+    }
+  }, [settings.schoolName, geprueft])
+
+  if (!offen) return null
+
+  const schritte = [
+    {
+      label: 'Schule',
+      beschreibung: 'Wo unterrichtest du?',
+      icon: <IconSchool size={18} />,
+      hinweis:
+        'Bundesland und Schulform bestimmen, welche Jahrgänge zur Auswahl stehen, welche Niveaus erwartet werden und wie der Lehrplan im jeweiligen Land heißt. Ohne diese Angaben arbeitet die App mit Voreinstellungen, die zu deiner Schule nicht passen müssen.',
+      inhalt: <SchoolCard settings={settings} update={update} />
+    },
+    {
+      label: 'KI-Zugang',
+      beschreibung: 'Womit soll erzeugt werden?',
+      icon: <IconSparkles size={18} />,
+      hinweis:
+        'Ohne Zugang erzeugt die App kein Material – das ist der Schritt, an dem es sonst hängenbleibt. Der Schlüssel wird verschlüsselt auf diesem Rechner abgelegt und verlässt ihn nicht.',
+      inhalt: <AiCard settings={settings} update={update} />
+    },
+    {
+      label: 'Aussehen',
+      beschreibung: 'Logo und Design',
+      icon: <IconPalette size={18} />,
+      hinweis: 'Betrifft nur das Aussehen der Blätter, nicht die Funktion. Lässt sich jederzeit in den Einstellungen ändern.',
+      inhalt: <AppearanceCard settings={settings} update={update} />
+    }
+  ]
+
+  const letzter = schritt >= schritte.length - 1
+  const aktuell = schritte[schritt]
+
+  return (
+    <Modal opened onClose={() => setOffen(false)} title="Willkommen bei Schul-Apps" size="xl" closeOnClickOutside={false}>
+      <Stack gap="lg">
+        <Group justify="space-between" align="center" wrap="nowrap">
+          <Text size="sm" c="dimmed">
+            Drei kurze Schritte, danach kannst du loslegen. Jeden davon kannst du überspringen und später in den Einstellungen nachholen.
+          </Text>
+          {/* Nach einem Zurücksetzen der naheliegende Weg zurück (Wunsch vom 25.09.2026) */}
+          <SicherungEinlesen variant="subtle" />
+        </Group>
+
+        <Stepper active={schritt} onStepClick={setSchritt} size="sm">
+          {schritte.map((s) => (
+            <Stepper.Step key={s.label} label={s.label} description={s.beschreibung} icon={s.icon} />
+          ))}
+        </Stepper>
+
+        <div>
+          <Title order={5} mb={4}>
+            {aktuell.beschreibung}
+          </Title>
+          <Text size="sm" c="dimmed" mb="md">
+            {aktuell.hinweis}
+          </Text>
+          {aktuell.inhalt}
+        </div>
+
+        <Group justify="space-between">
+          <Button variant="subtle" onClick={() => setOffen(false)}>
+            Später einrichten
+          </Button>
+          <Group>
+            {schritt > 0 && (
+              <Button variant="default" onClick={() => setSchritt((n) => n - 1)}>
+                Zurück
+              </Button>
+            )}
+            <Button variant="light" onClick={() => (letzter ? setOffen(false) : setSchritt((n) => n + 1))}>
+              Überspringen
+            </Button>
+            <Button onClick={() => (letzter ? setOffen(false) : setSchritt((n) => n + 1))}>{letzter ? 'Fertig' : 'Weiter'}</Button>
+          </Group>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}

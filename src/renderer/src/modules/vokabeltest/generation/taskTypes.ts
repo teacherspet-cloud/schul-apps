@@ -1,0 +1,946 @@
+import type { CefrLevel } from '@shared/types'
+import { newId, Rng, shuffle } from '../model/random'
+import type { Block, BlockKind, CategorizeBlock, GapItem, TaskTypeId, TestSettings, TextPart, VocabEntry } from '../model/types'
+import { buildCrossword, crosswordForm, isCrosswordWord, scrambleWord } from './crossword'
+import { arr, bool, enumOf, int, obj, str } from '../../../shared/aiSchema'
+import type { KnownVocab } from '../../../shared/knownVocab'
+import { baseForm } from '../render/helpTexts'
+import { NENNFORM_PUNKTE, nennformLabel } from '../didactics/latein'
+import { mitNennform } from '../input/lateinNennform'
+
+export interface GenContext {
+  settings: TestSettings
+  languageName: string
+  rng: Rng
+  allVocab: VocabEntry[]
+  /** Alle in dieser Testvariante abgefragten Vokabeln (für überzählige Wörter, die nichts verraten) */
+  variantVocab?: VocabEntry[]
+  /** Wortschatz, den die Klasse laut Lehrwerk schon kennt */
+  known?: KnownVocab
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface TaskTypeDef {
+  id: TaskTypeId
+  label: string
+  description: string
+  kind: BlockKind
+  minLevel: CefrLevel
+  usesVocab: boolean
+  minItems?: number
+  defaultPoints: number
+  defaultTitle: string
+  defaultInstruction: string
+  accepts?: (v: VocabEntry) => boolean
+  /** JSON-Schema der KI-Antwort; ohne Schema kommt der Block ohne KI aus */
+  schema?: Record<string, unknown>
+  prompt?: (vocab: VocabEntry[], ctx: GenContext) => string
+  build: (vocab: VocabEntry[], data: any, ctx: GenContext) => Block
+}
+
+// ---------- Hilfen ----------
+
+const vocabLines = (vocab: VocabEntry[]): string =>
+  vocab.map((v) => `- id="${v.id}" | ${v.term} | German: ${v.translation}${v.pos ? ` | ${v.pos}` : ''}${v.note ? ` | note: ${v.note}` : ''}`).join('\n')
+
+/** Ordnet eine KI-Antwort anhand der ID (oder notfalls des Wortes) einer Vokabel zu. */
+function findVocab(vocab: VocabEntry[], id: string, term?: string): VocabEntry | undefined {
+  return vocab.find((v) => v.id === id) ?? (term ? vocab.find((v) => v.term.toLowerCase() === term.toLowerCase()) : undefined)
+}
+
+const itemSchema = (props: Record<string, Record<string, unknown>>) =>
+  obj({ instruction: str('Short task instruction for the students in the target language'), items: arr(obj(props)) })
+
+function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction'>, data: any, ctx: GenContext) {
+  const points = ctx.settings.tasks.find((t) => t.type === def.id)?.pointsPerItem ?? 1
+  return {
+    id: newId(ctx.rng),
+    taskType: def.id,
+    title: def.defaultTitle,
+    instruction: (typeof data?.instruction === 'string' && data.instruction.trim()) || def.defaultInstruction,
+    pointsPerItem: points
+  }
+}
+
+const earlyLevel = (ctx: GenContext): boolean => ['Pre-A1', 'A1', 'A1+', 'A2'].includes(ctx.settings.level)
+
+const PICTURE_INSTRUCTIONS: Record<string, string> = {
+  en: 'Write the correct word under each picture.',
+  fr: 'Écris le bon mot sous chaque image.',
+  es: 'Escribe la palabra correcta debajo de cada imagen.',
+  it: 'Scrivi la parola giusta sotto ogni immagine.',
+  nl: 'Schrijf het juiste woord onder elke afbeelding.',
+  ru: 'Напиши правильное слово под каждой картинкой.'
+}
+
+const UNIQUE_RULE = `Students must be able to see without doubt which word is asked for in each item:
+- Students see all words of this task (e.g. in a word box). For every item, try each OTHER word of the list in any grammatical form. If another word would also make sense, add a clearer context clue (typical collocation, situation, reason, contrast) until only the target word fits.
+- Avoid items where a synonym, a more general word or a word from the same topic would also be correct.`
+
+const GAP_RULES = `Rules for gaps:
+- "before" + [gap] + "after" together form one natural sentence; the gap replaces exactly the tested word/phrase.
+- "answer" is the exact form that fits the gap (inflect if grammar requires, e.g. plural, past tense, 3rd person -s).
+- The context must make the tested word the ONLY sensible solution among all words of the list. Add clues (collocations, typical situations) to remove ambiguity.
+- The answer must never appear in "before" or "after".
+${UNIQUE_RULE}`
+
+/** Notreserve, falls weder die KI noch die Liste passende überzählige Wörter liefern */
+const FALLBACK_EXTRA_WORDS: Record<string, string[]> = {
+  en: ['window', 'bottle', 'garden', 'pencil', 'kitchen', 'bicycle', 'blanket', 'ladder', 'mirror', 'orange'],
+  fr: ['fenêtre', 'bouteille', 'jardin', 'crayon', 'cuisine', 'vélo', 'miroir', 'orange'],
+  es: ['ventana', 'botella', 'jardín', 'lápiz', 'cocina', 'bicicleta', 'espejo', 'naranja'],
+  it: ['finestra', 'bottiglia', 'giardino', 'matita', 'cucina', 'bicicletta', 'specchio', 'arancia'],
+  nl: ['raam', 'fles', 'tuin', 'potlood', 'keuken', 'fiets', 'spiegel', 'sinaasappel'],
+  ru: ['окно', 'бутылка', 'сад', 'карандаш', 'кухня', 'велосипед', 'зеркало', 'апельсин']
+}
+
+/** Mindestens so viele überzählige Wörter stehen in jedem Wortkasten bzw. jeder Zuordnung */
+export const MIN_EXTRA_WORDS = 2
+
+const extraWordsRule = (_vocab: VocabEntry[], ctx: GenContext): string =>
+  `Word box: the students see all tested words plus the "extraWords". Give 2 or 3 extra words (same word class, level and topic) that fit NONE of the gaps in any grammatical form – check every gap. Do NOT use any word from this vocabulary list as an extra word (they may be tested in other tasks): ${ctx.allVocab
+    .map((v) => v.term)
+    .slice(0, 60)
+    .join(', ')}.`
+
+/**
+ * Überzählige Wörter für Wortkasten/Zuordnung: Vorschläge der KI, ergänzt um andere Wörter der Liste,
+ * damit immer mindestens zwei Wörter nicht gebraucht werden.
+ */
+export function ensureExtraWords(proposed: unknown, vocab: VocabEntry[], ctx: GenContext, used: string[] = vocab.map((v) => v.term), max = 4): string[] {
+  // Wörter, die in dieser Variante abgefragt werden, dürfen nicht als Ablenker auftauchen (sie würden Lösungen verraten)
+  const tested = ctx.variantVocab ?? ctx.allVocab
+  const taken = new Set([...used, ...tested.map((v) => v.term)].map(baseForm))
+  const words: string[] = []
+  const add = (w: string): void => {
+    const clean = w.trim()
+    if (!clean || taken.has(baseForm(clean))) return
+    taken.add(baseForm(clean))
+    words.push(clean)
+  }
+  if (Array.isArray(proposed)) proposed.forEach((w) => typeof w === 'string' && add(w))
+  if (words.length < MIN_EXTRA_WORDS && ctx.variantVocab) {
+    // Nicht abgefragte Wörter der Liste sind unbedenklich
+    const untested = shuffle(
+      ctx.allVocab.filter((v) => !ctx.variantVocab!.some((x) => x.id === v.id)).map((v) => v.term),
+      ctx.rng
+    )
+    for (const o of untested) if (words.length < MIN_EXTRA_WORDS) add(o)
+  }
+  if (words.length < MIN_EXTRA_WORDS) {
+    const fallback = shuffle(FALLBACK_EXTRA_WORDS[ctx.settings.targetLanguage] ?? FALLBACK_EXTRA_WORDS.en, ctx.rng)
+    for (const o of fallback) if (words.length < MIN_EXTRA_WORDS) add(o)
+  }
+  return words.slice(0, max)
+}
+
+// ---------- Aufgabentypen ----------
+
+const defs: TaskTypeDef[] = [
+  {
+    id: 'gapSentences',
+    label: 'Lückensätze',
+    description: 'Ein Satz pro Vokabel mit Lücke, optional mit Wortkasten und Anfangsbuchstaben.',
+    kind: 'gap',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Fill in the gaps',
+    defaultInstruction: 'Complete the sentences with the correct words.',
+    schema: obj({
+      instruction: str('Short task instruction for the students in the target language'),
+      items: arr(obj({ vocabId: str(), before: str(), answer: str(), after: str() })),
+      extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
+    }),
+    prompt: (vocab, ctx) =>
+      `Task type: gap-fill sentences. Write exactly one sentence for each word below.\n${GAP_RULES}\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        if (!v) return []
+        return [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, bankWord: v.term }]
+      })
+      // Ohne Wortkasten hilft der Anfangsbuchstabe, die gesuchte Vokabel eindeutig zu erkennen
+      return {
+        ...base(this, data, ctx),
+        kind: 'gap',
+        items,
+        wordBank: earlyLevel(ctx),
+        firstLetterHint: !earlyLevel(ctx),
+        extraBankWords: ensureExtraWords(data.extraWords, vocab, ctx)
+      }
+    }
+  },
+  {
+    id: 'gapText',
+    label: 'Zusammenhängender Lückentext',
+    description: 'Kurze Geschichte, E-Mail oder Blogeintrag, in dem alle Vokabeln als Lücken vorkommen.',
+    kind: 'gapText',
+    minLevel: 'A1+',
+    usesVocab: true,
+    minItems: 3,
+    defaultPoints: 1,
+    defaultTitle: 'Complete the text',
+    defaultInstruction: 'Read the text and fill in the missing words.',
+    schema: obj({
+      instruction: str(),
+      text: str('The text. Mark each gap with [[vocabId]], e.g. "We [[v3]] the museum."'),
+      gaps: arr(obj({ vocabId: str(), answer: str() })),
+      extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
+    }),
+    prompt: (vocab, ctx) =>
+      `Task type: coherent gap text (a short story, e-mail, diary or blog entry${ctx.settings.topic ? ` about: ${ctx.settings.topic}` : ''}). Use every word below exactly once as a gap. Mark each gap in "text" with [[vocabId]] and give the fitting form in "gaps".\n${GAP_RULES}\nUse paragraphs (\\n) where natural. Length: about ${Math.max(60, vocab.length * 18)} words.\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return {
+        ...base(this, data, ctx),
+        kind: 'gapText',
+        parts: parseGapText(data, vocab, ctx.rng),
+        wordBank: true,
+        firstLetterHint: false,
+        extraBankWords: ensureExtraWords(data.extraWords, vocab, ctx)
+      }
+    }
+  },
+  {
+    id: 'dialogue',
+    label: 'Dialog ergänzen',
+    description: 'Ein Alltagsdialog, in dem die Vokabeln in die Lücken eingesetzt werden.',
+    kind: 'gapText',
+    minLevel: 'A1',
+    usesVocab: true,
+    minItems: 3,
+    defaultPoints: 1,
+    defaultTitle: 'Complete the dialogue',
+    defaultInstruction: 'Complete the dialogue with words from the box.',
+    schema: obj({
+      instruction: str(),
+      text: str('The dialogue, one line per turn like "Tom: …\\nAnna: …". Mark each gap with [[vocabId]].'),
+      gaps: arr(obj({ vocabId: str(), answer: str() })),
+      extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
+    }),
+    prompt: (vocab, ctx) =>
+      `Task type: dialogue completion. Write a natural dialogue between two teenagers${ctx.settings.topic ? ` about: ${ctx.settings.topic}` : ''} (8–14 turns). Use every word below exactly once as a gap marked with [[vocabId]].\n${GAP_RULES}\n${extraWordsRule(vocab, ctx)}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return {
+        ...base(this, data, ctx),
+        kind: 'gapText',
+        parts: parseGapText(data, vocab, ctx.rng),
+        wordBank: true,
+        firstLetterHint: false,
+        extraBankWords: ensureExtraWords(data.extraWords, vocab, ctx)
+      }
+    }
+  },
+  {
+    id: 'matchDefinitions',
+    label: 'Erklärungen zuordnen',
+    description: 'Einsprachige Erklärungen den Vokabeln zuordnen (mit überzähligen Wörtern).',
+    kind: 'match',
+    minLevel: 'A1',
+    usesVocab: true,
+    minItems: 3,
+    defaultPoints: 1,
+    defaultTitle: 'Match the words and the explanations',
+    defaultInstruction: 'Match the explanations (1–…) with the words (a–…). There are more words than you need.',
+    schema: obj({
+      instruction: str(),
+      pairs: arr(obj({ vocabId: str(), definition: str('Learner-friendly explanation that does not contain the word or its word family') })),
+      extraWords: arr(str(), 'Exactly 2 plausible extra words (same level, same word class) that match none of the explanations')
+    }),
+    prompt: (vocab) =>
+      `Task type: match explanations to words. Write a simple monolingual explanation (dictionary style for learners) for each word. The explanation must fit only this word – not any other word of the list and not the extra words – and must not contain the word itself or words of its family.\n${UNIQUE_RULE}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const pairs = (data.pairs ?? []).map((p: any) => ({ v: findVocab(vocab, p.vocabId), definition: p.definition })).filter((p: any) => p.v)
+      const right = shuffle(
+        [
+          ...pairs.map((p: any) => ({ id: newId(ctx.rng), text: p.v.term, vocabId: p.v.id })),
+          ...ensureExtraWords(data.extraWords, vocab, ctx).map((w: string) => ({ id: newId(ctx.rng), text: w, vocabId: undefined }))
+        ],
+        ctx.rng
+      )
+      const left = shuffle(pairs, ctx.rng).map((p: any) => ({
+        id: newId(ctx.rng),
+        vocabId: p.v.id,
+        text: p.definition,
+        answerId: right.find((r) => r.vocabId === p.v.id)!.id
+      }))
+      return {
+        ...base(this, data, ctx),
+        kind: 'match',
+        leftLabel: 'Explanations',
+        rightLabel: 'Words',
+        left,
+        right: right.map(({ id, text }) => ({ id, text }))
+      }
+    }
+  },
+  {
+    id: 'writeDefinitions',
+    label: 'Wörter erklären',
+    description: 'Die Schülerinnen und Schüler schreiben selbst eine einsprachige Erklärung.',
+    kind: 'open',
+    minLevel: 'A2',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Explain the words',
+    defaultInstruction: 'Explain the words in English. Do not translate them.',
+    schema: itemSchema({
+      vocabId: str(),
+      prompt: str('The word as shown to students, optionally with a short context in brackets for ambiguous words'),
+      modelAnswer: str()
+    }),
+    prompt: (vocab) =>
+      `Task type: students write their own explanation of each word in the target language. Give the word as "prompt" (add a short context in brackets only if the word has several meanings) and a model answer at the students' level.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+    }
+  },
+  {
+    id: 'pictureLabel',
+    label: 'Bilder beschriften',
+    description: 'Zu eindeutig darstellbaren Vokabeln erscheinen Bilder, die beschriftet werden.',
+    kind: 'picture',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Label the pictures',
+    defaultInstruction: PICTURE_INSTRUCTIONS.en,
+    accepts: (v) => v.depictable === true,
+    build(vocab, data, ctx) {
+      return {
+        ...base(this, data, ctx),
+        instruction: PICTURE_INSTRUCTIONS[ctx.settings.targetLanguage] ?? PICTURE_INSTRUCTIONS.en,
+        kind: 'picture',
+        items: vocab.map((v) => ({ id: newId(ctx.rng), vocabId: v.id, answer: v.term, imageKeywords: v.imageKeywords ?? [v.term] })),
+        // Wortkasten nur, wenn die Lehrkraft ihn will: Die Wörter wären sonst eine Hilfe,
+        // die am Gymnasium nicht vorgesehen ist. Mit Kasten kommen überzählige Wörter dazu,
+        // damit ein Bild nicht durch Ausschluss zu beschriften ist.
+        extraBankWords: ctx.settings.pictureWordBank ? ensureExtraWords([], vocab, ctx) : [],
+        wordBank: Boolean(ctx.settings.pictureWordBank),
+        columns: 4
+      }
+    }
+  },
+  {
+    id: 'multipleChoice',
+    label: 'Multiple Choice im Kontext',
+    description: 'Satz mit Lücke und vier Antwortmöglichkeiten.',
+    kind: 'choice',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Choose the correct word',
+    defaultInstruction: 'Tick the word that fits best.',
+    schema: itemSchema({
+      vocabId: str(),
+      before: str(),
+      after: str(),
+      options: arr(str(), 'Exactly 4 options in the form that fits the gap: the correct answer and 3 distractors of the same word class'),
+      correctIndex: int('0-based index of the correct option')
+    }),
+    prompt: (vocab, ctx) =>
+      `Task type: multiple choice in context. One sentence per word with a gap and 4 options. Distractors should preferably be other words from this vocabulary list (${ctx.allVocab.map((v) => v.term).join(', ')}) or words of the same word class. Exactly one option may fit: distractors must be clearly wrong in this context (no synonyms, no words that would also be acceptable).\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        if (!v || !Array.isArray(it.options) || it.options.length < 2) return []
+        const correct = it.options[it.correctIndex] ?? it.options[0]
+        const options = shuffle(it.options as string[], ctx.rng)
+        return [{ id: newId(ctx.rng), vocabId: v.id, before: it.before, after: it.after, options, correct: options.indexOf(correct) }]
+      })
+      return { ...base(this, data, ctx), kind: 'choice', items }
+    }
+  },
+  {
+    id: 'synonymsAntonyms',
+    label: 'Synonyme / Gegenteile',
+    description: 'Vokabeln ihren Synonymen oder Gegenteilen zuordnen.',
+    kind: 'match',
+    minLevel: 'A2',
+    usesVocab: true,
+    minItems: 3,
+    defaultPoints: 1,
+    defaultTitle: 'Synonyms and opposites',
+    defaultInstruction: 'Match each word with a word that has the same (=) or the opposite (≠) meaning.',
+    schema: obj({
+      instruction: str(),
+      pairs: arr(obj({ vocabId: str(), partner: str("A clear synonym or antonym at or below the students' level"), relation: enumOf(['=', '≠']) })),
+      extraWords: arr(str(), '2 or 3 extra words that are neither synonym nor antonym of any word')
+    }),
+    prompt: (vocab) =>
+      `Task type: match synonyms/opposites. For each word give ONE clear synonym or antonym (prefer the one that is unambiguous and known at this level) and mark the relation.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const pairs = (data.pairs ?? []).map((p: any) => ({ v: findVocab(vocab, p.vocabId), partner: p.partner, rel: p.relation })).filter((p: any) => p.v)
+      const right = shuffle(
+        [
+          ...pairs.map((p: any) => ({ id: newId(ctx.rng), text: p.partner, vocabId: p.v.id as string | undefined })),
+          ...ensureExtraWords(data.extraWords, vocab, ctx, [...vocab.map((v) => v.term), ...pairs.map((p: any) => p.partner)]).map((w: string) => ({
+            id: newId(ctx.rng),
+            text: w,
+            vocabId: undefined
+          }))
+        ],
+        ctx.rng
+      )
+      const left = shuffle(pairs, ctx.rng).map((p: any) => ({
+        id: newId(ctx.rng),
+        vocabId: p.v.id,
+        text: `${p.v.term} (${p.rel})`,
+        answerId: right.find((r) => r.vocabId === p.v.id)!.id
+      }))
+      return {
+        ...base(this, data, ctx),
+        kind: 'match',
+        leftLabel: 'Words',
+        rightLabel: 'Synonyms / opposites',
+        left,
+        right: right.map(({ id, text }) => ({ id, text }))
+      }
+    }
+  },
+  {
+    id: 'collocations',
+    label: 'Kollokationen',
+    description: 'Passende Wortverbindungen zusammenführen (z. B. make + a decision).',
+    kind: 'match',
+    minLevel: 'A2',
+    usesVocab: true,
+    minItems: 3,
+    defaultPoints: 1,
+    defaultTitle: 'Word partners',
+    defaultInstruction: 'Match the words to make common word partnerships.',
+    schema: obj({
+      instruction: str(),
+      pairs: arr(obj({ vocabId: str(), first: str(), second: str('first + second form a typical collocation; one of them contains the tested word') })),
+      extraWords: arr(str(), '2 or 3 extra endings that do not fit any beginning')
+    }),
+    prompt: (vocab) =>
+      `Task type: collocation matching. For each word create a strong, typical collocation (verb + noun, adjective + noun, verb + preposition …) and split it into "first" and "second". Every "second" part may fit only its own "first" part (check all combinations, including the extra endings).\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const pairs = (data.pairs ?? []).map((p: any) => ({ v: findVocab(vocab, p.vocabId), first: p.first, second: p.second })).filter((p: any) => p.v)
+      const right = shuffle(
+        [
+          ...pairs.map((p: any) => ({ id: newId(ctx.rng), text: p.second, vocabId: p.v.id as string | undefined })),
+          ...ensureExtraWords(
+            data.extraWords,
+            vocab,
+            ctx,
+            pairs.map((p: any) => p.second)
+          ).map((w: string) => ({ id: newId(ctx.rng), text: w, vocabId: undefined }))
+        ],
+        ctx.rng
+      )
+      const left = shuffle(pairs, ctx.rng).map((p: any) => ({
+        id: newId(ctx.rng),
+        vocabId: p.v.id,
+        text: p.first,
+        answerId: right.find((r) => r.vocabId === p.v.id)!.id
+      }))
+      return { ...base(this, data, ctx), kind: 'match', leftLabel: '', rightLabel: '', left, right: right.map(({ id, text }) => ({ id, text })) }
+    }
+  },
+  {
+    id: 'wordFormation',
+    label: 'Wortbildung',
+    description: 'Das Wort in Klammern in die passende Form bringen (z. B. decide → decision).',
+    kind: 'gap',
+    minLevel: 'A2+',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Word formation',
+    defaultInstruction: 'Use the word in brackets to form a word that fits the gap.',
+    schema: itemSchema({ vocabId: str(), before: str(), stem: str('Related word from the same family shown in brackets'), answer: str(), after: str() }),
+    prompt: (vocab) =>
+      `Task type: word formation. For each word write a sentence with a gap; "stem" is a different member of the word family (e.g. answer "decision", stem "decide"). The answer is the tested word (or its needed form).\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, hint: it.stem }] : []
+      })
+      return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
+    }
+  },
+  {
+    id: 'wordFamily',
+    label: 'Wortfamilie',
+    description: 'Ein verwandtes Wort ist vorgegeben (decisive, to decide) – gesucht ist das Wort aus der Liste (decision).',
+    kind: 'gap',
+    minLevel: 'A2',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Word families',
+    defaultInstruction: 'Which word from the list belongs to the same word family? Write it on the line.',
+    schema: itemSchema({
+      vocabId: str(),
+      related: str('A different word of the same family, NOT the tested word itself (e.g. "decisive" or "to decide" for "decision")'),
+      relatedPos: str('Word class of the given word: noun, verb, adjective or adverb'),
+      answer: str('The word from the list, exactly as it is written there')
+    }),
+    prompt: (vocab) =>
+      `Task type: word families. For every word give ONE related word of the same family that the students can start from – a different word class if possible (noun → verb or adjective). The given word must never be the tested word itself and must not contain it as a separate word. The answer is the word from the list.
+
+Words:
+${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        if (!v) return []
+        const given = String(it.related ?? '').trim()
+        // Das gesuchte Wort darf nicht schon dastehen
+        if (!given || given.toLowerCase() === v.term.toLowerCase()) return []
+        const label = it.relatedPos ? `${given} (${it.relatedPos})` : given
+        return [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: `${label} →`, after: '' }], answer: v.term }]
+      })
+      return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
+    }
+  },
+  {
+    id: 'mindmap',
+    label: 'Mindmap',
+    description: 'Zu einem Oberbegriff (z. B. „School things") die gelernten Vokabeln in leere Äste eintragen.',
+    kind: 'mindmap',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    minItems: 4,
+    defaultPoints: 1,
+    defaultTitle: 'Mind map',
+    defaultInstruction: 'Write the words you have learned about this topic into the empty branches.',
+    schema: obj({
+      instruction: str('Short task instruction for the students in the target language'),
+      topic: str('Superordinate topic that fits ALL the words, in the target language (e.g. "School things")'),
+      words: arr(obj({ vocabId: str() }), 'All words that belong to the topic')
+    }),
+    prompt: (vocab) =>
+      `Task type: mind map. Find ONE superordinate topic that fits all the words (e.g. "School things", "Free time", "Food"). List every word by its id.
+
+Words:
+${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const listed = (data.words ?? []).flatMap((w: any) => {
+        const v = findVocab(vocab, w.vocabId)
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, answer: v.term }] : []
+      })
+      // Ohne brauchbare Antwort der KI stehen die zugeteilten Vokabeln als Lösung
+      const items = listed.length ? listed : vocab.map((v) => ({ id: newId(ctx.rng), vocabId: v.id, answer: v.term }))
+      return { ...base(this, data, ctx), kind: 'mindmap', topic: String(data?.topic ?? '').trim() || 'Topic', items }
+    }
+  },
+  {
+    id: 'oddOneOut',
+    label: 'Odd one out',
+    description: 'Welches Wort passt nicht in die Reihe? Mit kurzer Begründung.',
+    kind: 'oddOneOut',
+    minLevel: 'A2',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Odd one out',
+    defaultInstruction: 'Circle the word that does not belong to the group and say why.',
+    schema: itemSchema({
+      vocabId: str(),
+      words: arr(str(), 'Exactly 4 words, including the tested word'),
+      answer: str('The odd word'),
+      reason: str("Short reason at the students' level")
+    }),
+    prompt: (vocab) =>
+      `Task type: odd one out. Create a group of 4 words for each tested word (the tested word must be in the group, either as odd word or as a member). There must be exactly one word that does not belong, for one clear, meaning-based reason (not spelling or grammar); no other word may be arguable.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, words: shuffle(it.words as string[], ctx.rng), answer: it.answer, reason: it.reason }] : []
+      })
+      return { ...base(this, data, ctx), kind: 'oddOneOut', items, askReason: true }
+    }
+  },
+  {
+    id: 'categorize',
+    label: 'Wortfelder sortieren',
+    description: 'Vokabeln in passende Oberbegriffe einsortieren.',
+    kind: 'categorize',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    minItems: 4,
+    defaultPoints: 0.5,
+    defaultTitle: 'Sort the words',
+    defaultInstruction: 'Put the words into the correct groups.',
+    schema: obj({
+      instruction: str(),
+      categories: arr(str(), '2–4 clear category names'),
+      words: arr(obj({ vocabId: str(), category: str('Exactly one of the category names') }))
+    }),
+    prompt: (vocab) =>
+      `Task type: sorting words into categories (word fields). Find 2–4 clear, meaning-based categories so that every word belongs to exactly one category without doubt (no word may fit two categories).\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const categories = (data.categories ?? []).map((name: string) => ({ id: newId(ctx.rng), name }))
+      const words = shuffle<CategorizeBlock['words'][number]>(
+        (data.words ?? []).flatMap((w: any) => {
+          const v = findVocab(vocab, w.vocabId)
+          const cat = categories.find((c: any) => c.name === w.category)
+          return v && cat ? [{ id: newId(ctx.rng), vocabId: v.id, text: v.term, categoryId: cat.id }] : []
+        }),
+        ctx.rng
+      )
+      return { ...base(this, data, ctx), kind: 'categorize', categories, words }
+    }
+  },
+  {
+    id: 'writeSentences',
+    label: 'Sätze bilden',
+    description: 'Eigene Sätze mit den Vokabeln schreiben, mit kleiner Situationsvorgabe.',
+    kind: 'open',
+    minLevel: 'A2',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Write sentences',
+    defaultInstruction: 'Write a sentence with each word. Show that you know what it means.',
+    schema: itemSchema({ vocabId: str(), prompt: str('The word plus a short situation, e.g. "to explore – your last holiday"'), modelAnswer: str() }),
+    prompt: (vocab) =>
+      `Task type: students write one meaningful sentence with each word. "prompt" shows the word and a short situation that helps them show the meaning. Give a model answer.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+    }
+  },
+  {
+    id: 'mediation',
+    label: 'Sinngemäß übertragen (Mediation)',
+    description: 'Deutsche Sätze sinngemäß in die Zielsprache übertragen, die Vokabel muss verwendet werden.',
+    kind: 'open',
+    minLevel: 'A2',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Mediation',
+    defaultInstruction: 'Say it in English. Use the word in brackets.',
+    schema: itemSchema({ vocabId: str(), prompt: str('German sentence followed by the target word in brackets'), modelAnswer: str() }),
+    prompt: (vocab) =>
+      `Task type: mediation. For each word write a natural GERMAN sentence from everyday life that students should render in the target language using the tested word. "prompt" = German sentence + " (" + word + ")". Keep the German simple so the difficulty lies in the vocabulary.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+    }
+  },
+  {
+    id: 'crossword',
+    label: 'Kreuzworträtsel',
+    description: 'Kreuzworträtsel mit einsprachigen Hinweisen (nur Einzelwörter).',
+    kind: 'crossword',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    minItems: 4,
+    defaultPoints: 1,
+    defaultTitle: 'Crossword',
+    defaultInstruction: 'Read the clues and complete the crossword.',
+    accepts: (v) => isCrosswordWord(v.term),
+    schema: itemSchema({ vocabId: str(), clue: str('Monolingual clue: short explanation or sentence with a gap (___); must not contain the word') }),
+    prompt: (vocab) =>
+      `Task type: crossword clues. Write one clear clue for each word (a short explanation or a sentence with ___). The clue must lead to exactly this word in its given form and must not fit any other word of the list.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const clues = new Map<string, string>((data.items ?? []).map((it: any) => [it.vocabId, it.clue]))
+      const layout = buildCrossword(
+        vocab.map((v) => ({ id: v.id, word: crosswordForm(v.term) })),
+        ctx.rng
+      )
+      const entries = layout.placed.map((p) => ({
+        id: newId(ctx.rng),
+        vocabId: p.id,
+        answer: p.word,
+        clue: clues.get(p.id) ?? '',
+        row: p.row,
+        col: p.col,
+        dir: p.dir,
+        number: p.number
+      }))
+      return {
+        ...base(this, data, ctx),
+        kind: 'crossword',
+        rows: layout.rows,
+        cols: layout.cols,
+        entries,
+        unplaced: layout.unplaced.map((id) => vocab.find((v) => v.id === id)?.term ?? id)
+      }
+    }
+  },
+  {
+    id: 'scrambled',
+    label: 'Buchstabensalat mit Hinweis',
+    description: 'Buchstaben ordnen, ein Kontextsatz hilft beim Erkennen.',
+    kind: 'scramble',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Unscramble the words',
+    defaultInstruction: 'Put the letters in the right order. The sentences help you.',
+    accepts: (v) => isCrosswordWord(v.term),
+    schema: itemSchema({ vocabId: str(), hint: str('Sentence with ___ where the word fits') }),
+    prompt: (vocab) =>
+      `Task type: scrambled letters with context. Write a short sentence with ___ for each word so that only this word (in its given base form) fits.\n${UNIQUE_RULE}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const hints = new Map<string, string>((data.items ?? []).map((it: any) => [it.vocabId, it.hint]))
+      const items = vocab.map((v) => {
+        const answer = v.term.replace(/^(to|a|an|the)\s+/i, '')
+        return { id: newId(ctx.rng), vocabId: v.id, hint: hints.get(v.id) ?? '', scrambled: scrambleWord(answer, ctx.rng), answer }
+      })
+      return { ...base(this, data, ctx), kind: 'scramble', items }
+    }
+  },
+  {
+    id: 'wrongWord',
+    label: 'Falsches Wort ersetzen',
+    description: 'Im Satz steht ein unpassendes Wort, das durch die richtige Vokabel ersetzt wird.',
+    kind: 'gap',
+    minLevel: 'B1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Correct the mistakes',
+    defaultInstruction: 'One word in each sentence is wrong. Cross it out and write the correct word.',
+    schema: itemSchema({
+      vocabId: str(),
+      before: str(),
+      wrongWord: str('A real word that does not fit here (e.g. a false friend, a similar-looking or related word)'),
+      after: str(),
+      answer: str()
+    }),
+    prompt: (vocab) =>
+      `Task type: wrong word. For each tested word write a sentence where the tested word is replaced by a wrong but plausible word (false friend, confusable word, wrong word of the same field). "answer" is the correct form. The wrong word must be clearly wrong, and only one word in the sentence may be wrong.\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, hint: it.wrongWord }] : []
+      })
+      return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
+    }
+  },
+  {
+    id: 'twoSentences',
+    label: 'Ein Wort – zwei Sätze',
+    description: 'Ein Wort passt in beide Sätze (verschiedene Bedeutungen oder Verwendungen).',
+    kind: 'gap',
+    minLevel: 'B1+',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'One word – two sentences',
+    defaultInstruction: 'Find one word that fits both sentences.',
+    schema: itemSchema({ vocabId: str(), before1: str(), after1: str(), before2: str(), after2: str(), answer: str('Same form in both sentences') }),
+    prompt: (vocab) =>
+      `Task type: one word fits two sentences. For each word write two different sentences (ideally using different meanings or typical collocations) where exactly the same form fits both gaps and no other word (from the list or in general) fits both.\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        return v
+          ? [
+              {
+                id: newId(ctx.rng),
+                vocabId: v.id,
+                sentences: [
+                  { before: it.before1, after: it.after1 },
+                  { before: it.before2, after: it.after2 }
+                ],
+                answer: it.answer
+              }
+            ]
+          : []
+      })
+      return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
+    }
+  },
+  {
+    id: 'trueFalse',
+    label: 'Richtig oder falsch?',
+    description: 'Aussagen zur Wortbedeutung beurteilen und falsche Aussagen korrigieren.',
+    kind: 'trueFalse',
+    minLevel: 'A2',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'True or false?',
+    defaultInstruction: 'Are the sentences true or false? Correct the false ones.',
+    schema: itemSchema({
+      vocabId: str(),
+      statement: str('Statement about the meaning/use of the word, word shown in the statement'),
+      isTrue: bool(),
+      correction: str('Corrected statement if false, otherwise empty string')
+    }),
+    prompt: (vocab) =>
+      `Task type: true/false statements about word meaning (e.g. "You use a ladder to climb up."). About half of the statements should be false in a way that shows whether students understand the word. Never make statements false through trivial details.\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, statement: it.statement, isTrue: Boolean(it.isTrue), correction: it.correction ?? '' }] : []
+      })
+      return { ...base(this, data, ctx), kind: 'trueFalse', items, askCorrection: true }
+    }
+  },
+  {
+    id: 'freeText',
+    label: 'Freie Aufgabe',
+    description: 'Eigener Text oder eigene Aufgabe mit Schreiblinien.',
+    kind: 'freeText',
+    minLevel: 'Pre-A1',
+    usesVocab: false,
+    defaultPoints: 0,
+    defaultTitle: 'Extra task',
+    defaultInstruction: '',
+    build(_vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'freeText', text: '', lines: 4 }
+    }
+  },
+  /*
+   * ---------- LATEIN ----------
+   *
+   * Grundlage: Recherche vom 24.09.2026, zusammengefasst in `didactics/latein.ts`.
+   * Der erste Typ ist der amtliche Muster-Vokabeltest; die drei weiteren decken die
+   * Wortschatzarbeit ab, die die Lehrplaene fuer Latein ausdruecklich verlangen
+   * (Wortbildung, Wortfamilien, Lehn- und Fremdwoerter, Monosemieren).
+   */
+  {
+    id: 'latinForms',
+    label: 'Nennform und Bedeutungen (Latein)',
+    description: 'Die Vokabel steht da; ergänzt werden die verlangte Form und alle Bedeutungen. Aufbau des amtlichen Muster-Vokabeltests.',
+    kind: 'latinForms',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Formen und Bedeutungen',
+    defaultInstruction: 'Ergänze zu jeder Vokabel die verlangte Form und alle Bedeutungen.',
+    /*
+     * Ohne KI: Form und Bedeutungen stehen bereits in der Vokabelliste. Die KI zu fragen
+     * hiesse, sie etwas erfinden zu lassen, was die Lehrkraft schon eingegeben hat – und
+     * ein erfundener Genitiv faellt erst beim Korrigieren auf.
+     */
+    build(vocab, data, ctx) {
+      /*
+       * `mitNennform` hier und nicht beim Einlesen: Die Zielsprache steht erst in den
+       * Einstellungen fest, die Vokabelliste kommt aber schon vorher herein – über Einfügen,
+       * Datei, Schulbuch oder Bibliothek. An dieser Stelle ist sicher, dass es Latein ist.
+       */
+      return {
+        ...base(this, data, ctx),
+        kind: 'latinForms',
+        pointsForm: NENNFORM_PUNKTE.form,
+        pointsMeaning: NENNFORM_PUNKTE.bedeutung,
+        items: vocab.map(mitNennform).map((v) => ({
+          id: newId(ctx.rng),
+          vocabId: v.id,
+          term: v.term,
+          formLabel: nennformLabel(v),
+          form: v.nennform ?? '',
+          meanings: v.translation
+        }))
+      }
+    }
+  },
+  {
+    id: 'latinLoanWords',
+    label: 'Fremd- und Lehnwörter (Latein)',
+    description: 'Zu deutschen Fremdwörtern wird das lateinische Ursprungswort gesucht – und umgekehrt.',
+    kind: 'open',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Fremd- und Lehnwörter',
+    defaultInstruction: 'Nenne zu jedem Wort ein deutsches Fremd- oder Lehnwort und erkläre den Zusammenhang.',
+    schema: itemSchema({
+      vocabId: str(),
+      prompt: str('Das lateinische Wort, wie es den Lernenden vorgelegt wird'),
+      modelAnswer: str('Deutsches Fremd- oder Lehnwort und in einem Satz der Bedeutungszusammenhang')
+    }),
+    prompt: (vocab) =>
+      'Aufgabentyp: Zu jedem lateinischen Wort sollen die Lernenden ein deutsches Fremd- oder Lehnwort nennen und den Bedeutungszusammenhang erklären.\n' +
+      'Nimm nur Wörter, zu denen es wirklich ein gebräuchliches deutsches Fremd- oder Lehnwort gibt; erfinde keine Verwandtschaft. Gibt es keines, lass das Wort weg.\n\n' +
+      `Wörter:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+    }
+  },
+  {
+    id: 'latinWordFormation',
+    label: 'Wortbildung und Wortfamilie (Latein)',
+    description: 'Komposita und Ableitungen werden in Bestandteile zerlegt oder einer Wortfamilie zugeordnet.',
+    kind: 'open',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Wortbildung',
+    defaultInstruction: 'Zerlege die Wörter in ihre Bestandteile und gib die Bedeutung der Teile an.',
+    schema: itemSchema({
+      vocabId: str(),
+      prompt: str('Das zusammengesetzte oder abgeleitete Wort'),
+      modelAnswer: str('Zerlegung in Präfix, Stamm und Endung mit den Bedeutungen der Teile')
+    }),
+    prompt: (vocab) =>
+      'Aufgabentyp: Wortbildung. Die Lernenden zerlegen Komposita und Ableitungen in Präfix, Stamm und Suffix und geben die Bedeutung der Teile an.\n' +
+      'Berücksichtige Assimilation (ad+ferre → afferre) und Vokalschwächung (per+facere → perficere), wenn sie vorkommen.\n' +
+      'Nimm nur Wörter, die wirklich zusammengesetzt oder abgeleitet sind.\n\n' +
+      `Wörter:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+    }
+  },
+  {
+    id: 'latinContext',
+    label: 'Bedeutung im Zusammenhang (Latein)',
+    description: 'Ein kurzer lateinischer Satz zeigt das Wort im Kontext; gewählt wird die dort passende Bedeutung.',
+    kind: 'choice',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Welche Bedeutung passt?',
+    defaultInstruction: 'Kreuze die Bedeutung an, die im Satz passt.',
+    schema: itemSchema({
+      vocabId: str(),
+      sentence: str('Kurzer, einfacher lateinischer Satz, in dem das Wort vorkommt'),
+      options: arr(str(), 'Drei deutsche Bedeutungen; nur eine passt im Satz'),
+      correct: int('Index der passenden Bedeutung, beginnend bei 0')
+    }),
+    prompt: (vocab) =>
+      'Aufgabentyp: Monosemieren. Zu jedem mehrdeutigen Wort ein kurzer lateinischer Satz und drei deutsche Bedeutungen, von denen nur eine im Satz passt.\n' +
+      'Die falschen Bedeutungen sind ECHTE Bedeutungen des Wortes, die hier nur nicht passen – keine erfundenen.\n' +
+      'Der Satz benutzt nur Formen und Vokabeln, die zum Lernstand passen.\n\n' +
+      `Wörter:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return {
+        ...base(this, data, ctx),
+        kind: 'choice',
+        items: (data.items ?? []).flatMap((it: any) => {
+          const v = findVocab(vocab, it.vocabId)
+          const options = (it.options ?? []).map((o: any) => String(o)).filter(Boolean)
+          if (!v || options.length < 2) return []
+          return [
+            {
+              id: newId(ctx.rng),
+              vocabId: v.id,
+              prompt: String(it.sentence ?? ''),
+              options,
+              correct: Math.max(0, Math.min(options.length - 1, Number(it.correct) || 0))
+            }
+          ]
+        })
+      }
+    }
+  }
+]
+
+export const TASK_TYPES = Object.fromEntries(defs.map((d) => [d.id, d])) as Record<TaskTypeId, TaskTypeDef>
+export const TASK_TYPE_LIST = defs
+
+// ---------- gemeinsame Bausteine ----------
+
+function openItems(vocab: VocabEntry[], data: any, ctx: GenContext, lines: number) {
+  return (data.items ?? []).flatMap((it: any) => {
+    const v = findVocab(vocab, it.vocabId)
+    return v ? [{ id: newId(ctx.rng), vocabId: v.id, prompt: it.prompt || v.term, modelAnswer: it.modelAnswer ?? '', lines }] : []
+  })
+}
+
+export function parseGapText(data: any, vocab: VocabEntry[], rng: Rng): TextPart[] {
+  const text: string = data.text ?? ''
+  const gaps = new Map<string, string>((data.gaps ?? []).map((g: any) => [g.vocabId, g.answer]))
+  const parts: TextPart[] = []
+  const re = /\[\[([^\]]+)\]\]/g
+  let last = 0
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    if (m.index > last) parts.push({ type: 'text', text: text.slice(last, m.index) })
+    const id = m[1].trim()
+    const v = findVocab(vocab, id, id)
+    parts.push({ type: 'gap', id: newId(rng), vocabId: v?.id, answer: gaps.get(id) ?? v?.term ?? id, bankWord: v?.term })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push({ type: 'text', text: text.slice(last) })
+  return parts
+}

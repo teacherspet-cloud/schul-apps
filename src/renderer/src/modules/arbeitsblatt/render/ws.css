@@ -1,0 +1,2135 @@
+/* Arbeitsblatt-Seiten – gilt für Editor, Vorschau, Druck und PDF. */
+
+.ws-page {
+  position: relative;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
+  background: #fff;
+  color: #111;
+  --ws-accent: #2b6cb0;
+}
+.ws-page *,
+.ws-measure * {
+  box-sizing: border-box;
+}
+.ws-sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ws-sidebar-left {
+  left: 0;
+}
+.ws-sidebar-right {
+  right: 0;
+}
+.ws-sidebar-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 1.05em;
+  white-space: nowrap;
+}
+.ws-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+}
+.ws-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 4mm;
+  /* Bezugsrahmen für frei platzierte Bausteine: Prozent gelten auf die Inhaltsfläche */
+  position: relative;
+}
+
+/*
+ * Von Hand auf die Seite gezogener Baustein.
+ *
+ * Er liegt über dem Fluss und schiebt nichts weiter – das ist der Sinn von „frei" und
+ * zugleich sein Preis. Deshalb gilt es immer nur für den einen gezogenen Baustein.
+ */
+.ws-free {
+  position: absolute;
+  z-index: 1;
+}
+
+/* ---------- Kopf ---------- */
+.ws-header-row .ws-head-row,
+.ws-band {
+  display: flex;
+  align-items: center;
+  gap: 4mm;
+}
+.ws-header-reverse .ws-head-row {
+  flex-direction: row-reverse;
+}
+.ws-header-row,
+.ws-header-centered {
+  border-bottom: 0.6mm solid var(--ws-accent);
+  padding-bottom: 2mm;
+}
+.ws-head-text {
+  flex: 1;
+  min-width: 0;
+}
+.ws-header-centered {
+  text-align: center;
+}
+.ws-header-centered .ws-logo {
+  display: block;
+  margin: 0 auto 1mm;
+}
+.ws-school {
+  font-size: 0.75em;
+  color: #555;
+}
+.ws-title {
+  font-size: 1.55em;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #111;
+}
+.ws-subject {
+  font-size: 0.8em;
+  color: #444;
+}
+.ws-sheetno {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1mm;
+  font-size: 0.8em;
+  font-weight: 700;
+}
+.ws-sheetno > span:first-child:not(.ws-level-mark) {
+  border: 0.4mm solid var(--ws-accent);
+  border-radius: 1.5mm;
+  padding: 0.5mm 2mm;
+}
+.ws-level-mark {
+  color: #666;
+  font-size: 0.9em;
+}
+.ws-logo {
+  display: inline-block;
+  max-width: 45mm;
+  object-fit: contain;
+}
+.ws-header-band .ws-band {
+  background: var(--ws-accent);
+  color: #fff;
+  border-radius: 2mm;
+  padding: 2.5mm 4mm;
+}
+.ws-header-band .ws-title,
+.ws-header-band .ws-subject,
+.ws-header-band .ws-school,
+.ws-header-band .ws-level-mark {
+  color: #fff;
+}
+.ws-band-logo {
+  background: #fff;
+  border-radius: 1.5mm;
+  padding: 1mm;
+  display: flex;
+}
+.ws-fields {
+  display: flex;
+  gap: 5mm;
+  margin-top: 3mm;
+  font-size: 0.9em;
+}
+.ws-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 2mm;
+}
+.ws-field-name {
+  flex: 3;
+}
+.ws-field-class {
+  flex: 1;
+}
+.ws-field-date {
+  flex: 1.4;
+}
+/* Datum in der Titelzeile: schmal, am Textende ausgerichtet */
+.ws-field-inline {
+  flex: 0 0 42mm;
+  align-self: flex-end;
+  margin-left: auto;
+  font-size: 0.9em;
+}
+.ws-material-no {
+  display: inline-block;
+  margin-right: 1.5mm;
+  padding: 0 1.2mm;
+  border: 0.3mm solid currentColor;
+  border-radius: 1mm;
+  font-size: 0.85em;
+}
+
+.ws-helpcards-page h2 {
+  font-size: 1.15em;
+  margin: 0 0 2mm;
+}
+.ws-helpcards-hint {
+  margin: 0 0 4mm;
+  font-size: 0.85em;
+  color: #555;
+}
+.ws-credits-page h2 {
+  font-size: 1.15em;
+  margin: 0 0 3mm;
+}
+.ws-credits-page ul {
+  margin: 0;
+  padding-left: 5mm;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+/* Nur das Datum: kleines Feld oben rechts, keine ganze Zeile */
+.ws-fields-date-only {
+  justify-content: flex-end;
+}
+.ws-fields-date-only .ws-field-date {
+  flex: 0 0 42mm;
+}
+.ws-field-line {
+  flex: 1;
+  border-bottom: 0.3mm solid #111;
+  height: 1.2em;
+}
+.ws-header-compact {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  font-size: 0.8em;
+  color: #444;
+  border-bottom: 0.3mm solid var(--ws-accent);
+  padding-bottom: 1.5mm;
+}
+.ws-compact-text {
+  flex: 1;
+}
+
+/* ---------- Fuß ---------- */
+.ws-footer {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  border-top: 0.3mm solid #999;
+  padding-top: 1.5mm;
+  font-size: 0.7em;
+  color: #555;
+}
+.ws-footer > span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+}
+.ws-footer-center {
+  justify-content: center;
+}
+.ws-footer-right {
+  justify-content: flex-end;
+}
+
+/* ---------- Bausteine ---------- */
+.ws-block {
+  margin: 0 0 4mm;
+  break-inside: avoid;
+}
+.rt-p {
+  margin: 0 0 0.35em;
+}
+.rt-p:last-child {
+  margin-bottom: 0;
+}
+.rt-list {
+  margin: 0.2em 0;
+  padding-left: 1.4em;
+}
+.rt-math svg {
+  vertical-align: middle;
+}
+.rt-math-display {
+  text-align: center;
+  margin: 0.3em 0;
+}
+
+.ws-goals {
+  border: 0.3mm solid var(--ws-accent);
+  border-radius: 2mm;
+  padding: 2mm 4mm;
+}
+.ws-goals-title {
+  font-weight: 700;
+  color: var(--ws-accent);
+}
+.ws-goals ul {
+  margin: 1mm 0 0;
+  padding-left: 1.3em;
+  list-style: '✓  ';
+}
+
+.ws-info {
+  border-left: 1.6mm solid var(--ws-accent);
+  background: color-mix(in srgb, var(--ws-accent) 9%, #fff);
+  border-radius: 0 2mm 2mm 0;
+  padding: 2.5mm 4mm;
+}
+.ws-info-head {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  font-weight: 700;
+  margin-bottom: 1mm;
+}
+.ws-info-symbol {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: var(--ws-accent);
+  color: #fff;
+  font-size: 0.85em;
+}
+
+.ws-text-title,
+.ws-table-title {
+  font-weight: 700;
+  margin-bottom: 1.5mm;
+}
+.ws-text-body {
+  position: relative;
+}
+.ws-text-numbered .ws-text-body {
+  padding-left: 8mm;
+  line-height: 1.5;
+}
+.ws-text-numbered .rt-p {
+  margin: 0;
+}
+.ws-text-numbered .ws-paragraph + .ws-paragraph .rt-p:first-child {
+  text-indent: 1.2em;
+}
+.ws-line-numbers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6mm;
+  color: #666;
+}
+.ws-line-numbers span {
+  position: absolute;
+  right: 0;
+  line-height: 1.5;
+}
+.ws-line-numbers small {
+  font-size: 0.7em;
+}
+.ws-text.ws-justify .ws-paragraph {
+  text-align: justify;
+  /* Ohne Trennung entstehen im Blocksatz große Lücken */
+  hyphens: auto;
+}
+
+.ws-glossary {
+  margin-top: 2mm;
+  font-size: 0.85em;
+  border-top: 0.2mm solid #999;
+  padding-top: 1mm;
+}
+.ws-source {
+  font-size: 0.72em;
+  color: #555;
+  margin-top: 1mm;
+}
+
+.ws-image {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+.ws-image img {
+  max-width: 100%;
+  max-height: 110mm;
+  object-fit: contain;
+}
+.ws-image-placeholder {
+  border: 0.4mm dashed #999;
+  border-radius: 2mm;
+  padding: 10mm 4mm;
+  color: #777;
+  font-size: 0.85em;
+}
+.ws-image figcaption {
+  font-size: 0.8em;
+  color: #333;
+  margin-top: 1mm;
+}
+.ws-side-image {
+  /*
+   * Bild ODER Tabelle neben dem Text bzw. den Schreiblinien.
+   *
+   * `float` ist hier genau richtig: Der Inhalt daneben fließt herum, und sobald er tiefer
+   * reicht als das Bild, läuft er DARUNTER in voller Blattbreite weiter. Kein Streifen
+   * bleibt ungenutzt, und die Schreiblinien werden unten wieder lang genug zum Schreiben.
+   */
+  float: right;
+  width: 38%;
+  /*
+   * Unten nur 1 mm statt 3 mm.
+   *
+   * Der Abstand nach unten entscheidet, wie viele Schreiblinien noch verkürzt unter dem
+   * Bild bzw. der Tabelle hängen bleiben: Jede Linie, die den Kasten auch nur um einen
+   * Punkt überschneidet, bleibt auf ihrer ganzen Höhe kurz. Bei 3 mm hingen dadurch zwei
+   * Linien mit leerem Papier daneben (gemeldet mit Bildschirmfoto, 24.09.2026).
+   */
+  margin: 0 0 1mm 4mm;
+}
+/* Linke Seite: Das Bild steht zuerst, geschrieben wird rechts daneben */
+.ws-side-image.ws-side-left {
+  float: left;
+  margin: 0 4mm 1mm 0;
+}
+/* Eine Tabelle daneben füllt ihre Spalte – ohne den Einzug, der sonst rechts Platz lässt */
+.ws-side-image .ws-table {
+  width: 100%;
+  margin: 0;
+}
+.ws-side-image .ws-block {
+  margin: 0;
+}
+.ws-side-image .ws-image {
+  width: 100% !important;
+  margin: 0;
+}
+.ws-side-image .ws-image img {
+  max-height: 55mm;
+}
+
+.ws-gallery {
+  width: 100%;
+}
+.ws-gallery-grid {
+  display: grid;
+  gap: 3mm;
+}
+.ws-gallery-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.ws-gallery-frame {
+  position: relative;
+  width: 100%;
+  height: 38mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ws-gallery-frame img {
+  max-width: 100%;
+  max-height: 38mm;
+  object-fit: contain;
+}
+.ws-gallery-frame .ws-image-placeholder {
+  width: 100%;
+  height: 100%;
+  padding: 2mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7em;
+  overflow: hidden;
+}
+.ws-gallery-pick {
+  cursor: pointer;
+}
+.ws-gallery-number {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 5mm;
+  height: 5mm;
+  border-radius: 2.5mm;
+  background: var(--ws-accent);
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ws-gallery-caption {
+  font-size: 0.8em;
+  margin-top: 1mm;
+  text-align: center;
+}
+.ws-gallery-credits {
+  display: block;
+  margin-top: 1mm;
+  font-size: 0.65em;
+}
+.ws-credit {
+  color: #777;
+  font-size: 0.85em;
+}
+
+.ws-task-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 2.5mm;
+}
+.ws-task-num {
+  flex-shrink: 0;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  font-weight: 700;
+  font-size: 0.9em;
+}
+.ws-num-circle {
+  border-radius: 50%;
+  background: var(--ws-accent);
+  color: #fff;
+}
+.ws-num-square {
+  border-radius: 1mm;
+  background: var(--ws-accent);
+  color: #fff;
+}
+.ws-num-plain {
+  color: var(--ws-accent);
+  font-size: 1.1em;
+}
+.ws-stars {
+  flex-shrink: 0;
+  color: #b8860b;
+  font-size: 0.9em;
+  padding-top: 0.1em;
+}
+.ws-social {
+  flex-shrink: 0;
+  color: #444;
+  display: inline-flex;
+  height: 1.3em;
+  padding-top: 0.1em;
+}
+.ws-social svg {
+  height: 100%;
+  width: auto;
+}
+.ws-task-instruction {
+  flex: 1;
+  min-width: 0;
+}
+.ws-points {
+  flex-shrink: 0;
+  font-size: 0.8em;
+  white-space: nowrap;
+  padding-top: 0.2em;
+}
+.ws-parts {
+  /*
+   * KEIN Außenabstand. `getBoundingClientRect()` misst die Rahmenbox – Außenabstände zählen
+   * dabei NIE mit. Was hier stünde, wäre beim Seitenumbruch unsichtbar und liefe unten über.
+   * Der Abstand sitzt deshalb als INNENabstand auf dem Kopf jeder Teilaufgabe.
+   */
+  margin: 0;
+  padding-left: 0;
+}
+/*
+ * Der Abstand zwischen Teilaufgaben sitzt auf der ANWEISUNG, nicht auf dem Listenpunkt.
+ *
+ * Gemessen wird beim Seitenumbruch jede Einheit einzeln – und Einheiten sind die Kästen
+ * INNERHALB des Listenpunktes. Ein Abstand am `li` wird dabei nicht mitgezählt: Auf Seite 2
+ * lief der Inhalt dadurch 12 mm über den Rand hinaus, weil fünf ungezählte Abstände
+ * zusammenkamen. Am Kopf der Teilaufgabe wird er mitgemessen und stimmt.
+ */
+.ws-parts > li {
+  margin-bottom: 0;
+  /* Kein Listenzeichen: Der Buchstabe steht im gemessenen Kasten – siehe `.ws-part-letter` */
+  list-style: none;
+}
+/* Innenabstand, damit er beim Messen mitzählt – siehe `.ws-parts` */
+.ws-part-kopf {
+  padding-top: 2mm;
+  /* Der Buchstabe hängt links heraus wie ein Listenzeichen */
+  padding-left: 8.5mm;
+  text-indent: -8.5mm;
+}
+.ws-part-letter {
+  font-weight: 700;
+  /* Der Einzug gilt nur für die erste Zeile; der Buchstabe füllt ihn aus */
+  margin-right: 2mm;
+}
+/*
+ * Die Fortsetzung einer Teilaufgabe auf der nächsten Seite.
+ *
+ * Sie gehört zu DEMSELBEN Listenpunkt wie das Stück davor und bekommt deshalb keinen neuen
+ * Buchstaben – sonst hieße die Fortsetzung von a) auf Seite 2 plötzlich b), und die
+ * Lernenden fänden ihre Antwort nicht wieder.
+ */
+.ws-parts > li.ws-part-continued {
+  list-style: none;
+}
+.ws-task > .ws-lines {
+  /* wie oben: Innenabstand, sonst fehlt er beim Messen */
+  margin-left: 8.5mm;
+  margin-top: 0;
+  padding-top: 1.5mm;
+}
+.ws-task > .ws-grid,
+.ws-task > .ws-space,
+.ws-task > .ws-options,
+.ws-task > .ws-match,
+.ws-task > .ws-tf,
+.ws-task > .ws-ordering,
+.ws-task > .ws-table,
+.ws-task > .ws-labels,
+.ws-task > .rt,
+.ws-task > .vt-editable {
+  margin-left: 8.5mm;
+  margin-top: 1.5mm;
+}
+
+/*
+ * Mustertext an der Stelle der Schreiblinien – nur auf dem Lösungsblatt.
+ *
+ * Er steht dort, wo die Lernenden schreiben, und zeigt der Lehrkraft beim Korrigieren
+ * unmittelbar, was erwartet wird. Der Einzug ist derselbe wie bei den Linien, damit die
+ * Lösung über dem Schülerblatt liegend passt.
+ */
+.ws-task > .ws-model-text {
+  margin-left: 8.5mm;
+  margin-top: 1.5mm;
+  color: #b00020;
+}
+.ws-task > .ws-model-text + .ws-model-text {
+  margin-top: 1mm;
+}
+
+.ws-lines {
+  /* INNENabstand, damit er beim Seitenumbruch mitgezählt wird – siehe `.ws-parts` */
+  padding-top: 1mm;
+  /*
+   * WARUM `flow-root`: Neben einem seitlich stehenden Bild oder einer Tabelle fließt nur
+   * FLIESSTEXT von selbst herum – ein Kasten wie eine Schreiblinie täte das nicht, sondern
+   * liefe unter dem Bild hindurch. `flow-root` macht aus jedem Linienpäckchen einen eigenen
+   * Satzbereich: Neben dem Baustein wird es schmal, unter ihm nimmt es die volle Breite.
+   *
+   * Dass die Linien überhaupt in Päckchen kommen (siehe `linienAbschnitte`), war ursprünglich
+   * für den Seitenumbruch gedacht – hier zahlt es sich ein zweites Mal aus: Der Übergang von
+   * schmal auf breit geschieht in Zweierschritten statt erst am Ende des ganzen Blocks.
+   */
+  display: flow-root;
+}
+/*
+ * Über Seiten geteilte Schreiblinien kommen als mehrere Päckchen (siehe `linienAbschnitte`).
+ * Auf einer Seite sollen sie aussehen wie ein einziger Block – also kein Abstand dazwischen.
+ */
+.ws-lines + .ws-lines,
+.ws-task > .ws-lines + .ws-lines {
+  padding-top: 0;
+}
+/*
+ * KORREKTURRAND neben den Schreiblinien.
+ *
+ * Die Linien enden vor dem rechten Rand; eine senkrechte Linie trennt den Streifen ab, in
+ * den die Lehrkraft beim Korrigieren schreibt. 45 mm ist das übliche Maß – breit genug für
+ * Randzeichen und ein Stichwort, schmal genug, dass den Lernenden genug Zeile bleibt.
+ *
+ * Gezeichnet wird mit `::after` je Linienpäckchen. Weil die Päckchen unmittelbar
+ * aneinanderstoßen, ergibt das eine durchgehende Linie, die am Seitenende sauber aufhört.
+ */
+.ws-lines-rand {
+  position: relative;
+}
+.ws-lines-rand .ws-line {
+  width: calc(100% - 45mm);
+}
+.ws-lines-rand::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 45mm;
+  border-left: 0.25mm solid #999;
+}
+
+/* Die Auffüllung schließt unmittelbar an – sie füllt den gemessenen Rest, nicht mehr */
+.ws-task > .ws-lines-fill {
+  padding-top: 0;
+}
+.ws-line {
+  height: 8.5mm;
+  border-bottom: 0.25mm solid #666;
+}
+.ws-grid {
+  margin-top: 1.5mm;
+  background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm), linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);
+  background-size: 5mm 5mm;
+  border: 0.2mm solid #b8c4cc;
+}
+.ws-space {
+  margin-top: 1.5mm;
+  border: 0.25mm solid #bbb;
+  border-radius: 1.5mm;
+}
+.ws-gap {
+  display: inline-block;
+  min-width: 7em;
+  border-bottom: 0.25mm solid #111;
+  height: 1.2em;
+  vertical-align: baseline;
+  padding: 0 1mm;
+}
+.ws-gap-key,
+.ws-key-text,
+.ws-solution,
+.ws-option-correct .ws-check {
+  color: #c62828;
+}
+.ws-gap-key {
+  height: auto;
+  font-weight: 600;
+}
+.ws-gaptext {
+  line-height: 2;
+}
+.ws-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm 7mm;
+  margin-top: 1mm;
+}
+.ws-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+.ws-check {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 4.2mm;
+  height: 4.2mm;
+  border: 0.25mm solid #111;
+  font-size: 0.8em;
+  line-height: 1;
+}
+.ws-match,
+.ws-tf,
+/*
+ * Hinweis zur Breite: Eine Tabelle, die über die Blattbreite hinauswächst, lässt Chromium
+ * beim Drucken das GANZE Dokument verkleinern – am Bildschirm sieht man davon nichts, weil
+ * die Seite den Überstand abschneidet. `tests/e2e/seitenbreite.mjs` misst das nach.
+ *
+ * Ein festes Spaltenlayout (`table-layout: fixed`) wurde erwogen und wieder verworfen: Am
+ * gemeldeten Blatt ließ sich der Überstand nicht nachstellen, und die Änderung hätte die
+ * Spaltenbreiten aller vorhandenen Tabellen verändert. Ohne Beweis kein Eingriff.
+ */
+.ws-table,
+.ws-selfcheck table {
+  width: calc(100% - 8.5mm);
+  border-collapse: collapse;
+}
+.ws-table td,
+.ws-table th,
+.ws-selfcheck table td,
+.ws-selfcheck table th {
+  overflow-wrap: break-word;
+}
+.ws-match td {
+  padding: 1mm 1.5mm;
+  vertical-align: top;
+}
+.ws-match-box {
+  width: 9mm;
+}
+.ws-box {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 7mm;
+  height: 7mm;
+  border: 0.25mm solid #111;
+  flex-shrink: 0;
+  color: #c62828;
+  font-weight: 700;
+}
+.ws-match-left {
+  width: 55%;
+}
+.ws-tf th,
+.ws-tf td,
+.ws-table th,
+.ws-table td,
+.ws-selfcheck th,
+.ws-selfcheck td {
+  border: 0.25mm solid #444;
+  padding: 1.2mm 2mm;
+  text-align: left;
+  vertical-align: top;
+}
+.ws-tf th,
+.ws-table th,
+.ws-selfcheck th {
+  background: color-mix(in srgb, var(--ws-accent) 12%, #fff);
+}
+.ws-tf-cell,
+.ws-sc-cell {
+  width: 16mm;
+  text-align: center !important;
+}
+.ws-cell-empty {
+  height: 9mm;
+}
+.ws-table-block .ws-table {
+  width: 100%;
+}
+.ws-ordering {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+}
+.ws-order-row,
+.ws-label-row {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+}
+.ws-label-num {
+  font-weight: 700;
+  min-width: 1.2em;
+}
+.ws-label-line {
+  flex: 1;
+  border-bottom: 0.25mm solid #666;
+  height: 7mm;
+}
+.ws-solution {
+  margin: 1.5mm 0 0 8.5mm;
+  font-size: 0.92em;
+}
+.ws-solution .rt {
+  display: inline;
+}
+.ws-teacher-note {
+  margin: 1mm 0 0 8.5mm;
+  font-size: 0.72em;
+  color: #666;
+}
+
+.ws-scaffold {
+  border: 0.35mm dashed var(--ws-accent);
+  border-radius: 2mm;
+  padding: 2mm 4mm;
+}
+.ws-scaffold-title {
+  font-weight: 700;
+  color: var(--ws-accent);
+  margin-bottom: 1mm;
+}
+.ws-scaffold ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.ws-wordbank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 6mm;
+}
+.ws-helpcards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2mm;
+}
+.ws-helpcard {
+  border: 0.25mm solid #999;
+  border-radius: 1.5mm;
+  padding: 1.5mm 2.5mm;
+  font-size: 0.9em;
+}
+.ws-helpcard-num {
+  font-weight: 700;
+  font-size: 0.85em;
+  color: var(--ws-accent);
+}
+
+.ws-workspace-label {
+  font-size: 0.85em;
+  margin-bottom: 1mm;
+}
+.ws-workspace-area {
+  border: 0.25mm solid #bbb;
+  border-radius: 1.5mm;
+}
+.ws-workspace-lines {
+  border: none;
+  border-radius: 0;
+  background-image: linear-gradient(to bottom, transparent calc(8.5mm - 0.25mm), #666 calc(8.5mm - 0.25mm));
+  background-size: 100% 8.5mm;
+}
+.ws-workspace-grid {
+  background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm), linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);
+  background-size: 5mm 5mm;
+}
+
+/* Gitternetz: als Bild in echter Millimetergröße, damit der Druck maßhaltig bleibt */
+.ws-grid-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  margin-bottom: 1mm;
+}
+.ws-grid-img {
+  display: block;
+  max-width: 100%;
+}
+.ws-grid-caption {
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 1mm;
+}
+
+/* Hörtext: auf dem Schülerblatt nur der Hinweis, das Skript steht im Lösungsteil */
+.ws-audio {
+  border: 0.3mm solid var(--ws-accent);
+  border-radius: 2mm;
+  padding: 2.5mm 3mm;
+}
+.ws-audio-head {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  flex-wrap: wrap;
+}
+.ws-audio-icon {
+  color: var(--ws-accent);
+  font-size: 0.9em;
+}
+.ws-audio-title {
+  font-weight: 600;
+}
+.ws-audio-meta {
+  font-size: 0.8em;
+  color: #555;
+}
+.ws-audio-body {
+  display: flex;
+  gap: 3mm;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.ws-audio-texts {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ws-audio-speakers,
+.ws-audio-before {
+  font-size: 0.85em;
+  margin-top: 1mm;
+}
+.ws-audio-qr {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: center;
+}
+.ws-audio-qr img {
+  display: block;
+  width: 22mm;
+  height: 22mm;
+}
+.ws-audio-qr figcaption {
+  font-size: 0.7em;
+  color: #555;
+}
+.ws-audio-script {
+  margin-top: 2mm;
+  border-top: 0.2mm dashed #bbb;
+  padding-top: 1.5mm;
+  font-size: 0.9em;
+  white-space: pre-line;
+}
+.ws-audio-script-title {
+  font-weight: 600;
+  font-size: 0.85em;
+  margin-bottom: 1mm;
+}
+
+.ws-selfcheck table {
+  width: 100%;
+}
+.ws-selfcheck th:first-child {
+  width: auto;
+}
+
+.ws-divider {
+  font-weight: 700;
+  font-size: 1.1em;
+  color: var(--ws-accent);
+  border-bottom: 0.3mm solid var(--ws-accent);
+  padding-bottom: 0.5mm;
+}
+
+/* ---------- Tafelbild (Lehrkraftseite) ---------- */
+.ws-board-page {
+  /* Druckränder wie die Arbeitsblätter: oben 15, rechts 15, unten 15, links 25 mm (Lochrand) */
+  padding: 15mm 15mm 15mm 25mm;
+  /* Viel Inhalt: Seite wächst mit (beim Druck auf Folgeseiten), statt abgeschnitten zu werden */
+  height: auto;
+  min-height: 297mm;
+  overflow: visible;
+  font-size: 11pt;
+  line-height: 1.3;
+  display: flex;
+  flex-direction: column;
+  gap: 5mm;
+}
+.ws-board-page.ws-board-compact {
+  font-size: 10pt;
+}
+.ws-board-page.ws-board-dense {
+  font-size: 9pt;
+  gap: 3.5mm;
+}
+.ws-board-page-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 4mm;
+  font-size: 0.8em;
+  color: #555;
+  border-bottom: 0.3mm solid #ccc;
+  padding-bottom: 1.5mm;
+}
+.ws-board {
+  border: 1.2mm solid #3d4a45;
+  border-radius: 2mm;
+  padding: 5mm 6mm;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+  min-height: 70mm;
+}
+.ws-board-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.35em;
+  text-decoration: underline;
+  text-decoration-color: var(--ws-accent);
+  text-underline-offset: 1.2mm;
+}
+.ws-board-row {
+  display: flex;
+  align-items: stretch;
+  gap: 3mm;
+}
+.ws-board-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 3mm;
+}
+.ws-board-arrow {
+  align-self: center;
+  font-size: 1.6em;
+  color: var(--ws-accent);
+  font-weight: 700;
+}
+.ws-board-page > * {
+  flex-shrink: 0;
+}
+.ws-board-section .rt-math svg,
+.ws-board-conclusion .rt-math svg {
+  max-width: 100%;
+  height: auto;
+}
+.ws-board-steps tr {
+  break-inside: avoid;
+}
+.ws-board-section {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  border: 0.4mm solid color-mix(in srgb, var(--ws-accent) 55%, #fff);
+  border-radius: 1.5mm;
+  padding: 2mm 3mm;
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+}
+.ws-board-columns .ws-board-section {
+  border-width: 0 0 0 0.6mm;
+  border-radius: 0;
+}
+.ws-board-heading {
+  font-weight: 700;
+  color: var(--ws-accent);
+}
+.ws-board-points {
+  flex: 1;
+}
+.ws-board-points .rt-list {
+  margin: 0;
+  padding-left: 4.5mm;
+}
+.ws-board-points .rt-list li {
+  margin: 0.3mm 0;
+}
+.ws-board-points .rt-p {
+  margin: 0;
+}
+.ws-board-sketch {
+  font-size: 0.8em;
+  color: #555;
+  font-style: italic;
+}
+.ws-board-from {
+  font-size: 0.75em;
+  color: #777;
+}
+.ws-board-cluster-grid {
+  display: grid;
+  grid-template-columns: repeat(min(var(--ws-board-count), 2), 1fr);
+  gap: 3mm;
+}
+.ws-board-conclusion {
+  border: 0.4mm solid var(--ws-accent);
+  background: color-mix(in srgb, var(--ws-accent) 8%, #fff);
+  border-radius: 1.5mm;
+  padding: 2mm 3mm;
+}
+.ws-board-conclusion-label {
+  font-weight: 700;
+  color: var(--ws-accent);
+}
+.ws-board-steps-title {
+  font-weight: 700;
+  font-size: 1.05em;
+}
+.ws-board-steps {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.ws-board-steps th,
+.ws-board-steps td {
+  border: 0.25mm solid #999;
+  padding: 1.2mm 2mm;
+  vertical-align: top;
+  text-align: left;
+}
+.ws-board-steps th {
+  background: #f1f3f5;
+}
+.ws-board-steps td:first-child {
+  width: 30%;
+}
+
+/* Unsichtbarer Messbereich für den Seitenumbruch */
+.ws-measure {
+  position: absolute;
+  left: -20000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+/*
+ * DAS TAFELBILD BEKOMMT EINE EIGENE SEITE IM QUERFORMAT.
+ *
+ * Gemeldet von der Lehrkraft (24.09.2026): Im PDF sass der Inhalt nur im oberen linken Teil
+ * der Seite, rechts und unten blieb alles leer – „die bereiche mit linien/kästen v.a. links
+ * / oben nicht vollständig dargestellt".
+ *
+ * Ursache: Die Tafelbild-Seite ist 297 mm breit (Querformat), `@page` war aber für das
+ * ganze Dokument A4 HOCH. Chromium verkleinert dann beim Drucken ALLE Seiten so weit, bis
+ * die breiteste hineinpasst – 210/297 = 0,707. Nachgemessen an der eingeschickten Datei:
+ * Die Tinte reichte waagerecht bis 65,7 % statt bis 90 %, und zwar auf jeder Seite.
+ *
+ * Am Bildschirm fiel es nicht auf: Dort steht jede Seite für sich, nichts wird verkleinert.
+ * Auch nicht bei einem Blatt OHNE Tafelbild – deshalb war es so schwer zu fassen.
+ *
+ * Mit einer benannten Seite bleibt das Querformat auf das Tafelbild beschränkt.
+ */
+@page tafelbild {
+  size: A4 landscape;
+  margin: 0;
+}
+@media print {
+  .ws-page {
+    page-break-after: always;
+    break-after: page;
+  }
+}
+
+/*
+ * Material-Bilder werden ausgewertet, nicht illustriert.
+ *
+ * Eine historische Karte auf 38 mm Höhe ist unlesbar: Grenzverläufe und Beschriftungen
+ * verschwinden. Bilder in der Rolle „material" bekommen deshalb deutlich mehr Fläche und
+ * stehen höchstens zu zweit nebeneinander (Vergleich zweier Karten bleibt möglich).
+ */
+.ws-gallery-material .ws-gallery-frame {
+  height: 82mm;
+}
+.ws-gallery-material .ws-gallery-frame img {
+  max-height: 82mm;
+}
+/* Ein einzelnes Material-Bild darf die volle Seitenhöhe eines Drittels nutzen */
+.ws-gallery-material .ws-gallery-grid:has(> :only-child) .ws-gallery-frame,
+.ws-gallery-material .ws-gallery-grid:has(> :only-child) .ws-gallery-frame img {
+  height: 105mm;
+  max-height: 105mm;
+}
+
+/*
+ * Tafelbild im Querformat.
+ *
+ * Eine Tafel ist breiter als hoch: Die Standard-Mitteltafel misst 200 × 100 cm. Ein Tafelbild
+ * im A4-Hochformat zu planen führt zu einem Bild, das an keine Tafel passt. Die Seite wird
+ * deshalb gedreht, und die Tafelfläche selbst bekommt das Seitenverhältnis des gewählten
+ * Formats.
+ */
+.ws-board-page.ws-board-landscape {
+  width: 297mm;
+  min-height: 210mm;
+  /* Eigene Seite im Querformat – sonst schrumpft das ganze Dokument, siehe `@page tafelbild` */
+  page: tafelbild;
+}
+
+/* Die drei Felder der Klapptafel nebeneinander */
+.ws-board-fields {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.ws-board-field-row {
+  display: grid;
+  /* Die Mitte trägt die Erarbeitung und bekommt deshalb den meisten Platz */
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 4mm;
+  flex: 1;
+}
+.ws-board-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5mm;
+  min-width: 0;
+  padding: 0 2mm;
+}
+.ws-board-field + .ws-board-field {
+  border-left: 0.3mm dashed #adb5bd;
+}
+.ws-board-field-label {
+  font-size: 0.72em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6c757d;
+}
+/* Der Kern, den die Lernenden ins Heft übertragen */
+.ws-board-field-mitte {
+  background: rgba(0, 0, 0, 0.025);
+  border-radius: 1.5mm;
+}
+.ws-board-section.ws-board-copy .ws-board-heading::after {
+  content: ' ✎';
+  color: #868e96;
+  font-size: 0.85em;
+}
+
+/*
+ * Deckblatt (Seite 0).
+ *
+ * Es richtet sich an Lehrkräfte: oben Titel und Maskottchen auf kräftigem Grund, darunter
+ * eine kurze Beschreibung, die Merkmale des Materials und eine Vorschau der Blätter.
+ */
+.ws-cover {
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--cover-light) 0%, #ffffff 65%);
+  padding: 0;
+}
+.ws-cover-top {
+  display: flex;
+  align-items: center;
+  gap: 8mm;
+  background: var(--cover-dark);
+  color: #fff;
+  padding: 16mm 18mm 14mm;
+}
+.ws-cover-headline {
+  flex: 1;
+  min-width: 0;
+}
+.ws-cover-title {
+  font-size: 26pt;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.ws-cover-facts {
+  margin-top: 3mm;
+  font-size: 11pt;
+  opacity: 0.85;
+}
+.ws-cover-fox {
+  width: 38mm;
+  height: 38mm;
+  flex: none;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+.ws-cover-fox:disabled {
+  cursor: default;
+}
+.ws-cover-fox img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ws-cover-fox-hint {
+  position: absolute;
+  right: 1.5mm;
+  bottom: 1.5mm;
+  width: 7mm;
+  height: 7mm;
+  border-radius: 50%;
+  background: var(--cover-dark);
+  color: #fff;
+  font-size: 10pt;
+  line-height: 7mm;
+  text-align: center;
+}
+/* Im Druck verschwindet der Knopf-Hinweis */
+@media print {
+  .ws-cover-fox-hint {
+    display: none;
+  }
+}
+.ws-cover-blurb {
+  padding: 12mm 18mm 0;
+  font-size: 13pt;
+  line-height: 1.45;
+  color: #2b2b2b;
+}
+.ws-cover-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3mm;
+  padding: 8mm 18mm 0;
+}
+.ws-cover-badge {
+  background: var(--cover-mid);
+  color: #1d2b3a;
+  border-radius: 8mm;
+  padding: 1.6mm 5mm;
+  font-size: 10pt;
+}
+/*
+ * Seitenvorschau auf dem Deckblatt: vier bis sechs EINZELNE Seiten, leicht gefächert.
+ *
+ * Gewünscht am 24.09.2026. Vorher zeigte jede Vorschau ein ganzes Blatt – alle Seiten
+ * untereinander in einem Daumennagel, von dem man nichts erkannte.
+ *
+ * Die Kacheln dürfen umbrechen: Bei sechs Seiten entstehen zwei Reihen zu dritt, bei vier
+ * eine Reihe. Ihre Breite richtet sich nach der Zahl, damit die Fläche gefüllt bleibt.
+ */
+.ws-cover-previews {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2mm;
+  padding: 6mm 10mm 10mm;
+  /* Der freie Raum verteilt sich gleichmaessig ueber und unter dem Faecher */
+  margin: auto 0;
+}
+.ws-cover-thumb {
+  flex: 0 0 auto;
+  /*
+   * Die Breite haengt an der ANZAHL: Alle Kacheln stehen in einer Reihe. Zwischen den
+   * Seitenraendern sind 190 mm frei; bei fester Breite ragten sechs Kacheln darueber hinaus
+   * und wurden abgeschnitten – nachgemessen am 24.09.2026.
+   */
+  width: var(--kachel, 44mm);
+  aspect-ratio: 210 / 297;
+  background: #fff;
+  border: 0.3mm solid var(--cover-mid);
+  border-radius: 1.5mm;
+  box-shadow: 0 1mm 3mm rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.ws-cover-previews-5 {
+  --kachel: 35mm;
+}
+.ws-cover-previews-6 {
+  --kachel: 29mm;
+}
+/*
+ * Der Faecher: abwechselnde kleine Drehungen und ein leichter Hoehenversatz. Regelmaessig
+ * genug, um ruhig zu wirken, unregelmaessig genug, um nicht wie eine Tabelle auszusehen.
+ */
+.ws-cover-thumb:nth-child(3n + 1) {
+  transform: rotate(-2deg) translateY(1.5mm);
+}
+.ws-cover-thumb:nth-child(3n + 2) {
+  transform: rotate(1deg) translateY(-1mm);
+}
+.ws-cover-thumb:nth-child(3n) {
+  transform: rotate(2.5deg) translateY(2mm);
+}
+
+.ws-cover-thumb-inner {
+  width: 210mm;
+  height: 297mm;
+  transform-origin: top left;
+  /* Die Vorschau zeigt echte Seiten, verkleinert auf die Kachelbreite (Kachel / 210 mm) */
+  transform: scale(var(--kachel-skala, 0.2095));
+}
+.ws-cover-previews-5 .ws-cover-thumb-inner {
+  --kachel-skala: 0.1667;
+}
+.ws-cover-previews-6 .ws-cover-thumb-inner {
+  --kachel-skala: 0.1381;
+}
+
+/* ---------- Beschriftungen direkt am Bild ---------- */
+/* Drei Spalten: Schilder links, Bild in der Mitte, Schilder rechts. Schild und Bildpunkt
+   liegen auf derselben Höhe, damit die Zuordnung ohne Verfolgen der Linie gelingt. */
+.ws-imglabel-grid {
+  display: grid;
+  grid-template-columns: 26mm 1fr 26mm;
+  align-items: start;
+  gap: 0;
+}
+
+.ws-imglabel-col {
+  position: relative;
+  /* Die Spalte ist so hoch wie das Bild; die Schilder sitzen absolut auf ihrer Höhe */
+  align-self: stretch;
+}
+
+.ws-imglabel-area {
+  position: relative;
+  line-height: 0;
+}
+
+.ws-imglabel-area img {
+  width: 100%;
+  height: auto;
+}
+
+.ws-imglabel-box {
+  position: absolute;
+  transform: translateY(-50%);
+  width: 100%;
+  font-size: 8.5pt;
+  line-height: 1.15;
+  /* Deckend: Text unmittelbar auf einem Bild ist schlecht lesbar (DBSV) */
+  background: #fff;
+  padding: 0.3mm 0.8mm;
+  box-sizing: border-box;
+}
+
+.ws-imglabel-col:first-child .ws-imglabel-box {
+  text-align: right;
+}
+
+.ws-imglabel-blank {
+  display: inline-block;
+  width: 100%;
+  min-width: 18mm;
+  border-bottom: 0.4pt solid #000;
+  height: 3.4mm;
+}
+
+.ws-imglabel-line {
+  position: absolute;
+  height: 0;
+  border-top: 0.4pt solid #000;
+  pointer-events: none;
+}
+
+.ws-imglabel-dot {
+  position: absolute;
+  width: 1.8mm;
+  height: 1.8mm;
+  margin: -0.9mm 0 0 -0.9mm;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #000;
+}
+
+.ws-imglabel-move {
+  cursor: grab;
+  /* Im Editor etwas größer, damit er sich greifen lässt */
+  width: 2.6mm;
+  height: 2.6mm;
+  margin: -1.3mm 0 0 -1.3mm;
+}
+
+/* ---------- Piktogramme ---------- */
+.ws-picto {
+  vertical-align: -0.15em;
+  margin-right: 0.35em;
+  /* Nimmt die Textfarbe an und erreicht damit denselben Kontrast wie die Schrift */
+  color: inherit;
+  flex: none;
+}
+
+/* ---------- Kennzeichnung erzeugter Bilder ---------- */
+/* Art. 50 Abs. 4 KI-Verordnung: sichtbar und klar. Klein, aber am Bild selbst – nicht nur
+   auf der Nachweisseite, und auch auf dem Lösungsblatt. */
+.ws-ai-mark {
+  position: absolute;
+  right: 0.8mm;
+  bottom: 0.8mm;
+  font-size: 6pt;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  padding: 0.5mm 1mm;
+  border: 0.3pt solid #000;
+  border-radius: 0.8mm;
+  background: #fff;
+  color: #000;
+}
+
+.ws-image {
+  position: relative;
+}
+
+/* ---------- Lehrerseite im Lösungsteil: Notenschlüssel und Fehlerprofil ---------- */
+.ws-teacher-page h2 {
+  font-size: 1.2em;
+  margin: 0 0 2mm;
+}
+
+.ws-teacher-page h2 + h2,
+.ws-teacher-page .ws-gradescale + h2,
+.ws-teacher-page table + h2 {
+  margin-top: 8mm;
+}
+
+.ws-teacher-hint {
+  font-size: 0.85em;
+  color: #444;
+  margin: 0 0 3mm;
+}
+
+.ws-teacher-page table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9em;
+}
+
+.ws-teacher-page th,
+.ws-teacher-page td {
+  border: 0.4pt solid #000;
+  padding: 1.2mm 2mm;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ws-teacher-page th {
+  font-weight: 600;
+}
+
+.ws-gradescale + .ws-gradescale {
+  margin-top: 5mm;
+}
+
+.ws-gradescale-title {
+  font-weight: 600;
+  margin-bottom: 1.5mm;
+}
+
+.ws-gradescale-note {
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 1.5mm;
+}
+
+/* Spalte zum Eintragen beim Durchsehen der Arbeiten */
+.ws-errorprofile-blank {
+  width: 22mm;
+}
+
+/* ---------- Nützliche Ausdrücke und Wortschatz ---------- */
+.ws-phrases {
+  border: 0.6pt solid var(--ws-accent, #444);
+  border-radius: 2mm;
+  padding: 3mm 4mm;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.ws-phrases-head {
+  font-weight: 600;
+  color: var(--ws-accent, #000);
+  margin-bottom: 1mm;
+}
+
+.ws-phrases-hint {
+  font-size: 0.85em;
+  color: #444;
+  margin-bottom: 2mm;
+}
+
+/* Zwei Spalten, damit ein Hilfsblatt nicht unnötig Platz frisst */
+.ws-phrases-groups {
+  column-count: 2;
+  column-gap: 6mm;
+}
+
+.ws-phrases-group {
+  break-inside: avoid;
+  margin-bottom: 2.5mm;
+}
+
+.ws-phrases-label {
+  font-weight: 600;
+  font-size: 0.9em;
+  margin-bottom: 0.6mm;
+}
+
+.ws-phrases-group ul {
+  margin: 0;
+  padding-left: 4mm;
+}
+
+.ws-phrases-group li {
+  margin-bottom: 0.5mm;
+  font-size: 0.92em;
+}
+
+/* Die deutsche Entsprechung tritt zurück – der Blick soll auf der Zielsprache bleiben */
+.ws-phrases-de {
+  color: #555;
+}
+
+/* Als eigenes Blatt: volle Seite, etwas luftiger */
+.ws-phrases-page .ws-phrases {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.ws-phrases-page h2 {
+  font-size: 1.2em;
+  margin: 0 0 2mm;
+}
+
+/* ── Film / Video ─────────────────────────────────────────────────────────── */
+.ws-video {
+  border: 0.3mm solid var(--ws-accent);
+  border-radius: 2mm;
+  padding: 2.5mm 3mm;
+}
+.ws-video-head {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  flex-wrap: wrap;
+}
+.ws-video-icon {
+  color: var(--ws-accent);
+  font-size: 0.9em;
+}
+.ws-video-title {
+  font-weight: 600;
+}
+.ws-video-meta {
+  font-size: 0.8em;
+  color: #555;
+}
+.ws-video-body {
+  display: flex;
+  gap: 3mm;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.ws-video-texts {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ws-video-source {
+  font-size: 0.85em;
+  font-style: italic;
+  margin-top: 1mm;
+}
+.ws-video-summary,
+.ws-video-before {
+  font-size: 0.85em;
+  margin-top: 1mm;
+}
+.ws-video-qr {
+  flex: 0 0 auto;
+  margin: 0;
+  text-align: center;
+}
+.ws-video-qr img {
+  display: block;
+  width: 24mm;
+  height: 24mm;
+}
+/* Der Link bricht um statt über den Rand zu laufen – er soll abtippbar bleiben */
+.ws-video-qr figcaption {
+  font-size: 0.6em;
+  color: #444;
+  max-width: 26mm;
+  margin-top: 0.5mm;
+  word-break: break-all;
+  line-height: 1.15;
+}
+.ws-video-note {
+  margin-top: 2mm;
+  padding-top: 1.5mm;
+  border-top: 0.2mm dashed #999;
+  font-size: 0.85em;
+}
+.ws-video-note-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: #555;
+}
+.ws-video-url {
+  font-size: 0.85em;
+  color: #444;
+  word-break: break-all;
+}
+
+/* Zwischenüberschrift der Beobachtungsphase – einmal je Abschnitt, nicht an jeder Aufgabe */
+.ws-phase {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--ws-accent);
+  margin: 2mm 0 1mm;
+  border-bottom: 0.2mm solid var(--ws-accent);
+  padding-bottom: 0.5mm;
+}
+.ws-group,
+.ws-timecode {
+  font-size: 0.75em;
+  border: 0.2mm solid #666;
+  border-radius: 1mm;
+  padding: 0 1mm;
+  color: #333;
+  white-space: nowrap;
+}
+/* Rechts- und QR-Hinweise auf der Lehrerseite – immer sichtbar, damit sie im Ausdruck stehen */
+.ws-video-hints {
+  margin-top: 1.5mm;
+  font-size: 0.8em;
+}
+.ws-video-hints-title {
+  font-weight: 600;
+  color: #555;
+}
+.ws-video-hints ul {
+  margin: 0.8mm 0 0;
+  padding-left: 4mm;
+}
+.ws-video-hints li {
+  margin-bottom: 0.5mm;
+}
+.ws-video-hints-source {
+  color: #666;
+  font-size: 0.9em;
+  margin-top: 1mm;
+}
+
+/*
+ * Fragenreihe zum Ankreuzen.
+ *
+ * Die Tabelle ordnet nur an – deshalb KEIN Rahmen. Sie ist das einzige Mittel, das
+ * Bildschirm, PDF und Word gleich umsetzen; mit CSS-Spalten (`column-count`) bräche eine
+ * Frage über die Spaltengrenze und der Word-Export hätte gar kein Gegenstück.
+ */
+.ws-mc-grid {
+  width: calc(100% - 8.5mm);
+  margin-left: 8.5mm;
+  margin-top: 1.5mm;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.ws-mc-grid td {
+  border: none;
+  vertical-align: top;
+  padding: 0 4mm 2.5mm 0;
+}
+.ws-mc-question {
+  display: flex;
+  gap: 1.5mm;
+  font-weight: 600;
+}
+.ws-mc-num {
+  flex-shrink: 0;
+}
+.ws-mc-options {
+  /* Bündig unter dem Fragetext, nicht unter der Nummer */
+  margin: 0.8mm 0 0 5mm;
+}
+.ws-mc-option {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5mm;
+  margin-bottom: 0.8mm;
+}
+.ws-mc-letter {
+  flex-shrink: 0;
+}
+/*
+ * Das Kästchen sitzt in einer Zeile mit Text – `align-items: baseline` würde es sonst
+ * absacken lassen, weil ein leeres Feld keine Grundlinie hat.
+ */
+.ws-mc-option .ws-check {
+  flex-shrink: 0;
+  align-self: center;
+}
+/* Angekreuztes Kästchen an der Arbeitsanweisung: zeigt, was zu tun ist */
+.ws-check-demo {
+  margin-right: 1.5mm;
+  vertical-align: middle;
+}
+
+/*
+ * Anweisung mit angekreuztem Kästchen: eine Zeile, nicht zwei.
+ * Der Textteil ist ein eigener Block – ohne diese Zeile stünde das Kästchen darüber.
+ * Absichtlich nur mit der Zusatzklasse, damit Anweisungen ohne Kästchen unverändert bleiben.
+ */
+.ws-task-instruction.ws-with-check {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5mm;
+}
+.ws-task-instruction.ws-with-check > .rt {
+  flex: 1;
+  min-width: 0;
+}
+
+/*
+ * Zwei Spalten bei vielen kurzen Möglichkeiten (z. B. zehn Hobbys zum Ankreuzen).
+ * Spaltenweise gefüllt, damit man eine Spalte zu Ende liest – wie bei der Fragenreihe.
+ */
+.ws-mc-options-2 {
+  column-count: 2;
+  column-gap: 6mm;
+}
+.ws-mc-options-2 > .ws-mc-option {
+  /* Eine Möglichkeit darf nicht über die Spaltengrenze brechen */
+  break-inside: avoid;
+}
+
+/*
+ * Gelöstes Beispiel (Punkt 0).
+ *
+ * Es steht mit auf dem Schülerblatt und zeigt, WIE geantwortet wird – es ist keine Aufgabe.
+ * Deshalb optisch zurückgenommen und mit einem Balken abgesetzt: Wer es für Aufgabe 1 hält,
+ * fängt an zu rechnen statt zu lesen.
+ */
+.ws-example {
+  margin: 1.5mm 0 1mm 8.5mm;
+  padding-left: 2.5mm;
+  border-left: 0.6mm solid #cfd6da;
+  color: #555;
+}
+.ws-example .ws-check {
+  border-color: #777;
+}
+/*
+ * Das Kreuz im Beispiel ist NICHT die Lösungsfarbe.
+ * Rot heißt auf diesen Blättern „Lösung, nur im Lehrerteil". Das Beispiel steht aber auf dem
+ * Schülerblatt – rot gedruckt sähe es nach einem Versehen aus und kostet beim Kopieren
+ * unnötig Farbe.
+ */
+.ws-example .ws-option-correct,
+.ws-example .ws-option-correct .ws-check {
+  color: #555;
+  font-weight: 600;
+}
+.ws-example-solution {
+  margin-left: 5mm;
+  font-weight: 600;
+}
+
+/*
+ * Hinweis auf das gelöste Beispiel, hinter der Arbeitsanweisung.
+ * Er gehört zur Anweisung, ist aber nicht die Anweisung – deshalb leicht zurückgenommen
+ * und mit Abstand davor, statt in einer eigenen Zeile.
+ */
+.ws-example-note {
+  margin-left: 1.5mm;
+  color: #555;
+}
+
+/*
+ * Kennzeichnung einer KI-erzeugten Aufnahme.
+ *
+ * Die KMK-Handlungsempfehlung zu Künstlicher Intelligenz (10.10.2024) verlangt „Absprachen
+ * zur Verwendung und Kennzeichnung KI-generierter Produkte". Der Hinweis steht deshalb auf
+ * dem Schülerblatt, nicht nur in den Lehrkraft-Notizen – zurückgenommen gesetzt, weil er
+ * zur Sache gehört, aber nicht die Aufgabe ist.
+ */
+.ws-audio-ai-note {
+  margin-top: 1.5mm;
+  font-size: 0.85em;
+  color: #666;
+  font-style: normal;
+}
+/* Text der Aufnahme auf dem Schülerblatt (Sachfächer) – abgesetzt wie ein Material */
+.ws-audio .ws-audio-script {
+  margin-top: 2mm;
+}
+
+/*
+ * Hinweis auf die im PDF angehängte Audiodatei.
+ *
+ * Steht im Seiteninhalt, nicht in der Abspieler-Annotation: Chrome, Edge und die
+ * macOS-Vorschau zeigen den Abspieler nicht – und zwar ohne Meldung. Dort ist dieser Satz
+ * das Einzige, was noch weiterhilft.
+ */
+.ws-audio-attach-note {
+  margin-top: 1.5mm;
+  font-size: 0.85em;
+  color: #444;
+}
+
+/* Suchhilfe, wenn keine Originalaufnahme gefunden wurde (nur Lehrerseite) */
+.ws-video-searchhelp {
+  font-size: 0.9em;
+}
+.ws-video-searchterms {
+  margin-top: 1mm;
+}
+.ws-video-searchhelp ul {
+  margin: 1mm 0 0;
+  padding-left: 5mm;
+}
+
+/*
+ * Materialkopf einer Quelle (Geschichte, Politik).
+ *
+ * Steht ÜBER dem Text, nicht unten bei der Fundstelle: Wer eine Quelle analysiert, muss
+ * wissen, wer spricht, BEVOR er liest. Zurückgenommen gesetzt – es ist Metatext, nicht die
+ * Quelle selbst.
+ */
+.ws-source-header {
+  font-size: 0.85em;
+  color: #555;
+  margin-bottom: 1mm;
+}
+
+/*
+ * Hinweis über einer Geschichtserzählung.
+ *
+ * Eine Ich-Erzählung suggeriert Authentizität; wer sie für eine Quelle hält, lernt beim
+ * Analysieren das Falsche. Der Hinweis steht deshalb über dem Text und nicht klein darunter.
+ */
+.ws-narration-note {
+  font-size: 0.85em;
+  color: #555;
+  font-style: normal;
+  margin-bottom: 1mm;
+}
+
+/*
+ * Vorgaben einer Schreibaufgabe (Fremdsprachen).
+ *
+ * Situierung, Notizentabelle, Inhaltspunkte und Formvorgaben. Bewusst zurückhaltend
+ * gesetzt: Das ist Teil der Aufgabe, nicht ein Kasten neben ihr.
+ */
+.ws-brief {
+  margin: 0.35em 0 0.2em 0;
+}
+.ws-brief-situation {
+  margin: 0 0 0.4em 0;
+}
+.ws-brief-frame {
+  margin: 0 0 0.4em 0;
+  font-style: italic;
+  opacity: 0.85;
+}
+.ws-brief-notes {
+  display: grid;
+  gap: 0 1.2em;
+  margin: 0.4em 0;
+  border: 1px solid currentColor;
+  padding: 0.45em 0.6em;
+}
+.ws-brief-note ul {
+  margin: 0.15em 0 0 1.05em;
+  padding: 0;
+}
+.ws-brief-note li {
+  margin: 0.05em 0;
+}
+.ws-brief-note-title {
+  font-weight: 600;
+}
+/* Offener Impuls: Die Lernenden füllen ihn selbst – deshalb Platz dahinter */
+.ws-brief-prompt {
+  margin-top: 0.3em;
+  border-bottom: 1px dotted currentColor;
+}
+.ws-brief-points {
+  margin: 0.3em 0 0.3em 1.05em;
+  padding: 0;
+}
+.ws-brief-form {
+  margin: 0.4em 0 0 0;
+  font-weight: 600;
+}
+/* Auf schmalen Blättern stehen die Notizenspalten untereinander */
+@media (max-width: 520px) {
+  .ws-brief-notes {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Erwartungshorizont – nur auf dem Lösungsblatt */
+.ws-expectation {
+  margin: 0.5em 0 0.2em 0;
+  padding: 0.45em 0.6em;
+  border-left: 3px solid currentColor;
+  font-size: 0.94em;
+}
+/*
+ * Der Erwartungshorizont besteht aus lauter EINZELNEN Einheiten, damit er über Seiten
+ * umbrechen kann (siehe `erwartungsAbschnitte`). Damit er trotzdem wie EIN Kasten wirkt,
+ * fallen Abstand und Polsterung zwischen unmittelbar aufeinanderfolgenden Einheiten weg –
+ * der senkrechte Balken läuft dann durch und beginnt auf der nächsten Seite sauber neu.
+ *
+ * Ohne diese Regel trug jede Zeile ihren eigenen Rahmen samt Abständen: rund 6 mm Höhe je
+ * Zeile umsonst, und das Blatt sah zerstückelt aus.
+ */
+.ws-expectation + .ws-expectation {
+  margin-top: 0;
+  padding-top: 0;
+}
+.ws-expectation:has(+ .ws-expectation) {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.ws-expectation-title {
+  font-weight: 700;
+  margin-bottom: 0.3em;
+}
+.ws-expectation-row {
+  margin: 0.35em 0;
+}
+.ws-expectation-head {
+  font-weight: 600;
+}
+.ws-expectation-points {
+  margin-left: 0.5em;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.ws-expectation-examples {
+  margin: 0.15em 0 0 1.05em;
+  padding: 0;
+}
+/* Der Satz zur Öffnungsklausel: wichtig, aber nicht die Hauptsache */
+.ws-expectation-note {
+  margin: 0.35em 0 0 0;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+/*
+ * Fortsetzung einer über zwei Seiten geteilten Aufgabe.
+ * Knapp gehalten: Es ist ein Wegweiser, keine zweite Überschrift.
+ */
+.ws-task-continued {
+  font-weight: 600;
+  opacity: 0.75;
+  margin-bottom: 0.3em;
+}
+
+/*
+ * NOTIZRAND neben einem Materialtext.
+ *
+ * Wunsch der Lehrkraft (24.09.2026): „einen geeigneten rand fuer notizen" neben den
+ * Materialien, wie es den Korrekturrand neben den Schreiblinien schon gibt.
+ *
+ * Die Trennlinie wird je ABSATZ gezeichnet, nicht einmal fuer den ganzen Baustein. Nur so
+ * geht sie ueber einen Seitenumbruch hinweg weiter: Ein langer Quellentext wird auf zwei
+ * Seiten verteilt, und eine Linie, die am Baustein haengt, endete auf Seite 1.
+ *
+ * Damit zwischen den Absaetzen keine Luecken in der Linie entstehen, traegt der Absatz
+ * seinen Abstand als PADDING. Das ist ohnehin noetig: Ein Margin zaehlt nicht zur gemessenen
+ * Hoehe (`getBoundingClientRect`), und der Seitenumbruch waere um die Summe aller
+ * Absatzabstaende zu spaet.
+ */
+.ws-notizrand .ws-paragraph {
+  position: relative;
+  padding-right: var(--notizrand, 42mm);
+  padding-bottom: 0.35em;
+}
+.ws-notizrand .ws-paragraph:last-child {
+  padding-bottom: 0;
+}
+.ws-notizrand .ws-paragraph .rt-p:last-child {
+  margin-bottom: 0;
+}
+.ws-notizrand .ws-paragraph::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: var(--notizrand, 42mm);
+  border-left: 0.25mm solid #999;
+}
+/*
+ * Ueberschrift, Materialkopf und Quellenangabe bleiben ueber die volle Breite – sie stehen
+ * linksbuendig und geraten der Notizspalte nicht in die Quere.
+ *
+ * Die Wortzahl schon: Sie ist RECHTSbuendig und landete damit jenseits der Trennlinie,
+ * mitten im Notizfeld (gesehen am 25.09.2026). Sie richtet sich deshalb an derselben Kante
+ * aus wie der Text.
+ */
+.ws-notizrand .ws-wortzahl {
+  padding-right: var(--notizrand, 42mm);
+}
+
+/*
+ * Wortzahl am Ende eines Materialtextes – rechtsbündig, wie in Prüfungsaufgaben üblich.
+ * Sie steht VOR der Quellenangabe: erst der Umfang des Textes, dann seine Herkunft.
+ */
+.ws-wortzahl {
+  text-align: right;
+  font-size: 0.85em;
+  color: #555;
+  margin-top: 0.3em;
+}

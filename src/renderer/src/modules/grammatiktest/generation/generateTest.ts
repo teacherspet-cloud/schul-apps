@@ -1,0 +1,178 @@
+/**
+ * Erzeugt die Aufgaben eines Grammatiktests.
+ *
+ * Der Auftrag stützt sich auf die Daten der Themenliste: die belegten Stolperstellen und die
+ * Aufgabenformen, die zum Thema passen. Die KI soll beides nicht erfinden.
+ *
+ * Zwei Dinge sind anders als beim Arbeitsblatt:
+ * - **Geprüft wird, nicht erarbeitet.** Kein Merkkasten, kein induktiver Dreischritt, keine
+ *   Hilfekarten – der Test misst, was sitzt.
+ * - **Jede Aufgabe zielt auf eine benannte Stolperstelle** und trägt sie mit. Daraus entsteht
+ *   das Fehlerprofil im Lösungsteil.
+ */
+import type { AiCall } from '../../../shared/imageChoice'
+import { createRng, newId } from '../../vokabeltest/model/random'
+import { chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf } from '../../arbeitsblatt/didactics/grammar'
+import { convertBlock } from '../../arbeitsblatt/generation/convert'
+import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
+import type { WsBlock } from '../../arbeitsblatt/model/types'
+import { knownVocabRulesDe } from '../../../shared/knownVocab'
+import { errorTargets, testingRules } from '../model/testRules'
+import type { GrammarTest } from '../model/types'
+
+/** Auftrag an die KI. */
+export function testPrompt(test: GrammarTest): string {
+  const m = test.meta
+  const topics = chosenGrammarTopics({ ...m, grammarTopics: m.topics } as never)
+  const german = m.subjectId === 'deutsch' || m.subjectId === 'daz'
+  const target = m.subjectLabel
+  const year = learningYear(m.grade, sequenceOf(m), m.stateId)
+  const targets = errorTargets(m)
+  const formats = m.formats.map(grammarFormatLabel)
+
+  return [
+    `Du entwirfst einen GRAMMATIKTEST für ${target}, Klasse ${m.grade}${german ? '' : `, ${year}. Lernjahr`}, Niveau ${m.cefrLevel}.`,
+    `Geprüfte Form${topics.length === 1 ? '' : 'en'}: ${topics.map((t) => `${t.label}${t.term && t.term !== t.label ? ` (${t.term})` : ''}`).join(', ')}.`,
+    `Umfang: ${m.minutes} Minuten, insgesamt ${m.points} Punkte.`,
+    '',
+    'ART DER AUFGABEN:',
+    '- Es wird GEPRÜFT, nicht erarbeitet: kein Merkkasten, keine Regelherleitung, keine Hilfekarten, keine Tippkästen.',
+    '- Die Arbeitsanweisung sagt knapp und eindeutig, was zu tun ist, und nennt die Punktzahl nicht (die vergibt die App).',
+    '- Jede Aufgabe hat eine eindeutig richtige Lösung. Wo mehrere Formen möglich sind, nenne sie in der Lösung alle.',
+    m.embedded
+      ? '- EINGEBETTET: Die Aufgaben hängen an EINEM zusammenhängenden Text (Nachricht, Bericht, kurze Geschichte, Dialog). Stelle ihn als Baustein „text" voran; die Aufgaben beziehen sich darauf. Keine Reihe unverbundener Einzelsätze.'
+      : '- Einzelsätze sind zulässig, aber jeder Satz muss für sich verständlich sein und eine Mitteilung enthalten – keine sinnlosen Übungssätze.',
+    '- Keine unbekannte Lexik: Der Test prüft die Form, nicht den Wortschatz. Wer ein Wort nicht kennt, scheitert sonst aus dem falschen Grund.',
+    german ? '' : `- Die Aufgabentexte stehen auf ${target}.`,
+    m.instructionsInGerman ? '- Die Arbeitsanweisungen stehen auf Deutsch.' : '',
+    '',
+    formats.length ? `AUFGABENFORMEN – nutze genau diese: ${formats.join(', ')}.` : '',
+    '- Steigere die Anforderung: erst Erkennen und Zuordnen, dann Umformen und Ergänzen, zuletzt eigenes Bilden.',
+    '',
+    targets.length
+      ? [
+          'STOLPERSTELLEN – jede Aufgabe zielt auf genau eine davon und trägt sie in grammarError:',
+          ...targets.map((t) => `- ${t.error}`),
+          'Verteile die Aufgaben so, dass möglichst jede Stolperstelle wenigstens einmal geprüft wird.'
+        ].join('\n')
+      : '',
+    '',
+    topics.some((t) => t.receptive)
+      ? `NUR ERKENNEN: ${topics
+          .filter((t) => t.receptive)
+          .map((t) => t.label)
+          .join(', ')} – dazu keine Aufgabe, die die Form selbst bilden lässt.`
+      : '',
+    m.knownVocab ? knownVocabRulesDe(m.knownVocab) : '',
+    '',
+    'Gib NUR Bausteine vom Typ „task" aus – und, wenn eingebettet, genau einen Baustein „text" davor.'
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** Antwortformen, die ein Grammatiktest wirklich braucht. */
+const TEST_ANSWER_KINDS = ['lines', 'gapText', 'matching', 'multipleChoice', 'ordering', 'tableFill', 'none']
+
+/**
+ * Antwortschema des Tests – bewusst SCHLANK.
+ *
+ * Ein Grammatiktest besteht aus einem Materialtext und Aufgaben. Felder für Bilder,
+ * Gitternetze, Achsen, Hörtexte oder Schreibaufträge braucht er nicht. Im strikten Modus muss
+ * die KI jedes Feld des Schemas für JEDEN Baustein ausfüllen – ein überflüssiges Feld kostet
+ * also bei jeder Aufgabe Platz und Zeit und macht die Antwort fehleranfälliger.
+ *
+ * Die Feldnamen entsprechen denen des Arbeitsblatts, damit `convertBlock` sie versteht; fehlende
+ * Felder verträgt es.
+ */
+const TEST_ANSWER = obj({
+  kind: enumOf(TEST_ANSWER_KINDS),
+  count: int('lines: Anzahl Schreiblinien'),
+  gapText: str('gapText: Text mit [[Lösung]] je Lücke'),
+  left: arr(str(), 'matching: linke Seite'),
+  right: arr(str(), 'matching: rechte Seite, mit 1–2 überzähligen Einträgen'),
+  pairs: arr(int(), 'matching: Index in right für jedes Element von left'),
+  options: arr(str(), 'multipleChoice: Antwortmöglichkeiten'),
+  correct: arr(int(), 'multipleChoice: Indizes der richtigen Antworten'),
+  items: arr(str(), 'ordering: Elemente in RICHTIGER Reihenfolge'),
+  headers: arr(str(), 'tableFill: Spaltenköpfe'),
+  rows: arr(arr(str()), 'tableFill: Zeilen; leere Zelle = auszufüllen'),
+  solutionRows: arr(arr(str()), 'tableFill: Lösungen der leeren Zellen')
+})
+
+export const TEST_SCHEMA = obj({
+  blocks: arr(
+    obj({
+      type: enumOf(['text', 'task']),
+      title: str('text: Überschrift des Materials; bei Aufgaben leer'),
+      body: str('text: der zusammenhängende Text; bei Aufgaben leer'),
+      instruction: str('task: knappe, eindeutige Arbeitsanweisung'),
+      answer: TEST_ANSWER,
+      parts: arr(obj({ instruction: str(), answer: TEST_ANSWER, solution: str() }), 'task: Teilaufgaben oder leer'),
+      solution: str('task: die richtige Lösung, bei mehreren Möglichkeiten alle'),
+      minutes: int('task: geschätzte Bearbeitungszeit'),
+      grammarTopicId: str('task: Kennung der geprüften Form; bei Material leer'),
+      grammarError: str('task: Stolperstelle im Wortlaut der Vorgabe; bei Material leer')
+    })
+  )
+})
+
+/**
+ * Verteilt die Punkte gleichmäßig auf die Aufgaben.
+ * Der Rest geht an die vorderen Aufgaben – so stimmt die Summe genau.
+ */
+export function spreadPoints(blocks: WsBlock[], total: number): void {
+  const tasks = blocks.filter((b) => b.type === 'task')
+  if (!tasks.length || total <= 0) return
+  const base = Math.floor(total / tasks.length)
+  let rest = total - base * tasks.length
+  for (const t of tasks) {
+    if (t.type !== 'task') continue
+    t.points = base + (rest > 0 ? 1 : 0)
+    if (rest > 0) rest--
+  }
+}
+
+export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (message: string) => void = () => undefined): Promise<WsBlock[]> {
+  onStep('Aufgaben werden entworfen …')
+  const data = await ai<{ blocks: Record<string, unknown>[] }>({
+    system: testPrompt(test),
+    user: 'Erzeuge die Aufgaben des Tests.',
+    // Der Name gehört dazu: Die Anbieter verlangen ihn für ein benanntes Antwortschema.
+    schemaName: 'grammar_test',
+    schema: TEST_SCHEMA as Record<string, unknown>,
+    ...(test.meta.provider ? { provider: test.meta.provider } : {}),
+    ...(test.meta.model ? { model: test.meta.model } : {})
+  })
+
+  const rng = createRng(Date.now())
+  const topics = chosenGrammarTopics({ ...test.meta, grammarTopics: test.meta.topics } as never)
+  const blocks: WsBlock[] = []
+  for (const raw of data?.blocks ?? []) {
+    const block = convertBlock(raw, rng, [])
+    if (!block) continue
+    block.id = block.id || newId(rng)
+    if (block.type === 'task') {
+      const topicId = String(raw.grammarTopicId ?? '')
+      const error = String(raw.grammarError ?? '').trim()
+      // Nur zuordnen, was es wirklich gibt – sonst stünde im Fehlerprofil eine erfundene Form
+      const topic = topics.find((t) => t.id === topicId) ?? (topics.length === 1 ? topics[0] : undefined)
+      if (topic && error) block.grammar = { topicId: topic.id, error }
+    }
+    blocks.push(block)
+  }
+  /*
+   * Lieber laut scheitern als still nichts liefern.
+   *
+   * Kam keine Aufgabe zurück, schaltete die App bisher auf den nächsten Schritt und zeigte eine
+   * leere Seite – ohne ein Wort. Die Lehrkraft sah nur, dass nichts passiert.
+   */
+  if (!blocks.some((b) => b.type === 'task')) {
+    throw new Error('Die KI hat keine Aufgaben geliefert. Versuche es erneut oder wähle eine andere Form.')
+  }
+  spreadPoints(blocks, test.meta.points)
+  return blocks
+}
+
+/** Hinweise, die beim Erstellen oben stehen (Landesvorgaben und Anlage des Tests). */
+export const testHints = (test: GrammarTest): string[] => testingRules(test.meta).map((r) => (r.suggestion ? `${r.text} ${r.suggestion}` : r.text))

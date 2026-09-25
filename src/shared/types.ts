@@ -1,0 +1,823 @@
+// Typen, die Main-Prozess, Preload und Oberfläche gemeinsam nutzen.
+
+export const CEFR_SCALE = ['Pre-A1', 'A1', 'A1+', 'A2', 'A2+', 'B1', 'B1+', 'B2', 'B2+', 'C1', 'C2'] as const
+export type CefrLevel = (typeof CEFR_SCALE)[number]
+
+export function cefrIndex(level: CefrLevel): number {
+  return CEFR_SCALE.indexOf(level)
+}
+
+// ---------- Einstellungen ----------
+
+export type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K]
+}
+
+export type AiProviderId = 'openai' | 'anthropic' | 'google'
+export type ImageProviderId = 'openai' | 'google' | 'anthropic' | 'none'
+export type SecretName = AiProviderId | 'pixabay' | 'elevenlabs'
+export type ModelKind = 'text' | 'image'
+
+export interface AiProviderInfo {
+  id: AiProviderId
+  label: string
+  keyUrl: string
+  keyPlaceholder: string
+  supportsImages: boolean
+}
+
+export const AI_PROVIDERS: AiProviderInfo[] = [
+  {
+    id: 'openai',
+    label: 'OpenAI (ChatGPT)',
+    keyUrl: 'platform.openai.com',
+    keyPlaceholder: 'sk-…',
+    supportsImages: true
+  },
+  {
+    id: 'anthropic',
+    label: 'Anthropic (Claude)',
+    keyUrl: 'platform.claude.com',
+    keyPlaceholder: 'sk-ant-…',
+    supportsImages: false
+  },
+  {
+    id: 'google',
+    label: 'Google (Gemini)',
+    keyUrl: 'aistudio.google.com',
+    keyPlaceholder: 'AIza…',
+    supportsImages: true
+  }
+]
+
+/** Zugang zur KI: bezahlter API-Schlüssel oder privates Abo über das Kommandozeilenprogramm des Anbieters. */
+export type AiAccess = 'api' | 'subscription'
+
+export interface SubscriptionInfo {
+  provider: AiProviderId
+  /** Name des Abos, z. B. „ChatGPT Plus/Pro" */
+  plan: string
+  /** Name des Kommandozeilenprogramms */
+  program: string
+  command: string
+  /** Ungefähre Downloadgröße in MB */
+  downloadMb: number
+  /** Anbieterkonto, mit dem man sich anmeldet */
+  account: string
+  /** Was beim Abo-Zugang für Bilder gilt */
+  imageNote: string
+  /** Hinweis zu den Nutzungsbedingungen (Stand der Prüfung) */
+  termsWarning: string
+  termsUrl: string
+  /** Noch nicht mit echtem Konto getestet */
+  experimental?: boolean
+}
+
+export const SUBSCRIPTIONS: Record<AiProviderId, SubscriptionInfo> = {
+  openai: {
+    provider: 'openai',
+    plan: 'ChatGPT Plus/Pro',
+    program: 'Codex CLI',
+    command: 'codex',
+    downloadMb: 140,
+    account: 'ChatGPT',
+    termsWarning:
+      'OpenAI empfiehlt für automatisierte Nutzung einen API-Schlüssel. Die Nutzung von Codex mit ChatGPT-Anmeldung durch andere Programme ist nach aktuellem Stand geduldet, aber nicht vertraglich zugesichert. Es gelten die Nutzungsgrenzen des Abos (pro 5 Stunden und pro Woche).',
+    termsUrl: 'https://learn.chatgpt.com/docs/auth',
+    imageNote:
+      'Bilder entstehen mit der Bildgenerierung von ChatGPT (Fotos und Zeichnungen). Ein Bild dauert etwa eine halbe Minute und zählt deutlich stärker auf das Kontingent als Text.'
+  },
+  anthropic: {
+    provider: 'anthropic',
+    plan: 'Claude Pro/Max',
+    program: 'Claude Code',
+    command: 'claude',
+    downloadMb: 230,
+    account: 'Claude',
+    termsWarning:
+      'Laut Anthropic ist die Abo-Anmeldung für die gewöhnliche Nutzung von Claude Code gedacht; Programme, die Anfragen über ein Pro- oder Max-Abo leiten, sind nicht vorgesehen. Anthropic behält sich vor, dagegen ohne Vorwarnung vorzugehen (z. B. Einschränkung des Kontos). Die Nutzung teilt sich das Kontingent mit claude.ai.',
+    termsUrl: 'https://code.claude.com/docs/en/legal-and-compliance',
+    imageNote:
+      'Claude kann keine Fotos erzeugen, zeichnet aber einfache Vektorgrafiken (SVG) – gut geeignet für Piktogramme und Symbole, weniger für realistische Motive.'
+  },
+  google: {
+    provider: 'google',
+    plan: 'Google AI Pro/Ultra',
+    program: 'Antigravity CLI',
+    command: 'agy',
+    downloadMb: 200,
+    account: 'Google',
+    termsWarning:
+      'Die Nutzungsbedingungen von Antigravity untersagen den Zugriff über Software Dritter; Google hat deswegen bereits Konten gesperrt. Die Nutzung erfolgt ausdrücklich auf eigenes Risiko. Die Anbindung ist experimentell und wurde ohne Google-Konto nur nach Dokumentation umgesetzt.',
+    termsUrl: 'https://antigravity.google/terms/',
+    imageNote: 'Bilder entstehen mit der Bildgenerierung von Antigravity. Experimentell: ohne Google-Konto nicht getestet.',
+    experimental: true
+  }
+}
+
+/** Fortschritt bei Einrichtung und Anmeldung (vom Hauptprozess an die Oberfläche) */
+export interface SetupEvent {
+  provider: AiProviderId
+  type: 'progress' | 'installed' | 'login-url' | 'logged-in' | 'error'
+  message: string
+  received?: number
+  total?: number
+  /** Anmeldeseite, falls sich der Browser nicht selbst öffnet */
+  url?: string
+  /** Die Anmeldeseite zeigt einen Code, der in der App eingefügt wird */
+  needsCode?: boolean
+}
+
+export interface SubscriptionStatus {
+  provider: AiProviderId
+  /** Gefundenes Programm (Pfad) oder null */
+  path: string | null
+  /** Von der App selbst eingerichtet (kann aktualisiert werden) */
+  managed?: boolean
+  version?: string
+  /** true/false, wenn prüfbar; null, wenn das Programm keine Prüfung anbietet */
+  loggedIn: boolean | null
+  account?: string
+  detail?: string
+}
+
+export interface ModelOption {
+  id: string
+  label: string
+  /** Neuestes/empfohlenes Modell dieses Anbieters */
+  recommended?: boolean
+}
+
+export interface ModelListResult {
+  provider: AiProviderId
+  kind: ModelKind
+  models: ModelOption[]
+  /** Zeitpunkt der letzten erfolgreichen Abfrage beim Anbieter */
+  fetchedAt?: string
+  source: 'live' | 'cache' | 'builtin'
+  error?: string
+}
+
+export type CitationStyle = 'deutsch' | 'mla' | 'apa' | 'chicago'
+
+export type ColorSchemeSetting = 'light' | 'dark' | 'auto'
+
+export interface AppSettings {
+  ai: {
+    textProvider: AiProviderId
+    textModels: Record<AiProviderId, string>
+    imageProvider: ImageProviderId
+    imageModels: { openai: string; google: string }
+    /** API-Schlüssel oder Abo für Bilder (Claude zeichnet Vektorgrafiken) */
+    imageAccess: Record<Exclude<ImageProviderId, 'none'>, AiAccess>
+    /** Automatisch immer das empfohlene (neueste) Modell verwenden */
+    autoLatest: boolean
+    /** API-Schlüssel oder Abo je Anbieter */
+    access: Record<AiProviderId, AiAccess>
+    /** Modell beim Abo-Zugang ('' = Voreinstellung des Programms) */
+    subscriptionModels: Record<AiProviderId, string>
+    /** Hinweis zu den Nutzungsbedingungen bestätigt */
+    subscriptionAccepted: Record<AiProviderId, boolean>
+    /** Optional: Pfad zum Kommandozeilenprogramm, falls es nicht automatisch gefunden wird */
+    cliPaths: Record<AiProviderId, string>
+    /** Sparmodus: weniger KI-Anfragen (auto = nur beim Abo-Zugang) */
+    economy: 'auto' | 'on' | 'off'
+  }
+  appearance: {
+    colorScheme: ColorSchemeSetting
+    theme: string
+  }
+  schoolName: string
+  defaults: {
+    stateId: string
+    schoolTypeId: string
+    targetLanguage: string
+  }
+  /** Hörtexte: voreingestellte Stimmen je Sprache (ElevenLabs-Kennungen) */
+  audio: {
+    voices: Record<string, string>
+  }
+  /**
+   * Notenschlüssel als Prozentschwellen für die Noten 1 bis 5 (6 gilt darunter).
+   *
+   * `allgemein` ist die Voreinstellung für alle Fächer. `jeFach` überschreibt sie für
+   * einzelne – das ist kein Luxus: Fachkonferenzen legen Schlüssel fachweise fest, und in
+   * den Fremdsprachen sind andere Schwellen üblich als in Mathematik.
+   */
+  gradeScale: {
+    allgemein: number[]
+    jeFach: Record<string, number[]>
+  }
+  /** Angaben zur Schule (Name, Logo) auf den Materialien abdrucken */
+  showSchool: boolean
+  /** Nach welchem Regelwerk Quellen auf den Materialien angegeben werden */
+  citationStyle: CitationStyle
+  /**
+   * Zugriff aus dem lokalen Netz (Browser auf Tablet, Handy, zweitem Rechner).
+   *
+   * Hier steht nur, WOMIT der Zugang liefe – Port und PIN. Ob er laeuft, steht bewusst
+   * NICHT in den Einstellungen: Der Zugang startet nie von selbst, sondern immer nur auf
+   * ausdruecklichen Knopfdruck, und ist nach dem Beenden des Programms wieder aus.
+   */
+  lan?: {
+    port: number
+    /** Sechsstellige PIN, die ein Geraet einmal eingeben muss */
+    pin: string
+  }
+}
+
+/** Eine bei ElevenLabs verfügbare Stimme */
+export interface TtsVoice {
+  id: string
+  name: string
+  language: string
+  gender: string
+  description: string
+  /** Fertige Hörprobe bei ElevenLabs – das Abspielen kostet kein Kontingent */
+  previewUrl?: string
+  /**
+   * Herkunft der Stimme: premade = mitgeliefert, cloned/professional/generated.
+   * Achtung: Auch Stimmen AUS DER BIBLIOTHEK tragen „cloned" oder „professional" – die
+   * Kategorie allein sagt also nicht, ob die Stimme dem Konto gehört.
+   */
+  category?: string
+  /** true = eigene Stimme des Kontos */
+  isOwner?: boolean
+  /** true = aus der Stimmenbibliothek übernommen (nicht in jedem Tarif nutzbar) */
+  fromLibrary?: boolean
+  /**
+   * false = im kostenlosen Tarif nicht über die Schnittstelle nutzbar.
+   * ElevenLabs antwortet dort mit „Free users cannot use library voices via the API".
+   */
+  usable?: boolean
+  /** Warum die Stimme nicht nutzbar ist – für die Anzeige */
+  unusableReason?: string
+}
+
+/**
+ * Klangregler einer Stimme, wie ElevenLabs sie kennt.
+ *
+ * `speed` reicht nur von 0.7 bis 1.2, alles andere von 0 bis 1. Die didaktische Bedeutung
+ * steckt im Tempo – die Herleitung aus dem GER-Niveau steht in `shared/voiceSettings.ts`.
+ */
+export interface TtsSettings {
+  /** Wie eng die Stimme an der Vorlage bleibt; niedrig = ausdrucksstärker, aber unruhiger */
+  stability: number
+  /** Ähnlichkeit zur Originalaufnahme */
+  similarity: number
+  /** Überzeichnung des Sprechstils; 0 = neutral */
+  style: number
+  /** Sprechtempo, 1 = natürliche Geschwindigkeit der Stimme */
+  speed: number
+  /** Klangliche Hervorhebung der Sprecherstimme */
+  speakerBoost: boolean
+}
+
+export interface TtsRequest {
+  /** Kennung des Hörtext-Bausteins; bestimmt den Dateinamen */
+  id: string
+  /** Sprecherzeilen in der Reihenfolge des Skripts */
+  turns: { voiceId: string; text: string }[]
+  /** ISO-639-1-Code der Zielsprache */
+  languageCode?: string
+  /** Klangregler; ohne Angabe gelten die Voreinstellungen von ElevenLabs */
+  settings?: TtsSettings
+}
+
+export interface TtsResult {
+  fileName: string
+  dataUrl: string
+  bytes: number
+  /**
+   * Welcher Weg gegangen wurde: `dialog` = alle Sprecher in einem Auftrag (eleven_v3),
+   * `solo` = eine Stimme über eleven_multilingual_v2. Das steht in der Erfolgsmeldung,
+   * weil es hörbar den Unterschied macht – und weil sich sonst nicht prüfen lässt, ob die
+   * Dialog-Vertonung überhaupt gegriffen hat.
+   */
+  mode: 'dialog' | 'solo'
+  /** Das tatsächlich benutzte Modell */
+  model: string
+  /** Zahl der Aufträge an ElevenLabs (mehr als einer nur bei sehr langen Texten) */
+  requests: number
+}
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  ai: {
+    textProvider: 'openai',
+    textModels: {
+      openai: 'gpt-5.5',
+      anthropic: 'claude-opus-5',
+      google: 'gemini-2.5-pro'
+    },
+    imageProvider: 'openai',
+    imageModels: { openai: 'gpt-image-2', google: 'imagen-4.0-generate-001' },
+    imageAccess: { openai: 'api', google: 'api', anthropic: 'api' },
+    autoLatest: true,
+    access: { openai: 'api', anthropic: 'api', google: 'api' },
+    subscriptionModels: { openai: '', anthropic: '', google: '' },
+    subscriptionAccepted: { openai: false, anthropic: false, google: false },
+    cliPaths: { openai: '', anthropic: '', google: '' },
+    economy: 'auto'
+  },
+  appearance: { colorScheme: 'auto', theme: 'teal' },
+  schoolName: '',
+  defaults: { stateId: 'NI', schoolTypeId: 'gymnasium', targetLanguage: 'en' },
+  audio: { voices: {} },
+  // 1 ab 91 %, 2 ab 78 %, 3 ab 64 %, 4 ab 50 %, 5 ab 25 % – die Vorgabe der Lehrkraft
+  gradeScale: { allgemein: [91, 78, 64, 50, 25], jeFach: {} },
+  showSchool: true,
+  citationStyle: 'deutsch'
+}
+
+export interface AiStatus {
+  textProvider: AiProviderId
+  textModel: string
+  textAccess: AiAccess
+  /** Text-KI ist eingerichtet (Schlüssel hinterlegt oder Abo-Zugang bestätigt) */
+  hasTextKey: boolean
+  imageProvider: ImageProviderId
+  imageModel: string
+  imageAccess: AiAccess
+  /** Bild-KI ist eingerichtet (Schlüssel hinterlegt oder Abo-Zugang bestätigt) */
+  hasImageKey: boolean
+  /** Sparmodus aktiv (weniger Anfragen, ohne zusätzliche KI-Prüfung) */
+  economy: boolean
+  /** Hörtexte lassen sich vertonen (ElevenLabs-Schlüssel hinterlegt) */
+  hasTts: boolean
+  /** Anbieter mit hinterlegtem Zugang, für die Wahl eines stärkeren Modells je Auftrag */
+  textOptions: { provider: AiProviderId; model: string; label: string }[]
+}
+
+// ---------- GER-Tabelle ----------
+
+export interface CefrGradeEntry {
+  level: CefrLevel
+  basis: 'Lehrplan' | 'KMK' | 'interpoliert' | string
+}
+
+export interface CefrLanguageTrack {
+  order: number
+  startGrade: number
+  grades: Record<string, CefrGradeEntry>
+  sources?: string[]
+}
+
+export interface CefrSchoolType {
+  id: string
+  name: string
+  languages: CefrLanguageTrack[]
+}
+
+export interface CefrState {
+  id: string
+  name: string
+  schoolTypes: CefrSchoolType[]
+}
+
+export interface CefrTable {
+  version: number
+  generatedAt?: string
+  note?: string
+  levelScale?: string[]
+  states: CefrState[]
+}
+
+// ---------- KI ----------
+
+export interface StructuredRequest {
+  system: string
+  user: string
+  /** Bilder als data:-URLs (PNG/JPEG) */
+  images?: string[]
+  schemaName: string
+  schema: Record<string, unknown>
+  /**
+   * Abweichender Anbieter für genau diese Anfrage (leer = der eingestellte).
+   * Gedacht für Aufträge, die ein stärkeres Modell verdienen – etwa Hörtexte.
+   */
+  provider?: AiProviderId
+  /** Abweichendes Modell; ohne Angabe gilt das eingestellte Modell des Anbieters */
+  model?: string
+  /**
+   * Kennung für die Fortschrittsmeldung. Ist sie gesetzt, wird die Antwort im Strom
+   * empfangen und die Zahl der eingetroffenen Zeichen laufend gemeldet.
+   */
+  progressId?: string
+}
+
+/** Fortschritt einer laufenden KI-Anfrage */
+export interface AiProgress {
+  id: string
+  /** Zeichen der Antwort, die bisher eingetroffen sind */
+  chars: number
+}
+
+export interface ConnectionResult {
+  ok: boolean
+  models?: string[]
+  error?: string
+}
+
+// ---------- Bilder ----------
+
+export interface OpenMojiHit {
+  hexcode: string
+  annotation: string
+  tags: string
+}
+
+export interface OnlineImageHit {
+  id: string
+  thumbnail: string
+  url: string
+  title: string
+  creator: string
+  license: string
+  licenseUrl?: string
+  /** Entstehungsdatum (Wikimedia Commons) */
+  date?: string
+  source: OnlineImageSource
+}
+
+export type OnlineImageSource = 'openverse' | 'pixabay' | 'wikimedia' | 'clipart'
+
+/** Ergebnis des Abgleichs eines Quellenzitats mit der angegebenen Internetquelle */
+/**
+ * Ergebnis der Prüfung einer Ton- oder Filmquelle.
+ *
+ * Geprüft wird nicht der Wortlaut (den kann man einer Videoseite nicht entnehmen), sondern
+ * zweierlei: Gibt es die Seite überhaupt, und handelt sie von dem, was die KI behauptet?
+ * Damit fallen erfundene Adressen auf – der häufigste Fehler, wenn ein Sprachmodell eine
+ * Fundstelle nennen soll.
+ */
+export interface MediaCheck {
+  /** ok = erreichbar und thematisch passend; mismatch = erreichbar, passt aber nicht; unreachable = nicht abrufbar */
+  status: 'ok' | 'mismatch' | 'unreachable'
+  /** Titel der Seite, soweit erkennbar */
+  title?: string
+  /** Erwartete Begriffe, die auf der Seite vorkommen */
+  matched: string[]
+  /** Erwartete Begriffe, die fehlen */
+  missing: string[]
+  message: string
+}
+
+export interface QuoteCheck {
+  status: 'found' | 'partial' | 'notFound' | 'unreachable'
+  ratio: number
+  message: string
+  /** Adresse, unter der der Wortlaut tatsächlich gefunden wurde (wenn die angegebene nicht passte) */
+  suggestedUrl?: string
+}
+
+// ---------- Suche nach Originalmaterial ----------
+
+/**
+ * Auftrag an die Materialsuche.
+ *
+ * Die Suchwörter stellt die KI aus Thema, Fach und Jahrgang zusammen; gesucht wird aber in
+ * der App, damit der Wortlaut nachweislich aus dem Archiv stammt und nicht aus dem
+ * Gedächtnis des Sprachmodells.
+ */
+export interface Materialanfrage {
+  suchwoerter: string
+  /** Sprache des gesuchten Textes, zweibuchstabig („de", „en", „la" …) */
+  sprache: string
+  /** Höchstzahl der Treffer je Archiv */
+  max?: number
+}
+
+export interface Quellentreffer {
+  titel: string
+  urheber?: string
+  jahr?: string
+  url: string
+  herkunft: 'wikisource' | 'gutenberg' | 'netz'
+  /**
+   * Ungefaehre Groesse der Quellseite in Zeichen – nur zum Vorsortieren.
+   * Die genaue Wortzahl steht erst fest, wenn die Quelle geladen ist.
+   */
+  zeichen?: number
+  /** die ersten Sätze – damit sich die Eignung beurteilen lässt, ohne alles zu laden */
+  auszug: string
+  lizenz?: string
+}
+
+/** Der tatsächlich geladene Wortlaut einer Quelle. Nur was hier steht, darf aufs Blatt. */
+export interface GeladeneQuelle {
+  url: string
+  titel: string
+  text: string
+  wortzahl: number
+  /** gesetzt, wenn die Quelle nicht geladen werden konnte – dann ist `text` leer */
+  fehler?: string
+  /**
+   * PDF-Daten, aus denen der Text noch zu gewinnen ist.
+   *
+   * Der Hauptprozess laedt nur die Bytes; die Formate versteht die Oberflaeche – dort liegt
+   * der PDF-Leser, den auch das hochgeladene Material der Lehrkraft benutzt. Zwei getrennte
+   * PDF-Leser waeren genau die Art Fehler, die still bleibt.
+   *
+   * Nachgemessen am 24.09.2026: Bei der Suche nach wissenschaftlichen Quellen zu
+   * „Antibiotikaresistenz" war ein Bericht des Robert-Koch-Instituts ein PDF – und fiel mit
+   * „Die Adresse liefert keinen Text" heraus. Gerade in den Naturwissenschaften liegt vieles
+   * so vor.
+   */
+  pdf?: Uint8Array
+}
+
+// ---------- Dateien ----------
+
+export interface FileFilter {
+  name: string
+  extensions: string[]
+}
+
+export interface OpenedFile {
+  name: string
+  data: Uint8Array
+}
+
+export interface SavedVocabList {
+  id: string
+  name: string
+  updatedAt: string
+  /** Sprache der Vokabeln (en, fr, es, it, la) – für Vorschläge im Test */
+  language?: string
+  /** Jahrgang, für den die Liste gedacht ist */
+  grade?: number
+  /** Herkunft, z. B. „Green Line 4 – Unit 1" */
+  source?: string
+  entries: {
+    term: string
+    translation: string
+    pos?: string
+    note?: string
+    grey?: boolean
+    inBox?: boolean
+    include?: boolean
+  }[]
+}
+
+// ---------- Gespeicherte Vokabeltests ----------
+
+export interface SavedTestStats {
+  /** Alle Vokabeln der Liste */
+  vocabCount: number
+  /** Davon für den Test markiert */
+  includedCount: number
+  /** Ein Test wurde bereits erstellt */
+  hasTest: boolean
+  variantCount: number
+  totalPoints: number
+}
+
+export interface SavedTestMeta extends SavedTestStats {
+  id: string
+  /** z. B. „Green Line 5 – Unit 1, Station 1" */
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Inhalt aus dem Vokabeltest-Programm (Vokabelliste, Einstellungen, Test) */
+export interface SavedTest extends SavedTestMeta {
+  payload: unknown
+}
+
+export interface SavedTestInput {
+  id: string
+  name: string
+  stats: SavedTestStats
+  payload: unknown
+}
+
+// ---------- Gespeicherte Arbeitsblätter ----------
+
+export interface SavedWorksheetStats {
+  subjectId: string
+  subjectLabel: string
+  /** Thema des Blattes – wird zum Themenordner */
+  topic: string
+  grade: number
+  schoolTypeName: string
+  /** Anzahl der Niveaufassungen */
+  sheetCount: number
+  hasBoard: boolean
+}
+
+export interface SavedWorksheetMeta extends SavedWorksheetStats {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  /** Kleines Vorschaubild der ersten Seite (JPEG, data:-URL) */
+  thumb?: string
+}
+
+export interface SavedWorksheet extends SavedWorksheetMeta {
+  payload: unknown
+}
+
+export interface SavedWorksheetInput {
+  id: string
+  name: string
+  stats: SavedWorksheetStats
+  thumb?: string
+  payload: unknown
+}
+
+// ---------- Schulbuch-Vokabeln (Lehrwerke) ----------
+
+export interface TextbookEntry {
+  term: string
+  translation: string
+  pos?: string
+  note?: string
+  /** Seite im Schulbuch */
+  page?: string
+  /** Passiver/fakultativer Wortschatz (im Buch grau oder markiert) */
+  grey?: boolean
+  /**
+   * Woher die graue Markierung stammt. „ohne-beispiel" heißt: Sie wurde daraus abgeleitet,
+   * dass die Verlagsliste zu diesem Wort keinen Kontextsatz führt (scripts/grey-without-example.mjs).
+   * Von Hand gesetzte Markierungen tragen nichts und bleiben dadurch unangetastet.
+   */
+  greyBy?: 'ohne-beispiel'
+  /** Vokabel aus einem Kasten der Unit (z. B. „Numbers 0-12“), nicht aus der laufenden Liste */
+  inBox?: boolean
+  /**
+   * Im Buch farbig hervorgehobener Eintrag, der statt einer Übersetzung eine Erklärung trägt
+   * (z. B. „nerd“, „meme“, „Coloured“). Für Übersetzungsaufgaben ungeeignet.
+   */
+  explained?: boolean
+  /** Beispielsatz aus dem Buch */
+  example?: string
+  exampleTranslation?: string
+}
+
+export interface TextbookSection {
+  /** z. B. „Check-in“, „Station 1“, „Story“ */
+  name: string
+  entries: TextbookEntry[]
+}
+
+export interface TextbookUnit {
+  /** z. B. „Unit 1“ */
+  name: string
+  sections: TextbookSection[]
+}
+
+export interface Textbook {
+  id: string
+  /** z. B. „Green Line 1“ */
+  name: string
+  /** Sprachcode der Vokabeln (en, fr, es, it, la) */
+  language: string
+  /** Jahrgang, für den der Band gedacht ist (Green Line 1 → Klasse 5) */
+  grade?: number
+  /** Bundesland und Schulform der Ausgabe – werden beim Test vorgeschlagen */
+  stateId?: string
+  schoolTypeId?: string
+  /** Verlag und Ausgabe, soweit bekannt (z. B. Klett, Niedersachsen) */
+  publisher?: string
+  edition?: string
+  units: TextbookUnit[]
+  /** mitgeliefert (nur lesen) oder von der Lehrkraft importiert */
+  builtIn?: boolean
+  importedAt: string
+}
+
+/** Kennzeichnungen einer Vokabel als Bitmaske (mehrere können zugleich gelten) */
+export const MARK_BOX = 1
+export const MARK_GREY = 2
+export const MARK_EXPLAINED = 4
+
+export interface TextbookSectionMeta {
+  /** z. B. „Station 1“ */
+  name: string
+  /**
+   * Zahl der Vokabeln je Kennzeichnungs-Kombination; der Index ist die Bitmaske aus
+   * MARK_BOX | MARK_GREY | MARK_EXPLAINED. `marks[0]` sind also die Vokabeln ohne jede
+   * Kennzeichnung. So stimmen die Zahlen auch, wenn mehrere Kennzeichnungen zusammenfallen.
+   */
+  marks: number[]
+}
+
+export interface TextbookMeta {
+  id: string
+  name: string
+  language: string
+  grade?: number
+  stateId?: string
+  schoolTypeId?: string
+  builtIn?: boolean
+  publisher?: string
+  edition?: string
+  units: { name: string; sections: TextbookSectionMeta[] }[]
+  entryCount: number
+}
+
+// ---------- Gespeicherte Klassenarbeiten ----------
+
+export interface SavedExamStats {
+  subjectLabel: string
+  grade: number
+  topic: string
+  /** Zahl der Teile */
+  partCount: number
+  /** Sind schon Aufgaben erzeugt? */
+  hasTasks: boolean
+  minutes: number
+}
+
+export interface SavedExamMeta extends SavedExamStats {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SavedExam extends SavedExamMeta {
+  payload: unknown
+}
+
+export interface SavedExamInput {
+  id: string
+  name: string
+  stats: SavedExamStats
+  payload: unknown
+}
+
+export interface SavedGrammarTestStats {
+  subjectLabel: string
+  grade: number
+  /** Geprüfte Formen, für die Übersicht bereits ausgeschrieben */
+  topics: string
+  taskCount: number
+  points: number
+  minutes: number
+  /** Wird der Test benotet? */
+  graded: boolean
+}
+
+export interface SavedGrammarTestMeta extends SavedGrammarTestStats {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SavedGrammarTest extends SavedGrammarTestMeta {
+  payload: unknown
+}
+
+export interface SavedGrammarTestInput {
+  id: string
+  name: string
+  stats: SavedGrammarTestStats
+  payload: unknown
+}
+
+/**
+ * Kennzahlen einer gespeicherten Lernzielkontrolle für die Übersicht.
+ *
+ * Bewusst andere als beim Grammatiktest: Hier zählt, welches Landesformat die Kontrolle hat
+ * und wie viele Fassungen es gibt – daran erkennt die Lehrkraft sie in der Liste wieder.
+ */
+export interface SavedKurztestStats {
+  subjectLabel: string
+  grade: number
+  thema: string
+  /** Bezeichnung des Landesformats, z. B. „Stegreifaufgabe" */
+  bezeichnung: string
+  stateId: string
+  taskCount: number
+  points: number
+  minutes: number
+  /** Zahl der Fassungen (A/B/C) */
+  varianten: number
+}
+
+export interface SavedKurztestMeta extends SavedKurztestStats {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SavedKurztest extends SavedKurztestMeta {
+  payload: unknown
+}
+
+export interface SavedKurztestInput {
+  id: string
+  name: string
+  stats: SavedKurztestStats
+  payload: unknown
+}
+
+/** Sparmodus aktiv? Automatisch beim Abo-Zugang, weil dort jede Anfrage auf das Kontingent zählt. */
+export function economyActive(ai: AppSettings['ai']): boolean {
+  return ai.economy === 'on' || (ai.economy !== 'off' && ai.access[ai.textProvider] === 'subscription')
+}

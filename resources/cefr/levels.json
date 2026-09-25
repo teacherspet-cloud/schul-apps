@@ -1,0 +1,4489 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-16",
+  "note": "Zielniveaus (GER) jeweils für das Ende des Schuljahres. „Lehrplan“: im Kerncurriculum/Lehrplan/Bildungsplan des Landes für diese Jahrgangsstufe ausgewiesen (Doppelangaben wie A2/A2+ -> niedrigere Stufe, da die höhere meist nur rezeptiv gilt; B2/C1 -> B2+; „X mit Anteilen von Y“ -> X+; Berlin/Brandenburg: Niveaustufen D=A1, E=A1+, F=A2, G=B1, H=B1+). „KMK“: aus den KMK-Bildungsstandards (ESA Ende Kl. 9 A2, MSA Ende Kl. 10 B1 bzw. Gymnasium B1+, AHR B2 bzw. B2+ als Mittel aus grundlegendem/erhöhtem Niveau; fortgeführte 2./3. Fremdsprache B2; Grundschule A1 lt. KMK-Bericht 2013). „interpoliert“: gleichmäßig zwischen den Ankern interpoliert (Rundung zur niedrigeren Stufe bei Gleichstand; Startanker Pre-A1 vor dem ersten Lernjahr) – einige Endwerte der 2. Fremdsprache an nicht-gymnasialen Schulformen sind reine Schätzwerte und ebenfalls so markiert. G8/G9-Stand 2026: G9 in BW, BY, HE, NI, NW, RP, SL, SH; G8 in BE, BB, HB, HH, MV, SN, ST, TH. Latein ist ausgenommen.",
+  "levelScale": [
+    "Pre-A1",
+    "A1",
+    "A1+",
+    "A2",
+    "A2+",
+    "B1",
+    "B1+",
+    "B2",
+    "B2+",
+    "C1",
+    "C2"
+  ],
+  "states": [
+    {
+      "id": "BW",
+      "name": "Baden-Württemberg",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Bildungsplan 2016 Baden-Württemberg, Gymnasium, Englisch als erste Fremdsprache: GeR-Niveaus Kl. 4 A1, Kl. 6 A2+, Kl. 8 B1, Kl. 10 B1 (in Teilen B2), Kursstufe B2 (in Teilen C1) – Übersicht ZSL, https://lehrerfortbildung-bw.de/u_sprachlit/englisch/gym/bp2016/fb3/1_info/1_einf/niveaustufen.html",
+                "KM BW: Bildungsplanarbeiten Englisch und Französisch – Inkraftsetzung (04.06.2025; überarbeiteter BP 2016 V2, gedehnte G9-Pläne ab Sommer 2026) – G8-Standardstufen hier auf G9 übertragen, https://km.baden-wuerttemberg.de/fileadmin/redaktion/m-km/intern/PDF/Dateien/Allgemeine_Infos/Bildungsplanarbeiten-Englisch-und-Franz%C3%B6sisch%E2%80%93Inkraftsetzung.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "werkrealschule",
+          "name": "Werkrealschule/Hauptschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "KMK"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Gemeinsamer Bildungsplan der Sekundarstufe I BW 2016 (Niveaus G/M/E), Englisch – keine GeR-Angabe je Klassenstufe (LS BW, Kompetenzraster Englisch NL 54: Progression A1 bis B1/B1+ zum MSA), https://www.schule-bw.de/themen-und-impulse/individuelles-lernen-und-individuelle-foerderung/allgemein-bildende-schulen/kompetenzraster-2016/englisch/e_nl_54_0_basis.pdf",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realschule",
+          "name": "Realschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Gemeinsamer Bildungsplan der Sekundarstufe I BW 2016 (Niveaus G/M/E), Englisch – keine GeR-Angabe je Klassenstufe (LS BW, Kompetenzraster Englisch NL 54: Progression A1 bis B1/B1+ zum MSA), https://www.schule-bw.de/themen-und-impulse/individuelles-lernen-und-individuelle-foerderung/allgemein-bildende-schulen/kompetenzraster-2016/englisch/e_nl_54_0_basis.pdf",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Bildungsplan 2016 BW, Sekundarstufe I, Französisch als zweite Fremdsprache (Wahlpflichtfach ab Kl. 7)",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gemeinschaftsschule",
+          "name": "Gemeinschaftsschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Gemeinsamer Bildungsplan der Sekundarstufe I BW 2016 (Niveaus G/M/E), Englisch – keine GeR-Angabe je Klassenstufe (LS BW, Kompetenzraster Englisch NL 54: Progression A1 bis B1/B1+ zum MSA), https://www.schule-bw.de/themen-und-impulse/individuelles-lernen-und-individuelle-foerderung/allgemein-bildende-schulen/kompetenzraster-2016/englisch/e_nl_54_0_basis.pdf",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan 2016 BW, Sekundarstufe I, Französisch als zweite Fremdsprache (ab Kl. 6)",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Bildungsplan 2016 Baden-Württemberg, Gymnasium, Englisch als erste Fremdsprache: GeR-Niveaus Kl. 4 A1, Kl. 6 A2+, Kl. 8 B1, Kl. 10 B1 (in Teilen B2), Kursstufe B2 (in Teilen C1) – Übersicht ZSL, https://lehrerfortbildung-bw.de/u_sprachlit/englisch/gym/bp2016/fb3/1_info/1_einf/niveaustufen.html",
+                "KM BW: Bildungsplanarbeiten Englisch und Französisch – Inkraftsetzung (04.06.2025; überarbeiteter BP 2016 V2, gedehnte G9-Pläne ab Sommer 2026) – G8-Standardstufen hier auf G9 übertragen, https://km.baden-wuerttemberg.de/fileadmin/redaktion/m-km/intern/PDF/Dateien/Allgemeine_Infos/Bildungsplanarbeiten-Englisch-und-Franz%C3%B6sisch%E2%80%93Inkraftsetzung.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Bildungsplan 2016 BW, Gymnasium, Synopse Französisch als zweite/dritte Fremdsprache (ZSL, Dez. 2018): F2 Kl. 6/7/8 A2, Kl. 9/10 B1+, Kl. 11/12 B2; F3 Kl. 9/10 B1, Kl. 11/12 B2, https://lehrerfortbildung-bw.de/u_sprachlit/franzoesisch/gym/bp2016/fb7/2_bp/1_synopse/01_-_bp-synopse_-_serverfassung.pdf",
+                "KM BW: Bildungsplanarbeiten Englisch und Französisch – Inkraftsetzung (04.06.2025; überarbeiteter BP 2016 V2, gedehnte G9-Pläne ab Sommer 2026) – G8-Standardstufen hier auf G9 übertragen, https://km.baden-wuerttemberg.de/fileadmin/redaktion/m-km/intern/PDF/Dateien/Allgemeine_Infos/Bildungsplanarbeiten-Englisch-und-Franz%C3%B6sisch%E2%80%93Inkraftsetzung.pdf"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 8,
+              "grades": {
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Bildungsplan 2016 BW, Gymnasium, Synopse Französisch als zweite/dritte Fremdsprache (ZSL, Dez. 2018): F2 Kl. 6/7/8 A2, Kl. 9/10 B1+, Kl. 11/12 B2; F3 Kl. 9/10 B1, Kl. 11/12 B2, https://lehrerfortbildung-bw.de/u_sprachlit/franzoesisch/gym/bp2016/fb7/2_bp/1_synopse/01_-_bp-synopse_-_serverfassung.pdf",
+                "KM BW: Bildungsplanarbeiten Englisch und Französisch – Inkraftsetzung (04.06.2025; überarbeiteter BP 2016 V2, gedehnte G9-Pläne ab Sommer 2026) – G8-Standardstufen hier auf G9 übertragen, https://km.baden-wuerttemberg.de/fileadmin/redaktion/m-km/intern/PDF/Dateien/Allgemeine_Infos/Bildungsplanarbeiten-Englisch-und-Franz%C3%B6sisch%E2%80%93Inkraftsetzung.pdf"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "BY",
+      "name": "Bayern",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "LehrplanPLUS Grundschule, Englisch Jgst. 3/4 (keine explizite GER-Angabe), https://www.lehrplanplus.bayern.de/fachprofil/grundschule/englisch",
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mittelschule",
+          "name": "Mittelschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "LehrplanPLUS Mittelschule, Fachprofil Englisch: nach Jgst. 9 A2 (Quali A2+), mittlerer Schulabschluss B1 (produktiv) bzw. B1+ (rezeptiv), https://www.lehrplanplus.bayern.de/fachprofil/mittelschule/englisch"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realschule",
+          "name": "Realschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "LehrplanPLUS Realschule, Fachprofil Englisch: Jgst. 9 mind. B1, Jgst. 10 mind. B1+, https://www.lehrplanplus.bayern.de/fachprofil/realschule/englisch/auspraegung/englisch"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "LehrplanPLUS Realschule, Fachprofil Französisch (Wahlpflichtfächergruppe IIIa): Ende Jgst. 7 A1, Jgst. 8 A2, Jgst. 9 A2+/B1, Jgst. 10 mind. B1, https://www.lehrplanplus.bayern.de/fachprofil/realschule/franzoesisch/auspraegung/franzoesisch"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "ISB Bayern: Ergänzende Informationen zum LehrplanPLUS Gymnasium, Moderne Fremdsprachen – GER-Niveaustufen je Jahrgangsstufe (Stand Dez. 2025; bei Doppelangaben gilt die niedrigere Stufe außer im Leseverstehen), https://www.isb.bayern.de/fileadmin/user_upload/Gymnasium/Faecher/Moderne_Fremdsprachen/Leistungserhebungen_und_Bewertungsraster/Hinweise/ger_niveaustufen_12_25.pdf (E1; Jgst. 12 gA B2, Jgst. 13 gA B2/C1 bzw. eA C1)",
+                "LehrplanPLUS Gymnasium, Fachprofil Englisch, https://www.lehrplanplus.bayern.de/fachprofil/gymnasium/englisch/auspraegung/englisch"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "ISB Bayern: Ergänzende Informationen zum LehrplanPLUS Gymnasium, Moderne Fremdsprachen – GER-Niveaustufen je Jahrgangsstufe (Stand Dez. 2025; bei Doppelangaben gilt die niedrigere Stufe außer im Leseverstehen), https://www.isb.bayern.de/fileadmin/user_upload/Gymnasium/Faecher/Moderne_Fremdsprachen/Leistungserhebungen_und_Bewertungsraster/Hinweise/ger_niveaustufen_12_25.pdf (F2/E2; Doppelangaben A2+/B1, B1/B1+, B1+/B2 -> niedrigere Stufe)"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 8,
+              "grades": {
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "ISB Bayern: Ergänzende Informationen zum LehrplanPLUS Gymnasium, Moderne Fremdsprachen – GER-Niveaustufen je Jahrgangsstufe (Stand Dez. 2025; bei Doppelangaben gilt die niedrigere Stufe außer im Leseverstehen), https://www.isb.bayern.de/fileadmin/user_upload/Gymnasium/Faecher/Moderne_Fremdsprachen/Leistungserhebungen_und_Bewertungsraster/Hinweise/ger_niveaustufen_12_25.pdf (F3/It3/Sp3)"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "BE",
+      "name": "Berlin",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "5": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (E zwischen A1 und A2 -> A1+); Regelungen für Berlin S. 11–13, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (Jgst. 3–4: C, in Teilen D; Jgst. 5: C–D; Jgst. 6: D, in Teilen E)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "integrierte-sekundarschule",
+          "name": "Integrierte Sekundarschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (E zwischen A1 und A2 -> A1+); Regelungen für Berlin S. 11–13, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (ISS erweitertes Niveau: Jgst. 7–8 E, in Teilen F; Jgst. 9–10 F–G; MSA = G = B1)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (E zwischen A1 und A2 -> A1+); Regelungen für Berlin S. 11–13, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (später beginnende Fremdsprachen)",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (E zwischen A1 und A2 -> A1+); Regelungen für Berlin S. 11–13, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (Gymnasium: Jgst. 7 E, 8 F, 9 G, 10 H)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (E zwischen A1 und A2 -> A1+); Regelungen für Berlin S. 11–13, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (später einsetzende Fremdsprachen: Niveau G bzw. H am Ende Jgst. 10 bei Beginn spätestens Jgst. 9)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "BB",
+      "name": "Brandenburg",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 1,
+              "grades": {
+                "1": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "2": {
+                  "level": "Pre-A1",
+                  "basis": "Lehrplan"
+                },
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "Pre-A1",
+                  "basis": "Lehrplan"
+                },
+                "5": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (Jgst. 1–2: A und B; 3–4: C; 5–6: D)",
+                "MBJS Brandenburg: Fremdsprachenunterricht ab Jgst. 1 (Begegnung/Kontaktphase Jgst. 1–2, systematischer Unterricht ab Jgst. 3), https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/grundschule/Englisch_VcV_GS_2012_Brandenburg.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "oberschule",
+          "name": "Oberschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (Oberschule, erweiterte Bildung/FOR-Klasse: Jgst. 7 E, 8 E und F, 9 F und G, 10 G)"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gesamtschule",
+          "name": "Gesamtschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (Gesamtschule: Niveaustufen von Oberschule und Gymnasium; hier erweiterte Bildung)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (Gymnasium: Jgst. 7 E, 8 F, 9 G, 10 H)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenlehrplan Jahrgangsstufen 1–10 Berlin/Brandenburg, Teil C Moderne Fremdsprachen (Fassung 28.01.2025): Niveaustufen D≈A1, F≈A2, G≈B1, H≈B1+ (A–C unterhalb A1); Regelungen für Brandenburg S. 15–17, https://bildungsserver.berlin-brandenburg.de/fileadmin/bbb/unterricht/rahmenlehrplaene/Rahmenlehrplanprojekt/amtliche_Fassung/Teil_C_Mod_Fremdsprachen_2025_01_28.pdf (später einsetzende Fremdsprachen: Niveau G bzw. H am Ende Jgst. 10; H Voraussetzung für Qualifikationsphase)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "HB",
+      "name": "Bremen",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "oberschule",
+          "name": "Oberschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Englisch für die Oberschule, Sekundarstufe I, Land Bremen (2010), Kap. 3.3: Mittlerer Schulabschluss Niveau B1 (produktiv mind. A2, im Wesentlichen B1), https://www.lis.bremen.de/sixcms/media.php/13/OSch_Englisch_2010.pdf",
+                "Bildungsplan Gymnasiale Oberstufe Bremen, Fortgeführte moderne Fremdsprachen (2015): Orientierung überwiegend an B2, https://bildung.bremen.de/sixcms/media.php/13/e_03-2015_a.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert",
+                "Bildungsplan Gymnasiale Oberstufe Bremen, Fortgeführte moderne Fremdsprachen (2015): Orientierung überwiegend an B2, https://bildung.bremen.de/sixcms/media.php/13/e_03-2015_a.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "KMK"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Englisch Gymnasium Sekundarstufe I Bremen (Standards Jgst. 6/8/10 ohne GeR-Stufen je Jahrgang)",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Bildungsplan Gymnasiale Oberstufe Bremen, Fortgeführte moderne Fremdsprachen (2015): Orientierung überwiegend an B2, https://bildung.bremen.de/sixcms/media.php/13/e_03-2015_a.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Gymnasiale Oberstufe Bremen, Fortgeführte moderne Fremdsprachen (2015): Orientierung überwiegend an B2, https://bildung.bremen.de/sixcms/media.php/13/e_03-2015_a.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Sek-I-Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "HH",
+      "name": "Hamburg",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 1,
+              "grades": {
+                "1": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "2": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "3": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Grundschule Hamburg, Englisch (ab Jgst. 1)",
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "stadtteilschule",
+          "name": "Stadtteilschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Bildungsplan Stadtteilschule Jgst. 5–11 Hamburg 2022, Englisch: Ende Jgst. 6 A1 (Mindest-) bzw. A2 (erhöht); ESA A2–; Ende Jgst. 8 A2+ (mit Blick auf MSA); MSA B1– (hier B1); Übergang Studienstufe B1+, https://www.hamburg.de/resource/blob/122964/3812266b9334c5b6d4e13c1971939d98/englisch-sts-2022-data.pdf (Jgst. 6: Mittel aus Mindest- und erhöhten Anforderungen)",
+                "Bildungsplan Studienstufe Hamburg 2022, Neuere Fremdsprachen Englisch: Ende Studienstufe gA B2, eA B2+/C1, https://www.hamburg.de/resource/blob/122990/8be6c0cd2aef732c3931bab3dc97c664/fsp-englisch-gyo-2022-data.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Gymnasium Sekundarstufe I Hamburg, Neuere Sprachen (weitere Fremdsprache ab Jgst. 6, Wahlpflicht ab Jgst. 8): Mindestanforderungen für den Übergang in die Studienstufe beim Sprachstand B1, https://dokumente.hamburg.de/resource/blob/798522/fcb461a72b28cfe35b2ea0573c3d5d08/neuere-sprachen-data.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Bildungsplan Gymnasium Sekundarstufe I Hamburg 2022, Englisch: Mindestanforderungen Ende Jgst. 6 A2, Ende Jgst. 8 B1– (hier B1), Übergang Studienstufe B1+, https://www.hamburg.de/resource/blob/122938/ea8fcb338d06e068c1e13091afa61761/englisch-gym-seki-2022-data.pdf",
+                "Bildungsplan Studienstufe Hamburg 2022, Neuere Fremdsprachen Englisch: Ende Studienstufe gA B2, eA B2+/C1, https://www.hamburg.de/resource/blob/122990/8be6c0cd2aef732c3931bab3dc97c664/fsp-englisch-gyo-2022-data.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Gymnasium Sekundarstufe I Hamburg, Neuere Sprachen (weitere Fremdsprache ab Jgst. 6, Wahlpflicht ab Jgst. 8): Mindestanforderungen für den Übergang in die Studienstufe beim Sprachstand B1, https://dokumente.hamburg.de/resource/blob/798522/fcb461a72b28cfe35b2ea0573c3d5d08/neuere-sprachen-data.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 8,
+              "grades": {
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Bildungsplan Gymnasium Sekundarstufe I Hamburg, Neuere Sprachen (weitere Fremdsprache ab Jgst. 6, Wahlpflicht ab Jgst. 8): Mindestanforderungen für den Übergang in die Studienstufe beim Sprachstand B1, https://dokumente.hamburg.de/resource/blob/798522/fcb461a72b28cfe35b2ea0573c3d5d08/neuere-sprachen-data.pdf (Wahlpflicht ab Jgst. 8)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "HE",
+      "name": "Hessen",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Primarstufe Hessen, Moderne Fremdsprachen (Bildungsstandards Ende Jgst. 4)",
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hauptschule",
+          "name": "Hauptschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Hauptschule Hessen: Abschluss im Wesentlichen A2; Jgst. 6 etwa A1+, https://kultus.hessen.de/sites/kultus.hessen.de/files/2021-07/kerncurriculum_moderne_fremdsprachen_hauptschule.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realschule",
+          "name": "Realschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Realschule Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache im Wesentlichen B1 (Mittlerer Abschluss), https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_realschule.pdf (Synopse: Jgst. 6 etwa A1+)"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Realschule Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache im Wesentlichen B1 (Mittlerer Abschluss), https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_realschule.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "integrierte-gesamtschule",
+          "name": "Integrierte Gesamtschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Realschule Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache im Wesentlichen B1 (Mittlerer Abschluss), https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_realschule.pdf (Bildungsgang Realschule)"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Realschule Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache im Wesentlichen B1 (Mittlerer Abschluss), https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_realschule.pdf",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Gymnasium Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache am Ende Jgst. 9/10 im Wesentlichen B1; Kap. 6.2: 3. Fremdsprache nach zwei Jahren produktiv A1, rezeptiv A1+/A2, https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_gymnasium.pdf",
+                "Kerncurriculum gymnasiale Oberstufe Englisch Hessen (Ausgabe 2024): Ende der Oberstufe B2 (rezeptiv auch C1), https://kultus.hessen.de/sites/kultus.hessen.de/files/2024-11/kerncurriculum_gymnasiale_oberstufe-englisch.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Gymnasium Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache am Ende Jgst. 9/10 im Wesentlichen B1; Kap. 6.2: 3. Fremdsprache nach zwei Jahren produktiv A1, rezeptiv A1+/A2, https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_gymnasium.pdf (G9: 2. Fremdsprache i. d. R. ab Jgst. 7)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 9,
+              "grades": {
+                "9": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Kerncurriculum Moderne Fremdsprachen Sekundarstufe I Gymnasium Hessen (Stand Juli 2023), Kap. 6.1: 1. und 2. Fremdsprache am Ende Jgst. 9/10 im Wesentlichen B1; Kap. 6.2: 3. Fremdsprache nach zwei Jahren produktiv A1, rezeptiv A1+/A2, https://kultus.hessen.de/sites/kultus.hessen.de/files/2023-07/2023_-_kerncurriculum_moderne_fremdsprachen_-_sekundarstufe_i_gymnasium.pdf",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert (Abiturniveau der in Jgst. 9 begonnenen 3. Fremdsprache)"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MV",
+      "name": "Mecklenburg-Vorpommern",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org",
+                "Rahmenplan Englisch Orientierungsstufe M-V (gültig ab 01.08.2026): Jgst. 5 Zielniveau A1, Jgst. 6 rezeptiv A1+/produktiv A1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP-Englisch-Orientierungsstufe-2026.pdf (Jgst. 3–4 interpoliert auf Zielniveau A1 in Jgst. 5)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "regionale-schule",
+          "name": "Regionale Schule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenplan Englisch Orientierungsstufe M-V (gültig ab 01.08.2026): Jgst. 5 Zielniveau A1, Jgst. 6 rezeptiv A1+/produktiv A1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP-Englisch-Orientierungsstufe-2026.pdf",
+                "Rahmenplan Englisch Regionale Schule Jgst. 7–10 M-V (2025): Jgst. 7 rezeptiv A2/produktiv A1+, Jgst. 8 A2, Jgst. 9 A2+, Jgst. 10 B1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_Eng_7-10_RegS_2025.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenplan Französisch Regionale Schule Jgst. 7–10 M-V (2025): Jgst. 7 A1, 8 A1+, 9 A2, 10 A2+, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_Frz_7-10_RegS_2025.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gesamtschule",
+          "name": "Integrierte Gesamtschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenplan Englisch Orientierungsstufe M-V (gültig ab 01.08.2026): Jgst. 5 Zielniveau A1, Jgst. 6 rezeptiv A1+/produktiv A1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP-Englisch-Orientierungsstufe-2026.pdf",
+                "Rahmenplan Englisch Gymnasium Jgst. 7–10 M-V (2025): Jgst. 7 rezeptiv A2/produktiv A1+, Jgst. 8 A2, Jgst. 9 A2+, Jgst. 10 B1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_Eng_7-10_Gym_2025.pdf",
+                "Rahmenplan Englisch gymnasiale Oberstufe M-V: B2, rezeptiv auch C1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_EN_SEK2.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenplan Französisch Gymnasium/Integrierte Gesamtschule Jgst. 7–10 M-V (2019): Jgst. 7 A1, 8 A2, 9 A2+, 10 B1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_FRZ_AHR_7-10.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenplan Englisch Orientierungsstufe M-V (gültig ab 01.08.2026): Jgst. 5 Zielniveau A1, Jgst. 6 rezeptiv A1+/produktiv A1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP-Englisch-Orientierungsstufe-2026.pdf",
+                "Rahmenplan Englisch Gymnasium Jgst. 7–10 M-V (2025): Jgst. 7 rezeptiv A2/produktiv A1+, Jgst. 8 A2, Jgst. 9 A2+, Jgst. 10 B1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_Eng_7-10_Gym_2025.pdf",
+                "Rahmenplan Englisch gymnasiale Oberstufe M-V: B2, rezeptiv auch C1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_EN_SEK2.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Rahmenplan Französisch Gymnasium/Integrierte Gesamtschule Jgst. 7–10 M-V (2019): Jgst. 7 A1, 8 A2, 9 A2+, 10 B1, https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/rahmenplaene/RP_FRZ_AHR_7-10.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "NI",
+      "name": "Niedersachsen",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 5–10 Englisch, Niedersachsen (2015), Kap. 2.2 und Anhang A2 (Vergleich HS/RS/IGS/GYM: Kommunikative Fertigkeiten am Ende der Schuljahrgänge 4, 6, 8, 9, 10; bei gemischten Angaben Mehrheit bzw. niedrigere Stufe), https://cuvo.nibis.de/cuvo.php?p=download&upload=139 (Jg. 4: Hörverstehen A1, sonst Annäherung an A1)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hauptschule",
+          "name": "Hauptschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 5–10 Englisch, Niedersachsen (2015), Kap. 2.2 und Anhang A2 (Vergleich HS/RS/IGS/GYM: Kommunikative Fertigkeiten am Ende der Schuljahrgänge 4, 6, 8, 9, 10; bei gemischten Angaben Mehrheit bzw. niedrigere Stufe), https://cuvo.nibis.de/cuvo.php?p=download&upload=139 (Spalte HS)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realschule",
+          "name": "Realschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 5–10 Englisch, Niedersachsen (2015), Kap. 2.2 und Anhang A2 (Vergleich HS/RS/IGS/GYM: Kommunikative Fertigkeiten am Ende der Schuljahrgänge 4, 6, 8, 9, 10; bei gemischten Angaben Mehrheit bzw. niedrigere Stufe), https://cuvo.nibis.de/cuvo.php?p=download&upload=139 (Spalte RS)"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für die Schulformen des Sekundarbereichs I Schuljahrgänge 6–10 Französisch, Niedersachsen: Ende Jg. 7 A1, Jg. 9 A2, Jg. 10 A2 / in Teilen B1, https://cuvo.nibis.de/index.php?p=download&upload=756"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "oberschule",
+          "name": "Oberschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 5–10 Englisch, Niedersachsen (2015), Kap. 2.2 und Anhang A2 (Vergleich HS/RS/IGS/GYM: Kommunikative Fertigkeiten am Ende der Schuljahrgänge 4, 6, 8, 9, 10; bei gemischten Angaben Mehrheit bzw. niedrigere Stufe), https://cuvo.nibis.de/cuvo.php?p=download&upload=139 (Spalte RS, erweitertes Niveau)"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für die Schulformen des Sekundarbereichs I Schuljahrgänge 6–10 Französisch, Niedersachsen: Ende Jg. 7 A1, Jg. 9 A2, Jg. 10 A2 / in Teilen B1, https://cuvo.nibis.de/index.php?p=download&upload=756"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "integrierte-gesamtschule",
+          "name": "Integrierte Gesamtschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 5–10 Englisch, Niedersachsen (2015), Kap. 2.2 und Anhang A2 (Vergleich HS/RS/IGS/GYM: Kommunikative Fertigkeiten am Ende der Schuljahrgänge 4, 6, 8, 9, 10; bei gemischten Angaben Mehrheit bzw. niedrigere Stufe), https://cuvo.nibis.de/cuvo.php?p=download&upload=139 (Spalte IGS, Kurse mit erhöhten Anforderungen)",
+                "Kerncurriculum Gymnasium – gymnasiale Oberstufe Englisch, Niedersachsen: Ende Einführungsphase B1+ in allen Kompetenzen, https://cuvo.nibis.de (KC Englisch Sek II)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für die Schulformen des Sekundarbereichs I Schuljahrgänge 6–10 Französisch, Niedersachsen: Ende Jg. 7 A1, Jg. 9 A2, Jg. 10 A2 / in Teilen B1, https://cuvo.nibis.de/index.php?p=download&upload=756",
+                "Kerncurriculum gymnasiale Oberstufe Französisch, Niedersachsen: Ende Jahrgang 11 B1+, Abitur B2, https://cuvo.nibis.de/index.php?p=download&upload=170"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 5–10 Englisch, Niedersachsen (2015), Kap. 2.2 und Anhang A2 (Vergleich HS/RS/IGS/GYM: Kommunikative Fertigkeiten am Ende der Schuljahrgänge 4, 6, 8, 9, 10; bei gemischten Angaben Mehrheit bzw. niedrigere Stufe), https://cuvo.nibis.de/cuvo.php?p=download&upload=139 (Gymnasium: Jg. 6 A2 rezeptiv/A1+ produktiv, Jg. 8 A2+, Jg. 10 B1+)",
+                "Kerncurriculum Gymnasium – gymnasiale Oberstufe Englisch, Niedersachsen: Ende Einführungsphase B1+ in allen Kompetenzen, https://cuvo.nibis.de (KC Englisch Sek II)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kerncurriculum für das Gymnasium Schuljahrgänge 6–10 Französisch, Niedersachsen: Ende Jg. 7 A1+, Jg. 9 A2+ (Hörverstehen A2/A2+), Jg. 10 B1, https://cuvo.nibis.de/cuvo.php?p=download&upload=171",
+                "Kerncurriculum gymnasiale Oberstufe Französisch, Niedersachsen: Ende Jahrgang 11 B1+, Abitur B2, https://cuvo.nibis.de/index.php?p=download&upload=170"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 8,
+              "grades": {
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Niedersachsen Gymnasium: dritte Fremdsprache im Wahlpflichtbereich ab Jg. 8",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "NW",
+      "name": "Nordrhein-Westfalen",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Grundschule NRW (2021, Englisch ab Klasse 3): Niveau A1 verbindlich, https://www.qua-lis.nrw.de/schulentwicklung-nrw/unterricht/sprache/englisch-in-der-primarstufe/lehrplan"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hauptschule",
+          "name": "Hauptschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Englisch Sekundarstufe I Hauptschule NRW (2021/2022): Ende Erprobungsstufe A1 mit Anteilen A2, HSA nach Klasse 10 A2 mit Anteilen B1, MSA B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/hs_e_klp_2021_07_14.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realschule",
+          "name": "Realschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Englisch Sekundarstufe I Realschule NRW (2022): Ende Erprobungsstufe A2, Ende Jgst. 8 A2 mit Anteilen B1, Ende Jgst. 10 B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/rs_e_klp_2022_06_13.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Französisch Sekundarstufe I Realschule NRW (2021): F7 Ende Sek I B1, F9 A2 mit Anteilen B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/rs_f_klp_2021_07_13.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sekundarschule",
+          "name": "Sekundarschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Englisch Sekundarstufe I Gesamtschule/Sekundarschule NRW (2022): Ende Jgst. 6 A1 mit Anteilen A2, Ende Jgst. 8 E-Kurs A2 mit Anteilen B1 (G-Kurs A2), Ende Jgst. 10 E-Kurs B1 (G-Kurs A2 mit Anteilen B1), https://lehrplannavigator.nrw.de/system/files/media/document/file/gesk_e_klp_2022_06_13.pdf (E-Kurs)"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Französisch Sekundarstufe I Gesamtschule/Sekundarschule NRW (2021): F7 Ende Sek I B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/gesk_f_klp_2021_07_14.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gesamtschule",
+          "name": "Gesamtschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Englisch Sekundarstufe I Gesamtschule/Sekundarschule NRW (2022): Ende Jgst. 6 A1 mit Anteilen A2, Ende Jgst. 8 E-Kurs A2 mit Anteilen B1 (G-Kurs A2), Ende Jgst. 10 E-Kurs B1 (G-Kurs A2 mit Anteilen B1), https://lehrplannavigator.nrw.de/system/files/media/document/file/gesk_e_klp_2022_06_13.pdf (E-Kurs)",
+                "Kernlehrplan Englisch Sekundarstufe II Gymnasium/Gesamtschule NRW: Ende Einführungsphase B1 mit Anteilen B2, Ende Qualifikationsphase B2 mit Anteilen C1 (rezeptiv), https://lehrplannavigator.nrw.de/system/files/media/document/file/klp_gost_englisch.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Französisch Sekundarstufe I Gesamtschule/Sekundarschule NRW (2021): F7 Ende Sek I B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/gesk_f_klp_2021_07_14.pdf",
+                "Kernlehrplan Französisch Sekundarstufe II NRW: fortgeführt Ende EF B1+, Ende Q-Phase B2; neu einsetzend Ende EF A2, Ende Q-Phase B1 mit Anteilen B2, https://lehrplannavigator.nrw.de/system/files/media/document/file/klp_gost_franzoesisch.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Englisch Sekundarstufe I Gymnasium NRW (G9, 2019): Ende Erprobungsstufe A2, Ende erste Stufe (Jgst. 8) A2 mit Anteilen B1, Ende Sek I B1+, https://lehrplannavigator.nrw.de/system/files/media/document/file/g9_e_klp_3417_2019_06_23.pdf",
+                "Kernlehrplan Englisch Sekundarstufe II Gymnasium/Gesamtschule NRW: Ende Einführungsphase B1 mit Anteilen B2, Ende Qualifikationsphase B2 mit Anteilen C1 (rezeptiv), https://lehrplannavigator.nrw.de/system/files/media/document/file/klp_gost_englisch.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Französisch/Spanisch Sekundarstufe I Gymnasium NRW (G9, 2019): 2. Fremdsprache ab Jgst. 7 – Ende erste Stufe (Jgst. 8) A2, Ende Sek I B1; 3. Fremdsprache ab Jgst. 9 – Ende Sek I A2 mit Anteilen B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/g9_f_klp_3410_2019_06_23.pdf",
+                "Kernlehrplan Französisch Sekundarstufe II NRW: fortgeführt Ende EF B1+, Ende Q-Phase B2; neu einsetzend Ende EF A2, Ende Q-Phase B1 mit Anteilen B2, https://lehrplannavigator.nrw.de/system/files/media/document/file/klp_gost_franzoesisch.pdf"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 9,
+              "grades": {
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Kernlehrplan Französisch/Spanisch Sekundarstufe I Gymnasium NRW (G9, 2019): 2. Fremdsprache ab Jgst. 7 – Ende erste Stufe (Jgst. 8) A2, Ende Sek I B1; 3. Fremdsprache ab Jgst. 9 – Ende Sek I A2 mit Anteilen B1, https://lehrplannavigator.nrw.de/system/files/media/document/file/g9_f_klp_3410_2019_06_23.pdf",
+                "Kernlehrplan Französisch Sekundarstufe II NRW: fortgeführt Ende EF B1+, Ende Q-Phase B2; neu einsetzend Ende EF A2, Ende Q-Phase B1 mit Anteilen B2, https://lehrplannavigator.nrw.de/system/files/media/document/file/klp_gost_franzoesisch.pdf"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "RP",
+      "name": "Rheinland-Pfalz",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Rahmenplan Grundschule Rheinland-Pfalz, Teilrahmenplan Fremdsprache (Englisch/Französisch; Ende Grundschule vergleichbar Niveau A1; Fremdsprachenunterricht ab Klasse 3, ab 2026/27 zweistündig), https://static.bildung-rp.de/lehrplaene/grundschule/TRP_FS_GS.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "realschule-plus",
+          "name": "Realschule plus",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "KMK"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Sekundarstufe I Klassen 5–10 Rheinland-Pfalz (keine GeR-Stufen je Klassenstufe ermittelbar), https://bildung.rlp.de/englisch",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Realschule plus RLP: zweite Fremdsprache im Wahlpflichtfach ab Klasse 6",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "integrierte-gesamtschule",
+          "name": "Integrierte Gesamtschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Sekundarstufe I Klassen 5–10 Rheinland-Pfalz (keine GeR-Stufen je Klassenstufe ermittelbar), https://bildung.rlp.de/englisch",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "KMK"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Sekundarstufe I Klassen 5–10 Rheinland-Pfalz (keine GeR-Stufen je Klassenstufe ermittelbar), https://bildung.rlp.de/englisch",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Lehrplan Englisch Grund- und Leistungsfach Jahrgangsstufen 11 bis 13 (MSS) Rheinland-Pfalz, https://www.edoweb-rlp.de/resource/edoweb:7007785/data"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 8,
+              "grades": {
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SL",
+      "name": "Saarland",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Saarland: Französisch als Fremdsprache der Grundschule ab Klasse 3 (vielfach ab Klasse 1)",
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gemeinschaftsschule",
+          "name": "Gemeinschaftsschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "KMK"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrpläne Gemeinschaftsschule Saarland, Englisch/Französisch (https://www.saarland.de/mbk/DE/portale/bildungsserver/schulen-und-bildungswege/lehrplaene/lehrplaene.allgemeinbildende/gemeinschaftsschule.lehrplaene)",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Französisch zweite Fremdsprache Gemeinschaftsschule Saarland, Jahrgangsübergreifender Teil (2025): baut auf Klassenstufen 5/6 mit Niveau A1 auf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch neunjähriges Gymnasium Saarland, erste und zweite Fremdsprache Klassenstufen 9 und 10 (2025): Ziel Ende Klassenstufe 10 B1+, https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_gym9_1._und_2.FS_9_und_10_2025.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch neunjähriges Gymnasium Saarland, erste und zweite Fremdsprache Klassenstufen 9 und 10 (2025): Ziel Ende Klassenstufe 10 B1+, https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_gym9_1._und_2.FS_9_und_10_2025.pdf (gilt auch für Englisch als 2. FS)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SN",
+      "name": "Sachsen",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Grundschule Englisch Sachsen (Schulportal Sachsen, https://www.schulportal.sachsen.de/lplandb/)",
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "oberschule",
+          "name": "Oberschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "KMK"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Oberschule Englisch Sachsen (https://www.schulportal.sachsen.de/lplandb/)",
+                "KMK: Bildungsstandards für die erste Fremdsprache (Englisch/Französisch) für den Hauptschulabschluss (2004) und den Mittleren Schulabschluss (2003), weiterentwickelt i. d. F. vom 22.06.2023 (ESA: A2, teils B1; MSA: B1, teils B1+), https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Oberschule Sachsen: zweite Fremdsprache ab Klassenstufe 6",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Schulordnung Gymnasien Abiturprüfung Sachsen, Anlage 22 „Erreichtes Niveau der fremdsprachlichen Kompetenzen“: Englisch/Französisch Kl. 5–10 B1; 2. FS Kl. 6–10 B1; 3. FS Kl. 8–10 A2; fortgeführt bis Jgst. 12 B2; neu einsetzend Kl. 10–12 B1, https://www.revosax.sachsen.de/attachments/31614",
+                "Lehrplan Gymnasium Englisch Sachsen, https://www.schulportal.sachsen.de/lplandb/lehrplan/816"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Schulordnung Gymnasien Abiturprüfung Sachsen, Anlage 22 „Erreichtes Niveau der fremdsprachlichen Kompetenzen“: Englisch/Französisch Kl. 5–10 B1; 2. FS Kl. 6–10 B1; 3. FS Kl. 8–10 A2; fortgeführt bis Jgst. 12 B2; neu einsetzend Kl. 10–12 B1, https://www.revosax.sachsen.de/attachments/31614"
+              ]
+            },
+            {
+              "order": 3,
+              "startGrade": 8,
+              "grades": {
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Schulordnung Gymnasien Abiturprüfung Sachsen, Anlage 22 „Erreichtes Niveau der fremdsprachlichen Kompetenzen“: Englisch/Französisch Kl. 5–10 B1; 2. FS Kl. 6–10 B1; 3. FS Kl. 8–10 A2; fortgeführt bis Jgst. 12 B2; neu einsetzend Kl. 10–12 B1, https://www.revosax.sachsen.de/attachments/31614"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ST",
+      "name": "Sachsen-Anhalt",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Grundschule Englisch Sachsen-Anhalt",
+                "KMK: Bericht „Fremdsprachen in der Grundschule – Sachstand und Konzeptionen“ (2013): Orientierung am Niveau A1 des GER am Ende der Grundschule, https://www.kmk.org"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sekundarschule",
+          "name": "Sekundarschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Fachliche Orientierungen Englisch Gemeinschaftsschule/Gesamtschule Sachsen-Anhalt, Tab. 1: Sekundarschule Jg. 6 A1+/A2, Jg. 8 A2, Jg. 10 B1; Gymnasium Jg. 9 A2+/B1, Jg. 10 B1/B1+, https://lisa.sachsen-anhalt.de/fileadmin/Bibliothek/Politik_und_Verwaltung/MK/LISA/Unterricht/Lehrplaene/GemS-GeS/Fachliche_Orientierung_Englisch.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                }
+              },
+              "sources": [
+                "Sekundarschule Sachsen-Anhalt: zweite Fremdsprache im Wahlpflichtbereich ab Schuljahrgang 7",
+                "Schätzwert (kein expliziter Lehrplan-/KMK-Anker für diese Sprachenfolge und Schulform); linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gemeinschaftsschule",
+          "name": "Gemeinschaftsschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Fachliche Orientierungen Englisch Gemeinschaftsschule/Gesamtschule Sachsen-Anhalt, Tab. 1: Sekundarschule Jg. 6 A1+/A2, Jg. 8 A2, Jg. 10 B1; Gymnasium Jg. 9 A2+/B1, Jg. 10 B1/B1+, https://lisa.sachsen-anhalt.de/fileadmin/Bibliothek/Politik_und_Verwaltung/MK/LISA/Unterricht/Lehrplaene/GemS-GeS/Fachliche_Orientierung_Englisch.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Fachlehrplan Gymnasium Englisch Sachsen-Anhalt (Anpassung 01.08.2022): Schuljahrgang 6 A1+/A2, 8 A2/A2+, 10 B1/B1+, Abitur B2/C1 (höhere Stufe jeweils rezeptiv), https://lisa.sachsen-anhalt.de/fileadmin/Bibliothek/Politik_und_Verwaltung/MK/LISA/Unterricht/Lehrplaene/Gym/Anpassung_2022/FLP_Englisch_Gym_010822_swd.pdf",
+                "Fachliche Orientierungen Englisch Gemeinschaftsschule/Gesamtschule Sachsen-Anhalt, Tab. 1: Sekundarschule Jg. 6 A1+/A2, Jg. 8 A2, Jg. 10 B1; Gymnasium Jg. 9 A2+/B1, Jg. 10 B1/B1+, https://lisa.sachsen-anhalt.de/fileadmin/Bibliothek/Politik_und_Verwaltung/MK/LISA/Unterricht/Lehrplaene/GemS-GeS/Fachliche_Orientierung_Englisch.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Fachlehrpläne Gymnasium Sachsen-Anhalt, Französisch/Spanisch (https://lisa.sachsen-anhalt.de)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "SH",
+      "name": "Schleswig-Holstein",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Fachanforderungen Englisch Sekundarstufe I/II Schleswig-Holstein (2014): Grundschule A1; ESA A2; MSA B1; Übergang in die Oberstufe B1+; Ende Einführungsphase B1+ mit Anteilen B2; Ende Sek II B2, in Teilen C1, https://fachportal.lernnetz.de/sh/faecher/englisch/fachanforderungen.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gemeinschaftsschule",
+          "name": "Gemeinschaftsschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Fachanforderungen Englisch Sekundarstufe I/II Schleswig-Holstein (2014): Grundschule A1; ESA A2; MSA B1; Übergang in die Oberstufe B1+; Ende Einführungsphase B1+ mit Anteilen B2; Ende Sek II B2, in Teilen C1, https://fachportal.lernnetz.de/sh/faecher/englisch/fachanforderungen.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Fachanforderungen Französisch/Spanisch Schleswig-Holstein (https://fachportal.lernnetz.de)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Fachanforderungen Englisch Sekundarstufe I/II Schleswig-Holstein (2014): Grundschule A1; ESA A2; MSA B1; Übergang in die Oberstufe B1+; Ende Einführungsphase B1+ mit Anteilen B2; Ende Sek II B2, in Teilen C1, https://fachportal.lernnetz.de/sh/faecher/englisch/fachanforderungen.html"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Fachanforderungen Französisch/Spanisch Schleswig-Holstein (https://fachportal.lernnetz.de)",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html",
+                "Werte linear interpoliert"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TH",
+      "name": "Thüringen",
+      "schoolTypes": [
+        {
+          "id": "grundschule",
+          "name": "Grundschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 3,
+              "grades": {
+                "3": {
+                  "level": "Pre-A1",
+                  "basis": "interpoliert"
+                },
+                "4": {
+                  "level": "Pre-A1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Gymnasium Thüringen, Erprobungsfassung 2026 (aufwachsend ab 2026/27): Ende Kl. 4 i. d. R. unterhalb A1, Kl. 6 A2, Kl. 8 A2/punktuell B1, Kl. 9 B1, Kl. 10 B1; Ende Qualifikationsphase B2/punktuell C1, https://www.schulportal-thueringen.de/tip/resources/medien/68191?dateiname=LP_Englisch_GY_Erprobungsfassung_2026-08-27.pdf (Lernausgangslage Kl. 5)",
+                "Lehrplan Grundschule Englisch Thüringen, https://www.schulportal-thueringen.de/lehrplaene"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "regelschule",
+          "name": "Regelschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Regelschule Thüringen (2011/2014): Ende Kl. 6 A2, Kl. 8 A2+, Kl. 9 A2+, Kl. 10 B1, https://www.schulportal-thueringen.de/tip/resources/medien/14654?dateiname=lp_rs_englisch_21072014.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Lehrplan Französisch Gymnasium Thüringen (2024): 2. Fremdsprache Ende Kl. 6 A1, Kl. 8 A2, Kl. 10 B1; Abschlussniveau Regelschule A2/A2+; Einführungsphase 11S B1, https://www.schulportal-thueringen.de/tip/resources/medien/62800?dateiname=lp_gy_franzoesisch_04_24.pdf"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gemeinschaftsschule",
+          "name": "Gemeinschaftsschule",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Regelschule Thüringen (2011/2014): Ende Kl. 6 A2, Kl. 8 A2+, Kl. 9 A2+, Kl. 10 B1, https://www.schulportal-thueringen.de/tip/resources/medien/14654?dateiname=lp_rs_englisch_21072014.pdf",
+                "Lehrplan Englisch Gymnasium Thüringen, Erprobungsfassung 2026 (aufwachsend ab 2026/27): Ende Kl. 4 i. d. R. unterhalb A1, Kl. 6 A2, Kl. 8 A2/punktuell B1, Kl. 9 B1, Kl. 10 B1; Ende Qualifikationsphase B2/punktuell C1, https://www.schulportal-thueringen.de/tip/resources/medien/68191?dateiname=LP_Englisch_GY_Erprobungsfassung_2026-08-27.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 7,
+              "grades": {
+                "7": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "9": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "12": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "13": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Französisch Gymnasium Thüringen (2024): 2. Fremdsprache Ende Kl. 6 A1, Kl. 8 A2, Kl. 10 B1; Abschlussniveau Regelschule A2/A2+; Einführungsphase 11S B1, https://www.schulportal-thueringen.de/tip/resources/medien/62800?dateiname=lp_gy_franzoesisch_04_24.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gymnasium",
+          "name": "Gymnasium",
+          "languages": [
+            {
+              "order": 1,
+              "startGrade": 5,
+              "grades": {
+                "5": {
+                  "level": "A1",
+                  "basis": "interpoliert"
+                },
+                "6": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A2",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2+",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "10": {
+                  "level": "B1+",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B2",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2+",
+                  "basis": "Lehrplan"
+                }
+              },
+              "sources": [
+                "Lehrplan Englisch Gymnasium Thüringen (2019): Ende Kl. 6 A2, Ende Kl. 7/8 A2+/punktuell B1, Ende Kl. 9/10 B1+, https://www.schulportal-thueringen.de/tip/resources/medien/14691?dateiname=lp_gy_englisch_2019_EN_2FS_Stand_12032019.pdf",
+                "Lehrplan Englisch Gymnasium Thüringen, Erprobungsfassung 2026 (aufwachsend ab 2026/27): Ende Kl. 4 i. d. R. unterhalb A1, Kl. 6 A2, Kl. 8 A2/punktuell B1, Kl. 9 B1, Kl. 10 B1; Ende Qualifikationsphase B2/punktuell C1, https://www.schulportal-thueringen.de/tip/resources/medien/68191?dateiname=LP_Englisch_GY_Erprobungsfassung_2026-08-27.pdf"
+              ]
+            },
+            {
+              "order": 2,
+              "startGrade": 6,
+              "grades": {
+                "6": {
+                  "level": "A1",
+                  "basis": "Lehrplan"
+                },
+                "7": {
+                  "level": "A1+",
+                  "basis": "interpoliert"
+                },
+                "8": {
+                  "level": "A2",
+                  "basis": "Lehrplan"
+                },
+                "9": {
+                  "level": "A2+",
+                  "basis": "interpoliert"
+                },
+                "10": {
+                  "level": "B1",
+                  "basis": "Lehrplan"
+                },
+                "11": {
+                  "level": "B1+",
+                  "basis": "interpoliert"
+                },
+                "12": {
+                  "level": "B2",
+                  "basis": "KMK"
+                }
+              },
+              "sources": [
+                "Lehrplan Französisch Gymnasium Thüringen (2024): 2. Fremdsprache Ende Kl. 6 A1, Kl. 8 A2, Kl. 10 B1; Abschlussniveau Regelschule A2/A2+; Einführungsphase 11S B1, https://www.schulportal-thueringen.de/tip/resources/medien/62800?dateiname=lp_gy_franzoesisch_04_24.pdf",
+                "KMK: Bildungsstandards für die fortgeführte Fremdsprache (Englisch/Französisch) für die Allgemeine Hochschulreife (18.10.2012): B2, auf erhöhtem Niveau teils C1, https://www.kmk.org/themen/qualitaetssicherung-in-schulen/bildungsstandards.html"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

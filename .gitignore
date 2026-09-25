@@ -1,0 +1,12 @@
+node_modules/
+out/
+dist/
+resources/openmoji/
+*.log
+.vite/
+test-results/
+# Heruntergeladene Lehrpläne und Quellen der Recherche – bleiben lokal
+recherche/
+# Zwischenstände von electron-vite und electron-builder
+electron.vite.config.*.mjs
+win-unpacked.tmp/

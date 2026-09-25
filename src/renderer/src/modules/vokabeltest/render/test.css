@@ -1,0 +1,579 @@
+/* Layout des Tests – gilt für Editor-Vorschau, Druck und PDF. */
+
+.vt-page {
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  /* Druckränder: oben 15, rechts 20, unten 20, links 25 mm (Lochrand) */
+  padding: 15mm 20mm 20mm 25mm;
+  background: #fff;
+  color: #111;
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+  line-height: 1.45;
+  position: relative;
+}
+
+/* Aufgeteilte Seiten: genau A4 */
+.vt-page-fixed {
+  height: 297mm;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vt-page-number {
+  position: absolute;
+  bottom: 11mm;
+  right: 20mm;
+  font-size: 8pt;
+  color: #555;
+}
+
+/* Satzzeichen bleiben an der Lücke */
+.vt-nowrap {
+  white-space: nowrap;
+}
+
+/* Unsichtbarer Bereich zum Messen der Seitenaufteilung */
+.vt-measure {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.vt-measure .vt-page {
+  min-height: 0;
+}
+
+.vt-page * {
+  box-sizing: border-box;
+}
+
+/* ---------- Kopf ---------- */
+.vt-school {
+  font-size: 0.8em;
+  color: #555;
+  margin-bottom: 2mm;
+}
+.vt-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 2px solid #111;
+  padding-bottom: 1.5mm;
+}
+.vt-title {
+  font-size: 1.9em;
+  margin: 0;
+  font-weight: 700;
+}
+.vt-variant {
+  font-size: 1.2em;
+  font-weight: 700;
+  border: 2px solid #111;
+  border-radius: 4px;
+  padding: 0 3mm;
+}
+.vt-subtitle {
+  margin-top: 1mm;
+  color: #333;
+}
+.vt-fields {
+  display: flex;
+  gap: 5mm;
+  margin-top: 5mm;
+}
+.vt-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 2mm;
+}
+.vt-field-name {
+  flex: 3;
+}
+.vt-field-class {
+  flex: 1;
+}
+.vt-field-date {
+  flex: 1.5;
+}
+.vt-field-line {
+  flex: 1;
+  border-bottom: 1px solid #111;
+  height: 1.2em;
+}
+.vt-score {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8mm;
+  margin-top: 3mm;
+  font-weight: 600;
+}
+.vt-score-blank {
+  display: inline-block;
+  width: 14mm;
+  border-bottom: 1px solid #111;
+}
+
+/* ---------- Blöcke ---------- */
+/* Fortsetzung einer geteilten Aufgabe oben auf der nächsten Seite */
+.vt-block.vt-block-continued {
+  margin-top: 0;
+}
+
+.vt-block {
+  margin-top: 7mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.vt-block-head {
+  display: flex;
+  align-items: baseline;
+  gap: 2.5mm;
+  font-weight: 700;
+  font-size: 1.1em;
+}
+.vt-num {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 0.85em;
+}
+.vt-block-title {
+  flex: 1;
+}
+.vt-points {
+  font-weight: 400;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+.vt-instruction {
+  font-style: italic;
+  margin: 1mm 0 2.5mm;
+}
+
+.vt-items {
+  margin: 0;
+  padding-left: 7mm;
+}
+.vt-item {
+  margin-bottom: 2.6mm;
+  position: relative;
+}
+.vt-item::marker {
+  font-weight: 600;
+}
+
+.vt-gap {
+  display: inline-block;
+  border-bottom: 1px solid #111;
+  min-width: 6em;
+  height: 1.25em;
+  vertical-align: baseline;
+  text-align: left;
+  padding: 0 1mm;
+}
+.vt-first-letter {
+  font-weight: 600;
+}
+.vt-gap-answer,
+.vt-key .vt-model-answer,
+.vt-key .vt-cw-letter,
+.vt-key .vt-picture-answer,
+.vt-key .vt-box,
+.vt-key .vt-option-correct,
+.vt-key .vt-categories td {
+  color: #c62828;
+  font-weight: 600;
+}
+.vt-gap-answer {
+  height: auto;
+}
+.vt-hint {
+  color: #333;
+}
+.vt-wrong {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  font-weight: 600;
+}
+.vt-gap-short {
+  min-width: 5em;
+}
+.vt-help {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  font-size: 0.85em;
+  margin: -1mm 0 2.5mm;
+  color: #333;
+}
+.vt-help-icon {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  width: 1.25em;
+  height: 1.25em;
+  border: 1px solid #333;
+  border-radius: 50%;
+  font-size: 0.8em;
+  font-weight: 700;
+  font-style: italic;
+  font-family: Georgia, serif;
+}
+.vt-correction {
+  margin-top: 1mm;
+}
+.vt-subsentence {
+  display: flex;
+  gap: 2mm;
+  flex-wrap: wrap;
+}
+.vt-sub-label {
+  font-weight: 600;
+}
+
+.vt-wordbank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm 5mm;
+  border: 1.5px solid #111;
+  border-radius: 3mm;
+  padding: 2mm 4mm;
+  margin: 1mm 0 3mm;
+}
+
+.vt-gaptext {
+  white-space: pre-wrap;
+  line-height: 2;
+}
+.vt-gap-number {
+  font-size: 0.75em;
+  font-weight: 700;
+  margin-right: 0.5mm;
+}
+
+.vt-match {
+  width: 100%;
+  border-collapse: collapse;
+}
+.vt-match td {
+  vertical-align: top;
+  padding: 1.2mm 1.5mm;
+}
+.vt-match-box {
+  width: 9mm;
+}
+.vt-box {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 7mm;
+  height: 7mm;
+  border: 1px solid #111;
+}
+.vt-match-left {
+  width: 60%;
+}
+.vt-match-num,
+.vt-match-letter {
+  font-weight: 700;
+  margin-right: 2mm;
+}
+
+.vt-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm 7mm;
+  margin-top: 1mm;
+}
+.vt-option,
+.vt-tf {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+.vt-checkbox {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 4.2mm;
+  height: 4.2mm;
+  border: 1px solid #111;
+  font-size: 0.8em;
+  line-height: 1;
+}
+.vt-tf-row {
+  display: flex;
+  gap: 4mm;
+  align-items: flex-start;
+}
+.vt-tf-row > :first-child {
+  flex: 1;
+}
+.vt-tf-boxes {
+  display: inline-flex;
+  gap: 4mm;
+  white-space: nowrap;
+}
+
+.vt-lines {
+  margin-top: 1mm;
+}
+.vt-line {
+  height: 8mm;
+  border-bottom: 1px solid #555;
+}
+.vt-model-answer {
+  font-style: italic;
+  color: #00796b;
+  margin-top: 1mm;
+}
+
+.vt-odd-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6mm;
+}
+.vt-odd-answer {
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  padding: 0 2mm;
+}
+.vt-key .vt-odd-answer {
+  color: #c62828;
+}
+.vt-reason {
+  margin-top: 1.5mm;
+  display: flex;
+  gap: 2mm;
+}
+
+.vt-categories {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.vt-categories th,
+.vt-categories td {
+  border: 1px solid #111;
+  padding: 1.5mm 2mm;
+  height: 8mm;
+  text-align: left;
+}
+.vt-categories th {
+  background: #eee;
+}
+
+.vt-pictures {
+  display: grid;
+  gap: 4mm;
+}
+.vt-picture {
+  position: relative;
+  text-align: center;
+}
+.vt-picture-img {
+  position: relative;
+  height: 30mm;
+  border: 1px solid #bbb;
+  border-radius: 2mm;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2mm;
+}
+.vt-picture-img img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.vt-picture-num {
+  position: absolute;
+  top: 1mm;
+  left: 1.5mm;
+  font-weight: 700;
+  font-size: 0.85em;
+}
+.vt-picture-missing {
+  color: #c62828;
+  font-size: 0.85em;
+}
+.vt-picture-line {
+  border-bottom: 1px solid #111;
+  height: 9mm;
+}
+.vt-picture-answer {
+  min-height: 9mm;
+  padding-top: 2mm;
+}
+
+.vt-scrambled {
+  font-family: Consolas, 'Courier New', monospace;
+  letter-spacing: 0.25em;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-right: 2mm;
+}
+.vt-scramble-hint {
+  font-style: italic;
+}
+
+.vt-crossword {
+  display: flex;
+  gap: 6mm;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.vt-crossword-grid {
+  border-collapse: collapse;
+}
+.vt-crossword-grid td {
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  position: relative;
+  text-align: center;
+  vertical-align: middle;
+}
+.vt-cw-cell {
+  border: 1px solid #111;
+}
+.vt-cw-number {
+  position: absolute;
+  top: 0;
+  left: 1px;
+  font-size: 6pt;
+  line-height: 1;
+}
+.vt-cw-letter {
+  font-weight: 700;
+}
+.vt-clue-columns {
+  flex: 1;
+  min-width: 70mm;
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+}
+.vt-clues-title {
+  font-weight: 700;
+}
+.vt-clue {
+  margin-bottom: 1mm;
+}
+
+.vt-freetext {
+  white-space: pre-wrap;
+}
+
+.vt-footer-credits {
+  margin-top: 8mm;
+  font-size: 7pt;
+  color: #777;
+}
+.vt-page-fixed .vt-footer-credits {
+  position: absolute;
+  bottom: 11mm;
+  left: 25mm;
+  right: 35mm;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Kompakte Darstellung (für eine Seitenvorgabe) ---------- */
+.vt-compact {
+  line-height: 1.3;
+}
+.vt-compact .vt-block {
+  margin-top: 4.5mm;
+}
+.vt-compact .vt-item {
+  margin-bottom: 1.4mm;
+}
+.vt-compact .vt-line {
+  height: 7mm;
+}
+.vt-compact .vt-fields {
+  margin-top: 3mm;
+}
+.vt-compact .vt-gaptext {
+  line-height: 1.8;
+}
+.vt-compact .vt-picture-img {
+  height: 25mm;
+}
+
+/* ---------- Druck ---------- */
+@page {
+  size: A4;
+  margin: 0;
+}
+@media print {
+  .vt-page {
+    page-break-after: always;
+    break-after: page;
+  }
+  .vt-page:not(.vt-page-fixed) {
+    min-height: auto;
+  }
+  .vt-item-controls {
+    display: none !important;
+  }
+}
+
+/* Mindmap: Oberbegriff in der Mitte, leere Äste zum Eintragen */
+.vt-mindmap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4mm;
+  margin: 2mm 0;
+}
+.vt-mindmap-topic {
+  padding: 2mm 6mm;
+  border: 1.6pt solid #111;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.vt-mindmap-branches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3mm 8mm;
+  width: 100%;
+}
+.vt-mindmap-branch {
+  display: flex;
+  align-items: flex-end;
+  gap: 2mm;
+}
+.vt-mindmap-dot {
+  flex: none;
+  width: 5mm;
+  height: 5mm;
+  border: 1pt solid #111;
+  border-radius: 50%;
+  font-size: 0.8em;
+  line-height: 5mm;
+  text-align: center;
+}
+.vt-mindmap-line {
+  flex: 1;
+  border-bottom: 1pt solid #111;
+  min-height: 6mm;
+}
+
+/* Buchstabe an der Antwortmöglichkeit – gleiche Form wie im Arbeitsblatt (.ws-mc-letter) */
+.vt-option-letter {
+  flex-shrink: 0;
+}

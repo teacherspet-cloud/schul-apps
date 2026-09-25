@@ -1,0 +1,113 @@
+import { app, safeStorage } from 'electron'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { AppSettings, DEFAULT_SETTINGS, DeepPartial, SecretName, SavedVocabList } from '@shared/types'
+
+function dataDir(): string {
+  const dir = app.getPath('userData')
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+  return dir
+}
+
+export function readJson<T>(file: string, fallback: T): T {
+  try {
+    return JSON.parse(readFileSync(join(dataDir(), file), 'utf8')) as T
+  } catch {
+    return fallback
+  }
+}
+
+export function writeJson(file: string, value: unknown): void {
+  writeFileSync(join(dataDir(), file), JSON.stringify(value, null, 2), 'utf8')
+}
+
+// ---------- Einstellungen ----------
+
+/** Führt gespeicherte Einstellungen (auch aus älteren Versionen) mit den Standardwerten zusammen. */
+function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { ai?: Record<string, unknown> }): AppSettings {
+  const ai = (stored.ai ?? {}) as Record<string, unknown>
+  // Version 0.1 speicherte nur ein OpenAI-Textmodell als Zeichenkette
+  const legacyText = typeof ai.textModel === 'string' ? { openai: ai.textModel } : {}
+  const legacyImage = typeof ai.imageModel === 'string' ? { openai: ai.imageModel } : {}
+  return {
+    ...base,
+    ...(stored as Partial<AppSettings>),
+    ai: {
+      textProvider: (ai.textProvider as AppSettings['ai']['textProvider']) ?? base.ai.textProvider,
+      textModels: { ...base.ai.textModels, ...legacyText, ...(ai.textModels as object) },
+      imageProvider: (ai.imageProvider as AppSettings['ai']['imageProvider']) ?? base.ai.imageProvider,
+      imageModels: { ...base.ai.imageModels, ...legacyImage, ...(ai.imageModels as object) },
+      imageAccess: { ...base.ai.imageAccess, ...(ai.imageAccess as object) },
+      autoLatest: typeof ai.autoLatest === 'boolean' ? ai.autoLatest : base.ai.autoLatest,
+      access: { ...base.ai.access, ...(ai.access as object) },
+      subscriptionModels: { ...base.ai.subscriptionModels, ...(ai.subscriptionModels as object) },
+      subscriptionAccepted: { ...base.ai.subscriptionAccepted, ...(ai.subscriptionAccepted as object) },
+      cliPaths: { ...base.ai.cliPaths, ...(ai.cliPaths as object) },
+      economy: (ai.economy as AppSettings['ai']['economy']) ?? base.ai.economy
+    },
+    appearance: { ...base.appearance, ...stored.appearance },
+    defaults: { ...base.defaults, ...stored.defaults },
+    audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
+    gradeScale: {
+      allgemein: (stored.gradeScale?.allgemein as number[]) ?? base.gradeScale.allgemein,
+      jeFach: { ...base.gradeScale.jeFach, ...(stored.gradeScale?.jeFach as Record<string, number[]>) }
+    }
+  }
+}
+
+export function getSettings(): AppSettings {
+  return mergeSettings(DEFAULT_SETTINGS, readJson('settings.json', {}))
+}
+
+export function setSettings(patch: DeepPartial<AppSettings>): AppSettings {
+  const next = mergeSettings(getSettings(), patch as DeepPartial<AppSettings> & { ai?: Record<string, unknown> })
+  writeJson('settings.json', next)
+  return next
+}
+
+// ---------- Geheimnisse (verschlüsselt über Windows DPAPI) ----------
+
+type SecretStore = Partial<Record<SecretName, string>>
+
+export function setSecret(name: SecretName, value: string): void {
+  const store = readJson<SecretStore>('secrets.json', {})
+  if (!value) {
+    delete store[name]
+  } else {
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('Verschlüsselung ist auf diesem System nicht verfügbar.')
+    }
+    store[name] = safeStorage.encryptString(value).toString('base64')
+  }
+  writeJson('secrets.json', store)
+}
+
+export function getSecret(name: SecretName): string | undefined {
+  const store = readJson<SecretStore>('secrets.json', {})
+  const enc = store[name]
+  if (!enc) return undefined
+  try {
+    return safeStorage.decryptString(Buffer.from(enc, 'base64'))
+  } catch {
+    return undefined
+  }
+}
+
+// ---------- Vokabel-Bibliothek ----------
+
+export function listVocabLists(): SavedVocabList[] {
+  return readJson<SavedVocabList[]>('vocab-library.json', [])
+}
+
+export function saveVocabList(list: SavedVocabList): SavedVocabList[] {
+  const lists = listVocabLists().filter((l) => l.id !== list.id)
+  lists.unshift({ ...list, updatedAt: new Date().toISOString() })
+  writeJson('vocab-library.json', lists)
+  return lists
+}
+
+export function deleteVocabList(id: string): SavedVocabList[] {
+  const lists = listVocabLists().filter((l) => l.id !== id)
+  writeJson('vocab-library.json', lists)
+  return lists
+}

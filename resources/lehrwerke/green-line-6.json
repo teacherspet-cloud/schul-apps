@@ -1,0 +1,3570 @@
+{
+ "id": "green-line-6",
+ "name": "Green Line 6",
+ "language": "en",
+ "grade": 10,
+ "publisher": "Klett",
+ "edition": "Niedersachsen",
+ "stateId": "NI",
+ "schoolTypeId": "gymnasium",
+ "units": [
+  {
+   "name": "Across cultures 1",
+   "sections": [
+    {
+     "name": "Wortschatz",
+     "entries": [
+      {
+       "term": "to greet",
+       "translation": "begrüßen, grüßen",
+       "pos": "verb",
+       "example": "The guests were greeted warmly at the door.",
+       "exampleTranslation": "Die Gäste wurden an der Tür herzlich begrüßt."
+      },
+      {
+       "term": "from … onwards",
+       "translation": "von … an",
+       "pos": "phrase",
+       "example": "I'm usually at home from five o'clock onwards.",
+       "exampleTranslation": "Ich bin normalerweise ab fünf Uhr zu Hause."
+      },
+      {
+       "term": "assumption",
+       "translation": "Annahme, Voraussetzung",
+       "pos": "noun",
+       "example": "The assumption that the earth is flat was proven wrong centuries ago.",
+       "exampleTranslation": "Die Annahme, dass die Erde flach ist, wurde schon vor Jahrhunderten widerlegt."
+      },
+      {
+       "term": "parliamentary democracy",
+       "translation": "parlamentarische Demokratie",
+       "pos": "phrase",
+       "example": "In a parliamentary democracy, the parliament, elected by the people, controls the government.",
+       "exampleTranslation": "In einer parlamentarischen Demokratie kontrolliert das vom Volk gewählte Parlament die Regierung."
+      },
+      {
+       "term": "to govern",
+       "translation": "regieren",
+       "pos": "verb",
+       "example": "The newly elected president will govern the country for four years.",
+       "exampleTranslation": "Der neu gewählte Präsident wird das Land vier Jahre lang regieren."
+      },
+      {
+       "term": "nature reserve",
+       "translation": "Naturreservat",
+       "pos": "noun",
+       "example": "People might be surprised that a small and very urban city-state like Singapore has four nature reserves.",
+       "exampleTranslation": "Viele Menschen wären überrascht, dass ein kleiner und sehr städtischer Stadtstaat wie Singapur vier Naturreservate besitzt."
+      },
+      {
+       "term": "trade route",
+       "translation": "Handelsroute",
+       "pos": "noun",
+       "example": "The trade route between the Atlantic and Pacific was much longer before the Panama Canal was built.",
+       "exampleTranslation": "Die Handelsroute zwischen Atlantik und Pazifik war viel länger, bevor der Panamakanal gebaut wurde."
+      },
+      {
+       "term": "to establish",
+       "translation": "einrichten, gründen, herstellen",
+       "pos": "verb",
+       "example": "Singapore was just one of many colonies that the British established around the world.",
+       "exampleTranslation": "Singapur war nur eine von vielen Kolonien, die die Briten weltweit gründeten."
+      },
+      {
+       "term": "to occupy",
+       "translation": "besetzen, belegen",
+       "pos": "verb",
+       "example": "Soon the army occupied most of the country.",
+       "exampleTranslation": "Schon bald besetzte die Armee den größten Teil des Landes."
+      },
+      {
+       "term": "surrender",
+       "translation": "Kapitulation",
+       "pos": "noun",
+       "example": "After Nazi Germany's surrender in 1945, the Allied Powers occupied the country in different zones.",
+       "exampleTranslation": "Nach der Kapitulation Nazi-Deutschlands im Jahr 1945 besetzten die Alliierten das Land in verschiedenen Zonen."
+      },
+      {
+       "term": "self-government [no pl]",
+       "translation": "Selbstverwaltung",
+       "pos": "noun",
+       "example": "The majority of the region's population supports self-government.",
+       "exampleTranslation": "Die Mehrheit der Bevölkerung der Region unterstützt die Selbstverwaltung."
+      },
+      {
+       "term": "merger",
+       "translation": "Fusion",
+       "pos": "noun",
+       "example": "The merger of the two companies would create the biggest investment firm in the region.",
+       "exampleTranslation": "Die Fusion der beiden Unternehmen würde die größte Investmentfirma der Region schaffen."
+      },
+      {
+       "term": "federation",
+       "translation": "Bundesstaat, Föderation",
+       "pos": "noun",
+       "example": "The USA is a federation of 50 states.",
+       "exampleTranslation": "Die USA sind ein Bundesstaat aus 50 Einzelstaaten."
+      },
+      {
+       "term": "unrest [no pl]",
+       "translation": "Unruhen",
+       "pos": "noun",
+       "example": "The president is returning from an international trip because of growing unrest in her country.",
+       "exampleTranslation": "Die Präsidentin kehrt wegen wachsender Unruhen in ihrem Land von einer Auslandsreise zurück."
+      },
+      {
+       "term": "tension",
+       "translation": "Spannung, Anspannung",
+       "pos": "noun",
+       "example": "You could feel the tension in the room as we waited for our exam results.",
+       "exampleTranslation": "Man konnte die Spannung im Raum spüren, während wir auf unsere Prüfungsergebnisse warteten."
+      },
+      {
+       "term": "expulsion",
+       "translation": "Ausschluss, Ausweisung",
+       "pos": "noun",
+       "example": "His violent behaviour led to his expulsion from school.",
+       "exampleTranslation": "Sein gewalttätiges Verhalten führte zu seinem Schulverweis."
+      },
+      {
+       "term": "creole",
+       "translation": "Kreolsprache, kreolisch",
+       "pos": "noun",
+       "example": "Singlish is an English-based creole.",
+       "exampleTranslation": "Singlish ist eine auf Englisch basierende Kreolsprache."
+      },
+      {
+       "term": "colloquial",
+       "translation": "umgangssprachlich",
+       "pos": "adjective",
+       "example": "You shouldn't use colloquial expressions in formal situations.",
+       "exampleTranslation": "Du solltest in formellen Situationen keine umgangssprachlichen Ausdrücke verwenden."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Unit 1",
+   "sections": [
+    {
+     "name": "Introduction",
+     "entries": [
+      {
+       "term": "prohibition",
+       "translation": "Verbot",
+       "pos": "noun",
+       "example": "I'd take the prohibition signs in Singapore very seriously if I were you: There are cameras everywhere, and they will find you if you do something that isn't allowed.",
+       "exampleTranslation": "Ich würde die Verbotsschilder in Singapur sehr ernst nehmen: Überall gibt es Kameras, und sie werden dich finden, wenn du etwas Unerlaubtes tust."
+      },
+      {
+       "term": "well-spiced",
+       "translation": "gut gewürzt",
+       "pos": "adjective",
+       "example": "Asian food is mostly well-spiced.",
+       "exampleTranslation": "Asiatisches Essen ist meistens gut gewürzt."
+      },
+      {
+       "term": "per capita",
+       "translation": "pro Kopf, Pro-Kopf-, pro Person",
+       "pos": "phrase",
+       "example": "The per capita consumption of coffee grew by 13% last year.",
+       "exampleTranslation": "Der Pro-Kopf-Kaffeekonsum stieg letztes Jahr um 13 %."
+      },
+      {
+       "term": "to fine sb for sth",
+       "translation": "jmdn. wegen etw. zu einer Geldstrafe verurteilen, gegen jmdn. wegen etw. ein Bußgeld verhängen",
+       "pos": "verb",
+       "example": "My older brother is regularly fined for driving too fast.",
+       "exampleTranslation": "Mein älterer Bruder wird regelmäßig mit einer Geldstrafe belegt, weil er zu schnell fährt."
+      },
+      {
+       "term": "chewing gum",
+       "translation": "Kaugummi",
+       "pos": "noun",
+       "example": "Chewing gum isn't allowed at our school.",
+       "exampleTranslation": "Kaugummi ist an unserer Schule nicht erlaubt."
+      },
+      {
+       "term": "death penalty",
+       "translation": "Todesstrafe",
+       "pos": "noun",
+       "example": "The EU forbids capital punishment,otherwise known as the death penalty, in all member states.",
+       "exampleTranslation": "Die EU verbietet die Todesstrafe (auch als Kapitalstrafe bezeichnet) in allen Mitgliedstaaten."
+      },
+      {
+       "term": "drug trafficking",
+       "translation": "Drogenhandel, Drogenschmuggel",
+       "pos": "noun",
+       "example": "Drug trafficking is never a good idea, but in Singapore you'll pay with your life for it.",
+       "exampleTranslation": "Drogenhandel ist nie eine gute Idee, aber in Singapur bezahlt man dafür mit dem Leben."
+      },
+      {
+       "term": "to screen",
+       "translation": "überprüfen, untersuchen",
+       "pos": "verb",
+       "example": "The film was screened by the government before it was shown on TV.",
+       "exampleTranslation": "Der Film wurde von der Regierung geprüft, bevor er im Fernsehen gezeigt wurde."
+      }
+     ]
+    },
+    {
+     "name": "Station 1",
+     "entries": [
+      {
+       "term": "work-life balance",
+       "translation": "Vereinbarkeit von Familie, Freizeit und Beruf",
+       "pos": "phrase",
+       "example": "For many people a good work-life balance is an important criterion when it comes to choosing a new job.",
+       "exampleTranslation": "Für viele Menschen ist eine gute Work-Life-Balance ein wichtiges Kriterium bei der Wahl eines neuen Jobs."
+      },
+      {
+       "term": "to perform",
+       "translation": "funktionieren, leisten",
+       "pos": "verb",
+       "example": "The equipment performed well during the tests.",
+       "exampleTranslation": "Die Ausrüstung funktionierte während der Tests gut."
+      },
+      {
+       "term": "ambitious",
+       "translation": "ehrgeizig",
+       "pos": "adjective",
+       "example": "Emma always wants to be the best. She's very ambitious.",
+       "exampleTranslation": "Emma will immer die Beste sein. Sie ist sehr ehrgeizig."
+      },
+      {
+       "term": "innovative",
+       "translation": "innovativ, kreativ",
+       "pos": "adjective",
+       "example": "This smartphone features innovative technology.",
+       "exampleTranslation": "Dieses Smartphone verfügt über innovative Technologie."
+      },
+      {
+       "term": "loose",
+       "translation": "lose, locker, frei",
+       "pos": "adjective",
+       "example": "This shirt is a little too big, but I like it when clothes are loose.",
+       "exampleTranslation": "Dieses Hemd ist etwas zu groß, aber ich mag es, wenn Kleidung locker sitzt."
+      },
+      {
+       "term": "to take a risk",
+       "translation": "ein Risiko eingehen",
+       "pos": "verb",
+       "example": "If you take a risk, you do something that could be dangerous.",
+       "exampleTranslation": "Wenn du ein Risiko eingehst, tust du etwas, das gefährlich sein könnte."
+      },
+      {
+       "term": "restriction",
+       "translation": "Einschränkung, Beschränkung",
+       "pos": "noun",
+       "example": "There should be tougher age restrictions on video games.",
+       "exampleTranslation": "Es sollte strengere Altersbeschränkungen für Videospiele geben."
+      },
+      {
+       "term": "reputation [no pl]",
+       "translation": "Ruf",
+       "pos": "noun",
+       "example": "If you drink too much alcohol in public, you might ruin your reputation.",
+       "exampleTranslation": "Wenn du in der Öffentlichkeit zu viel Alkohol trinkst, könntest du deinen Ruf ruinieren."
+      },
+      {
+       "term": "professional",
+       "translation": "Berufs-",
+       "pos": "noun",
+       "example": "A professional actor does acting as a job.",
+       "exampleTranslation": "Ein professioneller Schauspieler übt die Schauspielerei beruflich aus."
+      },
+      {
+       "term": "salary",
+       "translation": "Gehalt",
+       "pos": "noun",
+       "example": "My salary is paid at the end of each month.",
+       "exampleTranslation": "Mein Gehalt wird am Ende jedes Monats ausgezahlt."
+      },
+      {
+       "term": "housing",
+       "translation": "Wohnbau, Wohnungen, Unterbringung",
+       "pos": "noun",
+       "example": "If 85% of my salary goes to housing, how am I supposed to afford anything else?",
+       "exampleTranslation": "Wenn 85 % meines Gehalts für Wohnen draufgehen, wie soll ich mir dann noch etwas anderes leisten können?"
+      },
+      {
+       "term": "migrant worker",
+       "translation": "Arbeitsmigrant/-in, Wanderarbeiter/-in, Gastarbeiter/-in",
+       "pos": "noun",
+       "example": "A migrant worker is a person who moves from one place to another in order to find work.",
+       "exampleTranslation": "Ein Arbeitsmigrant ist eine Person, die von einem Ort zum anderen zieht, um Arbeit zu finden."
+      },
+      {
+       "term": "permit",
+       "translation": "Erlaubnis, Genehmigung",
+       "pos": "noun",
+       "example": "If you want to hunt or fish, you need to get a special permit.",
+       "exampleTranslation": "Wenn du jagen oder angeln möchtest, brauchst du eine besondere Genehmigung."
+      },
+      {
+       "term": "domestic worker",
+       "translation": "Hausangestellte/Hausangestellter",
+       "pos": "noun",
+       "example": "Our neighbours always had domestic workers to help with the children and the household chores.",
+       "exampleTranslation": "Unsere Nachbarn hatten immer Hausangestellte, die bei den Kindern und im Haushalt halfen."
+      },
+      {
+       "term": "employer",
+       "translation": "Arbeitgeber/-in",
+       "pos": "noun",
+       "example": "This company is one of the region's biggest employers.",
+       "exampleTranslation": "Dieses Unternehmen ist einer der größten Arbeitgeber der Region."
+      },
+      {
+       "term": "debt",
+       "translation": "Schuld, Verschuldung, Verpflichtung",
+       "pos": "noun",
+       "example": "That university is too expensive: I'd have to take out huge loans for four years and then I'd have a huge debt to pay back.",
+       "exampleTranslation": "Diese Universität ist zu teuer: Ich müsste für vier Jahre hohe Kredite aufnehmen und hätte danach einen riesigen Schuldenberg zurückzuzahlen."
+      },
+      {
+       "term": "fee",
+       "translation": "Gebühr, Abgabe",
+       "pos": "noun",
+       "example": "The students are planning to protest against rising tuition fees.",
+       "exampleTranslation": "Die Studierenden planen, gegen steigende Studiengebühren zu protestieren."
+      },
+      {
+       "term": "employment",
+       "translation": "Beschäftigung, Anstellung",
+       "pos": "noun",
+       "example": "My place of employment is only a mile from my house.",
+       "exampleTranslation": "Mein Arbeitsplatz ist nur etwa anderthalb Kilometer von meinem Haus entfernt."
+      },
+      {
+       "term": "employee",
+       "translation": "Angestellte/Angestellter, Mitarbeiter/-in, Arbeitnehmer/-in",
+       "pos": "noun",
+       "example": "Our company is looking for new employees.",
+       "exampleTranslation": "Unser Unternehmen sucht neue Mitarbeiter."
+      },
+      {
+       "term": "workplace",
+       "translation": "Arbeitsplatz, Arbeitsstätte",
+       "pos": "noun",
+       "example": "Our boss doesn't tolerate private calls at the workplace.",
+       "exampleTranslation": "Unser Chef duldet keine privaten Anrufe am Arbeitsplatz."
+      },
+      {
+       "term": "to charge (for)",
+       "translation": "Geld/Gebühren verlangen, berechnen",
+       "pos": "verb",
+       "example": "The new restaurant charges fair prices for its great food.",
+       "exampleTranslation": "Das neue Restaurant verlangt faire Preise für sein hervorragendes Essen."
+      },
+      {
+       "term": "process",
+       "translation": "Prozess, Verlauf, Ablauf",
+       "pos": "noun",
+       "example": "Becoming an excellent musician doesn't just happen overnight, it's a process that can take years.",
+       "exampleTranslation": "Ein hervorragender Musiker wird man nicht über Nacht; es ist ein Prozess, der Jahre dauern kann."
+      },
+      {
+       "term": "to add up",
+       "translation": "sich summieren, addieren",
+       "pos": "verb",
+       "example": "The debts were adding up to a large amount.",
+       "exampleTranslation": "Die Schulden summierten sich zu einer großen Summe."
+      },
+      {
+       "term": "productive",
+       "translation": "produktiv, leistungsfähig",
+       "pos": "adjective",
+       "example": "We had a very productive meeting – I felt we solved lots of problems.",
+       "exampleTranslation": "Wir hatten ein sehr produktives Meeting – ich hatte das Gefühl, dass wir viele Probleme gelöst haben."
+      },
+      {
+       "term": "apparently",
+       "translation": "anscheinend",
+       "pos": "adverb",
+       "example": "The accident was apparently caused by a 60-year-old man.",
+       "exampleTranslation": "Der Unfall wurde offenbar von einem 60-jährigen Mann verursacht."
+      },
+      {
+       "term": "to get married",
+       "translation": "heiraten",
+       "pos": "verb",
+       "example": "My grandparents got married 55 years ago!",
+       "exampleTranslation": "Meine Großeltern haben vor 55 Jahren geheiratet!"
+      },
+      {
+       "term": "to compromise",
+       "translation": "einen Kompromiss eingehen",
+       "pos": "verb",
+       "example": "It isn't always easy to compromise.",
+       "exampleTranslation": "Es ist nicht immer leicht, Kompromisse einzugehen."
+      }
+     ]
+    },
+    {
+     "name": "Station 2",
+     "entries": [
+      {
+       "term": "contribution",
+       "translation": "Beitrag, Beteiligung",
+       "pos": "noun",
+       "example": "What's your contribution to the party? Food, music?",
+       "exampleTranslation": "Was ist dein Beitrag zur Party? Essen, Musik?"
+      },
+      {
+       "term": "to launch",
+       "translation": "starten, einführen, in Gang setzen",
+       "pos": "verb",
+       "example": "The company recently launched a new advertising campaign.",
+       "exampleTranslation": "Das Unternehmen hat kürzlich eine neue Werbekampagne gestartet."
+      },
+      {
+       "term": "to honour",
+       "translation": "ehren",
+       "pos": "verb",
+       "example": "The president was honoured with the Nobel Peace Prize.",
+       "exampleTranslation": "Der Präsident wurde mit dem Friedensnobelpreis geehrt."
+      },
+      {
+       "term": "to enforce",
+       "translation": "durchsetzen",
+       "pos": "verb",
+       "example": "The police's job is to enforce the law.",
+       "exampleTranslation": "Die Aufgabe der Polizei ist es, das Gesetz durchzusetzen."
+      },
+      {
+       "term": "integration",
+       "translation": "Integration, Eingliederung, Einbindung",
+       "pos": "noun",
+       "example": "What can immigrants and non-immigrants in this country do to help with the integration process so that everyone feels like they belong?",
+       "exampleTranslation": "Was können Einwanderer und Nicht-Einwanderer in diesem Land tun, um den Integrationsprozess zu unterstützen, damit sich jeder zugehörig fühlt?"
+      },
+      {
+       "term": "to construct",
+       "translation": "bauen, konstruieren, errichten",
+       "pos": "verb",
+       "example": "The building was constructed at a cost of £2,000,000.",
+       "exampleTranslation": "Das Gebäude wurde zu Kosten von 2.000.000 £ errichtet."
+      },
+      {
+       "term": "tenant",
+       "translation": "Mieter/-in, Pächter/-in",
+       "pos": "noun",
+       "example": "My parents have never owned a house; they have always been tenants.",
+       "exampleTranslation": "Meine Eltern haben nie ein Haus besessen; sie waren immer Mieter."
+      },
+      {
+       "term": "quota",
+       "translation": "Quote",
+       "pos": "noun",
+       "example": "The USA, Australia and Switzerland are just three examples of countries that use quotas for yearly numbers of legal immigrants.",
+       "exampleTranslation": "Die USA, Australien und die Schweiz sind nur drei Beispiele für Länder, die Quoten für die jährliche Zahl legaler Einwanderer verwenden."
+      },
+      {
+       "term": "to apply (to)",
+       "translation": "gelten (für), zutreffen (auf)",
+       "pos": "verb",
+       "example": "That part of the form is for UK citizens, so it doesn't apply to you as an Italian.",
+       "exampleTranslation": "Dieser Teil des Formulars ist für britische Staatsbürger, daher gilt er für dich als Italiener nicht."
+      },
+      {
+       "term": "to operate",
+       "translation": "betreiben, leiten",
+       "pos": "verb",
+       "example": "The company operates five shops in town.",
+       "exampleTranslation": "Das Unternehmen betreibt fünf Geschäfte in der Stadt."
+      },
+      {
+       "term": "to exercise",
+       "translation": "ausüben",
+       "pos": "verb",
+       "example": "Voting is one way to exercise your democratic rights.",
+       "exampleTranslation": "Wählen ist eine Möglichkeit, seine demokratischen Rechte auszuüben."
+      },
+      {
+       "term": "to integrate",
+       "translation": "(sich) integrieren, (sich) einfügen, einbinden",
+       "pos": "verb",
+       "example": "Children are often very good at integrating into a new culture.",
+       "exampleTranslation": "Kinder sind oft sehr gut darin, sich in eine neue Kultur zu integrieren."
+      },
+      {
+       "term": "harmony",
+       "translation": "Harmonie",
+       "pos": "noun",
+       "example": "Imagine a society in which everyone lived together in perfect harmony. – Don't they call that a 'utopia'?",
+       "exampleTranslation": "Stell dir eine Gesellschaft vor, in der alle in vollkommener Harmonie zusammenleben. – Nennt man das nicht eine Utopie?"
+      },
+      {
+       "term": "to establish",
+       "translation": "einrichten, gründen, herstellen",
+       "pos": "verb",
+       "example": "The government established a new camp for the refugees.",
+       "exampleTranslation": "Die Regierung errichtete ein neues Lager für die Flüchtlinge."
+      }
+     ]
+    },
+    {
+     "name": "Station 3",
+     "entries": [
+      {
+       "term": "establishment",
+       "translation": "Einrichtung",
+       "pos": "noun",
+       "example": "Its establishment in the year 1088 makes the University of Bologna Europe's oldest university.",
+       "exampleTranslation": "Seine Gründung im Jahr 1088 macht die Universität Bologna zur ältesten Universität Europas."
+      },
+      {
+       "term": "to result from sth",
+       "translation": "sich aus etw. ergeben, aus etw. resultieren",
+       "pos": "verb",
+       "example": "His difficulty in walking results from a disease he had as a child.",
+       "exampleTranslation": "Seine Gehschwierigkeiten resultieren aus einer Krankheit, die er als Kind hatte."
+      },
+      {
+       "term": "to bring about",
+       "translation": "herbeiführen, hervorbringen",
+       "pos": "verb",
+       "example": "The new government wants to bring about many changes.",
+       "exampleTranslation": "Die neue Regierung möchte viele Veränderungen herbeiführen."
+      },
+      {
+       "term": "to give rise to",
+       "translation": "aufkommen lassen, verursachen",
+       "pos": "verb",
+       "example": "The government's new policy has given rise to a wave of protests.",
+       "exampleTranslation": "Die neue Politik der Regierung hat eine Welle von Protesten ausgelöst."
+      },
+      {
+       "term": "to increase",
+       "translation": "steigen, erhöhen, zunehmen, wachsen",
+       "pos": "verb",
+       "example": "Global average temperatures have increased significantly in recent decades.",
+       "exampleTranslation": "Die globalen Durchschnittstemperaturen sind in den letzten Jahrzehnten deutlich gestiegen."
+      },
+      {
+       "term": "to accelerate",
+       "translation": "beschleunigen, schneller werden",
+       "pos": "verb",
+       "example": "Scientists agree that the rise in sea levels will continue to accelerate.",
+       "exampleTranslation": "Wissenschaftler sind sich einig, dass der Anstieg des Meeresspiegels sich weiter beschleunigen wird."
+      },
+      {
+       "term": "significant",
+       "translation": "signifikant, bedeutend, wesentlich",
+       "pos": "adjective",
+       "example": "Climate change has led to a significant rise in temperatures.",
+       "exampleTranslation": "Der Klimawandel hat zu einem erheblichen Temperaturanstieg geführt."
+      },
+      {
+       "term": "in terms of",
+       "translation": "hinsichtlich, bezüglich",
+       "pos": "phrase",
+       "example": "Our country isn’t as great as it used to be, in terms of both political influence and economic power.",
+       "exampleTranslation": "Unser Land ist hinsichtlich sowohl des politischen Einflusses als auch der wirtschaftlichen Stärke nicht mehr so großartig wie früher."
+      },
+      {
+       "term": "to depart",
+       "translation": "abfahren, abfliegen",
+       "pos": "verb",
+       "example": "The plane departs at 6:30 a.m.",
+       "exampleTranslation": "Das Flugzeug startet um 6:30 Uhr morgens."
+      },
+      {
+       "term": "to estimate",
+       "translation": "schätzen",
+       "pos": "verb",
+       "example": "Some scientists estimate that climate change will cost about $38 trillion a year by 2049.",
+       "exampleTranslation": "Einige Wissenschaftler schätzen, dass der Klimawandel bis 2049 etwa 38 Billionen Dollar pro Jahr kosten wird."
+      },
+      {
+       "term": "capacity",
+       "translation": "Kapazität",
+       "pos": "noun",
+       "example": "The stadium has a seating capacity of 50,000.",
+       "exampleTranslation": "Das Stadion hat eine Kapazität von 50.000 Sitzplätzen."
+      },
+      {
+       "term": "to come second",
+       "translation": "an zweiter Stelle liegen",
+       "pos": "verb",
+       "example": "He always has to win. Coming second is the worst thing in the world for him.",
+       "exampleTranslation": "Er muss immer gewinnen. Zweiter zu werden ist für ihn das Schlimmste auf der Welt."
+      },
+      {
+       "term": "to invest",
+       "translation": "investieren",
+       "pos": "verb",
+       "example": "The new government has promised to invest more money in education.",
+       "exampleTranslation": "Die neue Regierung hat versprochen, mehr Geld in die Bildung zu investieren."
+      },
+      {
+       "term": "traveller",
+       "translation": "Reisende/Reisender",
+       "pos": "noun",
+       "example": "This hotel is for travellers who stay only one or two nights, not for tourists on a 2-week holiday.",
+       "exampleTranslation": "Dieses Hotel ist für Reisende gedacht, die nur ein oder zwei Nächte bleiben, nicht für Touristen in einem zweiwöchigen Urlaub."
+      },
+      {
+       "term": "rainforest",
+       "translation": "Regenwald",
+       "pos": "noun",
+       "example": "The world's tropical rainforests are important for our climate.",
+       "exampleTranslation": "Die tropischen Regenwälder der Welt sind wichtig für unser Klima."
+      },
+      {
+       "term": "destination",
+       "translation": "Ziel, Reiseziel",
+       "pos": "noun",
+       "example": "Where are you travelling to? – First to Singapore, but our final destination is actually Sydney.",
+       "exampleTranslation": "Wohin reist du? – Zuerst nach Singapur, aber unser endgültiges Ziel ist eigentlich Sydney."
+      },
+      {
+       "term": "facilities [pl]",
+       "translation": "Einrichtung, Anlage",
+       "pos": "noun",
+       "example": "Most hotels have private bathroom facilities in each room, but most hostels don't.",
+       "exampleTranslation": "Die meisten Hotels verfügen in jedem Zimmer über ein eigenes Bad, die meisten Hostels jedoch nicht."
+      },
+      {
+       "term": "infrastructure",
+       "translation": "Infrastruktur",
+       "pos": "noun",
+       "example": "More money is needed to improve the city's infrastructure.",
+       "exampleTranslation": "Es wird mehr Geld benötigt, um die Infrastruktur der Stadt zu verbessern."
+      },
+      {
+       "term": "competitive",
+       "translation": "konkurrenzfähig, wettbewerbsfähig",
+       "pos": "adjective",
+       "example": "The production costs in this country can be too high; other countries with lower costs are much more competitive.",
+       "exampleTranslation": "Die Produktionskosten in diesem Land können zu hoch sein; andere Länder mit niedrigeren Kosten sind viel wettbewerbsfähiger."
+      },
+      {
+       "term": "drawback",
+       "translation": "Nachteil",
+       "pos": "noun",
+       "example": "It's a fantastic camera – the only drawback is the high price.",
+       "exampleTranslation": "Es ist eine fantastische Kamera – der einzige Nachteil ist der hohe Preis."
+      },
+      {
+       "term": "to take off",
+       "translation": "starten, abheben",
+       "pos": "verb",
+       "example": "The next plane to London takes off at 3 p.m.",
+       "exampleTranslation": "Das nächste Flugzeug nach London hebt um 15 Uhr ab."
+      },
+      {
+       "term": "to stop over",
+       "translation": "einen Zwischenstopp einlegen, Zwischenstation machen",
+       "pos": "verb",
+       "example": "On our trip from London to New Zealand we’re planning to stop over in Singapore.",
+       "exampleTranslation": "Auf unserer Reise von London nach Neuseeland planen wir einen Zwischenstopp in Singapur."
+      }
+     ]
+    },
+    {
+     "name": "Story",
+     "entries": [
+      {
+       "term": "purse",
+       "translation": "Geldbeutel [brit.], Handtasche [amerik.]",
+       "pos": "noun",
+       "example": "I can't buy anything; I forgot my purse.",
+       "exampleTranslation": "Ich kann nichts kaufen; ich habe meinen Geldbeutel vergessen."
+      },
+      {
+       "term": "earring",
+       "translation": "Ohrring",
+       "pos": "noun",
+       "example": "I've found one earring – do you know where the other one is?",
+       "exampleTranslation": "Ich habe einen Ohrring gefunden – weißt du, wo der andere ist?"
+      },
+      {
+       "term": "laundry",
+       "translation": "Wäsche, Wäscherei",
+       "pos": "noun",
+       "example": "I've got to do my laundry.",
+       "exampleTranslation": "Ich muss meine Wäsche machen."
+      },
+      {
+       "term": "dishes [pl]",
+       "translation": "Geschirr",
+       "pos": "noun",
+       "example": "Where are your dishes? – They're in the cupboard there on the left.",
+       "exampleTranslation": "Wo ist euer Geschirr? – Es steht dort links im Schrank."
+      },
+      {
+       "term": "to enquire (about)",
+       "translation": "sich erkundigen (nach)",
+       "pos": "verb",
+       "example": "Good afternoon, I'm calling to enquire about any special offers you can give to school groups.",
+       "exampleTranslation": "Guten Tag, ich rufe an, um mich nach Sonderangeboten für Schulgruppen zu erkundigen."
+      },
+      {
+       "term": "client",
+       "translation": "Kunde/Kundin",
+       "pos": "noun",
+       "example": "We must treat our clients nicely because, after all, they keep us in business.",
+       "exampleTranslation": "Wir müssen unsere Kunden gut behandeln, denn schließlich halten sie uns im Geschäft."
+      },
+      {
+       "term": "immediately",
+       "translation": "sofort, gleich",
+       "pos": "adverb",
+       "example": "I can't wait any longer, I want service immediately! – Sir, please calm down, thank you.",
+       "exampleTranslation": "Ich kann nicht länger warten, ich möchte sofort bedient werden! – Sir, bitte beruhigen Sie sich, danke."
+      },
+      {
+       "term": "blank",
+       "translation": "leer, ausdruckslos",
+       "pos": "adjective",
+       "example": "The students all got a blank sheet of paper to note down their answers.",
+       "exampleTranslation": "Alle Schüler bekamen ein leeres Blatt Papier, um ihre Antworten aufzuschreiben."
+      },
+      {
+       "term": "to grit one's teeth",
+       "translation": "die Zähne zusammenbeißen",
+       "pos": "verb",
+       "example": "Sometimes I hate homework. But then I just grit my teeth and get on with it.",
+       "exampleTranslation": "Manchmal hasse ich Hausaufgaben. Aber dann beiße ich die Zähne zusammen und mache einfach weiter."
+      },
+      {
+       "term": "to return",
+       "translation": "zurückgeben",
+       "pos": "verb",
+       "example": "He returned two books he had borrowed from me three years ago.",
+       "exampleTranslation": "Er gab zwei Bücher zurück, die er vor drei Jahren von mir ausgeliehen hatte."
+      },
+      {
+       "term": "soap [no pl]",
+       "translation": "Seife",
+       "pos": "noun",
+       "example": "I'd like to wash my hands, but there's no soap in the bathroom.",
+       "exampleTranslation": "Ich würde mir gern die Hände waschen, aber im Badezimmer gibt es keine Seife."
+      },
+      {
+       "term": "to claim",
+       "translation": "behaupten",
+       "pos": "verb",
+       "example": "The driver claims that he was not responsible for the accident.",
+       "exampleTranslation": "Der Fahrer behauptet, dass er nicht für den Unfall verantwortlich war."
+      },
+      {
+       "term": "to insist (on)",
+       "translation": "insistieren, bestehen (auf)",
+       "pos": "verb",
+       "example": "My grandma is 85 now, but she insists on doing all her own housework.",
+       "exampleTranslation": "Meine Oma ist jetzt 85, aber sie besteht darauf, ihren gesamten Haushalt selbst zu erledigen."
+      },
+      {
+       "term": "attempt",
+       "translation": "Versuch",
+       "pos": "noun",
+       "example": "The pilot made several attempts to regain control of the plane.",
+       "exampleTranslation": "Der Pilot unternahm mehrere Versuche, die Kontrolle über das Flugzeug zurückzugewinnen."
+      },
+      {
+       "term": "to charge with",
+       "translation": "anklagen für, beschuldigen für",
+       "pos": "verb",
+       "example": "The man was charged with murder.",
+       "exampleTranslation": "Der Mann wurde wegen Mordes angeklagt."
+      },
+      {
+       "term": "embassy",
+       "translation": "Botschaft",
+       "pos": "noun",
+       "example": "Protesters staged an anti-war demonstration in front of the embassy.",
+       "exampleTranslation": "Demonstranten veranstalteten vor der Botschaft eine Antikriegsdemonstration."
+      },
+      {
+       "term": "theory",
+       "translation": "Theorie",
+       "pos": "noun",
+       "example": "His theory on the topic is very convincing.",
+       "exampleTranslation": "Seine Theorie zu diesem Thema ist sehr überzeugend."
+      },
+      {
+       "term": "to abuse",
+       "translation": "missbrauchen, misshandeln, beschimpfen",
+       "pos": "verb",
+       "example": "Many who move abroad as domestic workers are abused badly by their employers, e.g. by having their passports taken away or by physical violence as well.",
+       "exampleTranslation": "Viele Menschen, die als Hausangestellte ins Ausland gehen, werden von ihren Arbeitgebern schwer misshandelt, etwa indem ihnen die Pässe weggenommen werden oder durch körperliche Gewalt."
+      },
+      {
+       "term": "to starve",
+       "translation": "hungern, verhungern (lassen)",
+       "pos": "verb",
+       "example": "With the population increasing so fast, I'm worried that there'll be less and less food and more and more people will starve.",
+       "exampleTranslation": "Da die Bevölkerung so schnell wächst, mache ich mir Sorgen, dass es immer weniger Nahrung geben wird und immer mehr Menschen hungern werden."
+      },
+      {
+       "term": "to convict",
+       "translation": "verurteilen",
+       "pos": "verb",
+       "example": "She wasn't convicted of murder because there wasn't enough evidence.",
+       "exampleTranslation": "Sie wurde nicht wegen Mordes verurteilt, weil es nicht genügend Beweise gab."
+      },
+      {
+       "term": "horrible",
+       "translation": "schrecklich, furchtbar",
+       "pos": "adjective",
+       "example": "People often think of California or Australia when they hear about wildfires, but Canada has horrible ones each year too.",
+       "exampleTranslation": "Bei Waldbränden denken viele Menschen an Kalifornien oder Australien, aber auch Kanada hat jedes Jahr schreckliche Brände."
+      },
+      {
+       "term": "to get away with",
+       "translation": "davonkommen mit",
+       "pos": "verb",
+       "example": "It's time they stop his bad behaviour. He's been getting away with it for too long.",
+       "exampleTranslation": "Es wird Zeit, dass sie seinem schlechten Verhalten Einhalt gebieten. Er kommt schon viel zu lange damit davon."
+      },
+      {
+       "term": "trial",
+       "translation": "Gerichtsverfahren, Gerichtsverhandlung",
+       "pos": "noun",
+       "example": "The lawyers are going to present new evidence at the trial.",
+       "exampleTranslation": "Die Anwälte werden im Gerichtsverfahren neue Beweise vorlegen."
+      },
+      {
+       "term": "to sentence",
+       "translation": "verurteilen",
+       "pos": "verb",
+       "example": "The murderer showed no emotion when she was sentenced to life in prison.",
+       "exampleTranslation": "Die Mörderin zeigte keine Emotionen, als sie zu lebenslanger Haft verurteilt wurde."
+      },
+      {
+       "term": "urgent",
+       "translation": "dringend",
+       "pos": "adjective",
+       "example": "What is so urgent that you had to call me in the middle of the night?!",
+       "exampleTranslation": "Was war so dringend, dass du mich mitten in der Nacht anrufen musstest?!"
+      },
+      {
+       "term": "to be headed (to)",
+       "translation": "zusteuern (auf), gehen (in Richtung)",
+       "pos": "verb",
+       "example": "Where are you headed?",
+       "exampleTranslation": "Wohin bist du unterwegs?"
+      },
+      {
+       "term": "to investigate",
+       "translation": "ermitteln, untersuchen, Nachforschungen anstellen, recherchieren",
+       "pos": "verb",
+       "example": "Police are investigating the cause of the accident.",
+       "exampleTranslation": "Die Polizei untersucht die Ursache des Unfalls."
+      },
+      {
+       "term": "to get (sb) involved (in)",
+       "translation": "sich beteiligen (an), sich einlassen (auf), hineingezogen werden (in)",
+       "pos": "verb",
+       "example": "I don't want to get involved in your argument.",
+       "exampleTranslation": "Ich möchte mich nicht in euren Streit hineinziehen lassen."
+      },
+      {
+       "term": "innocent",
+       "translation": "unschuldig",
+       "pos": "adjective",
+       "example": "She has such an innocent face that I find it hard to believe anything bad of her. – Well, never judge a book by its cover, as they say!",
+       "exampleTranslation": "Sie hat so ein unschuldiges Gesicht, dass ich kaum etwas Schlechtes von ihr glauben kann. – Nun ja, man soll ein Buch nicht nach seinem Einband beurteilen!"
+      },
+      {
+       "term": "cry",
+       "translation": "Schrei",
+       "pos": "noun",
+       "example": "They woke up because there were cries of \"Fire!\" from outside.",
+       "exampleTranslation": "Sie wachten auf, weil draußen Rufe wie „Feuer!“ zu hören waren."
+      },
+      {
+       "term": "shortcut",
+       "translation": "Abkürzung",
+       "pos": "noun",
+       "example": "The kids always take a shortcut through the neighbours' garden, but the neighbours hate it.",
+       "exampleTranslation": "Die Kinder nehmen immer eine Abkürzung durch den Garten der Nachbarn, aber die Nachbarn hassen das."
+      },
+      {
+       "term": "detergent",
+       "translation": "Waschmittel, Reinigungsmittel",
+       "pos": "noun",
+       "example": "Here, use this special detergent for your white clothes.",
+       "exampleTranslation": "Hier, benutze dieses spezielle Waschmittel für deine weißen Kleidungsstücke."
+      },
+      {
+       "term": "frying pan",
+       "translation": "Bratpfanne",
+       "pos": "noun",
+       "example": "I don't need to use much oil with my new frying pan.",
+       "exampleTranslation": "Mit meiner neuen Bratpfanne brauche ich nicht viel Öl."
+      },
+      {
+       "term": "accidentally",
+       "translation": "versehentlich, aus Versehen",
+       "pos": "adverb",
+       "example": "We accidentally took the wrong turn, that's why we're late.",
+       "exampleTranslation": "Wir haben versehentlich die falsche Abzweigung genommen, deshalb sind wir zu spät."
+      },
+      {
+       "term": "suspicious",
+       "translation": "verdächtig",
+       "pos": "adjective",
+       "example": "His behaviour will make him look very suspicious.",
+       "exampleTranslation": "Sein Verhalten wird ihn sehr verdächtig erscheinen lassen."
+      },
+      {
+       "term": "to reveal",
+       "translation": "offenbaren, aufdecken",
+       "pos": "verb",
+       "example": "Journalists sometimes can't reveal their sources.",
+       "exampleTranslation": "Journalisten können ihre Quellen manchmal nicht offenlegen."
+      },
+      {
+       "term": "chill",
+       "translation": "Kälte",
+       "pos": "noun",
+       "example": "There is a chill in the air this morning. I need my jacket.",
+       "exampleTranslation": "Heute Morgen liegt eine Kälte in der Luft. Ich brauche meine Jacke."
+      },
+      {
+       "term": "confusion",
+       "translation": "Verwirrung",
+       "pos": "noun",
+       "example": "In all the confusion at the Tube station, he didn't notice that his phone had been stolen till he got home.",
+       "exampleTranslation": "In der ganzen Verwirrung an der U-Bahn-Station bemerkte er erst zu Hause, dass ihm das Handy gestohlen worden war."
+      },
+      {
+       "term": "shift",
+       "translation": "Schicht",
+       "pos": "noun",
+       "example": "She was very tired after working the night shift.",
+       "exampleTranslation": "Nach der Nachtschicht war sie sehr müde."
+      },
+      {
+       "term": "breathless",
+       "translation": "atemlos",
+       "pos": "adjective",
+       "example": "I was breathless after climbing the stairs.",
+       "exampleTranslation": "Nach dem Treppensteigen war ich außer Atem."
+      },
+      {
+       "term": "hug",
+       "translation": "Umarmung",
+       "pos": "noun",
+       "example": "My little boy always gets a kiss and a hug before he goes to bed.",
+       "exampleTranslation": "Mein kleiner Sohn bekommt immer einen Kuss und eine Umarmung, bevor er ins Bett geht."
+      },
+      {
+       "term": "cleaner",
+       "translation": "Raumpfleger/-in, Putzkraft",
+       "pos": "noun",
+       "example": "My aunt has an evening job as an office cleaner.",
+       "exampleTranslation": "Meine Tante arbeitet abends als Reinigungskraft in einem Büro."
+      },
+      {
+       "term": "backpack 🇺🇸",
+       "translation": "Rucksack",
+       "pos": "noun",
+       "example": "My backpack is too heavy. For a hike it shouldn't be more than five or six kilos.",
+       "exampleTranslation": "Mein Rucksack ist zu schwer. Für eine Wanderung sollte er nicht mehr als fünf oder sechs Kilo wiegen."
+      },
+      {
+       "term": "lipstick",
+       "translation": "Lippenstift",
+       "pos": "noun",
+       "example": "That lipstick on your neck isn't mine, so I hope you have a good excuse for how it got there.",
+       "exampleTranslation": "Dieser Lippenstift an deinem Hals ist nicht von mir, also hoffe ich, dass du eine gute Erklärung hast, wie er dorthin gekommen ist."
+      },
+      {
+       "term": "mirror",
+       "translation": "Spiegel",
+       "pos": "noun",
+       "example": "My grandma always says she still feels young, but then the mirror tells her a different story.",
+       "exampleTranslation": "Meine Oma sagt immer, dass sie sich noch jung fühlt, aber der Spiegel erzählt eine andere Geschichte."
+      },
+      {
+       "term": "tissue",
+       "translation": "Taschentuch",
+       "pos": "noun",
+       "example": "She was crying so I gave her a tissue.",
+       "exampleTranslation": "Sie hat geweint, deshalb gab ich ihr ein Taschentuch."
+      },
+      {
+       "term": "cautious",
+       "translation": "behutsam, vorsichtig",
+       "pos": "adjective",
+       "example": "He is a very cautious driver.",
+       "exampleTranslation": "Er ist ein sehr vorsichtiger Fahrer."
+      },
+      {
+       "term": "funeral",
+       "translation": "Beerdigung, Begräbnis",
+       "pos": "noun",
+       "example": "There were at least 100 people at my grandpa's funeral.",
+       "exampleTranslation": "Bei der Beerdigung meines Opas waren mindestens 100 Menschen."
+      },
+      {
+       "term": "to comfort",
+       "translation": "trösten, ermutigen",
+       "pos": "verb",
+       "example": "My mum comforted my crying brother.",
+       "exampleTranslation": "Meine Mutter tröstete meinen weinenden Bruder."
+      },
+      {
+       "term": "spine",
+       "translation": "Wirbelsäule",
+       "pos": "noun",
+       "example": "My best friend injured her spine in a riding accident.",
+       "exampleTranslation": "Meine beste Freundin verletzte sich bei einem Reitunfall an der Wirbelsäule."
+      }
+     ]
+    },
+    {
+     "name": "Unit task",
+     "entries": [
+      {
+       "term": "counsellor",
+       "translation": "Betreuer/-in, Berater/-in",
+       "pos": "noun",
+       "example": "The college now has a counsellor to help students with both personal and school problems.",
+       "exampleTranslation": "Die Hochschule hat nun einen Berater, der Studierenden bei persönlichen und schulischen Problemen hilft."
+      },
+      {
+       "term": "counselling",
+       "translation": "Betreuung, Beratung",
+       "pos": "noun",
+       "example": "Students can use the counselling service to discuss any kind of issue that is bothering them.",
+       "exampleTranslation": "Studierende können das Beratungsangebot nutzen, um über jede Art von Problem zu sprechen, das sie belastet."
+      },
+      {
+       "term": "generally",
+       "translation": "im Allgemeinen",
+       "pos": "adverb",
+       "example": "Most people would agree that people are generally friendly in Britain.",
+       "exampleTranslation": "Die meisten Menschen würden zustimmen, dass die Menschen in Großbritannien im Allgemeinen freundlich sind."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Across cultures 2",
+   "sections": [
+    {
+     "name": "Wortschatz",
+     "entries": [
+      {
+       "term": "to take into account",
+       "translation": "anrechnen, berücksichtigen",
+       "pos": "verb",
+       "example": "Tomorrow we'll be visiting churches on our tour, so please take into account the dress code for acceptable clothing.",
+       "exampleTranslation": "Morgen werden wir auf unserer Tour Kirchen besuchen, daher berücksichtigt bitte die Kleiderordnung für angemessene Kleidung."
+      },
+      {
+       "term": "generosity",
+       "translation": "Großzügigkeit",
+       "pos": "noun",
+       "example": "One of the best ways of showing generosity to others is with your time, e.g. when you do volunteer work.",
+       "exampleTranslation": "Eine der besten Möglichkeiten, anderen Großzügigkeit zu zeigen, ist, ihnen Zeit zu schenken, zum Beispiel durch ehrenamtliche Arbeit."
+      },
+      {
+       "term": "corruption",
+       "translation": "Korruption",
+       "pos": "noun",
+       "example": "Accepting an expensive gift from a business partner is a form of corruption as the gift giver could expect you to do something for them as a 'thank-you'.",
+       "exampleTranslation": "Ein teures Geschenk von einem Geschäftspartner anzunehmen ist eine Form von Korruption, da der Schenkende dafür möglicherweise eine Gegenleistung erwartet."
+      },
+      {
+       "term": "responsibility",
+       "translation": "Verantwortung, Zuständigkeit",
+       "pos": "noun",
+       "example": "Your dog is your responsibility, not mine!",
+       "exampleTranslation": "Dein Hund ist deine Verantwortung, nicht meine!"
+      },
+      {
+       "term": "to undermine",
+       "translation": "untergraben, unterminieren",
+       "pos": "verb",
+       "example": "When politicians don't take into account what people actually need, they undermine peoples' confidence in democracy.",
+       "exampleTranslation": "Wenn Politiker nicht berücksichtigen, was die Menschen tatsächlich brauchen, untergraben sie das Vertrauen der Bevölkerung in die Demokratie."
+      },
+      {
+       "term": "scale",
+       "translation": "Skala, Maßstab",
+       "pos": "noun",
+       "example": "How would you rate your teacher's work on a scale of 1 to 10?",
+       "exampleTranslation": "Wie würdest du die Arbeit deiner Lehrkraft auf einer Skala von 1 bis 10 bewerten?"
+      },
+      {
+       "term": "harmful",
+       "translation": "schädlich",
+       "pos": "adjective",
+       "example": "Too much sugar isn't good for you. It's harmful to your health.",
+       "exampleTranslation": "Zu viel Zucker ist nicht gut für dich. Er schadet deiner Gesundheit."
+      },
+      {
+       "term": "emergency room",
+       "translation": "Notaufnahme",
+       "pos": "noun",
+       "example": "He's cut his hand badly. We need to get him to the emergency room fast!",
+       "exampleTranslation": "Er hat sich schlimm in die Hand geschnitten. Wir müssen ihn schnell in die Notaufnahme bringen!"
+      },
+      {
+       "term": "pirate website",
+       "translation": "Piratenwebsite",
+       "pos": "noun",
+       "example": "Pirate websites sell or give away illegal copies of films, music, games, software or other digital goods.",
+       "exampleTranslation": "Piratenwebsites verkaufen oder verschenken illegale Kopien von Filmen, Musik, Spielen, Software und anderen digitalen Gütern."
+      },
+      {
+       "term": "hurtful",
+       "translation": "verletzend, kränkend",
+       "pos": "adjective",
+       "example": "He made some really hurtful comments on my new look and now I feel hurt.",
+       "exampleTranslation": "Er machte einige wirklich verletzende Bemerkungen über mein neues Aussehen, und jetzt fühle ich mich gekränkt."
+      },
+      {
+       "term": "to resign",
+       "translation": "zurücktreten, kündigen, resignieren",
+       "pos": "verb",
+       "example": "She decided to resign from her high position at the company and travel the world instead.",
+       "exampleTranslation": "Sie beschloss, ihre hohe Position im Unternehmen aufzugeben und stattdessen die Welt zu bereisen."
+      },
+      {
+       "term": "activism",
+       "translation": "Aktivismus",
+       "pos": "noun",
+       "example": "The protesters took their activism too far when their peaceful protest turned violent.",
+       "exampleTranslation": "Die Demonstrierenden gingen mit ihrem Aktivismus zu weit, als ihr friedlicher Protest gewalttätig wurde."
+      },
+      {
+       "term": "to cheat the system",
+       "translation": "das System hintergehen, betrügen",
+       "pos": "verb",
+       "example": "I absolutely hate it when people cheat the system in order to get disability benefits when they aren't actually disabled.",
+       "exampleTranslation": "Ich hasse es wirklich, wenn Menschen das System betrügen, um Sozialleistungen zu erhalten, obwohl sie gar nicht behindert sind."
+      },
+      {
+       "term": "dishonest",
+       "translation": "unehrlich",
+       "pos": "adjective",
+       "example": "We believe that you've been dishonest with us by making some false statements on your CV.",
+       "exampleTranslation": "Wir glauben, dass du uns gegenüber unehrlich warst, indem du falsche Angaben in deinem Lebenslauf gemacht hast."
+      },
+      {
+       "term": "egocentric",
+       "translation": "egozentrisch, ichbezogen",
+       "pos": "adjective",
+       "example": "She's quite egocentric. She doesn't much think about what's good for other people.",
+       "exampleTranslation": "Sie ist ziemlich egozentrisch. Sie denkt nicht viel darüber nach, was gut für andere Menschen ist."
+      },
+      {
+       "term": "morals [pl]",
+       "translation": "moralische Grundsätze, Moralvorstellungen",
+       "pos": "adjective",
+       "example": "The protagonist of the novel has low morals and high ambition; he'd do anything to reach the top, legal or not.",
+       "exampleTranslation": "Die Hauptfigur des Romans hat wenig Moral, aber großen Ehrgeiz; sie würde alles tun, um an die Spitze zu gelangen – legal oder nicht."
+      },
+      {
+       "term": "principle",
+       "translation": "Prinzip",
+       "pos": "noun",
+       "example": "The organisation works on the principle that all members have the same rights.",
+       "exampleTranslation": "Die Organisation arbeitet nach dem Prinzip, dass alle Mitglieder die gleichen Rechte haben."
+      },
+      {
+       "term": "solidarity",
+       "translation": "Solidarität, Zusammenhalt",
+       "pos": "noun",
+       "example": "We expressed our solidarity with the protesters by joining them.",
+       "exampleTranslation": "Wir zeigten unsere Solidarität mit den Demonstrierenden, indem wir uns ihnen anschlossen."
+      },
+      {
+       "term": "to take justice into one's own hands",
+       "translation": "das Recht in die eigene Hand nehmen",
+       "pos": "verb",
+       "example": "After the two men weren't convicted of murder, the victim's family took justice into their own hands.",
+       "exampleTranslation": "Nachdem die beiden Männer nicht wegen Mordes verurteilt worden waren, nahm die Familie des Opfers das Recht selbst in die Hand."
+      },
+      {
+       "term": "civic virtue",
+       "translation": "bürgerliche Tugend",
+       "pos": "phrase",
+       "example": "Civic virtues like volunteering and voting hold a society together.",
+       "exampleTranslation": "Bürgerliche Tugenden wie ehrenamtliches Engagement und Wählen halten eine Gesellschaft zusammen."
+      },
+      {
+       "term": "accountability",
+       "translation": "Verantwortlichkeit",
+       "pos": "noun",
+       "example": "Citizens must demand accountability from their politicians; we should know what they actually achieve for the people.",
+       "exampleTranslation": "Bürger müssen von ihren Politikern Rechenschaft verlangen; wir sollten wissen, was sie tatsächlich für die Menschen erreichen."
+      },
+      {
+       "term": "rule of law",
+       "translation": "Rechtsstaatlichkeit",
+       "pos": "noun",
+       "example": "Rule of law is an essential element in a democracy.",
+       "exampleTranslation": "Rechtsstaatlichkeit ist ein wesentliches Element einer Demokratie."
+      },
+      {
+       "term": "charge",
+       "translation": "Vorwurf, Anklage",
+       "pos": "noun",
+       "example": "The gang will have to face several criminal charges.",
+       "exampleTranslation": "Die Bande wird sich mehreren strafrechtlichen Anklagen stellen müssen."
+      },
+      {
+       "term": "to rule",
+       "translation": "entscheiden",
+       "pos": "verb",
+       "example": "The judge ruled that the company must pay three former employees $1 million each for racially discriminating against them.",
+       "exampleTranslation": "Der Richter entschied, dass das Unternehmen drei ehemaligen Mitarbeitern wegen rassistischer Diskriminierung jeweils eine Million Dollar zahlen muss."
+      },
+      {
+       "term": "monarchy",
+       "translation": "Monarchie",
+       "pos": "noun",
+       "example": "In a monarchy, the title of king, queen, prince etc. is passed from one family member to the next.",
+       "exampleTranslation": "In einer Monarchie wird der Titel eines Königs, einer Königin oder eines Prinzen usw. von einem Familienmitglied an das nächste weitergegeben."
+      },
+      {
+       "term": "dictatorship",
+       "translation": "Diktatur",
+       "pos": "noun",
+       "example": "In a dictatorship the ruler has complete power over the country.",
+       "exampleTranslation": "In einer Diktatur hat der Herrscher die vollständige Macht über das Land."
+      },
+      {
+       "term": "oligarchy",
+       "translation": "Oligarchie",
+       "pos": "noun",
+       "example": "The government denied that the country had become an oligarchy.",
+       "exampleTranslation": "Die Regierung bestritt, dass das Land zu einer Oligarchie geworden sei."
+      },
+      {
+       "term": "theocracy",
+       "translation": "Theokratie",
+       "pos": "noun",
+       "example": "In a theocracy the state is based on religious law.",
+       "exampleTranslation": "In einer Theokratie basiert der Staat auf religiösem Recht."
+      },
+      {
+       "term": "to govern",
+       "translation": "regieren",
+       "pos": "verb",
+       "example": "The newly elected president will govern the country for four years.",
+       "exampleTranslation": "Der neu gewählte Präsident wird das Land vier Jahre lang regieren."
+      },
+      {
+       "term": "representative",
+       "translation": "[hier:] parlamentarisch",
+       "pos": "adjective",
+       "example": "A representative group consists of a small number of people who have been chosen to make decisions on behalf of a larger group.",
+       "exampleTranslation": "Eine repräsentative Gruppe besteht aus einer kleinen Anzahl von Personen, die ausgewählt wurden, Entscheidungen im Namen einer größeren Gruppe zu treffen."
+      },
+      {
+       "term": "to determine",
+       "translation": "bestimmen, ermitteln",
+       "pos": "verb",
+       "example": "Your health is determined in part by what you eat.",
+       "exampleTranslation": "Deine Gesundheit wird teilweise durch das bestimmt, was du isst."
+      },
+      {
+       "term": "self-esteem",
+       "translation": "Selbstwertgefühl, Selbstachtung",
+       "pos": "noun",
+       "example": "Success in sport can really help to improve your self-esteem.",
+       "exampleTranslation": "Erfolg im Sport kann dein Selbstwertgefühl wirklich stärken."
+      },
+      {
+       "term": "to take on",
+       "translation": "übernehmen, annehmen, aufnehmen",
+       "pos": "verb",
+       "example": "You can't take on responsibility for the whole world!",
+       "exampleTranslation": "Du kannst nicht die Verantwortung für die ganze Welt übernehmen!"
+      },
+      {
+       "term": "to compensate for",
+       "translation": "ausgleichen, wettmachen",
+       "pos": "verb",
+       "example": "I was driving fast to compensate for being late.",
+       "exampleTranslation": "Ich fuhr schnell, um mein Zuspätkommen auszugleichen."
+      },
+      {
+       "term": "guilty conscience",
+       "translation": "schlechtes Gewissen, Schuldbewusstsein",
+       "pos": "phrase",
+       "example": "I didn't say anything when the waiter had forgotten to put a few things on our restaurant bill, but now I have a guilty conscience.",
+       "exampleTranslation": "Ich sagte nichts, als der Kellner einige Dinge auf unserer Restaurantrechnung vergessen hatte, aber jetzt habe ich ein schlechtes Gewissen."
+      },
+      {
+       "term": "questionable",
+       "translation": "fragwürdig, zweifelhaft, bedenklich, fraglich",
+       "pos": "adjective",
+       "example": "It is questionable whether we can achieve our goal.",
+       "exampleTranslation": "Es ist fraglich, ob wir unser Ziel erreichen können."
+      },
+      {
+       "term": "civil",
+       "translation": "zivil, höflich",
+       "pos": "adjective",
+       "example": "It was hard to be civil when I felt so angry.",
+       "exampleTranslation": "Es war schwer, höflich zu bleiben, als ich so wütend war."
+      },
+      {
+       "term": "tolerant",
+       "translation": "tolerant",
+       "pos": "adjective",
+       "example": "Some people think they're tolerant, but then they judge everybody who doesn't think or act just like them.",
+       "exampleTranslation": "Manche Menschen halten sich für tolerant, verurteilen dann aber jeden, der nicht genauso denkt oder handelt wie sie."
+      },
+      {
+       "term": "sexual orientation",
+       "translation": "sexuelle Orientierung",
+       "pos": "phrase",
+       "example": "A lot of people still experience discrimination because of their sexual orientation.",
+       "exampleTranslation": "Viele Menschen erfahren immer noch Diskriminierung aufgrund ihrer sexuellen Orientierung."
+      },
+      {
+       "term": "to provoke",
+       "translation": "provozieren, hervorrufen",
+       "pos": "verb",
+       "example": "The president's speech provoked a lot of protest.",
+       "exampleTranslation": "Die Rede des Präsidenten löste viele Proteste aus."
+      },
+      {
+       "term": "to judge a book by its cover",
+       "translation": "jmdn./etw. nach dem Äußeren beurteilen",
+       "pos": "verb",
+       "example": "Look at her: She has such a nice face. I can’t believe what she did. – Well, never judge a book by its cover, as they say!",
+       "exampleTranslation": "Sieh sie dir an: Sie hat so ein nettes Gesicht. Ich kann nicht glauben, was sie getan hat. – Nun ja, man soll ein Buch nicht nach seinem Einband beurteilen."
+      },
+      {
+       "term": "appropriate",
+       "translation": "angemessen",
+       "pos": "adjective",
+       "example": "Do you really think jeans and sneakers are the appropriate outfit for a job interview at a big bank?",
+       "exampleTranslation": "Glaubst du wirklich, dass Jeans und Turnschuhe die passende Kleidung für ein Vorstellungsgespräch bei einer großen Bank sind?"
+      },
+      {
+       "term": "to draw the line",
+       "translation": "die Grenze ziehen",
+       "pos": "verb",
+       "example": "I usually do whatever my family asks me to, but I draw the line when someone asks me to lie for them.",
+       "exampleTranslation": "Normalerweise tue ich, worum mich meine Familie bittet, aber ich ziehe die Grenze, wenn jemand von mir verlangt zu lügen."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Unit 2",
+   "sections": [
+    {
+     "name": "Introduction",
+     "entries": [
+      {
+       "term": "Down Syndrome",
+       "translation": "Down-Syndrom, Trisomie 21",
+       "pos": "noun",
+       "example": "I have Down Syndrome, but don't reduce me to that one aspect of myself. I have a full life, just like anyone else.",
+       "exampleTranslation": "Ich habe das Down-Syndrom, aber reduziere mich nicht auf diesen einen Aspekt. Ich habe ein erfülltes Leben wie jeder andere auch."
+      },
+      {
+       "term": "to pray",
+       "translation": "beten",
+       "pos": "verb",
+       "example": "Most people prefer to pray in quiet moments.",
+       "exampleTranslation": "Die meisten Menschen beten lieber in ruhigen Momenten."
+      },
+      {
+       "term": "hijab",
+       "translation": "Hidschab",
+       "pos": "noun",
+       "example": "What kind of a scarf is that? – It's a hijab, which covers your hair, neck and throat.",
+       "exampleTranslation": "Was ist das für ein Tuch? – Das ist ein Hijab, der Haare, Hals und Kehle bedeckt."
+      },
+      {
+       "term": "to wound",
+       "translation": "kränken, verletzen",
+       "pos": "verb",
+       "example": "His words wounded her badly, she could never forget them.",
+       "exampleTranslation": "Seine Worte verletzten sie tief, und sie konnte sie nie vergessen."
+      },
+      {
+       "term": "belonging",
+       "translation": "Zugehörigkeit",
+       "pos": "noun",
+       "example": "Her new novel explores questions of belonging.",
+       "exampleTranslation": "Ihr neuer Roman beschäftigt sich mit Fragen der Zugehörigkeit."
+      },
+      {
+       "term": "to embrace sb/sth",
+       "translation": "etw. (bereitwillig) übernehmen, etw. (bereitwillig) annehmen",
+       "pos": "verb",
+       "example": "She embraced the chance to move to Europe, knowing the chance might never come again.",
+       "exampleTranslation": "Sie ergriff die Chance, nach Europa zu ziehen, da sie wusste, dass sich diese Möglichkeit vielleicht nie wieder bieten würde."
+      },
+      {
+       "term": "to be subjected to differential treatment",
+       "translation": "unterschiedlich behandelt werden, einer Ungleichbehandlung ausgesetzt sein",
+       "pos": "verb",
+       "example": "A government subjecting people to differential treatment, for example because of a minority status, should never happen in a democracy.",
+       "exampleTranslation": "Eine Regierung, die Menschen zum Beispiel wegen ihres Minderheitenstatus unterschiedlich behandelt, sollte es in einer Demokratie niemals geben."
+      },
+      {
+       "term": "share (of)",
+       "translation": "Anteil (an)",
+       "pos": "noun",
+       "example": "The share of crimes by children and teenagers has increased over the past three years.",
+       "exampleTranslation": "Der Anteil der von Kindern und Jugendlichen begangenen Straftaten ist in den letzten drei Jahren gestiegen."
+      },
+      {
+       "term": "to differ",
+       "translation": "sich unterscheiden, abweichen",
+       "pos": "verb",
+       "example": "Although they are twins, they differ a lot.",
+       "exampleTranslation": "Obwohl sie Zwillinge sind, unterscheiden sie sich stark."
+      },
+      {
+       "term": "characteristic",
+       "translation": "typisches Merkmal",
+       "pos": "adjective",
+       "example": "People with similar characteristics enjoy being together.",
+       "exampleTranslation": "Menschen mit ähnlichen Eigenschaften verbringen gern Zeit miteinander."
+      },
+      {
+       "term": "empowerment",
+       "translation": "Stärkung, Unterstützung",
+       "pos": "noun",
+       "example": "A company gives its employees a sense of empowerment when it recognises and also rewards good work.",
+       "exampleTranslation": "Ein Unternehmen vermittelt seinen Mitarbeitern ein Gefühl der Selbstbestimmung, wenn es gute Arbeit anerkennt und belohnt."
+      },
+      {
+       "term": "enrichment",
+       "translation": "Bereicherung",
+       "pos": "noun",
+       "example": "A diverse team can bring much enrichment to a project since people will have very different life experiences to share.",
+       "exampleTranslation": "Ein vielfältiges Team kann ein Projekt sehr bereichern, da die Menschen ganz unterschiedliche Lebenserfahrungen einbringen."
+      },
+      {
+       "term": "inclusion",
+       "translation": "Inklusion, Einbeziehung",
+       "pos": "noun",
+       "example": "At our school, we believe in the idea of inclusion: everybody belongs, everybody helps, everybody participates.",
+       "exampleTranslation": "An unserer Schule glauben wir an Inklusion: Jeder gehört dazu, jeder hilft, jeder macht mit."
+      },
+      {
+       "term": "marginalisation",
+       "translation": "Marginalisierung, Ausgrenzung",
+       "pos": "noun",
+       "example": "When there is an imbalance of power in society, some people are pushed to its margins – they experience marginalisation.",
+       "exampleTranslation": "Wenn es in einer Gesellschaft ein Machtungleichgewicht gibt, werden manche Menschen an den Rand gedrängt – sie erfahren Ausgrenzung."
+      },
+      {
+       "term": "structural discrimination",
+       "translation": "strukturelle Diskriminierung",
+       "pos": "phrase",
+       "example": "Structural discrimination arises from the way a society’s structures, policies and institutions are set up.",
+       "exampleTranslation": "Strukturelle Diskriminierung entsteht durch die Art und Weise, wie die Strukturen, Richtlinien und Institutionen einer Gesellschaft aufgebaut sind."
+      },
+      {
+       "term": "hierarchy",
+       "translation": "Rangordnung, Hierarchie",
+       "pos": "noun",
+       "example": "There's a flat hierarchy at my new company: the people at the top work closely with the levels below them.",
+       "exampleTranslation": "In meinem neuen Unternehmen gibt es eine flache Hierarchie: Die Führungskräfte arbeiten eng mit den darunterliegenden Ebenen zusammen."
+      },
+      {
+       "term": "self-esteem",
+       "translation": "Selbstwertgefühl, Selbstachtung",
+       "pos": "noun",
+       "example": "Once you've had success in sport, it can really help to improve your self-esteem.",
+       "exampleTranslation": "Wenn man im Sport Erfolg hat, kann das das Selbstwertgefühl deutlich stärken."
+      },
+      {
+       "term": "to self-actualize 🇺🇸",
+       "translation": "sich selbst verwirklichen",
+       "pos": "verb",
+       "example": "After you meet your more basic needs, your goal will be to meet the more complex needs that will help you to self-actualize and meet your full potential as a person.",
+       "exampleTranslation": "Sobald deine Grundbedürfnisse erfüllt sind, wirst du danach streben, komplexere Bedürfnisse zu erfüllen, die dir helfen, dich selbst zu verwirklichen und dein volles Potenzial auszuschöpfen."
+      },
+      {
+       "term": "universal",
+       "translation": "allgemein, universell",
+       "pos": "adjective",
+       "example": "According to the UN, the right to an education is a universal human right.",
+       "exampleTranslation": "Laut den Vereinten Nationen ist das Recht auf Bildung ein universelles Menschenrecht."
+      }
+     ]
+    },
+    {
+     "name": "Station 1",
+     "entries": [
+      {
+       "term": "courage [no pl]",
+       "translation": "Mut, Tapferkeit, Courage",
+       "pos": "noun",
+       "example": "Not everyone has the courage to fight for their rights.",
+       "exampleTranslation": "Nicht jeder hat den Mut, für seine Rechte zu kämpfen."
+      },
+      {
+       "term": "resilience",
+       "translation": "Resilienz, Widerstandsfähigkeit, Durchhaltevermögen",
+       "pos": "noun",
+       "example": "Despite many difficult times, his ability to see the positive side in everything has given him the resilience to never give up.",
+       "exampleTranslation": "Trotz vieler schwieriger Zeiten hat ihm seine Fähigkeit, in allem das Positive zu sehen, die Widerstandskraft gegeben, niemals aufzugeben."
+      },
+      {
+       "term": "suffering",
+       "translation": "Leiden, Leid, Elend",
+       "pos": "noun",
+       "example": "We must try to keep the peace because war brings great suffering for everyone.",
+       "exampleTranslation": "Wir müssen versuchen, den Frieden zu bewahren, denn Krieg bringt großes Leid für alle."
+      },
+      {
+       "term": "courageous",
+       "translation": "mutig",
+       "pos": "adjective",
+       "example": "We need someone who is courageous enough to lead the protest.",
+       "exampleTranslation": "Wir brauchen jemanden, der mutig genug ist, den Protest anzuführen."
+      },
+      {
+       "term": "prior to",
+       "translation": "vor",
+       "pos": "phrase",
+       "example": "Prior to this job in education, I worked in a totally different area.",
+       "exampleTranslation": "Vor dieser Tätigkeit im Bildungsbereich arbeitete ich in einem völlig anderen Feld."
+      },
+      {
+       "term": "desegregation",
+       "translation": "Aufhebung der Segregation",
+       "pos": "noun",
+       "example": "Laws to end segregation in the US were one thing, but as Elizabeth Eckford learned, desegregation wasn't a reality when she tried to go to school with white students.",
+       "exampleTranslation": "Gesetze zur Beendigung der Segregation in den USA waren das eine, aber wie Elizabeth Eckford erfuhr, war die Aufhebung der Rassentrennung keine Realität, als sie versuchte, mit weißen Schülern zur Schule zu gehen."
+      },
+      {
+       "term": "to ensure",
+       "translation": "sicherstellen, gewährleisten",
+       "pos": "verb",
+       "example": "To ensure the protection of students against gun violence, many US schools have metal detectors at their entrances.",
+       "exampleTranslation": "Um den Schutz der Schüler vor Waffengewalt zu gewährleisten, haben viele US-Schulen Metalldetektoren an ihren Eingängen."
+      },
+      {
+       "term": "inadvertently",
+       "translation": "unabsichtlich, aus Versehen",
+       "pos": "adverb",
+       "example": "They had inadvertently left some old friends off their wedding guest list, but then they realised their mistake.",
+       "exampleTranslation": "Sie hatten versehentlich einige alte Freunde von ihrer Hochzeitsgästeliste vergessen, bemerkten den Fehler aber später."
+      },
+      {
+       "term": "reassured",
+       "translation": "beruhigt",
+       "pos": "adjective",
+       "example": "I was nervous at the party, but then I felt reassured after seeing a familiar face.",
+       "exampleTranslation": "Ich war auf der Party nervös, fühlte mich aber beruhigt, als ich ein bekanntes Gesicht sah."
+      },
+      {
+       "term": "rifle",
+       "translation": "Gewehr",
+       "pos": "noun",
+       "example": "I don't know if I'd feel comfortable as a guest in a house with rifles.",
+       "exampleTranslation": "Ich weiß nicht, ob ich mich als Gast in einem Haus mit Gewehren wohlfühlen würde."
+      },
+      {
+       "term": "mob",
+       "translation": "Mob, Pöbel",
+       "pos": "noun",
+       "example": "The angry mob threw bottles and stones at the police.",
+       "exampleTranslation": "Der wütende Mob warf Flaschen und Steine auf die Polizei."
+      },
+      {
+       "term": "decrease",
+       "translation": "Abnahme, Verminderung",
+       "pos": "noun",
+       "example": "My doctor asked me about my decrease in weight, so I told him about the marathon I was training for.",
+       "exampleTranslation": "Mein Arzt fragte mich nach meinem Gewichtsverlust, also erzählte ich ihm von dem Marathon, für den ich trainierte."
+      },
+      {
+       "term": "to identify as",
+       "translation": "sich identifizieren als",
+       "pos": "verb",
+       "example": "River identifies as non-binary and uses the pronouns they/them/their.",
+       "exampleTranslation": "River bezeichnet sich als nichtbinär und verwendet die Pronomen they/them/their."
+      },
+      {
+       "term": "workforce [no pl]",
+       "translation": "Arbeitskräfte, Belegschaft",
+       "pos": "noun",
+       "example": "The company has a very large and diverse workforce.",
+       "exampleTranslation": "Das Unternehmen hat eine sehr große und vielfältige Belegschaft."
+      },
+      {
+       "term": "overrepresented",
+       "translation": "überrepräsentiert",
+       "pos": "adjective",
+       "example": "In Germany's largest companies, men are still overrepresented in top management.",
+       "exampleTranslation": "In den größten deutschen Unternehmen sind Männer im Topmanagement noch immer überrepräsentiert."
+      },
+      {
+       "term": "contradiction",
+       "translation": "Widerspruch, Widersprüchlichkeit",
+       "pos": "noun",
+       "example": "Don't you think it's a contradiction for you to eat chocolate cake while you tell other people it's unhealthy?",
+       "exampleTranslation": "Findest du es nicht widersprüchlich, Schokoladenkuchen zu essen und gleichzeitig anderen zu sagen, er sei ungesund?"
+      },
+      {
+       "term": "correlation",
+       "translation": "Beziehung, Zusammenhang",
+       "pos": "noun",
+       "example": "Psychologists have been researching the correlation between social media use and anxiety among teenagers.",
+       "exampleTranslation": "Psychologen erforschen den Zusammenhang zwischen der Nutzung sozialer Medien und Ängsten bei Jugendlichen."
+      },
+      {
+       "term": "to be associated with",
+       "translation": "verbunden sein mit",
+       "pos": "verb",
+       "example": "Wealth is often associated with happiness, but does money really make you happier?",
+       "exampleTranslation": "Wohlstand wird oft mit Glück verbunden, aber macht Geld wirklich glücklicher?"
+      },
+      {
+       "term": "to be said to [+ inf]",
+       "translation": "gelten als",
+       "pos": "verb",
+       "example": "French cooking is said to be the world's best, but is it possible to objectively judge something like that?",
+       "exampleTranslation": "Die französische Küche gilt als die beste der Welt, aber kann man so etwas objektiv beurteilen?"
+      },
+      {
+       "term": "to be certain to do sth",
+       "translation": "etw. bestimmt tun",
+       "pos": "verb",
+       "example": "My family is certain to go to France on holiday this year. We go every year.",
+       "exampleTranslation": "Meine Familie wird dieses Jahr ganz sicher nach Frankreich in den Urlaub fahren. Wir fahren jedes Jahr dorthin."
+      },
+      {
+       "term": "to happen to do sth",
+       "translation": "zufällig etw. tun",
+       "pos": "verb",
+       "example": "If you happen to see Amy, please tell her I need to see her later today.",
+       "exampleTranslation": "Falls du Amy zufällig siehst, sag ihr bitte, dass ich sie später heute sprechen muss."
+      },
+      {
+       "term": "impact",
+       "translation": "Auswirkung, Einfluss",
+       "pos": "noun",
+       "example": "My middle school teacher had a great impact on me. I studied biology because of him.",
+       "exampleTranslation": "Mein Lehrer in der Mittelstufe hatte einen großen Einfluss auf mich. Wegen ihm habe ich Biologie studiert."
+      },
+      {
+       "term": "affirmative action",
+       "translation": "Förderungsmaßnahmen zugunsten von Minderheiten, Quotenregelung",
+       "pos": "phrase",
+       "example": "The organisation is working on new programmes to support affirmative action.",
+       "exampleTranslation": "Die Organisation arbeitet an neuen Programmen zur Förderung von Chancengleichheit."
+      },
+      {
+       "term": "merit",
+       "translation": "Leistung, Verdienst",
+       "pos": "noun",
+       "example": "Your academic merits look very impressive on your CV, but if you apply to that company, you should know that they look for merits in social areas too, like volunteer work.",
+       "exampleTranslation": "Deine akademischen Leistungen sehen im Lebenslauf sehr beeindruckend aus, aber wenn du dich bei dieser Firma bewirbst, solltest du wissen, dass sie auch in sozialen Bereichen suchen, wie zum Beispiel ehrenamtlicher Arbeit."
+      },
+      {
+       "term": "unconstitutional",
+       "translation": "verfassungswidrig",
+       "pos": "adjective",
+       "example": "Judges, not politicians, decide what is unconstitutional.",
+       "exampleTranslation": "Richter und nicht Politiker entscheiden darüber, was verfassungswidrig ist."
+      },
+      {
+       "term": "employment",
+       "translation": "Beschäftigung, Anstellung",
+       "pos": "noun",
+       "example": "After finishing university, it took my sister a full year to find employment.",
+       "exampleTranslation": "Nach dem Studium brauchte meine Schwester ein ganzes Jahr, um eine Anstellung zu finden."
+      },
+      {
+       "term": "to level the playing field",
+       "translation": "für Chancengleichheit sorgen, gleiche Rahmenbedingungen schaffen",
+       "pos": "verb",
+       "example": "Doped athletes have a huge advantage, so the sport must do more to level the playing field in its fight against doping.",
+       "exampleTranslation": "Gedopte Sportler haben einen großen Vorteil, daher muss der Sport mehr für Chancengleichheit im Kampf gegen Doping tun."
+      },
+      {
+       "term": "to catch up",
+       "translation": "aufholen",
+       "pos": "verb",
+       "example": "When it comes to fitness, I will never catch up with my friend.",
+       "exampleTranslation": "Wenn es um Fitness geht, werde ich meinen Freund nie einholen."
+      },
+      {
+       "term": "reverse",
+       "translation": "umgekehrt, rückwärts, gegenteilig",
+       "pos": "adjective",
+       "example": "When you shout at your children to be quiet, it often has the reverse effect: They scream even more.",
+       "exampleTranslation": "Wenn du deine Kinder anschreist, sie sollen leise sein, hat das oft den gegenteiligen Effekt: Sie schreien noch mehr."
+      },
+      {
+       "term": "to empower",
+       "translation": "stärken, unterstützen",
+       "pos": "verb",
+       "example": "You empower people by embracing their differences, not by ignoring them.",
+       "exampleTranslation": "Man stärkt Menschen, indem man ihre Unterschiede annimmt und nicht ignoriert."
+      },
+      {
+       "term": "to second-guess",
+       "translation": "in Frage stellen, kritisieren",
+       "pos": "verb",
+       "example": "Just before a performance is not the best time for an actor to start second-guessing their talent!",
+       "exampleTranslation": "Kurz vor einem Auftritt ist nicht der beste Zeitpunkt für einen Schauspieler, an seinem Talent zu zweifeln."
+      },
+      {
+       "term": "seat at the table",
+       "translation": "Platz, Mitspracherecht",
+       "pos": "noun",
+       "example": "Should schools and universities have a seat at the table when education decisions are made by the government?",
+       "exampleTranslation": "Sollten Schulen und Universitäten mitentscheiden dürfen, wenn die Regierung über Bildungspolitik entscheidet?"
+      },
+      {
+       "term": "to take a side on",
+       "translation": "Partei ergreifen für",
+       "pos": "verb",
+       "example": "I find it difficult to take a side on some of those hot topics.",
+       "exampleTranslation": "Ich finde es schwierig, bei einigen dieser kontroversen Themen Position zu beziehen."
+      },
+      {
+       "term": "to marginalize 🇺🇸",
+       "translation": "an den Rand drängen, marginalisieren",
+       "pos": "verb",
+       "example": "The community has been marginalized for decades.",
+       "exampleTranslation": "Die Gemeinschaft wird seit Jahrzehnten an den Rand gedrängt."
+      },
+      {
+       "term": "inevitable",
+       "translation": "unvermeidlich, unabwendbar",
+       "pos": "adjective",
+       "example": "If you order the same thing every time, it's inevitable that your favourite dish will become your most hated dish.",
+       "exampleTranslation": "Wenn du immer dasselbe bestellst, ist es unvermeidlich, dass dein Lieblingsgericht irgendwann zu deinem meistgehassten wird."
+      },
+      {
+       "term": "to differentiate",
+       "translation": "unterscheiden",
+       "pos": "verb",
+       "example": "Some people can't differentiate between their imagination and the real world.",
+       "exampleTranslation": "Manche Menschen können nicht zwischen ihrer Fantasie und der realen Welt unterscheiden."
+      }
+     ]
+    },
+    {
+     "name": "Station 2",
+     "entries": [
+      {
+       "term": "post-",
+       "translation": "danach, dahinter",
+       "pos": "adjective",
+       "example": "They say that the first post-university months are the hardest because the fun of the college lifestyle is suddenly over.",
+       "exampleTranslation": "Man sagt, die ersten Monate nach der Universität seien die schwierigsten, weil der Spaß des Studentenlebens plötzlich vorbei ist."
+      },
+      {
+       "term": "in spite of",
+       "translation": "trotz",
+       "pos": "phrase",
+       "example": "In spite of the rain we went for a walk.",
+       "exampleTranslation": "Trotz des Regens gingen wir spazieren."
+      },
+      {
+       "term": "(Indian) subcontinent",
+       "translation": "(Indischer) Subkontinent",
+       "pos": "noun",
+       "example": "The Indian subcontinent is a geographical and also cultural name that refers collectively to the countries of India, Pakistan and Bangladesh.",
+       "exampleTranslation": "Der indische Subkontinent ist eine geografische und kulturelle Bezeichnung für Indien, Pakistan und Bangladesch."
+      },
+      {
+       "term": "peasant",
+       "translation": "kleinbäuerlich, Kleinbauer/Kleinbäuerin",
+       "pos": "adjective",
+       "example": "In Robin Hood's time a lot of people in England were poor peasants.",
+       "exampleTranslation": "Zur Zeit von Robin Hood waren viele Menschen in England arme Bauern."
+      },
+      {
+       "term": "to originate from",
+       "translation": "entstammen, seinen/ihren Anfang nehmen in",
+       "pos": "verb",
+       "example": "Many traditions originate from ancient times.",
+       "exampleTranslation": "Viele Traditionen stammen aus der Antike."
+      },
+      {
+       "term": "large-scale",
+       "translation": "umfangreich, weitreichend",
+       "pos": "adjective",
+       "example": "The company has announced large-scale changes to their production process.",
+       "exampleTranslation": "Das Unternehmen hat umfangreiche Änderungen an seinem Produktionsprozess angekündigt."
+      },
+      {
+       "term": "civil unrest",
+       "translation": "Bürgeraufstand",
+       "pos": "noun",
+       "example": "When there's too much civil unrest in a country, it's bad for business and companies stay away.",
+       "exampleTranslation": "Wenn es in einem Land zu viele zivile Unruhen gibt, ist das schlecht für die Wirtschaft, und Unternehmen bleiben fern."
+      },
+      {
+       "term": "white-collar occupation 🇺🇸",
+       "translation": "umgangssprachliche Bezeichnung für einen Beruf, bei dem das Tragen eines Anzugs, z. B. mit weißem Hemdkragen, typisch ist/war",
+       "pos": "phrase",
+       "example": "Most employees at this company have white-collar occupations.",
+       "exampleTranslation": "Die meisten Beschäftigten dieses Unternehmens arbeiten in Büroberufen.",
+       "explained": true
+      },
+      {
+       "term": "civilization 🇺🇸",
+       "translation": "Kultur, Zivilisation",
+       "pos": "noun",
+       "example": "Electricity and telephones were major steps in the development of world civilization.",
+       "exampleTranslation": "Elektrizität und Telefone waren wichtige Schritte in der Entwicklung der menschlichen Zivilisation."
+      },
+      {
+       "term": "to maintain",
+       "translation": "beibehalten, aufrechterhalten",
+       "pos": "verb",
+       "example": "I want to maintain a good relationship to my family, but I don't want them to choose who I marry.",
+       "exampleTranslation": "Ich möchte eine gute Beziehung zu meiner Familie aufrechterhalten, aber ich möchte nicht, dass sie entscheidet, wen ich heirate."
+      },
+      {
+       "term": "to strengthen",
+       "translation": "stärken",
+       "pos": "verb",
+       "example": "She showed me some exercises for strengthening my lower back.",
+       "exampleTranslation": "Sie zeigte mir einige Übungen zur Stärkung meines unteren Rückens."
+      },
+      {
+       "term": "societal norm",
+       "translation": "gesellschaftliche Norm",
+       "pos": "phrase",
+       "example": "I'm going to move to Germany for a year and need to learn about the societal norms there before I go.",
+       "exampleTranslation": "Ich werde für ein Jahr nach Deutschland ziehen und muss vorher die gesellschaftlichen Normen dort kennenlernen."
+      },
+      {
+       "term": "legal marriage age",
+       "translation": "gesetzliches Mindestalter für eine Heirat",
+       "pos": "phrase",
+       "example": "The legal marriage age in Germany is 18.",
+       "exampleTranslation": "Das gesetzliche Mindestalter für eine Heirat in Deutschland beträgt 18 Jahre."
+      },
+      {
+       "term": "to be under scrutiny",
+       "translation": "unter die Lupe genommen werden, auf den Prüfstand gestellt werden",
+       "pos": "verb",
+       "example": "When he became a politician, his private life was suddenly under very close scrutiny.",
+       "exampleTranslation": "Als er Politiker wurde, stand sein Privatleben plötzlich unter genauer Beobachtung."
+      },
+      {
+       "term": "notion",
+       "translation": "Idee, Vorstellung",
+       "pos": "noun",
+       "example": "Some people have no notion of what it means to be poor.",
+       "exampleTranslation": "Manche Menschen haben keine Vorstellung davon, was es bedeutet, arm zu sein."
+      },
+      {
+       "term": "tie",
+       "translation": "Bindung, Verbindung",
+       "pos": "noun",
+       "example": "Our family has ties to the US. I have a cousin there.",
+       "exampleTranslation": "Unsere Familie hat Verbindungen in die USA. Ich habe dort einen Cousin."
+      }
+     ]
+    },
+    {
+     "name": "Station 3",
+     "entries": [
+      {
+       "term": "condition",
+       "translation": "Zustand, [hier:] (genetische) Störung / Krankheit",
+       "pos": "noun",
+       "example": "During the last few days there has been no change in the patient's condition.",
+       "exampleTranslation": "In den letzten Tagen hat sich der Zustand des Patienten nicht verändert."
+      },
+      {
+       "term": "dyspraxia",
+       "translation": "Dyspraxie [Bewegungs- und Koordinationsstörung]",
+       "pos": "noun",
+       "example": "Riding a bike is sometimes difficult for people with dyspraxia.",
+       "exampleTranslation": "Fahrradfahren ist für Menschen mit Dyspraxie manchmal schwierig."
+      },
+      {
+       "term": "rigid",
+       "translation": "steif, starr, streng",
+       "pos": "adjective",
+       "example": "She's so rigid in her political views that she hardly gives other ideas a chance.",
+       "exampleTranslation": "Sie ist in ihren politischen Ansichten so starr, dass sie anderen Ideen kaum eine Chance gibt."
+      },
+      {
+       "term": "to read",
+       "translation": "verstehen, durchschauen",
+       "pos": "verb",
+       "example": "Autistic people can have problems reading social situations, so small talk can be challenging.",
+       "exampleTranslation": "Autistische Menschen können Schwierigkeiten haben, soziale Situationen zu verstehen, daher kann Smalltalk herausfordernd sein."
+      },
+      {
+       "term": "spina bifida",
+       "translation": "offene Wirbelsäule",
+       "pos": "phrase",
+       "example": "People with spina bifida often, but not always, need a wheelchair.",
+       "exampleTranslation": "Menschen mit einer offenen Wirbelsäule benötigen oft, aber nicht immer, einen Rollstuhl."
+      },
+      {
+       "term": "boundary",
+       "translation": "Grenze, Abgrenzung",
+       "pos": "noun",
+       "example": "He sometimes has trouble maintaining boundaries in relationships.",
+       "exampleTranslation": "Er hat manchmal Schwierigkeiten, Grenzen in Beziehungen einzuhalten."
+      },
+      {
+       "term": "ableism",
+       "translation": "Ableismus, Behindertenfeindlichkeit",
+       "pos": "noun",
+       "example": "I streamed three different programmes last night and not one of them showed a person with a disability. – That's the TV people showing their ableism, as if there were only people without disabilities in the world.",
+       "exampleTranslation": "Gestern Abend habe ich drei verschiedene Sendungen gestreamt, und keine zeigte eine Person mit Behinderung. – Das zeigt den Ableismus der Fernsehmacher, als gäbe es nur Menschen ohne Behinderung auf dieser Welt."
+      },
+      {
+       "term": "student council",
+       "translation": "Schülerrat",
+       "pos": "noun",
+       "example": "Why are student councils important? – Well, they're a way for students to see that they themselves can make a change both at school and in their community.",
+       "exampleTranslation": "Warum sind Schülervertretungen wichtig? – Nun, sie sind eine Möglichkeit für Schülerinnen und Schüler zu erkennen, dass sie selbst sowohl in der Schule als auch in ihrer Gemeinschaft etwas verändern können."
+      },
+      {
+       "term": "bare",
+       "translation": "nackt, bloß",
+       "pos": "adjective",
+       "example": "I'm sorry, but you can't visit this restaurant in bare feet; you need shoes.",
+       "exampleTranslation": "Es tut mir leid, aber du kannst dieses Restaurant nicht barfuß betreten; du brauchst Schuhe."
+      },
+      {
+       "term": "sign language",
+       "translation": "Gebärdensprache",
+       "pos": "noun",
+       "example": "They have been learning sign language since they were little kids.",
+       "exampleTranslation": "Sie lernen Gebärdensprache, seit sie kleine Kinder waren."
+      },
+      {
+       "term": "interpreter",
+       "translation": "Dolmetscher/-in",
+       "pos": "noun",
+       "example": "She works as a sign language interpreter at an inclusive school.",
+       "exampleTranslation": "Sie arbeitet als Gebärdensprachdolmetscherin an einer inklusiven Schule."
+      },
+      {
+       "term": "to sign",
+       "translation": "Zeichen geben, gebärden",
+       "pos": "verb",
+       "example": "She signed that she had understood the rules.",
+       "exampleTranslation": "Sie gab durch Zeichen zu verstehen, dass sie die Regeln verstanden hatte."
+      },
+      {
+       "term": "hard of hearing",
+       "translation": "schwerhörig",
+       "pos": "phrase",
+       "example": "Could you please say that again? I'm hard of hearing.",
+       "exampleTranslation": "Könntest du das bitte wiederholen? Ich bin schwerhörig."
+      },
+      {
+       "term": "deafness",
+       "translation": "Gehörlosigkeit, Schwerhörigkeit, Taubheit",
+       "pos": "noun",
+       "example": "In spite of his deafness he can enjoy music by feeling it.",
+       "exampleTranslation": "Trotz seiner Gehörlosigkeit kann er Musik genießen, indem er sie fühlt."
+      },
+      {
+       "term": "to examine",
+       "translation": "untersuchen, prüfen",
+       "pos": "verb",
+       "example": "A group of researchers examined the effects of daily exercise on long-term memory.",
+       "exampleTranslation": "Eine Forschergruppe untersuchte die Auswirkungen täglicher Bewegung auf das Langzeitgedächtnis."
+      },
+      {
+       "term": "accessibility",
+       "translation": "Erreichbarkeit, Zugänglichkeit",
+       "pos": "noun",
+       "example": "I can't believe there are still buildings which don't offer wheelchair accessibility.",
+       "exampleTranslation": "Ich kann nicht glauben, dass es immer noch Gebäude gibt, die keine Barrierefreiheit für Rollstuhlfahrer bieten."
+      }
+     ]
+    },
+    {
+     "name": "Story",
+     "entries": [
+      {
+       "term": "in retrospect",
+       "translation": "rückblickend, im Nachhinein",
+       "pos": "phrase",
+       "example": "We often recognise only in retrospect that a decision was right or wrong.",
+       "exampleTranslation": "Oft erkennen wir erst im Nachhinein, dass eine Entscheidung richtig oder falsch war."
+      },
+      {
+       "term": "lecture",
+       "translation": "Vortrag, Vorlesung",
+       "pos": "noun",
+       "example": "Who's giving the lecture this afternoon? – An expert from the UK.",
+       "exampleTranslation": "Wer hält heute Nachmittag den Vortrag? – Ein Experte aus Großbritannien."
+      },
+      {
+       "term": "hygiene",
+       "translation": "Hygiene",
+       "pos": "noun",
+       "example": "Poor standards of hygiene mean that diseases can spread more easily.",
+       "exampleTranslation": "Mangelnde Hygiene führt dazu, dass sich Krankheiten leichter verbreiten können."
+      },
+      {
+       "term": "a wide range of",
+       "translation": "ein breites Spektrum an, eine große Vielfalt von",
+       "pos": "phrase",
+       "example": "There is a wide range of opinions on this issue.",
+       "exampleTranslation": "Zu diesem Thema gibt es eine große Bandbreite an Meinungen."
+      },
+      {
+       "term": "disorder",
+       "translation": "Störung",
+       "pos": "noun",
+       "example": "If you worry too much about your weight, you may develop an eating disorder.",
+       "exampleTranslation": "Wenn du dir zu viele Sorgen um dein Gewicht machst, könntest du eine Essstörung entwickeln."
+      },
+      {
+       "term": "appropriate",
+       "translation": "angemessen",
+       "pos": "adjective",
+       "example": "In a formal situation, you should use the appropriate language.",
+       "exampleTranslation": "In einer formellen Situation solltest du die angemessene Sprache verwenden."
+      },
+      {
+       "term": "to boot",
+       "translation": "hochfahren, booten",
+       "pos": "verb",
+       "example": "No idea what's wrong with my laptop, but I can't even boot it.",
+       "exampleTranslation": "Ich habe keine Ahnung, was mit meinem Laptop nicht stimmt, aber ich kann ihn nicht einmal hochfahren."
+      },
+      {
+       "term": "delay",
+       "translation": "Verspätung, Verzögerung",
+       "pos": "noun",
+       "example": "The train will be half an hour late. We apologise for the delay.",
+       "exampleTranslation": "Der Zug wird eine halbe Stunde Verspätung haben. Wir entschuldigen uns für die Verzögerung."
+      },
+      {
+       "term": "factor",
+       "translation": "Faktor, Gesichtspunkt, Einfluss",
+       "pos": "noun",
+       "example": "Money was not a factor in my decision to take another job.",
+       "exampleTranslation": "GL6 - Einheit 2 - Geschichte"
+      },
+      {
+       "term": "volume",
+       "translation": "Lautstärke, Volumen",
+       "pos": "noun",
+       "example": "Could you turn the volume of the TV down, please? I'm trying to sleep.",
+       "exampleTranslation": "Könntest du bitte die Lautstärke des Fernsehers leiser stellen? Ich versuche zu schlafen."
+      }
+     ]
+    },
+    {
+     "name": "Unit task",
+     "entries": [
+      {
+       "term": "approach",
+       "translation": "Herangehensweise, Vorgehensweise, Ansatz, Annäherung",
+       "pos": "noun",
+       "example": "We get the same results, but we have different approaches.",
+       "exampleTranslation": "Wir erzielen die gleichen Ergebnisse, aber wir haben unterschiedliche Herangehensweisen."
+      },
+      {
+       "term": "neglect",
+       "translation": "Vernachlässigung",
+       "pos": "noun",
+       "example": "The park in our town is in a state of neglect, it's terrible.",
+       "exampleTranslation": "Der Park in unserer Stadt ist vernachlässigt, es ist schrecklich."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Media smart",
+   "sections": [
+    {
+     "name": "Wortschatz",
+     "entries": [
+      {
+       "term": "method",
+       "translation": "Methode",
+       "pos": "noun",
+       "example": "That actor's method of acting is really intense. You almost can't separate the person from the role.",
+       "exampleTranslation": "Die Schauspielmethode dieses Schauspielers ist wirklich intensiv. Man kann die Person fast nicht von der Rolle trennen."
+      },
+      {
+       "term": "feed",
+       "translation": "Feed [eine Liste von Beiträgen auf Social Media]",
+       "pos": "noun",
+       "example": "Weird stuff has been showing up in my feed. I don't know why the algorithm thinks I want to see it!",
+       "exampleTranslation": "In meinem Feed tauchen seltsame Dinge auf. Ich weiß nicht, warum der Algorithmus denkt, dass ich das sehen möchte!"
+      },
+      {
+       "term": "advertiser",
+       "translation": "Werbefachmann/Werbefachfrau, Werber/-in, Anbieter/-in",
+       "pos": "noun",
+       "example": "Don't be an advertiser's dream consumer and just believe everything you read about a product.",
+       "exampleTranslation": "Sei nicht der Traumkunde eines Werbetreibenden und glaube nicht einfach alles, was du über ein Produkt liest."
+      },
+      {
+       "term": "bargain",
+       "translation": "Schnäppchen",
+       "pos": "noun",
+       "example": "Only a pound for this pair of used skates? That's a bargain!",
+       "exampleTranslation": "Nur ein Pfund für dieses Paar gebrauchter Schlittschuhe? Das ist ein echtes Schnäppchen!"
+      },
+      {
+       "term": "pitfall",
+       "translation": "Falle, Gefahr",
+       "pos": "noun",
+       "example": "One huge tourist pitfall is eating at places near the biggest tourist attractions, where the food is bad and the prices are high.",
+       "exampleTranslation": "Eine große Touristenfalle ist es, in der Nähe der größten Sehenswürdigkeiten zu essen, wo das Essen schlecht und die Preise hoch sind."
+      },
+      {
+       "term": "to be torn",
+       "translation": "hin und her gerissen sein",
+       "pos": "verb",
+       "example": "I was torn between staying home and going to the party.",
+       "exampleTranslation": "Ich war hin- und hergerissen zwischen Zuhausebleiben und zur Party gehen."
+      },
+      {
+       "term": "sponsorship",
+       "translation": "Sponsoring, Unterstützung",
+       "pos": "noun",
+       "example": "The organisation is looking for local sponsorships.",
+       "exampleTranslation": "Die Organisation sucht nach lokalen Sponsoren."
+      },
+      {
+       "term": "to push",
+       "translation": "Werbung machen für, verkaufen",
+       "pos": "verb",
+       "example": "Both a company and an influencer can push a product, but it's usually the company that actually sells it.",
+       "exampleTranslation": "Sowohl ein Unternehmen als auch ein Influencer können Werbung für ein Produkt machen, aber meist verkauft es das Unternehmen tatsächlich."
+      },
+      {
+       "term": "sincere",
+       "translation": "aufrichtig, seriös",
+       "pos": "adjective",
+       "example": "You said you'd like to help on the neighbourhood project. If you're being sincere about it, I could really use the help.",
+       "exampleTranslation": "Du hast gesagt, du möchtest beim Nachbarschaftsprojekt helfen. Wenn du das ernst meinst, könnte ich die Hilfe wirklich gut gebrauchen."
+      },
+      {
+       "term": "installment plan",
+       "translation": "Ratenzahlung, Teilzahlungsplan",
+       "pos": "noun",
+       "example": "We used an installment plan to buy our sofa, but there are only three installments so we won't have to pay too much for too long.",
+       "exampleTranslation": "Wir haben unser Sofa auf Raten gekauft, aber es sind nur drei Raten, daher müssen wir nicht lange zahlen."
+      },
+      {
+       "term": "tempting",
+       "translation": "verlockend",
+       "pos": "adjective",
+       "example": "These cheese sandwiches look really tempting.",
+       "exampleTranslation": "Diese Käsesandwiches sehen wirklich verlockend aus."
+      },
+      {
+       "term": "vicious cycle",
+       "translation": "Teufelskreis",
+       "pos": "noun",
+       "example": "When you are caught in a vicious cycle, it's very difficult to break out of it on your own.",
+       "exampleTranslation": "Wenn man in einem Teufelskreis gefangen ist, ist es sehr schwierig, allein daraus auszubrechen."
+      },
+      {
+       "term": "sustainability",
+       "translation": "Nachhaltigkeit",
+       "pos": "noun",
+       "example": "This company says sustainability is their first priority. Yet six countries are involved in the production and transport of each piece of clothing. That's greenwashing.",
+       "exampleTranslation": "Dieses Unternehmen behauptet, Nachhaltigkeit habe höchste Priorität. Trotzdem sind sechs Länder an Produktion und Transport jedes Kleidungsstücks beteiligt. Das ist Greenwashing."
+      },
+      {
+       "term": "colourwashing",
+       "translation": "Colourwashing [Überbegriff für gewinnorientierte PR-Methoden, die bestimmte Werte eines Unternehmens ohne Nachweisbarkeit und/oder Aufrichtigkeit kommunizieren]",
+       "pos": "noun",
+       "example": "Is graywashing another form of colourwashing? – Yeah, it's when companies say they support older people but aren't sincere about it.",
+       "exampleTranslation": "Ist Graywashing eine weitere Form von Colourwashing? – Ja, wenn Unternehmen behaupten, ältere Menschen zu unterstützen, es aber nicht ernst meinen.",
+       "explained": true
+      },
+      {
+       "term": "to qualify",
+       "translation": "die (nötigen) Voraussetzungen/Bedingungen erfüllen, (sich) qualifizieren",
+       "pos": "verb",
+       "example": "What qualifies as colourwashing? – Well, that always depends on how sincere the company is or isn't with its support for a cause.",
+       "exampleTranslation": "Was gilt als Colourwashing? – Das hängt davon ab, wie aufrichtig ein Unternehmen eine Sache tatsächlich unterstützt."
+      },
+      {
+       "term": "to predict",
+       "translation": "vorhersagen, voraussagen",
+       "pos": "verb",
+       "example": "It is hardly possible to predict the future.",
+       "exampleTranslation": "Es ist kaum möglich, die Zukunft vorherzusagen."
+      },
+      {
+       "term": "rainbow washing",
+       "translation": "Rainbow Washing [öffentliche, aber nicht wirklich ernst gemeinte Unterstützung von queeren Menschen und ihrer Community seitens eines Unternehmens/Geschäfts]",
+       "pos": "phrase",
+       "example": "Gilt die Regenbogentasse dieser Kaffeefirma als Regenbogenwäsche? – Es kommt darauf an: Unterstützen sie wirklich LGBTQ-Personen?",
+       "exampleTranslation": "Unterstützt dieser Regenbogenbecher einer Kaffeefirma wirklich LGBTQ-Menschen oder ist es nur Rainbow Washing?",
+       "explained": true
+      },
+      {
+       "term": "advocacy [no pl]",
+       "translation": "Unterstützung, Befürwortung",
+       "pos": "noun",
+       "example": "He is known for his advocacy of gay rights.",
+       "exampleTranslation": "Er ist für seine Unterstützung der Rechte homosexueller Menschen bekannt."
+      },
+      {
+       "term": "scrutiny [no pl]",
+       "translation": "Überprüfung, Untersuchung",
+       "pos": "noun",
+       "example": "The government's report will come under close scrutiny.",
+       "exampleTranslation": "Der Bericht der Regierung wird genau geprüft werden."
+      },
+      {
+       "term": "hypocrisy [no pl]",
+       "translation": "Heuchelei, Scheinheiligkeit",
+       "pos": "noun",
+       "example": "Just be honest with yourself and stop all this hypocrisy: Everyone can see you don't act according to your beliefs.",
+       "exampleTranslation": "Sei einfach ehrlich zu dir selbst und hör mit all dieser Heuchelei auf: Jeder kann sehen, dass du nicht nach deinen Überzeugungen handelst."
+      },
+      {
+       "term": "reputation [no pl]",
+       "translation": "Ruf",
+       "pos": "noun",
+       "example": "In the Middle Ages actors had a bad reputation. People often thought of them as thieves.",
+       "exampleTranslation": "Im Mittelalter hatten Schauspieler einen schlechten Ruf. Die Leute hielten sie oft für Diebe."
+      },
+      {
+       "term": "genuine",
+       "translation": "wirklich, echt",
+       "pos": "adjective",
+       "example": "She showed a genuine interest in my talent.",
+       "exampleTranslation": "Sie zeigte echtes Interesse an meinem Talent."
+      },
+      {
+       "term": "corporate",
+       "translation": "Unternehmens-",
+       "pos": "noun",
+       "example": "In the corporate world, large firms have the money to spend many millions on a single ad.",
+       "exampleTranslation": "In der Geschäftswelt haben große Firmen das Geld, viele Millionen für eine einzige Werbung auszugeben."
+      },
+      {
+       "term": "marketer",
+       "translation": "Marketingexperte/Marketingexpertin",
+       "pos": "noun",
+       "example": "Marketers identify customer needs and find ways to meet them. Advertising is just one tool that marketers use to reach customers.",
+       "exampleTranslation": "Marketer identifizieren Kundenbedürfnisse und finden Wege, diese zu erfüllen. Werbung ist nur ein Werkzeug, das Marketer nutzen, um Kunden zu erreichen."
+      },
+      {
+       "term": "to originate from",
+       "translation": "entstammen, seinen Anfang nehmen in",
+       "pos": "verb",
+       "example": "Many traditions originate from ancient times.",
+       "exampleTranslation": "Viele Traditionen stammen aus alten Zeiten."
+      },
+      {
+       "term": "superficial",
+       "translation": "oberflächlich",
+       "pos": "adjective",
+       "example": "I don't like the new book because the characters are very superficial.",
+       "exampleTranslation": "Ich mag das neue Buch nicht, weil die Figuren sehr oberflächlich sind."
+      },
+      {
+       "term": "to be committed to sth",
+       "translation": "etw. verpflichtet sein, engagiert sein für etw.",
+       "pos": "verb",
+       "example": "Are you committed to any social or political causes? – Yes, to animal protection.",
+       "exampleTranslation": "Sind Sie für soziale oder politische Anliegen engagiert? – Ja, auf den Tierschutz."
+      },
+      {
+       "term": "indifference [no pl]",
+       "translation": "Gleichgültigkeit",
+       "pos": "noun",
+       "example": "You're angry about the plans I've made, yet when I asked you what you wanted to do, you just shrugged your shoulders with indifference!",
+       "exampleTranslation": "Du bist wütend über meine Pläne, aber als ich dich gefragt habe, was du machen willst, hast du nur gleichgültig mit den Schultern gezuckt!"
+      },
+      {
+       "term": "societal norm",
+       "translation": "gesellschaftliche Norm",
+       "pos": "phrase",
+       "example": "I'm going to move to Germany for a year and need to learn about the societal norms there before I go.",
+       "exampleTranslation": "Ich werde für ein Jahr nach Deutschland ziehen und muss mich vor meiner Abreise über die gesellschaftlichen Normen dort informieren."
+      },
+      {
+       "term": "to give sb credit for sth",
+       "translation": "jmdn. für etw. würdigen, jmdm. für etw. Anerkennung zollen",
+       "pos": "verb",
+       "example": "We should give more credit to stage crews for the work they do in the theatre industry. It's not just actors who make plays successful.",
+       "exampleTranslation": "Wir sollten den Bühnenteams mehr Anerkennung für ihre Arbeit in der Theaterbranche geben. Es sind nicht nur Schauspieler, die Stücke erfolgreich machen."
+      },
+      {
+       "term": "homosexuality [no pl]",
+       "translation": "Homosexualität",
+       "pos": "noun",
+       "example": "I heard there was no homosexuality until the 19th century. – Are you joking? There have always been people with same-sex attractions and relationships. It's just the term 'homosexuality' that didn't exist until the 19th century.",
+       "exampleTranslation": "Ich habe gehört, dass es bis zum 19. Jahrhundert keine Homosexualität gab. – Machst du Witze? Es gab immer Menschen mit gleichgeschlechtlicher Anziehung und Beziehungen. Es ist einfach der Begriff 'Homosexualität', der erst im 19. Jahrhundert existierte."
+      },
+      {
+       "term": "appropriate",
+       "translation": "angemessen",
+       "pos": "adjective",
+       "example": "It helps to present sensitive subjects appropriately, and using appropriate terms in discussions is one way to do that.",
+       "exampleTranslation": "Es hilft, sensible Themen angemessen zu präsentieren, und die Verwendung geeigneter Begriffe in Diskussionen ist eine Möglichkeit, dies zu tun."
+      },
+      {
+       "term": "concern",
+       "translation": "Sorge",
+       "pos": "noun",
+       "example": "His biggest concern at the moment is his mother's poor health.",
+       "exampleTranslation": "Seine größte Sorge ist die schlechte Gesundheit seiner Mutter."
+      },
+      {
+       "term": "liberation [no pl]",
+       "translation": "Befreiung",
+       "pos": "noun",
+       "example": "The liberation of enslaved people was one very important result of the American Civil War.",
+       "exampleTranslation": "Die Befreiung der versklavten Menschen war ein sehr wichtiges Ergebnis des Amerikanischen Bürgerkriegs."
+      },
+      {
+       "term": "to capitalise on sth",
+       "translation": "aus etw. Kapital schlagen",
+       "pos": "verb",
+       "example": "She is very good at capitalising on other people's mistakes.",
+       "exampleTranslation": "Sie versteht es, aus den Fehlern anderer Kapital zu schlagen."
+      },
+      {
+       "term": "exploitation [no pl]",
+       "translation": "Ausbeutung, Abbau",
+       "pos": "noun",
+       "example": "The exploitation of natural resources is causing more and more environmental problems.",
+       "exampleTranslation": "Die Ausbeutung natürlicher Ressourcen verursacht immer mehr Umweltprobleme."
+      },
+      {
+       "term": "heterosexual",
+       "translation": "heterosexuell",
+       "pos": "adjective",
+       "example": "A heterosexual relationship is a romantic and/or sexual relationship between a man and a woman.",
+       "exampleTranslation": "Eine heterosexuelle Beziehung ist eine romantische und/oder sexuelle Beziehung zwischen einem Mann und einer Frau."
+      },
+      {
+       "term": "workforce [no pl]",
+       "translation": "Arbeitskräfte, Belegschaft",
+       "pos": "noun",
+       "example": "The company has a very large and diverse workforce.",
+       "exampleTranslation": "Das Unternehmen hat eine große und vielfältige Belegschaft."
+      },
+      {
+       "term": "to boycott",
+       "translation": "boykottieren",
+       "pos": "verb",
+       "example": "After the bus tickets got really expensive, the citizens boycotted the city's bus system.",
+       "exampleTranslation": "Nachdem die Bustickets sehr teuer wurden, boykottierten die Bürger das Bussystem der Stadt."
+      },
+      {
+       "term": "guilty",
+       "translation": "schuldig",
+       "pos": "adjective",
+       "example": "I didn't feel guilty because I hadn't done anything wrong.",
+       "exampleTranslation": "Ich fühlte mich nicht schuldig, weil ich nichts falsch gemacht hatte."
+      },
+      {
+       "term": "claim",
+       "translation": "Behauptung, Anspruch, [hier:] Marketingaussage",
+       "pos": "noun",
+       "example": "The claim the company makes about their new product has nothing to do with reality; we checked.",
+       "exampleTranslation": "Die Behauptung, die das Unternehmen über ihr neues Produkt macht, hat nichts mit der Realität zu tun; Wir haben nachgesehen."
+      },
+      {
+       "term": "formula",
+       "translation": "Formel",
+       "pos": "noun",
+       "example": "The product is made using a secret formula that the company refuses to reveal.",
+       "exampleTranslation": "Das Produkt wird mit einer geheimen Formel hergestellt, die das Unternehmen nicht preisgeben will."
+      },
+      {
+       "term": "ad copy",
+       "translation": "Werbetext",
+       "pos": "noun",
+       "example": "That's too much ad copy; no customer will take the time to read it.",
+       "exampleTranslation": "Das ist zu viel Werbetext; Kein Kunde nimmt sich die Zeit, es zu lesen."
+      },
+      {
+       "term": "desire",
+       "translation": "Verlangen, Wunsch, Sehnsucht",
+       "pos": "noun",
+       "example": "His only desire was to become a pop star.",
+       "exampleTranslation": "Sein einziger Wunsch war es, Popstar zu werden."
+      },
+      {
+       "term": "to persuade",
+       "translation": "überreden, überzeugen",
+       "pos": "verb",
+       "example": "What's an effective advertising method to persuade someone to buy something? – That's easy, make it sound urgent: \"Hurry, or you'll miss out!\"",
+       "exampleTranslation": "Was ist eine effektive Werbemethode, um jemanden zum Kauf zu bewegen? – Das ist einfach, lass es dringend klingen: \"Beeil dich, sonst verpasst du etwas!\""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Unit 3",
+   "sections": [
+    {
+     "name": "Introduction",
+     "entries": [
+      {
+       "term": "bookshop",
+       "translation": "Buchhandlung",
+       "pos": "noun",
+       "example": "Our bookshop has got books, but no comics.",
+       "exampleTranslation": "Unsere Buchhandlung hat Bücher, aber keine Comics."
+      },
+      {
+       "term": "autobiography",
+       "translation": "Autobiografie",
+       "pos": "noun",
+       "example": "A lot of celebrities write their autobiographies when they're still quite young.",
+       "exampleTranslation": "Viele Prominente schreiben ihre Autobiografien, als sie noch recht jung sind."
+      },
+      {
+       "term": "old-fashioned",
+       "translation": "altmodisch",
+       "pos": "adjective",
+       "example": "I love those old-fashioned sweet shops in old English villages, where everything still looks like it did 150 years ago.",
+       "exampleTranslation": "Ich liebe diese altmodischen Süßwarenläden in alten englischen Dörfern, wo alles noch so aussieht wie vor 150 Jahren."
+      },
+      {
+       "term": "formal",
+       "translation": "formal, formell, förmlich",
+       "pos": "adjective",
+       "example": "Meeting the King is a very formal situation.",
+       "exampleTranslation": "Den König zu treffen ist eine sehr formelle Situation."
+      },
+      {
+       "term": "informal",
+       "translation": "informell, zwanglos",
+       "pos": "adjective",
+       "example": "With your friends, you use informal language.",
+       "exampleTranslation": "Mit Freunden verwendet man informelle Sprache."
+      },
+      {
+       "term": "to confuse",
+       "translation": "verwirren",
+       "pos": "verb",
+       "example": "You're confusing me. Can you please explain it again?",
+       "exampleTranslation": "Du verwirrst mich. Kannst du es bitte noch einmal erklären?"
+      },
+      {
+       "term": "to fascinate",
+       "translation": "faszinieren",
+       "pos": "verb",
+       "example": "When a story fascinates me, I can never put the book down!",
+       "exampleTranslation": "Wenn mich eine Geschichte fasziniert, kann ich das Buch nie aus der Hand legen!"
+      }
+     ]
+    },
+    {
+     "name": "Station 1",
+     "entries": [
+      {
+       "term": "riot",
+       "translation": "Aufruhr, Ausschreitung, Unruhe, Krawall",
+       "pos": "noun",
+       "example": "Five prisoners were able to escape during the prison riot.",
+       "exampleTranslation": "Fünf Gefangene konnten während des Gefängnisaufstands fliehen."
+      },
+      {
+       "term": "gifted",
+       "translation": "begabt",
+       "pos": "adjective",
+       "example": "My little sister is very gifted: She was able to go from Year 5 directly to Year 7.",
+       "exampleTranslation": "Meine kleine Schwester ist sehr begabt: Sie konnte direkt von der fünften in die siebte Klasse wechseln."
+      },
+      {
+       "term": "adulthood",
+       "translation": "Erwachsensein, Erwachsenenalter",
+       "pos": "noun",
+       "example": "At the age of 18 you legally reach adulthood.",
+       "exampleTranslation": "Mit 18 Jahren erreicht man rechtlich das Erwachsenenalter."
+      },
+      {
+       "term": "authorities [pl]",
+       "translation": "Staatsgewalt, Behörden",
+       "pos": "noun",
+       "example": "The riot provided a reason for the authorities to stop the demonstration.",
+       "exampleTranslation": "Der Aufstand lieferte den Behörden einen Grund, die Demonstration einzustellen."
+      },
+      {
+       "term": "to persecute",
+       "translation": "verfolgen",
+       "pos": "verb",
+       "example": "The family decided to start a new life in Europe because they were persecuted in their home country.",
+       "exampleTranslation": "Die Familie beschloss, ein neues Leben in Europa zu beginnen, weil sie in ihrem Heimatland verfolgt wurde."
+      },
+      {
+       "term": "prime minister",
+       "translation": "Premierminister/-in",
+       "pos": "noun",
+       "example": "The Prime Minister usually lives at 10 Downing Street.",
+       "exampleTranslation": "Der Premierminister wohnt gewöhnlich in der Downing Street 10."
+      },
+      {
+       "term": "residence",
+       "translation": "Wohnsitz",
+       "pos": "noun",
+       "example": "The couple's main residence is Berlin, but they also live in Spain for three months each year.",
+       "exampleTranslation": "Der Hauptwohnsitz des Paares ist Berlin, aber sie leben auch drei Monate pro Jahr in Spanien."
+      },
+      {
+       "term": "to block",
+       "translation": "blockieren, abblocken",
+       "pos": "verb",
+       "example": "You can block messages from people you don't like.",
+       "exampleTranslation": "Du kannst Nachrichten von Personen blockieren, die du nicht magst."
+      },
+      {
+       "term": "on horseback",
+       "translation": "zu Pferde",
+       "pos": "phrase",
+       "example": "Travelling through Cornwall on horseback was so relaxing. I never want to spend a holiday in a car again!",
+       "exampleTranslation": "Zu Pferd durch Cornwall zu reisen, war so entspannend. Ich möchte nie wieder einen Urlaub im Auto verbringen!"
+      },
+      {
+       "term": "to strike",
+       "translation": "streiken",
+       "pos": "verb",
+       "example": "Workers often strike for more money.",
+       "exampleTranslation": "Arbeiter streiken oft für mehr Geld."
+      },
+      {
+       "term": "to remain",
+       "translation": "bleiben",
+       "pos": "verb",
+       "example": "Don't be afraid of change; otherwise things just remain the same.",
+       "exampleTranslation": "Hab keine Angst vor Veränderungen; sonst bleibt alles gleich."
+      },
+      {
+       "term": "passion",
+       "translation": "Passion, Leidenschaft",
+       "pos": "noun",
+       "example": "Singing is my one and only passion; I live for it.",
+       "exampleTranslation": "Singen ist meine einzige Leidenschaft; Ich lebe dafür."
+      },
+      {
+       "term": "oppressed",
+       "translation": "unterdrückt",
+       "pos": "adjective",
+       "example": "When people are oppressed, they don't have the same opportunities and freedom as others.",
+       "exampleTranslation": "Wenn Menschen unterdrückt werden, haben sie nicht die gleichen Chancen und Freiheiten wie andere."
+      },
+      {
+       "term": "extremist",
+       "translation": "Extremist/-in",
+       "pos": "noun",
+       "example": "A group of extremists was responsible for the attack.",
+       "exampleTranslation": "Eine Gruppe von Extremisten war für den Anschlag verantwortlich."
+      },
+      {
+       "term": "shield",
+       "translation": "Schild",
+       "pos": "noun",
+       "example": "In the museum we saw the shield of a Roman soldier from 2,000 years ago.",
+       "exampleTranslation": "Im Museum sahen wir den Schild eines römischen Soldaten von vor 2.000 Jahren."
+      },
+      {
+       "term": "amongst",
+       "translation": "unter, zwischen",
+       "pos": "adjective",
+       "example": "The famous movie star stood amongst thousands of people at the concert; nobody recognised her.",
+       "exampleTranslation": "Der berühmte Filmstar stand bei dem Konzert unter Tausenden von Menschen; niemand erkannte sie."
+      },
+      {
+       "term": "to fold",
+       "translation": "falten, klappen, verschränken",
+       "pos": "verb",
+       "example": "My mum stared at me with folded arms and an angry face and just said, \"You're in big trouble,\" after I'd got home way too late from the party.",
+       "exampleTranslation": "Meine Mutter starrte mich mit verschränkten Armen und einem wütenden Gesicht an und sagte nur: \"Du bist in großen Schwierigkeiten\", nachdem ich viel zu spät von der Party nach Hause gekommen war."
+      },
+      {
+       "term": "still",
+       "translation": "still, ruhig",
+       "pos": "adverb",
+       "example": "Stand still while I take this photo, please.",
+       "exampleTranslation": "Steh bitte still, während ich dieses Foto mache."
+      },
+      {
+       "term": "to guard",
+       "translation": "bewachen",
+       "pos": "verb",
+       "example": "Many world leaders have to be guarded whenever they're in public.",
+       "exampleTranslation": "Viele Staats- und Regierungschefs müssen in der Öffentlichkeit bewacht werden."
+      },
+      {
+       "term": "to reveal",
+       "translation": "offenbaren, aufdecken",
+       "pos": "verb",
+       "example": "Journalists never reveal their sources.",
+       "exampleTranslation": "Journalisten geben ihre Quellen niemals preis."
+      },
+      {
+       "term": "commentator",
+       "translation": "Kommentator/-in, Reporter/-in",
+       "pos": "noun",
+       "example": "The sports commentator didn't know what to say after the player lost his shorts on the pitch!",
+       "exampleTranslation": "Der Sportkommentator wusste nicht, was er sagen sollte, nachdem der Spieler auf dem Spielfeld seine Shorts verloren hatte!"
+      },
+      {
+       "term": "gear",
+       "translation": "Ausrüstung, Zeug",
+       "pos": "noun",
+       "example": "You can't climb a mountain in shorts and a T-shirt; you need special gear.",
+       "exampleTranslation": "Du kannst keinen Berg in Shorts und T‑Shirt besteigen; du brauchst spezielle Ausrüstung."
+      },
+      {
+       "term": "aggressive",
+       "translation": "aggressiv",
+       "pos": "adjective",
+       "example": "The dog is barking so aggressively. I don't want it to attack me.",
+       "exampleTranslation": "Der Hund bellt so aggressiv. Ich möchte nicht, dass er mich angreift."
+      },
+      {
+       "term": "alarmed",
+       "translation": "alarmiert, beunruhigt",
+       "pos": "adjective",
+       "example": "He was alarmed when his phone rang in the middle of the night.",
+       "exampleTranslation": "Er war alarmiert, als sein Telefon mitten in der Nacht klingelte."
+      },
+      {
+       "term": "amused",
+       "translation": "amüsiert",
+       "pos": "adjective",
+       "example": "I wasn't amused by my friends' jokes when I showed them my new shoes.",
+       "exampleTranslation": "Die Witze meiner Freunde fanden ich nicht lustig, als ich ihnen meine neuen Schuhe zeigte."
+      },
+      {
+       "term": "annoyed",
+       "translation": "verärgert, genervt",
+       "pos": "adjective",
+       "example": "The first time you told me what to do, I was annoyed, but you've just done it again and now I'm really angry!",
+       "exampleTranslation": "Als du mir das erste Mal gesagt hast, was ich tun soll, war ich genervt, aber du hast es gerade wieder gemacht und jetzt bin ich wirklich wütend!"
+      },
+      {
+       "term": "controlled",
+       "translation": "kontrolliert, beherrscht",
+       "pos": "adjective",
+       "example": "He never shows much emotion; he always looks so controlled.",
+       "exampleTranslation": "Er zeigt nie viele Gefühle; er wirkt immer sehr beherrscht."
+      },
+      {
+       "term": "energetic",
+       "translation": "energiegeladen, schwungvoll",
+       "pos": "adjective",
+       "example": "I have a roommate who is too energetic for me in the morning. He talks non-stop while I'm still only half awake.",
+       "exampleTranslation": "Ich habe einen Mitbewohner, der morgens zu energiegeladen für mich ist. Er redet ununterbrochen, während ich noch halb wach bin."
+      },
+      {
+       "term": "enraged",
+       "translation": "wütend, aufgebracht",
+       "pos": "adjective",
+       "example": "He felt so enraged that his face started to get red while he was screaming at us.",
+       "exampleTranslation": "Er war so wütend, dass sein Gesicht rot wurde, während er uns anschrie."
+      },
+      {
+       "term": "fascinated",
+       "translation": "fasziniert",
+       "pos": "adjective",
+       "example": "As a child I became fascinated by dinosaurs.",
+       "exampleTranslation": "Als Kind war ich von Dinosauriern fasziniert."
+      },
+      {
+       "term": "frightened",
+       "translation": "verängstigt",
+       "pos": "adjective",
+       "example": "Some children are frightened of the dark.",
+       "exampleTranslation": "Manche Kinder haben Angst vor der Dunkelheit."
+      },
+      {
+       "term": "hateful",
+       "translation": "hasserfüllt",
+       "pos": "adjective",
+       "example": "Not everyone at a riot is a hateful person. – Then why are they so violent?",
+       "exampleTranslation": "Nicht jeder bei einem Aufstand ist ein hasserfüllter Mensch. – Warum sind sie dann so gewalttätig?"
+      }
+     ]
+    },
+    {
+     "name": "Station 2",
+     "entries": [
+      {
+       "term": "to assume",
+       "translation": "annehmen",
+       "pos": "verb",
+       "example": "You can't assume everybody shares your likes and dislikes.",
+       "exampleTranslation": "Du kannst nicht davon ausgehen, dass jeder deine Vorlieben und Abneigungen teilt."
+      },
+      {
+       "term": "to suggest",
+       "translation": "andeuten, nahelegen",
+       "pos": "verb",
+       "example": "The statistics suggest that we've got a bigger problem than we realised.",
+       "exampleTranslation": "Die Statistiken deuten darauf hin, dass wir ein größeres Problem haben als gedacht."
+      },
+      {
+       "term": "to conclude",
+       "translation": "enden, schließen, schlussfolgern",
+       "pos": "verb",
+       "example": "At the end of the article the author concludes that it's too late to stop climate change.",
+       "exampleTranslation": "Am Ende des Artikels kommt der Autor zu der Schlussfolgerung, dass es zu spät ist, den Klimawandel aufzuhalten."
+      },
+      {
+       "term": "hunt",
+       "translation": "Jagd",
+       "pos": "noun",
+       "example": "I can't imagine going on a hunt to shoot animals.",
+       "exampleTranslation": "Ich kann mir nicht vorstellen, auf die Jagd zu gehen, um Tiere zu erschießen."
+      },
+      {
+       "term": "to imprison",
+       "translation": "verhaften, inhaftieren",
+       "pos": "verb",
+       "example": "Gandhi was imprisoned several times for taking part in the independence movement.",
+       "exampleTranslation": "Gandhi wurde mehrmals inhaftiert, weil er an der Unabhängigkeitsbewegung teilnahm."
+      },
+      {
+       "term": "obedient",
+       "translation": "gehorsam",
+       "pos": "adjective",
+       "example": "Lisa's children are so obedient, while mine don't do anything I tell them to do. Where did I go wrong as a parent?",
+       "exampleTranslation": "Lisas Kinder sind so gehorsam, während meine nichts tun, was ich ihnen sage. Wo habe ich als Elternteil einen Fehler gemacht?"
+      },
+      {
+       "term": "blade",
+       "translation": "Klinge",
+       "pos": "noun",
+       "example": "Be careful, that's a sharp blade!",
+       "exampleTranslation": "Vorsicht, das ist eine scharfe Klinge!"
+      },
+      {
+       "term": "knife, knives [pl]",
+       "translation": "Messer",
+       "pos": "noun",
+       "example": "The robber pointed a knife at the woman.",
+       "exampleTranslation": "Der Räuber richtete ein Messer auf die Frau."
+      },
+      {
+       "term": "to rise",
+       "translation": "aufsteigen",
+       "pos": "verb",
+       "example": "I love watching the sun rise over the mountains.",
+       "exampleTranslation": "Ich liebe es, die Sonne über den Bergen aufgehen zu sehen."
+      },
+      {
+       "term": "to suck",
+       "translation": "saugen, einsaugen, aufsaugen",
+       "pos": "verb",
+       "example": "Be careful at that beach; the waves there can really suck you under!",
+       "exampleTranslation": "Sei vorsichtig an diesem Strand; Die Wellen dort können einen wirklich unter Wasser saugen!"
+      },
+      {
+       "term": "battery",
+       "translation": "Batterie, Akku",
+       "pos": "noun",
+       "example": "My phone battery was too low, so I borrowed my friend's phone to call my parents.",
+       "exampleTranslation": "Mein Handyakku war zu leer, also habe ich mir das Handy meiner Freundin ausgeliehen, um meine Eltern anzurufen."
+      },
+      {
+       "term": "charger",
+       "translation": "Ladegerät",
+       "pos": "noun",
+       "example": "Can I borrow your phone charger? I forgot mine.",
+       "exampleTranslation": "Kann ich mir dein Ladegerät ausleihen? Ich habe meines vergessen."
+      },
+      {
+       "term": "log",
+       "translation": "Baumstamm, Holzklotz, Holzscheit",
+       "pos": "noun",
+       "example": "Let's make a fire on the beach. I'll grab those logs over there.",
+       "exampleTranslation": "Lass uns am Strand ein Feuer machen. Ich hole die Holzscheite dort drüben."
+      },
+      {
+       "term": "scar",
+       "translation": "Narbe",
+       "pos": "noun",
+       "example": "Where is your scar from? – Oh, I cut myself really badly a few years ago.",
+       "exampleTranslation": "Woher hast du die Narbe? – Ich habe mich vor einigen Jahren richtig schlimm geschnitten."
+      },
+      {
+       "term": "myth",
+       "translation": "Mythos, Legende",
+       "pos": "noun",
+       "example": "What's your favourite Greek myth? – I like the story of Perseus and Medusa.",
+       "exampleTranslation": "Was ist dein liebster griechischer Mythos? – Ich mag die Geschichte von Perseus und Medusa."
+      },
+      {
+       "term": "devil",
+       "translation": "Teufel",
+       "pos": "noun",
+       "example": "In many old works of art, the devil is represented with horns.",
+       "exampleTranslation": "In vielen alten Kunstwerken wird der Teufel mit Hörnern dargestellt."
+      },
+      {
+       "term": "visible",
+       "translation": "sichtbar",
+       "pos": "adjective",
+       "example": "On a clear day, the cliffs of Dover are visible from France.",
+       "exampleTranslation": "An klaren Tagen sind die Klippen von Dover von Frankreich aus sichtbar."
+      },
+      {
+       "term": "sleeve",
+       "translation": "Ärmel",
+       "pos": "noun",
+       "example": "Why did I wear short sleeves today? The air-conditioning in this office is so cold!",
+       "exampleTranslation": "Warum habe ich heute kurze Ärmel getragen? Die Klimaanlage in diesem Büro ist so kalt!"
+      },
+      {
+       "term": "breeze",
+       "translation": "Brise",
+       "pos": "noun",
+       "example": "It's too hot here downtown. Let's go down to the beach, where there'll be a breeze.",
+       "exampleTranslation": "Hier in der Innenstadt ist es zu heiß. Lass uns an den Strand gehen, dort weht eine Brise."
+      },
+      {
+       "term": "intense",
+       "translation": "intensiv, heftig",
+       "pos": "adjective",
+       "example": "Love is an intense feeling.",
+       "exampleTranslation": "Liebe ist ein intensives Gefühl."
+      },
+      {
+       "term": "aloud",
+       "translation": "laut",
+       "pos": "adjective",
+       "example": "Some people only sing aloud in the shower.",
+       "exampleTranslation": "Manche Menschen singen nur unter der Dusche laut."
+      },
+      {
+       "term": "anger [no pl]",
+       "translation": "Zorn, Wut",
+       "pos": "noun",
+       "example": "Jack was white with anger!",
+       "exampleTranslation": "Jack war außer sich vor Wut!"
+      },
+      {
+       "term": "order",
+       "translation": "Befehl",
+       "pos": "noun",
+       "example": "I don't take orders from anyone, especially not from my little brother!",
+       "exampleTranslation": "Ich nehme von niemandem Befehle entgegen, besonders nicht von meinem kleinen Bruder!"
+      },
+      {
+       "term": "scream",
+       "translation": "Schrei",
+       "pos": "noun",
+       "example": "On their way home they heard a scream and ran to help.",
+       "exampleTranslation": "Auf dem Heimweg hörten sie einen Schrei und rannten los, um zu helfen."
+      },
+      {
+       "term": "perception",
+       "translation": "Wahrnehmung",
+       "pos": "noun",
+       "example": "Verbs like 'see', 'watch', 'hear', 'feel' are verbs of perception.",
+       "exampleTranslation": "Verben wie „sehen“, „hören“ oder „fühlen“ sind Wahrnehmungsverben."
+      },
+      {
+       "term": "scent",
+       "translation": "Duft, Geruch",
+       "pos": "noun",
+       "example": "People usually like flowers for their scent as well as for how they look.",
+       "exampleTranslation": "Menschen mögen Blumen meist wegen ihres Duftes ebenso wie wegen ihres Aussehens."
+      },
+      {
+       "term": "impressive",
+       "translation": "beeindruckend",
+       "pos": "adjective",
+       "example": "The size of their new house is impressive. I didn't think it'd be so big!",
+       "exampleTranslation": "Die Größe ihres neuen Hauses ist beeindruckend. Ich hätte nicht gedacht, dass es so groß ist!"
+      },
+      {
+       "term": "defence",
+       "translation": "Verteidigung",
+       "pos": "noun",
+       "example": "Two percent of the country's budget is spent on defence.",
+       "exampleTranslation": "Zwei Prozent des Staatshaushalts werden für die Verteidigung ausgegeben."
+      }
+     ]
+    },
+    {
+     "name": "Station 3",
+     "entries": [
+      {
+       "term": "escape",
+       "translation": "Flucht",
+       "pos": "noun",
+       "example": "Reading is my escape after a hard day at school.",
+       "exampleTranslation": "Lesen ist meine Flucht nach einem harten Schultag."
+      },
+      {
+       "term": "narrowly",
+       "translation": "knapp",
+       "pos": "adverb",
+       "example": "The two teams were both very good; the French team only narrowly won.",
+       "exampleTranslation": "Beide Teams waren sehr gut; die französische Mannschaft gewann nur knapp."
+      },
+      {
+       "term": "on the run",
+       "translation": "auf der Flucht",
+       "pos": "phrase",
+       "example": "The criminals were on the run for weeks before the police caught them.",
+       "exampleTranslation": "Die Verbrecher waren wochenlang auf der Flucht, bevor die Polizei sie fasste."
+      },
+      {
+       "term": "extraordinary",
+       "translation": "außergewöhnlich",
+       "pos": "adjective",
+       "example": "Mozart was an extraordinary musician. He could hear a piece of music once and play the whole thing from memory.",
+       "exampleTranslation": "Mozart war ein außergewöhnlicher Musiker. Er konnte ein Musikstück einmal hören und es anschließend vollständig aus dem Gedächtnis spielen."
+      },
+      {
+       "term": "tide",
+       "translation": "Ebbe und Flut",
+       "pos": "noun",
+       "example": "People used the rising tide to transport goods up the river.",
+       "exampleTranslation": "Die Menschen nutzten die steigende Flut, um Waren flussaufwärts zu transportieren."
+      },
+      {
+       "term": "to lift",
+       "translation": "heben, anheben, sich heben",
+       "pos": "verb",
+       "example": "Could you help me to lift this heavy box?",
+       "exampleTranslation": "Kannst du mir helfen, diese schwere Kiste anzuheben?"
+      },
+      {
+       "term": "lung",
+       "translation": "Lunge",
+       "pos": "noun",
+       "example": "If there's water in your lungs, you can't breathe.",
+       "exampleTranslation": "Wenn sich Wasser in deinen Lungen befindet, kannst du nicht atmen."
+      },
+      {
+       "term": "teacup",
+       "translation": "Teetasse",
+       "pos": "noun",
+       "example": "It's fun to drink tea at my grandma's house. It feels so posh with all her beautiful old teacups.",
+       "exampleTranslation": "Es macht Spaß, bei meiner Großmutter Tee zu trinken. Es wirkt so vornehm mit all ihren schönen alten Teetassen."
+      },
+      {
+       "term": "heartbeat",
+       "translation": "Herzschlag",
+       "pos": "noun",
+       "example": "When I'm stressed, I can sometimes hear my heartbeat.",
+       "exampleTranslation": "Wenn ich gestresst bin, kann ich manchmal meinen Herzschlag hören."
+      },
+      {
+       "term": "to glance (at)",
+       "translation": "einen Blick werfen (auf), blicken (auf)",
+       "pos": "verb",
+       "example": "When he heard the bell, he quickly glanced at his watch.",
+       "exampleTranslation": "Als er die Glocke hörte, warf er schnell einen Blick auf seine Uhr."
+      },
+      {
+       "term": "wasp",
+       "translation": "Wespe",
+       "pos": "noun",
+       "example": "I love picnics, but not in late summer with all the wasps.",
+       "exampleTranslation": "Ich liebe Picknicks, aber nicht im Spätsommer mit all den Wespen."
+      },
+      {
+       "term": "in mid-flight",
+       "translation": "mitten im Flug",
+       "pos": "phrase",
+       "example": "The plane disappeared in mid-flight; nobody knows where it is.",
+       "exampleTranslation": "Das Flugzeug verschwand mitten im Flug; niemand weiß, wo es ist."
+      },
+      {
+       "term": "wing",
+       "translation": "Flügel",
+       "pos": "noun",
+       "example": "Birds and some insects have got wings to fly.",
+       "exampleTranslation": "Vögel und einige Insekten haben Flügel zum Fliegen."
+      },
+      {
+       "term": "to silence",
+       "translation": "zum Schweigen bringen",
+       "pos": "verb",
+       "example": "The shock of the bad news silenced him completely.",
+       "exampleTranslation": "Der Schock über die schlechten Nachrichten brachte ihn völlig zum Schweigen."
+      },
+      {
+       "term": "seagull",
+       "translation": "Möwe",
+       "pos": "noun",
+       "example": "What a cheeky seagull; it's just stolen my sandwich!",
+       "exampleTranslation": "Was für eine freche Möwe – sie hat gerade mein Sandwich gestohlen!"
+      },
+      {
+       "term": "frozen",
+       "translation": "(tief)gefroren, [hier:] erstarrt",
+       "pos": "adjective",
+       "example": "Ice is frozen water.",
+       "exampleTranslation": "Eis ist gefrorenes Wasser."
+      },
+      {
+       "term": "to step back",
+       "translation": "zurückgehen",
+       "pos": "verb",
+       "example": "You're looking at the problem too narrowly; step back and look at the big picture.",
+       "exampleTranslation": "Du betrachtest das Problem zu eng; tritt einen Schritt zurück und sieh dir das große Ganze an."
+      },
+      {
+       "term": "motion",
+       "translation": "Bewegung",
+       "pos": "noun",
+       "example": "First Tim agreed to the plan, then Liz, and now everything is in motion.",
+       "exampleTranslation": "Zuerst stimmte Tim dem Plan zu, dann Liz, und nun ist alles in Bewegung."
+      },
+      {
+       "term": "to sense",
+       "translation": "spüren, fühlen",
+       "pos": "verb",
+       "example": "My best friend and I always sense each other's moods. We don't need words to communicate if we're happy or sad.",
+       "exampleTranslation": "Meine beste Freundin und ich spüren immer gegenseitig ihre Stimmungen. Wir brauchen keine Worte, um zu kommunizieren, ob wir glücklich oder traurig sind."
+      },
+      {
+       "term": "hiding place",
+       "translation": "Versteck",
+       "pos": "noun",
+       "example": "What's your hiding place when you feel sad and lonely? – I just stay in bed.",
+       "exampleTranslation": "Wo versteckst du dich, wenn du traurig und einsam bist? – Ich bleibe einfach im Bett."
+      },
+      {
+       "term": "to split up, split up, split up",
+       "translation": "sich trennen",
+       "pos": "verb",
+       "example": "My parents split up when I was a teenager.",
+       "exampleTranslation": "Meine Eltern trennten sich, als ich ein Teenager war."
+      },
+      {
+       "term": "to be concerned",
+       "translation": "beunruhigt sein, besorgt sein",
+       "pos": "verb",
+       "example": "You seem to be concerned about something. – Yeah, my mum fell down some stairs and is now in hospital.",
+       "exampleTranslation": "Du wirkst wegen etwas besorgt. – Ja, meine Mutter ist die Treppe hinuntergefallen und liegt nun im Krankenhaus."
+      },
+      {
+       "term": "foreshadowing [no pl]",
+       "translation": "Andeutung, Vorahnung",
+       "pos": "noun",
+       "example": "Writers often use foreshadowing to give the reader clues before something shocking happens.",
+       "exampleTranslation": "Autoren machen oft Andeutungen, um dem Leser Hinweise zu geben, bevor etwas Schockierendes passiert."
+      },
+      {
+       "term": "beside",
+       "translation": "neben",
+       "pos": "preposition",
+       "example": "She woke up with her dog beside her.",
+       "exampleTranslation": "Sie wachte mit ihrem Hund neben sich auf."
+      },
+      {
+       "term": "moon",
+       "translation": "Mond",
+       "pos": "noun",
+       "example": "At night, when there are no clouds, you can see the moon.",
+       "exampleTranslation": "Nachts, wenn keine Wolken sind, kann man den Mond sehen."
+      },
+      {
+       "term": "possibly",
+       "translation": "möglicherweise",
+       "pos": "adverb",
+       "example": "His opinion is extreme. But could he possibly be right?",
+       "exampleTranslation": "Seine Meinung ist extrem. Aber könnte er möglicherweise recht haben?"
+      },
+      {
+       "term": "to challenge",
+       "translation": "herausfordern, infrage stellen",
+       "pos": "verb",
+       "example": "She always thinks she's right and can't deal with it when people challenge her opinions.",
+       "exampleTranslation": "Sie denkt immer, sie habe recht und kommt nicht damit klar, wenn jemand ihre Ansichten infrage stellt."
+      },
+      {
+       "term": "sudden",
+       "translation": "plötzlich",
+       "pos": "adjective",
+       "example": "The man screamed in pain and there was sudden silence in the whole restaurant.",
+       "exampleTranslation": "Der Mann schrie vor Schmerz, und plötzlich herrschte Stille im ganzen Restaurant."
+      },
+      {
+       "term": "dilemma",
+       "translation": "Dilemma, Zwickmühle",
+       "pos": "noun",
+       "example": "Claire is in a dilemma: Should she tell her friend she saw her boyfriend kissing another girl? Or does she keep that information to herself?",
+       "exampleTranslation": "Claire steckt in einem Dilemma: Soll sie ihrer Freundin sagen, dass sie gesehen hat, wie ihr Freund ein anderes Mädchen geküsst hat? Oder behält sie diese Information für sich?"
+      },
+      {
+       "term": "hooked",
+       "translation": "begeistert, gefesselt",
+       "pos": "adjective",
+       "example": "That book is great. Were you hooked too? – Not at all, I thought it was boring.",
+       "exampleTranslation": "Dieses Buch ist großartig. Warst du auch so gefesselt? – Überhaupt nicht, ich fand es langweilig."
+      },
+      {
+       "term": "antagonist",
+       "translation": "Antagonist/-in, Gegner/-in, Widersacher/-in",
+       "pos": "noun",
+       "example": "In literature, the antagonist is the enemy of the hero.",
+       "exampleTranslation": "In der Literatur ist der Antagonist der Gegner des Helden."
+      },
+      {
+       "term": "heroine",
+       "translation": "Heldin",
+       "pos": "noun",
+       "example": "Who is your favourite heroine? – Oh, probably Hermione Granger from the Harry Potter books.",
+       "exampleTranslation": "Wer ist deine Lieblingsheldin? – Oh, wahrscheinlich Hermine Granger aus den Harry-Potter-Büchern."
+      },
+      {
+       "term": "nighttime",
+       "translation": "Nacht",
+       "pos": "noun",
+       "example": "I love it when the setting of a scene is nighttime. The atmosphere can be so spooky.",
+       "exampleTranslation": "Ich liebe Szenen, die nachts spielen. Die Atmosphäre kann so unheimlich sein."
+      },
+      {
+       "term": "unexpected",
+       "translation": "unerwartet",
+       "pos": "adjective",
+       "example": "Wow, that ending was unexpected. I didn't see it coming at all!",
+       "exampleTranslation": "Wow, dieses Ende war unerwartet. Damit hatte ich überhaupt nicht gerechnet!"
+      },
+      {
+       "term": "urgent",
+       "translation": "dringend",
+       "pos": "adjective",
+       "example": "What is so urgent that you must call me in the middle of the night?!",
+       "exampleTranslation": "Was ist so dringend, dass du mich mitten in der Nacht anrufen musst?"
+      },
+      {
+       "term": "confrontation",
+       "translation": "Konfrontation",
+       "pos": "noun",
+       "example": "Some people won't express their opinion in order to avoid confrontations.",
+       "exampleTranslation": "Manche Menschen äußern ihre Meinung nicht, um Konfrontationen zu vermeiden."
+      },
+      {
+       "term": "characterisation",
+       "translation": "Beschreibung, Personenbeschreibung, Charakterisierung",
+       "pos": "noun",
+       "example": "You need to work on the characterisation of your story's protagonist. I still can't really imagine what she's like.",
+       "exampleTranslation": "Du musst an der Charakterisierung des Protagonisten deiner Geschichte arbeiten. Ich kann mir immer noch nicht wirklich vorstellen, wie sie ist."
+      }
+     ]
+    },
+    {
+     "name": "Story",
+     "entries": [
+      {
+       "term": "to reunite",
+       "translation": "wiedervereinigen, wieder zusammenbringen",
+       "pos": "verb",
+       "example": "The western and eastern parts of Germany were reunited in 1990.",
+       "exampleTranslation": "Die westlichen und östlichen Teile Deutschlands wurden 1990 wiedervereinigt."
+      },
+      {
+       "term": "ancient",
+       "translation": "alt, altertümlich, antik",
+       "pos": "adjective",
+       "example": "Cologne Cathedral is very old, but it isn't ancient like the pyramids in Egypt, which are 3,000 or 4,000 years old!",
+       "exampleTranslation": "Der Kölner Dom ist sehr alt, aber nicht so alt wie die Pyramiden in Ägypten, die 3.000 oder 4.000 Jahre alt sind!"
+      },
+      {
+       "term": "exhausted",
+       "translation": "erschöpft",
+       "pos": "adjective",
+       "example": "After running the marathon, they were exhausted.",
+       "exampleTranslation": "Nach dem Marathon waren sie völlig erschöpft."
+      },
+      {
+       "term": "to be asleep",
+       "translation": "schlafen",
+       "pos": "verb",
+       "example": "Shh, don't be so loud. The baby has only been asleep for half an hour or so!",
+       "exampleTranslation": "Pssst, sei nicht so laut. Das Baby schläft erst seit etwa einer halben Stunde!"
+      },
+      {
+       "term": "to wake, woke, woken",
+       "translation": "wecken",
+       "pos": "verb",
+       "example": "Please don't wake me till 10:00 tomorrow morning. It's Saturday.",
+       "exampleTranslation": "Bitte wecken Sie mich erst morgen früh um 10:00 Uhr. Es ist Samstag."
+      },
+      {
+       "term": "to check on sb/sth",
+       "translation": "nach jmdm./etw. sehen",
+       "pos": "verb",
+       "example": "I'm going to go check on the chicken. It's almost time to take it out of the oven.",
+       "exampleTranslation": "Ich gehe nach dem Hähnchen sehen. Es ist fast Zeit, es aus dem Ofen zu nehmen."
+      },
+      {
+       "term": "to hold one's breath",
+       "translation": "die Luft anhalten",
+       "pos": "verb",
+       "example": "She held her breath and jumped into the water.",
+       "exampleTranslation": "Sie hielt die Luft an und sprang ins Wasser."
+      },
+      {
+       "term": "sorrow",
+       "translation": "Kummer",
+       "pos": "noun",
+       "example": "Words cannot express the sorrow I felt after the loss of my grandma.",
+       "exampleTranslation": "Worte können den Kummer nach dem Verlust meiner Oma nicht ausdrücken."
+      },
+      {
+       "term": "pity [no pl]",
+       "translation": "Mitleid",
+       "pos": "noun",
+       "example": "When she broke both her legs, everyone felt pity for her.",
+       "exampleTranslation": "Als sie sich beide Beine brach, hatten alle Mitleid mit ihr."
+      },
+      {
+       "term": "to gaze",
+       "translation": "starren, blicken, starr blicken",
+       "pos": "verb",
+       "example": "It's so relaxing to just gaze at a fire without speaking.",
+       "exampleTranslation": "Es ist entspannend, einfach in ein Feuer zu schauen, ohne zu sprechen."
+      },
+      {
+       "term": "threat",
+       "translation": "Bedrohung, Gefahr",
+       "pos": "noun",
+       "example": "Some couples see single people as a threat to their relationships.",
+       "exampleTranslation": "Manche Paare sehen Singles als Bedrohung für ihre Beziehung."
+      },
+      {
+       "term": "finger",
+       "translation": "Finger",
+       "pos": "noun",
+       "example": "My friend wears a ring on each of his fingers.",
+       "exampleTranslation": "Mein Freund trägt an jedem Finger einen Ring."
+      },
+      {
+       "term": "encouragement",
+       "translation": "Ermutigung, Unterstützung",
+       "pos": "noun",
+       "example": "Thanks for all your encouragement. You've made me feel more sure of myself.",
+       "exampleTranslation": "Danke für deine ganze Ermutigung. Du hast mir mehr Selbstvertrauen gegeben."
+      },
+      {
+       "term": "smell",
+       "translation": "Geruch, Duft, Gestank",
+       "pos": "noun",
+       "example": "There's a wonderful smell coming from the kitchen.",
+       "exampleTranslation": "Aus der Küche kommt ein wunderbarer Geruch."
+      },
+      {
+       "term": "resistance",
+       "translation": "Widerstand",
+       "pos": "noun",
+       "example": "Why all the resistance to going on a date with Laura? It's just a date. You don't have to marry her!",
+       "exampleTranslation": "Warum dieser Widerstand gegen ein Date mit Laura? Es ist nur ein Date. Du musst sie ja nicht heiraten!"
+      },
+      {
+       "term": "gaze",
+       "translation": "Blick",
+       "pos": "noun",
+       "example": "Looking around the restaurant, her gaze fell on the face of a handsome man across the room.",
+       "exampleTranslation": "Als sie sich im Restaurant umsah, fiel ihr Blick auf das Gesicht eines gutaussehenden Mannes auf der anderen Seite des Raumes."
+      },
+      {
+       "term": "frustration",
+       "translation": "Frust, Enttäuschung",
+       "pos": "noun",
+       "example": "After that awful maths test I feel nothing but frustration.",
+       "exampleTranslation": "Nach dieser schrecklichen Mathearbeit empfinde ich nur Frustration."
+      },
+      {
+       "term": "uncertainty",
+       "translation": "Ungewissheit, Unsicherheit",
+       "pos": "noun",
+       "example": "In times of war there's always great uncertainty about the future of a country.",
+       "exampleTranslation": "In Kriegszeiten herrscht immer große Unsicherheit über die Zukunft eines Landes."
+      },
+      {
+       "term": "joy",
+       "translation": "Freude, Vergnügen",
+       "pos": "noun",
+       "example": "I hadn't seen my grandparents for more than two years, so it was a joy to see them looking so well when we finally met again.",
+       "exampleTranslation": "Ich hatte meine Großeltern seit mehr als zwei Jahren nicht gesehen, daher war es eine Freude, sie so wohlauf zu sehen, als wir uns endlich wiedertrafen."
+      },
+      {
+       "term": "grandad",
+       "translation": "Opa",
+       "pos": "noun",
+       "example": "My grandparents are very old. My grandad is 92.",
+       "exampleTranslation": "Meine Großeltern sind sehr alt. Mein Opa ist 92 Jahre alt."
+      },
+      {
+       "term": "uncontrollable",
+       "translation": "unkontrollierbar",
+       "pos": "adjective",
+       "example": "After sitting on a plane for 12 hours, I felt an uncontrollable need to walk for miles.",
+       "exampleTranslation": "Nachdem ich 12 Stunden im Flugzeug gesessen hatte, verspürte ich ein unkontrollierbares Bedürfnis, meilenweit zu laufen."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Trailer 1",
+   "sections": [
+    {
+     "name": "Wortschatz",
+     "entries": [
+      {
+       "term": "to allude to",
+       "translation": "anspielen auf",
+       "pos": "verb",
+       "example": "The cartoon alludes to current problems in society.",
+       "exampleTranslation": "Der Cartoon spielt auf aktuelle Probleme in der Gesellschaft an."
+      },
+      {
+       "term": "apparent",
+       "translation": "offensichtlich",
+       "pos": "adjective",
+       "example": "His disappointment was apparent to everyone.",
+       "exampleTranslation": "Seine Enttäuschung war für alle offensichtlich."
+      },
+      {
+       "term": "behavioural",
+       "translation": "Verhaltens-",
+       "pos": "noun",
+       "example": "Scientists have examined the behavioural patterns of different groups.",
+       "exampleTranslation": "Wissenschaftler haben die Verhaltensmuster verschiedener Gruppen untersucht."
+      },
+      {
+       "term": "blame",
+       "translation": "Schuld",
+       "pos": "noun",
+       "example": "You're responsible for your own decisions. Don't put the blame on me.",
+       "exampleTranslation": "Du bist für deine eigenen Entscheidungen verantwortlich. Gib nicht mir die Schuld."
+      },
+      {
+       "term": "customs [sg]",
+       "translation": "Zoll",
+       "pos": "noun",
+       "example": "We had to wait two hours before we could go through customs.",
+       "exampleTranslation": "Wir mussten zwei Stunden warten, bevor wir durch den Zoll gehen konnten."
+      },
+      {
+       "term": "to depict",
+       "translation": "darstellen, beschreiben",
+       "pos": "verb",
+       "example": "The painting depicts modern urban life.",
+       "exampleTranslation": "Das Gemälde stellt das moderne Stadtleben dar."
+      },
+      {
+       "term": "discomfort",
+       "translation": "Unbehagen",
+       "pos": "noun",
+       "example": "The idea causes discomfort among a lot of people.",
+       "exampleTranslation": "Die Idee verursacht bei vielen Menschen Unbehagen."
+      },
+      {
+       "term": "to ease",
+       "translation": "erleichtern",
+       "pos": "verb",
+       "example": "The political leaders plan to ease trade barriers between the two countries.",
+       "exampleTranslation": "Die politischen Führer planen, die Handelshemmnisse zwischen den beiden Ländern zu verringern."
+      },
+      {
+       "term": "hesitation",
+       "translation": "Zögern",
+       "pos": "noun",
+       "example": "The politician promised to reform the system without hesitation.",
+       "exampleTranslation": "Der Politiker versprach, das System ohne Zögern zu reformieren."
+      },
+      {
+       "term": "impossibility",
+       "translation": "(Ding der) Unmöglichkeit",
+       "pos": "noun",
+       "example": "Bringing them to their senses seems like an impossibility.",
+       "exampleTranslation": "Sie zur Vernunft zu bringen scheint unmöglich zu sein."
+      },
+      {
+       "term": "to interpret",
+       "translation": "interpretieren",
+       "pos": "verb",
+       "example": "It's difficult to interpret these lines.",
+       "exampleTranslation": "Es ist schwierig, diese Zeilen zu interpretieren."
+      },
+      {
+       "term": "leaver",
+       "translation": "Person, die für den Brexit gestimmt hat",
+       "pos": "noun",
+       "example": "In the 2016 Brexit referendum, leavers voted against remaining in the EU.",
+       "exampleTranslation": "Im Brexit-Referendum 2016 stimmten die Austrittsbefürworter gegen den Verbleib in der EU.",
+       "explained": true
+      },
+      {
+       "term": "to portray",
+       "translation": "darstellen, porträtieren",
+       "pos": "verb",
+       "example": "The politician is portrayed as an unpopular character in the film.",
+       "exampleTranslation": "Der Politiker wird im Film als unbeliebte Figur dargestellt."
+      },
+      {
+       "term": "to readmit",
+       "translation": "wieder aufnehmen",
+       "pos": "verb",
+       "example": "The politician hopes to be readmitted to the party after the investigation.",
+       "exampleTranslation": "Der Politiker hofft, nach der Untersuchung wieder in die Partei aufgenommen zu werden."
+      },
+      {
+       "term": "regulatory alignment",
+       "translation": "Regulierungsabgleich",
+       "pos": "noun",
+       "example": "Regulatory alignment is the process of making laws and rules more consistent across different regions or countries.",
+       "exampleTranslation": "Regulierungsabgleich ist der Prozess, Gesetze und Regeln zwischen verschiedenen Regionen oder Ländern stärker anzugleichen."
+      },
+      {
+       "term": "to remain",
+       "translation": "bleiben",
+       "pos": "verb",
+       "example": "In the 2016 Brexit referendum, the British people were asked whether the UK should remain in the European Union or leave the EU.",
+       "exampleTranslation": "Im Brexit-Referendum 2016 wurden die Briten gefragt, ob das Vereinigte Königreich in der Europäischen Union bleiben oder die EU verlassen sollte."
+      },
+      {
+       "term": "remainer",
+       "translation": "Person, die gegen den Brexit gestimmt hat",
+       "pos": "noun",
+       "example": "In the 2016 Brexit referendum, a lot of remainers were young voters.",
+       "exampleTranslation": "Beim Brexit-Referendum 2016 waren viele Befürworter des Verbleibs junge Wähler.",
+       "explained": true
+      },
+      {
+       "term": "to reset",
+       "translation": "zurücksetzen",
+       "pos": "verb",
+       "example": "Do you think the UK can reset relations with the EU?",
+       "exampleTranslation": "Glaubst du, dass das Vereinigte Königreich seine Beziehungen zur EU neu gestalten kann?"
+      },
+      {
+       "term": "to retain",
+       "translation": "behalten, bewahren",
+       "pos": "verb",
+       "example": "It's important for the community to retain their traditions.",
+       "exampleTranslation": "Es ist wichtig, dass die Gemeinschaft ihre Traditionen bewahrt."
+      },
+      {
+       "term": "trading block",
+       "translation": "Handelsgemeinschaft",
+       "pos": "noun",
+       "example": "A small region doesn't have the same economic opportunities as a large trading block.",
+       "exampleTranslation": "Eine kleine Region hat nicht dieselben wirtschaftlichen Chancen wie eine große Handelsgemeinschaft."
+      },
+      {
+       "term": "unifying",
+       "translation": "verbindend",
+       "pos": "adjective",
+       "example": "Their struggle has been a unifying force.",
+       "exampleTranslation": "Ihr Kampf war eine verbindende Kraft."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Trailer 2",
+   "sections": [
+    {
+     "name": "Wortschatz",
+     "entries": [
+      {
+       "term": "base",
+       "translation": "Stützpunkt",
+       "pos": "noun",
+       "example": "The US has military bases around the world.",
+       "exampleTranslation": "Die USA haben Militärstützpunkte auf der ganzen Welt."
+      },
+      {
+       "term": "to conduct",
+       "translation": "durchführen, ausführen",
+       "pos": "verb",
+       "example": "The company is conducting a survey to find out what their customers think of their service.",
+       "exampleTranslation": "Das Unternehmen führt eine Umfrage durch, um herauszufinden, was die Kunden von seinem Service halten."
+      },
+      {
+       "term": "disruption",
+       "translation": "Störung, Bruch, Zerrüttung",
+       "pos": "noun",
+       "example": "The strike has caused major disruptions around the country.",
+       "exampleTranslation": "Der Streik hat im ganzen Land große Störungen verursacht."
+      },
+      {
+       "term": "facet",
+       "translation": "Facette",
+       "pos": "noun",
+       "example": "Life in the USA has lots of different facets.",
+       "exampleTranslation": "Das Leben in den USA hat viele verschiedene Facetten."
+      },
+      {
+       "term": "fall",
+       "translation": "Fall",
+       "pos": "noun",
+       "example": "The history professor is writing a book about the rise and fall of empires.",
+       "exampleTranslation": "Der Geschichtsprofessor schreibt ein Buch über Aufstieg und Fall von Imperien."
+      },
+      {
+       "term": "globe",
+       "translation": "Erdball",
+       "pos": "noun",
+       "example": "Lots of young people around the globe are taking action to protect the environment.",
+       "exampleTranslation": "Viele junge Menschen weltweit ergreifen Maßnahmen, um die Umwelt zu schützen."
+      },
+      {
+       "term": "gross domestic product",
+       "translation": "Bruttoinlandsprodukt",
+       "pos": "noun",
+       "example": "The US has the largest economy in the world and is the country with the highest gross domestic product (GDP).",
+       "exampleTranslation": "Die USA haben die größte Volkswirtschaft der Welt und sind das Land mit dem höchsten Bruttoinlandsprodukt (BIP)."
+      },
+      {
+       "term": "to lend itself well to",
+       "translation": "sich gut eignen für",
+       "pos": "verb",
+       "example": "This text doesn't lend itself well to our topic.",
+       "exampleTranslation": "Dieser Text eignet sich nicht besonders gut für unser Thema."
+      },
+      {
+       "term": "presence",
+       "translation": "Präsenz, Anwesenheit",
+       "pos": "noun",
+       "example": "The strong police presence increased tensions among the protesters.",
+       "exampleTranslation": "Die starke Polizeipräsenz erhöhte die Spannungen unter den Demonstrierenden."
+      },
+      {
+       "term": "presidency",
+       "translation": "Präsidentschaft",
+       "pos": "noun",
+       "example": "Two candidates are running for the presidency.",
+       "exampleTranslation": "Zwei Kandidaten bewerben sich um die Präsidentschaft."
+      },
+      {
+       "term": "to what extent",
+       "translation": "inwiefern, inwieweit",
+       "pos": "verb",
+       "example": "It's still not clear to what extent the government's plan has improved the situation.",
+       "exampleTranslation": "Es ist noch immer nicht klar, inwieweit der Plan der Regierung die Situation verbessert hat."
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "importedAt": "2026-09-18T16:32:31.324Z"
+}

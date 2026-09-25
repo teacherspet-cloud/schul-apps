@@ -1,0 +1,309 @@
+.editor-canvas {
+  background: var(--editor-canvas);
+}
+
+.editor-sheet .vt-page {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Im Editor wachsen Seiten mit Hinweisen und Werkzeugen mit, statt abgeschnitten zu werden */
+.editor-sheet .vt-page-fixed {
+  height: auto;
+  min-height: 297mm;
+  overflow: visible;
+}
+
+/* Deutlich getrennte A4-Seiten */
+.editor-sheet .vt-page + .vt-page {
+  margin-top: 12mm;
+}
+
+.editor-sheet-key .vt-page {
+  outline: 3px solid #ffcdd2;
+}
+
+.editor-block {
+  position: relative;
+  margin: 0 -4mm;
+  padding: 0 4mm 1mm;
+  border-radius: 6px;
+  border: 1px dashed transparent;
+}
+
+.editor-block:hover,
+.editor-block:focus-within {
+  border-color: #adb5bd;
+}
+
+/* KI-Überarbeitung: kleines Symbol oben rechts am Baustein, Entwurfswechsel darüber */
+.editor-ai-revise-slot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 4;
+  opacity: 0.55;
+  transition: opacity 120ms;
+}
+.editor-block:hover .editor-ai-revise-slot,
+.editor-block:focus-within .editor-ai-revise-slot {
+  opacity: 1;
+}
+/* Schwebt über dem Baustein, damit die Seitenaufteilung unverändert bleibt */
+.editor-version-bar {
+  position: absolute;
+  top: -3.5mm;
+  right: 30px;
+  z-index: 4;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.editor-block-busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.editor-block-toolbar {
+  position: absolute;
+  top: 6mm;
+  right: -40px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Dauerhaft sichtbar, damit die Werkzeuge (u. a. die KI-Überarbeitung) gefunden werden */
+  opacity: 0.5;
+  transition: opacity 120ms;
+}
+
+.editor-block:hover .editor-block-toolbar,
+.editor-block:focus-within .editor-block-toolbar {
+  opacity: 1;
+}
+
+/*
+ * ZIEHEN – der Anfassknopf und der frei platzierte Baustein.
+ *
+ * `touch-action: none` steht NUR auf dem Knopf: Dort beginnt das Ziehen, und der Browser
+ * darf die Geste nicht als Rollen abfangen. Überall sonst bleibt Wischen zum Rollen und
+ * Tippen zum Bearbeiten – auf einem Blatt voller antippbarer Texte ist das entscheidend.
+ */
+.editor-block-griff {
+  cursor: grab;
+  touch-action: none;
+}
+.editor-block-griff:active {
+  cursor: grabbing;
+}
+/* Auf dem Tablet fingerbreit: unter 44 Punkten trifft man den Knopf nicht zuverlässig */
+@media (pointer: coarse) {
+  .editor-block-toolbar {
+    opacity: 1;
+    gap: 8px;
+  }
+  .editor-block-toolbar .mantine-ActionIcon-root {
+    width: 44px;
+    height: 44px;
+  }
+  .editor-block-toolbar {
+    right: -52px;
+  }
+}
+
+/*
+ * Der Bausteinrahmen zieht sich normalerweise 4 mm nach links und rechts heraus, damit sein
+ * gestrichelter Rand den Text nicht berührt. NEBEN einem Bild oder einer Tabelle darf er das
+ * nicht: Dort ragte der Baustein sonst über den bedruckbaren Bereich hinaus.
+ */
+.ws-side-image .editor-block {
+  margin: 0;
+  padding: 0;
+}
+
+/* Frei platziert: dauerhaft erkennbar, sonst sucht man später, warum nichts mitwandert */
+.editor-block-frei {
+  border-color: var(--mantine-primary-color-filled);
+  border-style: solid;
+  background: rgba(255, 255, 255, 0.85);
+}
+.editor-block-frei .editor-block-toolbar {
+  opacity: 1;
+}
+
+.editor-warning {
+  margin-top: 4mm;
+}
+
+/* Bearbeitbare Texte */
+.vt-editable {
+  outline: none;
+  border-radius: 3px;
+  /* inline statt inline-block: bearbeitbare Textstücke umbrechen wie normaler Text (kein Komma allein am Zeilenanfang) */
+  display: inline;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+div.vt-editable {
+  display: block;
+}
+
+/*
+ * Die Blätter sind immer weiß bedruckt – die Hervorhebung darf deshalb NICHT aus dem
+ * Farbschema kommen: Im Dunkelmodus ist „primary-color-light" dunkel, und der schwarze
+ * Text stand vor dunklem Grund (die Zeile wirkte schwarz überdeckt).
+ */
+.vt-editable:hover {
+  background: rgba(34, 139, 230, 0.12);
+}
+
+.vt-editable:focus {
+  background: rgba(34, 139, 230, 0.2);
+  box-shadow: 0 0 0 1px rgba(34, 139, 230, 0.85);
+}
+
+.vt-editable:empty::before {
+  content: attr(data-placeholder);
+  color: #adb5bd;
+}
+
+.vt-gap-edit {
+  color: #1c7ed6;
+  font-style: italic;
+  height: auto;
+}
+
+/* Werkzeuge schweben über dem Text und nehmen keinen Platz ein – das Schülerblatt sieht im Editor aus wie gedruckt */
+.vt-page .vt-item-controls {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  z-index: 3;
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vt-gaptext-gap,
+.vt-match td {
+  position: relative;
+}
+
+.vt-gaptext-gap .vt-item-controls {
+  top: auto;
+  bottom: 100%;
+  right: auto;
+  left: 0;
+}
+
+.vt-item:hover .vt-item-controls,
+.vt-gaptext-gap:hover .vt-item-controls,
+.vt-picture:hover .vt-item-controls,
+.vt-match tr:hover .vt-item-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vt-item-controls button {
+  border: 1px solid #ced4da;
+  background: white;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+
+.vt-item-controls button:hover {
+  background: #f1f3f5;
+}
+
+.vt-picture .vt-item-controls {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+.vt-option {
+  cursor: default;
+}
+
+.vt-item-controls button.vt-control-active {
+  background: rgba(34, 139, 230, 0.2);
+  border-color: rgba(34, 139, 230, 0.85);
+}
+
+/*
+ * Bearbeitungsfeld für Textbausteine (RichText).
+ *
+ * Ohne eigene Breite fällt ein <textarea> auf die Browser-Vorgabe von 20 Zeichen zurück –
+ * das Feld stand dann linksbündig auf etwa einem Drittel der Blattbreite, während der
+ * Text daneben verschwand. Es soll genau die Fläche einnehmen, die der Text auch einnimmt.
+ */
+.rt-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 3em;
+  resize: vertical;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: rgba(34, 139, 230, 0.06);
+  border: 1px solid rgba(34, 139, 230, 0.85);
+  border-radius: 3px;
+  padding: 2px 4px;
+  outline: none;
+}
+
+/* Der Anzeigezustand darf ebenfalls die volle Breite behalten, damit nichts springt */
+.rt-editable {
+  display: block;
+}
+
+.rt-editable-inline {
+  display: inline;
+}
+
+/*
+ * LATEIN: der Muster-Vokabeltest als dreispaltige Tabelle.
+ *
+ * Aufbau nach dem Leitfaden Latein (IQSH Schleswig-Holstein 2016, S. 25):
+ * „Vokabeln | Formen | Bedeutungen". Die beiden rechten Spalten bleiben auf dem Schülerblatt
+ * leer; geschrieben wird auf eine durchgezogene Linie, damit klar ist, wie viel Platz da ist.
+ */
+.vt-latin-forms {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5mm;
+}
+.vt-latin-forms td {
+  padding: 1.2mm 2mm 1.2mm 0;
+  vertical-align: bottom;
+}
+.vt-latin-term {
+  width: 30%;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vt-latin-form {
+  width: 32%;
+}
+.vt-latin-meaning {
+  width: 38%;
+}
+/* Sagt an, welche Form verlangt wird – ohne sie wäre bei „servus" unklar, was gemeint ist */
+.vt-latin-label {
+  font-size: 0.85em;
+  color: #555;
+  margin-right: 1.5mm;
+  white-space: nowrap;
+}
+.vt-latin-blank {
+  display: inline-block;
+  min-width: 55%;
+  border-bottom: 0.25mm solid #666;
+  height: 4.5mm;
+}

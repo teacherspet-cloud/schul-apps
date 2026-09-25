@@ -1,0 +1,106 @@
+import { Box, Button, Group, SegmentedControl, Stepper } from '@mantine/core'
+import { IconFolder, IconPlus } from '@tabler/icons-react'
+import { useEffect, useState } from 'react'
+import { notifyError } from '../../shared/util'
+import DesignManager from './design/DesignManager'
+import { parseWorksheetFile, WORKSHEET_FILTER } from './project'
+import EditorStep from './steps/EditorStep'
+import OutlineStep from './steps/OutlineStep'
+import TopicStep from './steps/TopicStep'
+import WorksheetLibrary from './steps/WorksheetLibrary'
+import { cleanWorksheetImages } from './library'
+import { useArbeitsblatt } from './store'
+
+export default function ArbeitsblattModule(): React.JSX.Element {
+  const { step, setStep, worksheet, loadWorksheet, newWorksheet } = useArbeitsblatt()
+  const [area, setArea] = useState<'create' | 'designs'>('create')
+  // Beim Öffnen die Bibliothek zeigen, wenn schon Arbeitsblätter gespeichert sind
+  const [library, setLibrary] = useState(false)
+
+  useEffect(() => {
+    if (worksheet?.sheets.length) return
+    window.api.sheets
+      .list()
+      .then((list) => setLibrary(list.length > 0))
+      .catch(() => setLibrary(false))
+  }, [])
+
+  const openFile = async (): Promise<void> => {
+    try {
+      const file = await window.api.files.open(WORKSHEET_FILTER)
+      if (file) {
+        loadWorksheet(parseWorksheetFile(file.data))
+        setLibrary(false)
+        void cleanWorksheetImages()
+      }
+    } catch (e) {
+      notifyError(e)
+    }
+  }
+
+  const showLibrary = area === 'create' && library
+
+  return (
+    <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Group px="lg" py="sm" className="app-toolbar" wrap="nowrap">
+        <SegmentedControl
+          value={area}
+          onChange={(v) => setArea(v as 'create' | 'designs')}
+          data={[
+            { value: 'create', label: 'Arbeitsblatt' },
+            { value: 'designs', label: 'Designvorlagen' }
+          ]}
+        />
+        {area === 'create' && !showLibrary && (
+          <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
+            <Stepper.Step label="Thema & Lerngruppe" description="Jahrgang, Schulform, Material" />
+            <Stepper.Step label="Gliederung" description="Lernziele und Bausteine" allowStepSelect={Boolean(worksheet?.outline)} />
+            <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(worksheet?.sheets.length)} />
+          </Stepper>
+        )}
+        {/*
+          Zurueck zur Uebersicht – beschriftet und immer an derselben Stelle.
+          Vorher gab es nur ein kleines Ordnersymbol in der Editorleiste; wer es nicht kannte,
+          kam aus einem geoeffneten Blatt nicht mehr heraus.
+        */}
+        {area !== 'designs' && !showLibrary && (
+          <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
+            Meine Arbeitsblätter
+          </Button>
+        )}
+        {area !== 'designs' && !showLibrary && (
+          <Button
+            variant="light"
+            leftSection={<IconPlus size={16} />}
+            onClick={() => {
+              newWorksheet()
+              setLibrary(false)
+            }}
+          >
+            Neues Arbeitsblatt
+          </Button>
+        )}
+      </Group>
+      <Box style={{ flex: 1, minHeight: 0 }}>
+        {area === 'designs' ? (
+          <DesignManager />
+        ) : showLibrary ? (
+          <WorksheetLibrary
+            onNew={() => {
+              setLibrary(false)
+              setStep(0)
+            }}
+            onOpenFile={openFile}
+            onOpened={() => setLibrary(false)}
+          />
+        ) : (
+          <>
+            {step === 0 && <TopicStep onLibrary={() => setLibrary(true)} />}
+            {step === 1 && <OutlineStep />}
+            {step === 2 && <EditorStep onLibrary={() => setLibrary(true)} />}
+          </>
+        )}
+      </Box>
+    </Box>
+  )
+}
