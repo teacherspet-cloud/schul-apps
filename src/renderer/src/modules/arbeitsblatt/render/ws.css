@@ -1,11 +1,19 @@
 /* Arbeitsblatt-Seiten – gilt für Editor, Vorschau, Druck und PDF. */
 
+/*
+ * `clip` statt `hidden` – hier und an .ws-body: Beides schneidet gleich ab, aber ein
+ * `hidden`-Kasten ist ein Rollbereich, den der Browser selbst verschiebt, sobald etwas
+ * darin den Fokus bekommt oder ins Bild gerollt wird. Im Editor ragt die Werkzeugleiste
+ * der Bausteine über den Satzspiegel hinaus; ein Klick auf „⋯“ rollte den Seiteninhalt um
+ * die Leistenbreite nach links, und alle Bausteine standen abgeschnitten („ius der
+ * Versammlung“ statt „Bericht aus der Versammlung“).
+ */
 .ws-page {
   position: relative;
   box-sizing: border-box;
   width: 210mm;
   height: 297mm;
-  overflow: hidden;
+  overflow: clip;
   background: #fff;
   color: #111;
   --ws-accent: #2b6cb0;
@@ -45,10 +53,22 @@
 .ws-body {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: clip;
   padding-top: 4mm;
   /* Bezugsrahmen für frei platzierte Bausteine: Prozent gelten auf die Inhaltsfläche */
   position: relative;
+}
+/*
+ * Im Editor steht die Werkzeugleiste der Bausteine im rechten Seitenrand, also außerhalb
+ * der Inhaltsfläche. Seitlich darf sie deshalb herausragen (vorher war sie unsichtbar und
+ * nur über das Wegrollen erreichbar); oben und unten schneidet die Fläche ab wie im Druck.
+ * Das leistet `clip-path` statt `overflow`: Jeder `overflow`-Wert außer `visible` macht die
+ * Fläche für die Menüs der Leiste (Mantine/floating-ui) zum Rahmen, und liegt der Knopf
+ * außerhalb davon, blenden sie ihr Menü als „abgelöst“ aus – „⋯“ öffnete dann nichts.
+ */
+.ws-editor-pages .ws-body {
+  overflow: visible;
+  clip-path: inset(0 -30mm);
 }
 
 /*

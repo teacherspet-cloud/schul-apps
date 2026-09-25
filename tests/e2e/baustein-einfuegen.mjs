@@ -69,8 +69,46 @@ const menueVon = async (text) => {
   await page.waitForTimeout(400)
 }
 
+/**
+ * Bausteininhalt bündig mit dem Satzspiegel (Fehler vom 25.09.2026): Ein Klick auf „⋯“
+ * rollte die Inhaltsfläche der Seite um die Breite der Werkzeugleiste nach links – aus
+ * „Bericht aus der Versammlung“ wurde „ius der Versammlung“. Gemessen wird, ob eine Fläche
+ * seitlich verrollt ist und ob das erste Textzeichen eines Bausteins links vom Inhalt liegt.
+ */
+const pruefeBuendig = async (wann) => {
+  const befund = await page.evaluate(() => {
+    const fehler = []
+    for (const body of document.querySelectorAll('.ws-editor-pages .ws-page .ws-body')) {
+      if (body.scrollLeft !== 0) fehler.push(`Inhaltsfläche um ${body.scrollLeft}px seitlich verrollt`)
+      const links = body.closest('.ws-content').getBoundingClientRect().left
+      for (const block of body.querySelectorAll('.editor-block')) {
+        const gang = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+        let t
+        while ((t = gang.nextNode())) if (t.textContent.trim() && !t.parentElement.closest('.editor-block-toolbar')) break
+        if (!t) continue
+        const r = document.createRange()
+        r.setStart(t, t.textContent.search(/\S/))
+        r.setEnd(t, t.textContent.search(/\S/) + 1)
+        const x = r.getBoundingClientRect().left
+        if (x < links - 1) fehler.push(`„${t.textContent.trim().slice(0, 20)}“ beginnt ${Math.round(links - x)}px links vom Satzspiegel`)
+      }
+    }
+    return fehler
+  })
+  pruefe(befund.length === 0, `${wann}: Bausteininhalt steht vollständig im Satzspiegel${befund.length ? ` (${befund.slice(0, 3).join('; ')})` : ''}`)
+}
+await pruefeBuendig('Vor dem Menü')
+
 // ---------- Duplizieren im Editor ----------
 await menueVon('Merke A')
+await pruefeBuendig('Mit offenem „⋯“-Menü')
+// Die Leiste steht im Seitenrand – sie muss dort auch zu sehen und zu treffen sein
+const leisteSichtbar = await page.evaluate(() => {
+  const knopf = [...document.querySelectorAll('.ws-editor-pages [aria-label="Weitere Aktionen"]')].pop()
+  const r = knopf.getBoundingClientRect()
+  return knopf.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
+})
+pruefe(leisteSichtbar, 'Die Bausteinleiste im Seitenrand ist sichtbar und anklickbar')
 await page.screenshot({ path: join(out, 'paket6-baustein-menue.png') })
 await page.getByRole('menuitem', { name: 'Duplizieren' }).click()
 await page.waitForTimeout(1200)
@@ -145,6 +183,7 @@ const [leiste, breite] = await page.evaluate(() => {
   return [l?.scrollWidth ?? -1, l?.clientWidth ?? -1]
 })
 pruefe(breite > 0 && leiste <= breite + 1, `Die Editorleiste passt ohne seitliches Wischen (${leiste} ≤ ${breite})`)
+await pruefeBuendig('Nach allen Menüs')
 await page.screenshot({ path: join(out, 'paket6-editor-leiste.png') })
 
 // ---------- Gliederung ----------
