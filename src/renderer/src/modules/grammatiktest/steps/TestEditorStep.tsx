@@ -81,11 +81,11 @@ export default function TestEditorStep(): React.JSX.Element {
     <BausteinRahmen
       block={block}
       placed={placed}
-      onUpdate={(fn) =>
+      onUpdate={(fn, gruppe) =>
         update((d) => {
           const b = d.blocks.find((x) => x.id === block.id)
           if (b) fn(b)
-        })
+        }, gruppe)
       }
       onMove={(richtung) =>
         update((d) => {

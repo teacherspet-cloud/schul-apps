@@ -8,6 +8,7 @@ import {
   Container,
   Grid,
   Group,
+  Loader,
   NumberInput,
   Progress,
   SegmentedControl,
@@ -22,8 +23,10 @@ import {
   Tooltip
 } from '@mantine/core'
 import { IconAlertTriangle, IconInfoCircle, IconSparkles } from '@tabler/icons-react'
-import { useEffect, useRef, useState } from 'react'
-import { AiProgressTracker, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AiProgressTracker, neverBackwards, overallRatio, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
+import GradeScaleModal from '../../../shared/components/GradeScaleModal'
+import { thresholdsForSubject } from '../../../shared/gradeScale'
 import { useAppSettings } from '../../../shared/settingsStore'
 import type { CefrTable } from '@shared/types'
 import { notifyError } from '../../../shared/util'
@@ -35,7 +38,7 @@ import { gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/sc
 import { STATES } from '../../arbeitsblatt/didactics/states'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import { AUSGLEICH_HILFEN, type AusgleichHilfe } from '../didactics/bausteine'
-import { SCHLUESSEL, schluesselById, type SchluesselId } from '../didactics/bewertung'
+import { gesamtpunkte, grenzenFuer, SCHLUESSEL, schluesselById, type Bewertungseinstellung, type SchluesselId } from '../didactics/bewertung'
 import { formateFuer, KURZTEST_FORMATE, standardMinuten, zeitWarnung } from '../didactics/formate'
 import { istBelegt, namenAus, profilFuer } from '../didactics/operatoren'
 import { themenAusZeile, themenFuer, themenHinweis, themenZeile, zweigeFuer } from '../didactics/themen'
@@ -72,6 +75,25 @@ export default function SetupStep(): React.JSX.Element {
   // Reiner Anzeigefilter fuer die Themenvorschlaege – gehoert nicht in den gespeicherten Test
   const [zweigWahl, setZweig] = useState('')
   const startedAt = useRef(0)
+  /*
+   * Fortschritt über ALLE Fassungen: Wie viele sind fertig? Vorher zeigte der Balken nur den
+   * Anteil der laufenden Anfrage – bei drei Fassungen sprang er zweimal auf null zurück.
+   */
+  const [fertigeFassungen, setFertigeFassungen] = useState(0)
+  const shown = useRef(0)
+  // Eigener Notenschlüssel: Das Fenster war bisher gar nicht erreichbar
+  const [schluesselOffen, setSchluesselOffen] = useState(false)
+  /*
+   * Sekundentakt, solange erzeugt wird – wie im Grammatiktest. Ohne ihn stand die Anzeige
+   * still, wenn der Anbieter keinen Fortschritt meldet: nichts löste ein neues Rendern aus,
+   * und der Balken blieb bei 0 %. Steht vor dem frühen `return` (Hook-Regel).
+   */
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!busy) return
+    const timer = setInterval(() => tick((n) => n + 1), 1000)
+    return () => clearInterval(timer)
+  }, [busy])
 
   /*
    * MUSS vor jedem frühen `return` stehen: Hooks müssen bei jedem Rendern in gleicher Zahl
@@ -97,11 +119,21 @@ export default function SetupStep(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [test === null])
 
+  /*
+   * Schlüssel aus den Einstellungen (je Fach) – Ausgangspunkt für einen eigenen Schlüssel.
+   * Gemerkt, weil das Notenschlüssel-Fenster bei jedem NEUEN Feld seinen Entwurf zurücksetzt:
+   * Ein bei jedem Rendern frisch gebautes Feld hätte jede Eingabe dort sofort überschrieben.
+   */
+  const schwellen = useMemo(() => thresholdsForSubject(settings.gradeScale, test?.meta.subjectId ?? ''), [settings.gradeScale, test?.meta.subjectId])
+  const eigeneGrenzen = test?.meta.bewertung.eigeneGrenzen
+  const schluesselImFenster = useMemo(() => (eigeneGrenzen ? [...eigeneGrenzen, 0] : schwellen), [eigeneGrenzen, schwellen])
+
   if (!test) return <Container py="xl">Lade …</Container>
   const current = test
   const m = current.meta
 
-  const patch = (next: Partial<KurztestMeta>): void => update((d) => Object.assign(d.meta, next))
+  // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
+  const patch = (next: Partial<KurztestMeta>): void => update((d) => Object.assign(d.meta, next), `angaben:${Object.keys(next).sort().join(',')}`)
 
   /**
    * Tafelbilder, Buchseiten und Hefteinträge einlesen.
@@ -145,6 +177,8 @@ export default function SetupStep(): React.JSX.Element {
   const create = async (): Promise<void> => {
     setBusy(true)
     startedAt.current = Date.now()
+    shown.current = 0
+    setFertigeFassungen(0)
     setChunkRatio(0)
     const tracker = new AiProgressTracker(() => setChunkRatio(tracker.ratio()))
     try {
@@ -158,7 +192,9 @@ export default function SetupStep(): React.JSX.Element {
         const label = variantenLabel(i, m.varianten)
         const blocks = await generateKurztest(current, label, trackedAiCall(tracker), setStepMessage)
         varianten.push({ id: `v${i + 1}`, label, blocks })
+        setFertigeFassungen(i + 1)
       }
+      // Ein eigener Verlaufsschritt: Strg+Z holt die vorige Fassung zurück (Rückfragen sind abgewählt)
       update((d) => {
         d.varianten = varianten
       })
@@ -618,9 +654,33 @@ export default function SetupStep(): React.JSX.Element {
                     { value: 'eigen', label: 'eigener Schlüssel' }
                   ]}
                   value={m.bewertung.schluessel}
-                  onChange={(v) => v && patch({ bewertung: { ...m.bewertung, schluessel: v as SchluesselId } })}
+                  onChange={(v) => {
+                    if (!v) return
+                    const next: Bewertungseinstellung = { ...m.bewertung, schluessel: v as SchluesselId }
+                    /*
+                     * „Eigener Schlüssel" hatte bis 25.09.2026 keine Wirkung: Die Grenzen wurden
+                     * nirgends gesetzt, und auf dem Lösungsblatt stand gar kein Schlüssel. Jetzt
+                     * startet er mit dem bisher gewählten und öffnet das Fenster zum Anpassen.
+                     */
+                    if (v === 'eigen' && !m.bewertung.eigeneGrenzen) {
+                      const bisher = grenzenFuer(m.bewertung, schwellen) ?? schwellen
+                      next.eigeneGrenzen = [bisher[0], bisher[1], bisher[2], bisher[3], bisher[4]]
+                    }
+                    patch({ bewertung: next })
+                    if (v === 'eigen') setSchluesselOffen(true)
+                  }}
                   allowDeselect={false}
                 />
+                {m.bewertung.schluessel === 'eigen' && (
+                  <Group gap="xs" wrap="nowrap">
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      {(m.bewertung.eigeneGrenzen ?? []).map((p, i) => `${i + 1} ab ${p} %`).join(' · ') || 'Noch keine Grenzen festgelegt.'}
+                    </Text>
+                    <Button size="compact-xs" variant="light" onClick={() => setSchluesselOffen(true)}>
+                      Grenzen festlegen …
+                    </Button>
+                  </Group>
+                )}
                 {schluesselById(m.bewertung.schluessel) && (
                   <Text size="xs" c={schluesselById(m.bewertung.schluessel)!.verbindlich ? 'teal.8' : 'dimmed'}>
                     {schluesselById(m.bewertung.schluessel)!.herkunft}
@@ -679,19 +739,37 @@ export default function SetupStep(): React.JSX.Element {
                     Bitte zuerst ein Thema angeben.
                   </Text>
                 )}
-                {busy && (
-                  <Stack gap={4}>
-                    <Progress value={chunkRatio * 100} animated size="sm" />
-                    <Text size="xs" c="dimmed">
-                      {stepMessage} {remainingLabel(remainingSeconds(chunkRatio, Date.now() - startedAt.current))}
-                    </Text>
-                  </Stack>
-                )}
+                {busy &&
+                  (() => {
+                    // Über alle Fassungen gerechnet und ohne Rücksprung
+                    const ratio = neverBackwards(shown.current, overallRatio(fertigeFassungen, m.varianten, chunkRatio))
+                    shown.current = ratio
+                    const sekunden = Math.round((Date.now() - startedAt.current) / 1000)
+                    const rest = remainingLabel(remainingSeconds(ratio, Date.now() - startedAt.current))
+                    return (
+                      <Stack gap={4}>
+                        {/* Meldet der Anbieter nichts, wäre ein Balken bei 0 % eine Behauptung – dann der Kreisel */}
+                        {ratio > 0 ? <Progress value={ratio * 100} animated size="sm" /> : <Loader size="sm" type="dots" />}
+                        <Text size="xs" c="dimmed">
+                          {stepMessage} {ratio > 0 ? `${Math.round(ratio * 100)} %${rest ? ` · ${rest}` : ''}` : `läuft seit ${sekunden} Sek.`}
+                        </Text>
+                      </Stack>
+                    )
+                  })()}
               </Stack>
             </Card>
           </Stack>
         </Grid.Col>
       </Grid>
+
+      {/* Dasselbe Fenster wie im Grammatiktest und in den Einstellungen; die Sechs gilt immer ab 0 % */}
+      <GradeScaleModal
+        opened={schluesselOffen}
+        onClose={() => setSchluesselOffen(false)}
+        points={gesamtpunkte(current.varianten[0]?.blocks ?? [])}
+        thresholds={schluesselImFenster}
+        onChange={(t) => patch({ bewertung: { ...m.bewertung, schluessel: 'eigen', eigeneGrenzen: [t[0], t[1], t[2], t[3], t[4]] } })}
+      />
     </Container>
   )
 }

@@ -7,22 +7,27 @@ import EditorStep from './steps/EditorStep'
 import SettingsStep from './steps/SettingsStep'
 import VocabStep from './steps/VocabStep'
 import { TestLibraryModal } from './steps/TestLibrary'
-import { useAutosave } from './library'
+import { newTestSafely, useAutosave } from './library'
+import { sichereAlles } from '../../shared/autosave'
+import { useUndoKeys } from '../../shared/useUndoKeys'
 import { parseProjectFile } from './project'
 import { includedVocab } from './model/vocab'
 import { useVokabeltest } from './store'
 
-export default function VokabeltestModule(): React.JSX.Element {
-  const { step, setStep, doc, vocab, settings, loadDocument, newTest } = useVokabeltest()
+export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
+  const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo } = useVokabeltest()
   const [libraryOpen, setLibraryOpen] = useState(false)
   useAutosave()
+  // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt (vorher hing es am Editor, auch im Hintergrund)
+  useUndoKeys(active && !libraryOpen, undo, redo)
 
   // Beim Öffnen einer .vokabeltest-Datei per Doppelklick direkt laden
   useEffect(() => {
     window.api.files
       .launchFile()
-      .then((file) => {
+      .then(async (file) => {
         if (!file) return
+        await sichereAlles()
         newTest()
         loadDocument(parseProjectFile(file.data))
         void cleanTestImages()
@@ -49,8 +54,12 @@ export default function VokabeltestModule(): React.JSX.Element {
         <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibraryOpen(true)}>
           Meine Vokabeltests
         </Button>
-        {/* Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen */}
-        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={newTest}>
+        {/*
+          Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen. Der
+          bisherige Test wird vorher gesichert – vorher ging hier ungespeicherte Arbeit verloren,
+          anders als beim gleichnamigen Knopf in der Bibliothek.
+        */}
+        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => newTestSafely().catch(notifyError)}>
           Neuer Vokabeltest
         </Button>
       </Group>

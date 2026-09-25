@@ -1,9 +1,8 @@
-import { useEffect, useRef } from 'react'
 import { cleanImageBackground } from '../../shared/imageCleanup'
 import type { SavedTestStats } from '@shared/types'
-import { notifyError } from '../../shared/util'
+import { sichereAlles } from '../../shared/autosave'
+import { useStoreAutosave } from '../../shared/useAutosave'
 import { variantPoints } from './model/blocks'
-import { newId } from './model/random'
 import { includedVocab } from './model/vocab'
 import { TestPayload, useVokabeltest } from './store'
 
@@ -27,12 +26,17 @@ export function hasContent(): boolean {
   return Boolean(doc) || vocab.some((v) => v.term.trim())
 }
 
-/** Speichert den aktuellen Vokabeltest in der App (neu oder unter der bisherigen ID). */
-export async function saveCurrentTest(name?: string): Promise<void> {
+/**
+ * Speichert den aktuellen Vokabeltest in der App (unter der Kennung des offenen Tests).
+ *
+ * `still`: automatisches Sichern. Der Vorschlagsname („Vokabeltest vom …") landet dann nicht
+ * im Namensfeld – es würde sonst mitten in der Eingabe der ersten Vokabel befüllt.
+ */
+export async function saveCurrentTest(name?: string, still = false): Promise<void> {
   const state = useVokabeltest.getState()
   const finalName = (name ?? state.listName).trim() || `Vokabeltest vom ${new Date().toLocaleDateString('de-DE')}`
-  if (finalName !== state.listName) state.setListName(finalName)
-  const id = state.testId ?? newId()
+  if (!still && finalName !== state.listName) state.setListName(finalName)
+  const id = state.testId
   const { payload, stats } = currentPayload()
   const meta = await window.api.tests.save({ id, name: finalName, stats, payload })
   useVokabeltest.getState().markSaved(meta.id, meta.updatedAt)
@@ -40,30 +44,37 @@ export async function saveCurrentTest(name?: string): Promise<void> {
 
 /** Öffnet einen gespeicherten Vokabeltest. */
 export async function openSavedTest(id: string): Promise<void> {
+  // Was am bisherigen Test noch ansteht, zuerst sichern – sonst ginge es beim Wechsel verloren
+  await sichereAlles()
   const test = await window.api.tests.get(id)
   useVokabeltest.getState().openSaved(test.id, test.name, test.payload as TestPayload, test.updatedAt)
   void cleanTestImages()
 }
 
+/** Neuen Vokabeltest beginnen – den bisherigen vorher sichern. */
+export async function newTestSafely(): Promise<void> {
+  await sichereAlles()
+  useVokabeltest.getState().newTest()
+}
+
 /**
- * Automatisches Speichern: Sobald ein Test einmal in der App gespeichert wurde,
- * wird jede Änderung (Vokabeln, Name, Einstellungen, Test) kurz danach gesichert.
+ * Automatisches Speichern – ab der ersten Vokabel, danach nach jeder Änderung (Vokabeln,
+ * Name, Einstellungen, Test).
+ *
+ * Bis 25.09.2026 sicherte der Vokabeltest erst, nachdem er einmal von Hand gespeichert war.
+ * Wer eine lange Liste abtippte und dann „Neuer Vokabeltest" drückte oder das Fenster
+ * schloss, hatte nichts mehr.
  */
 export function useAutosave(): void {
-  const timer = useRef<number | null>(null)
-  useEffect(
-    () =>
-      useVokabeltest.subscribe((state, prev) => {
-        if (!state.testId || state.testId !== prev.testId) return
-        const changed = state.vocab !== prev.vocab || state.doc !== prev.doc || state.settings !== prev.settings || state.listName !== prev.listName
-        if (!changed) return
-        if (timer.current) window.clearTimeout(timer.current)
-        timer.current = window.setTimeout(() => {
-          saveCurrentTest().catch((e) => notifyError(e, 'Automatisches Speichern fehlgeschlagen'))
-        }, 1200)
-      }),
-    []
-  )
+  useStoreAutosave({
+    store: useVokabeltest,
+    dokument: (s) => s.testId,
+    gesichert: (s) => Boolean(s.lastSavedAt),
+    bereit: () => hasContent(),
+    geaendert: (s, prev) => s.vocab !== prev.vocab || s.doc !== prev.doc || s.settings !== prev.settings || s.listName !== prev.listName,
+    verzoegerung: 1200,
+    speichern: () => saveCurrentTest(undefined, true)
+  })
 }
 
 /** Nach dem Öffnen: Bilder mit Schachbrett- oder Greenscreen-Hintergrund still freistellen. */

@@ -95,6 +95,7 @@ import type {
 import { parseWorksheetFile, WORKSHEET_FILTER } from '../project'
 import { profileFromMeta } from '../render/SheetPages'
 import { aiCall, useArbeitsblatt } from '../store'
+import { sichereAlles } from '../../../shared/autosave'
 import { ProfileCard } from './ProfileCard'
 import { isSensitiveForRolePlay, rolePlayTypeById, rolePlayTypesFor, WITHOUT_ESTABLISHED_PRACTICE } from '../didactics/rolePlay'
 import {
@@ -230,7 +231,8 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
 
   const meta = worksheet.meta
   const subject = subjectById(meta.subjectId)
-  const patch = (p: Partial<WorksheetMeta>): void => setWorksheet({ ...worksheet, meta: { ...meta, ...p } })
+  // Fortlaufendes Tippen im selben Feld (oder ein Zug am Regler) ist EIN Schritt für Strg+Z
+  const patch = (p: Partial<WorksheetMeta>): void => setWorksheet({ ...worksheet, meta: { ...meta, ...p } }, `angaben:${Object.keys(p).sort().join(',')}`)
   const vocabCount = splitWords(meta.vocabWords ?? '').length
   const vorwissenAnfrage: VorwissenAnfrage = {
     subjectId: meta.subjectId,
@@ -368,7 +370,10 @@ export default function TopicStep({ onLibrary }: { onLibrary?: () => void }): Re
             onClick={async () => {
               try {
                 const file = await window.api.files.open(WORKSHEET_FILTER)
-                if (file) loadWorksheet(parseWorksheetFile(file.data))
+                if (!file) return
+                // Das bisherige Blatt zuerst sichern – das geöffnete ist ein anderes Dokument
+                await sichereAlles()
+                loadWorksheet(parseWorksheetFile(file.data))
               } catch (e) {
                 notifyError(e)
               }

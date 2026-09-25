@@ -53,6 +53,16 @@ import { lanStatus, startLan, stopLan } from './services/lanServer'
 
 let mainWindow: BrowserWindow | null = null
 
+/**
+ * Wie lange das Fenster beim Schließen auf die Oberfläche wartet, bis alles gesichert ist.
+ * Reagiert sie nicht (etwa weil sie hängt), geht das Fenster trotzdem zu – sonst ließe sich
+ * das Programm gar nicht mehr beenden.
+ */
+const SICHERN_BEIM_SCHLIESSEN_MS = 3000
+
+/** Meldung der Oberfläche „alles gesichert" – gesetzt, solange auf sie gewartet wird. */
+let gesichert: (() => void) | null = null
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -69,6 +79,31 @@ function createWindow(): void {
     }
   })
   mainWindow.on('ready-to-show', () => mainWindow?.show())
+
+  /*
+   * Vor dem Schließen die Oberfläche sichern lassen.
+   *
+   * Die Programme sichern mit ein bis zwei Sekunden Verzögerung. Wer direkt nach einer
+   * Änderung das Fenster schloss, verlor sie bis 25.09.2026 still. Jetzt hält das Schließen
+   * kurz an, die Oberfläche führt alles Anstehende sofort aus und meldet sich zurück – oder
+   * nach drei Sekunden geht das Fenster ohnehin zu.
+   */
+  let schliessenErlaubt = false
+  mainWindow.on('close', (e) => {
+    const win = mainWindow
+    if (schliessenErlaubt || !win || win.webContents.isDestroyed() || win.webContents.isCrashed()) return
+    e.preventDefault()
+    if (gesichert) return // Es wird schon gewartet – ein zweiter Klick aufs Kreuz ändert daran nichts
+    const zu = (): void => {
+      clearTimeout(zeit)
+      gesichert = null
+      schliessenErlaubt = true
+      if (!win.isDestroyed()) win.close()
+    }
+    const zeit = setTimeout(zu, SICHERN_BEIM_SCHLIESSEN_MS)
+    gesichert = zu
+    win.webContents.send('fenster:schliessen')
+  })
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url)
     return { action: 'deny' }
@@ -206,6 +241,8 @@ function registerLan(): void {
 
 function registerIpc(): void {
   registerLan()
+  // Die Oberfläche hat vor dem Schließen alles gesichert (siehe createWindow)
+  handle('fenster:gesichert', () => gesichert?.())
   handle('settings:get', () => getSettings())
   handle('settings:set', (patch: DeepPartial<AppSettings>) => setSettings(patch))
   handle('secrets:set', (name: SecretName, value: string) => {

@@ -3,10 +3,9 @@
  * Arbeitsblättern, Klassenarbeiten und Grammatiktests. Gespeichert wird unter
  * `%APPDATA%/schul-apps/lernzielkontrollen`.
  */
-import { useEffect, useRef } from 'react'
 import type { SavedKurztestStats } from '@shared/types'
-import { notifyError } from '../../shared/util'
-import { newId } from '../vokabeltest/model/random'
+import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { useStoreAutosave } from '../../shared/useAutosave'
 import { gesamtpunkte } from './didactics/bewertung'
 import { teilaufgaben } from './didactics/pruefungen'
 import type { Kurztest } from './model/types'
@@ -14,6 +13,12 @@ import { useLernzielkontrolle } from './store'
 
 /** Hat die Kontrolle überhaupt Aufgaben? Ein leeres Formular soll die Übersicht nicht füllen. */
 export const hatInhalt = (test: Kurztest | null): boolean => Boolean(test?.varianten.some((v) => v.blocks.length))
+
+/**
+ * Lohnt sich das Sichern? Schon als Entwurf, sobald ein Thema dasteht – nicht erst nach dem
+ * Erzeugen. Vorher war alles Eingestellte bis dahin nur im Arbeitsspeicher.
+ */
+export const lohntSicherung = (test: Kurztest | null): boolean => Boolean(test && (hatInhalt(test) || test.meta.thema.trim() || test.meta.title.trim()))
 
 export function kurztestStats(test: Kurztest): SavedKurztestStats {
   const blocks = test.varianten[0]?.blocks ?? []
@@ -41,11 +46,11 @@ export function defaultKurztestName(test: Kurztest): string {
 export async function saveCurrentKurztest(name?: string): Promise<void> {
   const state = useLernzielkontrolle.getState()
   const test = state.test
-  if (!test || !hatInhalt(test)) return
-  const id = state.docId ?? newId()
+  if (!test || !lohntSicherung(test)) return
+  const id = state.docId
   const meta = await window.api.kurztests.save({
     id,
-    name: (name ?? state.docName).trim() || defaultKurztestName(test),
+    name: name?.trim() || dokumentName(id, state.docName, defaultKurztestName(test)),
     stats: kurztestStats(test),
     payload: test
   })
@@ -53,37 +58,32 @@ export async function saveCurrentKurztest(name?: string): Promise<void> {
 }
 
 export async function openSavedKurztest(id: string): Promise<void> {
+  // Was an der bisherigen Kontrolle noch ansteht, zuerst sichern – sonst ginge es beim Wechsel verloren
+  await sichereAlles()
   const saved = await window.api.kurztests.get(id)
   useLernzielkontrolle.getState().openSaved(saved.id, saved.name, saved.payload as Kurztest, saved.updatedAt)
 }
 
+/** Neue Kontrolle beginnen – die bisherige vorher sichern. */
+export async function newKurztestSafely(): Promise<void> {
+  await sichereAlles()
+  useLernzielkontrolle.getState().reset()
+}
+
 /**
- * Automatisches Speichern: das erste Mal, sobald Aufgaben da sind, danach nach jeder Änderung.
+ * Automatisches Speichern – als Entwurf ab dem Thema, danach nach jeder Änderung.
  *
  * Verzögert um anderthalb Sekunden, damit nicht jeder Tastendruck im Editor eine Datei
  * schreibt. Ohne diese Verzögerung entstand beim Grammatiktest bei jedem Zeichen ein
  * Schreibvorgang.
  */
 export function useKurztestAutosave(): void {
-  const timer = useRef<number | null>(null)
-  useEffect(() => {
-    const save = (): void => {
-      saveCurrentKurztest().catch((e) => notifyError(e, 'Automatisches Speichern fehlgeschlagen'))
-    }
-    const schedule = (): void => {
-      if (timer.current) window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(save, 1500)
-    }
-    const state = useLernzielkontrolle.getState()
-    if (hatInhalt(state.test) && !state.docId) schedule()
-    const unsubscribe = useLernzielkontrolle.subscribe((s, prev) => {
-      if (s.test === prev.test) return
-      if (!hatInhalt(s.test)) return
-      schedule()
-    })
-    return () => {
-      if (timer.current) window.clearTimeout(timer.current)
-      unsubscribe()
-    }
-  }, [])
+  useStoreAutosave({
+    store: useLernzielkontrolle,
+    dokument: (s) => s.docId,
+    gesichert: (s) => Boolean(s.savedAt),
+    bereit: (s) => lohntSicherung(s.test),
+    geaendert: (s, prev) => s.test !== prev.test,
+    speichern: () => saveCurrentKurztest()
+  })
 }

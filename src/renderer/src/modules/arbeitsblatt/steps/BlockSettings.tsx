@@ -1,4 +1,5 @@
 import { Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
+import { useArbeitsblatt } from '../store'
 import { IconAdjustments } from '@tabler/icons-react'
 import { shuffle, createRng, randomSeed } from '../../vokabeltest/model/random'
 import { emptyAnswer } from '../model/factory'
@@ -392,7 +393,8 @@ export function BlockSettings({
   combined
 }: {
   block: WsBlock
-  update: (fn: (d: WsBlock) => void) => void
+  /** `gruppe` fasst eine Geste (Schieberegler) zu einem Verlaufsschritt zusammen */
+  update: (fn: (d: WsBlock) => void, gruppe?: string) => void
   combined: boolean
 }): React.JSX.Element {
   return (
@@ -540,7 +542,9 @@ export function BlockSettings({
                 max={100}
                 step={5}
                 value={block.widthPercent}
-                onChange={(v) => update((d) => d.type === 'image' && (d.widthPercent = v))}
+                // Ein Zug am Regler ist EIN Schritt im Verlauf, nicht einer je Zwischenwert
+                onChange={(v) => update((d) => d.type === 'image' && (d.widthPercent = v), `regler:${block.id}:breite`)}
+                onChangeEnd={() => useArbeitsblatt.getState().endGroup()}
               />
               <ImageLabelSettings block={block} update={update} />
             </>

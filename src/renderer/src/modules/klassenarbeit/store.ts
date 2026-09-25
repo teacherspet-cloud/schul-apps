@@ -1,40 +1,77 @@
 import { create } from 'zustand'
 import type { StructuredRequest } from '@shared/types'
 import type { Exam } from './model/types'
+import { leererVerlauf, merke, rueckgaengig, schliesseGruppe, type Verlauf, wiederholen } from '../../shared/undo'
+import { newId } from '../vokabeltest/model/random'
 
 interface KlassenarbeitState {
   exam: Exam | null
   step: number
-  /** id der gespeicherten Arbeit, solange sie in der App liegt */
-  docId: string | null
+  /** Kennung der offenen Arbeit – von Anfang an; ob sie in der Bibliothek liegt, sagt `savedAt` */
+  docId: string
   docName: string
   savedAt: string | null
-  setExam: (exam: Exam) => void
+  /**
+   * Rückgängig/Wiederholen. Dazu gehört ausdrücklich, was Teile ersetzt oder leert: „Vorschlag
+   * erzeugen", der Wechsel von Fach oder Jahrgang und das Neu-Erzeugen der Arbeit. Rückfragen
+   * davor hat die Lehrkraft abgewählt – Strg+Z holt den alten Stand zurück.
+   */
+  verlauf: Verlauf<Exam>
+  setExam: (exam: Exam, gruppe?: string) => void
   setStep: (step: number) => void
-  update: (fn: (draft: Exam) => void) => void
+  /** `gruppe` fasst fortlaufendes Tippen in einem Feld (oder einen Zug) zu einem Verlaufsschritt zusammen */
+  update: (fn: (draft: Exam) => void, gruppe?: string) => void
   markSaved: (id: string, savedAt: string, name: string) => void
+  /** Die offene Arbeit wurde aus der Bibliothek gelöscht: Sie gilt wieder als ungesichert. */
+  forgetSaved: () => void
   openSaved: (id: string, name: string, exam: Exam, savedAt: string) => void
   reset: () => void
+  endGroup: () => void
+  undo: () => void
+  redo: () => void
 }
+
+/** Nach Rückgängig ohne Teile zurück zum Rahmen – der Aufgabenschritt hätte nichts zu zeigen. */
+const passenderSchritt = (step: number, exam: Exam): number => (exam.parts.length ? step : 0)
 
 export const useKlassenarbeit = create<KlassenarbeitState>((set, get) => ({
   exam: null,
   step: 0,
-  docId: null,
+  docId: newId(),
   docName: '',
   savedAt: null,
-  setExam: (exam) => set({ exam }),
+  verlauf: leererVerlauf(),
+  setExam: (exam, gruppe) => {
+    const { exam: vorher, verlauf } = get()
+    set({ exam, verlauf: vorher ? merke(verlauf, vorher, gruppe) : verlauf })
+  },
   setStep: (step) => set({ step }),
-  update: (fn) => {
-    const current = get().exam
+  update: (fn, gruppe) => {
+    const { exam: current, verlauf } = get()
     if (!current) return
     const draft = structuredClone(current)
     fn(draft)
-    set({ exam: draft })
+    set({ exam: draft, verlauf: merke(verlauf, current, gruppe) })
   },
-  markSaved: (docId, savedAt, docName) => set({ docId, savedAt, docName }),
-  openSaved: (docId, docName, exam, savedAt) => set({ docId, docName, exam, savedAt, step: exam.parts.some((p) => p.blocks.length) ? 1 : 0 }),
-  reset: () => set({ exam: null, step: 0, docId: null, docName: '', savedAt: null })
+  // Kommt die Bestätigung erst an, nachdem schon eine andere Arbeit offen ist, gilt sie nicht mehr
+  markSaved: (docId, savedAt, docName) => {
+    if (docId === get().docId) set({ savedAt, docName })
+  },
+  forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  openSaved: (docId, docName, exam, savedAt) =>
+    set({ docId, docName, exam, savedAt, step: exam.parts.some((p) => p.blocks.length) ? 1 : 0, verlauf: leererVerlauf() }),
+  reset: () => set({ exam: null, step: 0, docId: newId(), docName: '', savedAt: null, verlauf: leererVerlauf() }),
+  endGroup: () => set({ verlauf: schliesseGruppe(get().verlauf) }),
+  undo: () => {
+    const { exam, verlauf, step } = get()
+    const r = exam && rueckgaengig(verlauf, exam)
+    if (r) set({ exam: r.stand, verlauf: r.verlauf, step: passenderSchritt(step, r.stand) })
+  },
+  redo: () => {
+    const { exam, verlauf, step } = get()
+    const r = exam && wiederholen(verlauf, exam)
+    if (r) set({ exam: r.stand, verlauf: r.verlauf, step: passenderSchritt(step, r.stand) })
+  }
 }))
 
 /** KI-Aufruf über den Hauptprozess (gleiche Schnittstelle wie in den anderen Programmen). */

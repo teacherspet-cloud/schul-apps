@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SavedWorksheetMeta } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { openSavedWorksheet } from '../library'
+import { useArbeitsblatt } from '../store'
 import { useConfirmKeys } from '../../../shared/useConfirmKeys'
 import { imNetz } from '../../../shared/netzZugang'
 
@@ -73,6 +74,9 @@ export default function WorksheetLibrary({
     if (!confirmDelete) return
     try {
       setSheets(await window.api.sheets.delete(confirmDelete.id))
+      // Das offene Blatt darf nicht weiter auf den gelöschten Eintrag zeigen – sonst legte die
+      // nächste Sicherung ihn unter derselben Kennung stillschweigend wieder an
+      if (useArbeitsblatt.getState().docId === confirmDelete.id) useArbeitsblatt.getState().forgetSaved()
       notifySuccess('Arbeitsblatt gelöscht.')
     } catch (e) {
       notifyError(e)
@@ -237,7 +241,7 @@ export default function WorksheetLibrary({
                     <Image src={s.thumb} h={166} fit="contain" alt="" />
                   ) : (
                     <Text size="xs" c="dimmed">
-                      Keine Vorschau
+                      {s.sheetCount === 0 ? 'Entwurf – noch nicht ausformuliert' : 'Keine Vorschau'}
                     </Text>
                   )}
                 </Card.Section>
@@ -250,6 +254,12 @@ export default function WorksheetLibrary({
                       {s.subjectLabel} · Klasse {s.grade} · {dateText(s.updatedAt)}
                     </Text>
                     <Group gap={4} mt={4}>
+                      {/* Entwürfe werden ab dem ersten Schritt gesichert – noch ohne ausformuliertes Blatt */}
+                      {s.sheetCount === 0 && (
+                        <Badge size="xs" variant="light" color="gray">
+                          Entwurf
+                        </Badge>
+                      )}
                       {s.sheetCount > 1 && (
                         <Badge size="xs" variant="light">
                           {s.sheetCount} Niveaustufen
@@ -321,7 +331,9 @@ export default function WorksheetLibrary({
                 onClick={async () => {
                   try {
                     const full = await window.api.sheets.get(rename!.id)
-                    await window.api.sheets.save({ id: full.id, name: renameValue.trim(), stats: full, thumb: full.thumb, payload: full.payload })
+                    const meta = await window.api.sheets.save({ id: full.id, name: renameValue.trim(), stats: full, thumb: full.thumb, payload: full.payload })
+                    // Ist das Blatt gerade offen, übernimmt es den Namen – sonst schriebe die nächste Sicherung den alten zurück
+                    if (useArbeitsblatt.getState().docId === meta.id) useArbeitsblatt.getState().markSaved(meta.id, meta.updatedAt, meta.name)
                     setSheets(await window.api.sheets.list())
                   } catch (e) {
                     notifyError(e)

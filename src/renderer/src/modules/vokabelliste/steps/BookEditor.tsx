@@ -1,8 +1,9 @@
 import { Alert, Badge, Button, Card, Chip, Group, Stack, Text, Title } from '@mantine/core'
-import { IconDeviceFloppy } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { IconCheck, IconDeviceFloppy } from '@tabler/icons-react'
+import { useEffect, useRef, useState } from 'react'
 import type { Textbook, TextbookEntry } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
+import { useVerzoegertesSichern } from '../../../shared/useAutosave'
 import { newId } from '../../vokabeltest/model/random'
 import VocabRows, { emptyRow } from './VocabRows'
 import type { VocabRow } from './VocabRows'
@@ -23,6 +24,9 @@ function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
  * Mitgelieferte Lehrwerke bleiben unangetastet: Beim Speichern legt die App eine eigene
  * Fassung unter `%APPDATA%/schul-apps/lehrwerke` an, die das mitgelieferte Buch ersetzt.
  * „Änderungen verwerfen" stellt das Original wieder her.
+ *
+ * Gespeichert wird von selbst, kurz nach jeder Änderung. Vorher verwarf schon der Wechsel
+ * der Unit alles Getippte – ohne Hinweis.
  */
 export default function BookEditor({ bookId, onBack }: { bookId: string; onBack: () => void }): React.JSX.Element {
   const [book, setBook] = useState<Textbook | null>(null)
@@ -32,6 +36,14 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  /*
+   * Zählt, wie oft das Buch NEU geladen wurde (Öffnen, Verwerfen). Nur dann werden die Zeilen
+   * aus dem Buch geholt – nicht nach jedem Speichern. Sonst entstünden die Zeilen nach jeder
+   * automatischen Sicherung neu, mitten im Tippen.
+   */
+  const [geladen, setGeladen] = useState(0)
+  // Zählt Änderungen – so bleibt eine Eingabe WÄHREND des Speicherns als ungesichert markiert
+  const stand = useRef(0)
 
   useEffect(() => {
     window.api.textbooks
@@ -40,6 +52,7 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
         setBook(b)
         setUnit(b.units[0]?.name ?? '')
         setSection(b.units[0]?.sections[0]?.name ?? '')
+        setGeladen((n) => n + 1)
       })
       .catch(notifyError)
   }, [bookId])
@@ -50,10 +63,12 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
     const entries = book.units.find((u) => u.name === unit)?.sections.find((s) => s.name === section)?.entries ?? []
     setRows([...entries.map((e) => ({ ...e, id: newId() })), emptyRow()])
     setDirty(false)
-  }, [book, unit, section])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geladen, unit, section])
 
-  const save = async (): Promise<void> => {
+  const save = async (vonHand = false): Promise<void> => {
     if (!book) return
+    const gesichert = stand.current
     setSaving(true)
     try {
       // Nur den bearbeiteten Abschnitt ersetzen, alles andere bleibt wie es ist
@@ -78,13 +93,22 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
       }
       await window.api.textbooks.save([next])
       setBook(next)
-      setDirty(false)
-      notifySuccess(`„${book.name} – ${unit}, ${section}" gespeichert.`)
+      if (stand.current === gesichert) setDirty(false)
+      if (vonHand) notifySuccess(`„${book.name} – ${unit}, ${section}" gespeichert.`)
     } catch (e) {
+      // Beim automatischen Sichern meldet der gemeinsame Mechanismus den Fehler
+      if (!vonHand) throw e
       notifyError(e)
     } finally {
       setSaving(false)
     }
+  }
+  const sicherung = useVerzoegertesSichern(() => save())
+
+  /** Vor einem Wechsel (Unit, Abschnitt, zurück) erst das Getippte sichern. */
+  const wechsle = async (fn: () => void): Promise<void> => {
+    await sicherung.sofort()
+    fn()
   }
 
   const reset = async (): Promise<void> => {
@@ -94,6 +118,7 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
       await window.api.textbooks.delete(book.id)
       const fresh = await window.api.textbooks.get(book.id)
       setBook(fresh)
+      setGeladen((n) => n + 1)
       notifySuccess('Die eigenen Änderungen wurden verworfen.')
     } catch (e) {
       notifyError(e)
@@ -123,7 +148,7 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
           </Text>
         </div>
         <Group wrap="nowrap">
-          <Button variant="default" onClick={onBack}>
+          <Button variant="default" onClick={() => void wechsle(onBack)}>
             Zurück zur Übersicht
           </Button>
           {!book.builtIn && (
@@ -131,8 +156,15 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
               Änderungen verwerfen
             </Button>
           )}
-          <Button leftSection={<IconDeviceFloppy size={16} />} disabled={!dirty} loading={saving} onClick={() => void save()}>
-            Speichern
+          {/* Zeigt den Stand; ein Klick sichert sofort, statt die kurze Wartezeit abzuwarten */}
+          <Button
+            variant={dirty ? 'filled' : 'light'}
+            leftSection={dirty ? <IconDeviceFloppy size={16} /> : <IconCheck size={16} />}
+            disabled={!dirty}
+            loading={saving}
+            onClick={() => void sicherung.sofort().then(() => save(true))}
+          >
+            {dirty ? 'Speichern' : 'Gesichert'}
           </Button>
         </Group>
       </Group>
@@ -156,7 +188,8 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
                 autoFocus
                 onClick={() => {
                   setConfirmReset(false)
-                  void reset()
+                  // Anstehendes nicht erst NACH dem Verwerfen schreiben lassen
+                  void wechsle(() => void reset())
                 }}
               >
                 Verwerfen
@@ -170,7 +203,7 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
         <Text size="sm" fw={500} mb={4}>
           Unit
         </Text>
-        <Chip.Group value={unit} onChange={(v) => typeof v === 'string' && setUnit(v)}>
+        <Chip.Group value={unit} onChange={(v) => typeof v === 'string' && void wechsle(() => setUnit(v))}>
           <Group gap={6}>
             {book.units.map((u) => (
               <Chip key={u.name} value={u.name} size="xs">
@@ -184,7 +217,7 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
             <Text size="sm" fw={500} mt="sm" mb={4}>
               Abschnitt
             </Text>
-            <Chip.Group value={section} onChange={(v) => typeof v === 'string' && setSection(v)}>
+            <Chip.Group value={section} onChange={(v) => typeof v === 'string' && void wechsle(() => setSection(v))}>
               <Group gap={6}>
                 {unitMeta.sections.map((s) => (
                   <Chip key={s.name} value={s.name} size="xs">
@@ -213,7 +246,9 @@ export default function BookEditor({ bookId, onBack }: { bookId: string; onBack:
           rows={rows}
           onChange={(r) => {
             setRows(r)
+            stand.current++
             setDirty(true)
+            sicherung.plane(1200)
           }}
         />
       </Card>

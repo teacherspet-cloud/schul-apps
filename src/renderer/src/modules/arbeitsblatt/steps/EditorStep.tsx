@@ -19,8 +19,6 @@ import {
 } from '@mantine/core'
 import {
   IconAlertTriangle,
-  IconArrowBackUp,
-  IconArrowForwardUp,
   IconArrowLeft,
   IconDeviceFloppy,
   IconFileTypeDocx,
@@ -61,7 +59,8 @@ import { tafelbildHinweis, tafelbildZiel } from '../export/tafelbildZiel'
 import { contextFor, layoutKey, pageInfoFor, profileFromMeta, SheetPages, useSheetLayouts, vorschauSeiten } from '../render/SheetPages'
 import '../render/ws.css'
 import { aiCall, useArbeitsblatt } from '../store'
-import { defaultWorksheetName, useWorksheetAutosave } from '../library'
+import { defaultWorksheetName, setPreviewLayouts } from '../library'
+import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import '../../vokabeltest/steps/editor.css'
 import { BlockSettings } from './BlockSettings'
 import WarningButton from '../../../shared/components/WarningButton'
@@ -77,7 +76,7 @@ import { CoverPage } from '../render/CoverPage'
 import { COVER_DESIGNS, foxPrompt } from '../render/coverDesigns'
 
 export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): React.JSX.Element {
-  const { worksheet: ws, update, updateBlock, undo, redo, past, future, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
+  const { worksheet: ws, update, updateBlock, undo, redo, verlauf, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
   const logo = useAppSettings((s) => s.logoDataUrl)
   const schoolName = useAppSettings((s) => s.settings.schoolName)
 
@@ -108,8 +107,11 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
   const docName = useArbeitsblatt((s) => s.docName)
   const savedAt = useArbeitsblatt((s) => s.savedAt)
   const setDocName = useArbeitsblatt((s) => s.setDocName)
-  // Arbeitsblätter werden wie Vokabeltests automatisch in der App gesichert
-  useWorksheetAutosave(logo, schoolName, layouts)
+  // Gesichert wird im Programm (ab Schritt 1); der Editor liefert nur die Seiten fürs Vorschaubild
+  useEffect(() => {
+    setPreviewLayouts(layouts)
+    return () => setPreviewLayouts(null)
+  }, [layouts])
 
   /*
    * Die berechnete Seitenaufteilung fuer die Pruefwerkzeuge sichtbar machen.
@@ -126,22 +128,6 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
   useEffect(() => {
     window.api.designs.list().then(setDesigns).catch(notifyError)
   }, [])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      const t = e.target as HTMLElement
-      if (t.isContentEditable || ['INPUT', 'TEXTAREA'].includes(t.tagName)) return
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        undo()
-      } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
-        e.preventDefault()
-        redo()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
 
   const sheet = ws?.sheets.find((s) => s.id === activeSheetId) ?? ws?.sheets[0]
   const profile = useMemo(() => (ws ? profileFromMeta(ws.meta) : null), [ws])
@@ -311,7 +297,7 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
       block={block}
       placed={placed}
       busy={busy.has(block.id)}
-      onUpdate={(fn) => updateBlock(sheet.id, block.id, fn)}
+      onUpdate={(fn, gruppe) => updateBlock(sheet.id, block.id, fn, gruppe)}
       onMove={(richtung) => moveBlock(block.id, richtung)}
       extras={
         <>
@@ -334,7 +320,7 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
             </Tooltip>
           )}
           {!key && <AiReviseButton block={block} busy={busy.has(block.id)} onRevise={(instruction) => reviseBlock(block, instruction)} />}
-          <BlockSettings block={block} combined={combined} update={(fn) => updateBlock(sheet.id, block.id, fn)} />
+          <BlockSettings block={block} combined={combined} update={(fn, gruppe) => updateBlock(sheet.id, block.id, fn, gruppe)} />
           {block.type === 'image' && (
             <Tooltip label="Bild wählen" position="right">
               <ActionIcon size="sm" variant="default" onClick={() => setPicker(block.id)}>
@@ -413,16 +399,8 @@ export default function EditorStep({ onLibrary }: { onLibrary?: () => void }): R
         <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} onClick={() => setStep(1)}>
           Gliederung
         </Button>
-        <Tooltip label="Rückgängig (Strg+Z)">
-          <ActionIcon variant="default" onClick={undo} disabled={!past.length}>
-            <IconArrowBackUp size={16} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Wiederholen (Strg+Y)">
-          <ActionIcon variant="default" onClick={redo} disabled={!future.length}>
-            <IconArrowForwardUp size={16} />
-          </ActionIcon>
-        </Tooltip>
+        {/* Strg+Z / Strg+Y hängen am Programm (ArbeitsblattModule), damit sie in allen Schritten gelten */}
+        <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
         <Divider orientation="vertical" />
         {ws.sheets.length > 1 && view !== 'board' && view !== 'audio' && (
           <SegmentedControl size="xs" value={sheet.id} onChange={setActiveSheet} data={ws.sheets.map((s) => ({ value: s.id, label: s.label }))} />

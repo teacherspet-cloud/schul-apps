@@ -1,7 +1,10 @@
 import { Box, Button, Group, ScrollArea, Stepper, Text, Tooltip } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { useTestAutosave } from './library'
+import { newTestSafely, useTestAutosave } from './library'
+import { notifyError } from '../../shared/util'
+import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
+import { useUndoKeys } from '../../shared/useUndoKeys'
 import SetupStep from './steps/SetupStep'
 import TestEditorStep from './steps/TestEditorStep'
 import TestLibrary from './steps/TestLibrary'
@@ -16,11 +19,17 @@ const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
  * Beim Öffnen erscheinen die gespeicherten Tests, sofern es welche gibt – wie in den anderen
  * Programmen. Gespeichert wird von selbst, sobald Aufgaben da sind.
  */
-export default function GrammatiktestModule(): React.JSX.Element {
-  const { step, setStep, test, reset, savedAt, docName } = useGrammatiktest()
+export default function GrammatiktestModule({ active }: { active: boolean }): React.JSX.Element {
+  const { step, setStep, test, savedAt, docName, undo, redo, verlauf } = useGrammatiktest()
   const [library, setLibrary] = useState(false)
   const hasTasks = Boolean(test?.blocks.length)
   useTestAutosave()
+  // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt – in beiden Schritten
+  useUndoKeys(active && !library, undo, redo)
+  const startNew = (): void => {
+    setLibrary(false)
+    newTestSafely().catch(notifyError)
+  }
 
   useEffect(() => {
     if (useGrammatiktest.getState().test?.blocks.length) return
@@ -31,15 +40,7 @@ export default function GrammatiktestModule(): React.JSX.Element {
   }, [])
 
   if (library) {
-    return (
-      <TestLibrary
-        onNew={() => {
-          reset()
-          setLibrary(false)
-        }}
-        onOpened={() => setLibrary(false)}
-      />
-    )
+    return <TestLibrary onNew={startNew} onOpened={() => setLibrary(false)} />
   }
 
   return (
@@ -55,6 +56,7 @@ export default function GrammatiktestModule(): React.JSX.Element {
           <Stepper.Step label="Bearbeiten & Export" description="Lösungen, Word, PDF" disabled={!hasTasks} />
         </Stepper>
         <Group gap="xs">
+          <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
           {savedAt && (
             <Tooltip label={`Zuletzt gespeichert um ${timeFormat.format(new Date(savedAt))}`}>
               <Text size="xs" c="dimmed" maw={180} truncate>
@@ -65,7 +67,7 @@ export default function GrammatiktestModule(): React.JSX.Element {
           <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
             Meine Tests
           </Button>
-          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={reset}>
+          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
             Neuer Test
           </Button>
         </Group>

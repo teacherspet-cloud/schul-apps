@@ -9,6 +9,7 @@ import SettingsPage from './shell/SettingsPage'
 import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
 import { abgemeldet, imNetz } from './shared/netzZugang'
+import { sichereAlles } from './shared/autosave'
 
 export default function App(): React.JSX.Element {
   /*
@@ -17,8 +18,33 @@ export default function App(): React.JSX.Element {
    * lauter Fehlermeldungen aufbauen.
    */
   const [angemeldet, setAngemeldet] = useState(() => !imNetz() || !abgemeldet())
-  const [active, setActive] = useState<string>('home')
+  const [active, setActiveRaw] = useState<string>('home')
   const current = modules.find((m) => m.id === active)
+
+  /*
+   * Beim Wechsel des Programms anstehende Sicherungen sofort ausführen. Die Programme bleiben
+   * zwar im Hintergrund erhalten – aber wer danach das Fenster schließt oder der Rechner
+   * ausgeht, soll nicht die letzten Sekunden Arbeit verlieren.
+   */
+  const setActive = (id: string): void => {
+    if (id !== active) void sichereAlles()
+    setActiveRaw(id)
+  }
+
+  // Vor dem Schließen des Fensters: alles sichern und dem Hauptprozess Bescheid geben
+  useEffect(
+    () =>
+      window.api.fenster.onSchliessen(() => {
+        void sichereAlles().finally(() => void window.api.fenster.gesichert().catch(() => undefined))
+      }),
+    []
+  )
+  // Im Browser (Zugang aus dem Netz) gibt es kein Schließen-Ereignis – dort zumindest anstoßen
+  useEffect(() => {
+    const weg = (): void => void sichereAlles()
+    window.addEventListener('pagehide', weg)
+    return () => window.removeEventListener('pagehide', weg)
+  }, [])
 
   // Hinweis, wenn die Modellliste im Hintergrund die KI-Auswahl aktualisiert hat
   useEffect(

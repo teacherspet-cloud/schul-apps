@@ -2,40 +2,72 @@ import { create } from 'zustand'
 import type { StructuredRequest } from '@shared/types'
 import type { GrammarTest } from './model/types'
 import { AiProgressTracker, trackingAiCall } from '../../shared/aiProgress'
+import { leererVerlauf, merke, rueckgaengig, schliesseGruppe, type Verlauf, wiederholen } from '../../shared/undo'
+import { newId } from '../vokabeltest/model/random'
 
 interface GrammatiktestState {
   test: GrammarTest | null
   step: number
-  /** id des gespeicherten Tests, solange er in der App liegt */
-  docId: string | null
+  /** Kennung des offenen Tests – von Anfang an; ob er in der Bibliothek liegt, sagt `savedAt` */
+  docId: string
   docName: string
   savedAt: string | null
-  setTest: (test: GrammarTest) => void
+  /** Rückgängig/Wiederholen – auch ein neu erzeugter Test lässt sich zurücknehmen */
+  verlauf: Verlauf<GrammarTest>
+  /** `gruppe` fasst fortlaufendes Tippen in einem Feld zu einem Verlaufsschritt zusammen */
+  setTest: (test: GrammarTest, gruppe?: string) => void
   setStep: (step: number) => void
-  update: (fn: (draft: GrammarTest) => void) => void
+  update: (fn: (draft: GrammarTest) => void, gruppe?: string) => void
   markSaved: (id: string, savedAt: string, name: string) => void
+  /** Der offene Test wurde aus der Bibliothek gelöscht: Er gilt wieder als ungesichert. */
+  forgetSaved: () => void
   openSaved: (id: string, name: string, test: GrammarTest, savedAt: string) => void
   reset: () => void
+  endGroup: () => void
+  undo: () => void
+  redo: () => void
 }
+
+/** Nach Rückgängig ohne Aufgaben zurück zu den Angaben – der Editor hätte nichts zu zeigen. */
+const passenderSchritt = (step: number, test: GrammarTest): number => (test.blocks.length ? step : 0)
 
 export const useGrammatiktest = create<GrammatiktestState>((set, get) => ({
   test: null,
   step: 0,
-  docId: null,
+  docId: newId(),
   docName: '',
   savedAt: null,
-  setTest: (test) => set({ test }),
+  verlauf: leererVerlauf(),
+  setTest: (test, gruppe) => {
+    const { test: vorher, verlauf } = get()
+    set({ test, verlauf: vorher ? merke(verlauf, vorher, gruppe) : verlauf })
+  },
   setStep: (step) => set({ step }),
-  update: (fn) => {
-    const current = get().test
+  update: (fn, gruppe) => {
+    const { test: current, verlauf } = get()
     if (!current) return
     const draft = structuredClone(current)
     fn(draft)
-    set({ test: draft })
+    set({ test: draft, verlauf: merke(verlauf, current, gruppe) })
   },
-  markSaved: (docId, savedAt, docName) => set({ docId, savedAt, docName }),
-  openSaved: (docId, docName, test, savedAt) => set({ docId, docName, test, savedAt, step: test.blocks.length ? 1 : 0 }),
-  reset: () => set({ test: null, step: 0, docId: null, docName: '', savedAt: null })
+  // Kommt die Bestätigung erst an, nachdem schon ein anderer Test offen ist, gilt sie nicht mehr
+  markSaved: (docId, savedAt, docName) => {
+    if (docId === get().docId) set({ savedAt, docName })
+  },
+  forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  openSaved: (docId, docName, test, savedAt) => set({ docId, docName, test, savedAt, step: test.blocks.length ? 1 : 0, verlauf: leererVerlauf() }),
+  reset: () => set({ test: null, step: 0, docId: newId(), docName: '', savedAt: null, verlauf: leererVerlauf() }),
+  endGroup: () => set({ verlauf: schliesseGruppe(get().verlauf) }),
+  undo: () => {
+    const { test, verlauf, step } = get()
+    const r = test && rueckgaengig(verlauf, test)
+    if (r) set({ test: r.stand, verlauf: r.verlauf, step: passenderSchritt(step, r.stand) })
+  },
+  redo: () => {
+    const { test, verlauf, step } = get()
+    const r = test && wiederholen(verlauf, test)
+    if (r) set({ test: r.stand, verlauf: r.verlauf, step: passenderSchritt(step, r.stand) })
+  }
 }))
 
 /** KI-Aufruf über den Hauptprozess (gleiche Schnittstelle wie in den anderen Programmen). */

@@ -30,7 +30,7 @@ export default function KurztestLibrary({ onNew, onOpened }: { onNew: () => void
     try {
       setTests(await window.api.kurztests.delete(confirmDelete.id))
       // Die offene Kontrolle darf nicht weiter auf eine gelöschte Datei zeigen
-      if (useLernzielkontrolle.getState().docId === confirmDelete.id) useLernzielkontrolle.getState().markSaved('', '', '')
+      if (useLernzielkontrolle.getState().docId === confirmDelete.id) useLernzielkontrolle.getState().forgetSaved()
       setConfirmDelete(null)
     } catch (e) {
       notifyError(e)
@@ -67,7 +67,7 @@ export default function KurztestLibrary({ onNew, onOpened }: { onNew: () => void
 
         {tests.length === 0 && (
           <Text c="dimmed" size="sm">
-            Noch nichts gespeichert. Sobald eine Kontrolle Aufgaben hat, sichert die App sie von selbst.
+            Noch nichts gespeichert. Sobald ein Thema eingetragen ist, sichert die App die Kontrolle von selbst.
           </Text>
         )}
 
@@ -91,6 +91,12 @@ export default function KurztestLibrary({ onNew, onOpened }: { onNew: () => void
                           <Badge variant="light" color="grape">
                             {t.bezeichnung}
                           </Badge>
+                          {/* Entwürfe werden ab dem Thema gesichert – noch ohne Aufgaben */}
+                          {t.taskCount === 0 && (
+                            <Badge variant="light" color="gray">
+                              Entwurf
+                            </Badge>
+                          )}
                           {t.varianten > 1 && (
                             <Badge variant="outline" color="gray">
                               {t.varianten} Fassungen

@@ -97,7 +97,9 @@ export default function VokabellisteModule(): React.JSX.Element {
             list={openList}
             onSaved={(all, saved) => {
               setLists(all)
-              setOpenList(saved)
+              // Nur die offene Liste nachführen: Die letzte Sicherung kann eintreffen, nachdem
+              // schon zurück zur Übersicht gewechselt wurde – dann bleibt die Übersicht stehen
+              setOpenList((offen) => (offen?.id === saved.id ? saved : offen))
             }}
             onBack={() => setOpenList(null)}
           />
@@ -277,10 +279,20 @@ export default function VokabellisteModule(): React.JSX.Element {
           opened={wizard}
           defaults={{ stateId: choice.stateId, schoolTypeId, language: choice.language }}
           onClose={() => setWizard(false)}
-          onCreated={(list) => {
+          onCreated={async (created) => {
             setWizard(false)
+            const list = { ...created, id: created.id || newId() }
+            /*
+             * Gleich speichern. Bis 25.09.2026 stand die eingelesene Liste nur im Editor – wer von
+             * dort ohne „Speichern" zurückging, hatte die ganze Texterkennung umsonst bezahlt.
+             */
+            try {
+              setLists(await window.api.library.save(list))
+            } catch (e) {
+              notifyError(e, 'Die Liste konnte nicht gespeichert werden')
+            }
             // Direkt weiter in den Editor: Dort lässt sich jede Zeile prüfen und ergänzen
-            setOpenList({ ...list, id: list.id || newId() })
+            setOpenList(list)
             setChoice((c) => ({ ...c, language: list.language ?? c.language }))
           }}
         />

@@ -8,14 +8,21 @@ import EditorStep from './steps/EditorStep'
 import OutlineStep from './steps/OutlineStep'
 import TopicStep from './steps/TopicStep'
 import WorksheetLibrary from './steps/WorksheetLibrary'
-import { cleanWorksheetImages } from './library'
+import { cleanWorksheetImages, newWorksheetSafely, useWorksheetAutosave } from './library'
 import { useArbeitsblatt } from './store'
+import { sichereAlles } from '../../shared/autosave'
+import { useAppSettings } from '../../shared/settingsStore'
+import { useUndoKeys } from '../../shared/useUndoKeys'
 
-export default function ArbeitsblattModule(): React.JSX.Element {
-  const { step, setStep, worksheet, loadWorksheet, newWorksheet } = useArbeitsblatt()
+export default function ArbeitsblattModule({ active }: { active: boolean }): React.JSX.Element {
+  const { step, setStep, worksheet, loadWorksheet, undo, redo } = useArbeitsblatt()
   const [area, setArea] = useState<'create' | 'designs'>('create')
   // Beim Öffnen die Bibliothek zeigen, wenn schon Arbeitsblätter gespeichert sind
   const [library, setLibrary] = useState(false)
+  const logo = useAppSettings((s) => s.logoDataUrl)
+  const schoolName = useAppSettings((s) => s.settings.schoolName)
+  // Gesichert wird ab Schritt 1 – deshalb hängt das Sichern hier und nicht erst am Editor
+  useWorksheetAutosave(logo, schoolName)
 
   useEffect(() => {
     if (worksheet?.sheets.length) return
@@ -29,6 +36,7 @@ export default function ArbeitsblattModule(): React.JSX.Element {
     try {
       const file = await window.api.files.open(WORKSHEET_FILTER)
       if (file) {
+        await sichereAlles()
         loadWorksheet(parseWorksheetFile(file.data))
         setLibrary(false)
         void cleanWorksheetImages()
@@ -39,6 +47,13 @@ export default function ArbeitsblattModule(): React.JSX.Element {
   }
 
   const showLibrary = area === 'create' && library
+  // Strg+Z gilt in allen drei Schritten, aber nur, solange dieses Programm vorn liegt
+  useUndoKeys(active && area === 'create' && !showLibrary, undo, redo)
+
+  const startNew = (): void => {
+    setLibrary(false)
+    newWorksheetSafely().catch(notifyError)
+  }
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -69,14 +84,7 @@ export default function ArbeitsblattModule(): React.JSX.Element {
           </Button>
         )}
         {area !== 'designs' && !showLibrary && (
-          <Button
-            variant="light"
-            leftSection={<IconPlus size={16} />}
-            onClick={() => {
-              newWorksheet()
-              setLibrary(false)
-            }}
-          >
+          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
             Neues Arbeitsblatt
           </Button>
         )}
@@ -85,14 +93,7 @@ export default function ArbeitsblattModule(): React.JSX.Element {
         {area === 'designs' ? (
           <DesignManager />
         ) : showLibrary ? (
-          <WorksheetLibrary
-            onNew={() => {
-              setLibrary(false)
-              setStep(0)
-            }}
-            onOpenFile={openFile}
-            onOpened={() => setLibrary(false)}
-          />
+          <WorksheetLibrary onNew={startNew} onOpenFile={openFile} onOpened={() => setLibrary(false)} />
         ) : (
           <>
             {step === 0 && <TopicStep onLibrary={() => setLibrary(true)} />}

@@ -1,9 +1,10 @@
 import { Button, Card, Group, NumberInput, Select, Stack, Text, TextInput, Title } from '@mantine/core'
-import { IconClipboard, IconDeviceFloppy } from '@tabler/icons-react'
-import { useState } from 'react'
+import { IconCheck, IconClipboard, IconDeviceFloppy } from '@tabler/icons-react'
+import { useRef, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
 import DropZone, { FILE_TYPES } from '../../../shared/components/DropZone'
 import { notifyError, notifySuccess } from '../../../shared/util'
+import { useVerzoegertesSichern } from '../../../shared/useAutosave'
 import { importVocabFromFile } from '../../vokabeltest/input/importVocab'
 import { parseDelimited } from '../../vokabeltest/input/parseTable'
 import { newId } from '../../vokabeltest/model/random'
@@ -15,7 +16,13 @@ import type { VocabRow } from './VocabRows'
 
 const toRows = (list: SavedVocabList): VocabRow[] => [...list.entries.map((e) => ({ ...e, id: newId() })), emptyRow()]
 
-/** Eine eigene Vokabelliste bearbeiten. */
+/**
+ * Eine eigene Vokabelliste bearbeiten.
+ *
+ * Gespeichert wird von selbst, kurz nach jeder Änderung – wie in den übrigen Programmen.
+ * Vorher musste „Speichern" gedrückt werden; „Zurück zur Übersicht" verwarf alles andere
+ * ohne Nachfrage.
+ */
 export default function ListEditor({
   list,
   onSaved,
@@ -31,18 +38,17 @@ export default function ListEditor({
   const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
   const [dirty, setDirty] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
+  // Zählt Änderungen – so bleibt eine Eingabe WÄHREND des Speicherns als ungesichert markiert
+  const stand = useRef(0)
 
-  const addRows = (entries: { term: string; translation: string; pos?: string; note?: string; grey?: boolean; inBox?: boolean }[]): void => {
-    setRows((r) => [...r.filter((x) => x.term.trim() || x.translation.trim()), ...entries.map((e) => ({ ...e, id: newId() })), emptyRow()])
-    setDirty(true)
-  }
-
-  const save = async (): Promise<void> => {
+  const save = async (vonHand = false): Promise<void> => {
     const entries = rows.filter((r) => r.term.trim()).map(({ id: _id, ...e }) => ({ ...e, term: e.term.trim(), translation: e.translation.trim() }))
     if (!entries.length) {
-      notifyError('Die Liste enthält noch keine Vokabeln.')
+      // Von selbst wird eine leere Liste still übergangen; nur auf Knopfdruck gibt es den Hinweis
+      if (vonHand) notifyError('Die Liste enthält noch keine Vokabeln.')
       return
     }
+    const gesichert = stand.current
     try {
       const next: SavedVocabList = {
         ...list,
@@ -53,12 +59,26 @@ export default function ListEditor({
         updatedAt: new Date().toISOString()
       }
       const lists = await window.api.library.save(next)
-      setDirty(false)
+      if (stand.current === gesichert) setDirty(false)
       onSaved(lists, next)
-      notifySuccess(`„${next.name}" gespeichert – ${entries.length} Vokabeln.`)
+      if (vonHand) notifySuccess(`„${next.name}" gespeichert – ${entries.length} Vokabeln.`)
     } catch (e) {
+      // Beim automatischen Sichern meldet der gemeinsame Mechanismus den Fehler
+      if (!vonHand) throw e
       notifyError(e)
     }
+  }
+  const sicherung = useVerzoegertesSichern(() => save())
+  /** Jede Änderung: als ungesichert markieren und kurz danach von selbst speichern. */
+  const geaendert = (): void => {
+    stand.current++
+    setDirty(true)
+    sicherung.plane(1200)
+  }
+
+  const addRows = (entries: { term: string; translation: string; pos?: string; note?: string; grey?: boolean; inBox?: boolean }[]): void => {
+    setRows((r) => [...r.filter((x) => x.term.trim() || x.translation.trim()), ...entries.map((e) => ({ ...e, id: newId() })), emptyRow()])
+    geaendert()
   }
 
   return (
@@ -71,11 +91,24 @@ export default function ListEditor({
           </Text>
         </div>
         <Group wrap="nowrap">
-          <Button variant="default" onClick={onBack}>
+          <Button
+            variant="default"
+            onClick={async () => {
+              // Anstehendes zuerst sichern, dann erst zurück – die Übersicht zeigt so schon den neuen Stand
+              await sicherung.sofort()
+              onBack()
+            }}
+          >
             Zurück zur Übersicht
           </Button>
-          <Button leftSection={<IconDeviceFloppy size={16} />} disabled={!dirty} onClick={() => void save()}>
-            Speichern
+          {/* Zeigt den Stand; ein Klick sichert sofort, statt die kurze Wartezeit abzuwarten */}
+          <Button
+            variant={dirty ? 'filled' : 'light'}
+            leftSection={dirty ? <IconDeviceFloppy size={16} /> : <IconCheck size={16} />}
+            disabled={!dirty}
+            onClick={() => void sicherung.sofort().then(() => save(true))}
+          >
+            {dirty ? 'Speichern' : 'Gesichert'}
           </Button>
         </Group>
       </Group>
@@ -88,7 +121,7 @@ export default function ListEditor({
             value={name}
             onChange={(e) => {
               setName(e.currentTarget.value)
-              setDirty(true)
+              geaendert()
             }}
           />
           <Select
@@ -98,7 +131,7 @@ export default function ListEditor({
             onChange={(v) => {
               if (!v) return
               setLanguage(v)
-              setDirty(true)
+              geaendert()
             }}
             allowDeselect={false}
           />
@@ -111,7 +144,7 @@ export default function ListEditor({
             value={grade}
             onChange={(v) => {
               setGrade(v === '' ? '' : Number(v))
-              setDirty(true)
+              geaendert()
             }}
           />
         </Group>
@@ -144,6 +177,7 @@ export default function ListEditor({
             onEntries={(entries, selectionName) => {
               addRows(entries)
               if (!name.trim()) setName(selectionName)
+              geaendert()
             }}
           />
         </Group>
@@ -173,7 +207,7 @@ export default function ListEditor({
           rows={rows}
           onChange={(r) => {
             setRows(r)
-            setDirty(true)
+            geaendert()
           }}
         />
       </Card>

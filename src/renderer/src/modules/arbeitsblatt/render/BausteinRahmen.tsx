@@ -64,8 +64,11 @@ export function BausteinRahmen({
   children: React.ReactNode
   /** Zusätzliche Knöpfe des jeweiligen Programms (KI, Löschen, Einstellungen …) */
   extras?: React.ReactNode
-  /** Ändert den Baustein – Lage beim Ziehen, Anordnung über das Menü */
-  onUpdate: (fn: (d: WsBlock) => void) => void
+  /**
+   * Ändert den Baustein – Lage beim Ziehen, Anordnung über das Menü.
+   * `gruppe` kennzeichnet eine Geste: Alle Änderungen eines Zuges sind EIN Verlaufsschritt.
+   */
+  onUpdate: (fn: (d: WsBlock) => void, gruppe?: string) => void
   /** Eine Stelle nach oben (-1) oder unten (+1); fehlt, wenn das Programm es nicht kann */
   onMove?: (richtung: -1 | 1) => void
   busy?: boolean
@@ -76,7 +79,7 @@ export function BausteinRahmen({
   const halten = useRef<number | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
 
-  const setzen = (ziel: Ziel, x: number, y: number, breite: number): void =>
+  const setzen = (ziel: Ziel, x: number, y: number, breite: number, geste: string): void =>
     onUpdate((d) => {
       d.free = {
         page: ziel.seite,
@@ -85,7 +88,7 @@ export function BausteinRahmen({
         y: Math.round(Math.min(98, Math.max(0, y))),
         width: breite
       }
-    })
+    }, geste)
 
   /*
    * Die Verfolgung hängt am FENSTER, nicht am Baustein.
@@ -126,6 +129,12 @@ export function BausteinRahmen({
      */
     let laeuft = Boolean(block.free)
     const anfang = { x, y }
+    /*
+     * Jede Mausbewegung ändert die Lage – bis 25.09.2026 war das je ein Eintrag im Verlauf.
+     * Ein Zug quer übers Blatt füllte ihn damit ganz, und Strg+Z führte nur Pixel für Pixel
+     * zurück. Mit einer Kennung je Zug wird daraus ein einziger Schritt.
+     */
+    const geste = `ziehen:${block.id}:${Date.now()}`
 
     const bewegen = (ev: PointerEvent): void => {
       if (!griff.current) return
@@ -142,7 +151,8 @@ export function BausteinRahmen({
         z,
         ((ev.clientX - griff.current.dx - bb.left) / bb.width) * 100,
         ((ev.clientY - griff.current.dy - bb.top) / bb.height) * 100,
-        griff.current.breite
+        griff.current.breite,
+        geste
       )
     }
     const schluss = (): void => {

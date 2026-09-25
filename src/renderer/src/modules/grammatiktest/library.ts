@@ -3,10 +3,9 @@
  * Arbeitsblättern und Klassenarbeiten. Gespeichert wird unter
  * `%APPDATA%/schul-apps/grammatiktests`.
  */
-import { useEffect, useRef } from 'react'
 import type { SavedGrammarTestStats } from '@shared/types'
-import { notifyError } from '../../shared/util'
-import { newId } from '../vokabeltest/model/random'
+import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { useStoreAutosave } from '../../shared/useAutosave'
 import { chosenGrammarTopics } from '../arbeitsblatt/didactics/grammar'
 import type { GrammarTest } from './model/types'
 import { testHasContent, testPoints, testTaskCount } from './model/types'
@@ -39,15 +38,21 @@ export function defaultTestName(test: GrammarTest): string {
   return topics ? `${test.meta.subjectLabel} – ${topics}` : `Grammatiktest ${test.meta.subjectLabel}`
 }
 
+/**
+ * Lohnt sich das Sichern? Schon als Entwurf, sobald eine Form gewählt oder ein Titel da ist –
+ * nicht erst nach dem Erzeugen. Ein leeres Formular soll die Übersicht aber nicht füllen.
+ */
+export const lohntSicherung = (test: GrammarTest | null): boolean =>
+  Boolean(test && (testHasContent(test) || test.meta.topics.length || test.meta.title.trim()))
+
 export async function saveCurrentTest(name?: string): Promise<void> {
   const state = useGrammatiktest.getState()
   const test = state.test
-  // Ohne Aufgaben gibt es nichts zu sichern – ein leeres Formular soll die Übersicht nicht füllen
-  if (!test || !testHasContent(test)) return
-  const id = state.docId ?? newId()
+  if (!test || !lohntSicherung(test)) return
+  const id = state.docId
   const meta = await window.api.grammarTests.save({
     id,
-    name: (name ?? state.docName).trim() || defaultTestName(test),
+    name: name?.trim() || dokumentName(id, state.docName, defaultTestName(test)),
     stats: testStats(test),
     payload: test
   })
@@ -55,34 +60,29 @@ export async function saveCurrentTest(name?: string): Promise<void> {
 }
 
 export async function openSavedTest(id: string): Promise<void> {
+  // Was am bisherigen Test noch ansteht, zuerst sichern – sonst ginge es beim Wechsel verloren
+  await sichereAlles()
   const saved = await window.api.grammarTests.get(id)
   useGrammatiktest.getState().openSaved(saved.id, saved.name, saved.payload as GrammarTest, saved.updatedAt)
 }
 
+/** Neuen Test beginnen – den bisherigen vorher sichern. */
+export async function newTestSafely(): Promise<void> {
+  await sichereAlles()
+  useGrammatiktest.getState().reset()
+}
+
 /**
- * Automatisches Speichern: das erste Mal, sobald Aufgaben da sind, danach nach jeder Änderung.
+ * Automatisches Speichern – als Entwurf ab dem ersten Schritt, danach nach jeder Änderung.
  * Verzögert, damit nicht jede Eingabe im Editor eine Datei schreibt.
  */
 export function useTestAutosave(): void {
-  const timer = useRef<number | null>(null)
-  useEffect(() => {
-    const save = (): void => {
-      saveCurrentTest().catch((e) => notifyError(e, 'Automatisches Speichern fehlgeschlagen'))
-    }
-    const schedule = (): void => {
-      if (timer.current) window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(save, 1500)
-    }
-    const state = useGrammatiktest.getState()
-    if (state.test && testHasContent(state.test) && !state.docId) schedule()
-    const unsubscribe = useGrammatiktest.subscribe((s, prev) => {
-      if (s.test === prev.test) return
-      if (!s.test || !testHasContent(s.test)) return
-      schedule()
-    })
-    return () => {
-      if (timer.current) window.clearTimeout(timer.current)
-      unsubscribe()
-    }
-  }, [])
+  useStoreAutosave({
+    store: useGrammatiktest,
+    dokument: (s) => s.docId,
+    gesichert: (s) => Boolean(s.savedAt),
+    bereit: (s) => lohntSicherung(s.test),
+    geaendert: (s, prev) => s.test !== prev.test,
+    speichern: () => saveCurrentTest()
+  })
 }

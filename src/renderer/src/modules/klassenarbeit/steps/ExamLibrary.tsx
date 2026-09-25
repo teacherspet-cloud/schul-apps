@@ -19,7 +19,7 @@ export default function ExamLibrary({ onNew, onOpened }: { onNew: () => void; on
     if (!confirmDelete) return
     try {
       setExams(await window.api.exams.delete(confirmDelete.id))
-      if (useKlassenarbeit.getState().docId === confirmDelete.id) useKlassenarbeit.getState().markSaved('', '', '')
+      if (useKlassenarbeit.getState().docId === confirmDelete.id) useKlassenarbeit.getState().forgetSaved()
       setConfirmDelete(null)
     } catch (e) {
       notifyError(e)
@@ -76,8 +76,9 @@ export default function ExamLibrary({ onNew, onOpened }: { onNew: () => void; on
                               Aufgaben erstellt
                             </Badge>
                           ) : (
+                            // Entwürfe werden ab dem ersten Schritt gesichert – auch ganz ohne geplante Teile
                             <Badge variant="outline" color="gray">
-                              nur Rahmen
+                              {e.partCount ? 'nur Rahmen' : 'Entwurf'}
                             </Badge>
                           )}
                         </Group>

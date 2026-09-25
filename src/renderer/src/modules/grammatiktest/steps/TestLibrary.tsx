@@ -22,7 +22,7 @@ export default function TestLibrary({ onNew, onOpened }: { onNew: () => void; on
     try {
       setTests(await window.api.grammarTests.delete(confirmDelete.id))
       // Der offene Test darf nicht weiter auf eine gelöschte Datei zeigen
-      if (useGrammatiktest.getState().docId === confirmDelete.id) useGrammatiktest.getState().markSaved('', '', '')
+      if (useGrammatiktest.getState().docId === confirmDelete.id) useGrammatiktest.getState().forgetSaved()
       setConfirmDelete(null)
     } catch (e) {
       notifyError(e)
@@ -74,6 +74,12 @@ export default function TestLibrary({ onNew, onOpened }: { onNew: () => void; on
                             {t.name}
                           </Text>
                           <Badge variant="light">Klasse {t.grade}</Badge>
+                          {/* Entwürfe werden ab dem ersten Schritt gesichert – noch ohne Aufgaben */}
+                          {t.taskCount === 0 && (
+                            <Badge variant="light" color="gray">
+                              Entwurf
+                            </Badge>
+                          )}
                           {t.graded ? (
                             <Badge variant="light" color="grape">
                               benotet

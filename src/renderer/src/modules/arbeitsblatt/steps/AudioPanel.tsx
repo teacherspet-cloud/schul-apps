@@ -44,7 +44,7 @@ export function speakerNames(block: AudioBlock): string[] {
  * Klassenarbeiten benutzen denselben Reiter. Sie liegen in einem eigenen Speicher, deshalb
  * kommt die Änderungsfunktion von außen; ohne Angabe gilt der Arbeitsblatt-Speicher.
  */
-export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (ws: Worksheet) => void) => void }): React.JSX.Element {
+export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (ws: Worksheet) => void, gruppe?: string) => void }): React.JSX.Element {
   const updateSheet = useArbeitsblatt((s) => s.update)
   const update = onUpdate ?? updateSheet
   const settings = useAppSettings((s) => s.settings)
@@ -95,10 +95,10 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
     sheet.blocks.filter((b): b is AudioBlock => b.type === 'audio').map((block) => ({ sheet, block }))
   )
 
-  const setBlock = (id: string, fn: (b: AudioBlock) => void): void =>
+  const setBlock = (id: string, fn: (b: AudioBlock) => void, gruppe?: string): void =>
     update((d) => {
       for (const s of d.sheets) for (const b of s.blocks) if (b.id === id && b.type === 'audio') fn(b)
-    })
+    }, gruppe)
 
   /**
    * Stimmen, die das Konto auch wirklich benutzen darf.
@@ -427,7 +427,8 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
                 wpm={listeningRules(ws.meta.cefrLevel).wpm}
                 dialog={new Set((names.length ? names : ['Sprecher']).map((n) => voiceFor(block, n)).filter(Boolean)).size > 1}
                 eigene={block.voiceSettings}
-                onChange={(s) => setBlock(block.id, (b) => (s ? (b.voiceSettings = s) : delete b.voiceSettings))}
+                // Ein Zug an den Stimmreglern ist ein Verlaufsschritt
+                onChange={(s) => setBlock(block.id, (b) => (s ? (b.voiceSettings = s) : delete b.voiceSettings), `stimme:${block.id}`)}
               />
 
               <Group align="flex-end" gap="sm" wrap="wrap">

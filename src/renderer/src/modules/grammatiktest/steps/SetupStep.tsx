@@ -90,7 +90,8 @@ export default function SetupStep(): React.JSX.Element {
   if (!test) return <Container py="xl">Lade …</Container>
 
   const meta = test.meta
-  const patch = (p: Partial<GrammarTestMeta>): void => setTest({ ...test, meta: { ...meta, ...p } })
+  // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
+  const patch = (p: Partial<GrammarTestMeta>): void => setTest({ ...test, meta: { ...meta, ...p } }, `angaben:${Object.keys(p).sort().join(',')}`)
 
   /** Themen ändern: Formate mitziehen, solange die Lehrkraft sie nicht selbst angefasst hat. */
   const patchFromPicker = (p: Partial<WorksheetMeta>): void => {

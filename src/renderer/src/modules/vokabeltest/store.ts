@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import type { KnownVocab } from '../../shared/knownVocab'
 import type { Block, TestDocument, TestSettings, VocabEntry } from './model/types'
-
-const HISTORY_LIMIT = 60
+import { leererVerlauf, merke, rueckgaengig, type Verlauf, wiederholen } from '../../shared/undo'
+import { newId } from './model/random'
 
 /**
  * Woher die Liste stammt – aus einem Schulbuch mit bekanntem Jahrgang, Bundesland und
@@ -35,11 +35,13 @@ interface VokabeltestState {
   listContext: VocabListContext | null
   settings: TestSettings | null
   doc: TestDocument | null
-  past: TestDocument[]
-  future: TestDocument[]
+  verlauf: Verlauf<TestDocument>
   activeVariantId: string | null
-  /** ID in der Test-Bibliothek der App (null = noch nicht gespeichert) */
-  testId: string | null
+  /**
+   * Kennung des offenen Tests – von Anfang an, nicht erst nach dem ersten Speichern. Unter ihr
+   * landet er in der Bibliothek; ob er dort schon liegt, sagt `lastSavedAt`.
+   */
+  testId: string
   lastSavedAt: string | null
 
   setStep: (step: number) => void
@@ -51,6 +53,8 @@ interface VokabeltestState {
   updateDoc: (fn: (draft: TestDocument) => void) => void
   updateBlock: (variantId: string, blockId: string, fn: (draft: Block) => void) => void
   setActiveVariant: (id: string) => void
+  /** Der offene Test wurde aus der Bibliothek gelöscht: Er gilt wieder als ungesichert. */
+  forgetSaved: () => void
   undo: () => void
   redo: () => void
   /** Leeren Vokabeltest beginnen */
@@ -67,10 +71,9 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
   listContext: null,
   settings: null,
   doc: null,
-  past: [],
-  future: [],
+  verlauf: leererVerlauf(),
   activeVariantId: null,
-  testId: null,
+  testId: newId(),
   lastSavedAt: null,
 
   setStep: (step) => set({ step }),
@@ -79,11 +82,15 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
   setListContext: (listContext) => set({ listContext }),
   setSettings: (settings) => set({ settings }),
 
+  /*
+   * Einen (neu erzeugten) Test übernehmen. Der bisherige Test wandert in den Verlauf –
+   * vorher leerte „Test neu erstellen" den Verlauf, und der alte Test war verloren. Die
+   * Lehrkraft hat Rückfragen davor bewusst abgewählt; Strg+Z holt ihn zurück.
+   */
   loadDocument: (doc) =>
     set({
       doc,
-      past: [],
-      future: [],
+      verlauf: get().doc ? merke(get().verlauf, get().doc!) : get().verlauf,
       activeVariantId: doc.variants[0]?.id ?? null,
       // Die vollständige Liste (auch nicht abgefragte Vokabeln) bleibt erhalten, wenn sie schon da ist
       vocab: mergeVocab(get().vocab, doc.vocab),
@@ -92,11 +99,11 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
     }),
 
   updateDoc: (fn) => {
-    const { doc, past } = get()
+    const { doc, verlauf } = get()
     if (!doc) return
     const draft = structuredClone(doc)
     fn(draft)
-    set({ doc: draft, past: [...past, doc].slice(-HISTORY_LIMIT), future: [] })
+    set({ doc: draft, verlauf: merke(verlauf, doc) })
   },
 
   updateBlock: (variantId, blockId, fn) =>
@@ -106,17 +113,20 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
     }),
 
   setActiveVariant: (activeVariantId) => set({ activeVariantId }),
+  forgetSaved: () => set({ testId: newId(), lastSavedAt: null }),
 
   undo: () => {
-    const { doc, past, future } = get()
-    if (!doc || past.length === 0) return
-    set({ doc: past[past.length - 1], past: past.slice(0, -1), future: [doc, ...future] })
+    const { doc, verlauf, activeVariantId } = get()
+    const r = doc && rueckgaengig(verlauf, doc)
+    if (!r) return
+    set({ doc: r.stand, verlauf: r.verlauf, activeVariantId: gueltigeVariante(r.stand, activeVariantId) })
   },
 
   redo: () => {
-    const { doc, past, future } = get()
-    if (!doc || future.length === 0) return
-    set({ doc: future[0], past: [...past, doc], future: future.slice(1) })
+    const { doc, verlauf, activeVariantId } = get()
+    const r = doc && wiederholen(verlauf, doc)
+    if (!r) return
+    set({ doc: r.stand, verlauf: r.verlauf, activeVariantId: gueltigeVariante(r.stand, activeVariantId) })
   },
 
   newTest: () =>
@@ -127,10 +137,9 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       listContext: null,
       settings: null,
       doc: null,
-      past: [],
-      future: [],
+      verlauf: leererVerlauf(),
       activeVariantId: null,
-      testId: null,
+      testId: newId(),
       lastSavedAt: null
     }),
 
@@ -142,14 +151,19 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       vocab: payload.vocab ?? payload.doc?.vocab ?? [],
       settings: payload.settings ?? payload.doc?.settings ?? null,
       doc: payload.doc,
-      past: [],
-      future: [],
+      verlauf: leererVerlauf(),
       activeVariantId: payload.doc?.variants[0]?.id ?? null,
       step: payload.doc ? 2 : 0
     }),
 
-  markSaved: (testId, lastSavedAt) => set({ testId, lastSavedAt })
+  // Kommt die Bestätigung erst an, nachdem schon ein anderer Test offen ist, gilt sie nicht mehr
+  markSaved: (testId, lastSavedAt) => {
+    if (testId === get().testId) set({ lastSavedAt })
+  }
 }))
+
+/** Nach Rückgängig kann die angezeigte Variante fehlen (z. B. nach dem Neu-Erstellen mit weniger Varianten). */
+const gueltigeVariante = (doc: TestDocument, id: string | null): string | null => (doc.variants.some((v) => v.id === id) ? id : (doc.variants[0]?.id ?? null))
 
 /** Vokabeln aus dem Test mit der vollständigen Liste zusammenführen (IDs bleiben gleich). */
 function mergeVocab(list: VocabEntry[], fromDoc: VocabEntry[]): VocabEntry[] {

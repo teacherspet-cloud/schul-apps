@@ -129,7 +129,8 @@ export default function FrameStep({ onLibrary }: { onLibrary: () => void }): Rea
   if (!exam) return <Container py="xl">Lade …</Container>
 
   const meta = exam.meta
-  const patch = (p: Partial<ExamMeta>): void => update((d) => Object.assign(d.meta, p))
+  // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
+  const patch = (p: Partial<ExamMeta>): void => update((d) => Object.assign(d.meta, p), `angaben:${Object.keys(p).sort().join(',')}`)
   const range = gradeRange(table, meta.stateId, meta.schoolTypeId)
   const courseOptions = courseLevelOptions(meta.stateId, meta.schoolTypeId, meta.grade)
   const pointsPlanned = examPoints(exam)

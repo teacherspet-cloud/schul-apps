@@ -33,6 +33,7 @@ import { BLOCK_LABELS } from '../model/factory'
 import type { AnswerKind, OutlineItem, SocialForm, WsBlockType } from '../model/types'
 import { profileFromMeta } from '../render/SheetPages'
 import { aiCall, trackedAiCall, useArbeitsblatt } from '../store'
+import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { AiProgressTracker, neverBackwards, phaseRatio, remainingLabel, remainingSeconds } from '../../../shared/aiProgress'
 import type { RunPhase } from '../../../shared/aiProgress'
 
@@ -51,7 +52,7 @@ const ANSWER_LABELS: Record<AnswerKind, string> = {
 }
 
 export default function OutlineStep(): React.JSX.Element {
-  const { worksheet, setWorksheet, setStep, loadWorksheet } = useArbeitsblatt()
+  const { worksheet, setWorksheet, setStep, applyGenerated, undo, redo, verlauf } = useArbeitsblatt()
   const [review, setReview] = useState(true)
   // Sparmodus (Einstellungen → Künstliche Intelligenz): alle Niveaustufen in einer Anfrage, ohne Prüfrunde
   const [economy, setEconomy] = useState(false)
@@ -76,8 +77,13 @@ export default function OutlineStep(): React.JSX.Element {
 
   if (!worksheet?.outline || !profile) return <Container py="xl">Noch keine Gliederung.</Container>
   const outline = worksheet.outline
-  const setItems = (items: OutlineItem[]): void => setWorksheet({ ...worksheet, outline: { ...outline, items } })
-  const patchItem = (i: number, p: Partial<OutlineItem>): void => setItems(outline.items.map((it, j) => (j === i ? { ...it, ...p } : it)))
+  // Jede Änderung der Gliederung ist ein Schritt für Strg+Z; Tippen im selben Feld zählt als einer
+  const setItems = (items: OutlineItem[], gruppe?: string): void => setWorksheet({ ...worksheet, outline: { ...outline, items } }, gruppe)
+  const patchItem = (i: number, p: Partial<OutlineItem>): void =>
+    setItems(
+      outline.items.map((it, j) => (j === i ? { ...it, ...p } : it)),
+      `baustein:${outline.items[i]?.id}:${Object.keys(p).sort().join(',')}`
+    )
   const move = (i: number, d: number): void => {
     const items = [...outline.items]
     const [x] = items.splice(i, 1)
@@ -124,7 +130,8 @@ export default function OutlineStep(): React.JSX.Element {
       await finishWorksheet(result, profile, { ai, images: await browserWorksheetImageDeps(), sources: browserSourceServices() }, (message, done, total) =>
         setProgress({ message, done, total, phase: 'finish' })
       )
-      loadWorksheet(result, 2)
+      // Bleibt dasselbe Dokument wie der Entwurf; Strg+Z führt zur Gliederung zurück
+      applyGenerated(result, 2)
     } catch (e) {
       notifyError(e, 'Arbeitsblatt konnte nicht erstellt werden')
     } finally {
@@ -146,6 +153,7 @@ export default function OutlineStep(): React.JSX.Element {
             </Text>
           </div>
           <Group>
+            <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
             <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
               Zurück
             </Button>
@@ -156,7 +164,14 @@ export default function OutlineStep(): React.JSX.Element {
               onClick={async () => {
                 setReplanning(true)
                 try {
-                  setWorksheet({ ...worksheet, outline: await generateOutline(worksheet.meta, profile, worksheet.sources, aiCall) })
+                  /*
+                   * Mit dem Originalmaterial, das beim ersten Planen gefunden wurde. Vorher fehlte
+                   * es hier: Die neue Gliederung plante Aufgaben zu einem gedachten Text, obwohl
+                   * ein echter bereitlag. Die alte Gliederung bleibt über Strg+Z erreichbar.
+                   */
+                  const neu = await generateOutline(worksheet.meta, profile, worksheet.sources, aiCall, worksheet.originalMaterial ?? null)
+                  const aktuell = useArbeitsblatt.getState().worksheet ?? worksheet
+                  setWorksheet({ ...aktuell, outline: neu })
                 } catch (e) {
                   notifyError(e)
                 } finally {
@@ -180,7 +195,7 @@ export default function OutlineStep(): React.JSX.Element {
             <TextInput
               label="Titel"
               value={worksheet.meta.title || outline.title}
-              onChange={(e) => setWorksheet({ ...worksheet, meta: { ...worksheet.meta, title: e.currentTarget.value } })}
+              onChange={(e) => setWorksheet({ ...worksheet, meta: { ...worksheet.meta, title: e.currentTarget.value } }, 'titel')}
             />
             <Textarea
               label="Lernziele (eine pro Zeile)"
@@ -204,10 +219,10 @@ export default function OutlineStep(): React.JSX.Element {
             <Card key={it.id} withBorder padding="sm">
               <Group align="start" wrap="nowrap">
                 <Stack gap={2}>
-                  <ActionIcon size="sm" variant="default" disabled={i === 0} onClick={() => move(i, -1)}>
+                  <ActionIcon size="sm" variant="default" aria-label="Nach oben" disabled={i === 0} onClick={() => move(i, -1)}>
                     <IconArrowUp size={14} />
                   </ActionIcon>
-                  <ActionIcon size="sm" variant="default" disabled={i === outline.items.length - 1} onClick={() => move(i, 1)}>
+                  <ActionIcon size="sm" variant="default" aria-label="Nach unten" disabled={i === outline.items.length - 1} onClick={() => move(i, 1)}>
                     <IconArrowDown size={14} />
                   </ActionIcon>
                 </Stack>
@@ -286,8 +301,8 @@ export default function OutlineStep(): React.JSX.Element {
                       <IconWand size={16} />
                     </ActionIcon>
                   </Tooltip>
-                  <Tooltip label="Entfernen">
-                    <ActionIcon variant="subtle" color="red" onClick={() => setItems(outline.items.filter((_, j) => j !== i))}>
+                  <Tooltip label="Entfernen (Strg+Z holt ihn zurück)">
+                    <ActionIcon variant="subtle" color="red" aria-label="Baustein entfernen" onClick={() => setItems(outline.items.filter((_, j) => j !== i))}>
                       <IconTrash size={16} />
                     </ActionIcon>
                   </Tooltip>

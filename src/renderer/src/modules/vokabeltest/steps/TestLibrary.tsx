@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SavedTestMeta } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { hasContent, openSavedTest, saveCurrentTest } from '../library'
+import { sichereAlles } from '../../../shared/autosave'
 import { formatPoints } from '../model/blocks'
 import { parseProjectFile, PROJECT_FILTER } from '../project'
 import { TestPayload, useVokabeltest } from '../store'
@@ -23,7 +24,7 @@ export function TestLibraryModal({ opened, onClose }: { opened: boolean; onClose
     if (!confirmDelete) return
     try {
       setTests(await window.api.tests.delete(confirmDelete.id))
-      if (useVokabeltest.getState().testId === confirmDelete.id) useVokabeltest.getState().markSaved('', '')
+      if (useVokabeltest.getState().testId === confirmDelete.id) useVokabeltest.getState().forgetSaved()
       setConfirmDelete(null)
     } catch (e) {
       notifyError(e)
@@ -49,7 +50,9 @@ export function TestLibraryModal({ opened, onClose }: { opened: boolean; onClose
 
   /** Ungespeicherte Arbeit wird vor dem Wechsel gesichert, damit nichts verloren geht. */
   const keepCurrent = async (): Promise<void> => {
-    if (hasContent() && !useVokabeltest.getState().testId) {
+    // Anstehendes automatisches Sichern zuerst – danach ist ein Test mit Inhalt schon in der Bibliothek
+    await sichereAlles()
+    if (hasContent() && !useVokabeltest.getState().lastSavedAt) {
       await saveCurrentTest()
       notifySuccess(`Der bisherige Test wurde als „${useVokabeltest.getState().listName}" gespeichert.`)
     }
@@ -227,7 +230,7 @@ export function TestLibraryModal({ opened, onClose }: { opened: boolean; onClose
 
 /** Speichern in der App; beim ersten Speichern wird ein Name abgefragt. */
 export function SaveTestButton({ size = 'sm' }: { size?: 'xs' | 'sm' }): React.JSX.Element {
-  const { testId, listName, lastSavedAt } = useVokabeltest()
+  const { listName, lastSavedAt } = useVokabeltest()
   const [opened, setOpened] = useState(false)
   const [name, setName] = useState(listName)
   const [saving, setSaving] = useState(false)
@@ -245,7 +248,7 @@ export function SaveTestButton({ size = 'sm' }: { size?: 'xs' | 'sm' }): React.J
     }
   }
 
-  if (testId) {
+  if (lastSavedAt) {
     return (
       <Tooltip label={lastSavedAt ? `Automatisch gespeichert: ${dateFormat.format(new Date(lastSavedAt))}` : 'Gespeichert'}>
         <Button size={size} variant="default" leftSection={<IconDeviceFloppy size={14} />} loading={saving} onClick={() => void save(listName)}>
@@ -295,9 +298,9 @@ export type { TestPayload }
  * Verschwindet, sobald eine Liste eingegeben oder ein Test geöffnet ist.
  */
 export function RecentTests({ onShowAll }: { onShowAll: () => void }): React.JSX.Element | null {
-  const { vocab, doc, testId } = useVokabeltest()
+  const { vocab, doc, lastSavedAt } = useVokabeltest()
   const [tests, setTests] = useState<SavedTestMeta[]>([])
-  const empty = !doc && !testId && !vocab.some((v) => v.term.trim())
+  const empty = !doc && !lastSavedAt && !vocab.some((v) => v.term.trim())
 
   useEffect(() => {
     if (!empty) return

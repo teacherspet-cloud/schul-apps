@@ -21,9 +21,7 @@ import {
 } from '@mantine/core'
 import {
   IconAdjustments,
-  IconArrowBackUp,
   IconArrowDown,
-  IconArrowForwardUp,
   IconArrowUp,
   IconDeviceFloppy,
   IconFileTypeDocx,
@@ -56,10 +54,11 @@ import { TestLayouts, useTestLayout } from '../render/useTestLayout'
 import { PROJECT_FILTER, serializeProject } from '../project'
 import { aiCall, useVokabeltest } from '../store'
 import { SaveTestButton } from './TestLibrary'
+import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import './editor.css'
 
 export default function EditorStep(): React.JSX.Element {
-  const { doc, updateDoc, updateBlock, undo, redo, past, future, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
+  const { doc, updateDoc, updateBlock, undo, redo, verlauf, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
   const [view, setView] = useState<'test' | 'key'>('test')
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<{ blockId: string; itemId: string; keywords: string[] } | null>(null)
@@ -70,22 +69,7 @@ export default function EditorStep(): React.JSX.Element {
   // Echte A4-Seiten: Aufteilung wird unsichtbar gemessen (auch für Druck, PDF und Word)
   const { layouts, measure } = useTestLayout(doc)
 
-  // Tastenkürzel für Rückgängig/Wiederholen (nicht während der Texteingabe im Feld)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      const target = e.target as HTMLElement
-      if (target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
-      if (e.ctrlKey && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        undo()
-      } else if (e.ctrlKey && e.key.toLowerCase() === 'y') {
-        e.preventDefault()
-        redo()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo])
+  // Strg+Z / Strg+Y hängen am Programm (VokabeltestModule), damit sie nur gelten, solange es vorn liegt
 
   const withBusy = useCallback(async (id: string, fn: () => Promise<void>) => {
     setBusy((b) => new Set(b).add(id))
@@ -217,16 +201,7 @@ export default function EditorStep(): React.JSX.Element {
         <Button variant="default" size="xs" leftSection={<IconSettings size={14} />} onClick={() => setStep(1)}>
           Einstellungen
         </Button>
-        <Tooltip label="Rückgängig (Strg+Z)">
-          <ActionIcon variant="default" onClick={undo} disabled={past.length === 0}>
-            <IconArrowBackUp size={16} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Wiederholen (Strg+Y)">
-          <ActionIcon variant="default" onClick={redo} disabled={future.length === 0}>
-            <IconArrowForwardUp size={16} />
-          </ActionIcon>
-        </Tooltip>
+        <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
         <Divider orientation="vertical" />
         {doc.variants.length > 1 && (
           <SegmentedControl

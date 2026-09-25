@@ -1,7 +1,10 @@
 import { Box, Button, Group, Stepper } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { useExamAutosave } from './library'
+import { newExamSafely, useExamAutosave } from './library'
+import { notifyError } from '../../shared/util'
+import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
+import { useUndoKeys } from '../../shared/useUndoKeys'
 import ExamLibrary from './steps/ExamLibrary'
 import FrameStep from './steps/FrameStep'
 import TasksStep from './steps/TasksStep'
@@ -11,10 +14,19 @@ import { useKlassenarbeit } from './store'
  * Programm „Klassenarbeiten“ – zunächst für Englisch und Geschichte.
  * Beim Öffnen erscheinen die gespeicherten Arbeiten, sofern es welche gibt.
  */
-export default function KlassenarbeitModule(): React.JSX.Element {
-  const { step, setStep, exam, reset } = useKlassenarbeit()
+export default function KlassenarbeitModule({ active }: { active: boolean }): React.JSX.Element {
+  const { step, setStep, exam, undo, redo, verlauf } = useKlassenarbeit()
   const [library, setLibrary] = useState(false)
   useExamAutosave()
+  /*
+   * Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt. Zurückholen lässt sich damit auch,
+   * was Teile ersetzt oder leert (Vorschlag erzeugen, Fach- oder Jahrgangswechsel, Neu erzeugen).
+   */
+  useUndoKeys(active && !library, undo, redo)
+  const startNew = (): void => {
+    setLibrary(false)
+    newExamSafely().catch(notifyError)
+  }
 
   useEffect(() => {
     if (useKlassenarbeit.getState().exam?.parts.length) return
@@ -25,15 +37,7 @@ export default function KlassenarbeitModule(): React.JSX.Element {
   }, [])
 
   if (library) {
-    return (
-      <ExamLibrary
-        onNew={() => {
-          reset()
-          setLibrary(false)
-        }}
-        onOpened={() => setLibrary(false)}
-      />
-    )
+    return <ExamLibrary onNew={startNew} onOpened={() => setLibrary(false)} />
   }
 
   return (
@@ -49,12 +53,13 @@ export default function KlassenarbeitModule(): React.JSX.Element {
           <Stepper.Step label="Aufgaben" description="Material und Aufgaben" disabled={!exam?.parts.length} />
           <Stepper.Step label="Bearbeiten & Export" description="Erwartungshorizont, Word, PDF" disabled />
         </Stepper>
+        <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
         {/* Zurueck zur Uebersicht – beschriftet und immer sichtbar, wie in den anderen Programmen */}
         <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
           Meine Arbeiten
         </Button>
         {/* Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen */}
-        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={reset}>
+        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
           Neue Klassenarbeit
         </Button>
       </Group>

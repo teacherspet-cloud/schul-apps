@@ -121,6 +121,14 @@ export function buildApi(call: Call, extras: ApiExtras) {
       pruefen: (daten: Uint8Array) => call<{ erstellt: string; ordner: { ordner: string; eintraege: number }[]; dateien: string[] }>('wartung:pruefen', daten),
       wiederherstellen: (daten: Uint8Array) => call<{ wiederhergestellt: string[] }>('wartung:wiederherstellen', daten)
     },
+    /**
+     * Das Fenster soll schließen: Vorher sichert die Oberfläche alles Anstehende und meldet
+     * sich mit `gesichert()` zurück. Im Browser gibt es kein solches Ereignis.
+     */
+    fenster: {
+      onSchliessen: (cb: () => void) => extras.subscribe('fenster:schliessen', () => cb()),
+      gesichert: () => call<void>('fenster:gesichert')
+    },
     ai: {
       status: () => call<AiStatus>('ai:status'),
       /** Prüft den Schlüssel, lädt die Modellliste neu; liefert die Anzahl gefundener Modelle */

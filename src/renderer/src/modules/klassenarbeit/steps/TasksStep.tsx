@@ -35,14 +35,14 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
    * Der Hörtexte-Reiter arbeitet auf dem Arbeitsblatt-Abbild der Arbeit. Geändert wird
    * aber die Arbeit selbst: Der Baustein wird über seine id im passenden Teil gesucht.
    */
-  const updateAudio = (fn: (ws: Worksheet) => void): void =>
+  const updateAudio = (fn: (ws: Worksheet) => void, gruppe?: string): void =>
     updateExam((draft) => {
       const view = examToWorksheet(draft)
       fn(view)
       for (const part of draft.parts) {
         part.blocks = part.blocks.map((b) => view.sheets.flatMap((s) => s.blocks).find((x) => x.id === b.id) ?? b)
       }
-    })
+    }, gruppe)
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   const [busy, setBusy] = useState('')
@@ -162,11 +162,11 @@ export default function TasksStep({ exam, onLibrary }: { exam: Exam; onLibrary: 
       <BausteinRahmen
         block={block}
         placed={placed}
-        onUpdate={(fn) =>
+        onUpdate={(fn, gruppe) =>
           updateExam((d) => {
             const b = d.parts.flatMap((p) => p.blocks).find((x) => x.id === block.id)
             if (b) fn(b)
-          })
+          }, gruppe)
         }
         onMove={(richtung) =>
           updateExam((d) => {

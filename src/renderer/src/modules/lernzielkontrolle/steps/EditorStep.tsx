@@ -64,6 +64,19 @@ export default function EditorStep(): React.JSX.Element {
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   const [busy, setBusy] = useState(false)
+  /*
+   * Bei mehreren Fassungen wird gefragt, BEVOR etwas passiert.
+   *
+   * Ohne die Rueckfrage bekam man beim Drucken stillschweigend nur die gerade angezeigte
+   * Fassung - und merkte es erst, wenn die Klasse vor einem sitzt und die Haelfte das
+   * falsche Blatt hat. Umgekehrt waere „immer alle" genauso falsch: Wer nur Gruppe B
+   * nachdrucken will, braucht nicht A und C dazu.
+   *
+   * Der Zustand steht VOR dem frühen `return` weiter unten: Hooks müssen bei jedem Rendern
+   * in gleicher Zahl und Reihenfolge laufen. Dahinter lief er nur, wenn ein Test geladen war
+   * – dieselbe Falle, die im Grammatiktest die ganze App abstürzen ließ (React #310).
+   */
+  const [frage, setFrage] = useState<'docx' | 'pdf' | 'print' | null>(null)
 
   /*
    * Das Blatt NUR neu bauen, wenn sich Test oder Variante ändern.
@@ -97,15 +110,6 @@ export default function EditorStep(): React.JSX.Element {
   const { warnungen, hinweise } = zaehleBefunde(befunde)
   const dateiname = `${test.meta.title || test.meta.thema || test.meta.bezeichnung}${test.varianten[variante]?.label ? ` ${test.varianten[variante].label}` : ''}`
 
-  /*
-   * Bei mehreren Fassungen wird gefragt, BEVOR etwas passiert.
-   *
-   * Ohne die Rueckfrage bekam man beim Drucken stillschweigend nur die gerade angezeigte
-   * Fassung - und merkte es erst, wenn die Klasse vor einem sitzt und die Haelfte das
-   * falsche Blatt hat. Umgekehrt waere „immer alle" genauso falsch: Wer nur Gruppe B
-   * nachdrucken will, braucht nicht A und C dazu.
-   */
-  const [frage, setFrage] = useState<'docx' | 'pdf' | 'print' | null>(null)
   const mehrereFassungen = test.varianten.length > 1
 
   /** Das Blatt fuer die Ausgabe: eine Fassung oder alle in einem Dokument. */
@@ -172,16 +176,15 @@ export default function EditorStep(): React.JSX.Element {
    * Bis 24.09.2026 gab es hier gar keine Bausteinsteuerung: Das Blatt ließ sich nur im Text
    * bearbeiten. Die Lehrkraft wollte es „überall von Hand" haben.
    */
-  const bausteine = (): WsBlock[] => useLernzielkontrolle.getState().test?.varianten[variante]?.blocks ?? []
   const wrapBlock = (block: WsBlock, placed: PlacedItem, content: React.ReactNode): React.ReactNode => (
     <BausteinRahmen
       block={block}
       placed={placed}
-      onUpdate={(fn) =>
+      onUpdate={(fn, gruppe) =>
         update((d) => {
           const b = d.varianten[variante]?.blocks.find((x) => x.id === block.id)
           if (b) fn(b)
-        })
+        }, gruppe)
       }
       onMove={(richtung) =>
         update((d) => {
@@ -197,7 +200,6 @@ export default function EditorStep(): React.JSX.Element {
       {content}
     </BausteinRahmen>
   )
-  void bausteine
 
   return (
     <Container size="xl" py="md">

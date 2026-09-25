@@ -89,10 +89,16 @@ await page
 await page.getByRole('textbox', { name: 'Wort' }).first().fill('bearbeitet')
 await page.waitForTimeout(300)
 await page.screenshot({ path: join(out, '2-schulbuch.png'), fullPage: true })
-await page.getByRole('button', { name: 'Speichern' }).click()
+// Kein Klick auf „Speichern" mehr (seit 25.09.2026): Gespeichert wird von selbst, und
+// „Zurück zur Übersicht" sichert Anstehendes sofort. Genau das prüft der direkte Rückweg.
 await quiet()
 await page.getByRole('button', { name: 'Zurück zur Übersicht' }).click()
 await page.getByRole('button', { name: 'Neue Liste' }).waitFor()
+await page
+  .getByText('eigene Fassung')
+  .first()
+  .waitFor({ timeout: 5000 })
+  .catch(() => undefined)
 if (!(await page.getByText('eigene Fassung').first().isVisible())) throw new Error('Die bearbeitete Fassung wird in der Übersicht nicht angezeigt')
 console.log('Schulbuch bearbeitet und gespeichert (eigene Fassung)')
 

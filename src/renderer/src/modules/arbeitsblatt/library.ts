@@ -1,10 +1,10 @@
 // Arbeitsblätter in der App speichern (wie die Vokabeltests) – mit Vorschaubild der ersten Seite.
 import { cleanImageBackground } from '../../shared/imageCleanup'
 import * as pdfjs from 'pdfjs-dist'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import type { SavedWorksheetStats } from '@shared/types'
-import { notifyError } from '../../shared/util'
-import { newId } from '../vokabeltest/model/random'
+import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { useStoreAutosave } from '../../shared/useAutosave'
 import { buildWorksheetHtml } from './render/printHtml'
 import type { PagePlan } from './render/paginate'
 import type { Worksheet } from './model/types'
@@ -49,25 +49,43 @@ export async function worksheetThumb(ws: Worksheet, layouts: Map<string, PagePla
   }
 }
 
-/** Speichert das aktuelle Arbeitsblatt in der App (neu oder unter der bisherigen ID). */
+/**
+ * Lohnt sich das Sichern? Ab dem ersten Schritt, sobald ein Thema dasteht – nicht erst mit
+ * ausformulierten Bausteinen. Vorher war alles, was in Schritt 1 und 2 entstand (Angaben,
+ * Material, Gliederung), bis zum Ausformulieren nur im Arbeitsspeicher.
+ */
+export const lohntSicherung = (ws: Worksheet | null): boolean => Boolean(ws && (ws.sheets.length || ws.meta.topic.trim() || ws.outline))
+
+/** Speichert das aktuelle Arbeitsblatt in der App (unter der Kennung des offenen Blattes). */
 export async function saveCurrentWorksheet(
   opts: { name?: string; logo?: string | null; schoolName?: string; withThumb?: boolean; layouts?: Map<string, PagePlan[]> } = {}
 ): Promise<void> {
   const state = useArbeitsblatt.getState()
   const ws = state.worksheet
-  if (!ws || !ws.sheets.length) return
-  const name = (opts.name ?? state.docName).trim() || defaultWorksheetName(ws)
-  const id = state.docId ?? newId()
-  const thumb = opts.withThumb === false || !opts.layouts ? undefined : await worksheetThumb(ws, opts.layouts, opts.logo ?? null, opts.schoolName ?? '')
+  if (!ws || !lohntSicherung(ws)) return
+  const id = state.docId
+  const name = opts.name?.trim() || dokumentName(id, state.docName, defaultWorksheetName(ws))
+  const thumb =
+    opts.withThumb === false || !opts.layouts || !ws.sheets.length
+      ? undefined
+      : await worksheetThumb(ws, opts.layouts, opts.logo ?? null, opts.schoolName ?? '')
   const meta = await window.api.sheets.save({ id, name, stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
   useArbeitsblatt.getState().markSaved(meta.id, meta.updatedAt, meta.name)
 }
 
 export async function openSavedWorksheet(id: string): Promise<void> {
+  // Was am bisherigen Blatt noch ansteht, zuerst sichern – sonst ginge es beim Wechsel verloren
+  await sichereAlles()
   const saved = await window.api.sheets.get(id)
   useArbeitsblatt.getState().openSaved(saved.id, saved.name, saved.payload as Worksheet, saved.updatedAt)
   void cleanWorksheetImages()
   void loadAudioFiles()
+}
+
+/** Neues Arbeitsblatt beginnen – das bisherige vorher sichern. */
+export async function newWorksheetSafely(): Promise<void> {
+  await sichereAlles()
+  useArbeitsblatt.getState().newWorksheet()
 }
 
 /**
@@ -109,35 +127,37 @@ export async function loadAudioFiles(): Promise<void> {
 }
 
 /**
- * Automatisches Speichern: Das erste Mal, sobald ein Blatt ausformuliert ist; danach nach jeder Änderung.
- * Das Vorschaubild wird nur beim ersten Mal und danach höchstens alle zwei Minuten neu erzeugt.
+ * Die Seitenaufteilung, die der Editor gerade berechnet hat – für das Vorschaubild.
+ * Das Sichern selbst hängt am Programm, nicht am Editor: Es läuft schon in Schritt 1.
  */
-export function useWorksheetAutosave(logo: string | null, schoolName: string, layouts: Map<string, PagePlan[]>): void {
-  const current = useRef(layouts)
-  current.current = layouts
-  const timer = useRef<number | null>(null)
-  const lastThumb = useRef(0)
-  useEffect(() => {
-    const save = (): void => {
+let vorschauLayouts: Map<string, PagePlan[]> | null = null
+export const setPreviewLayouts = (layouts: Map<string, PagePlan[]> | null): void => {
+  vorschauLayouts = layouts
+}
+
+/**
+ * Automatisches Speichern – als Entwurf ab Schritt 1, danach nach jeder Änderung.
+ * Das Vorschaubild entsteht mit dem ersten ausformulierten Blatt und danach höchstens alle
+ * zwei Minuten neu.
+ */
+export function useWorksheetAutosave(logo: string | null, schoolName: string): void {
+  const vorschau = useRef({ docId: '', zuletzt: 0 }).current
+  useStoreAutosave({
+    store: useArbeitsblatt,
+    dokument: (s) => s.docId,
+    gesichert: (s) => Boolean(s.savedAt),
+    bereit: (s) => lohntSicherung(s.worksheet),
+    // Ein geänderter Name zählt nur, wenn ihn die Lehrkraft geändert hat – nicht die Bestätigung des Speicherns
+    geaendert: (s, prev) => s.worksheet !== prev.worksheet || (s.docName !== prev.docName && s.savedAt === prev.savedAt),
+    speichern: () => {
+      const { docId, worksheet } = useArbeitsblatt.getState()
+      if (vorschau.docId !== docId) Object.assign(vorschau, { docId, zuletzt: 0 })
       const now = Date.now()
-      const withThumb = now - lastThumb.current > 120_000
-      if (withThumb) lastThumb.current = now
-      saveCurrentWorksheet({ logo, schoolName, withThumb, layouts: current.current }).catch((e) => notifyError(e, 'Automatisches Speichern fehlgeschlagen'))
+      const withThumb = Boolean(worksheet?.sheets.length && vorschauLayouts) && now - vorschau.zuletzt > 120_000
+      if (withThumb) vorschau.zuletzt = now
+      return saveCurrentWorksheet({ logo, schoolName, withThumb, layouts: vorschauLayouts ?? undefined })
     }
-    // Schon vorhandene Blätter (gerade erzeugt oder aus einer Datei geöffnet) gleich sichern
-    const state = useArbeitsblatt.getState()
-    if (state.worksheet?.sheets.length && !state.docId) {
-      timer.current = window.setTimeout(save, 2500)
-    }
-    return useArbeitsblatt.subscribe((state, prev) => {
-      if (!state.worksheet?.sheets.length) return
-      const changed = state.worksheet !== prev.worksheet || state.docName !== prev.docName
-      const isNew = !state.docId && Boolean(prev.worksheet !== state.worksheet)
-      if (!changed && !isNew) return
-      if (timer.current) window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(save, isNew ? 200 : 1500)
-    })
-  }, [logo, schoolName])
+  })
 }
 
 /**
