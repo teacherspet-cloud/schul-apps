@@ -1,6 +1,7 @@
 import type { LearnerProfile } from '../didactics/profile'
 import { stageForGrade } from '../didactics/profile'
-import { anredeFuerStufe, anredeRegel } from '../../../shared/anrede'
+import { anredeRegel } from '../../../shared/anrede'
+import { anredeFuerMeta } from '../didactics/anrede'
 import type { Stars } from '../didactics/differentiation'
 import type { OriginalMaterialAblage, SheetType, SourceMaterial, WorksheetMeta } from '../model/types'
 import { GEZAEHLTE_SEITEN, seitenBereich, seitenText, seitenVorgabe } from '../didactics/seiten'
@@ -83,12 +84,13 @@ export function sheetTypePrompt(type: SheetType): string {
 /** Systemprompt: Rolle, Lerngruppen-Profil und allgemeine didaktische Qualitätskriterien. */
 export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): string {
   /*
-   * Anrede der Lernenden (Paket 8b): Sek II Sie, sonst du – aus `profile.stage`, also über
-   * dieselbe Stufengrenze wie alle übrigen Regeln. Der Satz steht in `shared/anrede.ts`, weil
+   * Anrede der Lernenden (Paket 8b): Sek II Sie, sonst du – über `anredeFuerMeta`, das die
+   * G8-Einführungsphase (Klasse 10) schon zur Sek II zählt, anders als `profile.stage`
+   * (didactics/bildungsgang.ts). Der Satz steht in `shared/anrede.ts`, weil
    * Grammatiktest, Lernzielkontrolle und Vokabeltest (Latein) ihn ebenso brauchen; er sagt
    * auch, dass die du-Beispiele in diesem Auftrag in der Oberstufe umzuformen sind.
    */
-  const address = anredeRegel(meta.anrede ?? anredeFuerStufe(profile.stage))
+  const address = anredeRegel(anredeFuerMeta(meta))
   return [
     `Du bist eine erfahrene Lehrkraft und Fachdidaktikerin für das Fach ${meta.subjectLabel} an deutschen Schulen. Du erstellst pädagogisch und didaktisch hochwertige Arbeitsblätter.`,
     '',

@@ -12,6 +12,7 @@ import { ANREDE_TEXTE, anredeFuerStufe, anredeRegel, falscheAnrede } from '../sr
 import { evidenceInstruction } from '../src/renderer/src/shared/evidenceInstruction'
 import { anredeFuer, anredeFuerMeta, checkAnrede } from '../src/renderer/src/modules/arbeitsblatt/didactics/anrede'
 import { buildLearnerProfile, stageForGrade } from '../src/renderer/src/modules/arbeitsblatt/didactics/profile'
+import { gehoertZurSekII, gymnasialerBildungsgang } from '../src/renderer/src/modules/arbeitsblatt/didactics/bildungsgang'
 import { playsLabelFor } from '../src/renderer/src/modules/arbeitsblatt/didactics/audioRules'
 import { systemPrompt } from '../src/renderer/src/modules/arbeitsblatt/generation/prompts'
 import { regenerateBlock } from '../src/renderer/src/modules/arbeitsblatt/generation/generate'
@@ -69,17 +70,75 @@ const text = (id: string, body: string): WsBlock => ({ id, type: 'text', title: 
 
 const blatt = (blocks: WsBlock[]): Sheet => ({ id: 's', label: 'Arbeitsblatt', blocks })
 
-describe('Stufe → Anrede aus derselben Quelle wie alle Stufenregeln', () => {
-  it('siezt genau dort, wo stageForGrade die Sekundarstufe II sieht', () => {
+describe('Stufe → Anrede: Sek II siezen, auch in der G8-Einführungsphase', () => {
+  it('siezt ab Klasse 11 wie stageForGrade – in G9-Ländern überall genau dort', () => {
     for (const schule of ['gymnasium', 'gesamtschule', 'realschule', 'grundschule']) {
       for (let k = 1; k <= 13; k++) {
-        expect(anredeFuer(k, schule), `${schule} ${k}`).toBe(stageForGrade(k, schule) === 'sek2' ? 'sie' : 'du')
+        expect(anredeFuer(k, schule, 'NI'), `${schule} ${k}`).toBe(stageForGrade(k, schule) === 'sek2' ? 'sie' : 'du')
       }
     }
     expect(anredeFuerStufe('primar')).toBe('du')
-    // Klasse 10 in G8-Ländern: dieselbe Grenze wie das Profil – dort also noch du
-    expect(anredeFuer(10, 'gymnasium')).toBe('du')
-    expect(anredeFuer(11, 'gymnasium')).toBe('sie')
+  })
+
+  it('G8 Klasse 10 Sie, G9 Klasse 10 du, Klasse 11 Sie, Klasse 9 du', () => {
+    // Sachsen, Berlin, Thüringen: G8 – Klasse 10 ist Einführungsphase
+    for (const land of ['SN', 'BE', 'TH', 'HH']) {
+      expect(anredeFuer(10, 'gymnasium', land), land).toBe('sie')
+      expect(anredeFuer(9, 'gymnasium', land), land).toBe('du')
+      expect(anredeFuer(11, 'gymnasium', land), land).toBe('sie')
+    }
+    // Niedersachsen, NRW, Bayern: G9 – Klasse 10 ist noch Sek I
+    for (const land of ['NI', 'NW', 'BY']) {
+      expect(anredeFuer(10, 'gymnasium', land), land).toBe('du')
+      expect(anredeFuer(11, 'gymnasium', land), land).toBe('sie')
+      expect(anredeFuer(9, 'gymnasium', land), land).toBe('du')
+    }
+    // Schulformen mit eigener Oberstufe führen in neun Jahren zum Abitur – auch in G8-Ländern
+    expect(anredeFuer(10, 'stadtteilschule', 'HH')).toBe('du')
+    expect(anredeFuer(10, 'integrierte-sekundarschule', 'BE')).toBe('du')
+    expect(anredeFuer(11, 'stadtteilschule', 'HH')).toBe('sie')
+    // Die übrigen Stufenregeln bleiben bewusst bei Sek I (bildungsgang.ts)
+    expect(stageForGrade(10, 'gymnasium')).toBe('sek1')
+  })
+
+  it('Länder im Übergang zu G9: der Jahrgang entscheidet', () => {
+    const herbst = (jahr: number): Date => new Date(jahr, 8, 15)
+    // Baden-Württemberg: erster G9-Jahrgang in Klasse 5 im Schuljahr 2024/25
+    expect(gymnasialerBildungsgang(10, 'gymnasium', 'BW', null, herbst(2026))).toBe('G8')
+    expect(gehoertZurSekII(10, 'gymnasium', 'BW', null, herbst(2026))).toBe(true)
+    expect(gymnasialerBildungsgang(10, 'gymnasium', 'BW', null, herbst(2029))).toBe('G9')
+    expect(gehoertZurSekII(10, 'gymnasium', 'BW', null, herbst(2029))).toBe(false)
+    expect(gymnasialerBildungsgang(7, 'gymnasium', 'BW', null, herbst(2026))).toBe('G9')
+  })
+
+  it('die Schuleinstellung der Lehrkraft geht für die eigene Schule vor', () => {
+    const g8Hessen = { stateId: 'HE', schoolTypeId: 'gymnasium', abiturNach: 'G8' as const }
+    expect(gehoertZurSekII(10, 'gymnasium', 'HE', null)).toBe(false)
+    expect(gehoertZurSekII(10, 'gymnasium', 'HE', g8Hessen)).toBe(true)
+    // … aber nur für die eigene Schule: ein Blatt für ein anderes Land folgt dessen Regel
+    expect(gehoertZurSekII(10, 'gymnasium', 'NI', g8Hessen)).toBe(false)
+    // Thüringer Gemeinschaftsschule mit Abitur nach Klasse 12
+    expect(gehoertZurSekII(10, 'gemeinschaftsschule', 'TH', { stateId: 'TH', schoolTypeId: 'gemeinschaftsschule', abiturNach: 'G8' })).toBe(true)
+    expect(gehoertZurSekII(10, 'gemeinschaftsschule', 'TH', null)).toBe(false)
+    // „wie im Land üblich" ändert nichts; G9 an einer G8-Landesschule hebt die Einführungsphase auf
+    expect(gehoertZurSekII(10, 'gymnasium', 'SN', { stateId: 'SN', schoolTypeId: 'gymnasium', abiturNach: 'land' })).toBe(true)
+    expect(gehoertZurSekII(10, 'gymnasium', 'SN', { stateId: 'SN', schoolTypeId: 'gymnasium', abiturNach: 'G9' })).toBe(false)
+  })
+
+  it('G8 Klasse 10 in allen Erzeugungswegen: Arbeitsblatt, Grammatiktest, Lernzielkontrolle', () => {
+    const m = meta({ stateId: 'SN', grade: 10 })
+    expect(anredeFuerMeta(m)).toBe('sie')
+    expect(systemPrompt(m, buildLearnerProfile(m))).toMatch(SIE_REGEL)
+    expect(systemPrompt(meta({ stateId: 'NI', grade: 10 }), buildLearnerProfile(meta({ stateId: 'NI', grade: 10 })))).toMatch(DU_REGEL)
+    const gt = newTest(presetDesigns()[0], 'SN', 'gymnasium', 'Gymnasium')
+    gt.meta = { ...gt.meta, subjectId: 'deutsch', subjectLabel: 'Deutsch', grade: 10, topics: [] }
+    expect(testPrompt(gt)).toMatch(SIE_REGEL)
+    const lzk = emptyKurztest('SN', 'gymnasium', 'Gymnasium')
+    lzk.meta = { ...lzk.meta, subjectId: 'mathematik', subjectLabel: 'Mathematik', grade: 10, stufe: 'sek1', thema: 'Potenzen' }
+    expect(worksheetMetaForKurztest(lzk).anrede).toBe('sie')
+    expect(kurztestPrompt(lzk, '')).toMatch(SIE_REGEL)
+    lzk.meta = { ...lzk.meta, stateId: 'NI' }
+    expect(worksheetMetaForKurztest(lzk).anrede).toBe('du')
   })
 
   it('eine ausdrücklich gesetzte Anrede (LZK) geht vor', () => {

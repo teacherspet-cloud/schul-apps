@@ -69,6 +69,7 @@ import PictogramStudio from './PictogramStudio'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
 import HaeufigSelect from '../shared/components/HaeufigSelect'
+import { stateInfo } from '../modules/arbeitsblatt/didactics/states'
 
 /**
  * Die Einstellungen in Reitern.
@@ -927,6 +928,25 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
             allowDeselect={false}
           />
         </Group>
+        {schoolTypeId !== 'grundschule' && (
+          /*
+           * G8 oder G9 an der eigenen Schule: In Ländern im Übergang und an Schulen mit eigener
+           * Wahl ist das aus dem Land allein nicht abzulesen. Es entscheidet, ob Klasse 10 schon
+           * Einführungsphase ist – dort werden die Lernenden auf dem Material gesiezt.
+           */
+          <Select
+            label="Abitur an dieser Schule nach"
+            description="Im G8 ist Klasse 10 die Einführungsphase der Oberstufe – dort werden die Lernenden auf dem Material gesiezt."
+            data={[
+              { value: 'land', label: `wie im Land üblich (${schoolTypeId === 'gymnasium' ? stateInfo(stateId).gymnasium : 'G9'})` },
+              { value: 'G8', label: 'Klasse 12 (G8)' },
+              { value: 'G9', label: 'Klasse 13 (G9)' }
+            ]}
+            value={settings.defaults.abiturNach ?? 'land'}
+            onChange={(v) => v && update({ defaults: { abiturNach: v as 'land' | 'G8' | 'G9' } })}
+            allowDeselect={false}
+          />
+        )}
       </Stack>
     </Card>
   )

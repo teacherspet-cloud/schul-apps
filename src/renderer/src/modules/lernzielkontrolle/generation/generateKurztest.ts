@@ -22,7 +22,8 @@ import { bausteinRegeln } from '../didactics/bausteine'
 import type { Punktebereich } from '../didactics/bewertung'
 import { formatById, geschaetzteMinuten } from '../didactics/formate'
 import { operatorRegeln } from '../didactics/operatorPruefung'
-import { anredeFuerStufe, anredeRegel } from '../../../shared/anrede'
+import { anredeRegel } from '../../../shared/anrede'
+import { anredeFuerKurztest } from '../model/defaults'
 import { profilFuer } from '../didactics/operatoren'
 import { stateInfo } from '../../arbeitsblatt/didactics/states'
 import type { Kurztest } from '../model/types'
@@ -146,8 +147,9 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
     '',
     operatorRegeln(profil),
     '',
-    // Anrede nach der gewählten Stufe – nicht nach der Anrede der Landesliste (Paket 8b)
-    anredeRegel(anredeFuerStufe(m.stufe)),
+    // Anrede nach der gewählten Stufe – nicht nach der Anrede der Landesliste (Paket 8b);
+    // Klasse 10 im G8 (Einführungsphase) immer Sie
+    anredeRegel(anredeFuerKurztest(m)),
     ...bevorzugteTeil(m.bevorzugteOperatoren ?? []),
     /*
      * Orte und interkulturelle Aspekte – dieselbe Regel wie im Arbeitsblatt. Ein Kurztest in

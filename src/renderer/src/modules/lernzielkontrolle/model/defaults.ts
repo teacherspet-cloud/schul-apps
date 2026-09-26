@@ -12,6 +12,8 @@ import { STANDARD_BEWERTUNG } from '../didactics/bewertung'
 import { standardFormat, standardMinuten } from '../didactics/formate'
 import type { Stufe } from '../didactics/operatoren'
 import type { Kurztest, KurztestMeta } from './types'
+import { anredeFuerStufe, type Anrede } from '../../../shared/anrede'
+import { gehoertZurSekII } from '../../arbeitsblatt/didactics/bildungsgang'
 
 /**
  * Sek I oder Sek II aus dem Jahrgang.
@@ -21,6 +23,17 @@ import type { Kurztest, KurztestMeta } from './types'
  * im Modell überschreibbar und nicht aus dem Jahrgang errechnet.
  */
 export const stufeFuerJahrgang = (grade: number): Stufe => (grade >= 11 ? 'sek2' : 'sek1')
+
+/**
+ * Anrede einer Lernzielkontrolle: nach der gewählten Stufe (Paket 8b). Steht die Stufe noch auf
+ * der Voreinstellung aus dem Jahrgang, zählt Klasse 10 im G8-Gymnasium als Sek II („Sie"), weil
+ * sie dort die Einführungsphase der Oberstufe ist (Regel der Lehrkraft: Sek II siezen). Die Stufe
+ * selbst bleibt dort Sek I – sie bestimmt auch die Operatorengrundlage, und die Länderlisten der
+ * Sek II sind Abiturdokumente (arbeitsblatt/didactics/bildungsgang.ts). Hat die Lehrkraft die
+ * Stufe ausdrücklich umgestellt (etwa für ein berufliches Gymnasium), gilt ihre Wahl.
+ */
+export const anredeFuerKurztest = (m: Pick<KurztestMeta, 'stufe' | 'grade' | 'schoolTypeId' | 'stateId'>): Anrede =>
+  m.stufe === stufeFuerJahrgang(m.grade) ? anredeFuerStufe(gehoertZurSekII(m.grade, m.schoolTypeId, m.stateId) ? 'sek2' : 'sek1') : anredeFuerStufe(m.stufe)
 
 export function defaultKurztestMeta(stateId: string, schoolTypeId: string, schoolTypeName: string): KurztestMeta {
   const format = standardFormat(stateId)

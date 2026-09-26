@@ -48,7 +48,7 @@ export function testPrompt(test: GrammarTest): string {
     german ? '' : `- Die Aufgabentexte stehen auf ${target}.`,
     m.instructionsInGerman ? '- Die Arbeitsanweisungen stehen auf Deutsch.' : '',
     // Anrede der Lernenden (Paket 8b): nur wo die Anweisungen deutsch sind – Sek I du, Sek II Sie
-    german || m.instructionsInGerman ? anredeRegel(anredeFuer(m.grade, m.schoolTypeId)) : '',
+    german || m.instructionsInGerman ? anredeRegel(anredeFuer(m.grade, m.schoolTypeId, m.stateId)) : '',
     '',
     formats.length ? `AUFGABENFORMEN – nutze genau diese: ${formats.join(', ')}.` : '',
     '- Steigere die Anforderung: erst Erkennen und Zuordnen, dann Umformen und Ergänzen, zuletzt eigenes Bilden.',

@@ -648,8 +648,8 @@ export default function SetupStep(): React.JSX.Element {
                             ]}
                           />
                           <Text size="xs" c="dimmed" mt={4}>
-                            Bestimmt die Operatorengrundlage und die Anrede. Die Länderlisten sind fast alle Abiturdokumente – für Klasse 7 gilt eine andere
-                            Grundlage als für Klasse 12.
+                            Bestimmt die Operatorengrundlage und die Anrede (Klasse 10 im G8 ist Einführungsphase und wird gesiezt). Die Länderlisten sind fast
+                            alle Abiturdokumente – für Klasse 7 gilt eine andere Grundlage als für Klasse 12.
                           </Text>
                         </div>
                         <TextInput

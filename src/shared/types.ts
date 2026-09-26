@@ -192,6 +192,12 @@ export interface AppSettings {
     stateId: string
     schoolTypeId: string
     targetLanguage: string
+    /**
+     * Abitur an der eigenen Schule nach Klasse 12 (G8) oder 13 (G9); 'land' = wie im Land üblich.
+     * Für Länder im Übergang und Schulen mit eigener Wahl – bestimmt, ob Klasse 10 schon zur
+     * Einführungsphase gehört und gesiezt wird (didactics/bildungsgang.ts).
+     */
+    abiturNach?: 'land' | 'G8' | 'G9'
   }
   /** Hörtexte: voreingestellte Stimmen je Sprache (ElevenLabs-Kennungen) */
   audio: {

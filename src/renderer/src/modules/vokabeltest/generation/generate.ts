@@ -69,7 +69,7 @@ ${lateinRegeln()}`
     // Bei Latein stehen die Anweisungen auf Deutsch – dann gilt die Anrede nach Stufe (Paket 8b)
     istLatein(settings.targetLanguage)
       ? `
-${anredeRegel(anredeFuer(settings.grade, settings.schoolTypeId))}`
+${anredeRegel(anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId))}`
       : ''
   ]
     .filter(Boolean)
@@ -185,7 +185,7 @@ async function finishBlock(
  */
 export function anredeHinweise(block: Block, settings: TestSettings): string[] {
   if (!istLatein(settings.targetLanguage)) return []
-  const soll = anredeFuer(settings.grade, settings.schoolTypeId)
+  const soll = anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId)
   const fund = falscheAnrede(block.instruction ?? '', soll)
   return fund ? [anredeMeldung('Arbeitsanweisung', fund, soll)] : []
 }

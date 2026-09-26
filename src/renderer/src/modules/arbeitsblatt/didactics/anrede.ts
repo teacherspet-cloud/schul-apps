@@ -2,15 +2,11 @@
  * Anrede der Lernenden für Arbeitsblatt, Grammatiktest, Klassenarbeit und Vokabeltest
  * (Paket 8b). Die Regel selbst und die festen Texte stehen in `shared/anrede.ts`.
  *
- * WELCHE STUFE GILT: dieselbe Quelle wie für alle übrigen Stufenregeln – `stageForGrade`.
- * Das Lerngruppen-Profil (`profile.stage`), die Oberstufenregeln der Klassenarbeit
- * (`upperSecondary`) und die Hörtext-Regeln lesen sie ebenfalls dort ab. Eine zweite,
- * eigene Grenze nur für die Anrede liefe früher oder später auseinander.
- *
- * Folge, bewusst so belassen: `stageForGrade` setzt die Oberstufe ab Klasse 11 an – auch in
- * G8-Ländern, in denen Klasse 10 am Gymnasium schon Einführungsphase ist. Dort wird in
- * Klasse 10 geduzt, genau wie dort auch die übrigen Regeln noch der Sekundarstufe I folgen.
- * Soll sich das ändern, dann in `stageForGrade` für alle Regeln zugleich.
+ * WELCHE STUFE GILT: Sek II ab Klasse 11 wie bei `stageForGrade` – und zusätzlich Klasse 10
+ * im G8-Gymnasium, weil sie dort die Einführungsphase der Oberstufe ist (Regel der Lehrkraft:
+ * Sek II siezen). Die übrigen Stufenregeln (`profile.stage`, Oberstufenregeln der
+ * Klassenarbeit, Hörtext-Regeln) bleiben dort bewusst bei der Sek I; warum, steht in
+ * `bildungsgang.ts`. Die Abweichung ist also gewollt und auf die Anrede beschränkt.
  *
  * Die Lernzielkontrolle hat eine eigene, von der Lehrkraft wählbare Stufe und reicht sie über
  * `WorksheetMeta.anrede` durch (render/kurztestWorksheet.ts).
@@ -20,14 +16,15 @@ import { plainText } from '../../../shared/richtext/parse'
 import type { Sheet, WorksheetMeta, WsBlock } from '../model/types'
 import { subjectById } from '../model/subjects'
 import type { DidacticWarning } from './checks'
-import { stageForGrade } from './profile'
+import { gehoertZurSekII } from './bildungsgang'
 
-/** Jahrgang und Schulform → Anrede, über dieselbe Stufengrenze wie alle anderen Regeln. */
-export const anredeFuer = (grade: number, schoolTypeId: string): Anrede => anredeFuerStufe(stageForGrade(grade, schoolTypeId))
+/** Jahrgang, Schulform und Land → Anrede (Klasse 10 im G8-Gymnasium: Sie). */
+export const anredeFuer = (grade: number, schoolTypeId: string, stateId: string): Anrede =>
+  anredeFuerStufe(gehoertZurSekII(grade, schoolTypeId, stateId) ? 'sek2' : 'sek1')
 
 /** Anrede eines Blattes; eine ausdrücklich gesetzte (LZK) geht vor. */
-export const anredeFuerMeta = (meta: Pick<WorksheetMeta, 'grade' | 'schoolTypeId'> & { anrede?: Anrede }): Anrede =>
-  meta.anrede ?? anredeFuer(meta.grade, meta.schoolTypeId)
+export const anredeFuerMeta = (meta: Pick<WorksheetMeta, 'grade' | 'schoolTypeId' | 'stateId'> & { anrede?: Anrede }): Anrede =>
+  meta.anrede ?? anredeFuer(meta.grade, meta.schoolTypeId, meta.stateId)
 
 /**
  * Stehen die Arbeitsanweisungen dieses Blattes auf Deutsch?

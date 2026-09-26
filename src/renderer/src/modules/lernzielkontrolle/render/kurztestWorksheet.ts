@@ -17,7 +17,7 @@ import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
 import { gesamtpunkte, notenspiegel, schluesselHinweis } from '../didactics/bewertung'
 import type { Kurztest } from '../model/types'
-import { anredeFuerStufe } from '../../../shared/anrede'
+import { anredeFuerKurztest } from '../model/defaults'
 
 /** Kopfzeile: Bezeichnung des Landesformats, Zeit und Punkte. */
 export function kopfzeile(test: Kurztest, varianteLabel: string): string {
@@ -61,8 +61,9 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
     title: m.title || m.thema || m.bezeichnung,
     grade: m.grade,
     ...(m.courseLevel ? { courseLevel: m.courseLevel } : {}),
-    // Die Lehrkraft wählt die Stufe selbst; die festen Texte des Blattes folgen ihr (Paket 8b)
-    anrede: anredeFuerStufe(m.stufe),
+    // Die Lehrkraft wählt die Stufe selbst; die festen Texte des Blattes folgen ihr (Paket 8b),
+    // Klasse 10 im G8 (Einführungsphase) wird dabei immer gesiezt
+    anrede: anredeFuerKurztest(m),
     answerKey: m.answerKey,
     vorlagenfarbe: m.vorlagenfarbe,
     // Überthema (Paket 11) – den Themenbereich setzt der Editor beim Anzeigen ein

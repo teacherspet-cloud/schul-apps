@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { AppSettings, DeepPartial, DEFAULT_SETTINGS } from '@shared/types'
 import { notifyError } from './util'
 import { merkeFachfarben } from './fachfarben'
+import { merkeBildungsgang } from '../modules/arbeitsblatt/didactics/bildungsgang'
 
 export { THEMES, themeById } from './themes'
 export type { AppTheme } from './themes'
@@ -38,6 +39,7 @@ export const useAppSettings = create<SettingsState>((set, get) => ({
         window.api.pictograms.get().catch(() => ({}))
       ])
       merkeFachfarben(settings.fachfarben)
+      merkeBildungsgang(settings.defaults)
       set({ settings, logoDataUrl, pictograms, loaded: true })
     } catch (e) {
       set({ loaded: true })
@@ -78,10 +80,13 @@ export const useAppSettings = create<SettingsState>((set, get) => ({
     const sofort = deepMerge(get().settings, patch)
     // Die Fachfarben zuerst – Druck und Vorschau lesen sie außerhalb von React (fachfarben.ts)
     merkeFachfarben(sofort.fachfarben)
+    // Ebenso der Bildungsgang der eigenen Schule (G8/G9) – die Anrede wird auch im Druck bestimmt
+    merkeBildungsgang(sofort.defaults)
     set({ settings: sofort })
     try {
       const gespeichert = await window.api.settings.set(patch)
       merkeFachfarben(gespeichert.fachfarben)
+      merkeBildungsgang(gespeichert.defaults)
       set({ settings: gespeichert })
     } catch (e) {
       notifyError(e)

@@ -60,7 +60,7 @@ const itemSchema = (props: Record<string, Record<string, unknown>>) =>
 
 function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction' | 'defaultInstructionSie'>, data: any, ctx: GenContext) {
   const points = ctx.settings.tasks.find((t) => t.type === def.id)?.pointsPerItem ?? 1
-  const sie = def.defaultInstructionSie && anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId) === 'sie'
+  const sie = def.defaultInstructionSie && anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId, ctx.settings.stateId) === 'sie'
   return {
     id: newId(ctx.rng),
     taskType: def.id,
