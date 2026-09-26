@@ -230,6 +230,35 @@ describe('Arbeitsblatt-Export', () => {
     expect((doc.match(/<w:drawing>/g) ?? []).length).toBeGreaterThan(3)
   })
 
+  it('Word-Lösungsteil enthält den Notenschlüssel – Sek I als Noten, Sek II als Notenpunkte (26.09.2026)', async () => {
+    const deps = { logo: PNG_1PX, schoolName: 'Musterschule', sizer: async () => ({ width: 10, height: 10 }), raster: async () => PNG_1PX, sidebar: async () => PNG_1PX }
+    const sekI = sampleWorksheet()
+    sekI.meta = { ...sekI.meta, gradeScale: { thresholds: [91, 78, 64, 50, 25, 0], groups: [{ label: '', points: 40 }] } }
+    const docI = await (await JSZip.loadAsync(await buildWorksheetDocx(sekI, { sheetIds: ['sheet-1'], includeKey: true }, deps))).file('word/document.xml')!.async('string')
+    expect(docI).toContain('Notenschlüssel')
+    expect(docI).toContain('1 (sehr gut)')
+    expect(docI).toContain('gerundet wird ab ,5 aufwärts')
+    expect(docI).not.toContain('Notenpunkte')
+
+    const sekII = sampleWorksheet()
+    sekII.meta = {
+      ...sekII.meta,
+      gradeScale: {
+        groups: [{ label: '', points: 60 }],
+        punkte: { schwellen: [95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 33, 27, 20, 0], hinweis: 'Prüfstand: KMK-Raster.' }
+      }
+    }
+    const docII = await (await JSZip.loadAsync(await buildWorksheetDocx(sekII, { sheetIds: ['sheet-1'], includeKey: true }, deps))).file('word/document.xml')!.async('string')
+    expect(docII).toContain('Notenpunkte')
+    expect(docII).toContain('1+')
+    expect(docII).toContain('57 – 60')
+    expect(docII).toContain('Prüfstand: KMK-Raster.')
+
+    // Auf dem Schülerblatt steht der Schlüssel nicht
+    const nurSchueler = await (await JSZip.loadAsync(await buildWorksheetDocx(sekII, { sheetIds: ['sheet-1'], includeKey: false }, deps))).file('word/document.xml')!.async('string')
+    expect(nurSchueler).not.toContain('Notenpunkte')
+  })
+
   it('Tafelbild wird als eigene Seite in Word und Druckansicht angehängt', async () => {
     const ws = sampleWorksheet()
     ws.board = {

@@ -31,6 +31,8 @@ import {
   WidthType
 } from 'docx'
 import { MUSTER_FORMEN } from '../generation/solution'
+import { gradeScaleRows } from '../../../shared/gradeScale'
+import { punkteZeilen } from '../../../shared/notenpunkte'
 import { PRINT_MARGINS, wordFontName } from '@shared/design'
 import {
   A4_HEIGHT,
@@ -409,6 +411,49 @@ async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: Wo
       new Paragraph({ spacing: { after: 160 }, children: [run(anredeText('hilfekarten', anredeFuerMeta(ctx.ws.meta)), { color: '555555' })] })
     ]
     for (const block of helpCards) children.push(...((await blockContent(ctx, block, numbers)) as Child[]))
+    flush(false)
+  }
+
+  /*
+   * NOTENSCHLÜSSEL auf der Lehrkraftseite des Lösungsteils – wie in Vorschau und PDF.
+   * Bis 26.09.2026 fehlte er im Word-Export vollständig (Befund der Lehrkraft). In der
+   * Sekundarstufe II steht die Punktetabelle 15 … 0 (shared/notenpunkte.ts), sonst der
+   * Schlüssel 1–6.
+   */
+  const scaleGroups = key ? (ctx.ws.meta.gradeScale?.groups ?? []).filter((g) => g.points > 0) : []
+  if (scaleGroups.length) {
+    const punkte = ctx.ws.meta.gradeScale?.punkte
+    children = [new Paragraph({ spacing: { after: 160 }, children: [run('Notenschlüssel', { bold: true, size: ctx.size + 4 })] })]
+    for (const g of scaleGroups) {
+      if (g.label) children.push(new Paragraph({ spacing: { before: 120, after: 60 }, children: [run(g.label, { bold: true })] }))
+      const tabelle = punkte
+        ? await gridTable(
+            ctx,
+            ['Notenpunkte', 'Note', 'Punkte', 'Anteil'],
+            punkteZeilen(g.points, punkte.schwellen).map((r) => [r.punkte, r.note, r.range, r.percent]),
+            Math.round(ctx.contentWidth * 0.8)
+          )
+        : await gridTable(
+            ctx,
+            ['Note', 'Punkte', 'Anteil'],
+            gradeScaleRows(g.points, ctx.ws.meta.gradeScale?.thresholds).map((r) => [r.grade, r.range, r.percent]),
+            Math.round(ctx.contentWidth * 0.8)
+          )
+      children.push(tabelle)
+      children.push(
+        new Paragraph({
+          spacing: { before: 60, after: 160 },
+          children: [
+            run(
+              punkte
+                ? `${g.points} Punkte insgesamt · Punktgrenze = kleinste Punktzahl, die den Prozentsatz erreicht · ${punkte.hinweis}`
+                : `${g.points} Punkte insgesamt · gerundet wird ab ,5 aufwärts`,
+              { size: ctx.size - 2, color: '555555' }
+            )
+          ]
+        })
+      )
+    }
     flush(false)
   }
 

@@ -65,6 +65,8 @@ console.log('Rahmen:', await page.locator('.ws-editor-pages .editor-block').coun
 const menueVon = async (text) => {
   const rahmen = page.locator('.ws-editor-pages .editor-block', { hasText: text }).last()
   await rahmen.hover()
+  await rahmen.hover()
+  await page.waitForTimeout(300)
   await rahmen.locator('[aria-label="Weitere Aktionen"]').first().click()
   await page.waitForTimeout(400)
 }
@@ -104,7 +106,10 @@ await menueVon('Merke A')
 await pruefeBuendig('Mit offenem „⋯“-Menü')
 // Die Leiste steht im Seitenrand – sie muss dort auch zu sehen und zu treffen sein
 const leisteSichtbar = await page.evaluate(() => {
-  const knopf = [...document.querySelectorAll('.ws-editor-pages [aria-label="Weitere Aktionen"]')].pop()
+  // Seit 26.09.2026 zeigt nur der überfahrene Baustein seine Leiste – also dessen Knopf prüfen
+  const knopf = [...document.querySelectorAll('.ws-editor-pages [aria-label="Weitere Aktionen"]')]
+    .filter((b) => getComputedStyle(b.closest('.editor-block-toolbar')).visibility === 'visible')
+    .pop()
   const r = knopf.getBoundingClientRect()
   return knopf.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
 })
@@ -146,6 +151,8 @@ await page.waitForTimeout(1000)
 pruefe((await reihenfolge()).join() === start.join(), 'Editor: Strg+Z nimmt das Einfügen zurück')
 
 // ---------- KI-Menü: beschriftet, beide Aktionen darin (nicht anklicken!) ----------
+await page.locator('.ws-editor-pages .editor-block').first().hover()
+await page.waitForTimeout(300)
 const ki = page.locator('.ws-editor-pages [aria-label="KI-Aktionen"]').first()
 pruefe((await ki.innerText()).trim() === 'KI', 'Der KI-Knopf ist beschriftet („KI“)')
 await ki.click()

@@ -39,6 +39,9 @@ await page.waitForTimeout(2500)
 
 // --- Neu erzeugen muss angeboten werden (geklickt wird nicht: das riefe die KI)
 // Seit Paket 6 stehen beide im beschrifteten KI-Menü des Bausteins
+// Seit 26.09.2026 erscheint die Werkzeugleiste erst am überfahrenen Baustein
+await page.locator('.ws-editor-pages .editor-block').first().hover()
+await page.waitForTimeout(300)
 await page.locator('.ws-editor-pages [aria-label="KI-Aktionen"]').first().click()
 await page.waitForTimeout(400)
 const neu = page.getByRole('menuitem', { name: 'Mit KI neu erzeugen' })
@@ -74,20 +77,22 @@ const zaehlung = async () => (await leiste.innerText()).replace(/\s+/g, ' ').tri
 const inhalt = async () => page.evaluate(() => document.querySelector('.ws-editor-pages .ws-text')?.innerText ?? '')
 
 console.log(`Anzeige: „${await zaehlung()}"`)
-pruefe((await zaehlung()).includes('2 von 2'), `Sie zeigt den wievielten von wie vielen („${await zaehlung()}")`)
+pruefe((await zaehlung()).includes('2 / 2'), `Sie zeigt den wievielten von wie vielen („${await zaehlung()}")`)
+pruefe((await zaehlung()).includes('Fassung'), 'Sie ist als „Fassung" beschriftet, nicht nur als Zahl')
 pruefe((await inhalt()).includes('ZWEITER'), 'Angezeigt wird der zweite Entwurf')
 
 // --- Zurückblättern
-await leiste.locator('[aria-label="Vorheriger Entwurf"]').click()
+await leiste.locator('[aria-label="Vorherige Fassung"]').click()
 await page.waitForTimeout(2000)
 console.log(`nach links: „${await zaehlung()}"`)
-pruefe((await zaehlung()).includes('1 von 2'), 'Nach links steht „Entwurf 1 von 2"')
+pruefe((await zaehlung()).includes('1 / 2'), 'Nach links steht „Fassung 1 / 2"')
+pruefe((await zaehlung()).includes('ursprünglich'), 'Die erste Fassung ist als „ursprünglich" gekennzeichnet')
 pruefe((await inhalt()).includes('ERSTER'), 'Der Inhalt wechselt zum ersten Entwurf')
 
 // --- Und wieder vor
-await leiste.locator('[aria-label="Nächster Entwurf"]').click()
+await leiste.locator('[aria-label="Nächste Fassung"]').click()
 await page.waitForTimeout(2000)
-pruefe((await zaehlung()).includes('2 von 2'), 'Nach rechts steht wieder „Entwurf 2 von 2"')
+pruefe((await zaehlung()).includes('2 / 2'), 'Nach rechts steht wieder „Fassung 2 / 2"')
 pruefe((await inhalt()).includes('ZWEITER'), 'Der zweite Entwurf ist zurück')
 
 await page.screenshot({ path: join(out, 'entwuerfe.png') })
