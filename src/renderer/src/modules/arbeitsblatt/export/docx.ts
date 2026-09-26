@@ -3,11 +3,15 @@ import {
   BorderStyle,
   Document,
   Footer,
+  FrameAnchorType,
+  FrameWrap,
   Header,
+  HeightRule,
   HorizontalPositionRelativeFrom,
   ImageRun,
   ISectionOptions,
   LineNumberRestartFormat,
+  LineRuleType,
   Packer,
   PageNumber,
   Paragraph,
@@ -66,7 +70,7 @@ import { zeigtUebersetzung } from '../didactics/phraseRules'
 import { anredeFuerMeta } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
 import { druckAkzent } from '../../../shared/fachfarben'
-import type { DeckblattBilder } from '../render/deckblattBilder'
+import type { DeckblattBilder, DeckblattText } from '../render/deckblattBilder'
 
 export interface WorksheetDocxDeps {
   logo: string | null
@@ -131,7 +135,7 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
     for (const sheet of sheets) sections.push(...(await sheetSections(ws, sheet, key, deps)))
   }
   // Das Deckblatt steht vor allem anderen – aber nicht vor einer reinen Lösungsdatei
-  if (deps.deckblatt && ws.meta.coverPage && !opts.keyOnly) sections.push(deckblattAbschnitt(deps.deckblatt))
+  if (deps.deckblatt && ws.meta.coverPage && !opts.keyOnly) sections.push(await deckblattAbschnitt(deps.deckblatt, deps.raster))
   if (!opts.keyOnly) await add(false)
   if (opts.includeKey || opts.keyOnly) await add(true)
   // Je gewähltem Tafelformat ein eigener Abschnitt
@@ -147,13 +151,65 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
   return new Uint8Array(await Packer.toArrayBuffer(doc))
 }
 
+/** Millimeter → Twips (Word-Maß für Rahmen und Zeilenabstand) */
+const TWIP_MM = 1440 / 25.4
+
 /**
- * Das Deckblatt als eigener Abschnitt: die Seite ohne Vorschauen als Bild hinter dem Text,
- * darüber jede Seitenvorschau als schwebendes Bild – an ihrer Stelle, gedreht und in ihrer
- * Ebene, genau wie im Editor und im PDF. In Word lassen sich die Vorschauen danach noch
- * verschieben.
+ * Ein Kopftext des Deckblatts als ECHTER Word-Text: ein Absatz in einem Textrahmen (`w:framePr`)
+ * an der gemessenen Stelle, mit Schrift, Größe, Farbe, Ausrichtung und Zeilenhöhe wie im
+ * Deckblatt (render/deckblattBilder.tsx, `vermesseTexte`).
+ *
+ * Warum Rahmen und keine Textfelder: Rahmen sind gewöhnliche Absätze – Word und LibreOffice
+ * setzen sie gleich, man tippt direkt hinein, und Formeln im Titel kommen wie überall als
+ * Bild mit. Die Zeilenhöhe ist GENAU die des Deckblatts, damit mehrzeilige Titel nicht wachsen.
+ * Word misst Schrift etwas anders als der Browser; damit eine Zeile nicht einen Buchstaben
+ * früher umbricht, bekommt der Rahmen 2 mm Luft – auf der Seite, zu der der Text NICHT
+ * ausgerichtet ist.
  */
-function deckblattAbschnitt(b: DeckblattBilder): ISectionOptions {
+async function deckblattText(t: DeckblattText, raster: MathRasterizer): Promise<Paragraph> {
+  const luft = 2
+  const x = t.ausrichtung === 'center' ? t.x - luft / 2 : t.ausrichtung === 'right' ? t.x - luft : t.x
+  const size = Math.round(t.pt * 2)
+  const zeile = Math.max(1, Math.round(t.zeile * TWIP_MM))
+  const run = { bold: t.fett, color: t.farbe }
+  const children: ParagraphChild[] = t.rich
+    ? await richTextRuns(t.text, { size, raster, run })
+    : [
+        new TextRun({
+          text: t.text,
+          size,
+          ...run,
+          allCaps: t.versalien || undefined,
+          ...(t.sperrungPt ? { characterSpacing: Math.round(t.sperrungPt * 20) } : {})
+        })
+      ]
+  // In der Pille (Kennzeichen) steht eine Zeile mittig – so hoch wie die Pille, Text in der Mitte
+  const hoehe = t.mittig ? t.hoehe : Math.max(t.hoehe, t.zeile)
+  const oben = t.mittig ? t.y + (t.hoehe - t.zeile) / 2 : t.y
+  return new Paragraph({
+    alignment: t.ausrichtung === 'center' ? AlignmentType.CENTER : t.ausrichtung === 'right' ? AlignmentType.RIGHT : AlignmentType.LEFT,
+    spacing: { before: 0, after: 0, line: zeile, lineRule: LineRuleType.EXACT },
+    frame: {
+      type: 'absolute',
+      position: { x: Math.round(Math.max(0, x) * TWIP_MM), y: Math.round(Math.max(0, oben) * TWIP_MM) },
+      width: Math.round((t.breite + luft) * TWIP_MM),
+      height: Math.round((t.mittig ? t.zeile : hoehe) * TWIP_MM),
+      rule: HeightRule.ATLEAST,
+      anchor: { horizontal: FrameAnchorType.PAGE, vertical: FrameAnchorType.PAGE },
+      wrap: FrameWrap.NONE
+    },
+    children
+  })
+}
+
+/**
+ * Das Deckblatt als eigener Abschnitt: die Seite ohne Vorschauen und ohne Texte als Bild hinter
+ * dem Text, darüber jede Seitenvorschau als schwebendes Bild – an ihrer Stelle, gedreht und in
+ * ihrer Ebene, genau wie im Editor und im PDF. In Word lassen sich die Vorschauen danach noch
+ * verschieben. Titel, Fakten-Zeile, Überthema, Kurztext und Kennzeichen stehen als echter
+ * Text in Rahmen darüber (`deckblattText`) und lassen sich in Word bearbeiten.
+ */
+async function deckblattAbschnitt(b: DeckblattBilder, raster: MathRasterizer): Promise<ISectionOptions> {
   const bild = (png: string, x0: number, y0: number, breite: number, hoehe: number, drehung: number, ebene: number, hinten: boolean): ImageRun =>
     new ImageRun({
       type: 'png',
@@ -183,7 +239,8 @@ function deckblattAbschnitt(b: DeckblattBilder): ISectionOptions {
           bild(b.hintergrund, 0, 0, 210, 297, 0, 1, true),
           ...b.karten.map((k) => bild(k.png, k.x0, k.y0, k.breite, k.hoehe, k.drehung, 10 + k.ebene - tiefste, false))
         ]
-      })
+      }),
+      ...(await Promise.all((b.texte ?? []).map((t) => deckblattText(t, raster))))
     ]
   }
 }

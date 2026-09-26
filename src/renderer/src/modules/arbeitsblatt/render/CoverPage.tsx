@@ -111,7 +111,8 @@ export function CoverPage({
   ws,
   vorschau,
   onChange,
-  onAustauschen
+  onAustauschen,
+  nurGrund
 }: {
   ws: Worksheet
   /** Seiten des Blattes für die Vorschauen; fehlt = ohne Vorschauen */
@@ -120,6 +121,11 @@ export function CoverPage({
   onChange?: (fn: (ws: Worksheet) => void, gruppe?: string) => void
   /** Nur im Editor: die Seite einer Karte gegen eine andere tauschen (öffnet die Seitenwahl) */
   onAustauschen?: (seite: string) => void
+  /**
+   * Nur für den Word-Export: die Seite ohne sichtbare Texte, als Hintergrundbild. Die Texte
+   * setzt Word als echten, bearbeitbaren Text darüber (render/deckblattBilder.tsx).
+   */
+  nurGrund?: boolean
 }): React.JSX.Element {
   const d = deckblattFarben(ws.meta)
   const kopf = ws.meta.coverHead ?? 'band'
@@ -271,7 +277,7 @@ export function CoverPage({
   return (
     <div
       ref={seiteRef}
-      className={`ws-page ws-cover ws-cover-kopf-${kopf} ${bild ? '' : 'ws-cover-ohne-bild'}`}
+      className={`ws-page ws-cover ws-cover-kopf-${kopf} ${bild ? '' : 'ws-cover-ohne-bild'} ${nurGrund ? 'ws-cover-nur-grund' : ''}`}
       // Schrift der Designvorlage – im Druck fiele das Deckblatt sonst auf die Serifen-Grundschrift zurück
       style={{
         fontFamily: ws.design.page.fontFamily,

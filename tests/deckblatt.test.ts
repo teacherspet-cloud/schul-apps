@@ -27,6 +27,7 @@ import { buildWorksheetDocx } from '../src/renderer/src/modules/arbeitsblatt/exp
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
 import type { Worksheet } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 import type { PagePlan } from '../src/renderer/src/modules/arbeitsblatt/render/paginate'
+import type { DeckblattText } from '../src/renderer/src/modules/arbeitsblatt/render/deckblattBilder'
 
 const PNG_1PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
@@ -164,6 +165,24 @@ describe('Deckblatt: Seitenwahl', () => {
 })
 
 /** Blatt mit Hilfekarten, Lösungen und Tafelbild – ohne KI */
+/** Ein gemessener Kopftext des Deckblatts – mit den üblichen Werten */
+const text = (t: Partial<DeckblattText> & Pick<DeckblattText, 'art' | 'text'>): DeckblattText => ({
+  rich: false,
+  x: 0,
+  y: 0,
+  breite: 50,
+  hoehe: 5,
+  pt: 11,
+  zeile: 5,
+  fett: false,
+  farbe: '222222',
+  ausrichtung: 'left',
+  versalien: false,
+  sperrungPt: 0,
+  mittig: false,
+  ...t
+})
+
 function blatt(): Worksheet {
   const meta = {
     ...defaultMeta('NI', 'gymnasium', 'Gymnasium'),
@@ -256,6 +275,24 @@ describe('Deckblatt: Seiten des Materials und Darstellung', () => {
       sidebar: async () => PNG_1PX,
       deckblatt: {
         hintergrund: PNG_1PX,
+        texte: [
+          text({
+            art: 'titel',
+            text: 'Fotosynthese im Blatt',
+            rich: true,
+            x: 18,
+            y: 16,
+            breite: 120,
+            hoehe: 12,
+            pt: 26,
+            zeile: 10.5,
+            fett: true,
+            farbe: 'FFFFFF'
+          }),
+          text({ art: 'fakten', text: 'Biologie › Stoffwechsel · Klasse 8', x: 18, y: 31, breite: 120, hoehe: 5, pt: 11, zeile: 5, farbe: 'DDE3EA' }),
+          text({ art: 'kicker-fach', text: 'Biologie', x: 18, y: 10, breite: 60, hoehe: 4, pt: 8.5, zeile: 4, versalien: true, sperrungPt: 0.7 }),
+          text({ art: 'kennzeichen', text: 'mit Lösungen', x: 23, y: 80, breite: 22, hoehe: 5, pt: 10, zeile: 4.5, mittig: true, ausrichtung: 'center' })
+        ],
         karten: [
           { png: PNG_1PX, x0: 20, y0: 130, breite: 50, hoehe: 70, drehung: -8, ebene: 1 },
           { png: PNG_1PX, x0: 80, y0: 140, breite: 50, hoehe: 70, drehung: 6, ebene: 2 }
@@ -272,6 +309,24 @@ describe('Deckblatt: Seiten des Materials und Darstellung', () => {
     expect(doc).toContain('rot="360000"')
     // Lage in EMU: 20 mm = 720 000
     expect(doc).toContain('<wp:posOffset>720000</wp:posOffset>')
+    // Kopftexte als ECHTER Text (w:t) in Rahmen an der gemessenen Stelle – nicht im Hintergrundbild
+    expect(doc).toContain('<w:t xml:space="preserve">Fotosynthese im Blatt</w:t>')
+    expect(doc).toContain('Biologie › Stoffwechsel · Klasse 8</w:t>')
+    expect(doc).toContain('mit Lösungen</w:t>')
+    const rahmen = doc.match(/<w:framePr [^>]*>/g) ?? []
+    expect(rahmen).toHaveLength(4)
+    // 18 mm = 1020 Twips, 16 mm = 907 Twips; an der Seite verankert
+    expect(rahmen[0]).toMatch(/w:x="1020"/)
+    expect(rahmen[0]).toMatch(/w:y="907"/)
+    expect(rahmen[0]).toMatch(/w:hAnchor="page"/)
+    // Schrift wie im Deckblatt: 26 pt fett weiß, Zeilenhöhe genau
+    expect(doc).toMatch(/<w:b\/>[\s\S]*?<w:color w:val="FFFFFF"\/>[\s\S]*?<w:sz w:val="52"\/>/)
+    expect(doc).toContain('w:lineRule="exact"')
+    // Versalien und Sperrung (Fach über dem betonten Überthema)
+    expect(doc).toContain('<w:caps/>')
+    expect(doc).toContain('<w:spacing w:val="14"/>')
+    // Pille: zentriert
+    expect(doc).toMatch(/<w:jc w:val="center"\/>[\s\S]*?mit Lösungen/)
     // Reiner Lösungsdruck: kein Deckblatt
     const loesung = await xml(blatt(), true)
     expect(loesung).not.toContain('rot="21120000"')

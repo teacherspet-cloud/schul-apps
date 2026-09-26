@@ -264,6 +264,19 @@ try {
     word.karten.length === (await karten()).length && word.karten.every((x) => x.laenge > 3000),
     `Word: jede Karte als eigenes Bild (${word.karten.map((x) => x.laenge).join(', ')})`
   )
+  /*
+   * Die Kopftexte stehen in Word als ECHTER Text über dem Hintergrund (Nachbesserung zu
+   * Paket 11) – gemessen im Deckblatt: der Titel oben im Kopf, groß und fett gesetzt.
+   */
+  const titel = word.texte.find((t) => t.art === 'titel')
+  pruefe(
+    Boolean(titel) && titel.y > 5 && titel.y < 120 && titel.pt > 16,
+    `Word: Titel als echter Text gemessen (${titel ? `${titel.x.toFixed(1)}/${titel.y.toFixed(1)} mm, ${titel.pt} pt, #${titel.farbe}` : 'fehlt'})`
+  )
+  pruefe(
+    word.texte.some((t) => t.art === 'fakten') && word.texte.some((t) => t.art === 'kennzeichen'),
+    `Word: Fakten-Zeile und Kennzeichen als Text (${word.texte.map((t) => t.art).join(', ')})`
+  )
 } finally {
   await app.close()
   rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 })

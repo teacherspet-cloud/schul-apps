@@ -1864,7 +1864,12 @@ export function installSelftest(): void {
    */
   const deckblattWord = async (
     mitBildern = false
-  ): Promise<{ hintergrund: number; karten: { laenge: number; drehung: number; x0: number; y0: number }[]; bilder?: string[] }> => {
+  ): Promise<{
+    hintergrund: number
+    karten: { laenge: number; drehung: number; x0: number; y0: number }[]
+    texte: { art: string; text: string; x: number; y: number; pt: number; farbe: string }[]
+    bilder?: string[]
+  }> => {
     const ws = useArbeitsblatt.getState().worksheet
     if (!ws) throw new Error('Kein Arbeitsblatt geladen.')
     const gemessen = (window as unknown as { __selftest?: { layouts?: Map<string, PagePlan[]> } }).__selftest?.layouts ?? new Map()
@@ -1872,6 +1877,8 @@ export function installSelftest(): void {
     return {
       hintergrund: b.hintergrund.length,
       karten: b.karten.map((k) => ({ laenge: k.png.length, drehung: k.drehung, x0: k.x0, y0: k.y0 })),
+      // Die Kopftexte, die Word als echten Text setzt – mit gemessener Lage und Schrift
+      texte: b.texte.map((t) => ({ art: t.art, text: t.text, x: t.x, y: t.y, pt: t.pt, farbe: t.farbe })),
       // Zum Ansehen: Hintergrund und erste Karte, wie sie ins Word-Dokument gehen
       ...(mitBildern ? { bilder: [b.hintergrund, b.karten[0]?.png ?? ''] } : {})
     }

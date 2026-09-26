@@ -1428,6 +1428,18 @@
   font-size: 10pt;
 }
 
+/*
+ * Hintergrund für den Word-Export: Texte unsichtbar, alles andere bleibt – Band, Pillen und der
+ * Rahmen des Überthemas (er nimmt `currentColor`, deshalb nur die Füllfarbe der Schrift
+ * ausblenden, nicht `color`). Word setzt die Texte als echten Text darüber.
+ */
+.ws-cover-nur-grund :is(.ws-cover-title, .ws-cover-facts, .ws-cover-kicker, .ws-cover-ueberthema, .ws-cover-blurb, .ws-cover-badge) {
+  -webkit-text-fill-color: transparent;
+}
+.ws-cover-nur-grund :is(.ws-cover-title, .ws-cover-blurb) :is(svg, img) {
+  visibility: hidden;
+}
+
 /* ---- Kopf: seitliches Band links über die ganze Höhe ---- */
 .ws-cover-kopf-seite .ws-cover-top {
   position: absolute;
