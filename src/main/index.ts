@@ -63,6 +63,8 @@ import {
   themenZuordnen
 } from './services/storage/themen'
 import { leseLehrplan } from './services/storage/lehrplan'
+import type { SuchOptionen } from '@shared/schulsuche'
+import { schulenSuchen, schulLogo, schulQuellen } from './services/storage/schulen'
 import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/themen'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
@@ -490,6 +492,10 @@ function registerIpc(): void {
   handle('themen:list', () => leseThemen())
   // Lehrplan-Themen je Land für die Hierarchie der Themenbereiche (Paket 12); null = Datei fehlt
   handle('lehrplan:themen', (stateId: string) => leseLehrplan(stateId))
+  // Schulsuche beim Schulnamen (Paket 13): gesucht wird hier, die Oberfläche bekommt nur die Treffer
+  handle('schulen:suche', (text: string, opt: SuchOptionen) => schulenSuchen(text, opt))
+  handle('schulen:logo', (id: string) => schulLogo(id))
+  handle('schulen:quellen', () => schulQuellen())
   handle('themen:bereich', (b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>) => themenBereichSetzen(b))
   handle('themen:delete', (id: string) => themenBereichLoeschen(id))
   handle('themen:verschieben', (id: string, elternId: string | null) => themenBereichVerschieben(id, elternId))

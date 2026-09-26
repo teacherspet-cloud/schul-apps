@@ -3,6 +3,7 @@ import { IconAlertTriangle, IconDeviceFloppy, IconTrash } from '@tabler/icons-re
 import { useEffect, useState } from 'react'
 import { notifyError, notifySuccess } from '../shared/util'
 import SicherungEinlesen from './SicherungEinlesen'
+import { SchulQuellen } from './Schulsuche'
 import { useAppSettings } from '../shared/settingsStore'
 
 /**
@@ -94,6 +95,14 @@ export default function WartungCard(): React.JSX.Element {
           </Button>
           <SicherungEinlesen />
         </Group>
+      </Card>
+
+      {/* Quellenvermerk der mitgelieferten Daten (Paket 13) – die Lizenzen verlangen die Namensnennung */}
+      <Card withBorder padding="lg" data-quellen-karte>
+        <Title order={4} mb="xs">
+          Quellen und Lizenzen
+        </Title>
+        <SchulQuellen />
       </Card>
 
       <Card withBorder padding="lg" style={{ borderColor: 'var(--mantine-color-red-5)' }}>

@@ -11,6 +11,7 @@
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
 import type { LehrplanDatei } from './lehrplan'
+import type { SchulQuelle, SchulTreffer, SuchOptionen } from './schulsuche'
 import type { DesignTemplate } from '@shared/design'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
 import type { LanStatus } from '../main/services/lanServer'
@@ -254,6 +255,12 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Lehrplan-Themen eines Landes (resources/lehrplaene/<LAND>.json, Paket 12/14); null = keine Datei */
     lehrplan: {
       themen: (stateId: string) => call<LehrplanDatei | null>('lehrplan:themen', stateId)
+    },
+    /** Schulverzeichnis (resources/schulen, Paket 13) – Suche, Vorgabe-Logo, Quellenvermerk */
+    schulen: {
+      suche: (text: string, opt: SuchOptionen) => call<SchulTreffer[]>('schulen:suche', text, opt),
+      logo: (id: string) => call<string | null>('schulen:logo', id),
+      quellen: () => call<{ stand: string; anzahl: number; quellen: SchulQuelle[] }>('schulen:quellen')
     },
     library: {
       list: () => call<SavedVocabList[]>('library:list'),

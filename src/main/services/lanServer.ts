@@ -104,6 +104,10 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'themen:list',
   // Lehrplan-Themen lesen (Paket 12) – mitgelieferte Daten, nichts vom Rechner der Lehrkraft
   'lehrplan:themen',
+  // Schulsuche (Paket 13): nur lesend im mitgelieferten Verzeichnis und seinen Vorgabe-Logos
+  'schulen:suche',
+  'schulen:logo',
+  'schulen:quellen',
 
   /*
    * --- Material speichern ---

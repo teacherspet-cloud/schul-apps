@@ -18,7 +18,6 @@ import {
   Switch,
   Tabs,
   Text,
-  TextInput,
   Title,
   Tooltip,
   UnstyledButton,
@@ -69,6 +68,7 @@ import PictogramStudio from './PictogramStudio'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
 import HaeufigSelect from '../shared/components/HaeufigSelect'
+import SchulnameFeld from './Schulsuche'
 import { stateInfo } from '../modules/arbeitsblatt/didactics/states'
 import { EigeneFaecherFeld, ProgrammeAnzeigenCard } from './ProgrammeAnzeigen'
 
@@ -869,7 +869,6 @@ function SecretField({
 
 /** Schulname sowie Bundesland und Schulform als Standard für neue Materialien. */
 export function SchoolCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
-  const [schoolName, setSchoolName] = useState(settings.schoolName)
   const [table, setTable] = useState<CefrTable | null>(null)
 
   useEffect(() => {
@@ -895,13 +894,8 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
           checked={settings.showSchool !== false}
           onChange={(e) => update({ showSchool: e.currentTarget.checked })}
         />
-        <TextInput
-          label="Schulname (erscheint im Kopf von Tests und Arbeitsblättern)"
-          value={schoolName}
-          onChange={(e) => setSchoolName(e.currentTarget.value)}
-          onBlur={() => update({ schoolName })}
-          disabled={settings.showSchool === false}
-        />
+        {/* Mit Schulsuche im Verzeichnis der Länder (Paket 13) – auch im Einrichtungsassistenten */}
+        <SchulnameFeld settings={settings} update={update} table={table} disabled={settings.showSchool === false} />
         <LogoField />
         <Group grow>
           <HaeufigSelect
