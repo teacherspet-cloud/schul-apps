@@ -16,9 +16,10 @@
  * - In Klassenarbeit und Kurztest bedeutet das Feld den geprüften STOFF, nicht das Vorwissen –
  *   dort liefert `stoffVorschlaege` die typischen Inhalte der Einheit.
  */
-import { GRAMMAR_TOPICS } from '../grammarTopics'
+import { GRAMMAR_TOPICS, type GrammarTopic } from '../grammarTopics'
+import { CEFR_SCALE, type CefrLevel } from '@shared/types'
 import { kapitelKurz, LEHRWERK_THEMEN, lehrwerkStand } from '../../../../shared/lehrwerkThemen'
-import { defaultSequence, findGrammarTopic, learningYear, topicStart, type LanguageSequence } from '../grammar'
+import { defaultSequence, findGrammarTopic, learningYear, topicStart, ueberNiveau, type LanguageSequence } from '../grammar'
 import { subjectById } from '../../model/subjects'
 import { STATES } from '../states'
 import { KNOTEN, LEHRPLAN, NUR_RICHTWERT, type BelegLand, type Knoten } from './ketten'
@@ -76,7 +77,17 @@ export interface VorwissenAnfrage {
    * eigenes Niveau tragen ihn als Kennzeichen – ausdrücklich als Richtwert markiert.
    */
   gerRichtwert?: string
+  /**
+   * Fremdsprachen: gewähltes GER-Niveau der Lerngruppe. Grammatikthemen, die erst darüber
+   * eingeführt werden, erscheinen weder als Vorwissen noch als Stoff (Befund der Lehrkraft vom
+   * 26.09.2026: bei A1 in Klasse 5 standen A2/B1-Themen da). Fehlt es, gilt `gerRichtwert`.
+   */
+  cefrLevel?: string
 }
+
+/** Liegt ein Grammatikthema über dem Niveau der Anfrage? */
+const zuHoch = (a: VorwissenAnfrage, t: GrammarTopic): boolean => ueberNiveau(t, alsNiveau(a.cefrLevel ?? a.gerRichtwert))
+const alsNiveau = (x: string | undefined): CefrLevel | undefined => (x && (CEFR_SCALE as readonly string[]).includes(x) ? (x as CefrLevel) : undefined)
 
 export interface VorwissenErgebnis {
   vorschlaege: VorwissenVorschlag[]
@@ -415,7 +426,7 @@ function sprachVorschlaege(a: VorwissenAnfrage): VorwissenVorschlag[] {
    * „simple present“ ohnehin gehabt.
    */
   for (const { t, start } of themen
-    .filter((x) => x.start < lj)
+    .filter((x) => x.start < lj && !zuHoch(a, x.t))
     .sort((x, y) => y.start - x.start)
     // Mit Lehrwerksstand kennt die App die Grammatik der Units genauer – dann genügen drei
     .slice(0, ausBuch.length ? 3 : 6))
@@ -533,7 +544,9 @@ export function stoffVorschlaege(a: VorwissenAnfrage): VorwissenErgebnis {
   if (fach.foreignLanguage || fach.uebersetzungssprache) {
     const seq = sequenzFuer(a)
     const lj = learningYear(a.grade, seq, a.stateId)
-    for (const t of GRAMMAR_TOPICS.filter((t) => t.subject === a.subjectId && t.scale === 'lernjahr' && [lj, lj - 1].includes(topicStart(t, seq))))
+    for (const t of GRAMMAR_TOPICS.filter(
+      (t) => t.subject === a.subjectId && t.scale === 'lernjahr' && [lj, lj - 1].includes(topicStart(t, seq)) && !zuHoch(a, t)
+    ))
       out.push({
         art: 'stoff',
         text: `Grammatik: ${t.label}`,

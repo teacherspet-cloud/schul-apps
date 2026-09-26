@@ -22,6 +22,7 @@
 import { GRAMMAR_TOPICS } from './grammarTopics'
 import type { GrammarTopic } from './grammarTopics'
 import type { WorksheetMeta } from '../model/types'
+import { CEFR_SCALE, cefrIndex, type CefrLevel } from '@shared/types'
 
 export type { GrammarTopic }
 export { GRAMMAR_TOPICS }
@@ -111,6 +112,37 @@ export interface GrammarQuery {
   sequence?: LanguageSequence
   /** DaZ: erreichte Erwerbsstufe (0–6) */
   acquisitionStage?: number
+  /**
+   * Gewähltes GER-Niveau der Lerngruppe (Fremdsprachen). Themen, die erst auf einem höheren
+   * Niveau eingeführt werden, fallen weg – siehe `einfuehrungsNiveau`.
+   */
+  cefrLevel?: CefrLevel
+}
+
+/**
+ * Das GER-Niveau, auf dem ein Thema eingeführt wird: das NIEDRIGSTE in seiner Stufenangabe
+ * („A2/B1" → A2, „A1→B1" → A1). null bei Angaben ohne GER-Niveau (Latein „Lehrbuch", Deutsch
+ * „Sek I").
+ */
+export function einfuehrungsNiveau(level: string): CefrLevel | null {
+  const treffer = level.match(/Pre-A1|[ABC][12]\+?/g) ?? []
+  const stufen = treffer.filter((x) => (CEFR_SCALE as readonly string[]).includes(x)) as CefrLevel[]
+  if (!stufen.length) return null
+  return stufen.reduce<CefrLevel>((a, b) => (cefrIndex(b) < cefrIndex(a) ? b : a), stufen[0])
+}
+
+/**
+ * Liegt die Einführung eines Themas über dem gewählten Niveau? (Ohne GER-Angabe: nein)
+ *
+ * SPIELRAUM eine Teilstufe (A1 → bis A1+, A1+ → bis A2, A2 → bis A2+): Das Niveau der
+ * Niveautabelle ist das ZIEL am Ende des Schuljahres, die Stufenangabe der Themen die
+ * Ersteinführung laut Lehrplänen und Lehrwerken. Mit dieser Teilstufe fallen in Klasse 5 (A1)
+ * die Themen mit „A2" und „A2/B1" weg, während Klasse 6 (A1+) Perfekt und Steigerung (A2) behält.
+ * FAUSTREGEL, an den Daten der Grammatiktabelle geprüft (tests/grammatikNiveau.test.ts).
+ */
+export function ueberNiveau(topic: Pick<GrammarTopic, 'level'>, cefrLevel: CefrLevel | undefined): boolean {
+  const n = einfuehrungsNiveau(topic.level)
+  return Boolean(cefrLevel && n && cefrIndex(n) > cefrIndex(cefrLevel) + 1)
 }
 
 /** Stufe, an der ein Thema für diese Lerngruppe gemessen wird. */
@@ -128,6 +160,12 @@ export function topicStart(topic: GrammarTopic, sequence: LanguageSequence): num
  * Ein Jahr Spielraum nach oben und unten, damit Wiederholung und Vorgriff möglich bleiben.
  * Die Auswahl ist eine Orientierung – die Lehrkraft kann jedes Thema wählen, die Liste zeigt
  * nur, was zum Zeitpunkt üblich ist.
+ *
+ * NIVEAU (Befund der Lehrkraft vom 26.09.2026): Der Spielraum nach oben holte in Klasse 5 bei
+ * gewähltem A1 Themen des 2. Lernjahres mit „A2/B1" in die Liste – das Niveau zählte gar nicht.
+ * Ist ein GER-Niveau gewählt, fallen deshalb Themen weg, die erst darüber eingeführt werden.
+ * Der Vorgriff bleibt innerhalb des Niveaus möglich; wer mehr will, schaltet „Alle Themen des
+ * Fachs" ein.
  */
 export function grammarTopicsFor(query: GrammarQuery): GrammarTopic[] {
   const { subjectId, grade, schoolTypeId = '', stateId = '' } = query
@@ -147,6 +185,7 @@ export function grammarTopicsFor(query: GrammarQuery): GrammarTopic[] {
     const start = t.scale === 'jahrgang' ? t.from : topicStart(t, sequence)
     const end = t.scale === 'jahrgang' ? t.to : topicStart({ ...t, from: t.to }, sequence)
     const now = t.scale === 'jahrgang' ? grade : learningYear(grade, sequence, stateId)
+    if (t.scale === 'lernjahr' && ueberNiveau(t, query.cefrLevel)) return false
     return now + 1 >= start + shift && now - 1 <= end + shift
   })
 }
@@ -174,7 +213,8 @@ export const grammarTopicsForMeta = (meta: WorksheetMeta): GrammarTopic[] =>
     schoolTypeId: meta.schoolTypeId,
     stateId: meta.stateId,
     sequence: sequenceOf(meta),
-    acquisitionStage: meta.acquisitionStage
+    acquisitionStage: meta.acquisitionStage,
+    cefrLevel: meta.cefrLevel || undefined
   })
 
 /** Klammerzusätze und Mehrfachnennungen abschneiden: „simple past (regular …)" → „simple past" */

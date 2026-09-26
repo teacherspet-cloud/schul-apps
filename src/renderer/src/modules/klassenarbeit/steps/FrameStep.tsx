@@ -112,7 +112,11 @@ export default function FrameStep(): React.JSX.Element {
           const stateId = last.stateId ?? appSettings.defaults.stateId
           const schoolTypeId = last.schoolTypeId ?? appSettings.defaults.schoolTypeId
           const typeName = cefr.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.name ?? 'Gymnasium'
-          setExam(emptyExam(stateId, schoolTypeId, typeName, ds.find((d) => d.isDefault) ?? ds[0]))
+          const neu = emptyExam(stateId, schoolTypeId, typeName, ds.find((d) => d.isDefault) ?? ds[0])
+          // Ohne gemerktes Niveau: das zum Jahrgang passende statt fest „B1" (auch in Klasse 5)
+          const level = !last.cefrLevel && neu.meta.subjectId === 'englisch' ? suggestLevel(cefr, stateId, schoolTypeId, 1, neu.meta.grade) : null
+          if (level) neu.meta.cefrLevel = level.level
+          setExam(neu)
         }
       })
       .catch(notifyError)
@@ -143,6 +147,20 @@ export default function FrameStep(): React.JSX.Element {
   const meta = exam.meta
   // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
   const patch = (p: Partial<ExamMeta>): void => update((d) => Object.assign(d.meta, p), `angaben:${Object.keys(p).sort().join(',')}`)
+  /**
+   * Land oder Schulform ändern: Das GER-Niveau zieht mit wie beim Jahrgang (Befund der Lehrkraft
+   * vom 26.09.2026 – bis dahin nur beim Jahrgang). Englisch ist hier immer 1. Fremdsprache.
+   */
+  const niveauVorschlag = exam && exam.meta.subjectId === 'englisch' ? suggestLevel(table, exam.meta.stateId, exam.meta.schoolTypeId, 1, exam.meta.grade) : null
+  const patchGruppe = (p: Partial<ExamMeta>): void =>
+    update(
+      (d) => {
+        Object.assign(d.meta, p)
+        const level = d.meta.subjectId === 'englisch' ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, 1, d.meta.grade) : null
+        if (level) d.meta.cefrLevel = level.level
+      },
+      `angaben:${Object.keys(p).sort().join(',')}`
+    )
   const range = gradeRange(table, meta.stateId, meta.schoolTypeId)
   const courseOptions = courseLevelOptions(meta.stateId, meta.schoolTypeId, meta.grade)
   const pointsPlanned = examPoints(exam)
@@ -253,6 +271,9 @@ export default function FrameStep(): React.JSX.Element {
                             d.meta.subjectId = v as ExamSubjectId
                             d.meta.subjectLabel = SUBJECTS.find((s) => s.value === v)?.label ?? ''
                             d.parts = []
+                            // Wechsel nach Englisch: Niveau passend zum Jahrgang
+                            const level = v === 'englisch' ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, 1, d.meta.grade) : null
+                            if (level) d.meta.cefrLevel = level.level
                           })
                         }
                         allowDeselect={false}
@@ -323,9 +344,13 @@ export default function FrameStep(): React.JSX.Element {
                       <Autocomplete
                         label="Grammatikthema der Arbeit"
                         description="Aus der Liste wählen oder frei eintippen"
-                        data={grammarTopicsFor({ subjectId: 'englisch', grade: meta.grade, schoolTypeId: meta.schoolTypeId, stateId: meta.stateId }).map(
-                          (t) => t.label
-                        )}
+                        data={grammarTopicsFor({
+                          subjectId: 'englisch',
+                          grade: meta.grade,
+                          schoolTypeId: meta.schoolTypeId,
+                          stateId: meta.stateId,
+                          cefrLevel: meta.cefrLevel
+                        }).map((t) => t.label)}
                         value={meta.grammarTopic}
                         onChange={(v) => patch({ grammarTopic: v })}
                         limit={40}
@@ -434,7 +459,7 @@ export default function FrameStep(): React.JSX.Element {
                              */
                             const list = schoolTypesForState(table, v)
                             const keep = list.some((t) => t.value === meta.schoolTypeId)
-                            patch({
+                            patchGruppe({
                               stateId: v,
                               schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
                               schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
@@ -449,7 +474,7 @@ export default function FrameStep(): React.JSX.Element {
                           value={meta.schoolTypeId}
                           onChange={(v) => {
                             const name = schoolTypesForState(table, meta.stateId).find((t) => t.value === v)?.label ?? meta.schoolTypeName
-                            if (v) patch({ schoolTypeId: v, schoolTypeName: name })
+                            if (v) patchGruppe({ schoolTypeId: v, schoolTypeName: name })
                           }}
                           allowDeselect={false}
                         />
@@ -469,6 +494,7 @@ export default function FrameStep(): React.JSX.Element {
                         {meta.subjectId === 'englisch' && (
                           <Select
                             label="Sprachniveau (GER)"
+                            description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
                             data={[...CEFR_SCALE]}
                             value={meta.cefrLevel}
                             onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}

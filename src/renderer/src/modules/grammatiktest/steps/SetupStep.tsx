@@ -10,6 +10,7 @@ import { notifyError } from '../../../shared/util'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { chosenGrammarTopics, GRAMMAR_FORMATS, grammarFormatLabel, hasGrammar } from '../../arbeitsblatt/didactics/grammar'
 import { gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/schoolProfiles'
+import { suggestLevel } from '../../../shared/cefr'
 import { STATES } from '../../arbeitsblatt/didactics/states'
 import GrammarPicker from '../../arbeitsblatt/steps/GrammarPicker'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
@@ -29,6 +30,19 @@ import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useKiZugang } from '../../../shared/useKiZugang'
 import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
+
+/**
+ * Das GER-Niveau folgt der Lerngruppe (Befund der Lehrkraft vom 26.09.2026): Bis dahin blieb es
+ * beim Wechsel des Jahrgangs stehen – ein neuer Test begann immer mit A2, auch in Klasse 5.
+ * Wie im Arbeitsblatt und im Vokabeltest setzt jeder Wechsel von Fach, Jahrgang, Land, Schulform
+ * oder Fremdsprachenfolge den Vorschlag der Niveautabelle; von Hand bleibt es danach änderbar.
+ * Ohne Eintrag in der Tabelle (Latein, Deutsch, fehlende Folge) bleibt es, wie es ist.
+ */
+function mitNiveau(table: CefrTable, m: GrammarTestMeta): GrammarTestMeta {
+  if (!subjectById(m.subjectId).foreignLanguage) return m
+  const s = suggestLevel(table, m.stateId, m.schoolTypeId, m.languageOrder, m.grade)
+  return s ? { ...m, cefrLevel: s.level } : m
+}
 
 /** Fächer, für die es eine Grammatikliste gibt. */
 const TEST_SUBJECTS = SUBJECTS.filter((s) => hasGrammar(s.id))
@@ -61,6 +75,8 @@ export default function SetupStep(): React.JSX.Element {
           // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor – sofern es Grammatiktests hat
           const vorgabe = TEST_SUBJECTS.find((s) => s.id === nimmFachVorgabe('grammatiktest'))
           if (vorgabe) neu.meta = { ...neu.meta, subjectId: vorgabe.id, subjectLabel: vorgabe.label, languageOrder: vorgabe.id === 'englisch' ? 1 : 2 }
+          // Auch der neue Test startet mit dem Niveau, das zu Jahrgang und Fremdsprachenfolge passt
+          neu.meta = mitNiveau(cefr, neu.meta)
           setTest(neu)
         }
       })
@@ -75,6 +91,12 @@ export default function SetupStep(): React.JSX.Element {
   const meta = test.meta
   // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
   const patch = (p: Partial<GrammarTestMeta>): void => setTest({ ...test, meta: { ...meta, ...p } }, `angaben:${Object.keys(p).sort().join(',')}`)
+  /** Lerngruppe ändern (Fach, Jahrgang, Land, Schulform, Fremdsprachenfolge): das Niveau zieht mit */
+  const patchGruppe = (p: Partial<GrammarTestMeta>): void =>
+    setTest({ ...test, meta: mitNiveau(table, { ...meta, ...p }) }, `angaben:${Object.keys(p).sort().join(',')}`)
+  const niveauVorschlag = subjectById(meta.subjectId).foreignLanguage
+    ? suggestLevel(table, meta.stateId, meta.schoolTypeId, meta.languageOrder, meta.grade)
+    : null
 
   /** Themen ändern: Formate mitziehen, solange die Lehrkraft sie nicht selbst angefasst hat. */
   const patchFromPicker = (p: Partial<WorksheetMeta>): void => {
@@ -149,7 +171,7 @@ export default function SetupStep(): React.JSX.Element {
                           if (!v) return
                           const s = subjectById(v)
                           // Fachwechsel: Die Themen des alten Fachs gelten nicht weiter
-                          patch({ subjectId: v, subjectLabel: s.label, topics: [], formats: [], languageOrder: v === 'englisch' ? 1 : 2 })
+                          patchGruppe({ subjectId: v, subjectLabel: s.label, topics: [], formats: [], languageOrder: v === 'englisch' ? 1 : 2 })
                         }}
                         allowDeselect={false}
                       />
@@ -157,7 +179,7 @@ export default function SetupStep(): React.JSX.Element {
                         label="Jahrgang"
                         data={grades.map((g) => ({ value: String(g), label: `Klasse ${g}` }))}
                         value={String(meta.grade)}
-                        onChange={(v) => v && patch({ grade: Number(v) })}
+                        onChange={(v) => v && patchGruppe({ grade: Number(v) })}
                         allowDeselect={false}
                       />
                     </Group>
@@ -177,7 +199,7 @@ export default function SetupStep(): React.JSX.Element {
                             if (!v) return
                             const list = schoolTypesForState(table, v)
                             const keep = list.some((t) => t.value === meta.schoolTypeId)
-                            patch({
+                            patchGruppe({
                               stateId: v,
                               schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
                               schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
@@ -190,7 +212,7 @@ export default function SetupStep(): React.JSX.Element {
                           label="Schulform"
                           data={types}
                           value={meta.schoolTypeId}
-                          onChange={(v) => v && patch({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
+                          onChange={(v) => v && patchGruppe({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
                           allowDeselect={false}
                         />
                       </Group>
@@ -201,12 +223,13 @@ export default function SetupStep(): React.JSX.Element {
                           label="Fremdsprache"
                           data={[1, 2, 3].map((n) => ({ value: String(n), label: `${n}. Fremdsprache` }))}
                           value={String(meta.languageOrder)}
-                          onChange={(v) => v && patch({ languageOrder: Number(v) })}
+                          onChange={(v) => v && patchGruppe({ languageOrder: Number(v) })}
                           allowDeselect={false}
                         />
                       )}
                       <Select
                         label="Sprachniveau (GER)"
+                        description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
                         data={[...CEFR_SCALE]}
                         value={meta.cefrLevel}
                         onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}

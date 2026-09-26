@@ -8,7 +8,8 @@ import {
   learningYear,
   sequenceOf,
   needsSequence,
-  topicStart
+  topicStart,
+  ueberNiveau
 } from '../didactics/grammar'
 import type { GrammarTopic } from '../didactics/grammar'
 import type { WorksheetMeta } from '../model/types'
@@ -48,6 +49,8 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
   const picked = chosen.map((id) => GRAMMAR_TOPICS.find((t) => t.id === id)).filter((t): t is GrammarTopic => Boolean(t))
   const year = learningYear(meta.grade, sequence, meta.stateId)
   const scaleWord = daz ? 'Erwerbsstufe' : meta.subjectId === 'deutsch' ? 'Jahrgang' : 'Lernjahr'
+  // Das gewählte GER-Niveau begrenzt die Auswahl nach oben (Fremdsprachen; grammarTopicsFor)
+  const niveau = needsSequence(meta.subjectId) && meta.cefrLevel ? meta.cefrLevel : undefined
 
   return (
     <Stack gap="xs">
@@ -95,7 +98,7 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
         <TextInput
           style={{ flex: 1 }}
           label="Grammatikthema"
-          description={`Gezeigt wird, was im ${scaleWord} ${daz ? '' : String(meta.subjectId === 'deutsch' ? meta.grade : year) + ' '}üblich ist. Die Zuordnung ist eine Orientierung, kein Lehrplanzitat.`}
+          description={`Gezeigt wird, was im ${scaleWord} ${daz ? '' : String(meta.subjectId === 'deutsch' ? meta.grade : year) + ' '}üblich ist${niveau ? ` und zum Niveau ${niveau} passt` : ''}. Die Zuordnung ist eine Orientierung, kein Lehrplanzitat.`}
           placeholder="suchen …"
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
@@ -136,7 +139,12 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
                           {t.term}
                         </Text>
                       )}
-                      <Badge size="xs" variant="light" color="gray">
+                      <Badge
+                        size="xs"
+                        variant="light"
+                        color={ueberNiveau(t, niveau) ? 'orange' : 'gray'}
+                        data-ueber-niveau={ueberNiveau(t, niveau) || undefined}
+                      >
                         {t.level}
                       </Badge>
                       {all && !fittingIds.has(t.id) && (
@@ -185,6 +193,11 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
               <Text size="xs" c="orange">
                 Die ausgewerteten Lehrpläne und Lehrwerke setzen dieses Thema zwischen {scaleWord} {topicStart(t, sequence)} und {t.to} an – bitte prüfen, ob es
                 zur Lerngruppe passt.
+              </Text>
+            )}
+            {ueberNiveau(t, niveau) && (
+              <Text size="xs" c="orange">
+                Eingeführt auf {t.level} – deutlich über dem gewählten Niveau {niveau}. Bitte prüfen, ob es zur Lerngruppe passt.
               </Text>
             )}
             {t.receptive && (

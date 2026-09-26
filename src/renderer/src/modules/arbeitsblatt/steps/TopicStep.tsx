@@ -171,6 +171,12 @@ export default function TopicStep(): React.JSX.Element {
             sources: [],
             createdAt: new Date().toISOString()
           }
+          // Ohne gemerktes Niveau: das zu Jahrgang und Fremdsprachenfolge passende statt fest „A2"
+          const niveau =
+            !last.cefrLevel && subjectById(ws.meta.subjectId).foreignLanguage
+              ? suggestLevel(cefr, ws.meta.stateId, ws.meta.schoolTypeId, ws.meta.languageOrder, ws.meta.grade)
+              : null
+          if (niveau) ws.meta.cefrLevel = niveau.level
           setWorksheet(ws)
         }
       })
@@ -241,6 +247,8 @@ export default function TopicStep(): React.JSX.Element {
     learningGoals: meta.learningGoals,
     languageOrder: meta.languageOrder,
     lateStartLanguage: meta.lateStartLanguage,
+    // Grammatik über dem gewählten Niveau erscheint nicht als Vorwissen (Befund vom 26.09.2026)
+    cefrLevel: subject.foreignLanguage ? meta.cefrLevel : undefined,
     lehrwerk: meta.knownVocab?.source,
     lehrwerkStand:
       meta.knownVocab?.buch && meta.knownVocab.unit
