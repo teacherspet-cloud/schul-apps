@@ -671,6 +671,11 @@ export interface WorksheetMeta {
    * eigenen Unterricht gerade ohnehin vorkommt.
    */
   aiCanaryWords?: string
+  /**
+   * „Farbe der Vorlage verwenden" (Paket 10a): true = die Akzentfarbe der Designvorlage statt
+   * der Fachfarbe aus den Einstellungen. Fehlt = Fachfarbe.
+   */
+  vorlagenfarbe?: boolean
   /** Deckblatt als Seite 0 vor die Arbeitsblätter stellen */
   coverPage?: boolean
   /** Farbgebung des Deckblatts (id aus COVER_DESIGNS) – unabhängig vom Blattdesign */

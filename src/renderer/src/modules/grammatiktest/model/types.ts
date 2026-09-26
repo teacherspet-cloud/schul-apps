@@ -18,6 +18,11 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import type { KnownVocab } from '../../../shared/knownVocab'
 
 export interface GrammarTestMeta {
+  /**
+   * „Farbe der Vorlage verwenden" (Paket 10a): true = die Akzentfarbe der Designvorlage statt
+   * der Fachfarbe aus den Einstellungen. Fehlt = Fachfarbe.
+   */
+  vorlagenfarbe?: boolean
   subjectId: string
   subjectLabel: string
   stateId: string

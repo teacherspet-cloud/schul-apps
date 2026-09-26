@@ -3,16 +3,19 @@
 //
 // Anlass (Paket 9, 26.09.2026): Die Programme tragen eigene Vektorsymbole
 // (shared/components/ProgrammSymbol.tsx) statt Tabler-Symbolen; die Startseiten-Kachel zeigt
-// eine Illustration, sobald eine vorliegt, sonst das Symbol. Geprüft wird:
-//  - Leiste, schmal und breit, hell und dunkel, mit normaler und farbiger Leiste:
-//    jedes Programm hat sein Symbol, 22 px groß, mit Fläche in der Programmfarbe;
-//  - auf dem aktiven Knopf und auf der farbigen Leiste nimmt die Fläche die Strichfarbe an
-//    (sonst verschwimmt sie mit dem Hintergrund), auf dem weißen aktiven Knopf der farbigen
-//    Leiste wieder die Programmfarbe;
+// eine Illustration, sobald eine vorliegt, sonst das Symbol.
+// Paket 10a (Entscheidung der Lehrkraft): Auch die Leiste zeigt die Illustrationen selbst,
+// verkleinert (kleine Fassung <id>-96.webp); die Vektorsymbole bleiben Rückfall und stehen im
+// Auftrags-Layer. Geprüft wird:
+//  - Leiste, schmal (40 px) und breit (30 px), hell und dunkel, normale und farbige Leiste:
+//    jedes Programm zeigt sein geladenes Bild, kein Vektorsymbol;
+//  - der aktive Knopf hebt sich durch die Fläche um das Bild ab, ruhende haben keine Fläche;
+//  - der Laufpunkt der Hintergrund-Aufträge sitzt weiter am Bild;
 //  - jede Kachel der Startseite zeigt Illustration oder Symbol.
-// Bildschirmfotos: paket9-leiste-*.png, paket9-start.png
+// Bildschirmfotos: paket10a-leiste-<thema>-<hell|dunkel>-<schmal|breit>.png, paket9-start.png
 import { _electron as electron } from 'playwright-core'
-import { mkdirSync, mkdtempSync, rmSync } from 'fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { PNG } from 'pngjs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 import { warteAufOberflaeche } from './warten.mjs'
@@ -35,21 +38,22 @@ try {
   await page.setViewportSize({ width: 1400, height: 900 })
   await warteAufOberflaeche(page)
 
-  /** Fläche und Strich des Symbols eines Leistenknopfs */
-  const symbol = (label) =>
+  /** Programmbild bzw. Symbol eines Leistenknopfs und die Fläche des Knopfes */
+  const knopf = (label) =>
     page.evaluate((label) => {
-      const knopf = document.querySelector(`.app-leiste [aria-label="${label}"]`)
-      const svg = knopf?.querySelector('svg.programm-symbol')
-      if (!svg) return null
-      const flaeche = getComputedStyle(svg.querySelector('.sym-akzent'))
+      const k = document.querySelector(`.app-leiste [aria-label="${label}"]`)
+      if (!k) return null
+      const bild = k.querySelector('img.nav-bild')
       return {
-        breite: svg.getBoundingClientRect().width,
-        fuellung: flaeche.fill,
-        deckkraft: flaeche.fillOpacity,
-        strich: getComputedStyle(svg).color,
-        tabler: !!knopf.querySelector('svg.tabler-icon')
+        bild: Boolean(bild),
+        geladen: Boolean(bild?.complete && bild.naturalWidth > 0),
+        quelle: bild?.naturalWidth ?? 0,
+        breite: bild ? Math.round(bild.getBoundingClientRect().width) : 0,
+        vektor: Boolean(k.querySelector('svg.programm-symbol')),
+        flaeche: getComputedStyle(k).backgroundColor
       }
     }, label)
+  const durchsichtig = (farbe) => farbe === 'transparent' || /rgba\(.*,\s*0\)$/.test(farbe)
 
   async function darstellung(theme, colorScheme) {
     await page.evaluate((a) => window.api.settings.set({ appearance: a }), { theme, colorScheme })
@@ -58,6 +62,8 @@ try {
     await page.click('[aria-label="Vokabeltest"]')
   }
 
+  // Paket 10a: In der Leiste stehen die Illustrationen selbst (Entscheidung der Lehrkraft)
+  const fotos = []
   for (const [theme, scheme] of [
     ['teal', 'light'],
     ['teal', 'dark'],
@@ -65,28 +71,47 @@ try {
     ['blue', 'dark']
   ]) {
     await darstellung(theme, scheme)
-    const farbig = theme === 'blue'
-    for (const name of PROGRAMME) {
-      const s = await symbol(name)
-      pruefe(!!s && !s.tabler && s.breite === 22, `${theme}/${scheme}: ${name} hat eigenes 22-px-Symbol`)
+    for (const breit of [false, true]) {
+      const soll = breit ? 30 : 40
+      for (const name of PROGRAMME) {
+        const k = await knopf(name)
+        pruefe(
+          !!k && k.bild && k.geladen && !k.vektor && k.breite === soll,
+          `${theme}/${scheme}/${breit ? 'breit' : 'schmal'}: ${name} zeigt sein Bild (${k?.breite} px)`
+        )
+      }
+      // Die kleine Fassung, nicht die große Kachel: scharf bis 200 % Zoom, ohne unnötige Last
+      const k0 = await knopf('Arbeitsblatt')
+      pruefe(k0.quelle >= 80 && k0.quelle <= 128, `${theme}/${scheme}: Leistenbild ist die kleine Fassung (${k0.quelle} px)`)
+      // Aktiv (Vokabeltest) mit Fläche um das Bild, ruhend (Arbeitsblatt) ohne
+      const aktiv = await knopf('Vokabeltest')
+      pruefe(!durchsichtig(aktiv.flaeche) && aktiv.flaeche !== k0.flaeche, `${theme}/${scheme}: aktiver Knopf hebt sich ab (${aktiv.flaeche} / ${k0.flaeche})`)
+      pruefe(durchsichtig(k0.flaeche), `${theme}/${scheme}: ruhender Knopf ohne Fläche (${k0.flaeche})`)
+      const leiste = page.locator('.app-leiste')
+      const datei = `paket10a-leiste-${theme}-${scheme}-${breit ? 'breit' : 'schmal'}.png`
+      await leiste.screenshot({ path: join(out, datei) })
+      fotos.push(datei)
+      await page.click('.leiste-umschalter')
+      await page.waitForTimeout(250)
     }
-    // Vokabeltest ist aktiv, Arbeitsblatt nicht
-    const aktiv = await symbol('Vokabeltest')
-    const ruhig = await symbol('Arbeitsblatt')
-    if (farbig) {
-      pruefe(aktiv.deckkraft === '1' && aktiv.fuellung !== aktiv.strich, `${theme}/${scheme}: aktiver weißer Knopf zeigt die Programmfarbe`)
-      pruefe(ruhig.deckkraft === '0.4', `${theme}/${scheme}: farbige Leiste – Fläche halbtransparent in Strichfarbe`)
-    } else {
-      pruefe(aktiv.deckkraft === '0.4', `${theme}/${scheme}: aktiver Knopf – Fläche halbtransparent in Strichfarbe`)
-      pruefe(ruhig.deckkraft === '1' && ruhig.fuellung !== ruhig.strich, `${theme}/${scheme}: ruhender Knopf – Fläche in Programmfarbe`)
-    }
-    const leiste = page.locator('.app-leiste')
-    await leiste.screenshot({ path: join(out, `paket9-leiste-${theme}-${scheme}-schmal.png`) })
-    await page.click('.leiste-umschalter')
-    await page.waitForTimeout(250)
-    await leiste.screenshot({ path: join(out, `paket9-leiste-${theme}-${scheme}-breit.png`) })
-    await page.click('.leiste-umschalter')
   }
+  // Der Laufpunkt der Hintergrund-Aufträge sitzt weiter am Bild
+  await page.evaluate(() => {
+    const ind = document.querySelector('.app-leiste [aria-label="Arbeitsblatt"] .mantine-Indicator-root')
+    if (!ind) throw new Error('kein Indicator am Leistenbild')
+  })
+  pruefe(true, 'der Laufpunkt (Indicator) umschließt das Leistenbild')
+
+  // Alle Leisten nebeneinander in einem Bild: paket10a-leiste.png
+  const bilder = fotos.map((f) => PNG.sync.read(readFileSync(join(out, f))))
+  const gesamt = new PNG({ width: bilder.reduce((b, p) => b + p.width + 8, 0), height: Math.max(...bilder.map((p) => p.height)) })
+  gesamt.data.fill(255)
+  let x = 0
+  for (const p of bilder) {
+    PNG.bitblt(p, gesamt, 0, 0, p.width, p.height, x, 0)
+    x += p.width + 8
+  }
+  writeFileSync(join(out, 'paket10a-leiste.png'), PNG.sync.write(gesamt))
 
   await darstellung('teal', 'light')
   await page.click('[aria-label="Startseite"]')

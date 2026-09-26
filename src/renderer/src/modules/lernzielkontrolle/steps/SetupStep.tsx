@@ -59,6 +59,7 @@ import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
+import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useKiZugang } from '../../../shared/useKiZugang'
 
 /**
@@ -649,6 +650,8 @@ export default function SetupStep(): React.JSX.Element {
                           onChange={(e) => patch({ bezeichnung: e.currentTarget.value })}
                           placeholder="Lernzielkontrolle"
                         />
+                        {/* Paket 10a: dezent in der Fachfarbe (Kopf, Überschriften) – hier abschaltbar */}
+                        <VorlagenfarbeSchalter fach={m.subjectId} checked={Boolean(m.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
                       </Stack>
                     </Card>
                   </Stack>
@@ -740,6 +743,7 @@ export function geaenderteOptionen(m: KurztestMeta, formatBezeichnung?: string):
           ? 'eigener Notenschlüssel'
           : `Schlüssel ${schluesselById(b.schluessel)?.name ?? b.schluessel}`
       : '',
-    m.nameFeld ? '' : 'ohne Namensfelder'
+    m.nameFeld ? '' : 'ohne Namensfelder',
+    m.vorlagenfarbe ? 'Farbe der Vorlage' : ''
   ].filter(Boolean)
 }

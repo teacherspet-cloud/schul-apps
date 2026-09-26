@@ -132,7 +132,15 @@ export default function App(): React.JSX.Element {
         */}
         <AppShell.Section grow className="leiste-liste" mt="md">
           {modules.map((m) => (
-            <NavIcon key={m.id} label={m.name} breit={breit} active={active === m.id} badge={laufpunkte[m.id]} onClick={() => openModule(m.id)}>
+            <NavIcon
+              key={m.id}
+              label={m.name}
+              breit={breit}
+              active={active === m.id}
+              badge={laufpunkte[m.id]}
+              bild={m.leistenbild}
+              onClick={() => openModule(m.id)}
+            >
               <m.icon size={22} />
             </NavIcon>
           ))}
@@ -184,21 +192,33 @@ export default function App(): React.JSX.Element {
 /**
  * Ein Eintrag der Leiste: schmal nur das Symbol mit Tooltip, breit Symbol und Name.
  * `badge` setzt einen Punkt ans Symbol (z. B. solange im Programm ein Auftrag läuft).
+ *
+ * `bild` (Paket 10a, Entscheidung der Lehrkraft): Die Programme zeigen hier ihre
+ * Illustration von der Startseite, verkleinert – dieselben Bilder überall, statt zweier
+ * Bildsprachen. Das Bild bringt seine eigene farbige Kachel mit; deshalb wird es nicht
+ * eingefärbt. Der aktive Knopf hebt sich durch die Fläche UM das Bild ab (Themenfarbe, in
+ * der farbigen Leiste weiß), die ruhenden Knöpfe bleiben ohne Fläche. Ohne Bild gilt das
+ * Vektorsymbol wie bisher.
  */
 function NavIcon(props: {
   label: string
   active: boolean
   breit: boolean
   badge?: boolean
+  bild?: string
   onClick: () => void
   children: React.ReactNode
 }): React.JSX.Element {
   // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
-  const variant = props.active ? 'filled' : 'light'
+  const variant = props.active ? 'filled' : props.bild ? 'subtle' : 'light'
   const color = props.active ? undefined : 'gray'
   const symbol = (
-    <Indicator disabled={!props.badge} size={10} offset={4} processing color="orange" position="top-end">
-      {props.children}
+    <Indicator disabled={!props.badge} size={10} offset={props.bild ? 2 : 4} processing color="orange" position="top-end">
+      {props.bild ? (
+        <img src={props.bild} className="nav-bild" width={props.breit ? 30 : 40} height={props.breit ? 30 : 40} alt="" draggable={false} />
+      ) : (
+        props.children
+      )}
     </Indicator>
   )
   if (props.breit)
@@ -208,6 +228,7 @@ function NavIcon(props: {
         aria-label={props.label}
         className="nav-icon nav-breit"
         data-active={props.active}
+        data-bild={Boolean(props.bild)}
         variant={variant}
         color={color}
         leftSection={symbol}
@@ -227,6 +248,7 @@ function NavIcon(props: {
         aria-label={props.label}
         className="nav-icon"
         data-active={props.active}
+        data-bild={Boolean(props.bild)}
         variant={variant}
         color={color}
         size={56}

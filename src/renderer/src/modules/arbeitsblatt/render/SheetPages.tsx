@@ -16,6 +16,7 @@ import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
 import { anredeFuerMeta } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
+import { druckDesign } from '../../../shared/fachfarben'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -41,9 +42,11 @@ export function pageInfoFor(ws: Worksheet, sheet: Sheet, logo: string | null, sc
   // Der Schalter am Blatt hat Vorrang vor der Vorgabe aus den Einstellungen und gilt
   // unabhängig von der Designvorlage.
   const school = ws.meta.showSchool !== false
+  // Die Fachfarbe ersetzt die Akzentfarbe der Vorlage (Paket 10a) – hier für Vorschau, Druck und Word zugleich
+  const design = druckDesign(ws)
   return {
     // Ein Blatt mit eigener Kopfzeile (Fassung B, C …) überschreibt die des Dokuments
-    design: sheet.kopfzeile === undefined ? ws.design : { ...ws.design, header: { ...ws.design.header, customText: sheet.kopfzeile } },
+    design: sheet.kopfzeile === undefined ? design : { ...design, header: { ...design.header, customText: sheet.kopfzeile } },
     meta: ws.meta,
     logo: school ? logo : null,
     schoolName: school ? schoolName : '',

@@ -11,6 +11,7 @@
  * Die Vorgabe „Blau" stammt aus einem Deckblatt der Lehrkraft; die Farbwerte sind daraus
  * ausgelesen (dunkel #2F528F, mittel #B4C7E7, hell #DAE3F3).
  */
+import { aufhellen, geltendeFachfarbe } from '../../../shared/fachfarben'
 
 export interface CoverDesign {
   id: string
@@ -84,6 +85,34 @@ export const COVER_DESIGNS: CoverDesign[] = [
 ]
 
 export const coverDesign = (id?: string): CoverDesign => COVER_DESIGNS.find((d) => d.id === id) ?? COVER_DESIGNS[0]
+
+/** Kennung der Deckblattfarbe, die der Fachfarbe folgt (Paket 10a) */
+export const FACH_COVER_ID = 'fach'
+
+/**
+ * Farben des Deckblatts für ein Blatt.
+ *
+ * Paket 10a: Ohne eigene Wahl folgt das Deckblatt der Fachfarbe – dunkel die Fachfarbe selbst,
+ * mittel und hell daraus aufgehellt, so wie die mitgelieferten Farbsätze aufgebaut sind. Eine
+ * ausdrücklich gewählte Deckblattfarbe (Blau, Grün …) behält Vorrang; bei „Farbe der Vorlage
+ * verwenden" oder unbekanntem Fach bleibt es beim bisherigen Blau. Das neue Deckblatt aus
+ * Paket 11 übernimmt diese Farbe.
+ */
+export function deckblattFarben(meta: { coverDesign?: string; subjectId?: string; vorlagenfarbe?: boolean }): CoverDesign {
+  const eigene = meta.coverDesign && meta.coverDesign !== FACH_COVER_ID ? COVER_DESIGNS.find((d) => d.id === meta.coverDesign) : undefined
+  if (eigene) return eigene
+  const fach = geltendeFachfarbe(meta.subjectId, meta.vorlagenfarbe)
+  if (!fach) return COVER_DESIGNS[0]
+  return {
+    id: FACH_COVER_ID,
+    label: 'Fachfarbe',
+    dark: fach,
+    mid: aufhellen(fach, 0.65),
+    light: aufhellen(fach, 0.85),
+    onDark: '#ffffff',
+    description: 'Folgt der Farbe des Fachs aus den Einstellungen.'
+  }
+}
 
 /**
  * Mitgelieferter Fuchs, solange keiner erzeugt wurde.

@@ -60,6 +60,7 @@ export function worksheetMetaForTest(test: GrammarTest): WorksheetMeta {
     instructionsInGerman: m.instructionsInGerman,
     labelLanguage: m.subjectId === 'englisch' ? 'en' : 'de',
     answerKey: m.answerKey,
+    vorlagenfarbe: m.vorlagenfarbe,
     helpCards: false,
     minutes: m.minutes,
     pages: Math.max(1, Math.ceil(test.blocks.length / 6)),

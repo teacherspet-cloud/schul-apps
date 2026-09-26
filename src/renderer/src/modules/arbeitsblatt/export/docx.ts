@@ -65,6 +65,7 @@ import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
 import { anredeFuerMeta } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
+import { druckAkzent } from '../../../shared/fachfarben'
 
 export interface WorksheetDocxDeps {
   logo: string | null
@@ -186,7 +187,8 @@ async function schwebenderBehaelter(
 
 async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: WorksheetDocxDeps): Promise<ISectionOptions[]> {
   const info = pageInfoFor(ws, sheet, deps.logo, deps.schoolName, key)
-  const d = ws.design
+  // Mit Fachfarbe (Paket 10a) – pageInfoFor hat sie schon eingesetzt, Word soll aussehen wie die Vorschau
+  const d = info.design
   const insets = contentInsets(d)
   const ctx: Ctx = {
     ws,
@@ -325,7 +327,7 @@ async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: Wo
 export async function boardSection(ws: Worksheet, board: BoardPlan, raster: MathRasterizer): Promise<ISectionOptions> {
   const margins = { top: 15, bottom: 15, left: PRINT_MARGINS.holePunchMm, right: 15 }
   const width = Math.round(A4_WIDTH - (margins.left + margins.right) * MM)
-  const accent = hexColor(ws.design.page.accentColor)
+  const accent = hexColor(druckAkzent(ws))
   const size = 22
   const frame = { style: BorderStyle.SINGLE, size: 24, color: '3D4A45' }
   const line = { style: BorderStyle.SINGLE, size: 6, color: accent }
@@ -491,10 +493,10 @@ async function logoRun(ctx: Ctx, heightMm: number): Promise<ImageRun | null> {
 }
 
 async function sidebarRun(ctx: Ctx): Promise<ImageRun | null> {
-  const s = ctx.ws.design.sidebar
+  const s = ctx.info.design.sidebar
   if (!s.show) return null
   // Wie in der Vorschau: im bedruckbaren Bereich, links hinter dem Lochrand
-  const box = sidebarBox(ctx.ws.design)!
+  const box = sidebarBox(ctx.info.design)!
   const height = 297 - 2 * PRINT_MARGINS.bleedSafeMm
   const png = await ctx.deps.sidebar(sidebarText(ctx.info), s.color, s.widthMm, height)
   const { data } = dataUrlBytes(png)

@@ -81,7 +81,8 @@ import { browserWorksheetImageDeps } from '../generation/browserImages'
 import { completeWorksheetImages } from '../generation/worksheetImages'
 import { CANARY_MAX, CANARY_WORDS, canaryNote, canaryText, canaryWordFor, canaryWords } from '../../../shared/aiCanary'
 import { CoverPage } from '../render/CoverPage'
-import { COVER_DESIGNS, foxPrompt } from '../render/coverDesigns'
+import { COVER_DESIGNS, FACH_COVER_ID, foxPrompt } from '../render/coverDesigns'
+import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useDruck } from '../../../shared/navigation'
 
 export default function EditorStep(): React.JSX.Element {
@@ -104,6 +105,8 @@ export default function EditorStep(): React.JSX.Element {
     }
   }
   const citationStyle = useAppSettings((s) => s.settings.citationStyle)
+  // Nur zum Neuzeichnen: pageInfoFor liest die Fachfarbe außerhalb von React (shared/fachfarben.ts)
+  useAppSettings((s) => s.settings.fachfarben)
   const [view, setView] = useState<'student' | 'key' | 'board' | 'audio'>('student')
   // Ausgeblendete Hinweise zur Seitenzahl („Blatt:Seitenzahl“) – eine neue Abweichung erscheint wieder
   const [seitenAus, setSeitenAus] = useState<string[]>([])
@@ -575,6 +578,12 @@ export default function EditorStep(): React.JSX.Element {
                   update((w) => (w.design.page.justifyText = an))
                 }}
               />
+              {/* Paket 10a: Fachfarbe statt Vorlagenfarbe – hier für dieses eine Blatt abschaltbar */}
+              <VorlagenfarbeSchalter
+                fach={ws.meta.subjectId}
+                checked={Boolean(ws.meta.vorlagenfarbe)}
+                onChange={(an) => update((w) => (w.meta.vorlagenfarbe = an))}
+              />
               <Checkbox
                 size="sm"
                 label="Deckblatt"
@@ -586,11 +595,9 @@ export default function EditorStep(): React.JSX.Element {
                 <Select
                   size="sm"
                   label="Gestaltung des Deckblatts"
-                  data={COVER_DESIGNS.map((d) => ({
-                    value: d.id,
-                    label: d.label
-                  }))}
-                  value={ws.meta.coverDesign ?? COVER_DESIGNS[0].id}
+                  // Ohne eigene Wahl folgt das Deckblatt der Fachfarbe (Paket 10a)
+                  data={[{ value: FACH_COVER_ID, label: 'Fachfarbe' }, ...COVER_DESIGNS.map((d) => ({ value: d.id, label: d.label }))]}
+                  value={ws.meta.coverDesign ?? FACH_COVER_ID}
                   allowDeselect={false}
                   onChange={(v) => v && update((w) => (w.meta.coverDesign = v))}
                 />

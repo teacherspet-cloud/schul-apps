@@ -22,11 +22,17 @@ export interface SchulModule {
   id: string
   name: string
   description: string
-  /** Vektorsymbol (Leiste, Aufträge, Zuletzt bearbeitet) – klein und scharf, Fläche in der Programmfarbe */
+  /** Vektorsymbol (Aufträge; Rückfall für Leiste und Zuletzt bearbeitet, solange kein Bild da ist) – Fläche in der Programmfarbe */
   icon: ProgrammIcon
   color: string
   /** Große Illustration für die Startseiten-Kachel; fehlt sie, zeigt die Kachel das Vektorsymbol */
   illustration?: string
+  /**
+   * Dieselbe Illustration klein (96 px) für die Leiste und „Zuletzt bearbeitet" (Paket 10a,
+   * Entscheidung der Lehrkraft: dort die Bilder statt der Vektorsymbole). Fehlt sie, gilt das
+   * Vektorsymbol.
+   */
+  leistenbild?: string
   /** active: das Programm ist gerade geöffnet (Module bleiben im Hintergrund erhalten) */
   component: ComponentType<{ active: boolean }>
 }
@@ -38,6 +44,8 @@ export interface SchulModule {
  */
 const bilder = import.meta.glob<string>('../assets/programme/*.{webp,png}', { eager: true, import: 'default' })
 const illustration = (id: string): string | undefined => bilder[`../assets/programme/${id}.webp`] ?? bilder[`../assets/programme/${id}.png`]
+// Die kleine Fassung, sonst die große (der Browser verkleinert sie dann selbst)
+const leistenbild = (id: string): string | undefined => bilder[`../assets/programme/${id}-96.webp`] ?? illustration(id)
 
 export const modules: SchulModule[] = [
   {
@@ -47,6 +55,7 @@ export const modules: SchulModule[] = [
     icon: programmSymbol('vokabeltest', 'teal'),
     color: 'teal',
     illustration: illustration('vokabeltest'),
+    leistenbild: leistenbild('vokabeltest'),
     component: VokabeltestModule
   },
   {
@@ -56,6 +65,7 @@ export const modules: SchulModule[] = [
     icon: programmSymbol('vokabelliste', 'cyan'),
     color: 'cyan',
     illustration: illustration('vokabelliste'),
+    leistenbild: leistenbild('vokabelliste'),
     component: VokabellisteModule
   },
   {
@@ -65,6 +75,7 @@ export const modules: SchulModule[] = [
     icon: programmSymbol('arbeitsblatt', 'indigo'),
     color: 'indigo',
     illustration: illustration('arbeitsblatt'),
+    leistenbild: leistenbild('arbeitsblatt'),
     component: ArbeitsblattModule
   },
   {
@@ -74,6 +85,7 @@ export const modules: SchulModule[] = [
     icon: programmSymbol('lernzielkontrolle', 'blue'),
     color: 'blue',
     illustration: illustration('lernzielkontrolle'),
+    leistenbild: leistenbild('lernzielkontrolle'),
     component: LernzielkontrolleModule
   },
   {
@@ -83,6 +95,7 @@ export const modules: SchulModule[] = [
     icon: programmSymbol('grammatiktest', 'orange'),
     color: 'orange',
     illustration: illustration('grammatiktest'),
+    leistenbild: leistenbild('grammatiktest'),
     component: GrammatiktestModule
   },
   {
@@ -93,6 +106,7 @@ export const modules: SchulModule[] = [
     icon: programmSymbol('klassenarbeit', 'grape'),
     color: 'grape',
     illustration: illustration('klassenarbeit'),
+    leistenbild: leistenbild('klassenarbeit'),
     component: KlassenarbeitModule
   }
 ]

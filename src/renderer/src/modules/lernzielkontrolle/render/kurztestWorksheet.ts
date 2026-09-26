@@ -64,6 +64,7 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
     // Die Lehrkraft wählt die Stufe selbst; die festen Texte des Blattes folgen ihr (Paket 8b)
     anrede: anredeFuerStufe(m.stufe),
     answerKey: m.answerKey,
+    vorlagenfarbe: m.vorlagenfarbe,
     // Die Lernhilfen des Arbeitsblatts gibt es hier nicht – siehe didactics/bausteine.ts
     helpCards: false,
     minutes: m.minutes,

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { AppSettings, DeepPartial, DEFAULT_SETTINGS } from '@shared/types'
 import { notifyError } from './util'
+import { merkeFachfarben } from './fachfarben'
 
 export { THEMES, themeById } from './themes'
 export type { AppTheme } from './themes'
@@ -36,6 +37,7 @@ export const useAppSettings = create<SettingsState>((set, get) => ({
         window.api.branding.getLogo(),
         window.api.pictograms.get().catch(() => ({}))
       ])
+      merkeFachfarben(settings.fachfarben)
       set({ settings, logoDataUrl, pictograms, loaded: true })
     } catch (e) {
       set({ loaded: true })
@@ -73,9 +75,14 @@ export const useAppSettings = create<SettingsState>((set, get) => ({
   },
   update: async (patch) => {
     // Sofort anzeigen, dann speichern
-    set({ settings: deepMerge(get().settings, patch) })
+    const sofort = deepMerge(get().settings, patch)
+    // Die Fachfarben zuerst – Druck und Vorschau lesen sie außerhalb von React (fachfarben.ts)
+    merkeFachfarben(sofort.fachfarben)
+    set({ settings: sofort })
     try {
-      set({ settings: await window.api.settings.set(patch) })
+      const gespeichert = await window.api.settings.set(patch)
+      merkeFachfarben(gespeichert.fachfarben)
+      set({ settings: gespeichert })
     } catch (e) {
       notifyError(e)
     }

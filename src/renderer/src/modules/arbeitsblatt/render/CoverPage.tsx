@@ -1,6 +1,6 @@
 import { RichText } from '../../../shared/richtext/RichText'
 import type { Worksheet } from '../model/types'
-import { coverDesign, foxPlaceholder } from './coverDesigns'
+import { deckblattFarben, foxPlaceholder } from './coverDesigns'
 
 /**
  * Deckblatt als Seite 0 vor den Arbeitsblättern.
@@ -26,7 +26,7 @@ export function CoverPage({
   onChange?: (fn: (ws: Worksheet) => void) => void
   onRegenerateFox?: () => void
 }): React.JSX.Element {
-  const d = coverDesign(ws.meta.coverDesign)
+  const d = deckblattFarben(ws.meta)
   const fox = ws.meta.coverImage || foxPlaceholder(d.dark, d.mid)
   const editable = Boolean(onChange)
   const set = (fn: (m: Worksheet['meta'], v: string) => void) => (onChange ? (v: string) => onChange((w) => fn(w.meta, v)) : undefined)

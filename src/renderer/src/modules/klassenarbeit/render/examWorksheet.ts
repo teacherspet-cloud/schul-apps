@@ -106,6 +106,8 @@ export function examToWorksheet(exam: Exam, fassung = 0): Worksheet {
       labelLanguage: exam.meta.subjectId === 'englisch' ? ('en' as const) : ('de' as const),
       // Der Lösungsteil einer Klassenarbeit ist der Erwartungshorizont – auch im Kopf
       loesungsBegriff: 'Erwartungshorizont',
+      // Fachfarbe oder Vorlagenfarbe – gilt für Arbeit und Erwartungshorizont gleichermaßen
+      vorlagenfarbe: exam.meta.vorlagenfarbe,
       pages: Math.max(1, Math.ceil(blocks.length / 6)),
       // Im Erwartungshorizont steht der Schlüssel immer – aber nur für Teile mit Punkten
       gradeScale: { thresholds: exam.meta.gradeScaleThresholds, groups: gradeScaleGroups(exam) }

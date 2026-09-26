@@ -51,7 +51,9 @@ function sampleWorksheet(design: DesignTemplate): Worksheet {
     topic: 'Fotosynthese',
     title: 'Wie Pflanzen Energie gewinnen',
     grade: 7,
-    sheetNumber: '3'
+    sheetNumber: '3',
+    // Hier wird die Vorlage selbst gestaltet – ihre eigene Farbe zeigen, nicht die Fachfarbe (Paket 10a)
+    vorlagenfarbe: true
   }
   return {
     version: 1,
@@ -287,6 +289,8 @@ export default function DesignManager(): React.JSX.Element {
                 onChangeEnd={(v) => patch('page', { accentColor: v })}
                 format="hex"
                 swatches={['#2b6cb0', '#0b7285', '#5f3dc4', '#c2255c', '#e8590c', '#2f9e44', '#343a40']}
+                // Seit Paket 10a gilt auf den Materialien meist die Fachfarbe – das soll hier niemanden überraschen
+                description="Gilt nur für Materialien mit „Farbe der Vorlage verwenden“; sonst färbt die Fachfarbe aus den Einstellungen."
               />
               <Select
                 label="Schrift"

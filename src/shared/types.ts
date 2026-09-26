@@ -208,6 +208,12 @@ export interface AppSettings {
     allgemein: number[]
     jeFach: Record<string, number[]>
   }
+  /**
+   * Fachfarben (Paket 10a): eigene Wahl der Lehrkraft je Fach (Kennung → #rrggbb). Fehlt ein
+   * Fach oder steht dort '', gilt der Vorschlag aus renderer/shared/fachfarben.ts – so kommen
+   * neue Vorschläge auch bei bestehenden Einstellungen an.
+   */
+  fachfarben?: Record<string, string>
   /** Angaben zur Schule (Name, Logo) auf den Materialien abdrucken */
   showSchool: boolean
   /** Nach welchem Regelwerk Quellen auf den Materialien angegeben werden */

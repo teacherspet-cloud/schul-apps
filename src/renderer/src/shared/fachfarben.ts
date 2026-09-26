@@ -1,0 +1,346 @@
+/**
+ * Fachfarben (Paket 10a, 26.09.2026).
+ *
+ * Wunsch der Lehrkraft: Ein Fach hat EINE Farbe über alle Materialien – Arbeitsblatt,
+ * Lernzielkontrolle, Grammatiktest, Klassenarbeit, Vokabeltest. Die Designvorlage bestimmt
+ * weiter Aufbau und Schrift, die Farbe kommt vom Fach. So erkennt man im Ordner und auf dem
+ * Tisch sofort, was zu Biologie und was zu Englisch gehört.
+ *
+ * Die Farbe wird beim Darstellen aus den Einstellungen gelesen, nicht ins Material kopiert:
+ * Ändert die Lehrkraft die Farbe eines Fachs, ziehen alle Materialien dieses Fachs mit. Nur
+ * wer an einem Material „Farbe der Vorlage verwenden" wählt, behält die Vorlagenfarbe.
+ *
+ * Dieses Modul ist bewusst ohne React und ohne Store geschrieben (Prüfung in
+ * tests/fachfarben.test.ts). Die Einstellungen reicht settingsStore.ts über
+ * `merkeFachfarben` herein – so können auch Druck und Word-Export, die außerhalb von React
+ * laufen, die Farbe lesen.
+ */
+import type { DesignTemplate } from '@shared/design'
+import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
+
+export interface PalettenFarbe {
+  hex: string
+  name: string
+}
+
+/*
+ * DRUCKFESTE PALETTE: 16 Farben, gewählt für Schulkopierer und Laserdrucker.
+ *
+ * Belegt (WCAG 2.1): Jede Farbe hat gegen Weiß ein Kontrastverhältnis von mindestens 4,5 : 1
+ * (SC 1.4.3) – weiße Aufgabennummern auf der Farbfläche bleiben lesbar, Überschriften und
+ * Linien auf weißem Papier ebenso. Untereinander liegen die Farben mindestens ΔE₀₀ = 12
+ * auseinander (CIEDE2000; ab etwa 10 gelten Farben nebeneinander als klar verschieden).
+ *
+ * Faustregel (nicht belegt, aus der Druckpraxis): Sehr helle Farben (Gelb, Hellblau)
+ * verschwinden auf der Schwarz-Weiß-Kopie, fast schwarze Farben unterscheiden sich dort nicht
+ * mehr vom Text. Deshalb enthält die Palette weder Pastell- noch Neonfarben; die hellste liegt
+ * noch bei 4,5 : 1 gegen Weiß, die dunkelste bei 1,6 : 1 gegen Schwarz.
+ */
+export const FACH_PALETTE: PalettenFarbe[] = [
+  { hex: '#1d4e89', name: 'Dunkelblau' },
+  { hex: '#1971c2', name: 'Blau' },
+  { hex: '#0b6e80', name: 'Petrol' },
+  { hex: '#0a8068', name: 'Türkis' },
+  { hex: '#1f5c45', name: 'Tannengrün' },
+  { hex: '#2a7f38', name: 'Grün' },
+  { hex: '#617a14', name: 'Olivgrün' },
+  { hex: '#946b00', name: 'Ocker' },
+  { hex: '#c25100', name: 'Orange' },
+  { hex: '#c92a2a', name: 'Rot' },
+  { hex: '#8c1d40', name: 'Bordeaux' },
+  { hex: '#b0247a', name: 'Magenta' },
+  { hex: '#5f3dc4', name: 'Violett' },
+  { hex: '#7c4a1e', name: 'Braun' },
+  { hex: '#5a6270', name: 'Schiefergrau' },
+  { hex: '#2f3338', name: 'Anthrazit' }
+]
+
+const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name)!.hex
+
+/*
+ * Vorschläge je Fach. Die App kennt 22 Fächer, die Palette hat 16 Farben – ganz ohne
+ * Doppelung geht es also nicht. Die 16 häufigsten Fächer haben je eine eigene Farbe, einige
+ * naheliegend (Biologie grün, Geschichte braun, Erdkunde oliv). Die übrigen teilen sich eine
+ * Farbe mit einem Fach, mit dem sie selten zusammen unterrichtet werden oder das auf einer
+ * anderen Schulstufe liegt (Sachunterricht in der Grundschule, Biologie ab Klasse 5). Alles
+ * lässt sich in den Einstellungen ändern.
+ */
+export const FACH_VORSCHLAG: Record<string, string> = {
+  deutsch: farbe('Rot'),
+  englisch: farbe('Dunkelblau'),
+  franzoesisch: farbe('Violett'),
+  spanisch: farbe('Orange'),
+  italienisch: farbe('Tannengrün'),
+  latein: farbe('Bordeaux'),
+  mathematik: farbe('Blau'),
+  biologie: farbe('Grün'),
+  chemie: farbe('Türkis'),
+  physik: farbe('Petrol'),
+  informatik: farbe('Schiefergrau'),
+  geschichte: farbe('Braun'),
+  erdkunde: farbe('Olivgrün'),
+  politik: farbe('Ocker'),
+  religion: farbe('Magenta'),
+  anderes: farbe('Anthrazit'),
+  // Geteilte Vorschläge (siehe oben) – in GETEILTE_VORSCHLAEGE einzeln begründet
+  'werte-und-normen': farbe('Tannengrün'),
+  kunst: farbe('Türkis'),
+  musik: farbe('Bordeaux'),
+  sport: farbe('Orange'),
+  sachunterricht: farbe('Grün'),
+  daz: farbe('Ocker')
+}
+
+/** Fächer, deren Vorschlag bewusst mit einem anderen Fach übereinstimmt (die Prüfung lässt nur diese zu) */
+export const GETEILTE_VORSCHLAEGE: Record<string, string> = {
+  'werte-und-normen': 'italienisch',
+  kunst: 'chemie',
+  musik: 'latein',
+  sport: 'spanisch',
+  sachunterricht: 'biologie',
+  daz: 'politik'
+}
+
+/** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) */
+const FACH_ZU_SPRACHE: Record<string, string> = { en: 'englisch', fr: 'franzoesisch', es: 'spanisch', it: 'italienisch', la: 'latein' }
+
+// ---------- Farbrechnung (sRGB, WCAG 2.1, CIELAB) ----------
+
+const HEX = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i
+
+export function istFarbe(wert: unknown): wert is string {
+  return typeof wert === 'string' && HEX.test(wert.trim())
+}
+
+function rgb(hex: string): [number, number, number] {
+  let h = hex.trim().replace('#', '')
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('')
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+}
+
+const linear = (c: number): number => {
+  const s = c / 255
+  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+}
+
+/** Relative Leuchtdichte nach WCAG 2.1 (0 = Schwarz, 1 = Weiß) – das ist zugleich der Grauwert im S/W-Druck */
+export function leuchtdichte(hex: string): number {
+  const [r, g, b] = rgb(hex).map(linear)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Kontrastverhältnis nach WCAG 2.1 (1 … 21) */
+export function kontrast(a: string, b: string): number {
+  const [hell, dunkel] = [leuchtdichte(a), leuchtdichte(b)].sort((x, y) => y - x)
+  return (hell + 0.05) / (dunkel + 0.05)
+}
+
+function lab(hex: string): [number, number, number] {
+  const [r, g, b] = rgb(hex).map(linear)
+  const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+  const f = (t: number): number => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116)
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))]
+}
+
+/** Farbabstand ΔE₀₀ (CIEDE2000) – wie verschieden zwei Farben fürs Auge wirken */
+export function farbabstand(a: string, b: string): number {
+  const [l1, a1, b1] = lab(a)
+  const [l2, a2, b2] = lab(b)
+  const rad = Math.PI / 180
+  const c1 = Math.hypot(a1, b1)
+  const c2 = Math.hypot(a2, b2)
+  const cm = (c1 + c2) / 2
+  const g = 0.5 * (1 - Math.sqrt(cm ** 7 / (cm ** 7 + 25 ** 7)))
+  const a1p = (1 + g) * a1
+  const a2p = (1 + g) * a2
+  const c1p = Math.hypot(a1p, b1)
+  const c2p = Math.hypot(a2p, b2)
+  const h1p = (Math.atan2(b1, a1p) / rad + 360) % 360
+  const h2p = (Math.atan2(b2, a2p) / rad + 360) % 360
+  const dL = l2 - l1
+  const dC = c2p - c1p
+  let dh = 0
+  if (c1p * c2p !== 0) {
+    dh = h2p - h1p
+    if (dh > 180) dh -= 360
+    else if (dh < -180) dh += 360
+  }
+  const dH = 2 * Math.sqrt(c1p * c2p) * Math.sin((dh / 2) * rad)
+  const lm = (l1 + l2) / 2
+  const cpm = (c1p + c2p) / 2
+  let hm = h1p + h2p
+  if (c1p * c2p !== 0) {
+    if (Math.abs(h1p - h2p) <= 180) hm = (h1p + h2p) / 2
+    else hm = h1p + h2p < 360 ? (h1p + h2p + 360) / 2 : (h1p + h2p - 360) / 2
+  }
+  const t = 1 - 0.17 * Math.cos((hm - 30) * rad) + 0.24 * Math.cos(2 * hm * rad) + 0.32 * Math.cos((3 * hm + 6) * rad) - 0.2 * Math.cos((4 * hm - 63) * rad)
+  const dTheta = 30 * Math.exp(-(((hm - 275) / 25) ** 2))
+  const rc = 2 * Math.sqrt(cpm ** 7 / (cpm ** 7 + 25 ** 7))
+  const sl = 1 + (0.015 * (lm - 50) ** 2) / Math.sqrt(20 + (lm - 50) ** 2)
+  const sc = 1 + 0.045 * cpm
+  const sh = 1 + 0.015 * cpm * t
+  const rt = -Math.sin(2 * dTheta * rad) * rc
+  return Math.sqrt((dL / sl) ** 2 + (dC / sc) ** 2 + (dH / sh) ** 2 + rt * (dC / sc) * (dH / sh))
+}
+
+// ---------- Graustufen-Prüfung ----------
+
+export type GrauStufe = 'gut' | 'knapp' | 'zu-hell' | 'zu-dunkel'
+
+export interface GrauPruefung {
+  stufe: GrauStufe
+  /** Kontrast gegen weißes Papier */
+  gegenWeiss: number
+  /** Kontrast gegen schwarzen Text */
+  gegenSchwarz: number
+  /** Grauwert im S/W-Druck in Prozent Schwärzung (0 = weiß, 100 = schwarz) */
+  grauProzent: number
+  /** Hinweis für die Lehrkraft; leer, wenn alles in Ordnung ist */
+  hinweis: string
+}
+
+/*
+ * Schwellen der Prüfung.
+ *  - 3 : 1 gegen Weiß: belegt als Mindestkontrast für Linien und Flächen (WCAG 2.1 SC 1.4.11).
+ *    Darunter verblassen Rahmen und Farbband im S/W-Druck – auf Kopien noch stärker.
+ *  - 4,5 : 1 gegen Weiß: belegt als Mindestkontrast für Text (WCAG 2.1 SC 1.4.3). Farbige
+ *    Überschriften und weiße Nummern auf der Farbfläche brauchen ihn.
+ *  - 1,6 : 1 gegen Schwarz: FAUSTREGEL. Darunter ist die Farbe im S/W-Druck praktisch
+ *    schwarz – Überschriften heben sich nicht mehr vom Text ab. Das ist kein Lesbarkeits-
+ *    problem, nur verschenkte Gliederung; deshalb nur ein milder Hinweis.
+ */
+export const GRAU_SCHWELLEN = { linieGegenWeiss: 3, textGegenWeiss: 4.5, gegenSchwarz: 1.6 }
+
+export function graustufenPruefung(hex: string): GrauPruefung {
+  const gegenWeiss = kontrast(hex, '#ffffff')
+  const gegenSchwarz = kontrast(hex, '#000000')
+  const grauProzent = Math.round((1 - leuchtdichte(hex) ** (1 / 2.2)) * 100)
+  const s = GRAU_SCHWELLEN
+  if (gegenWeiss < s.linieGegenWeiss)
+    return {
+      stufe: 'zu-hell',
+      gegenWeiss,
+      gegenSchwarz,
+      grauProzent,
+      hinweis: 'Zu hell für den S/W-Druck: Linien, Farbband und Überschriften verblassen auf der Kopie fast ganz.'
+    }
+  if (gegenWeiss < s.textGegenWeiss)
+    return {
+      stufe: 'knapp',
+      gegenWeiss,
+      gegenSchwarz,
+      grauProzent,
+      hinweis: 'Knapp: Im S/W-Druck bleiben Linien sichtbar, farbige Überschriften und weiße Nummern auf der Farbe werden aber blass.'
+    }
+  if (gegenSchwarz < s.gegenSchwarz)
+    return {
+      stufe: 'zu-dunkel',
+      gegenWeiss,
+      gegenSchwarz,
+      grauProzent,
+      hinweis: 'Sehr dunkel: Im S/W-Druck sehen Überschriften aus wie normaler Text (Faustregel).'
+    }
+  return { stufe: 'gut', gegenWeiss, gegenSchwarz, grauProzent, hinweis: '' }
+}
+
+// ---------- Fachfarbe eines Materials ----------
+
+/** Fachkennung aus Kennung, Anzeigename oder Sprachcode – die Listen der Programme speichern Verschiedenes */
+export function fachIdVon(wert?: string): string | null {
+  if (!wert) return null
+  const w = wert.trim()
+  if (FACH_VORSCHLAG[w]) return w
+  if (FACH_ZU_SPRACHE[w]) return FACH_ZU_SPRACHE[w]
+  const klein = w.toLocaleLowerCase('de')
+  return SUBJECTS.find((s) => s.label.toLocaleLowerCase('de') === klein)?.id ?? null
+}
+
+/** Farbe eines Fachs nach den Einstellungen (fehlt dort eine, gilt der Vorschlag); null = unbekanntes Fach */
+export function fachFarbeAus(fach: string | undefined, eigene: Record<string, string> | undefined): string | null {
+  const id = fachIdVon(fach)
+  if (!id) return null
+  const gewaehlt = eigene?.[id]
+  return istFarbe(gewaehlt) ? gewaehlt : (FACH_VORSCHLAG[id] ?? null)
+}
+
+let eingestellt: Record<string, string> = {}
+
+/** Von settingsStore.ts nach jedem Laden und Ändern der Einstellungen aufgerufen */
+export function merkeFachfarben(werte: Record<string, string> | undefined): void {
+  eingestellt = werte ?? {}
+}
+
+/**
+ * Farbe eines Fachs, wie sie gerade eingestellt ist – für Punkte in Bibliotheken und auf der
+ * Startseite und (Paket 10b) die Ordnersymbole der Themenbereiche. Nimmt Kennung, Namen
+ * („Biologie") oder Sprachcode („en").
+ */
+export function fachFarbe(fach: string | undefined): string | null {
+  return fachFarbeAus(fach, eingestellt)
+}
+
+/**
+ * Die Akzentfarbe, mit der ein Material gedruckt wird – der Vorrang in einer Funktion:
+ * 1. „Farbe der Vorlage verwenden" am Material → die Vorlagenfarbe;
+ * 2. sonst die Fachfarbe (eigene Wahl in den Einstellungen, sonst der Vorschlag);
+ * 3. unbekanntes Fach (z. B. Niederländisch im Vokabeltest) → die Vorlagenfarbe.
+ */
+export function wirksameFarbe(vorlage: string, fach: string | undefined, vorlagenfarbe: boolean | undefined, eigene = eingestellt): string {
+  if (vorlagenfarbe) return vorlage
+  return fachFarbeAus(fach, eigene) ?? vorlage
+}
+
+/**
+ * Designvorlage mit Fachfarbe: ersetzt die Akzentfarbe und die Farbe der Seitenleiste. Aufbau,
+ * Schrift und Ränder bleiben die der Vorlage. Liefert dasselbe Objekt zurück, wenn sich nichts
+ * ändert – wichtig für die Vorschau, die an unveränderten Objekten nichts neu misst.
+ */
+export function designMitFachfarbe(design: DesignTemplate, fach: string | undefined, vorlagenfarbe: boolean | undefined, eigene = eingestellt): DesignTemplate {
+  const f = vorlagenfarbe ? null : fachFarbeAus(fach, eigene)
+  // Vorlagenfarbe gewählt oder Fach unbekannt: Die Vorlage bleibt ganz, auch ihre Seitenleiste
+  if (!f || (f === design.page.accentColor && f === design.sidebar.color)) return design
+  return { ...design, page: { ...design.page, accentColor: f }, sidebar: { ...design.sidebar, color: f } }
+}
+
+/** Was ein Material zum Einfärben braucht – Arbeitsblatt und alle Programme, die ihr Blatt als Arbeitsblatt darstellen */
+interface Farbquelle {
+  design: DesignTemplate
+  meta: { subjectId?: string; vorlagenfarbe?: boolean }
+}
+
+/** Die Designvorlage eines Blattes, wie sie gedruckt wird (mit Fachfarbe, sofern nicht abgeschaltet) */
+export const druckDesign = (ws: Farbquelle, eigene = eingestellt): DesignTemplate =>
+  designMitFachfarbe(ws.design, ws.meta.subjectId, ws.meta.vorlagenfarbe, eigene)
+
+/** Akzentfarbe eines Blattes, wie sie gedruckt wird (Tafelbild, Deckblatt) */
+export const druckAkzent = (ws: Farbquelle, eigene = eingestellt): string => druckDesign(ws, eigene).page.accentColor
+
+/** Mischt eine Farbe mit Weiß (anteil 0 = unverändert, 1 = weiß) – für helle Flächen in der Fachfarbe */
+export function aufhellen(hex: string, anteil: number): string {
+  const kanal = (c: number): string =>
+    Math.round(c + (255 - c) * anteil)
+      .toString(16)
+      .padStart(2, '0')
+  const [r, g, b] = rgb(hex)
+  return `#${kanal(r)}${kanal(g)}${kanal(b)}`
+}
+
+/**
+ * Fachfarbe eines Materials, sofern sie gilt – sonst null (Vorlagenfarbe gewählt oder Fach
+ * unbekannt). Für Stellen ohne Designvorlage: Deckblatt, Vokabeltest.
+ */
+export const geltendeFachfarbe = (fach: string | undefined, vorlagenfarbe: boolean | undefined, eigene = eingestellt): string | null =>
+  vorlagenfarbe ? null : fachFarbeAus(fach, eigene)
+
+/** Anzeigename des Fachs zu Kennung, Namen oder Sprachcode (für Tooltips an Farbpunkten) */
+export function fachName(fach: string | undefined): string | undefined {
+  const id = fachIdVon(fach)
+  const label = SUBJECTS.find((s) => s.id === id)?.label
+  return label ? `Fach: ${label.replace(/\s*…$/, '')}` : undefined
+}

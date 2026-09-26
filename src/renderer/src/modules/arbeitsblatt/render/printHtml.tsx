@@ -6,6 +6,7 @@ import { contextFor, layoutKey, pageInfoFor, SheetPages, vorschauSeiten } from '
 import wsCss from './ws.css?raw'
 import { boardList } from '../didactics/boardDesign'
 import { CoverPage } from './CoverPage'
+import { druckAkzent } from '../../../shared/fachfarben'
 
 export interface WorksheetPrintSelection {
   sheetIds: string[]
@@ -78,7 +79,7 @@ export function buildWorksheetHtml(
   if (sel.includeBoard) {
     // Je gewähltem Tafelformat eine eigene Seite
     for (const board of boardList(ws)) {
-      parts.push(renderToStaticMarkup(<BoardPage board={board} meta={ws.meta} accent={ws.design.page.accentColor} fontFamily={ws.design.page.fontFamily} />))
+      parts.push(renderToStaticMarkup(<BoardPage board={board} meta={ws.meta} accent={druckAkzent(ws)} fontFamily={ws.design.page.fontFamily} />))
     }
   }
 

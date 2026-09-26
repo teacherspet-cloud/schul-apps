@@ -6,6 +6,7 @@ import { useAppSettings } from '../shared/settingsStore'
 import { openDocument, openModule, openSettings } from '../shared/navigation'
 import { imNetz } from '../shared/netzZugang'
 import { ladeMaterialien, Material, neueste, suche } from './materialien'
+import { FachPunkt } from '../shared/components/FachFarbe'
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
 const ZULETZT_ANZAHL = 8
@@ -194,13 +195,20 @@ function MaterialZeile({ material: m }: { material: Material }): React.JSX.Eleme
   return (
     <UnstyledButton className="home-material" onClick={() => void openDocument(m.moduleId, m.id)}>
       <Group gap="sm" wrap="nowrap">
-        {modul && (
-          <ThemeIcon size={36} variant="light" color={modul.color} title={modul.name}>
-            <modul.icon size={20} />
-          </ThemeIcon>
+        {/* Das Programmbild wie in der Leiste (Paket 10a); ohne Bild das Vektorsymbol */}
+        {modul?.leistenbild ? (
+          <img src={modul.leistenbild} className="home-material-bild" width={36} height={36} alt="" title={modul.name} draggable={false} />
+        ) : (
+          modul && (
+            <ThemeIcon size={36} variant="light" color={modul.color} title={modul.name}>
+              <modul.icon size={20} />
+            </ThemeIcon>
+          )
         )}
         <div style={{ minWidth: 0, flex: 1 }}>
           <Group gap={6} wrap="nowrap">
+            {/* Farbpunkt des Fachs (Paket 10a) */}
+            <FachPunkt fach={m.fach} />
             <Text fw={600} size="sm" truncate>
               {m.name}
             </Text>

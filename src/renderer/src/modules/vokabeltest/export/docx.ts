@@ -18,6 +18,7 @@ import {
 } from 'docx'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
+import { geltendeFachfarbe } from '../../../shared/fachfarben'
 import { blockHelp } from '../render/helpTexts'
 import type { TestLayouts } from '../render/useTestLayout'
 
@@ -43,7 +44,9 @@ export interface DocxOptions {
 export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer): Promise<Uint8Array> {
   const layoutFont = opts.layouts?.student.values().next().value?.fontSize
   const size = Math.round((layoutFont ?? doc.fontSize) * 2) // halbe Punkte
-  const ctx: Ctx = { doc, size, sizer }
+  // Dieselbe Farbe wie in Vorschau und Druck (vokabeltestFarbe in TestPage.tsx)
+  const farbe = geltendeFachfarbe(doc.settings.targetLanguage, doc.header.vorlagenfarbe)
+  const ctx: Ctx = { doc, size, sizer, akzent: farbe ? farbe.replace('#', '').toUpperCase() : null }
   const sections: ISectionOptions[] = []
   const variants = doc.variants.filter((v) => opts.variantIds.includes(v.id))
 
@@ -87,6 +90,8 @@ interface Ctx {
   doc: TestDocument
   size: number
   sizer: ImageSizer
+  /** Fachfarbe ohne # (Paket 10a) – null = schwarz wie bisher */
+  akzent: string | null
 }
 
 // ---------- Kopf ----------
@@ -99,13 +104,13 @@ function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
   }
   const titleRuns: ParagraphChild[] = [new TextRun({ text: h.title + (mode === 'key' ? ' – answer key' : ''), bold: true, size: Math.round(ctx.size * 1.9) })]
   if (h.showVariant && ctx.doc.variants.length > 1) {
-    titleRuns.push(new TextRun({ text: `\tTest ${v.label}`, bold: true, size: Math.round(ctx.size * 1.3) }))
+    titleRuns.push(new TextRun({ text: `\tTest ${v.label}`, bold: true, size: Math.round(ctx.size * 1.3), ...(ctx.akzent ? { color: ctx.akzent } : {}) }))
   }
   out.push(
     new Paragraph({
       children: titleRuns,
       tabStops: [{ type: TabStopType.RIGHT, position: CONTENT }],
-      border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '000000', space: 2 } },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: ctx.akzent ?? '000000', space: 2 } },
       spacing: { after: 120 }
     })
   )
@@ -202,7 +207,13 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
       spacing: { before: 320, after: 60 },
       tabStops: [{ type: TabStopType.RIGHT, position: CONTENT }],
       children: [
-        run(`${n}  ${block.title}`, { bold: true, size: Math.round(ctx.size * 1.1) }),
+        // Die Nummer in der Fachfarbe – im Druck steht sie im farbigen Kreis
+        ...(ctx.akzent
+          ? [
+              run(`${n}  `, { bold: true, size: Math.round(ctx.size * 1.1), color: ctx.akzent }),
+              run(block.title, { bold: true, size: Math.round(ctx.size * 1.1) })
+            ]
+          : [run(`${n}  ${block.title}`, { bold: true, size: Math.round(ctx.size * 1.1) })]),
         ...(points > 0 ? [run(`\t${mode === 'key' ? '' : '____ '}/ ${formatPoints(points)} P.`)] : [])
       ]
     })

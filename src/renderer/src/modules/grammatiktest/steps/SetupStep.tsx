@@ -25,6 +25,7 @@ import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
+import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useKiZugang } from '../../../shared/useKiZugang'
 
 /** Fächer, für die es eine Grammatikliste gibt. */
@@ -335,6 +336,8 @@ export default function SetupStep(): React.JSX.Element {
                       }}
                       allowDeselect={false}
                     />
+                    {/* Paket 10a: dezent in der Fachfarbe (Kopf, Überschriften) – hier abschaltbar */}
+                    <VorlagenfarbeSchalter fach={meta.subjectId} checked={Boolean(meta.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
                   </Stack>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>
@@ -398,7 +401,8 @@ export function geaenderteOptionen(test: GrammarTest, designs: DesignTemplate[],
     m.infoBox ? '' : 'ohne Kopfkasten',
     m.instructionsInGerman ? 'Anweisungen auf Deutsch' : '',
     test.design && standardDesign && test.design.id !== standardDesign.id ? `Design „${test.design.name}“` : '',
-    formenAnders ? 'Aufgabenformen angepasst' : ''
+    formenAnders ? 'Aufgabenformen angepasst' : '',
+    m.vorlagenfarbe ? 'Farbe der Vorlage' : ''
   ].filter(Boolean)
 }
 

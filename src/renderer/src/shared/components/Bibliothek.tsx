@@ -6,6 +6,7 @@ import { kopieName, passtZurSuche } from '../bibliothek'
 import { imNetz } from '../netzZugang'
 import { useConfirmKeys } from '../useConfirmKeys'
 import { notifyError, notifySuccess, uid } from '../util'
+import { FachPunkt } from './FachFarbe'
 
 /**
  * Gemeinsame Teile der fünf Bibliotheken (Vokabeltest, Arbeitsblatt, Lernzielkontrolle,
@@ -331,7 +332,8 @@ export function EintragZeile<M extends BibliotheksEintrag>({
   offen,
   kennzeichen,
   info,
-  onOeffnen
+  onOeffnen,
+  fach
 }: {
   bib: Bibliothek<M>
   eintrag: M
@@ -340,6 +342,8 @@ export function EintragZeile<M extends BibliotheksEintrag>({
   kennzeichen?: React.ReactNode
   info: React.ReactNode
   onOeffnen: () => void
+  /** Fach für den Farbpunkt vor dem Namen (Paket 10a) – dort, wo keine Fach-Überschrift darüber steht */
+  fach?: string
 }): React.JSX.Element {
   const neu = bib.neuId === eintrag.id
   return (
@@ -347,6 +351,7 @@ export function EintragZeile<M extends BibliotheksEintrag>({
       <Group justify="space-between" wrap="nowrap">
         <Oeffnen name={eintrag.name} onOeffnen={onOeffnen}>
           <Group gap="xs">
+            {fach && <FachPunkt fach={fach} />}
             <Text fw={600} truncate>
               {eintrag.name}
             </Text>
@@ -375,6 +380,16 @@ export function EintragZeile<M extends BibliotheksEintrag>({
       </Group>
       <EintragRueckfragen bib={bib} eintrag={eintrag} />
     </Card>
+  )
+}
+
+/** Überschrift einer Fachgruppe mit dem Farbpunkt des Fachs (Paket 10a) */
+export function FachUeberschrift({ fach }: { fach: string }): React.JSX.Element {
+  return (
+    <Group gap="xs" mt="md" mb="xs" wrap="nowrap" className="fach-ueberschrift">
+      <FachPunkt fach={fach} groesse={12} />
+      <Title order={4}>{fach}</Title>
+    </Group>
   )
 }
 

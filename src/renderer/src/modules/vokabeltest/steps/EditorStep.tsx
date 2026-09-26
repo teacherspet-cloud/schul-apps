@@ -58,10 +58,14 @@ import { aiCall, useVokabeltest } from '../store'
 import { SaveTestButton } from './TestLibrary'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useDruck } from '../../../shared/navigation'
+import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
+import { useAppSettings } from '../../../shared/settingsStore'
 import './editor.css'
 
 export default function EditorStep(): React.JSX.Element {
   const { doc, updateDoc, updateBlock, undo, redo, verlauf, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
+  // Nur zum Neuzeichnen: TestPage liest die Fachfarbe außerhalb von React (shared/fachfarben.ts)
+  useAppSettings((s) => s.settings.fachfarben)
   const [view, setView] = useState<'test' | 'key'>('test')
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [picker, setPicker] = useState<{ blockId: string; itemId: string; keywords: string[] } | null>(null)
@@ -536,6 +540,14 @@ function HeaderSettings({ doc, onChange }: { doc: TestDocument; onChange: (fn: (
             {toggle('showPoints', 'Punkte')}
             {toggle('showGrade', 'Note')}
           </Group>
+          {/* Paket 10a: Kopflinie und Nummern in der Fachfarbe der Sprache – hier abschaltbar */}
+          <VorlagenfarbeSchalter
+            size="xs"
+            fach={doc.settings.targetLanguage}
+            vorlagenname="Schwarz"
+            checked={Boolean(h.vorlagenfarbe)}
+            onChange={(an) => onChange((d) => (d.header.vorlagenfarbe = an))}
+          />
           <NumberInput
             size="xs"
             label="Schriftgröße (pt)"

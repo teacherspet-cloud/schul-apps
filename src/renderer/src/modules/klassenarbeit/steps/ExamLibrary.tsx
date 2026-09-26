@@ -1,8 +1,8 @@
-import { Badge, Button, Container, ScrollArea, Stack, Title } from '@mantine/core'
+import { Badge, Button, Container, ScrollArea, Stack } from '@mantine/core'
 import { IconFilePlus } from '@tabler/icons-react'
 import type { SavedExamMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
-import { BibliothekKopf, BibliothekLeer, EintragZeile, gruppiere, useBibliothek } from '../../../shared/components/Bibliothek'
+import { BibliothekKopf, BibliothekLeer, EintragZeile, FachUeberschrift, gruppiere, useBibliothek } from '../../../shared/components/Bibliothek'
 import { openSavedExam } from '../library'
 import { useKlassenarbeit } from '../store'
 
@@ -65,11 +65,7 @@ export default function ExamLibrary({
 
         {gruppen.map(([fach, liste]) => (
           <div key={fach || 'treffer'}>
-            {fach && (
-              <Title order={4} mt="md" mb="xs">
-                {fach}
-              </Title>
-            )}
+            {fach && <FachUeberschrift fach={fach} />}
             <Stack gap="xs">
               {liste.map((e) => (
                 <EintragZeile
@@ -78,6 +74,8 @@ export default function ExamLibrary({
                   eintrag={e}
                   offen={e.id === docId && zurueck !== null}
                   onOeffnen={() => oeffnen(e.id)}
+                  // Bei der Suche fehlt die Fach-Überschrift – dann steht der Farbpunkt am Eintrag
+                  fach={bib.suche.trim() ? e.subjectLabel : undefined}
                   kennzeichen={
                     <>
                       <Badge variant="light">Klasse {e.grade}</Badge>

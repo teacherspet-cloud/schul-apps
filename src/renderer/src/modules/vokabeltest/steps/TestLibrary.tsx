@@ -126,6 +126,8 @@ export default function TestLibrary({
               eintrag={t}
               offen={t.id === testId && zurueck !== null}
               onOeffnen={() => void open(t.id)}
+              // Farbpunkt der Sprache (Paket 10a); ältere Tests ohne Sprache haben keinen
+              fach={t.language ?? t.subjectLabel}
               kennzeichen={
                 !t.hasTest && (
                   <Badge size="sm" variant="outline" color="gray">

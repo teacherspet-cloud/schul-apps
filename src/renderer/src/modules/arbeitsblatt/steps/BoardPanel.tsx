@@ -10,6 +10,7 @@ import { aiCall, useArbeitsblatt } from '../store'
 import { BOARD_FORMATS, boardFormatInfo, boardList, checkBoard } from '../didactics/boardDesign'
 import type { BoardFormat } from '../didactics/boardDesign'
 import type { BoardPlan } from '../model/types'
+import { druckAkzent } from '../../../shared/fachfarben'
 
 /** Reiter „Tafelbild“ im Editor: erstellen, bearbeiten, mit KI überarbeiten. */
 export function BoardPanel({ ws, profile }: { ws: Worksheet; profile: LearnerProfile }): React.JSX.Element {
@@ -190,7 +191,7 @@ export function BoardPanel({ ws, profile }: { ws: Worksheet; profile: LearnerPro
         <BoardPage
           board={active}
           meta={ws.meta}
-          accent={ws.design.page.accentColor}
+          accent={druckAkzent(ws)}
           fontFamily={ws.design.page.fontFamily}
           onChange={(fn) => update((d) => setActive(d, fn))}
         />

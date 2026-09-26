@@ -48,6 +48,8 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     appearance: { ...base.appearance, ...stored.appearance },
     defaults: { ...base.defaults, ...stored.defaults },
     audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
+    // Je Fach zusammenführen: Eine geänderte Fachfarbe darf die übrigen nicht löschen
+    fachfarben: { ...base.fachfarben, ...(stored.fachfarben as Record<string, string>) },
     gradeScale: {
       allgemein: (stored.gradeScale?.allgemein as number[]) ?? base.gradeScale.allgemein,
       jeFach: { ...base.gradeScale.jeFach, ...(stored.gradeScale?.jeFach as Record<string, number[]>) }

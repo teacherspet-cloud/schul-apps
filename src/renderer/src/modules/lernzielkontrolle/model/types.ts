@@ -37,6 +37,11 @@ import type { StoffQuelle } from '../../../shared/files/stoffQuelle'
 export type { StoffQuelle }
 
 export interface KurztestMeta {
+  /**
+   * „Farbe der Vorlage verwenden" (Paket 10a): true = die Akzentfarbe der Designvorlage statt
+   * der Fachfarbe aus den Einstellungen. Fehlt = Fachfarbe.
+   */
+  vorlagenfarbe?: boolean
   subjectId: string
   subjectLabel: string
 

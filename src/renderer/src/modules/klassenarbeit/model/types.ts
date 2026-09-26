@@ -112,6 +112,11 @@ export interface ExamVocab {
 }
 
 export interface ExamMeta {
+  /**
+   * „Farbe der Vorlage verwenden" (Paket 10a): true = die Akzentfarbe der Designvorlage statt
+   * der Fachfarbe aus den Einstellungen. Fehlt = Fachfarbe.
+   */
+  vorlagenfarbe?: boolean
   title: string
   subjectId: ExamSubjectId
   subjectLabel: string

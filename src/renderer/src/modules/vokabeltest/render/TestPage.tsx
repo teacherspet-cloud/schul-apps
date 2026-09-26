@@ -4,6 +4,7 @@ import type { Block, TestDocument, Variant } from '../model/types'
 import { blockHelp } from './helpTexts'
 import { isEditable, showsAnswers, T, useRender } from './RenderContext'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
+import { geltendeFachfarbe } from '../../../shared/fachfarben'
 
 /** Seitenaufteilung eines Tests (aus der Messung in useTestLayout). */
 export interface PageLayout {
@@ -22,6 +23,9 @@ export interface BlockRange {
 
 /** Aufgabenarten, deren Items auf mehrere Seiten verteilt werden dürfen */
 export const SPLITTABLE_KINDS = new Set<Block['kind']>(['gap', 'choice', 'open', 'trueFalse', 'oddOneOut', 'scramble'])
+
+/** Fachfarbe eines Vokabeltests (nach der Zielsprache) oder null = schwarz – für Vorschau, Druck und Word */
+export const vokabeltestFarbe = (doc: TestDocument): string | null => geltendeFachfarbe(doc.settings.targetLanguage, doc.header.vorlagenfarbe)
 
 /**
  * Eine Testvariante als A4-Seiten. Wird für Editor, Druck und PDF gleichermaßen genutzt.
@@ -46,11 +50,13 @@ export function TestPage({
   const fontSize = layout?.fontSize ?? doc.fontSize
   const pages: PagePlan[] = layout?.pages ?? [{ items: variant.blocks.map((b) => ({ id: b.id })), overflow: false }]
   const pageClass = `vt-page ${showsAnswers(mode) ? 'vt-key' : ''} ${layout?.compact ? 'vt-compact' : ''} ${layout ? 'vt-page-fixed' : ''}`
+  // Kopflinie und Aufgabennummern in der Fachfarbe der Sprache (Paket 10a); ohne sie schwarz wie bisher
+  const akzent = vokabeltestFarbe(doc)
 
   return (
     <>
       {pages.map((plan, pi) => (
-        <div key={pi} className={pageClass} style={{ fontSize: `${fontSize}pt` }} data-page={pi + 1}>
+        <div key={pi} className={pageClass} style={{ fontSize: `${fontSize}pt`, ...(akzent ? { ['--vt-accent' as string]: akzent } : {}) }} data-page={pi + 1}>
           {pi === 0 && <TestHeader doc={doc} variant={variant} />}
           {plan.items.map((placed) => {
             const index = variant.blocks.findIndex((b) => b.id === placed.id)

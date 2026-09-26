@@ -177,6 +177,10 @@ body {
     --ai-size: 44px !important;
     margin-bottom: 4px !important;
   }
+  .app-leiste .nav-icon:not(.nav-breit) .nav-bild {
+    width: 34px;
+    height: 34px;
+  }
   .app-leiste .nav-breit {
     height: 40px !important;
     margin-bottom: 4px !important;
@@ -205,6 +209,23 @@ body {
 :root[data-app-nav='filled'] .nav-icon[data-active='true'] {
   background: #fff;
   color: var(--app-nav-solid);
+}
+
+/*
+ * Programmbilder in der Leiste (Paket 10a): Die Illustration bringt ihre eigene farbige Kachel
+ * mit. Ruhend steht sie ohne Fläche da (auch auf der farbigen Leiste), aktiv liegt die Fläche
+ * als Rahmen um das Bild – Themenfarbe bzw. Weiß auf der farbigen Leiste.
+ */
+.nav-bild {
+  display: block;
+  object-fit: contain;
+  border-radius: 10px;
+}
+:root[data-app-nav='filled'] .nav-icon[data-bild='true']:not([data-active='true']) {
+  background: transparent;
+}
+:root[data-app-nav='filled'] .nav-icon[data-bild='true']:not([data-active='true']):hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* Karten */
@@ -273,6 +294,11 @@ body {
 }
 .home-material:hover {
   border-color: var(--mantine-primary-color-filled);
+}
+.home-material-bild {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 8px;
 }
 
 .home-tile:hover {
@@ -598,4 +624,31 @@ img.home-illustration {
   .profil-gruppe {
     grid-template-columns: 1fr;
   }
+}
+
+/* Fachfarben in den Einstellungen (Paket 10a) */
+.fachfarbe-zeile {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--mantine-radius-default);
+  background: var(--app-surface);
+}
+.fachfarbe-zeile:hover {
+  border-color: var(--mantine-primary-color-filled);
+}
+.fachfarbe-zeile:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+/* Probe wie auf dem Blatt: weiße Schrift auf der Farbe, daneben derselbe Ton als Grau */
+.fachfarbe-probe {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
 }

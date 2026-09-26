@@ -61,6 +61,7 @@ import DropZone, { FILE_TYPES } from '../shared/components/DropZone'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '../shared/util'
 import { CITATION_STYLES } from '../shared/citation'
 import GradeScaleSettings from './GradeScaleSettings'
+import FachfarbenSettings from './FachfarbenSettings'
 import NetzwerkCard from './NetzwerkCard'
 import WartungCard from './WartungCard'
 import { imNetz } from '../shared/netzZugang'
@@ -153,6 +154,7 @@ export default function SettingsPage(): React.JSX.Element {
 
           <Tabs.Panel value="material">
             <Stack gap="lg">
+              <FachfarbenSettings settings={settings} update={update} />
               <GradeScaleSettings settings={settings} update={update} />
               <Card withBorder padding="lg">
                 <Title order={4} mb="md">

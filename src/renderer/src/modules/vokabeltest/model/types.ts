@@ -326,6 +326,11 @@ export interface TestHeader {
   showPoints: boolean
   showGrade: boolean
   subtitle: string
+  /**
+   * „Schwarz statt Fachfarbe" (Paket 10a): true = Kopflinie und Aufgabennummern schwarz wie
+   * bisher. Fehlt = Fachfarbe der Sprache (Englisch, Französisch …) aus den Einstellungen.
+   */
+  vorlagenfarbe?: boolean
 }
 
 export interface TaskSelection {

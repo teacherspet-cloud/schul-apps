@@ -1,4 +1,5 @@
 import { Badge, Box, Breadcrumbs, Button, Card, Container, Group, Image, Menu, ScrollArea, SegmentedControl, SimpleGrid, Text } from '@mantine/core'
+import { FachPunkt, useFachFarbe } from '../../../shared/components/FachFarbe'
 import { IconChalkboard, IconFilePlus, IconFolder, IconFolderOpen } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import type { SavedWorksheetMeta } from '@shared/types'
@@ -171,7 +172,7 @@ export default function WorksheetLibrary({
                     Alle Fächer
                   </Button>
                   {subject && (
-                    <Button variant="subtle" size="compact-sm" onClick={() => setFolder(null)}>
+                    <Button variant="subtle" size="compact-sm" onClick={() => setFolder(null)} leftSection={<FachPunkt fach={subject} />}>
                       {subjectLabel}
                     </Button>
                   )}
@@ -201,9 +202,10 @@ export default function WorksheetLibrary({
             {!subject && (
               <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
                 {subjects.map(([id, { label, count }]) => (
-                  <Card key={id} withBorder padding="md" className="picker-tile" {...kachelTasten(() => setSubject(id))}>
+                  <Card key={id} withBorder padding="md" className="picker-tile" data-fach={id} {...kachelTasten(() => setSubject(id))}>
                     <Group gap="sm" wrap="nowrap">
-                      <IconFolder size={28} />
+                      {/* Fachordner in der Fachfarbe (Paket 10a) */}
+                      <FachOrdner fach={id} />
                       <div style={{ minWidth: 0 }}>
                         <Text fw={600} lineClamp={1}>
                           {label}
@@ -287,9 +289,12 @@ function BlattKarte({
           <Text fw={600} lineClamp={2}>
             {s.name}
           </Text>
-          <Text size="xs" c="dimmed" lineClamp={1}>
-            {s.subjectLabel} · Klasse {s.grade} · {dateText(s.updatedAt)}
-          </Text>
+          <Group gap={6} wrap="nowrap">
+            <FachPunkt fach={s.subjectId} groesse={8} />
+            <Text size="xs" c="dimmed" lineClamp={1}>
+              {s.subjectLabel} · Klasse {s.grade} · {dateText(s.updatedAt)}
+            </Text>
+          </Group>
           <Group gap={4} mt={4}>
             {offen && (
               <Badge size="xs" variant="filled" color="gray">
@@ -332,4 +337,10 @@ function BlattKarte({
       <EintragRueckfragen bib={bib} eintrag={s} />
     </Card>
   )
+}
+
+/** Ordnersymbol eines Fachs in seiner Fachfarbe (Paket 10a; unbekanntes Fach: wie bisher) */
+function FachOrdner({ fach }: { fach: string }): React.JSX.Element {
+  const farbe = useFachFarbe(fach)
+  return <IconFolder size={28} color={farbe ?? undefined} />
 }

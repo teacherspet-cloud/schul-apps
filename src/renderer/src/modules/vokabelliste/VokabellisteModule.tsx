@@ -1,4 +1,5 @@
 import { Alert, Badge, Button, Card, Container, Group, Menu, ScrollArea, Stack, Text, TextInput, Title } from '@mantine/core'
+import { FachPunkt } from '../../shared/components/FachFarbe'
 import { IconBook2, IconFilePlus, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
@@ -172,6 +173,8 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
               value={choice.language}
               onChange={(v) => v && setChoice((c) => ({ ...c, language: v }))}
               allowDeselect={false}
+              // Farbpunkt des Fachs (Paket 10a)
+              leftSection={<FachPunkt fach={choice.language} />}
             />
           </Group>
         </Card>

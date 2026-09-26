@@ -28,6 +28,7 @@ import { IconAlertTriangle, IconArrowRight, IconTrash } from '@tabler/icons-reac
 import Formularfuss, { ersterGrund, FormularSeite } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
+import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
@@ -1011,6 +1012,8 @@ export default function FrameStep(): React.JSX.Element {
                       }}
                       allowDeselect={false}
                     />
+                    {/* Paket 10a: dezent in der Fachfarbe, auch im Erwartungshorizont – hier abschaltbar */}
+                    <VorlagenfarbeSchalter fach={meta.subjectId} checked={Boolean(meta.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
                     {/*
                      * Formulierungshilfen in einer ARBEIT – bewusst abschaltbar und aus.
                      *
@@ -1064,7 +1067,8 @@ export function geaenderteOptionen(exam: Exam, designs: DesignTemplate[]): strin
     m.gradeScale ? 'Notenschlüssel auf der Arbeit' : '',
     m.gradeScaleThresholds ? 'eigener Notenschlüssel' : '',
     exam.design && standardDesign && exam.design.id !== standardDesign.id ? `Design „${exam.design.name}“` : '',
-    schreiben && m.wordLimit ? 'Wortzahl genannt' : ''
+    schreiben && m.wordLimit ? 'Wortzahl genannt' : '',
+    m.vorlagenfarbe ? 'Farbe der Vorlage' : ''
   ].filter(Boolean)
 }
 

@@ -13,6 +13,7 @@
 //   damit das Bild auch im Dunkelmodus nicht in einem hellen Kasten steht.
 // - Zuschnitt auf das Motiv, quadratisch mit schmalem Rand.
 // - Verkleinern in Stufen auf 320 px (scharf genug für die 96-px-Kachel auch bei 200 % Zoom).
+// - Dazu <id>-96.webp für die Leiste und „Zuletzt bearbeitet“ (Paket 10a).
 // - WebP mit Durchsichtigkeit, Qualität so gewählt, dass jedes Bild unter 150 KB bleibt –
 //   die portable .exe soll dadurch nicht spürbar wachsen.
 //
@@ -24,6 +25,7 @@ import { join, resolve } from 'path'
 const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit']
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320
+const KANTE_LEISTE = 96
 const HOECHSTENS = 150 * 1024
 
 // Läuft im Fenster: Bild → durchsichtiger Rand, Zuschnitt, Verkleinern → WebP-Daten-URL
@@ -125,6 +127,10 @@ app.whenReady().then(async () => {
       const daten = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64')
       writeFileSync(join(ZIEL, `${id}.webp`), daten)
       console.log(`✓ ${id}.webp (${Math.round(daten.length / 1024)} KB)`)
+      // Paket 10a: kleine Fassung für die Leiste (bis 40 px, bei 200 % Zoom 80 px) – in
+      // Stufen verkleinert, damit sie schärfer ist, als der Browser sie aus 320 px rechnet
+      const klein = await fenster.webContents.executeJavaScript(`(${verarbeite})(${JSON.stringify(quelle)}, ${KANTE_LEISTE}, ${HOECHSTENS})`)
+      writeFileSync(join(ZIEL, `${id}-96.webp`), Buffer.from(klein.slice(klein.indexOf(',') + 1), 'base64'))
       anzahl++
     }
     console.log(`${anzahl} Kachelbild(er) in ${ZIEL}`)

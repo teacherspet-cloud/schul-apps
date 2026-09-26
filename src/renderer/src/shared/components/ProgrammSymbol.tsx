@@ -7,7 +7,7 @@ import { useId } from 'react'
  * Vorher standen hier Tabler-Symbole (Sprache, Liste, Datei …), die für die Lehrkraft nicht
  * zeigten, welches Programm dahintersteckt – LZK und Klassenarbeit sahen fast gleich aus.
  * Jetzt passt jedes Symbol zum Motiv der Startseiten-Illustration, ohne Buchstaben oder Ziffern:
- * Sprechblasen mit Häkchen, Karteikasten, Blatt mit Stift, Zielscheibe, Puzzleteile, Heftstapel.
+ * Globus vor Ankreuzblatt, Karteikasten, Blatt mit Stift, Blatt mit Balken, Puzzleteile, Heftstapel.
  *
  * Gezeichnet auf einem 24er-Raster, sichtbar ist der Ausschnitt 1…23. Bei der Leistengröße
  * 22 px fällt so jede Rastereinheit auf genau ein Bildschirmpixel: Die 2er-Striche auf
@@ -35,22 +35,31 @@ interface Form {
 
 export type ProgrammSymbolForm = 'vokabeltest' | 'vokabelliste' | 'arbeitsblatt' | 'lernzielkontrolle' | 'grammatiktest' | 'klassenarbeit'
 
-const SPRECHBLASE = 'M12 8H18A3 3 0 0 1 21 11V15A3 3 0 0 1 18 18H15L12 21V18A3 3 0 0 1 9 15V11A3 3 0 0 1 12 8Z'
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
-const PFEIL = 'M11 13L16 8M16 5V8H19L22 5H19V2Z'
+const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
+const BALKEN = 'M11 16H14V22H11ZM15 12H18V22H15ZM19 7H22V22H19Z'
 const PUZZLETEIL = 'M2 9H5A2.2 2.2 0 1 1 8 9H11V12.5A2.2 2.2 0 1 1 11 15.5V19H2Z'
 const FUELLER = 'M14.5 20L15.1 15.9L19.33 6.76A1.6 1.6 0 0 1 22.19 8.2L17.5 17.1Z'
 const heft = (x: number, y: number, breite: number, hoehe: number): string =>
   `M${x + 1} ${y}H${x + breite - 1}A1 1 0 0 1 ${x + breite} ${y + 1}V${y + hoehe - 1}A1 1 0 0 1 ${x + breite - 1} ${y + hoehe}H${x + 1}A1 1 0 0 1 ${x} ${y + hoehe - 1}V${y + 1}A1 1 0 0 1 ${x + 1} ${y}Z`
 
 const FORMEN: Record<ProgrammSymbolForm, Form> = {
-  // Zwei überlappende Sprechblasen, die vordere mit Häkchen – sprachneutral
+  // Kleiner Globus vor einem Blatt mit Ankreuzfeldern, das oberste angekreuzt – sprachneutral
+  // (Paket 10a: angeglichen an die gewählte Illustration, vorher Sprechblasen)
   vokabeltest: {
-    aussparen: SPRECHBLASE,
-    hinten: [{ d: 'M5 3H13A2 2 0 0 1 15 5V10A2 2 0 0 1 13 12H7L4 15V12A2 2 0 0 1 3 10V5A2 2 0 0 1 5 3Z', art: 'akzent' }],
+    aussparen: GLOBUS,
+    aussparenBreite: 3,
+    hinten: [
+      { d: 'M9 2H19A2 2 0 0 1 21 4V19A2 2 0 0 1 19 21H9A2 2 0 0 1 7 19V4A2 2 0 0 1 9 2Z', art: 'strich' },
+      { d: 'M10 4H14V8H10Z', art: 'akzent' },
+      { d: 'M10.5 6L12 7.5L15 3.5', art: 'strich', breite: 1.5 },
+      { d: 'M10.5 9.5H13.5V12.5H10.5Z', art: 'strich', breite: 1 },
+      { d: 'M16.5 6H18.5M16.5 11H18.5M16.5 16H18.5', art: 'strich' }
+    ],
     vorn: [
-      { d: SPRECHBLASE, art: 'strich' },
-      { d: 'M12 13L14 15L18 11', art: 'strich' }
+      { d: GLOBUS, art: 'akzent' },
+      { d: GLOBUS, art: 'strich', breite: 1.5 },
+      { d: 'M1.5 17.5H10.5M6 13A2 4.5 0 0 0 6 22A2 4.5 0 0 0 6 13', art: 'strich', breite: 1.25 }
     ]
   },
   // Offener Karteikasten mit Karten, eine davon mit Reiter
@@ -77,18 +86,16 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
       { d: BLEISTIFT, art: 'strich', breite: 1.5 }
     ]
   },
-  // Zielscheibe mit Pfeil
+  // Blatt mit Textzeilen, davor aufsteigende Balken – der Lernstand steigt
+  // (Paket 10a: angeglichen an die gewählte Illustration, vorher Zielscheibe)
   lernzielkontrolle: {
-    aussparen: PFEIL,
-    aussparenBreite: 5,
+    aussparen: BALKEN,
+    aussparenBreite: 2,
     hinten: [
-      { d: 'M11 4A9 9 0 1 0 20 13A9 9 0 0 0 11 4Z', art: 'strich' },
-      { d: 'M11 8A5 5 0 1 0 16 13A5 5 0 0 0 11 8Z', art: 'akzent' }
+      { d: 'M4 2H12A2 2 0 0 1 14 4V19A2 2 0 0 1 12 21H4A2 2 0 0 1 2 19V4A2 2 0 0 1 4 2Z', art: 'strich' },
+      { d: 'M5 6H11M5 10H11M5 14H8', art: 'strich' }
     ],
-    vorn: [
-      { d: 'M11 11A2 2 0 1 0 11 15A2 2 0 1 0 11 11Z', art: 'voll' },
-      { d: PFEIL, art: 'strich' }
-    ]
+    vorn: [{ d: BALKEN, art: 'akzent' }]
   },
   // Zwei Puzzleteile – das zweite hat die Aussparung, in die das erste einrastet
   grammatiktest: {

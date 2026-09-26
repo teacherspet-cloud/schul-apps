@@ -24,6 +24,8 @@ export interface Material {
   entwurf: boolean
   /** Name, Thema und Fach in Kleinbuchstaben – dagegen wird gesucht */
   suchtext: string
+  /** Fach als Kennung, Name oder Sprachcode – für den Farbpunkt (Paket 10a, shared/fachfarben.ts) */
+  fach?: string
 }
 
 export interface Listen {
@@ -40,9 +42,10 @@ const klasse = (g?: number): string => (g ? `Klasse ${g}` : '')
 const sprache = (code?: string): string => (code ? (LANGUAGES.find((l) => l.value === code)?.label ?? code) : '')
 const zeile = (...teile: (string | undefined)[]): string => teile.filter((t) => t && t.trim()).join(' · ')
 
-function material(moduleId: string, id: string, name: string, updatedAt: string, entwurf: boolean, detail: string, weitere: string[]): Material {
+function material(moduleId: string, id: string, name: string, updatedAt: string, entwurf: boolean, detail: string, weitere: string[], fach?: string): Material {
   return {
     moduleId,
+    fach,
     id,
     name: name || 'Ohne Namen',
     detail,
@@ -64,19 +67,42 @@ export function vereinige(l: Listen): Material[] {
         t.updatedAt,
         !t.hasTest,
         zeile(t.subjectLabel, klasse(t.grade), `${t.vocabCount} Vokabeln`, t.hasTest ? '' : 'noch kein Test'),
-        []
+        [],
+        t.language ?? t.subjectLabel
       )
     ),
     ...l.sheets.map((s) =>
-      material('arbeitsblatt', s.id, s.name, s.updatedAt, s.sheetCount === 0, zeile(s.subjectLabel, klasse(s.grade), s.topic), [s.schoolTypeName])
+      material('arbeitsblatt', s.id, s.name, s.updatedAt, s.sheetCount === 0, zeile(s.subjectLabel, klasse(s.grade), s.topic), [s.schoolTypeName], s.subjectId)
     ),
     ...l.kurztests.map((t) =>
-      material('lernzielkontrolle', t.id, t.name, t.updatedAt, t.taskCount === 0, zeile(t.subjectLabel, klasse(t.grade), t.thema), [t.bezeichnung])
+      material(
+        'lernzielkontrolle',
+        t.id,
+        t.name,
+        t.updatedAt,
+        t.taskCount === 0,
+        zeile(t.subjectLabel, klasse(t.grade), t.thema),
+        [t.bezeichnung],
+        t.subjectLabel
+      )
     ),
-    ...l.grammarTests.map((t) => material('grammatiktest', t.id, t.name, t.updatedAt, t.taskCount === 0, zeile(t.subjectLabel, klasse(t.grade), t.topics), [])),
-    ...l.exams.map((e) => material('klassenarbeit', e.id, e.name, e.updatedAt, !e.hasTasks, zeile(e.subjectLabel, klasse(e.grade), e.topic), [])),
+    ...l.grammarTests.map((t) =>
+      material('grammatiktest', t.id, t.name, t.updatedAt, t.taskCount === 0, zeile(t.subjectLabel, klasse(t.grade), t.topics), [], t.subjectLabel)
+    ),
+    ...l.exams.map((e) =>
+      material('klassenarbeit', e.id, e.name, e.updatedAt, !e.hasTasks, zeile(e.subjectLabel, klasse(e.grade), e.topic), [], e.subjectLabel)
+    ),
     ...l.vokabellisten.map((v) =>
-      material('vokabelliste', v.id, v.name, v.updatedAt, false, zeile(`${v.entries.length} Vokabeln`, klasse(v.grade), v.source), [sprache(v.language)])
+      material(
+        'vokabelliste',
+        v.id,
+        v.name,
+        v.updatedAt,
+        false,
+        zeile(`${v.entries.length} Vokabeln`, klasse(v.grade), v.source),
+        [sprache(v.language)],
+        v.language
+      )
     )
   ]
 }
