@@ -272,6 +272,9 @@ export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedIt
             <ImageLabelLayer
               labels={block.labels}
               showAnswers={isKeyMode(mode)}
+              // Für den Setzer der Schilder (26.09.2026): Blockbreite in mm und das Bild (Seitenverhältnis)
+              widthMm={((ctx.contentWidthMm ?? 170) * block.widthPercent) / 100}
+              imageDataUrl={block.image?.dataUrl}
               onMove={
                 edit && ctx.update
                   ? (id, x, y) =>
