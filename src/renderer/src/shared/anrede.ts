@@ -10,11 +10,13 @@
  * und die Lernzielkontrolle hatten eigene oder gar keine Regeln, und die festen Texte der App
  * („Das lernst du", „Nimm eine Karte erst, wenn du …") duzten auch in der Oberstufe.
  *
- * Diese Datei ist bewusst frei von Modulwissen: WELCHE Stufe gilt, entscheidet jedes Modul
- * aus seiner eigenen Stufenlogik (Arbeitsblatt und Nachbarn: `stageForGrade` über
- * `arbeitsblatt/didactics/anrede.ts`; LZK: die gewählte Stufe). So laufen Anrede und die
- * übrigen Stufenregeln nie auseinander.
+ * Diese Datei ist bewusst frei von Stufenwissen: WELCHE Stufe gilt, entscheidet jedes Modul
+ * aus seiner eigenen Stufenlogik (Arbeitsblatt und Nachbarn: `gehoertZurSekII` über
+ * `arbeitsblatt/didactics/anrede.ts`; LZK: die gewählte Stufe). Die Verben für die Prüfung
+ * kommen aus den Operatorenlisten der Module (shared/anredeVerben.ts).
  */
+
+import { DOPPELDEUTIG, duImperativFormen, NACH_NOMEN } from './anredeVerben'
 
 export type Anrede = 'du' | 'sie'
 
@@ -79,25 +81,67 @@ export const anredeText = (schluessel: keyof typeof ANREDE_TEXTE, anrede: Anrede
  * weil ein automatisch umgeformter Satz leicht schief wird.
  */
 
-/** Du-Imperative, mit denen Arbeitsanweisungen üblicherweise beginnen. */
-const DU_IMPERATIVE =
-  'Kreuze|Ordne|Ergänze|Lies|Schreib|Schreibe|Verbinde|Übersetze|Setze|Markiere|Nummeriere|Beschrifte|Finde|Unterstreiche|Streiche|Trage|Notiere|Erkläre|Erläutere|Beschreibe|Nenne|Benenne|Fülle|Bilde|Hör|Höre|Sieh|Schau|Beantworte|Vergleiche|Korrigiere|Wähle|Löse|Rechne|Berechne|Bestimme|Ermittle|Gib|Nimm|Arbeite|Merke|Überprüfe|Prüfe|Bewerte|Beurteile|Begründe|Belege|Zitiere|Deute|Denk|Denke|Tausche|Stelle|Präsentiere|Sprich|Lege|Zeichne|Skizziere|Suche|Achte|Nutze|Formuliere|Fasse|Lerne|Wiederhole|Vervollständige|Erstelle|Entwickle|Gestalte|Überlege|Sammle|Bringe|Übertrage|Halte|Sortiere|Zähle|Kläre|Untersuche|Entscheide|Recherchiere|Erinnere|Mach|Mache|Antworte|Ersetze|Leite|Wende|Zeige|Gliedere|Charakterisiere|Analysiere|Interpretiere|Diskutiere|Erörtere|Überführe|Verfasse|Setz|Kennzeichne|Konstruiere|Beweise|Widerlege|Vermute|Schätze|Miss|Führe'
-
 /** Satzanfang: Textbeginn, nach Satzzeichen, nach „a)" oder nach einer öffnenden Klammer */
 const ANFANG = String.raw`(?:^|[.!?:;]\s+|\n\s*|[a-z0-9]\)\s+|\(\s*|[-–•]\s+)`
 
-const DU_WORT = /\b(du|dich|dir|dein|deine|deinen|deinem|deiner|deines|Du|Dich|Dir|Dein|Deine|Deinen|Deinem|Deiner|Deines)\b/
-const DU_IMPERATIV = new RegExp(`${ANFANG}(${DU_IMPERATIVE})\\b(?!\\s+(?:Sie|wir)\\b)`)
-/** Im Satz: „… und begründe …", „…, dann vergleiche …" */
-const DU_IMPERATIV_KLEIN = new RegExp(`\\s(?:und|oder|dann)\\s+(${DU_IMPERATIVE.toLowerCase()})\\b(?!\\s+(?:Sie|wir)\\b)`)
+/*
+ * du-Imperative (Paket 8b, erweitert): nicht mehr aus einer festen Liste, sondern regelhaft aus
+ * allen Operatoren der App und einem Grundwortschatz gebildet (shared/anredeVerben.ts). So fällt
+ * auch „Erörtere", „Skizziere", „Entwirf" oder „Nimm Stellung" auf.
+ */
+const WORT_AM_ANFANG = new RegExp(String.raw`${ANFANG}(\p{Lu}\p{Ll}*)(?![\p{L}])`, 'gu')
+/** Im Satz: „… und begründe …", „…, dann vergleiche …", „…, markiere …" */
+const WORT_IM_SATZ = /(?:\s(?:und|oder|dann|danach|anschließend|zuerst|zunächst|schließlich|abschließend|bitte|sowie)\s+|,\s+)(\p{Ll}+)(?![\p{L}])/gu
+
+/** Das Wort nach der Fundstelle (für die doppeldeutigen Formen) */
+const naechstesWort = (t: string, ab: number): string => /^\s+([^\s.,;:!?]+)/u.exec(t.slice(ab))?.[1] ?? ''
+
+/**
+ * Ist das Wort an dieser Stelle ein du-Imperativ? Doppeldeutige Formen („Teile", „Frage",
+ * „Werte") nur, wenn ein kleingeschriebenes Wort folgt, das nicht zu einem Nomen gehört:
+ * „Teile den Text" ja, „Teile der Bevölkerung" und „Frage 3:" nein.
+ */
+function istDuImperativ(wort: string, t: string, ende: number): boolean {
+  const gross = wort.charAt(0).toUpperCase() + wort.slice(1)
+  if (!duImperativFormen().has(gross)) return false
+  const danach = naechstesWort(t, ende)
+  // „Erläutern Sie", „Lasst uns" – keine du-Form
+  if (danach === 'Sie' || danach === 'wir') return false
+  if (!DOPPELDEUTIG.has(gross)) return true
+  return /^\p{Ll}/u.test(danach) && !NACH_NOMEN.has(danach)
+}
+
+function duImperativIn(t: string): string | null {
+  for (const m of t.matchAll(WORT_AM_ANFANG)) {
+    if (istDuImperativ(m[1], t, m.index! + m[0].length)) return m[1]
+  }
+  for (const m of t.matchAll(WORT_IM_SATZ)) {
+    // nach dem Komma nur längere Formen – „…, male …" ist zu unsicher
+    if (m[0].startsWith(',') && (m[1].length < 5 || DOPPELDEUTIG.has(m[1].charAt(0).toUpperCase() + m[1].slice(1)))) continue
+    if (istDuImperativ(m[1], t, m.index! + m[0].length)) return m[1]
+  }
+  return null
+}
+
+/**
+ * du, dich, dir, dein…, euch, euer… als Anrede – dazu Verbformen, die es NUR in der 2. Person
+ * gibt („kannst", „bist", „habt", „seid"). „ihr" allein nicht: meist ist es das besitzanzeigende
+ * „ihr Vater"; als Anrede zählt es nur hinter einem Verb auf -t („Arbeitet ihr zu zweit").
+ */
+const DU_WORT =
+  /(?<![\p{L}])(du|dich|dir|dein|deine|deinen|deinem|deiner|deines|euch|euer|eure|euren|eurem|eurer|eures|Du|Dich|Dir|Dein|Deine|Deinen|Deinem|Deiner|Deines|Euch|Euer|Eure|Euren|Eurem|Eurer|Eures)(?![\p{L}])/u
+const DU_VERB = /(?<![\p{L}])(bist|hast|kannst|musst|sollst|darfst|willst|wirst|weißt|möchtest|seid|habt|könnt|müsst|dürft|sollt|wollt|wisst)(?![\p{L}])/u
+const IHR_ANREDE = new RegExp(String.raw`${ANFANG}((?:\p{Lu}\p{Ll}+t)\s+ihr|Ihr\s+\p{Ll}+t)(?![\p{L}])(?!\s+\p{Lu})`, 'u')
 
 /**
  * „Sie" und „Ihr…" als Anrede: GROSS geschrieben und NICHT am Satzanfang. Mitten im Satz ist
  * das großgeschriebene „Sie" immer die Höflichkeitsform; am Satzanfang meint es oft „sie"
- * (Plural), deshalb zählt dort nur die Verbindung Verb + Sie („Erläutern Sie").
+ * (Plural), deshalb zählt dort nur die Verbindung Verb + Sie („Erläutern Sie"). Die Sie-Form
+ * braucht keine Verbliste: Infinitiv + „Sie" am Satzanfang ist eindeutig, auch bei seltenen
+ * Operatoren („Skizzieren Sie", „Nehmen Sie Stellung", „Setzen Sie … ein").
  */
-const SIE_IM_SATZ = /[\p{Ll},]\s+(Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)\b/u
-const SIE_IMPERATIV = new RegExp(`${ANFANG}(\\p{Lu}\\p{Ll}+(?:en|ern|eln))\\s+Sie\\b`, 'u')
+const SIE_IM_SATZ = /[\p{Ll},]\s+(Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)(?![\p{L}])/u
+const SIE_IMPERATIV = new RegExp(String.raw`${ANFANG}(\p{Lu}\p{Ll}+(?:en|ern|eln))\s+Sie(?![\p{L}])`, 'u')
 
 /**
  * Entfernt, was die Lernenden NICHT anspricht: Anführungen („…", "…", »…«, ‚…'), weil dort
@@ -124,7 +168,7 @@ export function falscheAnrede(text: string, soll: Anrede, fach?: { fremdsprache?
   const duWort = fach?.fremdsprache === 'fr' ? null : DU_WORT.exec(t)?.[1]
   const treffer =
     soll === 'sie'
-      ? (duWort ?? DU_IMPERATIV.exec(t)?.[1] ?? DU_IMPERATIV_KLEIN.exec(t)?.[1])
+      ? (duWort ?? DU_VERB.exec(t)?.[1] ?? IHR_ANREDE.exec(t)?.[1] ?? duImperativIn(t))
       : SIE_IMPERATIV.exec(t)
         ? `${SIE_IMPERATIV.exec(t)![1]} Sie`
         : SIE_IM_SATZ.exec(t)?.[1]

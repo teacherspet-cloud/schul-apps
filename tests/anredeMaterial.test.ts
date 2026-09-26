@@ -334,6 +334,77 @@ describe('Die Prüfung meldet falsche Anrede – und schweigt bei Material', () 
     expect(falscheAnrede('Ergänzen Sie du, de la oder des.', 'sie', { fremdsprache: 'fr' })).toBeNull()
   })
 
+  it('seltene Imperative aus allen Operatorenlisten, regelhaft gebildet (Sek II)', () => {
+    const sek2 = (t: string): string | null => falscheAnrede(t, 'sie')
+    expect(sek2('Skizziere den Verlauf der Kurve.')).toBe('Skizziere')
+    expect(sek2('Erörtere die These des Autors.')).toBe('Erörtere')
+    expect(sek2('Beurteile die Maßnahme.')).toBe('Beurteile')
+    expect(sek2('Problematisiere die Aussage.')).toBe('Problematisiere')
+    expect(sek2('Charakterisiere die Hauptfigur.')).toBe('Charakterisiere')
+    // e→i-Wechsel, auch mit Vorsilbe
+    expect(sek2('Lies M2.')).toBe('Lies')
+    expect(sek2('Nimm Stellung zur These.')).toBe('Nimm')
+    expect(sek2('Entwirf ein Plakat.')).toBe('Entwirf')
+    expect(sek2('Entnimm der Tabelle die Werte.')).toBe('Entnimm')
+    expect(sek2('Sieh dir die Karikatur an.')).not.toBeNull()
+    expect(sek2('Gib die Definition an.')).toBe('Gib')
+    expect(sek2('Hilf deinem Partner.')).not.toBeNull()
+    // trennbare Verben: Grundverb vorn, Vorsilbe am Ende
+    expect(sek2('Setze die fehlenden Wörter ein.')).toBe('Setze')
+    expect(sek2('Ordne die Begriffe zu.')).toBe('Ordne')
+    expect(sek2('Werte die Umfrage aus.')).toBe('Werte')
+    expect(sek2('Stelle die Entwicklung grafisch dar.')).toBe('Stelle')
+    // -eln und -ern
+    expect(sek2('Ermittle den Schnittpunkt.')).toBe('Ermittle')
+    expect(sek2('Verallgemeinere das Ergebnis.')).toBe('Verallgemeinere')
+    // im Satz, nach Komma
+    expect(sek2('Lesen Sie M1, erörtere dann die Frage.')).not.toBeNull()
+    expect(sek2('Lesen Sie M1 und skizziere den Aufbau.')).toBe('skizziere')
+    // Verbformen der 2. Person und „ihr" als Anrede
+    expect(sek2('Wenn ihr fertig seid, vergleichen Sie.')).toBe('seid')
+    expect(sek2('Tauscht euch aus.')).toBe('euch')
+    expect(sek2('Arbeitet ihr zu zweit.')).not.toBeNull()
+    expect(sek2('Überlege, was du weißt.')).not.toBeNull()
+  })
+
+  it('seltene Sie-Formen in der Sek I', () => {
+    const sek1 = (t: string): string | null => falscheAnrede(t, 'du')
+    expect(sek1('Skizzieren Sie den Verlauf.')).toBe('Skizzieren Sie')
+    expect(sek1('Nehmen Sie Stellung zur These.')).toBe('Nehmen Sie')
+    expect(sek1('Setzen Sie die fehlenden Wörter ein.')).toBe('Setzen Sie')
+    expect(sek1('b) Erörtern Sie die These.')).toBe('Erörtern Sie')
+    expect(sek1('Lies M1 und beurteilen Sie die Rede.')).toBe('Sie')
+    expect(sek1('Lies M1. Was meinen Sie?')).toBe('Sie')
+    // die du-Formen selbst sind in der Sek I richtig
+    for (const t of ['Skizziere den Verlauf.', 'Nimm Stellung.', 'Setze ein.', 'Lies M2 und erörtere.', 'Entwirf ein Plakat.', 'Tauscht euch aus.']) {
+      expect(sek1(t), t).toBeNull()
+    }
+  })
+
+  it('Fehlalarme bleiben aus: Nomen am Satzanfang, „sie" als 3. Person, Mathematik', () => {
+    const sek2 = (t: string): string | null => falscheAnrede(t, 'sie')
+    // Formen, die zugleich Nomen sind
+    expect(sek2('Teile der Bevölkerung litten Hunger. Erläutern Sie die Ursachen.')).toBeNull()
+    expect(sek2('Frage 3: Beurteilen Sie die Maßnahme.')).toBeNull()
+    expect(sek2('Werte der Tabelle: Berechnen Sie den Mittelwert.')).toBeNull()
+    expect(sek2('Rede des Kanzlers (M2). Analysieren Sie die Rede.')).toBeNull()
+    expect(sek2('Stelle 2 im Text: Erläutern Sie sie.')).toBeNull()
+    expect(sek2('Folge 3 der Serie zeigt den Konflikt. Beschreiben Sie ihn.')).toBeNull()
+    // Mathematik: Konjunktiv und 3. Person
+    expect(sek2('Sei f eine Funktion. Zeigen Sie, dass f stetig ist.')).toBeNull()
+    expect(sek2('Gilt die Gleichung für alle x? Begründen Sie.')).toBeNull()
+    // „ihr" als Besitzwort, „Sie" am Satzanfang als 3. Person Plural
+    expect(sek2('Hat ihr Vater recht? Begründen Sie Ihre Antwort.')).toBeNull()
+    expect(sek2('Einige Historiker widersprechen. Nehmen Sie Stellung.')).toBeNull()
+    const sek1 = (t: string): string | null => falscheAnrede(t, 'du')
+    expect(sek1('Sie leben im Wald. Beschreibe, wie sie jagen.')).toBeNull()
+    expect(sek1('Ihr Mann war Arzt. Beschreibe sein Leben.')).toBeNull()
+    expect(sek1('Sie erläutern die Ursachen. Vergleiche ihre Argumente.')).toBeNull()
+    // Zitate und wörtliche Rede behalten ihre Anrede
+    expect(sek2('Deuten Sie den Satz „Nimm dir, was du brauchst".')).toBeNull()
+    expect(sek1('Erkläre den Satz „Setzen Sie sich!".')).toBeNull()
+  })
+
   it('Blattprüfung: Aufgaben und Hilfen ja, Material nein', () => {
     const sek2 = meta({ grade: 12 })
     const s = blatt([
