@@ -779,7 +779,13 @@ export function taskContext(meta: WorksheetMeta, profile: LearnerProfile): strin
     single
       ? `Umfang: ${umfang} mit GENAU EINER Aufgabe, Bearbeitungszeit ca. ${meta.minutes} Minuten. Der Platz gehört dem Ausgangstext und den Schreiblinien, nicht weiteren Aufgaben.`
       : `Umfang: ${umfang}, insgesamt ${tasksMin}–${tasksMax} Aufgaben (${tasksMax} ist die Obergrenze der Aufgabenzahl, nicht das Ziel), Bearbeitungszeit ca. ${meta.minutes} Minuten.`,
-    meta.socialForms.length ? `Bevorzugte Sozialformen: ${meta.socialForms.join(', ')}.` : ''
+    meta.socialForms.length ? `Bevorzugte Sozialformen: ${meta.socialForms.join(', ')}.` : '',
+    /*
+     * Zeichenflächen (26.09.2026): Wo gezeichnet oder eingetragen wird, gehört eine Fläche mit
+     * Achsen hin – keine Rechenkästchen, keine Linien. Die Achsen müssen die erwarteten Werte
+     * fassen; sonst zeichnen die Lernenden an den Rand.
+     */
+    'ZEICHENFLÄCHEN: Soll etwas gezeichnet oder eingetragen werden (Graph, Messreihe, Schrägbild, Zeitleiste, Spannungs- oder Verlaufskurve), ist answer.kind = "diagram" mit passendem diagram.kind (koordinaten | mm | klima | schraegbild | spannung | zeitleiste) und vollständigen Achsen: Beschriftung mit Einheit, Bereich und Schrittweite so gewählt, dass alle erwarteten Werte hineinpassen. Zeitleiste: from/to/step in der Einheit (day | month | year); Stufen wie Eskalation in timeline.yLevels von unten nach oben; Ereignisse nur in timeline.events, wenn sie VORGEGEBEN sein sollen; parallele Stränge in timeline.strands; sehr lange Zeiträume als sections mit eigener Skala. Verlaufskurve: Schritte in xCategories, Stufen in yLevels. Nie Rechenkästchen oder Linien für eine Zeichnung.'
   ]
     .filter(Boolean)
     .join('\n')

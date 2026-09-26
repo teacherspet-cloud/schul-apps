@@ -24,6 +24,7 @@ import type { Answer, Sheet, TaskBlock, Worksheet } from '../model/types'
 import { describeSheet } from './describe'
 import type { AiCall } from './generate'
 import { materialText } from './prompts'
+import { diagramDrawing } from '../render/diagramSvg'
 
 const TEIL = obj({
   solution: str('Erwartungshorizont der Teilaufgabe: knappe Stichpunkte, was eine vollständige und richtige Antwort enthält'),
@@ -46,10 +47,10 @@ interface KiLoesung {
 }
 
 /** Antwortformen, in die eine Musterlösung in Schülerform gehört. */
-export const MUSTER_FORMEN: Answer['kind'][] = ['lines', 'grid', 'space']
+export const MUSTER_FORMEN: Answer['kind'][] = ['lines', 'grid', 'space', 'diagram']
 
 /** Antwortformen, auf denen eine Skizze liegen kann. */
-const SKIZZEN_FORMEN: Answer['kind'][] = ['grid', 'space']
+const SKIZZEN_FORMEN: Answer['kind'][] = ['grid', 'space', 'diagram']
 
 /** Was die KI über den Antwortbereich wissen muss, um die Musterlösung passend zu bauen. */
 function antwortBeschreibung(a: Answer): string {
@@ -63,6 +64,15 @@ function antwortBeschreibung(a: Answer): string {
       ].join(' ')
     case 'space':
       return `Freie Fläche (${a.heightMm} mm hoch): Musterlösung als Text; bei einer Zeichnung zusätzlich „sketch" als SVG mit viewBox="0 0 170 ${Math.max(5, a.heightMm)}" (Millimeter), nur line, polyline, rect, circle, text, path.`
+    case 'diagram': {
+      // Dieselbe Breite wie die Darstellung (Answers.tsx: diagramWidthMm) – Skizze und Fläche müssen deckungsgleich sein
+      const d = diagramDrawing(a.diagram, 160)
+      return [
+        `Zeichenfläche mit Achsen (${a.diagram?.kind ?? 'koordinaten'}), ${d.widthMm} × ${d.heightMm} mm.`,
+        `Abbildung der Werte auf Millimeter (y wächst nach UNTEN, Ursprung links oben): ${d.frame.hinweis}.`,
+        `Musterlösung ZWINGEND als „sketch": SVG mit viewBox="0 0 ${d.widthMm} ${d.heightMm}" (Einheiten = Millimeter), nur line, polyline, circle, text, path; Strichstärke 0.5, Farbe #c62828, Schriftgröße 3; Punkte/Ereignisse als Kreise r=1.2 mit kurzer Beschriftung; Kurven als polyline durch die berechneten Millimeterkoordinaten. Dazu „model" als kurze Beschreibung der Eintragung (Werte, Verlauf).`
+      ].join(' ')
+    }
     case 'none':
       return 'Kein Antwortbereich (mündlich): nur der Erwartungshorizont, „model" leer.'
     default:

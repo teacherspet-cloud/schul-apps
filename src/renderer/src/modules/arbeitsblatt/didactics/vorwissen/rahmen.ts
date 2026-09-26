@@ -195,7 +195,18 @@ export const METHODEN: Methode[] = [
   // Geschichte
   { fach: 'geschichte', text: 'Quellen und Darstellungen unterscheiden', ab: 6, sicher: true, quelle: `${KLP_GE}, Ende Kl. 6` },
   { fach: 'geschichte', text: 'Grundlegende Schritte der Quelleninterpretation anwenden', ab: 6, sicher: true, quelle: `${KLP_GE}, Ende Kl. 6` },
-  { fach: 'geschichte', text: 'Zeitleiste lesen und anlegen', ab: 5, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'geschichte', text: 'Zeitleiste lesen und anlegen (auch mit Stufen, z. B. Eskalation)', ab: 5, sicher: false, quelle: 'Unterrichtspraxis' },
+  // Zeichenflächen mit Achsen (Diagramm-Antwortform, 26.09.2026) – wo Zeitleisten und Diagramme zum Fach gehören
+  { fach: 'politik', text: 'Zeitleiste eines Konflikts mit Eskalationsstufen anlegen', ab: 8, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'politik', text: 'Diagramm zeichnen (Verläufe, Statistiken mit x-y-Achsen)', ab: 7, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'deutsch', text: 'Handlungsverlauf als Zeitleiste oder Spannungskurve darstellen', ab: 5, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'religion', text: 'Zeitleiste der Religions- und Kirchengeschichte anlegen', ab: 7, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'werte-und-normen', text: 'Zeitleiste zur Ideen- und Religionsgeschichte anlegen', ab: 7, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'biologie', text: 'Entwicklungen auf einer Zeitleiste darstellen (Erdzeitalter, Evolution)', ab: 8, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'erdkunde', text: 'Erdgeschichte auf einer Zeitleiste mit Abschnitten darstellen', ab: 7, sicher: false, quelle: 'Unterrichtspraxis' },
+  { fach: 'erdkunde', text: 'Diagramm zeichnen (Verläufe, Klimadiagramm)', ab: 6, sicher: true, quelle: `${KLP_EK}, Ende Kl. 6` },
+  { fach: 'mathematik', text: 'Diagramm zeichnen: Wertepaare und Graphen im Koordinatensystem', ab: 5, sicher: true, quelle: 'Bildungsstandards Mathematik, Leitidee Funktionaler Zusammenhang' },
+  { fach: 'mathematik', text: 'Schrägbild zeichnen (Körper und Punkte im Raum)', ab: 7, sicher: false, quelle: 'Unterrichtspraxis Kl. 7–10' },
   {
     fach: 'geschichte',
     text: 'Karikaturen interpretieren',

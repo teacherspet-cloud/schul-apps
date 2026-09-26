@@ -15,25 +15,25 @@ export interface GridDrawing {
   heightMm: number
 }
 
-const FINE = '#ccd5dd'
-const MEDIUM = '#a8b4bf'
-const STRONG = '#7d8b97'
-const AXIS = '#333c44'
+export const FINE = '#ccd5dd'
+export const MEDIUM = '#a8b4bf'
+export const STRONG = '#7d8b97'
+export const AXIS = '#333c44'
 const LABEL = '#333c44'
 
-const round = (n: number): number => Math.round(n * 100) / 100
+export const round = (n: number): number => Math.round(n * 100) / 100
 
 /** Zahl ohne überflüssige Nullen, mit deutschem Komma. */
-function num(n: number): string {
+export function num(n: number): string {
   const r = Math.round(n * 1000) / 1000
   return String(r).replace('.', ',')
 }
 
-function line(x1: number, y1: number, x2: number, y2: number, color: string, width: number): string {
+export function line(x1: number, y1: number, x2: number, y2: number, color: string, width: number): string {
   return `<line x1="${round(x1)}" y1="${round(y1)}" x2="${round(x2)}" y2="${round(y2)}" stroke="${color}" stroke-width="${width}"/>`
 }
 
-function text(x: number, y: number, value: string, opts: { anchor?: string; size?: number; rotate?: number; bold?: boolean } = {}): string {
+export function text(x: number, y: number, value: string, opts: { anchor?: string; size?: number; rotate?: number; bold?: boolean } = {}): string {
   const anchor = opts.anchor ?? 'middle'
   const size = opts.size ?? 3
   const transform = opts.rotate ? ` transform="rotate(${opts.rotate} ${round(x)} ${round(y)})"` : ''
@@ -43,7 +43,7 @@ function text(x: number, y: number, value: string, opts: { anchor?: string; size
 }
 
 /** Gleichmäßiges Kästchenraster (Karo oder Millimeterpapier). */
-function plainGrid(x: number, y: number, w: number, h: number, cell: number, fine: boolean): string {
+export function plainGrid(x: number, y: number, w: number, h: number, cell: number, fine: boolean): string {
   const parts: string[] = []
   const cols = Math.floor(w / cell)
   const rows = Math.floor(h / cell)
@@ -63,7 +63,7 @@ function plainGrid(x: number, y: number, w: number, h: number, cell: number, fin
   return parts.join('')
 }
 
-function svgWrap(widthMm: number, heightMm: number, body: string): string {
+export function svgWrap(widthMm: number, heightMm: number, body: string): string {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${round(widthMm)}mm" height="${round(heightMm)}mm"`,
     ` viewBox="0 0 ${round(widthMm)} ${round(heightMm)}">`,

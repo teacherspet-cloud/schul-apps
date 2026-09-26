@@ -1,4 +1,5 @@
 import { newId } from '../../vokabeltest/model/random'
+import { defaultDiagram } from './diagram'
 import { defaultAxes } from './grid'
 import type { Answer, AnswerKind, TaskBlock, WsBlock, WsBlockType } from './types'
 import { ANREDE_TEXTE, anredeText, type Anrede } from '../../../shared/anrede'
@@ -20,7 +21,8 @@ export function emptyAnswer(kind: AnswerKind = 'lines'): Answer {
     headers: [],
     rows: [],
     solutionRows: [],
-    labels: []
+    labels: [],
+    ...(kind === 'diagram' ? { diagram: defaultDiagram('koordinaten') } : {})
   }
 }
 

@@ -3,6 +3,8 @@ import { RichText } from '../../../shared/richtext/RichText'
 import type { Answer } from '../model/types'
 import { isEditMode, isKeyMode, useWs } from './WsContext'
 import { optionSpalten } from './mcGrid'
+import { diagramDataUrl, diagramDrawing } from './diagramSvg'
+import type { DiagramSpec } from '../model/types'
 
 const letter = (i: number): string => String.fromCharCode(97 + i)
 
@@ -113,8 +115,26 @@ export function McOptions({
   )
 }
 
+/**
+ * Breite der Zeichenfläche: der Satzspiegel abzüglich Einzug, höchstens 160 mm – dieselbe
+ * Zahl nimmt `generation/solution.ts` für die Skizze, damit Musterlösung und Fläche
+ * deckungsgleich sind.
+ */
+export const diagramWidthMm = (contentWidthMm: number | undefined): number => Math.min(160, (contentWidthMm ?? 170) - 8.5)
+
+/** Zeichenfläche mit Achsen (Diagramm-Antwortform); `sketch` = Musterlösung als SVG darüber (Lösungsansicht). */
+export function DiagramView({ spec, widthMm, sketch }: { spec: DiagramSpec | undefined; widthMm: number; sketch?: string }): React.JSX.Element {
+  const drawing = diagramDrawing(spec, widthMm)
+  return (
+    <div className="ws-diagram" style={{ width: `${drawing.widthMm}mm`, height: `${drawing.heightMm}mm` }}>
+      <img className="ws-diagram-img" src={diagramDataUrl(drawing)} alt="Zeichenfläche mit Achsen" style={{ width: `${drawing.widthMm}mm`, height: `${drawing.heightMm}mm` }} />
+      {sketch && <div className="ws-muster-skizze" dangerouslySetInnerHTML={{ __html: sketch }} />}
+    </div>
+  )
+}
+
 export function AnswerView({ answer, onChange }: { answer: Answer; onChange?: (fn: (a: Answer) => void) => void }): React.JSX.Element | null {
-  const { mode, answerLanguage } = useWs()
+  const { mode, answerLanguage, contentWidthMm } = useWs()
   const key = isKeyMode(mode)
   const editText = mode === 'edit' && onChange
   const editKey = mode === 'keyEdit' && onChange
@@ -133,6 +153,8 @@ export function AnswerView({ answer, onChange }: { answer: Answer; onChange?: (f
       )
     case 'grid':
       return <div className="ws-grid" style={{ height: `${Math.max(1, answer.count) * 5}mm` }} />
+    case 'diagram':
+      return <DiagramView spec={answer.diagram} widthMm={diagramWidthMm(contentWidthMm)} />
     case 'space':
       return <div className="ws-space" style={{ height: `${Math.max(5, answer.heightMm)}mm` }} />
     case 'labels':

@@ -2,6 +2,7 @@
 import { newId, Rng, shuffle } from '../../vokabeltest/model/random'
 import type { Stars } from '../didactics/differentiation'
 import { emptyAnswer } from '../model/factory'
+import { sanitizeDiagram } from '../model/diagram'
 import { anredeText, type Anrede } from '../../../shared/anrede'
 import { defaultAxes, gridDefaults, sanitizeAxes } from '../model/grid'
 import type {
@@ -127,6 +128,12 @@ export function convertAnswer(a: any, rng: Rng): Answer {
   out.heightMm = Math.max(10, Math.min(200, Number(a?.heightMm) || 40))
   out.gapText = text(a?.gapText)
   out.labels = strings(a?.labels)
+  // Zeichenfläche mit Achsen: bereinigt, damit Bereich und Schrittweite brauchbar sind
+  if (out.kind === 'diagram') {
+    const roh = a?.diagram ?? {}
+    const ev = Array.isArray(roh?.timeline?.events) ? roh.timeline.events.map((e: any) => ({ ...e, level: typeof e?.level === 'number' && e.level >= 0 ? e.level : undefined })) : []
+    out.diagram = sanitizeDiagram({ ...roh, timeline: { ...(roh?.timeline ?? {}), events: ev } })
+  }
   switch (out.kind) {
     case 'matching': {
       const left = strings(a?.left)

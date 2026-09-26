@@ -31,6 +31,7 @@ import {
   WidthType
 } from 'docx'
 import { MUSTER_FORMEN } from '../generation/solution'
+import { diagramDrawing } from '../render/diagramSvg'
 import { gradeScaleRows } from '../../../shared/gradeScale'
 import { punkteZeilen } from '../../../shared/notenpunkte'
 import { PRINT_MARGINS, wordFontName } from '@shared/design'
@@ -1341,6 +1342,12 @@ async function answerContent(ctx: Ctx, a: Answer, indent: number): Promise<Child
       return key ? [] : writingLines(Math.max(0, a.count), indent)
     case 'grid':
       return [gridArea(ctx, a.count * 5, true)]
+    case 'diagram': {
+      // Zeichenfläche mit Achsen als maßhaltiges Bild (26.09.2026) – wie der Gitternetz-Baustein
+      const drawing = diagramDrawing(a.diagram, Math.min(160, (ctx.contentWidth - indent) / MM))
+      const png = await ctx.deps.raster(drawing.svg, drawing.widthMm * PX_PER_MM, drawing.heightMm * PX_PER_MM)
+      return [new Paragraph({ indent: { left: indent }, children: [imageRun(png, drawing.widthMm * PX_MM, drawing.heightMm * PX_MM)] })]
+    }
     case 'space':
       return [gridArea(ctx, a.heightMm, false)]
     case 'labels':
@@ -1684,9 +1691,11 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
         })
       )
       // Musterlösung in Schülerform (Lösungsblatt) an der Stelle von Linien, Kästchen, Fläche
-      if (ctx.key && p.modelAnswer && MUSTER_FORMEN.includes(p.answer.kind))
+      if (ctx.key && p.modelAnswer && MUSTER_FORMEN.includes(p.answer.kind)) {
+        // Diagramm: Fläche bleibt (Word kennt keine Skizze darüber), Beschreibung darunter
+        if (p.answer.kind === 'diagram') out.push(...(await answerContent(ctx, p.answer, indent * 2)))
         out.push(...(await rich(ctx, p.modelAnswer, { run: { color: RED }, paragraph: { indent: { left: indent * 2 } } })))
-      else out.push(...(await answerContent(ctx, p.answer, indent * 2)))
+      } else out.push(...(await answerContent(ctx, p.answer, indent * 2)))
       if (ctx.key && p.solution) out.push(...(await rich(ctx, p.solution, { run: { color: RED }, paragraph: { indent: { left: indent * 2 } } })))
     }
   } else {
@@ -1698,10 +1707,11 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
      */
     const mustertextOben = ctx.key && block.answer.kind === 'lines' && Boolean(block.brief?.model)
     if (mustertextOben) out.push(...(await rich(ctx, block.brief!.model!, { run: { color: RED }, paragraph: { indent: { left: indent } } })))
-    else if (ctx.key && block.modelAnswer && MUSTER_FORMEN.includes(block.answer.kind))
-      // Musterlösung in Schülerform (26.09.2026) – die Skizze gibt Word nicht wieder, nur den Text
+    else if (ctx.key && block.modelAnswer && MUSTER_FORMEN.includes(block.answer.kind)) {
+      // Musterlösung in Schülerform (26.09.2026) – die Skizze gibt Word nicht wieder, nur den Text; beim Diagramm bleibt die Fläche
+      if (block.answer.kind === 'diagram') out.push(...(await answerContent(ctx, block.answer, indent)))
       out.push(...(await rich(ctx, block.modelAnswer, { run: { color: RED }, paragraph: { indent: { left: indent } } })))
-    else out.push(...(await answerContent(ctx, block.answer, indent)))
+    } else out.push(...(await answerContent(ctx, block.answer, indent)))
   }
   if (ctx.key && block.solution)
     out.push(...(await rich(ctx, `**Lösung:** ${block.solution}`, { run: { color: RED }, paragraph: { indent: { left: indent } } })))

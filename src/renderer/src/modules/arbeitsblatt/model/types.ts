@@ -197,7 +197,67 @@ export interface ImageBlock extends BaseBlock {
   side?: 'left' | 'right' | 'none'
 }
 
-export type AnswerKind = 'lines' | 'grid' | 'space' | 'none' | 'gapText' | 'matching' | 'multipleChoice' | 'trueFalse' | 'ordering' | 'tableFill' | 'labels'
+export type AnswerKind = 'lines' | 'grid' | 'space' | 'none' | 'gapText' | 'matching' | 'multipleChoice' | 'trueFalse' | 'ordering' | 'tableFill' | 'labels' | 'diagram'
+
+/**
+ * Diagramm-Antwortform (26.09.2026): eine Zeichenfläche mit Achsen als Antwortbereich einer
+ * Aufgabe – Koordinatensystem, Millimeterpapier, Klimadiagramm, Schrägbild (x/y/z),
+ * Spannungskurve (Kategorien auf der x-Achse) und Zeitleiste. Die KI leitet Achsen, Bereich
+ * und Schrittweite aus der Aufgabe ab; die Lehrkraft ändert sie im Baustein.
+ */
+export type DiagramKind = 'koordinaten' | 'mm' | 'klima' | 'schraegbild' | 'spannung' | 'zeitleiste'
+
+export type TimelineUnit = 'day' | 'month' | 'year'
+
+export interface TimelineEvent {
+  /** Datum: „1914-07-28", „1914-07" oder „1914" (v. Chr. negativ: „-500") */
+  date: string
+  text: string
+  /** Strang (0-basiert) bei mehreren Strängen */
+  strand?: number
+  /** Stufe der y-Achse (0 = unterste), wenn Stufen vorgegeben sind */
+  level?: number
+}
+
+/** Abschnitt einer Zeitleiste mit eigener Skala – zwischen den Abschnitten ein Bruchzeichen */
+export interface TimelineSection {
+  from: string
+  to: string
+  unit: TimelineUnit
+  step: number
+}
+
+export interface TimelineSpec {
+  unit: TimelineUnit
+  from: string
+  to: string
+  /** Marke alle `step` Einheiten */
+  step: number
+  /** Abschnitte mit eigener Skala (lange Zeiträume); leer = eine durchgehende Skala */
+  sections: TimelineSection[]
+  /** Beschriftung der y-Achse (z. B. „Eskalation"); leer = keine y-Achse */
+  yLabel: string
+  /** Stufen der y-Achse von unten nach oben (z. B. Drohung, Ultimatum, Mobilmachung, Krieg) */
+  yLevels: string[]
+  /** Parallele Stränge an derselben Zeitachse (z. B. „Österreich-Ungarn", „Deutsches Reich") */
+  strands: string[]
+  /** Vorgegebene Ereignisse (stehen auf dem Schülerblatt); leer = Lernende tragen selbst ein */
+  events: TimelineEvent[]
+}
+
+export interface DiagramSpec {
+  kind: DiagramKind
+  heightMm: number
+  /** Achsen für koordinaten/mm/klima/spannung/schraegbild (x = x₂ rechts, y = x₃ oben) */
+  axes: GridAxes
+  /** Schrägbild: die Tiefenachse (x₁, nach vorn) */
+  z: { label: string; min: number; max: number; step: number }
+  /** Spannungskurve: Beschriftungen der x-Achse (Handlungsschritte, Kapitel …) */
+  xCategories: string[]
+  /** Spannungskurve: Stufen der y-Achse von unten nach oben; leer = Zahlen nach `axes` */
+  yLevels: string[]
+  timeline: TimelineSpec
+}
 
 export interface Answer {
   kind: AnswerKind
@@ -226,6 +286,8 @@ export interface Answer {
   solutionRows: string[][]
   /** labels: Lösungen der Beschriftungen */
   labels: string[]
+  /** diagram: die Zeichenfläche mit Achsen (26.09.2026) */
+  diagram?: DiagramSpec
 }
 
 export interface TaskPart {

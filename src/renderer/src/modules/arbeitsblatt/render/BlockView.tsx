@@ -1,6 +1,6 @@
 import { RichText } from '../../../shared/richtext/RichText'
 import type { Answer, GridBlock, ImageBlock, ImageRole, TaskBlock, TaskPart, WsBlock } from '../model/types'
-import { AnswerView, McOptions, gapRenderText } from './Answers'
+import { AnswerView, DiagramView, McOptions, diagramWidthMm, gapRenderText } from './Answers'
 import { ImageLabelLayer } from './ImageLabels'
 import { PictogramIcon } from './Pictogram'
 import { pictogramForInstruction, pictogramForSocialForm } from './pictograms'
@@ -929,7 +929,7 @@ function gruppiereTeilaufgaben(abschnitte: Abschnitt[]): { node: React.JSX.Eleme
 }
 
 function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }): React.JSX.Element {
-  const { mode, update, taskNumbers, showStars, taskStyle, phaseStarts, showTimecodes, answerLanguage, wordLimit, correctionMargin } = useWs()
+  const { mode, update, taskNumbers, showStars, taskStyle, phaseStarts, showTimecodes, answerLanguage, wordLimit, correctionMargin, contentWidthMm } = useWs()
   const edit = mode === 'edit'
   const key = isKeyMode(mode)
   const keyEdit = mode === 'keyEdit'
@@ -1091,6 +1091,15 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
     const txt = (text ?? '').trim()
     if (!txt && !svg) return []
     const skizzeKnoten = svg ? <div className="ws-muster-skizze" dangerouslySetInnerHTML={{ __html: svg }} /> : null
+    if (answer.kind === 'diagram') {
+      // Zeichenfläche bleibt stehen, die Skizze liegt deckungsgleich darauf, der Text darunter
+      return [
+        <div className="ws-diagram-muster" data-unit key={`${k}-muster`}>
+          <DiagramView spec={answer.diagram} widthMm={diagramWidthMm(contentWidthMm)} sketch={svg || undefined} />
+          {txt && <RichText className="ws-muster-text" value={txt} editable={keyEdit} onChange={set((d, v) => schreiben(d as TaskBlock, v))} placeholder="Musterlösung" />}
+        </div>
+      ]
+    }
     if (answer.kind === 'grid' || answer.kind === 'space') {
       const klasse = answer.kind === 'grid' ? 'ws-grid ws-grid-muster' : 'ws-space ws-space-muster'
       const hoehe = answer.kind === 'grid' ? `${Math.max(1, answer.count) * 5}mm` : `${Math.max(5, answer.heightMm)}mm`
@@ -1139,7 +1148,7 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
         <span className="ws-part-letter">{String.fromCharCode(97 + i)})</span>
         <RichText value={part.instruction} editable={edit} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
         {/* In der Lösungsansicht tritt die Musterlösung an die Stelle von Kästchen und Fläche */}
-        {part.answer.kind !== 'lines' && !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space')) && (
+        {part.answer.kind !== 'lines' && !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space' || part.answer.kind === 'diagram')) && (
           <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />
         )}
       </div>
@@ -1181,7 +1190,7 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
   else if (key && block.answer.kind === 'lines') {
     if (mustertextGezeigt) for (const n of mustertextAbschnitte(block.brief!.model!)) abschnitte.push({ node: n })
     else for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
-  } else if (key && (block.answer.kind === 'grid' || block.answer.kind === 'space') && hatMuster(block)) {
+  } else if (key && (block.answer.kind === 'grid' || block.answer.kind === 'space' || block.answer.kind === 'diagram') && hatMuster(block)) {
     // Kästchen bzw. Fläche bleiben stehen und tragen die Musterlösung
     for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
   } else if (block.answer.kind === 'lines' && block.answer.count > LINIEN_PRO_EINHEIT)

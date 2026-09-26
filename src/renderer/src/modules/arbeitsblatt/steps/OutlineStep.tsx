@@ -36,6 +36,7 @@ import { KiHinweise } from './KiHinweise'
 const ANSWER_LABELS: Record<AnswerKind, string> = {
   lines: 'Schreiblinien',
   grid: 'Rechenkästchen',
+  diagram: 'Diagramm / Zeitleiste',
   space: 'freie Fläche',
   none: 'mündlich / keine',
   gapText: 'Lückentext',

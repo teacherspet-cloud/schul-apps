@@ -4,7 +4,8 @@ import { IconAdjustments } from '@tabler/icons-react'
 import { shuffle, createRng, randomSeed } from '../../vokabeltest/model/random'
 import { emptyAnswer } from '../model/factory'
 import { defaultAxes, GRID_KINDS, gridDefaults } from '../model/grid'
-import type { Answer, AnswerKind, GridAxes, GridBlock, GridKind, ImageBlock, ImageLabel, WsBlock } from '../model/types'
+import { DIAGRAM_KINDS, TIMELINE_UNITS, defaultDiagram } from '../model/diagram'
+import type { Answer, AnswerKind, DiagramKind, DiagramSpec, GridAxes, GridBlock, GridKind, ImageBlock, ImageLabel, TimelineUnit, WsBlock } from '../model/types'
 import { IMAGE_FUNCTIONS, imageFunction, imageFunctionInfo, type ImageFunction } from '../didactics/imageDesign'
 import { newId } from '../../vokabeltest/model/random'
 
@@ -17,6 +18,7 @@ const lines = (v: string): string[] =>
 const ANSWER_OPTIONS: { value: AnswerKind; label: string }[] = [
   { value: 'lines', label: 'Schreiblinien' },
   { value: 'grid', label: 'Rechenkästchen' },
+  { value: 'diagram', label: 'Diagramm / Zeitleiste (Zeichenfläche mit Achsen)' },
   { value: 'space', label: 'Freie Fläche' },
   { value: 'none', label: 'Kein Antwortbereich' },
   { value: 'gapText', label: 'Lückentext' },
@@ -219,6 +221,150 @@ function ImageLabelSettings({ block, update }: { block: ImageBlock; update: (fn:
   )
 }
 
+/**
+ * Einstellungen der Zeichenfläche (Diagramm-Antwortform, 26.09.2026).
+ *
+ * Textfelder schreiben beim Verlassen (onBlur), Zahlen sofort – wie bei den Gitternetzen.
+ * Listen (Kategorien, Stufen, Stränge, Ereignisse, Abschnitte) stehen zeilenweise in einem
+ * Textfeld; Ereignisse als „Datum | Text | Strang | Stufe", Abschnitte als
+ * „von | bis | Einheit | Schritt".
+ */
+function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: (a: Answer) => void) => void }): React.JSX.Element {
+  const d = answer.diagram ?? defaultDiagram('koordinaten')
+  const set = (fn: (spec: DiagramSpec) => void): void =>
+    onChange((a) => {
+      if (!a.diagram) a.diagram = defaultDiagram('koordinaten')
+      fn(a.diagram)
+    })
+  const zahl = (label: string, wert: number, schreiben: (v: number) => void, step = 1): React.JSX.Element => (
+    <NumberInput size="xs" label={label} value={wert} step={step} onChange={(v) => set(() => schreiben(Number(v) || 0))} />
+  )
+  const t = d.timeline
+  const kartesisch = d.kind === 'koordinaten' || d.kind === 'mm' || d.kind === 'spannung' || d.kind === 'schraegbild'
+  return (
+    <Stack gap={6}>
+      <Select
+        size="xs"
+        label="Art der Zeichenfläche"
+        description={DIAGRAM_KINDS.find((k) => k.value === d.kind)?.hint}
+        data={DIAGRAM_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+        value={d.kind}
+        onChange={(v) =>
+          v &&
+          set((spec) => {
+            const frisch = defaultDiagram(v as DiagramKind)
+            spec.kind = frisch.kind
+            spec.heightMm = frisch.heightMm
+            if (v !== 'koordinaten' && v !== 'mm') spec.axes = frisch.axes
+            if (!spec.xCategories.length) spec.xCategories = frisch.xCategories
+            if (!spec.yLevels.length) spec.yLevels = frisch.yLevels
+          })
+        }
+        allowDeselect={false}
+      />
+      {zahl('Höhe (mm)', d.heightMm, (v) => set((spec) => (spec.heightMm = Math.max(30, Math.min(200, v)))), 5)}
+      {kartesisch && (
+        <>
+          <Group grow gap={6}>
+            <TextInput size="xs" label={d.kind === 'schraegbild' ? 'Achse rechts (x₂)' : 'x-Achse'} defaultValue={d.axes.xLabel} onBlur={(e) => set((spec) => (spec.axes.xLabel = e.currentTarget.value))} />
+            <TextInput size="xs" label={d.kind === 'schraegbild' ? 'Achse oben (x₃)' : 'y-Achse'} defaultValue={d.axes.yLabel} onBlur={(e) => set((spec) => (spec.axes.yLabel = e.currentTarget.value))} />
+          </Group>
+          {d.kind !== 'spannung' && (
+            <>
+              <Group grow gap={6}>
+                {zahl('x von', d.axes.xMin, (v) => set((spec) => (spec.axes.xMin = v)))}
+                {zahl('x bis', d.axes.xMax, (v) => set((spec) => (spec.axes.xMax = v)))}
+                {zahl('x je Kästchen', d.axes.xStep, (v) => set((spec) => (spec.axes.xStep = v)))}
+              </Group>
+              <Group grow gap={6}>
+                {zahl('y von', d.axes.yMin, (v) => set((spec) => (spec.axes.yMin = v)))}
+                {zahl('y bis', d.axes.yMax, (v) => set((spec) => (spec.axes.yMax = v)))}
+                {zahl('y je Kästchen', d.axes.yStep, (v) => set((spec) => (spec.axes.yStep = v)))}
+              </Group>
+              <Switch size="xs" label="Zahlen an den Achsen" checked={d.axes.showNumbers} onChange={(e) => set((spec) => (spec.axes.showNumbers = e.currentTarget.checked))} />
+            </>
+          )}
+          {d.kind === 'schraegbild' && (
+            <Group grow gap={6}>
+              <TextInput size="xs" label="Achse nach vorn (x₁)" defaultValue={d.z.label} onBlur={(e) => set((spec) => (spec.z.label = e.currentTarget.value))} />
+              {zahl('bis', d.z.max, (v) => set((spec) => (spec.z.max = v)))}
+              {zahl('je Einheit', d.z.step, (v) => set((spec) => (spec.z.step = v)))}
+            </Group>
+          )}
+          {d.kind === 'spannung' && (
+            <>
+              <Textarea size="xs" label="Schritte auf der x-Achse (eine je Zeile)" autosize minRows={2} defaultValue={d.xCategories.join('\n')} onBlur={(e) => set((spec) => (spec.xCategories = lines(e.currentTarget.value)))} />
+              <Textarea size="xs" label="Stufen der y-Achse von unten nach oben (eine je Zeile)" autosize minRows={2} defaultValue={d.yLevels.join('\n')} onBlur={(e) => set((spec) => (spec.yLevels = lines(e.currentTarget.value)))} />
+            </>
+          )}
+        </>
+      )}
+      {d.kind === 'klima' && (
+        <Group grow gap={6}>
+          {zahl('Temperatur von', d.axes.yMin, (v) => set((spec) => (spec.axes.yMin = v)), 10)}
+          {zahl('bis', d.axes.yMax, (v) => set((spec) => (spec.axes.yMax = v)), 10)}
+          {zahl('Schritt', d.axes.yStep, (v) => set((spec) => (spec.axes.yStep = v)), 5)}
+        </Group>
+      )}
+      {d.kind === 'zeitleiste' && (
+        <>
+          <Group grow gap={6}>
+            <Select
+              size="xs"
+              label="Einheit"
+              data={TIMELINE_UNITS}
+              value={t.unit}
+              onChange={(v) => v && set((spec) => (spec.timeline.unit = v as TimelineUnit))}
+              allowDeselect={false}
+            />
+            <TextInput size="xs" label="Von" placeholder="1914-07-28" defaultValue={t.from} onBlur={(e) => set((spec) => (spec.timeline.from = e.currentTarget.value.trim()))} />
+            <TextInput size="xs" label="Bis" placeholder="1914-08-04" defaultValue={t.to} onBlur={(e) => set((spec) => (spec.timeline.to = e.currentTarget.value.trim()))} />
+            {zahl('Marke alle', t.step, (v) => set((spec) => (spec.timeline.step = Math.max(1, v))))}
+          </Group>
+          <Text size="xs" c="dimmed">
+            Datum als Jahr („1914", „-500" = v. Chr.), Monat („1914-07") oder Tag („1914-07-28").
+          </Text>
+          <TextInput size="xs" label="y-Achse (optional), z. B. Eskalation" defaultValue={t.yLabel} onBlur={(e) => set((spec) => (spec.timeline.yLabel = e.currentTarget.value.trim()))} />
+          <Textarea size="xs" label="Stufen der y-Achse von unten nach oben (eine je Zeile)" autosize minRows={1} defaultValue={t.yLevels.join('\n')} onBlur={(e) => set((spec) => (spec.timeline.yLevels = lines(e.currentTarget.value)))} />
+          <Textarea size="xs" label="Stränge (eine je Zeile, z. B. zwei Länder)" autosize minRows={1} defaultValue={t.strands.join('\n')} onBlur={(e) => set((spec) => (spec.timeline.strands = lines(e.currentTarget.value)))} />
+          <Textarea
+            size="xs"
+            label="Vorgegebene Ereignisse: Datum | Text | Strang | Stufe (eine je Zeile)"
+            description="Leer lassen, wenn die Lernenden selbst eintragen"
+            autosize
+            minRows={1}
+            defaultValue={t.events.map((e) => [e.date, e.text, e.strand ?? '', e.level ?? ''].join(' | ').replace(/( \| )+$/, '')).join('\n')}
+            onBlur={(e) =>
+              set((spec) => {
+                spec.timeline.events = lines(e.currentTarget.value).map((z) => {
+                  const [date, text, strand, level] = z.split('|').map((x) => x.trim())
+                  return { date: date ?? '', text: text ?? '', ...(strand ? { strand: Number(strand) || 0 } : {}), ...(level ? { level: Number(level) || 0 } : {}) }
+                })
+              })
+            }
+          />
+          <Textarea
+            size="xs"
+            label="Abschnitte mit eigener Skala: von | bis | Einheit (day/month/year) | Schritt"
+            description="Für lange Zeiträume; leer = eine durchgehende Skala"
+            autosize
+            minRows={1}
+            defaultValue={t.sections.map((s) => [s.from, s.to, s.unit, s.step].join(' | ')).join('\n')}
+            onBlur={(e) =>
+              set((spec) => {
+                spec.timeline.sections = lines(e.currentTarget.value).map((z) => {
+                  const [from, to, unit, step] = z.split('|').map((x) => x.trim())
+                  return { from: from ?? '', to: to ?? '', unit: (unit === 'day' || unit === 'month' ? unit : 'year') as TimelineUnit, step: Number(step) || 1 }
+                })
+              })
+            }
+          />
+        </>
+      )}
+    </Stack>
+  )
+}
+
 function AnswerSettings({ answer, onChange }: { answer: Answer; onChange: (fn: (a: Answer) => void) => void }): React.JSX.Element {
   return (
     <Stack gap={6}>
@@ -258,6 +404,7 @@ function AnswerSettings({ answer, onChange }: { answer: Answer; onChange: (fn: (
           onChange={(v) => onChange((a) => (a.count = Number(v) || 1))}
         />
       )}
+      {answer.kind === 'diagram' && <DiagramSettings answer={answer} onChange={onChange} />}
       {answer.kind === 'space' && (
         <NumberInput
           size="xs"

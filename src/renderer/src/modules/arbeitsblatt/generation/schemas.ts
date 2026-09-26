@@ -18,7 +18,9 @@ export const BLOCK_TYPES = [
 ]
 export const VIDEO_KIND_IDS = ['spielfilm', 'kurzfilm', 'dokumentation', 'nachrichten', 'lernvideo', 'experiment', 'reportage']
 export const VIEWING_PHASE_IDS = ['vor', 'waehrend', 'nach']
-export const ANSWER_KINDS = ['lines', 'grid', 'space', 'none', 'gapText', 'matching', 'multipleChoice', 'trueFalse', 'ordering', 'tableFill', 'labels']
+export const ANSWER_KINDS = ['lines', 'grid', 'space', 'none', 'gapText', 'matching', 'multipleChoice', 'trueFalse', 'ordering', 'tableFill', 'labels', 'diagram']
+export const DIAGRAM_KIND_IDS = ['koordinaten', 'mm', 'klima', 'schraegbild', 'spannung', 'zeitleiste']
+export const TIMELINE_UNIT_IDS = ['day', 'month', 'year']
 export const BLOCK_SIDES = ['auto', 'none', 'left', 'right']
 export const SOCIAL_FORMS = ['EA', 'PA', 'GA', 'Plenum', 'Rollenspiel']
 export const AFBS = ['', 'I', 'II', 'III']
@@ -44,8 +46,49 @@ export const OUTLINE_SCHEMA = obj({
   )
 })
 
+/*
+ * Zeichenfläche mit Achsen als Antwortbereich (26.09.2026). Alle Felder sind Pflicht (strict);
+ * nicht benötigte bleiben leer bzw. 0. Die App bereinigt Bereich und Schrittweite
+ * (model/diagram.ts), damit kein unbrauchbares Diagramm aufs Papier kommt.
+ */
+const DIAGRAM = obj({
+  kind: enumOf(DIAGRAM_KIND_IDS),
+  heightMm: int('Höhe der Zeichenfläche in mm (45–120; Zeitleiste mit Strängen mehr)'),
+  axes: obj({
+    xLabel: str('Beschriftung der x-Achse mit Einheit, z. B. „Zeit t in s"; schraegbild: Achse nach rechts (x₂)'),
+    yLabel: str('Beschriftung der y-Achse mit Einheit; schraegbild: Achse nach oben (x₃)'),
+    y2Label: str('klima: rechte Achse, sonst leer'),
+    xMin: int(),
+    xMax: int(),
+    xStep: int('Wert je Kästchen auf der x-Achse (> 0)'),
+    yMin: int(),
+    yMax: int(),
+    yStep: int('Wert je Kästchen auf der y-Achse (> 0)'),
+    y2Min: int(),
+    y2Max: int(),
+    y2Step: int(),
+    showNumbers: bool('Zahlen an den Achsen'),
+    months: bool('klima: true')
+  }),
+  z: obj({ label: str('schraegbild: Tiefenachse nach vorn (x₁), sonst leer'), min: int(), max: int(), step: int() }),
+  xCategories: arr(str(), 'spannung: Beschriftungen der x-Achse (Handlungsschritte, Kapitel), sonst leer'),
+  yLevels: arr(str(), 'spannung: Stufen der y-Achse von unten nach oben, sonst leer'),
+  timeline: obj({
+    unit: enumOf(TIMELINE_UNIT_IDS),
+    from: str('zeitleiste: Anfang, z. B. „1914-07-28", „1914-07", „1914", „-500" (v. Chr.); sonst leer'),
+    to: str('zeitleiste: Ende'),
+    step: int('zeitleiste: Marke alle … Einheiten'),
+    sections: arr(obj({ from: str(), to: str(), unit: enumOf(TIMELINE_UNIT_IDS), step: int() }), 'zeitleiste: Abschnitte mit eigener Skala für lange Zeiträume, sonst leer'),
+    yLabel: str('zeitleiste: Beschriftung einer y-Achse (z. B. „Eskalation"), sonst leer'),
+    yLevels: arr(str(), 'zeitleiste: Stufen der y-Achse von unten nach oben (z. B. Drohung, Ultimatum, Mobilmachung, Krieg), sonst leer'),
+    strands: arr(str(), 'zeitleiste: mehrere Stränge an derselben Zeitachse (z. B. zwei Länder), sonst leer'),
+    events: arr(obj({ date: str(), text: str(), strand: int('0-basiert'), level: int('Stufe 0-basiert, -1 = keine') }), 'zeitleiste: VORGEGEBENE Ereignisse auf dem Schülerblatt; leer, wenn die Lernenden selbst eintragen')
+  })
+})
+
 const ANSWER = obj({
   kind: enumOf(ANSWER_KINDS),
+  diagram: DIAGRAM,
   count: int('lines/labels: Anzahl Linien; grid: Kästchenzeilen'),
   heightMm: int('space: Höhe in mm'),
   gapText: str('gapText: Text mit [[Lösung]] je Lücke'),
