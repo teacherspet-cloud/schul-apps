@@ -77,8 +77,10 @@ const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name
 /*
  * Vorschläge je Fach – seit 26.09.2026 für JEDES Fach ein eigener (vorher teilten sich
  * sechs Fächer ihre Farbe mit einem anderen, Niederländisch und Russisch hatten keine).
- * Naheliegendes blieb: Biologie grün, Geschichte braun, Erdkunde oliv, Deutsch rot; DaZ
- * bekam das Altrosa neben dem Rot von Deutsch, Sachunterricht ein Moosgrün neben Biologie.
+ * Naheliegendes blieb: Biologie grün, Erdkunde oliv, Deutsch rot; DaZ bekam das Altrosa neben
+ * dem Rot von Deutsch, Sachunterricht ein Moosgrün neben Biologie.
+ * Geschichte war braun; auf Wunsch der Lehrkraft (26.09.2026) getauscht mit Latein: Geschichte
+ * jetzt Bordeaux, Latein Braun.
  * Eine in den Einstellungen gewählte Farbe bleibt unverändert – nur die Vorschläge sind neu.
  */
 export const FACH_VORSCHLAG: Record<string, string> = {
@@ -87,13 +89,14 @@ export const FACH_VORSCHLAG: Record<string, string> = {
   franzoesisch: farbe('Violett'),
   spanisch: farbe('Orange'),
   italienisch: farbe('Tannengrün'),
-  latein: farbe('Bordeaux'),
+  // Getauscht mit Geschichte (Wunsch der Lehrkraft vom 26.09.2026, siehe oben)
+  latein: farbe('Braun'),
   mathematik: farbe('Blau'),
   biologie: farbe('Grün'),
   chemie: farbe('Türkis'),
   physik: farbe('Petrol'),
   informatik: farbe('Schiefergrau'),
-  geschichte: farbe('Braun'),
+  geschichte: farbe('Bordeaux'),
   erdkunde: farbe('Olivgrün'),
   politik: farbe('Ocker'),
   religion: farbe('Magenta'),

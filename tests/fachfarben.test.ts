@@ -72,6 +72,10 @@ describe('Druckfeste Palette', () => {
     expect(FACH_VORSCHLAG.englisch).not.toBe(FACH_VORSCHLAG.geschichte)
     expect(FACH_VORSCHLAG.mathematik).not.toBe(FACH_VORSCHLAG.physik)
     expect(FACH_VORSCHLAG.deutsch).not.toBe(FACH_VORSCHLAG.daz)
+    // Geschichte nicht mehr braun (Wunsch der Lehrkraft vom 26.09.2026): getauscht mit Latein
+    const name = (hex: string): string | undefined => FACH_PALETTE.find((f) => f.hex === hex)?.name
+    expect(name(FACH_VORSCHLAG.geschichte)).toBe('Bordeaux')
+    expect(name(FACH_VORSCHLAG.latein)).toBe('Braun')
   })
 })
 
