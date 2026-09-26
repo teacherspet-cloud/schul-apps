@@ -34,6 +34,9 @@ export interface Material {
   grade?: number
   /** Thema im Wortlaut des Programms – Grundlage der Vorschläge (shared/themenVorschlag.ts) */
   thema: string
+  /** Bundesland und Schulform aus den Kopfdaten (Paket 13) – nur, wenn das Programm sie gesichert hat */
+  land?: string
+  schulform?: string
 }
 
 export interface Listen {
@@ -79,7 +82,8 @@ function material(
   weitere: string[],
   fach?: string,
   grade?: number,
-  thema = ''
+  thema = '',
+  herkunft: { stateId?: string; schoolTypeId?: string } = {}
 ): Material {
   return {
     moduleId,
@@ -87,6 +91,8 @@ function material(
     fachId: fachSchluessel(fach),
     ...(grade ? { grade } : {}),
     thema,
+    ...(herkunft.stateId ? { land: herkunft.stateId } : {}),
+    ...(herkunft.schoolTypeId ? { schulform: herkunft.schoolTypeId } : {}),
     id,
     name: name || 'Ohne Namen',
     detail,
@@ -124,7 +130,8 @@ export function vereinige(l: Listen): Material[] {
         [s.schoolTypeName],
         s.subjectId,
         s.grade,
-        s.topic
+        s.topic,
+        s
       )
     ),
     ...l.kurztests.map((t) =>
@@ -138,7 +145,8 @@ export function vereinige(l: Listen): Material[] {
         [t.bezeichnung],
         t.subjectLabel,
         t.grade,
-        t.thema
+        t.thema,
+        t
       )
     ),
     ...l.grammarTests.map((t) =>
@@ -152,11 +160,24 @@ export function vereinige(l: Listen): Material[] {
         [],
         t.subjectLabel,
         t.grade,
-        t.topics
+        t.topics,
+        t
       )
     ),
     ...l.exams.map((e) =>
-      material('klassenarbeit', e.id, e.name, e.updatedAt, !e.hasTasks, zeile(e.subjectLabel, klasse(e.grade), e.topic), [], e.subjectLabel, e.grade, e.topic)
+      material(
+        'klassenarbeit',
+        e.id,
+        e.name,
+        e.updatedAt,
+        !e.hasTasks,
+        zeile(e.subjectLabel, klasse(e.grade), e.topic),
+        [],
+        e.subjectLabel,
+        e.grade,
+        e.topic,
+        e
+      )
     ),
     ...l.vokabellisten.map((v) =>
       material(

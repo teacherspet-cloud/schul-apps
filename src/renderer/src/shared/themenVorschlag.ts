@@ -51,6 +51,13 @@ export interface ThemenMaterial {
   thema: string
   fachId: string
   grade?: number
+  /**
+   * Bundesland und Schulform, für die das Material gemacht ist (Paket 13) – aus seinen Kopfdaten,
+   * sonst aus den Einstellungen. Die Lehrplandatei eines Landes gilt nur für dessen Materialien:
+   * Ein Blatt für Bayern kommt nicht in einen Bereich aus dem niedersächsischen Kerncurriculum.
+   */
+  land?: string
+  schulform?: string
   updatedAt: string
 }
 
@@ -64,6 +71,10 @@ export interface KatalogThema {
   jahrgaenge?: number[]
   /** Oberthemen von oben nach unten (Paket 12) – daraus entstehen beim Einsortieren die Oberbereiche */
   pfad?: string[]
+  /** Wortlaut des Lehrplans, wenn `name` gekürzt ist (Paket 13) – kommt als Tooltip an den Bereich */
+  wortlaut?: string
+  /** Dasselbe für die Oberthemen, Stelle für Stelle wie `pfad` ('' = nicht gekürzt) */
+  pfadWortlaut?: string[]
 }
 
 export interface Vorschlag {
@@ -76,6 +87,8 @@ export interface Vorschlag {
   herkunft: 'bereich' | KatalogThema['quelle'] | 'stichwort'
   /** Oberthemen aus dem Lehrplan (Paket 12) */
   pfad?: string[]
+  /** Wortlaut gekürzter Lehrplantitel je Name (Paket 13) */
+  wortlaute?: Record<string, string>
 }
 
 // ---------- Wörter ----------
@@ -225,9 +238,11 @@ export function einsortieren(materialien: ThemenMaterial[], daten: ThemenDaten, 
 
 // ---------- Lehrplan- und Lehrwerksthemen ----------
 
-type KatalogMitWoertern = { k: KatalogThema; w: string[] }[]
+/** `w`: Wörter aus Name und Zusatz, `n`: nur aus dem Namen */
+type KatalogMitWoertern = { k: KatalogThema; w: string[]; n: string[] }[]
 
-const katalogWoerter = (katalog: KatalogThema[]): KatalogMitWoertern => katalog.map((k) => ({ k, w: stichwoerter(`${k.name} ${k.zusatz ?? ''}`) }))
+const katalogWoerter = (katalog: KatalogThema[]): KatalogMitWoertern =>
+  katalog.map((k) => ({ k, w: stichwoerter(`${k.name} ${k.zusatz ?? ''}`), n: stichwoerter(k.name) }))
 
 /**
  * Das passendste belegte Thema für ein Material (Stelle im Katalog, -1 = keins): Mindestens
@@ -239,16 +254,38 @@ function besterKatalogIndex(m: ThemenMaterial, katalog: KatalogMitWoertern): num
   const w = woerterVon(m)
   let bestes = -1
   let wert = 0
+  let wertName = 0
+  let wertRueck = 0
   for (let i = 0; i < katalog.length; i++) {
     // „Unit 3" in Klasse 6 ist eine andere Unit als in Klasse 8
     const jg = katalog[i].k.jahrgaenge
     if (m.grade && jg && !jg.includes(m.grade)) continue
     const d = deckung(w, katalog[i].w)
-    // Mindestens ein aussagekräftiges Wort muss passen, nicht nur Kurzwörter
-    if (d < LEHRPLAN_DECKUNG || !w.some((x) => (x.length >= 5 || /\d/.test(x)) && katalog[i].w.some((y) => passt(x, y)))) continue
-    if (d > wert || (d === wert && bestes >= 0 && katalog[i].w.length < katalog[bestes].w.length)) {
+    /*
+     * Mindestens ein aussagekräftiges Wort muss passen, nicht nur Kurzwörter – ODER der ganze
+     * Name des Themas steht im Material (ab zwei Wörtern; Paket 13): „Leben im Wald" besteht nur
+     * aus Kurzwörtern, ein Blatt „Leben im Wald – Stockwerke" gehört trotzdem sicher dorthin.
+     */
+    const kraeftig = w.some((x) => (x.length >= 5 || /\d/.test(x)) && katalog[i].w.some((y) => passt(x, y)))
+    const ganzerName = katalog[i].n.length >= 2 && katalog[i].n.every((y) => w.some((x) => passt(x, y)))
+    if (d < LEHRPLAN_DECKUNG || !(kraeftig || ganzerName)) continue
+    /*
+     * Bei gleicher Deckung zählt, wie viel davon im NAMEN des Themas steht (Paket 13): Seit die
+     * Leitsätze der Kerncurricula als Zusatzwörter beim Oberthema mitzählen, trifft „Fotosynthese
+     * – Leben und Energie" sonst zufällig „Lebewesen in ihrer Umwelt" (… Energieflüsse …).
+     */
+    const dn = deckung(w, katalog[i].n)
+    // Danach: wie viel vom Namen des Themas im Material steht – „Lineare Zusammenhänge" ganz, „Abgrenzung gegen nicht-lineare Zusammenhänge" halb
+    const rn = deckung(katalog[i].n, w)
+    const besser =
+      d > wert ||
+      (d === wert &&
+        (dn > wertName || (dn === wertName && (rn > wertRueck || (rn === wertRueck && bestes >= 0 && katalog[i].w.length < katalog[bestes].w.length)))))
+    if (besser) {
       bestes = i
       wert = d
+      wertName = dn
+      wertRueck = rn
     }
   }
   return bestes
@@ -275,7 +312,8 @@ function besterKatalogIndex(m: ThemenMaterial, katalog: KatalogMitWoertern): num
 export function automatischEinsortieren(
   materialien: ThemenMaterial[],
   daten: ThemenDaten,
-  katalogFuer: (fachId: string) => KatalogThema[],
+  /** Die belegten Themen für ein Material – je Fach, Land und Schulform des Materials (Paket 13) */
+  katalogFuer: (fachId: string, m: ThemenMaterial) => KatalogThema[],
   heute = new Date().toISOString()
 ): { zuordnungen: Record<string, Zuordnung>; uebernahmen: BereichsUebernahme[] } {
   const zuordnungen: Record<string, Zuordnung> = {}
@@ -290,17 +328,28 @@ export function automatischEinsortieren(
       zuordnungen[k] = { bereichId: b.id, von: 'auto', am: heute }
       continue
     }
-    if (!kataloge.has(m.fachId)) kataloge.set(m.fachId, katalogWoerter(katalogFuer(m.fachId)))
-    const katalog = kataloge.get(m.fachId)!
+    const art = `${m.fachId}|${m.land ?? ''}|${m.schulform ?? ''}`
+    if (!kataloge.has(art)) kataloge.set(art, katalogWoerter(katalogFuer(m.fachId, m)))
+    const katalog = kataloge.get(art)!
     const i = besterKatalogIndex(m, katalog)
     if (i < 0) continue
     const thema = katalog[i].k
-    const pfad = passendePfadnamen(daten, m.fachId, [...(thema.pfad ?? []), thema.name].map(kurzName))
+    const lehrplanNamen = [...(thema.pfad ?? []), thema.name].map(kurzName)
+    const pfad = passendePfadnamen(daten, m.fachId, lehrplanNamen)
     const name = pfad.pop()!
+    const wortlaute = wortlauteVon(thema, lehrplanNamen)
     const schluessel = `${m.fachId}|${pfad.join('›')}|${name}`
     const da = gruppen.get(schluessel)
     if (da) da.schluessel.push(k)
-    else gruppen.set(schluessel, { fachId: m.fachId, name, ...(pfad.length ? { pfad } : {}), herkunft: thema.quelle, schluessel: [k] })
+    else
+      gruppen.set(schluessel, {
+        fachId: m.fachId,
+        name,
+        ...(pfad.length ? { pfad } : {}),
+        herkunft: thema.quelle,
+        ...(wortlaute ? { wortlaute } : {}),
+        schluessel: [k]
+      })
   }
   /*
    * Ein OBERSTES Thema ohne Unterthemen wird erst ab `MIN_GRUPPE` Materialien ein Bereich: Sonst
@@ -308,7 +357,31 @@ export function automatischEinsortieren(
    * diesem einen Blatt. Mit Oberthemen (Pfad) ist schon das erste Material richtig aufgehoben –
    * es steht dann unter seiner Unterrichtseinheit.
    */
-  return { zuordnungen, uebernahmen: [...gruppen.values()].filter((u) => u.pfad?.length || u.schluessel.length >= MIN_GRUPPE) }
+  /*
+   * Ausnahme (Paket 13): Entsteht der Bereich ohnehin – als Oberbereich eines anderen, der
+   * angelegt wird („Lineare Zusammenhänge" über „Lineare Gleichungen") –, kommt auch das eine
+   * Material dorthin. Sonst stünde es neben dem frisch angelegten Ordner seines Themas.
+   */
+  const alle = [...gruppen.values()]
+  const pfadText = (u: BereichsUebernahme): string => [...(u.pfad ?? []), u.name].join('›').toLocaleLowerCase('de')
+  const behalten = alle.filter((u) => u.pfad?.length || u.schluessel.length >= MIN_GRUPPE)
+  const entstehen = new Set(
+    behalten.flatMap((u) =>
+      (u.pfad ?? []).map((_, i) =>
+        u
+          .pfad!.slice(0, i + 1)
+          .join('›')
+          .toLocaleLowerCase('de')
+      )
+    )
+  )
+  return { zuordnungen, uebernahmen: alle.filter((u) => behalten.includes(u) || entstehen.has(pfadText(u))) }
+}
+
+/** Gekürzte Lehrplantitel: der Wortlaut je (Kurz-)Name, damit er am neuen Bereich als Tooltip steht */
+function wortlauteVon(k: KatalogThema, namen: string[]): Record<string, string> | undefined {
+  const paare = [...(k.pfadWortlaut ?? (k.pfad ?? []).map(() => '')), k.wortlaut ?? ''].map((w, j) => [namen[j], w] as const).filter(([n, w]) => n && w)
+  return paare.length ? Object.fromEntries(paare) : undefined
 }
 
 /** Ebene für Ebene: Heißt ein vorhandener Bereich fast gleich, wird sein Name genommen (dann legt `uebernehmen` keinen zweiten an) */
@@ -334,8 +407,9 @@ function passendePfadnamen(daten: ThemenDaten, fachId: string, namen: string[]):
 /** Lange Lehrplantitel kürzen – umbenennen lässt sich jeder Bereich danach */
 export function kurzName(name: string): string {
   const n = name.trim()
-  if (n.length <= 60) return n
-  return `${n.slice(0, 57).replace(/\s+\S*$/, '')} …`
+  // 80 Zeichen wie `bereichSetzen`; Lehrplantitel sind seit Paket 13 schon gekürzt (`bereichsName`)
+  if (n.length <= 80) return n
+  return `${n.slice(0, 77).replace(/\s+\S*$/, '')} …`
 }
 
 const gross = (w: string): string => w.charAt(0).toLocaleUpperCase('de') + w.slice(1)
@@ -399,12 +473,15 @@ export function vorschlagen(alle: ThemenMaterial[], daten: ThemenDaten, fachId: 
     }
     for (const [i, liste] of gruppen) {
       if (liste.length < MIN_GRUPPE) continue
+      const k = katalog[i].k
+      const wortlaute = wortlauteVon(k, [...(k.pfad ?? []), k.name].map(kurzName))
       vorschlaege.push({
-        name: kurzName(katalog[i].k.name),
+        name: kurzName(k.name),
         fachId,
         schluessel: liste.map(schluesselVon),
-        herkunft: katalog[i].k.quelle,
-        ...(katalog[i].k.pfad?.length ? { pfad: katalog[i].k.pfad!.map(kurzName) } : {})
+        herkunft: k.quelle,
+        ...(k.pfad?.length ? { pfad: k.pfad.map(kurzName) } : {}),
+        ...(wortlaute ? { wortlaute } : {})
       })
       for (const m of liste) vergeben.add(schluesselVon(m))
     }

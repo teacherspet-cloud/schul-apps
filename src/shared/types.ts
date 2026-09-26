@@ -643,6 +643,13 @@ export interface SavedWorksheetStats {
   topic: string
   grade: number
   schoolTypeName: string
+  /**
+   * Bundesland und Schulform des Materials (Paket 13) – damit die Themenbereiche nur den
+   * Lehrplan des passenden Landes anwenden. Ältere Einträge haben sie nicht; dann gelten die
+   * Einstellungen.
+   */
+  stateId?: string
+  schoolTypeId?: string
   /** Anzahl der Niveaufassungen */
   sheetCount: number
   hasBoard: boolean
@@ -771,6 +778,13 @@ export interface SavedExamStats {
   /** Sind schon Aufgaben erzeugt? */
   hasTasks: boolean
   minutes: number
+  /**
+   * Bundesland und Schulform des Materials (Paket 13) – damit die Themenbereiche nur den
+   * Lehrplan des passenden Landes anwenden. Ältere Einträge haben sie nicht; dann gelten die
+   * Einstellungen.
+   */
+  stateId?: string
+  schoolTypeId?: string
 }
 
 export interface SavedExamMeta extends SavedExamStats {
@@ -801,6 +815,13 @@ export interface SavedGrammarTestStats {
   minutes: number
   /** Wird der Test benotet? */
   graded: boolean
+  /**
+   * Bundesland und Schulform des Materials (Paket 13) – damit die Themenbereiche nur den
+   * Lehrplan des passenden Landes anwenden. Ältere Einträge haben sie nicht; dann gelten die
+   * Einstellungen.
+   */
+  stateId?: string
+  schoolTypeId?: string
 }
 
 export interface SavedGrammarTestMeta extends SavedGrammarTestStats {
@@ -834,6 +855,8 @@ export interface SavedKurztestStats {
   /** Bezeichnung des Landesformats, z. B. „Stegreifaufgabe" */
   bezeichnung: string
   stateId: string
+  /** Schulform (Paket 13, für die Themenbereiche); ältere Einträge haben sie nicht */
+  schoolTypeId?: string
   taskCount: number
   points: number
   minutes: number

@@ -19,7 +19,7 @@
  * Getrennt von themenVorschlag.ts, damit die Vorschlagslogik ohne die großen Datenlisten
  * prüfbar bleibt.
  */
-import type { LehrplanDatei, LehrplanUnterthema } from '@shared/lehrplan'
+import { bereichsName, lehrplanSchulform, type LehrplanDatei, type LehrplanUnterthema } from '@shared/lehrplan'
 import { THEMENBLOECKE } from '../modules/lernzielkontrolle/didactics/themen'
 import { CURRICULUM_TOPICS } from '../modules/klassenarbeit/model/curriculumGeschichte'
 import { GRAMMAR_TOPICS } from '../modules/arbeitsblatt/didactics/grammarTopics'
@@ -29,6 +29,8 @@ import type { KatalogThema } from './themenVorschlag'
 /** Ein Thema im Baum; `kinder` sind seine Unterthemen */
 export interface KatalogKnoten {
   name: string
+  /** Wortlaut des Lehrplans, wenn `name` daraus gekürzt ist (Paket 13) – als Tooltip am Bereich */
+  wortlaut?: string
   quelle: KatalogThema['quelle']
   zusatz?: string
   jahrgaenge?: number[]
@@ -66,8 +68,18 @@ function zusammenlegen(knoten: KatalogKnoten[]): KatalogKnoten[] {
  * Unterthemen aus der Lehrplandatei. „z. B."-Beispiele (`beispiel`) werden KEINE eigenen
  * Bereiche – „Ort", „Region" als Ordner wären Lärm –, ihre Wörter zählen aber beim Vergleich
  * für das Oberthema mit.
+ *
+ * Seit Paket 13 ebenso Kompetenz- und Leitsätze („lineare Funktionen … analysieren …",
+ * „Enzyme steuern Lebensvorgänge in Zellen"; gemeldet von der Lehrkraft): Aus ihnen wird kein
+ * Bereich (`bereichsName` liefert null), ihre Wörter zählen beim Oberthema, und ihre eigenen
+ * Unterthemen rücken eine Ebene hoch. Ein Material zu „Winkelsummensatz …" landet so im
+ * Oberthema „Körper und Figuren" statt in einem Ordner mit Satz-Namen.
  */
-function ausUnterthemen(liste: LehrplanUnterthema[] | undefined, jahrgaenge: number[] | undefined): { kinder: KatalogKnoten[]; beispiele: string } {
+function ausUnterthemen(
+  liste: LehrplanUnterthema[] | undefined,
+  jahrgaenge: number[] | undefined,
+  eltern = ''
+): { kinder: KatalogKnoten[]; beispiele: string } {
   const kinder: KatalogKnoten[] = []
   const beispiele: string[] = []
   for (const u of liste ?? []) {
@@ -75,37 +87,67 @@ function ausUnterthemen(liste: LehrplanUnterthema[] | undefined, jahrgaenge: num
       beispiele.push(u.thema)
       continue
     }
-    const tiefer = ausUnterthemen(u.unterthemen, jahrgaenge)
-    kinder.push({ name: u.thema, quelle: 'lehrplan', zusatz: tiefer.beispiele || undefined, jahrgaenge, kinder: tiefer.kinder })
+    const n = bereichsName(u.thema)
+    const tiefer = ausUnterthemen(u.unterthemen, jahrgaenge, n?.name ?? eltern)
+    // Kurzform wie das Oberthema („lineare Zusammenhänge identifizieren …" unter „Lineare Zusammenhänge"): kein zweiter Ordner gleichen Namens
+    if (!n || gleich(n.name, eltern)) {
+      beispiele.push(u.thema, tiefer.beispiele)
+      kinder.push(...tiefer.kinder)
+      continue
+    }
+    kinder.push({
+      name: n.name,
+      ...(n.wortlaut ? { wortlaut: n.wortlaut } : {}),
+      quelle: 'lehrplan',
+      // Der volle Wortlaut zählt beim Vergleich mit – gekürzt wird nur der Ordnername
+      zusatz: [n.wortlaut, tiefer.beispiele].filter(Boolean).join(' ') || undefined,
+      jahrgaenge,
+      kinder: tiefer.kinder
+    })
   }
-  return { kinder, beispiele: beispiele.join(' ') }
+  return { kinder, beispiele: beispiele.filter(Boolean).join(' ') }
 }
 
-/** Oberthemen eines Fachs aus der Lehrplandatei (optional nur für eine Schulform) */
+/**
+ * Oberthemen eines Fachs aus der Lehrplandatei (optional nur für eine Schulform der App –
+ * übersetzt in die Schulformen der Datei, `lehrplanSchulform`).
+ */
 export function lehrplanBaum(lehrplan: LehrplanDatei | null | undefined, fachId: string, schulform?: string): KatalogKnoten[] {
   if (!lehrplan) return []
+  const form = lehrplanSchulform(schulform)
   const knoten: KatalogKnoten[] = []
   for (const e of lehrplan.eintraege) {
     if (e.fach !== fachId) continue
-    if (schulform && e.schulformen?.length && !e.schulformen.includes(schulform)) continue
-    const unter = ausUnterthemen(e.unterthemen, e.jahrgaenge)
-    knoten.push({
-      name: e.thema,
-      quelle: 'lehrplan',
-      zusatz: [unter.beispiele, ...(e.stichwoerter ?? [])].filter(Boolean).join(' ') || undefined,
-      jahrgaenge: e.jahrgaenge,
-      kinder: unter.kinder
-    })
+    if (form && e.schulformen?.length && !e.schulformen.includes(form)) continue
+    const n = bereichsName(e.thema)
+    const unter = ausUnterthemen(e.unterthemen, e.jahrgaenge, n?.name)
+    const zusatz = [n?.wortlaut, unter.beispiele, ...(e.stichwoerter ?? [])].filter(Boolean).join(' ') || undefined
+    if (!n) {
+      // Oberthema ohne brauchbaren Namen: Seine Unterthemen stehen oben, sein Text zählt bei ihnen mit
+      for (const k of unter.kinder) knoten.push({ ...k, zusatz: [k.zusatz, e.thema, zusatz].filter(Boolean).join(' ') })
+      continue
+    }
+    knoten.push({ name: n.name, ...(n.wortlaut ? { wortlaut: n.wortlaut } : {}), quelle: 'lehrplan', zusatz, jahrgaenge: e.jahrgaenge, kinder: unter.kinder })
   }
   return zusammenlegen(knoten)
 }
 
-/** Der Rückfall: die flachen Lehrplanthemen, die die App schon mitbringt */
-function vorhandeneLehrplanthemen(fachId: string): KatalogKnoten[] {
+/**
+ * Der Rückfall: die flachen Lehrplanthemen, die die App schon mitbringt. Seit Paket 13 nur die
+ * des Landes (und der Schulform), für das das Material gemacht ist – wie bei der Lehrplandatei.
+ * Ohne Land (ältere Aufrufe) alle, wie bis Paket 12.
+ */
+function vorhandeneLehrplanthemen(fachId: string, land?: string, schulform?: string): KatalogKnoten[] {
   const liste: KatalogKnoten[] = []
-  for (const b of THEMENBLOECKE)
-    if (b.fach === fachId) for (const t of b.themen) liste.push({ name: t, quelle: 'lehrplan', jahrgaenge: b.jahrgaenge, kinder: [] })
-  if (fachId === 'geschichte') for (const t of CURRICULUM_TOPICS) liste.push({ name: t.label, quelle: 'lehrplan', jahrgaenge: t.grades, kinder: [] })
+  for (const b of THEMENBLOECKE) {
+    if (b.fach !== fachId || (land && b.stateId !== land)) continue
+    if (schulform && b.schulformen?.length && !b.schulformen.includes(schulform)) continue
+    for (const t of b.themen) liste.push({ name: t, quelle: 'lehrplan', jahrgaenge: b.jahrgaenge, kinder: [] })
+  }
+  if (fachId === 'geschichte')
+    for (const t of CURRICULUM_TOPICS)
+      if ((!land || t.stateId === land) && (!schulform || t.schoolTypeIds.includes(schulform)))
+        liste.push({ name: t.label, quelle: 'lehrplan', jahrgaenge: t.grades, kinder: [] })
   return liste
 }
 
@@ -132,13 +174,13 @@ const cache = new Map<string, KatalogKnoten[]>()
  * Der Themenbaum eines Fachs. Mit Lehrplandatei (und Einträgen für dieses Fach) gilt sie; sonst
  * die mitgebrachten flachen Themen. Lehrwerk und Grammatik kommen in beiden Fällen dazu.
  */
-export function katalogBaum(fachId: string, lehrplan?: LehrplanDatei | null, schulform?: string): KatalogKnoten[] {
-  const schluessel = `${fachId}|${lehrplan?.stateId ?? ''}|${lehrplan?.stand ?? ''}|${lehrplan?.eintraege.length ?? 0}|${schulform ?? ''}`
+export function katalogBaum(fachId: string, lehrplan?: LehrplanDatei | null, schulform?: string, land?: string): KatalogKnoten[] {
+  const schluessel = `${fachId}|${lehrplan?.stateId ?? ''}|${lehrplan?.stand ?? ''}|${lehrplan?.eintraege.length ?? 0}|${schulform ?? ''}|${land ?? ''}`
   const da = cache.get(schluessel)
   if (da) return da
   const ausDatei = lehrplanBaum(lehrplan, fachId, schulform)
   const baum = [
-    ...zusammenlegen(ausDatei.length ? ausDatei : vorhandeneLehrplanthemen(fachId)),
+    ...zusammenlegen(ausDatei.length ? ausDatei : vorhandeneLehrplanthemen(fachId, land, schulform)),
     ...lehrwerkBaum(fachId),
     ...zusammenlegen(
       GRAMMAR_TOPICS.filter((g) => g.subject === fachId).map((g) => ({ name: g.label, zusatz: g.term, quelle: 'grammatik' as const, kinder: [] }))
@@ -149,21 +191,23 @@ export function katalogBaum(fachId: string, lehrplan?: LehrplanDatei | null, sch
 }
 
 /** Derselbe Baum flach – jedes Thema mit seinen Oberthemen (`pfad`) */
-export function katalogFuer(fachId: string, lehrplan?: LehrplanDatei | null, schulform?: string): KatalogThema[] {
+export function katalogFuer(fachId: string, lehrplan?: LehrplanDatei | null, schulform?: string, land?: string): KatalogThema[] {
   const out: KatalogThema[] = []
-  const gehe = (knoten: KatalogKnoten[], pfad: string[]): void => {
+  const gehe = (knoten: KatalogKnoten[], pfad: KatalogKnoten[]): void => {
     for (const k of knoten) {
       out.push({
         name: k.name,
         quelle: k.quelle,
+        ...(k.wortlaut ? { wortlaut: k.wortlaut } : {}),
         ...(k.zusatz ? { zusatz: k.zusatz } : {}),
         ...(k.jahrgaenge ? { jahrgaenge: k.jahrgaenge } : {}),
-        ...(pfad.length ? { pfad } : {})
+        ...(pfad.length ? { pfad: pfad.map((p) => p.name) } : {}),
+        ...(pfad.some((p) => p.wortlaut) ? { pfadWortlaut: pfad.map((p) => p.wortlaut ?? '') } : {})
       })
-      gehe(k.kinder, [...pfad, k.name])
+      gehe(k.kinder, [...pfad, k])
     }
   }
-  gehe(katalogBaum(fachId, lehrplan, schulform), [])
+  gehe(katalogBaum(fachId, lehrplan, schulform, land), [])
   return out
 }
 

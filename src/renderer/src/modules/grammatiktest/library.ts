@@ -27,7 +27,9 @@ export function testStats(test: GrammarTest): SavedGrammarTestStats {
     taskCount: testTaskCount(test),
     points: testPoints(test),
     minutes: test.meta.minutes,
-    graded: test.meta.graded
+    graded: test.meta.graded,
+    stateId: test.meta.stateId,
+    schoolTypeId: test.meta.schoolTypeId
   }
 }
 

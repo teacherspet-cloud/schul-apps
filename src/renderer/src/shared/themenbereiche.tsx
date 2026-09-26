@@ -210,12 +210,18 @@ export async function abgleichen(materialien: ThemenMaterial[]): Promise<void> {
   try {
     const d = await ladeThemen()
     /*
-     * Seit Paket 12 auch in die Hierarchie aus dem Lehrplan: Die Lehrplandatei des eigenen
-     * Landes (Einstellungen › Schule), sonst die mitgebrachten Themen (themenKatalog.ts).
+     * Seit Paket 12 auch in die Hierarchie aus dem Lehrplan, sonst die mitgebrachten Themen
+     * (themenKatalog.ts). Seit Paket 13 je MATERIAL: Land und Schulform aus seinen Kopfdaten
+     * (ältere Materialien: die Einstellungen). Ein Blatt für Bayern kommt so nie in einen Bereich
+     * aus dem niedersächsischen Kerncurriculum, und ein Oberschul-Blatt nicht in einen, den es nur
+     * am Gymnasium gibt; den Jahrgang prüft die Automatik selbst (Sek I vs. Oberstufe).
      */
     const { stateId, schoolTypeId } = useAppSettings.getState().settings.defaults
-    const lehrplan = await ladeLehrplan(stateId)
-    const { zuordnungen, uebernahmen } = automatischEinsortieren(materialien, d, (fachId) => katalogFuer(fachId, lehrplan, schoolTypeId))
+    const laender = [...new Set(materialien.map((m) => m.land || stateId))]
+    const lehrplaene = new Map(await Promise.all(laender.map(async (l) => [l, await ladeLehrplan(l)] as const)))
+    const { zuordnungen, uebernahmen } = automatischEinsortieren(materialien, d, (fachId, m) =>
+      katalogFuer(fachId, lehrplaene.get(m.land || stateId) ?? null, m.schulform || schoolTypeId, m.land || stateId)
+    )
     const neu: Record<string, Zuordnung | null> = zuordnungen
     const vorhanden = new Set(materialien.map((m) => materialSchluessel(m.moduleId, m.id)))
     for (const k of verwaisteSchluessel(d, vorhanden)) neu[k] = null

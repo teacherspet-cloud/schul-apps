@@ -43,6 +43,12 @@ export interface Themenbereich {
   elternId?: string
   /** Von der Automatik aus Lehrplan, Lehrwerk oder Grammatiktabelle angelegt (nur zur Kennzeichnung) */
   herkunft?: 'lehrplan' | 'lehrwerk' | 'grammatik'
+  /**
+   * Wortlaut des Lehrplans, wenn der Name daraus gekürzt ist (Paket 13): „Entwicklung der Medien"
+   * statt „Entwicklung der Medien seit dem Zeitalter der Hochkulturen bis in die Gegenwart
+   * (Längsschnitt)". Erscheint als Tooltip; beim Umbenennen bleibt er – der Lehrplan ist derselbe.
+   */
+  wortlaut?: string
   /** Stellung unter den Geschwistern (aufsteigend) */
   reihenfolge: number
   angelegt: string
@@ -98,6 +104,8 @@ export interface BereichsUebernahme {
   pfad?: string[]
   /** Woher die Automatik den Namen hat – Lehrplan, Lehrwerk, Grammatik werden an neu angelegten Bereichen vermerkt */
   herkunft?: string
+  /** Wortlaut gekürzter Lehrplantitel je Name (Paket 13) – kommt an die neu angelegten Bereiche */
+  wortlaute?: Record<string, string>
   /** Vorhandener Bereich gleichen Namens – dann kommen die Materialien dorthin */
   bereichId?: string
   schluessel: string[]
@@ -209,12 +217,15 @@ export function bereichSetzen(d: ThemenDaten, b: Pick<Themenbereich, 'id' | 'fac
     throw new Error(elternId ? `Einen Unterbereich „${name}“ gibt es dort schon.` : `Einen Themenbereich „${name}“ gibt es in diesem Fach schon.`)
   const reihenfolge = alt?.reihenfolge ?? b.reihenfolge ?? Math.max(0, ...kinderVon(d, fachId, elternId ?? null).map((x) => x.reihenfolge + 1))
   const herkunft = alt?.herkunft ?? b.herkunft
+  const wortlautRoh = alt?.wortlaut ?? b.wortlaut
+  const wortlaut = typeof wortlautRoh === 'string' ? wortlautRoh.trim().slice(0, 400) : ''
   const neu: Themenbereich = {
     id: b.id,
     fachId,
     name,
     ...(elternId ? { elternId } : {}),
     ...(herkunft ? { herkunft } : {}),
+    ...(wortlaut ? { wortlaut } : {}),
     reihenfolge,
     angelegt: alt?.angelegt ?? b.angelegt ?? jetzt(),
     ...((b.beschreibung ?? alt?.beschreibung) ? { beschreibung: (b.beschreibung ?? alt?.beschreibung)!.trim() } : {})
@@ -279,12 +290,12 @@ export function zuordnen(d: ThemenDaten, eintraege: Record<string, Zuordnung | n
 export function uebernehmen(d: ThemenDaten, vorschlaege: BereichsUebernahme[], automatikSchluessel: string[], neueId: () => string): ThemenDaten {
   let neu = d
   /** Bereich dieses Namens unter `elternId` – vorhanden oder neu angelegt */
-  const bereichFuer = (fachId: string, name: string, elternId: string | undefined, quelle?: string): string => {
+  const bereichFuer = (fachId: string, name: string, elternId: string | undefined, quelle?: string, wortlaut?: string): string => {
     const da = neu.bereiche.find((b) => b.fachId === fachId && b.elternId === elternId && gleicherName(b.name, name))
     if (da) return da.id
     const id = neueId()
     const herkunft = HERKUNFT.find((h) => h === quelle)
-    neu = bereichSetzen(neu, { id, fachId, name, ...(elternId ? { elternId } : {}), ...(herkunft ? { herkunft } : {}) })
+    neu = bereichSetzen(neu, { id, fachId, name, ...(elternId ? { elternId } : {}), ...(herkunft ? { herkunft } : {}), ...(wortlaut ? { wortlaut } : {}) })
     return id
   }
   for (const v of vorschlaege) {
@@ -292,12 +303,12 @@ export function uebernehmen(d: ThemenDaten, vorschlaege: BereichsUebernahme[], a
     if (!id && v.pfad?.length) {
       // Hierarchie aus dem Lehrplan: die Oberbereiche der Reihe nach finden oder anlegen
       let eltern: string | undefined
-      for (const name of v.pfad) eltern = bereichFuer(v.fachId, name, eltern, v.herkunft)
-      id = bereichFuer(v.fachId, v.name, eltern, v.herkunft)
+      for (const name of v.pfad) eltern = bereichFuer(v.fachId, name, eltern, v.herkunft, v.wortlaute?.[name])
+      id = bereichFuer(v.fachId, v.name, eltern, v.herkunft, v.wortlaute?.[v.name])
     }
     // Ohne Pfad wie bisher: ein gleichnamiger Bereich irgendwo im Fach nimmt die Materialien auf
     id ??= neu.bereiche.find((b) => b.fachId === v.fachId && gleicherName(b.name, v.name))?.id
-    id ??= bereichFuer(v.fachId, v.name, undefined, v.herkunft)
+    id ??= bereichFuer(v.fachId, v.name, undefined, v.herkunft, v.wortlaute?.[v.name])
     const eintraege: Record<string, Zuordnung> = {}
     // Von Hand Zugeordnetes bleibt, wo es ist – auch wenn es im Vorschlag auftaucht
     for (const k of v.schluessel) if (neu.zuordnungen[k]?.von !== 'hand') eintraege[k] = { bereichId: id, von: 'auto', am: jetzt() }

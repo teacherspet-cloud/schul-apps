@@ -869,9 +869,12 @@ function BaumZeile({
               <UnstyledButton onClick={onOeffnen} style={{ minWidth: 0, flex: 1 }} aria-label={`Themenbereich „${b.name}“ öffnen`}>
                 <Group gap={8} wrap="nowrap">
                   <OrdnerSymbol fach={b.fachId} groesse={20} offen={offen} />
-                  <Text fw={600} size="sm" truncate>
-                    {b.name}
-                  </Text>
+                  {/* Gekürzter Lehrplantitel (Paket 13): der volle Wortlaut als Tooltip */}
+                  <Tooltip label={b.wortlaut ? `Im Lehrplan: ${b.wortlaut}` : b.name} multiline maw={420} openDelay={400} disabled={!b.wortlaut}>
+                    <Text fw={600} size="sm" truncate data-wortlaut={b.wortlaut}>
+                      {b.name}
+                    </Text>
+                  </Tooltip>
                   {b.herkunft && (
                     <Tooltip
                       label={`Automatisch angelegt (${b.herkunft === 'lehrplan' ? 'Lehrplan' : b.herkunft === 'lehrwerk' ? 'Lehrwerk' : 'Grammatik'}) – umbenennen und verschieben wie jeden anderen Bereich`}
@@ -1386,9 +1389,10 @@ function VorschlagHinweis({ fachId, alle, jahrgang }: { fachId: string; alle: Ma
   const [aus, setAus] = useState<Record<string, string>>(() => lies(VORSCHLAG_AUS_KEY, {}))
   const lehrplan = useLehrplan()
   const schulform = useAppSettings((s) => s.settings.defaults.schoolTypeId)
+  const stateId = useAppSettings((s) => s.settings.defaults.stateId)
   const vorschlaege = useMemo(
-    () => (geladen ? vorschlagen(alle, daten, fachId, { jahrgang, katalog: katalogFuer(fachId, lehrplan, schulform) }) : []),
-    [alle, daten, fachId, jahrgang, geladen, lehrplan, schulform]
+    () => (geladen ? vorschlagen(alle, daten, fachId, { jahrgang, katalog: katalogFuer(fachId, lehrplan, schulform, stateId) }) : []),
+    [alle, daten, fachId, jahrgang, geladen, lehrplan, schulform, stateId]
   )
   const merkmal = vorschlaege.map((v) => `${v.name}:${v.schluessel.length}`).join('|')
   const auswahlKey = `${fachId}|${jahrgang ?? ''}`

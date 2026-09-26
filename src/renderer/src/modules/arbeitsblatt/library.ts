@@ -19,6 +19,8 @@ export function worksheetStats(ws: Worksheet): SavedWorksheetStats {
     topic: ws.meta.topic.trim() || ws.meta.title.trim() || 'Ohne Thema',
     grade: ws.meta.grade,
     schoolTypeName: ws.meta.schoolTypeName,
+    stateId: ws.meta.stateId,
+    schoolTypeId: ws.meta.schoolTypeId,
     sheetCount: ws.sheets.length,
     hasBoard: boardList(ws).length > 0
   }

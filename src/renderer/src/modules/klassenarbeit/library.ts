@@ -18,7 +18,9 @@ export function examStats(exam: Exam): SavedExamStats {
     topic: exam.meta.topic,
     partCount: exam.parts.length,
     hasTasks: examHasContent(exam),
-    minutes: exam.meta.minutes
+    minutes: exam.meta.minutes,
+    stateId: exam.meta.stateId,
+    schoolTypeId: exam.meta.schoolTypeId
   }
 }
 

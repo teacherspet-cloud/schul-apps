@@ -29,6 +29,7 @@ export function kurztestStats(test: Kurztest): SavedKurztestStats {
     thema: test.meta.thema,
     bezeichnung: test.meta.bezeichnung,
     stateId: test.meta.stateId,
+    schoolTypeId: test.meta.schoolTypeId,
     taskCount: teilaufgaben(blocks),
     points: gesamtpunkte(blocks),
     minutes: test.meta.minutes,
