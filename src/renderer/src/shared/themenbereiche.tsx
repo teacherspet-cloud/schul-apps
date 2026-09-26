@@ -2,15 +2,21 @@ import { Button, Group, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { create } from 'zustand'
 import {
+  automatikAn,
   leereThemen,
   materialSchluessel,
+  nachfahrenVon,
+  obersterBereich,
+  pfadVon,
   verwaisteSchluessel,
   type BereichsUebernahme,
   type ThemenDaten,
   type Themenbereich,
   type Zuordnung
 } from '@shared/themen'
-import { einsortieren, type ThemenMaterial } from './themenVorschlag'
+import { automatischEinsortieren, type ThemenMaterial } from './themenVorschlag'
+import { katalogFuer, ladeLehrplan } from './themenKatalog'
+import { useAppSettings } from './settingsStore'
 import { notifyError, uid } from './util'
 
 /**
@@ -76,10 +82,11 @@ export function zeigeRueckgaengig(text: string, rueckgaengig: () => Promise<void
 
 const anzahl = (n: number): string => (n === 1 ? 'Ein Material' : `${n} Materialien`)
 
-export async function bereichAnlegen(fachId: string, name: string): Promise<Themenbereich | null> {
+/** Neuer Bereich – mit `elternId` als Unterbereich (Paket 12) */
+export async function bereichAnlegen(fachId: string, name: string, elternId?: string | null): Promise<Themenbereich | null> {
   try {
     const id = uid()
-    const d = setze(await window.api.themen.bereich({ id, fachId, name }))
+    const d = setze(await window.api.themen.bereich({ id, fachId, name, ...(elternId ? { elternId } : {}) }))
     return d.bereiche.find((b) => b.id === id) ?? null
   } catch (e) {
     notifyError(e, 'Der Themenbereich ließ sich nicht anlegen')
@@ -97,20 +104,47 @@ export async function bereichUmbenennen(b: Themenbereich, name: string): Promise
   }
 }
 
-/** Löschen: Die Materialien kommen nach „Ohne Themenbereich"; Rückgängig stellt Bereich, Zuordnungen und Reihenfolge wieder her. */
+/**
+ * Löschen samt Unterbereichen: Die Materialien rücken in den Oberbereich (bzw. nach „Ohne
+ * Themenbereich"); Rückgängig stellt alle Bereiche, Zuordnungen und Reihenfolgen wieder her.
+ */
 export async function bereichLoeschen(b: Themenbereich): Promise<void> {
   const vorher = useThemen.getState().daten
-  const betroffen = Object.fromEntries(Object.entries(vorher.zuordnungen).filter(([, z]) => z.bereichId === b.id))
-  const reihenfolge = vorher.reihenfolge[b.id]
+  const weg = new Set([b.id, ...nachfahrenVon(vorher, b.id)])
+  // Von oben nach unten – beim Wiederherstellen muss der Oberbereich zuerst da sein
+  const bereiche = vorher.bereiche.filter((x) => weg.has(x.id)).sort((x, y) => pfadVon(vorher, x.id).length - pfadVon(vorher, y.id).length)
+  const betroffen = Object.fromEntries(Object.entries(vorher.zuordnungen).filter(([, z]) => z.bereichId && weg.has(z.bereichId)))
+  const reihenfolgen = [...weg].flatMap((id) => (vorher.reihenfolge[id] ? [[id, vorher.reihenfolge[id]] as const] : []))
+  const eltern = b.elternId ? vorher.bereiche.find((x) => x.id === b.elternId) : undefined
+  const n = Object.keys(betroffen).length
   try {
     setze(await window.api.themen.delete(b.id))
-    zeigeRueckgaengig(`Themenbereich „${b.name}“ gelöscht. ${anzahl(Object.keys(betroffen).length)} jetzt ohne Themenbereich.`, async () => {
-      await window.api.themen.bereich(b)
-      if (Object.keys(betroffen).length) await window.api.themen.zuordnen(betroffen)
-      setze(reihenfolge ? await window.api.themen.reihenfolge(b.id, reihenfolge) : await window.api.themen.list())
-    })
+    const unter = bereiche.length - 1
+    zeigeRueckgaengig(
+      `Themenbereich „${b.name}“${unter ? ` mit ${unter === 1 ? 'einem Unterbereich' : `${unter} Unterbereichen`}` : ''} gelöscht.${n ? ` ${anzahl(n)} jetzt ${eltern ? `in „${eltern.name}“` : 'ohne Themenbereich'}.` : ''}`,
+      async () => {
+        for (const x of bereiche) await window.api.themen.bereich(x)
+        if (n) await window.api.themen.zuordnen(betroffen)
+        for (const [id, liste] of reihenfolgen) await window.api.themen.reihenfolge(id, [...liste])
+        setze(await window.api.themen.list())
+      }
+    )
   } catch (e) {
     notifyError(e, 'Der Themenbereich ließ sich nicht löschen')
+  }
+}
+
+/** Einen Bereich unter einen anderen hängen oder nach oben (`ziel` null) – mit Rückgängig (Paket 12) */
+export async function bereichUmhaengen(b: Themenbereich, ziel: Themenbereich | null): Promise<void> {
+  const vorher = b.elternId ?? null
+  if (vorher === (ziel?.id ?? null)) return
+  try {
+    setze(await window.api.themen.verschieben(b.id, ziel?.id ?? null))
+    zeigeRueckgaengig(`„${b.name}“ ${ziel ? `liegt jetzt unter „${ziel.name}“` : 'steht jetzt oben'}.`, async () => {
+      setze(await window.api.themen.verschieben(b.id, vorher))
+    })
+  } catch (e) {
+    notifyError(e, 'Der Themenbereich ließ sich nicht verschieben')
   }
 }
 
@@ -146,7 +180,7 @@ export async function vorschlaegeUebernehmen(vorschlaege: BereichsUebernahme[], 
   const alteIds = new Set(vorher.bereiche.map((b) => b.id))
   const schluessel = vorschlaege.flatMap((v) => v.schluessel)
   const alt: Record<string, Zuordnung | null> = Object.fromEntries(schluessel.map((k) => [k, vorher.zuordnungen[k] ?? null]))
-  const automatikVorher = Boolean(vorher.automatik[fachId])
+  const automatikVorher = automatikAn(vorher, fachId)
   try {
     const d = setze(await window.api.themen.uebernehmen(vorschlaege, [fachId]))
     const neu = d.bereiche.filter((b) => !alteIds.has(b.id))
@@ -175,10 +209,38 @@ export async function abgleichen(materialien: ThemenMaterial[]): Promise<void> {
   gleichtAb = true
   try {
     const d = await ladeThemen()
-    const neu: Record<string, Zuordnung | null> = einsortieren(materialien, d)
+    /*
+     * Seit Paket 12 auch in die Hierarchie aus dem Lehrplan: Die Lehrplandatei des eigenen
+     * Landes (Einstellungen › Schule), sonst die mitgebrachten Themen (themenKatalog.ts).
+     */
+    const { stateId, schoolTypeId } = useAppSettings.getState().settings.defaults
+    const lehrplan = await ladeLehrplan(stateId)
+    const { zuordnungen, uebernahmen } = automatischEinsortieren(materialien, d, (fachId) => katalogFuer(fachId, lehrplan, schoolTypeId))
+    const neu: Record<string, Zuordnung | null> = zuordnungen
     const vorhanden = new Set(materialien.map((m) => materialSchluessel(m.moduleId, m.id)))
     for (const k of verwaisteSchluessel(d, vorhanden)) neu[k] = null
     if (Object.keys(neu).length) setze(await window.api.themen.zuordnen(neu))
+    if (uebernahmen.length) {
+      // Neue Bereiche aus dem Lehrplan: sichtbar melden und rückgängig machbar – nichts soll ungefragt verschwinden
+      const alteIds = new Set(useThemen.getState().daten.bereiche.map((b) => b.id))
+      const schluessel = uebernahmen.flatMap((u) => u.schluessel)
+      const danach = setze(await window.api.themen.uebernehmen(uebernahmen, []))
+      const angelegt = danach.bereiche.filter((b) => !alteIds.has(b.id))
+      if (angelegt.length)
+        zeigeRueckgaengig(
+          `${anzahl(schluessel.length)} nach dem Lehrplan einsortiert (${uebernahmen
+            .slice(0, 3)
+            .map((u) => [...(u.pfad ?? []), u.name].join(' › '))
+            .join('; ')}${uebernahmen.length > 3 ? ' …' : ''}).`,
+          async () => {
+            // Als „Ohne Themenbereich" von Hand festhalten – sonst sortierte die Automatik sofort wieder ein
+            const am = new Date().toISOString()
+            await window.api.themen.zuordnen(Object.fromEntries(schluessel.map((k) => [k, { bereichId: null, von: 'hand', am } satisfies Zuordnung])))
+            for (const b of [...angelegt].reverse()) await window.api.themen.delete(b.id).catch(() => undefined)
+            setze(await window.api.themen.list())
+          }
+        )
+    }
   } catch {
     // Das Einsortieren ist eine Zugabe – scheitert es, bleibt die Bibliothek trotzdem benutzbar
   } finally {
@@ -218,19 +280,29 @@ export async function neuImBereich(moduleId: string, docId: string, bereich: The
 }
 
 /**
- * Themenbereich eines Materials – für Paket 11 („Überthema" im Kopf des Blattes: standardmäßig
- * der Themenbereich). null = ohne Bereich. Liest den geladenen Stand; wer sicher gehen will,
- * ruft vorher `ladeThemen()`.
+ * Themenbereich eines Materials – der, in dem es direkt liegt (mit Unterbereichen der tiefste).
+ * null = ohne Bereich. Liest den geladenen Stand; wer sicher gehen will, ruft vorher `ladeThemen()`.
  */
 export function themenbereichVon(moduleId: string, docId: string, daten = useThemen.getState().daten): Themenbereich | null {
   const z = daten.zuordnungen[materialSchluessel(moduleId, docId)]
   return z?.bereichId ? (daten.bereiche.find((b) => b.id === z.bereichId) ?? null) : null
 }
 
-/** Name des Themenbereichs eines Materials (leer ohne Bereich) */
-export const themenbereichName = (moduleId: string, docId: string): string => themenbereichVon(moduleId, docId)?.name ?? ''
+/**
+ * Der Bereich, der als ÜBERTHEMA im Kopf steht (Paket 11, festgelegt in Paket 12): der OBERSTE
+ * Bereich über dem Material, also die Unterrichtseinheit direkt unter dem Fach – nicht der
+ * Unterbereich, in dem es liegt (Begründung bei `obersterBereich` in src/shared/themen.ts).
+ * Ohne Unterbereiche ist das derselbe wie bisher.
+ */
+export function ueberthemaBereichVon(moduleId: string, docId: string, daten = useThemen.getState().daten): Themenbereich | null {
+  const b = themenbereichVon(moduleId, docId, daten)
+  return b ? obersterBereich(daten, b.id) : null
+}
 
-/** Dasselbe als Hook – folgt Umbenennen und Verschieben sofort */
+/** Name des Überthema-Bereichs eines Materials (leer ohne Bereich) */
+export const themenbereichName = (moduleId: string, docId: string): string => ueberthemaBereichVon(moduleId, docId)?.name ?? ''
+
+/** Dasselbe als Hook – folgt Umbenennen und Verschieben sofort. Liefert den Bereich fürs Überthema (den obersten). */
 export function useThemenbereich(moduleId: string, docId: string): Themenbereich | null {
-  return useThemen((s) => themenbereichVon(moduleId, docId, s.daten))
+  return useThemen((s) => ueberthemaBereichVon(moduleId, docId, s.daten))
 }

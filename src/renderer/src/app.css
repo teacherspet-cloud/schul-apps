@@ -746,3 +746,19 @@ img.home-illustration {
 .themen-ohne {
   border-radius: 8px;
 }
+/* Baum der Themenbereiche (Paket 12): Pfeil dreht beim Aufklappen, Zeilen kompakt */
+.themen-pfeil {
+  transition: transform 150ms ease;
+  flex-shrink: 0;
+}
+.themen-pfeil[data-offen='true'] {
+  transform: rotate(90deg);
+}
+.themen-zeile[draggable='true'] {
+  cursor: grab;
+}
+.themen-herkunft {
+  display: inline-flex;
+  color: var(--mantine-color-dimmed);
+  flex-shrink: 0;
+}

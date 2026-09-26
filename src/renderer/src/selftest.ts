@@ -1851,6 +1851,20 @@ export function installSelftest(): void {
     return true
   }
 
+  /** Wie `inBereich`, aber in einen Unterbereich: legt den Pfad an und ordnet dem untersten Bereich zu (Paket 12) */
+  const inUnterbereich = async (modul: string, pfad: string[], fachId: string): Promise<boolean> => {
+    let eltern: string | null = null
+    let b = null
+    for (const name of pfad) {
+      b = await bereichAnlegen(fachId, name, eltern)
+      if (!b) return false
+      eltern = b.id
+    }
+    if (!b) return false
+    await neuImBereich(modul, docIdVon(modul), b)
+    return true
+  }
+
   /** Name der Vokabelliste setzen – daraus liest der Vokabeltest ohne Themenbereich die Unit (Paket 11) */
   const vtListenName = (name: string): void => useVokabeltest.getState().setListName(name)
 
@@ -1892,6 +1906,7 @@ export function installSelftest(): void {
     worksheetJetzt,
     docIdVon,
     inBereich,
+    inUnterbereich,
     pdfText,
     deckblattWord,
     vtListenName,

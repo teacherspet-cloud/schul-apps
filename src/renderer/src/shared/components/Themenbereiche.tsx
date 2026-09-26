@@ -10,6 +10,7 @@ import {
   Card,
   Checkbox,
   Chip,
+  Collapse,
   Group,
   Menu,
   Modal,
@@ -24,7 +25,9 @@ import {
   UnstyledButton
 } from '@mantine/core'
 import {
+  IconArrowBarUp,
   IconBulb,
+  IconChevronRight,
   IconDots,
   IconFilePlus,
   IconFolder,
@@ -38,8 +41,9 @@ import {
   IconX
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
+import { create } from 'zustand'
 import type { Themenbereich } from '@shared/themen'
-import { materialSchluessel } from '@shared/themen'
+import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon, pfadVon } from '@shared/themen'
 import { modules } from '../../modules/registry'
 import { fachAnzeige, ladeMaterialien, type Material } from '../../shell/materialien'
 import { artFarbe } from '../materialart'
@@ -50,6 +54,7 @@ import {
   bereichAnlegen,
   bereichLoeschen,
   bereichUmbenennen,
+  bereichUmhaengen,
   ladeThemen,
   neuImBereich,
   reihenfolgeSetzen,
@@ -57,7 +62,10 @@ import {
   verschieben,
   vorschlaegeUebernehmen
 } from '../themenbereiche'
-import { katalogFuer } from '../themenKatalog'
+import { katalogFuer, ladeLehrplan } from '../themenKatalog'
+import { useAppSettings } from '../settingsStore'
+import { useSichtbareProgramme } from '../../shell/programme'
+import type { LehrplanDatei } from '@shared/lehrplan'
 import { SORTIERUNGEN, schluesselVon, sortiere, umstellen, vorschauText, vorschlagen, type Sortierung, type Vorschlag } from '../themenVorschlag'
 import { useConfirmKeys } from '../useConfirmKeys'
 import { notifyError } from '../util'
@@ -81,6 +89,13 @@ import { FachPunkt, useFachFarbe } from './FachFarbe'
  * Ordnen: Karten auf einen Ordner ziehen (auch mehrere – Strg-/Umschalt-Klick oder
  * „Auswählen"), oder „Verschieben nach …" im ⋯-Menü (Tastatur, Tablet). Jede Änderung zeigt
  * „Rückgängig".
+ *
+ * HIERARCHIE (Paket 12, Wunsch der Lehrkraft vom 26.09.2026): Bereiche haben Unterbereiche
+ * („Der Erste Weltkrieg" › „Ursachen des Ersten Weltkriegs" › „Der Balkan als Krisenherd").
+ * Die Übersicht zeigt je Fach einen Baum; Fächer und Bereiche sind auf- und zuklappbar und
+ * stehen ANFANGS ZUGEKLAPPT – der Zustand wird je Rechner gemerkt. Aufgeklappt zeigt ein
+ * Bereich seine Unterbereiche und seine Materialien. Karten lassen sich auf jeden Bereich
+ * ziehen, Bereiche auf andere Bereiche (dann liegen sie darunter) oder auf das Fach (nach oben).
  */
 
 const MIME = 'application/x-schulapps-material'
@@ -118,6 +133,45 @@ const JAHRGANG_KEY = 'schul-apps-themen-jahrgang'
 const SORTIERUNG_KEY = 'schul-apps-themen-sortierung'
 const UMFANG_KEY = 'schul-apps-themen-umfang'
 const VORSCHLAG_AUS_KEY = 'schul-apps-themen-vorschlag-aus'
+
+/** Was aufgeklappt ist: `fach:<Kennung>` und `bereich:<Kennung>`. Standard: alles zu (Wunsch der Lehrkraft). */
+const OFFEN_KEY = 'schul-apps-themen-offen'
+const MIME_BEREICH = 'application/x-schulapps-bereich'
+
+interface OffenState {
+  offen: string[]
+  umschalten: (k: string) => void
+  oeffne: (ks: string[]) => void
+}
+/** Gemeinsam für alle Bibliotheken und die übergreifende Seite: Was hier aufgeklappt wird, ist es dort auch */
+const useOffen = create<OffenState>((set, get) => ({
+  offen: lies<string[]>(OFFEN_KEY, []),
+  umschalten: (k) => {
+    const neu = get().offen.includes(k) ? get().offen.filter((x) => x !== k) : [...get().offen, k]
+    merke(OFFEN_KEY, neu)
+    set({ offen: neu })
+  },
+  oeffne: (ks) => {
+    const neu = [...new Set([...get().offen, ...ks])]
+    if (neu.length === get().offen.length) return
+    merke(OFFEN_KEY, neu)
+    set({ offen: neu })
+  }
+}))
+
+/** Lehrplandatei des eigenen Landes (für Vorschläge mit Oberthemen) – null, solange sie lädt oder fehlt */
+function useLehrplan(): LehrplanDatei | null {
+  const stateId = useAppSettings((s) => s.settings.defaults.stateId)
+  const [lehrplan, setLehrplan] = useState<LehrplanDatei | null>(null)
+  useEffect(() => {
+    let weg = false
+    void ladeLehrplan(stateId).then((l) => !weg && setLehrplan(l))
+    return () => {
+      weg = true
+    }
+  }, [stateId])
+  return lehrplan
+}
 
 const modul = (id: string): (typeof modules)[number] | undefined => modules.find((m) => m.id === id)
 /*
@@ -158,10 +212,20 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
   const [auswahlModus, setAuswahlModus] = useState(false)
   const [verschiebenFuer, setVerschiebenFuer] = useState<string[] | null>(null)
   const [ueber, setUeber] = useState<string | null>(null)
-  const [neuerBereich, setNeuerBereich] = useState<{ fachId: string; name: string } | null>(null)
+  // Neuer Bereich: oben im Fach (elternId null) oder als Unterbereich
+  const [neuerBereich, setNeuerBereich] = useState<{ fachId: string; elternId: string | null; name: string } | null>(null)
+  const offen = useOffen((s) => s.offen)
+  const umschalten = useOffen((s) => s.umschalten)
+  const oeffne = useOffen((s) => s.oeffne)
+  // „Neu in diesem Bereich …": nur Programme, die zu den eigenen Fächern passen (Paket 12)
+  const sichtbareProgramme = useSichtbareProgramme()
 
   useEffect(() => {
-    if (ziel) setOrt({ fachId: ziel.fachId ?? null, bereichId: ziel.bereichId ?? null })
+    if (!ziel) return
+    setOrt({ fachId: ziel.fachId ?? null, bereichId: ziel.bereichId ?? null })
+    // Ein Sprung von außen (Startseite) klappt sein Ziel auf
+    if (ziel.fachId)
+      oeffne([`fach:${ziel.fachId}`, ...(ziel.bereichId ? pfadVon(useThemen.getState().daten, ziel.bereichId).map((b) => `bereich:${b.id}`) : [])])
   }, [ziel?.n])
 
   // Alle Materialien holen (für „alle Materialien", die Vorschläge und das Einsortieren) – neu, sobald sich die eigene Liste ändert
@@ -207,10 +271,12 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
     if (ort.bereichId && useThemen.getState().geladen && !offenerBereich) setOrt((o) => ({ ...o, bereichId: null }))
   }, [ort.bereichId, offenerBereich])
 
-  const bereicheIn = (fachId: string): Themenbereich[] =>
-    daten.bereiche.filter((b) => b.fachId === fachId).sort((a, b) => a.reihenfolge - b.reihenfolge || a.name.localeCompare(b.name, 'de'))
+  const kinder = (fachId: string, elternId: string | null): Themenbereich[] => kinderVon(daten, fachId, elternId)
   const inBereich = (id: string | null, fachId: string): Material[] =>
     sichtbar.filter((m) => (id ? zuordnung(m) === id : !bereichVon(m) && fachVon(m) === fachId))
+  /** Materialien im Bereich UND seinen Unterbereichen – die Zahl an einem zugeklappten Ordner */
+  const gesamtIn = (b: Themenbereich): number => [b.id, ...nachfahrenVon(daten, b.id)].reduce((n, id) => n + inBereich(id, b.fachId).length, 0)
+  const istOffen = (k: string): boolean => offen.includes(k)
   const reihenKey = (id: string | null, fachId: string): string => id ?? `ohne:${fachId}`
   const sortiert = (liste: Material[], key: string): Material[] => sortiere(liste, sortierung, daten.reihenfolge[key], arten())
 
@@ -255,20 +321,44 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
     if (noetig.length) void verschieben(noetig, ziel)
     setAuswahl([])
   }
+  /**
+   * Ablageziel für Karten – und für Bereiche (Paket 12): Ein Bereich, der auf einen anderen
+   * gezogen wird, liegt danach darunter; auf „Ohne Themenbereich" bzw. das Fach gezogen, steht er
+   * oben. Unter sich selbst oder einen eigenen Unterbereich geht nicht – dort gibt es keine Marke.
+   */
   const ablageZiel = (id: string, ziel: Themenbereich | null): React.HTMLAttributes<HTMLElement> & { 'data-ablage': string; 'data-ueber': boolean } => ({
     'data-ablage': id,
     'data-ueber': ueber === id,
     onDragOver: (e) => {
-      if (!e.dataTransfer.types.includes(MIME)) return
+      const karte = e.dataTransfer.types.includes(MIME)
+      const bereich = e.dataTransfer.types.includes(MIME_BEREICH)
+      if (!karte && !bereich) return
+      if (bereich && ziel && gezogenerBereich && (gezogenerBereich === ziel.id || nachfahrenVon(daten, gezogenerBereich).includes(ziel.id))) return
       e.preventDefault()
+      e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
       if (ueber !== id) setUeber(id)
     },
     onDragLeave: (e) => {
       if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setUeber((u) => (u === id ? null : u))
     },
-    onDrop: (e) => ablegen(e, ziel)
+    onDrop: (e) => {
+      const bereichId = e.dataTransfer.getData(MIME_BEREICH)
+      if (bereichId) {
+        e.preventDefault()
+        e.stopPropagation()
+        setUeber(null)
+        setGezogenerBereich(null)
+        const b = daten.bereiche.find((x) => x.id === bereichId)
+        if (b && b.id !== ziel?.id) void bereichUmhaengen(b, ziel)
+        return
+      }
+      e.stopPropagation()
+      ablegen(e, ziel)
+    }
   })
+  // Welcher Bereich gerade gezogen wird – dataTransfer lässt sich beim Überfahren nicht lesen
+  const [gezogenerBereich, setGezogenerBereich] = useState<string | null>(null)
 
   // ---------- Eine Karte ----------
 
@@ -340,7 +430,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
     )
   }
 
-  const liste = (materialien: Material[], reihe: { key: string; bereich: Themenbereich | null } | null): React.JSX.Element => {
+  const liste_ = (materialien: Material[], reihe: { key: string; bereich: Themenbereich | null } | null): React.JSX.Element => {
     const keys = materialien.map(schluesselVon)
     const inhalt = materialien.map((m) => karte(m, keys, reihe))
     return darstellung === 'karten' && moduleId ? (
@@ -437,21 +527,87 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
   // Leere Bibliothek eines Programms: Den Hinweis dazu gibt die Bibliothek selbst
   const leer = geladen !== null && sichtbar.length === 0 && !(moduleId && umfang === 'nur' && eigene.length === 0 && !jahrgang)
 
+  // ---------- Baum (Paket 12) ----------
+
+  const neuerBereichZeile = (fachId: string, elternId: string | null, tiefe: number): React.ReactNode =>
+    neuerBereich?.fachId === fachId && neuerBereich.elternId === elternId ? (
+      <NeuerBereichZeile
+        tiefe={tiefe}
+        unter={elternId ? daten.bereiche.find((b) => b.id === elternId)?.name : undefined}
+        wert={neuerBereich.name}
+        onChange={(name) => setNeuerBereich({ fachId, elternId, name })}
+        onAbbrechen={() => setNeuerBereich(null)}
+        onAnlegen={async () => {
+          if (await bereichAnlegen(fachId, neuerBereich.name, elternId)) {
+            setNeuerBereich(null)
+            if (elternId) oeffne([`bereich:${elternId}`])
+          }
+        }}
+      />
+    ) : null
+
+  /** Die Bereiche unter `elternId` als aufklappbare Zeilen – aufgeklappt mit Unterbereichen und Materialien */
+  const baum = (fachId: string, elternId: string | null, tiefe: number): React.ReactNode => {
+    // Mit Jahrgangsfilter nur Bereiche, in denen (auch darunter) für diesen Jahrgang etwas liegt
+    const liste = kinder(fachId, elternId).filter((b) => !jahrgang || gesamtIn(b) > 0)
+    return (
+      <>
+        {liste.map((b) => {
+          const auf = istOffen(`bereich:${b.id}`)
+          const direkt = sortiert(inBereich(b.id, fachId), b.id)
+          const hatInhalt = direkt.length > 0 || kinder(fachId, b.id).length > 0
+          return (
+            <BaumZeile
+              key={b.id}
+              bereich={b}
+              tiefe={tiefe}
+              anzahl={gesamtIn(b)}
+              offen={auf}
+              aufklappbar={hatInhalt || neuerBereich?.elternId === b.id}
+              onUmschalten={() => umschalten(`bereich:${b.id}`)}
+              onOeffnen={() => setOrt({ fachId, bereichId: b.id })}
+              onUnterbereich={() => {
+                setNeuerBereich({ fachId, elternId: b.id, name: '' })
+                oeffne([`bereich:${b.id}`])
+              }}
+              ablage={ablageZiel(b.id, b)}
+              onZiehen={(an) => setGezogenerBereich(an ? b.id : null)}
+            >
+              {auf && (
+                <Stack gap={6} mt={4} mb={6}>
+                  {baum(fachId, b.id, tiefe + 1)}
+                  {neuerBereichZeile(fachId, b.id, tiefe + 1)}
+                  {direkt.length > 0 && <Box pl={(tiefe + 1) * 20 + 8}>{liste_(direkt, { key: b.id, bereich: b })}</Box>}
+                </Stack>
+              )}
+            </BaumZeile>
+          )
+        })}
+      </>
+    )
+  }
+
   // ---------- Geöffneter Bereich ----------
 
   if (offenerBereich) {
     const b = offenerBereich
     const inhalt = sortiert(inBereich(b.id, b.fachId), b.id)
-    const andere = bereicheIn(b.fachId).filter((x) => x.id !== b.id)
+    const pfad = pfadVon(daten, b.id)
+    const eltern = pfad.length > 1 ? pfad[pfad.length - 2] : null
+    const geschwister = kinder(b.fachId, b.elternId ?? null).filter((x) => x.id !== b.id)
+    const unter = kinder(b.fachId, b.id)
     return (
       <VerschiebenKontext.Provider value={verschiebenAus}>
         {kopf}
         <BereichKopf
           bereich={b}
-          anzahl={inhalt.length}
+          pfad={pfad}
+          anzahl={gesamtIn(b)}
           onZurueck={(fach) => setOrt({ fachId: fach ? b.fachId : null, bereichId: null })}
+          onPfad={(x) => setOrt({ fachId: x.fachId, bereichId: x.id })}
           sortierung={sortierung}
           onSortierung={setSortierung}
+          onUnterbereich={() => setNeuerBereich({ fachId: b.fachId, elternId: b.id, name: '' })}
           neu={
             moduleId && onNeu ? (
               <Button size="compact-sm" leftSection={<IconFilePlus size={14} />} onClick={() => void neuHier(b)}>
@@ -465,7 +621,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
                   </Button>
                 </Menu.Target>
                 <Menu.Dropdown>
-                  {modules
+                  {sichtbareProgramme
                     .filter((m) => arten().includes(m.id))
                     .map((m) => (
                       <Menu.Item key={m.id} onClick={() => void neuHier(b, m.id)}>
@@ -478,12 +634,17 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
           }
         />
         {auswahlLeiste}
-        {/* Ablageziele: die übrigen Bereiche des Fachs und „Ohne Themenbereich" */}
+        {/* Ablageziele: der Oberbereich, die Nachbarn und „Ohne Themenbereich" */}
         <Group gap={6} mb="md" wrap="wrap" className="themen-ziele">
           <Text size="xs" c="dimmed">
             Ablegen in:
           </Text>
-          {andere.map((x) => (
+          {eltern && (
+            <UnstyledButton className="themen-ziel" onClick={() => setOrt({ fachId: eltern.fachId, bereichId: eltern.id })} {...ablageZiel(eltern.id, eltern)}>
+              <IconArrowBarUp size={14} /> {eltern.name}
+            </UnstyledButton>
+          )}
+          {geschwister.map((x) => (
             <UnstyledButton key={x.id} className="themen-ziel" onClick={() => setOrt({ fachId: x.fachId, bereichId: x.id })} {...ablageZiel(x.id, x)}>
               <OrdnerSymbol fach={x.fachId} groesse={14} /> {x.name}
             </UnstyledButton>
@@ -492,11 +653,24 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
             Ohne Themenbereich
           </UnstyledButton>
         </Group>
+        {(unter.length > 0 || neuerBereich?.elternId === b.id) && (
+          <Stack gap={6} mb="md" data-unterbereiche>
+            <Text size="sm" fw={600} c="dimmed">
+              Unterbereiche
+            </Text>
+            {baum(b.fachId, b.id, 0)}
+            {neuerBereichZeile(b.fachId, b.id, 0)}
+          </Stack>
+        )}
         {inhalt.length ? (
-          liste(inhalt, { key: b.id, bereich: b })
+          liste_(inhalt, { key: b.id, bereich: b })
         ) : (
           <Text c="dimmed" size="sm" ta="center" py="xl" data-bereich-leer>
-            {jahrgang ? `In Klasse ${jahrgang} liegt hier noch nichts.` : 'Noch leer. Materialien hierher ziehen oder „Verschieben nach …" im ⋯-Menü wählen.'}
+            {jahrgang
+              ? `In Klasse ${jahrgang} liegt hier noch nichts.`
+              : unter.length
+                ? 'Direkt in diesem Bereich liegt nichts – die Materialien stehen in den Unterbereichen.'
+                : 'Noch leer. Materialien hierher ziehen oder „Verschieben nach …" im ⋯-Menü wählen.'}
           </Text>
         )}
         {sortierung === 'eigen' && inhalt.length > 1 && (
@@ -515,7 +689,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
     )
   }
 
-  // ---------- Übersicht: Fächer mit ihren Ordnern ----------
+  // ---------- Übersicht: Fächer mit ihrem Baum ----------
 
   const gezeigteFaecher = ort.fachId ? faecher.filter((f) => f === ort.fachId) : faecher
   return (
@@ -538,57 +712,58 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
         </Text>
       )}
       {gezeigteFaecher.map((fachId) => {
-        // Mit Jahrgangsfilter nur Bereiche, in denen für diesen Jahrgang etwas liegt
-        const bereiche = bereicheIn(fachId).filter((b) => !jahrgang || inBereich(b.id, fachId).length > 0)
+        const oben = kinder(fachId, null).filter((b) => !jahrgang || gesamtIn(b) > 0)
         const ohne = sortiert(inBereich(null, fachId), reihenKey(null, fachId))
+        // Nur ein Fach zu sehen (Sprung, Filter): dann gleich offen – ein einzelner zugeklappter Kopf wäre ein Klick zu viel
+        const auf = istOffen(`fach:${fachId}`) || gezeigteFaecher.length === 1
+        const zahl = sichtbar.filter((m) => fachVon(m) === fachId).length
         return (
-          <Box key={fachId} mb="lg" data-fach-abschnitt={fachId}>
-            <Group justify="space-between" gap="xs" mt="md" mb="xs" wrap="nowrap">
-              <UnstyledButton onClick={() => setOrt({ fachId, bereichId: null })} aria-label={`Nur ${fachAnzeige(fachId)} zeigen`}>
+          <Box key={fachId} mb="md" data-fach-abschnitt={fachId} data-offen={auf}>
+            <Group justify="space-between" gap="xs" mt="sm" mb="xs" wrap="nowrap" {...ablageZiel(`fach:${fachId}`, null)}>
+              <UnstyledButton
+                onClick={() => umschalten(`fach:${fachId}`)}
+                aria-expanded={auf}
+                aria-label={`${fachAnzeige(fachId)} ${auf ? 'zuklappen' : 'aufklappen'}`}
+                style={{ flex: 1, minWidth: 0 }}
+              >
                 <Group gap="xs" wrap="nowrap" className="fach-ueberschrift">
+                  <IconChevronRight size={16} className="themen-pfeil" data-offen={auf} />
                   <FachPunkt fach={fachId} groesse={12} />
                   <Title order={4}>{fachAnzeige(fachId)}</Title>
+                  <Text size="xs" c="dimmed">
+                    {oben.length ? `${oben.length === 1 ? '1 Bereich' : `${oben.length} Bereiche`} · ` : ''}
+                    {anzahlText(zahl)}
+                  </Text>
                 </Group>
               </UnstyledButton>
-              <FachMenue fachId={fachId} onNeu={() => setNeuerBereich({ fachId, name: '' })} />
+              <FachMenue
+                fachId={fachId}
+                onNeu={() => {
+                  setNeuerBereich({ fachId, elternId: null, name: '' })
+                  oeffne([`fach:${fachId}`])
+                }}
+              />
             </Group>
 
+            {/* Der Vorschlag steht auch am zugeklappten Fach – sonst sähe ihn niemand */}
             <VorschlagHinweis fachId={fachId} alle={alle} jahrgang={jahrgang} />
 
-            {(bereiche.length > 0 || neuerBereich?.fachId === fachId) && (
-              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="sm" mb="sm">
-                {bereiche.map((b) => (
-                  <OrdnerKachel
-                    key={b.id}
-                    bereich={b}
-                    anzahl={inBereich(b.id, fachId).length}
-                    onOeffnen={() => setOrt({ fachId, bereichId: b.id })}
-                    ablage={ablageZiel(b.id, b)}
-                  />
-                ))}
-                {neuerBereich?.fachId === fachId && (
-                  <NeuerBereichKachel
-                    wert={neuerBereich.name}
-                    onChange={(name) => setNeuerBereich({ fachId, name })}
-                    onAbbrechen={() => setNeuerBereich(null)}
-                    onAnlegen={async () => {
-                      if (await bereichAnlegen(fachId, neuerBereich.name)) setNeuerBereich(null)
-                    }}
-                  />
-                )}
-              </SimpleGrid>
-            )}
-
-            {ohne.length > 0 && (
-              <Box className="themen-ohne" {...(bereiche.length ? ablageZiel(`ohne:${fachId}`, null) : {})}>
-                {bereiche.length > 0 && (
-                  <Text size="sm" fw={600} c="dimmed" mb={6}>
-                    Ohne Themenbereich ({ohne.length})
-                  </Text>
-                )}
-                {liste(ohne, { key: reihenKey(null, fachId), bereich: null })}
-              </Box>
-            )}
+            <Collapse expanded={auf} keepMounted={false}>
+              <Stack gap={6} mb="sm" className="themen-baum">
+                {baum(fachId, null, 0)}
+                {neuerBereichZeile(fachId, null, 0)}
+              </Stack>
+              {ohne.length > 0 && (
+                <Box className="themen-ohne" {...(oben.length ? ablageZiel(`ohne:${fachId}`, null) : {})}>
+                  {oben.length > 0 && (
+                    <Text size="sm" fw={600} c="dimmed" mb={6}>
+                      Ohne Themenbereich ({ohne.length})
+                    </Text>
+                  )}
+                  {liste_(ohne, { key: reihenKey(null, fachId), bereich: null })}
+                </Box>
+              )}
+            </Collapse>
           </Box>
         )
       })}
@@ -612,78 +787,148 @@ function OrdnerSymbol({ fach, groesse = 28, offen }: { fach: string; groesse?: n
   return <Symbol size={groesse} color={farbe} style={{ flexShrink: 0, verticalAlign: 'middle' }} />
 }
 
-/** Ein Themenbereich als Ordner – Klick öffnet, Karten lassen sich darauf ablegen */
-function OrdnerKachel({
+/**
+ * Ein Themenbereich als Zeile im Baum (Paket 12): Pfeil klappt auf/zu, der Name öffnet den
+ * Bereich, Karten und andere Bereiche lassen sich darauf ablegen, die Zeile selbst lässt sich
+ * auf einen anderen Bereich ziehen.
+ */
+function BaumZeile({
   bereich: b,
+  tiefe,
   anzahl,
+  offen,
+  aufklappbar,
+  onUmschalten,
   onOeffnen,
-  ablage
+  onUnterbereich,
+  ablage,
+  onZiehen,
+  children
 }: {
   bereich: Themenbereich
+  tiefe: number
   anzahl: number
+  offen: boolean
+  aufklappbar: boolean
+  onUmschalten: () => void
   onOeffnen: () => void
+  onUnterbereich: () => void
   ablage: React.HTMLAttributes<HTMLElement>
+  onZiehen: (an: boolean) => void
+  children?: React.ReactNode
 }): React.JSX.Element {
   const [umbenennen, setUmbenennen] = useState<string | null>(null)
   const [loeschen, setLoeschen] = useState(false)
-  if (umbenennen !== null)
-    return (
-      <Card withBorder padding="sm">
-        <TextInput
-          size="xs"
-          aria-label="Neuer Name des Themenbereichs"
-          value={umbenennen}
-          autoFocus
-          onChange={(e) => setUmbenennen(e.currentTarget.value)}
-          onKeyDown={async (e) => {
-            if (e.key === 'Escape') setUmbenennen(null)
-            if (e.key === 'Enter' && umbenennen.trim() && (await bereichUmbenennen(b, umbenennen))) setUmbenennen(null)
-          }}
-          onBlur={() => setUmbenennen(null)}
-        />
-      </Card>
-    )
+  const [verschieben, setVerschieben] = useState(false)
+  const unter = useThemen((s) => nachfahrenVon(s.daten, b.id).length)
   return (
-    <Card withBorder padding="sm" className="themen-ordner" data-bereich={b.name} {...ablage}>
-      <Group gap="sm" wrap="nowrap" justify="space-between">
-        <UnstyledButton onClick={onOeffnen} style={{ minWidth: 0, flex: 1 }} aria-label={`Themenbereich „${b.name}“ öffnen`}>
-          <Group gap="sm" wrap="nowrap">
-            <OrdnerSymbol fach={b.fachId} />
-            <div style={{ minWidth: 0 }}>
-              <Text fw={600} lineClamp={2}>
-                {b.name}
-              </Text>
-              <Text size="xs" c="dimmed">
-                {anzahl ? anzahlText(anzahl) : 'leer'}
-              </Text>
-            </div>
+    <div data-baum-tiefe={tiefe}>
+      <Card
+        withBorder
+        padding={6}
+        pl={8 + tiefe * 20}
+        className="themen-ordner themen-zeile"
+        data-bereich={b.name}
+        draggable={umbenennen === null}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(MIME_BEREICH, b.id)
+          e.dataTransfer.effectAllowed = 'move'
+          onZiehen(true)
+        }}
+        onDragEnd={() => onZiehen(false)}
+        {...ablage}
+      >
+        <Group gap={6} wrap="nowrap" justify="space-between">
+          <Group gap={6} wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+            <ActionIcon
+              variant="subtle"
+              size="sm"
+              color="gray"
+              onClick={onUmschalten}
+              aria-expanded={offen}
+              aria-label={`„${b.name}“ ${offen ? 'zuklappen' : 'aufklappen'}`}
+              style={{ visibility: aufklappbar ? 'visible' : 'hidden' }}
+            >
+              <IconChevronRight size={14} className="themen-pfeil" data-offen={offen} />
+            </ActionIcon>
+            {umbenennen !== null ? (
+              <TextInput
+                size="xs"
+                aria-label="Neuer Name des Themenbereichs"
+                value={umbenennen}
+                autoFocus
+                style={{ flex: 1 }}
+                onChange={(e) => setUmbenennen(e.currentTarget.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Escape') setUmbenennen(null)
+                  if (e.key === 'Enter' && umbenennen.trim() && (await bereichUmbenennen(b, umbenennen))) setUmbenennen(null)
+                }}
+                onBlur={() => setUmbenennen(null)}
+              />
+            ) : (
+              <UnstyledButton onClick={onOeffnen} style={{ minWidth: 0, flex: 1 }} aria-label={`Themenbereich „${b.name}“ öffnen`}>
+                <Group gap={8} wrap="nowrap">
+                  <OrdnerSymbol fach={b.fachId} groesse={20} offen={offen} />
+                  <Text fw={600} size="sm" truncate>
+                    {b.name}
+                  </Text>
+                  {b.herkunft && (
+                    <Tooltip
+                      label={`Automatisch angelegt (${b.herkunft === 'lehrplan' ? 'Lehrplan' : b.herkunft === 'lehrwerk' ? 'Lehrwerk' : 'Grammatik'}) – umbenennen und verschieben wie jeden anderen Bereich`}
+                    >
+                      <span className="themen-herkunft" aria-label="automatisch angelegt">
+                        <IconWand size={12} />
+                      </span>
+                    </Tooltip>
+                  )}
+                  <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+                    {anzahl ? anzahlText(anzahl) : 'leer'}
+                    {unter ? ` · ${unter === 1 ? '1 Unterbereich' : `${unter} Unterbereiche`}` : ''}
+                  </Text>
+                </Group>
+              </UnstyledButton>
+            )}
           </Group>
-        </UnstyledButton>
-        <BereichMenue bereich={b} onUmbenennen={() => setUmbenennen(b.name)} onLoeschen={() => setLoeschen(true)} />
-      </Group>
-      {loeschen && <LoeschenRueckfrage bereich={b} onAbbrechen={() => setLoeschen(false)} />}
-    </Card>
+          <BereichMenue
+            bereich={b}
+            onUmbenennen={() => setUmbenennen(b.name)}
+            onLoeschen={() => setLoeschen(true)}
+            onUnterbereich={onUnterbereich}
+            onVerschieben={() => setVerschieben(true)}
+          />
+        </Group>
+        {loeschen && <LoeschenRueckfrage bereich={b} onAbbrechen={() => setLoeschen(false)} />}
+      </Card>
+      {children}
+      <BereichVerschiebenDialog bereich={verschieben ? b : null} onClose={() => setVerschieben(false)} />
+    </div>
   )
 }
 
-function NeuerBereichKachel({
+function NeuerBereichZeile({
+  tiefe,
+  unter,
   wert,
   onChange,
   onAbbrechen,
   onAnlegen
 }: {
+  tiefe: number
+  /** Name des Oberbereichs – dann heißt es „Unterbereich von …" */
+  unter?: string
   wert: string
   onChange: (s: string) => void
   onAbbrechen: () => void
   onAnlegen: () => void
 }): React.JSX.Element {
   return (
-    <Card withBorder padding="sm" className="themen-ordner-neu">
-      <Stack gap={6}>
+    <Card withBorder padding={6} pl={8 + tiefe * 20} className="themen-ordner-neu">
+      <Group gap={6} wrap="nowrap">
         <TextInput
           size="xs"
-          placeholder="Name, z. B. Ökologie"
-          aria-label="Name des neuen Themenbereichs"
+          style={{ flex: 1 }}
+          placeholder={unter ? `Unterbereich von „${unter}“, z. B. Ursachen` : 'Name, z. B. Ökologie'}
+          aria-label={unter ? 'Name des neuen Unterbereichs' : 'Name des neuen Themenbereichs'}
           value={wert}
           autoFocus
           onChange={(e) => onChange(e.currentTarget.value)}
@@ -692,21 +937,31 @@ function NeuerBereichKachel({
             if (e.key === 'Escape') onAbbrechen()
           }}
         />
-        <Group gap={6}>
-          <Button size="compact-xs" disabled={!wert.trim()} onClick={onAnlegen}>
-            Anlegen
-          </Button>
-          <Button size="compact-xs" variant="default" onClick={onAbbrechen}>
-            Abbrechen
-          </Button>
-        </Group>
-      </Stack>
+        <Button size="compact-xs" disabled={!wert.trim()} onClick={onAnlegen}>
+          Anlegen
+        </Button>
+        <Button size="compact-xs" variant="default" onClick={onAbbrechen}>
+          Abbrechen
+        </Button>
+      </Group>
     </Card>
   )
 }
 
-/** ⋯ am Bereich: Umbenennen, Löschen (am Rechner) */
-function BereichMenue({ bereich, onUmbenennen, onLoeschen }: { bereich: Themenbereich; onUmbenennen: () => void; onLoeschen: () => void }): React.JSX.Element {
+/** ⋯ am Bereich: Unterbereich anlegen, Umbenennen, Verschieben, Löschen (am Rechner) */
+function BereichMenue({
+  bereich,
+  onUmbenennen,
+  onLoeschen,
+  onUnterbereich,
+  onVerschieben
+}: {
+  bereich: Themenbereich
+  onUmbenennen: () => void
+  onLoeschen: () => void
+  onUnterbereich?: () => void
+  onVerschieben?: () => void
+}): React.JSX.Element {
   return (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
@@ -715,9 +970,19 @@ function BereichMenue({ bereich, onUmbenennen, onLoeschen }: { bereich: Themenbe
         </ActionIcon>
       </Menu.Target>
       <Menu.Dropdown>
+        {onUnterbereich && (
+          <Menu.Item leftSection={<IconFolderPlus size={14} />} onClick={onUnterbereich}>
+            Unterbereich anlegen
+          </Menu.Item>
+        )}
         <Menu.Item leftSection={<IconPencil size={14} />} onClick={onUmbenennen}>
           Umbenennen
         </Menu.Item>
+        {onVerschieben && (
+          <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={onVerschieben}>
+            Verschieben nach …
+          </Menu.Item>
+        )}
         {/* Löschen gibt es wie bei den Materialien nur am Rechner */}
         {!imNetz() && (
           <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={onLoeschen}>
@@ -731,6 +996,8 @@ function BereichMenue({ bereich, onUmbenennen, onLoeschen }: { bereich: Themenbe
 
 /** Rückfrage direkt am Bereich wie in der Bibliothek (Enter bestätigt, Esc bricht ab); die Materialien bleiben erhalten */
 function LoeschenRueckfrage({ bereich, onAbbrechen }: { bereich: Themenbereich; onAbbrechen: () => void }): React.JSX.Element {
+  const unter = useThemen((s) => nachfahrenVon(s.daten, bereich.id).length)
+  const eltern = useThemen((s) => (bereich.elternId ? s.daten.bereiche.find((b) => b.id === bereich.elternId) : undefined))
   const los = (): void => {
     onAbbrechen()
     void bereichLoeschen(bereich)
@@ -739,7 +1006,10 @@ function LoeschenRueckfrage({ bereich, onAbbrechen }: { bereich: Themenbereich; 
   return (
     <Alert color="red" mt="xs" p="xs" data-bereich-loeschen>
       <Stack gap={6}>
-        <Text size="sm">„{bereich.name}“ löschen? Die Materialien bleiben erhalten und stehen danach unter „Ohne Themenbereich“.</Text>
+        <Text size="sm">
+          „{bereich.name}“{unter ? ` samt ${unter === 1 ? 'einem Unterbereich' : `${unter} Unterbereichen`}` : ''} löschen? Die Materialien bleiben erhalten und
+          stehen danach {eltern ? `in „${eltern.name}“` : 'unter „Ohne Themenbereich“'}.
+        </Text>
         <Group gap="xs" justify="flex-end">
           <Button size="xs" variant="default" onClick={onAbbrechen}>
             Abbrechen
@@ -756,24 +1026,32 @@ function LoeschenRueckfrage({ bereich, onAbbrechen }: { bereich: Themenbereich; 
 /** Kopf eines geöffneten Bereichs: Pfad, Sortierung, „Neu in diesem Bereich", ⋯ */
 function BereichKopf({
   bereich: b,
+  pfad,
   anzahl,
   onZurueck,
+  onPfad,
   sortierung,
   onSortierung,
+  onUnterbereich,
   neu
 }: {
   bereich: Themenbereich
+  /** Von oben bis zu diesem Bereich (Paket 12) */
+  pfad: Themenbereich[]
   anzahl: number
   onZurueck: (fach: boolean) => void
+  onPfad: (b: Themenbereich) => void
   sortierung: Sortierung
   onSortierung: (s: Sortierung) => void
+  onUnterbereich: () => void
   neu: React.ReactNode
 }): React.JSX.Element {
   const [umbenennen, setUmbenennen] = useState<string | null>(null)
   const [loeschen, setLoeschen] = useState(false)
+  const [verschieben, setVerschieben] = useState(false)
   return (
     <Stack gap="xs" mb="sm">
-      <Breadcrumbs separator="›">
+      <Breadcrumbs separator="›" data-pfad={pfad.map((x) => x.name).join(' › ')}>
         <Anchor component="button" size="sm" onClick={() => onZurueck(false)}>
           Alle Fächer
         </Anchor>
@@ -783,6 +1061,11 @@ function BereichKopf({
             {fachAnzeige(b.fachId)}
           </Group>
         </Anchor>
+        {pfad.slice(0, -1).map((x) => (
+          <Anchor key={x.id} component="button" size="sm" onClick={() => onPfad(x)}>
+            {x.name}
+          </Anchor>
+        ))}
         <Text size="sm" fw={600}>
           {b.name}
         </Text>
@@ -807,7 +1090,13 @@ function BereichKopf({
             <Text c="dimmed" size="sm">
               {anzahlText(anzahl)}
             </Text>
-            <BereichMenue bereich={b} onUmbenennen={() => setUmbenennen(b.name)} onLoeschen={() => setLoeschen(true)} />
+            <BereichMenue
+              bereich={b}
+              onUmbenennen={() => setUmbenennen(b.name)}
+              onLoeschen={() => setLoeschen(true)}
+              onUnterbereich={onUnterbereich}
+              onVerschieben={() => setVerschieben(true)}
+            />
           </Group>
         )}
         <Group gap="xs" wrap="wrap">
@@ -824,13 +1113,65 @@ function BereichKopf({
         </Group>
       </Group>
       {loeschen && <LoeschenRueckfrage bereich={b} onAbbrechen={() => setLoeschen(false)} />}
+      <BereichVerschiebenDialog bereich={verschieben ? b : null} onClose={() => setVerschieben(false)} />
     </Stack>
+  )
+}
+
+/**
+ * „Verschieben nach …" für einen BEREICH (Paket 12): unter einen anderen Bereich desselben Fachs
+ * oder ganz nach oben. Der Bereich selbst und seine Unterbereiche stehen nicht zur Wahl.
+ */
+function BereichVerschiebenDialog({ bereich, onClose }: { bereich: Themenbereich | null; onClose: () => void }): React.JSX.Element {
+  const daten = useThemen((s) => s.daten)
+  const gesperrt = bereich ? new Set([bereich.id, ...nachfahrenVon(daten, bereich.id)]) : new Set<string>()
+  const zeilen = (elternId: string | null, tiefe: number): React.ReactNode[] =>
+    bereich
+      ? kinderVon(daten, bereich.fachId, elternId)
+          .filter((b) => !gesperrt.has(b.id))
+          .flatMap((b) => [
+            <Button
+              key={b.id}
+              variant={bereich.elternId === b.id ? 'light' : 'default'}
+              justify="flex-start"
+              pl={12 + tiefe * 20}
+              leftSection={<OrdnerSymbol fach={b.fachId} groesse={18} />}
+              onClick={() => {
+                onClose()
+                void bereichUmhaengen(bereich, b)
+              }}
+            >
+              {b.name}
+              {bereich.elternId === b.id ? ' (hier)' : ''}
+            </Button>,
+            ...zeilen(b.id, tiefe + 1)
+          ])
+      : []
+  return (
+    <Modal opened={bereich !== null} onClose={onClose} title={bereich ? `„${bereich.name}“ verschieben nach …` : ''} size="md">
+      <Stack gap="xs" data-bereich-verschieben-dialog>
+        <Button
+          variant={bereich?.elternId ? 'default' : 'light'}
+          justify="flex-start"
+          leftSection={<IconArrowBarUp size={16} />}
+          onClick={() => {
+            onClose()
+            if (bereich) void bereichUmhaengen(bereich, null)
+          }}
+        >
+          Oberste Ebene{bereich ? ` in ${fachAnzeige(bereich.fachId)}` : ''}
+          {bereich && !bereich.elternId ? ' (hier)' : ''}
+        </Button>
+        {zeilen(null, 0)}
+      </Stack>
+    </Modal>
   )
 }
 
 /** ⋯ am Fach: neuer Bereich, Automatik ein/aus */
 function FachMenue({ fachId, onNeu }: { fachId: string; onNeu: () => void }): React.JSX.Element {
-  const automatik = useThemen((s) => Boolean(s.daten.automatik[fachId]))
+  // Standard seit Paket 12: an (nur ausdrücklich ausgeschaltet steht false)
+  const automatik = useThemen((s) => automatikAn(s.daten, fachId))
   return (
     <Group gap={4} wrap="nowrap">
       <Button size="compact-sm" variant="subtle" leftSection={<IconFolderPlus size={14} />} onClick={onNeu}>
@@ -932,6 +1273,19 @@ export function FremdKarte({ material: m, onVerschieben }: { material: Material;
   )
 }
 
+/** Alle Bereiche eines Fachs in Baumreihenfolge, mit Tiefe */
+function baumListe(daten: { bereiche: Themenbereich[] }, fachId: string): { b: Themenbereich; tiefe: number }[] {
+  const out: { b: Themenbereich; tiefe: number }[] = []
+  const gehe = (elternId: string | null, tiefe: number): void => {
+    for (const b of kinderVon(daten, fachId, elternId)) {
+      out.push({ b, tiefe })
+      gehe(b.id, tiefe + 1)
+    }
+  }
+  gehe(null, 0)
+  return out
+}
+
 /** „Verschieben nach …" – für Tastatur und Tablet, wo Ziehen mühsam ist */
 function VerschiebenDialog({
   schluessel,
@@ -968,22 +1322,21 @@ function VerschiebenDialog({
                 {fachAnzeige(fachId)}
               </Text>
             )}
-            {daten.bereiche
-              .filter((b) => b.fachId === fachId)
-              .sort((a, b) => a.reihenfolge - b.reihenfolge)
-              .map((b, i) => (
-                <Button
-                  key={b.id}
-                  variant={hier.has(b.id) && hier.size === 1 ? 'light' : 'default'}
-                  justify="flex-start"
-                  leftSection={<OrdnerSymbol fach={b.fachId} groesse={18} />}
-                  onClick={() => void nach(b)}
-                  data-autofocus={i === 0 ? true : undefined}
-                >
-                  {b.name}
-                  {hier.has(b.id) && hier.size === 1 ? ' (hier)' : ''}
-                </Button>
-              ))}
+            {/* Als Baum eingerückt (Paket 12) – Unterbereiche unter ihrem Oberbereich */}
+            {baumListe(daten, fachId).map(({ b, tiefe }, i) => (
+              <Button
+                key={b.id}
+                variant={hier.has(b.id) && hier.size === 1 ? 'light' : 'default'}
+                justify="flex-start"
+                pl={12 + tiefe * 20}
+                leftSection={<OrdnerSymbol fach={b.fachId} groesse={18} />}
+                onClick={() => void nach(b)}
+                data-autofocus={i === 0 ? true : undefined}
+              >
+                {b.name}
+                {hier.has(b.id) && hier.size === 1 ? ' (hier)' : ''}
+              </Button>
+            ))}
             <Group gap="xs" wrap="nowrap">
               <TextInput
                 size="xs"
@@ -1031,9 +1384,11 @@ function VorschlagHinweis({ fachId, alle, jahrgang }: { fachId: string; alle: Ma
   const [offen, setOffen] = useState(false)
   const [abgewaehlt, setAbgewaehlt] = useState<string[]>([])
   const [aus, setAus] = useState<Record<string, string>>(() => lies(VORSCHLAG_AUS_KEY, {}))
+  const lehrplan = useLehrplan()
+  const schulform = useAppSettings((s) => s.settings.defaults.schoolTypeId)
   const vorschlaege = useMemo(
-    () => (geladen ? vorschlagen(alle, daten, fachId, { jahrgang, katalog: katalogFuer(fachId) }) : []),
-    [alle, daten, fachId, jahrgang, geladen]
+    () => (geladen ? vorschlagen(alle, daten, fachId, { jahrgang, katalog: katalogFuer(fachId, lehrplan, schulform) }) : []),
+    [alle, daten, fachId, jahrgang, geladen, lehrplan, schulform]
   )
   const merkmal = vorschlaege.map((v) => `${v.name}:${v.schluessel.length}`).join('|')
   const auswahlKey = `${fachId}|${jahrgang ?? ''}`
@@ -1043,7 +1398,14 @@ function VorschlagHinweis({ fachId, alle, jahrgang }: { fachId: string; alle: Ma
   const uebernehmen = (liste: Vorschlag[]): void => {
     setOffen(false)
     void vorschlaegeUebernehmen(
-      liste.map((v) => ({ fachId: v.fachId, name: v.name, bereichId: v.bereichId, schluessel: v.schluessel })),
+      liste.map((v) => ({
+        fachId: v.fachId,
+        name: v.name,
+        bereichId: v.bereichId,
+        schluessel: v.schluessel,
+        // Oberthemen aus dem Lehrplan: die Ebenen darüber entstehen mit (Paket 12)
+        ...(v.pfad?.length ? { pfad: v.pfad, herkunft: v.herkunft } : {})
+      })),
       fachId
     )
   }
@@ -1106,7 +1468,7 @@ function VorschlagHinweis({ fachId, alle, jahrgang }: { fachId: string; alle: Ma
                 size="xs"
                 checked={!abgewaehlt.includes(v.name)}
                 onChange={(e) => setAbgewaehlt(e.currentTarget.checked ? abgewaehlt.filter((x) => x !== v.name) : [...abgewaehlt, v.name])}
-                label={`${v.name} (${v.schluessel.length}) – ${herkunft(v)}`}
+                label={`${[...(v.pfad ?? []), v.name].join(' › ')} (${v.schluessel.length}) – ${herkunft(v)}`}
               />
             </Tooltip>
           ))}

@@ -56,11 +56,13 @@ import {
   leseThemen,
   themenAutomatik,
   themenBereichLoeschen,
+  themenBereichVerschieben,
   themenBereichSetzen,
   themenReihenfolge,
   themenUebernehmen,
   themenZuordnen
 } from './services/storage/themen'
+import { leseLehrplan } from './services/storage/lehrplan'
 import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/themen'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
@@ -486,8 +488,11 @@ function registerIpc(): void {
    * heißt wie bei den Materialien `…:delete` und ist damit über das Netz gesperrt.
    */
   handle('themen:list', () => leseThemen())
+  // Lehrplan-Themen je Land für die Hierarchie der Themenbereiche (Paket 12); null = Datei fehlt
+  handle('lehrplan:themen', (stateId: string) => leseLehrplan(stateId))
   handle('themen:bereich', (b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>) => themenBereichSetzen(b))
   handle('themen:delete', (id: string) => themenBereichLoeschen(id))
+  handle('themen:verschieben', (id: string, elternId: string | null) => themenBereichVerschieben(id, elternId))
   handle('themen:zuordnen', (eintraege: Record<string, Zuordnung | null>) => themenZuordnen(eintraege))
   handle('themen:uebernehmen', (vorschlaege: BereichsUebernahme[], automatik: string[]) => themenUebernehmen(vorschlaege, automatik))
   handle('themen:reihenfolge', (schluessel: string, liste: string[]) => themenReihenfolge(schluessel, liste))

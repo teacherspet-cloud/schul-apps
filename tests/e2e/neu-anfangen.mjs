@@ -26,14 +26,19 @@ await app.evaluate(async ({ BrowserWindow }) => {
 })
 await warteAufOberflaeche(page)
 
-/** Sichtbare Beschriftungen der Eingabefelder – das Maß dafür, ob ein Formular da ist. */
+/**
+ * Sichtbare Beschriftungen der Eingabefelder – das Maß dafür, ob ein Formular da ist. Dazu die
+ * Platzhalter: Schritt 1 des Vokabeltests (seit Paket 7 eine Karte mit Reitern) hat Felder ohne
+ * eigene Beschriftung, nur mit Platzhalter („Name des Vokabeltests …").
+ */
 const felder = () =>
-  page.evaluate(() =>
-    [...document.querySelectorAll('label')]
+  page.evaluate(() => [
+    ...[...document.querySelectorAll('label')]
       .filter((l) => l.offsetParent)
       .map((l) => l.textContent.trim())
-      .filter(Boolean)
-  )
+      .filter(Boolean),
+    ...[...document.querySelectorAll('input[placeholder], textarea[placeholder]')].filter((i) => i.offsetParent).map((i) => i.getAttribute('placeholder'))
+  ])
 
 const module = [
   { icon: 'Arbeitsblatt', knopf: 'Neues Arbeitsblatt', erwartet: 'Thema' },

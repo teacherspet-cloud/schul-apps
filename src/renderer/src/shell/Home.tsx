@@ -9,7 +9,7 @@ import { fachAnzeige, ladeMaterialien, Material, neueste, suche } from './materi
 import { FachPunkt, useFachFarbe } from '../shared/components/FachFarbe'
 import { abgleichen, ladeThemen, useThemen } from '../shared/themenbereiche'
 import { AB_MATERIALIEN } from '../shared/themenVorschlag'
-import type { Themenbereich } from '@shared/themen'
+import { nachfahrenVon, pfadVon, type Themenbereich } from '@shared/themen'
 import { useSichtbareProgramme } from './programme'
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
@@ -87,14 +87,19 @@ export default function Home(): React.JSX.Element {
     if (!woerter.length) return []
     return themen.bereiche.filter((b) => woerter.every((w) => `${b.name} ${fachAnzeige(b.fachId)}`.toLocaleLowerCase('de').includes(w))).slice(0, 6)
   }, [suchtext, themen])
-  const bereichZahl = (b: Themenbereich): number => (materialien ?? []).filter((m) => themen.zuordnungen[`${m.moduleId}:${m.id}`]?.bereichId === b.id).length
+  // Mit Unterbereichen gezählt (Paket 12) – die Zahl am Ordner zeigt, was darin steckt
+  const bereichZahl = (b: Themenbereich): number => {
+    const ids = new Set([b.id, ...nachfahrenVon(themen, b.id)])
+    return (materialien ?? []).filter((m) => ids.has(themen.zuordnungen[`${m.moduleId}:${m.id}`]?.bereichId ?? '')).length
+  }
   /*
    * Abschnitt „Themenbereiche": je Fach ein Knopf. Nur, wenn es Bereiche gibt oder so viel
    * Material, dass die Vorschläge greifen – vorher wäre er nur Lärm.
    */
   const themenFaecher = useMemo(() => {
     const map = new Map<string, number>()
-    for (const b of themen.bereiche) map.set(b.fachId, (map.get(b.fachId) ?? 0) + 1)
+    // Nur die obersten Bereiche – die Unterrichtseinheiten; Unterbereiche zählen nicht extra
+    for (const b of themen.bereiche) if (!b.elternId) map.set(b.fachId, (map.get(b.fachId) ?? 0) + 1)
     return [...map.entries()].sort((a, b) => fachAnzeige(a[0]).localeCompare(fachAnzeige(b[0]), 'de'))
   }, [themen])
   const themenZeigen = themenFaecher.length > 0 || (materialien ?? []).filter((m) => m.moduleId !== 'vokabelliste').length >= AB_MATERIALIEN
@@ -175,7 +180,14 @@ export default function Home(): React.JSX.Element {
           {suchtAktiv && bereichTreffer.length > 0 && (
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
               {bereichTreffer.map((b) => (
-                <BereichZeile key={b.id} bereich={b} anzahl={bereichZahl(b)} />
+                <BereichZeile
+                  key={b.id}
+                  bereich={b}
+                  anzahl={bereichZahl(b)}
+                  oben={pfadVon(themen, b.id)
+                    .slice(0, -1)
+                    .map((x) => x.name)}
+                />
               ))}
             </SimpleGrid>
           )}
@@ -294,7 +306,7 @@ function MaterialZeile({ material: m }: { material: Material }): React.JSX.Eleme
 const zeileMitModul = (...teile: (string | undefined)[]): string => teile.filter(Boolean).join(' · ')
 
 /** Suchtreffer „Themenbereich": öffnet die übergreifende Seite in diesem Bereich */
-function BereichZeile({ bereich: b, anzahl }: { bereich: Themenbereich; anzahl: number }): React.JSX.Element {
+function BereichZeile({ bereich: b, anzahl, oben = [] }: { bereich: Themenbereich; anzahl: number; oben?: string[] }): React.JSX.Element {
   const farbe = useFachFarbe(b.fachId) ?? undefined
   return (
     <UnstyledButton className="home-material" onClick={() => openThemen(b.fachId, b.id)} data-home-bereich={b.name}>
@@ -305,7 +317,12 @@ function BereichZeile({ bereich: b, anzahl }: { bereich: Themenbereich; anzahl: 
             {b.name}
           </Text>
           <Text size="xs" c="dimmed" truncate>
-            {zeileMitModul('Themenbereich', fachAnzeige(b.fachId), anzahl === 1 ? '1 Material' : `${anzahl} Materialien`)}
+            {/* Unterbereiche (Paket 12): der Weg dorthin, damit „Ursachen" nicht ohne Einheit dasteht */}
+            {zeileMitModul(
+              oben.length ? 'Unterbereich' : 'Themenbereich',
+              [fachAnzeige(b.fachId), ...oben].join(' › '),
+              anzahl === 1 ? '1 Material' : `${anzahl} Materialien`
+            )}
           </Text>
         </div>
       </Group>

@@ -10,6 +10,7 @@
  * WELCHE Aufrufe aus dem Netz überhaupt erlaubt sind, steht NICHT hier, sondern im Server
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
+import type { LehrplanDatei } from './lehrplan'
 import type { DesignTemplate } from '@shared/design'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
 import type { LanStatus } from '../main/services/lanServer'
@@ -239,14 +240,20 @@ export function buildApi(call: Call, extras: ApiExtras) {
       list: () => call<ThemenDaten>('themen:list'),
       /** Anlegen oder umbenennen */
       bereich: (b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>) => call<ThemenDaten>('themen:bereich', b),
-      /** Löschen – die Materialien kommen nach „Ohne Themenbereich" */
+      /** Löschen samt Unterbereichen – die Materialien rücken in den Oberbereich bzw. nach „Ohne Themenbereich" */
       delete: (id: string) => call<ThemenDaten>('themen:delete', id),
+      /** Unter einen anderen Bereich hängen oder nach oben (null) – Paket 12 */
+      verschieben: (id: string, elternId: string | null) => call<ThemenDaten>('themen:verschieben', id, elternId),
       /** Zuordnungen setzen; null entfernt den Eintrag */
       zuordnen: (eintraege: Record<string, Zuordnung | null>) => call<ThemenDaten>('themen:zuordnen', eintraege),
       /** Vorschläge der Automatik übernehmen und für diese Fächer die Automatik einschalten */
       uebernehmen: (vorschlaege: BereichsUebernahme[], automatik: string[]) => call<ThemenDaten>('themen:uebernehmen', vorschlaege, automatik),
       reihenfolge: (schluessel: string, liste: string[]) => call<ThemenDaten>('themen:reihenfolge', schluessel, liste),
       automatik: (fachId: string, an: boolean) => call<ThemenDaten>('themen:automatik', fachId, an)
+    },
+    /** Lehrplan-Themen eines Landes (resources/lehrplaene/<LAND>.json, Paket 12/14); null = keine Datei */
+    lehrplan: {
+      themen: (stateId: string) => call<LehrplanDatei | null>('lehrplan:themen', stateId)
     },
     library: {
       list: () => call<SavedVocabList[]>('library:list'),

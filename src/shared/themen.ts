@@ -35,7 +35,15 @@ export interface Themenbereich {
   fachId: string
   name: string
   beschreibung?: string
-  /** Stellung unter den Bereichen des Fachs (aufsteigend) */
+  /**
+   * Oberbereich (Paket 12): Bereiche können Unterbereiche haben, beliebig tief – die Oberfläche
+   * ist für drei Ebenen gebaut. Beispiel der Lehrkraft: „Der Erste Weltkrieg" › „Ursachen des
+   * Ersten Weltkriegs" › „Der Balkan als Krisenherd Europas". Fehlt = oberste Ebene unter dem Fach.
+   */
+  elternId?: string
+  /** Von der Automatik aus Lehrplan, Lehrwerk oder Grammatiktabelle angelegt (nur zur Kennzeichnung) */
+  herkunft?: 'lehrplan' | 'lehrwerk' | 'grammatik'
+  /** Stellung unter den Geschwistern (aufsteigend) */
   reihenfolge: number
   angelegt: string
 }
@@ -57,17 +65,25 @@ export interface Zuordnung {
 }
 
 export interface ThemenDaten {
-  version: 1
+  /** 2 seit Paket 12 (Unterbereiche); Dateien der Version 1 werden beim Einlesen übernommen – ihre Bereiche stehen oben */
+  version: 2
   bereiche: Themenbereich[]
   /** Schlüssel: `materialSchluessel(moduleId, id)` */
   zuordnungen: Record<string, Zuordnung>
   /** Eigene Reihenfolge je Bereich (per Ziehen); Schlüssel wie oben. `ohne:<fachId>` für „Ohne Themenbereich" */
   reihenfolge: Record<string, string[]>
-  /** Fächer, in denen neue Materialien automatisch einsortiert werden (eingeschaltet mit dem ersten übernommenen Vorschlag) */
+  /**
+   * Automatik je Fach. Seit Paket 12 (Wunsch der Lehrkraft: „vorhandene Materialien AUTOMATISCH
+   * einsortiert") ist sie überall an; `false` heißt: in diesem Fach ausdrücklich ausgeschaltet.
+   * In Version 1 stand hier nur `true` für Fächer, in denen ein Vorschlag übernommen war.
+   */
   automatik: Record<string, boolean>
 }
 
-export const leereThemen = (): ThemenDaten => ({ version: 1, bereiche: [], zuordnungen: {}, reihenfolge: {}, automatik: {} })
+export const leereThemen = (): ThemenDaten => ({ version: 2, bereiche: [], zuordnungen: {}, reihenfolge: {}, automatik: {} })
+
+/** Sortiert die Automatik in diesem Fach ein? (Standard: ja) */
+export const automatikAn = (d: Pick<ThemenDaten, 'automatik'>, fachId: string): boolean => d.automatik[fachId] !== false
 
 export const materialSchluessel = (moduleId: string, id: string): string => `${moduleId}:${id}`
 
@@ -75,12 +91,22 @@ export const materialSchluessel = (moduleId: string, id: string): string => `${m
 export interface BereichsUebernahme {
   fachId: string
   name: string
+  /**
+   * Oberbereiche von oben nach unten (Namen), unter denen der Bereich liegt – fehlende werden
+   * angelegt, vorhandene gleichen Namens wiederverwendet (Paket 12, Hierarchie aus dem Lehrplan).
+   */
+  pfad?: string[]
+  /** Woher die Automatik den Namen hat – Lehrplan, Lehrwerk, Grammatik werden an neu angelegten Bereichen vermerkt */
+  herkunft?: string
   /** Vorhandener Bereich gleichen Namens – dann kommen die Materialien dorthin */
   bereichId?: string
   schluessel: string[]
 }
 
 const jetzt = (): string => new Date().toISOString()
+
+/** Herkünfte, die an einem automatisch angelegten Bereich vermerkt werden */
+const HERKUNFT = ['lehrplan', 'lehrwerk', 'grammatik'] as const
 
 /** Liest eine Datei ein und verwirft, was nicht passt – eine beschädigte Datei darf die Bibliotheken nicht lahmlegen. */
 export function pruefeThemen(roh: unknown): ThemenDaten {
@@ -91,6 +117,26 @@ export function pruefeThemen(roh: unknown): ThemenDaten {
     d.bereiche = r.bereiche.filter(
       (b): b is Themenbereich => !!b && typeof b.id === 'string' && typeof b.fachId === 'string' && typeof b.name === 'string' && b.name.trim() !== ''
     )
+  /*
+   * Unterbereiche (Paket 12): Ein Verweis auf einen fehlenden Oberbereich, auf einen aus einem
+   * anderen Fach oder ein Kreis (A unter B unter A) kann nur aus einer beschädigten Datei stammen
+   * – der Bereich rückt dann nach oben, statt samt Inhalt unsichtbar zu werden. Dateien der
+   * Version 1 kennen gar keine Oberbereiche; ihre Bereiche stehen danach oben wie bisher.
+   */
+  const nachId = new Map(d.bereiche.map((b) => [b.id, b]))
+  d.bereiche = d.bereiche.map((b) => {
+    const { elternId, ...rest } = b
+    if (typeof elternId !== 'string') return rest
+    const eltern = nachId.get(elternId)
+    if (!eltern || eltern.fachId !== b.fachId) return rest
+    // Kreis? Den Weg nach oben gehen – kommt man wieder bei sich an, ist er kaputt
+    const gesehen = new Set([b.id])
+    for (let x: Themenbereich | undefined = eltern; x; x = x.elternId ? nachId.get(x.elternId) : undefined) {
+      if (gesehen.has(x.id)) return rest
+      gesehen.add(x.id)
+    }
+    return { ...rest, elternId }
+  })
   const ids = new Set(d.bereiche.map((b) => b.id))
   if (r.zuordnungen && typeof r.zuordnungen === 'object')
     for (const [k, z] of Object.entries(r.zuordnungen))
@@ -98,8 +144,52 @@ export function pruefeThemen(roh: unknown): ThemenDaten {
         d.zuordnungen[k] = { bereichId: z.bereichId, von: z.von, am: typeof z.am === 'string' ? z.am : '' }
   if (r.reihenfolge && typeof r.reihenfolge === 'object')
     for (const [k, v] of Object.entries(r.reihenfolge)) if (Array.isArray(v)) d.reihenfolge[k] = v.filter((s) => typeof s === 'string')
-  if (r.automatik && typeof r.automatik === 'object') for (const [k, v] of Object.entries(r.automatik)) if (v === true) d.automatik[k] = true
+  if (r.automatik && typeof r.automatik === 'object') for (const [k, v] of Object.entries(r.automatik)) if (typeof v === 'boolean') d.automatik[k] = v
   return d
+}
+
+// ---------- Hierarchie (Paket 12) ----------
+
+/** Die Bereiche direkt unter `elternId` (null = oberste Ebene des Fachs), in ihrer Reihenfolge */
+export function kinderVon(d: Pick<ThemenDaten, 'bereiche'>, fachId: string, elternId: string | null): Themenbereich[] {
+  return d.bereiche
+    .filter((b) => b.fachId === fachId && (b.elternId ?? null) === elternId)
+    .sort((a, b) => a.reihenfolge - b.reihenfolge || a.name.localeCompare(b.name, 'de'))
+}
+
+/** Der Weg von oben bis zum Bereich selbst („Der Erste Weltkrieg", „Ursachen …", „Der Balkan …") */
+export function pfadVon(d: Pick<ThemenDaten, 'bereiche'>, id: string): Themenbereich[] {
+  const nachId = new Map(d.bereiche.map((b) => [b.id, b]))
+  const pfad: Themenbereich[] = []
+  for (let b = nachId.get(id); b && !pfad.includes(b); b = b.elternId ? nachId.get(b.elternId) : undefined) pfad.unshift(b)
+  return pfad
+}
+
+/** Alle Unterbereiche eines Bereichs, beliebig tief (ohne ihn selbst) */
+export function nachfahrenVon(d: Pick<ThemenDaten, 'bereiche'>, id: string): string[] {
+  const out: string[] = []
+  const offen = [id]
+  while (offen.length) {
+    const eltern = offen.pop()!
+    for (const b of d.bereiche)
+      if (b.elternId === eltern && !out.includes(b.id)) {
+        out.push(b.id)
+        offen.push(b.id)
+      }
+  }
+  return out
+}
+
+/**
+ * Der oberste Bereich über einem Bereich (bzw. er selbst, wenn er oben steht).
+ *
+ * Er ist das ÜBERTHEMA im Kopf der Materialien (Paket 11/12): Ein Blatt in „Der Erste Weltkrieg
+ * › Ursachen › Der Balkan als Krisenherd" trägt „Der Erste Weltkrieg" – die Unterrichtseinheit.
+ * Der Unterbereich ist meist schon das Thema des Blattes selbst; im Kopf daneben stünde es
+ * doppelt. Wer es anders will, trägt das Überthema am Material von Hand ein.
+ */
+export function obersterBereich(d: Pick<ThemenDaten, 'bereiche'>, id: string): Themenbereich | null {
+  return pfadVon(d, id)[0] ?? null
 }
 
 const gleicherName = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de') === b.trim().toLocaleLowerCase('de')
@@ -109,14 +199,22 @@ export function bereichSetzen(d: ThemenDaten, b: Pick<Themenbereich, 'id' | 'fac
   const name = b.name.trim().slice(0, 80)
   if (!name) throw new Error('Der Themenbereich braucht einen Namen.')
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(b.id)) throw new Error('Ungültige Kennung eines Themenbereichs.')
-  if (d.bereiche.some((x) => x.id !== b.id && x.fachId === b.fachId && gleicherName(x.name, name)))
-    throw new Error(`Einen Themenbereich „${name}“ gibt es in diesem Fach schon.`)
   const alt = d.bereiche.find((x) => x.id === b.id)
-  const reihenfolge = alt?.reihenfolge ?? b.reihenfolge ?? Math.max(0, ...d.bereiche.filter((x) => x.fachId === b.fachId).map((x) => x.reihenfolge + 1))
+  const fachId = alt?.fachId ?? b.fachId
+  // Der Oberbereich bleibt beim Umbenennen, wie er ist – verschoben wird mit `bereichVerschieben`
+  const elternId = alt ? alt.elternId : b.elternId
+  if (elternId && !d.bereiche.some((x) => x.id === elternId && x.fachId === fachId)) throw new Error('Den übergeordneten Themenbereich gibt es nicht mehr.')
+  // Gleiche Namen nur unter verschiedenen Oberbereichen – „Quellen" darf es in zwei Einheiten geben
+  if (d.bereiche.some((x) => x.id !== b.id && x.fachId === fachId && (x.elternId ?? null) === (elternId ?? null) && gleicherName(x.name, name)))
+    throw new Error(elternId ? `Einen Unterbereich „${name}“ gibt es dort schon.` : `Einen Themenbereich „${name}“ gibt es in diesem Fach schon.`)
+  const reihenfolge = alt?.reihenfolge ?? b.reihenfolge ?? Math.max(0, ...kinderVon(d, fachId, elternId ?? null).map((x) => x.reihenfolge + 1))
+  const herkunft = alt?.herkunft ?? b.herkunft
   const neu: Themenbereich = {
     id: b.id,
-    fachId: alt?.fachId ?? b.fachId,
+    fachId,
     name,
+    ...(elternId ? { elternId } : {}),
+    ...(herkunft ? { herkunft } : {}),
     reihenfolge,
     angelegt: alt?.angelegt ?? b.angelegt ?? jetzt(),
     ...((b.beschreibung ?? alt?.beschreibung) ? { beschreibung: (b.beschreibung ?? alt?.beschreibung)!.trim() } : {})
@@ -124,13 +222,42 @@ export function bereichSetzen(d: ThemenDaten, b: Pick<Themenbereich, 'id' | 'fac
   return { ...d, bereiche: alt ? d.bereiche.map((x) => (x.id === b.id ? neu : x)) : [...d.bereiche, neu] }
 }
 
-/** Löscht einen Bereich; seine Materialien landen in „Ohne Themenbereich" (und bleiben dort, bis jemand sie verschiebt). */
+/**
+ * Einen Bereich (samt Unterbereichen) unter einen anderen hängen – oder nach oben (`null`).
+ * Abgewiesen wird, was einen Kreis ergäbe (unter sich selbst oder einen eigenen Unterbereich)
+ * und ein Name, den es am Ziel schon gibt.
+ */
+export function bereichVerschieben(d: ThemenDaten, id: string, elternId: string | null): ThemenDaten {
+  const b = d.bereiche.find((x) => x.id === id)
+  if (!b) throw new Error('Den Themenbereich gibt es nicht mehr.')
+  if ((b.elternId ?? null) === elternId) return d
+  if (elternId) {
+    const ziel = d.bereiche.find((x) => x.id === elternId)
+    if (!ziel || ziel.fachId !== b.fachId) throw new Error('Themenbereiche lassen sich nur innerhalb eines Fachs verschieben.')
+    if (elternId === id || nachfahrenVon(d, id).includes(elternId)) throw new Error('Ein Themenbereich kann nicht in seinen eigenen Unterbereich.')
+  }
+  if (d.bereiche.some((x) => x.id !== id && x.fachId === b.fachId && (x.elternId ?? null) === elternId && gleicherName(x.name, b.name)))
+    throw new Error(`Dort gibt es schon einen Bereich „${b.name}“.`)
+  const reihenfolge = Math.max(0, ...kinderVon(d, b.fachId, elternId).map((x) => x.reihenfolge + 1))
+  const neu: Themenbereich = { ...b, reihenfolge }
+  if (elternId) neu.elternId = elternId
+  else delete neu.elternId
+  return { ...d, bereiche: d.bereiche.map((x) => (x.id === id ? neu : x)) }
+}
+
+/**
+ * Löscht einen Bereich MIT seinen Unterbereichen. Die Materialien darin rücken in den
+ * Oberbereich des gelöschten Bereichs – bei einem obersten nach „Ohne Themenbereich" – und
+ * bleiben dort, bis jemand sie verschiebt. Material geht dabei nie verloren.
+ */
 export function bereichLoeschen(d: ThemenDaten, id: string): ThemenDaten {
+  const weg = new Set([id, ...nachfahrenVon(d, id)])
+  const ziel = d.bereiche.find((b) => b.id === id)?.elternId ?? null
   const zuordnungen: Record<string, Zuordnung> = {}
-  for (const [k, z] of Object.entries(d.zuordnungen)) zuordnungen[k] = z.bereichId === id ? { ...z, bereichId: null, am: jetzt() } : z
+  for (const [k, z] of Object.entries(d.zuordnungen)) zuordnungen[k] = z.bereichId && weg.has(z.bereichId) ? { ...z, bereichId: ziel, am: jetzt() } : z
   const reihenfolge = { ...d.reihenfolge }
-  delete reihenfolge[id]
-  return { ...d, bereiche: d.bereiche.filter((b) => b.id !== id), zuordnungen, reihenfolge }
+  for (const x of weg) delete reihenfolge[x]
+  return { ...d, bereiche: d.bereiche.filter((b) => !weg.has(b.id)), zuordnungen, reihenfolge }
 }
 
 /** Setzt oder entfernt (null) Zuordnungen. Unbekannte Bereiche werden abgewiesen. */
@@ -151,13 +278,26 @@ export function zuordnen(d: ThemenDaten, eintraege: Record<string, Zuordnung | n
 /** Übernimmt Vorschläge: legt fehlende Bereiche an, ordnet zu (automatisch) und schaltet die Automatik ein. */
 export function uebernehmen(d: ThemenDaten, vorschlaege: BereichsUebernahme[], automatikSchluessel: string[], neueId: () => string): ThemenDaten {
   let neu = d
+  /** Bereich dieses Namens unter `elternId` – vorhanden oder neu angelegt */
+  const bereichFuer = (fachId: string, name: string, elternId: string | undefined, quelle?: string): string => {
+    const da = neu.bereiche.find((b) => b.fachId === fachId && b.elternId === elternId && gleicherName(b.name, name))
+    if (da) return da.id
+    const id = neueId()
+    const herkunft = HERKUNFT.find((h) => h === quelle)
+    neu = bereichSetzen(neu, { id, fachId, name, ...(elternId ? { elternId } : {}), ...(herkunft ? { herkunft } : {}) })
+    return id
+  }
   for (const v of vorschlaege) {
     let id = v.bereichId && neu.bereiche.some((b) => b.id === v.bereichId) ? v.bereichId : undefined
-    id ??= neu.bereiche.find((b) => b.fachId === v.fachId && gleicherName(b.name, v.name))?.id
-    if (!id) {
-      id = neueId()
-      neu = bereichSetzen(neu, { id, fachId: v.fachId, name: v.name })
+    if (!id && v.pfad?.length) {
+      // Hierarchie aus dem Lehrplan: die Oberbereiche der Reihe nach finden oder anlegen
+      let eltern: string | undefined
+      for (const name of v.pfad) eltern = bereichFuer(v.fachId, name, eltern, v.herkunft)
+      id = bereichFuer(v.fachId, v.name, eltern, v.herkunft)
     }
+    // Ohne Pfad wie bisher: ein gleichnamiger Bereich irgendwo im Fach nimmt die Materialien auf
+    id ??= neu.bereiche.find((b) => b.fachId === v.fachId && gleicherName(b.name, v.name))?.id
+    id ??= bereichFuer(v.fachId, v.name, undefined, v.herkunft)
     const eintraege: Record<string, Zuordnung> = {}
     // Von Hand Zugeordnetes bleibt, wo es ist – auch wenn es im Vorschlag auftaucht
     for (const k of v.schluessel) if (neu.zuordnungen[k]?.von !== 'hand') eintraege[k] = { bereichId: id, von: 'auto', am: jetzt() }

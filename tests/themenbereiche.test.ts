@@ -161,9 +161,10 @@ describe('Übernehmen und Automatik', () => {
     expect(nochmal.zuordnungen[materialSchluessel('arbeitsblatt', hand.id)].bereichId).toBe('bereich2')
   })
 
-  it('sortiert ohne eingeschaltete Automatik nichts ein', () => {
+  it('sortiert in einem Fach mit ausgeschalteter Automatik nichts ein – eingeschaltet ist sie seit Paket 12 von selbst', () => {
     const d = bereichSetzen(leereThemen(), { id: 'bereich1', fachId: 'biologie', name: 'Zelle' })
-    expect(einsortieren([mat('Zellkern')], d)).toEqual({})
+    expect(einsortieren([mat('Zellkern')], { ...d, automatik: { biologie: false } })).toEqual({})
+    expect(Object.values(einsortieren([mat('Zellkern')], d))[0]?.bereichId).toBe('bereich1')
   })
 })
 

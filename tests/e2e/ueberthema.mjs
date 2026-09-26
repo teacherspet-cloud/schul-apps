@@ -170,7 +170,15 @@ try {
   const knopf = page.getByRole('button', { name: 'Meine Arbeitsblätter', exact: true }).filter({ visible: true })
   if (await knopf.count()) await knopf.click()
   await page.waitForTimeout(900)
-  await page.locator('[data-bereich="Mechanik"]').filter({ visible: true }).first().click()
+  // Seit Paket 12 stehen Fächer anfangs zugeklappt
+  const physik = page.locator('[data-fach-abschnitt="physik"]').filter({ visible: true }).first()
+  if ((await physik.getAttribute('data-offen')) !== 'true')
+    await physik
+      .getByRole('button', { name: /aufklappen$/ })
+      .first()
+      .click()
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'Themenbereich „Mechanik“ öffnen' }).filter({ visible: true }).first().click()
   await page.waitForTimeout(600)
   await page.getByRole('button', { name: 'Neu in diesem Bereich' }).filter({ visible: true }).first().click()
   await page.waitForTimeout(2500)

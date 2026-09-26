@@ -6,7 +6,18 @@ import { app } from 'electron'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
-import { bereichLoeschen, bereichSetzen, BereichsUebernahme, pruefeThemen, ThemenDaten, Themenbereich, uebernehmen, zuordnen, Zuordnung } from '@shared/themen'
+import {
+  bereichLoeschen,
+  bereichSetzen,
+  BereichsUebernahme,
+  bereichVerschieben,
+  pruefeThemen,
+  ThemenDaten,
+  Themenbereich,
+  uebernehmen,
+  zuordnen,
+  Zuordnung
+} from '@shared/themen'
 
 /** Dateiname – steht auch in der Sicherung (wartung.ts, DATEIEN) */
 export const THEMEN_DATEI = 'themenbereiche.json'
@@ -35,6 +46,8 @@ const neueId = (): string => randomBytes(6).toString('hex')
 export const themenBereichSetzen = (b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>): ThemenDaten =>
   schreibe(bereichSetzen(leseThemen(), b))
 export const themenBereichLoeschen = (id: string): ThemenDaten => schreibe(bereichLoeschen(leseThemen(), id))
+/** Unter einen anderen Bereich hängen oder nach oben (null) – Paket 12 */
+export const themenBereichVerschieben = (id: string, elternId: string | null): ThemenDaten => schreibe(bereichVerschieben(leseThemen(), id, elternId))
 export const themenZuordnen = (eintraege: Record<string, Zuordnung | null>): ThemenDaten => schreibe(zuordnen(leseThemen(), eintraege))
 export const themenUebernehmen = (vorschlaege: BereichsUebernahme[], automatik: string[]): ThemenDaten =>
   schreibe(uebernehmen(leseThemen(), vorschlaege, automatik, neueId))
@@ -46,8 +59,6 @@ export function themenReihenfolge(schluessel: string, liste: string[]): ThemenDa
 
 export function themenAutomatik(fachId: string, an: boolean): ThemenDaten {
   const d = leseThemen()
-  const automatik = { ...d.automatik }
-  if (an) automatik[fachId] = true
-  else delete automatik[fachId]
-  return schreibe({ ...d, automatik })
+  // Seit Paket 12 ist die Automatik von selbst an – ausgeschaltet muss deshalb ausdrücklich `false` stehen
+  return schreibe({ ...d, automatik: { ...d.automatik, [fachId]: an } })
 }

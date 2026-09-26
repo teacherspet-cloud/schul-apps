@@ -102,6 +102,8 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'grammarTests:get',
   // Themenbereiche (Paket 10b): Bereiche und Zuordnungen lesen
   'themen:list',
+  // Lehrplan-Themen lesen (Paket 12) – mitgelieferte Daten, nichts vom Rechner der Lehrkraft
+  'lehrplan:themen',
 
   /*
    * --- Material speichern ---
@@ -122,6 +124,7 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
    * Löschaufrufe – auch wenn es nur den Ordner und nicht das Material träfe.
    */
   'themen:bereich',
+  'themen:verschieben',
   'themen:zuordnen',
   'themen:uebernehmen',
   'themen:reihenfolge',

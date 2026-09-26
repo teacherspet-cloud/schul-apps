@@ -56,6 +56,16 @@ const eintraege = () =>
       .map((e) => e.getAttribute('data-bibliothek-eintrag'))
   )
 
+/** Alle zugeklappten Fächer und Bereiche aufklappen (Paket 12) */
+async function allesAufklappen() {
+  for (let i = 0; i < 12; i++) {
+    const zu = sichtbar(page.getByRole('button', { name: /aufklappen$/ }))
+    if (!(await zu.count())) return
+    await zu.first().click()
+    await page.waitForTimeout(250)
+  }
+}
+
 /**
  * Bibliothek eines Programms durchgehen: öffnen, „Zurück zu", Kopie, Suche.
  * `name` ist der Name des offenen Dokuments, `leiste` die Beschriftung des Leistenknopfs.
@@ -68,6 +78,9 @@ async function bibliothekPruefen(programm, leiste, name, suchwort) {
   const zurueck = sichtbar(page.locator('[data-bibliothek-zurueck]'))
   pruefe((await zurueck.count()) === 1 && (await zurueck.innerText()).includes(name), `${programm}: „Zurück zu „${name}““ steht da`)
 
+  // Seit Paket 12 stehen Fächer und Themenbereiche anfangs zugeklappt, und die Automatik sortiert
+  // neue Materialien in Bereiche ein – für die Probe alles aufklappen
+  await allesAufklappen()
   // Kopie anlegen: erscheint, wird nicht geöffnet
   const vorher = await eintraege()
   await sichtbar(page.getByRole('button', { name: `Weitere Aktionen für „${name}“` }))
@@ -75,6 +88,7 @@ async function bibliothekPruefen(programm, leiste, name, suchwort) {
     .click()
   await page.getByRole('menuitem', { name: 'Kopie anlegen' }).click()
   await page.waitForTimeout(1200)
+  await allesAufklappen()
   const nachher = await eintraege()
   pruefe(
     nachher.length === vorher.length + 1 && nachher.includes(`${name} (Kopie)`),

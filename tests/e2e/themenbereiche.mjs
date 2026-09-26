@@ -10,7 +10,11 @@
 //  4. Jahrgangsfilter oben (Chips) – gemerkt über einen Neustart der Oberfläche.
 //  5. Übergreifende Seite von der Startseite aus: Die Lernzielkontrolle im Bereich öffnet im
 //     Programm „Lernzielkontrolle".
-// Bildschirmfotos (hell und dunkel): paket10b-*.png
+//  6. Paket 12: Unterbereiche (Beispiel der Lehrkraft: „Der Erste Weltkrieg" › „Ursachen …" ›
+//     „Der Balkan als Krisenherd Europas"), Fächer und Bereiche anfangs zugeklappt und gemerkt,
+//     Breadcrumb, Bereich auf Bereich ziehen, Löschen samt Unterbereichen, automatisches
+//     Einsortieren in die Hierarchie, Überthema = oberster Bereich.
+// Bildschirmfotos (hell und dunkel): paket10b-*.png, paket12-themen-*.png
 import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
@@ -53,6 +57,25 @@ const blatt = (id, name, subjectId, subjectLabel, grade, topic = name) => ({
   payload: {}
 })
 
+/** Fach aufklappen (Paket 12: anfangs zugeklappt) */
+async function aufklappen(fachId) {
+  const abschnitt = sichtbar(page.locator(`[data-fach-abschnitt="${fachId}"]`)).first()
+  if ((await abschnitt.getAttribute('data-offen')) === 'true') return
+  await abschnitt
+    .getByRole('button', { name: /aufklappen$/ })
+    .first()
+    .click()
+  await page.waitForTimeout(400)
+}
+/** Bereich im Baum aufklappen */
+async function bereichAuf(name) {
+  const knopf = sichtbar(page.getByRole('button', { name: `„${name}“ aufklappen` }))
+  if (await knopf.count()) {
+    await knopf.first().click()
+    await page.waitForTimeout(300)
+  }
+}
+
 async function arbeitsblattBibliothek() {
   await page.click('[aria-label="Arbeitsblatt"]')
   await page.waitForTimeout(400)
@@ -62,6 +85,19 @@ async function arbeitsblattBibliothek() {
 }
 
 try {
+  await warteAufOberflaeche(page)
+  /*
+   * Seit Paket 12 sortiert die Automatik von selbst ein – auch nach der Lehrplandatei des Landes,
+   * die die Recherche laufend ergänzt. Für die Abläufe 1–5 (Vorschlag, Ziehen, Verschieben) muss
+   * der Bestand ungeordnet beginnen; die Automatik prüft Teil 6 eigens.
+   */
+  await page.evaluate(async () => {
+    await window.api.themen.automatik('biologie', false)
+    await window.api.themen.automatik('mathematik', false)
+    await window.api.themen.automatik('geschichte', false)
+  })
+  // Neu laden: Die Oberfläche hält die Themenbereiche im Speicher und liest sie sonst nicht neu
+  await page.reload()
   await warteAufOberflaeche(page)
   // ---------- Bestand: eine echte Lernzielkontrolle (Mathematik) und Arbeitsblätter
   await page.click('[aria-label="Lernzielkontrolle"]')
@@ -89,6 +125,12 @@ try {
   // ---------- 1) Vorschlag ab 8 Materialien
   console.log('\nVorschlag')
   await arbeitsblattBibliothek()
+  // Anfangs ist alles zugeklappt (Paket 12)
+  const zu = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-fach-abschnitt]')].filter((x) => x.offsetParent).map((x) => x.getAttribute('data-offen'))
+  )
+  pruefe(zu.length > 0 && zu.every((x) => x === 'false'), `Fächer anfangs zugeklappt (${zu.join(', ')})`)
+  await page.screenshot({ path: join(out, 'paket12-themen-zugeklappt.png') })
   const hinweis = sichtbar(page.locator('[data-vorschlag="biologie"]'))
   pruefe((await hinweis.count()) === 1, 'Biologie (8 Blätter): Vorschlag erscheint')
   const text = (await hinweis.count()) ? await hinweis.innerText() : ''
@@ -101,6 +143,7 @@ try {
   await hinweis.getByRole('checkbox', { name: /^Ökosystem/ }).uncheck()
   await hinweis.getByRole('button', { name: '2 Bereiche übernehmen' }).click()
   await page.waitForTimeout(900)
+  await aufklappen('biologie')
   pruefe((await ordner('Zelle').count()) === 1 && (await ordner('Fotosynthese').count()) === 1, 'Ordner „Zelle" und „Fotosynthese" angelegt')
   pruefe((await ordner('Ökosystem').count()) === 0, 'Der abgewählte Vorschlag „Ökosystem" bleibt weg')
   pruefe((await ordner('Zelle').innerText()).includes('3 Materialien'), '„Zelle" enthält 3 Materialien')
@@ -120,6 +163,7 @@ try {
   console.log('\nAnlegen und Ziehen')
   const mathe = sichtbar(page.locator('[data-fach-abschnitt="mathematik"]'))
   await mathe.getByRole('button', { name: 'Themenbereich', exact: true }).click()
+  await page.waitForTimeout(300)
   await page.getByRole('textbox', { name: 'Name des neuen Themenbereichs' }).fill('Potenzen')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(600)
@@ -232,11 +276,160 @@ try {
   await page.waitForTimeout(300)
   pruefe((await sichtbar(page.locator('[data-home-bereich="Potenzen"]')).count()) === 1, 'Startseiten-Suche findet den Themenbereich')
 
+  // ---------- 6) Hierarchie (Paket 12)
+  console.log('\nUnterbereiche')
+  await arbeitsblattBibliothek()
+  await page.evaluate(
+    async (blaetter) => {
+      for (const b of blaetter) await window.api.sheets.save(b)
+    },
+    [
+      blatt('ges00001', 'Ursachen des Ersten Weltkriegs – Bündnisse', 'geschichte', 'Geschichte', 9),
+      blatt('ges00002', 'Der Balkan als Krisenherd Europas', 'geschichte', 'Geschichte', 9)
+    ]
+  )
+  await page.reload()
+  await warteAufOberflaeche(page)
+  await arbeitsblattBibliothek()
+  await aufklappen('geschichte')
+  const geschichte = sichtbar(page.locator('[data-fach-abschnitt="geschichte"]'))
+  await geschichte.getByRole('button', { name: 'Themenbereich', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Name des neuen Themenbereichs' }).fill('Der Erste Weltkrieg')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(600)
+  const unterAnlegen = async (oben, name) => {
+    await ordner(oben)
+      .getByRole('button', { name: `Weitere Aktionen für den Themenbereich „${oben}“` })
+      .first()
+      .click()
+    await page.getByRole('menuitem', { name: 'Unterbereich anlegen' }).click()
+    await page.getByRole('textbox', { name: 'Name des neuen Unterbereichs' }).fill(name)
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(600)
+  }
+  await unterAnlegen('Der Erste Weltkrieg', 'Ursachen des Ersten Weltkriegs')
+  await unterAnlegen('Ursachen des Ersten Weltkriegs', 'Der Balkan als Krisenherd Europas')
+  pruefe((await ordner('Der Balkan als Krisenherd Europas').count()) === 1, 'Drei Ebenen angelegt, der Unterbereich ist aufgeklappt sichtbar')
+  const tiefe = await page.evaluate(() =>
+    document.querySelector('[data-bereich="Der Balkan als Krisenherd Europas"]')?.closest('[data-baum-tiefe]')?.getAttribute('data-baum-tiefe')
+  )
+  pruefe(tiefe === '2', `„Der Balkan …" steht auf der dritten Ebene (Tiefe ${tiefe})`)
+
+  // Automatik einschalten: vorhandene Blätter kommen in den passenden (tiefsten) Unterbereich
+  await geschichte.getByRole('button', { name: 'Einstellungen der Themenbereiche in Geschichte' }).click()
+  await page.getByRole('menuitem', { name: 'Neue Materialien automatisch einsortieren' }).click()
+  await page.waitForTimeout(300)
+  await page.reload()
+  await warteAufOberflaeche(page)
+  await arbeitsblattBibliothek()
+  await page.waitForTimeout(800)
+  const z = await page.evaluate(async () => {
+    const d = await window.api.themen.list()
+    const name = (id) => d.bereiche.find((b) => b.id === id)?.name
+    return [name(d.zuordnungen['arbeitsblatt:ges00001']?.bereichId), name(d.zuordnungen['arbeitsblatt:ges00002']?.bereichId)]
+  })
+  pruefe(
+    z[0] === 'Ursachen des Ersten Weltkriegs' && z[1] === 'Der Balkan als Krisenherd Europas',
+    `Automatisch in die Hierarchie einsortiert (${z.join(' / ')})`
+  )
+  // Aufgeklappt bleibt aufgeklappt – auch nach dem Neuladen
+  pruefe((await ordner('Der Balkan als Krisenherd Europas').count()) === 1, 'Aufgeklappte Fächer und Bereiche sind gemerkt')
+  pruefe((await ordner('Der Erste Weltkrieg').innerText()).includes('2 Materialien'), 'Der Oberbereich zählt die Materialien seiner Unterbereiche mit')
+  await page.screenshot({ path: join(out, 'paket12-themen-baum.png') })
+
+  // Zuklappen und aufklappen
+  await page.getByRole('button', { name: '„Der Erste Weltkrieg“ zuklappen' }).first().click()
+  await page.waitForTimeout(300)
+  pruefe((await ordner('Ursachen des Ersten Weltkriegs').count()) === 0, 'Zugeklappt verschwinden die Unterbereiche')
+  await bereichAuf('Der Erste Weltkrieg')
+
+  // Geöffneter Bereich: ganzer Pfad als Breadcrumb
+  await ordner('Der Balkan als Krisenherd Europas').getByRole('button', { name: 'Themenbereich „Der Balkan als Krisenherd Europas“ öffnen' }).click()
+  await page.waitForTimeout(500)
+  const pfad = await sichtbar(page.locator('[data-pfad]')).first().getAttribute('data-pfad')
+  pruefe(pfad === 'Der Erste Weltkrieg › Ursachen des Ersten Weltkriegs › Der Balkan als Krisenherd Europas', `Breadcrumb mit dem ganzen Pfad (${pfad})`)
+  await page.screenshot({ path: join(out, 'paket12-themen-pfad.png') })
+  await sichtbar(page.getByRole('button', { name: 'Der Erste Weltkrieg', exact: true }))
+    .first()
+    .click()
+  await page.waitForTimeout(400)
+  pruefe((await sichtbar(page.locator('[data-offener-bereich="Der Erste Weltkrieg"]')).count()) === 1, 'Ein Klick im Pfad führt zum Oberbereich')
+  pruefe((await sichtbar(page.locator('[data-unterbereiche]')).count()) === 1, '… der seine Unterbereiche zeigt')
+  await sichtbar(page.getByRole('button', { name: 'Alle Fächer' }))
+    .first()
+    .click()
+  await page.waitForTimeout(400)
+
+  // Bereich auf Bereich ziehen: „Der Balkan …" unter einen neuen Bereich „Imperialismus"
+  await geschichte.getByRole('button', { name: 'Themenbereich', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Name des neuen Themenbereichs' }).fill('Imperialismus')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(600)
+  await ordner('Der Balkan als Krisenherd Europas').first().dragTo(ordner('Imperialismus').first())
+  await page.waitForTimeout(800)
+  const neuePfad = await page.evaluate(async () => {
+    const d = await window.api.themen.list()
+    const b = d.bereiche.find((x) => x.name === 'Der Balkan als Krisenherd Europas')
+    return d.bereiche.find((x) => x.id === b?.elternId)?.name
+  })
+  pruefe(neuePfad === 'Imperialismus', `Bereich per Ziehen unter einen anderen gehängt (jetzt unter „${neuePfad}")`)
+  await sichtbar(page.locator('[data-rueckgaengig-hinweis]')).last().getByRole('button', { name: 'Rückgängig' }).click()
+  await page.waitForTimeout(700)
+  const zurueck = await page.evaluate(async () => {
+    const d = await window.api.themen.list()
+    const b = d.bereiche.find((x) => x.name === 'Der Balkan als Krisenherd Europas')
+    return d.bereiche.find((x) => x.id === b?.elternId)?.name
+  })
+  pruefe(zurueck === 'Ursachen des Ersten Weltkriegs', '„Rückgängig" hängt ihn zurück')
+
+  // Löschen samt Unterbereichen, Rückgängig stellt alles wieder her
+  await ordner('Der Erste Weltkrieg').getByRole('button', { name: 'Weitere Aktionen für den Themenbereich „Der Erste Weltkrieg“' }).first().click()
+  await page.getByRole('menuitem', { name: 'Löschen' }).click()
+  await page.waitForTimeout(200)
+  const frage = sichtbar(page.locator('[data-bereich-loeschen]'))
+  pruefe((await frage.innerText()).includes('samt 2 Unterbereichen'), 'Die Rückfrage nennt die Unterbereiche')
+  await frage.getByRole('button', { name: 'Löschen' }).click()
+  await page.waitForTimeout(700)
+  pruefe(
+    (await ordner('Der Erste Weltkrieg').count()) === 0 && (await karte('Der Balkan als Krisenherd Europas').count()) === 1,
+    'Gelöscht; das Blatt steht unter „Ohne Themenbereich"'
+  )
+  await sichtbar(page.locator('[data-rueckgaengig-hinweis]')).last().getByRole('button', { name: 'Rückgängig' }).click()
+  await page.waitForTimeout(900)
+  const wieder = await page.evaluate(async () => {
+    const d = await window.api.themen.list()
+    const name = (id) => d.bereiche.find((b) => b.id === id)?.name
+    return name(d.zuordnungen['arbeitsblatt:ges00002']?.bereichId)
+  })
+  pruefe(
+    wieder === 'Der Balkan als Krisenherd Europas' && (await ordner('Der Erste Weltkrieg').count()) === 1,
+    '„Rückgängig" stellt alle drei Ebenen samt Zuordnung wieder her'
+  )
+
+  // Überthema im Kopf = der OBERSTE Bereich
+  await page.click('[aria-label="Arbeitsblatt"]')
+  await page.waitForTimeout(500)
+  // Aus der Bibliothek zurück in den Editor
+  const zurueckZu = sichtbar(page.getByRole('button', { name: /^Zurück zu/ }))
+  if (await zurueckZu.count()) await zurueckZu.first().click()
+  await page.evaluate(() => window.__selftest.wsMaterialtext(6))
+  await page.waitForTimeout(2000)
+  await page.evaluate(() => window.__selftest.inUnterbereich('arbeitsblatt', ['Die Weimarer Republik', 'Krisenjahre'], 'geschichte'))
+  await page.waitForTimeout(1200)
+  const fachzeile = await page.evaluate(() => {
+    const seite = [...document.querySelectorAll('.ws-editor-pages .ws-page')].find(
+      (p) => p.getBoundingClientRect().width > 0 && !p.classList.contains('ws-cover')
+    )
+    return seite?.querySelector('.ws-header .ws-subject')?.textContent ?? ''
+  })
+  pruefe(fachzeile.includes('Geschichte › Die Weimarer Republik') && !fachzeile.includes('Krisenjahre'), `Überthema ist der oberste Bereich („${fachzeile}")`)
+
   // ---------- Dunkelmodus
   await page.evaluate(() => window.api.settings.set({ appearance: { colorScheme: 'dark' } }))
   await page.reload()
   await warteAufOberflaeche(page)
   await arbeitsblattBibliothek()
+  await aufklappen('mathematik')
   await shot('bibliothek-dunkel')
   await ordner('Potenzen').getByRole('button', { name: 'Themenbereich „Potenzen“ öffnen' }).click()
   await page.waitForTimeout(600)

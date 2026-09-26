@@ -22,8 +22,8 @@
  * Ohne React und ohne Store geschrieben – geprüft in tests/themenbereiche.test.ts.
  */
 import { STOPPWOERTER } from '@shared/stoppwoerter'
-import type { ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
-import { materialSchluessel } from '@shared/themen'
+import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
+import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon } from '@shared/themen'
 
 /*
  * SCHWELLEN – was belegt ist und was nicht:
@@ -62,6 +62,8 @@ export interface KatalogThema {
   quelle: 'lehrplan' | 'lehrwerk' | 'grammatik'
   /** Jahrgänge, für die das Thema gilt; fehlt = alle. Ein Material mit anderem Jahrgang passt nicht dazu. */
   jahrgaenge?: number[]
+  /** Oberthemen von oben nach unten (Paket 12) – daraus entstehen beim Einsortieren die Oberbereiche */
+  pfad?: string[]
 }
 
 export interface Vorschlag {
@@ -72,6 +74,8 @@ export interface Vorschlag {
   schluessel: string[]
   /** Woher der Name stammt – für den Hinweis („aus dem Lehrplan") */
   herkunft: 'bereich' | KatalogThema['quelle'] | 'stichwort'
+  /** Oberthemen aus dem Lehrplan (Paket 12) */
+  pfad?: string[]
 }
 
 // ---------- Wörter ----------
@@ -169,20 +173,26 @@ export const schluesselVon = (m: Pick<ThemenMaterial, 'moduleId' | 'id'>): strin
 export function besterBereich(m: ThemenMaterial, bereiche: Themenbereich[], mitglieder: Map<string, string[][]>): Themenbereich | null {
   const w = woerterVon(m)
   if (!w.length) return null
-  let bester: Themenbereich | null = null
+  let beste: Themenbereich[] = []
   let wert = 0
-  let gleichstand = false
   for (const b of bereiche) {
     if (b.fachId !== m.fachId) continue
     const s = Math.max(aehnlichkeit(w, stichwoerter(b.name)), ...(mitglieder.get(b.id) ?? []).map((x) => aehnlichkeit(w, x)))
     if (s < AEHNLICH) continue
     if (s > wert) {
-      bester = b
+      beste = [b]
       wert = s
-      gleichstand = false
-    } else if (s === wert) gleichstand = true
+    } else if (s === wert) beste.push(b)
   }
-  return gleichstand ? null : bester
+  if (beste.length <= 1) return beste[0] ?? null
+  /*
+   * Gleichstand in EINER Linie (Paket 12): „Der Erste Weltkrieg" und sein Unterbereich „Ursachen
+   * des Ersten Weltkriegs" passen gleich gut – dann der tiefere, er ist genauer. Gleichstand
+   * zwischen verschiedenen Zweigen bleibt unentschieden: lieber gar nicht als falsch einsortieren.
+   */
+  const alle = { bereiche }
+  const tiefster = beste.find((b) => beste.every((x) => x.id === b.id || nachfahrenVon(alle, x.id).includes(b.id)))
+  return tiefster ?? null
 }
 
 /** Stichwörter der Materialien je Bereich (nur, was einsortiert ist) */
@@ -206,11 +216,117 @@ export function einsortieren(materialien: ThemenMaterial[], daten: ThemenDaten, 
   const mitglieder = mitgliederWoerter(materialien, daten)
   for (const m of materialien) {
     const k = schluesselVon(m)
-    if (daten.zuordnungen[k] || !daten.automatik[m.fachId]) continue
+    if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
     const b = besterBereich(m, daten.bereiche, mitglieder)
     if (b) neu[k] = { bereichId: b.id, von: 'auto', am: heute }
   }
   return neu
+}
+
+// ---------- Lehrplan- und Lehrwerksthemen ----------
+
+type KatalogMitWoertern = { k: KatalogThema; w: string[] }[]
+
+const katalogWoerter = (katalog: KatalogThema[]): KatalogMitWoertern => katalog.map((k) => ({ k, w: stichwoerter(`${k.name} ${k.zusatz ?? ''}`) }))
+
+/**
+ * Das passendste belegte Thema für ein Material (Stelle im Katalog, -1 = keins): Mindestens
+ * `LEHRPLAN_DECKUNG` der Wörter des Materials müssen im Thema stehen, darunter ein
+ * aussagekräftiges; der Jahrgang muss passen. Bei gleicher Deckung das engere Thema (weniger
+ * Wörter) – im Baum meist das tiefere.
+ */
+function besterKatalogIndex(m: ThemenMaterial, katalog: KatalogMitWoertern): number {
+  const w = woerterVon(m)
+  let bestes = -1
+  let wert = 0
+  for (let i = 0; i < katalog.length; i++) {
+    // „Unit 3" in Klasse 6 ist eine andere Unit als in Klasse 8
+    const jg = katalog[i].k.jahrgaenge
+    if (m.grade && jg && !jg.includes(m.grade)) continue
+    const d = deckung(w, katalog[i].w)
+    // Mindestens ein aussagekräftiges Wort muss passen, nicht nur Kurzwörter
+    if (d < LEHRPLAN_DECKUNG || !w.some((x) => (x.length >= 5 || /\d/.test(x)) && katalog[i].w.some((y) => passt(x, y)))) continue
+    if (d > wert || (d === wert && bestes >= 0 && katalog[i].w.length < katalog[bestes].w.length)) {
+      bestes = i
+      wert = d
+    }
+  }
+  return bestes
+}
+
+/**
+ * Die AUTOMATIK (Paket 12, Wunsch der Lehrkraft vom 26.09.2026): „vorhandene und neue
+ * Materialien werden automatisch in die Hierarchie einsortiert – von Hand Zugeordnetes bleibt".
+ *
+ * Für jedes noch nie zugeordnete Material in einem Fach mit eingeschalteter Automatik
+ * (Standard: an):
+ * 1. Passt es zu einem vorhandenen Bereich (auch einem Unterbereich), kommt es dorthin.
+ * 2. Sonst: Passt es sicher zu einem belegten Thema aus Lehrplan oder Lehrwerk, entsteht der
+ *    Bereich mit seinen Oberbereichen („Der Erste Weltkrieg" › „Ursachen des Ersten
+ *    Weltkriegs"). Heißt ein vorhandener Bereich auf derselben Ebene fast gleich („Erster
+ *    Weltkrieg"), wird er genommen statt eines zweiten.
+ *    Ein oberstes Thema ohne Oberthemen braucht dafür mindestens `MIN_GRUPPE` Materialien.
+ * 3. Sonst bleibt es ohne Bereich – geraten wird nicht. Gemeinsame Stichwörter ohne Beleg
+ *    bleiben ein Vorschlag, den die Lehrkraft übernimmt (`vorschlagen`).
+ *
+ * Anders als die Vorschläge greift die Automatik ab dem ersten Material: Hier wird nur nach
+ * Belegtem oder schon Vorhandenem sortiert, nicht nach Ähnlichkeit untereinander.
+ */
+export function automatischEinsortieren(
+  materialien: ThemenMaterial[],
+  daten: ThemenDaten,
+  katalogFuer: (fachId: string) => KatalogThema[],
+  heute = new Date().toISOString()
+): { zuordnungen: Record<string, Zuordnung>; uebernahmen: BereichsUebernahme[] } {
+  const zuordnungen: Record<string, Zuordnung> = {}
+  const gruppen = new Map<string, BereichsUebernahme>()
+  const mitglieder = mitgliederWoerter(materialien, daten)
+  const kataloge = new Map<string, KatalogMitWoertern>()
+  for (const m of materialien) {
+    const k = schluesselVon(m)
+    if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
+    const b = besterBereich(m, daten.bereiche, mitglieder)
+    if (b) {
+      zuordnungen[k] = { bereichId: b.id, von: 'auto', am: heute }
+      continue
+    }
+    if (!kataloge.has(m.fachId)) kataloge.set(m.fachId, katalogWoerter(katalogFuer(m.fachId)))
+    const katalog = kataloge.get(m.fachId)!
+    const i = besterKatalogIndex(m, katalog)
+    if (i < 0) continue
+    const thema = katalog[i].k
+    const pfad = passendePfadnamen(daten, m.fachId, [...(thema.pfad ?? []), thema.name].map(kurzName))
+    const name = pfad.pop()!
+    const schluessel = `${m.fachId}|${pfad.join('›')}|${name}`
+    const da = gruppen.get(schluessel)
+    if (da) da.schluessel.push(k)
+    else gruppen.set(schluessel, { fachId: m.fachId, name, ...(pfad.length ? { pfad } : {}), herkunft: thema.quelle, schluessel: [k] })
+  }
+  /*
+   * Ein OBERSTES Thema ohne Unterthemen wird erst ab `MIN_GRUPPE` Materialien ein Bereich: Sonst
+   * entstünde zu jedem Blatt, dessen Titel zufällig ein Lehrplanthema ist, ein Ordner mit genau
+   * diesem einen Blatt. Mit Oberthemen (Pfad) ist schon das erste Material richtig aufgehoben –
+   * es steht dann unter seiner Unterrichtseinheit.
+   */
+  return { zuordnungen, uebernahmen: [...gruppen.values()].filter((u) => u.pfad?.length || u.schluessel.length >= MIN_GRUPPE) }
+}
+
+/** Ebene für Ebene: Heißt ein vorhandener Bereich fast gleich, wird sein Name genommen (dann legt `uebernehmen` keinen zweiten an) */
+function passendePfadnamen(daten: ThemenDaten, fachId: string, namen: string[]): string[] {
+  const out: string[] = []
+  let eltern: string | null = null
+  // Gibt es eine Ebene noch nicht, gibt es darunter auch keine vorhandenen Unterbereiche
+  let vorhanden = true
+  for (const name of namen) {
+    const w = stichwoerter(name)
+    const da: Themenbereich | undefined = vorhanden
+      ? kinderVon(daten, fachId, eltern).find((b) => w.length > 0 && aehnlichkeit(w, stichwoerter(b.name)) >= 1)
+      : undefined
+    out.push(da?.name ?? name)
+    vorhanden = Boolean(da)
+    eltern = da?.id ?? null
+  }
+  return out
 }
 
 // ---------- Vorschläge ----------
@@ -274,31 +390,22 @@ export function vorschlagen(alle: ThemenMaterial[], daten: ThemenDaten, fachId: 
   offen = offen.filter((m) => !vergeben.has(schluesselVon(m)))
 
   // 2. Lehrplan und Lehrwerk
-  const katalog = (opt.katalog ?? []).map((k) => ({ k, w: stichwoerter(`${k.name} ${k.zusatz ?? ''}`) }))
+  const katalog = katalogWoerter(opt.katalog ?? [])
   if (katalog.length) {
     const gruppen = new Map<number, ThemenMaterial[]>()
     for (const m of offen) {
-      const w = woerterVon(m)
-      let bestes = -1
-      let wert = 0
-      for (let i = 0; i < katalog.length; i++) {
-        // „Unit 3" in Klasse 6 ist eine andere Unit als in Klasse 8
-        const jg = katalog[i].k.jahrgaenge
-        if (m.grade && jg && !jg.includes(m.grade)) continue
-        const d = deckung(w, katalog[i].w)
-        // Mindestens ein aussagekräftiges Wort muss passen, nicht nur Kurzwörter
-        if (d < LEHRPLAN_DECKUNG || !w.some((x) => (x.length >= 5 || /\d/.test(x)) && katalog[i].w.some((y) => passt(x, y)))) continue
-        // Bei gleicher Deckung das engere Thema (weniger Wörter)
-        if (d > wert || (d === wert && bestes >= 0 && katalog[i].w.length < katalog[bestes].w.length)) {
-          bestes = i
-          wert = d
-        }
-      }
+      const bestes = besterKatalogIndex(m, katalog)
       if (bestes >= 0) gruppen.set(bestes, [...(gruppen.get(bestes) ?? []), m])
     }
     for (const [i, liste] of gruppen) {
       if (liste.length < MIN_GRUPPE) continue
-      vorschlaege.push({ name: kurzName(katalog[i].k.name), fachId, schluessel: liste.map(schluesselVon), herkunft: katalog[i].k.quelle })
+      vorschlaege.push({
+        name: kurzName(katalog[i].k.name),
+        fachId,
+        schluessel: liste.map(schluesselVon),
+        herkunft: katalog[i].k.quelle,
+        ...(katalog[i].k.pfad?.length ? { pfad: katalog[i].k.pfad!.map(kurzName) } : {})
+      })
       for (const m of liste) vergeben.add(schluesselVon(m))
     }
     offen = offen.filter((m) => !vergeben.has(schluesselVon(m)))
