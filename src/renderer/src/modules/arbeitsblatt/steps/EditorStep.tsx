@@ -534,6 +534,24 @@ export default function EditorStep(): React.JSX.Element {
           </Popover.Target>
           <Popover.Dropdown>
             <Stack gap="sm" mah="70vh" style={{ overflowY: 'auto' }} className="blattoptionen">
+              {/*
+               * Die Designvorlage steht OBEN (Wunsch der Lehrkraft vom 26.09.2026): Unten, unter
+               * rund zehn Schaltern, war sie erst nach Scrollen zu sehen und wurde nicht gefunden.
+               */}
+              <Select
+                size="sm"
+                label="Designvorlage"
+                data={designs.map((d) => ({
+                  value: d.id,
+                  label: d.name
+                }))}
+                value={designs.some((d) => d.id === ws.design.id) ? ws.design.id : null}
+                placeholder="Design wählen"
+                onChange={(v) => {
+                  const d = designs.find((x) => x.id === v)
+                  if (d) update((w) => (w.design = structuredClone(d)))
+                }}
+              />
               {ws.meta.differentiation.levels > 1 && (
                 <Checkbox
                   size="sm"
@@ -638,20 +656,6 @@ export default function EditorStep(): React.JSX.Element {
                   }}
                 />
               </Tooltip>
-              <Select
-                size="sm"
-                label="Designvorlage"
-                data={designs.map((d) => ({
-                  value: d.id,
-                  label: d.name
-                }))}
-                value={designs.some((d) => d.id === ws.design.id) ? ws.design.id : null}
-                placeholder="Design wählen"
-                onChange={(v) => {
-                  const d = designs.find((x) => x.id === v)
-                  if (d) update((w) => (w.design = structuredClone(d)))
-                }}
-              />
             </Stack>
           </Popover.Dropdown>
         </Popover>
