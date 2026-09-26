@@ -378,6 +378,79 @@ export function automatischEinsortieren(
   return { zuordnungen, uebernahmen: alle.filter((u) => behalten.includes(u) || entstehen.has(pfadText(u))) }
 }
 
+/**
+ * „Alle Materialien automatisch einsortieren" (Paket 15, Wunsch der Lehrkraft vom 26.09.2026):
+ * Die Automatik läuft sonst nur über NEUE Materialien – was sie früher einsortiert hat, bleibt,
+ * wo es ist, auch wenn inzwischen bessere Bereiche (Lehrplan, Unterbereiche) da sind. Diese
+ * Aktion sortiert ein ganzes Fach auf Wunsch neu.
+ *
+ * `umfang`:
+ * - 'auto': nicht zugeordnete und automatisch zugeordnete Materialien (Standard). Von Hand
+ *   Zugeordnetes – auch ausdrücklich „Ohne Themenbereich" – bleibt unberührt.
+ * - 'alle': auch von Hand zugeordnete. Sie gelten danach als automatisch einsortiert.
+ *
+ * Gerechnet wird, als wären die betroffenen Materialien nie zugeordnet gewesen – sonst
+ * bestätigte jedes sich selbst (ein Material passt immer zu dem Bereich, in dem es liegt). Findet
+ * die Automatik für eines keinen Platz, bleibt es, wo es war: Neu einsortieren soll ordnen,
+ * nicht Ordnung wegwerfen. Die Automatik des Fachs zählt hier nicht – die Aktion ist ausdrücklich
+ * gewählt.
+ *
+ * Ergebnis in zwei Schritten, weil `uebernehmen` (src/shared/themen.ts) von Hand Zugeordnetes
+ * schützt: erst `zuordnungen` schreiben (null = Eintrag entfernen), dann `uebernahmen`.
+ */
+export function neuEinsortierenPlan(
+  materialien: ThemenMaterial[],
+  daten: ThemenDaten,
+  fachId: string,
+  katalogFuer: (fachId: string, m: ThemenMaterial) => KatalogThema[],
+  umfang: 'auto' | 'alle',
+  heute = new Date().toISOString()
+): { zuordnungen: Record<string, Zuordnung | null>; uebernahmen: BereichsUebernahme[]; betroffen: string[] } {
+  const imFach = materialien.filter((m) => m.fachId === fachId)
+  const betroffen = imFach.map(schluesselVon).filter((k) => umfang === 'alle' || daten.zuordnungen[k]?.von !== 'hand')
+  const weg = new Set(betroffen)
+  const frei: ThemenDaten = {
+    ...daten,
+    zuordnungen: Object.fromEntries(Object.entries(daten.zuordnungen).filter(([k]) => !weg.has(k))),
+    automatik: { ...daten.automatik, [fachId]: true }
+  }
+  const r = automatischEinsortieren(imFach, frei, katalogFuer, heute)
+  const inUebernahme = new Set(r.uebernahmen.flatMap((u) => u.schluessel))
+  const zuordnungen: Record<string, Zuordnung | null> = {}
+  for (const k of betroffen) {
+    const alt = daten.zuordnungen[k]
+    const neu = r.zuordnungen[k]
+    if (neu) {
+      if (!alt || alt.bereichId !== neu.bereichId || alt.von !== 'auto') zuordnungen[k] = neu
+    } else if (inUebernahme.has(k)) {
+      // Der Eintrag muss weg, damit `uebernehmen` das Material annimmt
+      if (alt) zuordnungen[k] = null
+    } else if (alt?.von === 'hand') {
+      // Kein besserer Platz: bleibt, wo es ist – aber als automatisch gekennzeichnet (nur bei „alle")
+      zuordnungen[k] = alt.bereichId ? { ...alt, von: 'auto', am: heute } : null
+    }
+  }
+  return { zuordnungen, uebernahmen: r.uebernahmen, betroffen }
+}
+
+/** Was „Alle einsortieren" bewirkt hat: vorher ohne Bereich → jetzt in einem („einsortiert"), vorher in A → jetzt in B („verschoben") */
+export function einsortierBilanz(
+  vorher: Pick<ThemenDaten, 'zuordnungen'>,
+  nachher: Pick<ThemenDaten, 'zuordnungen'>,
+  schluessel: string[]
+): { einsortiert: number; verschoben: number } {
+  let einsortiert = 0
+  let verschoben = 0
+  for (const k of schluessel) {
+    const a = vorher.zuordnungen[k]?.bereichId ?? null
+    const b = nachher.zuordnungen[k]?.bereichId ?? null
+    if (!b || a === b) continue
+    if (a) verschoben++
+    else einsortiert++
+  }
+  return { einsortiert, verschoben }
+}
+
 /** Gekürzte Lehrplantitel: der Wortlaut je (Kurz-)Name, damit er am neuen Bereich als Tooltip steht */
 function wortlauteVon(k: KatalogThema, namen: string[]): Record<string, string> | undefined {
   const paare = [...(k.pfadWortlaut ?? (k.pfad ?? []).map(() => '')), k.wortlaut ?? ''].map((w, j) => [namen[j], w] as const).filter(([n, w]) => n && w)

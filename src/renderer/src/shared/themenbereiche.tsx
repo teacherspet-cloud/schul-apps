@@ -14,7 +14,7 @@ import {
   type Themenbereich,
   type Zuordnung
 } from '@shared/themen'
-import { automatischEinsortieren, type ThemenMaterial } from './themenVorschlag'
+import { automatischEinsortieren, einsortierBilanz, neuEinsortierenPlan, type KatalogThema, type ThemenMaterial } from './themenVorschlag'
 import { katalogFuer, ladeLehrplan } from './themenKatalog'
 import { useAppSettings } from './settingsStore'
 import { notifyError, uid } from './util'
@@ -197,6 +197,14 @@ export async function vorschlaegeUebernehmen(vorschlaege: BereichsUebernahme[], 
   }
 }
 
+/** Belegte Themen je Material – Lehrplan des Landes und Schulform aus seinen Kopfdaten (ältere Materialien: die Einstellungen) */
+async function katalogLader(materialien: ThemenMaterial[]): Promise<(fachId: string, m: ThemenMaterial) => KatalogThema[]> {
+  const { stateId, schoolTypeId } = useAppSettings.getState().settings.defaults
+  const laender = [...new Set(materialien.map((m) => m.land || stateId))]
+  const lehrplaene = new Map(await Promise.all(laender.map(async (l) => [l, await ladeLehrplan(l)] as const)))
+  return (fachId, m) => katalogFuer(fachId, lehrplaene.get(m.land || stateId) ?? null, m.schulform || schoolTypeId, m.land || stateId)
+}
+
 let gleichtAb = false
 
 /**
@@ -216,12 +224,7 @@ export async function abgleichen(materialien: ThemenMaterial[]): Promise<void> {
      * aus dem niedersächsischen Kerncurriculum, und ein Oberschul-Blatt nicht in einen, den es nur
      * am Gymnasium gibt; den Jahrgang prüft die Automatik selbst (Sek I vs. Oberstufe).
      */
-    const { stateId, schoolTypeId } = useAppSettings.getState().settings.defaults
-    const laender = [...new Set(materialien.map((m) => m.land || stateId))]
-    const lehrplaene = new Map(await Promise.all(laender.map(async (l) => [l, await ladeLehrplan(l)] as const)))
-    const { zuordnungen, uebernahmen } = automatischEinsortieren(materialien, d, (fachId, m) =>
-      katalogFuer(fachId, lehrplaene.get(m.land || stateId) ?? null, m.schulform || schoolTypeId, m.land || stateId)
-    )
+    const { zuordnungen, uebernahmen } = automatischEinsortieren(materialien, d, await katalogLader(materialien))
     const neu: Record<string, Zuordnung | null> = zuordnungen
     const vorhanden = new Set(materialien.map((m) => materialSchluessel(m.moduleId, m.id)))
     for (const k of verwaisteSchluessel(d, vorhanden)) neu[k] = null
@@ -311,4 +314,46 @@ export const themenbereichName = (moduleId: string, docId: string): string => ue
 /** Dasselbe als Hook – folgt Umbenennen und Verschieben sofort. Liefert den Bereich fürs Überthema (den obersten). */
 export function useThemenbereich(moduleId: string, docId: string): Themenbereich | null {
   return useThemen((s) => ueberthemaBereichVon(moduleId, docId, s.daten))
+}
+
+/**
+ * „Alle Materialien automatisch einsortieren" im ⋯ am Fach (Paket 15): das ganze Fach neu
+ * ordnen – im Standard nur, was nicht oder automatisch zugeordnet ist, auf Wunsch auch von Hand
+ * Zugeordnetes (Plan und Regeln: `neuEinsortierenPlan`). Danach eine Zusammenfassung
+ * („12 einsortiert, 3 verschoben") mit EINEM Rückgängig-Schritt: Es stellt alle Zuordnungen
+ * wieder her – auch die Kennzeichnung „von Hand" – und löscht die dabei angelegten Bereiche.
+ *
+ * `materialien`: alle Materialien des Fachs, alle Programme (das Fach ist bei Materialien in
+ * einem Bereich das Fach des Bereichs, siehe `fachVon` in Themenbereiche.tsx).
+ */
+export async function allesEinsortieren(fachId: string, materialien: ThemenMaterial[], umfang: 'auto' | 'alle'): Promise<void> {
+  try {
+    const vorher = await ladeThemen()
+    const plan = neuEinsortierenPlan(materialien, vorher, fachId, await katalogLader(materialien), umfang)
+    const alteIds = new Set(vorher.bereiche.map((b) => b.id))
+    if (Object.keys(plan.zuordnungen).length) setze(await window.api.themen.zuordnen(plan.zuordnungen))
+    if (plan.uebernahmen.length) setze(await window.api.themen.uebernehmen(plan.uebernahmen, []))
+    const nachher = useThemen.getState().daten
+    const { einsortiert, verschoben } = einsortierBilanz(vorher, nachher, plan.betroffen)
+    const angelegt = nachher.bereiche.filter((b) => !alteIds.has(b.id))
+    const geaendert = plan.betroffen.filter((k) => JSON.stringify(vorher.zuordnungen[k] ?? null) !== JSON.stringify(nachher.zuordnungen[k] ?? null))
+    if (!geaendert.length && !angelegt.length) {
+      notifications.show({ message: 'Nichts zu ändern – die Materialien liegen schon dort, wo die Automatik sie einsortieren würde.' })
+      return
+    }
+    const teile = [
+      `${einsortiert} einsortiert`,
+      `${verschoben} verschoben`,
+      ...(angelegt.length ? [`${angelegt.length === 1 ? '1 Themenbereich' : `${angelegt.length} Themenbereiche`} angelegt`] : [])
+    ]
+    const alt: Record<string, Zuordnung | null> = Object.fromEntries(geaendert.map((k) => [k, vorher.zuordnungen[k] ?? null]))
+    zeigeRueckgaengig(`${teile.join(', ')}.`, async () => {
+      // Erst die neuen Bereiche weg (von unten nach oben), dann die alten Zuordnungen zurück
+      for (const b of [...angelegt].reverse()) await window.api.themen.delete(b.id).catch(() => undefined)
+      await window.api.themen.zuordnen(alt)
+      setze(await window.api.themen.list())
+    })
+  } catch (e) {
+    notifyError(e, 'Das Einsortieren ist fehlgeschlagen')
+  }
 }

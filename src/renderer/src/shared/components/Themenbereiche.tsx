@@ -14,6 +14,7 @@ import {
   Group,
   Menu,
   Modal,
+  Radio,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -36,6 +37,7 @@ import {
   IconFolderShare,
   IconListCheck,
   IconPencil,
+  IconSortAscending,
   IconTrash,
   IconWand,
   IconX
@@ -52,6 +54,7 @@ import { useMenueFokus } from '../menueFokus'
 import { imNetz } from '../netzZugang'
 import {
   abgleichen,
+  allesEinsortieren,
   bereichAnlegen,
   bereichLoeschen,
   bereichUmbenennen,
@@ -755,6 +758,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
               </UnstyledButton>
               <FachMenue
                 fachId={fachId}
+                materialien={() => alle.map((m) => ({ ...m, fachId: fachVon(m) }))}
                 onNeu={() => {
                   setNeuerBereich({ fachId, elternId: null, name: '' })
                   oeffne([`fach:${fachId}`])
@@ -1199,16 +1203,19 @@ function BereichVerschiebenDialog({ bereich, onClose }: { bereich: Themenbereich
   )
 }
 
-/** ⋯ am Fach: neuer Bereich, Automatik ein/aus */
-function FachMenue({ fachId, onNeu }: { fachId: string; onNeu: () => void }): React.JSX.Element {
+/** ⋯ am Fach: neuer Bereich, Automatik ein/aus, alles neu einsortieren */
+function FachMenue({ fachId, materialien, onNeu }: { fachId: string; materialien: () => Material[]; onNeu: () => void }): React.JSX.Element {
   // Standard seit Paket 12: an (nur ausdrücklich ausgeschaltet steht false)
   const automatik = useThemen((s) => automatikAn(s.daten, fachId))
+  const [einsortieren, setEinsortieren] = useState(false)
+  // „Alle … einsortieren" öffnet eine Rückfrage – das Menü darf den Fokus nicht aus ihr herausholen
+  const { menue, weiter } = useMenueFokus()
   return (
     <Group gap={4} wrap="nowrap">
       <Button size="compact-sm" variant="subtle" leftSection={<IconFolderPlus size={14} />} onClick={onNeu}>
         Themenbereich
       </Button>
-      <Menu position="bottom-end" withinPortal>
+      <Menu position="bottom-end" withinPortal {...menue}>
         <Menu.Target>
           <ActionIcon variant="subtle" aria-label={`Einstellungen der Themenbereiche in ${fachAnzeige(fachId)}`}>
             <IconDots size={16} />
@@ -1227,12 +1234,71 @@ function FachMenue({ fachId, onNeu }: { fachId: string; onNeu: () => void }): Re
           >
             Neue Materialien automatisch einsortieren
           </Menu.Item>
+          <Menu.Item leftSection={<IconSortAscending size={14} />} onClick={weiter(() => setEinsortieren(true))}>
+            Alle Materialien automatisch einsortieren
+          </Menu.Item>
           <Menu.Item leftSection={<IconFolderOpen size={14} />} onClick={() => openThemen(fachId)}>
             Alle Materialarten dieses Fachs zeigen
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>
+      <EinsortierenRueckfrage
+        fachId={fachId}
+        offen={einsortieren}
+        onClose={() => setEinsortieren(false)}
+        onLos={(umfang) => {
+          setEinsortieren(false)
+          void allesEinsortieren(fachId, materialien(), umfang)
+        }}
+      />
     </Group>
+  )
+}
+
+/**
+ * Rückfrage vor „Alle Materialien automatisch einsortieren" (Paket 15): Von Hand Zugeordnetes
+ * bleibt im Standard, wo es ist – wer es auch neu ordnen lassen will, wählt das ausdrücklich.
+ * Rückgängig gibt es danach trotzdem (ein Schritt).
+ */
+function EinsortierenRueckfrage({
+  fachId,
+  offen,
+  onClose,
+  onLos
+}: {
+  fachId: string
+  offen: boolean
+  onClose: () => void
+  onLos: (umfang: 'auto' | 'alle') => void
+}): React.JSX.Element {
+  const [umfang, setUmfang] = useState<'auto' | 'alle'>('auto')
+  // Bei jedem Öffnen wieder der sichere Standard
+  useEffect(() => {
+    if (offen) setUmfang('auto')
+  }, [offen])
+  return (
+    <Modal opened={offen} onClose={onClose} title={`Alle Materialien in ${fachAnzeige(fachId)} einsortieren`} size="md">
+      <Stack gap="sm" data-einsortieren-rueckfrage>
+        <Text size="sm">
+          Die Automatik ordnet die Materialien dieses Fachs nach Lehrplan, Lehrwerk und den vorhandenen Themenbereichen neu ein – lokal, ohne KI. Was sie nicht
+          sicher zuordnen kann, bleibt, wo es ist.
+        </Text>
+        <Radio.Group value={umfang} onChange={(v) => setUmfang(v as 'auto' | 'alle')} label="Auch von Hand zugeordnete Materialien neu einsortieren?">
+          <Stack gap={6} mt={6}>
+            <Radio value="auto" label="Nur automatisch zugeordnete und nicht zugeordnete" data-autofocus />
+            <Radio value="alle" label="Alle, auch von Hand zugeordnete" description="Sie gelten danach als automatisch einsortiert." />
+          </Stack>
+        </Radio.Group>
+        <Group justify="flex-end" gap="xs">
+          <Button variant="default" onClick={onClose}>
+            Abbrechen
+          </Button>
+          <Button leftSection={<IconSortAscending size={14} />} onClick={() => onLos(umfang)}>
+            Einsortieren
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   )
 }
 
