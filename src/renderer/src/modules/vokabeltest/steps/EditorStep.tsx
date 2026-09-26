@@ -64,6 +64,8 @@ import UeberthemaFeld from '../../../shared/components/UeberthemaFeld'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { unitAusName } from '../../../shared/ueberthema'
 import './editor.css'
+import { useLaufendeSchluessel } from '../../../shared/auftraege'
+import { aufgabeBeheben } from '../auftraege'
 
 export default function EditorStep(): React.JSX.Element {
   const { doc: gespeichert, updateDoc, updateBlock, undo, redo, verlauf, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
@@ -86,6 +88,8 @@ export default function EditorStep(): React.JSX.Element {
   useAppSettings((s) => s.settings.fachfarben)
   const [view, setView] = useState<'test' | 'key'>('test')
   const [busy, setBusy] = useState<Set<string>>(new Set())
+  // Aufgaben, an denen gerade „Mit KI beheben" arbeitet (Paket 12)
+  const laufend = useLaufendeSchluessel(useVokabeltest((s) => s.testId))
   const [picker, setPicker] = useState<{ blockId: string; itemId: string; keywords: string[] } | null>(null)
   const [exportOpen, setExportOpen] = useState<null | 'docx' | 'pdf' | 'print'>(null)
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken“
@@ -163,7 +167,15 @@ export default function EditorStep(): React.JSX.Element {
     <div className={`editor-block ${busy.has(block.id) ? 'editor-block-busy' : ''}`}>
       <div className="editor-block-toolbar">
         {block.warnings && block.warnings.length > 0 && view !== 'key' && (
-          <WarningButton warnings={block.warnings} onDismiss={() => updateBlock(variant.id, block.id, (d) => (d.warnings = []))} />
+          <WarningButton
+            warnings={block.warnings}
+            onDismiss={() => updateBlock(variant.id, block.id, (d) => (d.warnings = []))}
+            // Paket 12: „Mit KI beheben" – die Aufgabe wird ohne die gemeldeten Probleme neu erzeugt (ein Rückgängig-Schritt)
+            onBeheben={
+              TASK_TYPES[block.taskType].schema ? (liste) => aufgabeBeheben(useVokabeltest.getState().testId, doc, variant.id, block.id, liste) : undefined
+            }
+            laeuft={laufend.has(block.id)}
+          />
         )}
         <Tooltip label="Nach oben">
           <ActionIcon size="sm" variant="default" aria-label={`Aufgabe ${index + 1} nach oben`} disabled={index === 0} onClick={() => moveBlock(index, -1)}>

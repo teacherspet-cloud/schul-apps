@@ -68,13 +68,15 @@ import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 import '../render/ws.css'
 import { useArbeitsblatt } from '../store'
-import { bausteinAuftrag, maskottchenZeichnen } from '../auftraege'
+import { bausteinAuftrag, hinweiseBeheben, maskottchenZeichnen } from '../auftraege'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { defaultWorksheetName, setPreviewLayouts } from '../library'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import '../../vokabeltest/steps/editor.css'
 import { BlockSettings } from './BlockSettings'
 import WarningButton from '../../../shared/components/WarningButton'
+import { AlleBehebenKnopf, KiBehebenKnopf } from '../../../shared/components/KiBeheben'
+import { istBehebbar } from '../../../shared/kiBeheben'
 import { KiMenue, VersionSwitcher } from './BlockRevision'
 import { EinfuegenUntermenue } from './EinfuegenMenue'
 import { AudioPanel } from './AudioPanel'
@@ -384,7 +386,20 @@ export default function EditorStep(): React.JSX.Element {
       extras={
         <>
           {!key && block.warnings && block.warnings.length > 0 && (
-            <WarningButton warnings={block.warnings} onDismiss={() => updateBlock(sheet.id, block.id, (d) => (d.warnings = []))} />
+            <WarningButton
+              warnings={block.warnings}
+              onDismiss={() => updateBlock(sheet.id, block.id, (d) => (d.warnings = []))}
+              // Paket 12: „Mit KI beheben" – ein kleiner Auftrag, Ergebnis als ein Rückgängig-Schritt, danach neue Prüfung
+              onBeheben={(liste) =>
+                hinweiseBeheben(
+                  ws,
+                  docId,
+                  sheet.id,
+                  liste.map((text) => ({ text, blockId: block.id }))
+                )
+              }
+              laeuft={busy.has(block.id) || busy.has(`beheben-${sheet.id}`)}
+            />
           )}
           {!key && istLeer(block) && (
             <Tooltip label="Von der KI füllen lassen – passend zu dieser Stelle im Blatt" position="left" multiline w={260}>
@@ -689,7 +704,19 @@ export default function EditorStep(): React.JSX.Element {
          * Der Kasten stand über dem Blatt und wuchs mit jedem Hinweis – bei einem vollen
          * Arbeitsblatt schob er die erste Seite aus dem Bild.
          */}
-        <BlattHinweise note={ws.meta.teacherNote} warnings={pageWarnings.map((w) => w.message)} />
+        <BlattHinweise
+          note={ws.meta.teacherNote}
+          warnings={pageWarnings.map((w) => w.message)}
+          onBeheben={(liste) =>
+            hinweiseBeheben(
+              ws,
+              docId,
+              sheet.id,
+              liste.map((text) => ({ text }))
+            )
+          }
+          laeuft={busy.has(`beheben-${sheet.id}`)}
+        />
       </Group>
 
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">
@@ -970,7 +997,17 @@ export default function EditorStep(): React.JSX.Element {
  * die Befunde der Prüfungen. Beides zusammen wurde als Kasten zu lang, verschwinden soll es
  * aber nicht – ein übersehener Hinweis ist genau das, was später auf dem Blatt auffällt.
  */
-function BlattHinweise({ note, warnings }: { note?: string; warnings: string[] }): React.JSX.Element | null {
+function BlattHinweise({
+  note,
+  warnings,
+  onBeheben,
+  laeuft
+}: {
+  note?: string
+  warnings: string[]
+  onBeheben?: (hinweise: string[]) => void
+  laeuft?: boolean
+}): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
   const anzahl = warnings.length + (note?.trim() ? 1 : 0)
   if (!anzahl) return null
@@ -994,10 +1031,31 @@ function BlattHinweise({ note, warnings }: { note?: string; warnings: string[] }
                 {warnings.length === 1 ? 'Ein Befund der Prüfung' : `${warnings.length} Befunde der Prüfung`}
               </Text>
               {warnings.map((w, i) => (
-                <Text key={i} size="sm">
-                  · {w}
-                </Text>
+                <Group key={i} justify="space-between" gap="xs" wrap="nowrap" align="flex-start" data-hinweis>
+                  <Text size="sm">· {w}</Text>
+                  {onBeheben && istBehebbar(w) && (
+                    <KiBehebenKnopf
+                      laeuft={laeuft}
+                      onClick={() => {
+                        onBeheben([w])
+                        setOffen(false)
+                      }}
+                    />
+                  )}
+                </Group>
               ))}
+              {onBeheben && (
+                <Group justify="flex-end">
+                  <AlleBehebenKnopf
+                    anzahl={warnings.filter(istBehebbar).length}
+                    laeuft={laeuft}
+                    onClick={() => {
+                      onBeheben(warnings.filter(istBehebbar))
+                      setOffen(false)
+                    }}
+                  />
+                </Group>
+              )}
             </Stack>
           )}
           <Group justify="flex-end">

@@ -40,6 +40,7 @@ import { examGrades } from '../model/types'
 import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, teilNachUeberarbeitung } from '../model/fassungen'
 import { examHasContent, examToWorksheet, examToWorksheetAlle } from '../render/examWorksheet'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
+import { arbeitHinweiseBeheben } from '../beheben'
 import { AudioPanel } from '../../arbeitsblatt/steps/AudioPanel'
 import type { Worksheet } from '../../arbeitsblatt/model/types'
 import { useKlassenarbeit } from '../store'
@@ -432,7 +433,17 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           </Alert>
         )}
 
-        <AnredeHinweise befunde={anrede} />
+        <AnredeHinweise
+          befunde={anrede}
+          // Paket 12: „Mit KI beheben" – je Fassung ein Auftrag (bei mehreren steht „Fassung B, …" vor dem Hinweis)
+          onBeheben={(liste) => {
+            worksheet.sheets.forEach((s, f) => {
+              const eigene = gesamt > 1 ? liste.filter((b) => b.startsWith(`${s.label}, `)) : liste
+              if (eigene.length) arbeitHinweiseBeheben(exam, docId, f, eigene)
+            })
+          }}
+          laeuft={[...busy].some((k) => k.startsWith('beheben-'))}
+        />
 
         {hasContent && meta.variants !== gesamt && (
           <Alert color="gray" icon={<IconInfoCircle size={18} />} mb="md" p="xs">

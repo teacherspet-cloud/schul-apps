@@ -19,6 +19,7 @@ import { bedeutungsHinweise, operatorenIn, pruefeOperatoren, type AufgabeZurPrue
 import { KERN_OPERATOREN, namenAus, PRAXIS_OPERATOREN, profilFuer, ZU_AUFWENDIG, type Laenderprofil } from './operatoren'
 import type { Kurztest } from '../model/types'
 import { anredeBefundeBaustein } from '../../arbeitsblatt/didactics/anrede'
+import { checkIntegrity } from '../../arbeitsblatt/didactics/integrity'
 import { worksheetMetaForKurztest } from '../render/kurztestWorksheet'
 
 export type Schwere = 'hinweis' | 'warnung'
@@ -123,6 +124,14 @@ export function pruefeKurztest(test: Kurztest, varianteIndex = 0): Befund[] {
   // Aufbau: nur Aufgaben und Material
   for (const w of pruefeBausteine(blocks, m.nachteilsausgleich)) out.push({ bereich: 'Aufbau', schwere: 'warnung', message: w.message, blockId: w.blockId })
   for (const w of pruefeMaterialtexte(blocks)) out.push({ bereich: 'Aufbau', schwere: 'warnung', message: w.message, blockId: w.blockId })
+  /*
+   * Verweise auf Material („anhand von M2") – dieselbe Prüfung wie im Arbeitsblatt und in der
+   * Klassenarbeit, über die GANZE Fassung (Paket 12). Die Lernzielkontrolle hatte sie nicht:
+   * Ein Verweis auf ein fehlendes „M3" fiel erst beim Austeilen auf. Nur tote Verweise; leere
+   * Materialtexte meldet pruefeMaterialtexte oben nicht doppelt.
+   */
+  for (const f of checkIntegrity({ id: 'lzk', label: '', blocks }))
+    if (/verweist auf|beruft sich auf Material/.test(f.message)) out.push({ bereich: 'Aufbau', schwere: 'warnung', message: f.message, blockId: f.blockId })
 
   // Operatoren
   for (const w of pruefeOperatoren(alsAufgaben(blocks, profil), profil)) {

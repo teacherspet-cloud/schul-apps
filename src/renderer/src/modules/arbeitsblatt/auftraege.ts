@@ -26,6 +26,13 @@ import { profileFromMeta } from './render/SheetPages'
 import type { AuftragsKontext } from '../../shared/auftraege'
 import { foxPrompt } from './render/coverDesigns'
 import { tierPrompt } from './render/maskottchen'
+import { pruefeBlattNeu } from './generation/generate'
+import { repariereBausteine } from './generation/reparatur'
+import { systemPrompt, taskContext } from './generation/prompts'
+import { anredeFuerMeta } from './didactics/anrede'
+import { anredeRegel } from '../../shared/anrede'
+import { lerngruppeSatz, ohneHinweise, wendeReparaturAn } from '../../shared/kiBeheben'
+import type { WorksheetMeta } from './model/types'
 
 const titelVon = (ws: Worksheet): string => ws.meta.title.trim() || ws.meta.topic.trim() || 'Arbeitsblatt'
 
@@ -250,6 +257,79 @@ export function maskottchenZeichnen(worksheet: Worksheet, docId: string): void {
         ...aktuell,
         // Das Tier gehört zu der Art, die beim Start gewählt war – nicht zu einer inzwischen anderen
         meta: tier ? { ...aktuell.meta, coverAnimal: welches, coverAnimalImage: bild } : { ...aktuell.meta, coverImage: bild }
+      }))
+  })
+}
+
+/** Ein Hinweis, der behoben werden soll – mit dem Baustein, an dem er hängt (fehlt bei Hinweisen zum ganzen Blatt) */
+export interface BehebHinweis {
+  text: string
+  blockId?: string
+}
+
+/** Lerngruppe und Lernziel eines Blattes für den Reparaturauftrag */
+export function reparaturKontextAus(meta: WorksheetMeta, lernziele: string[] = []): { lerngruppe: string; lernziel: string } {
+  return {
+    lerngruppe: lerngruppeSatz({ fach: meta.subjectLabel, jahrgang: meta.grade, schulform: meta.schoolTypeName, niveau: meta.cefrLevel || undefined }),
+    lernziel: [meta.topic, ...lernziele].filter((x) => x?.trim()).join('; ')
+  }
+}
+
+/**
+ * „Mit KI beheben" am Arbeitsblatt (Paket 12): ein kleiner Auftrag, der das Blatt nicht sperrt.
+ * Die KI bekommt den Hinweis mit Baustein, Blatt, Lernziel, Lerngruppe und Anrede-Regel und
+ * liefert eine gezielte Reparatur (generation/reparatur.ts). Abgelegt wird sie als EIN
+ * Rückgängig-Schritt – danach laufen die lokalen Prüfungen des Blattes neu.
+ */
+export function hinweiseBeheben(worksheet: Worksheet, docId: string, sheetId: string, hinweise: BehebHinweis[]): void {
+  if (!hinweise.length || !worksheet.sheets.some((s) => s.id === sheetId)) return
+  // Hinweise zum ganzen Blatt („[Blatt] …") hängen nur am ersten Baustein – sie gehören zu keinem bestimmten
+  const ziel = hinweise.length === 1 && !hinweise[0].text.startsWith('[Blatt]') ? hinweise[0].blockId : undefined
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art: hinweise.length > 1 ? `${hinweise.length} Hinweise mit KI beheben` : 'Hinweis mit KI beheben',
+    eingabe: worksheet,
+    istOffen: () => blattOffen(docId),
+    sperrt: false,
+    // Am Baustein dreht sich dann sein Ladezeichen; Hinweise zum ganzen Blatt haben einen eigenen Schlüssel
+    schluessel: ziel ?? `beheben-${sheetId}`,
+    fehlerTitel: 'Der Hinweis ließ sich nicht beheben',
+    arbeit: async (ws, k) => {
+      k.melde('Die KI behebt den Hinweis …')
+      const blatt = ws.sheets.find((x) => x.id === sheetId)!
+      const profile = profileFromMeta(ws.meta)
+      const anrede = anredeFuerMeta(ws.meta)
+      const nummer = ziel ? blatt.blocks.findIndex((b) => b.id === ziel) + 1 : 0
+      return repariereBausteine(
+        {
+          bloecke: blatt.blocks,
+          hinweise: hinweise.map((h) => h.text),
+          kontext: {
+            material: 'Arbeitsblatt',
+            ...reparaturKontextAus(ws.meta, ws.outline?.learningGoals),
+            ort: ws.sheets.length > 1 ? blatt.label : undefined,
+            anredeRegel: anredeRegel(anrede),
+            bausteinNummer: nummer || undefined
+          },
+          system: systemPrompt(ws.meta, profile),
+          zusatz: [taskContext(ws.meta, profile)],
+          anrede,
+          punkte: 'keine'
+        },
+        k.ai
+      )
+    },
+    abschluss: (e) => (e.erklaerung ? `Behoben: ${e.erklaerung}` : 'Fertig – im Blatt übernommen'),
+    ablegen: (e, ws) =>
+      legeArbeitsblattAb(docId, ws, (aktuell) => ({
+        ...aktuell,
+        sheets: aktuell.sheets.map((s) =>
+          s.id !== sheetId
+            ? s
+            : pruefeBlattNeu({ ...s, blocks: wendeReparaturAn(ohneHinweise(s.blocks, hinweise), e.aenderungen) }, profileFromMeta(aktuell.meta), aktuell.meta)
+        )
       }))
   })
 }

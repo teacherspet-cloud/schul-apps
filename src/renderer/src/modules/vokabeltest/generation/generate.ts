@@ -101,7 +101,9 @@ export async function generateBlock(
   vocab: VocabEntry[],
   ctx: GenContext,
   opts: Pick<GenerateOptions, 'ai' | 'review' | 'findImage' | 'findImages'>,
-  variantLabel?: string
+  variantLabel?: string,
+  /** Zu behebende Hinweise („Mit KI beheben", Paket 12) – gehen schon in den ersten Versuch ein */
+  hinweis?: string
 ): Promise<Block> {
   const def = TASK_TYPES[taskType]
   const system = systemPrompt(ctx.settings, variantLabel, ctx.known)
@@ -122,7 +124,7 @@ export async function generateBlock(
   const aiReview = opts.review && Boolean(def.schema) && vocab.length > 0
   const words = vocab.map((v) => v.term)
 
-  let block = await produce()
+  let block = await produce(hinweis)
   let issues = checkBlock(block, vocab).filter((i) => block.kind !== 'picture' || !i.message.startsWith('Kein Bild'))
   if (aiReview) issues = [...issues, ...(await reviewBlock(block, ctx.settings, opts.ai, words))]
 

@@ -50,11 +50,13 @@ export async function regenerateBlock(
   variant: Variant,
   block: Block,
   ai: AiCall,
-  images: Pick<GenerateOptions, 'findImage' | 'findImages'> = {}
+  images: Pick<GenerateOptions, 'findImage' | 'findImages'> = {},
+  /** Hinweise, die behoben werden sollen („Mit KI beheben", Paket 12) */
+  hinweis?: string
 ): Promise<Block> {
   const ids = blockVocabIds(block)
   const vocab = doc.vocab.filter((v) => ids.includes(v.id))
-  const fresh = await generateBlock(block.taskType, vocab, context(doc), { ai, review: false, ...images }, variantLabel(doc, variant))
+  const fresh = await generateBlock(block.taskType, vocab, context(doc), { ai, review: false, ...images }, variantLabel(doc, variant), hinweis)
   return { ...fresh, id: block.id, title: block.title, pointsPerItem: block.pointsPerItem }
 }
 

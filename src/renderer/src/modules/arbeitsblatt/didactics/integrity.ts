@@ -19,6 +19,9 @@ export interface IntegrityFinding {
   severity: 'hoch' | 'mittel'
 }
 
+/** M2 vor M10 */
+const nachNummer = (a: string, b: string): number => a.localeCompare(b, 'de', { numeric: true })
+
 /** Materialbezeichnungen, die ein Baustein trägt („M1", „Q2", „B3"). */
 const labelsOf = (block: WsBlock): string[] => {
   const texts: string[] = []
@@ -140,10 +143,39 @@ export function checkListening(sheet: Sheet): IntegrityFinding[] {
   return findings
 }
 
-export function checkIntegrity(sheet: Sheet): IntegrityFinding[] {
+/** Bausteine, die als Material gelten und von der App eine Nummer bekommen (render/SheetPages.tsx nummeriert genauso). */
+export const isMaterial = (block: WsBlock): boolean => ['text', 'image', 'table', 'grid', 'audio', 'video'].includes(block.type)
+
+/**
+ * Materialnummern, wie die App sie beim Darstellen vergibt: fortlaufend M1, M2 … in der
+ * Reihenfolge der Bausteine des GANZEN Dokuments (bei der Klassenarbeit über alle Teile hinweg).
+ */
+export function materialNummern(blocks: WsBlock[]): Map<string, string> {
+  const map = new Map<string, string>()
+  let n = 0
+  for (const block of blocks) if (isMaterial(block)) map.set(block.id, `M${++n}`)
+  return map
+}
+
+/**
+ * Vollständigkeit eines Blattes.
+ *
+ * `dokument`: alle Bausteine des Dokuments, in dem das Blatt steht – Standard: das Blatt selbst.
+ *
+ * Gemeldet am 26.09.2026 (Sprachmittlung, Übungsklausur): „Die Aufgabe verweist auf ‚M1‘, auf
+ * dem Blatt ist aber kein Material so bezeichnet“ – obwohl M1 auf der nächsten Seite stand. Zwei
+ * Kurzsichtigkeiten auf einmal: (1) Die Prüfung las nur Nummern aus den TITELN, die Nummern
+ * vergibt aber seit Langem die App beim Darstellen (Titel tragen keine mehr); (2) sie sah nur
+ * den gerade geprüften Ausschnitt – in der Klassenarbeit den einzelnen Teil, obwohl die Nummern
+ * über alle Teile durchgezählt werden, und im Arbeitsblatt das Blatt VOR dem Einsetzen des
+ * Originaltextes. Die Reihenfolge Aufgabe → Material (Klausur) ist ausdrücklich erlaubt: Es
+ * zählt, ob das Material im Dokument steht, nicht ob es davor steht.
+ */
+export function checkIntegrity(sheet: Sheet, dokument: WsBlock[] = sheet.blocks): IntegrityFinding[] {
   const findings: IntegrityFinding[] = []
-  const present = new Set(sheet.blocks.flatMap(labelsOf))
-  const materials = sheet.blocks.filter((b) => b.type !== 'task').length
+  const nummern = materialNummern(dokument)
+  const present = new Set([...dokument.flatMap(labelsOf), ...nummern.values()])
+  const materials = dokument.filter((b) => b.type !== 'task').length
 
   for (const block of sheet.blocks) {
     // 1. Verweise auf Material, das es nicht gibt
@@ -153,8 +185,8 @@ export function checkIntegrity(sheet: Sheet): IntegrityFinding[] {
         blockId: block.id,
         severity: 'hoch',
         message: present.size
-          ? `Die Aufgabe verweist auf „${ref}“, auf dem Blatt gibt es aber nur ${[...present].join(', ')}.`
-          : `Die Aufgabe verweist auf „${ref}“, auf dem Blatt ist aber kein Material so bezeichnet.`
+          ? `Die Aufgabe verweist auf „${ref}“, im Material gibt es aber nur ${[...present].sort(nachNummer).join(', ')}.`
+          : `Die Aufgabe verweist auf „${ref}“, es gibt aber kein Material so bezeichnet.`
       })
     }
 

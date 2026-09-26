@@ -13,6 +13,7 @@ import type { AudioBlock, Sheet, TaskBlock, TextBlock, WorksheetMeta, WsBlock } 
 import { subjectById } from '../model/subjects'
 import type { DidacticWarning } from './checks'
 import { phraseSheetModus } from '../generation/prompts'
+import { istUebungsklausur } from '../generation/abiturPrompt'
 
 /**
  * Steht dieser Text auf Deutsch, obwohl er in der Zielsprache stehen müsste?
@@ -115,14 +116,24 @@ export function checkMediation(sheet: Sheet, meta: WorksheetMeta): DidacticWarni
     .filter((t) => t.skill === 'mediation')
     .forEach((t, i) => {
       const label = `Sprachmittlung ${i + 1}`
-      const before = sheet.blocks.slice(0, indexOf(sheet, t))
-      const german = before.filter((b): b is TextBlock => b.type === 'text' && b.language === 'de')
-      if (!german.length) {
-        out.push({ kind: 'mediation', message: `${label}: Es fehlt der deutsche Ausgangstext vor der Aufgabe.` })
+      /*
+       * Der Ausgangstext darf VOR oder NACH der Aufgabe stehen – auf dem ganzen Blatt, auch auf
+       * einer späteren Seite. Gemeldet am 26.09.2026: In der Übungsklausur steht die
+       * Aufgabenstellung vorn und das Material auf den folgenden Seiten (so ist es in der
+       * Prüfung, siehe generation/originalmaterial.ts). Die Prüfung verlangte „vor der
+       * Aufgabe" und meldete einen fehlenden Text, der da war. Gewählt wird der nächstgelegene
+       * deutsche Text davor, sonst der erste danach.
+       */
+      const stelle = indexOf(sheet, t)
+      const deutsch = (b: WsBlock): b is TextBlock => b.type === 'text' && b.language === 'de'
+      const davor = sheet.blocks.slice(0, stelle).filter(deutsch)
+      const danach = sheet.blocks.slice(stelle + 1).filter(deutsch)
+      const german = [...davor, ...danach]
+      const ausgangstext = davor[davor.length - 1] ?? danach[0]
+      if (!ausgangstext) {
+        out.push({ kind: 'mediation', message: `${label}: Es fehlt der deutsche Ausgangstext.` })
       } else {
-        const words = plainText(german[german.length - 1].body)
-          .split(/\s+/)
-          .filter(Boolean).length
+        const words = plainText(ausgangstext.body).split(/\s+/).filter(Boolean).length
         if (words < 50)
           out.push({
             kind: 'mediation',
@@ -306,9 +317,15 @@ export function checkWriting(sheet: Sheet, meta: WorksheetMeta): DidacticWarning
   return out
 }
 
-/** Hörverstehen: Skript vorhanden, Aufgaben danach und während des Hörens lösbar. */
-export function checkListening(sheet: Sheet): DidacticWarning[] {
+/**
+ * Hörverstehen: Skript vorhanden, Aufgaben danach und während des Hörens lösbar.
+ *
+ * In der Übungsklausur (`meta.abitur.klausur`) stehen die Aufgaben vorn und das Material
+ * dahinter – dort genügt es, dass es Aufgabe und Hörtext auf dem Blatt gibt.
+ */
+export function checkListening(sheet: Sheet, meta?: WorksheetMeta): DidacticWarning[] {
   const out: DidacticWarning[] = []
+  const klausur = meta ? istUebungsklausur(meta) : false
   const audios = sheet.blocks.filter((b): b is AudioBlock => b.type === 'audio')
   audios.forEach((a, i) => {
     const label = `Hörtext ${i + 1}`
@@ -316,7 +333,7 @@ export function checkListening(sheet: Sheet): DidacticWarning[] {
     if (words < 40) out.push({ kind: 'listening', message: `${label}: Das Skript fehlt oder ist mit ${words} Wörtern zu kurz.` })
     if (a.plays < 2) out.push({ kind: 'listening', message: `${label}: Hörtexte werden in der Regel zweimal abgespielt.` })
     if (!a.beforeListening.trim()) out.push({ kind: 'listening', message: `${label}: Es fehlt der Hinweis vor dem Hören (worauf zu achten ist).` })
-    if (!sheet.blocks.some((b) => b.type === 'task' && b.skill === 'listening' && indexOf(sheet, b) > indexOf(sheet, a))) {
+    if (!sheet.blocks.some((b) => b.type === 'task' && b.skill === 'listening' && (klausur || indexOf(sheet, b) > indexOf(sheet, a)))) {
       out.push({ kind: 'listening', message: `${label}: Nach dem Hörtext folgt keine Aufgabe zum Hörverstehen.` })
     }
   })
@@ -324,7 +341,7 @@ export function checkListening(sheet: Sheet): DidacticWarning[] {
     .filter((t) => t.skill === 'listening')
     .forEach((t, i) => {
       const label = `Höraufgabe ${i + 1}`
-      const audio = audios.find((a) => indexOf(sheet, a) < indexOf(sheet, t))
+      const audio = audios.find((a) => klausur || indexOf(sheet, a) < indexOf(sheet, t))
       if (!audio) out.push({ kind: 'listening', message: `${label}: Die Aufgabe steht vor dem Hörtext oder es gibt keinen.` })
       const kinds = [t.answer.kind, ...t.parts.map((p) => p.answer.kind)]
       if (!kinds.some((k) => WHILE_LISTENING.includes(k))) {
@@ -337,10 +354,18 @@ export function checkListening(sheet: Sheet): DidacticWarning[] {
   return out
 }
 
-/** Bausteine, die auf einem Sprachmittlungs- bzw. Schreibblatt erlaubt sind */
+/**
+ * Bausteine, die auf einem Sprachmittlungs- bzw. Schreibblatt erlaubt sind.
+ *
+ * Neben Ausgangstext und Aufgabe auch, was die APP selbst dazusetzt: der Schreibraum und die
+ * Vorbemerkung zum Originaltext der Übungsklausur (originalmaterial.ts) – und das Hilfsblatt
+ * „Nützliche Ausdrücke" (phrases), sobald es eingeschaltet ist. Gemeldet am 26.09.2026: Die
+ * Prüfung beanstandete die phrases auf Seite 4, obwohl die Lehrkraft sie bestellt hatte (in der
+ * Übungsklausur sind sie in den Fremdsprachen sogar Pflicht, siehe `phraseSheetModus`).
+ */
 const FOCUS_BLOCKS: Record<'mediation' | 'writing', string[]> = {
-  mediation: ['text', 'task'],
-  writing: ['text', 'task']
+  mediation: ['text', 'task', 'workspace'],
+  writing: ['text', 'task', 'workspace']
 }
 
 /**
@@ -357,11 +382,12 @@ export function checkSkillFocus(sheet: Sheet, meta: WorksheetMeta): DidacticWarn
   if (list.length > 1) {
     out.push({ kind: focus, message: `Schwerpunkt ${name}: ${list.length} Aufgaben – vorgesehen ist genau eine Aufgabe, dazu nur der Ausgangstext.` })
   }
-  const extra = sheet.blocks.filter((b) => !FOCUS_BLOCKS[focus].includes(b.type))
+  const erlaubt = [...FOCUS_BLOCKS[focus], ...(phraseSheetModus(meta) !== 'aus' ? ['phrases'] : [])]
+  const extra = sheet.blocks.filter((b) => !erlaubt.includes(b.type) && !(istUebungsklausur(meta) && b.type === 'infoBox' && b.title === 'Zum Text'))
   if (extra.length) {
     out.push({
       kind: focus,
-      message: `Schwerpunkt ${name}: zusätzliche Bausteine (${[...new Set(extra.map((b) => b.type))].join(', ')}) – das Blatt enthält nur den Text und die eine Aufgabe.`
+      message: `Schwerpunkt ${name}: zusätzliche Bausteine (${[...new Set(extra.map((b) => b.type))].join(', ')}) – vorgesehen sind nur der Ausgangstext und die eine Aufgabe${erlaubt.includes('phrases') ? ' (dazu das Hilfsblatt)' : ''}.`
     })
   }
   const texts = sheet.blocks.filter((b) => b.type === 'text')
@@ -373,5 +399,5 @@ export function checkSkillFocus(sheet: Sheet, meta: WorksheetMeta): DidacticWarn
 
 /** Alle Fremdsprachenprüfungen zusammen (nur für Fremdsprachenfächer aufrufen). */
 export function checkLanguageSkills(sheet: Sheet, meta: WorksheetMeta): DidacticWarning[] {
-  return [...checkMediation(sheet, meta), ...checkWriting(sheet, meta), ...checkListening(sheet), ...checkSkillFocus(sheet, meta)]
+  return [...checkMediation(sheet, meta), ...checkWriting(sheet, meta), ...checkListening(sheet, meta), ...checkSkillFocus(sheet, meta)]
 }

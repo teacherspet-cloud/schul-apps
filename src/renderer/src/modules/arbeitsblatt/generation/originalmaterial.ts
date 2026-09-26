@@ -17,6 +17,10 @@ import type { GeladeneQuelle, Materialanfrage, Quellentreffer, StructuredRequest
 import { arr, int, obj, str } from '../../../shared/aiSchema'
 import { wantsSourceHeader } from '../didactics/sourceHeader'
 import { istUebungsklausur } from './abiturPrompt'
+import { subjectById } from '../model/subjects'
+
+/** Moderne Fremdsprache (nicht Latein) – nur dort unterscheiden sich Ausgangs- und Zielsprache */
+const fremdsprache = (subjectId: string): boolean => Boolean(subjectById(subjectId).foreignLanguage)
 import type { OriginalMaterialAblage, Sheet, TextBlock, WorksheetMeta, WsBlock } from '../model/types'
 import { kuerzungsHinweis, kuerzungsProtokoll, pruefeKuerzung, wortzahl, type KuerzungsPruefung } from './kuerzung'
 import { befundText, bewerte, type Bewertung } from './textQualitaet'
@@ -401,7 +405,11 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
  * Zitats – und damit genau der Übergangssatz, den das Änderungsverbot des § 62 Abs. 1 UrhG
  * ausschließt.
  */
-export function materialBausteine(material: OriginalMaterialAblage, meta: Pick<WorksheetMeta, 'subjectId'>, id: () => string): WsBlock[] {
+export function materialBausteine(
+  material: OriginalMaterialAblage,
+  meta: Pick<WorksheetMeta, 'subjectId'> & Partial<Pick<WorksheetMeta, 'skillFocus'>>,
+  id: () => string
+): WsBlock[] {
   const bausteine: WsBlock[] = []
   if (material.vorbemerkung?.trim()) {
     bausteine.push({
@@ -420,7 +428,13 @@ export function materialBausteine(material: OriginalMaterialAblage, meta: Pick<W
     // Zeilennummern: Ohne sie lässt sich kein Textbeleg angeben (EPA Geschichte 3.3.3)
     lineNumbers: true,
     source: [material.quellenangabe, material.hinweis].filter(Boolean).join(' '),
-    glossary: []
+    glossary: [],
+    /*
+     * Sprache des Textes kennzeichnen (Paket 12): Die Prüfung der Sprachmittlung sucht den
+     * DEUTSCHEN Ausgangstext über dieses Merkmal. Der eingesetzte Originaltext trug es nicht –
+     * und die Prüfung meldete „Es fehlt der deutsche Ausgangstext", obwohl er dastand.
+     */
+    ...(fremdsprache(meta.subjectId) ? { language: meta.skillFocus === 'mediation' ? ('de' as const) : ('target' as const) } : {})
   }
   if (wantsSourceHeader(meta)) {
     /*
@@ -460,7 +474,12 @@ export function materialBausteine(material: OriginalMaterialAblage, meta: Pick<W
  * ihren Eingaben ableiten kann, soll sie nicht von der Aufmerksamkeit des Aufrufers abhaengig
  * machen.
  */
-export function setzeMaterialEin(sheet: Sheet, material: OriginalMaterialAblage, meta: Pick<WorksheetMeta, 'subjectId' | 'abitur'>, id: () => string): Sheet {
+export function setzeMaterialEin(
+  sheet: Sheet,
+  material: OriginalMaterialAblage,
+  meta: Pick<WorksheetMeta, 'subjectId' | 'abitur'> & Partial<Pick<WorksheetMeta, 'skillFocus'>>,
+  id: () => string
+): Sheet {
   const bausteine = materialBausteine(material, meta, id)
   if (istUebungsklausur(meta)) {
     /*

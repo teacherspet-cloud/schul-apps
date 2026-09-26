@@ -19,6 +19,7 @@ import { anredeText } from '../../../shared/anrede'
 import { druckDesign } from '../../../shared/fachfarben'
 import { boardList } from '../didactics/boardDesign'
 import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
+import { isMaterial, materialNummern } from '../didactics/integrity'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -63,8 +64,8 @@ export function pageInfoFor(ws: Worksheet, sheet: Sheet, logo: string | null, sc
   }
 }
 
-/** Bausteine, die als Material gelten und eine Nummer bekommen. */
-export const isMaterial = (block: WsBlock): boolean => ['text', 'image', 'table', 'grid', 'audio', 'video'].includes(block.type)
+/** Bausteine, die als Material gelten und eine Nummer bekommen – dieselbe Regel wie in der Prüfung (didactics/integrity.ts) */
+export { isMaterial }
 
 /**
  * Materialnummern vergibt die App, nicht die KI: fortlaufend M1, M2 … in der Reihenfolge
@@ -72,10 +73,8 @@ export const isMaterial = (block: WsBlock): boolean => ['text', 'image', 'table'
  * Aufgabe auf ein „M5" verweisen, das es gar nicht gab.
  */
 export function materialNumbersFor(sheet: Sheet): Map<string, string> {
-  const map = new Map<string, string>()
-  let n = 0
-  for (const block of sheet.blocks) if (isMaterial(block)) map.set(block.id, `M${++n}`)
-  return map
+  // Eine Zählung für Darstellung und Prüfung – sonst meldet die Prüfung Nummern, die das Blatt anders zeigt
+  return materialNummern(sheet.blocks)
 }
 
 export function taskNumbersFor(sheet: Sheet): Map<string, number> {

@@ -17,6 +17,8 @@ import { useGrammatiktest } from '../store'
 import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
+import { useLaufendeSchluessel } from '../../../shared/auftraege'
+import { testHinweiseBeheben } from '../beheben'
 
 /**
  * Schritt 2: Test ansehen, bearbeiten und ausgeben.
@@ -55,6 +57,8 @@ export default function TestEditorStep(): React.JSX.Element {
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
   // Anrede der Lernenden am angezeigten Test prüfen – auch nach Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (ws ? anredeBefunde(ws.meta, ws.sheets) : []), [ws])
+  const docId = useGrammatiktest((s) => s.docId)
+  const laufend = useLaufendeSchluessel(docId)
   // Strg+P druckt wie der Knopf „Drucken"; vor dem frühen return, weil es ein Hook ist
   const drucken = useRef<() => void>(() => undefined)
   useDruck('grammatiktest', test && ws ? () => drucken.current() : null)
@@ -138,7 +142,14 @@ export default function TestEditorStep(): React.JSX.Element {
       </Group>
 
       <Stack>
-        {!key && <AnredeHinweise befunde={anrede} />}
+        {!key && (
+          <AnredeHinweise
+            befunde={anrede}
+            // Paket 12: „Mit KI beheben" – ein kleiner Auftrag, Ergebnis als ein Rückgängig-Schritt
+            onBeheben={(liste) => testHinweiseBeheben(test, docId, liste)}
+            laeuft={laufend.has('beheben')}
+          />
+        )}
         <FitToWidth className="ws-editor-pages">
           <SheetPages
             ws={ws}

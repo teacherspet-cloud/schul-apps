@@ -225,12 +225,13 @@ describe('Hörverstehen: Zuordnung übersteht die Nachbesserung', () => {
     })
     let revised = false
     const fakeAi = async <T>(req: { system: string; user: string }): Promise<T> => {
-      // Der erste Entwurf verweist auf ein Material, das es nicht gibt – das erzwingt die Nachbesserung
+      // Der erste Entwurf verweist auf ein Material, das es nicht gibt – das erzwingt die Nachbesserung.
+      // (Bis Paket 12 stand hier „M1" – das gibt es aber: Die App nummeriert den Hörtext als M1.)
       if (req.user.includes('Behebe diese Mängel')) {
         revised = true
         return { blocks: [audio, task('**Tick** the correct answer.')] } as T
       }
-      return { blocks: [audio, task('**Tick** the correct answer in M1.')] } as T
+      return { blocks: [audio, task('**Tick** the correct answer in M5.')] } as T
     }
     const result = await generateExam(exam([part('en-listening')]), fakeAi, () => undefined)
     expect(revised).toBe(true)

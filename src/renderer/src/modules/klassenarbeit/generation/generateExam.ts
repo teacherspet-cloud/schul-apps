@@ -772,7 +772,15 @@ async function pruefeFassung(
       ...checkNarration(sheet, teilMeta)
     ]
     if (wortlaut.length) notes.push(`${praefix}Teil ${i + 1} – Fragewortlaut: ${wortlaut.map((w) => w.message).join(' ')}`)
-    const findings = checkIntegrity(sheet)
+    /*
+     * Verweise gegen die GANZE Fassung prüfen: Die App nummeriert das Material über alle Teile
+     * hinweg (render/examWorksheet.ts setzt sie auf ein Blatt). Ein „M3" in Teil 2 kann in Teil 1
+     * stehen – gemeldet wurde es trotzdem als fehlend (Paket 12, 26.09.2026).
+     */
+    const findings = checkIntegrity(
+      sheet,
+      out.flatMap((p) => p.blocks)
+    )
     if (!findings.length) continue
     const severe = findings.filter((f) => f.severity === 'hoch')
     if (severe.length) {

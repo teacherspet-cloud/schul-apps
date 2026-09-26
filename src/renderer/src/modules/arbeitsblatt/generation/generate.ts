@@ -487,6 +487,25 @@ function addSheetWarnings(sheet: Sheet, profile: LearnerProfile, meta?: Workshee
   return sheet
 }
 
+/**
+ * Alle lokalen Prüfungen eines Blattes neu laufen lassen – ohne KI (Paket 12).
+ *
+ * Nach „Mit KI beheben" muss sichtbar werden, ob der Hinweis wirklich weg ist – und ob die
+ * Reparatur einen neuen verursacht hat. Die Hinweise der Prüfungen (`[Prüfung]`, `[Blatt]`,
+ * `[Vollständigkeit]`) werden dafür weggeräumt und frisch ermittelt; Hinweise der KI-Prüfrunde
+ * und Notizen bleiben stehen, die lassen sich ohne KI nicht neu bewerten.
+ */
+export function pruefeBlattNeu(sheet: Sheet, profile: LearnerProfile, meta: WorksheetMeta): Sheet {
+  const blocks = sheet.blocks.map((b) => ({ ...b, warnings: (b.warnings ?? []).filter((w) => !/^\[(Prüfung|Blatt|Vollständigkeit)\]/.test(w)) }))
+  const next: Sheet = { ...sheet, blocks }
+  const findings = [...checkIntegrity(next), ...checkListening(next), ...checkVideo(next, meta), ...checkDemand(next), ...checkImages(next, meta)]
+  for (const f of findings) {
+    const b = next.blocks.find((x) => x.id === f.blockId)
+    if (b) b.warnings = [...(b.warnings ?? []), `[Vollständigkeit] ${f.message}`]
+  }
+  return addSheetWarnings(next, profile, meta)
+}
+
 /** Formuliert alle Niveaufassungen aus, prüft sie und korrigiert schwerwiegende Probleme gezielt. */
 export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, opts: GenerateOptions): Promise<Worksheet> {
   const { meta } = ws
@@ -514,7 +533,14 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
    * wie ein Zitat. Was die App selbst einsetzt, ist dagegen genau der Wortlaut, den sie
    * geladen und geprueft hat.
    */
-  const mitMaterial = (sheets: Sheet[]): Sheet[] => (ws.originalMaterial ? sheets.map((s) => setzeMaterialEin(s, ws.originalMaterial!, meta, newId)) : sheets)
+  /*
+   * Eingesetzt wird er DIREKT nach dem Ausformulieren, VOR den Prüfungen und der Nachbesserung
+   * (Paket 12, 26.09.2026). Vorher kam er erst ganz am Ende hinzu: Die Prüfungen sahen ein
+   * Blatt ohne Material und meldeten „Die Aufgabe verweist auf ‚M1‘, … kein Material so
+   * bezeichnet" und „Es fehlt der deutsche Ausgangstext" – für einen Text, der auf dem fertigen
+   * Blatt stand. Die Nachbesserung schrieb dann womöglich eine Aufgabe um, die in Ordnung war.
+   */
+  const mitMaterial = (sheet: Sheet): Sheet => (ws.originalMaterial ? setzeMaterialEin(sheet, ws.originalMaterial, meta, newId) : sheet)
 
   /*
    * Das Kuerzungsprotokoll gehoert in den Lehrkraft-Hinweis, nicht in eine Randnotiz.
@@ -560,7 +586,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     const sheets = await runLimited(
       levels.map((level) => async () => {
         const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
-        let sheet = await generateSheet(ws, profile, level, opts.ai, scripts)
+        let sheet = mitMaterial(await generateSheet(ws, profile, level, opts.ai, scripts))
         /*
          * Auch im Sparmodus: Die Vollständigkeitsprüfungen laufen und bessern einmal nach.
          *
@@ -576,14 +602,14 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       }),
       3
     )
-    return { ...ws, meta: metaMitProtokoll(), sheets: mitMaterial(expandObserverGroups(sheets)) }
+    return { ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }
   }
 
   const sheets = await runLimited(
     levels.map((level) => async () => {
       const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
       step(`${label}: wird ausformuliert …`)
-      let sheet = await generateSheet(ws, profile, level, opts.ai, scripts)
+      let sheet = mitMaterial(await generateSheet(ws, profile, level, opts.ai, scripts))
       done++
       if (opts.review) {
         step(`${label}: wird geprüft …`)
@@ -624,7 +650,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     3
   )
 
-  return { ...ws, meta: metaMitProtokoll(), sheets: mitMaterial(expandObserverGroups(sheets)) }
+  return { ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }
 }
 
 /**

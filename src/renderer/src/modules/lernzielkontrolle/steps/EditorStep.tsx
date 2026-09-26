@@ -20,6 +20,9 @@ import { useLernzielkontrolle } from '../store'
 import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
+import { useLaufendeSchluessel } from '../../../shared/auftraege'
+import { AlleBehebenKnopf, KiBehebenKnopf } from '../../../shared/components/KiBeheben'
+import { befundBehebbar, befundeBeheben } from '../beheben'
 
 /**
  * Schritt 2: ansehen, bearbeiten, ausgeben.
@@ -32,10 +35,16 @@ import { mitThemenbereich } from '../../../shared/ueberthema'
  * (23.09.2026): warnen, nicht blockieren. Die Zeitgrenzen sind nur für fünf Länder belegt,
  * und wer an einer Schule unterrichtet, kennt ihre Gepflogenheiten besser als eine Tabelle.
  */
-function BefundListe({ befunde }: { befunde: Befund[] }): React.JSX.Element {
+function BefundListe({ befunde, onBeheben, laeuft }: { befunde: Befund[]; onBeheben?: (b: Befund[]) => void; laeuft?: boolean }): React.JSX.Element {
   const bereiche = [...new Set(befunde.map((b) => b.bereich))]
+  const behebbar = befunde.filter(befundBehebbar)
   return (
     <Stack gap="xs">
+      {onBeheben && (
+        <Group justify="flex-end">
+          <AlleBehebenKnopf anzahl={behebbar.length} laeuft={laeuft} onClick={() => onBeheben(behebbar)} />
+        </Group>
+      )}
       {bereiche.map((bereich) => (
         <div key={bereich}>
           <Text size="xs" fw={600} c="dimmed" mb={4}>
@@ -51,7 +60,11 @@ function BefundListe({ befunde }: { befunde: Befund[] }): React.JSX.Element {
                   icon={b.schwere === 'warnung' ? <IconAlertTriangle size={15} /> : <IconInfoCircle size={15} />}
                   p="xs"
                 >
-                  <Text size="xs">{b.message}</Text>
+                  <Group justify="space-between" gap="xs" wrap="nowrap" align="flex-start" data-hinweis>
+                    <Text size="xs">{b.message}</Text>
+                    {/* Paket 12: behebbare Befunde bekommen einen Knopf, reine Hinweise nicht */}
+                    {onBeheben && befundBehebbar(b) && <KiBehebenKnopf laeuft={laeuft} onClick={() => onBeheben([b])} />}
+                  </Group>
                 </Alert>
               ))}
           </Stack>
@@ -109,6 +122,9 @@ export default function EditorStep(): React.JSX.Element {
   )?.name
   const ws = useMemo(() => (test ? mitThemenbereich(kurztestToWorksheet(test, variante, schwellen), bereich) : null), [test, variante, schwellen, bereich])
   const befunde = useMemo(() => (test ? pruefeKurztest(test, variante) : []), [test, variante])
+  // „Mit KI beheben" (Paket 12): laufende Reparaturen dieser Kontrolle
+  const docId = useLernzielkontrolle((s) => s.docId)
+  const laufend = useLaufendeSchluessel(docId)
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
   // Strg+P druckt wie der Knopf „Drucken" (mit Rückfrage bei mehreren Fassungen); vor dem frühen return, weil es ein Hook ist
   const drucken = useRef<() => void>(() => undefined)
@@ -282,7 +298,11 @@ export default function EditorStep(): React.JSX.Element {
               </Text>
             </Accordion.Control>
             <Accordion.Panel>
-              <BefundListe befunde={befunde} />
+              <BefundListe
+                befunde={befunde}
+                onBeheben={(liste) => befundeBeheben(test, docId, variante, liste)}
+                laeuft={[...laufend].some((k) => k.startsWith('beheben-') || befunde.some((b) => b.blockId === k))}
+              />
               <Text size="xs" c="dimmed" mt="sm">
                 Nichts davon hindert am Ausdrucken. Die Zeitgrenzen sind nur für fünf Bundesländer belegt – die eigene Schule kennt die Lehrkraft besser als
                 eine Tabelle.
