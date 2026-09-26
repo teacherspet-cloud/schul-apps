@@ -3,6 +3,7 @@ import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSea
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
 import { kopieName, passtZurSuche } from '../bibliothek'
+import { useMenueFokus } from '../menueFokus'
 import { imNetz } from '../netzZugang'
 import { useConfirmKeys } from '../useConfirmKeys'
 import { notifyError, notifySuccess, uid } from '../util'
@@ -236,8 +237,10 @@ export function EintragMenue<M extends BibliotheksEintrag>({
   vorne?: React.ReactNode
 }): React.JSX.Element {
   const verschieben = useContext(VerschiebenKontext)
+  // Umbenennen und Löschen öffnen ein Feld bzw. eine Rückfrage mit Fokus – das Menü darf ihn nicht zurückholen
+  const { menue, weiter } = useMenueFokus()
   return (
-    <Menu position="bottom-end" withinPortal>
+    <Menu position="bottom-end" withinPortal {...menue}>
       <Menu.Target>
         <ActionIcon variant="subtle" aria-label={`Weitere Aktionen für „${eintrag.name}“`}>
           <IconDots size={16} />
@@ -245,20 +248,20 @@ export function EintragMenue<M extends BibliotheksEintrag>({
       </Menu.Target>
       <Menu.Dropdown>
         {vorne}
-        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => bib.setUmbenennen({ id: eintrag.id, name: eintrag.name })}>
+        <Menu.Item leftSection={<IconPencil size={14} />} onClick={weiter(() => bib.setUmbenennen({ id: eintrag.id, name: eintrag.name }))}>
           Umbenennen
         </Menu.Item>
         <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => void bib.kopieren(eintrag.id)}>
           Kopie anlegen
         </Menu.Item>
         {verschieben && (
-          <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={() => verschieben(eintrag.id)}>
+          <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={weiter(() => verschieben(eintrag.id))}>
             Verschieben nach …
           </Menu.Item>
         )}
         {/* Löschen gibt es nur am Rechner – über das Netz ist es gesperrt */}
         {!imNetz() && (
-          <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={() => bib.setLoeschen(eintrag)}>
+          <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={weiter(() => bib.setLoeschen(eintrag))}>
             Löschen
           </Menu.Item>
         )}

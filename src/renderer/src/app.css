@@ -757,6 +757,21 @@ img.home-illustration {
 .themen-zeile[draggable='true'] {
   cursor: grab;
 }
+/* Eben angelegter Bereich: kurz hervorgehoben, damit man sieht, wo er steht; der Rand bleibt, bis ein anderer angelegt wird */
+.themen-zeile[data-neu='true'] {
+  border-color: var(--mantine-primary-color-filled);
+  animation: themen-neu 1.6s ease-out;
+}
+@keyframes themen-neu {
+  from {
+    background: color-mix(in srgb, var(--mantine-primary-color-filled) 22%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .themen-zeile[data-neu='true'] {
+    animation: none;
+  }
+}
 .themen-herkunft {
   display: inline-flex;
   color: var(--mantine-color-dimmed);

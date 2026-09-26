@@ -40,7 +40,7 @@ import {
   IconWand,
   IconX
 } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { Themenbereich } from '@shared/themen'
 import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon, pfadVon } from '@shared/themen'
@@ -48,6 +48,7 @@ import { modules } from '../../modules/registry'
 import { fachAnzeige, ladeMaterialien, type Material } from '../../shell/materialien'
 import { artFarbe } from '../materialart'
 import { neuAnlegen, openDocument, openThemen } from '../navigation'
+import { useMenueFokus } from '../menueFokus'
 import { imNetz } from '../netzZugang'
 import {
   abgleichen,
@@ -214,6 +215,12 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
   const [ueber, setUeber] = useState<string | null>(null)
   // Neuer Bereich: oben im Fach (elternId null) oder als Unterbereich
   const [neuerBereich, setNeuerBereich] = useState<{ fachId: string; elternId: string | null; name: string } | null>(null)
+  /*
+   * Hier eben angelegte Bereiche (der letzte wird hervorgehoben). Sie bleiben sichtbar, auch wenn
+   * der Jahrgangsfilter leere Bereiche ausblendet – ein Bereich, der beim Anlegen verschwindet,
+   * sähe aus, als sei das Anlegen gescheitert.
+   */
+  const [angelegt, setAngelegt] = useState<string[]>([])
   const offen = useOffen((s) => s.offen)
   const umschalten = useOffen((s) => s.umschalten)
   const oeffne = useOffen((s) => s.oeffne)
@@ -277,6 +284,8 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
   /** Materialien im Bereich UND seinen Unterbereichen – die Zahl an einem zugeklappten Ordner */
   const gesamtIn = (b: Themenbereich): number => [b.id, ...nachfahrenVon(daten, b.id)].reduce((n, id) => n + inBereich(id, b.fachId).length, 0)
   const istOffen = (k: string): boolean => offen.includes(k)
+  /** Mit Jahrgangsfilter nur Bereiche, in denen (auch darunter) für diesen Jahrgang etwas liegt – oder die gerade angelegt wurden */
+  const zeigen = (b: Themenbereich): boolean => !jahrgang || gesamtIn(b) > 0 || [b.id, ...nachfahrenVon(daten, b.id)].some((id) => angelegt.includes(id))
   const reihenKey = (id: string | null, fachId: string): string => id ?? `ohne:${fachId}`
   const sortiert = (liste: Material[], key: string): Material[] => sortiere(liste, sortierung, daten.reihenfolge[key], arten())
 
@@ -538,9 +547,17 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
         onChange={(name) => setNeuerBereich({ fachId, elternId, name })}
         onAbbrechen={() => setNeuerBereich(null)}
         onAnlegen={async () => {
-          if (await bereichAnlegen(fachId, neuerBereich.name, elternId)) {
+          const b = await bereichAnlegen(fachId, neuerBereich.name, elternId)
+          if (b) {
             setNeuerBereich(null)
-            if (elternId) oeffne([`bereich:${elternId}`])
+            setAngelegt((a) => [...a, b.id])
+            // Fach und alle Oberbereiche aufklappen – der neue Bereich soll sofort zu sehen sein
+            oeffne([
+              `fach:${fachId}`,
+              ...pfadVon(useThemen.getState().daten, b.id)
+                .slice(0, -1)
+                .map((x) => `bereich:${x.id}`)
+            ])
           }
         }}
       />
@@ -548,8 +565,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
 
   /** Die Bereiche unter `elternId` als aufklappbare Zeilen – aufgeklappt mit Unterbereichen und Materialien */
   const baum = (fachId: string, elternId: string | null, tiefe: number): React.ReactNode => {
-    // Mit Jahrgangsfilter nur Bereiche, in denen (auch darunter) für diesen Jahrgang etwas liegt
-    const liste = kinder(fachId, elternId).filter((b) => !jahrgang || gesamtIn(b) > 0)
+    const liste = kinder(fachId, elternId).filter(zeigen)
     return (
       <>
         {liste.map((b) => {
@@ -563,6 +579,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
               tiefe={tiefe}
               anzahl={gesamtIn(b)}
               offen={auf}
+              neu={angelegt[angelegt.length - 1] === b.id}
               aufklappbar={hatInhalt || neuerBereich?.elternId === b.id}
               onUmschalten={() => umschalten(`bereich:${b.id}`)}
               onOeffnen={() => setOrt({ fachId, bereichId: b.id })}
@@ -712,7 +729,7 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
         </Text>
       )}
       {gezeigteFaecher.map((fachId) => {
-        const oben = kinder(fachId, null).filter((b) => !jahrgang || gesamtIn(b) > 0)
+        const oben = kinder(fachId, null).filter(zeigen)
         const ohne = sortiert(inBereich(null, fachId), reihenKey(null, fachId))
         // Nur ein Fach zu sehen (Sprung, Filter): dann gleich offen – ein einzelner zugeklappter Kopf wäre ein Klick zu viel
         const auf = istOffen(`fach:${fachId}`) || gezeigteFaecher.length === 1
@@ -797,6 +814,7 @@ function BaumZeile({
   tiefe,
   anzahl,
   offen,
+  neu,
   aufklappbar,
   onUmschalten,
   onOeffnen,
@@ -809,6 +827,8 @@ function BaumZeile({
   tiefe: number
   anzahl: number
   offen: boolean
+  /** Eben angelegt: hervorheben und in den sichtbaren Bereich holen */
+  neu?: boolean
   aufklappbar: boolean
   onUmschalten: () => void
   onOeffnen: () => void
@@ -821,9 +841,15 @@ function BaumZeile({
   const [loeschen, setLoeschen] = useState(false)
   const [verschieben, setVerschieben] = useState(false)
   const unter = useThemen((s) => nachfahrenVon(s.daten, b.id).length)
+  const zeile = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (neu) zeile.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [neu])
   return (
     <div data-baum-tiefe={tiefe}>
       <Card
+        ref={zeile}
+        data-neu={neu || undefined}
         withBorder
         padding={6}
         pl={8 + tiefe * 20}
@@ -965,8 +991,10 @@ function BereichMenue({
   onUnterbereich?: () => void
   onVerschieben?: () => void
 }): React.JSX.Element {
+  // Alle vier Punkte öffnen ein Feld, eine Rückfrage oder einen Dialog – das Menü darf den Fokus nicht zurückholen (shared/menueFokus.ts)
+  const { menue, weiter } = useMenueFokus()
   return (
-    <Menu position="bottom-end" withinPortal>
+    <Menu position="bottom-end" withinPortal {...menue}>
       <Menu.Target>
         <ActionIcon variant="subtle" aria-label={`Weitere Aktionen für den Themenbereich „${bereich.name}“`}>
           <IconDots size={16} />
@@ -974,21 +1002,21 @@ function BereichMenue({
       </Menu.Target>
       <Menu.Dropdown>
         {onUnterbereich && (
-          <Menu.Item leftSection={<IconFolderPlus size={14} />} onClick={onUnterbereich}>
+          <Menu.Item leftSection={<IconFolderPlus size={14} />} onClick={weiter(onUnterbereich)}>
             Unterbereich anlegen
           </Menu.Item>
         )}
-        <Menu.Item leftSection={<IconPencil size={14} />} onClick={onUmbenennen}>
+        <Menu.Item leftSection={<IconPencil size={14} />} onClick={weiter(onUmbenennen)}>
           Umbenennen
         </Menu.Item>
         {onVerschieben && (
-          <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={onVerschieben}>
+          <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={weiter(onVerschieben)}>
             Verschieben nach …
           </Menu.Item>
         )}
         {/* Löschen gibt es wie bei den Materialien nur am Rechner */}
         {!imNetz() && (
-          <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={onLoeschen}>
+          <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={weiter(onLoeschen)}>
             Löschen
           </Menu.Item>
         )}
@@ -1212,6 +1240,8 @@ function FachMenue({ fachId, onNeu }: { fachId: string; onNeu: () => void }): Re
 export function FremdKarte({ material: m, onVerschieben }: { material: Material; onVerschieben?: () => void }): React.JSX.Element {
   const p = modul(m.moduleId)
   const oeffnen = (): void => void openDocument(m.moduleId, m.id)
+  // „Verschieben nach …" öffnet einen Dialog – das Menü darf den Fokus nicht aus ihm herausholen
+  const { menue, weiter } = useMenueFokus()
   return (
     <Card withBorder padding="sm" data-bibliothek-eintrag={m.name}>
       <Group justify="space-between" wrap="nowrap" gap="sm">
@@ -1254,7 +1284,7 @@ export function FremdKarte({ material: m, onVerschieben }: { material: Material;
             {m.detail}
           </Text>
         </div>
-        <Menu position="bottom-end" withinPortal>
+        <Menu position="bottom-end" withinPortal {...menue}>
           <Menu.Target>
             <ActionIcon variant="subtle" aria-label={`Weitere Aktionen für „${m.name}“`}>
               <IconDots size={16} />
@@ -1265,7 +1295,7 @@ export function FremdKarte({ material: m, onVerschieben }: { material: Material;
               Öffnen in „{p?.name}“
             </Menu.Item>
             {onVerschieben && (
-              <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={onVerschieben}>
+              <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={weiter(onVerschieben)}>
                 Verschieben nach …
               </Menu.Item>
             )}

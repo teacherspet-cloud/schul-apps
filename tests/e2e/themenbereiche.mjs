@@ -297,19 +297,38 @@ try {
   await page.getByRole('textbox', { name: 'Name des neuen Themenbereichs' }).fill('Der Erste Weltkrieg')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(600)
-  const unterAnlegen = async (oben, name) => {
+  /*
+   * Wie eine Lehrkraft: Menüpunkt wählen und einfach lostippen – OHNE `fill()`, das den Fokus
+   * selbst ins Feld holt. Anlass (26.09.2026): Das Menü holte den Fokus 10 ms nach dem Schließen
+   * auf seinen ⋯-Knopf zurück; getippt wurde ins Leere, Enter öffnete das Menü von Neuem, und die
+   * Wache brach je nach Rechnerlast hier ab (shared/menueFokus.ts).
+   */
+  const perMenue = async (oben, punkt) => {
     await ordner(oben)
       .getByRole('button', { name: `Weitere Aktionen für den Themenbereich „${oben}“` })
       .first()
       .click()
-    await page.getByRole('menuitem', { name: 'Unterbereich anlegen' }).click()
-    await page.getByRole('textbox', { name: 'Name des neuen Unterbereichs' }).fill(name)
+    await page.getByRole('menuitem', { name: punkt }).click()
+    await page.waitForTimeout(300)
+    return page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName)
+  }
+  const unterAnlegen = async (oben, name) => {
+    const fokus = await perMenue(oben, 'Unterbereich anlegen')
+    pruefe(fokus === 'Name des neuen Unterbereichs', `„Unterbereich anlegen": der Fokus steht im Namensfeld (${fokus})`)
+    await page.keyboard.type(name)
     await page.keyboard.press('Enter')
     await page.waitForTimeout(600)
+    pruefe((await ordner(name).count()) === 1, `„${name}" sofort sichtbar (Oberbereich aufgeklappt)`)
+    pruefe((await ordner(name).first().getAttribute('data-neu')) === 'true', `… und hervorgehoben`)
   }
   await unterAnlegen('Der Erste Weltkrieg', 'Ursachen des Ersten Weltkriegs')
   await unterAnlegen('Ursachen des Ersten Weltkriegs', 'Der Balkan als Krisenherd Europas')
   pruefe((await ordner('Der Balkan als Krisenherd Europas').count()) === 1, 'Drei Ebenen angelegt, der Unterbereich ist aufgeklappt sichtbar')
+  // Umbenennen im Baum ebenso: Früher schloss der zurückgeholte Fokus das Feld sofort (onBlur)
+  const fokusUm = await perMenue('Der Balkan als Krisenherd Europas', 'Umbenennen')
+  pruefe(fokusUm === 'Neuer Name des Themenbereichs', `„Umbenennen": das Feld bleibt offen und hat den Fokus (${fokusUm})`)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
   const tiefe = await page.evaluate(() =>
     document.querySelector('[data-bereich="Der Balkan als Krisenherd Europas"]')?.closest('[data-baum-tiefe]')?.getAttribute('data-baum-tiefe')
   )
@@ -361,10 +380,20 @@ try {
   await page.waitForTimeout(400)
 
   // Bereich auf Bereich ziehen: „Der Balkan …" unter einen neuen Bereich „Imperialismus"
+  // – angelegt bei eingeschaltetem Jahrgangsfilter: Der leere neue Bereich darf nicht verschwinden
+  await sichtbar(page.locator('.mantine-Chip-label', { hasText: 'Klasse 9' })).click()
+  await page.waitForTimeout(400)
   await geschichte.getByRole('button', { name: 'Themenbereich', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name des neuen Themenbereichs' }).fill('Imperialismus')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(600)
+  pruefe((await ordner('Imperialismus').count()) === 1, 'Neuer (leerer) Bereich bleibt trotz Jahrgangsfilter sichtbar')
+  await sichtbar(page.locator('.mantine-Chip-label', { hasText: 'Alle Jahrgänge' })).click()
+  await page.waitForTimeout(400)
+  // Beide Zeilen ins Bild holen: Scrollt Playwright erst während des Ziehens zum Ziel, bricht Chromium das Ziehen ab
+  await ordner('Der Balkan als Krisenherd Europas')
+    .first()
+    .evaluate((el) => el.scrollIntoView({ block: 'center' }))
   await ordner('Der Balkan als Krisenherd Europas').first().dragTo(ordner('Imperialismus').first())
   await page.waitForTimeout(800)
   const neuePfad = await page.evaluate(async () => {
