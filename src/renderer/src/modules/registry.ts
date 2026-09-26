@@ -6,13 +6,18 @@ import KlassenarbeitModule from './klassenarbeit/KlassenarbeitModule'
 import LernzielkontrolleModule from './lernzielkontrolle/LernzielkontrolleModule'
 import VokabellisteModule from './vokabelliste/VokabellisteModule'
 import VokabeltestModule from './vokabeltest/VokabeltestModule'
+import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
 
 /**
  * Jedes Programm der Schul-Apps ist ein Modul.
  * Neues Programm: Ordner unter modules/ anlegen und hier eintragen –
  * es erscheint dann automatisch als Kachel auf der Startseite und in der Leiste.
  *
- * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+6.
+ * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+6 – gezählt werden nur die
+ * sichtbaren Programme. Seit Paket 12 (Wunsch der Lehrkraft, 26.09.2026) gilt überall:
+ * Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten,
+ * Vokabellisten – die meistgenutzten zuerst, die Listen als Werkzeug der Vokabeltests zuletzt.
+ * Dieselbe Folge steht in shared/programmSichtbarkeit.ts (`PROGRAMM_REIHENFOLGE`).
  *
  * Die Kacheltexte sagen, WANN man welches Programm nimmt – vor allem bei Lernzielkontrolle,
  * Grammatiktest und Klassenarbeit, die sich auf den ersten Blick ähneln (Rückmeldung der
@@ -33,6 +38,11 @@ export interface SchulModule {
    * Vektorsymbol.
    */
   leistenbild?: string
+  /**
+   * Für welche Fächer das Programm gedacht ist (Paket 12). Passt keines der eigenen Fächer
+   * (Einstellungen › Schule), wird es ausgeblendet – siehe shared/programmSichtbarkeit.ts.
+   */
+  faecher: ProgrammFaecher
   /** active: das Programm ist gerade geöffnet (Module bleiben im Hintergrund erhalten) */
   component: ComponentType<{ active: boolean }>
 }
@@ -49,26 +59,6 @@ const leistenbild = (id: string): string | undefined => bilder[`../assets/progra
 
 export const modules: SchulModule[] = [
   {
-    id: 'vokabeltest',
-    name: 'Vokabeltest',
-    description: 'Vokabeltests mit Aufgaben im Satzzusammenhang – aus eigenen Listen, Schulbuchvokabeln, Fotos, PDF- oder Word-Dateien.',
-    icon: programmSymbol('vokabeltest', 'teal'),
-    color: 'teal',
-    illustration: illustration('vokabeltest'),
-    leistenbild: leistenbild('vokabeltest'),
-    component: VokabeltestModule
-  },
-  {
-    id: 'vokabelliste',
-    name: 'Vokabellisten',
-    description: 'Schulbuchvokabeln und eigene Listen anlegen und pflegen – Grundlage für Vokabeltests und Klassenarbeiten.',
-    icon: programmSymbol('vokabelliste', 'cyan'),
-    color: 'cyan',
-    illustration: illustration('vokabelliste'),
-    leistenbild: leistenbild('vokabelliste'),
-    component: VokabellisteModule
-  },
-  {
     id: 'arbeitsblatt',
     name: 'Arbeitsblatt',
     description: 'Didaktisch aufbereitete Arbeitsblätter zu jedem Thema – passend zu Jahrgang, Schulform und Bundesland, mit eigenem Design.',
@@ -76,17 +66,19 @@ export const modules: SchulModule[] = [
     color: 'indigo',
     illustration: illustration('arbeitsblatt'),
     leistenbild: leistenbild('arbeitsblatt'),
+    faecher: PROGRAMM_FAECHER.arbeitsblatt,
     component: ArbeitsblattModule
   },
   {
-    id: 'lernzielkontrolle',
-    name: 'Lernzielkontrolle',
-    description: 'Kurze schriftliche Überprüfung in jedem Fach – im Format des Bundeslandes (Bezeichnung, Zeitgrenze, Operatoren). Nur Aufgaben und Material.',
-    icon: programmSymbol('lernzielkontrolle', 'blue'),
-    color: 'blue',
-    illustration: illustration('lernzielkontrolle'),
-    leistenbild: leistenbild('lernzielkontrolle'),
-    component: LernzielkontrolleModule
+    id: 'vokabeltest',
+    name: 'Vokabeltest',
+    description: 'Vokabeltests mit Aufgaben im Satzzusammenhang – aus eigenen Listen, Schulbuchvokabeln, Fotos, PDF- oder Word-Dateien.',
+    icon: programmSymbol('vokabeltest', 'teal'),
+    color: 'teal',
+    illustration: illustration('vokabeltest'),
+    leistenbild: leistenbild('vokabeltest'),
+    faecher: PROGRAMM_FAECHER.vokabeltest,
+    component: VokabeltestModule
   },
   {
     id: 'grammatiktest',
@@ -96,7 +88,19 @@ export const modules: SchulModule[] = [
     color: 'orange',
     illustration: illustration('grammatiktest'),
     leistenbild: leistenbild('grammatiktest'),
+    faecher: PROGRAMM_FAECHER.grammatiktest,
     component: GrammatiktestModule
+  },
+  {
+    id: 'lernzielkontrolle',
+    name: 'Lernzielkontrolle',
+    description: 'Kurze schriftliche Überprüfung in jedem Fach – im Format des Bundeslandes (Bezeichnung, Zeitgrenze, Operatoren). Nur Aufgaben und Material.',
+    icon: programmSymbol('lernzielkontrolle', 'blue'),
+    color: 'blue',
+    illustration: illustration('lernzielkontrolle'),
+    leistenbild: leistenbild('lernzielkontrolle'),
+    faecher: PROGRAMM_FAECHER.lernzielkontrolle,
+    component: LernzielkontrolleModule
   },
   {
     id: 'klassenarbeit',
@@ -107,6 +111,18 @@ export const modules: SchulModule[] = [
     color: 'grape',
     illustration: illustration('klassenarbeit'),
     leistenbild: leistenbild('klassenarbeit'),
+    faecher: PROGRAMM_FAECHER.klassenarbeit,
     component: KlassenarbeitModule
+  },
+  {
+    id: 'vokabelliste',
+    name: 'Vokabellisten',
+    description: 'Schulbuchvokabeln und eigene Listen anlegen und pflegen – Grundlage für Vokabeltests und Klassenarbeiten.',
+    icon: programmSymbol('vokabelliste', 'cyan'),
+    color: 'cyan',
+    illustration: illustration('vokabelliste'),
+    leistenbild: leistenbild('vokabelliste'),
+    faecher: PROGRAMM_FAECHER.vokabelliste,
+    component: VokabellisteModule
   }
 ]

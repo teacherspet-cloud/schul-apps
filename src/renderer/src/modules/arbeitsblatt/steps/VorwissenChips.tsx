@@ -1,4 +1,4 @@
-import { Alert, Button, Group, Stack, Text, Tooltip } from '@mantine/core'
+import { Alert, Badge, Button, Group, Stack, Text, Tooltip } from '@mantine/core'
 import { IconInfoCircle, IconPlus, IconSparkles } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
 import { notifyError } from '../../../shared/util'
@@ -81,25 +81,53 @@ export default function VorwissenChips({
               </Text>
             )}
             <Group gap={6}>
-              {zeigen.map((v) => (
-                <Tooltip key={v.text} label={v.quelle} multiline maw={360} withArrow openDelay={300}>
-                  <Button
-                    size="compact-xs"
-                    radius="xl"
-                    variant={v.ki ? 'light' : v.sicher ? 'light' : 'outline'}
-                    color={v.ki ? 'violet' : v.sicher ? 'teal' : 'gray'}
-                    leftSection={v.ki ? <IconSparkles size={12} /> : <IconPlus size={12} />}
-                    styles={{ root: { height: 'auto', minHeight: 24, paddingBlock: 3 }, label: { whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.35, overflow: 'visible' } }}
-                    aria-label={`${alsZeile(v)} übernehmen (${v.quelle})`}
-                    title={v.quelle}
-                    data-art={art}
-                    data-sicher={v.sicher ? 'ja' : 'nein'}
-                    onClick={() => onChange(zeileEinfuegen(wert, alsZeile(v)))}
-                  >
-                    {v.text}
-                  </Button>
-                </Tooltip>
-              ))}
+              {zeigen.map((v) => {
+                /*
+                 * GER-Kennzeichen (Paket 12): das belegte Niveau des Vorschlags, sonst – nur in den
+                 * Fremdsprachen – der Richtwert der Lerngruppe mit „≈" davor. So sieht die Lehrkraft
+                 * auf einen Blick, was über oder unter dem Niveau der Klasse liegt.
+                 */
+                const niveau = v.niveau ?? anfrage.gerRichtwert
+                const richtwert = !v.niveau && Boolean(anfrage.gerRichtwert)
+                const niveauText = niveau ? (richtwert ? `GER-Richtwert der Lerngruppe: ${niveau}` : `GER-Niveau der Einführung: ${niveau}`) : ''
+                return (
+                  <Tooltip key={v.text} label={niveauText ? `${v.quelle} · ${niveauText}` : v.quelle} multiline maw={360} withArrow openDelay={300}>
+                    <Button
+                      size="compact-xs"
+                      radius="xl"
+                      variant={v.ki ? 'light' : v.sicher ? 'light' : 'outline'}
+                      color={v.ki ? 'violet' : v.sicher ? 'teal' : 'gray'}
+                      leftSection={v.ki ? <IconSparkles size={12} /> : <IconPlus size={12} />}
+                      rightSection={
+                        niveau ? (
+                          <Badge
+                            size="xs"
+                            radius="sm"
+                            variant={richtwert ? 'outline' : 'filled'}
+                            color={richtwert ? 'gray' : 'indigo'}
+                            className="ger-kennzeichen"
+                            data-ger={niveau}
+                            styles={{ root: { textTransform: 'none', paddingInline: 4 } }}
+                          >
+                            {richtwert ? `≈${niveau}` : niveau}
+                          </Badge>
+                        ) : undefined
+                      }
+                      styles={{
+                        root: { height: 'auto', minHeight: 24, paddingBlock: 3 },
+                        label: { whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.35, overflow: 'visible' }
+                      }}
+                      aria-label={`${alsZeile(v)} übernehmen (${v.quelle}${niveauText ? `, ${niveauText}` : ''})`}
+                      title={v.quelle}
+                      data-art={art}
+                      data-sicher={v.sicher ? 'ja' : 'nein'}
+                      onClick={() => onChange(zeileEinfuegen(wert, alsZeile(v)))}
+                    >
+                      {v.text}
+                    </Button>
+                  </Tooltip>
+                )
+              })}
               {gruppe.length > SICHTBAR && (
                 <Button size="compact-xs" variant="subtle" onClick={() => setOffen((o) => ({ ...o, [art]: !o[art] }))}>
                   {offen[art] ? 'Weniger' : `Mehr (${gruppe.length - SICHTBAR})`}
@@ -112,6 +140,7 @@ export default function VorwissenChips({
       <Group gap="xs" justify="space-between" wrap="nowrap" align="center">
         <Text size="xs" c="dimmed">
           Klick übernimmt ins Feld. Grün = belegt, umrandet = bitte prüfen, violett = KI. Die Herkunft steht im Tooltip.
+          {alle.some((v) => v.niveau) || anfrage.gerRichtwert ? ' Kennzeichen A1 … C1 = GER-Niveau, „≈“ = Richtwert der Lerngruppe.' : ''}
         </Text>
         <Button
           size="compact-xs"

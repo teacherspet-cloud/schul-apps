@@ -257,28 +257,53 @@ export default function FrameStep(): React.JSX.Element {
                         }
                         allowDeselect={false}
                       />
+                      <Select
+                        label="Jahrgang"
+                        data={Array.from({ length: range.max - range.min + 1 }, (_, i) => ({
+                          value: String(range.min + i),
+                          label: `Klasse ${range.min + i}`
+                        }))}
+                        value={String(meta.grade)}
+                        onChange={(v) => {
+                          if (!v) return
+                          const grade = Number(v)
+                          const level = suggestLevel(table, meta.stateId, meta.schoolTypeId, 1, grade)
+                          update((d) => {
+                            d.meta.grade = grade
+                            d.meta.minutes = defaultMinutes(grade)
+                            if (level && d.meta.subjectId === 'englisch') d.meta.cefrLevel = level.level
+                            d.parts = []
+                          })
+                        }}
+                        allowDeselect={false}
+                      />
+                    </Group>
+                    {/* Paket 12: Titel rechts neben dem Thema, Jahrgang neben dem Fach – was zusammen gelesen wird, steht zusammen */}
+                    <Group align="flex-start" gap="sm" wrap="wrap">
+                      <Autocomplete
+                        style={{ flex: 2, minWidth: 220 }}
+                        label="Thema"
+                        required
+                        description={
+                          meta.subjectId === 'geschichte' && curriculum.length
+                            ? `Themen aus dem Lehrplan für ${meta.schoolTypeName} in Klasse ${meta.grade} – oder frei eintippen.`
+                            : undefined
+                        }
+                        placeholder={meta.subjectId === 'englisch' ? 'z. B. Going abroad' : 'z. B. Industrialisierung'}
+                        data={meta.subjectId === 'geschichte' ? curriculum.map((t) => (t.code ? `${t.code}: ${t.label}` : t.label)) : []}
+                        value={meta.topic}
+                        onChange={(v) => patch({ topic: v })}
+                        limit={40}
+                        filter={suggestAll}
+                      />
                       <TextInput
+                        style={{ flex: 1, minWidth: 180 }}
                         label="Titel der Arbeit (optional)"
                         placeholder="z. B. 2. Klassenarbeit"
                         value={meta.title}
                         onChange={(e) => patch({ title: e.currentTarget.value })}
                       />
                     </Group>
-                    <Autocomplete
-                      label="Thema"
-                      required
-                      description={
-                        meta.subjectId === 'geschichte' && curriculum.length
-                          ? `Themen aus dem Lehrplan für ${meta.schoolTypeName} in Klasse ${meta.grade} – oder frei eintippen.`
-                          : undefined
-                      }
-                      placeholder={meta.subjectId === 'englisch' ? 'z. B. Going abroad' : 'z. B. Industrialisierung'}
-                      data={meta.subjectId === 'geschichte' ? curriculum.map((t) => (t.code ? `${t.code}: ${t.label}` : t.label)) : []}
-                      value={meta.topic}
-                      onChange={(v) => patch({ topic: v })}
-                      limit={40}
-                      filter={suggestAll}
-                    />
                     {meta.subjectId === 'geschichte' && (
                       <Text size="xs" c="dimmed">
                         {source ? (
@@ -325,7 +350,9 @@ export default function FrameStep(): React.JSX.Element {
                         stateId: meta.stateId,
                         schoolTypeId: meta.schoolTypeId,
                         // Englisch mit Lehrwerk: Thema und Grammatik der gewählten Unit
-                        lehrwerkStand: lehrwerkStandAus(meta.vocab)
+                        lehrwerkStand: lehrwerkStandAus(meta.vocab),
+                        // GER-Kennzeichen an den Chips (Paket 12): Richtwert ist das Niveau der Arbeit
+                        gerRichtwert: meta.subjectId === 'englisch' ? meta.cefrLevel : undefined
                       }}
                       wert={meta.content}
                       onChange={(content) => patch({ content })}
@@ -428,46 +455,28 @@ export default function FrameStep(): React.JSX.Element {
                         />
                       </Group>
                     </SchulAngabe>
-                    <Group grow>
-                      <Select
-                        label="Jahrgang"
-                        data={Array.from({ length: range.max - range.min + 1 }, (_, i) => ({
-                          value: String(range.min + i),
-                          label: `Klasse ${range.min + i}`
-                        }))}
-                        value={String(meta.grade)}
-                        onChange={(v) => {
-                          if (!v) return
-                          const grade = Number(v)
-                          const level = suggestLevel(table, meta.stateId, meta.schoolTypeId, 1, grade)
-                          update((d) => {
-                            d.meta.grade = grade
-                            d.meta.minutes = defaultMinutes(grade)
-                            if (level && d.meta.subjectId === 'englisch') d.meta.cefrLevel = level.level
-                            d.parts = []
-                          })
-                        }}
-                        allowDeselect={false}
-                      />
-                      {courseOptions && (
-                        <Select
-                          label="Kursniveau"
-                          data={courseOptions}
-                          value={meta.courseLevel}
-                          onChange={(v) => v && patch({ courseLevel: v as ExamMeta['courseLevel'] })}
-                          allowDeselect={false}
-                        />
-                      )}
-                      {meta.subjectId === 'englisch' && (
-                        <Select
-                          label="Sprachniveau (GER)"
-                          data={[...CEFR_SCALE]}
-                          value={meta.cefrLevel}
-                          onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
-                          allowDeselect={false}
-                        />
-                      )}
-                    </Group>
+                    {(courseOptions || meta.subjectId === 'englisch') && (
+                      <Group grow>
+                        {courseOptions && (
+                          <Select
+                            label="Kursniveau"
+                            data={courseOptions}
+                            value={meta.courseLevel}
+                            onChange={(v) => v && patch({ courseLevel: v as ExamMeta['courseLevel'] })}
+                            allowDeselect={false}
+                          />
+                        )}
+                        {meta.subjectId === 'englisch' && (
+                          <Select
+                            label="Sprachniveau (GER)"
+                            data={[...CEFR_SCALE]}
+                            value={meta.cefrLevel}
+                            onChange={(v) => v && patch({ cefrLevel: v as CefrLevel })}
+                            allowDeselect={false}
+                          />
+                        )}
+                      </Group>
+                    )}
                   </Stack>
                 </Card>
               </Stack>

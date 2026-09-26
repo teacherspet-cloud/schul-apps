@@ -14,6 +14,8 @@
  * lässt (tests/haeufig.test.ts).
  */
 
+import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
+
 export type HaeufigArt = 'bundesland' | 'schulform' | 'fach'
 
 export interface Eintrag {
@@ -35,8 +37,11 @@ export const HAEUFIG_AB = 2
  *
  * `ansEnde`: Werte, die nicht ins Alphabet gehören, sondern immer unten stehen
  * („Anderes Fach …").
+ *
+ * `eigene`: Werte der unterrichteten Fächer (nur bei Fachauswahlen) – sie stehen als Gruppe
+ * „Eigene Fächer" ganz oben.
  */
-export function gruppiereHaeufig(eintraege: Eintrag[], zaehler: Record<string, number>, ansEnde: string[] = ['anderes']): Gruppiert {
+export function gruppiereHaeufig(eintraege: Eintrag[], zaehler: Record<string, number>, ansEnde: string[] = ['anderes'], eigene: string[] = []): Gruppiert {
   // Doppelte Werte entfernen – sie würden das Auswahlfeld zum Absturz bringen
   const gesehen = new Set<string>()
   const eindeutig = eintraege.filter((e) => (gesehen.has(e.value) ? false : (gesehen.add(e.value), true)))
@@ -52,6 +57,24 @@ export function gruppiereHaeufig(eintraege: Eintrag[], zaehler: Record<string, n
     .filter((e) => (zaehler[e.value] ?? 0) >= HAEUFIG_AB)
     .sort((a, b) => (zaehler[b.value] ?? 0) - (zaehler[a.value] ?? 0) || a.label.localeCompare(b.label, 'de', { sensitivity: 'base' }))
     .slice(0, HAEUFIG_MAX)
+
+  /*
+   * Eigene Fächer (Paket 12, Einstellungen › Schule): ganz oben als eigene Gruppe, in der
+   * Reihenfolge des Alphabets. „Häufig gewählt" zeigt dann nur noch, was darüber hinaus oft
+   * vorkommt (ohne Dubletten), der Rest heißt „Andere Fächer".
+   */
+  const eigen = alphabetisch.filter((e) => eigene.includes(e.value))
+  if (eigen.length) {
+    const schonOben = new Set(eigen.map((e) => e.value))
+    const oft = haeufig.filter((e) => !schonOben.has(e.value))
+    for (const e of oft) schonOben.add(e.value)
+    const andere = alphabetisch.filter((e) => !schonOben.has(e.value))
+    return [
+      { group: 'Eigene Fächer', items: eigen },
+      ...(oft.length ? [{ group: 'Häufig gewählt', items: oft }] : []),
+      ...(andere.length ? [{ group: 'Andere Fächer', items: andere }] : [])
+    ]
+  }
 
   if (!haeufig.length) return alphabetisch
   const oben = new Set(haeufig.map((e) => e.value))
@@ -84,4 +107,23 @@ export function zaehleWahl(art: HaeufigArt, value: string): void {
   } catch {
     // ohne lokalen Speicher keine Zählung – unkritisch
   }
+}
+
+/**
+ * Welche Werte einer Fachauswahl gehören zu den unterrichteten Fächern?
+ *
+ * Die meisten Auswahlen führen Fachkennungen („englisch"); die Vokabellisten dagegen
+ * Sprachkürzel („en", „la"). Beide sollen die eigenen Fächer oben zeigen – deshalb wird hier
+ * übersetzt statt in jedem Formular.
+ */
+export function eigeneWerte(eigeneFaecher: string[], data: { value: string }[]): string[] {
+  if (!eigeneFaecher.length) return []
+  const passend = new Set<string>()
+  for (const id of eigeneFaecher) {
+    passend.add(id)
+    const fach = SUBJECTS.find((s) => s.id === id)
+    if (fach?.foreignLanguage) passend.add(fach.foreignLanguage)
+    if (fach?.uebersetzungssprache) passend.add(fach.uebersetzungssprache)
+  }
+  return data.map((d) => d.value).filter((v) => passend.has(v))
 }

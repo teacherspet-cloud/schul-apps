@@ -220,6 +220,18 @@ export interface AppSettings {
    * neue Vorschläge auch bei bestehenden Einstellungen an.
    */
   fachfarben?: Record<string, string>
+  /**
+   * Unterrichtete Fächer der Lehrkraft (Paket 12; Kennungen aus arbeitsblatt/model/subjects.ts).
+   * Sie stehen in jeder Fachauswahl oben, und Programme, die zu keinem davon passen, werden
+   * ausgeblendet (renderer/shared/programmSichtbarkeit.ts). Leer oder fehlend = alles sichtbar.
+   */
+  eigeneFaecher?: string[]
+  /**
+   * „Programme anzeigen": eigene Wahl je Programm, geht der Regel nach Fächern vor
+   * (true = immer zeigen, false = immer ausblenden; fehlt = nach den eigenen Fächern). Ein
+   * mitgeschicktes null nimmt die Festlegung zurück – der Hauptprozess löscht den Eintrag.
+   */
+  programmeAnzeigen?: Record<string, boolean | null>
   /** Angaben zur Schule (Name, Logo) auf den Materialien abdrucken */
   showSchool: boolean
   /** Nach welchem Regelwerk Quellen auf den Materialien angegeben werden */

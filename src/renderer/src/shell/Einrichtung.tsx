@@ -64,7 +64,7 @@ export default function Einrichtung(): React.JSX.Element | null {
       beschreibung: 'Wo wird unterrichtet?',
       icon: <IconSchool size={18} />,
       hinweis:
-        'Bundesland und Schulform bestimmen, welche Jahrgänge zur Auswahl stehen, welche Niveaus erwartet werden und wie der Lehrplan im jeweiligen Land heißt. Ohne diese Angaben arbeitet die App mit Voreinstellungen, die nicht zur eigenen Schule passen müssen.',
+        'Bundesland und Schulform bestimmen, welche Jahrgänge zur Auswahl stehen, welche Niveaus erwartet werden und wie der Lehrplan im jeweiligen Land heißt. Ohne diese Angaben arbeitet die App mit Voreinstellungen, die nicht zur eigenen Schule passen müssen. Die unterrichteten Fächer stehen später in jeder Fachauswahl oben; Programme, die zu keinem davon passen, werden ausgeblendet.',
       inhalt: <SchoolCard settings={settings} update={update} />
     },
     {

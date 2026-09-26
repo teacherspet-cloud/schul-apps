@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gruppiereHaeufig } from '../src/renderer/src/shared/haeufig'
+import { eigeneWerte, gruppiereHaeufig } from '../src/renderer/src/shared/haeufig'
 
 /*
  * Auswahllisten Bundesland, Schulform, Fach: alphabetisch, die häufig gewählten oben
@@ -64,5 +64,31 @@ describe('gruppiereHaeufig', () => {
   it('ignoriert Zählungen für Werte, die in dieser Liste nicht vorkommen', () => {
     const r = gruppiereHaeufig(FAECHER, { latein: 9 })
     expect('group' in (r as object[])[0]).toBe(false)
+  })
+})
+
+describe('eigene Fächer oben (Paket 12)', () => {
+  it('Gruppe „Eigene Fächer", dann „Häufig gewählt" ohne Dubletten, dann „Andere Fächer" alphabetisch', () => {
+    const r = gruppiereHaeufig(FAECHER, { englisch: 5, sport: 3, deutsch: 2 }, ['anderes'], ['geschichte', 'englisch']) as {
+      group: string
+      items: { label: string }[]
+    }[]
+    expect(r.map((g) => g.group)).toEqual(['Eigene Fächer', 'Häufig gewählt', 'Andere Fächer'])
+    expect(labels(r[0].items)).toEqual(['Englisch', 'Geschichte'])
+    expect(labels(r[1].items)).toEqual(['Sport', 'Deutsch'])
+    expect(labels(r[2].items)).toEqual(['Ästhetik', 'Biologie', 'Erdkunde / Geographie', 'Anderes Fach …'])
+    const alle = r.flatMap((g) => g.items.map((i) => i.label))
+    expect(new Set(alle).size).toBe(alle.length)
+  })
+
+  it('ohne häufige Wahlen: nur „Eigene Fächer" und „Andere Fächer"', () => {
+    const r = gruppiereHaeufig(FAECHER, {}, ['anderes'], ['sport']) as { group: string }[]
+    expect(r.map((g) => g.group)).toEqual(['Eigene Fächer', 'Andere Fächer'])
+  })
+
+  it('Sprachkürzel der Vokabellisten werden den Fächern zugeordnet', () => {
+    const data = [{ value: 'en' }, { value: 'fr' }, { value: 'la' }, { value: 'ru' }]
+    expect(eigeneWerte(['englisch', 'latein', 'geschichte'], data)).toEqual(['en', 'la'])
+    expect(eigeneWerte([], data)).toEqual([])
   })
 })

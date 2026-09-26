@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   alsZeile,
+  grammatikNiveau,
   stoffVorschlaege,
   teileVorwissen,
   vorwissenRegeln,
@@ -312,5 +313,22 @@ describe('Ausbau: Niedersachsen, Hessen, Religion/Ethik, neue Themen', () => {
     expect(aktiv.treffer).not.toContain('Drama: Aufbau, Figurenrede, geschlossene Form')
     const rede = vorwissenVorschlaege(anfrage({ subjectId: 'deutsch', topic: 'Indirekte Rede', grade: 8 }))
     expect(rede.treffer).not.toContain('Rhetorische Mittel und ihre Wirkung')
+  })
+})
+
+describe('GER-Kennzeichen an den Stoff-Vorschlägen (Paket 12, Klassenarbeit)', () => {
+  it('Grammatikthemen tragen das Niveau aus der Grammatiktabelle', () => {
+    const r = stoffVorschlaege(anfrage({ subjectId: 'englisch', topic: 'Going abroad', grade: 7, stateId: 'NI' }))
+    const grammatik = r.vorschlaege.filter((v) => v.text.startsWith('Grammatik:'))
+    expect(grammatik.length).toBeGreaterThan(0)
+    for (const g of grammatik) expect(g.niveau).toMatch(/^(A1|A2|B1|B2|C1)/)
+  })
+
+  it('findet das Niveau zu einer Lehrwerks-Grammatik, sonst bleibt es offen', () => {
+    expect(grammatikNiveau('englisch', 'Grammatik: present perfect')).toMatch(/^(A1|A2|B1)/)
+    expect(grammatikNiveau('englisch', 'Grammatik: etwas völlig Unbekanntes')).toBeUndefined()
+    // Geschichte kennt kein GER-Niveau
+    const g = stoffVorschlaege(anfrage({ subjectId: 'geschichte', topic: 'Die Weimarer Republik', grade: 9, stateId: 'NW' }))
+    expect(g.vorschlaege.every((v) => !v.niveau)).toBe(true)
   })
 })

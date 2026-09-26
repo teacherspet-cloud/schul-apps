@@ -70,6 +70,7 @@ import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
 import HaeufigSelect from '../shared/components/HaeufigSelect'
 import { stateInfo } from '../modules/arbeitsblatt/didactics/states'
+import { EigeneFaecherFeld, ProgrammeAnzeigenCard } from './ProgrammeAnzeigen'
 
 /**
  * Die Einstellungen in Reitern.
@@ -150,7 +151,10 @@ export default function SettingsPage(): React.JSX.Element {
       <ScrollArea style={{ flex: 1 }}>
         <Container size="md" py="lg">
           <Tabs.Panel value="schule">
-            <SchoolCard settings={settings} update={update} />
+            <Stack gap="lg">
+              <SchoolCard settings={settings} update={update} />
+              <ProgrammeAnzeigenCard settings={settings} update={update} />
+            </Stack>
           </Tabs.Panel>
 
           <Tabs.Panel value="material">
@@ -928,6 +932,8 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
             allowDeselect={false}
           />
         </Group>
+        {/* Eigene Fächer (Paket 12) – hier, damit sie auch im Einrichtungsassistenten gefragt werden */}
+        <EigeneFaecherFeld settings={settings} update={update} />
         {schoolTypeId !== 'grundschule' && (
           /*
            * G8 oder G9 an der eigenen Schule: In Ländern im Übergang und an Schulen mit eigener

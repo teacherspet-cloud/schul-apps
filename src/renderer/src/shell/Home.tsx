@@ -10,6 +10,7 @@ import { FachPunkt, useFachFarbe } from '../shared/components/FachFarbe'
 import { abgleichen, ladeThemen, useThemen } from '../shared/themenbereiche'
 import { AB_MATERIALIEN } from '../shared/themenVorschlag'
 import type { Themenbereich } from '@shared/themen'
+import { useSichtbareProgramme } from './programme'
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
 const ZULETZT_ANZAHL = 8
@@ -53,6 +54,8 @@ export default function Home(): React.JSX.Element {
   const [materialien, setMaterialien] = useState<Material[] | null>(null)
   const [ohneKi, setOhneKi] = useState(false)
   const [suchtext, setSuchtext] = useState('')
+  // Kacheln nur für die Programme zu den eigenen Fächern (Paket 12); „Zuletzt bearbeitet" und die Suche zeigen weiter alles
+  const programme = useSichtbareProgramme()
 
   useEffect(() => {
     let weg = false
@@ -226,7 +229,7 @@ export default function Home(): React.JSX.Element {
         Programme
       </Title>
       <SimpleGrid cols={{ base: 2, md: 3 }} spacing="lg">
-        {modules.map((m) => (
+        {programme.map((m) => (
           // Als Knopf: mit Tab erreichbar, mit Enter oder Leertaste zu öffnen
           <Card key={m.id} component="button" type="button" withBorder padding="xl" className="home-tile" onClick={() => openModule(m.id)}>
             {/* Illustration, sobald eine vorliegt (registry.ts); sonst das Vektorsymbol in gleicher Größe */}

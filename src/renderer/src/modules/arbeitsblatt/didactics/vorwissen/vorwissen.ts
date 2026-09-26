@@ -48,6 +48,12 @@ export interface VorwissenVorschlag {
   /** Belegt (Lehrplan/Lehrwerk/Forschung) oder nur plausibel („bitte prüfen“) */
   sicher: boolean
   ki?: boolean
+  /**
+   * GER-Niveau (A1 … C1) des Vorschlags, wo es belegt ist – bei Grammatikthemen aus der
+   * Grammatiktabelle (dieselben Daten wie im Grammatik-Picker). Die Chips zeigen es als
+   * Kennzeichen (Paket 12, Wunsch der Lehrkraft für die Klassenarbeit).
+   */
+  niveau?: string
 }
 
 /** Was die Vorschläge brauchen – unabhängig vom Programm */
@@ -65,6 +71,11 @@ export interface VorwissenAnfrage {
   lehrwerk?: string
   /** Fremdsprachen: Band und Unit der Auswahl – für die Themen je Unit (shared/lehrwerkThemen.ts) */
   lehrwerkStand?: { buch: string; unit: string; fruehereBaende?: string[] }
+  /**
+   * Fremdsprachen: GER-Richtwert der Lerngruppe (z. B. „A2" für Klasse 7). Vorschläge ohne
+   * eigenes Niveau tragen ihn als Kennzeichen – ausdrücklich als Richtwert markiert.
+   */
+  gerRichtwert?: string
 }
 
 export interface VorwissenErgebnis {
@@ -474,6 +485,34 @@ function lehrwerkVorschlaege(a: VorwissenAnfrage): VorwissenVorschlag[] {
  * „Was wurde unmittelbar vorher behandelt?“ (Kurztest). Entscheidung der Lehrkraft: Dort meint
  * das Feld den geprüften Stoff, also werden Inhalte vorgeschlagen, keine Voraussetzungen.
  */
+/**
+ * Niveau eines Grammatikthemas aus dem Lehrwerk („Grammatik: present perfect, going to-Futur")
+ * – aus der Grammatiktabelle. Verglichen wird Abschnitt für Abschnitt: Ein Abschnitt passt,
+ * wenn er Bezeichnung oder Fachbegriff eines Themas enthält oder dessen Anfang ist
+ * („present perfect" → „present perfect simple"); bei mehreren Treffern gilt das kürzeste,
+ * also allgemeinste Thema. Ohne Treffer bleibt es offen – ein geratenes Niveau wäre schlimmer
+ * als keins.
+ */
+export function grammatikNiveau(subjectId: string, text: string): string | undefined {
+  const klein = (x: string): string => x.toLocaleLowerCase('de').trim()
+  const abschnitte = klein(text.replace(/^grammatik:\s*/i, ''))
+    .split(/[,;]| und /)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 5)
+  const themen = GRAMMAR_TOPICS.filter((g) => g.subject === subjectId)
+  for (const a of abschnitte) {
+    const passend = themen.filter((g) =>
+      [g.label, g.term].some((x) => {
+        const n = klein(x ?? '')
+        return n.length >= 5 && (a.includes(n) || n === a || n.startsWith(`${a} `))
+      })
+    )
+    const bester = passend.sort((x, y) => Math.min(x.label.length, x.term.length) - Math.min(y.label.length, y.term.length))[0]
+    if (bester) return bester.level
+  }
+  return undefined
+}
+
 export function stoffVorschlaege(a: VorwissenAnfrage): VorwissenErgebnis {
   const out: VorwissenVorschlag[] = []
   const fach = subjectById(a.subjectId)
@@ -488,7 +527,8 @@ export function stoffVorschlaege(a: VorwissenAnfrage): VorwissenErgebnis {
   if (st && aktuell) {
     const quelle = `${st.buch}, ${st.unit} – ${LEHRWERK_THEMEN[st.buch].quelle}`
     out.push({ art: 'stoff', text: `${st.unit}: ${kapitelKurz(aktuell)}`, quelle, sicher: true })
-    if (aktuell.grammatik) out.push({ art: 'stoff', text: `Grammatik: ${aktuell.grammatik}`, quelle, sicher: true })
+    if (aktuell.grammatik)
+      out.push({ art: 'stoff', text: `Grammatik: ${aktuell.grammatik}`, quelle, sicher: true, niveau: grammatikNiveau(a.subjectId, aktuell.grammatik) })
   }
   if (fach.foreignLanguage || fach.uebersetzungssprache) {
     const seq = sequenzFuer(a)
@@ -498,7 +538,8 @@ export function stoffVorschlaege(a: VorwissenAnfrage): VorwissenErgebnis {
         art: 'stoff',
         text: `Grammatik: ${t.label}`,
         quelle: `Grammatiktabelle der App, Einführung meist Lernjahr ${topicStart(t, seq)}`,
-        sicher: false
+        sicher: false,
+        niveau: t.level
       })
   }
   const hinweise = !treffer.length && a.topic.trim() ? ['Zu diesem Thema sind keine typischen Inhalte hinterlegt. „Mit KI ergänzen“ schlägt sie vor.'] : []

@@ -50,6 +50,11 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
     // Je Fach zusammenführen: Eine geänderte Fachfarbe darf die übrigen nicht löschen
     fachfarben: { ...base.fachfarben, ...(stored.fachfarben as Record<string, string>) },
+    // Ebenso je Programm: Das Einblenden des einen darf die Wahl bei den anderen nicht löschen
+    // (null nimmt die Festlegung für ein Programm zurück – dann gilt wieder die Regel nach den Fächern)
+    programmeAnzeigen: Object.fromEntries(
+      Object.entries({ ...base.programmeAnzeigen, ...(stored.programmeAnzeigen as Record<string, boolean | null>) }).filter(([, v]) => typeof v === 'boolean')
+    ),
     gradeScale: {
       allgemein: (stored.gradeScale?.allgemein as number[]) ?? base.gradeScale.allgemein,
       jeFach: { ...base.gradeScale.jeFach, ...(stored.gradeScale?.jeFach as Record<string, number[]>) }

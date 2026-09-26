@@ -2,7 +2,7 @@ import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
 import { modules } from './modules/registry'
 import Home from './shell/Home'
@@ -11,6 +11,7 @@ import Themenuebersicht from './shell/Themenuebersicht'
 import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
 import AuftragsLayer from './shell/AuftragsLayer'
+import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
 import { druckeAktives, openModule, useNavigation } from './shared/navigation'
@@ -36,6 +37,11 @@ export default function App(): React.JSX.Element {
   const active = useNavigation((s) => s.active)
   const laufpunkte = useNavigation((s) => s.laufpunkte)
   const current = modules.find((m) => m.id === active)
+  // Nur die Programme zu den eigenen Fächern (Paket 12) – geladen bleiben trotzdem alle
+  const sichtbar = useSichtbareProgramme()
+  // Der Tastenhorcher (unten) bleibt stehen; die aktuelle Liste liest er hier
+  const sichtbarRef = useRef(sichtbar)
+  sichtbarRef.current = sichtbar
 
   /*
    * Ausklappbare Leiste (Wunsch der Lehrkraft, 25.09.2026): Die Symbole allein waren nicht
@@ -68,8 +74,9 @@ export default function App(): React.JSX.Element {
   }, [])
 
   /*
-   * Tastenkürzel der Hauptapp: Strg+1 … Strg+6 öffnen die Programme in der Reihenfolge der
-   * Leiste, Strg+0 die Startseite, Strg+P den Druck des vorderen Programms – aber nur, wenn
+   * Tastenkürzel der Hauptapp: Strg+1 … Strg+6 öffnen die SICHTBAREN Programme in der
+   * Reihenfolge der Leiste (ausgeblendete zählen nicht mit – sonst stimmte die Ziffer nicht mit
+   * der Stelle in der Leiste überein), Strg+0 die Startseite, Strg+P den Druck des vorderen Programms – aber nur, wenn
    * dort ein Editor mit Druck offen ist. Sonst bleibt Strg+P ohne Wirkung (am Rechner) bzw.
    * beim Browser (Zugang aus dem Netz).
    */
@@ -79,7 +86,7 @@ export default function App(): React.JSX.Element {
       const ziffer = /^(Digit|Numpad)(\d)$/.exec(e.code)?.[2]
       if (ziffer !== undefined) {
         const n = Number(ziffer)
-        const ziel = n === 0 ? 'home' : modules[n - 1]?.id
+        const ziel = n === 0 ? 'home' : sichtbarRef.current[n - 1]?.id
         if (!ziel) return
         e.preventDefault()
         openModule(ziel)
@@ -132,7 +139,7 @@ export default function App(): React.JSX.Element {
           Einstellungs-Symbol stehen blieb.
         */}
         <AppShell.Section grow className="leiste-liste" mt="md">
-          {modules.map((m) => (
+          {sichtbar.map((m) => (
             <NavIcon
               key={m.id}
               label={m.name}
