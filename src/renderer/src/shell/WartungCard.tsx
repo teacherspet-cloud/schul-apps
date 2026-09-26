@@ -85,8 +85,8 @@ export default function WartungCard(): React.JSX.Element {
           Sicherung
         </Title>
         <Text size="sm" c="dimmed" mb="md">
-          Schreibt alle erstellten Materialien, die Einstellungen und das Logo in eine einzige Datei. Die Zugänge zur KI bleiben aus Sicherheitsgründen draußen
-          – sie stünden in der Datei im Klartext.
+          Schreibt alle erstellten Materialien samt Themenbereichen, die Einstellungen und das Logo in eine einzige Datei. Die Zugänge zur KI bleiben aus
+          Sicherheitsgründen draußen – sie stünden in der Datei im Klartext.
         </Text>
         <Group>
           <Button variant="light" leftSection={<IconDeviceFloppy size={16} />} onClick={() => void sichern()}>

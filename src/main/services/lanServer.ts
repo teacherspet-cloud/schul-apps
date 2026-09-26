@@ -100,6 +100,8 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'kurztests:get',
   'grammarTests:list',
   'grammarTests:get',
+  // Themenbereiche (Paket 10b): Bereiche und Zuordnungen lesen
+  'themen:list',
 
   /*
    * --- Material speichern ---
@@ -114,6 +116,16 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'grammarTests:save',
   'textbooks:save',
   'library:save',
+  /*
+   * Themenbereiche ordnen wie die übrigen Bibliotheks-Schreibwege: anlegen, umbenennen,
+   * zuordnen, sortieren, Vorschläge übernehmen. `themen:delete` bleibt gesperrt wie alle
+   * Löschaufrufe – auch wenn es nur den Ordner und nicht das Material träfe.
+   */
+  'themen:bereich',
+  'themen:zuordnen',
+  'themen:uebernehmen',
+  'themen:reihenfolge',
+  'themen:automatik',
 
   // --- Ausgabe: erzeugt die Datei, die der Browser herunterlädt ---
   'export:preview',

@@ -6,14 +6,14 @@ import { notifyError } from '../../shared/util'
 import EditorStep from './steps/EditorStep'
 import SettingsStep from './steps/SettingsStep'
 import VocabStep from './steps/VocabStep'
-import TestLibrary from './steps/TestLibrary'
+import TestLibrary, { neuerTestMitSicherung } from './steps/TestLibrary'
 import { hasContent, LISTE_PRAEFIX, newTestSafely, oeffneListeAlsTest, openSavedTest, useAutosave } from './library'
 import { sichereAlles } from '../../shared/autosave'
 import { useUndoKeys } from '../../shared/useUndoKeys'
 import { parseProjectFile } from './project'
 import { includedVocab } from './model/vocab'
 import { useVokabeltest } from './store'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
@@ -65,6 +65,17 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
 
   const geladen = Boolean(doc || lastSavedAt || vocab.some((v) => v.term.trim()))
 
+  /*
+   * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
+   * Kennung liefern – aus der eigenen Bibliothek und von der übergreifenden Seite aus.
+   */
+  const neuMitKennung = async (): Promise<string> => {
+    setLibraryOpen(false)
+    await neuerTestMitSicherung()
+    return useVokabeltest.getState().testId
+  }
+  useNeuAnleger('vokabeltest', neuMitKennung)
+
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Group px="lg" py="sm" className="app-toolbar" display={libraryOpen ? 'none' : undefined}>
@@ -101,6 +112,7 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
         {libraryOpen ? (
           <TestLibrary
             onClose={() => setLibraryOpen(false)}
+            onNeuImBereich={neuMitKennung}
             // „Zurück zu …" nur, solange ein Test offen ist (Vokabeln, Test oder schon gesichert)
             zurueck={geladen ? listName.trim() || 'Unbenannter Vokabeltest' : null}
           />

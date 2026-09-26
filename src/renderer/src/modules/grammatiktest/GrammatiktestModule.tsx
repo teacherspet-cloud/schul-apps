@@ -9,7 +9,7 @@ import SetupStep from './steps/SetupStep'
 import TestEditorStep from './steps/TestEditorStep'
 import TestLibrary from './steps/TestLibrary'
 import { useGrammatiktest } from './store'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
@@ -35,6 +35,16 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
     setLibrary(false)
     newTestSafely().catch(notifyError)
   }
+  /*
+   * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
+   * Kennung liefern – aus der eigenen Bibliothek und von der übergreifenden Seite aus.
+   */
+  const neuMitKennung = async (): Promise<string> => {
+    setLibrary(false)
+    await newTestSafely()
+    return useGrammatiktest.getState().docId
+  }
+  useNeuAnleger('grammatiktest', neuMitKennung)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   const vonAussen = useDokumentOeffner('grammatiktest', async (id) => {
@@ -55,6 +65,7 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
     return (
       <TestLibrary
         onNew={startNew}
+        onNeuImBereich={neuMitKennung}
         onOpened={() => setLibrary(false)}
         zurueck={test ? docName || defaultTestName(test) : null}
         onZurueck={() => setLibrary(false)}

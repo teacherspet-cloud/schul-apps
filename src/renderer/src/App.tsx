@@ -7,6 +7,7 @@ import { useAppSettings } from './shared/settingsStore'
 import { modules } from './modules/registry'
 import Home from './shell/Home'
 import SettingsPage from './shell/SettingsPage'
+import Themenuebersicht from './shell/Themenuebersicht'
 import NetzAnmeldung from './shell/NetzAnmeldung'
 import Einrichtung from './shell/Einrichtung'
 import AuftragsLayer from './shell/AuftragsLayer'
@@ -121,7 +122,7 @@ export default function App(): React.JSX.Element {
     <AppShell navbar={{ width: breit ? 232 : 76, breakpoint: 0 }} padding={0}>
       <AppShell.Navbar p={10} className="app-leiste" data-breit={breit}>
         <AppShell.Section>
-          <NavIcon label="Startseite" breit={breit} active={active === 'home'} onClick={() => openModule('home')}>
+          <NavIcon label="Startseite" breit={breit} active={active === 'home' || active === 'themen'} onClick={() => openModule('home')}>
             <IconHome size={22} />
           </NavIcon>
         </AppShell.Section>
@@ -175,6 +176,8 @@ export default function App(): React.JSX.Element {
         {/* Die Startseite wird bei jedem Zurückkommen neu aufgebaut – damit ist „Zuletzt bearbeitet" aktuell */}
         {active === 'home' && <Home />}
         {active === 'settings' && <SettingsPage />}
+        {/* Themenbereiche über alle Programme (Paket 10b) – erreichbar von der Startseite */}
+        {active === 'themen' && <Themenuebersicht />}
         {modules.map((m) => (
           // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
           <div key={m.id} hidden={m.id !== current?.id} className="module-container">

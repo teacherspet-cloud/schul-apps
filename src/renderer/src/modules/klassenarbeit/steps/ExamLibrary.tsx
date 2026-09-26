@@ -2,23 +2,29 @@ import { Badge, Button, Container, ScrollArea, Stack } from '@mantine/core'
 import { IconFilePlus } from '@tabler/icons-react'
 import type { SavedExamMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
-import { BibliothekKopf, BibliothekLeer, EintragZeile, FachUeberschrift, gruppiere, useBibliothek } from '../../../shared/components/Bibliothek'
+import { useMemo } from 'react'
+import { BibliothekKopf, BibliothekLeer, EintragZeile, useBibliothek } from '../../../shared/components/Bibliothek'
+import { ThemenAnsicht } from '../../../shared/components/Themenbereiche'
+import { nurListe } from '../../../shell/materialien'
 import { openSavedExam } from '../library'
 import { useKlassenarbeit } from '../store'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
 /**
- * Übersicht der gespeicherten Klassenarbeiten, nach Fach gruppiert; mit Suche eine flache
- * Trefferliste. Verhalten (Suche, Umbenennen, Kopie, Löschen) aus shared/components/Bibliothek.
+ * Übersicht der gespeicherten Klassenarbeiten: Fach › Themenbereich (Paket 10b,
+ * shared/components/Themenbereiche.tsx); mit Suche eine flache Trefferliste. Verhalten (Suche, Umbenennen, Kopie, Löschen) aus shared/components/Bibliothek.
  */
 export default function ExamLibrary({
   onNew,
+  onNeuImBereich,
   onOpened,
   zurueck,
   onZurueck
 }: {
   onNew: () => void
+  /** Neu anlegen und die Kennung liefern („Neu in diesem Bereich") */
+  onNeuImBereich: () => Promise<string>
   onOpened: () => void
   /** Name der offenen Arbeit – dann gibt es „Zurück zu …" */
   zurueck: string | null
@@ -28,16 +34,54 @@ export default function ExamLibrary({
   const bib = useBibliothek<SavedExamMeta>(window.api.exams, {
     offeneId: () => useKlassenarbeit.getState().docId,
     umbenannt: (meta) => useKlassenarbeit.getState().markSaved(meta.id, meta.updatedAt, meta.name),
-    geloescht: () => useKlassenarbeit.getState().forgetSaved()
+    geloescht: () => useKlassenarbeit.getState().forgetSaved(),
+    moduleId: 'klassenarbeit'
   })
   const exams = bib.eintraege ?? []
   const treffer = bib.treffer((e) => [e.topic, e.subjectLabel, `Klasse ${e.grade}`, e.grade])
-  const gruppen: [string, SavedExamMeta[]][] = bib.suche.trim() ? [['', treffer]] : gruppiere(treffer, (e) => e.subjectLabel)
+  const suche = bib.suche.trim() !== ''
+  const eigene = useMemo(() => nurListe({ exams: bib.eintraege ?? [] }), [bib.eintraege])
+  const nachId = useMemo(() => new Map(exams.map((x) => [x.id, x])), [exams])
 
   const oeffnen = (id: string): void => {
     if (id === docId && zurueck !== null) return onZurueck()
     openSavedExam(id).then(onOpened).catch(notifyError)
   }
+
+  const zeile = (e: SavedExamMeta): React.JSX.Element => (
+    <EintragZeile
+      bib={bib}
+      eintrag={e}
+      offen={e.id === docId && zurueck !== null}
+      onOeffnen={() => oeffnen(e.id)}
+      // Bei der Suche fehlt die Fach-Überschrift – dann steht der Farbpunkt am Eintrag
+      fach={suche ? e.subjectLabel : undefined}
+      kennzeichen={
+        <>
+          <Badge variant="light">Klasse {e.grade}</Badge>
+          {e.hasTasks ? (
+            <Badge variant="light" color="teal">
+              Aufgaben erstellt
+            </Badge>
+          ) : (
+            // Entwürfe werden ab dem ersten Schritt gesichert – auch ganz ohne geplante Teile
+            <Badge variant="outline" color="gray">
+              {e.partCount ? 'nur Rahmen' : 'Entwurf'}
+            </Badge>
+          )}
+        </>
+      }
+      info={[
+        suche ? e.subjectLabel : '',
+        e.topic || 'ohne Thema',
+        `${e.partCount} ${e.partCount === 1 ? 'Teil' : 'Teile'}`,
+        `${e.minutes} Minuten`,
+        dateFormat.format(new Date(e.updatedAt))
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    />
+  )
 
   return (
     <ScrollArea h="100%">
@@ -63,48 +107,24 @@ export default function ExamLibrary({
           />
         )}
 
-        {gruppen.map(([fach, liste]) => (
-          <div key={fach || 'treffer'}>
-            {fach && <FachUeberschrift fach={fach} />}
-            <Stack gap="xs">
-              {liste.map((e) => (
-                <EintragZeile
-                  key={e.id}
-                  bib={bib}
-                  eintrag={e}
-                  offen={e.id === docId && zurueck !== null}
-                  onOeffnen={() => oeffnen(e.id)}
-                  // Bei der Suche fehlt die Fach-Überschrift – dann steht der Farbpunkt am Eintrag
-                  fach={bib.suche.trim() ? e.subjectLabel : undefined}
-                  kennzeichen={
-                    <>
-                      <Badge variant="light">Klasse {e.grade}</Badge>
-                      {e.hasTasks ? (
-                        <Badge variant="light" color="teal">
-                          Aufgaben erstellt
-                        </Badge>
-                      ) : (
-                        // Entwürfe werden ab dem ersten Schritt gesichert – auch ganz ohne geplante Teile
-                        <Badge variant="outline" color="gray">
-                          {e.partCount ? 'nur Rahmen' : 'Entwurf'}
-                        </Badge>
-                      )}
-                    </>
-                  }
-                  info={[
-                    bib.suche.trim() ? e.subjectLabel : '',
-                    e.topic || 'ohne Thema',
-                    `${e.partCount} ${e.partCount === 1 ? 'Teil' : 'Teile'}`,
-                    `${e.minutes} Minuten`,
-                    dateFormat.format(new Date(e.updatedAt))
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                />
-              ))}
-            </Stack>
-          </div>
-        ))}
+        {suche ? (
+          <Stack gap="xs">
+            {treffer.map((x) => (
+              <div key={x.id}>{zeile(x)}</div>
+            ))}
+          </Stack>
+        ) : (
+          <ThemenAnsicht
+            moduleId="klassenarbeit"
+            artPlural="Klassenarbeiten"
+            eigene={eigene}
+            renderEigen={(m) => {
+              const x = nachId.get(m.id)
+              return x ? zeile(x) : null
+            }}
+            onNeu={onNeuImBereich}
+          />
+        )}
       </Container>
     </ScrollArea>
   )

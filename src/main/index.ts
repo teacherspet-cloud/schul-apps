@@ -52,6 +52,16 @@ import { deleteDesign, listDesigns, saveDesign, setDefaultDesign } from './servi
 import { getCefrTable } from './services/storage/cefr'
 import { deleteTest, getTest, listTests, saveTest } from './services/storage/vocabTests'
 import { deleteVocabList, getSecret, getSettings, listVocabLists, saveVocabList, setSecret, setSettings } from './services/storage/settings'
+import {
+  leseThemen,
+  themenAutomatik,
+  themenBereichLoeschen,
+  themenBereichSetzen,
+  themenReihenfolge,
+  themenUebernehmen,
+  themenZuordnen
+} from './services/storage/themen'
+import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/themen'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
 import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
@@ -471,6 +481,17 @@ function registerIpc(): void {
   handle('textbooks:get', (id: string) => getTextbook(id))
   handle('textbooks:save', (books: Textbook[]) => saveTextbooks(books))
   handle('textbooks:delete', (id: string) => deleteTextbook(id))
+  /*
+   * Themenbereiche (Paket 10b): Bereiche je Fach und die Zuordnung der Materialien. Löschen
+   * heißt wie bei den Materialien `…:delete` und ist damit über das Netz gesperrt.
+   */
+  handle('themen:list', () => leseThemen())
+  handle('themen:bereich', (b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>) => themenBereichSetzen(b))
+  handle('themen:delete', (id: string) => themenBereichLoeschen(id))
+  handle('themen:zuordnen', (eintraege: Record<string, Zuordnung | null>) => themenZuordnen(eintraege))
+  handle('themen:uebernehmen', (vorschlaege: BereichsUebernahme[], automatik: string[]) => themenUebernehmen(vorschlaege, automatik))
+  handle('themen:reihenfolge', (schluessel: string, liste: string[]) => themenReihenfolge(schluessel, liste))
+  handle('themen:automatik', (fachId: string, an: boolean) => themenAutomatik(fachId, an))
   handle('library:list', () => listVocabLists())
   handle('library:save', (list: SavedVocabList) => saveVocabList(list))
   handle('library:delete', (id: string) => deleteVocabList(id))

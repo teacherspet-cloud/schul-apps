@@ -1,7 +1,9 @@
-import { Badge, Box, Breadcrumbs, Button, Card, Container, Group, Image, Menu, ScrollArea, SegmentedControl, SimpleGrid, Text } from '@mantine/core'
-import { FachPunkt, useFachFarbe } from '../../../shared/components/FachFarbe'
-import { IconChalkboard, IconFilePlus, IconFolder, IconFolderOpen } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import { Badge, Box, Button, Card, Container, Group, Image, Menu, ScrollArea, SimpleGrid, Text } from '@mantine/core'
+import { FachPunkt } from '../../../shared/components/FachFarbe'
+import { IconChalkboard, IconFilePlus, IconFolderOpen } from '@tabler/icons-react'
+import { useMemo } from 'react'
+import { ThemenAnsicht } from '../../../shared/components/Themenbereiche'
+import { nurListe } from '../../../shell/materialien'
 import type { SavedWorksheetMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import { openSavedWorksheet } from '../library'
@@ -16,72 +18,35 @@ import {
   useBibliothek
 } from '../../../shared/components/Bibliothek'
 
-export type FolderMode = 'grade' | 'topic'
-
-/** Ordnername eines Blattes: Jahrgang („Klasse 7“) oder Thema */
-export function folderOf(sheet: SavedWorksheetMeta, mode: FolderMode): string {
-  return mode === 'grade' ? `Klasse ${sheet.grade}` : sheet.topic || 'Ohne Thema'
-}
-
-export interface Folder {
-  name: string
-  sheets: SavedWorksheetMeta[]
-}
-
-/** Gruppiert die Blätter und sortiert: Jahrgänge nach Zahl, Themen alphabetisch. */
-export function buildFolders(sheets: SavedWorksheetMeta[], mode: FolderMode): Folder[] {
-  const map = new Map<string, SavedWorksheetMeta[]>()
-  for (const s of sheets) {
-    const name = folderOf(s, mode)
-    map.set(name, [...(map.get(name) ?? []), s])
-  }
-  const collator = new Intl.Collator('de', { numeric: true })
-  return [...map.entries()]
-    .map(([name, list]) => ({ name, sheets: [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) }))
-    .sort((a, b) => collator.compare(a.name, b.name))
-}
-
 const dateText = (iso: string): string => new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-/** Kachel, die per Klick und per Tastatur (Enter/Leertaste) aufgeht */
-const kachelTasten = (
-  auf: () => void
-): { role: string; tabIndex: number; onClick: () => void; onKeyDown: (e: React.KeyboardEvent) => void; style: React.CSSProperties } => ({
-  role: 'button',
-  tabIndex: 0,
-  onClick: auf,
-  onKeyDown: (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      auf()
-    }
-  },
-  style: { cursor: 'pointer' }
-})
-
 /**
- * Startseite des Arbeitsblatt-Programms: gespeicherte Blätter nach Fach, darin nach Jahrgang
- * oder Thema. Mit Suche statt der Ordner eine flache Trefferliste über alle Fächer – vorher
- * filterte die Suche nur die Ordner, und man musste sich trotzdem durchklicken.
+ * Startseite des Arbeitsblatt-Programms: gespeicherte Blätter nach Fach › Themenbereich
+ * (Paket 10b, shared/components/Themenbereiche.tsx), der Jahrgang als Filter oben. Mit Suche
+ * statt der Ordner eine flache Trefferliste über alle Fächer.
+ *
+ * Bis Paket 10b gab es hier Ordner „nach Jahrgang" oder „nach Thema" – die Themenordner
+ * entstanden aus dem wörtlichen Themen-Text und zersplitterten: „Fotosynthese" und
+ * „Photosynthese – Versuch" lagen in zwei Ordnern mit je einem Blatt.
  * Verhalten (Suche, Umbenennen, Kopie, Löschen) aus shared/components/Bibliothek.
  */
 export default function WorksheetLibrary({
   onNew,
+  onNeuImBereich,
   onOpenFile,
   onOpened,
   zurueck,
   onZurueck
 }: {
   onNew: () => void
+  /** Neues Blatt anlegen und seine Kennung liefern („Neu in diesem Bereich") */
+  onNeuImBereich: () => Promise<string>
   onOpenFile: () => void
   onOpened: () => void
   /** Name des offenen Blattes – dann gibt es „Zurück zu …" */
   zurueck: string | null
   onZurueck: () => void
 }): React.JSX.Element {
-  const [subject, setSubject] = useState<string | null>(null)
-  const [mode, setMode] = useState<FolderMode>('grade')
-  const [folder, setFolder] = useState<string | null>(null)
   const docId = useArbeitsblatt((s) => s.docId)
   const bib = useBibliothek<SavedWorksheetMeta>(window.api.sheets, {
     offeneId: () => useArbeitsblatt.getState().docId,
@@ -89,25 +54,14 @@ export default function WorksheetLibrary({
     umbenannt: (meta) => useArbeitsblatt.getState().markSaved(meta.id, meta.updatedAt, meta.name),
     // Das offene Blatt darf nicht weiter auf den gelöschten Eintrag zeigen – sonst legte die
     // nächste Sicherung ihn unter derselben Kennung stillschweigend wieder an
-    geloescht: () => useArbeitsblatt.getState().forgetSaved()
+    geloescht: () => useArbeitsblatt.getState().forgetSaved(),
+    moduleId: 'arbeitsblatt'
   })
   const sheets = useMemo(() => bib.eintraege ?? [], [bib.eintraege])
   const suche = bib.suche.trim()
   const treffer = bib.treffer((s) => [s.topic, s.subjectLabel, `Klasse ${s.grade}`, s.grade, s.schoolTypeName])
-
-  const subjects = useMemo(() => {
-    const map = new Map<string, { label: string; count: number }>()
-    for (const s of sheets) {
-      const entry = map.get(s.subjectId) ?? { label: s.subjectLabel, count: 0 }
-      map.set(s.subjectId, { label: entry.label, count: entry.count + 1 })
-    }
-    return [...map.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'de'))
-  }, [sheets])
-
-  const inSubject = useMemo(() => (subject ? sheets.filter((s) => s.subjectId === subject) : []), [sheets, subject])
-  const folders = useMemo(() => (subject ? buildFolders(inSubject, mode) : []), [inSubject, mode, subject])
-  const openFolder = folder ? folders.find((f) => f.name === folder) : null
-  const subjectLabel = subjects.find(([id]) => id === subject)?.[1].label ?? ''
+  const eigene = useMemo(() => nurListe({ sheets }), [sheets])
+  const nachId = useMemo(() => new Map(sheets.map((s) => [s.id, s])), [sheets])
 
   const open = async (id: string): Promise<void> => {
     if (id === docId && zurueck !== null) return onZurueck()
@@ -119,12 +73,8 @@ export default function WorksheetLibrary({
     }
   }
 
-  const karten = (liste: SavedWorksheetMeta[]): React.JSX.Element => (
-    <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-      {liste.map((s) => (
-        <BlattKarte key={s.id} bib={bib} sheet={s} offen={s.id === docId && zurueck !== null} onOeffnen={() => void open(s.id)} />
-      ))}
-    </SimpleGrid>
+  const karte = (s: SavedWorksheetMeta): React.JSX.Element => (
+    <BlattKarte bib={bib} sheet={s} offen={s.id === docId && zurueck !== null} onOeffnen={() => void open(s.id)} />
   )
 
   return (
@@ -155,93 +105,23 @@ export default function WorksheetLibrary({
         )}
 
         {suche ? (
-          karten(treffer)
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+            {treffer.map((s) => (
+              <div key={s.id}>{karte(s)}</div>
+            ))}
+          </SimpleGrid>
         ) : (
-          <>
-            {sheets.length > 0 && (
-              <Group justify="space-between" mb="sm">
-                <Breadcrumbs separator="›">
-                  <Button
-                    variant="subtle"
-                    size="compact-sm"
-                    onClick={() => {
-                      setSubject(null)
-                      setFolder(null)
-                    }}
-                  >
-                    Alle Fächer
-                  </Button>
-                  {subject && (
-                    <Button variant="subtle" size="compact-sm" onClick={() => setFolder(null)} leftSection={<FachPunkt fach={subject} />}>
-                      {subjectLabel}
-                    </Button>
-                  )}
-                  {openFolder && (
-                    <Text size="sm" fw={600}>
-                      {openFolder.name}
-                    </Text>
-                  )}
-                </Breadcrumbs>
-                {subject && (
-                  <SegmentedControl
-                    size="xs"
-                    value={mode}
-                    onChange={(v) => {
-                      setMode(v as FolderMode)
-                      setFolder(null)
-                    }}
-                    data={[
-                      { value: 'grade', label: 'Nach Jahrgang' },
-                      { value: 'topic', label: 'Nach Thema' }
-                    ]}
-                  />
-                )}
-              </Group>
-            )}
-
-            {!subject && (
-              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
-                {subjects.map(([id, { label, count }]) => (
-                  <Card key={id} withBorder padding="md" className="picker-tile" data-fach={id} {...kachelTasten(() => setSubject(id))}>
-                    <Group gap="sm" wrap="nowrap">
-                      {/* Fachordner in der Fachfarbe (Paket 10a) */}
-                      <FachOrdner fach={id} />
-                      <div style={{ minWidth: 0 }}>
-                        <Text fw={600} lineClamp={1}>
-                          {label}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {count} {count === 1 ? 'Arbeitsblatt' : 'Arbeitsblätter'}
-                        </Text>
-                      </div>
-                    </Group>
-                  </Card>
-                ))}
-              </SimpleGrid>
-            )}
-
-            {subject && !openFolder && (
-              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="md">
-                {folders.map((f) => (
-                  <Card key={f.name} withBorder padding="md" className="picker-tile" {...kachelTasten(() => setFolder(f.name))}>
-                    <Group gap="sm" wrap="nowrap">
-                      <IconFolder size={28} />
-                      <div style={{ minWidth: 0 }}>
-                        <Text fw={600} lineClamp={2}>
-                          {f.name}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {f.sheets.length} {f.sheets.length === 1 ? 'Blatt' : 'Blätter'}
-                        </Text>
-                      </div>
-                    </Group>
-                  </Card>
-                ))}
-              </SimpleGrid>
-            )}
-
-            {openFolder && karten(openFolder.sheets)}
-          </>
+          <ThemenAnsicht
+            moduleId="arbeitsblatt"
+            artPlural="Arbeitsblätter"
+            eigene={eigene}
+            darstellung="karten"
+            renderEigen={(m) => {
+              const s = nachId.get(m.id)
+              return s ? karte(s) : null
+            }}
+            onNeu={onNeuImBereich}
+          />
         )}
 
         <Box h="lg" />
@@ -337,10 +217,4 @@ function BlattKarte({
       <EintragRueckfragen bib={bib} eintrag={s} />
     </Card>
   )
-}
-
-/** Ordnersymbol eines Fachs in seiner Fachfarbe (Paket 10a; unbekanntes Fach: wie bisher) */
-function FachOrdner({ fach }: { fach: string }): React.JSX.Element {
-  const farbe = useFachFarbe(fach)
-  return <IconFolder size={28} color={farbe ?? undefined} />
 }

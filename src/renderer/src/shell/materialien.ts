@@ -11,6 +11,8 @@
  */
 import type { SavedExamMeta, SavedGrammarTestMeta, SavedKurztestMeta, SavedTestMeta, SavedVocabList, SavedWorksheetMeta } from '@shared/types'
 import { LANGUAGES } from '../modules/vokabeltest/model/types'
+import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
+import { fachIdVon, WEITERE_FAECHER } from '../shared/fachfarben'
 
 export interface Material {
   /** Programm aus modules/registry.ts */
@@ -26,6 +28,12 @@ export interface Material {
   suchtext: string
   /** Fach als Kennung, Name oder Sprachcode – für den Farbpunkt (Paket 10a, shared/fachfarben.ts) */
   fach?: string
+  /** Einheitliche Fachkennung für die Themenbereiche (Paket 10b, `fachSchluessel`) */
+  fachId: string
+  /** Jahrgang, sofern bekannt – Filter der Themenbereiche */
+  grade?: number
+  /** Thema im Wortlaut des Programms – Grundlage der Vorschläge (shared/themenVorschlag.ts) */
+  thema: string
 }
 
 export interface Listen {
@@ -42,10 +50,43 @@ const klasse = (g?: number): string => (g ? `Klasse ${g}` : '')
 const sprache = (code?: string): string => (code ? (LANGUAGES.find((l) => l.value === code)?.label ?? code) : '')
 const zeile = (...teile: (string | undefined)[]): string => teile.filter((t) => t && t.trim()).join(' · ')
 
-function material(moduleId: string, id: string, name: string, updatedAt: string, entwurf: boolean, detail: string, weitere: string[], fach?: string): Material {
+/**
+ * Einheitliche Fachkennung (Paket 10b): Die Programme speichern das Fach als Kennung
+ * („biologie"), als Namen („Biologie") oder – der Vokabeltest – als Sprachcode („en"). Für die
+ * Themenbereiche muss „Englisch" aus dem Vokabeltest und „englisch" vom Arbeitsblatt dasselbe
+ * Fach sein. Unbekannte Fächer (Niederländisch im Vokabeltest) behalten ihren Namen.
+ */
+export function fachSchluessel(fach?: string): string {
+  return fachIdVon(fach) ?? (fach?.trim().toLocaleLowerCase('de') || 'ohne-fach')
+}
+
+/** Anzeigename zu einer Fachkennung aus `fachSchluessel` */
+export function fachAnzeige(fachId: string): string {
+  if (fachId === 'ohne-fach') return 'Ohne Fach'
+  const label = [...SUBJECTS, ...WEITERE_FAECHER].find((s) => s.id === fachId)?.label
+  if (label) return label.replace(/\s*…$/, '')
+  const sprache = LANGUAGES.find((l) => l.value === fachId)?.label
+  return sprache ?? fachId.charAt(0).toLocaleUpperCase('de') + fachId.slice(1)
+}
+
+function material(
+  moduleId: string,
+  id: string,
+  name: string,
+  updatedAt: string,
+  entwurf: boolean,
+  detail: string,
+  weitere: string[],
+  fach?: string,
+  grade?: number,
+  thema = ''
+): Material {
   return {
     moduleId,
     fach,
+    fachId: fachSchluessel(fach),
+    ...(grade ? { grade } : {}),
+    thema,
     id,
     name: name || 'Ohne Namen',
     detail,
@@ -68,11 +109,23 @@ export function vereinige(l: Listen): Material[] {
         !t.hasTest,
         zeile(t.subjectLabel, klasse(t.grade), `${t.vocabCount} Vokabeln`, t.hasTest ? '' : 'noch kein Test'),
         [],
-        t.language ?? t.subjectLabel
+        t.language ?? t.subjectLabel,
+        t.grade
       )
     ),
     ...l.sheets.map((s) =>
-      material('arbeitsblatt', s.id, s.name, s.updatedAt, s.sheetCount === 0, zeile(s.subjectLabel, klasse(s.grade), s.topic), [s.schoolTypeName], s.subjectId)
+      material(
+        'arbeitsblatt',
+        s.id,
+        s.name,
+        s.updatedAt,
+        s.sheetCount === 0,
+        zeile(s.subjectLabel, klasse(s.grade), s.topic),
+        [s.schoolTypeName],
+        s.subjectId,
+        s.grade,
+        s.topic
+      )
     ),
     ...l.kurztests.map((t) =>
       material(
@@ -83,14 +136,27 @@ export function vereinige(l: Listen): Material[] {
         t.taskCount === 0,
         zeile(t.subjectLabel, klasse(t.grade), t.thema),
         [t.bezeichnung],
-        t.subjectLabel
+        t.subjectLabel,
+        t.grade,
+        t.thema
       )
     ),
     ...l.grammarTests.map((t) =>
-      material('grammatiktest', t.id, t.name, t.updatedAt, t.taskCount === 0, zeile(t.subjectLabel, klasse(t.grade), t.topics), [], t.subjectLabel)
+      material(
+        'grammatiktest',
+        t.id,
+        t.name,
+        t.updatedAt,
+        t.taskCount === 0,
+        zeile(t.subjectLabel, klasse(t.grade), t.topics),
+        [],
+        t.subjectLabel,
+        t.grade,
+        t.topics
+      )
     ),
     ...l.exams.map((e) =>
-      material('klassenarbeit', e.id, e.name, e.updatedAt, !e.hasTasks, zeile(e.subjectLabel, klasse(e.grade), e.topic), [], e.subjectLabel)
+      material('klassenarbeit', e.id, e.name, e.updatedAt, !e.hasTasks, zeile(e.subjectLabel, klasse(e.grade), e.topic), [], e.subjectLabel, e.grade, e.topic)
     ),
     ...l.vokabellisten.map((v) =>
       material(
@@ -101,11 +167,16 @@ export function vereinige(l: Listen): Material[] {
         false,
         zeile(`${v.entries.length} Vokabeln`, klasse(v.grade), v.source),
         [sprache(v.language)],
-        v.language
+        v.language,
+        v.grade
       )
     )
   ]
 }
+
+/** Die Liste EINES Programms als Materialien (für die Themenbereiche in seiner Bibliothek) */
+export const nurListe = (teil: Partial<Listen>): Material[] =>
+  vereinige({ tests: [], sheets: [], kurztests: [], grammarTests: [], exams: [], vokabellisten: [], ...teil })
 
 const zeit = (m: Material): number => Date.parse(m.updatedAt) || 0
 

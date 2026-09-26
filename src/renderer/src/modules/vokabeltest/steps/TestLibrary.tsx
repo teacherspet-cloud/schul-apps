@@ -1,6 +1,6 @@
 import { Badge, Button, Container, Popover, ScrollArea, Stack, TextInput, Tooltip } from '@mantine/core'
 import { IconDeviceFloppy, IconFileImport, IconPlus } from '@tabler/icons-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { SavedTestMeta } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { hasContent, openSavedTest, saveCurrentTest } from '../library'
@@ -9,6 +9,8 @@ import { formatPoints } from '../model/blocks'
 import { parseProjectFile, PROJECT_FILTER } from '../project'
 import { TestPayload, useVokabeltest } from '../store'
 import { BibliothekKopf, BibliothekLeer, EintragZeile, useBibliothek } from '../../../shared/components/Bibliothek'
+import { ThemenAnsicht } from '../../../shared/components/Themenbereiche'
+import { nurListe } from '../../../shell/materialien'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -20,6 +22,12 @@ async function keepCurrent(): Promise<void> {
     await saveCurrentTest()
     notifySuccess(`Der bisherige Test wurde als „${useVokabeltest.getState().listName}" gespeichert.`)
   }
+}
+
+/** Neuer Test – der bisherige wird vorher gesichert (Knopf „Neuer Vokabeltest" und „Neu in diesem Bereich") */
+export async function neuerTestMitSicherung(): Promise<void> {
+  await keepCurrent()
+  useVokabeltest.getState().newTest()
 }
 
 /**
@@ -34,10 +42,13 @@ async function keepCurrent(): Promise<void> {
  */
 export default function TestLibrary({
   onClose,
+  onNeuImBereich,
   zurueck
 }: {
   /** Schließt die Bibliothek (nach dem Öffnen, „Zurück zu …", „Neuer Vokabeltest") */
   onClose: () => void
+  /** Neuen Test anlegen und seine Kennung liefern („Neu in diesem Bereich", Paket 10b) */
+  onNeuImBereich: () => Promise<string>
   /** Name des offenen Tests – dann gibt es „Zurück zu …" */
   zurueck: string | null
 }): React.JSX.Element {
@@ -45,11 +56,16 @@ export default function TestLibrary({
   const bib = useBibliothek<SavedTestMeta>(window.api.tests, {
     offeneId: () => useVokabeltest.getState().testId,
     umbenannt: (meta) => useVokabeltest.getState().setListName(meta.name),
-    geloescht: () => useVokabeltest.getState().forgetSaved()
+    geloescht: () => useVokabeltest.getState().forgetSaved(),
+    moduleId: 'vokabeltest'
   })
   const tests = bib.eintraege ?? []
   // Fach und Klasse seit Paket 7 (ältere Tests haben sie nicht – dort zählt nur der Name)
   const treffer = bib.treffer((t) => [t.subjectLabel, t.grade ? `Klasse ${t.grade}` : '', t.hasTest ? 'Test erstellt' : 'noch kein Test'])
+  const suche = bib.suche.trim() !== ''
+  // Themenbereiche (Paket 10b): ohne Suche Fach › Themenbereich, wie in den übrigen Bibliotheken
+  const eigene = useMemo(() => nurListe({ tests: bib.eintraege ?? [] }), [bib.eintraege])
+  const nachId = useMemo(() => new Map((bib.eintraege ?? []).map((t) => [t.id, t])), [bib.eintraege])
 
   const open = async (id: string): Promise<void> => {
     try {
@@ -62,6 +78,33 @@ export default function TestLibrary({
       notifyError(e)
     }
   }
+
+  const zeile = (t: SavedTestMeta): React.JSX.Element => (
+    <EintragZeile
+      bib={bib}
+      eintrag={t}
+      offen={t.id === testId && zurueck !== null}
+      onOeffnen={() => void open(t.id)}
+      // Farbpunkt der Sprache (Paket 10a) bei der Suche; sonst steht er an der Fach-Überschrift
+      fach={suche ? (t.language ?? t.subjectLabel) : undefined}
+      kennzeichen={
+        !t.hasTest && (
+          <Badge size="sm" variant="outline" color="gray">
+            noch kein Test
+          </Badge>
+        )
+      }
+      info={[
+        t.subjectLabel,
+        t.grade ? `Klasse ${t.grade}` : '',
+        `${t.vocabCount} Vokabeln (${t.includedCount} abgefragt)`,
+        t.hasTest ? `Test erstellt${t.variantCount > 1 ? `, ${t.variantCount} Varianten` : ''}, ${formatPoints(t.totalPoints)} Punkte` : '',
+        dateFormat.format(new Date(t.updatedAt))
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    />
+  )
 
   return (
     <ScrollArea h="100%">
@@ -102,8 +145,7 @@ export default function TestLibrary({
             leftSection={<IconPlus size={16} />}
             onClick={async () => {
               try {
-                await keepCurrent()
-                useVokabeltest.getState().newTest()
+                await neuerTestMitSicherung()
                 onClose()
               } catch (e) {
                 notifyError(e)
@@ -118,35 +160,24 @@ export default function TestLibrary({
           <BibliothekLeer leer={tests.length === 0} text="Noch keine Vokabeltests gespeichert. Gesichert wird automatisch ab der ersten Vokabel." />
         )}
 
-        <Stack gap="xs">
-          {treffer.map((t) => (
-            <EintragZeile
-              key={t.id}
-              bib={bib}
-              eintrag={t}
-              offen={t.id === testId && zurueck !== null}
-              onOeffnen={() => void open(t.id)}
-              // Farbpunkt der Sprache (Paket 10a); ältere Tests ohne Sprache haben keinen
-              fach={t.language ?? t.subjectLabel}
-              kennzeichen={
-                !t.hasTest && (
-                  <Badge size="sm" variant="outline" color="gray">
-                    noch kein Test
-                  </Badge>
-                )
-              }
-              info={[
-                t.subjectLabel,
-                t.grade ? `Klasse ${t.grade}` : '',
-                `${t.vocabCount} Vokabeln (${t.includedCount} abgefragt)`,
-                t.hasTest ? `Test erstellt${t.variantCount > 1 ? `, ${t.variantCount} Varianten` : ''}, ${formatPoints(t.totalPoints)} Punkte` : '',
-                dateFormat.format(new Date(t.updatedAt))
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            />
-          ))}
-        </Stack>
+        {suche ? (
+          <Stack gap="xs">
+            {treffer.map((t) => (
+              <div key={t.id}>{zeile(t)}</div>
+            ))}
+          </Stack>
+        ) : (
+          <ThemenAnsicht
+            moduleId="vokabeltest"
+            artPlural="Vokabeltests"
+            eigene={eigene}
+            renderEigen={(m) => {
+              const t = nachId.get(m.id)
+              return t ? zeile(t) : null
+            }}
+            onNeu={onNeuImBereich}
+          />
+        )}
       </Container>
     </ScrollArea>
   )

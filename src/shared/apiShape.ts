@@ -11,6 +11,7 @@
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
 import type { DesignTemplate } from '@shared/design'
+import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
 import type { LanStatus } from '../main/services/lanServer'
 import type { Netzfund } from '../main/services/ai/provider'
 import type {
@@ -229,6 +230,23 @@ export function buildApi(call: Call, extras: ApiExtras) {
       get: (id: string) => call<Textbook>('textbooks:get', id),
       save: (books: Textbook[]) => call<TextbookMeta[]>('textbooks:save', books),
       delete: (id: string) => call<TextbookMeta[]>('textbooks:delete', id)
+    },
+    /**
+     * Themenbereiche je Fach und die Zuordnung der Materialien (Paket 10b, src/shared/themen.ts).
+     * Jeder Aufruf liefert den ganzen neuen Stand zurück.
+     */
+    themen: {
+      list: () => call<ThemenDaten>('themen:list'),
+      /** Anlegen oder umbenennen */
+      bereich: (b: Pick<Themenbereich, 'id' | 'fachId' | 'name'> & Partial<Themenbereich>) => call<ThemenDaten>('themen:bereich', b),
+      /** Löschen – die Materialien kommen nach „Ohne Themenbereich" */
+      delete: (id: string) => call<ThemenDaten>('themen:delete', id),
+      /** Zuordnungen setzen; null entfernt den Eintrag */
+      zuordnen: (eintraege: Record<string, Zuordnung | null>) => call<ThemenDaten>('themen:zuordnen', eintraege),
+      /** Vorschläge der Automatik übernehmen und für diese Fächer die Automatik einschalten */
+      uebernehmen: (vorschlaege: BereichsUebernahme[], automatik: string[]) => call<ThemenDaten>('themen:uebernehmen', vorschlaege, automatik),
+      reihenfolge: (schluessel: string, liste: string[]) => call<ThemenDaten>('themen:reihenfolge', schluessel, liste),
+      automatik: (fachId: string, an: boolean) => call<ThemenDaten>('themen:automatik', fachId, an)
     },
     library: {
       list: () => call<SavedVocabList[]>('library:list'),

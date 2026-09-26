@@ -3,7 +3,7 @@ import { IconAlertTriangle, IconCheck } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { AppSettings, DeepPartial } from '@shared/types'
 import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
-import { FACH_PALETTE, FACH_VORSCHLAG, fachFarbeAus, farbabstand, graustufenPruefung, istFarbe, leuchtdichte } from '../shared/fachfarben'
+import { FACH_PALETTE, FACH_VORSCHLAG, fachFarbeAus, farbabstand, graustufenPruefung, istFarbe, leuchtdichte, WEITERE_FAECHER } from '../shared/fachfarben'
 import MehrText from '../shared/components/MehrText'
 
 /** Grauwert einer Farbe, wie ein S/W-Drucker sie ungefähr wiedergibt */
@@ -36,7 +36,8 @@ export default function FachfarbenSettings({
   update: (patch: DeepPartial<AppSettings>) => void
 }): React.JSX.Element {
   const eigene = settings.fachfarben ?? {}
-  const faecher = SUBJECTS.map((s) => ({ id: s.id, name: fachname(s.label), farbe: fachFarbeAus(s.id, eigene)! }))
+  // Dazu die Sprachen, die es nur im Vokabeltest gibt (Niederländisch, Russisch)
+  const faecher = [...SUBJECTS, ...WEITERE_FAECHER].map((s) => ({ id: s.id, name: fachname(s.label), farbe: fachFarbeAus(s.id, eigene)! }))
 
   return (
     <Card withBorder padding="lg" className="fachfarben-karte">

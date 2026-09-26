@@ -20,6 +20,7 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { pruefeThemen, type ThemenDaten } from '@shared/themen'
 
 /**
  * Was das Zurücksetzen NICHT anfasst.
@@ -51,7 +52,17 @@ export const GESCHUETZT = [
 const MATERIAL = ['arbeitsblaetter', 'vokabeltests', 'klassenarbeiten', 'grammatiktests', 'lernzielkontrollen', 'piktogramme', 'hoertexte']
 
 /** Einzelne Dateien mit Einstellungen und Zugängen. */
-const DATEIEN = ['settings.json', 'secrets.json', 'logo.png', 'worksheet-designs.json', 'worksheet-designs-version.json', 'model-cache.json']
+const DATEIEN = [
+  'settings.json',
+  'secrets.json',
+  'logo.png',
+  'worksheet-designs.json',
+  'worksheet-designs-version.json',
+  'model-cache.json',
+  // Themenbereiche und die Zuordnung der Materialien (Paket 10b) – ohne sie käme nach dem
+  // Einlesen alles Material ungeordnet zurück
+  'themenbereiche.json'
+]
 
 const userData = (): string => app.getPath('userData')
 
@@ -184,8 +195,44 @@ export function wiederherstellen(daten: Uint8Array): { wiederhergestellt: string
   for (const datei of DATEIEN) {
     const base64 = inhalt[datei]
     if (typeof base64 !== 'string' || !base64 || datei === 'secrets.json') continue
+    if (datei === 'themenbereiche.json') {
+      // Zusammenführen wie beim Material: Bereiche, die es nur hier gibt, bleiben erhalten
+      writeFileSync(join(wurzel, datei), JSON.stringify(themenZusammenfuehren(join(wurzel, datei), Buffer.from(base64, 'base64').toString('utf8'))))
+      wiederhergestellt.push(datei)
+      continue
+    }
     writeFileSync(join(wurzel, datei), Buffer.from(base64, 'base64'))
     wiederhergestellt.push(datei)
   }
   return { wiederhergestellt }
+}
+
+/**
+ * Themenbereiche aus der Sicherung mit den vorhandenen zusammenführen (Paket 10b): Was in der
+ * Sicherung steht, gewinnt; Bereiche und Zuordnungen, die es nur auf diesem Rechner gibt,
+ * bleiben – so wie Materialien, die nicht in der Sicherung stehen.
+ */
+export function themenZusammenfuehren(pfad: string, ausSicherung: string): ThemenDaten {
+  let hier: unknown = null
+  let dort: unknown = null
+  try {
+    if (existsSync(pfad)) hier = JSON.parse(readFileSync(pfad, 'utf8'))
+  } catch {
+    hier = null
+  }
+  try {
+    dort = JSON.parse(ausSicherung)
+  } catch {
+    dort = null
+  }
+  const a = pruefeThemen(hier)
+  const b = pruefeThemen(dort)
+  const bereiche = [...a.bereiche.filter((x) => !b.bereiche.some((y) => y.id === x.id)), ...b.bereiche]
+  return pruefeThemen({
+    version: 1,
+    bereiche,
+    zuordnungen: { ...a.zuordnungen, ...b.zuordnungen },
+    reihenfolge: { ...a.reihenfolge, ...b.reihenfolge },
+    automatik: { ...a.automatik, ...b.automatik }
+  })
 }

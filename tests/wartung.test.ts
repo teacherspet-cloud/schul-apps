@@ -67,6 +67,29 @@ describe('Sicherung wiederherstellen', () => {
     expect(readFileSync(join(wurzel, 'arbeitsblaetter/a1.json'), 'utf8')).toBe('{"titel":"Weimar"}')
   })
 
+  it('sichert die Themenbereiche mit und führt sie beim Einlesen zusammen (Paket 10b)', () => {
+    const bereich = (id: string, name: string): object => ({ id, fachId: 'biologie', name, reihenfolge: 0, angelegt: '' })
+    schreibe(
+      'themenbereiche.json',
+      JSON.stringify({
+        version: 1,
+        bereiche: [bereich('bereich1', 'Zelle')],
+        zuordnungen: { 'arbeitsblatt:a1': { bereichId: 'bereich1', von: 'hand', am: '' } }
+      })
+    )
+    const { daten } = sicherung()
+    expect(pruefeSicherung(daten).dateien).toContain('themenbereiche.json')
+    // Danach auf diesem Rechner ein weiterer Bereich – er darf beim Einlesen nicht verschwinden
+    schreibe('themenbereiche.json', JSON.stringify({ version: 1, bereiche: [bereich('bereich2', 'Ökologie')], zuordnungen: {} }))
+    wiederherstellen(daten)
+    const d = JSON.parse(readFileSync(join(wurzel, 'themenbereiche.json'), 'utf8'))
+    expect(d.bereiche.map((b: { name: string }) => b.name).sort()).toEqual(['Zelle', 'Ökologie'])
+    expect(d.zuordnungen['arbeitsblatt:a1'].bereichId).toBe('bereich1')
+    // Das Zurücksetzen nimmt die Datei mit
+    werkszustand()
+    expect(existsSync(join(wurzel, 'themenbereiche.json'))).toBe(false)
+  })
+
   it('weist fremde Dateien ab, bevor etwas geschrieben wird', () => {
     expect(() => pruefeSicherung(new TextEncoder().encode('kein json'))).toThrow(/keine Sicherung/)
     expect(() => wiederherstellen(new TextEncoder().encode('{"version":7}'))).toThrow(/unbekannten Version/)

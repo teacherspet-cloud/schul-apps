@@ -15,10 +15,10 @@ import {
   fachFarbeAus,
   fachIdVon,
   farbabstand,
-  GETEILTE_VORSCHLAEGE,
   graustufenPruefung,
   kontrast,
   merkeFachfarben,
+  WEITERE_FAECHER,
   wirksameFarbe
 } from '../src/renderer/src/shared/fachfarben'
 import { SUBJECTS } from '../src/renderer/src/modules/arbeitsblatt/model/subjects'
@@ -43,8 +43,8 @@ const GRUEN = FACH_VORSCHLAG.biologie
 afterEach(() => merkeFachfarben({}))
 
 describe('Druckfeste Palette', () => {
-  it('hat rund 16 Farben, jede fürs Auge klar von jeder anderen verschieden', () => {
-    expect(FACH_PALETTE.length).toBe(16)
+  it('hat mindestens so viele Farben wie Fächer, jede fürs Auge klar von jeder anderen verschieden', () => {
+    expect(FACH_PALETTE.length).toBeGreaterThanOrEqual(SUBJECTS.length + WEITERE_FAECHER.length)
     for (let i = 0; i < FACH_PALETTE.length; i++)
       for (let j = i + 1; j < FACH_PALETTE.length; j++) {
         const a = FACH_PALETTE[i]
@@ -57,14 +57,17 @@ describe('Druckfeste Palette', () => {
     for (const f of FACH_PALETTE) expect(graustufenPruefung(f.hex).stufe, f.name).toBe('gut')
   })
 
-  it('gibt jedem Fach einen Vorschlag aus der Palette – doppelt nur, wo es begründet ist', () => {
+  it('gibt jedem Fach einen eigenen Vorschlag aus der Palette – auch Niederländisch und Russisch', () => {
+    // Wunsch der Lehrkraft (26.09.2026): keine geteilten Vorschläge mehr
     const palette = new Set(FACH_PALETTE.map((f) => f.hex))
-    for (const s of SUBJECTS) expect(palette.has(FACH_VORSCHLAG[s.id]), s.id).toBe(true)
-    for (const s of SUBJECTS) {
-      const gleich = SUBJECTS.filter((x) => x.id !== s.id && FACH_VORSCHLAG[x.id] === FACH_VORSCHLAG[s.id]).map((x) => x.id)
-      const erlaubt = [GETEILTE_VORSCHLAEGE[s.id], ...Object.keys(GETEILTE_VORSCHLAEGE).filter((k) => GETEILTE_VORSCHLAEGE[k] === s.id)].filter(Boolean)
-      expect(gleich.sort(), s.id).toEqual(erlaubt.sort())
-    }
+    const faecher = [...SUBJECTS, ...WEITERE_FAECHER]
+    for (const s of faecher) expect(palette.has(FACH_VORSCHLAG[s.id]), s.id).toBe(true)
+    expect(new Set(faecher.map((s) => FACH_VORSCHLAG[s.id])).size).toBe(faecher.length)
+    // Je zwei Vorschläge mindestens ΔE₀₀ = 12 auseinander (folgt aus der Palette, hier ausdrücklich)
+    for (const a of faecher)
+      for (const b of faecher) if (a.id < b.id) expect(farbabstand(FACH_VORSCHLAG[a.id], FACH_VORSCHLAG[b.id]), `${a.id} ↔ ${b.id}`).toBeGreaterThanOrEqual(12)
+    expect(fachIdVon('nl')).toBe('niederlaendisch')
+    expect(fachIdVon('Russisch')).toBe('russisch')
     // Die häufigen Kombinationen der Lehrkraft (z. B. Englisch/Geschichte, Mathe/Physik) sind verschieden
     expect(FACH_VORSCHLAG.englisch).not.toBe(FACH_VORSCHLAG.geschichte)
     expect(FACH_VORSCHLAG.mathematik).not.toBe(FACH_VORSCHLAG.physik)
@@ -109,8 +112,10 @@ describe('Vorrang Fachfarbe › Vorlage', () => {
     // '' = zurück zum Vorschlag
     expect(wirksameFarbe(vorlage, 'biologie', false, { biologie: '' })).toBe(GRUEN)
     expect(wirksameFarbe(vorlage, 'biologie', true, { biologie: '#123456' })).toBe(vorlage)
-    // Unbekanntes Fach (Niederländisch im Vokabeltest): Vorlage
-    expect(wirksameFarbe(vorlage, 'nl', false, {})).toBe(vorlage)
+    // Unbekanntes Fach (etwa eine Sprache, die der Vokabeltest nicht kennt): Vorlage
+    expect(wirksameFarbe(vorlage, 'pt', false, {})).toBe(vorlage)
+    // Niederländisch hat seit 26.09.2026 eine eigene Farbe
+    expect(wirksameFarbe(vorlage, 'nl', false, {})).toBe(FACH_VORSCHLAG.niederlaendisch)
   })
 
   it('findet das Fach über Kennung, Namen oder Sprachcode', () => {
@@ -215,6 +220,7 @@ describe('Wirkung in allen Programmen', () => {
       ({ settings: { targetLanguage }, header: { vorlagenfarbe } }) as unknown as TestDocument
     expect(vokabeltestFarbe(doc('fr'))).toBe(FACH_VORSCHLAG.franzoesisch)
     expect(vokabeltestFarbe(doc('fr', true))).toBeNull()
-    expect(vokabeltestFarbe(doc('nl'))).toBeNull()
+    expect(vokabeltestFarbe(doc('nl'))).toBe(FACH_VORSCHLAG.niederlaendisch)
+    expect(vokabeltestFarbe(doc('pt'))).toBeNull()
   })
 })

@@ -13,7 +13,7 @@ import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useUndoKeys } from '../../shared/useUndoKeys'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import QuellenAuswahl from './steps/QuellenAuswahl'
@@ -74,6 +74,17 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
     setLibrary(false)
     newWorksheetSafely().catch(notifyError)
   }
+  /*
+   * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
+   * Kennung liefern – aus der eigenen Bibliothek und von der übergreifenden Seite aus.
+   */
+  const neuMitKennung = async (): Promise<string> => {
+    setArea('create')
+    setLibrary(false)
+    await newWorksheetSafely()
+    return useArbeitsblatt.getState().docId
+  }
+  useNeuAnleger('arbeitsblatt', neuMitKennung)
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -115,6 +126,7 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
         ) : showLibrary ? (
           <WorksheetLibrary
             onNew={startNew}
+            onNeuImBereich={neuMitKennung}
             onOpenFile={openFile}
             onOpened={() => setLibrary(false)}
             // „Zurück zu …" nur, solange ein Blatt offen ist

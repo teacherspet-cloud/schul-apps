@@ -2,23 +2,29 @@ import { Badge, Button, Container, ScrollArea, Stack } from '@mantine/core'
 import { IconFilePlus } from '@tabler/icons-react'
 import type { SavedGrammarTestMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
-import { BibliothekKopf, BibliothekLeer, EintragZeile, FachUeberschrift, gruppiere, useBibliothek } from '../../../shared/components/Bibliothek'
+import { useMemo } from 'react'
+import { BibliothekKopf, BibliothekLeer, EintragZeile, useBibliothek } from '../../../shared/components/Bibliothek'
+import { ThemenAnsicht } from '../../../shared/components/Themenbereiche'
+import { nurListe } from '../../../shell/materialien'
 import { openSavedTest } from '../library'
 import { useGrammatiktest } from '../store'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
 /**
- * Übersicht der gespeicherten Grammatiktests, nach Fach gruppiert; mit Suche eine flache
- * Trefferliste. Verhalten (Suche, Umbenennen, Kopie, Löschen) aus shared/components/Bibliothek.
+ * Übersicht der gespeicherten Grammatiktests: Fach › Themenbereich (Paket 10b,
+ * shared/components/Themenbereiche.tsx); mit Suche eine flache Trefferliste. Verhalten (Suche, Umbenennen, Kopie, Löschen) aus shared/components/Bibliothek.
  */
 export default function TestLibrary({
   onNew,
+  onNeuImBereich,
   onOpened,
   zurueck,
   onZurueck
 }: {
   onNew: () => void
+  /** Neu anlegen und die Kennung liefern („Neu in diesem Bereich") */
+  onNeuImBereich: () => Promise<string>
   onOpened: () => void
   /** Name des offenen Tests – dann gibt es „Zurück zu …" */
   zurueck: string | null
@@ -28,16 +34,60 @@ export default function TestLibrary({
   const bib = useBibliothek<SavedGrammarTestMeta>(window.api.grammarTests, {
     offeneId: () => useGrammatiktest.getState().docId,
     umbenannt: (meta) => useGrammatiktest.getState().markSaved(meta.id, meta.updatedAt, meta.name),
-    geloescht: () => useGrammatiktest.getState().forgetSaved()
+    geloescht: () => useGrammatiktest.getState().forgetSaved(),
+    moduleId: 'grammatiktest'
   })
   const tests = bib.eintraege ?? []
   const treffer = bib.treffer((t) => [t.topics, t.subjectLabel, `Klasse ${t.grade}`, t.grade])
-  const gruppen: [string, SavedGrammarTestMeta[]][] = bib.suche.trim() ? [['', treffer]] : gruppiere(treffer, (t) => t.subjectLabel)
+  const suche = bib.suche.trim() !== ''
+  const eigene = useMemo(() => nurListe({ grammarTests: bib.eintraege ?? [] }), [bib.eintraege])
+  const nachId = useMemo(() => new Map(tests.map((x) => [x.id, x])), [tests])
 
   const oeffnen = (id: string): void => {
     if (id === docId && zurueck !== null) return onZurueck()
     openSavedTest(id).then(onOpened).catch(notifyError)
   }
+
+  const zeile = (t: SavedGrammarTestMeta): React.JSX.Element => (
+    <EintragZeile
+      bib={bib}
+      eintrag={t}
+      offen={t.id === docId && zurueck !== null}
+      onOeffnen={() => oeffnen(t.id)}
+      // Bei der Suche fehlt die Fach-Überschrift – dann steht der Farbpunkt am Eintrag
+      fach={suche ? t.subjectLabel : undefined}
+      kennzeichen={
+        <>
+          <Badge variant="light">Klasse {t.grade}</Badge>
+          {/* Entwürfe werden ab dem ersten Schritt gesichert – noch ohne Aufgaben */}
+          {t.taskCount === 0 && (
+            <Badge variant="light" color="gray">
+              Entwurf
+            </Badge>
+          )}
+          {t.graded ? (
+            <Badge variant="light" color="grape">
+              benotet
+            </Badge>
+          ) : (
+            <Badge variant="outline" color="gray">
+              ohne Note
+            </Badge>
+          )}
+        </>
+      }
+      info={[
+        suche ? t.subjectLabel : '',
+        t.topics || 'ohne Form',
+        `${t.taskCount} ${t.taskCount === 1 ? 'Aufgabe' : 'Aufgaben'}`,
+        `${t.points} Punkte`,
+        `${t.minutes} Minuten`,
+        dateFormat.format(new Date(t.updatedAt))
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    />
+  )
 
   return (
     <ScrollArea h="100%">
@@ -60,54 +110,24 @@ export default function TestLibrary({
           <BibliothekLeer leer={tests.length === 0} text="Noch kein Grammatiktest gespeichert. Neue Tests werden automatisch gesichert." />
         )}
 
-        {gruppen.map(([fach, liste]) => (
-          <div key={fach || 'treffer'}>
-            {fach && <FachUeberschrift fach={fach} />}
-            <Stack gap="xs">
-              {liste.map((t) => (
-                <EintragZeile
-                  key={t.id}
-                  bib={bib}
-                  eintrag={t}
-                  offen={t.id === docId && zurueck !== null}
-                  onOeffnen={() => oeffnen(t.id)}
-                  // Bei der Suche fehlt die Fach-Überschrift – dann steht der Farbpunkt am Eintrag
-                  fach={bib.suche.trim() ? t.subjectLabel : undefined}
-                  kennzeichen={
-                    <>
-                      <Badge variant="light">Klasse {t.grade}</Badge>
-                      {/* Entwürfe werden ab dem ersten Schritt gesichert – noch ohne Aufgaben */}
-                      {t.taskCount === 0 && (
-                        <Badge variant="light" color="gray">
-                          Entwurf
-                        </Badge>
-                      )}
-                      {t.graded ? (
-                        <Badge variant="light" color="grape">
-                          benotet
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" color="gray">
-                          ohne Note
-                        </Badge>
-                      )}
-                    </>
-                  }
-                  info={[
-                    bib.suche.trim() ? t.subjectLabel : '',
-                    t.topics || 'ohne Form',
-                    `${t.taskCount} ${t.taskCount === 1 ? 'Aufgabe' : 'Aufgaben'}`,
-                    `${t.points} Punkte`,
-                    `${t.minutes} Minuten`,
-                    dateFormat.format(new Date(t.updatedAt))
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                />
-              ))}
-            </Stack>
-          </div>
-        ))}
+        {suche ? (
+          <Stack gap="xs">
+            {treffer.map((x) => (
+              <div key={x.id}>{zeile(x)}</div>
+            ))}
+          </Stack>
+        ) : (
+          <ThemenAnsicht
+            moduleId="grammatiktest"
+            artPlural="Grammatiktests"
+            eigene={eigene}
+            renderEigen={(m) => {
+              const x = nachId.get(m.id)
+              return x ? zeile(x) : null
+            }}
+            onNeu={onNeuImBereich}
+          />
+        )}
       </Container>
     </ScrollArea>
   )

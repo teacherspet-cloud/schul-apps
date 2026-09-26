@@ -1,12 +1,19 @@
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
-import { IconArrowLeft, IconCopy, IconDots, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
 import { kopieName, passtZurSuche } from '../bibliothek'
 import { imNetz } from '../netzZugang'
 import { useConfirmKeys } from '../useConfirmKeys'
 import { notifyError, notifySuccess, uid } from '../util'
 import { FachPunkt } from './FachFarbe'
+import { zuordnungKopieren, zuordnungVergessen } from '../themenbereiche'
+
+/**
+ * „Verschieben nach …" im ⋯-Menü jedes Eintrags (Paket 10b). Die Themenansicht
+ * (Themenbereiche.tsx) stellt die Aktion bereit; außerhalb davon (Suchtreffer) fehlt der Punkt.
+ */
+export const VerschiebenKontext = createContext<((eintragId: string) => void) | null>(null)
 
 /**
  * Gemeinsame Teile der fünf Bibliotheken (Vokabeltest, Arbeitsblatt, Lernzielkontrolle,
@@ -61,7 +68,13 @@ export interface Bibliothek<M extends BibliotheksEintrag> {
  */
 export function useBibliothek<M extends BibliotheksEintrag>(
   api: BibliotheksApi<M>,
-  opts: { offeneId: () => string | null; umbenannt?: (meta: M) => void; geloescht?: () => void }
+  opts: {
+    offeneId: () => string | null
+    umbenannt?: (meta: M) => void
+    geloescht?: () => void
+    /** Programm (modules/registry.ts) – damit Kopie und Löschen die Zuordnung zum Themenbereich mitnehmen */
+    moduleId?: string
+  }
 ): Bibliothek<M> {
   const [eintraege, setEintraege] = useState<M[] | null>(null)
   const [suche, setSuche] = useState('')
@@ -102,6 +115,7 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     try {
       setEintraege(await api.delete(loeschen.id))
       if (aktuell.current.offeneId() === loeschen.id) aktuell.current.geloescht?.()
+      if (aktuell.current.moduleId) void zuordnungVergessen(aktuell.current.moduleId, loeschen.id)
       setLoeschen(null)
     } catch (e) {
       notifyError(e)
@@ -123,6 +137,8 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     try {
       const alt = await holen(id)
       const meta = await api.save({ ...alt, id: uid(), name: kopieName(alt.name) })
+      // Die Kopie gehört in denselben Themenbereich wie das Original
+      if (aktuell.current.moduleId) await zuordnungKopieren(aktuell.current.moduleId, id, meta.id)
       setEintraege(await api.list())
       setNeuId(meta.id)
       notifySuccess(`„${meta.name}“ angelegt.`)
@@ -219,6 +235,7 @@ export function EintragMenue<M extends BibliotheksEintrag>({
   /** Zusätzliche Punkte des Programms vor den gemeinsamen */
   vorne?: React.ReactNode
 }): React.JSX.Element {
+  const verschieben = useContext(VerschiebenKontext)
   return (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
@@ -234,6 +251,11 @@ export function EintragMenue<M extends BibliotheksEintrag>({
         <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => void bib.kopieren(eintrag.id)}>
           Kopie anlegen
         </Menu.Item>
+        {verschieben && (
+          <Menu.Item leftSection={<IconFolderShare size={14} />} onClick={() => verschieben(eintrag.id)}>
+            Verschieben nach …
+          </Menu.Item>
+        )}
         {/* Löschen gibt es nur am Rechner – über das Netz ist es gesperrt */}
         {!imNetz() && (
           <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={() => bib.setLoeschen(eintrag)}>

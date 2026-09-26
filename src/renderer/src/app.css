@@ -652,3 +652,97 @@ img.home-illustration {
   font-weight: 700;
   text-align: center;
 }
+
+/* ---------- Themenbereiche (Paket 10b, shared/components/Themenbereiche.tsx) ---------- */
+
+/*
+ * Karten der Materialarten: ganz leicht in der Kennfarbe der Art getönt (shared/materialart.ts),
+ * dazu ein schmaler Streifen links. Im Dunkelmodus etwas stärker getönt – 5 % sind auf dunklem
+ * Grund nicht mehr zu sehen.
+ */
+.material-huelle {
+  position: relative;
+  border-radius: var(--mantine-radius-default);
+}
+/* Doppeltes :root: muss die Kartenstile der Oberflächenthemen (oben, „shadow"/„flat"/„bold") schlagen */
+:root:root .material-huelle > .mantine-Card-root {
+  background: color-mix(in srgb, var(--art) 5%, var(--app-surface, var(--mantine-color-body)));
+  border-left: 3px solid var(--art);
+}
+:root:root[data-mantine-color-scheme='dark'] .material-huelle > .mantine-Card-root {
+  background: color-mix(in srgb, var(--art) 8%, var(--app-surface, var(--mantine-color-body)));
+}
+.material-huelle[draggable='true'] {
+  cursor: grab;
+}
+.material-huelle[data-ausgewaehlt='true'] > .mantine-Card-root {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+/* Einfügemarke bei eigener Reihenfolge */
+.material-huelle[data-einfuegen='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--mantine-primary-color-filled);
+}
+.material-huelle:has(.material-haken) {
+  padding-left: 30px;
+}
+.material-haken {
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* Kennzeichen „automatisch einsortiert" */
+.material-auto {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--app-surface, var(--mantine-color-body));
+  border: 1px solid var(--app-border, var(--mantine-color-default-border));
+  color: var(--mantine-color-dimmed);
+}
+.material-huelle:has(.material-haken) .material-auto {
+  left: 24px;
+}
+
+/* Ablageziele beim Ziehen */
+[data-ablage][data-ueber='true'] {
+  outline: 2px dashed var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--mantine-primary-color-filled) 8%, transparent);
+}
+.themen-ordner {
+  transition: border-color 120ms ease;
+}
+.themen-ordner:hover {
+  border-color: var(--mantine-primary-color-filled);
+}
+.themen-ziel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px dashed var(--app-border, var(--mantine-color-default-border));
+  border-radius: 999px;
+  font-size: var(--mantine-font-size-xs);
+}
+.themen-ziel:hover {
+  border-color: var(--mantine-primary-color-filled);
+}
+.themen-ohne {
+  border-radius: 8px;
+}

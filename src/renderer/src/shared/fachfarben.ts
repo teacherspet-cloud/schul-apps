@@ -24,7 +24,7 @@ export interface PalettenFarbe {
 }
 
 /*
- * DRUCKFESTE PALETTE: 16 Farben, gewählt für Schulkopierer und Laserdrucker.
+ * DRUCKFESTE PALETTE: 24 Farben, gewählt für Schulkopierer und Laserdrucker.
  *
  * Belegt (WCAG 2.1): Jede Farbe hat gegen Weiß ein Kontrastverhältnis von mindestens 4,5 : 1
  * (SC 1.4.3) – weiße Aufgabennummern auf der Farbfläche bleiben lesbar, Überschriften und
@@ -52,18 +52,34 @@ export const FACH_PALETTE: PalettenFarbe[] = [
   { hex: '#5f3dc4', name: 'Violett' },
   { hex: '#7c4a1e', name: 'Braun' },
   { hex: '#5a6270', name: 'Schiefergrau' },
-  { hex: '#2f3338', name: 'Anthrazit' }
+  { hex: '#2f3338', name: 'Anthrazit' },
+  /*
+   * Ergänzt am 26.09.2026 (Wunsch der Lehrkraft: jedes Fach ein eigener Vorschlag, auch
+   * Niederländisch und Russisch aus dem Vokabeltest – 24 Fächer). Die ersten 16 blieben, wie
+   * sie waren. Die acht neuen sind per Rechnung gesucht: unter allen sRGB-Farben mit
+   * „gut" in der Graustufen-Prüfung (≥ 4,5 : 1 gegen Weiß, ≥ 1,6 : 1 gegen Schwarz), mit
+   * mittlerer Buntheit (Chroma 35–70 – keine Neon-, keine Grautöne) jeweils die, die von
+   * allen übrigen am weitesten entfernt liegt. Ergebnis: kleinster Abstand zweier Farben der
+   * ganzen Palette ΔE₀₀ = 12,3 – die Schwelle 12 hält also auch mit 24 Farben.
+   */
+  { hex: '#aa50be', name: 'Orchidee' },
+  { hex: '#5a5014', name: 'Khaki' },
+  { hex: '#b45a6e', name: 'Altrosa' },
+  { hex: '#643c78', name: 'Pflaume' },
+  { hex: '#285a00', name: 'Moosgrün' },
+  { hex: '#aa6450', name: 'Terrakotta' },
+  { hex: '#823c32', name: 'Rostrot' },
+  { hex: '#786eaa', name: 'Lavendel' }
 ]
 
 const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name)!.hex
 
 /*
- * Vorschläge je Fach. Die App kennt 22 Fächer, die Palette hat 16 Farben – ganz ohne
- * Doppelung geht es also nicht. Die 16 häufigsten Fächer haben je eine eigene Farbe, einige
- * naheliegend (Biologie grün, Geschichte braun, Erdkunde oliv). Die übrigen teilen sich eine
- * Farbe mit einem Fach, mit dem sie selten zusammen unterrichtet werden oder das auf einer
- * anderen Schulstufe liegt (Sachunterricht in der Grundschule, Biologie ab Klasse 5). Alles
- * lässt sich in den Einstellungen ändern.
+ * Vorschläge je Fach – seit 26.09.2026 für JEDES Fach ein eigener (vorher teilten sich
+ * sechs Fächer ihre Farbe mit einem anderen, Niederländisch und Russisch hatten keine).
+ * Naheliegendes blieb: Biologie grün, Geschichte braun, Erdkunde oliv, Deutsch rot; DaZ
+ * bekam das Altrosa neben dem Rot von Deutsch, Sachunterricht ein Moosgrün neben Biologie.
+ * Eine in den Einstellungen gewählte Farbe bleibt unverändert – nur die Vorschläge sind neu.
  */
 export const FACH_VORSCHLAG: Record<string, string> = {
   deutsch: farbe('Rot'),
@@ -82,27 +98,35 @@ export const FACH_VORSCHLAG: Record<string, string> = {
   politik: farbe('Ocker'),
   religion: farbe('Magenta'),
   anderes: farbe('Anthrazit'),
-  // Geteilte Vorschläge (siehe oben) – in GETEILTE_VORSCHLAEGE einzeln begründet
-  'werte-und-normen': farbe('Tannengrün'),
-  kunst: farbe('Türkis'),
-  musik: farbe('Bordeaux'),
-  sport: farbe('Orange'),
-  sachunterricht: farbe('Grün'),
-  daz: farbe('Ocker')
+  'werte-und-normen': farbe('Lavendel'),
+  kunst: farbe('Orchidee'),
+  musik: farbe('Pflaume'),
+  sport: farbe('Terrakotta'),
+  sachunterricht: farbe('Moosgrün'),
+  daz: farbe('Altrosa'),
+  niederlaendisch: farbe('Rostrot'),
+  russisch: farbe('Khaki')
 }
 
-/** Fächer, deren Vorschlag bewusst mit einem anderen Fach übereinstimmt (die Prüfung lässt nur diese zu) */
-export const GETEILTE_VORSCHLAEGE: Record<string, string> = {
-  'werte-und-normen': 'italienisch',
-  kunst: 'chemie',
-  musik: 'latein',
-  sport: 'spanisch',
-  sachunterricht: 'biologie',
-  daz: 'politik'
-}
+/**
+ * Fächer, die es nur im Vokabeltest gibt (Sprachen ohne eigenes Fach in der Fächerliste der
+ * übrigen Programme) – damit auch sie eine Farbe haben und in den Einstellungen stehen.
+ */
+export const WEITERE_FAECHER: { id: string; label: string }[] = [
+  { id: 'niederlaendisch', label: 'Niederländisch' },
+  { id: 'russisch', label: 'Russisch' }
+]
 
 /** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) */
-const FACH_ZU_SPRACHE: Record<string, string> = { en: 'englisch', fr: 'franzoesisch', es: 'spanisch', it: 'italienisch', la: 'latein' }
+const FACH_ZU_SPRACHE: Record<string, string> = {
+  en: 'englisch',
+  fr: 'franzoesisch',
+  es: 'spanisch',
+  it: 'italienisch',
+  la: 'latein',
+  nl: 'niederlaendisch',
+  ru: 'russisch'
+}
 
 // ---------- Farbrechnung (sRGB, WCAG 2.1, CIELAB) ----------
 
@@ -258,7 +282,7 @@ export function fachIdVon(wert?: string): string | null {
   if (FACH_VORSCHLAG[w]) return w
   if (FACH_ZU_SPRACHE[w]) return FACH_ZU_SPRACHE[w]
   const klein = w.toLocaleLowerCase('de')
-  return SUBJECTS.find((s) => s.label.toLocaleLowerCase('de') === klein)?.id ?? null
+  return [...SUBJECTS, ...WEITERE_FAECHER].find((s) => s.label.toLocaleLowerCase('de') === klein)?.id ?? null
 }
 
 /** Farbe eines Fachs nach den Einstellungen (fehlt dort eine, gilt der Vorschlag); null = unbekanntes Fach */
@@ -341,6 +365,6 @@ export const geltendeFachfarbe = (fach: string | undefined, vorlagenfarbe: boole
 /** Anzeigename des Fachs zu Kennung, Namen oder Sprachcode (für Tooltips an Farbpunkten) */
 export function fachName(fach: string | undefined): string | undefined {
   const id = fachIdVon(fach)
-  const label = SUBJECTS.find((s) => s.id === id)?.label
+  const label = [...SUBJECTS, ...WEITERE_FAECHER].find((s) => s.id === id)?.label
   return label ? `Fach: ${label.replace(/\s*…$/, '')}` : undefined
 }

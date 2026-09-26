@@ -1,12 +1,15 @@
 import { Alert, Badge, Button, Card, CloseButton, Container, Group, SimpleGrid, Stack, Text, TextInput, ThemeIcon, Title, UnstyledButton } from '@mantine/core'
-import { IconAlertTriangle, IconDeviceFloppy, IconSearch } from '@tabler/icons-react'
+import { IconAlertTriangle, IconDeviceFloppy, IconFolder, IconSearch } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { modules } from '../modules/registry'
 import { useAppSettings } from '../shared/settingsStore'
-import { openDocument, openModule, openSettings } from '../shared/navigation'
+import { openDocument, openModule, openSettings, openThemen } from '../shared/navigation'
 import { imNetz } from '../shared/netzZugang'
-import { ladeMaterialien, Material, neueste, suche } from './materialien'
-import { FachPunkt } from '../shared/components/FachFarbe'
+import { fachAnzeige, ladeMaterialien, Material, neueste, suche } from './materialien'
+import { FachPunkt, useFachFarbe } from '../shared/components/FachFarbe'
+import { abgleichen, ladeThemen, useThemen } from '../shared/themenbereiche'
+import { AB_MATERIALIEN } from '../shared/themenVorschlag'
+import type { Themenbereich } from '@shared/themen'
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
 const ZULETZT_ANZAHL = 8
@@ -53,7 +56,13 @@ export default function Home(): React.JSX.Element {
 
   useEffect(() => {
     let weg = false
-    void ladeMaterialien().then((m) => !weg && setMaterialien(m))
+    void ladeMaterialien().then((m) => {
+      if (weg) return
+      setMaterialien(m)
+      // Neue Materialien in die Themenbereiche einsortieren (Paket 10b) – auch wer nur die Startseite sieht, findet sie dort
+      void abgleichen(m.filter((x) => x.moduleId !== 'vokabelliste'))
+    })
+    void ladeThemen().catch(() => undefined)
     // Am Tablet richtet niemand den KI-Zugang ein – dort wäre der Hinweis nur Lärm
     if (!imNetz())
       window.api.ai
@@ -68,6 +77,24 @@ export default function Home(): React.JSX.Element {
   const zuletzt = useMemo(() => neueste(materialien ?? [], ZULETZT_ANZAHL), [materialien])
   const treffer = useMemo(() => suche(materialien ?? [], suchtext), [materialien, suchtext])
   const suchtAktiv = suchtext.trim().length > 0
+  const themen = useThemen((s) => s.daten)
+  // Themenbereiche passend zur Suche (Name oder Fach) – vor den Materialien
+  const bereichTreffer = useMemo(() => {
+    const woerter = suchtext.toLocaleLowerCase('de').split(/\s+/).filter(Boolean)
+    if (!woerter.length) return []
+    return themen.bereiche.filter((b) => woerter.every((w) => `${b.name} ${fachAnzeige(b.fachId)}`.toLocaleLowerCase('de').includes(w))).slice(0, 6)
+  }, [suchtext, themen])
+  const bereichZahl = (b: Themenbereich): number => (materialien ?? []).filter((m) => themen.zuordnungen[`${m.moduleId}:${m.id}`]?.bereichId === b.id).length
+  /*
+   * Abschnitt „Themenbereiche": je Fach ein Knopf. Nur, wenn es Bereiche gibt oder so viel
+   * Material, dass die Vorschläge greifen – vorher wäre er nur Lärm.
+   */
+  const themenFaecher = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of themen.bereiche) map.set(b.fachId, (map.get(b.fachId) ?? 0) + 1)
+    return [...map.entries()].sort((a, b) => fachAnzeige(a[0]).localeCompare(fachAnzeige(b[0]), 'de'))
+  }, [themen])
+  const themenZeigen = themenFaecher.length > 0 || (materialien ?? []).filter((m) => m.moduleId !== 'vokabelliste').length >= AB_MATERIALIEN
 
   /*
    * Erinnerung ans Sichern: nur, wenn es überhaupt Material gibt, und erst nach einem Monat.
@@ -142,10 +169,19 @@ export default function Home(): React.JSX.Element {
               maw="100%"
             />
           </Group>
+          {suchtAktiv && bereichTreffer.length > 0 && (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+              {bereichTreffer.map((b) => (
+                <BereichZeile key={b.id} bereich={b} anzahl={bereichZahl(b)} />
+              ))}
+            </SimpleGrid>
+          )}
           {suchtAktiv && treffer.length === 0 ? (
-            <Text c="dimmed" size="sm">
-              Keine Materialien gefunden.
-            </Text>
+            bereichTreffer.length === 0 && (
+              <Text c="dimmed" size="sm">
+                Keine Materialien gefunden.
+              </Text>
+            )
           ) : (
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
               {(suchtAktiv ? treffer.slice(0, 40) : zuletzt).map((m) => (
@@ -156,6 +192,31 @@ export default function Home(): React.JSX.Element {
           {suchtAktiv && treffer.length > 40 && (
             <Text c="dimmed" size="xs">
               {treffer.length - 40} weitere Treffer – Suche genauer fassen.
+            </Text>
+          )}
+        </Stack>
+      )}
+
+      {themenZeigen && !suchtAktiv && (
+        <Stack gap="sm" mb={40} data-home-themen>
+          <Group justify="space-between" align="end">
+            <Title order={3}>Themenbereiche</Title>
+            <Button size="compact-sm" variant="subtle" onClick={() => openThemen()}>
+              Alle Themenbereiche
+            </Button>
+          </Group>
+          {themenFaecher.length ? (
+            <Group gap="xs">
+              {themenFaecher.map(([fachId, n]) => (
+                <Button key={fachId} variant="default" leftSection={<FachPunkt fach={fachId} />} onClick={() => openThemen(fachId)}>
+                  {fachAnzeige(fachId)} · {n === 1 ? '1 Bereich' : `${n} Bereiche`}
+                </Button>
+              ))}
+            </Group>
+          ) : (
+            <Text size="sm" c="dimmed">
+              Materialien aller Programme lassen sich je Fach in Themenbereiche ordnen – etwa „Ökologie“ mit Arbeitsblättern, Kontrollen und Tests. Die
+              Bibliotheken schlagen passende Bereiche vor.
             </Text>
           )}
         </Stack>
@@ -228,3 +289,23 @@ function MaterialZeile({ material: m }: { material: Material }): React.JSX.Eleme
 }
 
 const zeileMitModul = (...teile: (string | undefined)[]): string => teile.filter(Boolean).join(' · ')
+
+/** Suchtreffer „Themenbereich": öffnet die übergreifende Seite in diesem Bereich */
+function BereichZeile({ bereich: b, anzahl }: { bereich: Themenbereich; anzahl: number }): React.JSX.Element {
+  const farbe = useFachFarbe(b.fachId) ?? undefined
+  return (
+    <UnstyledButton className="home-material" onClick={() => openThemen(b.fachId, b.id)} data-home-bereich={b.name}>
+      <Group gap="sm" wrap="nowrap">
+        <IconFolder size={32} color={farbe} style={{ flexShrink: 0 }} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Text fw={600} size="sm" truncate>
+            {b.name}
+          </Text>
+          <Text size="xs" c="dimmed" truncate>
+            {zeileMitModul('Themenbereich', fachAnzeige(b.fachId), anzahl === 1 ? '1 Material' : `${anzahl} Materialien`)}
+          </Text>
+        </div>
+      </Group>
+    </UnstyledButton>
+  )
+}

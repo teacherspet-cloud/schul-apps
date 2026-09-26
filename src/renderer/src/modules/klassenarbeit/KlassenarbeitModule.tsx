@@ -9,7 +9,7 @@ import ExamLibrary from './steps/ExamLibrary'
 import FrameStep from './steps/FrameStep'
 import TasksStep from './steps/TasksStep'
 import { useKlassenarbeit } from './store'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import QuellenAuswahl from '../arbeitsblatt/steps/QuellenAuswahl'
@@ -38,6 +38,16 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
     setLibrary(false)
     newExamSafely().catch(notifyError)
   }
+  /*
+   * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
+   * Kennung liefern – aus der eigenen Bibliothek und von der übergreifenden Seite aus.
+   */
+  const neuMitKennung = async (): Promise<string> => {
+    setLibrary(false)
+    await newExamSafely()
+    return useKlassenarbeit.getState().docId
+  }
+  useNeuAnleger('klassenarbeit', neuMitKennung)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   const vonAussen = useDokumentOeffner('klassenarbeit', async (id) => {
@@ -58,6 +68,7 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
     return (
       <ExamLibrary
         onNew={startNew}
+        onNeuImBereich={neuMitKennung}
         onOpened={() => setLibrary(false)}
         zurueck={exam ? docName || defaultExamName(exam) : null}
         onZurueck={() => setLibrary(false)}

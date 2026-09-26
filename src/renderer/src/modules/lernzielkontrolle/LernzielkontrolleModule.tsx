@@ -9,7 +9,7 @@ import EditorStep from './steps/EditorStep'
 import KurztestLibrary from './steps/KurztestLibrary'
 import SetupStep from './steps/SetupStep'
 import { useLernzielkontrolle } from './store'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
@@ -42,6 +42,16 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
     setLibrary(false)
     newKurztestSafely().catch(notifyError)
   }
+  /*
+   * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
+   * Kennung liefern – aus der eigenen Bibliothek und von der übergreifenden Seite aus.
+   */
+  const neuMitKennung = async (): Promise<string> => {
+    setLibrary(false)
+    await newKurztestSafely()
+    return useLernzielkontrolle.getState().docId
+  }
+  useNeuAnleger('lernzielkontrolle', neuMitKennung)
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   const vonAussen = useDokumentOeffner('lernzielkontrolle', async (id) => {
@@ -62,6 +72,7 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
     return (
       <KurztestLibrary
         onNew={startNew}
+        onNeuImBereich={neuMitKennung}
         onOpened={() => setLibrary(false)}
         zurueck={test ? docName || defaultKurztestName(test) : null}
         onZurueck={() => setLibrary(false)}

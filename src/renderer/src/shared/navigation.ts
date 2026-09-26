@@ -32,25 +32,30 @@ import { notifyError } from './util'
 export type SettingsTab = 'schule' | 'material' | 'darstellung' | 'ki' | 'dienste' | 'netzwerk' | 'wartung'
 
 interface NavigationState {
-  /** 'home', 'settings' oder die Kennung eines Programms aus modules/registry.ts */
+  /** 'home', 'settings', 'themen' (übergreifende Themenbereiche) oder die Kennung eines Programms aus modules/registry.ts */
   active: string
   settingsTab: SettingsTab
+  /** Wohin die Seite „Themenbereiche" beim Öffnen zeigt (Fach, Bereich); `n` zählt hoch, damit auch derselbe Sprung wirkt */
+  themenZiel: { fachId?: string; bereichId?: string; n: number }
   /** Programme, an deren Symbol ein Punkt steht (laufender Auftrag, abgeleitet aus auftraege.ts) */
   laufpunkte: Record<string, boolean>
   openModule: (id: string) => void
   openSettings: (tab?: SettingsTab) => void
   setSettingsTab: (tab: SettingsTab) => void
   openDocument: (moduleId: string, docId: string) => Promise<void>
+  openThemen: (fachId?: string, bereichId?: string) => void
 }
 
 type Oeffner = (docId: string) => Promise<void>
 
 const oeffner = new Map<string, Oeffner>()
+const anleger = new Map<string, () => Promise<string>>()
 const druck = new Map<string, () => void>()
 
 export const useNavigation = create<NavigationState>((set, get) => ({
   active: 'home',
   settingsTab: 'schule',
+  themenZiel: { n: 0 },
   laufpunkte: {},
   openModule: (id) => {
     /*
@@ -77,6 +82,10 @@ export const useNavigation = create<NavigationState>((set, get) => ({
     } catch (e) {
       notifyError(e, 'Das Dokument ließ sich nicht öffnen')
     }
+  },
+  openThemen: (fachId, bereichId) => {
+    get().openModule('themen')
+    set({ themenZiel: { fachId, bereichId, n: get().themenZiel.n + 1 } })
   }
 }))
 
@@ -98,6 +107,34 @@ useAuftraege.subscribe((s, prev) => {
 export const openModule = (id: string): void => useNavigation.getState().openModule(id)
 export const openSettings = (tab?: SettingsTab): void => useNavigation.getState().openSettings(tab)
 export const openDocument = (moduleId: string, docId: string): Promise<void> => useNavigation.getState().openDocument(moduleId, docId)
+export const openThemen = (fachId?: string, bereichId?: string): void => useNavigation.getState().openThemen(fachId, bereichId)
+
+/**
+ * Das Programm meldet an, wie es ein NEUES Dokument anlegt, und liefert dessen Kennung
+ * (Paket 10b: „Neu in diesem Bereich" – auch von der übergreifenden Seite der Themenbereiche
+ * aus, die selbst kein Programm ist).
+ */
+export function useNeuAnleger(moduleId: string, anlegen: () => Promise<string>): void {
+  const aktuell = useRef(anlegen)
+  aktuell.current = anlegen
+  useEffect(() => {
+    const fn = (): Promise<string> => aktuell.current()
+    anleger.set(moduleId, fn)
+    return () => {
+      if (anleger.get(moduleId) === fn) anleger.delete(moduleId)
+    }
+  }, [moduleId])
+}
+
+/** Neues Dokument im Programm anlegen und dorthin wechseln; liefert die Kennung (null, wenn das Programm es nicht kann) */
+export async function neuAnlegen(moduleId: string): Promise<string | null> {
+  const fn = anleger.get(moduleId)
+  if (!fn) return null
+  await sichereAlles()
+  const id = await fn()
+  useNavigation.getState().openModule(moduleId)
+  return id
+}
 
 /**
  * Das Programm meldet an, wie es ein gespeichertes Dokument öffnet.

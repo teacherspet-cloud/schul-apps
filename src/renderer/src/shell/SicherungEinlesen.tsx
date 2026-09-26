@@ -27,6 +27,7 @@ const DATEI_NAMEN: Record<string, string> = {
   'settings.json': 'Einstellungen (Schule, Bundesland, Farbschema …)',
   'logo.png': 'Logo',
   'worksheet-designs.json': 'eigene Designvorlagen',
+  'themenbereiche.json': 'Themenbereiche und Zuordnung der Materialien',
   'worksheet-designs-version.json': '',
   'model-cache.json': ''
 }
