@@ -179,29 +179,50 @@ export const schluesselVon = (m: Pick<ThemenMaterial, 'moduleId' | 'id'>): strin
 // ---------- Einsortieren in vorhandene Bereiche ----------
 
 /**
+ * Wie gut passen die Wörter eines Materials zu einem Vergleichstext – als Rangfolge:
+ * 1. Ähnlichkeit (`aehnlichkeit`, entscheidet über `AEHNLICH`),
+ * 2. Zahl der GENAU gleichen Wörter,
+ * 3. Zahl der passenden Wörter überhaupt.
+ *
+ * Anlass (Paket 15, Befund der Lehrkraft vom 26.09.2026): „Die Zelle" landete in „Zellorganellen"
+ * statt in „Zelle". `passt` lässt „zell" auch als Wortanfang von „zellorganell" gelten – gewollt,
+ * damit „Zelle" auch „Zellatmung" findet –, beide Bereiche erreichten deshalb Ähnlichkeit 1, und
+ * bei Gleichstand gewann der tiefere Bereich. Ein genau gleiches Wort sagt aber mehr als ein
+ * gemeinsamer Wortanfang; erst wenn auch das gleich ist, entscheidet die Tiefe.
+ */
+type Bewertung = [aehnlich: number, genau: number, treffer: number]
+function bewertung(w: string[], x: string[]): Bewertung {
+  return [aehnlichkeit(w, x), w.filter((a) => x.includes(a)).length, w.filter((a) => x.some((b) => passt(a, b))).length]
+}
+/** >0: a besser, <0: b besser, 0: gleich */
+const vergleiche = (a: Bewertung, b: Bewertung): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+
+/**
  * Bester vorhandener Bereich für ein Material: Name des Bereichs oder eines der Materialien
- * darin muss mindestens `AEHNLICH` erreichen. Bei Gleichstand zweier Bereiche bleibt das
- * Material, wo es ist – lieber gar nicht als falsch einsortieren.
+ * darin muss mindestens `AEHNLICH` erreichen. Unter mehreren passenden gewinnt der mit der besten
+ * `bewertung`. Bei echtem Gleichstand zweier Bereiche bleibt das Material, wo es ist – lieber gar
+ * nicht als falsch einsortieren.
  */
 export function besterBereich(m: ThemenMaterial, bereiche: Themenbereich[], mitglieder: Map<string, string[][]>): Themenbereich | null {
   const w = woerterVon(m)
   if (!w.length) return null
   let beste: Themenbereich[] = []
-  let wert = 0
+  let wert: Bewertung = [0, 0, 0]
   for (const b of bereiche) {
     if (b.fachId !== m.fachId) continue
-    const s = Math.max(aehnlichkeit(w, stichwoerter(b.name)), ...(mitglieder.get(b.id) ?? []).map((x) => aehnlichkeit(w, x)))
-    if (s < AEHNLICH) continue
-    if (s > wert) {
+    const s = [stichwoerter(b.name), ...(mitglieder.get(b.id) ?? [])].map((x) => bewertung(w, x)).reduce((a, c) => (vergleiche(c, a) > 0 ? c : a))
+    if (s[0] < AEHNLICH) continue
+    const v = beste.length ? vergleiche(s, wert) : 1
+    if (v > 0) {
       beste = [b]
       wert = s
-    } else if (s === wert) beste.push(b)
+    } else if (v === 0) beste.push(b)
   }
   if (beste.length <= 1) return beste[0] ?? null
   /*
-   * Gleichstand in EINER Linie (Paket 12): „Der Erste Weltkrieg" und sein Unterbereich „Ursachen
-   * des Ersten Weltkriegs" passen gleich gut – dann der tiefere, er ist genauer. Gleichstand
-   * zwischen verschiedenen Zweigen bleibt unentschieden: lieber gar nicht als falsch einsortieren.
+   * Gleichstand in EINER Linie (Paket 12): Passen ein Bereich und sein Unterbereich auch nach
+   * genauen Wörtern gleich gut, dann der tiefere, er ist genauer. Gleichstand zwischen
+   * verschiedenen Zweigen bleibt unentschieden: lieber gar nicht als falsch einsortieren.
    */
   const alle = { bereiche }
   const tiefster = beste.find((b) => beste.every((x) => x.id === b.id || nachfahrenVon(alle, x.id).includes(b.id)))

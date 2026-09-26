@@ -225,6 +225,22 @@ describe('Automatik: einsortieren in die Hierarchie', () => {
     expect(besterBereich(m, d.bereiche, new Map())?.id).toBe('ursachen')
   })
 
+  it('ein genau gleiches Wort schlägt einen gemeinsamen Wortanfang – „Die Zelle" gehört nach „Zelle", nicht in „Zellorganellen"', () => {
+    let d = bereichSetzen(leereThemen(), { id: 'zelle1', fachId: 'biologie', name: 'Zelle' })
+    d = bereichSetzen(d, { id: 'organ1', fachId: 'biologie', name: 'Zellorganellen', elternId: 'zelle1' })
+    const mitglieder = new Map([['organ1', [['zellorganell', 'ueberblick']]]])
+    expect(besterBereich(mat('Die Zelle', 'biologie', 7), d.bereiche, mitglieder)?.id).toBe('zelle1')
+    // Umgekehrt bleibt der Unterbereich richtig, wenn er genau getroffen wird
+    expect(besterBereich(mat('Zellorganellen – Mitochondrien', 'biologie', 7), d.bereiche, mitglieder)?.id).toBe('organ1')
+    // Gleichstand zwischen zwei Zweigen bleibt unentschieden
+    const zwei = bereichSetzen(bereichSetzen(leereThemen(), { id: 'a1xx', fachId: 'biologie', name: 'Zelle' }), {
+      id: 'b1xx',
+      fachId: 'biologie',
+      name: 'Zellen'
+    })
+    expect(besterBereich(mat('Die Zelle', 'biologie', 7), zwei.bereiche, new Map())).toBeNull()
+  })
+
   it('von Hand Zugeordnetes bleibt; ausgeschaltete Automatik sortiert nichts; Unbelegtes bleibt ohne Bereich', () => {
     const m = mat('Der Balkan als Krisenherd Europas')
     const hand = zuordnen(weltkrieg(), { [materialSchluessel('arbeitsblatt', m.id)]: { bereichId: 'welt1', von: 'hand', am: '' } })

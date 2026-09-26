@@ -192,7 +192,10 @@ try {
   const z = (d, k) => d.zuordnungen[`arbeitsblatt:${k}`]
   const name = (d, k) => d.bereiche.find((b) => b.id === z(d, k)?.bereichId)?.name
   pruefe(z(nach, 'bio00002')?.von === 'auto' && name(nach, 'bio00002') === 'Zelle', `„Zellatmung" einsortiert (${name(nach, 'bio00002')})`)
-  pruefe(z(nach, 'bio00001')?.bereichId !== 'sonst001', `„Die Zelle" (vorher automatisch in „Sonstiges") verschoben (${name(nach, 'bio00001')})`)
+  pruefe(
+    name(nach, 'bio00001') === 'Zelle',
+    `„Die Zelle" (vorher automatisch in „Sonstiges") nach „Zelle" verschoben, nicht in „Zellorganellen" (${name(nach, 'bio00001')})`
+  )
   pruefe(
     ['bio00003', 'bio00004', 'bio00005'].every((k) => JSON.stringify(z(nach, k)) === JSON.stringify(z(vorher, k))),
     'Von Hand Zugeordnetes bleibt unberührt'
