@@ -189,6 +189,26 @@ export function nachfahrenVon(d: Pick<ThemenDaten, 'bereiche'>, id: string): str
 }
 
 /**
+ * Welche Bereiche eine EINGESCHRÄNKTE Ansicht zeigt (Paket 15; „nur Arbeitsblätter", Jahrgang):
+ * die mit passenden Materialien – direkt oder in einem Unterbereich, beliebig tief – samt den
+ * Oberbereichen auf dem Weg dorthin, dazu die in `immer` genannten (eben angelegte, noch leere
+ * Bereiche) mit ihren Oberbereichen. Leere und nur mit anderen Materialarten gefüllte Bereiche
+ * fallen weg.
+ *
+ * `direkt`: Zahl der passenden Materialien, die direkt im Bereich liegen.
+ */
+export function bereicheMitInhalt(d: Pick<ThemenDaten, 'bereiche'>, direkt: ReadonlyMap<string, number>, immer: Iterable<string> = []): Set<string> {
+  const nachId = new Map(d.bereiche.map((b) => [b.id, b]))
+  const out = new Set<string>()
+  const mitOberen = (id: string): void => {
+    for (let b = nachId.get(id); b && !out.has(b.id); b = b.elternId ? nachId.get(b.elternId) : undefined) out.add(b.id)
+  }
+  for (const [id, n] of direkt) if (n > 0) mitOberen(id)
+  for (const id of immer) mitOberen(id)
+  return out
+}
+
+/**
  * Der oberste Bereich über einem Bereich (bzw. er selbst, wenn er oben steht).
  *
  * Er ist das ÜBERTHEMA im Kopf der Materialien (Paket 11/12): Ein Blatt in „Der Erste Weltkrieg

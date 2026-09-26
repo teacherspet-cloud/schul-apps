@@ -33,9 +33,18 @@ import { notifyError, uid } from './util'
 interface ThemenState {
   daten: ThemenDaten
   geladen: boolean
+  /**
+   * In dieser Sitzung (seit dem Start der App) angelegte Bereiche (Paket 15). Die Bibliotheken
+   * blenden bei „nur <Art>" Bereiche ohne Materialien dieser Art aus – ein eben angelegter,
+   * noch leerer Ordner verschwände dann sofort, als wäre das Anlegen gescheitert. Diese
+   * Bereiche bleiben deshalb sichtbar, bis die App neu startet; danach gilt die Regel wieder.
+   * Absichtlich nur im Speicher und für alle Bibliotheken gemeinsam: Wer den Bereich in der
+   * Arbeitsblatt-Bibliothek anlegt und zu den Lernzielkontrollen wechselt, will ihn dort befüllen.
+   */
+  sitzung: string[]
 }
 
-export const useThemen = create<ThemenState>(() => ({ daten: leereThemen(), geladen: false }))
+export const useThemen = create<ThemenState>(() => ({ daten: leereThemen(), geladen: false, sitzung: [] }))
 
 const setze = (daten: ThemenDaten): ThemenDaten => {
   useThemen.setState({ daten, geladen: true })
@@ -87,6 +96,7 @@ export async function bereichAnlegen(fachId: string, name: string, elternId?: st
   try {
     const id = uid()
     const d = setze(await window.api.themen.bereich({ id, fachId, name, ...(elternId ? { elternId } : {}) }))
+    useThemen.setState((s) => ({ sitzung: [...s.sitzung, id] }))
     return d.bereiche.find((b) => b.id === id) ?? null
   } catch (e) {
     notifyError(e, 'Der Themenbereich ließ sich nicht anlegen')

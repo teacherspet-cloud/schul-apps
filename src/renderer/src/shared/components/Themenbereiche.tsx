@@ -45,7 +45,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
 import type { Themenbereich } from '@shared/themen'
-import { automatikAn, kinderVon, materialSchluessel, nachfahrenVon, pfadVon } from '@shared/themen'
+import { automatikAn, bereicheMitInhalt, kinderVon, materialSchluessel, nachfahrenVon, pfadVon } from '@shared/themen'
 import { modules } from '../../modules/registry'
 import { fachAnzeige, ladeMaterialien, type Material } from '../../shell/materialien'
 import { artFarbe } from '../materialart'
@@ -267,13 +267,34 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
   const imUmfang = umfang === 'nur' && moduleId ? alle.filter((m) => m.moduleId === moduleId) : alle
   const sichtbar = imUmfang.filter((m) => !jahrgang || m.grade === jahrgang)
 
+  /*
+   * EINGESCHRÄNKTE Ansicht (Paket 15, Wunsch der Lehrkraft): Bei „nur Arbeitsblätter" (bzw. der
+   * Art der Bibliothek) oder einem Jahrgang stehen nur Bereiche da, in denen – auch tiefer –
+   * passende Materialien liegen, samt ihren Oberbereichen; die Zahlen zählen nur diese. Vorher
+   * zeigte „nur Arbeitsblätter" jeden Ordner des Fachs, auch leere und solche mit nur
+   * Vokabeltests – die Bibliothek sah voller aus, als sie war.
+   * Ausnahme: in dieser Sitzung angelegte Bereiche (`sitzung` im Store, gemeinsam für alle
+   * Bibliotheken) bleiben sichtbar, auch leer – sonst verschwände der eben angelegte Ordner.
+   */
+  const sitzung = useThemen((s) => s.sitzung)
+  const eingeschraenkt = !!jahrgang || (umfang === 'nur' && !!moduleId)
+  const sichtbareBereiche = useMemo(() => {
+    if (!eingeschraenkt) return null
+    const direkt = new Map<string, number>()
+    for (const m of sichtbar) {
+      const id = daten.zuordnungen[schluesselVon(m)]?.bereichId
+      if (id) direkt.set(id, (direkt.get(id) ?? 0) + 1)
+    }
+    return bereicheMitInhalt(daten, direkt, [...sitzung, ...angelegt])
+  }, [eingeschraenkt, sichtbar, daten, sitzung, angelegt])
+
   const faecher = useMemo(() => {
     const set = new Set(sichtbar.map(fachVon))
-    // Ohne Einschränkung auf eine Art zeigen auch leere Bereiche ihr Fach – ein eben angelegter Bereich soll nicht verschwinden
-    if (umfang === 'alle' && !jahrgang) for (const b of daten.bereiche) set.add(b.fachId)
+    // Ohne Einschränkung zeigen auch leere Bereiche ihr Fach, eingeschränkt nur die gezeigten (eben angelegte)
+    for (const b of daten.bereiche) if (!sichtbareBereiche || sichtbareBereiche.has(b.id)) set.add(b.fachId)
     if (ort.fachId) set.add(ort.fachId)
     return [...set].sort((a, b) => fachAnzeige(a).localeCompare(fachAnzeige(b), 'de'))
-  }, [sichtbar, daten, umfang, ort.fachId, jahrgang])
+  }, [sichtbar, daten, ort.fachId, sichtbareBereiche])
 
   const offenerBereich = ort.bereichId ? (daten.bereiche.find((b) => b.id === ort.bereichId) ?? null) : null
   // Gelöschter oder unbekannter Bereich: zurück zur Übersicht
@@ -287,8 +308,8 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
   /** Materialien im Bereich UND seinen Unterbereichen – die Zahl an einem zugeklappten Ordner */
   const gesamtIn = (b: Themenbereich): number => [b.id, ...nachfahrenVon(daten, b.id)].reduce((n, id) => n + inBereich(id, b.fachId).length, 0)
   const istOffen = (k: string): boolean => offen.includes(k)
-  /** Mit Jahrgangsfilter nur Bereiche, in denen (auch darunter) für diesen Jahrgang etwas liegt – oder die gerade angelegt wurden */
-  const zeigen = (b: Themenbereich): boolean => !jahrgang || gesamtIn(b) > 0 || [b.id, ...nachfahrenVon(daten, b.id)].some((id) => angelegt.includes(id))
+  /** Eingeschränkt (Art, Jahrgang) nur Bereiche mit passendem Inhalt – oder die gerade angelegt wurden (siehe `sichtbareBereiche`) */
+  const zeigen = (b: Themenbereich): boolean => !sichtbareBereiche || sichtbareBereiche.has(b.id)
   const reihenKey = (id: string | null, fachId: string): string => id ?? `ohne:${fachId}`
   const sortiert = (liste: Material[], key: string): Material[] => sortiere(liste, sortierung, daten.reihenfolge[key], arten())
 
@@ -574,13 +595,14 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
         {liste.map((b) => {
           const auf = istOffen(`bereich:${b.id}`)
           const direkt = sortiert(inBereich(b.id, fachId), b.id)
-          const hatInhalt = direkt.length > 0 || kinder(fachId, b.id).length > 0
+          const hatInhalt = direkt.length > 0 || kinder(fachId, b.id).some(zeigen)
           return (
             <BaumZeile
               key={b.id}
               bereich={b}
               tiefe={tiefe}
               anzahl={gesamtIn(b)}
+              unter={nachfahrenVon(daten, b.id).filter((id) => !sichtbareBereiche || sichtbareBereiche.has(id)).length}
               offen={auf}
               neu={angelegt[angelegt.length - 1] === b.id}
               aufklappbar={hatInhalt || neuerBereich?.elternId === b.id}
@@ -614,8 +636,8 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
     const inhalt = sortiert(inBereich(b.id, b.fachId), b.id)
     const pfad = pfadVon(daten, b.id)
     const eltern = pfad.length > 1 ? pfad[pfad.length - 2] : null
-    const geschwister = kinder(b.fachId, b.elternId ?? null).filter((x) => x.id !== b.id)
-    const unter = kinder(b.fachId, b.id)
+    const geschwister = kinder(b.fachId, b.elternId ?? null).filter((x) => x.id !== b.id && zeigen(x))
+    const unter = kinder(b.fachId, b.id).filter(zeigen)
     return (
       <VerschiebenKontext.Provider value={verschiebenAus}>
         {kopf}
@@ -817,6 +839,7 @@ function BaumZeile({
   bereich: b,
   tiefe,
   anzahl,
+  unter,
   offen,
   neu,
   aufklappbar,
@@ -830,6 +853,8 @@ function BaumZeile({
   bereich: Themenbereich
   tiefe: number
   anzahl: number
+  /** Zahl der gezeigten Unterbereiche (beliebig tief) – in der eingeschränkten Ansicht nur die mit Inhalt */
+  unter: number
   offen: boolean
   /** Eben angelegt: hervorheben und in den sichtbaren Bereich holen */
   neu?: boolean
@@ -844,7 +869,6 @@ function BaumZeile({
   const [umbenennen, setUmbenennen] = useState<string | null>(null)
   const [loeschen, setLoeschen] = useState(false)
   const [verschieben, setVerschieben] = useState(false)
-  const unter = useThemen((s) => nachfahrenVon(s.daten, b.id).length)
   const zeile = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (neu) zeile.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
