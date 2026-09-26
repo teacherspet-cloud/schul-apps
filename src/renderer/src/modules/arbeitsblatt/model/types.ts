@@ -821,6 +821,11 @@ export interface WorksheetMeta {
   gradeScale?: {
     thresholds?: number[]
     groups: { label: string; points: number }[]
+    /**
+     * Sekundarstufe II: Notenpunkte 0–15 statt Noten 1–6 (26.09.2026, `shared/notenpunkte.ts`).
+     * `schwellen` = 16 Prozentwerte für 15 … 0 Punkte, `hinweis` = Rechtsgrundlage im Land.
+     */
+    punkte?: { schwellen: number[]; hinweis: string }
   }
   /**
    * Ein schmückendes Bild zulassen (Standard: ja, aber unter Bedingungen).

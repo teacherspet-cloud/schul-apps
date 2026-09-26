@@ -11,6 +11,7 @@ import { DEFAULT_CITATION_STYLE, formatCitation } from '../../../shared/citation
 import type { CitationStyle } from '@shared/types'
 import { canaryText, canaryWordFor, canaryWords } from '../../../shared/aiCanary'
 import { gradeScaleRows } from '../../../shared/gradeScale'
+import { punkteZeilen } from '../../../shared/notenpunkte'
 import { GRAMMAR_TOPICS } from '../didactics/grammar'
 import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
@@ -375,25 +376,56 @@ export function SheetPages({
                 {scaleGroups.map((group, gi) => (
                   <div key={gi} className="ws-gradescale">
                     {group.label && <div className="ws-gradescale-title">{group.label}</div>}
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Note</th>
-                          <th>Punkte</th>
-                          <th>Anteil</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {gradeScaleRows(group.points, ws.meta.gradeScale?.thresholds).map((row) => (
-                          <tr key={row.grade}>
-                            <td>{row.grade}</td>
-                            <td>{row.range}</td>
-                            <td>{row.percent}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className="ws-gradescale-note">{group.points} Punkte insgesamt · gerundet wird ab ,5 aufwärts</div>
+                    {ws.meta.gradeScale?.punkte ? (
+                      /* Sekundarstufe II: Notenpunkte 0–15 (26.09.2026, shared/notenpunkte.ts) */
+                      <>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Notenpunkte</th>
+                              <th>Note</th>
+                              <th>Punkte</th>
+                              <th>Anteil</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {punkteZeilen(group.points, ws.meta.gradeScale.punkte.schwellen).map((row) => (
+                              <tr key={row.punkte}>
+                                <td>{row.punkte}</td>
+                                <td>{row.note}</td>
+                                <td>{row.range}</td>
+                                <td>{row.percent}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div className="ws-gradescale-note">
+                          {group.points} Punkte insgesamt · Punktgrenze = kleinste Punktzahl, die den Prozentsatz erreicht · {ws.meta.gradeScale.punkte.hinweis}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Note</th>
+                              <th>Punkte</th>
+                              <th>Anteil</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {gradeScaleRows(group.points, ws.meta.gradeScale?.thresholds).map((row) => (
+                              <tr key={row.grade}>
+                                <td>{row.grade}</td>
+                                <td>{row.range}</td>
+                                <td>{row.percent}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div className="ws-gradescale-note">{group.points} Punkte insgesamt · gerundet wird ab ,5 aufwärts</div>
+                      </>
+                    )}
                   </div>
                 ))}
               </>

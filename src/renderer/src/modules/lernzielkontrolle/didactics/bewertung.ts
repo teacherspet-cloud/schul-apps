@@ -9,7 +9,11 @@
  * vorgeschrieben, und die echten Vorlagen, die der Recherche zugrunde lagen – bayerische
  * Stegreifaufgaben – tragen weder Punkte noch Schlüssel.
  *
- * ZUR BELEGLAGE DER SCHLÜSSEL: Nur EIN Land hat einen verbindlichen Prozentschlüssel.
+ * ZUR BELEGLAGE DER SCHLÜSSEL (Sek I): Mecklenburg-Vorpommern hat einen verbindlichen
+ * Prozentschlüssel; nach der Recherche vom 26.09.2026 außerdem Brandenburg (VV-Leistungs-
+ * bewertung Nr. 6 Abs. 3: 96/80/60/45/16) und Sachsen-Anhalt (Erlass Nr. 3.4.1 „sollte":
+ * 95/81/66/51/26). Für die Sekundarstufe II gelten Notenpunkte 0–15 – siehe
+ * `shared/notenpunkte.ts`, dort auch die Länderlage.
  * Mecklenburg-Vorpommern, LeistBewVO § 4 Abs. 3: ab 96 % = 1, 80 % = 2, 60 % = 3, 40 % = 4,
  * 20 % = 5, darunter 6. Wörtlich: „Maßgeblich … sind ganze Prozentwerte. Eine Rundung findet
  * nicht statt." Nach § 4 Abs. 4 gilt diese Tabelle für schriftliche Lernerfolgskontrollen

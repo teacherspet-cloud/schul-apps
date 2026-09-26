@@ -13,6 +13,7 @@ import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblat
 import type { GrammarTest } from '../model/types'
 import { testPoints } from '../model/types'
 import { gradeScaleLine } from '../../../shared/gradeScale'
+import { notenpunkteFuer, punkteZeile } from '../../../shared/notenpunkte'
 
 /** Kopfkasten: Zeit, Punkte und – auf Wunsch – der Notenschlüssel. */
 export function testHeadBlock(test: GrammarTest): WsBlock | null {
@@ -26,7 +27,9 @@ export function testHeadBlock(test: GrammarTest): WsBlock | null {
     english ? `${points} points` : `${points} Punkte`,
     // Die geprüfte Form wird genannt: Ein Test soll nicht raten lassen, worum es geht
     topics.length ? (english ? `Focus: ${topics.map((t) => t.term || t.label).join(', ')}` : `Schwerpunkt: ${topics.map((t) => t.label).join(', ')}`) : '',
-    m.gradeScaleOnSheet && points > 0 ? `${english ? 'Marks' : 'Notenschlüssel'}: ${gradeScaleLine(points, m.gradeScaleThresholds)}` : ''
+    m.gradeScaleOnSheet && points > 0
+      ? `${english ? 'Marks' : 'Notenschlüssel'}: ${((r) => (r ? punkteZeile(points, r.schwellen) : gradeScaleLine(points, m.gradeScaleThresholds)))(notenpunkteFuer(m))}`
+      : ''
   ].filter(Boolean)
   return {
     id: 'test-head',
@@ -68,7 +71,16 @@ export function worksheetMetaForTest(test: GrammarTest): WorksheetMeta {
     minutes: m.minutes,
     pages: Math.max(1, Math.ceil(test.blocks.length / 6)),
     // Nur wenn über Punkte bewertet wird, sagt ein Schlüssel etwas aus
-    ...(m.graded && points > 0 ? { gradeScale: { thresholds: m.gradeScaleThresholds, groups: [{ label: '', points }] } } : {})
+    ...(m.graded && points > 0
+      ? {
+          gradeScale: {
+            thresholds: m.gradeScaleThresholds,
+            groups: [{ label: '', points }],
+            // Sekundarstufe II: Notenpunkte 0–15 (26.09.2026)
+            ...((r) => (r ? { punkte: { schwellen: r.schwellen, hinweis: r.hinweis } } : {}))(notenpunkteFuer(m))
+          }
+        }
+      : {})
   }
 }
 

@@ -45,7 +45,8 @@ import { defaultExamMeta, defaultMinutes } from '../model/defaults'
 import { courseLevelOptions, gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { STATES } from '../../arbeitsblatt/didactics/states'
 import { curriculumSource, curriculumTopics } from '../model/curriculumGeschichte'
-import { examWarnings, gradeScaleGroups, gradeScaleLine, stateRules, WORTZAHL_GRUND, wortzahlErlaubt } from '../model/examRules'
+import { examWarnings, gradeScaleGroups, scaleLineFuer, stateRules, WORTZAHL_GRUND, wortzahlErlaubt } from '../model/examRules'
+import { notenpunkteFuer } from '../../../shared/notenpunkte'
 import { STUDENT_TEXT_TYPES } from '../../arbeitsblatt/generation/prompts'
 import { CONTENT_SHARE, defaultWeights, formatById, formatsFor, suggestParts, writingWeightFor } from '../model/formats'
 import { ANSWER_KEY_DETAILS } from '../model/types'
@@ -907,7 +908,7 @@ export default function FrameStep(): React.JSX.Element {
                             </Group>
                             {g.points > 0 && (
                               <Text size="xs" c="dimmed">
-                                Notenschlüssel: {gradeScaleLine(g.points, meta.gradeScaleThresholds)}
+                                Notenschlüssel: {scaleLineFuer(meta, g.points)}
                               </Text>
                             )}
                           </div>
@@ -919,7 +920,7 @@ export default function FrameStep(): React.JSX.Element {
                           </Text>
                           {pointsPlanned > 0 && (
                             <Text size="xs" c="dimmed">
-                              Notenschlüssel: {gradeScaleLine(pointsPlanned, meta.gradeScaleThresholds)}
+                              Notenschlüssel: {scaleLineFuer(meta, pointsPlanned)}
                             </Text>
                           )}
                         </>
@@ -1033,9 +1034,16 @@ export default function FrameStep(): React.JSX.Element {
                         checked={meta.gradeScale}
                         onChange={(e) => patch({ gradeScale: e.currentTarget.checked })}
                       />
-                      <Button size="compact-sm" variant="light" onClick={() => setScaleOpen(true)}>
-                        Notenschlüssel bearbeiten
-                      </Button>
+                      {notenpunkteFuer(meta) ? (
+                        /* Sekundarstufe II: Notenpunkte 0–15 nach dem Raster des Landes – nicht frei einstellbar (26.09.2026) */
+                        <Text size="xs" c="dimmed" style={{ flexBasis: '100%' }}>
+                          Sekundarstufe II: Bewertung mit 0–15 Notenpunkten. {notenpunkteFuer(meta)!.hinweis}
+                        </Text>
+                      ) : (
+                        <Button size="compact-sm" variant="light" onClick={() => setScaleOpen(true)}>
+                          Notenschlüssel bearbeiten
+                        </Button>
+                      )}
                     </Group>
                   </Stack>
                 </Grid.Col>

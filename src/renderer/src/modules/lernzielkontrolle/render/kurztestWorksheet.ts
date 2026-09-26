@@ -16,6 +16,7 @@
 import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
 import { gesamtpunkte, notenspiegel, schluesselHinweis } from '../didactics/bewertung'
+import { notenpunkteFuer, punkteZeilen } from '../../../shared/notenpunkte'
 import type { Kurztest } from '../model/types'
 import { anredeFuerKurztest } from '../model/defaults'
 
@@ -38,6 +39,20 @@ export function kopfzeile(test: Kurztest, varianteLabel: string): string {
  */
 export function schluesselBlock(test: Kurztest, ausEinstellungen?: number[]): WsBlock | null {
   const punkte = gesamtpunkte(test.varianten[0]?.blocks ?? [])
+  /*
+   * Sekundarstufe II: Notenpunkte 0–15 nach dem Raster des Landes (26.09.2026) – auch ein
+   * Kurztest der Oberstufe wird in Punkten bewertet, nicht in Noten 1–6.
+   */
+  const regel = punkte > 0 && test.meta.bewertung.schluessel !== 'keiner' ? notenpunkteFuer(test.meta) : null
+  if (regel) {
+    return {
+      id: 'lzk-schluessel',
+      type: 'table',
+      title: `Notenpunkte (${punkte} Punkte) – ${regel.hinweis}`,
+      headers: ['Notenpunkte', 'Note', 'Punkte', 'Anteil'],
+      rows: punkteZeilen(punkte, regel.schwellen).map((z) => [z.punkte, z.note, z.range, z.percent])
+    }
+  }
   const zeilen = notenspiegel(punkte, test.meta.bewertung, ausEinstellungen)
   if (!zeilen.length) return null
   return {

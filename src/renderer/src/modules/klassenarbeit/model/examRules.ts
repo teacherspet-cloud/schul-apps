@@ -13,6 +13,7 @@
  * aktuelle Fassung; bei BW und Hessen lag nur eine ältere Fassung vor.
  */
 import { gradeScaleLine as sharedGradeScaleLine } from '../../../shared/gradeScale'
+import { notenpunkteFuer, punkteZeile } from '../../../shared/notenpunkte'
 import { examGrades } from './types'
 import type { Exam } from './types'
 
@@ -169,6 +170,15 @@ export function examWarnings(stateId: string, subjectId: string, grade: number, 
  */
 export function gradeScaleLine(points: number, thresholds?: number[]): string {
   return sharedGradeScaleLine(points, thresholds)
+}
+
+/**
+ * Die Schlüsselzeile für DIESE Arbeit: in der Sekundarstufe II Notenpunkte 0–15 nach dem
+ * Raster des Landes (26.09.2026), sonst der Notenschlüssel 1–6 der Lehrkraft.
+ */
+export function scaleLineFuer(meta: { grade: number; schoolTypeId: string; stateId: string; gradeScaleThresholds?: number[] }, points: number): string {
+  const regel = notenpunkteFuer(meta)
+  return regel ? punkteZeile(points, regel.schwellen) : sharedGradeScaleLine(points, meta.gradeScaleThresholds)
 }
 
 /**

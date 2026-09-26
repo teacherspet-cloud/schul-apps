@@ -10,7 +10,8 @@ import { newId } from '../../vokabeltest/model/random'
 import type { Sheet, Worksheet, WsBlock } from '../../arbeitsblatt/model/types'
 import { worksheetMetaFor } from '../generation/generateExam'
 import { translateAids } from '../model/aids'
-import { gradeScaleGroups, gradeScaleLine } from '../model/examRules'
+import { gradeScaleGroups, scaleLineFuer } from '../model/examRules'
+import { notenpunkteFuer } from '../../../shared/notenpunkte'
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam } from '../model/types'
 import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
@@ -58,7 +59,7 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
     }),
     // Nur bei einer einzigen Note sinnvoll
     // Nur auf ausdrücklichen Wunsch: Der Schlüssel steht sonst allein im Erwartungshorizont
-    ...(m.gradeScale ? gradeScaleGroups(exam).map((g) => t.scale(`${g.label ? `${g.label}: ` : ''}${gradeScaleLine(g.points, m.gradeScaleThresholds)}`)) : [])
+    ...(m.gradeScale ? gradeScaleGroups(exam).map((g) => t.scale(`${g.label ? `${g.label}: ` : ''}${scaleLineFuer(m, g.points)}`)) : [])
   ]
   return {
     id: 'exam-head',
@@ -113,7 +114,12 @@ export function examToWorksheet(exam: Exam, fassung = 0): Worksheet {
       ueberthemaAus: exam.meta.ueberthemaAus,
       pages: Math.max(1, Math.ceil(blocks.length / 6)),
       // Im Erwartungshorizont steht der Schlüssel immer – aber nur für Teile mit Punkten
-      gradeScale: { thresholds: exam.meta.gradeScaleThresholds, groups: gradeScaleGroups(exam) }
+      gradeScale: {
+        thresholds: exam.meta.gradeScaleThresholds,
+        groups: gradeScaleGroups(exam),
+        // Sekundarstufe II: Notenpunkte 0–15 nach dem Raster des Landes (26.09.2026)
+        ...((r) => (r ? { punkte: { schwellen: r.schwellen, hinweis: r.hinweis } } : {}))(notenpunkteFuer(exam.meta))
+      }
     },
     // Auf einer Klassenarbeit tragen die Lernenden Name, Klasse und Datum ein
     design: { ...exam.design, header: { ...exam.design.header, fields: { name: true, class: true, date: true } } },
