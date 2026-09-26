@@ -65,6 +65,9 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
     anrede: anredeFuerStufe(m.stufe),
     answerKey: m.answerKey,
     vorlagenfarbe: m.vorlagenfarbe,
+    // Überthema (Paket 11) – den Themenbereich setzt der Editor beim Anzeigen ein
+    ueberthema: m.ueberthema,
+    ueberthemaAus: m.ueberthemaAus,
     // Die Lernhilfen des Arbeitsblatts gibt es hier nicht – siehe didactics/bausteine.ts
     helpCards: false,
     minutes: m.minutes,

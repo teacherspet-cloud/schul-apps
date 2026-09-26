@@ -60,10 +60,28 @@ import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useDruck } from '../../../shared/navigation'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useAppSettings } from '../../../shared/settingsStore'
+import UeberthemaFeld from '../../../shared/components/UeberthemaFeld'
+import { useThemenbereich } from '../../../shared/themenbereiche'
+import { unitAusName } from '../../../shared/ueberthema'
 import './editor.css'
 
 export default function EditorStep(): React.JSX.Element {
-  const { doc, updateDoc, updateBlock, undo, redo, verlauf, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
+  const { doc: gespeichert, updateDoc, updateBlock, undo, redo, verlauf, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
+  /*
+   * Überthema (Paket 11): der Themenbereich des Tests – ohne Bereich die Unit aus dem Namen der
+   * Liste („Green Line 5 – Unit 3" → „Unit 3"). Nur zum Anzeigen eingesetzt; Vorschau, Druck,
+   * PDF und Word nehmen dieses `doc`.
+   */
+  const bereich =
+    useThemenbereich(
+      'vokabeltest',
+      useVokabeltest((s) => s.testId)
+    )?.name ?? ''
+  const unit = unitAusName(listName)
+  const doc = useMemo(
+    () => (gespeichert && (bereich || unit) ? { ...gespeichert, header: { ...gespeichert.header, themenbereich: bereich || unit } } : gespeichert),
+    [gespeichert, bereich, unit]
+  )
   // Nur zum Neuzeichnen: TestPage liest die Fachfarbe außerhalb von React (shared/fachfarben.ts)
   useAppSettings((s) => s.settings.fachfarben)
   const [view, setView] = useState<'test' | 'key'>('test')
@@ -237,7 +255,7 @@ export default function EditorStep(): React.JSX.Element {
             { value: 'key', label: 'Lösungen' }
           ]}
         />
-        <HeaderSettings doc={doc} onChange={(fn) => updateDoc(fn)} />
+        <HeaderSettings doc={doc} bereich={bereich} unit={unit} onChange={(fn) => updateDoc(fn)} />
         <Box style={{ flex: 1 }} />
         <Text size="xs" c="dimmed">
           {formatPoints(variantPoints(variant))} Punkte · Niveau {doc.settings.level}
@@ -507,7 +525,17 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
   )
 }
 
-function HeaderSettings({ doc, onChange }: { doc: TestDocument; onChange: (fn: (d: TestDocument) => void) => void }): React.JSX.Element {
+function HeaderSettings({
+  doc,
+  bereich,
+  unit,
+  onChange
+}: {
+  doc: TestDocument
+  bereich: string
+  unit: string
+  onChange: (fn: (d: TestDocument) => void) => void
+}): React.JSX.Element {
   const h = doc.header
   const toggle = (key: keyof typeof h, label: string): React.JSX.Element => (
     <Checkbox size="xs" label={label} checked={Boolean(h[key])} onChange={(e) => onChange((d) => ((d.header[key] as boolean) = e.currentTarget.checked))} />
@@ -548,6 +576,8 @@ function HeaderSettings({ doc, onChange }: { doc: TestDocument; onChange: (fn: (
             checked={Boolean(h.vorlagenfarbe)}
             onChange={(an) => onChange((d) => (d.header.vorlagenfarbe = an))}
           />
+          {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
+          <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
           <NumberInput
             size="xs"
             label="Schriftgröße (pt)"

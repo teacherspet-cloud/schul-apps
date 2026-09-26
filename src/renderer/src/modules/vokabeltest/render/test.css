@@ -56,6 +56,22 @@
   color: #555;
   margin-bottom: 2mm;
 }
+/* Überthema (Paket 11): „Englisch › Unit 3" rechts in der Zeile der Schule */
+.vt-kopfzeile {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4mm;
+  margin-bottom: 2mm;
+}
+.vt-kopfzeile .vt-school {
+  margin-bottom: 0;
+}
+.vt-ueberthema {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--vt-accent, #333);
+}
 .vt-title-row {
   display: flex;
   justify-content: space-between;

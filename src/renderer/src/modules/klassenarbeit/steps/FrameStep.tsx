@@ -1,3 +1,4 @@
+import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
   ActionIcon,
   Alert,
@@ -61,6 +62,7 @@ import GradeScaleModal from '../../../shared/components/GradeScaleModal'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import StoffQuellen from '../../../shared/components/StoffQuellen'
+import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
 
 const SUBJECTS: { value: ExamSubjectId; label: string }[] = [
   { value: 'englisch', label: 'Englisch' },
@@ -70,7 +72,9 @@ const SUBJECTS: { value: ExamSubjectId; label: string }[] = [
 function emptyExam(stateId: string, schoolTypeId: string, schoolTypeName: string, design: DesignTemplate): Exam {
   // Zuletzt gewählte Angaben gelten wieder (Fach, Jahrgang, Kursniveau)
   const last = loadLastChoice('klassenarbeit')
-  const subject = SUBJECTS.find((s) => s.value === last.subjectId)
+  // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor (shared/fachVorgabe.ts)
+  const vorgabe = nimmFachVorgabe('klassenarbeit')
+  const subject = SUBJECTS.find((s) => s.value === vorgabe) ?? SUBJECTS.find((s) => s.value === last.subjectId)
   return {
     version: 1,
     meta: {
@@ -1014,6 +1018,8 @@ export default function FrameStep(): React.JSX.Element {
                     />
                     {/* Paket 10a: dezent in der Fachfarbe, auch im Erwartungshorizont – hier abschaltbar */}
                     <VorlagenfarbeSchalter fach={meta.subjectId} checked={Boolean(meta.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
+                    {/* Paket 11: Überthema im Kopf der Arbeit – standardmäßig der Themenbereich */}
+                    <UeberthemaFeldFuer moduleId="klassenarbeit" docId={useKlassenarbeit.getState().docId} werte={meta} onChange={(p) => patch(p)} />
                     {/*
                      * Formulierungshilfen in einer ARBEIT – bewusst abschaltbar und aus.
                      *

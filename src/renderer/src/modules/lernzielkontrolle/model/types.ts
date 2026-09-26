@@ -42,6 +42,10 @@ export interface KurztestMeta {
    * der Fachfarbe aus den Einstellungen. Fehlt = Fachfarbe.
    */
   vorlagenfarbe?: boolean
+  /** Überthema im Kopf (Paket 11, shared/ueberthema.ts): eigener Eintrag; leer = der Themenbereich */
+  ueberthema?: string
+  /** true = kein Überthema auf diesem Material */
+  ueberthemaAus?: boolean
   subjectId: string
   subjectLabel: string
 

@@ -1,3 +1,4 @@
+import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import { Alert, Box, Button, Card, Container, Grid, Group, NumberInput, ScrollArea, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
 import { IconAlertTriangle, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -27,6 +28,7 @@ import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useKiZugang } from '../../../shared/useKiZugang'
+import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
 
 /** Fächer, für die es eine Grammatikliste gibt. */
 const TEST_SUBJECTS = SUBJECTS.filter((s) => hasGrammar(s.id))
@@ -55,7 +57,11 @@ export default function SetupStep(): React.JSX.Element {
           const stateId = settings.defaults.stateId
           const schoolTypeId = settings.defaults.schoolTypeId
           const name = cefr.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.name ?? 'Gymnasium'
-          setTest(newTest(ds.find((d) => d.isDefault) ?? ds[0], stateId, schoolTypeId, name))
+          const neu = newTest(ds.find((d) => d.isDefault) ?? ds[0], stateId, schoolTypeId, name)
+          // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor – sofern es Grammatiktests hat
+          const vorgabe = TEST_SUBJECTS.find((s) => s.id === nimmFachVorgabe('grammatiktest'))
+          if (vorgabe) neu.meta = { ...neu.meta, subjectId: vorgabe.id, subjectLabel: vorgabe.label, languageOrder: vorgabe.id === 'englisch' ? 1 : 2 }
+          setTest(neu)
         }
       })
       .catch(notifyError)
@@ -338,6 +344,8 @@ export default function SetupStep(): React.JSX.Element {
                     />
                     {/* Paket 10a: dezent in der Fachfarbe (Kopf, Überschriften) – hier abschaltbar */}
                     <VorlagenfarbeSchalter fach={meta.subjectId} checked={Boolean(meta.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
+                    {/* Paket 11: Überthema dezent im Kopf – standardmäßig der Themenbereich */}
+                    <UeberthemaFeldFuer moduleId="grammatiktest" docId={useGrammatiktest.getState().docId} werte={meta} onChange={(p) => patch(p)} />
                   </Stack>
                 </Grid.Col>
                 <Grid.Col span={{ base: 12, md: 6 }}>

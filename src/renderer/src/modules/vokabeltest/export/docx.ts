@@ -24,6 +24,7 @@ import type { TestLayouts } from '../render/useTestLayout'
 
 import { A4_WIDTH as PAGE_WIDTH, ALL_BORDERS, CM, dataUrlBytes, ImageSizer, NO_BORDERS, RED, run, THIN, writingLines } from '../../../shared/export/docxKit'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
+import { vokabeltestPfad } from '../render/TestPage'
 
 type Mode = 'print' | 'key'
 export type { ImageSizer }
@@ -99,7 +100,19 @@ interface Ctx {
 function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
   const h = ctx.doc.header
   const out: (Paragraph | Table)[] = []
-  if (h.showSchool && h.schoolName) {
+  // Überthema rechts in der Zeile der Schule – wie in der Vorschau (Paket 11)
+  const pfad = vokabeltestPfad(ctx.doc)
+  if (pfad) {
+    out.push(
+      new Paragraph({
+        tabStops: [{ type: TabStopType.RIGHT, position: CONTENT }],
+        children: [
+          new TextRun({ text: h.showSchool ? h.schoolName : '', size: ctx.size - 4, color: '555555' }),
+          new TextRun({ text: `\t${pfad}`, size: ctx.size - 4, bold: true, color: ctx.akzent ?? '333333' })
+        ]
+      })
+    )
+  } else if (h.showSchool && h.schoolName) {
     out.push(new Paragraph({ children: [new TextRun({ text: h.schoolName, size: ctx.size - 4, color: '555555' })] }))
   }
   const titleRuns: ParagraphChild[] = [new TextRun({ text: h.title + (mode === 'key' ? ' – answer key' : ''), bold: true, size: Math.round(ctx.size * 1.9) })]

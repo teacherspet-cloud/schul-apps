@@ -19,6 +19,8 @@ export interface RunOptions {
   color?: string
   size?: number
   font?: string
+  /** Großbuchstaben nur in der Darstellung (Fach über dem Überthema, Paket 11) */
+  allCaps?: boolean
 }
 
 export const run = (text: string, opts: RunOptions = {}): TextRun => new TextRun({ text, ...opts })

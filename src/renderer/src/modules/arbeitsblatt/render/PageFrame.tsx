@@ -3,6 +3,7 @@ import type { WorksheetMeta } from '../model/types'
 import type { CitationStyle } from '@shared/types'
 import { CANARY_STYLE } from '../../../shared/aiCanary'
 import { RichText } from '../../../shared/richtext/RichText'
+import { fachPfad, ueberthemaVon, type UeberthemaStil } from '../../../shared/ueberthema'
 
 export interface PageInfo {
   design: DesignTemplate
@@ -26,10 +27,45 @@ export interface PageInfo {
 /** Titel im Kopf; im Lösungsteil mit dem Begriff des Moduls („– Lösungen", „– Erwartungshorizont"). */
 export const kopfTitel = (meta: WorksheetMeta, isKey: boolean): string => (meta.title || meta.topic) + (isKey ? ` – ${meta.loesungsBegriff || 'Lösungen'}` : '')
 
+/**
+ * Überthema im Kopf (Paket 11) – wie es die Designvorlage darstellen lässt.
+ * - `fachZeile`: der Fachteil der Zeile unter dem Titel („Biologie › Ökologie" beim Pfad);
+ * - `block`: das Überthema als eigener Block rechts im Kopf (Fach links / Überthema rechts
+ *   bzw. betont mit dem Fach klein darüber) – bewusst beim Kopfband und nicht bei der
+ *   Blattüberschrift.
+ * Ohne Überthema bleibt alles wie vor Paket 11: kein Block, kein einsamer Pfeil.
+ * Vorschau und Word-Export (export/docx.ts) lesen beide hier.
+ */
+export interface KopfUeberthema {
+  stil: UeberthemaStil
+  ueber: string
+  fachZeile: string
+  block: { fach: string; thema: string } | null
+}
+
+export function kopfUeberthema(info: PageInfo): KopfUeberthema {
+  const stil = info.design.header.overTopicStyle ?? 'path'
+  const fach = info.design.header.showSubject ? info.meta.subjectLabel : ''
+  const ueber = ueberthemaVon(info.meta)
+  if (!ueber || stil === 'path') return { stil, ueber, fachZeile: fachPfad(fach, ueber), block: null }
+  if (stil === 'split') return { stil, ueber, fachZeile: fach, block: { fach: '', thema: ueber } }
+  return { stil, ueber, fachZeile: '', block: { fach, thema: ueber } }
+}
+
+/** Text vor dem Titel im kompakten Kopf: Fach bzw. „Fach › Überthema" (Pfad) */
+export function kompaktVorTitel(info: PageInfo): string {
+  const u = kopfUeberthema(info)
+  const fach = u.stil === 'path' ? u.fachZeile : info.design.header.showSubject ? info.meta.subjectLabel : ''
+  return fach ? `${fach} · ` : ''
+}
+
 export function sidebarText(info: PageInfo): string {
   const s = info.design.sidebar
   if (s.content === 'subject') return info.meta.subjectLabel
   if (s.content === 'topic') return info.meta.topic || info.meta.title
+  // Paket 11: das Überthema allein oder als Pfad hinter dem Fach (ohne Überthema nur das Fach)
+  if (s.content === 'overTopic') return ueberthemaVon(info.meta)
+  if (s.content === 'subjectOverTopic') return fachPfad(info.meta.subjectLabel, ueberthemaVon(info.meta))
   if (s.content === 'custom') return s.customText
   return ''
 }
@@ -136,10 +172,22 @@ function Logo({ info, heightMm }: { info: PageInfo; heightMm: number }): React.J
   return <img className="ws-logo" src={info.logo} alt="Schullogo" style={{ height: `${heightMm}mm` }} />
 }
 
+/** Überthema als eigener Block im Kopf (Fach links / Überthema rechts bzw. betont) */
+function UeberthemaBlock({ u }: { u: KopfUeberthema }): React.JSX.Element | null {
+  if (!u.block) return null
+  return (
+    <div className={`ws-ueberthema ws-ueberthema-${u.stil}`} data-ueberthema={u.ueber}>
+      {u.block.fach && <span className="ws-ueberthema-fach">{u.block.fach}</span>}
+      <span className="ws-ueberthema-thema">{u.block.thema}</span>
+    </div>
+  )
+}
+
 function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
   const h = info.design.header
   const title = kopfTitel(info.meta, info.isKey)
-  const subjectLine = [h.showSubject ? info.meta.subjectLabel : '', info.meta.grade ? pageLabels(info).grade(info.meta.grade) : ''].filter(Boolean).join(' · ')
+  const u = kopfUeberthema(info)
+  const subjectLine = [u.fachZeile, info.meta.grade ? pageLabels(info).grade(info.meta.grade) : ''].filter(Boolean).join(' · ')
   const meta = (
     <div className="ws-head-text">
       {h.showSchoolName && info.schoolName && <div className="ws-school">{info.schoolName}</div>}
@@ -149,9 +197,14 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
           <RichText value={title} inline editable={false} />
         </div>
       )}
-      {(subjectLine || h.customText) && <div className="ws-subject">{[subjectLine, h.customText].filter(Boolean).join(' · ')}</div>}
+      {(subjectLine || h.customText) && (
+        <div className="ws-subject" data-ueberthema={u.stil === 'path' && u.ueber ? u.ueber : undefined}>
+          {[subjectLine, h.customText].filter(Boolean).join(' · ')}
+        </div>
+      )}
     </div>
   )
+  const block = <UeberthemaBlock u={u} />
   const badge =
     h.showSheetNumber || info.levelMark ? (
       <div className="ws-sheetno">
@@ -170,6 +223,7 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
             </div>
           )}
           {meta}
+          {block}
           {badge}
           {dateInTitleRow(info) && <DateField info={info} />}
         </div>
@@ -182,6 +236,7 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
       <header className="ws-header ws-header-centered">
         <Logo info={info} heightMm={h.logoHeightMm} />
         {meta}
+        {block}
         {badge}
         {dateInTitleRow(info) && <DateField info={info} />}
         <Fields info={info} />
@@ -193,6 +248,7 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
       <div className="ws-head-row">
         <Logo info={info} heightMm={h.logoHeightMm} />
         {meta}
+        {block}
         {badge}
         {dateInTitleRow(info) && <DateField info={info} />}
       </div>
@@ -203,13 +259,20 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
 
 function CompactHeader({ info }: { info: PageInfo }): React.JSX.Element {
   const title = kopfTitel(info.meta, info.isKey)
+  const u = kopfUeberthema(info)
   return (
     <header className="ws-header ws-header-compact">
       {info.design.header.showLogo && info.logo && <img className="ws-logo" src={info.logo} alt="" style={{ height: '7mm' }} />}
-      <span className="ws-compact-text">
-        {info.design.header.showSubject && info.meta.subjectLabel ? `${info.meta.subjectLabel} · ` : ''}
+      <span className="ws-compact-text" data-ueberthema={u.stil === 'path' && u.ueber ? u.ueber : undefined}>
+        {kompaktVorTitel(info)}
         <RichText value={title} inline editable={false} />
       </span>
+      {/* Auf Folgeseiten genügt das Überthema selbst – rechts, ohne das Fach ein zweites Mal */}
+      {u.block && (
+        <span className="ws-compact-ueberthema" data-ueberthema={u.ueber}>
+          {u.ueber}
+        </span>
+      )}
       {info.levelMark && <span className="ws-level-mark">{info.levelMark}</span>}
     </header>
   )

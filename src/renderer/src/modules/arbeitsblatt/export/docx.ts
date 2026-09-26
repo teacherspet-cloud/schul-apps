@@ -48,7 +48,7 @@ import { INFO_VARIANTS, SOCIAL_FORM_SVG } from '../render/icons'
 import { pictogramForSocialForm } from '../render/pictograms'
 import { istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../render/mcGrid'
 import { imageCredits, isHelpCard, isPhraseSheet } from '../render/SheetPages'
-import { contentInsets, footerSlotText, kopfTitel, PageInfo, sidebarBox, sidebarText } from '../render/PageFrame'
+import { contentInsets, footerSlotText, kompaktVorTitel, kopfTitel, kopfUeberthema, PageInfo, sidebarBox, sidebarText } from '../render/PageFrame'
 import { audioLength, galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraphs } from '../render/BlockView'
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../didactics/audioRules'
@@ -66,6 +66,7 @@ import { zeigtUebersetzung } from '../didactics/phraseRules'
 import { anredeFuerMeta } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
 import { druckAkzent } from '../../../shared/fachfarben'
+import type { DeckblattBilder } from '../render/deckblattBilder'
 
 export interface WorksheetDocxDeps {
   logo: string | null
@@ -76,6 +77,11 @@ export interface WorksheetDocxDeps {
   sidebar: (text: string, color: string, widthMm: number, heightMm: number) => Promise<string>
   /** Selbst gestaltete Piktogramme (Kennung → PNG-data:-URL); leer = mitgelieferte Symbole */
   pictograms?: Record<string, string>
+  /**
+   * Das Deckblatt als Bilder (Paket 11, render/deckblattBilder.tsx). Fehlt es, hat das
+   * Word-Dokument kein Deckblatt – so wie vor Paket 11.
+   */
+  deckblatt?: DeckblattBilder
 }
 
 export interface WorksheetDocxOptions {
@@ -124,6 +130,8 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
   const add = async (key: boolean): Promise<void> => {
     for (const sheet of sheets) sections.push(...(await sheetSections(ws, sheet, key, deps)))
   }
+  // Das Deckblatt steht vor allem anderen – aber nicht vor einer reinen Lösungsdatei
+  if (deps.deckblatt && ws.meta.coverPage && !opts.keyOnly) sections.push(deckblattAbschnitt(deps.deckblatt))
   if (!opts.keyOnly) await add(false)
   if (opts.includeKey || opts.keyOnly) await add(true)
   // Je gewähltem Tafelformat ein eigener Abschnitt
@@ -137,6 +145,47 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
     sections
   })
   return new Uint8Array(await Packer.toArrayBuffer(doc))
+}
+
+/**
+ * Das Deckblatt als eigener Abschnitt: die Seite ohne Vorschauen als Bild hinter dem Text,
+ * darüber jede Seitenvorschau als schwebendes Bild – an ihrer Stelle, gedreht und in ihrer
+ * Ebene, genau wie im Editor und im PDF. In Word lassen sich die Vorschauen danach noch
+ * verschieben.
+ */
+function deckblattAbschnitt(b: DeckblattBilder): ISectionOptions {
+  const bild = (png: string, x0: number, y0: number, breite: number, hoehe: number, drehung: number, ebene: number, hinten: boolean): ImageRun =>
+    new ImageRun({
+      type: 'png',
+      data: dataUrlBytes(png).data,
+      transformation: {
+        width: Math.round(breite * PX_MM),
+        height: Math.round(hoehe * PX_MM),
+        // Word dreht um die Mitte und kennt nur 0° bis 360°
+        ...(drehung ? { rotation: Math.round((((drehung % 360) + 360) % 360) * 100) / 100 } : {})
+      },
+      floating: {
+        horizontalPosition: { relative: HorizontalPositionRelativeFrom.PAGE, offset: Math.round(x0 * EMU_MM) },
+        verticalPosition: { relative: VerticalPositionRelativeFrom.PAGE, offset: Math.round(y0 * EMU_MM) },
+        behindDocument: hinten,
+        allowOverlap: true,
+        zIndex: ebene,
+        wrap: { type: TextWrappingType.NONE }
+      }
+    })
+  // Ebenen der Karten auf positive Werte bringen – der Hintergrund liegt ganz unten
+  const tiefste = Math.min(0, ...b.karten.map((k) => k.ebene))
+  return {
+    properties: { page: { size: { width: A4_WIDTH, height: A4_HEIGHT }, margin: { top: 0, bottom: 0, left: 0, right: 0, header: 0, footer: 0 } } },
+    children: [
+      new Paragraph({
+        children: [
+          bild(b.hintergrund, 0, 0, 210, 297, 0, 1, true),
+          ...b.karten.map((k) => bild(k.png, k.x0, k.y0, k.breite, k.hoehe, k.drehung, 10 + k.ebene - tiefste, false))
+        ]
+      })
+    ]
+  }
 }
 
 /** Randlos in ALLE Richtungen – `NO_BORDERS` kennt die Innenlinien einer Tabelle nicht. */
@@ -530,8 +579,11 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
     children.push(new Paragraph({ children: sidebar ? [sidebar] : [] }))
     return new Header({ children })
   }
+  // Überthema (Paket 11) – dieselbe Aufteilung wie in der Vorschau (render/PageFrame.tsx)
+  const u = kopfUeberthema(ctx.info)
   if (mode === 'compact') {
     const logo = await logoRun(ctx, 6)
+    const rechts = u.block || ctx.info.levelMark
     children.push(
       new Paragraph({
         border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: ctx.accent, space: 2 } },
@@ -539,8 +591,10 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
         children: [
           ...(sidebar ? [sidebar] : []),
           ...(logo ? [logo, run('  ')] : []),
-          run([h.showSubject ? ctx.ws.meta.subjectLabel : '', title].filter(Boolean).join(' · '), { size: ctx.size - 4, color: '444444' }),
-          ...(ctx.info.levelMark ? [run(`\t${ctx.info.levelMark}`, { size: ctx.size - 4, color: '666666' })] : [])
+          run(kompaktVorTitel(ctx.info) + title, { size: ctx.size - 4, color: '444444' }),
+          ...(rechts ? [run('\t')] : []),
+          ...(u.block ? [run(u.ueber, { size: ctx.size - 4, color: ctx.accent, bold: true })] : []),
+          ...(ctx.info.levelMark ? [run(`${u.block ? '  ' : ''}${ctx.info.levelMark}`, { size: ctx.size - 4, color: '666666' })] : [])
         ]
       })
     )
@@ -558,20 +612,35 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
       // Auch die Kopfzeile: ein Mathematikblatt kann „Rechnen mit $a^m \cdot a^n$" heissen
       new Paragraph({ alignment: align, children: await richRun(ctx, title, { bold: true, size: Math.round(ctx.size * 1.55), color }) })
     )
-  const subjectLine = [h.showSubject ? ctx.ws.meta.subjectLabel : '', `Klasse ${ctx.ws.meta.grade}`, h.customText].filter(Boolean).join(' · ')
+  const subjectLine = [u.fachZeile, `Klasse ${ctx.ws.meta.grade}`, h.customText].filter(Boolean).join(' · ')
   if (subjectLine) textParas.push(new Paragraph({ alignment: align, children: [run(subjectLine, { size: ctx.size - 4, color: color ?? '444444' })] }))
+  // Überthema als eigener Block: rechts im Kopf bzw. unter dem zentrierten Kopf
+  const ueberParas = (ausrichtung: (typeof AlignmentType)[keyof typeof AlignmentType]): Paragraph[] =>
+    u.block
+      ? [
+          ...(u.block.fach
+            ? [new Paragraph({ alignment: ausrichtung, children: [run(u.block.fach, { size: ctx.size - 7, color: color ?? '555555', allCaps: true })] })]
+            : []),
+          new Paragraph({
+            alignment: ausrichtung,
+            children: [run(u.block.thema, { size: u.stil === 'emphasis' ? ctx.size + 1 : ctx.size - 2, bold: true, color: color ?? ctx.accent })]
+          })
+        ]
+      : []
   const badgeText = [h.showSheetNumber && ctx.ws.meta.sheetNumber ? `AB ${ctx.ws.meta.sheetNumber}` : '', ctx.info.levelMark ?? ''].filter(Boolean).join('  ')
   const logo = await logoRun(ctx, h.logoHeightMm)
 
   if (h.layout === 'centered') {
     if (logo) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [logo] }))
     textParas.forEach((p) => children.push(p))
+    ueberParas(AlignmentType.CENTER).forEach((p) => children.push(p))
     if (badgeText) children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(badgeText, { bold: true, size: ctx.size - 4 })] }))
     children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: ctx.accent, space: 1 } }, children: [] }))
   } else {
     const logoW = logo ? Math.round(ctx.contentWidth * 0.22) : 0
     const badgeW = badgeText ? Math.round(ctx.contentWidth * 0.14) : 0
-    const textW = ctx.contentWidth - logoW - badgeW
+    const ueberW = u.block ? Math.round(ctx.contentWidth * 0.26) : 0
+    const textW = ctx.contentWidth - logoW - badgeW - ueberW
     const cellOpts = (width: number) => ({
       width: { size: width, type: WidthType.DXA },
       borders: NO_BORDERS,
@@ -582,6 +651,7 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
     const cells: TableCell[] = []
     const logoCell = logo ? new TableCell({ ...cellOpts(logoW), children: [new Paragraph({ children: [logo] })] }) : null
     const textCell = new TableCell({ ...cellOpts(textW), children: textParas.length ? textParas : [new Paragraph('')] })
+    const ueberCell = u.block ? new TableCell({ ...cellOpts(ueberW), children: ueberParas(AlignmentType.RIGHT) }) : null
     const badgeCell = badgeText
       ? new TableCell({
           ...cellOpts(badgeW),
@@ -591,10 +661,12 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
     if (h.layout === 'logoRight') {
       if (badgeCell) cells.push(badgeCell)
       cells.push(textCell)
+      if (ueberCell) cells.push(ueberCell)
       if (logoCell) cells.push(logoCell)
     } else {
       if (logoCell) cells.push(logoCell)
       cells.push(textCell)
+      if (ueberCell) cells.push(ueberCell)
       if (badgeCell) cells.push(badgeCell)
     }
     children.push(

@@ -47,6 +47,11 @@ export interface DesignTemplate {
     fields: { name: boolean; date: boolean; class: boolean }
     customText: string
     followingPages: 'full' | 'compact' | 'none'
+    /**
+     * Überthema im Kopf (Paket 11): Pfad „Fach › Überthema", Fach links / Überthema rechts
+     * oder Überthema betont mit dem Fach klein darüber. Fehlt = Pfad.
+     */
+    overTopicStyle?: 'path' | 'split' | 'emphasis'
   }
   footer: {
     show: boolean
@@ -61,7 +66,8 @@ export interface DesignTemplate {
     side: 'left' | 'right'
     widthMm: number
     color: string
-    content: 'subject' | 'topic' | 'custom' | 'none'
+    /** Paket 11: `overTopic` = nur das Überthema, `subjectOverTopic` = „Fach › Überthema" */
+    content: 'subject' | 'topic' | 'overTopic' | 'subjectOverTopic' | 'custom' | 'none'
     customText: string
   }
   tasks: {
@@ -99,7 +105,8 @@ const base: Omit<DesignTemplate, 'id' | 'name' | 'isDefault'> = {
     // Schüler tragen nur das Datum ein (Name und Klasse sind auf Arbeitsblättern nicht nötig)
     fields: { name: false, date: true, class: false },
     customText: '',
-    followingPages: 'compact'
+    followingPages: 'compact',
+    overTopicStyle: 'path'
   },
   footer: { show: true, left: 'schoolName', center: 'pageNumber', right: 'subject', customText: '', showLogoSmall: false },
   sidebar: { show: false, side: 'left', widthMm: 9, color: '#2b6cb0', content: 'subject', customText: '' },

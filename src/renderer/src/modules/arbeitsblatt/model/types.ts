@@ -12,6 +12,7 @@ import type { SubtitleMode, VideoKind, ViewingDuring, ViewingPhase } from '../di
 import type { SourceHeader } from '../didactics/sourceHeader'
 import type { ZuhoerenMode } from '../didactics/zuhoeren'
 import type { Narration } from '../didactics/narration'
+import type { DeckblattKarte, DeckblattKopf, DeckblattLayout, DeckblattMaskottchen, DeckblattTier } from '../render/deckblatt'
 
 export type { Afb, Stars }
 
@@ -684,6 +685,32 @@ export interface WorksheetMeta {
   coverText?: string
   /** Erzeugtes Maskottchen als data:-URL; leer = mitgelieferte Zeichnung */
   coverImage?: string
+  /**
+   * Deckblatt, Paket 11 (Aufbau siehe render/deckblatt.ts): Start-Layout der Seitenvorschauen,
+   * Kopf-Layout, Maskottchen, gewählte Seiten und die frei gezogene Anordnung.
+   */
+  coverLayout?: DeckblattLayout
+  coverHead?: DeckblattKopf
+  coverMascot?: DeckblattMaskottchen
+  /** Tier bei `coverMascot: 'tier'` */
+  coverAnimal?: DeckblattTier
+  /** Von der KI gezeichnetes Tier (data:-URL); leer = mitgelieferte Zeichnung */
+  coverAnimalImage?: string
+  /** Eigenes Bild bei `coverMascot: 'bild'` (data:-URL) */
+  coverOwnImage?: string
+  /** Rahmen der Seitenvorschauen; fehlt = Polaroid bei der Pinnwand, sonst schlicht */
+  coverFrame?: 'schlicht' | 'polaroid'
+  /** Gewählte Seiten (Schlüssel aus `deckblattKandidaten`); fehlt = automatisch */
+  coverPages?: string[]
+  /** Von Hand angepasste Lage je Seite; fehlt = aus dem Start-Layout berechnet */
+  coverArrangement?: DeckblattKarte[]
+  /**
+   * Überthema im Kopf (Paket 11, shared/ueberthema.ts): von Hand eingetragen, abgeschaltet und
+   * – nur zum Anzeigen – der Name des Themenbereichs.
+   */
+  ueberthema?: string
+  ueberthemaAus?: boolean
+  themenbereich?: string
   /** Fremdsprachen: Kompetenzschwerpunkt des Blattes ('mixed' = gemischt) */
   skillFocus?: LanguageSkill | 'mixed'
   /**

@@ -118,7 +118,7 @@ export const WEITERE_FAECHER: { id: string; label: string }[] = [
 ]
 
 /** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) */
-const FACH_ZU_SPRACHE: Record<string, string> = {
+export const FACH_ZU_SPRACHE: Record<string, string> = {
   en: 'englisch',
   fr: 'franzoesisch',
   es: 'spanisch',

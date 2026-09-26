@@ -108,6 +108,9 @@ export function examToWorksheet(exam: Exam, fassung = 0): Worksheet {
       loesungsBegriff: 'Erwartungshorizont',
       // Fachfarbe oder Vorlagenfarbe – gilt für Arbeit und Erwartungshorizont gleichermaßen
       vorlagenfarbe: exam.meta.vorlagenfarbe,
+      // Überthema im Kopf (Paket 11) – den Themenbereich setzt der Editor beim Anzeigen ein
+      ueberthema: exam.meta.ueberthema,
+      ueberthemaAus: exam.meta.ueberthemaAus,
       pages: Math.max(1, Math.ceil(blocks.length / 6)),
       // Im Erwartungshorizont steht der Schlüssel immer – aber nur für Teile mit Punkten
       gradeScale: { thresholds: exam.meta.gradeScaleThresholds, groups: gradeScaleGroups(exam) }

@@ -17,6 +17,8 @@ import { zeigtUebersetzung } from '../didactics/phraseRules'
 import { anredeFuerMeta } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
 import { druckDesign } from '../../../shared/fachfarben'
+import { boardList } from '../didactics/boardDesign'
+import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -230,7 +232,8 @@ export function SheetPages({
   plans,
   info,
   context,
-  wrapBlock
+  wrapBlock,
+  nurSeite
 }: {
   ws: Worksheet
   sheet: Sheet
@@ -238,6 +241,11 @@ export function SheetPages({
   info: PageInfo
   context: WsContextValue
   wrapBlock?: (block: WsBlock, placed: PlacedItem, content: React.ReactNode) => React.ReactNode
+  /**
+   * Nur diese eine Seite zeigen (0-basiert, Schlussseiten mitgezählt) – für die Vorschauen auf
+   * dem Deckblatt (Paket 11). Seitenzahlen und Kopf bleiben die des ganzen Blattes.
+   */
+  nurSeite?: number
 }): React.JSX.Element {
   const ownPhrasePage = phraseSheetModus(ws.meta) === 'blatt'
   const pages = plans && plans.length ? plans : fallbackPlan(sheet, ownPhrasePage)
@@ -262,68 +270,80 @@ export function SheetPages({
   const scaleGroups = isKey ? (ws.meta.gradeScale?.groups ?? []).filter((g) => g.points > 0) : []
   const errorRows = isKey ? errorProfileRows(sheet) : []
   const hasTeacherPage = scaleGroups.length > 0 || errorRows.length > 0
-  const extraPages = (helpCards.length ? 1 : 0) + (credits.length ? 1 : 0) + (hasTeacherPage ? 1 : 0) + (phraseSheet.length ? 1 : 0)
-  const total = pages.length + extraPages
+  // Reihenfolge wie `zusatzSeiten` – die Deckblattwahl zählt dieselben Seiten
+  const zusatz: ZusatzSeite[] = [
+    ...(phraseSheet.length ? ['hilfsblatt' as const] : []),
+    ...(helpCards.length ? ['hilfekarten' as const] : []),
+    ...(hasTeacherPage ? ['lehrkraft' as const] : []),
+    ...(credits.length ? ['nachweise' as const] : [])
+  ]
+  const total = pages.length + zusatz.length
+  // Seitenzahl einer Schlussseite; bis Paket 11 trugen alle Schlussseiten dieselbe Nummer
+  const nr = (art: ZusatzSeite): number => pages.length + zusatz.indexOf(art) + 1
+  const zeige = (seite: number): boolean => nurSeite === undefined || nurSeite === seite - 1
   return (
     <WsContext.Provider value={context}>
-      {pages.map((page, i) => (
-        <PageFrame key={i} info={info} page={i + 1} pages={total}>
-          {/*
+      {pages.map(
+        (page, i) =>
+          zeige(i + 1) && (
+            <PageFrame key={i} info={info} page={i + 1} pages={total}>
+              {/*
             Frei platzierte Bausteine liegen ÜBER dem Fluss, auf ihrer eigenen Seite.
             Zuerst gezeichnet, damit der fließende Inhalt sie bei gleicher Lage überdeckt –
             ein versehentlich abgelegter Baustein verdeckt so nicht die Aufgabenstellung.
             Gibt es die gemerkte Seite nicht mehr, rutscht er auf die letzte.
           */}
-          {freie
-            .filter((b) => Math.min(b.free!.page, pages.length) === i + 1)
-            .map((b) => {
-              const inhalt = <BlockView block={b} />
-              const box = (
-                <div
-                  className="ws-free"
-                  style={{
-                    left: `${b.free!.x}%`,
-                    top: `${b.free!.y}%`,
-                    width: `${b.free!.width}%`
-                  }}
-                  data-free-block={b.id}
-                >
-                  {wrapBlock ? wrapBlock(b, { id: b.id }, inhalt) : inhalt}
-                </div>
-              )
-              return <div key={`frei-${b.id}`}>{box}</div>
-            })}
-          {page.items.map((placed) => {
-            const block = byId.get(placed.id)
-            if (!block) return null
-            const side = placed.continued ? undefined : sides.get(placed.id)
-            const content = (
-              <>
-                {side && (
-                  <div className={`ws-side-image ${side.at === 'left' ? 'ws-side-left' : ''}`}>
-                    {/*
+              {freie
+                .filter((b) => Math.min(b.free!.page, pages.length) === i + 1)
+                .map((b) => {
+                  const inhalt = <BlockView block={b} />
+                  const box = (
+                    <div
+                      className="ws-free"
+                      style={{
+                        left: `${b.free!.x}%`,
+                        top: `${b.free!.y}%`,
+                        width: `${b.free!.width}%`
+                      }}
+                      data-free-block={b.id}
+                    >
+                      {wrapBlock ? wrapBlock(b, { id: b.id }, inhalt) : inhalt}
+                    </div>
+                  )
+                  return <div key={`frei-${b.id}`}>{box}</div>
+                })}
+              {page.items.map((placed) => {
+                const block = byId.get(placed.id)
+                if (!block) return null
+                const side = placed.continued ? undefined : sides.get(placed.id)
+                const content = (
+                  <>
+                    {side && (
+                      <div className={`ws-side-image ${side.at === 'left' ? 'ws-side-left' : ''}`}>
+                        {/*
                       Auch der seitlich stehende Baustein braucht seinen eigenen Griff – sonst
                       ließe sich ausgerechnet das Bild bzw. die Tabelle neben der Aufgabe als
                       Einziges nicht anfassen.
                     */}
-                    {wrapBlock ? wrapBlock(side.block, { id: side.block.id }, <BlockView block={side.block} />) : <BlockView block={side.block} />}
+                        {wrapBlock ? wrapBlock(side.block, { id: side.block.id }, <BlockView block={side.block} />) : <BlockView block={side.block} />}
+                      </div>
+                    )}
+                    <BlockView block={block} placed={placed} />
+                  </>
+                )
+                return wrapBlock ? (
+                  <div key={`${placed.id}-${placed.from ?? 0}`}>{wrapBlock(block, placed, content)}</div>
+                ) : (
+                  <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow">
+                    {content}
                   </div>
-                )}
-                <BlockView block={block} placed={placed} />
-              </>
-            )
-            return wrapBlock ? (
-              <div key={`${placed.id}-${placed.from ?? 0}`}>{wrapBlock(block, placed, content)}</div>
-            ) : (
-              <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow">
-                {content}
-              </div>
-            )
-          })}
-        </PageFrame>
-      ))}
-      {phraseSheet.length > 0 && (
-        <PageFrame info={info} page={pages.length + 1} pages={total}>
+                )
+              })}
+            </PageFrame>
+          )
+      )}
+      {phraseSheet.length > 0 && zeige(nr('hilfsblatt')) && (
+        <PageFrame info={info} page={nr('hilfsblatt')} pages={total}>
           <div className="ws-phrases-page">
             {phraseSheet.map((block) => (
               <BlockView key={block.id} block={block} />
@@ -331,8 +351,8 @@ export function SheetPages({
           </div>
         </PageFrame>
       )}
-      {helpCards.length > 0 && (
-        <PageFrame info={info} page={pages.length + 1} pages={total}>
+      {helpCards.length > 0 && zeige(nr('hilfekarten')) && (
+        <PageFrame info={info} page={nr('hilfekarten')} pages={total}>
           <div className="ws-helpcards-page">
             <h2>Tipp- und Hilfekarten</h2>
             <p className="ws-helpcards-hint">{anredeText('hilfekarten', anredeFuerMeta(ws.meta))}</p>
@@ -342,8 +362,8 @@ export function SheetPages({
           </div>
         </PageFrame>
       )}
-      {hasTeacherPage && (
-        <PageFrame info={info} page={pages.length + 1} pages={total}>
+      {hasTeacherPage && zeige(nr('lehrkraft')) && (
+        <PageFrame info={info} page={nr('lehrkraft')} pages={total}>
           <div className="ws-teacher-page">
             {scaleGroups.length > 0 && (
               <>
@@ -406,8 +426,8 @@ export function SheetPages({
           </div>
         </PageFrame>
       )}
-      {credits.length > 0 && (
-        <PageFrame info={info} page={total} pages={total}>
+      {credits.length > 0 && zeige(nr('nachweise')) && (
+        <PageFrame info={info} page={nr('nachweise')} pages={total}>
           <div className="ws-credits-page">
             <h2>Bildnachweise</h2>
             <ul>
@@ -423,6 +443,58 @@ export function SheetPages({
       )}
     </WsContext.Provider>
   )
+}
+
+export type ZusatzSeite = 'hilfsblatt' | 'hilfekarten' | 'lehrkraft' | 'nachweise'
+
+/** Die Schlussseiten eines Blattes in der Reihenfolge, in der `SheetPages` sie setzt. */
+export function zusatzSeiten(ws: Worksheet, sheet: Sheet, isKey: boolean): ZusatzSeite[] {
+  const aus: ZusatzSeite[] = []
+  if (!isKey && phraseSheetModus(ws.meta) === 'blatt' && sheet.blocks.some(isPhraseSheet)) aus.push('hilfsblatt')
+  if (!isKey && sheet.blocks.some(isHelpCard)) aus.push('hilfekarten')
+  if (isKey && ((ws.meta.gradeScale?.groups ?? []).some((g) => g.points > 0) || errorProfileRows(sheet).length > 0)) aus.push('lehrkraft')
+  if (!isKey && imageCredits(sheet).length > 0) aus.push('nachweise')
+  return aus
+}
+
+const ZUSATZ_TITEL: Record<ZusatzSeite, string> = {
+  hilfsblatt: 'Hilfsblatt',
+  hilfekarten: 'Hilfekarten',
+  lehrkraft: 'Notenschlüssel',
+  nachweise: 'Bildnachweise'
+}
+
+/**
+ * Alle Seiten, die auf dem Deckblatt erscheinen können (Paket 11): Seiten jedes Blattes samt
+ * Schlussseiten, die Lösungsseiten und das Tafelbild – in der Reihenfolge des Materials.
+ * `layouts` ist die gemessene Seitenaufteilung; ohne sie zählt jedes Blatt eine Seite.
+ */
+export function deckblattKandidaten(ws: Worksheet, layouts: Map<string, PagePlan[]>): SeitenKandidat[] {
+  const aus: SeitenKandidat[] = []
+  const mehrere = ws.sheets.length > 1
+  for (const key of [false, true]) {
+    if (key && !ws.meta.answerKey) continue
+    for (const sheet of ws.sheets) {
+      const n = Math.max(1, layouts.get(layoutKey(sheet.id, key))?.length ?? 1)
+      const name = mehrere ? `${sheet.label || 'Blatt'} · ` : ''
+      for (let i = 0; i < n; i++)
+        aus.push({
+          schluessel: seitenSchluessel(sheet.id, key, i),
+          art: key ? 'loesung' : 'blatt',
+          sheetId: sheet.id,
+          key,
+          index: i,
+          titel: `${name}${key ? 'Lösungen' : 'Seite'} ${i + 1}`
+        })
+      zusatzSeiten(ws, sheet, key).forEach((art, k) =>
+        aus.push({ schluessel: seitenSchluessel(sheet.id, key, n + k), art, sheetId: sheet.id, key, index: n + k, titel: `${name}${ZUSATZ_TITEL[art]}` })
+      )
+    }
+  }
+  boardList(ws).forEach((_, i, alle) =>
+    aus.push({ schluessel: `tafel:${i}`, art: 'tafel', index: i, titel: alle.length > 1 ? `Tafelbild ${i + 1}` : 'Tafelbild' })
+  )
+  return aus
 }
 
 /** Alle Bildnachweise eines Blattes, in der Reihenfolge der Bausteine. */

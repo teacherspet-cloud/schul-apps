@@ -1,3 +1,4 @@
+import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
   Alert,
   Badge,
@@ -150,7 +151,10 @@ export default function TopicStep(): React.JSX.Element {
           const stateId = last.stateId ?? appSettings.defaults.stateId
           const schoolTypeId = last.schoolTypeId ?? appSettings.defaults.schoolTypeId
           const typeName = cefr.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.name ?? 'Gymnasium'
-          const subject = last.subjectId ? subjectById(last.subjectId) : null
+          // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor (shared/fachVorgabe.ts)
+          const vorgabe = nimmFachVorgabe('arbeitsblatt')
+          const fachId = vorgabe && subjectById(vorgabe).id === vorgabe ? vorgabe : last.subjectId
+          const subject = fachId ? subjectById(fachId) : null
           const ws: Worksheet = {
             version: 1,
             meta: {

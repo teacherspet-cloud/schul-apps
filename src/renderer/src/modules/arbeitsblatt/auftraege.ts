@@ -24,6 +24,8 @@ import { subjectById } from './model/subjects'
 import type { Worksheet, WsBlock } from './model/types'
 import { profileFromMeta } from './render/SheetPages'
 import type { AuftragsKontext } from '../../shared/auftraege'
+import { foxPrompt } from './render/coverDesigns'
+import { tierPrompt } from './render/maskottchen'
 
 const titelVon = (ws: Worksheet): string => ws.meta.title.trim() || ws.meta.topic.trim() || 'Arbeitsblatt'
 
@@ -213,5 +215,41 @@ export function bausteinAuftrag(
     arbeit,
     abschluss: () => 'Fertig – im Blatt übernommen',
     ablegen: (aendern, ws) => legeArbeitsblattAb(docId, ws, (aktuell) => aendereBaustein(aktuell, blockId, aendern))
+  })
+}
+
+/**
+ * Maskottchen des Deckblatts neu zeichnen lassen (Fuchs oder anderes Tier, Paket 11).
+ *
+ * Vorher wartete der Editor auf das Bild (`await window.api.ai.image`), ohne Abbrechen und
+ * ohne Anzeige in der Auftragsleiste. Jetzt ein kleiner Auftrag wie beim Überarbeiten eines
+ * Bausteins: sperrt nichts, lässt sich abbrechen und legt das Bild im SELBEN Blatt ab – als
+ * Rückgängig-Schritt, falls es offen ist. Nur auf Knopfdruck: Ein KI-Bild kostet spürbar
+ * Kontingent, und das Deckblatt steht auch mit der mitgelieferten Zeichnung.
+ */
+export function maskottchenZeichnen(worksheet: Worksheet, docId: string): void {
+  const tier = worksheet.meta.coverMascot === 'tier'
+  const welches = worksheet.meta.coverAnimal ?? 'eule'
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art: tier ? 'Deckblatt-Tier zeichnen' : 'Deckblatt-Fuchs zeichnen',
+    eingabe: worksheet,
+    istOffen: () => blattOffen(docId),
+    sperrt: false,
+    schluessel: 'deckblatt-maskottchen',
+    fehlerTitel: 'Das Bild konnte nicht erzeugt werden',
+    arbeit: (ws, k) => {
+      k.melde('Die Bild-KI zeichnet das Maskottchen …')
+      return k.bild(tier ? tierPrompt(welches, ws.meta.subjectLabel, ws.meta.topic) : foxPrompt(ws.meta.subjectLabel, ws.meta.topic))
+    },
+    abschluss: () => 'Fertig – auf dem Deckblatt übernommen',
+    ablegen: (bild, ws) =>
+      legeArbeitsblattAb(docId, ws, (aktuell) => ({
+        ...aktuell,
+        // Das Tier gehört zu der Art, die beim Start gewählt war – nicht zu einer inzwischen anderen
+        meta: tier ? { ...aktuell.meta, coverAnimal: welches, coverAnimalImage: bild } : { ...aktuell.meta, coverImage: bild }
+      }))
   })
 }

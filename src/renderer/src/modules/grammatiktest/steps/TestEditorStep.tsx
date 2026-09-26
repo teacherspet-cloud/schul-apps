@@ -15,6 +15,8 @@ import { testToWorksheet } from '../render/testWorksheet'
 import { testPoints, testTaskCount } from '../model/types'
 import { useGrammatiktest } from '../store'
 import { useDruck } from '../../../shared/navigation'
+import { useThemenbereich } from '../../../shared/themenbereiche'
+import { mitThemenbereich } from '../../../shared/ueberthema'
 
 /**
  * Schritt 2: Test ansehen, bearbeiten und ausgeben.
@@ -44,7 +46,12 @@ export default function TestEditorStep(): React.JSX.Element {
    * fertig erzeugt, aber der Editor kam nie zum Vorschein, und es erschien auch keine
    * Fehlermeldung. Die Klassenarbeit macht es seit jeher so.
    */
-  const ws = useMemo(() => (test ? testToWorksheet(test) : null), [test])
+  // Überthema (Paket 11): der Themenbereich des Tests steht dezent im Kopf – nur zum Anzeigen eingesetzt
+  const bereich = useThemenbereich(
+    'grammatiktest',
+    useGrammatiktest((s) => s.docId)
+  )?.name
+  const ws = useMemo(() => (test ? mitThemenbereich(testToWorksheet(test), bereich) : null), [test, bereich])
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
   // Anrede der Lernenden am angezeigten Test prüfen – auch nach Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (ws ? anredeBefunde(ws.meta, ws.sheets) : []), [ws])

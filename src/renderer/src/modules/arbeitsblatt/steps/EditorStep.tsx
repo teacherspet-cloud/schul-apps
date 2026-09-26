@@ -59,10 +59,16 @@ import { BausteinRahmen } from '../render/BausteinRahmen'
 import type { PlacedItem } from '../render/paginate'
 import { buildWorksheetHtml } from '../render/printHtml'
 import { tafelbildHinweis, tafelbildZiel } from '../export/tafelbildZiel'
-import { contextFor, layoutKey, pageInfoFor, profileFromMeta, SheetPages, useSheetLayouts, vorschauSeiten } from '../render/SheetPages'
+import { contextFor, layoutKey, pageInfoFor, profileFromMeta, SheetPages, useSheetLayouts } from '../render/SheetPages'
+import { deckblattVorschau } from '../render/deckblattVorschau'
+import { deckblattBilder } from '../render/deckblattBilder'
+import { DeckblattSeitenwahl, DeckblattWerkzeuge } from './DeckblattWerkzeuge'
+import UeberthemaFeld from '../../../shared/components/UeberthemaFeld'
+import { useThemenbereich } from '../../../shared/themenbereiche'
+import { mitThemenbereich } from '../../../shared/ueberthema'
 import '../render/ws.css'
 import { useArbeitsblatt } from '../store'
-import { bausteinAuftrag } from '../auftraege'
+import { bausteinAuftrag, maskottchenZeichnen } from '../auftraege'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { defaultWorksheetName, setPreviewLayouts } from '../library'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
@@ -81,29 +87,25 @@ import { browserWorksheetImageDeps } from '../generation/browserImages'
 import { completeWorksheetImages } from '../generation/worksheetImages'
 import { CANARY_MAX, CANARY_WORDS, canaryNote, canaryText, canaryWordFor, canaryWords } from '../../../shared/aiCanary'
 import { CoverPage } from '../render/CoverPage'
-import { COVER_DESIGNS, FACH_COVER_ID, foxPrompt } from '../render/coverDesigns'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useDruck } from '../../../shared/navigation'
 
 export default function EditorStep(): React.JSX.Element {
-  const { worksheet: ws, update, updateBlock, undo, redo, verlauf, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
+  const { worksheet: gespeichert, update, updateBlock, undo, redo, verlauf, activeSheetId, setActiveSheet, setStep } = useArbeitsblatt()
   const logo = useAppSettings((s) => s.logoDataUrl)
   const schoolName = useAppSettings((s) => s.settings.schoolName)
-
-  /**
-   * Zeichnet ein neues Maskottchen für das Deckblatt.
-   * Nur auf Knopfdruck: Ein KI-Bild kostet spürbar Kontingent, und das Deckblatt steht auch
-   * mit der mitgelieferten Zeichnung.
+  /*
+   * Überthema (Paket 11): Der Themenbereich, in dem das Blatt liegt, steht im Kopf. Er wird nur
+   * zum Anzeigen eingesetzt – Vorschau, Druck, PDF und Word nehmen dieses `ws` – und folgt so
+   * sofort einem Umbenennen oder Verschieben in der Bibliothek.
    */
-  const makeFox = async (): Promise<void> => {
-    try {
-      const dataUrl = await window.api.ai.image(foxPrompt(ws?.meta.subjectLabel ?? '', ws?.meta.topic ?? ''))
-      update((w) => (w.meta.coverImage = dataUrl))
-      notifySuccess('Neues Deckblatt-Bild erzeugt.')
-    } catch (e) {
-      notifyError(e, 'Das Bild konnte nicht erzeugt werden')
-    }
-  }
+  const bereich = useThemenbereich(
+    'arbeitsblatt',
+    useArbeitsblatt((s) => s.docId)
+  )
+  const ws = useMemo(() => (gespeichert ? mitThemenbereich(gespeichert, bereich?.name) : gespeichert), [gespeichert, bereich?.name])
+  // Seitenwahl des Deckblatts: offen, und ggf. welche Seite ausgetauscht wird
+  const [seitenwahl, setSeitenwahl] = useState<{ tausch: string | null } | null>(null)
   const citationStyle = useAppSettings((s) => s.settings.citationStyle)
   // Nur zum Neuzeichnen: pageInfoFor liest die Fachfarbe außerhalb von React (shared/fachfarben.ts)
   useAppSettings((s) => s.settings.fachfarben)
@@ -195,6 +197,8 @@ export default function EditorStep(): React.JSX.Element {
   const abweichung = seitenAbweichung(ws.meta, sheet, gezaehlteSeiten)
   const abweichungsSchluessel = `${sheet.id}:${gezaehlteSeiten}`
   const baseName = safeFileName(`${ws.meta.subjectLabel} - ${ws.meta.title || ws.meta.topic}`)
+  // Seiten für das Deckblatt – dieselben, die Druck und Word nehmen (render/deckblattVorschau.tsx)
+  const deckblatt = ws.meta.coverPage ? deckblattVorschau(ws, layouts, logo, schoolName, citationStyle) : null
 
   const moveBlock = (id: string, delta: number): void =>
     update((d) => {
@@ -584,6 +588,7 @@ export default function EditorStep(): React.JSX.Element {
                 checked={Boolean(ws.meta.vorlagenfarbe)}
                 onChange={(an) => update((w) => (w.meta.vorlagenfarbe = an))}
               />
+              <UeberthemaFeld werte={ws.meta} bereich={bereich?.name ?? ''} onChange={(patch) => update((w) => Object.assign(w.meta, patch), 'ueberthema')} />
               <Checkbox
                 size="sm"
                 label="Deckblatt"
@@ -591,17 +596,6 @@ export default function EditorStep(): React.JSX.Element {
                 checked={Boolean(ws.meta.coverPage)}
                 onChange={(e) => update((w) => (w.meta.coverPage = e.currentTarget.checked))}
               />
-              {ws.meta.coverPage && (
-                <Select
-                  size="sm"
-                  label="Gestaltung des Deckblatts"
-                  // Ohne eigene Wahl folgt das Deckblatt der Fachfarbe (Paket 10a)
-                  data={[{ value: FACH_COVER_ID, label: 'Fachfarbe' }, ...COVER_DESIGNS.map((d) => ({ value: d.id, label: d.label }))]}
-                  value={ws.meta.coverDesign ?? FACH_COVER_ID}
-                  allowDeselect={false}
-                  onChange={(v) => v && update((w) => (w.meta.coverDesign = v))}
-                />
-              )}
               <Tooltip
                 multiline
                 w={320}
@@ -702,25 +696,25 @@ export default function EditorStep(): React.JSX.Element {
         <Stack align="center" py="lg" gap="md">
           {view === 'board' && <BoardPanel ws={ws} profile={profile} />}
           {view === 'audio' && <AudioPanel ws={ws} />}
-          {view === 'student' && ws.meta.coverPage && (
-            <FitToWidth className="ws-editor-pages">
-              <CoverPage
+          {view === 'student' && ws.meta.coverPage && deckblatt && (
+            <>
+              {/* Werkzeuge ÜBER der Seite, nicht darauf – nichts davon gerät in den Druck (Paket 11) */}
+              <DeckblattWerkzeuge
                 ws={ws}
-                onChange={(fn) => update(fn)}
-                onRegenerateFox={() => void makeFox()}
-                // Einzelne Seiten statt ganzer Blaetter – siehe `vorschauSeiten`
-                previews={vorschauSeiten((layouts.get(`${ws.sheets[0].id}:print`) ?? []).length).map((i) => (
-                  <SheetPages
-                    key={i}
-                    ws={ws}
-                    sheet={ws.sheets[0]}
-                    plans={[(layouts.get(`${ws.sheets[0].id}:print`) ?? [])[i]]}
-                    info={pageInfoFor(ws, ws.sheets[0], logo, schoolName, false, citationStyle)}
-                    context={contextFor(ws, ws.sheets[0], 'print')}
-                  />
-                ))}
+                vorschau={deckblatt}
+                update={(fn) => update(fn)}
+                onZeichnen={() => maskottchenZeichnen(ws, docId)}
+                onSeitenwahl={() => setSeitenwahl({ tausch: null })}
               />
-            </FitToWidth>
+              <FitToWidth className="ws-editor-pages">
+                <CoverPage
+                  ws={ws}
+                  vorschau={deckblatt}
+                  onChange={(fn, gruppe) => update(fn, gruppe)}
+                  onAustauschen={(seite) => setSeitenwahl({ tausch: seite })}
+                />
+              </FitToWidth>
+            </>
           )}
           {view === 'student' && abweichung && !seitenAus.includes(abweichungsSchluessel) && (
             <SeitenHinweis
@@ -807,6 +801,16 @@ export default function EditorStep(): React.JSX.Element {
           setCanaryOffen(false)
         }}
       />
+      {deckblatt && (
+        <DeckblattSeitenwahl
+          ws={ws}
+          vorschau={deckblatt}
+          tausch={seitenwahl?.tausch ?? null}
+          offen={seitenwahl !== null}
+          onClose={() => setSeitenwahl(null)}
+          update={(fn) => update(fn)}
+        />
+      )}
       <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${ws.meta.title || 'Arbeitsblatt'}`} onClose={() => setDruck(null)} />
       <ExportModal
         mode={exportMode}
@@ -905,7 +909,13 @@ export default function EditorStep(): React.JSX.Element {
             dateien.push({
               name: `${baseName}${suffix}.docx`,
               filter: WORD_FILTER,
-              daten: () => buildWorksheetDocx(ws, { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument }, deps)
+              // Mit Deckblatt: seine Seite und die Vorschauen als Bilder in derselben Lage (Paket 11)
+              daten: async () =>
+                buildWorksheetDocx(
+                  ws,
+                  { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument },
+                  { ...deps, deckblatt: ws.meta.coverPage ? await deckblattBilder(ws, layouts, logo, schoolName, citationStyle) : undefined }
+                )
             })
             if (keyMode === 'separate')
               dateien.push({

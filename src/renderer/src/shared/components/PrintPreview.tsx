@@ -27,6 +27,18 @@ export async function renderPages(data: Uint8Array): Promise<string[]> {
   return pages
 }
 
+/** Text je Seite eines PDFs – für die Prüfmechanik (`__selftest.pdfText`), z. B. ob das Überthema darin steht */
+export async function pdfTexte(data: Uint8Array): Promise<string[]> {
+  const pdf = await pdfjs.getDocument({ data }).promise
+  const seiten: string[] = []
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const inhalt = await (await pdf.getPage(p)).getTextContent()
+    seiten.push(inhalt.items.map((i) => ('str' in i ? i.str : '')).join(' '))
+  }
+  await pdf.cleanup()
+  return seiten
+}
+
 const PRINTER_KEY = 'schulapps.printer'
 
 /**

@@ -34,7 +34,10 @@ import { TASK_TYPES } from './modules/vokabeltest/generation/taskTypes'
 import { createRng } from './modules/vokabeltest/model/random'
 import type { TestDocument } from './modules/vokabeltest/model/types'
 import { presetDesigns } from '@shared/design'
-import { renderPages } from './shared/components/PrintPreview'
+import { pdfTexte, renderPages } from './shared/components/PrintPreview'
+import { bereichAnlegen, neuImBereich, themenbereichName } from './shared/themenbereiche'
+import { mitThemenbereich } from './shared/ueberthema'
+import { deckblattBilder } from './modules/arbeitsblatt/render/deckblattBilder'
 import { buildWorksheetHtml } from './modules/arbeitsblatt/render/printHtml'
 import { useLernzielkontrolle } from './modules/lernzielkontrolle/store'
 import { emptyKurztest } from './modules/lernzielkontrolle/model/defaults'
@@ -1475,7 +1478,8 @@ async function lzkEcht(input: { stateId: string; fach: string; grade: number; th
 /** Das Druck-HTML des aktuellen Arbeitsblatts – Grundlage der PDF-Prüfung. */
 function printHtmlNow(): string {
   const state = useArbeitsblatt.getState()
-  const ws = state.worksheet
+  // Wie der Editor: der Themenbereich steht als Überthema im Kopf (Paket 11)
+  const ws = state.worksheet && mitThemenbereich(state.worksheet, themenbereichName('arbeitsblatt', state.docId))
   if (!ws) throw new Error('Kein Arbeitsblatt geladen.')
   /*
    * Mit der ECHTEN Seitenaufteilung, sobald der Editor sie berechnet hat (`__selftest.layouts`).
@@ -1829,12 +1833,61 @@ export function installSelftest(): void {
   /** Das Arbeitsblatt, wie es gerade im Zustand steht – um Aenderungen nachzuweisen. */
   const worksheetJetzt = (): Worksheet | null => useArbeitsblatt.getState().worksheet
 
+  /** Kennung des offenen Dokuments eines Programms (Paket 11: Themenbereich zuordnen) */
+  const docIdVon = (modul: string): string =>
+    ({
+      arbeitsblatt: useArbeitsblatt.getState().docId,
+      lernzielkontrolle: useLernzielkontrolle.getState().docId,
+      grammatiktest: useGrammatiktest.getState().docId,
+      klassenarbeit: useKlassenarbeit.getState().docId,
+      vokabeltest: useVokabeltest.getState().testId
+    })[modul] ?? ''
+
+  /** Das offene Dokument in einen (neuen) Themenbereich legen – über denselben Weg wie „Neu in diesem Bereich" */
+  const inBereich = async (modul: string, name: string, fachId: string): Promise<boolean> => {
+    const b = await bereichAnlegen(fachId, name)
+    if (!b) return false
+    await neuImBereich(modul, docIdVon(modul), b)
+    return true
+  }
+
+  /** Name der Vokabelliste setzen – daraus liest der Vokabeltest ohne Themenbereich die Unit (Paket 11) */
+  const vtListenName = (name: string): void => useVokabeltest.getState().setListName(name)
+
+  /** Text je Seite eines PDFs */
+  const pdfText = (data: number[]): Promise<string[]> => pdfTexte(new Uint8Array(data))
+
+  /**
+   * Das Deckblatt so rastern, wie es der Word-Export tut (Paket 11) – mit der echten
+   * Seitenaufteilung. Liefert Größe und Lage der Bilder; ein leeres oder „vergiftetes"
+   * Canvas (foreignObject) fiele hier als Fehler bzw. winziges Bild auf.
+   */
+  const deckblattWord = async (
+    mitBildern = false
+  ): Promise<{ hintergrund: number; karten: { laenge: number; drehung: number; x0: number; y0: number }[]; bilder?: string[] }> => {
+    const ws = useArbeitsblatt.getState().worksheet
+    if (!ws) throw new Error('Kein Arbeitsblatt geladen.')
+    const gemessen = (window as unknown as { __selftest?: { layouts?: Map<string, PagePlan[]> } }).__selftest?.layouts ?? new Map()
+    const b = await deckblattBilder(ws, gemessen, null, '')
+    return {
+      hintergrund: b.hintergrund.length,
+      karten: b.karten.map((k) => ({ laenge: k.png.length, drehung: k.drehung, x0: k.x0, y0: k.y0 })),
+      // Zum Ansehen: Hintergrund und erste Karte, wie sie ins Word-Dokument gehen
+      ...(mitBildern ? { bilder: [b.hintergrund, b.karten[0]?.png ?? ''] } : {})
+    }
+  }
+
   ;(window as unknown as { __selftest: unknown }).__selftest = {
     kaMetaSetzen,
     lzkMetaSetzen,
     logo,
     setWorksheet,
     worksheetJetzt,
+    docIdVon,
+    inBereich,
+    pdfText,
+    deckblattWord,
+    vtListenName,
     textQualitaet,
     materialLaden,
     wsMaterialtext,

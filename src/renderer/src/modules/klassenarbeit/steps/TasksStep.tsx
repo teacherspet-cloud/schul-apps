@@ -47,6 +47,8 @@ import { starteAuftrag, useLaufendeSchluessel } from '../../../shared/auftraege'
 import { arbeitOffen, defaultExamName, legeArbeitAb } from '../library'
 import { QUELLENAUSWAHL, type QuellenFrage } from '../../arbeitsblatt/auftraege'
 import type { AudioBlock } from '../../arbeitsblatt/model/types'
+import { useThemenbereich } from '../../../shared/themenbereiche'
+import { mitThemenbereich } from '../../../shared/ueberthema'
 
 /** Einen Baustein in ALLEN Fassungen ändern – übernommenes Material steht dort mit derselben id. */
 function aendereBaustein(d: Exam, id: string, fn: (b: WsBlock) => void): void {
@@ -116,7 +118,12 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    * Gemessen wird das Blatt ALLER Fassungen: Angezeigt wird die gewählte, ausgegeben auf Wunsch
    * alle – und für jede muss die Seitenaufteilung vorliegen.
    */
-  const worksheet = useMemo(() => examToWorksheetAlle(exam), [exam])
+  // Überthema (Paket 11): der Themenbereich der Arbeit steht im Kopf – nur zum Anzeigen eingesetzt
+  const bereich = useThemenbereich(
+    'klassenarbeit',
+    useKlassenarbeit((s) => s.docId)
+  )?.name
+  const worksheet = useMemo(() => mitThemenbereich(examToWorksheetAlle(exam), bereich), [exam, bereich])
   const audioSicht = useMemo(() => examToWorksheet(exam, 0), [exam])
   // Anrede der Lernenden in allen Fassungen prüfen – auch nach Überarbeitung und Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (hasContent ? anredeBefunde(worksheet.meta, worksheet.sheets) : []), [hasContent, worksheet])

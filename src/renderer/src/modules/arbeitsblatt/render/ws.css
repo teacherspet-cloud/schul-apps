@@ -242,6 +242,51 @@
 .ws-compact-text {
   flex: 1;
 }
+/*
+ * Überthema (Paket 11): gehört zum Kopfband, nicht zur Überschrift – deshalb als eigener Block
+ * am rechten Rand des Kopfes (bzw. unter dem zentrierten Kopf), in der Farbe des Kopfes.
+ */
+.ws-ueberthema {
+  flex: none;
+  max-width: 62mm;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  line-height: 1.2;
+  color: var(--ws-accent);
+}
+.ws-ueberthema-split .ws-ueberthema-thema {
+  font-size: 0.9em;
+  font-weight: 600;
+  border-left: 0.6mm solid currentColor;
+  padding-left: 2mm;
+}
+.ws-ueberthema-fach {
+  font-size: 0.62em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #555;
+}
+.ws-ueberthema-emphasis .ws-ueberthema-thema {
+  font-size: 1.05em;
+  font-weight: 700;
+}
+.ws-header-band .ws-ueberthema,
+.ws-header-band .ws-ueberthema-fach {
+  color: #fff;
+}
+.ws-header-centered .ws-ueberthema {
+  align-items: center;
+  text-align: center;
+  max-width: none;
+  margin-top: 1mm;
+}
+.ws-compact-ueberthema {
+  flex: none;
+  color: var(--ws-accent);
+  font-weight: 600;
+}
 
 /* ---------- Fuß ---------- */
 .ws-footer {
@@ -1289,6 +1334,10 @@
  *
  * Es richtet sich an Lehrkräfte: oben Titel und Maskottchen auf kräftigem Grund, darunter
  * eine kurze Beschreibung, die Merkmale des Materials und eine Vorschau der Blätter.
+ *
+ * Paket 11 (26.09.2026): vier Kopf-Layouts (`ws-cover-kopf-*`) und frei angeordnete
+ * Seitenvorschauen. Die Vorschauen liegen absolut auf der Seite, in mm (render/deckblatt.ts) –
+ * Druck, PDF und Word geben sie deshalb genau so wieder wie der Editor.
  */
 .ws-cover {
   display: flex;
@@ -1318,44 +1367,46 @@
   font-size: 11pt;
   opacity: 0.85;
 }
+/* Überthema betont, das Fach klein darüber (Designvorlage „betont") */
+.ws-cover-kicker {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2.5mm;
+}
+.ws-cover-kicker-fach {
+  font-size: 8.5pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.ws-cover-kicker-thema {
+  font-size: 14pt;
+  font-weight: 600;
+}
+/* Überthema rechts im Kopf (Designvorlage „Fach links, Überthema rechts") */
+.ws-cover-ueberthema {
+  flex: none;
+  max-width: 55mm;
+  font-size: 12pt;
+  font-weight: 600;
+  text-align: right;
+  padding: 1.5mm 3mm;
+  border: 0.4mm solid currentColor;
+  border-radius: 1.5mm;
+}
 .ws-cover-fox {
   width: 38mm;
   height: 38mm;
   flex: none;
-  border: none;
-  padding: 0;
   border-radius: 50%;
   background: #fff;
-  position: relative;
-  cursor: pointer;
   overflow: hidden;
-}
-.ws-cover-fox:disabled {
-  cursor: default;
 }
 .ws-cover-fox img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-.ws-cover-fox-hint {
-  position: absolute;
-  right: 1.5mm;
-  bottom: 1.5mm;
-  width: 7mm;
-  height: 7mm;
-  border-radius: 50%;
-  background: var(--cover-dark);
-  color: #fff;
-  font-size: 10pt;
-  line-height: 7mm;
-  text-align: center;
-}
-/* Im Druck verschwindet der Knopf-Hinweis */
-@media print {
-  .ws-cover-fox-hint {
-    display: none;
-  }
+  display: block;
 }
 .ws-cover-blurb {
   padding: 12mm 18mm 0;
@@ -1376,72 +1427,257 @@
   padding: 1.6mm 5mm;
   font-size: 10pt;
 }
+
+/* ---- Kopf: seitliches Band links über die ganze Höhe ---- */
+.ws-cover-kopf-seite .ws-cover-top {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 62mm;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8mm;
+  padding: 18mm 8mm;
+}
+.ws-cover-kopf-seite .ws-cover-headline {
+  flex: none;
+}
+.ws-cover-kopf-seite .ws-cover-title {
+  font-size: 19pt;
+}
+.ws-cover-kopf-seite .ws-cover-fox {
+  width: 40mm;
+  height: 40mm;
+  align-self: center;
+}
+.ws-cover-kopf-seite .ws-cover-ueberthema {
+  margin-top: 5mm;
+  text-align: left;
+  max-width: none;
+}
+.ws-cover-kopf-seite .ws-cover-blurb,
+.ws-cover-kopf-seite .ws-cover-badges {
+  margin-left: 62mm;
+  padding-left: 12mm;
+  padding-right: 12mm;
+}
+.ws-cover-kopf-seite .ws-cover-blurb {
+  padding-top: 18mm;
+}
+
+/* ---- Kopf: zentriert, ohne Farbfläche – nur eine Leiste oben ---- */
+.ws-cover-kopf-zentriert .ws-cover-top {
+  flex-direction: column;
+  gap: 5mm;
+  background: transparent;
+  color: var(--cover-dark);
+  border-top: 7mm solid var(--cover-dark);
+  padding: 12mm 22mm 4mm;
+  text-align: center;
+}
+.ws-cover-kopf-zentriert .ws-cover-headline {
+  width: 100%;
+}
+.ws-cover-kopf-zentriert .ws-cover-kicker {
+  align-items: center;
+}
+.ws-cover-kopf-zentriert .ws-cover-facts {
+  color: #3a3a3a;
+  opacity: 1;
+}
+.ws-cover-kopf-zentriert .ws-cover-fox {
+  width: 34mm;
+  height: 34mm;
+  border: 0.6mm solid var(--cover-mid);
+}
+.ws-cover-kopf-zentriert .ws-cover-ueberthema {
+  margin: 4mm auto 0;
+  text-align: center;
+  max-width: none;
+  display: inline-block;
+}
+.ws-cover-kopf-zentriert .ws-cover-blurb {
+  text-align: center;
+  padding-top: 6mm;
+}
+.ws-cover-kopf-zentriert .ws-cover-badges {
+  justify-content: center;
+}
+
+/* ---- Kopf: großes Titelbild, der Titel in einem Band darunter ---- */
+.ws-cover-kopf-titelbild .ws-cover-top {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.ws-cover-bildflaeche {
+  height: 88mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 55%, #ffffff 0%, var(--cover-light) 55%, var(--cover-mid) 100%);
+}
+.ws-cover-kopf-titelbild .ws-cover-fox {
+  width: 72mm;
+  height: 72mm;
+  box-shadow: 0 1mm 4mm rgba(0, 0, 0, 0.12);
+}
+.ws-cover-kopf-titelbild.ws-cover-ohne-bild .ws-cover-bildflaeche {
+  height: 30mm;
+}
+.ws-cover-kopf-titelbild .ws-cover-headline {
+  padding: 8mm 18mm 8mm;
+}
+.ws-cover-kopf-titelbild .ws-cover-ueberthema {
+  margin-top: 3mm;
+  display: inline-block;
+  max-width: none;
+}
+.ws-cover-kopf-titelbild .ws-cover-blurb {
+  padding-top: 7mm;
+}
+
 /*
- * Seitenvorschau auf dem Deckblatt: vier bis sechs EINZELNE Seiten, leicht gefächert.
- *
- * Gewünscht am 24.09.2026. Vorher zeigte jede Vorschau ein ganzes Blatt – alle Seiten
- * untereinander in einem Daumennagel, von dem man nichts erkannte.
- *
- * Die Kacheln dürfen umbrechen: Bei sechs Seiten entstehen zwei Reihen zu dritt, bei vier
- * eine Reihe. Ihre Breite richtet sich nach der Zahl, damit die Fläche gefüllt bleibt.
+ * Seitenvorschauen: jede Karte absolut auf der Seite (mm). Lage, Größe, Drehung und Ebene
+ * kommen aus render/deckblatt.ts; hier stehen nur Rahmen und Schatten.
  */
 .ws-cover-previews {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
-  align-items: flex-end;
-  gap: 2mm;
-  padding: 6mm 10mm 10mm;
-  /* Der freie Raum verteilt sich gleichmaessig ueber und unter dem Faecher */
-  margin: auto 0;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 .ws-cover-thumb {
-  flex: 0 0 auto;
-  /*
-   * Die Breite haengt an der ANZAHL: Alle Kacheln stehen in einer Reihe. Zwischen den
-   * Seitenraendern sind 190 mm frei; bei fester Breite ragten sechs Kacheln darueber hinaus
-   * und wurden abgeschnitten – nachgemessen am 24.09.2026.
-   */
-  width: var(--kachel, 44mm);
-  aspect-ratio: 210 / 297;
+  position: absolute;
+  box-sizing: border-box;
   background: #fff;
   border: 0.3mm solid var(--cover-mid);
   border-radius: 1.5mm;
   box-shadow: 0 1mm 3mm rgba(0, 0, 0, 0.12);
+  transform-origin: 50% 50%;
+  pointer-events: auto;
+}
+.ws-cover-karte-seite {
+  position: absolute;
   overflow: hidden;
+  background: #fff;
 }
-.ws-cover-previews-5 {
-  --kachel: 35mm;
+.ws-cover-rahmen-schlicht .ws-cover-karte-seite {
+  border-radius: 1.2mm;
 }
-.ws-cover-previews-6 {
-  --kachel: 29mm;
+/* Polaroid: weißer Rand, unten breiter; die Seite selbst mit feiner Kante */
+.ws-cover-rahmen-polaroid .ws-cover-thumb {
+  border: 0.25mm solid #d5d5d5;
+  border-radius: 0.6mm;
+  box-shadow: 0 0.8mm 2.5mm rgba(0, 0, 0, 0.16);
 }
-/*
- * Der Faecher: abwechselnde kleine Drehungen und ein leichter Hoehenversatz. Regelmaessig
- * genug, um ruhig zu wirken, unregelmaessig genug, um nicht wie eine Tabelle auszusehen.
- */
-.ws-cover-thumb:nth-child(3n + 1) {
-  transform: rotate(-2deg) translateY(1.5mm);
+.ws-cover-rahmen-polaroid .ws-cover-karte-seite {
+  outline: 0.2mm solid #e2e2e2;
 }
-.ws-cover-thumb:nth-child(3n + 2) {
-  transform: rotate(1deg) translateY(-1mm);
+/* Klebestreifen: hell und halb durchsichtig – druckt als zarter grauer Balken */
+.ws-cover-klebe {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  background: rgba(214, 214, 205, 0.72);
+  border-left: 0.3mm dashed rgba(255, 255, 255, 0.7);
+  border-right: 0.3mm dashed rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0.2mm 0.6mm rgba(0, 0, 0, 0.1);
 }
-.ws-cover-thumb:nth-child(3n) {
-  transform: rotate(2.5deg) translateY(2mm);
+/* Pin: kleiner Kopf in der Deckblattfarbe mit Lichtpunkt */
+.ws-cover-pin {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -35%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, var(--cover-dark) 22% 100%);
+  box-shadow: 0.4mm 0.6mm 0.8mm rgba(0, 0, 0, 0.3);
+}
+.ws-cover-thumb-inner {
+  transform-origin: top left;
+}
+/* Das Tafelbild steht quer; als Vorschau darf es keine eigene Druckseite anstoßen */
+.ws-cover-thumb-inner .ws-page {
+  page: auto;
+  break-after: auto;
+  page-break-after: auto;
 }
 
-.ws-cover-thumb-inner {
-  width: 210mm;
-  height: 297mm;
-  transform-origin: top left;
-  /* Die Vorschau zeigt echte Seiten, verkleinert auf die Kachelbreite (Kachel / 210 mm) */
-  transform: scale(var(--kachel-skala, 0.2095));
+/* ---- Griffe: nur im Editor, nie im Druck ---- */
+.ws-cover-thumb[role='button'] {
+  cursor: move;
+  touch-action: none;
 }
-.ws-cover-previews-5 .ws-cover-thumb-inner {
-  --kachel-skala: 0.1667;
+.ws-cover-thumb-aktiv,
+.ws-cover-thumb:focus-visible {
+  outline: 0.6mm solid #228be6;
+  outline-offset: 0.8mm;
 }
-.ws-cover-previews-6 .ws-cover-thumb-inner {
-  --kachel-skala: 0.1381;
+.ws-cover-griff {
+  position: absolute;
+  width: 5mm;
+  height: 5mm;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: #fff;
+  border: 0.5mm solid #228be6;
+  touch-action: none;
+  z-index: 2;
+}
+.ws-cover-griff-drehen {
+  left: 50%;
+  top: -9mm;
+  transform: translateX(-50%);
+  cursor: grab;
+}
+.ws-cover-griff-drehen::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 0.4mm;
+  height: 4mm;
+  background: #228be6;
+}
+.ws-cover-griff-groesse {
+  right: -2.5mm;
+  bottom: -2.5mm;
+  border-radius: 1mm;
+  cursor: nwse-resize;
+}
+.ws-cover-griffe {
+  position: absolute;
+  display: flex;
+  gap: 1mm;
+  z-index: 1000;
+  pointer-events: auto;
+  font-family: system-ui, sans-serif;
+}
+.ws-cover-griffe button {
+  font-size: 7pt;
+  padding: 0.8mm 2mm;
+  border: 0.3mm solid #adb5bd;
+  border-radius: 1mm;
+  background: #fff;
+  color: #212529;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ws-cover-griffe button:hover {
+  background: #e7f5ff;
+}
+@media print {
+  .ws-cover-griff,
+  .ws-cover-griffe {
+    display: none;
+  }
+  .ws-cover-thumb-aktiv {
+    outline: none;
+  }
 }
 
 /* ---------- Beschriftungen direkt am Bild ---------- */

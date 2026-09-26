@@ -1,3 +1,4 @@
+import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
   Alert,
   Badge,
@@ -61,6 +62,7 @@ import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useKiZugang } from '../../../shared/useKiZugang'
+import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
 
 /**
  * Schritt 1: Lerngruppe, Landesformat, Umfang.
@@ -99,6 +101,12 @@ export default function SetupStep(): React.JSX.Element {
         const schoolTypeId = settings.defaults.schoolTypeId
         const name = cefr.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.name ?? 'Gymnasium'
         const neu = emptyKurztest(stateId, schoolTypeId, name)
+        // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor (shared/fachVorgabe.ts)
+        const vorgabe = nimmFachVorgabe('lernzielkontrolle')
+        if (vorgabe && subjectById(vorgabe).id === vorgabe) {
+          neu.meta.subjectId = vorgabe
+          neu.meta.subjectLabel = subjectById(vorgabe).label
+        }
         const design = designs.find((d) => d.isDefault) ?? designs[0]
         if (design) neu.design = design
         setTest(neu)
@@ -652,6 +660,8 @@ export default function SetupStep(): React.JSX.Element {
                         />
                         {/* Paket 10a: dezent in der Fachfarbe (Kopf, Überschriften) – hier abschaltbar */}
                         <VorlagenfarbeSchalter fach={m.subjectId} checked={Boolean(m.vorlagenfarbe)} onChange={(an) => patch({ vorlagenfarbe: an })} />
+                        {/* Paket 11: Überthema dezent im Kopf – standardmäßig der Themenbereich */}
+                        <UeberthemaFeldFuer moduleId="lernzielkontrolle" docId={useLernzielkontrolle.getState().docId} werte={m} onChange={(p) => patch(p)} />
                       </Stack>
                     </Card>
                   </Stack>

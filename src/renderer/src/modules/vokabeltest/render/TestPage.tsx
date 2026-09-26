@@ -5,6 +5,8 @@ import { blockHelp } from './helpTexts'
 import { isEditable, showsAnswers, T, useRender } from './RenderContext'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
+import { fachPfad, ueberthemaVon } from '../../../shared/ueberthema'
+import { LANGUAGES } from '../model/types'
 
 /** Seitenaufteilung eines Tests (aus der Messung in useTestLayout). */
 export interface PageLayout {
@@ -23,6 +25,16 @@ export interface BlockRange {
 
 /** Aufgabenarten, deren Items auf mehrere Seiten verteilt werden dürfen */
 export const SPLITTABLE_KINDS = new Set<Block['kind']>(['gap', 'choice', 'open', 'trueFalse', 'oddOneOut', 'scramble'])
+
+/**
+ * „Englisch › Unit 3" – Sprache und Überthema für den Kopf (Paket 11); leer ohne Überthema.
+ * Vokabeltests haben keine Designvorlage, deshalb immer als Pfad.
+ */
+export function vokabeltestPfad(doc: TestDocument): string {
+  const ueber = ueberthemaVon(doc.header)
+  if (!ueber) return ''
+  return fachPfad(LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? '', ueber)
+}
 
 /** Fachfarbe eines Vokabeltests (nach der Zielsprache) oder null = schwarz – für Vorschau, Druck und Word */
 export const vokabeltestFarbe = (doc: TestDocument): string | null => geltendeFachfarbe(doc.settings.targetLanguage, doc.header.vorlagenfarbe)
@@ -86,9 +98,20 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
   const h = doc.header
   const total = variantPoints(variant)
   const multi = doc.variants.length > 1
+  // Überthema (Paket 11): „Englisch › Unit 3" oben rechts im Kopf; ohne Überthema wie bisher
+  const pfad = vokabeltestPfad(doc)
   return (
     <header className="vt-header">
-      {h.showSchool && h.schoolName && <div className="vt-school">{h.schoolName}</div>}
+      {pfad ? (
+        <div className="vt-kopfzeile">
+          <span className="vt-school">{h.showSchool ? h.schoolName : ''}</span>
+          <span className="vt-ueberthema" data-ueberthema={ueberthemaVon(h)}>
+            {pfad}
+          </span>
+        </div>
+      ) : (
+        h.showSchool && h.schoolName && <div className="vt-school">{h.schoolName}</div>
+      )}
       <div className="vt-title-row">
         <h1 className="vt-title">
           {h.title}

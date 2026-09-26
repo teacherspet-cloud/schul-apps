@@ -18,6 +18,8 @@ import { dauerSchaetzung } from '../generation/generateKurztest'
 import { kurztestToWorksheet, kurztestToWorksheetAlle, schluesselHerkunft } from '../render/kurztestWorksheet'
 import { useLernzielkontrolle } from '../store'
 import { useDruck } from '../../../shared/navigation'
+import { useThemenbereich } from '../../../shared/themenbereiche'
+import { mitThemenbereich } from '../../../shared/ueberthema'
 
 /**
  * Schritt 2: ansehen, bearbeiten, ausgeben.
@@ -100,7 +102,12 @@ export default function EditorStep(): React.JSX.Element {
    * erschien gar nicht mehr, und zwar ohne Fehlermeldung im Fenster.
    */
   const schwellen = useMemo(() => thresholdsForSubject(settings.gradeScale, test?.meta.subjectId ?? ''), [settings.gradeScale, test?.meta.subjectId])
-  const ws = useMemo(() => (test ? kurztestToWorksheet(test, variante, schwellen) : null), [test, variante, schwellen])
+  // Überthema (Paket 11): der Themenbereich der Kontrolle steht dezent im Kopf – nur zum Anzeigen eingesetzt
+  const bereich = useThemenbereich(
+    'lernzielkontrolle',
+    useLernzielkontrolle((s) => s.docId)
+  )?.name
+  const ws = useMemo(() => (test ? mitThemenbereich(kurztestToWorksheet(test, variante, schwellen), bereich) : null), [test, variante, schwellen, bereich])
   const befunde = useMemo(() => (test ? pruefeKurztest(test, variante) : []), [test, variante])
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
   // Strg+P druckt wie der Knopf „Drucken" (mit Rückfrage bei mehreren Fassungen); vor dem frühen return, weil es ein Hook ist
@@ -121,7 +128,7 @@ export default function EditorStep(): React.JSX.Element {
   /** Das Blatt fuer die Ausgabe: eine Fassung oder alle in einem Dokument. */
   const ausgabe = (alle: boolean): { ws: Worksheet; sheetIds: string[]; name: string } => {
     if (!alle) return { ws, sheetIds: [sheet.id], name: dateiname }
-    const komplett = kurztestToWorksheetAlle(test, schwellen)
+    const komplett = mitThemenbereich(kurztestToWorksheetAlle(test, schwellen), bereich)
     return {
       ws: komplett,
       sheetIds: komplett.sheets.map((s) => s.id),

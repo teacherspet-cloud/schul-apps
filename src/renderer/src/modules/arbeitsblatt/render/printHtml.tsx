@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { Worksheet } from '../model/types'
 import type { PagePlan } from './paginate'
 import { BoardPage } from './BoardView'
-import { contextFor, layoutKey, pageInfoFor, SheetPages, vorschauSeiten } from './SheetPages'
+import { contextFor, layoutKey, pageInfoFor, SheetPages } from './SheetPages'
+import { deckblattVorschau } from './deckblattVorschau'
 import wsCss from './ws.css?raw'
 import { boardList } from '../didactics/boardDesign'
 import { CoverPage } from './CoverPage'
@@ -51,28 +52,11 @@ export function buildWorksheetHtml(
   }
   // Das Deckblatt ist Seite 0 und steht vor allem anderen – aber nicht vor einem reinen Lösungsdruck
   if (ws.meta.coverPage && !sel.keyOnly) {
-    parts.push(
-      renderToStaticMarkup(
-        <CoverPage
-          ws={ws}
-          /*
-            EINZELNE Seiten, nicht ganze Blätter. Vorher rendert jede Vorschau ein komplettes
-            Blatt – auf dem Deckblatt standen dadurch alle Seiten untereinander in einem
-            einzigen Daumennagel (gemeldet am 24.09.2026).
-          */
-          previews={vorschauSeiten((layouts.get(layoutKey(sheets[0].id, false)) ?? []).length).map((i) => (
-            <SheetPages
-              key={i}
-              ws={ws}
-              sheet={sheets[0]}
-              plans={[(layouts.get(layoutKey(sheets[0].id, false)) ?? [])[i]]}
-              info={pageInfoFor(ws, sheets[0], logo, schoolName, false)}
-              context={contextFor(ws, sheets[0], 'print')}
-            />
-          ))}
-        />
-      )
-    )
+    /*
+      EINZELNE Seiten, nicht ganze Blätter (gemeldet am 24.09.2026). Seit Paket 11 dieselben
+      Seiten in derselben Lage wie im Editor – auch Lösungen, Hilfekarten und Tafelbild.
+    */
+    parts.push(renderToStaticMarkup(<CoverPage ws={ws} vorschau={deckblattVorschau(ws, layouts, logo, schoolName)} />))
   }
   if (!sel.keyOnly) render(false)
   if (sel.includeKey || sel.keyOnly) render(true)

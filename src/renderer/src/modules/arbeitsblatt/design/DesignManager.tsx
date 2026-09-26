@@ -31,6 +31,7 @@ import { defaultMeta } from '../model/defaults'
 import type { Worksheet } from '../model/types'
 import { SheetPages, contextFor, pageInfoFor } from '../render/SheetPages'
 import EinstellungenLink from '../../../shared/components/EinstellungenLink'
+import { UEBERTHEMA_STILE, type UeberthemaStil } from '../../../shared/ueberthema'
 import '../render/ws.css'
 
 const FOOTER_SLOTS: { value: FooterSlot; label: string }[] = [
@@ -52,6 +53,8 @@ function sampleWorksheet(design: DesignTemplate): Worksheet {
     title: 'Wie Pflanzen Energie gewinnen',
     grade: 7,
     sheetNumber: '3',
+    // Damit die Vorschau zeigt, wie das Überthema im Kopf steht (Paket 11)
+    ueberthema: 'Ökologie',
     // Hier wird die Vorlage selbst gestaltet – ihre eigene Farbe zeigen, nicht die Fachfarbe (Paket 10a)
     vorlagenfarbe: true
   }
@@ -421,6 +424,18 @@ export default function DesignManager(): React.JSX.Element {
                   onChange={(v) => patch('header', { followingPages: v as 'full' })}
                 />
               </div>
+              {/*
+                Paket 11: Überthema (standardmäßig der Themenbereich des Materials) – es gehört zum
+                Kopf, nicht zur Überschrift. Die Vorschau rechts zeigt es mit „Ökologie".
+              */}
+              <Select
+                label="Überthema im Kopf"
+                description="Steht neben dem Fach, wenn das Material in einem Themenbereich liegt oder eines eingetragen ist."
+                data={UEBERTHEMA_STILE.map((s) => ({ value: s.value, label: `${s.label} – ${s.beispiel}` }))}
+                value={design.header.overTopicStyle ?? 'path'}
+                onChange={(v) => v && patch('header', { overTopicStyle: v as UeberthemaStil })}
+                allowDeselect={false}
+              />
 
               <Divider label="Fußbereich" labelPosition="left" />
               <Switch label="Fußzeile anzeigen" checked={design.footer.show} onChange={(e) => patch('footer', { show: e.currentTarget.checked })} />
@@ -500,6 +515,8 @@ export default function DesignManager(): React.JSX.Element {
                     label="Text"
                     data={[
                       { value: 'subject', label: 'Fach' },
+                      { value: 'subjectOverTopic', label: 'Fach › Überthema' },
+                      { value: 'overTopic', label: 'Überthema' },
                       { value: 'topic', label: 'Thema' },
                       { value: 'custom', label: 'Eigener Text' },
                       { value: 'none', label: 'kein Text' }

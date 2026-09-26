@@ -331,6 +331,13 @@ export interface TestHeader {
    * bisher. Fehlt = Fachfarbe der Sprache (Englisch, Französisch …) aus den Einstellungen.
    */
   vorlagenfarbe?: boolean
+  /**
+   * Überthema im Kopf (Paket 11, shared/ueberthema.ts), z. B. „Englisch › Unit 3": eigener
+   * Eintrag, abgeschaltet und – nur zum Anzeigen – der Themenbereich bzw. die Unit der Liste.
+   */
+  ueberthema?: string
+  ueberthemaAus?: boolean
+  themenbereich?: string
 }
 
 export interface TaskSelection {

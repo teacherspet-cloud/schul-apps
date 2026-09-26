@@ -1,3 +1,4 @@
+import { setzeFachVorgabe } from '../fachVorgabe'
 import {
   ActionIcon,
   Alert,
@@ -353,6 +354,8 @@ export function ThemenAnsicht({ moduleId, artPlural, eigene, renderEigen, darste
 
   const neuHier = async (b: Themenbereich, modulId?: string): Promise<void> => {
     try {
+      // Das neue Material beginnt im Fach des Bereichs (Rest aus Paket 10b)
+      setzeFachVorgabe(modulId ?? moduleId ?? '', b.fachId)
       const id = modulId && modulId !== moduleId ? await neuAnlegen(modulId) : onNeu ? await onNeu() : null
       if (id) await neuImBereich(modulId ?? moduleId ?? '', id, b)
     } catch (e) {
