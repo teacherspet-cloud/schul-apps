@@ -131,11 +131,13 @@ export function CoverPage({
   const stil = ws.design.header.overTopicStyle ?? 'path'
   const ueber = ueberthemaVon(ws.meta)
   const fach = ws.meta.subjectLabel
+  // „0 Aufgaben" auf einem Deckblatt wirkt wie ein Fehler – bei reinen Materialblättern entfällt die Angabe
+  const aufgaben = ws.sheets[0]?.blocks.filter((b) => b.type === 'task').length ?? 0
   const facts = [
     stil === 'path' ? fachPfad(fach, ueber) : stil === 'emphasis' && ueber ? '' : fach,
     ws.meta.grade ? `Klasse ${ws.meta.grade}` : '',
     levels > 1 ? `${levels} Niveaustufen` : '',
-    `${ws.sheets[0]?.blocks.filter((b) => b.type === 'task').length ?? 0} Aufgaben`
+    aufgaben > 0 ? `${aufgaben} ${aufgaben === 1 ? 'Aufgabe' : 'Aufgaben'}` : ''
   ].filter(Boolean)
 
   const { karten, rahmen } = vorschau ? deckblattLage(ws.meta, vorschau.kandidaten) : { karten: [], rahmen: 'schlicht' as const }
