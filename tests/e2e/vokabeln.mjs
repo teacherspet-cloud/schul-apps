@@ -100,6 +100,12 @@ await karte('Unit 7 – Tiere')
 await page.getByRole('menuitem', { name: 'Kopie anlegen' }).click()
 await karte('Unit 7 – Tiere (Kopie)').waitFor({ timeout: 5000 })
 pruefe((await karte('Unit 7 – Tiere (Kopie)').count()) === 1, 'Kopie der Liste angelegt')
+/*
+ * Erst warten, bis das Menü des Originals ganz zu ist (Übergang ~150 ms). Seit die Schulbücher als
+ * zugeklappte Reihen-Karte stehen (Paket 15), liegen die Listen ohne Scrollen im Bild; das zweite
+ * Menü ging dann auf, solange das erste noch im DOM stand, und „Löschen" traf das Original.
+ */
+await page.waitForFunction(() => !document.querySelector('[role="menu"]'), null, { timeout: 5000 })
 await karte('Unit 7 – Tiere (Kopie)')
   .getByRole('button', { name: /^Weitere Aktionen für/ })
   .click()

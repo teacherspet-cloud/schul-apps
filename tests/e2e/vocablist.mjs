@@ -56,6 +56,22 @@ if (!lerngruppe.includes('Niedersachsen')) throw new Error('Bundesland ist nicht
 if (!lerngruppe.includes('Gymnasium')) throw new Error('Schulform ist nicht auf Gymnasium voreingestellt')
 if ((await value('Fach')) !== 'Englisch') throw new Error('Fach ist nicht auf Englisch voreingestellt')
 
+/*
+ * Schulbuchreihen (Paket 15): je Reihe eine Karte, anfangs zugeklappt. Heute gibt es nur Green
+ * Line bei Klett für Niedersachsen – dann steht in der Filterzeile nur das Fach.
+ */
+const reihe = page.locator('[data-reihe]').filter({ visible: true })
+const reihenTitel = await reihe.first().getAttribute('data-reihe')
+console.log(`Reihen: ${await reihe.count()} (${reihenTitel})`)
+if (reihenTitel !== 'Green Line · Niedersachsen · Ausgabe ab 2021 · Klett') throw new Error(`Unerwartete Reihen-Beschriftung: ${reihenTitel}`)
+if (!(await reihe.first().innerText()).includes('7 Bände')) throw new Error('Die Reihen-Karte nennt nicht „7 Bände"')
+if ((await reihe.first().getAttribute('data-offen')) !== 'false') throw new Error('Die Reihen-Karte ist nicht anfangs zugeklappt')
+if (await page.locator('[data-reihen-filter]').filter({ visible: true }).count())
+  throw new Error('Bei nur einer Reihe, einem Verlag, einer Ausgabe und einer Landesausgabe darf kein Filter erscheinen')
+await page.screenshot({ path: join(out, '1-reihen-zugeklappt.png'), fullPage: true })
+await page.getByRole('button', { name: `${reihenTitel} aufklappen` }).click()
+await page.waitForTimeout(400)
+
 const books = await page.getByRole('button', { name: 'Vokabeln bearbeiten' }).count()
 console.log(`Schulbücher für diese Lerngruppe: ${books}`)
 if (books < 7) throw new Error(`Es fehlen Lehrwerke (gefunden: ${books})`)

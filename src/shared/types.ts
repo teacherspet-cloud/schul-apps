@@ -728,9 +728,17 @@ export interface Textbook {
   /** Bundesland und Schulform der Ausgabe – werden beim Test vorgeschlagen */
   stateId?: string
   schoolTypeId?: string
-  /** Verlag und Ausgabe, soweit bekannt (z. B. Klett, Niedersachsen) */
+  /** Verlag und Landesausgabe, soweit bekannt (z. B. Klett, Niedersachsen) */
   publisher?: string
   edition?: string
+  /**
+   * Schulbuchreihe, Ausgabe (Generation/Erscheinungsjahr, z. B. „ab 2021") und Band („3",
+   * „Transition") – Paket 15, siehe src/shared/lehrwerkReihe.ts. Fehlen Reihe und Band, werden
+   * sie beim Einlesen aus dem Namen abgeleitet.
+   */
+  reihe?: string
+  ausgabe?: string
+  band?: string
   units: TextbookUnit[]
   /** mitgeliefert (nur lesen) oder von der Lehrkraft importiert */
   builtIn?: boolean
@@ -762,7 +770,12 @@ export interface TextbookMeta {
   schoolTypeId?: string
   builtIn?: boolean
   publisher?: string
+  /** Landesausgabe („Niedersachsen") */
   edition?: string
+  /** Reihe, Ausgabe und Band (Paket 15) – im Hauptprozess notfalls aus dem Namen abgeleitet, also bei Reihe und Band immer gesetzt */
+  reihe?: string
+  ausgabe?: string
+  band?: string
   units: { name: string; sections: TextbookSectionMeta[] }[]
   entryCount: number
 }

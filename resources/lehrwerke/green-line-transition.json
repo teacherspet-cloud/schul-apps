@@ -5,6 +5,9 @@
   "grade": 11,
   "publisher": "Klett",
   "edition": "Niedersachsen",
+  "reihe": "Green Line",
+  "ausgabe": "ab 2021",
+  "band": "Transition",
   "stateId": "NI",
   "schoolTypeId": "gymnasium",
   "units": [

@@ -1,6 +1,23 @@
-import { Alert, Badge, Button, Card, Container, Group, Menu, ScrollArea, Stack, Text, TextInput, Title } from '@mantine/core'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Collapse,
+  Container,
+  Group,
+  Menu,
+  MultiSelect,
+  ScrollArea,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  UnstyledButton
+} from '@mantine/core'
 import { FachPunkt } from '../../shared/components/FachFarbe'
-import { IconBook2, IconFilePlus, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
+import { IconBook2, IconBooks, IconChevronRight, IconFilePlus, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
 import { notifyError } from '../../shared/util'
@@ -19,6 +36,21 @@ import { passtZurSuche } from '../../shared/bibliothek'
 import { testAusListe } from '../vokabeltest/library'
 import { ZUSATZ } from '../vokabeltest/steps/VokabelTabelle'
 import { vokabellistenApi } from './listenApi'
+import {
+  FILTER_FELDER,
+  filterOptionen,
+  filtere,
+  gruppiereReihen,
+  nachKlasse,
+  REIHEN_SORTIERUNGEN,
+  reiheTitel,
+  sinnvolleSortierungen,
+  wirksamerFilter,
+  wirksameSortierung,
+  type FilterFeld,
+  type FilterWahl,
+  type ReihenSortierung
+} from '@shared/lehrwerkReihe'
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -49,6 +81,8 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
   const [openList, setOpenList] = useState<SavedVocabList | null>(null)
   const [openBook, setOpenBook] = useState<string | null>(null)
   const [wizard, setWizard] = useState(false)
+  // Aufgeklappte Reihen (Paket 15): anfangs alle zu; bleibt beim Wechsel in den Buch-Editor und zurück erhalten
+  const [offeneReihen, setOffeneReihen] = useState<string[]>([])
 
   // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
   useDokumentOeffner('vokabelliste', async (id) => {
@@ -62,8 +96,15 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
 
   useEffect(() => {
     window.api.cefr.get().then(setTable).catch(notifyError)
-    window.api.textbooks.list().then(setBooks).catch(notifyError)
   }, [])
+  /*
+   * Lehrwerke bei jedem Wechsel hierher neu holen: Das Programm bleibt im Hintergrund geladen, und
+   * ein im Vokabeltest importiertes Lehrwerk fehlte sonst bis zum Neustart (gefunden mit der
+   * Wache schulbuchreihen.mjs, Paket 15).
+   */
+  useEffect(() => {
+    if (active) window.api.textbooks.list().then(setBooks).catch(notifyError)
+  }, [active])
 
   useEffect(() => {
     try {
@@ -72,6 +113,12 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
       // ohne lokalen Speicher bleibt die Auswahl nur für diese Sitzung
     }
   }, [choice])
+
+  // Hooks vor den frühen Rücksprüngen (Buch- und Listen-Editor)
+  const reihen = useReihenFilter(
+    books.filter((b) => b.language === choice.language),
+    choice.language
+  )
 
   if (openBook) {
     return (
@@ -176,53 +223,20 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
               // Farbpunkt des Fachs (Paket 10a)
               leftSection={<FachPunkt fach={choice.language} />}
             />
+            {/* Filterzeile (Paket 15): nach dem Fach Verlag – Reihe – Landesausgabe – Ausgabe, nur wenn sie etwas unterscheiden */}
+            {reihenFilterFelder({ reihen })}
           </Group>
         </Card>
 
-        <Title order={4} mb="xs">
-          Schulbücher
-        </Title>
-        {matching.length + others.length === 0 ? (
-          <Alert color="gray" mb="md">
-            Für {languageLabel} ist noch kein Lehrwerk hinterlegt. Über „Neue Liste" lässt sich eine Vokabelliste aus Fotos oder Dateien anlegen.
-          </Alert>
-        ) : (
-          <Stack gap="xs" mb="md">
-            {[...matching, ...others].map((b) => (
-              <Card key={b.id} withBorder padding="sm">
-                <Group justify="space-between" wrap="nowrap">
-                  <div style={{ minWidth: 0 }}>
-                    <Group gap="xs">
-                      <IconBook2 size={16} />
-                      <Text fw={600} truncate>
-                        {b.name}
-                      </Text>
-                      <Badge variant="light">{b.entryCount} Vokabeln</Badge>
-                      {b.grade ? <Badge variant="outline">Klasse {b.grade}</Badge> : null}
-                      {!b.builtIn && (
-                        <Badge variant="light" color="teal">
-                          eigene Fassung
-                        </Badge>
-                      )}
-                      {!matching.includes(b) && (
-                        <Badge variant="outline" color="gray">
-                          andere Lerngruppe
-                        </Badge>
-                      )}
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      {b.units.length} Units{b.publisher ? ` · ${b.publisher}` : ''}
-                      {b.edition ? ` · ${b.edition}` : ''}
-                    </Text>
-                  </div>
-                  <Button size="xs" onClick={() => setOpenBook(b.id)}>
-                    Vokabeln bearbeiten
-                  </Button>
-                </Group>
-              </Card>
-            ))}
-          </Stack>
-        )}
+        <Schulbuecher
+          buecher={[...matching, ...others]}
+          andere={others}
+          languageLabel={languageLabel}
+          reihen={reihen}
+          offen={offeneReihen}
+          onOffen={setOffeneReihen}
+          onBearbeiten={setOpenBook}
+        />
 
         <EigeneListen sprache={choice.language} languageLabel={languageLabel} onBearbeiten={setOpenList} />
 
@@ -361,6 +375,217 @@ function EigeneListen({
               Nichts gefunden. Anderen Suchbegriff versuchen.
             </Text>
           )}
+        </Stack>
+      )}
+    </>
+  )
+}
+
+const FILTER_KEY = 'vokabellisten-reihenfilter'
+const SORT_KEY = 'vokabellisten-reihensortierung'
+
+function lies<T>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key)
+    return v === null ? fallback : (JSON.parse(v) as T)
+  } catch {
+    return fallback
+  }
+}
+function merke(key: string, wert: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(wert))
+  } catch {
+    // ohne lokalen Speicher gilt die Wahl nur für diese Sitzung
+  }
+}
+
+/** Filter und Sortierung der Schulbücher (Paket 15) – gemerkt; Regeln in src/shared/lehrwerkReihe.ts */
+interface ReihenFilter {
+  optionen: Record<FilterFeld, string[]>
+  wahl: FilterWahl
+  setzeFilter: (feld: FilterFeld, werte: string[]) => void
+  sortierungen: ReihenSortierung[]
+  sortierung: ReihenSortierung
+  setSortierung: (s: ReihenSortierung) => void
+  /** Die Bücher, die zur (wirksamen) Wahl passen */
+  gezeigt: TextbookMeta[]
+}
+
+function useReihenFilter(buecher: TextbookMeta[], sprache: string): ReihenFilter {
+  const [filterJeFach, setFilterJeFach] = useState<Record<string, Partial<FilterWahl>>>(() => lies(FILTER_KEY, {}))
+  const [sortWahl, setSortWahl] = useState<ReihenSortierung>(() => lies(SORT_KEY, 'reihe'))
+  const optionen = filterOptionen(buecher)
+  // Ausgeblendete Filter und verschwundene Werte gelten als „alle" – nichts filtert still weiter
+  const wahl = wirksamerFilter(filterJeFach[sprache], optionen)
+  const sortierungen = sinnvolleSortierungen(buecher)
+  return {
+    optionen,
+    wahl,
+    setzeFilter: (feld, werte) => {
+      const neu = { ...filterJeFach, [sprache]: { ...wahl, [feld]: werte } }
+      setFilterJeFach(neu)
+      merke(FILTER_KEY, neu)
+    },
+    sortierungen,
+    sortierung: wirksameSortierung(sortWahl, sortierungen),
+    setSortierung: (v) => {
+      setSortWahl(v)
+      merke(SORT_KEY, v)
+    },
+    gezeigt: filtere(buecher, wahl)
+  }
+}
+
+/**
+ * Die Filter der Filterzeile (nach dem Fach): Verlag – Reihe – Landesausgabe – Ausgabe, jeweils
+ * Mehrfachauswahl. Nur die, die unter den Büchern des Fachs etwas unterscheiden.
+ */
+function reihenFilterFelder({ reihen }: { reihen: ReihenFilter }): React.JSX.Element[] {
+  return FILTER_FELDER.filter(({ feld }) => reihen.optionen[feld].length > 0).map(({ feld, label }) => (
+    <MultiSelect
+      key={feld}
+      label={label}
+      placeholder={reihen.wahl[feld].length ? '' : 'alle'}
+      data={reihen.optionen[feld]}
+      value={reihen.wahl[feld]}
+      onChange={(v) => reihen.setzeFilter(feld, v)}
+      clearable
+      data-reihen-filter={feld}
+    />
+  ))
+}
+
+/**
+ * „Schulbücher" der Übersicht, nach Reihen geordnet (Paket 15, Wunsch der Lehrkraft vom 26.09.2026).
+ *
+ * Vorher stand jeder Band als eigene Zeile da; mit mehreren Reihen, Verlagen und Ausgaben wird
+ * das unübersichtlich. Jetzt: je Reihe + Landesausgabe + Ausgabe + Verlag eine aufklappbare Karte
+ * („Green Line · Niedersachsen · Ausgabe ab 2021 · Klett – 7 Bände"), ANFANGS ZUGEKLAPPT;
+ * aufgeklappt die Bände wie bisher. Die Sortierung „Klassenstufe" zeigt eine flache Liste über
+ * alle Reihen, jeder Band mit seiner Reihe als Kennzeichen.
+ *
+ * Filter (Verlag, Reihe, Landesausgabe, Ausgabe – nach dem Fach in der Karte darüber) erscheinen
+ * nur, wenn sie unter den Büchern des Fachs etwas unterscheiden; ebenso bietet die Sortierung nur,
+ * was etwas bewirkt. Die Wahl wird gemerkt (Filter je Fach) – eine gemerkte Wahl, deren Filter
+ * gerade ausgeblendet ist, gilt als „alle" (Regeln in src/shared/lehrwerkReihe.ts).
+ */
+function Schulbuecher({
+  buecher,
+  andere,
+  languageLabel,
+  reihen,
+  offen,
+  onOffen,
+  onBearbeiten
+}: {
+  buecher: TextbookMeta[]
+  /** Bände, die nicht zur gewählten Lerngruppe passen (Kennzeichen „andere Lerngruppe") */
+  andere: TextbookMeta[]
+  languageLabel: string
+  reihen: ReihenFilter
+  offen: string[]
+  onOffen: (o: string[]) => void
+  onBearbeiten: (id: string) => void
+}): React.JSX.Element {
+  const { sortierungen, sortierung, setSortierung, gezeigt } = reihen
+  const band = (b: TextbookMeta, mitReihe: boolean): React.JSX.Element => (
+    <Card key={b.id} withBorder padding="sm" data-band={b.name}>
+      <Group justify="space-between" wrap="nowrap">
+        <div style={{ minWidth: 0 }}>
+          <Group gap="xs">
+            <IconBook2 size={16} />
+            <Text fw={600} truncate>
+              {b.name}
+            </Text>
+            <Badge variant="light">{b.entryCount} Vokabeln</Badge>
+            {b.grade ? <Badge variant="outline">Klasse {b.grade}</Badge> : null}
+            {mitReihe && (
+              <Badge variant="light" color="gray" tt="none" data-reihen-kennzeichen>
+                {reiheTitel(b)}
+              </Badge>
+            )}
+            {!b.builtIn && (
+              <Badge variant="light" color="teal">
+                eigene Fassung
+              </Badge>
+            )}
+            {andere.includes(b) && (
+              <Badge variant="outline" color="gray">
+                andere Lerngruppe
+              </Badge>
+            )}
+          </Group>
+          <Text size="xs" c="dimmed">
+            {b.units.length} Units{b.band ? ` · Band ${b.band}` : ''}
+          </Text>
+        </div>
+        <Button size="xs" onClick={() => onBearbeiten(b.id)}>
+          Vokabeln bearbeiten
+        </Button>
+      </Group>
+    </Card>
+  )
+
+  return (
+    <>
+      <Group justify="space-between" mb="xs" align="flex-end" wrap="wrap" gap="xs">
+        <Title order={4}>Schulbücher</Title>
+        {sortierungen.length > 0 && (
+          <Select
+            size="xs"
+            w={210}
+            aria-label="Schulbücher sortieren"
+            data={REIHEN_SORTIERUNGEN.filter((s) => sortierungen.includes(s.value))}
+            value={sortierung}
+            allowDeselect={false}
+            onChange={(v) => v && setSortierung(v as ReihenSortierung)}
+          />
+        )}
+      </Group>
+      {buecher.length === 0 ? (
+        <Alert color="gray" mb="md">
+          Für {languageLabel} ist noch kein Lehrwerk hinterlegt. Über „Neue Liste" lässt sich eine Vokabelliste aus Fotos oder Dateien anlegen.
+        </Alert>
+      ) : gezeigt.length === 0 ? (
+        <Text c="dimmed" size="sm" ta="center" py="md" mb="md">
+          Kein Schulbuch passt zu diesen Filtern.
+        </Text>
+      ) : sortierung === 'klasse' ? (
+        <Stack gap="xs" mb="md" data-reihen-flach>
+          {nachKlasse(gezeigt).map((b) => band(b, true))}
+        </Stack>
+      ) : (
+        <Stack gap="xs" mb="md">
+          {gruppiereReihen(gezeigt, sortierung).map((g) => {
+            const auf = offen.includes(g.schluessel)
+            return (
+              <Card key={g.schluessel} withBorder padding="sm" data-reihe={g.titel} data-offen={auf}>
+                <UnstyledButton
+                  onClick={() => onOffen(auf ? offen.filter((x) => x !== g.schluessel) : [...offen, g.schluessel])}
+                  aria-expanded={auf}
+                  aria-label={`${g.titel} ${auf ? 'zuklappen' : 'aufklappen'}`}
+                  style={{ width: '100%' }}
+                >
+                  <Group gap="xs" wrap="nowrap">
+                    <IconChevronRight size={16} style={{ transform: auf ? 'rotate(90deg)' : undefined, transition: 'transform 150ms', flexShrink: 0 }} />
+                    <IconBooks size={18} style={{ flexShrink: 0 }} />
+                    <Text fw={600} truncate>
+                      {g.titel}
+                    </Text>
+                    <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
+                      – {g.baende.length === 1 ? '1 Band' : `${g.baende.length} Bände`}
+                    </Text>
+                  </Group>
+                </UnstyledButton>
+                <Collapse expanded={auf}>
+                  <Stack gap="xs" mt="sm">
+                    {g.baende.map((b) => band(b, false))}
+                  </Stack>
+                </Collapse>
+              </Card>
+            )
+          })}
         </Stack>
       )}
     </>

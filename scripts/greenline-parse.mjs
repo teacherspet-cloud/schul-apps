@@ -43,7 +43,7 @@ const PREPOSITIONS =
   'about, above, across, after, against, along, among, around, at, before, behind, below, beside, between, by, down, during, for, from, in, inside, into, near, next to, of, off, on, onto, opposite, out, out of, outside, over, past, round, since, through, to, towards, under, until, up, with, within, without'
 const CONJUNCTIONS = 'and, but, or, so, because, if, when, while, although, though, than, as, unless, since, either, neither, nor'
 const DETERMINERS = 'a, an, the, some, any, much, many, more, most, all, both, every, each, another, few, several, enough'
-const MODALS = "can, cannot, could, may, might, must, shall, should, will, would, need to, have to"
+const MODALS = 'can, cannot, could, may, might, must, shall, should, will, would, need to, have to'
 const INTERJECTIONS = 'yes, no, hello, hi, hey, bye, goodbye, oh, ah, ouch, wow, please, thanks, thank you, sorry, ok, okay, hooray, well done'
 // Häufige Adverbien, die nicht auf -ly enden
 const ADVERBS =
@@ -168,6 +168,10 @@ export function parseGreenLine(rows, boxRows = []) {
     grade: book?.grade,
     publisher: 'Klett',
     edition: 'Niedersachsen',
+    // Reihe, Ausgabe (Generation) und Band – Paket 15, src/shared/lehrwerkReihe.ts
+    reihe: 'Green Line',
+    ausgabe: 'ab 2021',
+    band: (book?.name ?? 'Green Line').replace(/^Green Line\s*/, '') || undefined,
     // Die Ausgabe ist für das niedersächsische Gymnasium gedacht
     stateId: 'NI',
     schoolTypeId: 'gymnasium',

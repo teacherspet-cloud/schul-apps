@@ -155,7 +155,9 @@ export function buildTextbooks(rows: string[][], map: ColumnMap, opts: BuildOpti
     let book = books.get(id)
     if (!book) {
       const grade = Number.parseInt(current.grade, 10)
-      book = { id, name, language: opts.language ?? 'en', ...(Number.isFinite(grade) ? { grade } : {}), units: [], importedAt: now }
+      // Reihe und Band aus eigenen Spalten, wenn es sie gibt (Paket 15); sonst leitet sie der Hauptprozess aus dem Namen ab
+      const reihe = current.book && current.volume ? { reihe: current.book, band: current.volume } : {}
+      book = { id, name, language: opts.language ?? 'en', ...(Number.isFinite(grade) ? { grade } : {}), ...reihe, units: [], importedAt: now }
       books.set(id, book)
     }
     const uName = unitName(current.unit) || 'Ohne Unit'

@@ -5,6 +5,7 @@ import { join } from 'path'
 import { MARK_BOX, MARK_EXPLAINED, MARK_GREY } from '@shared/types'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import { resourcePath } from './paths'
+import { mitReihe } from '@shared/lehrwerkReihe'
 
 function userDir(): string {
   const d = join(app.getPath('userData'), 'lehrwerke')
@@ -23,7 +24,8 @@ function readBooks(dir: string, builtIn: boolean): Textbook[] {
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
     try {
       const book = JSON.parse(readFileSync(join(dir, f), 'utf8')) as Textbook
-      if (book?.id && Array.isArray(book.units)) books.push({ ...book, builtIn })
+      // Reihe und Band fehlen bei älteren und importierten Lehrwerken: aus dem Namen ableiten (Paket 15)
+      if (book?.id && Array.isArray(book.units)) books.push(mitReihe({ ...book, builtIn }))
     } catch {
       // beschädigte Datei überspringen
     }
@@ -49,6 +51,9 @@ export function toMeta(b: Textbook): TextbookMeta {
     builtIn: b.builtIn,
     publisher: b.publisher,
     edition: b.edition,
+    reihe: b.reihe,
+    ausgabe: b.ausgabe,
+    band: b.band,
     units: b.units.map((u) => ({
       name: u.name,
       sections: u.sections.map((s) => {

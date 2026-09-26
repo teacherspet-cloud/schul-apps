@@ -1,10 +1,12 @@
-import { Alert, Badge, Button, Card, Chip, Group, Stack, Text, Title } from '@mantine/core'
-import { IconCheck, IconDeviceFloppy } from '@tabler/icons-react'
+import { Alert, Badge, Box, Button, Card, Chip, Collapse, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
+import { IconCheck, IconChevronRight, IconDeviceFloppy } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../../shared/useUndoKeys'
 import { useVerlauf } from '../../../shared/useVerlauf'
-import type { Textbook, TextbookEntry } from '@shared/types'
+import type { Textbook, TextbookEntry, TextbookMeta } from '@shared/types'
+import { reiheTitel } from '@shared/lehrwerkReihe'
+import LehrwerkAngaben, { type LehrwerkAngabenWerte } from '../../../shared/components/LehrwerkAngaben'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { useVerzoegertesSichern } from '../../../shared/useAutosave'
 import { newId } from '../../vokabeltest/model/random'
@@ -41,6 +43,15 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [angabenOffen, setAngabenOffen] = useState(false)
+  // Alle Lehrwerke – Vorschlagslisten für Reihe, Verlag, Landesausgabe, Ausgabe
+  const [alle, setAlle] = useState<TextbookMeta[]>([])
+  useEffect(() => {
+    window.api.textbooks
+      .list()
+      .then(setAlle)
+      .catch(() => setAlle([]))
+  }, [])
   /*
    * Zählt, wie oft das Buch NEU geladen wurde (Öffnen, Verwerfen). Nur dann werden die Zeilen
    * aus dem Buch geholt – nicht nach jedem Speichern. Sonst entstünden die Zeilen nach jeder
@@ -244,6 +255,36 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
             </Chip.Group>
           </>
         )}
+      </Card>
+
+      {/* Reihe, Band, Verlag, Landesausgabe, Ausgabe (Paket 15) – gespeichert wie jede Änderung, von selbst */}
+      <Card withBorder>
+        <UnstyledButton onClick={() => setAngabenOffen((o) => !o)} aria-expanded={angabenOffen} style={{ width: '100%' }}>
+          <Group gap="xs" wrap="nowrap">
+            <IconChevronRight size={14} style={{ transform: angabenOffen ? 'rotate(90deg)' : undefined, transition: 'transform 150ms' }} />
+            <Text size="sm" fw={500}>
+              Reihe und Ausgabe
+            </Text>
+            <Text size="xs" c="dimmed" truncate>
+              {[reiheTitel(book), book.band ? `Band ${book.band}` : ''].filter(Boolean).join(' · ')}
+            </Text>
+          </Group>
+        </UnstyledButton>
+        <Collapse expanded={angabenOffen}>
+          <Box mt="xs">
+            <LehrwerkAngaben
+              werte={book}
+              vorhandene={alle}
+              onChange={(patch) => {
+                // Geleerte Felder entfallen ganz (Reihe und Band leitet die App dann wieder aus dem Namen ab)
+                const neu: Textbook = { ...book }
+                for (const [k, v] of Object.entries(patch) as [keyof LehrwerkAngabenWerte, string][]) neu[k] = v.trim() ? v : undefined
+                setBook(neu)
+                geaendert()
+              }}
+            />
+          </Box>
+        </Collapse>
       </Card>
 
       {book.builtIn && (

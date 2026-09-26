@@ -21,6 +21,12 @@ await page.click('[aria-label="Klassenarbeiten"]')
 await page.waitForSelector('text=Rahmen der Arbeit')
 // Vokabeln aus dem Schulbuch zuordnen: Buch → Unit → Abschnitte, Kästen zuschaltbar
 await page.getByRole('combobox', { name: 'Schulbuch' }).click()
+// Gruppiert nach Schulbuchreihe wie in den Vokabellisten (Paket 15)
+{
+  const gruppen = await page.locator('[class*="groupLabel"]').filter({ visible: true }).allTextContents()
+  if (!gruppen.includes('Green Line · Niedersachsen · Ausgabe ab 2021 · Klett'))
+    throw new Error(`Schulbuch-Auswahl nicht nach Reihe gruppiert: ${gruppen.join(' | ')}`)
+}
 await page.getByRole('option', { name: 'Green Line 1' }).click()
 await page.getByRole('combobox', { name: 'Unit', exact: true }).click()
 await page.getByRole('option', { name: 'Unit 1', exact: true }).click()

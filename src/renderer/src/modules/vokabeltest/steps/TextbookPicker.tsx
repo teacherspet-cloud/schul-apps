@@ -30,6 +30,8 @@ import { notifyError, notifySuccess } from '../../../shared/util'
 import { buildTextbooks, ColumnMap, ColumnRole, COLUMN_ROLES, decodeCsv, detectColumns, guessLanguage, hasHeader, parseCsvRows } from '../input/textbookCsv'
 import { newId } from '../model/random'
 import { LANGUAGES, VocabEntry } from '../model/types'
+import { lehrwerkOptionen, mitReihe, reiheTitel } from '@shared/lehrwerkReihe'
+import LehrwerkAngaben, { angabenSauber, type LehrwerkAngabenWerte } from '../../../shared/components/LehrwerkAngaben'
 
 const STORAGE_KEY = 'vokabeltest-lehrwerk-auswahl'
 
@@ -320,14 +322,8 @@ export function TextbookPicker({
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book?.id, units.join('|'), JSON.stringify(sectionsByUnit), filter.boxes, filter.grey, count])
-  const bookOptions = useMemo(() => {
-    const groups = new Map<string, { value: string; label: string }[]>()
-    for (const b of books) {
-      const g = languageLabel(b.language)
-      groups.set(g, [...(groups.get(g) ?? []), { value: b.id, label: b.name }])
-    }
-    return [...groups.entries()].map(([group, items]) => ({ group, items }))
-  }, [books])
+  // Gruppiert nach Schulbuchreihe wie in den Vokabellisten (Paket 15): „Green Line · Niedersachsen · Ausgabe ab 2021 · Klett"
+  const bookOptions = useMemo(() => lehrwerkOptionen(books, languageLabel), [books])
 
   const take = async (): Promise<void> => {
     if (!book || !unitMetas.length) return
@@ -509,6 +505,7 @@ export function TextbookPicker({
 
       <TextbookImportModal
         opened={importOpen}
+        vorhandene={books}
         onClose={() => setImportOpen(false)}
         onSaved={(list, first) => {
           setBooks(list)
@@ -565,10 +562,13 @@ export function TextbookPicker({
 /** Datei einlesen, Spalten zuordnen, Vorschau der Gliederung, speichern. */
 function TextbookImportModal({
   opened,
+  vorhandene,
   onClose,
   onSaved
 }: {
   opened: boolean
+  /** Vorhandene Lehrwerke – Vorschläge für Reihe, Verlag, Landesausgabe, Ausgabe */
+  vorhandene: TextbookMeta[]
   onClose: () => void
   onSaved: (books: TextbookMeta[], firstId: string | null) => void
 }): React.JSX.Element {
@@ -579,12 +579,19 @@ function TextbookImportModal({
   const [language, setLanguage] = useState<string>('en')
   const [bookName, setBookName] = useState('')
   const [saving, setSaving] = useState(false)
+  /*
+   * Reihe, Band, Verlag, Landesausgabe, Ausgabe (Paket 15): Nur was die Lehrkraft ändert, steht
+   * hier; sonst gilt der Vorschlag aus dem Namen des Lehrwerks („Green Line 3" → Green Line,
+   * Band 3). Verlag, Landesausgabe und Ausgabe schlägt eine vorhandene Reihe gleichen Namens vor.
+   */
+  const [angaben, setAngaben] = useState<LehrwerkAngabenWerte>({})
 
   useEffect(() => {
     if (!opened) {
       setRows([])
       setHeader([])
       setFileName('')
+      setAngaben({})
     }
   }, [opened])
 
@@ -612,7 +619,28 @@ function TextbookImportModal({
     }
   }
 
-  const books = useMemo(() => (rows.length ? buildTextbooks(rows, map, { bookName, language }) : []), [rows, map, bookName, language])
+  const roh = useMemo(() => (rows.length ? buildTextbooks(rows, map, { bookName, language }) : []), [rows, map, bookName, language])
+  // Vorschlag aus dem ersten Lehrwerk; Verlag usw. von einer vorhandenen Reihe gleichen Namens
+  const vorschlag = useMemo((): LehrwerkAngabenWerte => {
+    if (!roh.length) return {}
+    const erstes = mitReihe({ ...roh[0], ...(angaben.reihe?.trim() ? { reihe: angaben.reihe.trim() } : {}) })
+    const gleich = vorhandene.find((b) => b.reihe && erstes.reihe && b.reihe.toLocaleLowerCase('de') === erstes.reihe.toLocaleLowerCase('de'))
+    return { reihe: erstes.reihe, band: erstes.band, publisher: gleich?.publisher, edition: gleich?.edition, ausgabe: gleich?.ausgabe }
+  }, [roh, vorhandene, angaben.reihe])
+  const gezeigt: LehrwerkAngabenWerte = Object.fromEntries(
+    (['reihe', 'band', 'publisher', 'edition', 'ausgabe'] as const).map((k) => [k, angaben[k] ?? vorschlag[k] ?? ''])
+  )
+  const gezeigtText = JSON.stringify(gezeigt)
+  const books = useMemo(
+    () =>
+      roh.map((b) => {
+        const { reihe, publisher, edition, ausgabe, band } = angabenSauber(JSON.parse(gezeigtText) as LehrwerkAngabenWerte)
+        // Mehrere Bände in einer Datei: der Band jedes Buches aus seinem Namen
+        const eigen = roh.length === 1 ? { reihe, band } : mitReihe({ name: b.name, reihe: reihe ?? b.reihe, band: b.band })
+        return { ...b, ...angabenSauber({ reihe: eigen.reihe, band: eigen.band, publisher, edition, ausgabe }) }
+      }),
+    [roh, gezeigtText]
+  )
   const missing = COLUMN_ROLES.filter((r) => r.required && map[r.value] === undefined)
   const columnOptions = header.map((h, i) => ({
     value: String(i),
@@ -694,6 +722,7 @@ function TextbookImportModal({
               />
             )}
           </SimpleGrid>
+          <LehrwerkAngaben werte={gezeigt} onChange={(patch) => setAngaben((a) => ({ ...a, ...patch }))} vorhandene={vorhandene} mitBand={roh.length <= 1} />
           {missing.length > 0 && (
             <Alert color="orange" p="xs">
               Bitte noch zuordnen: {missing.map((m) => m.label).join(', ')}
@@ -717,6 +746,9 @@ function TextbookImportModal({
                     <Table.Td>
                       {b.name}
                       {b.grade ? ` (Kl. ${b.grade})` : ''}
+                      <Text size="xs" c="dimmed">
+                        {[reiheTitel(b), b.band ? `Band ${b.band}` : ''].filter(Boolean).join(' · ')}
+                      </Text>
                     </Table.Td>
                     <Table.Td>
                       {b.units.slice(0, 12).map((u) => (

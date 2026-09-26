@@ -8,6 +8,7 @@ import { markCount, NO_MARKS, sectionCount, textbookEntries } from '../../vokabe
 import type { TextbookFilter } from '../../vokabeltest/steps/TextbookPicker'
 import type { ExamVocab } from '../model/types'
 import { collectKnownVocab } from '../../../shared/knownVocab'
+import { lehrwerkOptionen } from '@shared/lehrwerkReihe'
 
 /** Kennung einer aus dem Schulbuch übernommenen Auswahl (grenzt sie von gespeicherten Listen ab). */
 const bookVocabId = (bookId: string, unit: string, sections: string[], filter: TextbookFilter): string =>
@@ -156,7 +157,8 @@ export default function ExamVocabPicker({
               label="Schulbuch"
               description="Vokabeln aus dem Lehrwerk"
               placeholder="z. B. Green Line 1"
-              data={books.map((b) => ({ value: b.id, label: b.name }))}
+              // Gruppiert nach Schulbuchreihe wie in den Vokabellisten und im Vokabeltest (Paket 15)
+              data={lehrwerkOptionen(books, (c) => c)}
               value={bookId}
               onChange={(v) => {
                 setBookId(v)
