@@ -1,7 +1,8 @@
 import { ActionIcon, Checkbox, Group, Stack, Text } from '@mantine/core'
-import { IconFileText, IconPhoto, IconX } from '@tabler/icons-react'
+import { IconWorld, IconMovie, IconFileText, IconPhoto, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
 import DropZone from './DropZone'
+import UrlQuelleEingabe from './UrlQuelleEingabe'
 import { extractContent, MATERIAL_ACCEPT } from '../files/extractContent'
 import { stoffQuelleAus, type StoffQuelle } from '../files/stoffQuelle'
 import { notifyError } from '../util'
@@ -51,12 +52,14 @@ export default function StoffQuellen({ quellen, onHinzu, onAktiv, onEntfernen, t
   return (
     <>
       <DropZone onFiles={(f) => void dateienLesen(f)} accept={MATERIAL_ACCEPT} title={lese ?? title} hint={hint} loading={Boolean(lese)} minHeight={70} />
+      {/* Internetadresse als Unterlage – Webseite oder Video (26.09.2026) */}
+      <UrlQuelleEingabe onInhalt={(c) => onHinzu([stoffQuelleAus(c, `q${Date.now()}-url`)])} />
       {quellen.length > 0 && (
         <Stack gap={4}>
           {quellen.map((q) => (
             <Group key={q.id} gap="xs" wrap="nowrap">
               <Checkbox size="xs" aria-label={`${q.fileName} verwenden`} checked={q.aktiv} onChange={(e) => onAktiv(q.id, e.currentTarget.checked)} />
-              {q.kind === 'image' ? <IconPhoto size={15} /> : <IconFileText size={15} />}
+              {q.kind === 'image' ? <IconPhoto size={15} /> : q.kind === 'video' ? <IconMovie size={15} /> : q.kind === 'web' ? <IconWorld size={15} /> : <IconFileText size={15} />}
               <Text size="xs" style={{ flex: 1 }} truncate>
                 {q.fileName}
               </Text>

@@ -38,6 +38,7 @@ import { htmlToPdfWithExtras } from './services/export/fillablePdf'
 import { fetchAsDataUrl, getOpenMojiSvg, searchOnline, searchOpenMoji } from './services/images/images'
 import { checkMediaSource, checkQuote } from './services/images/sources'
 import { ladeOriginalquelle, sucheOriginalquellen } from './services/sources/materialSuche'
+import { ladeVideo } from './services/sources/video'
 import { audioPath, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
 import { deleteExam, getExam, listExams, saveExam } from './services/storage/exams'
@@ -520,6 +521,8 @@ function registerIpc(): void {
    */
   handle('sources:suche', (anfrage: Materialanfrage) => sucheOriginalquellen(anfrage))
   handle('sources:laden', (url: string) => ladeOriginalquelle(url))
+  // Video als Material: Titel, Beschreibung, Transkript aus den Untertiteln (26.09.2026)
+  handle('sources:video', (url: string) => ladeVideo(url))
 
   handle('audio:voices', () => listVoices())
   handle('audio:speak', (req: TtsRequest) => speak(req))

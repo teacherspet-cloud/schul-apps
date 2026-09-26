@@ -195,9 +195,13 @@ function answerKeyRules(exam: Exam, part: ExamPart): string {
         : '- Bei geschlossenen Aufgaben zusätzlich ein Satz, woran die Lösung im Text zu erkennen ist.'
     ].join('\n')
   }
+  // raster = knapp mit Raster; ausfuehrlichRaster = ausformuliert mit Raster (26.09.2026)
+  const knapp = detail === 'raster'
   return [
-    'ERWARTUNGSHORIZONT (mit Bewertungsraster):',
-    '- solution je Aufgabe: ausformulierte Musterlösung UND ein Raster mit Punkten je Kriterium.',
+    `ERWARTUNGSHORIZONT (${knapp ? 'knapp' : 'ausformuliert'}, mit Bewertungsraster):`,
+    knapp
+      ? '- solution je Aufgabe: Stichpunkte der erwarteten Inhalte (keine ausformulierten Sätze) UND ein Raster mit Punkten je Kriterium.'
+      : '- solution je Aufgabe: eine vollständig ausformulierte Musterlösung, wie sie eine gute Arbeit enthielte, UND ein Raster mit Punkten je Kriterium.',
     productive
       ? `- Die Schreibleistung wird getrennt bewertet: ${part.contentShare ?? CONTENT_SHARE} % Inhalt (erwartete Inhaltspunkte, je Punkt ein Kriterium) und ${100 - (part.contentShare ?? CONTENT_SHARE)} % Sprache (kommunikative Textgestaltung, Ausdrucksvermögen, Sprachrichtigkeit). Nenne die Kriterien einzeln.`
       : part.items && part.items > 0

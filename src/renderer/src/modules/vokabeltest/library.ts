@@ -8,16 +8,25 @@ import { variantPoints } from './model/blocks'
 import { ausListe, includedVocab } from './model/vocab'
 import { openDocument } from '../../shared/navigation'
 import { TestPayload, useVokabeltest, type VocabListContext } from './store'
+import { lehrwerkAngaben } from '@shared/lehrwerkSprache'
 
 /**
  * Kennzahlen für die Bibliothek. Seit Paket 7 mit Sprache, Fach und Jahrgang – vorher fand
  * die Suche einen Test nur über seinen Namen. Sie stammen aus den Testeinstellungen, sonst
  * aus der Herkunft der Liste (Schulbuch, gespeicherte Liste).
  */
-export function statsVon({ vocab, doc, settings }: TestPayload, herkunft?: VocabListContext | null): SavedTestStats {
+export function statsVon(payload: TestPayload, herkunft?: VocabListContext | null, name?: string): SavedTestStats {
+  const { vocab, doc, settings } = payload
   const s = settings ?? doc?.settings ?? null
-  const language = s?.targetLanguage || herkunft?.language || undefined
-  const grade = s?.grade ?? herkunft?.grade
+  const quelle = herkunft ?? payload.herkunft ?? null
+  /*
+   * Rückfall über den Namen (26.09.2026): „Green Line 1 – Unit 1" ist Englisch, Klasse 5,
+   * auch wenn weder Einstellungen noch Herkunft vorliegen – sonst steht der Test ohne Fach
+   * in der Bibliothek und lässt sich keinem Themenbereich zuordnen.
+   */
+  const ausName = lehrwerkAngaben(quelle?.bookName || name)
+  const language = s?.targetLanguage || quelle?.language || ausName?.language || undefined
+  const grade = s?.grade ?? quelle?.grade ?? ausName?.grade
   return {
     vocabCount: vocab.filter((v) => v.term.trim()).length,
     includedCount: includedVocab(vocab).length,
@@ -30,9 +39,9 @@ export function statsVon({ vocab, doc, settings }: TestPayload, herkunft?: Vocab
 }
 
 function currentPayload(): { payload: TestPayload; stats: SavedTestStats } {
-  const { vocab, settings, doc, listContext } = useVokabeltest.getState()
-  const payload: TestPayload = { vocab, settings, doc }
-  return { payload, stats: statsVon(payload, listContext) }
+  const { vocab, settings, doc, listContext, listName } = useVokabeltest.getState()
+  const payload: TestPayload = { vocab, settings, doc, herkunft: listContext }
+  return { payload, stats: statsVon(payload, listContext, listName) }
 }
 
 /** Ist genau dieser Test gerade im Programm offen? */
@@ -59,7 +68,7 @@ export function legeVokabeltestAb(docId: string, schnappschuss: TestPayload, erg
         await window.api.tests.save({
           id,
           name: gespeichert ?? (name.trim() || `Vokabeltest vom ${new Date().toLocaleDateString('de-DE')}`),
-          stats: statsVon(payload),
+          stats: statsVon(payload, undefined, gespeichert ?? name),
           payload
         })
       }

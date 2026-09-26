@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Alert,
   Badge,
   Button,
   Card,
@@ -32,6 +31,7 @@ import { aiCall, useArbeitsblatt } from '../store'
 import { formuliereAus, planeNeu } from '../auftraege'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { EinfuegeStelle } from './EinfuegenMenue'
+import { KiHinweise } from './KiHinweise'
 
 const ANSWER_LABELS: Record<AnswerKind, string> = {
   lines: 'Schreiblinien',
@@ -144,9 +144,9 @@ export default function OutlineStep(): React.JSX.Element {
         </Group>
 
         {outline.teacherNote && (
-          <Alert color="yellow" mb="md" title="Hinweis der KI">
-            {outline.teacherNote}
-          </Alert>
+          <div style={{ marginBottom: 16 }}>
+            <KiHinweise note={outline.teacherNote} />
+          </div>
         )}
 
         <Card withBorder mb="md">

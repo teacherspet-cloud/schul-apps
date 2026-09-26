@@ -28,6 +28,7 @@ import {
   IconPlus,
   IconPrinter,
   IconCircleNumber0,
+  IconClipboardCheck,
   IconCopy,
   IconHeadphones,
   IconNumber0Small,
@@ -48,6 +49,8 @@ import { browserDocxDeps } from '../export/browserDeps'
 import { buildWorksheetDocx } from '../export/docx'
 import { fuelleBaustein, regenerateBlock } from '../generation/generate'
 import { generateExample } from '../generation/example'
+import { generateSolution } from '../generation/solution'
+import { KiHinweise } from './KiHinweise'
 import { hoerenIstPruefgegenstand } from '../didactics/audioRules'
 import { plainText } from '../../../shared/richtext/parse'
 import { estimateSeconds } from '../generation/convert'
@@ -308,9 +311,26 @@ export default function EditorStep(): React.JSX.Element {
    */
   const addExample = (block: WsBlock): void => {
     if (block.type !== 'task') return
-    bausteinAuftrag(ws, docId, 'Beispiel schreiben', `beispiel-${block.id}`, block.id, async (w, k) => {
+    bausteinAuftrag(ws, docId, 'Beispiellösung schreiben', `beispiel-${block.id}`, block.id, async (w, k) => {
       const example = await generateExample(block, w.meta, k.ai)
       return (current) => (current.type === 'task' ? { ...current, example } : current)
+    })
+  }
+
+  /**
+   * „Lösung im Erwartungshorizont generieren" (Lösungsansicht, 26.09.2026).
+   *
+   * Schreibt Erwartungshorizont und – bei Linien, Rechenkästchen und freier Fläche – die
+   * Musterlösung in Schülerform, ggf. mit Skizze (generation/solution.ts). Die Aufgabe bleibt
+   * unverändert; der vorige Lösungsstand bleibt als Fassung abrufbar.
+   */
+  const addSolution = (block: WsBlock): void => {
+    if (block.type !== 'task') return
+    bausteinAuftrag(ws, docId, 'Lösung schreiben', `loesung-${block.id}`, block.id, async (w, k) => {
+      const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
+      const aktuell = blatt.blocks.find((b) => b.id === block.id)
+      const fresh = await generateSolution(aktuell?.type === 'task' ? aktuell : block, blatt, w, k.ai)
+      return (current) => (current.type === 'task' ? addVersion(current, fresh) : current)
     })
   }
 
@@ -423,7 +443,7 @@ export default function EditorStep(): React.JSX.Element {
            */}
           <KiMenue
             block={block}
-            busy={busy.has(block.id) || busy.has(`beispiel-${block.id}`)}
+            busy={busy.has(block.id) || busy.has(`beispiel-${block.id}`) || busy.has(`loesung-${block.id}`)}
             onRevise={(instruction) => reviseBlock(block, instruction)}
             onRegenerate={() => reviseBlock(block)}
           >
@@ -434,7 +454,16 @@ export default function EditorStep(): React.JSX.Element {
              */}
             {block.type === 'task' && !block.example && (
               <Menu.Item leftSection={<IconCircleNumber0 size={14} />} onClick={() => addExample(block)}>
-                Gelöstes Beispiel (0) hinzufügen
+                Beispiellösung in Aufgabe hinzufügen
+              </Menu.Item>
+            )}
+            {/*
+             * Nur in der Lösungsansicht (26.09.2026): Dort fehlte im KI-Menü jeder Weg, eine
+             * Lösung erzeugen zu lassen. Erwartungshorizont + Musterlösung in Schülerform.
+             */}
+            {block.type === 'task' && key && (
+              <Menu.Item leftSection={<IconClipboardCheck size={14} />} onClick={() => addSolution(block)}>
+                Lösung im Erwartungshorizont generieren
               </Menu.Item>
             )}
           </KiMenue>
@@ -458,7 +487,7 @@ export default function EditorStep(): React.JSX.Element {
           <EinfuegenUntermenue titel="Darunter einfügen" onWaehlen={(typ) => einfuegen(block.id, 1, typ)} />
           {block.type === 'task' && block.example && (
             <Menu.Item leftSection={<IconNumber0Small size={16} />} onClick={() => updateBlock(sheet.id, block.id, (d) => delete (d as TaskBlock).example)}>
-              Gelöstes Beispiel entfernen
+              Beispiellösung aus Aufgabe entfernen
             </Menu.Item>
           )}
           {/*
@@ -1024,11 +1053,7 @@ function BlattHinweise({
       </Tooltip>
       <Modal opened={offen} onClose={() => setOffen(false)} title="Hinweise für die Lehrkraft" size="lg">
         <Stack gap="sm">
-          {note?.trim() && (
-            <Alert variant="light" color="blue" title="Hinweis der KI">
-              <Text size="sm">{note}</Text>
-            </Alert>
-          )}
+          {note?.trim() && <KiHinweise note={note} />}
           {warnings.length > 0 && (
             <Stack gap={6}>
               <Text size="sm" fw={600}>

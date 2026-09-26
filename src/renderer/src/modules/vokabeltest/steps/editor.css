@@ -58,16 +58,26 @@
 .editor-block:focus-within .editor-ai-revise-slot {
   opacity: 1;
 }
-/* Schwebt über dem Baustein, damit die Seitenaufteilung unverändert bleibt */
+/*
+ * Fassungs-Marke („Fassung 2 / 2 · neu“) – LINKS oben, als blaue Marke.
+ * Schwebt über dem Baustein, damit die Seitenaufteilung unverändert bleibt. Links, weil dort
+ * das Lesen beginnt und die Werkzeugleiste rechts nicht überdeckt wird (26.09.2026).
+ */
 .editor-version-bar {
   position: absolute;
   top: -3.5mm;
-  right: 30px;
+  left: 4mm;
   z-index: 4;
-  padding: 0 6px;
+  padding: 1px 6px 1px 5px;
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  color: #1f3f8a;
+  background: #eaf1ff;
+  border: 1px solid #b7c9f2;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  cursor: default;
+}
+.editor-version-kennung {
+  color: #4a63a0;
 }
 
 .editor-block-busy {
@@ -75,6 +85,22 @@
   pointer-events: none;
 }
 
+/*
+ * Die Werkzeugleiste erscheint NUR am überfahrenen oder angeklickten Baustein.
+ *
+ * Bis 26.09.2026 stand sie an jedem Baustein halb durchsichtig da. Bei kurzen Bausteinen ist
+ * die Leiste länger als der Baustein – die Leisten benachbarter Bausteine lagen dann
+ * übereinander, und welcher Knopf zu welchem Baustein gehört, war nicht zu erkennen
+ * (Befund der Lehrkraft). Jetzt ist zu jeder Zeit höchstens eine Leiste zu sehen.
+ *
+ * NACHLAUF: Beim Verlassen bleibt die Leiste noch 700 ms stehen und klickbar. Sie sitzt 40
+ * Punkte NEBEN dem Baustein; auf dem Weg dorthin verlässt der Zeiger den Baustein kurz, und
+ * ohne Nachlauf verschwände die Leiste genau dann, wenn man sie erreichen will. Erst danach
+ * blendet sie aus. Beim Betreten gibt es keine Verzögerung.
+ *
+ * `visibility` statt `pointer-events`: Während des Nachlaufs muss die Leiste klickbar
+ * bleiben; erst am Ende der Verzögerung wird sie unsichtbar UND unklickbar.
+ */
 .editor-block-toolbar {
   position: absolute;
   top: 6mm;
@@ -82,14 +108,30 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Dauerhaft sichtbar, damit die Werkzeuge (u. a. die KI-Überarbeitung) gefunden werden */
-  opacity: 0.5;
-  transition: opacity 120ms;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 150ms ease 700ms,
+    visibility 0s linear 850ms;
 }
 
+/*
+ * Sichtbar: überfahren, angeklickt (`editor-block-aktiv`, gesetzt vom Rahmen), ein Feld darin
+ * hat den Fokus, oder eines seiner Menüs bzw. Pop-ups ist offen (`aria-expanded` setzt
+ * Mantine am Auslöser). Letzteres ist wichtig: Der Zeiger wandert ins aufgeklappte Menü, das
+ * als Portal AUSSERHALB des Bausteins liegt – ohne diese Regel verschwände die Leiste unter
+ * dem offenen Menü.
+ */
 .editor-block:hover .editor-block-toolbar,
-.editor-block:focus-within .editor-block-toolbar {
+.editor-block:focus-within .editor-block-toolbar,
+.editor-block-aktiv .editor-block-toolbar,
+.editor-block:has([aria-expanded='true']) .editor-block-toolbar,
+.editor-block-toolbar:hover {
   opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 120ms ease,
+    visibility 0s;
 }
 
 /*
@@ -108,8 +150,8 @@
 }
 /* Auf dem Tablet fingerbreit: unter 44 Punkten trifft man den Knopf nicht zuverlässig */
 @media (pointer: coarse) {
+  /* Ohne Maus gibt es kein Überfahren: Antippen des Bausteins zeigt die Leiste (editor-block-aktiv) */
   .editor-block-toolbar {
-    opacity: 1;
     gap: 8px;
   }
   .editor-block-toolbar .mantine-ActionIcon-root {
@@ -139,6 +181,7 @@
 }
 .editor-block-frei .editor-block-toolbar {
   opacity: 1;
+  visibility: visible;
 }
 
 .editor-warning {

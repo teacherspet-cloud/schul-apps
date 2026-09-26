@@ -729,8 +729,14 @@
 .ws-lines-rand {
   position: relative;
 }
+/*
+ * Die Linie endet 3 mm VOR der Trennlinie (Befund der Lehrkraft, 26.09.2026: „fehlt noch ein
+ * geringer Abstand"). Vorher stieß die Schreiblinie stumpf an die senkrechte Linie – beim
+ * Schreiben bis ans Zeilenende lief die Schrift in den Korrekturstreifen hinein. Der Abstand
+ * ist reines Stylesheet und gilt damit auch für alle schon gespeicherten Blätter.
+ */
 .ws-lines-rand .ws-line {
-  width: calc(100% - 45mm);
+  width: calc(100% - 45mm - var(--rand-abstand, 3mm));
 }
 .ws-lines-rand::after {
   content: '';
@@ -2360,9 +2366,13 @@
  * Hoehe (`getBoundingClientRect`), und der Seitenumbruch waere um die Summe aller
  * Absatzabstaende zu spaet.
  */
+/*
+ * Auch hier 3 mm Luft zwischen Text und Trennlinie (26.09.2026), damit die letzte Silbe
+ * einer Zeile nicht an der Linie klebt. Die Linie selbst bleibt bei `--notizrand`.
+ */
 .ws-notizrand .ws-paragraph {
   position: relative;
-  padding-right: var(--notizrand, 42mm);
+  padding-right: calc(var(--notizrand, 42mm) + var(--rand-abstand, 3mm));
   padding-bottom: 0.35em;
 }
 .ws-notizrand .ws-paragraph:last-child {
@@ -2388,7 +2398,7 @@
  * aus wie der Text.
  */
 .ws-notizrand .ws-wortzahl {
-  padding-right: var(--notizrand, 42mm);
+  padding-right: calc(var(--notizrand, 42mm) + var(--rand-abstand, 3mm));
 }
 
 /*
@@ -2400,4 +2410,36 @@
   font-size: 0.85em;
   color: #555;
   margin-top: 0.3em;
+}
+
+/*
+ * MUSTERLÖSUNG in Schülerform auf Kästchen und Fläche (Lösungsansicht, 26.09.2026).
+ *
+ * Das Raster bleibt sichtbar, der Text liegt darauf: Zeilenhöhe 5 mm = ein Kästchen, damit
+ * ein Rechenweg Zeile für Zeile in den Kästchen steht. Rot wie jede Lösung auf dem Blatt.
+ * Eine Skizze (SVG mit viewBox in Millimetern) liegt in voller Breite über dem Raster.
+ */
+.ws-grid-muster,
+.ws-space-muster {
+  position: relative;
+}
+.ws-grid-muster .ws-muster-text {
+  padding: 0 2.5mm;
+  line-height: 5mm;
+  color: #c62828;
+  font-weight: 600;
+}
+.ws-grid-muster .ws-muster-text .rt-p,
+.ws-grid-muster .ws-muster-text p {
+  margin: 0;
+  line-height: 5mm;
+}
+.ws-space-muster .ws-muster-text {
+  padding: 2mm 3mm;
+  color: #c62828;
+}
+.ws-muster-skizze svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }

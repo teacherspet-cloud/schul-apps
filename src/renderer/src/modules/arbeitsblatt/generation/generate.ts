@@ -556,7 +556,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     const kopf = m.wortlautGeprueft
       ? `Originalquelle „${m.titel}": Wortlaut gegen die Fundstelle geprueft.`
       : `Originalquelle „${m.titel}": ACHTUNG – beim Abgleich mit der Fundstelle gab es Abweichungen. Vor dem Einsatz mit dem Original vergleichen.`
-    return { ...meta, teacherNote: [meta.teacherNote, kopf, ...m.protokoll].filter(Boolean).join(' ') }
+    // Zeilenweise – `didactics/hinweise.ts` gliedert daraus die Anzeige
+    return { ...meta, teacherNote: [meta.teacherNote, kopf, ...m.protokoll].filter(Boolean).join('\n') }
   }
 
   // Der Hörtext entsteht zuerst und in einer eigenen Anfrage – auf Wunsch mit einem stärkeren

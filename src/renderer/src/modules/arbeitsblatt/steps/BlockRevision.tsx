@@ -1,5 +1,5 @@
 import { ActionIcon, Button, Chip, Group, Menu, Popover, Stack, Text, Textarea, Tooltip } from '@mantine/core'
-import { IconChevronLeft, IconChevronRight, IconRefresh, IconSparkles } from '@tabler/icons-react'
+import { IconChevronLeft, IconChevronRight, IconHistory, IconRefresh, IconSparkles } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { WsBlock } from '../model/types'
 import { versionInfo } from '../model/versions'
@@ -94,8 +94,8 @@ export function KiMenue({
             ))}
           </Group>
           <Text size="xs" c="dimmed">
-            Der bisherige Stand bleibt als Entwurf erhalten – die Pfeile über dem Baustein wechseln zwischen den Entwürfen. Andere Bausteine bleiben
-            unverändert.
+            Der bisherige Stand bleibt erhalten: Über dem Baustein erscheint „Fassung 1 / 2“ – die Pfeile wechseln zwischen alter und
+            neuer Fassung. Andere Bausteine bleiben unverändert.
           </Text>
           <Button size="xs" leftSection={<IconSparkles size={14} />} disabled={!text.trim()} onClick={run}>
             Überarbeiten
@@ -106,21 +106,47 @@ export function KiMenue({
   )
 }
 
-/** „‹ Entwurf 2 von 3 ›“ über einem Baustein mit mehreren Entwürfen. */
+/**
+ * Fassungen eines Bausteins nach einer KI-Überarbeitung: „Fassung 2 / 2 · neu“.
+ *
+ * Bis 26.09.2026 stand rechts oben nur „‹ Entwurf 2 von 2 ›“ – ohne Symbol, ohne Erklärung,
+ * halb über dem Bausteinrand. Die Lehrkraft fand das „unintuitiv platziert / dargestellt“.
+ * Jetzt: eine blaue Marke LINKS oben am Baustein (dort beginnt das Lesen), mit Uhr-Symbol,
+ * dem Wort „Fassung“, der Kennzeichnung „ursprünglich“ bzw. „neu“ und einem Tooltip, der
+ * sagt, woher die Fassungen kommen und dass nichts verloren geht. Die Pfeile tragen
+ * beschriftete Tooltips.
+ */
 export function VersionSwitcher({ block, onSwitch }: { block: WsBlock; onSwitch: (index: number) => void }): React.JSX.Element | null {
   const { count, current } = versionInfo(block)
   if (count < 2) return null
+  const kennung = current === count ? 'neu' : current === 1 ? 'ursprünglich' : 'älter'
   return (
-    <Group className="editor-version-bar" gap={4} justify="flex-end" wrap="nowrap">
-      <ActionIcon size="xs" variant="subtle" aria-label="Vorheriger Entwurf" disabled={current <= 1} onClick={() => onSwitch(current - 2)}>
-        <IconChevronLeft size={14} />
-      </ActionIcon>
-      <Text size="xs" c="dimmed">
-        Entwurf {current} von {count}
-      </Text>
-      <ActionIcon size="xs" variant="subtle" aria-label="Nächster Entwurf" disabled={current >= count} onClick={() => onSwitch(current)}>
-        <IconChevronRight size={14} />
-      </ActionIcon>
-    </Group>
+    <Tooltip
+      label={`Dieser Baustein liegt in ${count} Fassungen vor: der ursprünglichen und ${count - 1 === 1 ? 'einer KI-Überarbeitung' : `${count - 1} KI-Überarbeitungen`}. Mit den Pfeilen wechseln – keine Fassung geht verloren.`}
+      multiline
+      w={300}
+      position="top-start"
+      openDelay={300}
+    >
+      <Group className="editor-version-bar" gap={2} wrap="nowrap" aria-label={`Fassung ${current} von ${count}`}>
+        <IconHistory size={13} />
+        <Text size="xs" fw={600} span>
+          Fassung {current} / {count}
+        </Text>
+        <Text size="xs" span className="editor-version-kennung">
+          · {kennung}
+        </Text>
+        <Tooltip label="Vorherige Fassung zeigen" position="bottom" disabled={current <= 1}>
+          <ActionIcon size="xs" variant="subtle" aria-label="Vorherige Fassung" disabled={current <= 1} onClick={() => onSwitch(current - 2)}>
+            <IconChevronLeft size={14} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Neuere Fassung zeigen" position="bottom" disabled={current >= count}>
+          <ActionIcon size="xs" variant="subtle" aria-label="Nächste Fassung" disabled={current >= count} onClick={() => onSwitch(current)}>
+            <IconChevronRight size={14} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+    </Tooltip>
   )
 }

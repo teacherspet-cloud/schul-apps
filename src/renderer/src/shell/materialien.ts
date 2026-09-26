@@ -9,6 +9,7 @@
  * Die Umwandlung ist bewusst ohne React geschrieben, damit sie sich ohne Oberfläche prüfen
  * lässt (tests/materialien.test.ts).
  */
+import { lehrwerkAngaben } from '@shared/lehrwerkSprache'
 import type { SavedExamMeta, SavedGrammarTestMeta, SavedKurztestMeta, SavedTestMeta, SavedVocabList, SavedWorksheetMeta } from '@shared/types'
 import { LANGUAGES } from '../modules/vokabeltest/model/types'
 import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
@@ -115,8 +116,8 @@ export function vereinige(l: Listen): Material[] {
         !t.hasTest,
         zeile(t.subjectLabel, klasse(t.grade), `${t.vocabCount} Vokabeln`, t.hasTest ? '' : 'noch kein Test'),
         [],
-        t.language ?? t.subjectLabel,
-        t.grade
+        t.language ?? t.subjectLabel ?? lehrwerkAngaben(t.name)?.language,
+        t.grade ?? lehrwerkAngaben(t.name)?.grade
       )
     ),
     ...l.sheets.map((s) =>

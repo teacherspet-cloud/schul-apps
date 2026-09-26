@@ -45,7 +45,16 @@ export function saveTest(input: SavedTestInput): SavedTestMeta {
   const now = new Date().toISOString()
   const list = listTests()
   const previous = list.find((t) => t.id === id)
-  const meta: SavedTestMeta = { ...input.stats, id, name, createdAt: previous?.createdAt ?? now, updatedAt: now }
+  /*
+   * Sprache und Jahrgang bleiben erhalten, wenn der neue Stand sie nicht kennt (26.09.2026).
+   * Das automatische Sichern schickt die Kennzahlen des offenen Tests; hatte der beim Öffnen
+   * seine Herkunft verloren, überschrieb es hier Sprache und Jahrgang mit „nichts".
+   */
+  const bewahrt: Partial<SavedTestMeta> = {
+    ...(previous?.language && !input.stats.language ? { language: previous.language, subjectLabel: previous.subjectLabel } : {}),
+    ...(previous?.grade && !input.stats.grade ? { grade: previous.grade } : {})
+  }
+  const meta: SavedTestMeta = { ...input.stats, ...bewahrt, id, name, createdAt: previous?.createdAt ?? now, updatedAt: now }
   writeAtomic(join(dir(), `${id}.json`), JSON.stringify({ ...meta, payload: input.payload } satisfies SavedTest))
   writeAtomic(indexFile(), JSON.stringify([meta, ...list.filter((t) => t.id !== id)], null, 1))
   return meta

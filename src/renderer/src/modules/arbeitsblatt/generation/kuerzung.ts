@@ -240,7 +240,8 @@ export function kuerzungsProtokoll(p: KuerzungsPruefung): string[] {
   if (!p.anfangErhalten) zeilen.push('Der Text beginnt nicht am Anfang des Originals.')
   if (!p.schlussErhalten) zeilen.push('Der Text endet vor dem Schluss des Originals.')
   for (const [i, a] of p.auslassungen.entries()) zeilen.push(`Auslassung ${i + 1}: ${a.wortzahl} Wörter ab „${a.anfang} …"`)
-  for (const e of p.einfuegungen) zeilen.push(`Ergänzung in eckigen Klammern: „${e}"`)
+  // Leere Klammern „[]" ergaben die Zeile „Ergänzung in eckigen Klammern: „"" (gesehen 26.09.2026)
+  for (const e of p.einfuegungen) if (e.trim()) zeilen.push(`Ergänzung in eckigen Klammern: „${e.trim()}"`)
   for (const v of p.verstoesse) zeilen.push(`ACHTUNG: ${v}`)
   return zeilen
 }

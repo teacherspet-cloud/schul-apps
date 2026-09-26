@@ -1,6 +1,6 @@
 import { ActionIcon, Menu, Tooltip } from '@mantine/core'
 import { IconArrowDown, IconArrowUp, IconArrowsMove, IconDots, IconLayoutAlignTop, IconLayoutDistributeHorizontal } from '@tabler/icons-react'
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PlacedItem } from './paginate'
 import type { WsBlock } from '../model/types'
 
@@ -85,6 +85,53 @@ export function BausteinRahmen({
   const griff = useRef<{ dx: number; dy: number; breite: number } | null>(null)
   const halten = useRef<number | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
+  /*
+   * ANGEKLICKT: Die Werkzeugleiste erscheint sonst nur beim Überfahren (editor.css). Ein Klick
+   * in den Baustein hält sie offen, bis irgendwo anders geklickt wird – auch auf dem Tablet,
+   * wo es kein Überfahren gibt. Klicks in ein aufgeklapptes Menü oder Pop-up (Mantine-Portal
+   * außerhalb des Bausteins) gelten als „drinnen“, sonst schlösse die Leiste beim Auswählen.
+   */
+  const [aktiv, setAktiv] = useState(false)
+  const leiste = useRef<HTMLDivElement>(null)
+
+  /*
+   * Die Leiste bleibt auf der Seite (26.09.2026).
+   *
+   * Sie hängt 6 mm unter der Oberkante des Bausteins und ist bei kurzen Bausteinen länger
+   * als er. Am unteren Seitenrand ragte sie damit aus der Seite und wurde abgeschnitten
+   * (`clip-path` der Inhaltsfläche) – die unteren Knöpfe waren nicht zu erreichen. Vor dem
+   * Einblenden wird deshalb gemessen und die Leiste so weit nach oben gerückt, dass sie ganz
+   * auf der Seite steht; notfalls beginnt sie über dem Baustein.
+   */
+  const ausrichten = (): void => {
+    const t = leiste.current
+    const seite = box.current?.closest<HTMLElement>('.ws-page')
+    const rahmen = box.current
+    if (!t || !seite || !rahmen) return
+    t.style.top = ''
+    const tr = t.getBoundingClientRect()
+    const sr = seite.getBoundingClientRect()
+    const br = rahmen.getBoundingClientRect()
+    const rand = 8
+    const ueberhang = tr.bottom - (sr.bottom - rand)
+    if (ueberhang <= 0) return
+    const hoechstensHoch = sr.top + rand - br.top
+    t.style.top = `${Math.max(hoechstensHoch, t.offsetTop - ueberhang)}px`
+  }
+  useEffect(() => {
+    if (aktiv) ausrichten()
+  })
+  useEffect(() => {
+    if (!aktiv) return
+    const draussen = (e: PointerEvent): void => {
+      const ziel = e.target as HTMLElement | null
+      if (!ziel || box.current?.contains(ziel)) return
+      if (ziel.closest('.mantine-Menu-dropdown, .mantine-Popover-dropdown, .mantine-Modal-root, .mantine-Tooltip-tooltip')) return
+      setAktiv(false)
+    }
+    document.addEventListener('pointerdown', draussen, true)
+    return () => document.removeEventListener('pointerdown', draussen, true)
+  }, [aktiv])
 
   const setzen = (ziel: Ziel, x: number, y: number, breite: number, geste: string): void =>
     onUpdate((d) => {
@@ -222,14 +269,18 @@ export function BausteinRahmen({
   return (
     <div
       ref={box}
-      className={`editor-block ${busy ? 'editor-block-busy' : ''} ${block.free ? 'editor-block-frei' : ''}`}
-      onPointerDown={druckBeginn}
+      className={`editor-block ${busy ? 'editor-block-busy' : ''} ${block.free ? 'editor-block-frei' : ''} ${aktiv ? 'editor-block-aktiv' : ''}`}
+      onPointerDown={(e) => {
+        setAktiv(true)
+        druckBeginn(e)
+      }}
+      onPointerEnter={ausrichten}
       onPointerMove={druckBewegung}
       onPointerUp={abbrechen}
       onPointerCancel={abbrechen}
     >
       {!placed.continued && (
-        <div className="editor-block-toolbar">
+        <div className="editor-block-toolbar" ref={leiste}>
           {/*
             Der Anfassknopf. Er ist bewusst groß (Fingerbreite) und trägt `touch-action: none`:
             Nur hier beginnt das Ziehen, überall sonst bleibt Wischen zum Rollen.

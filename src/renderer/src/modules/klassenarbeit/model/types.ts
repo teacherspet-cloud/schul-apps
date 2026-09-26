@@ -28,18 +28,28 @@ export type GradeGroup = 'writing' | 'other'
  * Ausführlichkeit des Erwartungshorizonts:
  * kurz = Stichpunkte der erwarteten Inhalte,
  * ausfuehrlich = vollständig ausformulierte Musterlösung,
- * raster = Musterlösung plus Bewertungsraster mit Punkten je Kriterium
+ * raster = Stichpunkte plus Bewertungsraster mit Punkten je Kriterium,
+ * ausfuehrlichRaster = ausformulierte Musterlösung plus Bewertungsraster
  *          (bei Schreiben und Sprachmittlung getrennt nach Inhalt und Sprache).
+ *
+ * Die vierte Stufe kam am 26.09.2026 auf Wunsch der Lehrkraft hinzu; „raster" war bis dahin
+ * Musterlösung UND Raster und ist jetzt die knappe Form mit Raster, damit sich die vier Stufen
+ * unterscheiden.
  */
-export type AnswerKeyDetail = 'kurz' | 'ausfuehrlich' | 'raster'
+export type AnswerKeyDetail = 'kurz' | 'ausfuehrlich' | 'raster' | 'ausfuehrlichRaster'
 
 export const ANSWER_KEY_DETAILS: { value: AnswerKeyDetail; label: string; description: string }[] = [
   { value: 'kurz', label: 'Knapp', description: 'Stichpunkte der erwarteten Inhalte je Aufgabe.' },
   { value: 'ausfuehrlich', label: 'Ausformuliert', description: 'Vollständige Musterlösung, wie sie eine gute Arbeit enthielte.' },
   {
     value: 'raster',
-    label: 'Mit Bewertungsraster',
-    description: 'Musterlösung und Raster mit Punkten je Kriterium – bei Schreiben und Sprachmittlung getrennt nach Inhalt und Sprache.'
+    label: 'Knapp mit Bewertungsraster',
+    description: 'Stichpunkte der erwarteten Inhalte und Raster mit Punkten je Kriterium – bei Schreiben und Sprachmittlung getrennt nach Inhalt und Sprache.'
+  },
+  {
+    value: 'ausfuehrlichRaster',
+    label: 'Ausformuliert und Bewertungsraster',
+    description: 'Vollständige Musterlösung und Raster mit Punkten je Kriterium – bei Schreiben und Sprachmittlung getrennt nach Inhalt und Sprache.'
   }
 ]
 

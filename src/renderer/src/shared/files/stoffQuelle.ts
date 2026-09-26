@@ -11,7 +11,9 @@ import type { ExtractedContent } from './extractContent'
 export interface StoffQuelle {
   id: string
   fileName: string
-  kind: 'pdf' | 'docx' | 'image' | 'text'
+  kind: 'pdf' | 'docx' | 'image' | 'text' | 'web' | 'video'
+  /** Internetadresse, wenn die Unterlage von dort stammt (Webseite oder Video) */
+  url?: string
   /** Der ausgelesene Text; bei einem reinen Tafelbild leer */
   text: string
   /**
@@ -28,6 +30,7 @@ export const stoffQuelleAus = (c: ExtractedContent, id: string): StoffQuelle => 
   id,
   fileName: c.fileName,
   kind: c.kind,
+  ...(c.url ? { url: c.url } : {}),
   text: c.text,
   bilder: c.pageImages,
   aktiv: true

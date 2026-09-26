@@ -24,6 +24,13 @@ export interface TestPayload {
   vocab: VocabEntry[]
   settings: TestSettings | null
   doc: TestDocument | null
+  /**
+   * Herkunft der Liste (Schulbuch: Sprache, Jahrgang, Bundesland) – seit 26.09.2026 mit
+   * gespeichert. Vorher ging sie beim Öffnen verloren, und das automatische Sichern
+   * überschrieb danach Sprache und Jahrgang in der Bibliothek mit „nichts": Der Test stand
+   * ohne Fach da, und die Themenbereiche konnten ihn nicht einsortieren.
+   */
+  herkunft?: VocabListContext | null
 }
 
 interface VokabeltestState {
@@ -169,6 +176,7 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
       vocab: payload.vocab ?? payload.doc?.vocab ?? [],
       settings: payload.settings ?? payload.doc?.settings ?? null,
       doc: payload.doc,
+      listContext: payload.herkunft ?? null,
       verlauf: leererVerlauf(),
       vokabelVerlauf: leererVerlauf(),
       activeVariantId: payload.doc?.variants[0]?.id ?? null,

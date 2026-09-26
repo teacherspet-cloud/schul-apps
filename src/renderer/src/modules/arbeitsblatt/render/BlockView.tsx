@@ -18,6 +18,7 @@ import { archivesForSubject, searchesMediaSources } from '../didactics/mediaArch
 import { headerLine } from '../didactics/sourceHeader'
 import { narrationNote } from '../didactics/narration'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../didactics/audioRules'
+import { bereinigeSkizze } from '../generation/solution'
 import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from './mcGrid'
 
 /** Ab dieser Länge gilt ein Text als „länger" und wird im Blocksatz gesetzt */
@@ -1060,6 +1061,62 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
         </div>
       ))
 
+  /** Hat die Aufgabe bzw. Teilaufgabe eine Musterlösung in Schülerform? */
+  const hatMuster = (p: { modelAnswer?: string; modelSketch?: string }): boolean => Boolean(p.modelAnswer?.trim() || bereinigeSkizze(p.modelSketch))
+
+  /*
+   * MUSTERLÖSUNG in Schülerform – nur in der Lösungsansicht (26.09.2026).
+   *
+   * Wunsch der Lehrkraft: Die Lösung soll „in den Rechenkästchen erfolgen oder die
+   * Rechenkästchen im Lösungen-Bildschirm so ersetzen, dass es aussieht, wie es bei den
+   * Schülern aussehen müsste". Deshalb bleibt der Antwortbereich in seiner Form stehen –
+   * Kästchenraster oder Rahmen der freien Fläche – und trägt den Lösungstext (rot, wie alle
+   * Lösungen) und, wo die Aufgabe zeichnen lässt, die Skizze. Bei Schreiblinien steht der
+   * Text an ihrer Stelle, je Absatz eine Einheit, damit er über Seiten laufen kann.
+   *
+   * `schreiben` legt die Änderung am Baustein ab; bei Absätzen wird nur der bearbeitete
+   * Absatz ersetzt, die übrigen bleiben – sonst schriebe ein Absatz den ganzen Text.
+   */
+  const musterKnoten = (
+    answer: Answer,
+    text: string | undefined,
+    skizze: string | undefined,
+    k: string,
+    schreiben: (d: TaskBlock, v: string) => void
+  ): React.JSX.Element[] => {
+    const svg = bereinigeSkizze(skizze)
+    const txt = (text ?? '').trim()
+    if (!txt && !svg) return []
+    const skizzeKnoten = svg ? <div className="ws-muster-skizze" dangerouslySetInnerHTML={{ __html: svg }} /> : null
+    if (answer.kind === 'grid' || answer.kind === 'space') {
+      const klasse = answer.kind === 'grid' ? 'ws-grid ws-grid-muster' : 'ws-space ws-space-muster'
+      const hoehe = answer.kind === 'grid' ? `${Math.max(1, answer.count) * 5}mm` : `${Math.max(5, answer.heightMm)}mm`
+      return [
+        <div className={klasse} style={{ minHeight: hoehe }} data-unit key={`${k}-muster`}>
+          {skizzeKnoten}
+          {txt && <RichText className="ws-muster-text" value={txt} editable={keyEdit} onChange={set((d, v) => schreiben(d as TaskBlock, v))} placeholder="Musterlösung" />}
+        </div>
+      ]
+    }
+    const absaetze = txt
+      .split(/\n{2,}/)
+      .map((a) => a.trim())
+      .filter(Boolean)
+    return absaetze.map((absatz, i) => (
+      <div className="ws-model-text" data-unit key={`${k}-muster-${i}`}>
+        <RichText
+          value={absatz}
+          editable={keyEdit}
+          onChange={set((d, v) => {
+            const neu = [...absaetze]
+            neu[i] = v
+            schreiben(d as TaskBlock, neu.join('\n\n'))
+          })}
+        />
+      </div>
+    ))
+  }
+
   /**
    * Eine Teilaufgabe – in Stücke zerlegt, an denen über Seiten getrennt werden darf.
    *
@@ -1078,7 +1135,10 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
         */}
         <span className="ws-part-letter">{String.fromCharCode(97 + i)})</span>
         <RichText value={part.instruction} editable={edit} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
-        {part.answer.kind !== 'lines' && <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />}
+        {/* In der Lösungsansicht tritt die Musterlösung an die Stelle von Kästchen und Fläche */}
+        {part.answer.kind !== 'lines' && !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space')) && (
+          <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />
+        )}
       </div>
     )
     const schluss =
@@ -1089,7 +1149,14 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
       ) : null
     // Nur Schreiblinien werden zerlegt; alle anderen Antwortformen bleiben eine Einheit
     const linien = part.answer.kind === 'lines' && !key ? linienAbschnitte(part.answer.count).map((n) => ({ node: n, teil: i, teilWeiter: true })) : []
-    return [{ node: kopf, teil: i }, ...linien, ...(schluss ? [{ node: schluss, teil: i, teilWeiter: true }] : [])]
+    const muster = key
+      ? musterKnoten(part.answer, part.modelAnswer, part.modelSketch, part.id, (d, v) => (d.parts[i].modelAnswer = v)).map((n) => ({
+          node: n,
+          teil: i,
+          teilWeiter: true
+        }))
+      : []
+    return [{ node: kopf, teil: i }, ...linien, ...muster, ...(schluss ? [{ node: schluss, teil: i, teilWeiter: true }] : [])]
   }
 
   /*
@@ -1110,6 +1177,10 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
    */
   else if (key && block.answer.kind === 'lines') {
     if (mustertextGezeigt) for (const n of mustertextAbschnitte(block.brief!.model!)) abschnitte.push({ node: n })
+    else for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
+  } else if (key && (block.answer.kind === 'grid' || block.answer.kind === 'space') && hatMuster(block)) {
+    // Kästchen bzw. Fläche bleiben stehen und tragen die Musterlösung
+    for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
   } else if (block.answer.kind === 'lines' && block.answer.count > LINIEN_PRO_EINHEIT)
     for (const n of linienAbschnitte(block.answer.count)) abschnitte.push({ node: n })
   else

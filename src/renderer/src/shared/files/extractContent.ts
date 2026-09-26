@@ -6,7 +6,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 export interface ExtractedContent {
   fileName: string
-  kind: 'pdf' | 'docx' | 'image' | 'text'
+  /** web = Webseite, video = YouTube-Transkript (beides über eine Internetadresse, 26.09.2026) */
+  kind: 'pdf' | 'docx' | 'image' | 'text' | 'web' | 'video'
+  /** Internetadresse, wenn das Material von dort stammt */
+  url?: string
   /** Text der Datei; bei Word-Dateien HTML (Tabellen bleiben erhalten) */
   text: string
   format: 'plain' | 'html'

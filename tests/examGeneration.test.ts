@@ -119,8 +119,15 @@ describe('Auftrag an die KI', () => {
     expect(partPrompt(exam([], { answerKeyDetail: 'ausfuehrlich' }), writing, 2)).toContain('ausformulierte Musterlösung')
     const raster = partPrompt(exam([], { answerKeyDetail: 'raster' }), writing, 2)
     expect(raster).toContain('Bewertungsraster')
+    expect(raster).toContain('Stichpunkte')
+    expect(raster).not.toContain('ausformulierte Musterlösung')
     expect(raster).toContain('40 % Inhalt')
     expect(raster).toContain('60 % Sprache')
+    // Vierte Stufe (26.09.2026): ausformuliert UND Raster
+    const beides = partPrompt(exam([], { answerKeyDetail: 'ausfuehrlichRaster' }), writing, 2)
+    expect(beides).toContain('Bewertungsraster')
+    expect(beides).toContain('ausformulierte Musterlösung')
+    expect(beides).toContain('40 % Inhalt')
   })
 })
 

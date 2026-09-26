@@ -22,7 +22,7 @@ import { subjectById } from '../model/subjects'
 /** Moderne Fremdsprache (nicht Latein) – nur dort unterscheiden sich Ausgangs- und Zielsprache */
 const fremdsprache = (subjectId: string): boolean => Boolean(subjectById(subjectId).foreignLanguage)
 import type { OriginalMaterialAblage, Sheet, TextBlock, WorksheetMeta, WsBlock } from '../model/types'
-import { kuerzungsHinweis, kuerzungsProtokoll, pruefeKuerzung, wortzahl, type KuerzungsPruefung } from './kuerzung'
+import { kuerzungsHinweis, kuerzungsProtokoll, pruefeKuerzung, type KuerzungsPruefung } from './kuerzung'
 import { befundText, bewerte, type Bewertung } from './textQualitaet'
 
 export type AiRuf = <T>(req: StructuredRequest) => Promise<T>
@@ -383,7 +383,8 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
       vorbemerkung: (auftrag.vorbemerkung ?? '').trim(),
       protokoll: [
         ...(auftrag.vorbemerkung ? [`Vorbemerkung der Lehrkraft: „${auftrag.vorbemerkung}"`] : []),
-        `Gewählt: ${gewaehlt.treffer.titel} (${gewaehlt.quelle.wortzahl} Wörter im Original, ${wortzahl(auftrag.gekuerzt)} auf dem Blatt).`,
+        // Die Wortzahlen stehen im Kürzungsprotokoll („Umfang: …") – hier nicht noch einmal
+        `Gewählt: ${gewaehlt.treffer.titel}`,
         ...kuerzungsProtokoll(pruefung)
       ],
       pruefung

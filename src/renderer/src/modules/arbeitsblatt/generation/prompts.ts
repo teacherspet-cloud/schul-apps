@@ -890,7 +890,9 @@ export function materialText(sources: SourceMaterial[]): string {
     'MATERIAL DER LEHRKRAFT (als Grundlage nutzen; längere Passagen nicht wörtlich übernehmen, sondern altersgerecht bearbeiten und die Quelle angeben):',
     ...used.map((s, i) =>
       s.text
-        ? `--- Material ${i + 1}: ${s.fileName}${s.format === 'html' ? ' (als HTML)' : ''} ---\n${s.text}`
+        ? `--- Material ${i + 1}: ${s.fileName}${s.format === 'html' ? ' (als HTML)' : ''}${
+            s.kind === 'web' ? ` (Webseite${s.url ? `: ${s.url}` : ''})` : s.kind === 'video' ? ` (Video-Transkript${s.url ? `: ${s.url}` : ''})` : ''
+          } ---\n${s.text}`
         : `--- Material ${i + 1}: ${s.fileName} (als Bild beigefügt) ---`
     )
   ].join('\n\n')

@@ -899,3 +899,22 @@ export interface SavedKurztestInput {
 export function economyActive(ai: AppSettings['ai']): boolean {
   return ai.economy === 'on' || (ai.economy !== 'off' && ai.access[ai.textProvider] === 'subscription')
 }
+
+/**
+ * Ein YouTube-Video als Material (26.09.2026): Was der Hauptprozess von der Wiedergabeseite
+ * lesen konnte. `fehler` ist gesetzt, wenn etwas fehlt – dann sind die übrigen Felder so
+ * weit gefüllt, wie es ging (z. B. Titel ohne Transkript).
+ */
+export interface VideoQuelle {
+  url: string
+  titel: string
+  kanal: string
+  beschreibung: string
+  dauerSekunden: number
+  /** Fließtext aus den Untertiteln; leer, wenn es keine gibt */
+  transkript: string
+  transkriptSprache: string
+  /** Untertitel automatisch erzeugt (können Fehler enthalten) */
+  automatisch: boolean
+  fehler?: string
+}

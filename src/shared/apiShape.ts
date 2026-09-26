@@ -30,6 +30,7 @@ import type {
   SubscriptionStatus,
   FileFilter,
   GeladeneQuelle,
+  VideoQuelle,
   Materialanfrage,
   OnlineImageHit,
   OnlineImageSource,
@@ -280,7 +281,9 @@ export function buildApi(call: Call, extras: ApiExtras) {
       /** Sucht Originalmaterial in den freien Archiven (Wikisource, Projekt Gutenberg) */
       suche: (anfrage: Materialanfrage) => call<Quellentreffer[]>('sources:suche', anfrage),
       /** Laedt den Wortlaut einer Quelle – auch fuer Fundstellen, die die KI selbst gefunden hat */
-      laden: (url: string) => call<GeladeneQuelle>('sources:laden', url)
+      laden: (url: string) => call<GeladeneQuelle>('sources:laden', url),
+      /** Titel, Beschreibung und Transkript eines YouTube-Videos – Material aus einer Adresse (26.09.2026) */
+      video: (url: string) => call<VideoQuelle>('sources:video', url)
     },
     /** Hörtexte vertonen (ElevenLabs) */
     audio: {

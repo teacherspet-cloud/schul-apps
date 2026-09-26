@@ -30,6 +30,7 @@ import {
   VerticalPositionRelativeFrom,
   WidthType
 } from 'docx'
+import { MUSTER_FORMEN } from '../generation/solution'
 import { PRINT_MARGINS, wordFontName } from '@shared/design'
 import {
   A4_HEIGHT,
@@ -1637,7 +1638,10 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
           ]
         })
       )
-      out.push(...(await answerContent(ctx, p.answer, indent * 2)))
+      // Musterlösung in Schülerform (Lösungsblatt) an der Stelle von Linien, Kästchen, Fläche
+      if (ctx.key && p.modelAnswer && MUSTER_FORMEN.includes(p.answer.kind))
+        out.push(...(await rich(ctx, p.modelAnswer, { run: { color: RED }, paragraph: { indent: { left: indent * 2 } } })))
+      else out.push(...(await answerContent(ctx, p.answer, indent * 2)))
       if (ctx.key && p.solution) out.push(...(await rich(ctx, p.solution, { run: { color: RED }, paragraph: { indent: { left: indent * 2 } } })))
     }
   } else {
@@ -1649,6 +1653,9 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
      */
     const mustertextOben = ctx.key && block.answer.kind === 'lines' && Boolean(block.brief?.model)
     if (mustertextOben) out.push(...(await rich(ctx, block.brief!.model!, { run: { color: RED }, paragraph: { indent: { left: indent } } })))
+    else if (ctx.key && block.modelAnswer && MUSTER_FORMEN.includes(block.answer.kind))
+      // Musterlösung in Schülerform (26.09.2026) – die Skizze gibt Word nicht wieder, nur den Text
+      out.push(...(await rich(ctx, block.modelAnswer, { run: { color: RED }, paragraph: { indent: { left: indent } } })))
     else out.push(...(await answerContent(ctx, block.answer, indent)))
   }
   if (ctx.key && block.solution)

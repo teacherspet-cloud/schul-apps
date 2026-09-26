@@ -233,6 +233,10 @@ export interface TaskPart {
   instruction: string
   answer: Answer
   solution: string
+  /** Musterlösung in Schülerform – siehe `TaskBlock.modelAnswer` */
+  modelAnswer?: string
+  /** Skizze zur Musterlösung als SVG – siehe `TaskBlock.modelSketch` */
+  modelSketch?: string
 }
 
 /**
@@ -342,6 +346,22 @@ export interface TaskBlock extends BaseBlock {
    * verschiebt und beim Zählen der Punkte nicht mitläuft.
    */
   example?: TaskPart
+  /**
+   * MUSTERLÖSUNG in Schülerform – nur für die Lehrkraft, nur im Lösungsblatt.
+   *
+   * Wunsch der Lehrkraft (26.09.2026): Im Lösungsblatt soll dort, wo die Lernenden schreiben
+   * (Schreiblinien, Rechenkästchen, freie Fläche), eine Lösung so stehen, „wie es bei den
+   * Schülern aussehen müsste" – zusätzlich zum stichpunktartigen Erwartungshorizont in
+   * `solution`. Erzeugt auf Knopfdruck im KI-Menü der Lösungsansicht („Lösung im
+   * Erwartungshorizont generieren"), nachträglich und je Aufgabe.
+   */
+  modelAnswer?: string
+  /**
+   * Skizze zur Musterlösung als SVG (Zeitleiste, Diagramm, Zeichnung) – nur dort, wo die
+   * Aufgabe eine Zeichnung verlangt. Wird in den Rechenkästchen bzw. auf der freien Fläche
+   * gezeigt; Word-Export gibt stattdessen den Text der Musterlösung aus.
+   */
+  modelSketch?: string
   /** Hörverstehen: id des Hörtext-Bausteins, zu dem die Aufgabe gehört */
   audioId?: string
   /** Filmbeobachtung: id des Video-Bausteins, zu dem die Aufgabe gehört */
@@ -969,7 +989,9 @@ export type WorksheetImageSource = 'auto' | 'web' | 'ai' | 'placeholder'
 export interface SourceMaterial {
   id: string
   fileName: string
-  kind: 'pdf' | 'docx' | 'image' | 'text'
+  kind: 'pdf' | 'docx' | 'image' | 'text' | 'web' | 'video'
+  /** Internetadresse, wenn das Material von dort stammt (Webseite oder Video) */
+  url?: string
   text: string
   format: 'plain' | 'html'
   pageImages: string[]

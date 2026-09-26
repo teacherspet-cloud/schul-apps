@@ -337,6 +337,19 @@ export function useThemenbereich(moduleId: string, docId: string): Themenbereich
  * einem Bereich das Fach des Bereichs, siehe `fachVon` in Themenbereiche.tsx).
  */
 export async function allesEinsortieren(fachId: string, materialien: ThemenMaterial[], umfang: 'auto' | 'alle'): Promise<void> {
+  /*
+   * Ohne Fach kein Themenbereich – das sagt die Meldung jetzt auch (26.09.2026). Vorher hieß
+   * es „Nichts zu ändern", was die Lehrkraft als Fehler der Automatik las; der Grund war ein
+   * Vokabeltest, der seine Sprache verloren hatte.
+   */
+  if (fachId === 'ohne-fach') {
+    notifications.show({
+      color: 'orange',
+      message:
+        'Diese Materialien haben kein Fach – ohne Fach kann die Automatik keinen Themenbereich finden. Beim Vokabeltest ergibt sich das Fach aus der Zielsprache in den Testeinstellungen oder aus dem Schulbuch (z. B. „Green Line 1“ = Englisch).'
+    })
+    return
+  }
   try {
     const vorher = await ladeThemen()
     const plan = neuEinsortierenPlan(materialien, vorher, fachId, await katalogLader(materialien), umfang)

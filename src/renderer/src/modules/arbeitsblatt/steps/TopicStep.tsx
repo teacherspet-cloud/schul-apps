@@ -24,15 +24,17 @@ import {
   TextInput,
   Title
 } from '@mantine/core'
-import { IconAlertTriangle, IconBook2, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
+import { IconDownload, IconAlertTriangle, IconBook2, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
+import UrlQuelleEingabe from '../../../shared/components/UrlQuelleEingabe'
+import { istVideoAdresse, normalisiereAdresse } from '../../../shared/files/urlQuelle'
 import type { DesignTemplate } from '@shared/design'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import DropZone from '../../../shared/components/DropZone'
 import { suggestLevel, languageTracks } from '../../../shared/cefr'
 import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractContent'
 import { useAppSettings } from '../../../shared/settingsStore'
-import { notifyError } from '../../../shared/util'
+import { notifyError, notifySuccess } from '../../../shared/util'
 import { newId } from '../../vokabeltest/model/random'
 import { comprehensionFormatById, comprehensionFormatsFor, defaultComprehensionFormats } from '../didactics/comprehensionFormats'
 import { istDeutschZuhoeren, ZUHOEREN_MODES, type ZuhoerenMode } from '../didactics/zuhoeren'
@@ -1066,6 +1068,11 @@ export default function TopicStep(): React.JSX.Element {
                     loading={Boolean(reading)}
                     minHeight={80}
                   />
+                  {/* Internetadresse als Material – Webseite oder Video (26.09.2026) */}
+                  <UrlQuelleEingabe
+                    mt="xs"
+                    onInhalt={(c) => setWorksheet({ ...worksheet, sources: [...worksheet.sources, { id: newId(), ...c, useAsBasis: true, embedImage: false }] })}
+                  />
                   <Stack gap={6} mt="sm">
                     {worksheet.sources.map((s, i) => (
                       <Group key={s.id} justify="space-between" wrap="nowrap" className="picker-tile" px="sm" py={6}>
@@ -1080,7 +1087,11 @@ export default function TopicStep(): React.JSX.Element {
                                 ? 'Bild'
                                 : s.kind === 'docx'
                                   ? 'Word-Dokument'
-                                  : 'Text'}
+                                  : s.kind === 'video'
+                                    ? 'Video – Transkript'
+                                    : s.kind === 'web'
+                                      ? 'Webseite'
+                                      : 'Text'}
                             {s.text
                               ? ` · ${s.text.length.toLocaleString('de-DE')} Zeichen`
                               : s.pageImages.length
@@ -1296,6 +1307,38 @@ function VideoCard({
   const isUrl = /^https?:\/\//i.test(v?.url.trim() ?? '')
   const { sourced } = observationFoci(meta.subjectId)
   const section = sectionMinutes(meta.grade)
+  const [videoLaeuft, setVideoLaeuft] = useState(false)
+
+  /**
+   * Titel, Laufzeit und Inhalt aus dem Video übernehmen (26.09.2026).
+   *
+   * Die KI kann das Video nicht ansehen – bisher musste die Lehrkraft den Inhalt selbst
+   * beschreiben. Bei einem YouTube-Video liest die App Titel, Beschreibung und Transkript
+   * aus den Untertiteln und trägt sie hier ein; Vorhandenes wird nicht überschrieben.
+   */
+  const videoLaden = async (): Promise<void> => {
+    if (!v) return
+    setVideoLaeuft(true)
+    try {
+      const q = await window.api.sources.video(normalisiereAdresse(v.url))
+      if (!q.titel && !q.transkript && !q.beschreibung) throw new Error(q.fehler ?? 'Das Video ließ sich nicht laden.')
+      const inhalt = [q.beschreibung, q.transkript ? `Transkript${q.automatisch ? ' (automatisch erzeugte Untertitel)' : ''}:\n${q.transkript}` : '']
+        .filter(Boolean)
+        .join('\n\n')
+      set({
+        title: v.title.trim() || q.titel,
+        platform: v.platform.trim() || 'YouTube',
+        minutes: v.minutes || Math.round(q.dauerSekunden / 60),
+        summary: v.summary.trim() ? v.summary : inhalt
+      })
+      if (q.fehler) notifyError(new Error(q.fehler), 'Video nur teilweise gelesen')
+      else notifySuccess(q.transkript ? 'Titel, Laufzeit und Transkript übernommen.' : 'Titel und Laufzeit übernommen.')
+    } catch (e) {
+      notifyError(e, 'Das Video ließ sich nicht laden')
+    } finally {
+      setVideoLaeuft(false)
+    }
+  }
 
   return (
     <Card withBorder>
@@ -1323,6 +1366,11 @@ function VideoCard({
             value={v.url}
             onChange={(e) => set({ url: e.currentTarget.value })}
           />
+          {isUrl && istVideoAdresse(v.url) && (
+            <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} loading={videoLaeuft} style={{ alignSelf: 'flex-start' }} onClick={() => void videoLaden()}>
+              Titel, Laufzeit und Inhalt aus dem Video übernehmen
+            </Button>
+          )}
           <Group grow>
             <Select
               label="Art des Videos"

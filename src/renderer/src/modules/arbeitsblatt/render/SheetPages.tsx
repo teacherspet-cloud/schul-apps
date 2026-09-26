@@ -345,7 +345,7 @@ export function SheetPages({
         <PageFrame info={info} page={nr('hilfsblatt')} pages={total}>
           <div className="ws-phrases-page">
             {phraseSheet.map((block) => (
-              <BlockView key={block.id} block={block} />
+              <div key={block.id}>{wrapBlock ? wrapBlock(block, { id: block.id }, <BlockView block={block} />) : <BlockView block={block} />}</div>
             ))}
           </div>
         </PageFrame>
@@ -355,8 +355,13 @@ export function SheetPages({
           <div className="ws-helpcards-page">
             <h2>Tipp- und Hilfekarten</h2>
             <p className="ws-helpcards-hint">{anredeText('hilfekarten', anredeFuerMeta(ws.meta))}</p>
+            {/*
+              Auch die ausgelagerten Karten bekommen den Bausteinrahmen (26.09.2026): Vorher
+              standen sie ohne Werkzeugleiste – nicht mit KI zu überarbeiten, nicht neu zu
+              erzeugen, nicht zu löschen (Befund der Lehrkraft).
+            */}
             {helpCards.map((block) => (
-              <BlockView key={block.id} block={block} />
+              <div key={block.id}>{wrapBlock ? wrapBlock(block, { id: block.id }, <BlockView block={block} />) : <BlockView block={block} />}</div>
             ))}
           </div>
         </PageFrame>
@@ -618,9 +623,45 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
 
   const variants = useMemo(() => (ws ? ws.sheets.flatMap((s) => [false, true].map((key) => ({ sheet: s, key }))) : []), [ws])
 
+  /*
+   * VERSTECKT GEMESSEN = FALSCH GEMESSEN (Befund der Lehrkraft, 26.09.2026).
+   *
+   * Die Programme bleiben eingehängt; das gerade nicht gezeigte steht auf `hidden`
+   * (App.tsx, `.module-container`). Wird ein Blatt fertig, während ein anderes Programm
+   * vorn ist, misst dieser Hook in einem `display: none`-Zweig: Jede Höhe ist 0, die
+   * Inhaltsfläche „fasst" nichts, und jede Einheit landet auf einer eigenen Seite – ein
+   * Blatt mit 97 Seiten, darunter leere Seiten „Aufgabe 1 (Fortsetzung)". Erst eine
+   * Änderung am Blatt (`ws` neu) maß noch einmal – dann richtig.
+   *
+   * Deshalb: Liefert die Messfläche keine brauchbare Höhe, wird NICHT gesetzt, sondern
+   * kurz darauf erneut gemessen; und sobald der Messbereich seine Größe ändert (Programm
+   * kommt nach vorn, Schriften sind da), wird ebenfalls neu gemessen.
+   */
+  const letzteGroesse = useRef({ w: 0, h: 0 })
   useLayoutEffect(() => {
     const root = ref.current
     if (!root || !ws) return
+    const beobachter = new ResizeObserver(() => {
+      const r = root.getBoundingClientRect()
+      if (Math.abs(r.width - letzteGroesse.current.w) < 1 && Math.abs(r.height - letzteGroesse.current.h) < 1) return
+      letzteGroesse.current = { w: r.width, h: r.height }
+      setTick((t) => t + 1)
+    })
+    beobachter.observe(root)
+    let aktiv = true
+    document.fonts?.ready.then(() => aktiv && setTick((t) => t + 1)).catch(() => undefined)
+    return () => {
+      aktiv = false
+      beobachter.disconnect()
+    }
+  }, [ws])
+
+  useLayoutEffect(() => {
+    const root = ref.current
+    if (!root || !ws) return
+    // Versteckt oder noch ohne Stylesheet: nichts setzen – der Beobachter oben misst neu, sobald sich die Größe ändert
+    const probe = root.querySelector<HTMLElement>('.ws-page .ws-body')
+    if (!probe || probe.getBoundingClientRect().height < 50) return
     const next = new Map<string, PagePlan[]>()
     for (const { sheet, key } of variants) {
       const el = root.querySelector<HTMLElement>(`[data-layout="${layoutKey(sheet.id, key)}"]`)

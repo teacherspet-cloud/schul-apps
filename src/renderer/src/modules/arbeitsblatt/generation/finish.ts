@@ -11,8 +11,13 @@ export interface FinishDeps {
   sources: SourceServices
 }
 
+/*
+ * Je Hinweis EINE Zeile. Bis 26.09.2026 wurde mit Leerzeichen angehängt – daraus wurde ein
+ * einziger Absatz aus Planung, Kürzungsprotokoll und Quellenwarnung, den die Lehrkraft als
+ * „unübersichtlich und überfrachtet" zurückgab. `didactics/hinweise.ts` ordnet die Zeilen.
+ */
 const addNote = (ws: Worksheet, note: string): void => {
-  ws.meta = { ...ws.meta, teacherNote: [ws.meta.teacherNote, note].filter(Boolean).join(' ') }
+  ws.meta = { ...ws.meta, teacherNote: [ws.meta.teacherNote, note].filter(Boolean).join('\n') }
 }
 
 /** Nach dem Ausformulieren: Quellen prüfen, Bilder suchen/erzeugen, optional Tafelbild. */
