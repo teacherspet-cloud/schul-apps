@@ -1736,6 +1736,59 @@ async function clean(dataUrl: string) {
  * Leitfaden Latein SH 2016, S. 25). Die Vokabeln decken die vier Wortarten ab, für die es
  * eine eigene Nennform gibt, dazu ein Adverb ohne Nennform.
  */
+/**
+ * Englischer Vokabeltest mit EINER Aufgabe „Write sentences", an der ein behebbarer Hinweis
+ * hängt – für die Wache „Mit KI beheben" (Paket 13, tests/e2e/ki-beheben.mjs). Ohne KI.
+ */
+function vtMitHinweis(hinweis: string): { aufgaben: number } {
+  const woerter: VocabEntry[] = [
+    { id: 'e1', term: 'to explore', translation: 'erkunden', include: true },
+    { id: 'e2', term: 'journey', translation: 'Reise', include: true },
+    { id: 'e3', term: 'abroad', translation: 'im Ausland', include: true }
+  ]
+  const einstellungen: TestSettings = {
+    targetLanguage: 'en',
+    stateId: 'NI',
+    schoolTypeId: 'gymnasium',
+    languageOrder: 1,
+    grade: 8,
+    level: 'A2',
+    vocabCount: woerter.length,
+    variantCount: 1,
+    variantMode: 'sameVocab',
+    tasks: [{ type: 'writeSentences', count: woerter.length, pointsPerItem: 2 }],
+    topic: 'Travelling',
+    pictureSource: 'none',
+    answerKey: true,
+    seed: 1
+  }
+  const block = TASK_TYPES.writeSentences.build(
+    woerter,
+    {
+      instruction: 'Write a sentence with each word.',
+      items: woerter.map((w) => ({ vocabId: w.id, prompt: `${w.term} – ${w.term}`, modelAnswer: `I like ${w.term}.` }))
+    },
+    { settings: einstellungen, languageName: 'English', rng: createRng(1), allVocab: woerter } as never
+  )
+  block.warnings = [hinweis]
+  const doc: TestDocument = {
+    version: 1,
+    header: defaultHeader(''),
+    settings: einstellungen,
+    vocab: woerter,
+    variants: [{ id: 'v1', label: 'A', blocks: [block] }],
+    fontSize: 11,
+    createdAt: new Date().toISOString()
+  }
+  useVokabeltest.getState().loadDocument(doc)
+  useVokabeltest.getState().setListName('Travelling')
+  useVokabeltest.getState().setStep(2)
+  return { aufgaben: 1 }
+}
+
+/** Der Vokabeltest im Speicher (für Wachen) */
+const vtJetzt = (): TestDocument | null => useVokabeltest.getState().doc
+
 function vtLatein(): { zeilen: number } {
   const woerter: VocabEntry[] = [
     {
@@ -1934,6 +1987,15 @@ export function installSelftest(): void {
     wsMitTafelbild,
     printHtmlMitTafelbild,
     vtLatein,
+    vtMitHinweis,
+    vtJetzt,
+    gtJetzt: () => useGrammatiktest.getState().test,
+    kaJetzt: () => useKlassenarbeit.getState().exam,
+    lzkJetzt: () => useLernzielkontrolle.getState().test,
+    // Ganze Dokumente setzen (Wachen „Mit KI beheben": einen Mangel einbauen) – ein Rückgängig-Schritt
+    gtSetzen: (t: GrammarTest) => useGrammatiktest.getState().setTest(t),
+    kaSetzen: (e: Exam) => useKlassenarbeit.getState().setExam(e),
+    lzkSetzen: (t: Kurztest) => useLernzielkontrolle.getState().setTest(t),
     lzkSpeichern,
     lzkRundreise,
     lzkBibliothek,
