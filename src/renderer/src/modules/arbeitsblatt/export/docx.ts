@@ -521,7 +521,7 @@ export async function boardSection(ws: Worksheet, board: BoardPlan, raster: Math
         }),
         ...sec.points.map((pt) => new Paragraph({ bullet: { level: 0 }, spacing: { after: 40 }, children: runs(pt) })),
         ...(sec.sketch
-          ? [new Paragraph({ spacing: { before: 40 }, children: [run('✎ Skizze: ', { italics: true, color: '555555', size: size - 3 }), ...runs(sec.sketch)] })]
+          ? [new Paragraph({ spacing: { before: 40 }, children: [run('✎ An die Tafel zeichnen: ', { italics: true, color: '555555', size: size - 3 }), ...runs(sec.sketch)] })]
           : []),
         ...(sec.fromTasks ? [p(sec.fromTasks, { color: '777777', size: size - 5 })] : [])
       ]
@@ -611,9 +611,9 @@ export async function boardSection(ws: Worksheet, board: BoardPlan, raster: Math
         width: { size: width, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         rows: [
-          new TableRow({ tableHeader: true, children: ['Schritt', 'Impuls der Lehrkraft', 'Erwartete Beiträge → Tafel'].map((t, i) => cell(t, i, true)) }),
+          new TableRow({ tableHeader: true, children: ['Schritt', 'Arbeitsauftrag / Impuls der Lehrkraft', 'Erwartete Beiträge → Tafel'].map((t, i) => cell(t, i, true)) }),
           ...board.steps.map(
-            (st, n) => new TableRow({ cantSplit: true, children: [cell(st.phase, 0, false, `${n + 1}. `), cell(st.impulse, 1), cell(st.expected, 2)] })
+            (st, n) => new TableRow({ cantSplit: true, children: [cell(st.phase.replace(/^\s*\d+[.)]\s*/, ''), 0, false, `${n + 1}. `), cell(st.impulse, 1), cell(st.expected, 2)] })
           )
         ]
       })

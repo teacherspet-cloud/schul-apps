@@ -54,7 +54,7 @@ export function BoardCanvas({ board, onChange }: Pick<BoardProps, 'board' | 'onC
       />
       {(s.sketch || editable) && (
         <div className="ws-board-sketch">
-          <span>✎ Skizze: </span>
+          <span>✎ An die Tafel zeichnen: </span>
           <RichText
             inline
             editable={editable}
@@ -84,8 +84,15 @@ export function BoardCanvas({ board, onChange }: Pick<BoardProps, 'board' | 'onC
   const info = boardFormatInfo(board.format)
   if (byField) {
     const fields: BoardField[] = ['links', 'mitte', 'rechts']
+    /*
+     * Seitenverhältnis der Tafel nur als MINDESThöhe (26.09.2026). Vorher stand hier
+     * `aspect-ratio`: Bei viel Inhalt wuchs die Tafel nicht mit, die drei Felder liefen unten
+     * aus dem Rahmen heraus, über die Überschrift „So entsteht das Tafelbild" und in die
+     * Ablauftabelle hinein (Befund der Lehrkraft am Tafelbild „Julikrise 1914"). Die Breite
+     * der Querformatseite ist fest (297 mm abzüglich 25 + 15 mm Rand = 257 mm).
+     */
     return (
-      <div className="ws-board ws-board-fields" style={{ aspectRatio: String(info.ratio) }}>
+      <div className="ws-board ws-board-fields" style={{ minHeight: `${Math.round(257 / info.ratio)}mm` }}>
         <div className="ws-board-title">
           <RichText inline editable={editable} value={board.title} placeholder="Leitfrage" onChange={edit<string>((d, v) => (d.title = v))} />
         </div>
@@ -155,7 +162,7 @@ export function BoardSteps({ board, onChange }: Pick<BoardProps, 'board' | 'onCh
       <thead>
         <tr>
           <th>Schritt</th>
-          <th>Impuls der Lehrkraft</th>
+          <th>Arbeitsauftrag / Impuls der Lehrkraft</th>
           <th>Erwartete Beiträge → Tafel</th>
         </tr>
       </thead>
@@ -163,7 +170,8 @@ export function BoardSteps({ board, onChange }: Pick<BoardProps, 'board' | 'onCh
         {board.steps.map((s, i) => (
           <tr key={i}>
             <td>
-              <b>{i + 1}.</b> <RichText inline editable={editable} value={s.phase} onChange={edit(i, 'phase')} />
+              {/* Die KI nummeriert die Phase oft selbst („1. Ergebnisse …") – dann nicht noch einmal */}
+              <b>{i + 1}.</b> <RichText inline editable={editable} value={s.phase.replace(/^\s*\d+[.)]\s*/, '')} onChange={edit(i, 'phase')} />
             </td>
             <td>
               <RichText inline editable={editable} value={s.impulse} onChange={edit(i, 'impulse')} />

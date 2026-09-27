@@ -1,4 +1,5 @@
 import { ActionIcon, Alert, MultiSelect, SegmentedControl, Button, Card, Group, Popover, Select, Stack, Text, Textarea, Title, Tooltip } from '@mantine/core'
+import { AUFTRAEGE_STATT_FRAGEN } from '../generation/board'
 import { IconChalkboard, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { notifyError } from '../../../shared/util'
@@ -13,6 +14,7 @@ import type { BoardPlan } from '../model/types'
 import { druckAkzent } from '../../../shared/fachfarben'
 
 /** Reiter „Tafelbild“ im Editor: erstellen, bearbeiten, mit KI überarbeiten. */
+
 export function BoardPanel({ ws, profile }: { ws: Worksheet; profile: LearnerProfile }): React.JSX.Element {
   const update = useArbeitsblatt((s) => s.update)
   const [busy, setBusy] = useState(false)
@@ -112,6 +114,15 @@ export function BoardPanel({ ws, profile }: { ws: Worksheet; profile: LearnerPro
             else if (!wanted.includes(activeFormat)) setActiveFormat(wanted[0])
           }}
         />
+        {/*
+         * Bestehende Tafelbilder mit Fragen als Impulsen (vor 27.09.2026) auf einen Klick in
+         * Arbeitsaufträge mit Operator umformulieren – neue Tafelbilder entstehen so von selbst.
+         */}
+        {active && active.steps.some((st) => /^\s*(was|wer|wie|welche|welcher|welches|wo|wann|warum|wozu|woran|wofür|inwiefern)/i.test(st.impulse)) && (
+          <Button size="xs" variant="light" loading={busy} onClick={() => void run(AUFTRAEGE_STATT_FRAGEN, true)}>
+            Impulse als Aufträge formulieren
+          </Button>
+        )}
         <Popover opened={reviseOpen} onChange={setReviseOpen} width={340} position="bottom-start" withArrow shadow="md" trapFocus>
           <Popover.Target>
             <Button size="xs" variant="light" leftSection={<IconSparkles size={14} />} loading={busy} onClick={() => setReviseOpen((o) => !o)}>

@@ -4,7 +4,7 @@ import { useAppSettings } from '../src/renderer/src/shared/settingsStore'
 import { illustrationenAktiv, platziereIllustrationen, platziereKopfUndSchluss, poseFuer } from '../src/renderer/src/modules/arbeitsblatt/generation/illustrationen'
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
 import { emptyAnswer, newBlock } from '../src/renderer/src/modules/arbeitsblatt/model/factory'
-import type { Worksheet, WsBlock } from '../src/renderer/src/modules/arbeitsblatt/model/types'
+import type { TaskBlock, Worksheet, WsBlock } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 import { MASKOTTCHEN_POSEN, maskottchenId, posePrompt } from '../src/shared/maskottchen'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
@@ -15,7 +15,7 @@ function blatt(grade: number, blocks: WsBlock[]): Worksheet {
 }
 
 const aufgabe = (id: string, operator = 'Berechne', kind: 'lines' | 'grid' | 'diagram' = 'grid'): WsBlock => ({
-  ...(newBlock('task') as WsBlock),
+  ...(newBlock('task') as TaskBlock),
   id,
   operator,
   instruction: `${operator} etwas.`,

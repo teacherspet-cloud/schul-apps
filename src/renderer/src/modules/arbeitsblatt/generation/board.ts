@@ -17,6 +17,10 @@ export const BOARD_LAYOUTS: { value: BoardLayout; label: string }[] = [
   { value: 'cluster', label: 'Zentraler Begriff mit Aspekten' }
 ]
 
+/** Fester Auftrag: Fragen in der Ablauftabelle werden Arbeitsaufträge mit Operator (27.09.2026) */
+export const AUFTRAEGE_STATT_FRAGEN =
+  'Formuliere in der Ablauftabelle (steps) jeden Impuls als Arbeitsauftrag mit Operator im Plural-Imperativ um (Nennt …, Beschreibt …, Erklärt …, Ordnet …, Vergleicht …, Begründet …, Beurteilt …). Die bisherige Frage darf als zweiter Satz folgen, um weiter zu lenken. Formuliere außerdem jede Skizze als konkrete Zeichenanweisung (was, wo, mit welcher Beschriftung) ohne unerklärte Farbcodes. Alles andere unverändert lassen.'
+
 export const BOARD_SCHEMA = obj({
   title: str('Überschrift des Tafelbilds – als Leitfrage formuliert'),
   layout: enumOf(BOARD_LAYOUTS.map((l) => l.value)),
@@ -29,14 +33,14 @@ export const BOARD_SCHEMA = obj({
       field: enumOf(['links', 'mitte', 'rechts']),
       toNotebook: bool('Wird dieser Bereich ins Heft übertragen? Nur der Kern in der Mitte.'),
       fromTasks: str('z. B. „Aufgabe 1, 2b“'),
-      sketch: str('Skizze, die die Lehrkraft dazuzeichnet (z. B. Kräftepfeile, Zahlenstrahl, Kartenskizze) – leer, wenn keine nötig')
+      sketch: str('Zeichenanweisung für die Lehrkraft in einem Satz: WAS wird WO mit WELCHER Beschriftung gezeichnet (z. B. „Waagerechter Zeitstrahl über die Feldbreite mit fünf Marken 5.7., 23.7., 28.7., 1.8., 4.8.; über jeder Marke das Ereignis, Pfeile zwischen den Marken"); keine Farbcodes ohne Erklärung; leer, wenn keine Zeichnung nötig')
     })
   ),
   conclusion: str('Merksatz / zentrales Ergebnis in 1–2 Sätzen'),
   steps: arr(
     obj({
       phase: str('Unterrichtsschritt, z. B. „Ergebnisse von Aufgabe 1 vergleichen“'),
-      impulse: str('Impuls oder Frage der Lehrkraft'),
+      impulse: str('Arbeitsauftrag der Lehrkraft an die Klasse mit Operator im Plural-Imperativ (Nennt …, Erklärt …, Ordnet …, Begründet …, Vergleicht …); danach optional eine lenkende Frage als zweiter Satz'),
       expected: str('erwartete Schülerbeiträge, die an die Tafel kommen')
     })
   )
@@ -67,11 +71,13 @@ export function boardPrompt(ws: Worksheet, profile: LearnerProfile, instruction 
     'Weitere Regeln:',
     '- layout nach der Denkstruktur des Themas: „columns“ für Vergleich/Gegenüberstellung, „flow“ für Abläufe, Ursache → Wirkung oder Entwicklungen (Bereiche in zeitlicher/logischer Reihenfolge), „cluster“ für einen zentralen Begriff mit Merkmalen oder Aspekten.',
     '- fromTasks: aus welchen Aufgaben die Inhalte des Bereichs stammen (Aufgabennummern wie auf dem Blatt).',
-    '- sketch: nur wenn eine einfache Zeichnung das Verständnis trägt, kurz beschreiben, was gezeichnet wird; sonst leer.',
+    '- sketch: nur wenn eine einfache Zeichnung das Verständnis trägt – dann als konkrete Zeichenanweisung: Form (Zeitstrahl, Pfeilkette, Tabelle, Skizze), Lage, Elemente und ihre Beschriftungen, alles mit Wörtern der Tafel. Keine Symbolik oder Farbcodes, die nicht auf der Tafel erklärt sind. Sonst leer.',
+    '- Keine Bereiche mit Regieanweisungen („Abschreibhinweis", „Nur die Mitte abschreiben"): Was ins Heft gehört, steuert toNotebook.',
     '- Formeln und Rechenwege als LaTeX in $…$, Hervorhebungen mit **fett**.',
     boardSubjectHints(ws.meta),
     '- conclusion: Merksatz bzw. Antwort auf die Leitfrage in 1–2 Sätzen, der die Ergebnisse der Aufgaben verbindet.',
-    '- steps: 3–6 Schritte in Unterrichtsreihenfolge – je Schritt die Phase (welche Aufgabenergebnisse verglichen werden), ein offener Impuls bzw. eine Frage der Lehrkraft und die erwarteten Schülerbeiträge, die an die Tafel kommen. Der letzte Schritt führt zum Merksatz.',
+    '- steps: 3–6 Schritte in Unterrichtsreihenfolge – je Schritt die Phase (welche Aufgabenergebnisse verglichen werden, ohne Nummer davor), der Arbeitsauftrag der Lehrkraft und die erwarteten Schülerbeiträge, die an die Tafel kommen. Der letzte Schritt führt zum Merksatz.',
+    '- impulse IMMER als Arbeitsauftrag mit Operator im Plural-Imperativ (Nennt, Beschreibt, Erklärt, Ordnet, Vergleicht, Begründet, Beurteilt …), z. B. „Nennt die Vorwürfe und Forderungen, die den Druck auf Serbien erhöhten." Eine Frage darf als ZWEITER Satz folgen, um weiter zu lenken („Welche davon wog am schwersten?") – nie allein.',
     multi
       ? '- Es gibt mehrere Niveaustufen. Vergleiche die Aufgaben der Fassungen: Das Tafelbild enthält das gemeinsame Kernergebnis, das alle erreichen; Inhalte, die nur aus der anspruchsvollsten Fassung stammen, mit „(★★★)“ kennzeichnen. Aufgabennummern mit Stufe angeben, falls sie sich unterscheiden (z. B. „★ A2 / ★★★ A3“).'
       : '',
@@ -136,7 +142,8 @@ export function convertBoard(data: any): BoardPlan {
     sections,
     conclusion: text(data?.conclusion),
     steps: (Array.isArray(data?.steps) ? data.steps : [])
-      .map((s: any) => ({ phase: text(s?.phase), impulse: text(s?.impulse), expected: text(s?.expected) }))
+      // Nummer vor der Phase entfernen – die Tabelle nummeriert selbst (sonst „1. 1. …")
+      .map((s: any) => ({ phase: text(s?.phase).replace(/^\s*\d+[.)]\s*/, ''), impulse: text(s?.impulse), expected: text(s?.expected) }))
       .filter((s: BoardPlan['steps'][number]) => s.phase || s.impulse || s.expected)
   }
 }
