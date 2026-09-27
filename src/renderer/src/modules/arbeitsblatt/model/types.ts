@@ -5,6 +5,7 @@ import type { BoardField, BoardFormat } from '../didactics/boardDesign'
 import type { ImageFunction } from '../didactics/imageDesign'
 import type { Afb, AfbMix } from '../didactics/ageBands'
 import type { Stars } from '../didactics/differentiation'
+import type { Stufe } from '../didactics/schwierigkeit'
 import type { LanguageMode } from '../didactics/language'
 import type { CourseLevel } from '../didactics/schoolProfiles'
 import type { KnownVocab } from '../../../shared/knownVocab'
@@ -69,6 +70,28 @@ export interface ImageLabel {
 
 interface BaseBlock {
   id: string
+  /**
+   * Kennung eines MATERIALS für Verweise (27.09.2026): Die KI wählt sie selbst („zeitleiste",
+   * „karte", der eingesetzte Ausgangstext heißt „quelle"); fehlt sie, gilt die Kennung des
+   * Bausteins. GESPEICHERT wird in Aufgaben „M{zeitleiste}"; die Nummer (M1, M2 …) vergibt die
+   * App beim DARSTELLEN nach der aktuellen Reihenfolge (render/SheetPages.tsx `zurAnzeige`,
+   * didactics/integrity.ts). Verschiebt die Lehrkraft ein Material, wandern die Nummern in den
+   * Aufgaben mit; tippt sie „M3", wird beim Speichern die Kennung daraus.
+   *
+   * Anlass: Auf dem Blatt „Julikrise 1914" verwies Aufgabe 2 auf „die Rede M2" und Aufgabe 1
+   * auf „die Zeitleiste M1" – auf dem Blatt war die Rede M1 und die Zeitleiste M3. Die KI
+   * hatte nach ihrer eigenen Zählung nummeriert, die App setzte den Ausgangstext an eine
+   * andere Stelle und zählte den Einstiegstext mit. Mit Kennungen kann sich keine Zählung
+   * mehr verschieben.
+   */
+  ref?: string
+  /**
+   * Nur im Lösungsteil (27.09.2026): Erwartungshorizont, Musterlösung, Bewertungshinweise –
+   * Bausteine für die Lehrkraft, die auf dem Schülerblatt nichts verloren haben. Sie fehlen in
+   * Anzeige, Druck und Word des Schülerblatts und zählen nicht als Material; im Editor stehen
+   * sie mit Vermerk (didactics/loesungsteil.ts). Von der KI-Umwandlung gesetzt, von Hand umschaltbar.
+   */
+  nurLoesung?: boolean
   /**
    * Dieser Baustein beginnt auf einer NEUEN Seite.
    *
@@ -214,7 +237,8 @@ export interface ImageBlock extends BaseBlock {
   side?: 'left' | 'right' | 'none'
 }
 
-export type AnswerKind = 'lines' | 'grid' | 'space' | 'none' | 'gapText' | 'matching' | 'multipleChoice' | 'trueFalse' | 'ordering' | 'tableFill' | 'labels' | 'diagram'
+export type AnswerKind =
+  'lines' | 'grid' | 'space' | 'none' | 'gapText' | 'matching' | 'multipleChoice' | 'trueFalse' | 'ordering' | 'tableFill' | 'labels' | 'diagram'
 
 /**
  * Diagramm-Antwortform (26.09.2026): eine Zeichenfläche mit Achsen als Antwortbereich einer
@@ -375,6 +399,11 @@ export interface TaskBrief {
   textType: string
   /** Zweck: informieren, überzeugen, beraten, berichten … */
   purpose: string
+  /**
+   * Die Rahmenzeile „Adressat · Textsorte · Zweck" nicht auf dem Blatt zeigen (27.09.2026).
+   * In der Oberstufe nimmt sie der Aufgabe die Entscheidung ab, was der Text leisten muss.
+   */
+  frameHidden?: boolean
   /** erwarteter Umfang in Wörtern (0 = keine Vorgabe) */
   words: number
   /** Punkte, die der Text abdecken muss (Gliederungsvorgabe der Aufgabe) */
@@ -595,6 +624,16 @@ export interface TableBlock extends BaseBlock {
    * 'none' = ausdrücklich untereinander. Fehlt der Wert, entscheidet bei Bildern die Rolle.
    */
   side?: 'left' | 'right' | 'none'
+  /**
+   * Von Hand gezogene Maße (27.09.2026, render/tabelleMasse.ts): Spaltenbreiten in Prozent
+   * der Tabellenbreite (Summe 100), Mindesthöhen der Zeilen in mm (0 = nach Inhalt), Höhe der
+   * Kopfzeile in mm und die Breite der ganzen Tabelle in Prozent der Textspalte. Fehlen sie,
+   * teilt sich die Tabelle wie bisher selbst auf.
+   */
+  colWidths?: number[]
+  rowHeightsMm?: number[]
+  headerHeightMm?: number
+  widthPercent?: number
 }
 
 export interface WorkspaceBlock extends BaseBlock {
@@ -641,6 +680,13 @@ export interface GridBlock extends BaseBlock {
   /** Kästchenweite in mm (Karo 5, Millimeterpapier 1) */
   cellMm: number
   axes: GridAxes
+  /**
+   * Fertig gezeichnete Zeichenfläche als MATERIAL (27.09.2026): eine Zeitleiste mit
+   * Ereignissen, Stufen und Strängen, die die App selbst zeichnet – maßhaltig und mit Schrift in
+   * Druckgröße, statt eines KI-Bildes mit erfundener Mini-Schrift. Ist sie gesetzt, zeigt der
+   * Baustein diese Zeichnung statt des Gitternetzes (generation/zeitleiste.ts).
+   */
+  diagram?: DiagramSpec
 }
 
 export interface SelfCheckBlock extends BaseBlock {
@@ -942,7 +988,14 @@ export interface WorksheetMeta {
   itemCount?: number
   minutes: number
   socialForms: SocialForm[]
-  differentiation: { levels: 1 | 2 | 3; mode: 'separate' | 'combined' }
+  differentiation: {
+    levels: 1 | 2 | 3
+    mode: 'separate' | 'combined'
+    /** Ein Niveau: Schwierigkeit des Blattes (fehlt = jahrgangsgemäß, „mittel/mittel") */
+    schwierigkeit?: Stufe
+    /** Getrennte Fassungen: Schwierigkeit je ★ (fehlt = ★ grundlegend, ★★ mittel, ★★★ anspruchsvoll) */
+    stufen?: Partial<Record<Stars, Stufe>>
+  }
   answerKey: boolean
   sheetNumber: string
   /** auto = Internet (KI-geprüft), sonst KI-Bild; web = nur Internet; ai = nur KI-Bilder; placeholder = selbst wählen */
@@ -954,6 +1007,12 @@ export interface WorksheetMeta {
    * einstellbar am fertigen Blatt, weil sich erst dort zeigt, ob der Platz gebraucht wird.
    */
   correctionMargin?: boolean
+  /**
+   * Klausur der Oberstufe (27.09.2026): Formhinweise („Anrede und Grußformel verwenden") und
+   * Notizentabellen der Schreibaufgaben werden nicht gezeigt – Textsortenkompetenz ist Teil der
+   * Leistung. Gesetzt von der Klassenarbeit (generateExam.ts, worksheetMetaFor).
+   */
+  ohneSchreibhilfen?: boolean
   /**
    * Notizrand neben den Materialtexten.
    *
@@ -1107,6 +1166,12 @@ export interface Outline {
   learningGoals: string[]
   minutes: number
   teacherNote: string
+  /**
+   * Unterrichtseinheit, die die KI beim Planen nennt (27.09.2026) – Wortlaut eines vorhandenen
+   * Themenbereichs, wenn einer passt. Wird zum Überthema des Blattes und ordnet es dem
+   * Themenbereich zu (shared/themenVorschlag.ts).
+   */
+  ueberthema?: string
   items: OutlineItem[]
 }
 

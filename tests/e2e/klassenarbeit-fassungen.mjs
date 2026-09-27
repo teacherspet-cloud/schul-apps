@@ -116,7 +116,7 @@ try {
   await feld.waitFor({ timeout: 3000 })
   await feld.press('End')
   await feld.type(' Geaendert im Blatt.')
-  await page.getByRole('heading', { name: 'Bearbeiten & Export' }).click()
+  await page.getByText(/direkt im Blatt ändern/).click()
   await page.waitForTimeout(500)
   pruefe((await blattText()).includes('Geaendert im Blatt.'), 'Der Text lässt sich direkt im Blatt ändern')
   await page.getByText('Gruppe A', { exact: true }).click()
@@ -124,7 +124,7 @@ try {
   pruefe(!(await blattText()).includes('Geaendert im Blatt.'), 'Die Änderung betrifft nur Fassung B')
   await gruppeB.click()
   await page.waitForTimeout(300)
-  await page.getByRole('heading', { name: 'Bearbeiten & Export' }).click()
+  await page.getByText(/direkt im Blatt ändern/).click()
   await page.keyboard.press('Control+z')
   await page.waitForTimeout(500)
   const nachUndo = await blattText()
@@ -140,8 +140,13 @@ try {
   await page.getByText('Arbeit', { exact: true }).click()
 
   // ---------- 6. Speicheranzeige und Drucken
-  await page.getByText(/^Gespeichert:/).waitFor({ timeout: 8000 })
-  pruefe(true, '„Gespeichert: …" steht in der Leiste')
+  // Seit 27.09.2026 steht die Sicherung wie beim Arbeitsblatt in der Editor-Leiste („gesichert HH:MM"), der Name im Feld daneben
+  await page
+    .getByTestId('gesichert')
+    .filter({ hasText: /^gesichert \d/ })
+    .waitFor({ timeout: 8000 })
+  pruefe(true, '„gesichert HH:MM" steht in der Leiste')
+  pruefe((await page.getByLabel('Name in der App').inputValue()).length > 0, 'Der Name der Arbeit steht in der Leiste')
   await page.getByRole('button', { name: 'Drucken' }).click()
   const alle = page.getByRole('radio', { name: 'Alle in einer Datei' })
   await alle.waitFor({ timeout: 5000 })

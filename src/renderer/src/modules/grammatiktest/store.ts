@@ -18,9 +18,13 @@ interface GrammatiktestState {
   setStep: (step: number) => void
   update: (fn: (draft: GrammarTest) => void, gruppe?: string) => void
   markSaved: (id: string, savedAt: string, name: string) => void
+  /** Name in der App – aus der Werkzeugleiste (27.09.2026) */
+  setDocName: (name: string) => void
   /** Der offene Test wurde aus der Bibliothek gelöscht: Er gilt wieder als ungesichert. */
   forgetSaved: () => void
   openSaved: (id: string, name: string, test: GrammarTest, savedAt: string) => void
+  /** Aus einer Datei: neues Dokument, noch nicht in der Bibliothek */
+  loadFromFile: (test: GrammarTest) => void
   reset: () => void
   endGroup: () => void
   undo: () => void
@@ -53,7 +57,9 @@ export const useGrammatiktest = create<GrammatiktestState>((set, get) => ({
   markSaved: (docId, savedAt, docName) => {
     if (docId === get().docId) set({ savedAt, docName })
   },
+  setDocName: (docName) => set({ docName }),
   forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  loadFromFile: (test) => set({ docId: newId(), docName: '', test, savedAt: null, step: test.blocks.length ? 1 : 0, verlauf: leererVerlauf() }),
   openSaved: (docId, docName, test, savedAt) => set({ docId, docName, test, savedAt, step: test.blocks.length ? 1 : 0, verlauf: leererVerlauf() }),
   reset: () => set({ test: null, step: 0, docId: newId(), docName: '', savedAt: null, verlauf: leererVerlauf() }),
   endGroup: () => set({ verlauf: schliesseGruppe(get().verlauf) }),

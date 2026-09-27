@@ -4,6 +4,8 @@
  * `%APPDATA%/schul-apps/lernzielkontrollen`.
  */
 import type { SavedKurztestStats } from '@shared/types'
+import { einsortierenNachSpeichern } from '../../shared/themenbereiche'
+import { ueberthemaVon } from '../../shared/ueberthema'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
 import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
@@ -33,7 +35,8 @@ export function kurztestStats(test: Kurztest): SavedKurztestStats {
     taskCount: teilaufgaben(blocks),
     points: gesamtpunkte(blocks),
     minutes: test.meta.minutes,
-    varianten: test.varianten.length
+    varianten: test.varianten.length,
+    ...(ueberthemaVon(test.meta) ? { ueberthema: ueberthemaVon(test.meta) } : {})
   }
 }
 
@@ -56,6 +59,7 @@ export async function saveCurrentKurztest(name?: string): Promise<void> {
     stats: kurztestStats(test),
     payload: test
   })
+  void einsortierenNachSpeichern()
   useLernzielkontrolle.getState().markSaved(meta.id, meta.updatedAt, meta.name)
 }
 
@@ -92,6 +96,7 @@ export function legeKurztestAb(docId: string, schnappschuss: Kurztest, einarbeit
       },
       speichern: async (id, name, test) => {
         await window.api.kurztests.save({ id, name: name ?? defaultKurztestName(test), stats: kurztestStats(test), payload: test })
+        void einsortierenNachSpeichern()
       }
     },
     docId,
@@ -119,7 +124,8 @@ export function useKurztestAutosave(): void {
     dokument: (s) => s.docId,
     gesichert: (s) => Boolean(s.savedAt),
     bereit: (s) => lohntSicherung(s.test),
-    geaendert: (s, prev) => s.test !== prev.test,
+    // Ein geänderter Name zählt nur, wenn ihn die Lehrkraft geändert hat – nicht die Bestätigung des Speicherns
+    geaendert: (s, prev) => s.test !== prev.test || (s.docName !== prev.docName && s.savedAt === prev.savedAt),
     speichern: () => saveCurrentKurztest()
   })
 }

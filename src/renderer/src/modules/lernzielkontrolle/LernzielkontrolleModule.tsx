@@ -1,4 +1,5 @@
-import { Box, Button, Group, ScrollArea, Stepper, Text, Tooltip } from '@mantine/core'
+import { sichereAlles } from '../../shared/autosave'
+import { Box, Button, Group, ScrollArea, Stepper } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { defaultKurztestName, hatInhalt, newKurztestSafely, openSavedKurztest, useKurztestAutosave } from './library'
@@ -9,11 +10,10 @@ import EditorStep from './steps/EditorStep'
 import KurztestLibrary from './steps/KurztestLibrary'
 import SetupStep from './steps/SetupStep'
 import { useLernzielkontrolle } from './store'
+import { KURZTEST_FILTER, parseKurztestFile } from './project'
 import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
-
-const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
 /**
  * Programm „Lernzielkontrolle".
@@ -30,7 +30,7 @@ const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
  * wäre das alles unsichtbar gewesen.
  */
 export default function LernzielkontrolleModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, test, savedAt, docName, undo, redo, verlauf, docId } = useLernzielkontrolle()
+  const { step, setStep, test, docName, undo, redo, verlauf, docId } = useLernzielkontrolle()
   // Läuft für diese Kontrolle ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(docId)
   const [library, setLibrary] = useState(false)
@@ -41,6 +41,19 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
   const startNew = (): void => {
     setLibrary(false)
     newKurztestSafely().catch(notifyError)
+  }
+  // Datei des Programms öffnen (27.09.2026) – wie „Datei öffnen …" beim Arbeitsblatt
+  const openFile = async (): Promise<void> => {
+    try {
+      const file = await window.api.files.open(KURZTEST_FILTER)
+      if (file) {
+        await sichereAlles()
+        useLernzielkontrolle.getState().loadFromFile(parseKurztestFile(file.data))
+        setLibrary(false)
+      }
+    } catch (e) {
+      notifyError(e)
+    }
   }
   /*
    * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
@@ -73,6 +86,7 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
       <KurztestLibrary
         onNew={startNew}
         onNeuImBereich={neuMitKennung}
+        onOpenFile={() => void openFile()}
         onOpened={() => setLibrary(false)}
         zurueck={test ? docName || defaultKurztestName(test) : null}
         onZurueck={() => setLibrary(false)}
@@ -93,14 +107,8 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
           <Stepper.Step label="Bearbeiten & Export" description="Prüfung, Word, PDF" disabled={!hatAufgaben} />
         </Stepper>
         <Group gap="xs">
-          <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
-          {savedAt && (
-            <Tooltip label={`Zuletzt gespeichert um ${timeFormat.format(new Date(savedAt))}`}>
-              <Text size="xs" c="dimmed" maw={180} truncate>
-                Gespeichert: {docName}
-              </Text>
-            </Tooltip>
-          )}
+          {/* Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt) */}
+          {step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
           <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
             Meine Lernzielkontrollen
           </Button>
@@ -118,9 +126,15 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
           <SetupStep />
         </Box>
       ) : (
-        <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-          {auftrag ? <AuftragsHinweis auftrag={auftrag} neuLabel="Neue Kontrolle" onNeu={startNew} /> : step === 1 && hatAufgaben && <EditorStep />}
-        </ScrollArea>
+        <Box style={{ flex: 1, minHeight: 0 }}>
+          {auftrag ? (
+            <ScrollArea h="100%">
+              <AuftragsHinweis auftrag={auftrag} neuLabel="Neue Kontrolle" onNeu={startNew} />
+            </ScrollArea>
+          ) : (
+            step === 1 && hatAufgaben && <EditorStep />
+          )}
+        </Box>
       )}
     </Box>
   )

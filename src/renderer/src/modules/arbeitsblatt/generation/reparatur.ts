@@ -17,6 +17,7 @@ import type { Anrede } from '../../../shared/anrede'
 import { MAX_AENDERUNGEN, reparaturAuftrag, type Reparatur, type ReparaturArt, type ReparaturKontext } from '../../../shared/kiBeheben'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
 import type { WsBlock } from '../model/types'
+import { verschluesseleMaterialverweise } from '../didactics/integrity'
 import { convertBlock } from './convert'
 import { describeBlock } from './describe'
 import { FLAT_BLOCK } from './schemas'
@@ -82,8 +83,10 @@ export function reparaturAus(
       continue
     }
     const b = a.block as Record<string, unknown> | undefined
-    const neu = convertBlock(art === 'ersetzen' && alt && !b?.type ? { ...b, type: alt.type } : b, rng, [], anrede)
-    if (!neu) continue
+    const roh = convertBlock(art === 'ersetzen' && alt && !b?.type ? { ...b, type: alt.type } : b, rng, [], anrede)
+    if (!roh) continue
+    // Nummern der KI werden zu Kennungen („M{quelle}"), gezählt über das Blatt; ein ersetzter Baustein steht an der Stelle des alten
+    const [neu] = verschluesseleMaterialverweise([roh], art === 'ersetzen' && alt ? bloecke.map((x) => (x.id === alt.id ? roh : x)) : [...bloecke, roh])
     const altePunkte = alt?.type === 'task' ? alt.points : undefined
     const mitPunkten: WsBlock =
       neu.type !== 'task'

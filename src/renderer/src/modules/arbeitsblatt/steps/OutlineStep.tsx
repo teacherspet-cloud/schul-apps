@@ -15,7 +15,8 @@ import {
   Textarea,
   TextInput,
   Title,
-  Tooltip
+  Tooltip,
+  Popover
 } from '@mantine/core'
 import { IconArrowDown, IconArrowLeft, IconArrowUp, IconCopy, IconPlus, IconRefresh, IconSparkles, IconTrash, IconWand } from '@tabler/icons-react'
 import { Fragment, useEffect, useMemo, useState } from 'react'
@@ -62,6 +63,9 @@ export default function OutlineStep(): React.JSX.Element {
   }, [aiSettings])
   /** Baustein, den die KI gerade beschreibt */
   const [neu, setNeu] = useState('')
+  // Zauberstab mit Änderungswunsch (27.09.2026): welcher Baustein, welcher Text
+  const [wunschFuer, setWunschFuer] = useState<string | null>(null)
+  const [wunschText, setWunschText] = useState('')
   const profile = useMemo(() => (worksheet ? profileFromMeta(worksheet.meta) : null), [worksheet])
 
   if (!worksheet?.outline || !profile) return <Container py="xl">Noch keine Gliederung.</Container>
@@ -100,11 +104,12 @@ export default function OutlineStep(): React.JSX.Element {
   const combined = worksheet.meta.differentiation.levels > 1 && worksheet.meta.differentiation.mode === 'combined'
 
   /** Einen einzelnen Gliederungspunkt von der KI beschreiben lassen. */
-  const beschreiben = async (i: number): Promise<void> => {
+  const beschreiben = async (i: number, wunsch = ''): Promise<void> => {
     const item = outline.items[i]
     setNeu(item.id)
+    setWunschFuer(null)
     try {
-      const vorschlag = await suggestOutlineItem(worksheet, profile, outline, i, aiCall)
+      const vorschlag = await suggestOutlineItem(worksheet, profile, outline, i, aiCall, wunsch)
       // Nur beschreiben, nicht umentscheiden: Operator bleibt, wenn die Lehrkraft einen gesetzt hat
       patchItem(i, { purpose: vorschlag.purpose || item.purpose, ...(item.operator || !vorschlag.operator ? {} : { operator: vorschlag.operator }) })
     } catch (e) {
@@ -271,16 +276,57 @@ export default function OutlineStep(): React.JSX.Element {
                   <Stack gap={4}>
                     {/* Neu beschreiben lassen: Art, Anforderungsbereich, Operator, Sozialform und
                       Antwortform bleiben, wie die Lehrkraft sie gesetzt hat. */}
-                    <Tooltip label={it.purpose.trim() ? 'Diesen Baustein von der KI neu beschreiben lassen' : 'Von der KI ausfüllen lassen'}>
-                      <ActionIcon
-                        variant="subtle"
-                        loading={neu === it.id}
-                        aria-label={it.purpose.trim() ? 'Von der KI neu beschreiben lassen' : 'Von der KI ausfüllen lassen'}
-                        onClick={() => void beschreiben(i)}
-                      >
-                        <IconWand size={16} />
-                      </ActionIcon>
-                    </Tooltip>
+                    {/*
+                     * Zauberstab (27.09.2026): ein kleines Fenster mit Änderungswunsch – „anders gestalten",
+                     * „umformulieren", „als Partnerarbeit" – statt sofort neu zu beschreiben.
+                     */}
+                    <Popover
+                      opened={wunschFuer === it.id}
+                      onChange={(o) => setWunschFuer(o ? it.id : null)}
+                      position="left"
+                      withArrow
+                      shadow="md"
+                      trapFocus
+                      width={340}
+                    >
+                      <Popover.Target>
+                        <Tooltip label={it.purpose.trim() ? 'Diesen Baustein von der KI ändern lassen' : 'Von der KI ausfüllen lassen'}>
+                          <ActionIcon
+                            variant="subtle"
+                            loading={neu === it.id}
+                            aria-label={it.purpose.trim() ? 'Von der KI ändern lassen' : 'Von der KI ausfüllen lassen'}
+                            onClick={() => {
+                              setWunschText('')
+                              setWunschFuer(wunschFuer === it.id ? null : it.id)
+                            }}
+                          >
+                            <IconWand size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Popover.Target>
+                      <Popover.Dropdown>
+                        <Stack gap="xs">
+                          <Textarea
+                            size="sm"
+                            autosize
+                            minRows={2}
+                            label="Änderungswunsch an die KI"
+                            placeholder="z. B. anspruchsvoller formulieren, als Partnerarbeit, mit Bezug auf M1 …"
+                            value={wunschText}
+                            onChange={(e) => setWunschText(e.currentTarget.value)}
+                            data-autofocus
+                          />
+                          <Group justify="flex-end" gap="xs">
+                            <Button size="xs" variant="default" onClick={() => void beschreiben(i)}>
+                              {it.purpose.trim() ? 'Ohne Wunsch neu beschreiben' : 'Ausfüllen lassen'}
+                            </Button>
+                            <Button size="xs" disabled={!wunschText.trim()} onClick={() => void beschreiben(i, wunschText)}>
+                              Ändern
+                            </Button>
+                          </Group>
+                        </Stack>
+                      </Popover.Dropdown>
+                    </Popover>
                     <Tooltip label="Duplizieren – die Kopie steht direkt darunter">
                       <ActionIcon variant="subtle" aria-label="Baustein duplizieren" onClick={() => duplizieren(i)}>
                         <IconCopy size={16} />

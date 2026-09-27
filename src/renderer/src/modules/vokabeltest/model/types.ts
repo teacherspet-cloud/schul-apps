@@ -338,6 +338,12 @@ export interface TestHeader {
   ueberthema?: string
   ueberthemaAus?: boolean
   themenbereich?: string
+  /**
+   * Maskottchen (27.09.2026): winkend am Kopf, jubelnd am Schluss – nur auf dem Schülerblatt,
+   * wie bei Arbeiten. `an` = ausdrückliche Wahl; fehlt sie, entscheidet der Jahrgang
+   * (Einstellung „Illustrationen bis Klasse"). `maskottchenId` = Figur, sonst die Standardfigur.
+   */
+  illustrationen?: { an?: boolean; maskottchenId?: string }
 }
 
 export interface TaskSelection {

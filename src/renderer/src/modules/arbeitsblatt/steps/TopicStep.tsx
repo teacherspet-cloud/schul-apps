@@ -27,6 +27,8 @@ import {
 import { IconDownload, IconAlertTriangle, IconBook2, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import UrlQuelleEingabe from '../../../shared/components/UrlQuelleEingabe'
+import StufenWahl from './StufenWahl'
+import { STANDARD_STUFEN, stufeFuer } from '../didactics/schwierigkeit'
 import { istVideoAdresse, normalisiereAdresse } from '../../../shared/files/urlQuelle'
 import type { DesignTemplate } from '@shared/design'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
@@ -991,6 +993,38 @@ export default function TopicStep(): React.JSX.Element {
                         onChange={(v) => patch({ differentiation: { ...meta.differentiation, levels: Number(v) as 1 | 2 | 3 } })}
                       />
                     </div>
+                    {/*
+                     * Schwierigkeit (27.09.2026, didactics/schwierigkeit.ts): Anspruch und Sprache
+                     * getrennt, jeweils relativ zum Jahrgang. Bei einem Niveau fürs ganze Blatt,
+                     * bei ★/★★ je Fassung – vorher war ★ fest grundlegend und ★★ fest mittel.
+                     */}
+                    {meta.differentiation.levels === 1 && (
+                      <StufenWahl
+                        titel="Schwierigkeit"
+                        value={stufeFuer(meta, null)}
+                        onChange={(s) => patch({ differentiation: { ...meta.differentiation, schwierigkeit: s } })}
+                      />
+                    )}
+                    {meta.differentiation.levels === 2 && meta.differentiation.mode === 'separate' && (
+                      <Stack gap={6}>
+                        {([1, 2] as const).map((stern) => (
+                          <StufenWahl
+                            key={stern}
+                            titel={stern === 1 ? 'Schwierigkeit ★' : 'Schwierigkeit ★★'}
+                            hinweis={stern === 2}
+                            value={stufeFuer(meta, stern)}
+                            onChange={(s) =>
+                              patch({
+                                differentiation: {
+                                  ...meta.differentiation,
+                                  stufen: { ...STANDARD_STUFEN, ...meta.differentiation.stufen, [stern]: s }
+                                }
+                              })
+                            }
+                          />
+                        ))}
+                      </Stack>
+                    )}
                     {meta.differentiation.levels > 1 && (
                       <Radio.Group
                         value={meta.differentiation.mode}
@@ -1071,7 +1105,9 @@ export default function TopicStep(): React.JSX.Element {
                   {/* Internetadresse als Material – Webseite oder Video (26.09.2026) */}
                   <UrlQuelleEingabe
                     mt="xs"
-                    onInhalt={(c) => setWorksheet({ ...worksheet, sources: [...worksheet.sources, { id: newId(), ...c, useAsBasis: true, embedImage: false }] })}
+                    onInhalt={(c) =>
+                      setWorksheet({ ...worksheet, sources: [...worksheet.sources, { id: newId(), ...c, useAsBasis: true, embedImage: false }] })
+                    }
                   />
                   <Stack gap={6} mt="sm">
                     {worksheet.sources.map((s, i) => (
@@ -1367,7 +1403,14 @@ function VideoCard({
             onChange={(e) => set({ url: e.currentTarget.value })}
           />
           {isUrl && istVideoAdresse(v.url) && (
-            <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} loading={videoLaeuft} style={{ alignSelf: 'flex-start' }} onClick={() => void videoLaden()}>
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconDownload size={14} />}
+              loading={videoLaeuft}
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => void videoLaden()}
+            >
               Titel, Laufzeit und Inhalt aus dem Video übernehmen
             </Button>
           )}

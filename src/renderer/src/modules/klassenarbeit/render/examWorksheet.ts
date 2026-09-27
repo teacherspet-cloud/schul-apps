@@ -9,13 +9,14 @@
 import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
 import { newId } from '../../vokabeltest/model/random'
 import type { Sheet, Worksheet, WsBlock } from '../../arbeitsblatt/model/types'
-import { worksheetMetaFor } from '../generation/generateExam'
+import { upperSecondary, worksheetMetaFor } from '../generation/generateExam'
 import { translateAids } from '../model/aids'
 import { gradeScaleGroups, scaleLineFuer } from '../model/examRules'
 import { notenpunkteFuer } from '../../../shared/notenpunkte'
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam } from '../model/types'
 import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
+import { operatorenBlock } from '../didactics/operatorenliste'
 import { examGrades, examPoints } from '../model/types'
 
 /**
@@ -67,7 +68,8 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
     type: 'infoBox',
     variant: 'wissen',
     title: m.title || t.title,
-    body: lines.map((l) => `- ${l}`).join('\n')
+    // Von Hand geänderter Wortlaut hat Vorrang (27.09.2026); leer = aus den Angaben berechnet
+    body: m.kopfText?.trim() ? m.kopfText : lines.map((l) => `- ${l}`).join('\n')
   }
 }
 
@@ -101,8 +103,24 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     blocks.push({ id: `part-${part.id}`, type: 'divider', title: `${english ? 'Part' : 'Teil'} ${i + 1}: ${format?.label ?? part.label}${points}` })
     blocks.push(...part.blocks.map((b) => ({ ...b, id: b.id || newId() })))
   })
+  /*
+   * Oberstufe: keine Schreiblinien unter Schreibaufgaben (Befund der Lehrkraft vom 27.09.2026) –
+   * geschrieben wird auf eigenem Papier, und die Auffüllung bis zum Seitenende entfällt damit.
+   */
+  const bloecke: WsBlock[] = upperSecondary(exam.meta)
+    ? blocks.map((b) => (b.type === 'task' && b.answer.kind === 'lines' ? { ...b, answer: { ...b.answer, kind: 'none' as const } } : b))
+    : blocks
+  // Operatorenliste (27.09.2026) – DIREKT hinter der letzten Aufgabe, nicht hinter dem Material (Wunsch der Lehrkraft)
+  const operatoren = operatorenBlock(exam)
+  if (operatoren) {
+    let letzteAufgabe = -1
+    bloecke.forEach((b, k) => {
+      if (b.type === 'task') letzteAufgabe = k
+    })
+    bloecke.splice(letzteAufgabe + 1, 0, operatoren)
+  }
   // Fassung A behält die bisherige Blattkennung – so bleibt alles gültig, was sich darauf bezieht
-  const sheet: Sheet = { id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`, label: label ? `Fassung ${label}` : 'Klassenarbeit', blocks }
+  const sheet: Sheet = { id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`, label: label ? `Fassung ${label}` : 'Klassenarbeit', blocks: bloecke }
   return {
     version: 1,
     meta: {

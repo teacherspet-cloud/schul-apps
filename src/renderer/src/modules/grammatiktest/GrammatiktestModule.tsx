@@ -1,4 +1,5 @@
-import { Box, Button, Group, ScrollArea, Stepper, Text, Tooltip } from '@mantine/core'
+import { sichereAlles } from '../../shared/autosave'
+import { Box, Button, Group, ScrollArea, Stepper } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { defaultTestName, newTestSafely, openSavedTest, useTestAutosave } from './library'
@@ -9,11 +10,10 @@ import SetupStep from './steps/SetupStep'
 import TestEditorStep from './steps/TestEditorStep'
 import TestLibrary from './steps/TestLibrary'
 import { useGrammatiktest } from './store'
+import { GRAMMATIKTEST_FILTER, parseGrammarTestFile } from './project'
 import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
-
-const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
 
 /**
  * Programm „Grammatiktest".
@@ -23,7 +23,7 @@ const timeFormat = new Intl.DateTimeFormat('de-DE', { timeStyle: 'short' })
  * Programmen. Gespeichert wird von selbst, sobald Aufgaben da sind.
  */
 export default function GrammatiktestModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, test, savedAt, docName, undo, redo, verlauf, docId } = useGrammatiktest()
+  const { step, setStep, test, docName, undo, redo, verlauf, docId } = useGrammatiktest()
   const [library, setLibrary] = useState(false)
   const hasTasks = Boolean(test?.blocks.length)
   // Läuft für diesen Test ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
@@ -34,6 +34,19 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
   const startNew = (): void => {
     setLibrary(false)
     newTestSafely().catch(notifyError)
+  }
+  // Datei des Programms öffnen (27.09.2026) – wie „Datei öffnen …" beim Arbeitsblatt
+  const openFile = async (): Promise<void> => {
+    try {
+      const file = await window.api.files.open(GRAMMATIKTEST_FILTER)
+      if (file) {
+        await sichereAlles()
+        useGrammatiktest.getState().loadFromFile(parseGrammarTestFile(file.data))
+        setLibrary(false)
+      }
+    } catch (e) {
+      notifyError(e)
+    }
   }
   /*
    * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
@@ -66,6 +79,7 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
       <TestLibrary
         onNew={startNew}
         onNeuImBereich={neuMitKennung}
+        onOpenFile={() => void openFile()}
         onOpened={() => setLibrary(false)}
         zurueck={test ? docName || defaultTestName(test) : null}
         onZurueck={() => setLibrary(false)}
@@ -86,14 +100,8 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
           <Stepper.Step label="Bearbeiten & Export" description="Lösungen, Word, PDF" disabled={!hasTasks} />
         </Stepper>
         <Group gap="xs">
-          <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
-          {savedAt && (
-            <Tooltip label={`Zuletzt gespeichert um ${timeFormat.format(new Date(savedAt))}`}>
-              <Text size="xs" c="dimmed" maw={180} truncate>
-                Gespeichert: {docName}
-              </Text>
-            </Tooltip>
-          )}
+          {/* Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt) */}
+          {step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
           <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
             Meine Grammatiktests
           </Button>
@@ -111,9 +119,15 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
           <SetupStep />
         </Box>
       ) : (
-        <ScrollArea style={{ flex: 1, minHeight: 0 }}>
-          {auftrag ? <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Test" onNeu={startNew} /> : step === 1 && hasTasks && <TestEditorStep />}
-        </ScrollArea>
+        <Box style={{ flex: 1, minHeight: 0 }}>
+          {auftrag ? (
+            <ScrollArea h="100%">
+              <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Test" onNeu={startNew} />
+            </ScrollArea>
+          ) : (
+            step === 1 && hasTasks && <TestEditorStep />
+          )}
+        </Box>
       )}
     </Box>
   )

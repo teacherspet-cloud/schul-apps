@@ -5,6 +5,7 @@ import { runLimited } from '../../../shared/async'
 import { GREEN_SCREEN_PROMPT } from '../../../shared/images'
 import type { ImageBlock, ImageItem, WorksheetMeta, WsBlock } from '../model/types'
 import { findReusable, type ReusableImage } from '../../../shared/imageReuse'
+import { istZeitleiste, zeitleisteAusBeschreibung } from './zeitleiste'
 
 export interface WorksheetImageDeps {
   ai: AiCall
@@ -19,6 +20,12 @@ export interface WorksheetImageDeps {
    * wirkt als Abrufhilfe (Schneider u. a. 2020) und spart zugleich Suche und Kontingent.
    */
   reuse?: Map<string, ReusableImage>
+  /**
+   * Ersetzt einen Bild-Baustein durch einen anderen Baustein (27.09.2026): Eine als Bild
+   * beschriebene Zeitleiste wird zur gezeichneten Zeitleiste (generation/zeitleiste.ts).
+   * Fehlt der Rückruf, bleibt der Bild-Baustein mit Hinweis stehen.
+   */
+  ersetze?: (imageId: string, block: WsBlock) => void
 }
 
 const warn = (b: WsBlock, text: string): void => {
@@ -30,6 +37,7 @@ export function worksheetImageRules(meta: WorksheetMeta): string {
     `Arbeitsblatt ${meta.subjectLabel}, Klasse ${meta.grade}, Thema „${meta.topic}“.`,
     'Wähle je Eintrag das Bild, das das beschriebene KERNMOTIV fachlich korrekt zeigt und für Lernende dieser Klasse verständlich ist. Nebensächliche Abweichungen (Blickwinkel, Wetter, Hintergrund, Farbe, weitere Details) sind kein Grund zur Ablehnung – ein echtes Foto oder Schema ist einem erzeugten Bild vorzuziehen.',
     'Ungeeignet sind Bilder mit falschem oder nur ungefähr passendem Inhalt, fachlich falschen oder irreführenden Darstellungen, unleserlichen Details, Wasserzeichen, eingebranntem Schachbrettmuster (Transparenz-Karo), nicht altersgerechten Inhalten oder viel fremdsprachiger Beschriftung (bei Schemata: ohne oder mit deutscher Beschriftung ist besser).',
+    'Karten, Dokumente und Diagramme: Geeignet ist das Bild, das Raum, Zeit und Gegenstand des Kernmotivs fachlich richtig zeigt – auch wenn in der Beschreibung genannte Zusätze fehlen (Pfeile, Datumsangaben, eine bestimmte Legende oder Farbgebung); solche Zusätze erarbeiten die Lernenden in der Aufgabe. Fremdsprachige Ländernamen und eine kurze fremdsprachige Legende auf einer Karte sind hinnehmbar („brauchbar"). Ein echtes Bild ist hier immer besser als keines.',
     'Einträge mit „Originalquelle“: eindeutig ist nur das genannte Werk selbst (Urheber, Titel, Jahr) – ein ähnliches anderes Werk ist ungeeignet.',
     '„brauchbar“ nur, wenn das Bild den Zweck erfüllt, aber nicht ideal ist.'
   ].join('\n')
@@ -64,8 +72,23 @@ export function worksheetImagePrompt(b: ImageBlock, meta: WorksheetMeta): string
     `It must show exactly: ${b.description}.`,
     'Scientifically and factually correct, simple and uncluttered, friendly flat style with clear outlines, suitable for black-and-white printing.',
     GREEN_SCREEN_PROMPT,
-    'No text, no labels, no letters, no numbers unless explicitly required above.'
+    // Beschriftungen setzt die App selbst (imageLabels); Schrift aus der Bild-KI ist erfunden und im Druck unlesbar
+    'Absolutely no text, no labels, no letters, no numbers and no dates anywhere in the image – labels are added separately.'
   ].join(' ')
+}
+
+/**
+ * Mindestanforderung an ein echtes Bild, wenn die genaue Beschreibung nichts ergab.
+ *
+ * Auf dem Blatt „Julikrise 1914" (27.09.2026) blieb die Europakarte leer: Die KI hatte eine
+ * Karte „mit datierten Mobilmachungs- und Kriegspfeilen" beschrieben, der Prüfer lehnte vier
+ * passende Bündniskarten ab, weil die Pfeile fehlten. Der zweite Durchgang fragt nur noch nach
+ * dem Kernmotiv – der Bildunterschrift –, denn Zusätze, die kein Archivbild hat, gehören in die
+ * Aufgabe und nicht in die Anforderung.
+ */
+export function mindestanforderung(b: Pick<ImageBlock, 'caption' | 'description'>): string {
+  const kern = b.caption.replace(/^\s*[MQB]\d+\s*:\s*/, '').trim() || b.description.split(/[,.;]/)[0].trim()
+  return `Mindestanforderung: ein echtes Bild, das „${kern}“ fachlich richtig zeigt. Zusätze aus der ursprünglichen Beschreibung (Pfeile, Datumsangaben, bestimmte Legende, Farben) sind NICHT nötig.`
 }
 
 /**
@@ -77,7 +100,7 @@ export async function completeWorksheetImages(
   meta: WorksheetMeta,
   deps: WorksheetImageDeps,
   onProgress?: (message: string, done: number, total: number) => void
-): Promise<{ web: number; ai: number; missing: number; reused: number }> {
+): Promise<{ web: number; ai: number; missing: number; reused: number; gezeichnet: number }> {
   // Einzelbilder von Bildreihen werden wie eigene Bild-Bausteine gesucht und danach zurückgeschrieben
   const proxies: { proxy: ImageBlock; block: ImageBlock; item: ImageItem; index: number }[] = []
   const targets: ImageBlock[] = []
@@ -111,9 +134,9 @@ async function completeTargets(
   meta: WorksheetMeta,
   deps: WorksheetImageDeps,
   onProgress?: (message: string, done: number, total: number) => void
-): Promise<{ web: number; ai: number; missing: number; reused: number }> {
+): Promise<{ web: number; ai: number; missing: number; reused: number; gezeichnet: number }> {
   const mode = meta.imageSource ?? 'auto'
-  const stats = { web: 0, ai: 0, missing: 0, reused: 0 }
+  const stats = { web: 0, ai: 0, missing: 0, reused: 0, gezeichnet: 0 }
   if (!images.length || mode === 'placeholder') return stats
 
   // Gleiche Suche/Beschreibung → ein Bedarf
@@ -181,6 +204,40 @@ async function completeTargets(
       stats.web++
       pending.delete(rep)
     }
+    /*
+     * Zweiter Durchgang für Karten, Dokumente und Diagramme: Wurden Kandidaten gefunden, aber
+     * wegen fehlender Zusätze abgelehnt, genügt das Kernmotiv (siehe `mindestanforderung`).
+     * Ein erzeugtes Bild gibt es für diese Motive nicht – ohne diesen Durchgang bliebe die Stelle leer.
+     */
+    const zweiteRunde = gathered.filter(({ rep, candidates }) => pending.has(rep) && !rep.original && candidates.length && needsRealMaterial(rep))
+    if (zweiteRunde.length) {
+      onProgress?.('Kein Bild passte genau – die KI prüft die Funde noch einmal auf das Kernmotiv …', 0, reps.length)
+      const locker = await chooseImages(
+        zweiteRunde.map(({ rep, need, candidates }) => ({ need: { ...need, subject: `${need.subject} – ${mindestanforderung(rep)}` }, candidates })),
+        worksheetImageRules(meta),
+        deps.ai
+      )
+      for (const { rep, need } of zweiteRunde) {
+        const c = locker.get(need.id)
+        if (!c?.candidate) {
+          if (c) reasons.set(rep, c.reason)
+          continue
+        }
+        const dataUrl = await c.candidate.load().catch(() => null)
+        if (!dataUrl) continue
+        const source = c.candidate.source === 'ai' ? 'ai' : c.candidate.source
+        apply(rep, (b) => {
+          b.image = { dataUrl, source, credit: c.candidate!.credit, ...(c.candidate!.citation ? { citation: c.candidate!.citation } : {}) }
+          b.autoPicked = true
+          warn(
+            b,
+            `Bild: automatisch gewählt („${c.candidate!.title.slice(0, 60)}“) – zeigt das Kernmotiv, nicht jede beschriebene Einzelheit (${c.reason}). Bitte prüfen; fehlende Angaben gehören in die Aufgabe.`
+          )
+        })
+        stats.web++
+        pending.delete(rep)
+      }
+    }
     for (const { rep, need } of gathered) {
       if (pending.has(rep) && rep.original) {
         apply(rep, (b) =>
@@ -202,11 +259,32 @@ async function completeTargets(
   await runLimited(
     rest.map((rep) => async () => {
       if (needsRealMaterial(rep)) {
+        /*
+         * Zeitleiste ohne Archivbild (27.09.2026): Die App zeichnet sie selbst aus den Daten der
+         * Beschreibung (generation/zeitleiste.ts) – aber erst HIER, nach Vorrat und Archivsuche:
+         * Ein echtes Bild hat Vorrang, Erzeugtes ist der Rückfall (Vorgabe der Lehrkraft).
+         */
+        if (istZeitleiste(rep) && deps.ersetze) {
+          onProgress?.('Kein Archivbild – die Zeitleiste wird aus der Beschreibung gezeichnet …', done, rest.length)
+          try {
+            const grid = await zeitleisteAusBeschreibung(rep, meta, deps.ai)
+            if (grid) {
+              apply(rep, (b) => deps.ersetze!(b.id, { ...grid, id: b.id, ...(b.ref ? { ref: b.ref } : {}), ...(b.stars ? { stars: b.stars } : {}) }))
+              stats.gezeichnet++
+              done++
+              return
+            }
+          } catch {
+            // Dann bleibt der Hinweis – die Lehrkraft kann es im KI-Menü noch einmal anstoßen
+          }
+        }
         // Erzeugte Bilder mit Schrift, Zahlen oder Karten wären erfunden – echtes Material nötig
         apply(rep, (b) =>
           warn(
             b,
-            `Bild: kein passendes freies Bild gefunden${reasons.has(rep) ? ` (${reasons.get(rep)})` : ''}. Für Dokumente, Diagramme, Karten und Statistiken wird kein KI-Bild erzeugt, weil es Inhalte erfinden würde – bitte echtes Material über „Bild wählen“ einfügen.`
+            istZeitleiste(rep)
+              ? `Bild: kein passendes freies Bild gefunden${reasons.has(rep) ? ` (${reasons.get(rep)})` : ''}, und die Zeitleiste ließ sich nicht aus der Beschreibung zeichnen. Im KI-Menü des Bausteins „Als Zeitleiste zeichnen lassen“ noch einmal anstoßen – oder ein Bild über „Bild wählen“ einfügen.`
+              : `Bild: kein passendes freies Bild gefunden${reasons.has(rep) ? ` (${reasons.get(rep)})` : ''}. Für Dokumente, Karten und Statistiken wird kein KI-Bild erzeugt, weil es Inhalte erfinden würde – bitte echtes Material über „Bild wählen“ einfügen.`
           )
         )
       } else if ((mode === 'auto' || mode === 'ai') && generate) {
@@ -238,9 +316,13 @@ async function completeTargets(
   return stats
 }
 
-/** Motive, deren Inhalt aus Schrift, Zahlen oder genauen Lageangaben besteht: KI-Bilder würden Inhalte erfinden. */
+/**
+ * Motive, deren Inhalt aus Schrift, Zahlen oder genauen Lageangaben besteht: KI-Bilder würden Inhalte erfinden.
+ * Seit dem 27.09.2026 auch Zeitleisten und Ablaufschemata – eine erzeugte „Zeitleiste der Julikrise" trug
+ * erfundene, im Druck unlesbare Ereigniskarten.
+ */
 export function needsRealMaterial(b: Pick<ImageBlock, 'description' | 'caption'>): boolean {
-  return /stimmzettel|wahlzettel|urkunde|dokument|zeitung|plakat mit|formular|diagramm|statistik|tabelle|grafik mit|schaubild mit zahlen|landkarte|\bkarte\b|stadtplan|fahrplan|screenshot|quittung|rechnung|brief mit|beschriftet/i.test(
+  return /stimmzettel|wahlzettel|urkunde|dokument|zeitung|plakat mit|formular|diagramm|statistik|tabelle|grafik mit|schaubild|\b[a-zäöü]*karte\b|stadtplan|fahrplan|screenshot|quittung|rechnung|brief mit|beschriftet|zeitleiste|zeitachse|zeitstrahl|ablaufschema|ablaufplan|organigramm|ereigniskarte|mit datum|datumsangabe|datiert|jahreszahl|mit zahlen|mit text|mit schrift/i.test(
     `${b.caption} ${b.description}`
   )
 }

@@ -11,27 +11,14 @@ import {
   NumberInput,
   Popover,
   ScrollArea,
-  SegmentedControl,
+  Select,
   Stack,
   Switch,
   Text,
   TextInput,
   Tooltip
 } from '@mantine/core'
-import {
-  IconAdjustments,
-  IconArrowDown,
-  IconArrowUp,
-  IconDeviceFloppy,
-  IconFileTypeDocx,
-  IconFileTypePdf,
-  IconHeading,
-  IconPlus,
-  IconPrinter,
-  IconRefresh,
-  IconSettings,
-  IconTrash
-} from '@tabler/icons-react'
+import { IconAdjustments, IconArrowDown, IconArrowUp, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
@@ -40,6 +27,8 @@ import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../share
 import { imageSize } from '../../../shared/images'
 import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
 import { buildDocx } from '../export/docx'
+import { standardMaskottchen, useMaskottchen } from '../../../shared/maskottchenStore'
+import { vokabeltestFigurVorschlag } from '../render/maskottchen'
 import { canRegenerateItem, createAdditionalBlock, regenerateBlock, regenerateItem } from '../generation/edit'
 import { pictureOptions } from '../generation/pictureOptions'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
@@ -54,9 +43,8 @@ import { TestPage } from '../render/TestPage'
 import { DEFAULT_PAGE_LIMIT, pageLimitMin, pageLimitText, TestLayouts, useTestLayout } from '../render/useTestLayout'
 import SeitenVorgabe from './SeitenVorgabe'
 import { PROJECT_FILTER, serializeProject } from '../project'
+import EditorLeiste from '../../../shared/components/EditorLeiste'
 import { aiCall, useVokabeltest } from '../store'
-import { SaveTestButton } from './TestLibrary'
-import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useDruck } from '../../../shared/navigation'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -68,7 +56,20 @@ import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { aufgabeBeheben } from '../auftraege'
 
 export default function EditorStep(): React.JSX.Element {
-  const { doc: gespeichert, updateDoc, updateBlock, undo, redo, verlauf, activeVariantId, setActiveVariant, setStep, listName } = useVokabeltest()
+  const {
+    doc: gespeichert,
+    updateDoc,
+    updateBlock,
+    undo,
+    redo,
+    verlauf,
+    activeVariantId,
+    setActiveVariant,
+    setStep,
+    listName,
+    setListName,
+    lastSavedAt
+  } = useVokabeltest()
   /*
    * Überthema (Paket 11): der Themenbereich des Tests – ohne Bereich die Unit aus dem Namen der
    * Liste („Green Line 5 – Unit 3" → „Unit 3"). Nur zum Anzeigen eingesetzt; Vorschau, Druck,
@@ -244,65 +245,46 @@ export default function EditorStep(): React.JSX.Element {
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Group px="md" py={8} gap="xs" className="app-toolbar">
-        <Button variant="default" size="xs" leftSection={<IconSettings size={14} />} onClick={() => setStep(1)}>
-          Einstellungen
-        </Button>
-        <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
-        <Divider orientation="vertical" />
-        {doc.variants.length > 1 && (
-          <SegmentedControl
-            size="xs"
-            value={variant.id}
-            onChange={setActiveVariant}
-            data={doc.variants.map((v) => ({ value: v.id, label: `Test ${v.label}` }))}
-          />
-        )}
-        <SegmentedControl
-          size="xs"
-          value={view}
-          onChange={(v) => setView(v as 'test' | 'key')}
-          data={[
+      <EditorLeiste
+        zurueck={{ label: 'Einstellungen', onClick: () => setStep(1) }}
+        undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
+        fassungen={
+          doc.variants.length > 1
+            ? {
+                value: variant.id,
+                onChange: setActiveVariant,
+                data: doc.variants.map((v) => ({ value: v.id, label: `Test ${v.label}` })),
+                ariaLabel: 'Variante'
+              }
+            : null
+        }
+        ansichten={{
+          value: view,
+          onChange: (v) => setView(v as 'test' | 'key'),
+          data: [
             { value: 'test', label: 'Schülerblatt' },
             { value: 'key', label: 'Lösungen' }
-          ]}
-        />
-        <HeaderSettings doc={doc} bereich={bereich} unit={unit} onChange={(fn) => updateDoc(fn)} />
-        <Box style={{ flex: 1 }} />
-        <Text size="xs" c="dimmed">
-          {formatPoints(variantPoints(variant))} Punkte · Niveau {doc.settings.level}
-          {layouts
-            ? ` · ${layouts.student.get(variant.id)?.pages.length ?? 1} ${layouts.student.get(variant.id)?.pages.length === 1 ? 'Seite' : 'Seiten'}`
-            : ''}
-        </Text>
-        <SaveTestButton size="xs" />
-        <Tooltip label="Als Datei speichern … (.vokabeltest, z. B. zum Weitergeben)">
-          <ActionIcon
-            variant="default"
-            size="md"
-            aria-label="Als Datei speichern …"
-            onClick={async () => {
-              try {
-                const path = await window.api.files.save(`${baseName}.vokabeltest`, PROJECT_FILTER, serializeProject(doc))
-                if (path) notifySuccess('Datei gespeichert.')
-              } catch (e) {
-                notifyError(e)
-              }
-            }}
-          >
-            <IconDeviceFloppy size={16} />
-          </ActionIcon>
-        </Tooltip>
-        <Button size="xs" leftSection={<IconFileTypeDocx size={14} />} onClick={() => setExportOpen('docx')}>
-          Word
-        </Button>
-        <Button size="xs" leftSection={<IconFileTypePdf size={14} />} onClick={() => setExportOpen('pdf')}>
-          PDF
-        </Button>
-        <Button size="xs" variant="light" leftSection={<IconPrinter size={14} />} onClick={() => setExportOpen('print')}>
-          Drucken
-        </Button>
-      </Group>
+          ]
+        }}
+        optionen={<HeaderSettingsInhalt doc={doc} bereich={bereich} unit={unit} onChange={(fn) => updateDoc(fn)} />}
+        info={`${formatPoints(variantPoints(variant))} Punkte · Niveau ${doc.settings.level}${
+          layouts ? ` · ${layouts.student.get(variant.id)?.pages.length ?? 1} ${layouts.student.get(variant.id)?.pages.length === 1 ? 'Seite' : 'Seiten'}` : ''
+        }`}
+        name={{ value: listName, placeholder: 'Name des Vokabeltests', onChange: setListName }}
+        gesichertAm={lastSavedAt}
+        dateiSpeichern={{
+          tooltip: 'Als Datei speichern … (.vokabeltest, z. B. zum Weitergeben)',
+          onClick: async () => {
+            try {
+              const path = await window.api.files.save(`${baseName}.vokabeltest`, PROJECT_FILTER, serializeProject(doc))
+              if (path) notifySuccess('Datei gespeichert.')
+            } catch (e) {
+              notifyError(e)
+            }
+          }
+        }}
+        ausgabe={{ onWord: () => setExportOpen('docx'), onPdf: () => setExportOpen('pdf'), onDrucken: () => setExportOpen('print') }}
+      />
 
       {measure}
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">
@@ -537,7 +519,41 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
   )
 }
 
-function HeaderSettings({
+/** Kopf- und Schlussfigur ein/aus und – bei mehreren Figuren – welche. Ohne angelegte Figur nichts. */
+function MaskottchenSchalter({ doc, onChange }: { doc: TestDocument; onChange: (fn: (d: TestDocument) => void) => void }): React.JSX.Element | null {
+  const figuren = useMaskottchen((s) => s.liste)
+  if (!figuren.length) return null
+  const an = doc.header.illustrationen?.an ?? vokabeltestFigurVorschlag(doc.settings.grade)
+  return (
+    <Group gap="md" align="center">
+      <Checkbox
+        size="xs"
+        label="Maskottchen (Kopf und Schluss)"
+        checked={an}
+        onChange={(e) => {
+          const wert = e.currentTarget.checked
+          onChange((d) => (d.header.illustrationen = { ...d.header.illustrationen, an: wert }))
+        }}
+      />
+      {an && figuren.length > 1 && (
+        <Select
+          size="xs"
+          aria-label="Figur"
+          data={figuren.map((m) => ({ value: m.id, label: m.name }))}
+          value={doc.header.illustrationen?.maskottchenId ?? standardMaskottchen()?.id ?? null}
+          onChange={(v) => v && onChange((d) => (d.header.illustrationen = { ...d.header.illustrationen, maskottchenId: v }))}
+          w={150}
+        />
+      )}
+    </Group>
+  )
+}
+
+/**
+ * Inhalt der Blattoptionen des Vokabeltests (bis 27.09.2026 ein eigener Knopf „Kopf & Format";
+ * jetzt steht er wie in allen Programmen hinter „Blattoptionen", shared/components/EditorLeiste.tsx).
+ */
+function HeaderSettingsInhalt({
   doc,
   bereich,
   unit,
@@ -553,58 +569,51 @@ function HeaderSettings({
     <Checkbox size="xs" label={label} checked={Boolean(h[key])} onChange={(e) => onChange((d) => ((d.header[key] as boolean) = e.currentTarget.checked))} />
   )
   return (
-    <Popover width={320} shadow="md" withArrow>
-      <Popover.Target>
-        <Button size="xs" variant="default" leftSection={<IconHeading size={14} />}>
-          Kopf & Format
-        </Button>
-      </Popover.Target>
-      <Popover.Dropdown>
-        <Stack gap="xs">
-          <TextInput size="xs" label="Überschrift" defaultValue={h.title} onBlur={(e) => onChange((d) => (d.header.title = e.currentTarget.value))} />
-          <TextInput
-            size="xs"
-            label="Untertitel (optional)"
-            defaultValue={h.subtitle}
-            onBlur={(e) => onChange((d) => (d.header.subtitle = e.currentTarget.value))}
-          />
-          <TextInput size="xs" label="Schulname" defaultValue={h.schoolName} onBlur={(e) => onChange((d) => (d.header.schoolName = e.currentTarget.value))} />
-          <Group gap="md">
-            {toggle('showName', 'Name')}
-            {toggle('showClass', 'Klasse')}
-            {toggle('showDate', 'Datum')}
-          </Group>
-          <Group gap="md">
-            {toggle('showSchool', 'Schule')}
-            {toggle('showVariant', 'Variante')}
-            {toggle('showPoints', 'Punkte')}
-            {toggle('showGrade', 'Note')}
-          </Group>
-          {/* Paket 10a: Kopflinie und Nummern in der Fachfarbe der Sprache – hier abschaltbar */}
-          <VorlagenfarbeSchalter
-            size="xs"
-            fach={doc.settings.targetLanguage}
-            vorlagenname="Schwarz"
-            checked={Boolean(h.vorlagenfarbe)}
-            onChange={(an) => onChange((d) => (d.header.vorlagenfarbe = an))}
-          />
-          {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
-          <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
-          <NumberInput
-            size="xs"
-            label="Schriftgröße (pt)"
-            min={9}
-            max={16}
-            value={doc.fontSize}
-            onChange={(v) => onChange((d) => (d.fontSize = Number(v) || 12))}
-          />
-          <Text size="xs" fw={500}>
-            Seitenumfang je Test
-          </Text>
-          <SeitenVorgabe size="xs" limit={doc.settings.pageLimit ?? DEFAULT_PAGE_LIMIT} onChange={(next) => onChange((d) => (d.settings.pageLimit = next))} />
-        </Stack>
-      </Popover.Dropdown>
-    </Popover>
+    <Stack gap="xs">
+      <TextInput size="xs" label="Überschrift" defaultValue={h.title} onBlur={(e) => onChange((d) => (d.header.title = e.currentTarget.value))} />
+      <TextInput
+        size="xs"
+        label="Untertitel (optional)"
+        defaultValue={h.subtitle}
+        onBlur={(e) => onChange((d) => (d.header.subtitle = e.currentTarget.value))}
+      />
+      <TextInput size="xs" label="Schulname" defaultValue={h.schoolName} onBlur={(e) => onChange((d) => (d.header.schoolName = e.currentTarget.value))} />
+      <Group gap="md">
+        {toggle('showName', 'Name')}
+        {toggle('showClass', 'Klasse')}
+        {toggle('showDate', 'Datum')}
+      </Group>
+      <Group gap="md">
+        {toggle('showSchool', 'Schule')}
+        {toggle('showVariant', 'Variante')}
+        {toggle('showPoints', 'Punkte')}
+        {toggle('showGrade', 'Note')}
+      </Group>
+      {/* Maskottchen (27.09.2026): winkend am Kopf, jubelnd am Schluss – wie bei Arbeiten; Vorschlag nach Jahrgang */}
+      <MaskottchenSchalter doc={doc} onChange={onChange} />
+      {/* Paket 10a: Kopflinie und Nummern in der Fachfarbe der Sprache – hier abschaltbar */}
+      <VorlagenfarbeSchalter
+        size="xs"
+        fach={doc.settings.targetLanguage}
+        vorlagenname="Schwarz"
+        checked={Boolean(h.vorlagenfarbe)}
+        onChange={(an) => onChange((d) => (d.header.vorlagenfarbe = an))}
+      />
+      {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
+      <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
+      <NumberInput
+        size="xs"
+        label="Schriftgröße (pt)"
+        min={9}
+        max={16}
+        value={doc.fontSize}
+        onChange={(v) => onChange((d) => (d.fontSize = Number(v) || 12))}
+      />
+      <Text size="xs" fw={500}>
+        Seitenumfang je Test
+      </Text>
+      <SeitenVorgabe size="xs" limit={doc.settings.pageLimit ?? DEFAULT_PAGE_LIMIT} onChange={(next) => onChange((d) => (d.settings.pageLimit = next))} />
+    </Stack>
   )
 }
 

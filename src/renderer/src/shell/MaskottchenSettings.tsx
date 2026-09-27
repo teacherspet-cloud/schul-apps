@@ -1,5 +1,23 @@
-import { ActionIcon, Badge, Button, Card, FileButton, Group, Image, NumberInput, Select, SimpleGrid, Stack, Text, TextInput, Textarea, Title, Tooltip } from '@mantine/core'
-import { IconPhoto, IconRefresh, IconSparkles, IconStar, IconStarFilled, IconTrash, IconUpload } from '@tabler/icons-react'
+import {
+  ActionIcon,
+  Badge,
+  Button,
+  Card,
+  FileButton,
+  Group,
+  Image,
+  Modal,
+  NumberInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+  Tooltip
+} from '@mantine/core'
+import { IconChevronLeft, IconChevronRight, IconPhoto, IconRefresh, IconSparkles, IconStar, IconStarFilled, IconTrash, IconUpload } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
 import { BESCHREIBUNGS_AUFTRAG, MASKOTTCHEN_POSEN, maskottchenId, posePrompt, vorlagePrompt, type MaskottchenInfo } from '@shared/maskottchen'
@@ -21,6 +39,11 @@ import { ILLUSTRATIONEN_BIS_KLASSE } from '../modules/arbeitsblatt/generation/il
  *
  * Jede Pose ist eine Bildanfrage (Abo: rund 45 s). Deshalb laufen die Zeichnungen als
  * Auftrag im Hintergrund, abbrechbar, mit Fortschritt in der Auftragsleiste.
+ *
+ * Ergänzt 27.09.2026 (Wunsch der Lehrkraft): Ein Druck auf eine Pose öffnet sie GROSS in
+ * einem Fenster; erst dort gibt es „neu zeichnen lassen". Vorher löste der kleine Knopf die
+ * Zeichnung sofort aus – ein Fehlgriff kostete eine Bildanfrage. Die Bilder entstehen auf
+ * Neongrün und werden freigestellt (shared/maskottchen.ts), damit auf dem Blatt kein Kasten steht.
  */
 
 /** Bilder auf eine handliche Größe bringen – 1,5 MB je Pose wären auf jedem Blatt zu viel */
@@ -33,6 +56,8 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
   const [name, setName] = useState('')
   const [angabe, setAngabe] = useState('')
   const [laeuft, setLaeuft] = useState<string | null>(null)
+  /** Groß gezeigte Pose (Figur und Pose) – null = Fenster zu */
+  const [ansicht, setAnsicht] = useState<{ figurId: string; poseId: string } | null>(null)
   const illu = settings.illustrationen ?? { bisKlasse: ILLUSTRATIONEN_BIS_KLASSE }
 
   useEffect(() => {
@@ -45,7 +70,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
       moduleId: 'einstellungen',
       docId: `maskottchen-${figur.id}`,
       titel: figur.name,
-      art: posen.length === 1 ? `Pose „${posen[0].label}" zeichnen` : `${posen.length} Posen zeichnen`,
+      art: posen.length === 1 ? `Pose „${posen[0].label}" zeichnen` : 'Posen zeichnen',
       eingabe: figur,
       istOffen: () => true,
       sperrt: false,
@@ -169,8 +194,8 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
         Maskottchen und Illustrationen
       </Title>
       <Text size="sm" c="dimmed" mb="md">
-        Für jüngere Jahrgänge setzen die Programme altersgerechte Figuren auf die Materialien – an Merkkästen, Aufgaben und als Begrüßung; auf
-        Arbeiten nur am Kopf und am Schluss. Jede Figur hat eine Vorlage und zwölf Posen (winkend, zeigend, denkend, schreibend, sprechend …).
+        Für jüngere Jahrgänge setzen die Programme altersgerechte Figuren auf die Materialien – an Merkkästen, Aufgaben und als Begrüßung; auf Arbeiten nur am
+        Kopf und am Schluss. Jede Figur hat eine Vorlage und zwölf Posen (winkend, zeigend, denkend, schreibend, sprechend …).
       </Text>
       <Group align="flex-end" mb="md">
         <NumberInput
@@ -215,19 +240,35 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
                   </Text>
                   <Group gap={4}>
                     {MASKOTTCHEN_POSEN.map((p) => (
-                      <Tooltip key={p.id} label={`${p.label} – ${p.zweck}${m.posen[p.id] ? ' (neu zeichnen)' : ' (fehlt – zeichnen)'}`}>
-                        <ActionIcon size="sm" variant={m.posen[p.id] ? 'light' : 'default'} color={m.posen[p.id] ? 'green' : 'gray'} aria-label={`Pose ${p.label}`} onClick={() => posenZeichnen(m, [p.id])}>
+                      <Tooltip key={p.id} label={`${p.label} – ${p.zweck}${m.posen[p.id] ? '' : ' (fehlt)'} · vergrößern`}>
+                        <ActionIcon
+                          size="sm"
+                          variant={m.posen[p.id] ? 'light' : 'default'}
+                          color={m.posen[p.id] ? 'green' : 'gray'}
+                          aria-label={`Pose ${p.label}`}
+                          onClick={() => setAnsicht({ figurId: m.id, poseId: p.id })}
+                        >
                           {m.posen[p.id] ? <img src={m.posen[p.id]} alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} /> : <IconPhoto size={12} />}
                         </ActionIcon>
                       </Tooltip>
                     ))}
                   </Group>
                   <Group gap={6}>
-                    <Button size="compact-xs" variant="light" leftSection={<IconSparkles size={12} />} onClick={() => posenZeichnen(m, fehlend.length ? fehlend : undefined)}>
+                    <Button
+                      size="compact-xs"
+                      variant="light"
+                      leftSection={<IconSparkles size={12} />}
+                      onClick={() => posenZeichnen(m, fehlend.length ? fehlend : undefined)}
+                    >
                       {fehlend.length ? `${fehlend.length} fehlende Posen zeichnen` : 'Alle Posen neu zeichnen'}
                     </Button>
                     {standardId !== m.id && (
-                      <Button size="compact-xs" variant="subtle" leftSection={<IconStar size={12} />} onClick={() => update({ illustrationen: { ...illu, standardId: m.id } })}>
+                      <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        leftSection={<IconStar size={12} />}
+                        onClick={() => update({ illustrationen: { ...illu, standardId: m.id } })}
+                      >
                         Als Standard
                       </Button>
                     )}
@@ -243,7 +284,8 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
         })}
       </SimpleGrid>
 
-      <Card withBorder padding="sm" bg="var(--mantine-color-gray-0)">
+      {/* Leicht abgesetzt in Hell UND Dunkel – ein fester Grauton stand im dunklen Thema als weißer Kasten da */}
+      <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
         <Text size="sm" fw={600} mb={6}>
           Neue Figur
         </Text>
@@ -276,11 +318,103 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
             </Tooltip>
           </Group>
           <Text size="xs" c="dimmed">
-            Beim Hochladen wird der Hintergrund freigestellt; die Posen zeichnet die KI aus einer Beschreibung der Vorlage. Jede Pose ist eine
-            Bildanfrage.
+            Die KI zeichnet Vorlage und Posen auf neongrünem Grund, der anschließend entfernt wird – auf dem Blatt steht nur die Figur. Beim Hochladen wird der
+            Hintergrund ebenso freigestellt; die Posen zeichnet die KI aus einer Beschreibung der Vorlage. Jede Pose ist eine Bildanfrage.
           </Text>
         </Stack>
       </Card>
+
+      <PosenAnsicht
+        ansicht={ansicht}
+        liste={liste}
+        onWechsel={setAnsicht}
+        onZeichnen={(m, poseId) => {
+          posenZeichnen(m, [poseId])
+          setAnsicht(null)
+        }}
+      />
     </Card>
+  )
+}
+
+/**
+ * Eine Pose groß – mit Blättern zur nächsten und dem Knopf zum (Neu-)Zeichnen.
+ * Die Figur kommt bei jedem Zeichnen frisch aus der Liste, damit ein gerade fertiges Bild sofort hier steht.
+ */
+function PosenAnsicht({
+  ansicht,
+  liste,
+  onWechsel,
+  onZeichnen
+}: {
+  ansicht: { figurId: string; poseId: string } | null
+  liste: MaskottchenInfo[]
+  onWechsel: (a: { figurId: string; poseId: string } | null) => void
+  onZeichnen: (figur: MaskottchenInfo, poseId: string) => void
+}): React.JSX.Element {
+  const figur = ansicht ? liste.find((m) => m.id === ansicht.figurId) : undefined
+  const index = ansicht ? MASKOTTCHEN_POSEN.findIndex((p) => p.id === ansicht.poseId) : -1
+  const pose = index >= 0 ? MASKOTTCHEN_POSEN[index] : undefined
+  const bild = figur && pose ? figur.posen[pose.id] : undefined
+  const blaettere = (schritt: number): void => {
+    if (!figur) return
+    const n = MASKOTTCHEN_POSEN.length
+    onWechsel({ figurId: figur.id, poseId: MASKOTTCHEN_POSEN[(index + schritt + n) % n].id })
+  }
+  return (
+    <Modal opened={Boolean(figur && pose)} onClose={() => onWechsel(null)} title={figur && pose ? `${figur.name} – ${pose.label}` : ''} size="md" centered>
+      {figur && pose && (
+        <Stack gap="sm" data-posen-ansicht={pose.id}>
+          <Group wrap="nowrap" align="center" gap="xs">
+            <ActionIcon variant="subtle" aria-label="Vorige Pose" onClick={() => blaettere(-1)}>
+              <IconChevronLeft size={18} />
+            </ActionIcon>
+            {/* Getönter Grund statt Weiß: So sieht man, dass die Figur wirklich freigestellt ist */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 320,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 'var(--mantine-radius-md)',
+                background: 'var(--mantine-color-default-hover)'
+              }}
+            >
+              {bild ? (
+                <Image src={bild} alt={`${figur.name} ${pose.label}`} fit="contain" h={320} w="auto" />
+              ) : (
+                <Stack align="center" gap={4}>
+                  <IconPhoto size={36} opacity={0.5} />
+                  <Text size="sm" c="dimmed">
+                    Diese Pose gibt es noch nicht.
+                  </Text>
+                </Stack>
+              )}
+            </div>
+            <ActionIcon variant="subtle" aria-label="Nächste Pose" onClick={() => blaettere(1)}>
+              <IconChevronRight size={18} />
+            </ActionIcon>
+          </Group>
+          <Text size="sm">
+            <Text span fw={600}>
+              {pose.label}
+            </Text>{' '}
+            · {pose.zweck} · Pose {index + 1} von {MASKOTTCHEN_POSEN.length}
+          </Text>
+          <Text size="xs" c="dimmed">
+            Die Figur {pose.prompt}.
+          </Text>
+          <Group justify="space-between">
+            <Button variant="default" onClick={() => onWechsel(null)}>
+              Schließen
+            </Button>
+            <Button leftSection={<IconSparkles size={14} />} onClick={() => onZeichnen(figur, pose.id)}>
+              {bild ? 'Pose neu zeichnen lassen' : 'Pose zeichnen lassen'}
+            </Button>
+          </Group>
+        </Stack>
+      )}
+    </Modal>
   )
 }

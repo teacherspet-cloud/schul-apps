@@ -7,12 +7,13 @@
  * verwendet wie im Arbeitsblatt – dadurch funktionieren Darstellung, Seitenumbruch und Export
  * unverändert weiter.
  */
-import type { StructuredRequest } from '@shared/types'
+import type { Quellentreffer, StructuredRequest } from '@shared/types'
+import { obj, str } from '../../../shared/aiSchema'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
 import { comprehensionFormatById, defaultComprehensionFormats } from '../../arbeitsblatt/didactics/comprehensionFormats'
 import { buildLearnerProfile, stageForGrade } from '../../arbeitsblatt/didactics/profile'
 import { browserWorksheetImageDeps, worksheetImagePool } from '../../arbeitsblatt/generation/browserImages'
-import { checkIntegrity } from '../../arbeitsblatt/didactics/integrity'
+import { checkIntegrity, verschluesseleMaterialverweise } from '../../arbeitsblatt/didactics/integrity'
 import { checkClosedFormatsHistory, checkItemWording, checkTrueFalseEvidence } from '../../arbeitsblatt/didactics/itemWording'
 import { checkSourceHeaders } from '../../arbeitsblatt/didactics/sourceHeader'
 import { checkNarration } from '../../arbeitsblatt/didactics/narration'
@@ -23,7 +24,8 @@ import {
   beschaffeOriginalmaterial,
   materialBausteine,
   materialSprache,
-  type GepruefterTreffer
+  type GepruefterTreffer,
+  quellenangabeMitAbruf
 } from '../../arbeitsblatt/generation/originalmaterial'
 import { completeWorksheetImages } from '../../arbeitsblatt/generation/worksheetImages'
 import { describeBlock } from '../../arbeitsblatt/generation/describe'
@@ -49,9 +51,10 @@ import { glossarFuerArbeit } from './glossar'
 import { scriptForSheet, wantsListening, writeListeningScript } from '../../arbeitsblatt/generation/listening'
 import type { ListeningScript } from '../../arbeitsblatt/generation/listening'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
-import { stoffBilder } from '../../../shared/files/stoffQuelle'
+import { stoffBilder, type StoffQuelle } from '../../../shared/files/stoffQuelle'
 import {
   alleFassungen,
+  bloeckeDerFassung,
   fassungsLabel,
   gleichePunkte,
   laengenHinweis,
@@ -115,6 +118,14 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     // werden: Texte und Bilder müssen recherchierte Originalquellen sein.
     imageSource: upperSecondary(m) ? 'web' : 'placeholder',
     originalSources: upperSecondary(m) ? 'on' : 'off',
+    // Oberstufe: keine Formhinweise und Notizentabellen bei Schreibaufgaben (27.09.2026)
+    ohneSchreibhilfen: upperSecondary(m),
+    // Korrektur- und Notizrand wie beim Arbeitsblatt
+    correctionMargin: m.correctionMargin,
+    notesMargin: m.notesMargin,
+    showSchool: m.showSchool,
+    aiCanary: m.aiCanary,
+    aiCanaryWords: m.aiCanaryWords,
     boardPlan: false,
     // Hörtext-Einstellungen der Arbeit gelten für den Hörverstehensteil
     audioAi: m.audioAi,
@@ -240,6 +251,14 @@ export function schreibvorgabenRegeln(exam: Exam, part: ExamPart): string {
   const meta = worksheetMetaFor(exam, part)
   return [
     writingBriefRules(meta),
+    /*
+     * Oberstufe (Befund der Lehrkraft, 27.09.2026): Eine Klausuraufgabe im 13. Jahrgang trug
+     * „Use an appropriate salutation and closing · Organise the email in clear paragraphs" –
+     * Hilfen, die dort Teil der geprüften Leistung sind. Formhinweise und Notizentabelle entfallen.
+     */
+    upperSecondary(exam.meta)
+      ? '- OBERSTUFE: brief.form und brief.notes bleiben LEER – keine Formhinweise (Anrede, Grußformel, Absätze) und keine Notizentabelle; Textsortenkompetenz ist Teil der Leistung. Die Inhaltspunkte (brief.points) sind knappe Teilaufgaben mit Operator, ohne Erläuterung oder Tipp.'
+      : '',
     wortzahlErlaubt(exam.meta.stateId, exam.meta.subjectId)
       ? ''
       : `- KEINE WORTZAHL in der Aufgabe, in den Vorgaben oder in den Formhinweisen. ${WORTZAHL_GRUND}`,
@@ -298,6 +317,97 @@ export function unterlagenTeil(exam: Exam): string {
   return out.join('\n')
 }
 
+/**
+ * Material FÜR die Arbeit (27.09.2026): die aktiven Quellen aus dem Kasten unter „Aufbau der
+ * Arbeit". Das erste mit Text wird bei textgebundenen Teilen (Lesen, Quelle, Mediation) wie ein
+ * beschaffter Originaltext von der APP eingesetzt; alle gehen als Grundlage in den Auftrag.
+ */
+export function arbeitsmaterialQuellen(exam: Exam): StoffQuelle[] {
+  return (exam.meta.arbeitsmaterial ?? []).filter((q) => q.aktiv && q.text.trim())
+}
+
+/** Die Kopfzeilen, die `urlQuelle` dem Text einer Webseite voranstellt, abschneiden */
+export const ohneWebseitenKopf = (text: string): string => text.replace(/^\s*(?:(?:Webseite|Adresse|Titel):[^\n]*\n?)+\s*/i, '').trim()
+
+/** Das erste Material als Ablage, wie sie `materialBausteine` versteht – die App setzt es wörtlich ein */
+export function arbeitsmaterialAblage(exam: Exam): OriginalMaterialAblage | null {
+  const q = arbeitsmaterialQuellen(exam)[0]
+  if (!q) return null
+  const titel = q.fileName.replace(/\.[^.]+$/, '').trim() || 'Material'
+  return {
+    titel,
+    urheber: '',
+    url: q.url ?? '',
+    // Die Kopfzeilen der Webseite („Webseite: …", „Adresse: …") sind Auskunft für die KI, kein Lesetext (27.09.2026)
+    text: ohneWebseitenKopf(q.text),
+    // Ohne „Quelle:" – das Wort setzt die Darstellung selbst davor; die volle Angabe ermittelt `quellenangabenErmitteln`
+    quellenangabe: q.quellenangabe || q.url || `Material der Lehrkraft: ${q.fileName}`,
+    hinweis: '',
+    protokoll: [],
+    wortlautGeprueft: true
+  }
+}
+
+const QUELLENANGABE_SCHEMA = obj({
+  urheber: str('Verfasser bzw. Urheber des Textes – leer, wenn nicht erkennbar'),
+  titel: str('Titel des Textes'),
+  publikationsort: str('Zeitung, Zeitschrift, Webseite oder Verlag'),
+  datum: str('Erscheinungsdatum, so genau wie erkennbar – leer, wenn unbekannt')
+})
+
+/**
+ * Vollständige Quellenangabe für Material FÜR die Arbeit (Befund der Lehrkraft vom 27.09.2026:
+ * „die Quellenangaben sind weiterhin nur die URL"). Die KI liest Urheber, Titel, Publikationsort
+ * und Datum aus dem Text; Fundort und Abrufdatum setzt die App – dasselbe Format wie bei
+ * beschafften Originaltexten (`quellenangabeMitAbruf`). Ermittelt wird einmal je Quelle; die
+ * Angabe bleibt an der Quelle und lässt sich am Baustein bearbeiten.
+ */
+export async function quellenangabenErmitteln(quellen: StoffQuelle[], ai: AiCall): Promise<StoffQuelle[]> {
+  return Promise.all(
+    quellen.map(async (q) => {
+      if (!q.url || q.quellenangabe || !q.text.trim()) return q
+      try {
+        const d = await ai<{ urheber?: string; titel?: string; publikationsort?: string; datum?: string }>({
+          system:
+            'Du ermittelst bibliografische Angaben zu einem Text von einer Webseite. Erfinde nichts: Was im Text oder in der Adresse nicht steht, bleibt leer.',
+          user: [`Adresse: ${q.url}`, `Dateiname bzw. Seitentitel: ${q.fileName}`, 'TEXT (Anfang):', q.text.slice(0, 2500)].join('\n'),
+          schemaName: 'material_quellenangabe',
+          schema: QUELLENANGABE_SCHEMA
+        })
+        const titel = (d?.titel ?? '').trim() || q.fileName.replace(/\.[^.]+$/, '').trim()
+        const angabe = [(d?.urheber ?? '').trim(), titel ? `„${titel}“` : '', (d?.publikationsort ?? '').trim(), (d?.datum ?? '').trim()]
+          .filter(Boolean)
+          .join(', ')
+        return { ...q, quellenangabe: quellenangabeMitAbruf(angabe, { url: q.url, titel, urheber: (d?.urheber ?? '').trim() } as Quellentreffer) }
+      } catch {
+        return q
+      }
+    })
+  )
+}
+
+/** Textgebundene Teile: Dort steht das Material der Lehrkraft als Lesetext auf der Arbeit */
+export const textgebunden = (part: Pick<ExamPart, 'formatId'>): boolean => QUELLENFORMATE.includes(part.formatId)
+
+/** Auftragsteil: Material der Lehrkraft als Grundlage (Schreib-, Mediations- und andere Teile) */
+export function arbeitsmaterialTeil(exam: Exam, part: ExamPart): string {
+  const quellen = arbeitsmaterialQuellen(exam)
+  if (!quellen.length) return ''
+  const eingesetzt = textgebunden(part)
+  const out = [
+    'MATERIAL FÜR DIE ARBEIT (von der Lehrkraft beigefügt – wird in der Arbeit VERWENDET):',
+    eingesetzt
+      ? '- Das erste Material setzt die App als Lesetext dieses Teils wörtlich ein (mit Quellenangabe). Plane die Aufgaben zu DIESEM Text; gib ihn nicht wieder.'
+      : '- Dieser Teil baut auf dem Material auf: Die Schreib- bzw. Mediationsaufgabe bezieht sich inhaltlich darauf (Sachverhalt, Standpunkte, Angaben). Zitiere daraus nur kurz mit Angabe; ein Lesetext wird hier nicht abgedruckt.',
+    '- Nichts erfinden, was das Material nicht hergibt.'
+  ]
+  for (const q of quellen) {
+    out.push(`--- ${q.fileName}${q.url ? ` (${q.url})` : ''} ---`)
+    out.push(q.text.trim().slice(0, 8000))
+  }
+  return out.join('\n')
+}
+
 /** Die Seitenbilder der Unterlagen als Zusatz einer Anfrage (leer, wenn es keine gibt). */
 export function unterlagenBilder(exam: Exam): { images?: string[] } {
   const images = stoffBilder(exam.meta.materialQuellen)
@@ -317,6 +427,7 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
     `Thema der Arbeit: ${m.topic}`,
     m.content ? `Inhalte der Unterrichtseinheit, auf die sich die Arbeit bezieht: ${m.content}` : '',
     unterlagenTeil(exam),
+    arbeitsmaterialTeil(exam, part),
     `Teil ${number}: ${format?.label ?? part.label} – Kompetenzbereich ${part.competence}.`,
     format?.description ? `Was der Teil verlangt: ${format.description}` : '',
     `Bearbeitungszeit für diesen Teil: ${part.minutes} Minuten.`,
@@ -582,7 +693,16 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
      */
     let material: OriginalMaterialAblage | null = null
     let blocks: WsBlock[] | null = null
-    if (brauchtOriginaltext(exam, part)) {
+    // Material der Lehrkraft (27.09.2026) hat Vorrang vor jeder Suche: Bei textgebundenen Teilen wird es als Lesetext eingesetzt
+    if (textgebunden(part) && arbeitsmaterialQuellen(exam).some((q) => q.url && !q.quellenangabe)) {
+      onProgress(`Teil ${i + 1}: Quellenangabe des Materials wird ermittelt …`)
+      exam = { ...exam, meta: { ...exam.meta, arbeitsmaterial: await quellenangabenErmitteln(exam.meta.arbeitsmaterial ?? [], ai) } }
+    }
+    const eigenes = textgebunden(part) ? arbeitsmaterialAblage(exam) : null
+    if (eigenes) {
+      material = eigenes
+      materialNotizen.push(`Teil ${i + 1} (${part.label}): Material der Lehrkraft „${eigenes.titel}" als Lesetext eingesetzt.`)
+    } else if (brauchtOriginaltext(exam, part)) {
       const teilMeta = worksheetMetaFor(exam, part)
       const ergebnis = await beschaffeOriginalmaterial({
         wunsch: {
@@ -614,13 +734,15 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
     }
 
     blocks ??= await generateExamPart(exam, part, i + 1, ai, material)
+    // Nummern der KI werden zu Kennungen, gezählt über alle bisherigen Teile (die Nummern laufen über die ganze Arbeit)
+    blocks = verschluesseleMaterialverweise(blocks, [...parts.flatMap((p) => p.blocks), ...blocks])
     // Punkte VOR den weiteren Fassungen angleichen – ihr Auftrag nennt die Punkte der Vorlage
     punkteAufTeil(blocks, part.points)
     let fertig: ExamPart = { ...part, blocks }
     for (let f = 1; f < anzahl; f++) {
       onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label} (Fassung ${label(f)}) …`)
       const r = await generateParallelPart(exam, part, i + 1, f, blocks, ai, material)
-      fertig = mitBloecken(fertig, f, r.blocks)
+      fertig = mitBloecken(fertig, f, verschluesseleMaterialverweise(r.blocks, [...parts.flatMap((p) => bloeckeDerFassung(p, f)), ...r.blocks]))
       if (r.hinweise.length) notes.push(`Fassung ${label(f)}, Teil ${i + 1}: ${r.hinweise.join(' ')}`)
     }
     parts.push(fertig)

@@ -424,11 +424,14 @@ export function materialBausteine(
   const quelle: TextBlock = {
     id: id(),
     type: 'text',
+    // Feste Kennung: Die KI verweist mit „M{quelle}", die Nummer vergibt die App nach der Stelle des Bausteins
+    ref: 'quelle',
     title: `Q1: ${material.titel}`,
     body: material.text,
     // Zeilennummern: Ohne sie lässt sich kein Textbeleg angeben (EPA Geschichte 3.3.3)
     lineNumbers: true,
-    source: [material.quellenangabe, material.hinweis].filter(Boolean).join(' '),
+    // „Quelle:" schreibt die Darstellung davor – eine Angabe, die selbst so beginnt, stünde sonst doppelt („Quelle: Quelle: https://…", 27.09.2026)
+    source: [material.quellenangabe.replace(/^\s*quelle\s*:\s*/i, ''), material.hinweis].filter(Boolean).join(' '),
     glossary: [],
     /*
      * Sprache des Textes kennzeichnen (Paket 12): Die Prüfung der Sprachmittlung sucht den

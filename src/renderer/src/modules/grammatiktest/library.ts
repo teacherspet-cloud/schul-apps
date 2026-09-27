@@ -4,6 +4,8 @@
  * `%APPDATA%/schul-apps/grammatiktests`.
  */
 import type { SavedGrammarTestStats } from '@shared/types'
+import { einsortierenNachSpeichern } from '../../shared/themenbereiche'
+import { ueberthemaVon } from '../../shared/ueberthema'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
 import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
@@ -29,7 +31,8 @@ export function testStats(test: GrammarTest): SavedGrammarTestStats {
     minutes: test.meta.minutes,
     graded: test.meta.graded,
     stateId: test.meta.stateId,
-    schoolTypeId: test.meta.schoolTypeId
+    schoolTypeId: test.meta.schoolTypeId,
+    ...(ueberthemaVon(test.meta) ? { ueberthema: ueberthemaVon(test.meta) } : {})
   }
 }
 
@@ -59,6 +62,7 @@ export async function saveCurrentTest(name?: string): Promise<void> {
     stats: testStats(test),
     payload: test
   })
+  void einsortierenNachSpeichern()
   useGrammatiktest.getState().markSaved(meta.id, meta.updatedAt, meta.name)
 }
 
@@ -95,6 +99,7 @@ export function legeTestAb(docId: string, schnappschuss: GrammarTest, einarbeite
       },
       speichern: async (id, name, test) => {
         await window.api.grammarTests.save({ id, name: name ?? defaultTestName(test), stats: testStats(test), payload: test })
+        void einsortierenNachSpeichern()
       }
     },
     docId,
@@ -119,7 +124,8 @@ export function useTestAutosave(): void {
     dokument: (s) => s.docId,
     gesichert: (s) => Boolean(s.savedAt),
     bereit: (s) => lohntSicherung(s.test),
-    geaendert: (s, prev) => s.test !== prev.test,
+    // Ein geänderter Name zählt nur, wenn ihn die Lehrkraft geändert hat – nicht die Bestätigung des Speicherns
+    geaendert: (s, prev) => s.test !== prev.test || (s.docName !== prev.docName && s.savedAt === prev.savedAt),
     speichern: () => saveCurrentTest()
   })
 }

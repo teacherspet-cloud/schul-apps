@@ -267,7 +267,8 @@ try {
   await page.waitForTimeout(1200)
   const aktiv = await page.evaluate(() => document.querySelector('.app-leiste [data-active="true"]')?.getAttribute('aria-label'))
   pruefe(aktiv === 'Lernzielkontrolle', `Klick öffnet im Programm „Lernzielkontrolle" (aktiv: ${aktiv})`)
-  pruefe((await sichtbar(page.getByText('Gespeichert: Prüflauf Potenzen')).count()) === 1, '… mit genau dieser Kontrolle')
+  // Seit 27.09.2026 steht der Name im Feld der Editor-Leiste (wie beim Arbeitsblatt)
+  pruefe((await page.getByLabel('Name in der App').inputValue()) === 'Prüflauf Potenzen', '… mit genau dieser Kontrolle')
 
   // Suche auf der Startseite findet den Bereich
   await page.click('[aria-label="Startseite"]')

@@ -5,7 +5,7 @@
 
 export type Stars = 1 | 2 | 3
 
-export const STAR_LABELS: Record<Stars, string> = { 1: '★ grundlegend', 2: '★★ mittel', 3: '★★★ erweitert' }
+export const STAR_LABELS: Record<Stars, string> = { 1: '★', 2: '★★', 3: '★★★' }
 
 export const DIFFERENTIATION_PRINCIPLES = [
   'Alle Niveaustufen haben dasselbe Lernziel, dasselbe Thema, dasselbe Material und dasselbe Layout; die Kernaufgabe ist in allen Stufen enthalten.',
@@ -13,21 +13,11 @@ export const DIFFERENTIATION_PRINCIPLES = [
   'Gleiches Material heißt nicht gleicher Wortlaut: Umfang, Zahl der Merkmale und deren Reihenfolge dürfen sich zwischen den Stufen unterscheiden. Bei Vergleichsmaterial stehen die Merkmale nie in derselben Reihenfolge wie beim Vergleichsgegenstand.'
 ]
 
-export const LEVEL_RULES: Record<Stars, string[]> = {
-  1: [
-    'Niveau ★ (grundlegend): geschlossene oder halboffene Formate, Anforderungsbereich I bis Einstieg II.',
-    'Gib ein gelöstes Beispiel, einen Wortspeicher und Satzanfänge vor; zerlege Aufgaben in vorgegebene Teilschritte.',
-    'Kürzere Texte, konkrete bzw. bildliche Darstellung; ergänze gestufte Hilfekarten (1. Aufgabe in eigenen Worten, 2. Denkanstoß, 3. Fachwissen, 4. Lösungsbeispiel).'
-  ],
-  2: [
-    'Niveau ★★ (mittel): halboffene Formate mit Schwerpunkt Anforderungsbereich II.',
-    'Hilfen nur als optionaler Tipp-Kasten, mittlere Textlänge, Wechsel von bildlicher zu symbolischer Darstellung.'
-  ],
-  3: [
-    'Niveau ★★★ (erweitert): offene Formate, Anforderungsbereich II–III mit Transfer, Begründung und Bewertung.',
-    'Keine vorgegebenen Teilschritte, Fachsprache, mehrere Lösungswege zulassen; ergänze eine Knobel- oder Forscheraufgabe.'
-  ]
-}
+/*
+ * Die Regeln je Stufe stehen seit dem 27.09.2026 in `didactics/schwierigkeit.ts` (`stufenRegeln`):
+ * Welche Stufe ★, ★★ und das einzelne Blatt haben, wählt die Lehrkraft – vorher war ★ immer
+ * grundlegend und ★★ immer mittel.
+ */
 
 /** Regeln für ein Blatt mit ★-markierten Aufgaben (alle Stufen auf einem Blatt). */
 export const COMBINED_RULES = [

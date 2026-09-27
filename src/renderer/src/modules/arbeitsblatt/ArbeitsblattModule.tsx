@@ -8,7 +8,14 @@ import EditorStep from './steps/EditorStep'
 import OutlineStep from './steps/OutlineStep'
 import TopicStep from './steps/TopicStep'
 import WorksheetLibrary from './steps/WorksheetLibrary'
-import { cleanWorksheetImages, defaultWorksheetName, newWorksheetSafely, openSavedWorksheet, useWorksheetAutosave } from './library'
+import {
+  cleanWorksheetImages,
+  defaultWorksheetName,
+  newWorksheetSafely,
+  openSavedWorksheet,
+  useWorksheetAutosave,
+  markiereLoesungsbausteineImOffenen
+} from './library'
 import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings } from '../../shared/settingsStore'
@@ -59,6 +66,7 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
         await sichereAlles()
         loadWorksheet(parseWorksheetFile(file.data))
         setLibrary(false)
+        markiereLoesungsbausteineImOffenen()
         void cleanWorksheetImages()
       }
     } catch (e) {

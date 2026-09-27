@@ -1,5 +1,5 @@
 import { Badge, Button, Container, ScrollArea, Stack } from '@mantine/core'
-import { IconFilePlus } from '@tabler/icons-react'
+import { IconFilePlus, IconFolderOpen } from '@tabler/icons-react'
 import type { SavedExamMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import { useMemo } from 'react'
@@ -18,11 +18,14 @@ const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeS
 export default function ExamLibrary({
   onNew,
   onNeuImBereich,
+  onOpenFile,
   onOpened,
   zurueck,
   onZurueck
 }: {
   onNew: () => void
+  /** Eine .klassenarbeit-Datei öffnen (27.09.2026) */
+  onOpenFile: () => void
   /** Neu anlegen und die Kennung liefern („Neu in diesem Bereich") */
   onNeuImBereich: () => Promise<string>
   onOpened: () => void
@@ -95,6 +98,9 @@ export default function ExamLibrary({
           onSuche={bib.setSuche}
           suchHinweis="Name, Thema, Fach, Klasse"
         >
+          <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
+            Datei öffnen …
+          </Button>
           <Button leftSection={<IconFilePlus size={16} />} onClick={onNew}>
             Neue Klassenarbeit
           </Button>

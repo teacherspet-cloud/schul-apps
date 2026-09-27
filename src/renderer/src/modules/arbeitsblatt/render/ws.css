@@ -316,6 +316,23 @@
   margin: 0 0 4mm;
   break-inside: avoid;
 }
+/* Nur im Lösungsteil (Editor): gestrichelt umrandet mit Vermerk – gedruckt wird er nur auf den Lösungen */
+.ws-nur-loesung {
+  position: relative;
+  outline: 0.4mm dashed #b8860b;
+  outline-offset: 1mm;
+  margin-top: 4mm;
+}
+.ws-nur-loesung-label {
+  position: absolute;
+  top: -3.6mm;
+  right: 0;
+  font-size: 2.4mm;
+  line-height: 1;
+  color: #b8860b;
+  background: #fff;
+  padding: 0 1mm;
+}
 .rt-p {
   margin: 0 0 0.35em;
 }
@@ -877,6 +894,45 @@
 }
 .ws-table-block .ws-table {
   width: 100%;
+}
+/* Griffe zum Ziehen der Spalten- und Zeilenmaße – nur im Editor (render/tabelleMasse.ts) */
+.ws-table-ziehbar th,
+.ws-table-ziehbar td {
+  position: relative;
+}
+.ws-spalten-griff {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.ws-zeilen-griff {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 6px;
+  cursor: row-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.ws-spalten-griff:hover,
+.ws-zeilen-griff:hover {
+  background: color-mix(in srgb, var(--ws-accent) 45%, transparent);
+}
+@media (pointer: coarse) {
+  .ws-spalten-griff {
+    right: -6px;
+    width: 12px;
+  }
+  .ws-zeilen-griff {
+    bottom: -6px;
+    height: 12px;
+  }
 }
 .ws-ordering {
   display: flex;

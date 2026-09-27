@@ -32,7 +32,8 @@ import {
   VIDEO_KIND_IDS,
   VIEWING_PHASE_IDS
 } from './schemas'
-import type { ImageFunction } from '../didactics/imageDesign'
+import { standardBildbreite, type ImageFunction } from '../didactics/imageDesign'
+import { MATERIAL_TYPES } from '../didactics/integrity'
 import type { VideoKind, ViewingPhase } from '../didactics/videoTasks'
 
 /** Wörter je Minute beim Vorlesen eines Hörtextes (deutlich artikulierte Standardsprache). */
@@ -108,6 +109,7 @@ export function convertOutline(data: any): Outline {
     learningGoals: strings(data?.learningGoals),
     minutes: Number(data?.minutes) || 45,
     teacherNote: text(data?.teacherNote),
+    ...(text(data?.ueberthema).trim() ? { ueberthema: text(data?.ueberthema).trim().slice(0, 80) } : {}),
     items: (Array.isArray(data?.items) ? data.items : []).map((it: any): OutlineItem => ({
       id: newId(),
       type: pick<WsBlockType>(it.type, BLOCK_TYPES, 'task'),
@@ -131,7 +133,9 @@ export function convertAnswer(a: any, rng: Rng): Answer {
   // Zeichenfläche mit Achsen: bereinigt, damit Bereich und Schrittweite brauchbar sind
   if (out.kind === 'diagram') {
     const roh = a?.diagram ?? {}
-    const ev = Array.isArray(roh?.timeline?.events) ? roh.timeline.events.map((e: any) => ({ ...e, level: typeof e?.level === 'number' && e.level >= 0 ? e.level : undefined })) : []
+    const ev = Array.isArray(roh?.timeline?.events)
+      ? roh.timeline.events.map((e: any) => ({ ...e, level: typeof e?.level === 'number' && e.level >= 0 ? e.level : undefined }))
+      : []
     out.diagram = sanitizeDiagram({ ...roh, timeline: { ...(roh?.timeline ?? {}), events: ev } })
   }
   switch (out.kind) {
@@ -200,7 +204,15 @@ export function convertBlock(
   const id = newId(rng)
   const type = pick<WsBlockType>(b?.type, BLOCK_TYPES, 'task')
   const stars = starsOf(b?.stars)
-  const base = { id, ...(stars ? { stars } : {}) }
+  // Kennung für Verweise („M{zeitleiste}") – nur bei Material, bereinigt auf Kleinbuchstaben, Ziffern und Bindestrich
+  const ref = MATERIAL_TYPES.includes(type)
+    ? String(b?.ref ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+    : ''
+  const base = { id, ...(stars ? { stars } : {}), ...(ref ? { ref } : {}) }
   switch (type) {
     case 'learningGoals':
       return { ...base, type, title: text(b.title) || anredeText('lernziele', anrede), goals: strings(b.items) }
@@ -240,18 +252,22 @@ export function convertBlock(
       }
     case 'image': {
       const img = images.find((i) => i.index === Number(b.sourceImageIndex))
+      const role = pick<ImageRole>(b.imageRole, IMAGE_ROLES, 'material')
+      const fn = pick<ImageFunction>(b.imageFunction, IMAGE_FUNCTION_IDS, 'repraesentation')
+      const side = seite(b.blockSide)
       return {
         ...base,
         type,
         description: text(b.imageDescription),
         // Bildunterschriften sind einfacher Text (ohne **fett**)
         caption: text(b.title).split('**').join(''),
-        widthPercent: 60,
+        // Breite nach Funktion (didactics/imageDesign.ts): Ein Schema oder eine Zeitleiste braucht die ganze Blattbreite
+        widthPercent: standardBildbreite(fn, role, side),
         ...(!img && text(b.imageSearch) ? { search: text(b.imageSearch) } : {}),
         ...(!img && b.imageIsSource ? { original: true } : {}),
-        role: pick<ImageRole>(b.imageRole, IMAGE_ROLES, 'material'),
-        ...(seite(b.blockSide) ? { side: seite(b.blockSide) } : {}),
-        fn: pick<ImageFunction>(b.imageFunction, IMAGE_FUNCTION_IDS, 'repraesentation'),
+        role,
+        ...(side ? { side } : {}),
+        fn,
         // Beschriftungen direkt am Bildteil; Werte außerhalb 0–100 wären unbrauchbar
         ...(Array.isArray(b.imageLabels) && b.imageLabels.length
           ? {
@@ -353,6 +369,9 @@ export function convertBlock(
     case 'grid': {
       const kind = pick<GridKind>(b.variant, GRID_KIND_IDS, 'karo')
       const preset = gridDefaults(kind)
+      // Zeitleiste als Material (27.09.2026): die App zeichnet sie aus den Daten – kein KI-Bild, kein Platzhalter
+      const zeitleiste = b.variant === 'zeitleiste' || (Array.isArray(b.timeline?.events) && b.timeline.events.length > 0)
+      const diagram = zeitleiste ? sanitizeDiagram({ kind: 'zeitleiste', heightMm: Number(b.heightMm) || undefined, timeline: b.timeline }) : undefined
       return {
         ...base,
         type,
@@ -360,8 +379,9 @@ export function convertBlock(
         title: text(b.title),
         caption: text(b.body),
         cellMm: Math.max(1, Math.min(10, Number(b.cellMm) || preset.cellMm)),
-        heightMm: Math.max(20, Math.min(220, Number(b.heightMm) || preset.heightMm)),
-        axes: sanitizeAxes({ ...defaultAxes(kind), ...(b.axes ?? {}) }, kind)
+        heightMm: diagram ? diagram.heightMm : Math.max(20, Math.min(220, Number(b.heightMm) || preset.heightMm)),
+        axes: sanitizeAxes({ ...defaultAxes(kind), ...(b.axes ?? {}) }, kind),
+        ...(diagram && diagram.timeline.events.length ? { diagram } : {})
       }
     }
     case 'audio': {

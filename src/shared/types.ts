@@ -655,6 +655,8 @@ export interface SavedWorksheetStats {
   /** Anzahl der Niveaufassungen */
   sheetCount: number
   hasBoard: boolean
+  /** Überthema des Blattes (27.09.2026) – die Themenbereiche ordnen danach zu (shared/themenVorschlag.ts) */
+  ueberthema?: string
 }
 
 export interface SavedWorksheetMeta extends SavedWorksheetStats {
@@ -788,6 +790,8 @@ export interface SavedExamStats {
   subjectLabel: string
   grade: number
   topic: string
+  /** Überthema (27.09.2026) – die Themenbereiche ordnen danach zu */
+  ueberthema?: string
   /** Zahl der Teile */
   partCount: number
   /** Sind schon Aufgaben erzeugt? */
@@ -823,6 +827,8 @@ export interface SavedExamInput {
 export interface SavedGrammarTestStats {
   subjectLabel: string
   grade: number
+  /** Überthema (27.09.2026) – die Themenbereiche ordnen danach zu */
+  ueberthema?: string
   /** Geprüfte Formen, für die Übersicht bereits ausgeschrieben */
   topics: string
   taskCount: number
@@ -867,6 +873,8 @@ export interface SavedKurztestStats {
   subjectLabel: string
   grade: number
   thema: string
+  /** Überthema (27.09.2026) – die Themenbereiche ordnen danach zu */
+  ueberthema?: string
   /** Bezeichnung des Landesformats, z. B. „Stegreifaufgabe" */
   bezeichnung: string
   stateId: string

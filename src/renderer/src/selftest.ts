@@ -1789,6 +1789,9 @@ function vtMitHinweis(hinweis: string): { aufgaben: number } {
 /** Der Vokabeltest im Speicher (für Wachen) */
 const vtJetzt = (): TestDocument | null => useVokabeltest.getState().doc
 
+/** Jahrgang des offenen Vokabeltests umstellen (Wache Maskottchen: Kopf- und Schlussfigur) */
+const vtJahrgang = (grade: number): void => useVokabeltest.getState().updateDoc((d) => void (d.settings.grade = grade))
+
 function vtLatein(): { zeilen: number } {
   const woerter: VocabEntry[] = [
     {
@@ -1989,12 +1992,14 @@ export function installSelftest(): void {
     vtLatein,
     vtMitHinweis,
     vtJetzt,
+    vtJahrgang,
     gtJetzt: () => useGrammatiktest.getState().test,
     kaJetzt: () => useKlassenarbeit.getState().exam,
     lzkJetzt: () => useLernzielkontrolle.getState().test,
     // Ganze Dokumente setzen (Wachen „Mit KI beheben": einen Mangel einbauen) – ein Rückgängig-Schritt
     gtSetzen: (t: GrammarTest) => useGrammatiktest.getState().setTest(t),
     kaSetzen: (e: Exam) => useKlassenarbeit.getState().setExam(e),
+    kaSchritt: (n: number) => useKlassenarbeit.getState().setStep(n),
     lzkSetzen: (t: Kurztest) => useLernzielkontrolle.getState().setTest(t),
     lzkSpeichern,
     lzkRundreise,

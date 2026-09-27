@@ -287,7 +287,7 @@ export default function SetupStep(): React.JSX.Element {
                       </Alert>
                     )}
                     {format && (
-                      <Card withBorder padding="xs" bg="var(--mantine-color-gray-0)">
+                      <Card withBorder padding="xs" bg="var(--mantine-color-default-hover)">
                         <Stack gap={4}>
                           <Group gap="xs">
                             <Badge

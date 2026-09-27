@@ -1,6 +1,6 @@
 import type { LearnerProfile } from '../didactics/profile'
 import { platziereIllustrationen } from './illustrationen'
-import type { Worksheet } from '../model/types'
+import type { Worksheet, WsBlock } from '../model/types'
 import { generateBoard } from './board'
 import type { AiCall, Progress } from './generate'
 import { allBlocks, checkMediaSources, completeOriginalSources, SourceServices } from './originalSources'
@@ -52,11 +52,15 @@ export async function finishWorksheet(result: Worksheet, profile: LearnerProfile
   }
 
   try {
-    const images = await completeWorksheetImages(allBlocks(result), result.meta, deps.images, onProgress)
-    if (images.web + images.ai + images.missing + images.reused > 0) {
+    // Eine als Bild beschriebene Zeitleiste wird zum gezeichneten Baustein – an derselben Stelle, mit derselben Kennung
+    const ersetze = (imageId: string, block: WsBlock): void => {
+      for (const sheet of result.sheets) sheet.blocks = sheet.blocks.map((b) => (b.id === imageId ? block : b))
+    }
+    const images = await completeWorksheetImages(allBlocks(result), result.meta, { ...deps.images, ersetze }, onProgress)
+    if (images.web + images.ai + images.missing + images.reused + images.gezeichnet > 0) {
       addNote(
         result,
-        `Bilder: ${images.web} aus dem Internet (KI-geprüft), ${images.ai} KI-generiert${images.reused ? `, ${images.reused} aus einem früheren Blatt übernommen` : ''}${images.missing ? `, ${images.missing} noch auszuwählen` : ''} – Bildnachweise stehen unter den Bildern.`
+        `Bilder: ${images.web} aus dem Internet (KI-geprüft), ${images.ai} KI-generiert${images.gezeichnet ? `, ${images.gezeichnet} Zeitleiste(n) von der App gezeichnet` : ''}${images.reused ? `, ${images.reused} aus einem früheren Blatt übernommen` : ''}${images.missing ? `, ${images.missing} noch auszuwählen` : ''} – Bildnachweise stehen unter den Bildern.`
       )
     }
   } catch (e) {

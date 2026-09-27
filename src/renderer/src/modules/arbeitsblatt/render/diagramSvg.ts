@@ -111,7 +111,10 @@ function kartesisch(spec: DiagramSpec, widthMm: number): DiagramDrawing {
   stufen.forEach((s, i) => {
     const cy = bottom - (i + 0.5) * cell
     parts.push(text(left - 1.8, cy + 1, s, { anchor: 'end', size: 2.8 }))
-    if (i > 0) parts.push(`<line x1="${round(left)}" y1="${round(bottom - i * cell)}" x2="${round(right)}" y2="${round(bottom - i * cell)}" stroke="${STRONG}" stroke-width="0.25" stroke-dasharray="1.5 1"/>`)
+    if (i > 0)
+      parts.push(
+        `<line x1="${round(left)}" y1="${round(bottom - i * cell)}" x2="${round(right)}" y2="${round(bottom - i * cell)}" stroke="${STRONG}" stroke-width="0.25" stroke-dasharray="1.5 1"/>`
+      )
   })
   if (axes.xLabel) parts.push(text(right + 3, kategorien.length ? bottom + padBottom - 1.5 : xZero + 8, axes.xLabel, { anchor: 'end', size: 3.2, bold: true }))
   if (axes.yLabel) parts.push(text(Math.max(3, yZero - 10), top - 4, axes.yLabel, { anchor: 'start', size: 3.2, bold: true }))
@@ -176,7 +179,7 @@ function schraegbild(spec: DiagramSpec, widthMm: number): DiagramDrawing {
     if (cell >= 6 || i % 2 === 0) parts.push(text(ox - 1.8, cy + 1, num(axes.yMin + i * axes.yStep), { anchor: 'end', size: 2.6 }))
   }
   for (let i = 1; i <= zSteps; i++) {
-    const t = (i * cell * 0.5) * Math.SQRT1_2
+    const t = i * cell * 0.5 * Math.SQRT1_2
     const px = ox - t
     const py = oy + t
     parts.push(line(px - 0.6, py - 0.6, px + 0.6, py + 0.6, AXIS, 0.3))
@@ -211,8 +214,13 @@ function marken(s: TimelineSection): { a: number; b: number; werte: number[] } {
   return { a, b, werte }
 }
 
-/** Zeitleiste – Abschnitte, Stufen, Stränge, Ereignisse, Karoraster als Zeichenfläche. */
-function zeitleiste(spec: DiagramSpec, widthMm: number): DiagramDrawing {
+/**
+ * Zeitleiste – Abschnitte, Stufen, Stränge, Ereignisse, Karoraster als Zeichenfläche.
+ * `raster = false`: fertige Material-Zeitleiste (27.09.2026) – ohne Karo, das nur Rauschen wäre.
+ * `extraTop`: zusätzlicher Platz über der obersten Stufe, wenn Beschriftungen dort sonst nicht
+ * unterkommen (die Zeichnung wird um so viel höher; siehe Beschriftungen unten).
+ */
+function zeitleiste(spec: DiagramSpec, widthMm: number, raster = true, extraTop = 0): DiagramDrawing {
   const t: TimelineSpec = spec.timeline
   const abschnitte: TimelineSection[] = t.sections.length ? t.sections : [{ from: t.from, to: t.to, unit: t.unit, step: t.step }]
   const straenge = t.strands.length > 1 ? t.strands : []
@@ -220,14 +228,14 @@ function zeitleiste(spec: DiagramSpec, widthMm: number): DiagramDrawing {
   const linksText = straenge.length ? straenge : stufen
   const padLeft = linksText.length ? Math.min(45, Math.max(...linksText.map((s) => textWidthMm(s, 2.8))) + 6) : t.yLabel ? 8 : 5
   const padRight = 7
-  const padTop = t.yLabel ? 11 : 7
+  const padTop = (t.yLabel ? 11 : 7) + extraTop
   const padBottom = 11
-  const height = spec.heightMm
+  const height = spec.heightMm + extraTop
   const availW = widthMm - padLeft - padRight
   const availH = height - padTop - padBottom
   const gridW = Math.floor((widthMm - 1) / 5) * 5
   const gridH = Math.floor((height - 1) / 5) * 5
-  const parts: string[] = [plainGrid(0.5, 0.5, gridW, gridH, 5, false)]
+  const parts: string[] = raster ? [plainGrid(0.5, 0.5, gridW, gridH, 5, false)] : []
 
   // Abschnitte: Breite nach Zahl der Marken, mindestens 22 mm, dazwischen 5 mm für das Bruchzeichen
   const luecke = 5
@@ -302,10 +310,13 @@ function zeitleiste(spec: DiagramSpec, widthMm: number): DiagramDrawing {
     parts.push(line(padLeft, by, padLeft, padTop - 1, AXIS, 0.4), `<path d="M ${round(padLeft)} ${round(padTop - 1)} l -1.1 1.8 h 2.2 z" fill="${AXIS}"/>`)
     stufen.forEach((s, i) => {
       const cy = by - (i + 1) * bandH
-      parts.push(`<line x1="${round(padLeft)}" y1="${round(cy)}" x2="${round(right)}" y2="${round(cy)}" stroke="${MEDIUM}" stroke-width="0.25" stroke-dasharray="1.5 1"/>`)
+      parts.push(
+        `<line x1="${round(padLeft)}" y1="${round(cy)}" x2="${round(right)}" y2="${round(cy)}" stroke="${MEDIUM}" stroke-width="0.25" stroke-dasharray="1.5 1"/>`
+      )
       parts.push(text(padLeft - 1.8, cy + 1, s, { anchor: 'end', size: 2.7 }))
     })
-    if (t.yLabel) parts.push(text(padLeft + 2.5, padTop - 4, t.yLabel, { anchor: 'start', size: 3, bold: true }))
+    // Ganz oben, damit der Platz darunter (extraTop) für Beschriftungen frei bleibt
+    if (t.yLabel) parts.push(text(padLeft + 2.5, Math.min(padTop - 4, 6), t.yLabel, { anchor: 'start', size: 3, bold: true }))
   }
   // Vorgegebene Ereignisse
   const stufenY = (level: number | undefined, by: number): number => {
@@ -313,31 +324,78 @@ function zeitleiste(spec: DiagramSpec, widthMm: number): DiagramDrawing {
     const bandH = Math.min(12, (by - padTop - 2) / stufen.length)
     return by - (level + 1) * bandH
   }
-  t.events.forEach((e, n) => {
-    const seg = abschnitte.findIndex((a) => {
-      const v = datumZahl(e.date, a.unit)
-      const i = infos[abschnitte.indexOf(a)]
-      return v !== null && v >= i.a - 1e-9 && v <= i.b + 1e-9
+  /*
+   * Beschriftungen ohne Überlagerung (27.09.2026): Bei einer Material-Zeitleiste liegen
+   * Ereignisse oft dicht (1., 3., 4. August 1914). Jede Beschriftung sucht sich – abwechselnd
+   * über und unter dem Punkt – die erste Zeile, in der sie keine schon gesetzte überdeckt;
+   * rückt sie dafür vom Punkt weg, führt eine dünne Linie zum Punkt. Am linken und rechten
+   * Rand rückt der Text ein, statt abgeschnitten zu werden.
+   */
+  const SCHRIFT = 2.5
+  const ZEILE = 3.3
+  /* Obergrenze für Beschriftungen: unter der Achsenbeschriftung bzw. am Blattrand */
+  const obenGrenze = t.yLabel ? 8 : 0.5
+  const gesetzt: { x0: number; x1: number; y0: number; y1: number }[] = []
+  // Kleine Toleranz gegen Gleitkommareste (28.300000000000004 > 28.3 wäre sonst „überdeckt")
+  const frei = (x0: number, x1: number, y0: number, y1: number): boolean =>
+    !gesetzt.some((g) => x0 < g.x1 + 1 - 1e-6 && x1 > g.x0 - 1 + 1e-6 && y0 < g.y1 + 0.6 - 1e-6 && y1 > g.y0 - 0.6 + 1e-6)
+  let ohnePlatz = false
+  const ereignisse = t.events
+    .map((e, n) => {
+      const seg = abschnitte.findIndex((a) => {
+        const v = datumZahl(e.date, a.unit)
+        const i = infos[abschnitte.indexOf(a)]
+        return v !== null && v >= i.a - 1e-9 && v <= i.b + 1e-9
+      })
+      if (seg < 0) return null
+      const v = datumZahl(e.date, abschnitte[seg].unit) ?? infos[seg].a
+      const cx = xVon(v, seg)
+      const by = baseline(Math.min(lanes - 1, e.strand ?? 0))
+      return { e, n, cx, by, cy: stufenY(e.level, by) }
     })
-    if (seg < 0) return
-    const v = datumZahl(e.date, abschnitte[seg].unit) ?? infos[seg].a
-    const cx = xVon(v, seg)
-    const by = baseline(Math.min(lanes - 1, e.strand ?? 0))
-    const cy = stufenY(e.level, by)
+    .filter((x): x is NonNullable<typeof x> => Boolean(x))
+    .sort((a, b) => a.cx - b.cx || a.n - b.n)
+  // Die Punkte selbst sind belegt – keine Beschriftung läuft durch einen Punkt (auch nicht durch den eines anderen Ereignisses)
+  for (const p of ereignisse) gesetzt.push({ x0: p.cx - 1.6, x1: p.cx + 1.6, y0: p.cy - 1.6, y1: p.cy + 1.6 })
+  for (const { e, n, cx, by, cy } of ereignisse) {
     parts.push(`<circle cx="${round(cx)}" cy="${round(cy)}" r="1.2" fill="${AXIS}"/>`)
     if (cy !== by) parts.push(line(cx, cy, cx, by, STRONG, 0.25))
-    /*
-     * Beschriftung abwechselnd über und unter dem Punkt, aber immer im Bild: oben nur, wenn
-     * Platz bis zum Rand ist; unter der Grundlinie erst unter den Datumsmarken. Am linken und
-     * rechten Rand rückt der Text ein, statt abgeschnitten zu werden.
-     */
-    const passtOben = cy - 2.8 >= padTop + 2.5
-    const oben = passtOben && (n % 2 === 0 || cy === by)
-    const ty = oben ? cy - 2.6 : cy === by ? by + 9 : cy + 4.8
-    const anchor = cx < padLeft + 14 ? 'start' : cx > right - 14 ? 'end' : 'middle'
-    const tx = anchor === 'start' ? cx - 1.5 : anchor === 'end' ? cx + 1.5 : cx
-    parts.push(text(tx, ty, e.text, { size: 2.5, anchor }))
-  })
+    const breite = textWidthMm(e.text, SCHRIFT)
+    const anchor = cx - breite / 2 < padLeft - 2 ? 'start' : cx + breite / 2 > widthMm - 1.5 ? 'end' : 'middle'
+    const tx = anchor === 'start' ? Math.max(1, cx - 1.5) : anchor === 'end' ? Math.min(widthMm - 1, cx + 1.5) : cx
+    const x0 = anchor === 'start' ? tx : anchor === 'end' ? tx - breite : tx - breite / 2
+    const x1 = x0 + breite
+    // Unter der Grundlinie erst unter den Datumsmarken; über dem Punkt nur, wenn Platz bis zum Rand ist
+    const untenStart = cy === by ? by + 9 : cy + 4.8
+    const obenStart = cy - 2.6
+    const bevorzugtOben = n % 2 === 0 || cy === by
+    let platz: { ty: number; oben: boolean } | null = null
+    for (let zeile = 0; zeile < 6 && !platz; zeile++) {
+      for (const oben of bevorzugtOben ? [true, false] : [false, true]) {
+        const ty = oben ? obenStart - zeile * ZEILE : untenStart + zeile * ZEILE
+        if (oben && ty - SCHRIFT < obenGrenze) continue
+        if (!oben && ty > height - 1) continue
+        if (frei(x0, x1, ty - SCHRIFT, ty + 0.6)) {
+          platz = { ty, oben }
+          break
+        }
+      }
+    }
+    if (!platz) ohnePlatz = true
+    const ty = platz?.ty ?? (bevorzugtOben && obenStart - SCHRIFT >= obenGrenze ? obenStart : untenStart)
+    gesetzt.push({ x0, x1, y0: ty - SCHRIFT, y1: ty + 0.6 })
+    // Weggerückt: dünne Führungslinie vom Punkt zur Beschriftung
+    if (platz && ((platz.oben && ty < obenStart - 0.1) || (!platz.oben && ty > untenStart + 0.1))) {
+      parts.push(line(cx, platz.oben ? cy - 1.4 : cy === by ? by + 7 : cy + 1.4, cx, platz.oben ? ty + 0.8 : ty - SCHRIFT - 0.2, STRONG, 0.25))
+    }
+    parts.push(text(tx, ty, e.text, { size: SCHRIFT, anchor }))
+  }
+  /*
+   * Fand eine Beschriftung keinen Platz (dichte Ereignisse auf der obersten Stufe, wie die
+   * Kriegserklärungen vom 1., 3. und 4. August 1914), bekommt die Zeichnung oben mehr Raum
+   * und wird noch einmal gesetzt – höchstens fünf Zeilen mehr.
+   */
+  if (ohnePlatz && extraTop < 5 * ZEILE - 0.1) return zeitleiste(spec, widthMm, raster, extraTop + ZEILE)
 
   const frame: DiagramFrame = {
     left: padLeft,
@@ -349,8 +407,12 @@ function zeitleiste(spec: DiagramSpec, widthMm: number): DiagramDrawing {
     yMin: 0,
     yMax: stufen.length,
     hinweis: [
-      ...abschnitte.map((a, s) => `Abschnitt ${s + 1}: ${a.from} bei ${round(segLeft[s])} mm bis ${a.to} bei ${round(segLeft[s] + breiten[s])} mm (Einheit ${a.unit}, linear)`),
-      straenge.length ? `Stränge (Grundlinien): ${straenge.map((s, i) => `„${s}" bei y = ${round(baseline(i))} mm`).join(', ')}` : `Grundlinie bei y = ${round(baseline(0))} mm`,
+      ...abschnitte.map(
+        (a, s) => `Abschnitt ${s + 1}: ${a.from} bei ${round(segLeft[s])} mm bis ${a.to} bei ${round(segLeft[s] + breiten[s])} mm (Einheit ${a.unit}, linear)`
+      ),
+      straenge.length
+        ? `Stränge (Grundlinien): ${straenge.map((s, i) => `„${s}" bei y = ${round(baseline(i))} mm`).join(', ')}`
+        : `Grundlinie bei y = ${round(baseline(0))} mm`,
       stufen.length ? `Stufen von unten nach oben: ${stufen.map((s, i) => `„${s}" bei y = ${round(stufenY(i, baseline(0)))} mm`).join(', ')}` : ''
     ]
       .filter(Boolean)
@@ -360,7 +422,7 @@ function zeitleiste(spec: DiagramSpec, widthMm: number): DiagramDrawing {
 }
 
 /** Zeichnet die Fläche einer Diagramm-Antwort in der angegebenen Breite. */
-export function diagramDrawing(roh: DiagramSpec | undefined, widthMm: number): DiagramDrawing {
+export function diagramDrawing(roh: DiagramSpec | undefined, widthMm: number, opts: { raster?: boolean } = {}): DiagramDrawing {
   const spec = sanitizeDiagram(roh)
   const width = Math.max(60, widthMm)
   if (spec.kind === 'klima') {
@@ -382,7 +444,7 @@ export function diagramDrawing(roh: DiagramSpec | undefined, widthMm: number): D
     }
   }
   if (spec.kind === 'schraegbild') return schraegbild(spec, width)
-  if (spec.kind === 'zeitleiste') return zeitleiste(spec, width)
+  if (spec.kind === 'zeitleiste') return zeitleiste(spec, width, opts.raster !== false)
   return kartesisch(spec, width)
 }
 
@@ -390,4 +452,3 @@ export function diagramDrawing(roh: DiagramSpec | undefined, widthMm: number): D
 export function diagramDataUrl(drawing: DiagramDrawing): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(drawing.svg)}`
 }
-

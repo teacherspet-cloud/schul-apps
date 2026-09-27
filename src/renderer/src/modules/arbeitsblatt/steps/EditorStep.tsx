@@ -1,33 +1,10 @@
-import {
-  ActionIcon,
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  Divider,
-  Group,
-  Menu,
-  Modal,
-  Popover,
-  ScrollArea,
-  SegmentedControl,
-  Select,
-  Stack,
-  Text,
-  TextInput,
-  Tooltip
-} from '@mantine/core'
+import { ActionIcon, Box, Button, Checkbox, Group, Menu, Modal, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
 import {
   IconMoodSmile,
-  IconAdjustmentsHorizontal,
   IconAlertTriangle,
-  IconArrowLeft,
-  IconDeviceFloppy,
-  IconFileTypeDocx,
-  IconFileTypePdf,
   IconPhoto,
+  IconTimeline,
   IconPlus,
-  IconPrinter,
   IconCircleNumber0,
   IconClipboardCheck,
   IconCopy,
@@ -53,8 +30,6 @@ import { generateExample } from '../generation/example'
 import { generateSolution } from '../generation/solution'
 import { KiHinweise } from './KiHinweise'
 import { IllustrationDialog } from './IllustrationDialog'
-import { illustrationenVorschlag, platziereIllustrationen } from '../generation/illustrationen'
-import { useMaskottchen } from '../../../shared/maskottchenStore'
 import { hoerenIstPruefgegenstand } from '../didactics/audioRules'
 import { plainText } from '../../../shared/richtext/parse'
 import { estimateSeconds } from '../generation/convert'
@@ -70,7 +45,10 @@ import { contextFor, layoutKey, pageInfoFor, profileFromMeta, SheetPages, useShe
 import { deckblattVorschau } from '../render/deckblattVorschau'
 import { deckblattBilder } from '../render/deckblattBilder'
 import { DeckblattSeitenwahl, DeckblattWerkzeuge } from './DeckblattWerkzeuge'
-import UeberthemaFeld from '../../../shared/components/UeberthemaFeld'
+import EditorLeiste from '../../../shared/components/EditorLeiste'
+import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
+import CanaryDialog from '../../../shared/components/CanaryDialog'
+import IllustrationenOption from './IllustrationenOption'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 import '../render/ws.css'
@@ -78,7 +56,6 @@ import { useArbeitsblatt } from '../store'
 import { bausteinAuftrag, hinweiseBeheben, maskottchenZeichnen } from '../auftraege'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { defaultWorksheetName, setPreviewLayouts } from '../library'
-import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import '../../vokabeltest/steps/editor.css'
 import { BlockSettings } from './BlockSettings'
 import WarningButton from '../../../shared/components/WarningButton'
@@ -94,9 +71,9 @@ import SeitenHinweis from './SeitenHinweis'
 import { browserSourceServices, completeOriginalSources } from '../generation/originalSources'
 import { browserWorksheetImageDeps } from '../generation/browserImages'
 import { completeWorksheetImages } from '../generation/worksheetImages'
-import { CANARY_MAX, CANARY_WORDS, canaryNote, canaryText, canaryWordFor, canaryWords } from '../../../shared/aiCanary'
+import { istZeitleiste, zeitleisteAusBeschreibung } from '../generation/zeitleiste'
+import { canaryWordFor } from '../../../shared/aiCanary'
 import { CoverPage } from '../render/CoverPage'
-import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useDruck } from '../../../shared/navigation'
 
 export default function EditorStep(): React.JSX.Element {
@@ -131,7 +108,6 @@ export default function EditorStep(): React.JSX.Element {
   const [designs, setDesigns] = useState<DesignTemplate[]>([])
   // Beim Einschalten des KI-Tests fragt die App nach den Wörtern (siehe CanaryDialog)
   const [canaryOffen, setCanaryOffen] = useState(false)
-  const [optionenOffen, setOptionenOffen] = useState(false)
   const { layouts, measure } = useSheetLayouts(ws, logo, schoolName)
   const docName = useArbeitsblatt((s) => s.docName)
   const savedAt = useArbeitsblatt((s) => s.savedAt)
@@ -159,7 +135,6 @@ export default function EditorStep(): React.JSX.Element {
   }, [])
   // Maskottchen an einen Baustein heften (26.09.2026)
   const [illuBlockId, setIlluBlockId] = useState<string | null>(null)
-  const maskottchenListe = useMaskottchen((s) => s.liste)
 
   const sheet = ws?.sheets.find((s) => s.id === activeSheetId) ?? ws?.sheets[0]
   const profile = useMemo(() => (ws ? profileFromMeta(ws.meta) : null), [ws])
@@ -228,6 +203,19 @@ export default function EditorStep(): React.JSX.Element {
    * – auch wenn inzwischen ein anderes Blatt offen ist.
    */
   const docId = useArbeitsblatt.getState().docId
+
+  /**
+   * Eine als Bild beschriebene Zeitleiste von der App zeichnen lassen (27.09.2026) – für
+   * Platzhalter auf vorhandenen Blättern; neue Blätter bekommen die Zeichnung beim Fertigstellen.
+   */
+  const zeitleisteZeichnen = (block: WsBlock): void => {
+    if (block.type !== 'image') return
+    bausteinAuftrag(ws, docId, 'Zeitleiste zeichnen', block.id, block.id, async (w, k) => {
+      const grid = await zeitleisteAusBeschreibung(block, w.meta, k.ai)
+      if (!grid) throw new Error('Aus der Beschreibung ließ sich keine Zeitleiste mit mindestens zwei Ereignissen ableiten.')
+      return (current) => addVersion(current, grid)
+    })
+  }
 
   /** Ersetzt den Baustein durch einen neuen Entwurf; der bisherige Stand bleibt abrufbar. */
   const reviseBlock = (block: WsBlock, instruction = ''): void =>
@@ -464,6 +452,12 @@ export default function EditorStep(): React.JSX.Element {
                 Beispiellösung in Aufgabe hinzufügen
               </Menu.Item>
             )}
+            {/* Platzhalter einer Zeitleiste: die App zeichnet sie aus der Beschreibung (generation/zeitleiste.ts) */}
+            {block.type === 'image' && !block.image && istZeitleiste(block) && (
+              <Menu.Item leftSection={<IconTimeline size={14} />} onClick={() => zeitleisteZeichnen(block)}>
+                Als Zeitleiste zeichnen lassen
+              </Menu.Item>
+            )}
             {/*
              * Nur in der Lösungsansicht (26.09.2026): Dort fehlte im KI-Menü jeder Weg, eine
              * Lösung erzeugen zu lassen. Erwartungshorizont + Musterlösung in Schülerform.
@@ -547,60 +541,37 @@ export default function EditorStep(): React.JSX.Element {
         wert={illuBlock?.illustration}
         onChange={(neu) => illuBlock && updateBlock(sheet.id, illuBlock.id, (d) => (neu ? (d.illustration = neu) : delete d.illustration))}
       />
-      <Group px="md" py={8} gap="xs" className="app-toolbar">
-        <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} onClick={() => setStep(1)}>
-          Gliederung
-        </Button>
-        {/* Strg+Z / Strg+Y hängen am Programm (ArbeitsblattModule), damit sie in allen Schritten gelten */}
-        <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />
-        <Divider orientation="vertical" />
-        {ws.sheets.length > 1 && view !== 'board' && view !== 'audio' && (
-          <SegmentedControl size="xs" value={sheet.id} onChange={setActiveSheet} data={ws.sheets.map((s) => ({ value: s.id, label: s.label }))} />
-        )}
-        <SegmentedControl
-          size="xs"
-          value={view}
-          onChange={(v) => setView(v as typeof view)}
-          data={[
+      <EditorLeiste
+        zurueck={{ label: 'Gliederung', onClick: () => setStep(1) }}
+        undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
+        fassungen={
+          ws.sheets.length > 1 && view !== 'board' && view !== 'audio'
+            ? { value: sheet.id, onChange: setActiveSheet, data: ws.sheets.map((s) => ({ value: s.id, label: s.label })), ariaLabel: 'Niveaustufe' }
+            : null
+        }
+        ansichten={{
+          value: view,
+          onChange: (v) => setView(v as typeof view),
+          data: [
             { value: 'student', label: 'Arbeitsblatt' },
             { value: 'key', label: 'Lösungen' },
             { value: 'board', label: ws.board ? 'Tafelbild' : 'Tafelbild +' },
             ...(hasAudio ? [{ value: 'audio', label: 'Hörtexte' }] : [])
-          ]}
-        />
-        {/*
-         * Blattoptionen gebündelt (Paket 6): Bis dahin standen Sternchen, Schulangaben,
-         * Korrekturrand, Notizrand, Blocksatz, Deckblatt, KI-Test und Design einzeln in der
-         * Leiste – rund zwanzig Elemente, die am Tablet seitlich weggewischt werden mussten.
-         * Jetzt stehen sie in einem Fenster, mit ihren Erklärungen als Beschreibung.
-         */}
-        <Popover opened={optionenOffen} onChange={setOptionenOffen} width={360} position="bottom-start" shadow="md" withArrow trapFocus={false} keepMounted>
-          <Popover.Target>
-            <Button size="xs" variant="default" leftSection={<IconAdjustmentsHorizontal size={14} />} onClick={() => setOptionenOffen((o) => !o)}>
-              Blattoptionen
-            </Button>
-          </Popover.Target>
-          <Popover.Dropdown>
-            <Stack gap="sm" mah="70vh" style={{ overflowY: 'auto' }} className="blattoptionen">
-              {/*
-               * Die Designvorlage steht OBEN (Wunsch der Lehrkraft vom 26.09.2026): Unten, unter
-               * rund zehn Schaltern, war sie erst nach Scrollen zu sehen und wurde nicht gefunden.
-               */}
-              <Select
-                size="sm"
-                label="Designvorlage"
-                data={designs.map((d) => ({
-                  value: d.id,
-                  label: d.name
-                }))}
-                value={designs.some((d) => d.id === ws.design.id) ? ws.design.id : null}
-                placeholder="Design wählen"
-                onChange={(v) => {
-                  const d = designs.find((x) => x.id === v)
-                  if (d) update((w) => (w.design = structuredClone(d)))
-                }}
-              />
-              {ws.meta.differentiation.levels > 1 && (
+          ]
+        }}
+        optionen={
+          /*
+           * Blattoptionen gebündelt (Paket 6): Bis dahin standen Sternchen, Schulangaben,
+           * Korrekturrand, Notizrand, Blocksatz, Deckblatt, KI-Test und Design einzeln in der
+           * Leiste – rund zwanzig Elemente, die am Tablet seitlich weggewischt werden mussten.
+           * Seit 27.09.2026 sind die Felder für alle Programme dieselben (BlattoptionenFelder).
+           */
+          <BlattoptionenFelder
+            designs={designs}
+            designId={ws.design.id}
+            onDesign={(d) => update((w) => (w.design = structuredClone(d)))}
+            nachDesign={
+              ws.meta.differentiation.levels > 1 && (
                 <Checkbox
                   size="sm"
                   label="Sternchen zeigen"
@@ -608,114 +579,17 @@ export default function EditorStep(): React.JSX.Element {
                   checked={ws.meta.showLevelMarks !== false}
                   onChange={(e) => update((w) => (w.meta.showLevelMarks = e.currentTarget.checked))}
                 />
-              )}
-              <Checkbox
-                size="sm"
-                label="Schulangaben"
-                description="Schulname und Logo auf diesem Arbeitsblatt abdrucken – unabhängig von der Designvorlage"
-                checked={ws.meta.showSchool !== false}
-                onChange={(e) => update((w) => (w.meta.showSchool = e.currentTarget.checked))}
-              />
-              {/*
-               * Blocksatz war bisher nur über die Designvorlage erreichbar. Die Belege sprechen
-               * mehrheitlich für Flattersatz – Ofqual 2021, Cambridge International 2026,
-               * leserlich.info (DIN 1450), Netzwerk Leichte Sprache; dagegen steht die
-               * Handreichung des ISB Bayern 2012, die Blocksatz bei längeren Texten empfiehlt.
-               * Weil die Quellen sich widersprechen, entscheidet die Lehrkraft – sichtbar und je
-               * Arbeitsblatt. Bei Einfacher und Leichter Sprache bleibt es unabhängig davon aus.
-               */}
-              {/*
-               * Illustrationen (26.09.2026): Vorschlag nach Jahrgang (Einstellung „bis Klasse"),
-               * am Blatt ein- und ausschaltbar; „neu setzen" verteilt die Figuren nach den Regeln.
-               */}
-              {maskottchenListe.length > 0 && (
-                <>
-                  <Checkbox
-                    size="sm"
-                    label="Illustrationen (Maskottchen)"
-                    description={`Figuren an Kästen, Aufgaben und am Anfang/Ende – ${illustrationenVorschlag(ws.meta.grade) ? 'für diesen Jahrgang vorgesehen' : 'für diesen Jahrgang nicht vorgesehen, hier einschaltbar'}`}
-                    checked={ws.meta.illustrationen?.an ?? illustrationenVorschlag(ws.meta.grade)}
-                    onChange={(e) => {
-                      const an = e.currentTarget.checked
-                      update((w) => (w.meta.illustrationen = { ...w.meta.illustrationen, an }))
-                      if (!an) update((w) => w.sheets.forEach((s) => s.blocks.forEach((b) => delete b.illustration)))
-                    }}
-                  />
-                  {(ws.meta.illustrationen?.an ?? illustrationenVorschlag(ws.meta.grade)) && (
-                    <Group gap="xs">
-                      {maskottchenListe.length > 1 && (
-                        <Select
-                          size="xs"
-                          data={maskottchenListe.map((m) => ({ value: m.id, label: m.name }))}
-                          value={ws.meta.illustrationen?.maskottchenId ?? maskottchenListe[0].id}
-                          onChange={(v) => v && update((w) => (w.meta.illustrationen = { ...w.meta.illustrationen, maskottchenId: v }))}
-                          allowDeselect={false}
-                          w={180}
-                        />
-                      )}
-                      <Button
-                        size="compact-xs"
-                        variant="light"
-                        onClick={() =>
-                          void platziereIllustrationen({ ...ws, meta: { ...ws.meta, illustrationen: { ...ws.meta.illustrationen, an: true } } }).then((neu) =>
-                            update((w) => {
-                              w.sheets = neu.sheets
-                            })
-                          )
-                        }
-                      >
-                        Figuren neu setzen
-                      </Button>
-                    </Group>
-                  )}
-                </>
-              )}
-              {/*
-               * Korrekturrand: Erst am fertigen Blatt zeigt sich, ob der Platz gebraucht wird –
-               * deshalb steht der Schalter hier und nicht in den Vorgaben vor dem Erzeugen.
-               */}
-              <Checkbox
-                size="sm"
-                label="Korrekturrand"
-                description="Neben den Schreiblinien 45 mm für Korrekturzeichen freihalten; eine senkrechte Linie trennt den Streifen ab."
-                checked={Boolean(ws.meta.correctionMargin)}
-                onChange={(e) => {
-                  const an = e.currentTarget.checked
-                  update((w) => (w.meta.correctionMargin = an))
-                }}
-              />
-              {/*
-               * Notizrand neben den Materialtexten – gewuenscht am 24.09.2026, „wie beim
-               * korrekturrand". Auch dieser Schalter steht am fertigen Blatt: Ob der Platz
-               * gebraucht wird, zeigt sich erst, wenn man den Text vor sich hat.
-               */}
-              <Checkbox
-                size="sm"
-                label="Notizrand"
-                description="Neben den Materialtexten 42 mm zum Mitschreiben freihalten; eine senkrechte Linie trennt den Streifen ab. Der Seitenumbruch verschiebt sich entsprechend."
-                checked={Boolean(ws.meta.notesMargin)}
-                onChange={(e) => {
-                  const an = e.currentTarget.checked
-                  update((w) => (w.meta.notesMargin = an))
-                }}
-              />
-              <Checkbox
-                size="sm"
-                label="Blocksatz"
-                description="Längere Texte im Blocksatz setzen. Flattersatz gilt als besser lesbar (Ofqual 2021, DIN 1450); bei Einfacher und Leichter Sprache ist Blocksatz immer aus."
-                checked={ws.design.page.justifyText !== false}
-                onChange={(e) => {
-                  const an = e.currentTarget.checked
-                  update((w) => (w.design.page.justifyText = an))
-                }}
-              />
-              {/* Paket 10a: Fachfarbe statt Vorlagenfarbe – hier für dieses eine Blatt abschaltbar */}
-              <VorlagenfarbeSchalter
-                fach={ws.meta.subjectId}
-                checked={Boolean(ws.meta.vorlagenfarbe)}
-                onChange={(an) => update((w) => (w.meta.vorlagenfarbe = an))}
-              />
-              <UeberthemaFeld werte={ws.meta} bereich={bereich?.name ?? ''} onChange={(patch) => update((w) => Object.assign(w.meta, patch), 'ueberthema')} />
+              )
+            }
+            schulangaben={{ checked: ws.meta.showSchool !== false, onChange: (an) => update((w) => (w.meta.showSchool = an)) }}
+            nachSchule={<IllustrationenOption ws={ws} update={update} />}
+            korrekturrand={{ checked: Boolean(ws.meta.correctionMargin), onChange: (an) => update((w) => (w.meta.correctionMargin = an)) }}
+            notizrand={{ checked: Boolean(ws.meta.notesMargin), onChange: (an) => update((w) => (w.meta.notesMargin = an)) }}
+            blocksatz={{ checked: ws.design.page.justifyText !== false, onChange: (an) => update((w) => (w.design.page.justifyText = an)) }}
+            fach={ws.meta.subjectId}
+            vorlagenfarbe={{ checked: Boolean(ws.meta.vorlagenfarbe), onChange: (an) => update((w) => (w.meta.vorlagenfarbe = an)) }}
+            ueberthema={{ werte: ws.meta, bereich: bereich?.name ?? '', onChange: (patch) => update((w) => Object.assign(w.meta, patch), 'ueberthema') }}
+            vorKiTest={
               <Checkbox
                 size="sm"
                 label="Deckblatt"
@@ -723,99 +597,54 @@ export default function EditorStep(): React.JSX.Element {
                 checked={Boolean(ws.meta.coverPage)}
                 onChange={(e) => update((w) => (w.meta.coverPage = e.currentTarget.checked))}
               />
-              <Tooltip
-                multiline
-                w={320}
-                label={
-                  ws.meta.aiCanary
-                    ? canaryNote(canaryWords(ws.meta.aiCanaryWords, canaryWordFor(`${ws.meta.title}|${ws.meta.topic}`)))
-                    : 'Setzt einen für Lernende unsichtbaren Satz auf das Schülerblatt, der ein Sprachmodell zu einem verräterischen Wort verleitet.'
-                }
-              >
-                <Checkbox
-                  size="sm"
-                  label="KI-Test"
-                  checked={Boolean(ws.meta.aiCanary)}
-                  /*
-                   * Beim EINSCHALTEN wird nach den Wörtern gefragt, statt eines zu würfeln: Die
-                   * Lehrkraft sucht hinterher in den Abgaben danach, und nur sie weiß, welches Wort
-                   * im eigenen Unterricht ohnehin gerade vorkommt.
-                   */
-                  onChange={(e) => {
-                    // Das Fenster mit den Wörtern kommt nach vorn – die Blattoptionen gehen dafür zu
-                    if (e.currentTarget.checked) {
-                      setOptionenOffen(false)
-                      setCanaryOffen(true)
-                    } else update((w) => (w.meta.aiCanary = false))
-                  }}
-                />
-              </Tooltip>
-            </Stack>
-          </Popover.Dropdown>
-        </Popover>
-        <Box style={{ flex: 1 }} />
-        <TextInput
-          size="xs"
-          w={220}
-          aria-label="Name in der App"
-          placeholder={defaultWorksheetName(ws)}
-          value={docName}
-          onChange={(e) => setDocName(e.currentTarget.value)}
-        />
-        <Text size="xs" c="dimmed" w={104}>
-          {savedAt ? `gesichert ${new Date(savedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : 'wird gesichert …'}
-        </Text>
-        <Tooltip label="Als Datei speichern …">
-          <ActionIcon
-            size="md"
-            variant="default"
-            aria-label="Als Datei speichern"
-            onClick={async () => {
-              try {
-                const path = await window.api.files.save(`${baseName}.arbeitsblatt`, WORKSHEET_FILTER, serializeWorksheet(ws))
-                if (path) notifySuccess('Arbeitsblatt gespeichert.')
-              } catch (e) {
-                notifyError(e)
-              }
+            }
+            kiTest={{
+              an: Boolean(ws.meta.aiCanary),
+              woerter: ws.meta.aiCanaryWords,
+              vorschlagFuer: `${ws.meta.title}|${ws.meta.topic}`,
+              onEin: () => setCanaryOffen(true),
+              onAus: () => update((w) => (w.meta.aiCanary = false))
             }}
-          >
-            <IconDeviceFloppy size={16} />
-          </ActionIcon>
-        </Tooltip>
-        <Button size="xs" leftSection={<IconFileTypeDocx size={14} />} onClick={() => setExportMode('docx')}>
-          Word
-        </Button>
-        <Button size="xs" leftSection={<IconFileTypePdf size={14} />} onClick={() => setExportMode('pdf')}>
-          PDF
-        </Button>
-        <Button size="xs" variant="light" leftSection={<IconPrinter size={14} />} onClick={() => setExportMode('print')}>
-          Drucken
-        </Button>
-        {/*
-         * Hinweise der KI und der Prüfungen: als Symbol, nicht als Kasten.
-         *
-         * Wunsch der Lehrkraft (25.09.2026): „nach erstellung von material sind die
-         * rot/orangenen kästen mit warnhinweisen für die nutzer inzwischen sehr lang. Mach es
-         * aufrufbar über ein rotes Ausrufezeichen Symbol … Zeige die Warnhinweise nicht mehr
-         * nach Erstellung der materialien, nur über das symbol."
-         *
-         * Der Kasten stand über dem Blatt und wuchs mit jedem Hinweis – bei einem vollen
-         * Arbeitsblatt schob er die erste Seite aus dem Bild.
-         */}
-        <BlattHinweise
-          note={ws.meta.teacherNote}
-          warnings={pageWarnings.map((w) => w.message)}
-          onBeheben={(liste) =>
-            hinweiseBeheben(
-              ws,
-              docId,
-              sheet.id,
-              liste.map((text) => ({ text }))
-            )
+          />
+        }
+        name={{ value: docName, placeholder: defaultWorksheetName(ws), onChange: setDocName }}
+        gesichertAm={savedAt}
+        dateiSpeichern={{
+          tooltip: 'Als Datei speichern …',
+          onClick: async () => {
+            try {
+              const path = await window.api.files.save(`${baseName}.arbeitsblatt`, WORKSHEET_FILTER, serializeWorksheet(ws))
+              if (path) notifySuccess('Arbeitsblatt gespeichert.')
+            } catch (e) {
+              notifyError(e)
+            }
           }
-          laeuft={busy.has(`beheben-${sheet.id}`)}
-        />
-      </Group>
+        }}
+        ausgabe={{ onWord: () => setExportMode('docx'), onPdf: () => setExportMode('pdf'), onDrucken: () => setExportMode('print') }}
+        rechts={
+          /*
+           * Hinweise der KI und der Prüfungen: als Symbol, nicht als Kasten.
+           *
+           * Wunsch der Lehrkraft (25.09.2026): „nach erstellung von material sind die
+           * rot/orangenen kästen mit warnhinweisen für die nutzer inzwischen sehr lang. Mach es
+           * aufrufbar über ein rotes Ausrufezeichen Symbol … Zeige die Warnhinweise nicht mehr
+           * nach Erstellung der materialien, nur über das symbol."
+           */
+          <BlattHinweise
+            note={ws.meta.teacherNote}
+            warnings={pageWarnings.map((w) => w.message)}
+            onBeheben={(liste) =>
+              hinweiseBeheben(
+                ws,
+                docId,
+                sheet.id,
+                liste.map((text) => ({ text }))
+              )
+            }
+            laeuft={busy.has(`beheben-${sheet.id}`)}
+          />
+        }
+      />
 
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">
         <Stack align="center" py="lg" gap="md">
@@ -855,7 +684,10 @@ export default function EditorStep(): React.JSX.Element {
                 ws={ws}
                 sheet={sheet}
                 plans={plans}
-                info={pageInfoFor(ws, sheet, logo, schoolName, key, citationStyle)}
+                info={{
+                  ...pageInfoFor(ws, sheet, logo, schoolName, key, citationStyle),
+                  onTitle: (title) => update((w) => (w.meta.title = title.trim()), 'titel')
+                }}
                 context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', {
                   update: (id, fn) => updateBlock(sheet.id, id, fn),
                   actions: {
@@ -1160,80 +992,6 @@ function BlattHinweise({
         </Stack>
       </Modal>
     </>
-  )
-}
-
-function CanaryDialog({
-  offen,
-  vorschlag,
-  wert,
-  onAbbruch,
-  onFertig
-}: {
-  offen: boolean
-  vorschlag: string
-  wert: string
-  onAbbruch: () => void
-  onFertig: (woerter: string) => void
-}): React.ReactElement {
-  const [text, setText] = useState(wert)
-  // Beim Öffnen mit dem Vorschlag beginnen, wenn noch nichts gewählt wurde
-  useEffect(() => {
-    if (offen) setText(wert || vorschlag)
-  }, [offen, wert, vorschlag])
-
-  const woerter = canaryWords(text, vorschlag)
-  return (
-    <Modal opened={offen} onClose={onAbbruch} title="Wörter für den KI-Test" size="lg">
-      <Stack gap="sm">
-        <Text size="sm">
-          Auf dem Schülerblatt steht ein für Lernende unsichtbarer Satz, der ein Sprachmodell dazu bringt, diese Wörter einzubauen. Tauchen sie in einer Abgabe
-          auf, ist der Blatttext durch eine KI gelaufen.
-        </Text>
-        <TextInput
-          label={`Wort oder Wörter (durch Komma getrennt, höchstens ${CANARY_MAX})`}
-          value={text}
-          onChange={(e) => setText(e.currentTarget.value)}
-          data-autofocus
-        />
-        <Group gap="xs">
-          <Text size="xs" c="dimmed">
-            Vorschläge:
-          </Text>
-          {CANARY_WORDS.map((w) => (
-            <Button key={w} size="compact-xs" variant="light" onClick={() => setText(w)}>
-              {w}
-            </Button>
-          ))}
-        </Group>
-        <Alert variant="light" color="gray">
-          <Text size="xs">Auf dem Blatt steht dann unsichtbar: „{canaryText(woerter)}"</Text>
-        </Alert>
-        {/*
-         * Was der Test leistet und was nicht – vor dem Einschalten, nicht erst hinterher.
-         *
-         * Die Angaben stammen aus der Recherche vom 25.09.2026: Die Model Spec von OpenAI
-         * entzieht Anweisungen aus Dateianhängen ausdrücklich die Verbindlichkeit, und
-         * Reasoning-Modelle erkennen versteckte Fremdanweisungen. Eine Lehrkraft, die das
-         * nicht weiß, hält einen fehlenden Treffer für einen Freispruch.
-         */}
-        <Alert variant="light" color="yellow" title="Was der Test leisten kann">
-          <Text size="xs">
-            Ein Treffer ist ein <b>Indiz für das Gespräch</b>, kein Nachweis. Am ehesten wirkt der Test, wenn der Aufgabentext kopiert und eingefügt wird. Beim
-            Hochladen der PDF-Datei behandeln ChatGPT und Claude Anweisungen aus Anhängen regelgemäß als bloße Information; beim Abfotografieren geht der Satz
-            gar nicht mit. Wer eine Vorlesefunktion nutzt, bekommt ihn vorgelesen – die Vorgabe ist deshalb bewusst harmlos und ändert nichts an der Lösung.
-          </Text>
-        </Alert>
-        <Group justify="flex-end">
-          <Button variant="default" onClick={onAbbruch}>
-            Abbrechen
-          </Button>
-          <Button onClick={() => onFertig(woerter.join(', '))} disabled={!woerter.length}>
-            KI-Test einschalten
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
   )
 }
 

@@ -29,9 +29,13 @@ interface KlassenarbeitState {
   /** `gruppe` fasst fortlaufendes Tippen in einem Feld (oder einen Zug) zu einem Verlaufsschritt zusammen */
   update: (fn: (draft: Exam) => void, gruppe?: string) => void
   markSaved: (id: string, savedAt: string, name: string) => void
+  /** Name in der App – aus der Werkzeugleiste (27.09.2026) */
+  setDocName: (name: string) => void
   /** Die offene Arbeit wurde aus der Bibliothek gelöscht: Sie gilt wieder als ungesichert. */
   forgetSaved: () => void
   openSaved: (id: string, name: string, exam: Exam, savedAt: string) => void
+  /** Aus einer .klassenarbeit-Datei: neues Dokument, noch nicht in der Bibliothek */
+  loadFromFile: (exam: Exam) => void
   reset: () => void
   endGroup: () => void
   undo: () => void
@@ -74,7 +78,21 @@ export const useKlassenarbeit = create<KlassenarbeitState>((set, get) => ({
   markSaved: (docId, savedAt, docName) => {
     if (docId === get().docId) set({ savedAt, docName })
   },
+  setDocName: (docName) => set({ docName }),
   forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  loadFromFile: (roh) => {
+    const exam = normalisiereArbeit(roh)
+    set({
+      docId: newId(),
+      docName: '',
+      exam,
+      savedAt: null,
+      step: exam.parts.some((p) => p.blocks.length) ? 1 : 0,
+      fassung: 0,
+      loesung: false,
+      verlauf: leererVerlauf()
+    })
+  },
   // Gespeicherte Arbeiten auf den heutigen Stand (Fassungen) – eine Arbeit mit einer Fassung bleibt unverändert
   openSaved: (docId, docName, gespeichert, savedAt) => {
     const exam = normalisiereArbeit(gespeichert)

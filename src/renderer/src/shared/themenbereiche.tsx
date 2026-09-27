@@ -267,6 +267,23 @@ export async function abgleichen(materialien: ThemenMaterial[]): Promise<void> {
   }
 }
 
+/**
+ * Gleich nach dem Speichern eines Materials einsortieren (27.09.2026). Bis dahin lief die
+ * Automatik nur beim Aufruf der Startseite oder einer Bibliothek – ein eben erzeugtes Blatt
+ * stand bis dahin in keinem Bereich. Mit der ganzen Materialliste, weil `abgleichen` daran
+ * auch verwaiste Zuordnungen erkennt. Der Import ist dynamisch: Die Bibliotheken der Programme
+ * hängen von dieser Datei ab, nicht umgekehrt.
+ */
+export async function einsortierenNachSpeichern(): Promise<void> {
+  try {
+    const { ladeMaterialien } = await import('../shell/materialien')
+    const alle = await ladeMaterialien()
+    await abgleichen(alle.filter((m) => m.moduleId !== 'vokabelliste'))
+  } catch {
+    // Das Einsortieren ist eine Zugabe – das Blatt ist gespeichert
+  }
+}
+
 /** Material wurde als Kopie angelegt: Die Kopie kommt in denselben Bereich (Paket 10b) */
 export async function zuordnungKopieren(moduleId: string, altId: string, neuId: string): Promise<void> {
   const z = useThemen.getState().daten.zuordnungen[materialSchluessel(moduleId, altId)]

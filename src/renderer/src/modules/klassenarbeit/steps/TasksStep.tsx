@@ -2,8 +2,10 @@ import {
   ActionIcon,
   Alert,
   Badge,
+  Box,
   Button,
   Card,
+  Collapse,
   Container,
   Group,
   List,
@@ -11,15 +13,25 @@ import {
   Popover,
   Radio,
   ScrollArea,
-  SegmentedControl,
   Stack,
   Text,
   Textarea,
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconFileTypeDocx, IconFileTypePdf, IconHeadphones, IconInfoCircle, IconPrinter, IconRefresh, IconSparkles } from '@tabler/icons-react'
-import { useMemo, useState } from 'react'
+import {
+  IconCopy,
+  IconFileTypeDocx,
+  IconHeadphones,
+  IconInfoCircle,
+  IconPrinter,
+  IconRefresh,
+  IconSparkles,
+  IconTrash,
+  IconChevronDown,
+  IconChevronUp
+} from '@tabler/icons-react'
+import { useEffect, useMemo, useState } from 'react'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { comprehensionFormatById } from '../../arbeitsblatt/didactics/comprehensionFormats'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
@@ -28,6 +40,18 @@ import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/Loe
 import { useDruck } from '../../../shared/navigation'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
+import { KiMenue, VersionSwitcher } from '../../arbeitsblatt/steps/BlockRevision'
+import { BlockSettings } from '../../arbeitsblatt/steps/BlockSettings'
+import { EinfuegenUntermenue } from '../../arbeitsblatt/steps/EinfuegenMenue'
+import WarningButton from '../../../shared/components/WarningButton'
+import { regenerateBlock } from '../../arbeitsblatt/generation/generate'
+import { profileFromMeta } from '../../arbeitsblatt/render/SheetPages'
+import { addVersion, switchVersion } from '../../arbeitsblatt/model/versions'
+import { newBlock } from '../../arbeitsblatt/model/factory'
+import { newId } from '../../vokabeltest/model/random'
+import { examHeadBlock } from '../render/examWorksheet'
+import { operatorenBefund, operatorenlisteAktiv } from '../didactics/operatorenliste'
+import type { WsBlockType } from '../../arbeitsblatt/model/types'
 import { WsContext, type WsContextValue } from '../../arbeitsblatt/render/WsContext'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
@@ -37,13 +61,19 @@ import { generateExam, reviseExamPart, upperSecondary } from '../generation/gene
 import { CONTENT_SHARE, formatById } from '../model/formats'
 import type { Exam, ExamPart } from '../model/types'
 import { examGrades } from '../model/types'
-import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, teilNachUeberarbeitung } from '../model/fassungen'
+import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, mitBloecken, teilNachUeberarbeitung } from '../model/fassungen'
 import { examHasContent, examToWorksheet, examToWorksheetAlle } from '../render/examWorksheet'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import { arbeitHinweiseBeheben } from '../beheben'
 import { AudioPanel } from '../../arbeitsblatt/steps/AudioPanel'
 import type { Worksheet } from '../../arbeitsblatt/model/types'
 import { useKlassenarbeit } from '../store'
+import { EXAM_FILTER, serializeExam } from '../project'
+import EditorLeiste from '../../../shared/components/EditorLeiste'
+import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
+import CanaryDialog from '../../../shared/components/CanaryDialog'
+import { canaryWordFor } from '../../../shared/aiCanary'
+import type { DesignTemplate } from '@shared/design'
 import { starteAuftrag, useLaufendeSchluessel } from '../../../shared/auftraege'
 import { arbeitOffen, defaultExamName, legeArbeitAb } from '../library'
 import { QUELLENAUSWAHL, type QuellenFrage } from '../../arbeitsblatt/auftraege'
@@ -68,7 +98,15 @@ function aendereBaustein(d: Exam, id: string, fn: (b: WsBlock) => void): void {
  * Für Darstellung und Export wird die Arbeit in die Struktur des Arbeitsblatts übersetzt.
  */
 export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
-  const { setStep, fassung: gewaehlt, setFassung, loesung, setLoesung } = useKlassenarbeit()
+  const { setStep, fassung: gewaehlt, setFassung, loesung, setLoesung, undo, redo, verlauf, docName, savedAt, setDocName } = useKlassenarbeit()
+  // Blattoptionen, KI-Test-Dialog und Hörtext-Ansicht – die Leiste ist dieselbe wie beim Arbeitsblatt (27.09.2026)
+  const [designs, setDesigns] = useState<DesignTemplate[]>([])
+  useEffect(() => {
+    window.api.designs.list().then(setDesigns).catch(notifyError)
+  }, [])
+  const [canaryOffen, setCanaryOffen] = useState(false)
+  const [hoertexte, setHoertexte] = useState(false)
+  const [aufbauOffen, setAufbauOffen] = useState(() => !examHasContent(exam))
   const updateExam = useKlassenarbeit((s) => s.update)
   const gesamt = fassungsZahl(exam)
   const fassung = Math.min(gewaehlt, gesamt - 1)
@@ -126,16 +164,32 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   )?.name
   const worksheet = useMemo(() => mitThemenbereich(examToWorksheetAlle(exam), bereich), [exam, bereich])
   const audioSicht = useMemo(() => examToWorksheet(exam, 0), [exam])
+  const hatHoertexte = audioSicht.sheets.some((sh) => sh.blocks.some((b) => b.type === 'audio'))
+  // Operatorenliste (27.09.2026): nur amtliche Definitionen – was fehlt, erfährt die Lehrkraft hier
+  const operatorenHinweis = useMemo(() => {
+    const b = operatorenBefund(exam)
+    if (!b.liste) return `Für ${meta.stateId} und ${meta.subjectLabel} ist keine amtliche Operatorenliste hinterlegt – die Anlage „Operatoren" entfällt.`
+    return b.fehlend.length ? `Ohne amtliche Definition in der Operatorenliste (${b.liste.quelle}): ${b.fehlend.join(', ')}.` : ''
+  }, [exam, meta.stateId, meta.subjectLabel])
   // Anrede der Lernenden in allen Fassungen prüfen – auch nach Überarbeitung und Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (hasContent ? anredeBefunde(worksheet.meta, worksheet.sheets) : []), [hasContent, worksheet])
   const { layouts, measure } = useSheetLayouts(hasContent ? worksheet : null, logo, settings.schoolName)
+  // Selbsttest (wie beim Arbeitsblatt): die echte Seitenaufteilung für Wachen und Sichtprüfungen
+  useEffect(() => {
+    const w = window as unknown as { __selftest?: Record<string, unknown> }
+    if (w.__selftest) w.__selftest.layouts = layouts
+  }, [layouts])
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken" – sobald es etwas zu drucken gibt
   useDruck('klassenarbeit', hasContent ? () => starte('print') : null)
   const sheet = worksheet.sheets[fassung] ?? worksheet.sheets[0]
   // Die Sprache der Beschriftungen steht am Blatt (examToWorksheet), damit PDF und Word sie mitnehmen
   const pageInfo = useMemo(
-    () => pageInfoFor(worksheet, sheet, logo, settings.schoolName, loesung, settings.citationStyle),
-    [worksheet, sheet, logo, settings.schoolName, settings.citationStyle, loesung]
+    () => ({
+      ...pageInfoFor(worksheet, sheet, logo, settings.schoolName, loesung, settings.citationStyle),
+      // Der Titel in der Kopfzeile ist der Titel der Arbeit – direkt im Blatt änderbar (27.09.2026)
+      onTitle: (title: string) => updateExam((d) => (d.meta.title = title.trim()), 'titel')
+    }),
+    [worksheet, sheet, logo, settings.schoolName, settings.citationStyle, loesung, updateExam]
   )
   // Direkt im Blatt bearbeiten – in der Arbeit oder im Erwartungshorizont
   const editContext = useMemo(
@@ -151,6 +205,27 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    * Aufbau. Sie stehen deshalb schreibgeschützt da (Titel und Zeiten ändert der Rahmen).
    */
   const nurLesen: WsContextValue = useMemo(() => ({ ...editContext, mode: loesung ? 'key' : 'print', update: undefined }), [editContext, loesung])
+  /*
+   * Der Kopfkasten wird aus der Arbeit berechnet – bis 27.09.2026 war er deshalb nicht
+   * bearbeitbar (Vorbild Arbeitsblatt). Jetzt schreibt eine Änderung im Blatt Titel und
+   * Wortlaut in die Arbeit zurück (meta.title, meta.kopfText); „wieder berechnen" leert den Wortlaut.
+   */
+  const kopfBearbeiten: WsContextValue = useMemo(
+    () => ({
+      ...editContext,
+      update: (_id, fn) =>
+        updateExam((d) => {
+          const kopf = examHeadBlock(d)
+          if (!kopf || kopf.type !== 'infoBox') return
+          const entwurf = structuredClone(kopf)
+          fn(entwurf)
+          if (entwurf.type !== 'infoBox') return
+          d.meta.title = entwurf.title.replace(/ – (Gruppe|Group) [A-Z]$/, '').trim()
+          d.meta.kopfText = entwurf.body
+        })
+    }),
+    [editContext, updateExam]
+  )
 
   /*
    * Beides läuft als Hintergrund-Auftrag (shared/auftraege.ts) mit einer Kopie der Arbeit von
@@ -272,13 +347,107 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    * gehören keinem Teil; sie bekommen deshalb keine Griffe und sind schreibgeschützt.
    */
   const teilVon = (id: string): ExamPart | undefined => exam.parts.find((p) => bloeckeDerFassung(p, fassung).some((b) => b.id === id))
+
+  /** Bausteinliste der ANGEZEIGTEN Fassung des Teils, in dem der Baustein steht – Änderung als ein Verlaufsschritt */
+  const aendereListe = (blockId: string, fn: (liste: WsBlock[], i: number) => void): void =>
+    updateExam((d) => {
+      const teil = d.parts.find((p) => bloeckeDerFassung(p, fassung).some((x) => x.id === blockId))
+      if (!teil) return
+      const liste = bloeckeDerFassung(teil, fassung)
+      fn(
+        liste,
+        liste.findIndex((x) => x.id === blockId)
+      )
+    })
+  const bausteinLoeschen = (id: string): void => aendereListe(id, (liste, i) => void liste.splice(i, 1))
+  const duplizieren = (id: string): void =>
+    aendereListe(
+      id,
+      (liste, i) => void liste.splice(i + 1, 0, { ...structuredClone(liste[i]), id: newId(), ref: undefined, versions: undefined, versionIndex: undefined })
+    )
+  const einfuegen = (id: string, versatz: 0 | 1, typ: WsBlockType): void => aendereListe(id, (liste, i) => void liste.splice(i + versatz, 0, newBlock(typ)))
+
+  /**
+   * Einen Baustein mit der KI überarbeiten oder neu erzeugen (27.09.2026, Vorbild Arbeitsblatt):
+   * ein kleiner Auftrag mit der Arbeit von jetzt; das Ergebnis ersetzt nur diesen Baustein in
+   * dieser Fassung, der bisherige Stand bleibt als Fassung abrufbar.
+   */
+  const bausteinUeberarbeiten = (block: WsBlock, instruction = ''): void => {
+    const f = fassung
+    void starteAuftrag({
+      moduleId: 'klassenarbeit',
+      docId,
+      titel,
+      art: instruction ? 'Baustein überarbeiten' : 'Baustein neu erzeugen',
+      eingabe: exam,
+      istOffen: () => arbeitOffen(docId),
+      sperrt: false,
+      schluessel: `block-${block.id}`,
+      fehlerTitel: 'Der Baustein konnte nicht überarbeitet werden',
+      arbeit: async (e, k) => {
+        k.melde(instruction ? 'Die KI überarbeitet den Baustein …' : 'Die KI erzeugt den Baustein neu …')
+        const ws = examToWorksheet(e, f)
+        return regenerateBlock(ws, ws.sheets[0], block.id, profileFromMeta(ws.meta), k.ai, '', instruction)
+      },
+      abschluss: () => (instruction ? 'Der Baustein wurde überarbeitet.' : 'Der Baustein wurde neu erzeugt.'),
+      ablegen: (fresh, e) =>
+        legeArbeitAb(docId, e, (aktuell) => ({
+          ...aktuell,
+          parts: aktuell.parts.map((p) =>
+            mitBloecken(
+              p,
+              f,
+              bloeckeDerFassung(p, f).map((b) => (b.id === block.id ? addVersion(b, fresh) : b))
+            )
+          )
+        }))
+    })
+  }
+
   const wrapBlock = (block: WsBlock, placed: PlacedItem, content: React.ReactNode): React.ReactNode => {
+    // Kopfkasten: bearbeitbar (Titel und Wortlaut landen in der Arbeit); Teil-Überschriften bleiben berechnet
+    if (block.id === 'exam-head') return <WsContext.Provider value={loesung ? nurLesen : kopfBearbeiten}>{content}</WsContext.Provider>
     if (!teilVon(block.id)) return <WsContext.Provider value={nurLesen}>{content}</WsContext.Provider>
+    const laeuft = busy.has(`block-${block.id}`)
     return (
       <BausteinRahmen
         block={block}
         placed={placed}
+        busy={laeuft}
         onUpdate={(fn, gruppe) => updateExam((d) => aendereBaustein(d, block.id, fn), gruppe)}
+        extras={
+          <>
+            {!loesung && block.warnings && block.warnings.length > 0 && (
+              <WarningButton
+                warnings={block.warnings}
+                onDismiss={() => updateExam((d) => aendereBaustein(d, block.id, (b) => (b.warnings = [])))}
+                onBeheben={(liste) => arbeitHinweiseBeheben(exam, docId, fassung, liste)}
+                laeuft={[...busy].some((k) => k.startsWith('beheben-'))}
+              />
+            )}
+            <KiMenue
+              block={block}
+              busy={laeuft}
+              onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)}
+              onRegenerate={() => bausteinUeberarbeiten(block)}
+            />
+            <BlockSettings block={block} combined={false} update={(fn, gruppe) => updateExam((d) => aendereBaustein(d, block.id, fn), gruppe)} />
+          </>
+        }
+        menue={
+          <>
+            <Menu.Label>Baustein</Menu.Label>
+            <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => duplizieren(block.id)}>
+              Duplizieren
+            </Menu.Item>
+            <EinfuegenUntermenue titel="Darüber einfügen" onWaehlen={(typ) => einfuegen(block.id, 0, typ)} />
+            <EinfuegenUntermenue titel="Darunter einfügen" onWaehlen={(typ) => einfuegen(block.id, 1, typ)} />
+            <Menu.Divider />
+            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => bausteinLoeschen(block.id)}>
+              Baustein löschen
+            </Menu.Item>
+          </>
+        }
         onMove={(richtung) =>
           updateExam((d) => {
             // Nur INNERHALB des Teils und der Fassung: Die Teile sind der Aufbau der Arbeit
@@ -292,277 +461,347 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           })
         }
       >
+        {!placed.continued && !loesung && (
+          <VersionSwitcher block={block} onSwitch={(i) => aendereListe(block.id, (liste, k) => void (liste[k] = switchVersion(liste[k], i)))} />
+        )}
         {content}
       </BausteinRahmen>
     )
   }
 
   return (
-    <ScrollArea h="100%">
-      <Container size="xl" py="lg">
-        <Group justify="space-between" mb="md">
-          <div>
-            <Title order={2}>Bearbeiten &amp; Export</Title>
-            <Text c="dimmed" size="sm">
-              {meta.subjectLabel} · {meta.schoolTypeName} · Klasse {meta.grade} · {meta.minutes} Minuten
-              {meta.variants > 1 ? ` · ${meta.variants} Fassungen` : ''}
-            </Text>
-          </div>
-          <Group gap="xs">
-            <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
-              Zurück zum Rahmen
-            </Button>
-            <Button leftSection={hasContent ? <IconRefresh size={16} /> : <IconSparkles size={16} />} onClick={run}>
+    <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <EditorLeiste
+        zurueck={{ label: 'Rahmen', onClick: () => setStep(0) }}
+        undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
+        fassungen={
+          gesamt > 1
+            ? {
+                value: String(fassung),
+                onChange: (v) => setFassung(Number(v)),
+                data: Array.from({ length: gesamt }, (_, f) => ({ value: String(f), label: gruppe(f) })),
+                ariaLabel: 'Angezeigte Fassung'
+              }
+            : null
+        }
+        ansichten={{
+          value: hoertexte ? 'audio' : loesung ? 'key' : 'student',
+          onChange: (v) => {
+            setHoertexte(v === 'audio')
+            if (v !== 'audio') setLoesung(v === 'key')
+          },
+          // „Erwartungshorizont" bleibt der Name des Lösungsteils – fachlich richtig für eine Klassenarbeit
+          data: [
+            { value: 'student', label: 'Arbeit' },
+            { value: 'key', label: 'Erwartungshorizont' },
+            ...(hatHoertexte ? [{ value: 'audio', label: 'Hörtexte' }] : [])
+          ]
+        }}
+        optionen={
+          <BlattoptionenFelder
+            designs={designs}
+            designId={exam.design.id}
+            onDesign={(d) => updateExam((x) => (x.design = structuredClone(d)))}
+            schulangaben={{ checked: meta.showSchool !== false, onChange: (an) => updateExam((d) => (d.meta.showSchool = an)) }}
+            korrekturrand={{ checked: Boolean(meta.correctionMargin), onChange: (an) => updateExam((d) => (d.meta.correctionMargin = an)) }}
+            notizrand={{ checked: Boolean(meta.notesMargin), onChange: (an) => updateExam((d) => (d.meta.notesMargin = an)) }}
+            blocksatz={{ checked: exam.design.page.justifyText !== false, onChange: (an) => updateExam((d) => (d.design.page.justifyText = an)) }}
+            fach={meta.subjectId}
+            vorlagenfarbe={{ checked: Boolean(meta.vorlagenfarbe), onChange: (an) => updateExam((d) => (d.meta.vorlagenfarbe = an)) }}
+            ueberthema={{ werte: meta, bereich: bereich ?? '', onChange: (patch) => updateExam((d) => Object.assign(d.meta, patch), 'ueberthema') }}
+            vorKiTest={
+              meta.kopfText?.trim() ? (
+                <Button size="compact-xs" variant="subtle" onClick={() => updateExam((d) => (d.meta.kopfText = undefined))}>
+                  Kopfkasten wieder berechnen
+                </Button>
+              ) : null
+            }
+            kiTest={{
+              an: Boolean(meta.aiCanary),
+              woerter: meta.aiCanaryWords,
+              vorschlagFuer: `${meta.title}|${meta.topic}`,
+              onEin: () => setCanaryOffen(true),
+              onAus: () => updateExam((d) => (d.meta.aiCanary = false))
+            }}
+          />
+        }
+        extras={
+          <>
+            <Button size="xs" variant="light" leftSection={hasContent ? <IconRefresh size={14} /> : <IconSparkles size={14} />} onClick={run}>
               {hasContent ? 'Neu erzeugen' : 'Arbeit erzeugen'}
             </Button>
-          </Group>
-        </Group>
-
-        <Card withBorder mb="md">
-          <Title order={4} mb="sm">
-            {meta.title || 'Klassenarbeit'}: {meta.topic}
-          </Title>
-          <Stack gap="sm">
-            {exam.parts.map((part, i) => {
-              const format = formatById(part.formatId)
-              const formats = (part.formats ?? []).map((id) => comprehensionFormatById(id)?.label).filter(Boolean)
-              const key = schluessel(part)
-              const bloecke = bloeckeDerFassung(part, fassung)
-              return (
-                <Card key={part.id} withBorder padding="sm">
-                  <Group gap="xs" mb={4}>
-                    <Badge variant="light">Teil {i + 1}</Badge>
-                    <Text fw={600}>{format?.label ?? part.label}</Text>
-                    <Badge variant="outline" color="gray">
-                      {part.competence}
-                    </Badge>
-                    <Badge variant="light" color={part.gradeGroup === 'writing' ? 'grape' : 'blue'}>
-                      {part.weight} %
-                    </Badge>
-                    {bloecke.length > 0 && (
-                      <Badge variant="light" color="teal">
-                        {bloecke.length} Bausteine
-                      </Badge>
-                    )}
-                    <Popover width={320} position="bottom-end" withArrow opened={revise === key} onChange={(o) => setRevise(o ? key : null)}>
-                      <Popover.Target>
-                        <Tooltip
-                          label={
-                            gesamt > 1
-                              ? `Diesen Teil in Fassung ${label} mit einem eigenen Auftrag überarbeiten`
-                              : 'Diesen Teil mit einem eigenen Auftrag überarbeiten'
-                          }
-                        >
-                          <ActionIcon
-                            variant="subtle"
-                            aria-label={`Teil ${i + 1} überarbeiten`}
-                            loading={busy.has(key)}
-                            onClick={() => setRevise(revise === key ? null : key)}
-                          >
-                            <IconSparkles size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-                      </Popover.Target>
-                      <Popover.Dropdown>
-                        <Stack gap="xs">
-                          <Textarea
-                            size="xs"
-                            label="Was soll anders werden?"
-                            description="Strg+Enter startet den Auftrag"
-                            placeholder="z. B. kürzerer Text, keine Multiple-Choice-Aufgaben, Thema Sport"
-                            autosize
-                            minRows={2}
-                            data-autofocus
-                            value={wuensche[key] ?? ''}
-                            onChange={(e) => {
-                              const v = e.currentTarget.value
-                              setWuensche((w) => ({ ...w, [key]: v }))
-                            }}
-                            onKeyDown={(e) => {
-                              // Wie in den übrigen Überarbeiten-Feldern der App: Strg+Enter schickt ab
-                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                                e.preventDefault()
-                                revisePart(part, i)
-                              }
-                            }}
-                          />
-                          <Button size="xs" disabled={!(wuensche[key] ?? '').trim()} onClick={() => revisePart(part, i)}>
-                            {gesamt > 1 ? `Teil überarbeiten (Fassung ${label})` : 'Teil überarbeiten'}
-                          </Button>
-                        </Stack>
-                      </Popover.Dropdown>
-                    </Popover>
-                  </Group>
-                  <Text size="sm" c="dimmed">
-                    {part.points > 0
-                      ? `${part.points} Punkte`
-                      : `Bewertung: ${part.contentShare ?? CONTENT_SHARE} % Inhalt, ${100 - (part.contentShare ?? CONTENT_SHARE)} % Sprache`}{' '}
-                    · {part.minutes} Minuten
-                    {formats.length ? ` · Formate: ${formats.join(', ')}` : ''}
-                  </Text>
-                </Card>
-              )
-            })}
-          </Stack>
-        </Card>
-
-        <Card withBorder mb="md">
-          <Title order={4} mb="sm">
-            Noten
-          </Title>
-          <List spacing={4} size="sm">
-            {grades.map((g) => (
-              <List.Item key={g.group}>
-                <b>{g.label}</b>: {g.points > 0 ? `${g.points} Punkte` : 'Inhalt und Sprache'} · zählt {g.weight} %
-              </List.Item>
-            ))}
-          </List>
-          <Text size="xs" c="dimmed" mt="xs">
-            {meta.gradeScale ? 'Der Notenschlüssel steht auf der ersten Seite der Arbeit.' : 'Ohne Notenschlüssel auf der Arbeit.'} Die Arbeit hat kein
-            Deckblatt – sie beginnt sofort mit dem Kopf und der ersten Aufgabe.
-          </Text>
-        </Card>
-
-        {!hasContent && (
-          <Alert color="blue" icon={<IconInfoCircle size={18} />} title="Noch keine Aufgaben erzeugt">
-            <Text size="sm">
-              „Arbeit erzeugen“ schreibt Material, Aufgaben und – wenn eingeschaltet – den Erwartungshorizont für jeden Teil
-              {meta.variants > 1 ? `, und zwar in ${meta.variants} gleichwertigen Fassungen` : ''}. Jeder Teil wird einzeln erzeugt, das dauert je nach
-              KI-Zugang einen Moment.
-            </Text>
-          </Alert>
-        )}
-
-        <AnredeHinweise
-          befunde={anrede}
-          // Paket 12: „Mit KI beheben" – je Fassung ein Auftrag (bei mehreren steht „Fassung B, …" vor dem Hinweis)
-          onBeheben={(liste) => {
-            worksheet.sheets.forEach((s, f) => {
-              const eigene = gesamt > 1 ? liste.filter((b) => b.startsWith(`${s.label}, `)) : liste
-              if (eigene.length) arbeitHinweiseBeheben(exam, docId, f, eigene)
-            })
-          }}
-          laeuft={[...busy].some((k) => k.startsWith('beheben-'))}
-        />
-
-        {hasContent && meta.variants !== gesamt && (
-          <Alert color="gray" icon={<IconInfoCircle size={18} />} mb="md" p="xs">
-            <Text size="sm">
-              Eingestellt {meta.variants === 1 ? 'ist eine Fassung' : `sind ${meta.variants} Fassungen`}, erzeugt {gesamt === 1 ? 'ist eine' : `sind ${gesamt}`}
-              . „Neu erzeugen“ legt die Arbeit passend an.
-            </Text>
-          </Alert>
-        )}
-
-        {hasContent && audioSicht.sheets.some((s) => s.blocks.some((b) => b.type === 'audio')) && (
-          <Card withBorder mb="md">
-            <AudioPanel ws={audioSicht} onUpdate={updateAudio} />
-          </Card>
-        )}
-
-        {hasContent && (
-          <>
-            <Group justify="space-between" mb="sm" gap="xs">
-              <Group gap="xs">
-                {gesamt > 1 && (
-                  <SegmentedControl
-                    size="xs"
-                    aria-label="Angezeigte Fassung"
-                    value={String(fassung)}
-                    onChange={(v) => setFassung(Number(v))}
-                    data={Array.from({ length: gesamt }, (_, f) => ({ value: String(f), label: gruppe(f) }))}
-                  />
-                )}
-                {/* „Erwartungshorizont" bleibt hier der Name des Lösungsteils – fachlich richtig für eine Klassenarbeit */}
-                <SegmentedControl
-                  size="xs"
-                  aria-label="Ansicht"
-                  value={loesung ? 'key' : 'student'}
-                  onChange={(v) => setLoesung(v === 'key')}
-                  data={[
-                    { value: 'student', label: 'Arbeit' },
-                    { value: 'key', label: 'Erwartungshorizont' }
-                  ]}
-                />
-              </Group>
-              <Group gap="xs">
-                {audioBlocks.length > 0 && (
-                  <Menu position="bottom-end" withinPortal>
-                    <Menu.Target>
-                      <Button variant="light" leftSection={<IconHeadphones size={16} />}>
-                        Transkript
-                      </Button>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item leftSection={<IconFileTypeDocx size={14} />} onClick={() => void exportTranscript('docx')}>
-                        Als Word-Datei
-                      </Menu.Item>
-                      <Menu.Item leftSection={<IconPrinter size={14} />} onClick={() => void exportTranscript('pdf')}>
-                        Als PDF
-                      </Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
-                )}
-                <Button variant="default" leftSection={<IconFileTypePdf size={16} />} onClick={() => starte('pdf')}>
-                  PDF
-                </Button>
-                <Button variant="default" leftSection={<IconFileTypeDocx size={16} />} onClick={() => starte('docx')}>
-                  Word
-                </Button>
-                <Button variant="default" leftSection={<IconPrinter size={16} />} onClick={() => starte('print')}>
-                  Drucken
-                </Button>
-              </Group>
-            </Group>
-            <Text size="xs" c="dimmed" mb="xs">
-              {loesung
-                ? 'Lösungen und Erwartungshorizont lassen sich direkt im Blatt ändern.'
-                : 'Texte und Aufgaben lassen sich direkt im Blatt ändern; Strg+Z nimmt Änderungen zurück.'}
-            </Text>
-            <FitToWidth className={`ws-editor-pages ${loesung ? 'editor-sheet-key' : ''}`}>
-              <SheetPages
-                ws={worksheet}
-                sheet={sheet}
-                plans={layouts.get(`${sheet.id}:${loesung ? 'key' : 'print'}`) ?? []}
-                info={pageInfo}
-                context={editContext}
-                wrapBlock={wrapBlock}
-              />
-            </FitToWidth>
+            {audioBlocks.length > 0 && (
+              <Menu position="bottom-end" withinPortal>
+                <Menu.Target>
+                  <Button variant="light" leftSection={<IconHeadphones size={16} />}>
+                    Transkript
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item leftSection={<IconFileTypeDocx size={14} />} onClick={() => void exportTranscript('docx')}>
+                    Als Word-Datei
+                  </Menu.Item>
+                  <Menu.Item leftSection={<IconPrinter size={14} />} onClick={() => void exportTranscript('pdf')}>
+                    Als PDF
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            )}
           </>
-        )}
-        {measure}
-        <AusgabeDialog
-          modus={ausgabe}
-          onClose={() => setAusgabe(null)}
-          modul="klassenarbeit"
-          hatLoesungen={meta.answerKey}
-          erwartungshorizont
-          onAusgabe={async (modus, loesungWahl) => {
-            const q = quelle(gesamt > 1 && alleAusgeben)
-            if (modus === 'print') setDruck(druckAusgabe(q, loesungWahl))
-            else await speichereBlatt(q, modus, loesungWahl)
-          }}
-        >
+        }
+        name={{ value: docName, placeholder: defaultExamName(exam), onChange: setDocName }}
+        gesichertAm={savedAt}
+        dateiSpeichern={{
+          tooltip: 'Als Datei speichern … (.klassenarbeit, z. B. zum Weitergeben)',
+          onClick: async () => {
+            try {
+              const path = await window.api.files.save(`${quelle(false).name}.klassenarbeit`, EXAM_FILTER, serializeExam(exam))
+              if (path) notifySuccess('Klassenarbeit gespeichert.')
+            } catch (e) {
+              notifyError(e)
+            }
+          }
+        }}
+        ausgabe={{ onWord: () => starte('docx'), onPdf: () => starte('pdf'), onDrucken: () => starte('print') }}
+      />
+      <CanaryDialog
+        offen={canaryOffen}
+        vorschlag={canaryWordFor(`${meta.title}|${meta.topic}`)}
+        wert={meta.aiCanaryWords ?? ''}
+        onAbbruch={() => setCanaryOffen(false)}
+        onFertig={(woerter) => {
+          updateExam((d) => {
+            d.meta.aiCanary = true
+            d.meta.aiCanaryWords = woerter
+          })
+          setCanaryOffen(false)
+        }}
+      />
+      <ScrollArea style={{ flex: 1, minHeight: 0 }}>
+        <Container size="xl" py="lg">
           {/*
-           * Wie in der Lernzielkontrolle: VORHER fragen. Stillschweigend nur die angezeigte
-           * Fassung zu drucken fiele erst auf, wenn die Hälfte der Klasse das falsche Blatt hat.
+           * Aufbau der Arbeit (Teile mit ✨, Noten) – seit 27.09.2026 EINKLAPPBAR unter der Leiste,
+           * damit das Blatt oben steht wie beim Arbeitsblatt. Entscheidung der Lehrkraft: standardmäßig
+           * zu, offen nur, solange noch nichts erzeugt ist.
            */}
-          {gesamt > 1 && (
-            <Radio.Group
-              label={`${gesamt} Fassungen – nur die angezeigte oder alle?`}
-              value={alleAusgeben ? 'alle' : 'eine'}
-              onChange={(v) => setAlleAusgeben(v === 'alle')}
+          <Group gap="xs" mb="xs">
+            <Button
+              size="compact-sm"
+              variant="subtle"
+              leftSection={aufbauOffen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+              onClick={() => setAufbauOffen((o) => !o)}
+              aria-expanded={aufbauOffen}
+              data-testid="aufbau-kopf"
             >
-              <Stack gap={6} mt={4}>
-                <Radio value="eine" label={`Nur ${gruppe(fassung)}`} />
-                <Radio value="alle" label="Alle in einer Datei" />
-              </Stack>
-            </Radio.Group>
+              Aufbau der Arbeit
+              {aufbauOffen
+                ? ''
+                : ` – ${exam.parts.length} ${exam.parts.length === 1 ? 'Teil' : 'Teile'} · ${grades.map((g) => `${g.label} ${g.weight} %`).join(' · ')}`}
+            </Button>
+          </Group>
+          <Collapse expanded={aufbauOffen}>
+            <div>
+              <Card withBorder mb="md">
+                <Title order={4} mb="sm">
+                  {meta.title || 'Klassenarbeit'}: {meta.topic}
+                </Title>
+                <Stack gap="sm">
+                  {exam.parts.map((part, i) => {
+                    const format = formatById(part.formatId)
+                    const formats = (part.formats ?? []).map((id) => comprehensionFormatById(id)?.label).filter(Boolean)
+                    const key = schluessel(part)
+                    const bloecke = bloeckeDerFassung(part, fassung)
+                    return (
+                      <Card key={part.id} withBorder padding="sm">
+                        <Group gap="xs" mb={4}>
+                          <Badge variant="light">Teil {i + 1}</Badge>
+                          <Text fw={600}>{format?.label ?? part.label}</Text>
+                          <Badge variant="outline" color="gray">
+                            {part.competence}
+                          </Badge>
+                          <Badge variant="light" color={part.gradeGroup === 'writing' ? 'grape' : 'blue'}>
+                            {part.weight} %
+                          </Badge>
+                          {bloecke.length > 0 && (
+                            <Badge variant="light" color="teal">
+                              {bloecke.length} Bausteine
+                            </Badge>
+                          )}
+                          <Popover width={320} position="bottom-end" withArrow opened={revise === key} onChange={(o) => setRevise(o ? key : null)}>
+                            <Popover.Target>
+                              <Tooltip
+                                label={
+                                  gesamt > 1
+                                    ? `Diesen Teil in Fassung ${label} mit einem eigenen Auftrag überarbeiten`
+                                    : 'Diesen Teil mit einem eigenen Auftrag überarbeiten'
+                                }
+                              >
+                                <ActionIcon
+                                  variant="subtle"
+                                  aria-label={`Teil ${i + 1} überarbeiten`}
+                                  loading={busy.has(key)}
+                                  onClick={() => setRevise(revise === key ? null : key)}
+                                >
+                                  <IconSparkles size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Popover.Target>
+                            <Popover.Dropdown>
+                              <Stack gap="xs">
+                                <Textarea
+                                  size="xs"
+                                  label="Was soll anders werden?"
+                                  description="Strg+Enter startet den Auftrag"
+                                  placeholder="z. B. kürzerer Text, keine Multiple-Choice-Aufgaben, Thema Sport"
+                                  autosize
+                                  minRows={2}
+                                  data-autofocus
+                                  value={wuensche[key] ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.currentTarget.value
+                                    setWuensche((w) => ({ ...w, [key]: v }))
+                                  }}
+                                  onKeyDown={(e) => {
+                                    // Wie in den übrigen Überarbeiten-Feldern der App: Strg+Enter schickt ab
+                                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                      e.preventDefault()
+                                      revisePart(part, i)
+                                    }
+                                  }}
+                                />
+                                <Button size="xs" disabled={!(wuensche[key] ?? '').trim()} onClick={() => revisePart(part, i)}>
+                                  {gesamt > 1 ? `Teil überarbeiten (Fassung ${label})` : 'Teil überarbeiten'}
+                                </Button>
+                              </Stack>
+                            </Popover.Dropdown>
+                          </Popover>
+                        </Group>
+                        <Text size="sm" c="dimmed">
+                          {part.points > 0
+                            ? `${part.points} Punkte`
+                            : `Bewertung: ${part.contentShare ?? CONTENT_SHARE} % Inhalt, ${100 - (part.contentShare ?? CONTENT_SHARE)} % Sprache`}{' '}
+                          · {part.minutes} Minuten
+                          {formats.length ? ` · Formate: ${formats.join(', ')}` : ''}
+                        </Text>
+                      </Card>
+                    )
+                  })}
+                </Stack>
+              </Card>
+
+              <Card withBorder mb="md">
+                <Title order={4} mb="sm">
+                  Noten
+                </Title>
+                <List spacing={4} size="sm">
+                  {grades.map((g) => (
+                    <List.Item key={g.group}>
+                      <b>{g.label}</b>: {g.points > 0 ? `${g.points} Punkte` : 'Inhalt und Sprache'} · zählt {g.weight} %
+                    </List.Item>
+                  ))}
+                </List>
+                <Text size="xs" c="dimmed" mt="xs">
+                  {meta.gradeScale ? 'Der Notenschlüssel steht auf der ersten Seite der Arbeit.' : 'Ohne Notenschlüssel auf der Arbeit.'} Die Arbeit hat kein
+                  Deckblatt – sie beginnt sofort mit dem Kopf und der ersten Aufgabe.
+                </Text>
+              </Card>
+            </div>
+          </Collapse>
+
+          {!hasContent && (
+            <Alert color="blue" icon={<IconInfoCircle size={18} />} title="Noch keine Aufgaben erzeugt">
+              <Text size="sm">
+                „Arbeit erzeugen“ schreibt Material, Aufgaben und – wenn eingeschaltet – den Erwartungshorizont für jeden Teil
+                {meta.variants > 1 ? `, und zwar in ${meta.variants} gleichwertigen Fassungen` : ''}. Jeder Teil wird einzeln erzeugt, das dauert je nach
+                KI-Zugang einen Moment.
+              </Text>
+            </Alert>
           )}
-        </AusgabeDialog>
-        <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${quelle(false).name}`} onClose={() => setDruck(null)} />
-      </Container>
-    </ScrollArea>
+
+          <AnredeHinweise
+            befunde={anrede}
+            // Paket 12: „Mit KI beheben" – je Fassung ein Auftrag (bei mehreren steht „Fassung B, …" vor dem Hinweis)
+            onBeheben={(liste) => {
+              worksheet.sheets.forEach((s, f) => {
+                const eigene = gesamt > 1 ? liste.filter((b) => b.startsWith(`${s.label}, `)) : liste
+                if (eigene.length) arbeitHinweiseBeheben(exam, docId, f, eigene)
+              })
+            }}
+            laeuft={[...busy].some((k) => k.startsWith('beheben-'))}
+          />
+
+          {hasContent && meta.variants !== gesamt && (
+            <Alert color="gray" icon={<IconInfoCircle size={18} />} mb="md" p="xs">
+              <Text size="sm">
+                Eingestellt {meta.variants === 1 ? 'ist eine Fassung' : `sind ${meta.variants} Fassungen`}, erzeugt{' '}
+                {gesamt === 1 ? 'ist eine' : `sind ${gesamt}`}. „Neu erzeugen“ legt die Arbeit passend an.
+              </Text>
+            </Alert>
+          )}
+
+          {hasContent && hoertexte && (
+            <Card withBorder mb="md">
+              <AudioPanel ws={audioSicht} onUpdate={updateAudio} />
+            </Card>
+          )}
+
+          {hasContent && !hoertexte && (
+            <>
+              {operatorenlisteAktiv(exam) && operatorenHinweis && (
+                <Alert color="yellow" variant="light" mb="xs" p="xs">
+                  <Text size="xs">{operatorenHinweis}</Text>
+                </Alert>
+              )}
+              <Text size="xs" c="dimmed" mb="xs">
+                {loesung
+                  ? 'Lösungen und Erwartungshorizont lassen sich direkt im Blatt ändern.'
+                  : 'Texte, Aufgaben und der Kopfkasten lassen sich direkt im Blatt ändern; Strg+Z nimmt Änderungen zurück.'}
+              </Text>
+              <FitToWidth className={`ws-editor-pages ${loesung ? 'editor-sheet-key' : ''}`}>
+                <SheetPages
+                  ws={worksheet}
+                  sheet={sheet}
+                  plans={layouts.get(`${sheet.id}:${loesung ? 'key' : 'print'}`) ?? []}
+                  info={pageInfo}
+                  context={editContext}
+                  wrapBlock={wrapBlock}
+                />
+              </FitToWidth>
+            </>
+          )}
+          {measure}
+          <AusgabeDialog
+            modus={ausgabe}
+            onClose={() => setAusgabe(null)}
+            modul="klassenarbeit"
+            hatLoesungen={meta.answerKey}
+            erwartungshorizont
+            onAusgabe={async (modus, loesungWahl) => {
+              const q = quelle(gesamt > 1 && alleAusgeben)
+              if (modus === 'print') setDruck(druckAusgabe(q, loesungWahl))
+              else await speichereBlatt(q, modus, loesungWahl)
+            }}
+          >
+            {/*
+             * Wie in der Lernzielkontrolle: VORHER fragen. Stillschweigend nur die angezeigte
+             * Fassung zu drucken fiele erst auf, wenn die Hälfte der Klasse das falsche Blatt hat.
+             */}
+            {gesamt > 1 && (
+              <Radio.Group
+                label={`${gesamt} Fassungen – nur die angezeigte oder alle?`}
+                value={alleAusgeben ? 'alle' : 'eine'}
+                onChange={(v) => setAlleAusgeben(v === 'alle')}
+              >
+                <Stack gap={6} mt={4}>
+                  <Radio value="eine" label={`Nur ${gruppe(fassung)}`} />
+                  <Radio value="alle" label="Alle in einer Datei" />
+                </Stack>
+              </Radio.Group>
+            )}
+          </AusgabeDialog>
+          <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${quelle(false).name}`} onClose={() => setDruck(null)} />
+        </Container>
+      </ScrollArea>
+    </Box>
   )
 }

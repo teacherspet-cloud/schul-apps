@@ -96,6 +96,12 @@ export class AiProgressTracker {
     this.onChange?.()
   }
 
+  /** Eingetroffene und erwartete Zeichen einer laufenden Anfrage – für die Restzeit (shared/restzeit.ts) */
+  stand(id: string): { chars: number; expectedChars: number } {
+    const kind = this.kinds.get(id)
+    return { chars: this.chars.get(id) ?? 0, expectedChars: kind ? expectedChars(kind) : 0 }
+  }
+
   /** Anteil aller laufenden Anfragen zusammen (0 bis 1). */
   ratio(): number {
     const ids = [...this.kinds.keys()]
@@ -121,7 +127,8 @@ export function overallRatio(done: number, total: number, current: number): numb
 }
 
 /**
- * Geschätzte Restzeit in Sekunden.
+ * Restzeit in Sekunden, hochgerechnet über den Balken – seit dem 27.09.2026 nur noch EIN
+ * Baustein der Schätzung (shared/restzeit.ts rechnet gemerkte Dauern je KI hinzu).
  * Erst ab einem Zehntel Fortschritt, sonst wären die Zahlen Zufall.
  */
 export function remainingSeconds(ratio: number, elapsedMs: number): number | null {

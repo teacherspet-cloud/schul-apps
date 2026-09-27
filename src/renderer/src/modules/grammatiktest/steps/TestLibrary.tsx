@@ -1,5 +1,5 @@
 import { Badge, Button, Container, ScrollArea, Stack } from '@mantine/core'
-import { IconFilePlus } from '@tabler/icons-react'
+import { IconFilePlus, IconFolderOpen } from '@tabler/icons-react'
 import type { SavedGrammarTestMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import { useMemo } from 'react'
@@ -18,6 +18,7 @@ const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeS
 export default function TestLibrary({
   onNew,
   onNeuImBereich,
+  onOpenFile,
   onOpened,
   zurueck,
   onZurueck
@@ -25,6 +26,8 @@ export default function TestLibrary({
   onNew: () => void
   /** Neu anlegen und die Kennung liefern („Neu in diesem Bereich") */
   onNeuImBereich: () => Promise<string>
+  /** Eine Datei des Programms öffnen (27.09.2026) */
+  onOpenFile: () => void
   onOpened: () => void
   /** Name des offenen Tests – dann gibt es „Zurück zu …" */
   zurueck: string | null
@@ -101,6 +104,9 @@ export default function TestLibrary({
           onSuche={bib.setSuche}
           suchHinweis="Name, Form, Fach, Klasse"
         >
+          <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
+            Datei öffnen …
+          </Button>
           <Button leftSection={<IconFilePlus size={16} />} onClick={onNew}>
             Neuer Test
           </Button>

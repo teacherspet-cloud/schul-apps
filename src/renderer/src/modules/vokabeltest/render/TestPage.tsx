@@ -7,6 +7,8 @@ import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
 import { fachPfad, ueberthemaVon } from '../../../shared/ueberthema'
 import { LANGUAGES } from '../model/types'
+import { MaskottchenBild } from '../../arbeitsblatt/render/Illustration'
+import { vokabeltestFigur } from './maskottchen'
 
 /** Seitenaufteilung eines Tests (aus der Messung in useTestLayout). */
 export interface PageLayout {
@@ -64,6 +66,8 @@ export function TestPage({
   const pageClass = `vt-page ${showsAnswers(mode) ? 'vt-key' : ''} ${layout?.compact ? 'vt-compact' : ''} ${layout ? 'vt-page-fixed' : ''}`
   // Kopflinie und Aufgabennummern in der Fachfarbe der Sprache (Paket 10a); ohne sie schwarz wie bisher
   const akzent = vokabeltestFarbe(doc)
+  // Schlussfigur (27.09.2026): jubelnd unten rechts im Seitenrand der letzten Seite – nie im Lösungsteil
+  const figur = showsAnswers(mode) ? null : vokabeltestFigur(doc)
 
   return (
     <>
@@ -81,6 +85,7 @@ export function TestPage({
             return wrapBlock ? <div key={key}>{wrapBlock(block, index, content)}</div> : content
           })}
           {pi === pages.length - 1 && footer}
+          {figur && pi === pages.length - 1 && <MaskottchenBild id={figur.maskottchenId} pose="jubelnd" className="vt-illu vt-illu-schluss" />}
           {pages.length > 1 && (
             <div className="vt-page-number">
               {pi + 1} / {pages.length}
@@ -100,8 +105,11 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
   const multi = doc.variants.length > 1
   // Überthema (Paket 11): „Englisch › Unit 3" oben rechts im Kopf; ohne Überthema wie bisher
   const pfad = vokabeltestPfad(doc)
+  // Kopffigur (27.09.2026): winkend oben rechts; Kopfzeile und Titelzeile rücken ihr aus dem Weg
+  const figur = key ? null : vokabeltestFigur(doc)
   return (
-    <header className="vt-header">
+    <header className={`vt-header${figur ? ' vt-header-illu' : ''}`}>
+      {figur && <MaskottchenBild id={figur.maskottchenId} pose="winkend" className="vt-illu vt-illu-kopf" />}
       {pfad ? (
         <div className="vt-kopfzeile">
           <span className="vt-school">{h.showSchool ? h.schoolName : ''}</span>

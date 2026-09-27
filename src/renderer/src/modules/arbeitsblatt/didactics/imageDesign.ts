@@ -56,8 +56,8 @@
  * Bildgröße. Alle Mengenangaben unten sind als Faustregel gekennzeichnet und bewusst an der
  * Anzahl orientiert, nicht an der Größe – das ist die einzige Dimension, zu der es Befunde gibt.
  */
-import type { IntegrityFinding } from './integrity'
-import type { ImageBlock, Sheet, WorksheetMeta, WsBlock } from '../model/types'
+import { loeseMaterialverweise, type IntegrityFinding } from './integrity'
+import type { ImageBlock, ImageRole, Sheet, WorksheetMeta, WsBlock } from '../model/types'
 import { bildmasse, bildzugriff, mindestbreite } from './bildarbeit'
 import { seitenBereich, seitenText, seitenVorgabe } from './seiten'
 
@@ -119,6 +119,26 @@ export function imageFunction(block: ImageBlock): ImageFunction {
   // Ein Material-Bild ist meistens ein Schema, eine Karte oder ein Diagramm
   if (block.role === 'material') return 'organisation'
   return 'repraesentation'
+}
+
+/**
+ * Standardbreite eines Bildes in Prozent des Satzspiegels.
+ *
+ * Bis zum 27.09.2026 bekam jedes Bild 60 %. Auf dem Blatt „Julikrise 1914" stand so eine
+ * Zeitleiste mit Ereigniskarten auf rund 100 mm – die Beschriftung war im Druck nicht zu
+ * lesen. Ein ORDNENDES Bild (Schema, Zeitleiste, Karte, Diagramm) trägt Text und Struktur und
+ * braucht die ganze Breite; ein Foto zum Wiedererkennen kommt mit weniger aus; ein Bild zum
+ * Einstieg oder als Schmuck bleibt klein. Seitlich stehende Bilder richtet das Layout selbst
+ * aus (render: `.ws-side-image`), die Zahl gilt dort nur als Vorgabe für die Spaltenbreite.
+ *
+ * FAUSTREGEL aus der Druckpraxis, keine Messung.
+ */
+export function standardBildbreite(fn: ImageFunction, role: ImageRole, side?: 'left' | 'right' | 'none'): number {
+  if (side === 'left' || side === 'right') return 45
+  if (role === 'motivation' || fn === 'schmuck') return 35
+  if (fn === 'organisation') return 100
+  if (role === 'illustration') return 45
+  return 80
 }
 
 /**
@@ -279,7 +299,8 @@ function isReferenced(image: ImageBlock, blocks: WsBlock[]): boolean {
  */
 export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding[] {
   const out: IntegrityFinding[] = []
-  const blocks = sheet.blocks
+  // Verweise, wie sie auf dem Blatt stehen („M3"), nicht wie sie gespeichert sind („M{karte}")
+  const blocks = loeseMaterialverweise(sheet.blocks)
   const images = blocks.filter((b): b is ImageBlock => b.type === 'image')
   if (!images.length) return out
 

@@ -4,7 +4,11 @@ import { runLimited } from '../../../shared/async'
 import { obj, str } from '../../../shared/aiSchema'
 import { plainText } from '../../../shared/richtext/parse'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
-import { checkIntegrity, checkListening, checkVideo } from '../didactics/integrity'
+import { checkIntegrity, checkListening, checkVideo, verschluesseleMaterialverweise } from '../didactics/integrity'
+import { markiereLoesungsbausteine } from '../didactics/loesungsteil'
+import { lernzieleFormulieren } from './lernziele'
+import { useThemen } from '../../../shared/themenbereiche'
+import { pfadVon } from '@shared/themen'
 import { checkDemand } from '../didactics/demand'
 import { checkImages } from '../didactics/imageDesign'
 import { checkAfbMix, checkOperators, checkStyle, checkText, DidacticWarning } from '../didactics/checks'
@@ -12,7 +16,9 @@ import { checkSheet } from '../didactics/sheetChecks'
 import { anredeBefundeBaustein, anredeFuerMeta } from '../didactics/anrede'
 import type { Anrede } from '../../../shared/anrede'
 import { subjectById } from '../model/subjects'
-import { COMBINED_RULES, DIFFERENTIATION_PRINCIPLES, LEVEL_RULES, STAR_LABELS, Stars } from '../didactics/differentiation'
+import { COMBINED_RULES, DIFFERENTIATION_PRINCIPLES, STAR_LABELS, Stars } from '../didactics/differentiation'
+import { fassungsLabel, istMittel, profilFuerStufe, stufeFuer, stufenRegeln, stufeText } from '../didactics/schwierigkeit'
+import { lesbarkeitAngleichen } from './lesbarkeit'
 import type { LearnerProfile } from '../didactics/profile'
 import type { OriginalMaterialAblage, Outline, OutlineItem, Sheet, SourceMaterial, Worksheet, WorksheetMeta, WsBlock } from '../model/types'
 import { convertBlock, convertOutline } from './convert'
@@ -58,6 +64,7 @@ export async function generateOutline(
     user: [
       'Plane die Gliederung eines Arbeitsblatts (noch ohne ausformulierte Inhalte).',
       taskContext(meta, profile),
+      themenbereichVorgabe(meta.subjectId),
       originalSourceRules(meta, levels > 1 && meta.differentiation.mode === 'separate' ? (Math.min(3, levels) as Stars) : null, material),
       originalMaterialVorgabe(material),
       levels > 1 && meta.differentiation.mode === 'combined'
@@ -92,7 +99,28 @@ export async function generateOutline(
     schemaName: 'worksheet_outline',
     schema: OUTLINE_SCHEMA
   })
-  return mitHilfsblatt(convertOutline(data), meta)
+  const outline = mitHilfsblatt(convertOutline(data), meta)
+  // Lernziele in einer eigenen Anfrage aus der fertigen Gliederung (generation/lernziele.ts) – sonst Blatt für Blatt dieselben Formeln
+  return { ...outline, learningGoals: await lernzieleFormulieren(meta, outline, ai) }
+}
+
+/**
+ * Die vorhandenen Themenbereiche des Fachs für die Gliederung (27.09.2026): Die KI nennt in
+ * „ueberthema" den Wortlaut des passenden Bereichs – so landet ein neues Blatt sicher in seinem
+ * Ordner, statt dass die Wortähnlichkeit raten muss („Die Julikrise 1914" ↔ „Ursachen des
+ * Ersten Weltkriegs"). Ohne Bereiche nennt sie die Unterrichtseinheit frei; daraus entsteht der Bereich.
+ */
+export function themenbereichVorgabe(fachId: string): string {
+  const d = useThemen.getState().daten
+  const namen = d.bereiche
+    .filter((b) => b.fachId === fachId)
+    .map((b) =>
+      pfadVon(d, b.id)
+        .map((x) => x.name)
+        .join(' › ')
+    )
+  if (!namen.length) return 'ÜBERTHEMA: Nenne in „ueberthema" die Unterrichtseinheit (2–5 Wörter, lehrplannah), unter der dieses Blatt steht.'
+  return `VORHANDENE THEMENBEREICHE DES FACHS: ${namen.join('; ')}. Nenne in „ueberthema" GENAU den Wortlaut des Bereichs (bei Unterbereichen nur den letzten Teil), zu dem dieses Blatt gehört; passt keiner, die Unterrichtseinheit (2–5 Wörter, lehrplannah).`
 }
 
 /**
@@ -150,11 +178,17 @@ function outlineText(outline: Outline): string {
   ].join('\n')
 }
 
-function levelInstruction(meta: WorksheetMeta, level: Stars | null): string {
+/*
+ * Schwierigkeit der Fassung (didactics/schwierigkeit.ts): Ein Blatt mit einem Niveau bekommt die
+ * gewählte Stufe, bei getrennten Fassungen hat jedes ★ seine eigene. „mittel/mittel" ist der
+ * Jahrgang selbst – dann steht hier nichts Zusätzliches, das Profil regelt es.
+ */
+export function levelInstruction(meta: WorksheetMeta, level: Stars | null, profile?: LearnerProfile): string {
+  if (meta.differentiation.levels > 1 && meta.differentiation.mode === 'combined') return [...DIFFERENTIATION_PRINCIPLES, ...COMBINED_RULES].join('\n')
+  const stufe = stufeFuer(meta, level)
+  if (!level) return istMittel(stufe) ? '' : [`Schwierigkeit dieses Blattes: ${stufeText(stufe)}.`, ...stufenRegeln(stufe, profile)].join('\n')
   if (meta.differentiation.levels <= 1) return ''
-  if (meta.differentiation.mode === 'combined') return [...DIFFERENTIATION_PRINCIPLES, ...COMBINED_RULES].join('\n')
-  if (!level) return ''
-  return [`Diese Fassung ist ${STAR_LABELS[level]}.`, ...DIFFERENTIATION_PRINCIPLES, ...LEVEL_RULES[level]].join('\n')
+  return [`Diese Fassung ist ${STAR_LABELS[level]} (${stufeText(stufe)}).`, ...DIFFERENTIATION_PRINCIPLES, ...stufenRegeln(stufe, profile)].join('\n')
 }
 
 export async function generateSheet(
@@ -168,6 +202,8 @@ export async function generateSheet(
   const { meta, sources } = ws
   const outline = ws.outline!
   const images = embeddableImages(sources)
+  // Anforderungsbereiche, Sprachgrenzen und Hilfen der gewählten Stufe
+  profile = profilFuerStufe(profile, stufeFuer(meta, level))
   const data = await ai<any>({
     system: systemPrompt(meta, profile),
     user: [
@@ -184,7 +220,7 @@ export async function generateSheet(
       }`,
       taskContext(meta, profile),
       outlineText(outline),
-      levelInstruction(meta, level),
+      levelInstruction(meta, level, profile),
       originalSourceRules(meta, level, ws.originalMaterial),
       originalMaterialVorgabe(ws.originalMaterial),
       scriptForSheet(script ?? null),
@@ -199,7 +235,9 @@ export async function generateSheet(
     schemaName: 'worksheet',
     schema: WORKSHEET_SCHEMA
   })
-  return buildSheet(data, level, images, anredeFuerMeta(meta))
+  const sheet = buildSheet(data, level, images, anredeFuerMeta(meta))
+  // Die Fassung heißt nach ihrer gewählten Stufe („★ grundlegend", „★★ anspruchsvoll") – so steht es im Blattwechsler und beim Export
+  return level ? { ...sheet, label: fassungsLabel(level, stufeFuer(meta, level)) } : sheet
 }
 
 /**
@@ -214,7 +252,8 @@ export function ohnePunkte<T extends WsBlock | null>(block: T, punkte = 0): T {
 function buildSheet(data: any, level: Stars | null, images: ReturnType<typeof embeddableImages>, anrede: Anrede = 'du'): Sheet {
   const rng = createRng(randomSeed())
   const roh: (WsBlock | null)[] = (Array.isArray(data?.blocks) ? data.blocks : []).map((b: any) => ohnePunkte(convertBlock(b, rng, images, anrede)))
-  const blocks = sortViewingTasks(roh.filter((b: WsBlock | null): b is WsBlock => Boolean(b)))
+  // Erwartungshorizont & Co. als Baustein: nur im Lösungsteil (didactics/loesungsteil.ts)
+  const blocks = markiereLoesungsbausteine(sortViewingTasks(roh.filter((b: WsBlock | null): b is WsBlock => Boolean(b))))
   // Hier, weil JEDER Weg durch buildSheet läuft – auch der Sparmodus, der die Prüfrunde
   // überspringt. Ohne die Zuordnung liefe die Lösungsprüfung gegen alle Skripte zugleich.
   linkListeningTasks(blocks)
@@ -334,7 +373,7 @@ export async function reviewSheet(
       '- falsch eingeordneter Anforderungsbereich oder unpassender Operator',
       '- fehlender Lebensweltbezug bzw. unpassende Beispiele für die Schulform',
       'severity „hoch“ = muss korrigiert werden, „mittel“ = Hinweis für die Lehrkraft. Leere Liste, wenn alles passt.',
-      sheet.stars ? `Niveaustufe dieser Fassung: ${STAR_LABELS[sheet.stars]}.` : '',
+      sheet.stars ? `Niveaustufe dieser Fassung: ${STAR_LABELS[sheet.stars]} (${stufeText(stufeFuer(ws.meta, sheet.stars))}).` : '',
       describeSheet(sheet)
     ]
       .filter(Boolean)
@@ -378,6 +417,7 @@ export async function regenerateBlock(
   const index = sheet.blocks.findIndex((b) => b.id === blockId)
   const old = sheet.blocks[index]
   const images = embeddableImages(ws.sources)
+  profile = profilFuerStufe(profile, stufeFuer(ws.meta, sheet.stars ?? null))
   const data = await ai<any>({
     system: systemPrompt(ws.meta, profile),
     user: [
@@ -387,7 +427,7 @@ export async function regenerateBlock(
         : feedback
           ? `Zu behebende Probleme: ${feedback}`
           : 'Formuliere ihn neu und verbessere ihn didaktisch.',
-      sheet.stars ? levelInstruction(ws.meta, sheet.stars) : '',
+      levelInstruction(ws.meta, sheet.stars ?? null, profile),
       taskContext(ws.meta, profile),
       originalSourceRules(ws.meta, sheet.stars ?? null),
       `Gesamtes Arbeitsblatt:\n${describeSheet(sheet)}`,
@@ -407,7 +447,13 @@ export async function regenerateBlock(
     old.type === 'task' ? old.points : 0
   )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  return mitAnredePruefung({ ...block, id: old.id, stars: old.stars }, sheet, ws.meta)
+  const neu = { ...block, id: old.id, stars: old.stars }
+  // Nummern, die die KI schreibt, werden zu Kennungen – gezählt über das ganze Blatt; der neue Baustein steht an der Stelle des alten
+  const [aufgeloest] = verschluesseleMaterialverweise(
+    [neu],
+    sheet.blocks.map((b) => (b.id === old.id ? neu : b))
+  )
+  return mitAnredePruefung(aufgeloest, sheet, ws.meta)
 }
 
 /**
@@ -438,6 +484,7 @@ export async function fuelleBaustein(
   if (!old) throw new Error('Der Baustein wurde nicht gefunden.')
   const images = embeddableImages(ws.sources)
   const nachbar = (i: number): string => (sheet.blocks[i] ? describeBlock(sheet.blocks[i]) : '')
+  profile = profilFuerStufe(profile, stufeFuer(ws.meta, sheet.stars ?? null))
   const data = await ai<any>({
     system: systemPrompt(ws.meta, profile),
     user: [
@@ -446,7 +493,7 @@ export async function fuelleBaustein(
       wunsch ? `Vorgabe der Lehrkraft (genau umsetzen): ${wunsch}` : '',
       index > 0 ? `Davor steht: ${nachbar(index - 1)}` : 'Er steht am Anfang des Blattes.',
       index < sheet.blocks.length - 1 ? `Danach folgt: ${nachbar(index + 1)}` : 'Er steht am Ende des Blattes.',
-      sheet.stars ? levelInstruction(ws.meta, sheet.stars) : '',
+      levelInstruction(ws.meta, sheet.stars ?? null, profile),
       taskContext(ws.meta, profile),
       originalSourceRules(ws.meta, sheet.stars ?? null, ws.originalMaterial),
       `Gesamtes Arbeitsblatt:
@@ -466,7 +513,13 @@ ${describeSheet(sheet)}`,
     old.type === 'task' ? old.points : 0
   )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  return mitAnredePruefung({ ...block, id: old.id, stars: old.stars }, sheet, ws.meta)
+  const neu = { ...block, id: old.id, stars: old.stars }
+  // Nummern, die die KI schreibt, werden zu Kennungen – gezählt über das ganze Blatt; der neue Baustein steht an der Stelle des alten
+  const [aufgeloest] = verschluesseleMaterialverweise(
+    [neu],
+    sheet.blocks.map((b) => (b.id === old.id ? neu : b))
+  )
+  return mitAnredePruefung(aufgeloest, sheet, ws.meta)
 }
 
 // ---------- Gesamtablauf ----------
@@ -540,7 +593,12 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
    * bezeichnet" und „Es fehlt der deutsche Ausgangstext" – für einen Text, der auf dem fertigen
    * Blatt stand. Die Nachbesserung schrieb dann womöglich eine Aufgabe um, die in Ordnung war.
    */
-  const mitMaterial = (sheet: Sheet): Sheet => (ws.originalMaterial ? setzeMaterialEin(sheet, ws.originalMaterial, meta, newId) : sheet)
+  const mitMaterial = (sheet: Sheet): Sheet => {
+    const mit = ws.originalMaterial ? setzeMaterialEin(sheet, ws.originalMaterial, meta, newId) : sheet
+    // Gespeichert werden KENNUNGEN: Schreibt die KI trotzdem „M2", wird daraus die Kennung des Materials, das jetzt M2 ist.
+    // Erst jetzt, wo alle Materialien an ihrem Platz stehen – auch der eingesetzte Ausgangstext. Die Nummern entstehen beim Darstellen.
+    return { ...mit, blocks: verschluesseleMaterialverweise(mit.blocks) }
+  }
 
   /*
    * Das Kuerzungsprotokoll gehoert in den Lehrkraft-Hinweis, nicht in eine Randnotiz.
@@ -587,7 +645,9 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     const sheets = await runLimited(
       levels.map((level) => async () => {
         const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
-        let sheet = mitMaterial(await generateSheet(ws, profile, level, opts.ai, scripts))
+        const stufe = stufeFuer(meta, level)
+        const profil = profilFuerStufe(profile, stufe)
+        let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts))
         /*
          * Auch im Sparmodus: Die Vollständigkeitsprüfungen laufen und bessern einmal nach.
          *
@@ -596,10 +656,12 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
          * Lösung im Hörtext nicht vorkommt, spart kein Kontingent – es kostet Unterrichtszeit.
          * Sind keine schweren Befunde da, kostet das auch keine einzige Anfrage.
          */
-        sheet = await repairSheet(ws, sheet, profile, opts.ai, () => undefined, label)
+        sheet = await repairSheet(ws, sheet, profil, opts.ai, () => undefined, label)
+        // Sprache nachmessen und bei Abweichung umschreiben lassen (Entscheidung der Lehrkraft: automatisch)
+        sheet = await lesbarkeitAngleichen(meta, sheet, profil, stufe, opts.ai)
         finished++
         opts.onProgress?.(`${label} fertig (${finished} von ${levels.length})`, done + finished, total)
-        return addSheetWarnings(sheet, profile, meta)
+        return addSheetWarnings(sheet, profil, meta)
       }),
       3
     )
@@ -609,12 +671,14 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
   const sheets = await runLimited(
     levels.map((level) => async () => {
       const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
+      const stufe = stufeFuer(meta, level)
+      const profil = profilFuerStufe(profile, stufe)
       step(`${label}: wird ausformuliert …`)
-      let sheet = mitMaterial(await generateSheet(ws, profile, level, opts.ai, scripts))
+      let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts))
       done++
       if (opts.review) {
         step(`${label}: wird geprüft …`)
-        const problems = await reviewSheet(ws, sheet, profile, opts.ai)
+        const problems = await reviewSheet(ws, sheet, profil, opts.ai)
         done++
         const severe = problems.filter((p) => p.severity === 'hoch' && p.blockNumber > 0 && p.blockNumber <= sheet.blocks.length)
         step(`${label}: ${severe.length ? `${severe.length} Baustein(e) werden verbessert …` : 'keine Korrekturen nötig'}`)
@@ -624,7 +688,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
         await runLimited(
           [...byBlock.entries()].map(([num, msgs]) => async () => {
             try {
-              blocks[num - 1] = await regenerateBlock({ ...ws, sheets: [sheet] }, sheet, sheet.blocks[num - 1].id, profile, opts.ai, msgs.join(' '))
+              blocks[num - 1] = await regenerateBlock({ ...ws, sheets: [sheet] }, sheet, sheet.blocks[num - 1].id, profil, opts.ai, msgs.join(' '))
             } catch {
               blocks[num - 1] = { ...blocks[num - 1], warnings: [...(blocks[num - 1].warnings ?? []), ...msgs] }
             }
@@ -641,8 +705,10 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       }
       // Vollständigkeit: tote Materialverweise, leeres Material, gleiche Reihenfolge in
       // Vergleichslisten. Läuft auf beiden Wegen – der Sparmodus tut dasselbe weiter oben.
-      sheet = await repairSheet(ws, sheet, profile, opts.ai, step, label)
-      const sheetWarnings = localChecks(sheet, profile, ws.meta)
+      sheet = await repairSheet(ws, sheet, profil, opts.ai, step, label)
+      // Sprache nachmessen und bei Abweichung umschreiben lassen (Entscheidung der Lehrkraft: automatisch)
+      sheet = await lesbarkeitAngleichen(meta, sheet, profil, stufe, opts.ai, (m) => step(`${label}: ${m}`))
+      const sheetWarnings = localChecks(sheet, profil, ws.meta)
       if (sheetWarnings.length && sheet.blocks[0]) {
         sheet.blocks[0].warnings = [...(sheet.blocks[0].warnings ?? []), ...sheetWarnings.map((w) => `[Blatt] ${w.message}`)]
       }
@@ -666,7 +732,9 @@ export async function suggestOutlineItem(
   profile: LearnerProfile,
   outline: Outline,
   index: number,
-  ai: AiCall
+  ai: AiCall,
+  /** Änderungswunsch der Lehrkraft (27.09.2026): „anders gestalten", „umformulieren", „als Partnerarbeit" … */
+  wunsch = ''
 ): Promise<{ purpose: string; operator: string }> {
   const item = outline.items[index]
   const umgebung = outline.items
@@ -689,6 +757,9 @@ export async function suggestOutlineItem(
       item.type === 'task' ? `- Antwortform: ${item.answerKind}` : '',
       item.stars ? `- Niveaustufe: ${'*'.repeat(item.stars)}` : '',
       '',
+      wunsch.trim()
+        ? `ÄNDERUNGSWUNSCH der Lehrkraft (genau umsetzen, alles andere möglichst beibehalten): ${wunsch.trim()}${item.purpose.trim() ? `\nBisherige Beschreibung: ${item.purpose.trim()}` : ''}`
+        : '',
       'Antworte mit „purpose": ein bis zwei Sätze, WAS dieser Baustein enthält bzw. verlangt – so genau, dass sich daraus das Blatt ausformulieren lässt. Er darf nicht wiederholen, was die anderen Bausteine schon leisten.',
       item.type === 'task' && !item.operator ? 'Nenne in „operator" den passenden Operator; sonst lasse das Feld leer.' : 'Lasse „operator" leer.',
       materialText(ws.sources)

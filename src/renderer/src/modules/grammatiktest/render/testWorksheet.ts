@@ -68,6 +68,12 @@ export function worksheetMetaForTest(test: GrammarTest): WorksheetMeta {
     // Überthema (Paket 11) – den Themenbereich setzt der Editor beim Anzeigen ein
     ueberthema: m.ueberthema,
     ueberthemaAus: m.ueberthemaAus,
+    // Blattoptionen wie beim Arbeitsblatt (27.09.2026)
+    showSchool: m.showSchool,
+    correctionMargin: m.correctionMargin,
+    notesMargin: m.notesMargin,
+    aiCanary: m.aiCanary,
+    aiCanaryWords: m.aiCanaryWords,
     helpCards: false,
     minutes: m.minutes,
     pages: Math.max(1, Math.ceil(test.blocks.length / 6)),

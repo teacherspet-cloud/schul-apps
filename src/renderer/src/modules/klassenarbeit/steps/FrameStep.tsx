@@ -1,3 +1,4 @@
+import { upperSecondary } from '../generation/generateExam'
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
   ActionIcon,
@@ -32,6 +33,7 @@ import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
+import { amtlicheListe } from '../didactics/operatorenliste'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import { suggestLevel } from '../../../shared/cefr'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -882,6 +884,44 @@ export default function FrameStep(): React.JSX.Element {
                   )}
                 </Card>
 
+                {/*
+                  Material FÜR die Arbeit (Wunsch der Lehrkraft, 27.09.2026): Dateien hineinziehen oder
+                  eine Webseite angeben; der Inhalt wird in der Arbeit verwendet – als Lesetext bei
+                  textgebundenen Teilen (die App setzt ihn wörtlich ein) oder als Grundlage für Schreib-
+                  und Mediationsaufgaben (generation/generateExam.ts, arbeitsmaterialTeil).
+                */}
+                <Card withBorder>
+                  <Title order={4} mb={4}>
+                    Material für die Arbeit (optional)
+                  </Title>
+                  <Text size="xs" c="dimmed" mb="sm">
+                    Ein Text, eine Buchseite oder eine Webseite, die in der Arbeit selbst verwendet wird – anders als die Unterlagen aus dem Unterricht oben
+                    links.
+                  </Text>
+                  <StoffQuellen
+                    quellen={meta.arbeitsmaterial ?? []}
+                    onHinzu={(neu) =>
+                      update((d) => {
+                        d.meta.arbeitsmaterial = [...(d.meta.arbeitsmaterial ?? []), ...neu]
+                      })
+                    }
+                    onAktiv={(id, aktiv) =>
+                      update((d) => {
+                        const q = d.meta.arbeitsmaterial?.find((x) => x.id === id)
+                        if (q) q.aktiv = aktiv
+                      })
+                    }
+                    onEntfernen={(id) =>
+                      update((d) => {
+                        d.meta.arbeitsmaterial = (d.meta.arbeitsmaterial ?? []).filter((x) => x.id !== id)
+                      })
+                    }
+                    title="Material hierher ziehen oder eine Webseite angeben"
+                    hint="Lesetext, Quelle, Artikel – PDF, Word, Foto, Textdatei oder Internetadresse"
+                    erklaerung="Bei Lese-, Quellen- und Mediationsteilen steht das erste Material wörtlich mit Quellenangabe auf der Arbeit; Schreib- und andere Teile bauen inhaltlich darauf auf."
+                  />
+                </Card>
+
                 {meta.subjectId === 'englisch' && exam.parts.length > 0 && (
                   <Card withBorder>
                     <Group justify="space-between" mb="sm">
@@ -948,6 +988,17 @@ export default function FrameStep(): React.JSX.Element {
                   </Title>
                   <Stack gap="sm">
                     <Switch label="Erwartungshorizont erstellen" checked={meta.answerKey} onChange={(e) => patch({ answerKey: e.currentTarget.checked })} />
+                    {/* Operatorenliste als Anlage (27.09.2026): Sek II von selbst, Sek I per Schalter – nur amtliche Definitionen */}
+                    <Switch
+                      label="Operatorenliste anhängen"
+                      description={
+                        amtlicheListe(meta.stateId, meta.subjectId)
+                          ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${amtlicheListe(meta.stateId, meta.subjectId)!.quelle}) am Ende der Arbeit${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
+                          : 'Für dieses Land und Fach ist keine amtliche Operatorenliste hinterlegt – der Baustein bleibt leer'
+                      }
+                      checked={meta.operatorenliste ?? upperSecondary(meta)}
+                      onChange={(e) => patch({ operatorenliste: e.currentTarget.checked })}
+                    />
                     {meta.answerKey && (
                       <Select
                         label="Ausführlichkeit des Erwartungshorizonts"

@@ -38,7 +38,15 @@ const labelsOf = (block: WsBlock): string[] => {
 const referencesOf = (block: WsBlock): string[] => {
   if (block.type !== 'task') return []
   const texts = [block.instruction ?? '', block.brief?.situation ?? '', ...block.parts.map((p) => p.instruction ?? '')]
-  return [...new Set(texts.flatMap((t) => [...String(t).matchAll(/\b([MQB]\s?\d+)\b/g)].map((m) => m[1].replace(/\s+/g, ''))))]
+  return [
+    ...new Set(
+      texts.flatMap((t) => [
+        ...[...String(t).matchAll(/\b([MQB]\s?\d+)\b/g)].map((m) => m[1].replace(/\s+/g, '')),
+        // Nicht aufgelöste Kennungen („M{karte}" ohne Material dieser Kennung) sind ebenfalls tote Verweise
+        ...[...String(t).matchAll(MATERIAL_VERWEIS)].map((m) => m[0])
+      ])
+    )
+  ]
 }
 
 /** Eine Zeile „Alex: Buch, Stift, Heft" → die aufgezählten Dinge. */
@@ -143,8 +151,135 @@ export function checkListening(sheet: Sheet): IntegrityFinding[] {
   return findings
 }
 
+/** Bausteintypen, die als Material gelten und von der App eine Nummer bekommen */
+export const MATERIAL_TYPES: WsBlock['type'][] = ['text', 'image', 'table', 'grid', 'audio', 'video']
+
 /** Bausteine, die als Material gelten und von der App eine Nummer bekommen (render/SheetPages.tsx nummeriert genauso). */
-export const isMaterial = (block: WsBlock): boolean => ['text', 'image', 'table', 'grid', 'audio', 'video'].includes(block.type)
+export const isMaterial = (block: WsBlock): boolean => MATERIAL_TYPES.includes(block.type) && !block.nurLoesung
+
+/** Verweis über die Kennung eines Materials, wie er GESPEICHERT wird: „M{zeitleiste}" (siehe `ref` in model/types.ts) */
+export const MATERIAL_VERWEIS = /M\{([a-z0-9-]+)\}/g
+/** Verweis, wie er auf dem Blatt STEHT: „M3" */
+const MATERIAL_NUMMER = /\bM(\d+)\b/g
+
+/**
+ * Kennung eines Materials für Verweise: die von der KI gewählte (`ref`), sonst die Kennung des
+ * Bausteins – so lässt sich JEDES Material dynamisch ansprechen, auch von Hand eingefügte.
+ */
+export const refOf = (b: WsBlock): string => b.ref ?? b.id
+
+/** Felder, die keine Texte sind und nie umgeschrieben werden */
+const KEINE_TEXTE = new Set(['id', 'ref', 'dataUrl', 'aiPrompt', 'url'])
+
+/** Wendet `fn` auf alle Texte eines Wertes an; unveränderte Teile bleiben dasselbe Objekt. */
+function wandleTexte(wert: unknown, fn: (s: string) => string): unknown {
+  if (typeof wert === 'string') return fn(wert)
+  if (Array.isArray(wert)) {
+    let geaendert = false
+    const neu = wert.map((w) => {
+      const n = wandleTexte(w, fn)
+      if (n !== w) geaendert = true
+      return n
+    })
+    return geaendert ? neu : wert
+  }
+  if (wert && typeof wert === 'object') {
+    let geaendert = false
+    const neu: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(wert as Record<string, unknown>)) {
+      const n = KEINE_TEXTE.has(k) ? v : wandleTexte(v, fn)
+      if (n !== v) geaendert = true
+      neu[k] = n
+    }
+    return geaendert ? neu : wert
+  }
+  return wert
+}
+
+/** Dasselbe AN ORT UND STELLE – für Entwürfe im Editor, die der Speicher gerade ändert */
+function wandleTexteInPlace(wert: unknown, fn: (s: string) => string): void {
+  if (Array.isArray(wert)) {
+    wert.forEach((w, i) => {
+      if (typeof w === 'string') wert[i] = fn(w)
+      else wandleTexteInPlace(w, fn)
+    })
+    return
+  }
+  if (wert && typeof wert === 'object') {
+    const o = wert as Record<string, unknown>
+    for (const k of Object.keys(o)) {
+      if (KEINE_TEXTE.has(k)) continue
+      if (typeof o[k] === 'string') o[k] = fn(o[k] as string)
+      else wandleTexteInPlace(o[k], fn)
+    }
+  }
+}
+
+/** Kennung → Nummer und Nummer → Kennung, gezählt über das Dokument */
+function kennungen(dokument: WsBlock[]): { nachKennung: Map<string, string>; nachNummer: Map<string, string> } {
+  const nummern = materialNummern(dokument)
+  const nachKennung = new Map<string, string>()
+  const nachNummer = new Map<string, string>()
+  for (const b of dokument) {
+    const n = nummern.get(b.id)
+    if (!n) continue
+    const r = refOf(b)
+    if (!nachKennung.has(r)) nachKennung.set(r, n)
+    if (!nachNummer.has(n)) nachNummer.set(n, r)
+  }
+  return { nachKennung, nachNummer }
+}
+
+/**
+ * ANZEIGE: Löst gespeicherte Verweise „M{kennung}" in die Nummern auf, die die App nach der
+ * Reihenfolge der Bausteine vergibt – gezählt über `dokument` (Standard: die Bausteine selbst;
+ * bei der Klassenarbeit alle Teile). Wird ein Material verschoben, wandern damit auch die
+ * Nummern in den Aufgaben, Hilfen und Tabellenköpfen mit (Wunsch der Lehrkraft, 27.09.2026).
+ * Unbekannte Kennungen bleiben stehen, damit die Prüfung sie melden kann. Bausteine ohne
+ * Verweis kommen unverändert (dasselbe Objekt) zurück.
+ */
+export function loeseMaterialverweise<T extends WsBlock>(blocks: T[], dokument: WsBlock[] = blocks): T[] {
+  const { nachKennung } = kennungen(dokument)
+  if (!nachKennung.size) return blocks
+  const ersetze = (s: string): string => (s.includes('M{') ? s.replace(MATERIAL_VERWEIS, (ganz, kennung: string) => nachKennung.get(kennung) ?? ganz) : s)
+  return gleichWennUnveraendert(blocks, ersetze)
+}
+
+/** Neue Liste nur, wenn sich ein Baustein geändert hat – sonst dieselbe (Anzeige-Zwischenspeicher, Vergleiche) */
+function gleichWennUnveraendert<T extends WsBlock>(blocks: T[], fn: (s: string) => string): T[] {
+  let geaendert = false
+  const neu = blocks.map((b) => {
+    const n = wandleTexte(b, fn) as T
+    if (n !== b) geaendert = true
+    return n
+  })
+  return geaendert ? neu : blocks
+}
+
+/**
+ * SPEICHERN: der umgekehrte Weg. Nummern „M3", wie die Lehrkraft sie tippt oder wie die KI sie
+ * trotz Anweisung schreibt, werden zur Kennung des Materials, das GERADE diese Nummer trägt.
+ * Nummern ohne Material bleiben stehen.
+ */
+export function verschluesseleMaterialverweise<T extends WsBlock>(blocks: T[], dokument: WsBlock[] = blocks): T[] {
+  const { nachNummer } = kennungen(dokument)
+  if (!nachNummer.size) return blocks
+  return gleichWennUnveraendert(blocks, (s) => verschluesseleText(s, nachNummer))
+}
+
+const verschluesseleText = (s: string, nachNummer: Map<string, string>): string =>
+  /\bM\d/.test(s) ? s.replace(MATERIAL_NUMMER, (ganz, n: string) => (nachNummer.has(`M${n}`) ? `M{${nachNummer.get(`M${n}`)}}` : ganz)) : s
+
+/**
+ * Für den Editor: Ein gerade geänderter Baustein (Entwurf des Speichers) wird an Ort und
+ * Stelle verschlüsselt. Die Anzeige zeigt „M3", gespeichert wird „M{zeitleiste}" – tippt die
+ * Lehrkraft „M3", meint sie das Material, das jetzt so heißt.
+ */
+export function verschluesseleBaustein(draft: WsBlock, dokument: WsBlock[]): void {
+  const { nachNummer } = kennungen(dokument)
+  if (!nachNummer.size) return
+  wandleTexteInPlace(draft, (s) => verschluesseleText(s, nachNummer))
+}
 
 /**
  * Materialnummern, wie die App sie beim Darstellen vergibt: fortlaufend M1, M2 … in der
@@ -177,16 +312,19 @@ export function checkIntegrity(sheet: Sheet, dokument: WsBlock[] = sheet.blocks)
   const present = new Set([...dokument.flatMap(labelsOf), ...nummern.values()])
   const materials = dokument.filter((b) => b.type !== 'task').length
 
-  for (const block of sheet.blocks) {
+  // Geprüft wird, was auf dem Blatt steht: Kennungen mit Material werden zu Nummern, unbekannte bleiben „M{…}"
+  for (const block of loeseMaterialverweise(sheet.blocks, dokument)) {
     // 1. Verweise auf Material, das es nicht gibt
     for (const ref of referencesOf(block)) {
       if (present.has(ref)) continue
       findings.push({
         blockId: block.id,
         severity: 'hoch',
-        message: present.size
-          ? `Die Aufgabe verweist auf „${ref}“, im Material gibt es aber nur ${[...present].sort(nachNummer).join(', ')}.`
-          : `Die Aufgabe verweist auf „${ref}“, es gibt aber kein Material so bezeichnet.`
+        message: ref.startsWith('M{')
+          ? `Die Aufgabe verweist auf „${ref}“, aber kein Material trägt diese Kennung – die Kennung des gemeinten Materials verwenden.`
+          : present.size
+            ? `Die Aufgabe verweist auf „${ref}“, im Material gibt es aber nur ${[...present].sort(nachNummer).join(', ')}.`
+            : `Die Aufgabe verweist auf „${ref}“, es gibt aber kein Material so bezeichnet.`
       })
     }
 

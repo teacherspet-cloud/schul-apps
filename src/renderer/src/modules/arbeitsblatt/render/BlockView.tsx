@@ -1,14 +1,17 @@
+import { useRef, useState } from 'react'
 import { RichText } from '../../../shared/richtext/RichText'
-import type { Answer, GridBlock, ImageBlock, ImageRole, TaskBlock, TaskPart, WsBlock } from '../model/types'
+import type { Answer, GridBlock, ImageBlock, ImageRole, TaskBlock, TaskPart, WsBlock, TableBlock } from '../model/types'
 import { AnswerView, DiagramView, McOptions, diagramWidthMm, gapRenderText } from './Answers'
 import { ImageLabelLayer } from './ImageLabels'
 import { PictogramIcon } from './Pictogram'
 import { pictogramForInstruction, pictogramForSocialForm } from './pictograms'
 import { gridDataUrl, gridDrawing } from './gridSvg'
+import { diagramDrawing } from './diagramSvg'
 import { qrDataUrl } from './qr'
 import { INFO_VARIANTS, SOCIAL_FORM_LABELS, SOCIAL_FORM_SVG } from './icons'
 import type { PlacedItem } from './paginate'
 import { plainText } from '../../../shared/richtext/parse'
+import { spaltenBreiten, spalteVerschieben, tabellenBreite, zeilenHoehe, zeilenHoehen } from './tabelleMasse'
 import { isEditMode, isKeyMode, useWs } from './WsContext'
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById, VIEWING_PHASES } from '../didactics/videoTasks'
 import { taskItems } from '../model/items'
@@ -59,6 +62,10 @@ export function Feld({
 
 /** Alternativtext des Gitternetzes (Barrierefreiheit und Word-Export). */
 export function gridAlt(block: GridBlock): string {
+  if (block.diagram?.kind === 'zeitleiste') {
+    const t = block.diagram.timeline
+    return `Zeitleiste von ${t.from} bis ${t.to}: ${t.events.map((e) => `${e.date} ${e.text}`).join('; ')}`
+  }
   if (block.kind === 'klima') return 'Raster für ein Klimadiagramm: zwölf Monate, links Temperatur, rechts Niederschlag'
   if (block.kind === 'koordinaten') {
     const a = block.axes
@@ -97,13 +104,152 @@ function useSetter<B extends WsBlock>(block: B) {
 }
 
 /**
+ * Tabelle mit ziehbaren Maßen (27.09.2026, render/tabelleMasse.ts).
+ *
+ * Wunsch der Lehrkraft: Spalten und Zeilen von Hand breiter/schmaler und höher/niedriger
+ * ziehen, das Blatt passt sich an. Im Editor sitzen Griffe an den Spaltenlinien (rechts der
+ * letzten Spalte ändert sich die Breite der ganzen Tabelle) und an den Zeilenlinien. Während
+ * des Ziehens zeigt eine Vorschau die Maße; losgelassen wird EINMAL gespeichert – erst dann
+ * misst die Messfläche denselben Baustein mit den neuen Maßen und das Blatt bricht neu um.
+ */
+function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: PlacedItem }): React.JSX.Element {
+  const ctx = useWs()
+  const edit = ctx.mode === 'edit'
+  const set = useSetter(block)
+  const tableRef = useRef<HTMLTableElement>(null)
+  const [vorschau, setVorschau] = useState<{ colWidths: number[]; rowHeightsMm: number[]; headerHeightMm: number; widthPercent: number } | null>(null)
+  const from = placed?.from ?? 0
+  const to = placed?.to ?? block.rows.length
+  const breiten = vorschau?.colWidths ?? spaltenBreiten(block)
+  const hoehen = vorschau?.rowHeightsMm ?? zeilenHoehen(block)
+  const kopfHoehe = vorschau?.headerHeightMm ?? block.headerHeightMm ?? 0
+  const breite = vorschau?.widthPercent ?? block.widthPercent ?? 100
+  const mitMassen = Boolean(block.colWidths?.length || vorschau)
+
+  const ziehen = (e: React.PointerEvent, art: 'spalte' | 'tabelle' | 'zeile' | 'kopf', index: number): void => {
+    const table = tableRef.current
+    if (!edit || !ctx.update || !table) return
+    e.preventDefault()
+    e.stopPropagation()
+    const rect = table.getBoundingClientRect()
+    const startX = e.clientX
+    const startY = e.clientY
+    const inhaltMm = ctx.contentWidthMm ?? 170
+    // Millimeter je Bildschirmpunkt – so stimmt es auch in der verkleinerten Vorschau
+    const mmProPx = (inhaltMm * (breite / 100)) / Math.max(1, rect.width)
+    const zeileDom = art === 'zeile' ? table.rows[index - from + 1] : art === 'kopf' ? table.rows[0] : null
+    const startHoeheMm = zeileDom ? zeileDom.getBoundingClientRect().height * mmProPx : 0
+    const start = { colWidths: [...breiten], rowHeightsMm: [...hoehen], headerHeightMm: kopfHoehe, widthPercent: breite }
+    let letzte = start
+    const bewegen = (ev: PointerEvent): void => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (art === 'spalte') letzte = { ...start, colWidths: spalteVerschieben(start.colWidths, index, (dx / rect.width) * 100) }
+      else if (art === 'tabelle') letzte = { ...start, widthPercent: tabellenBreite(start.widthPercent + (dx / rect.width) * start.widthPercent) }
+      else if (art === 'kopf') letzte = { ...start, headerHeightMm: zeilenHoehe(startHoeheMm + dy * mmProPx) }
+      else {
+        const h = [...start.rowHeightsMm]
+        h[index] = zeilenHoehe(startHoeheMm + dy * mmProPx)
+        letzte = { ...start, rowHeightsMm: h }
+      }
+      setVorschau(letzte)
+    }
+    const ende = (): void => {
+      window.removeEventListener('pointermove', bewegen)
+      window.removeEventListener('pointerup', ende)
+      window.removeEventListener('pointercancel', ende)
+      setVorschau(null)
+      const m = letzte
+      ctx.update!(block.id, (d) => {
+        if (d.type !== 'table') return
+        d.colWidths = m.colWidths
+        if (m.rowHeightsMm.some((x) => x > 0)) d.rowHeightsMm = m.rowHeightsMm
+        else delete d.rowHeightsMm
+        if (m.headerHeightMm > 0) d.headerHeightMm = m.headerHeightMm
+        else delete d.headerHeightMm
+        if (m.widthPercent !== 100) d.widthPercent = m.widthPercent
+        else delete d.widthPercent
+      })
+    }
+    window.addEventListener('pointermove', bewegen)
+    window.addEventListener('pointerup', ende)
+    window.addEventListener('pointercancel', ende)
+  }
+
+  return (
+    <div className={`ws-block ws-table-block ${placed?.continued ? 'ws-continued' : ''}`}>
+      {from === 0 && (block.title || ctx.materialNumbers?.get(block.id)) && (
+        <div className="ws-table-title" data-head>
+          {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
+          <Feld value={block.title} editable={edit} onChange={set((d, v) => (d.title = v))} />
+        </div>
+      )}
+      <table
+        ref={tableRef}
+        className={`ws-table ${edit ? 'ws-table-ziehbar' : ''}`}
+        style={{ width: `${breite}%`, tableLayout: mitMassen ? 'fixed' : undefined }}
+      >
+        {mitMassen && (
+          <colgroup>
+            {breiten.map((w, c) => (
+              <col key={c} style={{ width: `${w}%` }} />
+            ))}
+          </colgroup>
+        )}
+        <thead data-head>
+          <tr style={kopfHoehe ? { height: `${kopfHoehe}mm` } : undefined}>
+            {block.headers.map((h, c) => (
+              <th key={c}>
+                <Feld value={h} editable={edit} onChange={set((d, v) => (d.headers[c] = v))} />
+                {edit && (
+                  <>
+                    <span
+                      className="ws-spalten-griff"
+                      title={c < breiten.length - 1 ? 'Spaltenbreite ziehen' : 'Tabellenbreite ziehen'}
+                      onPointerDown={(e) => ziehen(e, c < breiten.length - 1 ? 'spalte' : 'tabelle', c)}
+                    />
+                    <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'kopf', 0)} />
+                  </>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.slice(from, to).map((row, r) => (
+            <tr key={from + r} data-unit style={hoehen[from + r] ? { height: `${hoehen[from + r]}mm` } : undefined}>
+              {row.map((cell, c) => (
+                <td key={c}>
+                  <RichText value={cell} inline editable={edit} onChange={set((d, v) => (d.rows[from + r][c] = v))} />
+                  {edit && <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'zeile', from + r)} />}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/**
  * Jeder Baustein mit angehefteter Illustration bekommt die Figur an die Ecke (26.09.2026) –
  * nur auf dem Schülerblatt; im Lösungsteil lenkt sie nur ab.
  */
 export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
   const { mode } = useWs()
   const set = useSetter(block)
-  const inhalt = <BlockInhalt block={block} placed={placed} />
+  const kern = <BlockInhalt block={block} placed={placed} />
+  // Nur im Lösungsteil (didactics/loesungsteil.ts): im Editor sichtbar mit Vermerk, sonst nur auf den Lösungen
+  const inhalt =
+    block.nurLoesung && mode === 'edit' ? (
+      <div className="ws-nur-loesung" data-nur-loesung>
+        <span className="ws-nur-loesung-label">nur im Lösungsteil</span>
+        {kern}
+      </div>
+    ) : (
+      kern
+    )
   if (!block.illustration || isKeyMode(mode) || placed?.continued) return inhalt
   return (
     <Illustriert block={block} editable={mode === 'edit'} onBubble={set((d, v) => (d.illustration ? (d.illustration.bubble = v) : undefined))}>
@@ -117,6 +263,9 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
   const { mode } = ctx
   const edit = mode === 'edit'
   const set = useSetter(block)
+
+  // Lehrerbausteine fehlen auf dem Schülerblatt – auch beim Messen der Seiten
+  if (block.nurLoesung && (mode === 'print' || mode === 'measure')) return null
 
   switch (block.type) {
     case 'illustration':
@@ -260,9 +409,13 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
             Gezaehlt wird der ganze Text, nicht nur das Stueck auf dieser Seite – und die
             Auslassungszeichen zaehlen nicht mit.
           */}
-          {to >= paragraphs.length && materialWoerter > 0 && <div className="ws-wortzahl">({materialWoerter} Wörter)</div>}
+          {to >= paragraphs.length && materialWoerter > 0 && (
+            <div className="ws-wortzahl" data-foot>
+              ({materialWoerter} Wörter)
+            </div>
+          )}
           {block.source && to >= paragraphs.length && (
-            <div className="ws-source">
+            <div className="ws-source" data-foot>
               Quelle: <Feld value={block.source} editable={edit} onChange={set((d, v) => ((d as typeof block).source = v))} />
             </div>
           )}
@@ -313,8 +466,10 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
           ) : (
             picture
           )}
-          {(block.caption || edit) && (
+          {(block.caption || edit || ctx.materialNumbers?.get(block.id)) && (
             <figcaption>
+              {/* Die Nummer steht am Bild wie am Text: Eine Aufgabe „mithilfe von M3" braucht ein sichtbares M3 (27.09.2026) */}
+              {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
               {/* Der Bildnachweis steht auf der Schlussseite, nicht unter dem Bild */}
               <Feld value={block.caption} editable={edit} onChange={set((d, v) => ((d as typeof block).caption = v))} placeholder="Bildunterschrift" />
             </figcaption>
@@ -335,7 +490,7 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
                 value={block.hint}
                 editable={edit}
                 onChange={set((d, v) => ((d as typeof block).hint = v))}
-                placeholder="Kurzer Hinweis, wie das Blatt zu benutzen ist"
+                placeholder="Hinweis zur Nutzung (optional), z. B. „Für Aufgabe 2: …“"
               />
             </div>
           )}
@@ -346,13 +501,21 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
                 <ul>
                   {group.items.map((item, ii) => (
                     <li key={ii}>
-                      <span className="ws-phrases-text">{item.text}</span>
+                      {/* **fett** wie überall auf dem Blatt – vorher standen die Sternchen im Druck */}
+                      <span className="ws-phrases-text">
+                        <RichText value={item.text} inline editable={false} />
+                      </span>
                       {/*
                         Die deutsche Entsprechung steht gedämpft daneben, nicht darunter –
                         so bleibt der Blick auf der Zielsprache. Ab dem mittleren Niveau und
                         ab B1+ entfällt sie ganz; warum, steht in `didactics/phraseRules.ts`.
                       */}
-                      {item.german && ctx.phraseGerman && <span className="ws-phrases-de"> – {item.german}</span>}
+                      {item.german && ctx.phraseGerman && (
+                        <span className="ws-phrases-de">
+                          {' – '}
+                          <RichText value={item.german} inline editable={false} />
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -401,41 +564,8 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
         </div>
       )
 
-    case 'table': {
-      const from = placed?.from ?? 0
-      const to = placed?.to ?? block.rows.length
-      return (
-        <div className={`ws-block ws-table-block ${placed?.continued ? 'ws-continued' : ''}`}>
-          {from === 0 && block.title && (
-            <div className="ws-table-title" data-head>
-              <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
-            </div>
-          )}
-          <table className="ws-table">
-            <thead data-head>
-              <tr>
-                {block.headers.map((h, c) => (
-                  <th key={c}>
-                    <Feld value={h} editable={edit} onChange={set((d, v) => ((d as typeof block).headers[c] = v))} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {block.rows.slice(from, to).map((row, r) => (
-                <tr key={from + r} data-unit>
-                  {row.map((cell, c) => (
-                    <td key={c}>
-                      <RichText value={cell} inline editable={edit} onChange={set((d, v) => ((d as typeof block).rows[from + r][c] = v))} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
-    }
+    case 'table':
+      return <TabelleAnsicht block={block} placed={placed} />
 
     case 'workspace':
       if (isKeyMode(mode)) return null
@@ -447,11 +577,15 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
       )
 
     case 'grid': {
-      const drawing = gridDrawing(block, ctx.contentWidthMm ?? 170)
+      // Fertig gezeichnete Zeitleiste (Material) oder leeres Gitternetz (Zeichenfläche)
+      const drawing = block.diagram
+        ? diagramDrawing(block.diagram, ctx.contentWidthMm ?? 170, { raster: false })
+        : gridDrawing(block, ctx.contentWidthMm ?? 170)
       return (
         <div className="ws-block ws-grid-block">
-          {block.title && (
+          {(block.title || ctx.materialNumbers?.get(block.id)) && (
             <div className="ws-grid-title">
+              {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
               <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </div>
           )}
@@ -483,6 +617,7 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
               ▶
             </span>
             <span className="ws-audio-title">
+              {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
               <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </span>
             <span className="ws-audio-meta">
@@ -563,6 +698,7 @@ function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem })
               ▶
             </span>
             <span className="ws-video-title">
+              {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
               <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </span>
             <span className="ws-video-meta">{facts.join(' · ')}</span>
@@ -714,28 +850,46 @@ function briefAbschnitte({
   block,
   edit,
   set,
-  wordLimit
+  wordLimit,
+  ohneHilfen
 }: {
   block: TaskBlock
   edit: boolean
   set: (apply: (draft: TaskBlock, value: string) => void) => ((v: string) => void) | undefined
   wordLimit?: boolean
+  /** Klausur der Oberstufe (27.09.2026): keine Formhinweise, keine Notizentabelle – das wären Hilfen in einer Leistungssituation */
+  ohneHilfen?: boolean
 }): React.JSX.Element[] {
   const brief = block.brief
   if (!brief) return []
-  const rahmen = [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
-  const notizen = (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
-  const form = (brief.form ?? []).filter(Boolean)
+  const rahmen = brief.frameHidden ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
+  const notizen = ohneHilfen ? [] : (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
+  const form = ohneHilfen ? [] : (brief.form ?? []).filter(Boolean)
   const teile: React.JSX.Element[] = []
 
   /*
    * Die Situation steht seit dem 24.09.2026 VORN in der Arbeitsanweisung, nicht mehr hier.
    * Sonst staende sie zweimal auf dem Blatt – genau das war die Beschwerde.
    */
+  /*
+   * Die Rahmenzeile ist im Editor Feld für Feld bearbeitbar (Befund der Lehrkraft vom
+   * 27.09.2026: sie ließ sich weder ändern noch entfernen). Ausblenden: Bausteineinstellungen.
+   */
   if (rahmen)
     teile.push(
       <div className="ws-brief" data-unit key="situation">
-        <p className="ws-brief-frame">{rahmen}</p>
+        <p className="ws-brief-frame">
+          {edit
+            ? (['audience', 'textType', 'purpose'] as const)
+                .filter((k) => brief[k])
+                .map((k, i) => (
+                  <span key={k}>
+                    {i > 0 && ' · '}
+                    <RichText value={brief[k]} inline editable onChange={set((d, v) => (d.brief![k] = v))} />
+                  </span>
+                ))
+            : rahmen}
+        </p>
       </div>
     )
 
@@ -769,12 +923,26 @@ function briefAbschnitte({
       </div>
     )
 
-  if (brief.points.length > 0)
+  /*
+   * Leere Inhaltspunkte gibt es nicht (Befund der Lehrkraft vom 27.09.2026): Wer den Text eines
+   * Punktes löscht, löscht den Punkt – sonst blieb ein nackter Aufzählungspunkt stehen, den man
+   * nicht mehr loswurde. Bereits leere Punkte älterer Blätter werden nicht dargestellt.
+   */
+  const punkte = brief.points.map((p, i) => ({ p, i })).filter(({ p }) => plainText(p).trim())
+  if (punkte.length > 0)
     teile.push(
       <ul className="ws-brief-points" data-unit key="points">
-        {brief.points.map((p, i) => (
+        {punkte.map(({ p, i }) => (
           <li key={i}>
-            <RichText value={p} inline editable={edit} onChange={set((d, v) => (d.brief!.points[i] = v))} />
+            <RichText
+              value={p}
+              inline
+              editable={edit}
+              onChange={set((d, v) => {
+                if (plainText(v).trim()) d.brief!.points[i] = v
+                else d.brief!.points.splice(i, 1)
+              })}
+            />
           </li>
         ))}
       </ul>
@@ -949,7 +1117,20 @@ function gruppiereTeilaufgaben(abschnitte: Abschnitt[]): { node: React.JSX.Eleme
 }
 
 function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }): React.JSX.Element {
-  const { mode, update, taskNumbers, showStars, taskStyle, phaseStarts, showTimecodes, answerLanguage, wordLimit, correctionMargin, contentWidthMm } = useWs()
+  const {
+    mode,
+    update,
+    taskNumbers,
+    showStars,
+    taskStyle,
+    phaseStarts,
+    showTimecodes,
+    answerLanguage,
+    wordLimit,
+    ohneSchreibhilfen,
+    correctionMargin,
+    contentWidthMm
+  } = useWs()
   const edit = mode === 'edit'
   const key = isKeyMode(mode)
   const keyEdit = mode === 'keyEdit'
@@ -1116,7 +1297,15 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
       return [
         <div className="ws-diagram-muster" data-unit key={`${k}-muster`}>
           <DiagramView spec={answer.diagram} widthMm={diagramWidthMm(contentWidthMm)} sketch={svg || undefined} />
-          {txt && <RichText className="ws-muster-text" value={txt} editable={keyEdit} onChange={set((d, v) => schreiben(d as TaskBlock, v))} placeholder="Musterlösung" />}
+          {txt && (
+            <RichText
+              className="ws-muster-text"
+              value={txt}
+              editable={keyEdit}
+              onChange={set((d, v) => schreiben(d as TaskBlock, v))}
+              placeholder="Musterlösung"
+            />
+          )}
         </div>
       ]
     }
@@ -1126,7 +1315,15 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
       return [
         <div className={klasse} style={{ minHeight: hoehe }} data-unit key={`${k}-muster`}>
           {skizzeKnoten}
-          {txt && <RichText className="ws-muster-text" value={txt} editable={keyEdit} onChange={set((d, v) => schreiben(d as TaskBlock, v))} placeholder="Musterlösung" />}
+          {txt && (
+            <RichText
+              className="ws-muster-text"
+              value={txt}
+              editable={keyEdit}
+              onChange={set((d, v) => schreiben(d as TaskBlock, v))}
+              placeholder="Musterlösung"
+            />
+          )}
         </div>
       ]
     }
@@ -1168,9 +1365,10 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
         <span className="ws-part-letter">{String.fromCharCode(97 + i)})</span>
         <RichText value={part.instruction} editable={edit} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
         {/* In der Lösungsansicht tritt die Musterlösung an die Stelle von Kästchen und Fläche */}
-        {part.answer.kind !== 'lines' && !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space' || part.answer.kind === 'diagram')) && (
-          <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />
-        )}
+        {part.answer.kind !== 'lines' &&
+          !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space' || part.answer.kind === 'diagram')) && (
+            <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />
+          )}
       </div>
     )
     const schluss =
@@ -1199,7 +1397,7 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
   // Der Mustertext steht oben auf den Linien – dann nicht noch einmal am Ende
   const mustertextGezeigt = Boolean(key && block.answer.kind === 'lines' && !block.parts.length && block.brief?.model)
   const abschnitte: Abschnitt[] = []
-  for (const teil of briefAbschnitte({ block, edit, set, wordLimit })) abschnitte.push({ node: teil })
+  for (const teil of briefAbschnitte({ block, edit, set, wordLimit, ohneHilfen: ohneSchreibhilfen })) abschnitte.push({ node: teil })
   if (block.example) abschnitte.push({ node: beispielKnoten })
   if (mcListe) abschnitte.push({ node: mcGitter })
   else if (block.parts.length > 0) block.parts.forEach((part, i) => abschnitte.push(...teilaufgabe(part, i)))
@@ -1209,7 +1407,8 @@ function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }):
    */
   else if (key && block.answer.kind === 'lines') {
     if (mustertextGezeigt) for (const n of mustertextAbschnitte(block.brief!.model!)) abschnitte.push({ node: n })
-    else for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
+    else
+      for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
   } else if (key && (block.answer.kind === 'grid' || block.answer.kind === 'space' || block.answer.kind === 'diagram') && hatMuster(block)) {
     // Kästchen bzw. Fläche bleiben stehen und tragen die Musterlösung
     for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })

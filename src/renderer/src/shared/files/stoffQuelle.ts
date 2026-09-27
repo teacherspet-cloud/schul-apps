@@ -23,6 +23,11 @@ export interface StoffQuelle {
   bilder: string[]
   /** Wird diese Quelle der KI mitgegeben? */
   aktiv: boolean
+  /**
+   * Vollständige Quellenangabe (Urheber, Titel, Publikationsort, Datum, Fundort, Abrufdatum),
+   * für Material FÜR die Arbeit von der KI aus Text und Adresse ermittelt (27.09.2026).
+   */
+  quellenangabe?: string
 }
 
 /** Aus einer gelesenen Datei eine Unterlage machen. */

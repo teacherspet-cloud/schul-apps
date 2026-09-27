@@ -1,6 +1,5 @@
-import { ActionIcon, Button, Container, Group, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core'
-import { IconArrowLeft, IconDownload, IconFileTypeDocx, IconPrinter } from '@tabler/icons-react'
-import { useMemo, useRef, useState } from 'react'
+import { Container, Stack, Box, ScrollArea } from '@mantine/core'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
@@ -14,6 +13,14 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { testToWorksheet } from '../render/testWorksheet'
 import { testPoints, testTaskCount } from '../model/types'
 import { useGrammatiktest } from '../store'
+import { GRAMMATIKTEST_FILTER, serializeGrammarTest } from '../project'
+import { defaultTestName } from '../library'
+import EditorLeiste from '../../../shared/components/EditorLeiste'
+import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
+import CanaryDialog from '../../../shared/components/CanaryDialog'
+import { canaryWordFor } from '../../../shared/aiCanary'
+import { notifyError, notifySuccess } from '../../../shared/util'
+import type { DesignTemplate } from '@shared/design'
 import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
@@ -27,7 +34,13 @@ import { testHinweiseBeheben } from '../beheben'
  * Lösungsteil trägt den Notenschlüssel und das Fehlerprofil; beides erscheint nur dort.
  */
 export default function TestEditorStep(): React.JSX.Element {
-  const { test, setStep, update } = useGrammatiktest()
+  const { test, setStep, update, undo, redo, verlauf, docName, savedAt, setDocName } = useGrammatiktest()
+  // Blattoptionen, KI-Test-Dialog – die Leiste ist dieselbe wie beim Arbeitsblatt (27.09.2026)
+  const [designs, setDesigns] = useState<DesignTemplate[]>([])
+  useEffect(() => {
+    window.api.designs.list().then(setDesigns).catch(notifyError)
+  }, [])
+  const [canaryOffen, setCanaryOffen] = useState(false)
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   const [view, setView] = useState<'student' | 'key'>('student')
@@ -107,83 +120,116 @@ export default function TestEditorStep(): React.JSX.Element {
   )
 
   return (
-    <Container size="xl" py="md">
-      <Group justify="space-between" mb="sm">
-        <Group gap="xs">
-          <Tooltip label="Zurück zu den Einstellungen">
-            <ActionIcon variant="default" onClick={() => setStep(0)}>
-              <IconArrowLeft size={16} />
-            </ActionIcon>
-          </Tooltip>
-          <SegmentedControl
-            size="xs"
-            value={view}
-            onChange={(v) => setView(v as 'student' | 'key')}
-            data={[
-              { value: 'student', label: 'Test' },
-              { value: 'key', label: 'Lösungen' }
-            ]}
+    <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <EditorLeiste
+        zurueck={{ label: 'Einstellungen', onClick: () => setStep(0) }}
+        undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
+        fassungen={null}
+        ansichten={{
+          value: view,
+          onChange: (v) => setView(v as 'student' | 'key'),
+          data: [
+            { value: 'student', label: 'Test' },
+            { value: 'key', label: 'Lösungen' }
+          ]
+        }}
+        optionen={
+          <BlattoptionenFelder
+            designs={designs}
+            designId={test.design.id}
+            onDesign={(d) => update((x) => (x.design = structuredClone(d)))}
+            schulangaben={{ checked: test.meta.showSchool !== false, onChange: (an) => update((d) => (d.meta.showSchool = an)) }}
+            korrekturrand={{ checked: Boolean(test.meta.correctionMargin), onChange: (an) => update((d) => (d.meta.correctionMargin = an)) }}
+            notizrand={{ checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) }}
+            blocksatz={{ checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) }}
+            fach={test.meta.subjectId}
+            vorlagenfarbe={{ checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) }}
+            ueberthema={{ werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') }}
+            kiTest={{
+              an: Boolean(test.meta.aiCanary),
+              woerter: test.meta.aiCanaryWords,
+              vorschlagFuer: `${test.meta.title}|${test.meta.topics.join(', ')}`,
+              onEin: () => setCanaryOffen(true),
+              onAus: () => update((d) => (d.meta.aiCanary = false))
+            }}
           />
-          <Text size="xs" c="dimmed">
-            {testTaskCount(test)} Aufgaben · {points} Punkte
-          </Text>
-        </Group>
-        <Group gap="xs">
-          <Button size="compact-sm" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => setAusgabe('docx')}>
-            Word
-          </Button>
-          <Button size="compact-sm" variant="light" leftSection={<IconPrinter size={14} />} onClick={() => setAusgabe('print')}>
-            Drucken
-          </Button>
-          <Button size="compact-sm" variant="light" leftSection={<IconDownload size={14} />} onClick={() => setAusgabe('pdf')}>
-            PDF
-          </Button>
-        </Group>
-      </Group>
-
-      <Stack>
-        {!key && (
-          <AnredeHinweise
-            befunde={anrede}
-            // Paket 12: „Mit KI beheben" – ein kleiner Auftrag, Ergebnis als ein Rückgängig-Schritt
-            onBeheben={(liste) => testHinweiseBeheben(test, docId, liste)}
-            laeuft={laufend.has('beheben')}
-          />
-        )}
-        <FitToWidth className="ws-editor-pages">
-          <SheetPages
-            ws={ws}
-            sheet={sheet}
-            plans={layouts.get(`${sheet.id}:${key ? 'key' : 'print'}`) ?? []}
-            info={pageInfoFor(ws, sheet, logo, settings.schoolName, key, settings.citationStyle)}
-            context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', {
-              update: (blockId, fn) =>
-                update((d) => {
-                  const block = d.blocks.find((b) => b.id === blockId)
-                  if (block) fn(block)
-                })
-            })}
-            wrapBlock={wrapBlock}
-          />
-        </FitToWidth>
-      </Stack>
-      {measure}
-      <AusgabeDialog
-        modus={ausgabe}
-        onClose={() => setAusgabe(null)}
-        modul="grammatiktest"
-        hatLoesungen={test.meta.answerKey}
-        onAusgabe={async (modus, loesung) => {
-          if (modus === 'print') setDruck(druckAusgabe(quelle, loesung))
-          else await speichereBlatt(quelle, modus, loesung)
+        }
+        info={`${testTaskCount(test)} Aufgaben · ${points} Punkte`}
+        name={{ value: docName, placeholder: defaultTestName(test), onChange: setDocName }}
+        gesichertAm={savedAt}
+        dateiSpeichern={{
+          tooltip: 'Als Datei speichern … (.grammatiktest, z. B. zum Weitergeben)',
+          onClick: async () => {
+            try {
+              const path = await window.api.files.save(`${quelle.name}.grammatiktest`, GRAMMATIKTEST_FILTER, serializeGrammarTest(test))
+              if (path) notifySuccess('Datei gespeichert.')
+            } catch (e) {
+              notifyError(e)
+            }
+          }
+        }}
+        ausgabe={{ onWord: () => setAusgabe('docx'), onPdf: () => setAusgabe('pdf'), onDrucken: () => setAusgabe('print') }}
+      />
+      <CanaryDialog
+        offen={canaryOffen}
+        vorschlag={canaryWordFor(`${test.meta.title}|${test.meta.topics.join(', ')}`)}
+        wert={test.meta.aiCanaryWords ?? ''}
+        onAbbruch={() => setCanaryOffen(false)}
+        onFertig={(woerter) => {
+          update((d) => {
+            d.meta.aiCanary = true
+            d.meta.aiCanaryWords = woerter
+          })
+          setCanaryOffen(false)
         }}
       />
-      <PrintPreview
-        html={druck?.html ?? null}
-        loesung={druck?.loesung}
-        title={`Drucken – ${ws.meta.title || 'Grammatiktest'}`}
-        onClose={() => setDruck(null)}
-      />
-    </Container>
+      <ScrollArea style={{ flex: 1, minHeight: 0 }}>
+        <Container size="xl" py="md">
+          <Stack>
+            {!key && (
+              <AnredeHinweise
+                befunde={anrede}
+                // Paket 12: „Mit KI beheben" – ein kleiner Auftrag, Ergebnis als ein Rückgängig-Schritt
+                onBeheben={(liste) => testHinweiseBeheben(test, docId, liste)}
+                laeuft={laufend.has('beheben')}
+              />
+            )}
+            <FitToWidth className="ws-editor-pages">
+              <SheetPages
+                ws={ws}
+                sheet={sheet}
+                plans={layouts.get(`${sheet.id}:${key ? 'key' : 'print'}`) ?? []}
+                info={pageInfoFor(ws, sheet, logo, settings.schoolName, key, settings.citationStyle)}
+                context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', {
+                  update: (blockId, fn) =>
+                    update((d) => {
+                      const block = d.blocks.find((b) => b.id === blockId)
+                      if (block) fn(block)
+                    })
+                })}
+                wrapBlock={wrapBlock}
+              />
+            </FitToWidth>
+          </Stack>
+          {measure}
+          <AusgabeDialog
+            modus={ausgabe}
+            onClose={() => setAusgabe(null)}
+            modul="grammatiktest"
+            hatLoesungen={test.meta.answerKey}
+            onAusgabe={async (modus, loesung) => {
+              if (modus === 'print') setDruck(druckAusgabe(quelle, loesung))
+              else await speichereBlatt(quelle, modus, loesung)
+            }}
+          />
+          <PrintPreview
+            html={druck?.html ?? null}
+            loesung={druck?.loesung}
+            title={`Drucken – ${ws.meta.title || 'Grammatiktest'}`}
+            onClose={() => setDruck(null)}
+          />
+        </Container>
+      </ScrollArea>
+    </Box>
   )
 }

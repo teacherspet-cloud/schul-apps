@@ -5,6 +5,8 @@ import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
 import type { Netzfund } from '../../../main/services/ai/provider'
 import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPhase } from './aiProgress'
 import { sichereAlles } from './autosave'
+import { glaetteZiel, kiKennung, merkeAnfrage, merkeAuftrag, schaetzeRest } from './restzeit'
+import { useAppSettings } from './settingsStore'
 
 /**
  * Hintergrund-Aufträge: Material entsteht, während die Lehrkraft weiterarbeitet.
@@ -33,6 +35,11 @@ import { sichereAlles } from './autosave'
  *
  * Die Liste zeigt die Auftragsleiste unten rechts (shell/AuftragsLayer.tsx); daraus leitet
  * die Seitenleiste den Punkt am Programmsymbol ab (navigation.ts).
+ *
+ * Restzeit (27.09.2026): Jeder Auftrag führt Buch über seine Anfragen (Art, KI, Dauer) und
+ * meldet am Ende Dauer, Umfang und Mischung an den Verlauf (shared/restzeit.ts). Daraus
+ * schätzt er laufend, wie lange es noch dauert – als Zielzeitpunkt `restBis`, damit der
+ * Zähler in der Leiste zwischen zwei Schätzungen von selbst weiterläuft.
  */
 
 export type AuftragsStatus = 'wartend' | 'laufend' | 'fertig' | 'fehler' | 'abgebrochen'
@@ -68,6 +75,10 @@ export interface Auftrag {
   kannErneut: boolean
   /** Warum er wartet, falls das mehr ist als „alle Plätze belegt" (siehe `warteGrund`) */
   wartegrund?: string
+  /** Geschätzter Zeitpunkt des Endes (ms seit 1970) – fehlt, solange keine belastbare Zahl vorliegt */
+  restBis?: number
+  /** Der Auftrag läuft länger als alle gemerkten Läufe seiner Art */
+  restLage?: 'laenger'
 }
 
 interface AuftraegeState {
@@ -281,17 +292,58 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
   let stufe: { fertig: number; gesamt: number; abschnitt?: RunPhase } = { fertig: 0, gesamt: 1 }
   let gezeigt = 0
   const tracker = new AiProgressTracker(() => aktualisiere())
+
+  // Buch über die Anfragen dieses Auftrags – Grundlage der Restzeit und des Verlaufs
+  const buch = {
+    erledigt: {} as Record<string, number>,
+    laufend: new Map<string, { art: string; ki: string; start: number }>(),
+    /** Größte gemeldete Schrittzahl – der Umfang, an dem die Mischung gemessen wird */
+    umfang: 1
+  }
+  const kiFuer = (art: string, req?: StructuredRequest): string => kiKennung(useAppSettings.getState().settings.ai, art === 'bild' ? 'bild' : 'text', req)
+  let restBis: number | undefined
+  const restzeit = (): Pick<Auftrag, 'restBis' | 'restLage'> => {
+    const nun = Date.now()
+    const { sekunden, laenger } = schaetzeRest({
+      art: start.art,
+      umfang: buch.umfang,
+      elapsedMs: nun - jetzt,
+      ratio: gezeigt,
+      erledigt: buch.erledigt,
+      laufend: [...buch.laufend].map(([anfrageId, l]) => ({ art: l.art, ki: l.ki, elapsedMs: nun - l.start, ...tracker.stand(anfrageId) })),
+      ki: (art) => kiFuer(art)
+    })
+    if (laenger) {
+      restBis = undefined
+      return { restBis: undefined, restLage: 'laenger' }
+    }
+    if (sekunden === null) {
+      restBis = undefined
+      return { restBis: undefined, restLage: undefined }
+    }
+    restBis = glaetteZiel(restBis, nun + sekunden * 1000)
+    return { restBis, restLage: undefined }
+  }
+
   const aktualisiere = (meldung?: string): void => {
     const chunk = tracker.ratio()
     const roh = stufe.abschnitt ? phaseRatio(stufe.abschnitt, stufe.fertig, stufe.gesamt, chunk) : overallRatio(stufe.fertig, stufe.gesamt, chunk)
     gezeigt = neverBackwards(gezeigt, roh)
-    aendere(id, (a) => (laeuft(a) ? { ...a, anteil: gezeigt, meldung: meldung ?? a.meldung, ...lage(lz, a) } : a))
+    const rest = restzeit()
+    aendere(id, (a) => (laeuft(a) ? { ...a, anteil: gezeigt, meldung: meldung ?? a.meldung, ...lage(lz, a), ...rest } : a))
   }
+  // Ohne Zeichenstrom (Bilder, Abo-Zugang) käme sonst minutenlang keine neue Schätzung
+  const takt = setInterval(() => {
+    if (!lz.beendet && !signal.aborted) aktualisiere()
+  }, 5000)
 
-  const anfrage = async <T>(art: string, senden: (anfrageId: string) => Promise<T>): Promise<T> => {
+  const anfrage = async <T>(art: string, senden: (anfrageId: string) => Promise<T>, req?: StructuredRequest): Promise<T> => {
     if (signal.aborted) throw new AbbruchFehler()
     const anfrageId = tracker.begin(art)
     lz.anfragen.add(anfrageId)
+    buch.laufend.set(anfrageId, { art, ki: kiFuer(art, req), start: Date.now() })
+    // Schon jetzt schätzen: Mit Verlauf steht die Restzeit ab der ersten Sekunde da
+    aktualisiere()
     let ok = false
     try {
       const wert = await senden(anfrageId)
@@ -300,6 +352,12 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     } catch (e) {
       throw signal.aborted ? new AbbruchFehler() : e
     } finally {
+      const lauf = buch.laufend.get(anfrageId)
+      buch.laufend.delete(anfrageId)
+      if (ok && lauf) {
+        buch.erledigt[art] = (buch.erledigt[art] ?? 0) + 1
+        merkeAnfrage(art, lauf.ki, { ms: Date.now() - lauf.start, chars: tracker.stand(anfrageId).chars })
+      }
       tracker.end(anfrageId, ok)
       lz.anfragen.delete(anfrageId)
       wartendeAnfragen.delete(anfrageId)
@@ -309,12 +367,15 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
 
   const k: AuftragsKontext = {
     signal,
-    ai: <T>(req: StructuredRequest) => anfrage(req.schemaName, (progressId) => window.api.ai.structured<T>({ ...req, progressId })),
+    ai: <T>(req: StructuredRequest) => anfrage(req.schemaName, (progressId) => window.api.ai.structured<T>({ ...req, progressId }), req),
     bild: (prompt) => anfrage('bild', (anfrageId) => window.api.ai.image(prompt, anfrageId)),
     websuche: (auftrag) => anfrage('websuche', (anfrageId) => window.api.ai.websuche(auftrag, anfrageId)),
     melde: (meldung, fertig, gesamt, abschnitt) => {
       if (signal.aborted) return
-      if (fertig !== undefined && gesamt !== undefined) stufe = { fertig, gesamt, abschnitt }
+      if (fertig !== undefined && gesamt !== undefined) {
+        stufe = { fertig, gesamt, abschnitt }
+        buch.umfang = Math.max(buch.umfang, gesamt)
+      }
       aktualisiere(meldung)
     },
     frage: <T>(art: string, daten: unknown) =>
@@ -352,12 +413,17 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       lz.legtAb = true
       aendere(id, (a) => ({ ...a, meldung: 'Wird abgelegt …' }))
       await start.ablegen(ergebnis, eingabe)
+      const ende = Date.now()
+      // Aus diesem Lauf lernen: Dauer, Umfang und Mischung der Anfragen dieser Auftragsart
+      merkeAuftrag(start.art, { ms: ende - jetzt, umfang: buch.umfang, ki: kiFuer('text'), mix: { ...buch.erledigt } })
       aendere(id, (a) => ({
         ...a,
         status: 'fertig',
         anteil: 1,
-        ende: Date.now(),
+        ende,
         rueckfrage: undefined,
+        restBis: undefined,
+        restLage: undefined,
         meldung: start.abschluss?.(ergebnis) ?? 'Fertig – in der Bibliothek gespeichert'
       }))
       return ergebnis
@@ -372,6 +438,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       return null
     } finally {
       lz.beendet = true
+      clearInterval(takt)
       tracker.dispose()
     }
   })()

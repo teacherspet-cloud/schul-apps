@@ -144,7 +144,8 @@ describe('Antwort der KI übersetzen', () => {
     expect(r.aenderungen[0].anker).toBe('t')
     const neu = r.aenderungen[0].block as TaskBlock
     expect(neu.id).toBe('t')
-    expect(neu.instruction).toBe('Beschreibe M1.')
+    // Gespeichert wird die Kennung des Materials, das gerade M1 ist (27.09.2026) – angezeigt wird wieder „M1"
+    expect(neu.instruction).toBe('Beschreibe M{q}.')
     expect(neu.points).toBe(5)
   })
   it('Arbeitsblätter tragen keine Punkte; neue Bausteine bekommen eine neue Kennung', () => {

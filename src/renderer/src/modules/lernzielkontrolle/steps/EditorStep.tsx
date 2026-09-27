@@ -1,6 +1,6 @@
-import { Accordion, ActionIcon, Alert, Badge, Button, Card, Container, Group, Radio, SegmentedControl, Stack, Text, Tooltip } from '@mantine/core'
-import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconDownload, IconFileTypeDocx, IconInfoCircle, IconPrinter } from '@tabler/icons-react'
-import { useMemo, useRef, useState } from 'react'
+import { Accordion, Alert, Badge, Card, Container, Group, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import { IconAlertTriangle, IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
@@ -17,6 +17,14 @@ import { pruefeKurztest, teilaufgaben, zaehleBefunde, type Befund } from '../did
 import { dauerSchaetzung } from '../generation/generateKurztest'
 import { kurztestToWorksheet, kurztestToWorksheetAlle, schluesselHerkunft } from '../render/kurztestWorksheet'
 import { useLernzielkontrolle } from '../store'
+import { KURZTEST_FILTER, serializeKurztest } from '../project'
+import { defaultKurztestName } from '../library'
+import EditorLeiste from '../../../shared/components/EditorLeiste'
+import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
+import CanaryDialog from '../../../shared/components/CanaryDialog'
+import { canaryWordFor } from '../../../shared/aiCanary'
+import { notifyError, notifySuccess } from '../../../shared/util'
+import type { DesignTemplate } from '@shared/design'
 import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
@@ -75,7 +83,13 @@ function BefundListe({ befunde, onBeheben, laeuft }: { befunde: Befund[]; onBehe
 }
 
 export default function EditorStep(): React.JSX.Element {
-  const { test, setStep, update, variante, setVariante, loesung, setLoesung } = useLernzielkontrolle()
+  const { test, setStep, update, variante, setVariante, loesung, setLoesung, undo, redo, verlauf, docName, savedAt, setDocName } = useLernzielkontrolle()
+  // Blattoptionen, KI-Test-Dialog – die Leiste ist dieselbe wie beim Arbeitsblatt (27.09.2026)
+  const [designs, setDesigns] = useState<DesignTemplate[]>([])
+  useEffect(() => {
+    window.api.designs.list().then(setDesigns).catch(notifyError)
+  }, [])
+  const [canaryOffen, setCanaryOffen] = useState(false)
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   /*
@@ -202,167 +216,204 @@ export default function EditorStep(): React.JSX.Element {
   )
 
   return (
-    <Container size="xl" py="md">
-      <Group justify="space-between" mb="sm" wrap="nowrap">
-        <Group gap="xs">
-          <Tooltip label="Zurück zu den Einstellungen">
-            <ActionIcon variant="default" onClick={() => setStep(0)}>
-              <IconArrowLeft size={16} />
-            </ActionIcon>
-          </Tooltip>
-          {test.varianten.length > 1 && (
-            <SegmentedControl
-              size="xs"
-              value={String(variante)}
-              onChange={(v) => setVariante(Number(v))}
-              data={test.varianten.map((v, i) => ({ value: String(i), label: `Gruppe ${v.label}` }))}
-            />
-          )}
-          <SegmentedControl
-            size="xs"
-            value={loesung ? 'key' : 'student'}
-            onChange={(v) => setLoesung(v === 'key')}
-            data={[
-              { value: 'student', label: 'Aufgabenblatt' },
-              { value: 'key', label: 'Lösungen' }
-            ]}
+    <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <EditorLeiste
+        zurueck={{ label: 'Einstellungen', onClick: () => setStep(0) }}
+        undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
+        fassungen={
+          test.varianten.length > 1
+            ? {
+                value: String(variante),
+                onChange: (v) => setVariante(Number(v)),
+                data: test.varianten.map((v, i) => ({ value: String(i), label: `Gruppe ${v.label}` })),
+                ariaLabel: 'Gruppe'
+              }
+            : null
+        }
+        ansichten={{
+          value: loesung ? 'key' : 'student',
+          onChange: (v) => setLoesung(v === 'key'),
+          data: [
+            { value: 'student', label: 'Aufgabenblatt' },
+            { value: 'key', label: 'Lösungen' }
+          ]
+        }}
+        optionen={
+          <BlattoptionenFelder
+            designs={designs}
+            designId={test.design.id}
+            onDesign={(d) => update((x) => (x.design = structuredClone(d)))}
+            schulangaben={{ checked: test.meta.showSchool !== false, onChange: (an) => update((d) => (d.meta.showSchool = an)) }}
+            korrekturrand={{ checked: Boolean(test.meta.correctionMargin), onChange: (an) => update((d) => (d.meta.correctionMargin = an)) }}
+            notizrand={{ checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) }}
+            blocksatz={{ checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) }}
+            fach={test.meta.subjectId}
+            vorlagenfarbe={{ checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) }}
+            ueberthema={{ werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') }}
+            kiTest={{
+              an: Boolean(test.meta.aiCanary),
+              woerter: test.meta.aiCanaryWords,
+              vorschlagFuer: `${test.meta.title}|${test.meta.thema}`,
+              onEin: () => setCanaryOffen(true),
+              onAus: () => update((d) => (d.meta.aiCanary = false))
+            }}
           />
-        </Group>
-        <Group gap="xs">
-          <Button size="compact-sm" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => starte('docx')}>
-            Word
-          </Button>
-          <Button size="compact-sm" variant="light" leftSection={<IconPrinter size={14} />} onClick={() => starte('print')}>
-            Drucken
-          </Button>
-          <Button size="compact-sm" variant="light" leftSection={<IconDownload size={14} />} onClick={() => starte('pdf')}>
-            PDF
-          </Button>
-        </Group>
-      </Group>
-
-      <Card withBorder padding="xs" mb="sm">
-        <Group justify="space-between" wrap="nowrap">
-          <Group gap="xs">
-            <Badge variant="light" color="gray">
-              {anzahl} {anzahl === 1 ? 'Teilaufgabe' : 'Teilaufgaben'}
-            </Badge>
-            {punkte > 0 && (
-              <Badge variant="light" color="gray">
-                {punkte} Punkte
-              </Badge>
-            )}
-            <Tooltip label="Geschätzt aus der Zahl der Teilaufgaben, kalibriert an zwei echten bayerischen Stegreifaufgaben. Eine Faustregel, keine Norm.">
-              <Badge variant="light" color={dauer > test.meta.minutes ? 'orange' : 'teal'}>
-                geschätzt {dauer} von {test.meta.minutes} Minuten
-              </Badge>
-            </Tooltip>
-          </Group>
-          <Group gap="xs">
-            {warnungen === 0 && hinweise === 0 ? (
-              <Badge variant="light" color="teal" leftSection={<IconCircleCheck size={13} />}>
-                keine Befunde
-              </Badge>
-            ) : (
-              <>
-                {warnungen > 0 && (
-                  <Badge variant="light" color="orange">
-                    {warnungen} {warnungen === 1 ? 'Warnung' : 'Warnungen'}
-                  </Badge>
-                )}
-                {hinweise > 0 && (
+        }
+        info={undefined}
+        name={{ value: docName, placeholder: defaultKurztestName(test), onChange: setDocName }}
+        gesichertAm={savedAt}
+        dateiSpeichern={{
+          tooltip: 'Als Datei speichern … (.lernzielkontrolle, z. B. zum Weitergeben)',
+          onClick: async () => {
+            try {
+              const path = await window.api.files.save(`${quelle(false).name}.lernzielkontrolle`, KURZTEST_FILTER, serializeKurztest(test))
+              if (path) notifySuccess('Datei gespeichert.')
+            } catch (e) {
+              notifyError(e)
+            }
+          }
+        }}
+        ausgabe={{ onWord: () => starte('docx'), onPdf: () => starte('pdf'), onDrucken: () => starte('print') }}
+      />
+      <CanaryDialog
+        offen={canaryOffen}
+        vorschlag={canaryWordFor(`${test.meta.title}|${test.meta.thema}`)}
+        wert={test.meta.aiCanaryWords ?? ''}
+        onAbbruch={() => setCanaryOffen(false)}
+        onFertig={(woerter) => {
+          update((d) => {
+            d.meta.aiCanary = true
+            d.meta.aiCanaryWords = woerter
+          })
+          setCanaryOffen(false)
+        }}
+      />
+      <ScrollArea style={{ flex: 1, minHeight: 0 }}>
+        <Container size="xl" py="md">
+          <Card withBorder padding="xs" mb="sm">
+            <Group justify="space-between" wrap="nowrap">
+              <Group gap="xs">
+                <Badge variant="light" color="gray">
+                  {anzahl} {anzahl === 1 ? 'Teilaufgabe' : 'Teilaufgaben'}
+                </Badge>
+                {punkte > 0 && (
                   <Badge variant="light" color="gray">
-                    {hinweise} {hinweise === 1 ? 'Hinweis' : 'Hinweise'}
+                    {punkte} Punkte
                   </Badge>
                 )}
-              </>
-            )}
-          </Group>
-        </Group>
-      </Card>
+                <Tooltip label="Geschätzt aus der Zahl der Teilaufgaben, kalibriert an zwei echten bayerischen Stegreifaufgaben. Eine Faustregel, keine Norm.">
+                  <Badge variant="light" color={dauer > test.meta.minutes ? 'orange' : 'teal'}>
+                    geschätzt {dauer} von {test.meta.minutes} Minuten
+                  </Badge>
+                </Tooltip>
+              </Group>
+              <Group gap="xs">
+                {warnungen === 0 && hinweise === 0 ? (
+                  <Badge variant="light" color="teal" leftSection={<IconCircleCheck size={13} />}>
+                    keine Befunde
+                  </Badge>
+                ) : (
+                  <>
+                    {warnungen > 0 && (
+                      <Badge variant="light" color="orange">
+                        {warnungen} {warnungen === 1 ? 'Warnung' : 'Warnungen'}
+                      </Badge>
+                    )}
+                    {hinweise > 0 && (
+                      <Badge variant="light" color="gray">
+                        {hinweise} {hinweise === 1 ? 'Hinweis' : 'Hinweise'}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </Group>
+            </Group>
+          </Card>
 
-      {/*
-       * Die Befunde stehen zugeklappt und schmal.
-       *
-       * Vorher klappte der Bereich bei jeder Warnung von selbst auf und schob das Blatt
-       * fast aus dem Bild – dabei ist das Blatt das, was die Lehrkraft sehen will. Die Zahl
-       * der Befunde steht ohnehin oben in der Kennzahlenzeile; wer sie lesen möchte, klickt
-       * auf.
-       */}
-      {befunde.length > 0 && (
-        <Accordion variant="contained" mb="sm" chevronSize={14}>
-          <Accordion.Item value="befunde">
-            <Accordion.Control py={4}>
-              <Text size="xs" c="dimmed">
-                Was der App aufgefallen ist{warnungen + hinweise > 0 ? ` (${warnungen + hinweise})` : ''}
-              </Text>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <BefundListe
-                befunde={befunde}
-                onBeheben={(liste) => befundeBeheben(test, docId, variante, liste)}
-                laeuft={[...laufend].some((k) => k.startsWith('beheben-') || befunde.some((b) => b.blockId === k))}
+          {/*
+           * Die Befunde stehen zugeklappt und schmal.
+           *
+           * Vorher klappte der Bereich bei jeder Warnung von selbst auf und schob das Blatt
+           * fast aus dem Bild – dabei ist das Blatt das, was die Lehrkraft sehen will. Die Zahl
+           * der Befunde steht ohnehin oben in der Kennzahlenzeile; wer sie lesen möchte, klickt
+           * auf.
+           */}
+          {befunde.length > 0 && (
+            <Accordion variant="contained" mb="sm" chevronSize={14}>
+              <Accordion.Item value="befunde">
+                <Accordion.Control py={4}>
+                  <Text size="xs" c="dimmed">
+                    Was der App aufgefallen ist{warnungen + hinweise > 0 ? ` (${warnungen + hinweise})` : ''}
+                  </Text>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <BefundListe
+                    befunde={befunde}
+                    onBeheben={(liste) => befundeBeheben(test, docId, variante, liste)}
+                    laeuft={[...laufend].some((k) => k.startsWith('beheben-') || befunde.some((b) => b.blockId === k))}
+                  />
+                  <Text size="xs" c="dimmed" mt="sm">
+                    Nichts davon hindert am Ausdrucken. Die Zeitgrenzen sind nur für fünf Bundesländer belegt – die eigene Schule kennt die Lehrkraft besser als
+                    eine Tabelle.
+                  </Text>
+                </Accordion.Panel>
+              </Accordion.Item>
+            </Accordion>
+          )}
+
+          {loesung && schluesselHerkunft(test, schwellen) && (
+            <Alert color="gray" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
+              <Text size="xs">Notenschlüssel: {schluesselHerkunft(test, schwellen)}</Text>
+            </Alert>
+          )}
+          {test.meta.nachteilsausgleich.aktiv && test.meta.nachteilsausgleich.vermerk && (
+            <Alert color="blue" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
+              <Text size="xs">Nachteilsausgleich: {test.meta.nachteilsausgleich.vermerk}</Text>
+            </Alert>
+          )}
+
+          <Stack>
+            <FitToWidth className="ws-editor-pages">
+              <SheetPages
+                ws={ws}
+                sheet={sheet}
+                plans={layouts.get(`${sheet.id}:${loesung ? 'key' : 'print'}`) ?? []}
+                info={pageInfoFor(ws, sheet, logo, settings.schoolName, loesung, settings.citationStyle)}
+                context={contextFor(ws, sheet, loesung ? 'keyEdit' : 'edit', {
+                  update: (blockId, fn) =>
+                    update((d) => {
+                      const block = d.varianten[variante]?.blocks.find((b) => b.id === blockId)
+                      if (block) fn(block)
+                    })
+                })}
+                wrapBlock={wrapBlock}
               />
-              <Text size="xs" c="dimmed" mt="sm">
-                Nichts davon hindert am Ausdrucken. Die Zeitgrenzen sind nur für fünf Bundesländer belegt – die eigene Schule kennt die Lehrkraft besser als
-                eine Tabelle.
-              </Text>
-            </Accordion.Panel>
-          </Accordion.Item>
-        </Accordion>
-      )}
-
-      {loesung && schluesselHerkunft(test, schwellen) && (
-        <Alert color="gray" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
-          <Text size="xs">Notenschlüssel: {schluesselHerkunft(test, schwellen)}</Text>
-        </Alert>
-      )}
-      {test.meta.nachteilsausgleich.aktiv && test.meta.nachteilsausgleich.vermerk && (
-        <Alert color="blue" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
-          <Text size="xs">Nachteilsausgleich: {test.meta.nachteilsausgleich.vermerk}</Text>
-        </Alert>
-      )}
-
-      <Stack>
-        <FitToWidth className="ws-editor-pages">
-          <SheetPages
-            ws={ws}
-            sheet={sheet}
-            plans={layouts.get(`${sheet.id}:${loesung ? 'key' : 'print'}`) ?? []}
-            info={pageInfoFor(ws, sheet, logo, settings.schoolName, loesung, settings.citationStyle)}
-            context={contextFor(ws, sheet, loesung ? 'keyEdit' : 'edit', {
-              update: (blockId, fn) =>
-                update((d) => {
-                  const block = d.varianten[variante]?.blocks.find((b) => b.id === blockId)
-                  if (block) fn(block)
-                })
-            })}
-            wrapBlock={wrapBlock}
-          />
-        </FitToWidth>
-      </Stack>
-      {measure}
-      <AusgabeDialog
-        modus={ausgabeModus}
-        onClose={() => setAusgabeModus(null)}
-        modul="lernzielkontrolle"
-        hatLoesungen={test.meta.answerKey}
-        onAusgabe={ausfuehren}
-      >
-        {mehrereFassungen && (
-          <Radio.Group
-            label={`${test.varianten.length} Fassungen (${test.varianten.map((v) => v.label).join(', ')}) – nur die angezeigte oder alle?`}
-            value={alleFassungen ? 'alle' : 'eine'}
-            onChange={(v) => setAlleFassungen(v === 'alle')}
+            </FitToWidth>
+          </Stack>
+          {measure}
+          <AusgabeDialog
+            modus={ausgabeModus}
+            onClose={() => setAusgabeModus(null)}
+            modul="lernzielkontrolle"
+            hatLoesungen={test.meta.answerKey}
+            onAusgabe={ausfuehren}
           >
-            <Stack gap={6} mt={4}>
-              <Radio value="eine" label={`Nur Gruppe ${test.varianten[variante]?.label}`} />
-              <Radio value="alle" label="Alle in einer Datei" />
-            </Stack>
-          </Radio.Group>
-        )}
-      </AusgabeDialog>
-      <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${dateiname}`} onClose={() => setDruck(null)} />
-    </Container>
+            {mehrereFassungen && (
+              <Radio.Group
+                label={`${test.varianten.length} Fassungen (${test.varianten.map((v) => v.label).join(', ')}) – nur die angezeigte oder alle?`}
+                value={alleFassungen ? 'alle' : 'eine'}
+                onChange={(v) => setAlleFassungen(v === 'alle')}
+              >
+                <Stack gap={6} mt={4}>
+                  <Radio value="eine" label={`Nur Gruppe ${test.varianten[variante]?.label}`} />
+                  <Radio value="alle" label="Alle in einer Datei" />
+                </Stack>
+              </Radio.Group>
+            )}
+          </AusgabeDialog>
+          <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${dateiname}`} onClose={() => setDruck(null)} />
+        </Container>
+      </ScrollArea>
+    </Box>
   )
 }

@@ -22,9 +22,25 @@ import { geltendeFachfarbe } from '../../../shared/fachfarben'
 import { blockHelp } from '../render/helpTexts'
 import type { TestLayouts } from '../render/useTestLayout'
 
-import { A4_WIDTH as PAGE_WIDTH, ALL_BORDERS, CM, dataUrlBytes, ImageSizer, NO_BORDERS, RED, run, THIN, writingLines } from '../../../shared/export/docxKit'
+import {
+  A4_WIDTH as PAGE_WIDTH,
+  ALL_BORDERS,
+  CM,
+  dataUrlBytes,
+  imageRun,
+  ImageSizer,
+  NO_BORDERS,
+  RED,
+  run,
+  THIN,
+  writingLines
+} from '../../../shared/export/docxKit'
+import { maskottchenBild } from '../../../shared/maskottchenStore'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
+import { vokabeltestFigur } from '../render/maskottchen'
 import { vokabeltestPfad } from '../render/TestPage'
+
+const PX_MM = 96 / 25.4
 
 type Mode = 'print' | 'key'
 export type { ImageSizer }
@@ -53,7 +69,7 @@ export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: Ima
 
   const addSections = async (mode: Mode): Promise<void> => {
     for (const v of variants) {
-      const children: (Paragraph | Table)[] = [...header(ctx, v, mode)]
+      const children: (Paragraph | Table)[] = [...(mode === 'print' ? await figurAbsatz(ctx, 'winkend') : []), ...header(ctx, v, mode)]
       const layout = (mode === 'key' ? opts.layouts?.key : opts.layouts?.student)?.get(v.id)
       // Aufgaben, die im Editor oben auf einer neuen Seite beginnen
       const pageStarts = new Set(
@@ -65,6 +81,7 @@ export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: Ima
       for (let i = 0; i < v.blocks.length; i++) {
         children.push(...(await blockContent(ctx, v.blocks[i], i + 1, mode, pageStarts.has(v.blocks[i].id))))
       }
+      if (mode === 'print') children.push(...(await figurAbsatz(ctx, 'jubelnd')))
       if (opts.credits?.length) {
         children.push(new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: opts.credits.join(' · '), size: 14, color: '777777' })] }))
       }
@@ -96,6 +113,21 @@ interface Ctx {
 }
 
 // ---------- Kopf ----------
+
+/**
+ * Kopf- und Schlussfigur (27.09.2026) wie im Arbeitsblatt-Export: ein kleines Bild rechts,
+ * vor dem Kopf bzw. nach der letzten Aufgabe – Word kennt keine Ecke „darüber".
+ */
+async function figurAbsatz(ctx: Ctx, pose: 'winkend' | 'jubelnd'): Promise<Paragraph[]> {
+  const figur = vokabeltestFigur(ctx.doc)
+  if (!figur) return []
+  const src = maskottchenBild(figur.maskottchenId, pose)
+  if (!src) return []
+  const dim = await ctx.sizer(src).catch(() => ({ width: 2, height: 3 }))
+  const h = 16 * PX_MM
+  const w = (dim.width / Math.max(1, dim.height)) * h
+  return [new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { after: 60 }, children: [imageRun(src, w, h)] })]
+}
 
 function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
   const h = ctx.doc.header

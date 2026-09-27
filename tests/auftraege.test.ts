@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StructuredRequest } from '../src/shared/types'
 import { ABBRUCH_MELDUNG } from '../src/shared/abbruch'
+import { leseVerlauf, vergissVerlauf } from '../src/renderer/src/shared/restzeit'
+
+// Verlauf der Dauern (Restzeit) landet im lokalen Speicher – hier eine Attrappe
+const speicher = new Map<string, string>()
+vi.stubGlobal('localStorage', {
+  getItem: (k: string) => speicher.get(k) ?? null,
+  setItem: (k: string, v: string) => void speicher.set(k, v),
+  removeItem: (k: string) => void speicher.delete(k)
+})
 
 /**
  * Wache für die Hintergrund-Aufträge der Oberfläche (shared/auftraege.ts, Paket 3):
@@ -52,6 +61,117 @@ beforeEach(() => {
   offen.clear()
   abgebrochen.length = 0
   offeneBilder.length = 0
+  vergissVerlauf()
+})
+
+describe('Restzeit: Der Auftrag lernt aus seinem Lauf', () => {
+  it('merkt sich Dauer, Umfang und Mischung der Anfragen – aber nur von fertigen Aufträgen', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    try {
+      const lauf = starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId: 'd-lern',
+        titel: 'Igel',
+        art: 'Probe planen',
+        eingabe: {},
+        arbeit: async (_e, k) => {
+          k.melde('Los', 0, 3)
+          await k.ai(REQ)
+          await k.ai({ ...REQ, schemaName: 'zweite' })
+          return 'fertig'
+        },
+        ablegen: async () => undefined
+      })
+      await tick()
+      vi.advanceTimersByTime(4000)
+      await antworte({ ok: true })
+      // Erst nach einem weiteren Umlauf hat der Auftrag die zweite Anfrage gestellt
+      await tick()
+      vi.advanceTimersByTime(6000)
+      await antworte({ ok: true })
+      await lauf
+      const v = leseVerlauf()
+      const probe = v.auftraege['Probe planen']
+      expect(probe).toHaveLength(1)
+      expect(probe[0].umfang).toBe(3)
+      expect(probe[0].mix).toEqual({ probe: 1, zweite: 1 })
+      expect(probe[0].ms).toBeGreaterThanOrEqual(10000)
+      expect(probe[0].ki).toMatch(/^openai:/)
+      // Je Anfrageart und KI die Dauer
+      const anfrageArten = Object.keys(v.anfragen)
+      expect(anfrageArten.some((k) => k.startsWith('probe@openai:'))).toBe(true)
+      expect(anfrageArten.some((k) => k.startsWith('zweite@openai:'))).toBe(true)
+      expect(
+        Object.values(v.anfragen)
+          .flat()
+          .map((p) => p.ms)
+      ).toEqual([4000, 6000])
+      // Der fertige Auftrag zeigt keine Restzeit mehr
+      expect(auftrag()!.restBis).toBeUndefined()
+
+      // Ein Abbruch lehrt nichts
+      starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId: 'd-abbruch',
+        titel: 'Igel',
+        art: 'Probe planen',
+        eingabe: {},
+        arbeit: async (_e, k) => k.ai(REQ),
+        ablegen: async () => undefined
+      })
+      await tick()
+      brichAb(auftrag()!.id)
+      await tick()
+      expect(leseVerlauf().auftraege['Probe planen']).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('zeigt mit Verlauf schon vor dem ersten Zeichen eine Restzeit', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    try {
+      // Erster Lauf: 4 s je Anfrage
+      const erster = starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId: 'a',
+        titel: 'x',
+        art: 'Probe planen',
+        eingabe: {},
+        arbeit: async (_e, k) => k.ai(REQ),
+        ablegen: async () => undefined
+      })
+      await tick()
+      vi.advanceTimersByTime(4000)
+      await antworte({ ok: true })
+      await erster
+      // Zweiter Lauf: Sofort steht eine Zahl da – ohne Fortschritt auf dem Balken
+      starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId: 'b',
+        titel: 'x',
+        art: 'Probe planen',
+        eingabe: {},
+        arbeit: async (_e, k) => k.ai(REQ),
+        ablegen: async () => undefined
+      })
+      await tick()
+      vi.advanceTimersByTime(1000)
+      await tick()
+      const a = auftrag()!
+      expect(a.anteil).toBe(0)
+      expect(a.restBis).toBeDefined()
+      expect(a.restBis! - Date.now()).toBeGreaterThan(1000)
+      expect(a.restBis! - Date.now()).toBeLessThanOrEqual(4000)
+      // Läuft es länger als alle gemerkten Läufe, sagt der Auftrag das statt einer erfundenen Zahl
+      vi.advanceTimersByTime(20000)
+      await tick()
+      expect(auftrag()!.restLage).toBe('laenger')
+      await antworte({ ok: true })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('Hintergrund-Aufträge', () => {

@@ -85,6 +85,12 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
     // Überthema (Paket 11) – den Themenbereich setzt der Editor beim Anzeigen ein
     ueberthema: m.ueberthema,
     ueberthemaAus: m.ueberthemaAus,
+    // Blattoptionen wie beim Arbeitsblatt (27.09.2026)
+    showSchool: m.showSchool,
+    correctionMargin: m.correctionMargin,
+    notesMargin: m.notesMargin,
+    aiCanary: m.aiCanary,
+    aiCanaryWords: m.aiCanaryWords,
     // Die Lernhilfen des Arbeitsblatts gibt es hier nicht – siehe didactics/bausteine.ts
     helpCards: false,
     minutes: m.minutes,

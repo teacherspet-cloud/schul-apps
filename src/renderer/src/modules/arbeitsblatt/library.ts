@@ -11,6 +11,9 @@ import type { PagePlan } from './render/paginate'
 import type { Worksheet } from './model/types'
 import { useArbeitsblatt } from './store'
 import { boardList } from './didactics/boardDesign'
+import { markiereLoesungsbausteine } from './didactics/loesungsteil'
+import { ueberthemaVon } from '../../shared/ueberthema'
+import { einsortierenNachSpeichern } from '../../shared/themenbereiche'
 
 export function worksheetStats(ws: Worksheet): SavedWorksheetStats {
   return {
@@ -22,8 +25,27 @@ export function worksheetStats(ws: Worksheet): SavedWorksheetStats {
     stateId: ws.meta.stateId,
     schoolTypeId: ws.meta.schoolTypeId,
     sheetCount: ws.sheets.length,
-    hasBoard: boardList(ws).length > 0
+    hasBoard: boardList(ws).length > 0,
+    // Überthema für die Themenbereiche (27.09.2026): So findet die Automatik den Bereich, den das Blatt selbst nennt
+    ...(ueberthemaVon(ws.meta) ? { ueberthema: ueberthemaVon(ws.meta) } : {})
   }
+}
+
+/**
+ * Nach dem Öffnen: Lehrerbausteine älterer Blätter als „nur im Lösungsteil" kennzeichnen
+ * (didactics/loesungsteil.ts) – nur, wo noch nichts entschieden ist; ohne Verlaufsschritt.
+ */
+export function markiereLoesungsbausteineImOffenen(): void {
+  const ws = useArbeitsblatt.getState().worksheet
+  if (!ws) return
+  const sheets = ws.sheets.map((s) => {
+    const blocks = markiereLoesungsbausteine(s.blocks)
+    return blocks === s.blocks ? s : { ...s, blocks }
+  })
+  if (sheets.every((s, i) => s === ws.sheets[i])) return
+  useArbeitsblatt.getState().update((d) => {
+    d.sheets = sheets
+  })
 }
 
 export function defaultWorksheetName(ws: Worksheet): string {
@@ -74,6 +96,8 @@ export async function saveCurrentWorksheet(
       : await worksheetThumb(ws, opts.layouts, opts.logo ?? null, opts.schoolName ?? '')
   const meta = await window.api.sheets.save({ id, name, stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
   useArbeitsblatt.getState().markSaved(meta.id, meta.updatedAt, meta.name)
+  // Sofort in die Themenbereiche einsortieren – nicht erst beim nächsten Besuch der Startseite (27.09.2026)
+  void einsortierenNachSpeichern()
 }
 
 export async function openSavedWorksheet(id: string): Promise<void> {
@@ -81,6 +105,7 @@ export async function openSavedWorksheet(id: string): Promise<void> {
   await sichereAlles()
   const saved = await window.api.sheets.get(id)
   useArbeitsblatt.getState().openSaved(saved.id, saved.name, saved.payload as Worksheet, saved.updatedAt)
+  markiereLoesungsbausteineImOffenen()
   void cleanWorksheetImages()
   void loadAudioFiles()
 }
@@ -115,6 +140,7 @@ export function legeArbeitsblattAb(docId: string, schnappschuss: Worksheet, eina
       },
       speichern: async (id, name, ws) => {
         await window.api.sheets.save({ id, name: name ?? defaultWorksheetName(ws), stats: worksheetStats(ws), payload: withoutAudioData(ws) })
+        void einsortierenNachSpeichern()
       }
     },
     docId,

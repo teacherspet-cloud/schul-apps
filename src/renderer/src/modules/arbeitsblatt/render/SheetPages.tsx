@@ -20,7 +20,7 @@ import { anredeText } from '../../../shared/anrede'
 import { druckDesign } from '../../../shared/fachfarben'
 import { boardList } from '../didactics/boardDesign'
 import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
-import { isMaterial, materialNummern } from '../didactics/integrity'
+import { isMaterial, loeseMaterialverweise, materialNummern, verschluesseleBaustein } from '../didactics/integrity'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -60,8 +60,10 @@ export function pageInfoFor(ws: Worksheet, sheet: Sheet, logo: string | null, sc
     language: ws.meta.labelLanguage ?? 'de',
     levelMark: ws.meta.showLevelMarks !== false && ws.sheets.length > 1 && sheet.stars ? '★'.repeat(sheet.stars) : undefined,
     citationStyle,
-    // Für dasselbe Blatt immer dasselbe Wort, damit die Lehrkraft weiß, wonach sie sucht
-    canary: ws.meta.aiCanary ? canaryText(canaryWords(ws.meta.aiCanaryWords, canaryWordFor(`${ws.meta.title}|${ws.meta.topic}`))) : undefined
+    // Für dasselbe Blatt immer dasselbe Wort, damit die Lehrkraft weiß, wonach sie sucht; bei Fremdsprachen zweisprachig
+    canary: ws.meta.aiCanary
+      ? canaryText(canaryWords(ws.meta.aiCanaryWords, canaryWordFor(`${ws.meta.title}|${ws.meta.topic}`)), subjectById(ws.meta.subjectId).foreignLanguage)
+      : undefined
   }
 }
 
@@ -76,6 +78,23 @@ export { isMaterial }
 export function materialNumbersFor(sheet: Sheet): Map<string, string> {
   // Eine Zählung für Darstellung und Prüfung – sonst meldet die Prüfung Nummern, die das Blatt anders zeigt
   return materialNummern(sheet.blocks)
+}
+
+const anzeigen = new WeakMap<Sheet, Sheet>()
+
+/**
+ * Das Blatt, wie es dargestellt wird: gespeicherte Verweise „M{zeitleiste}" werden zu der
+ * Nummer, die das Material nach der AKTUELLEN Reihenfolge trägt (27.09.2026). Verschiebt die
+ * Lehrkraft M2 vor M1, heißt es auf dem Blatt M1 – und jede Aufgabe, die es nennt, sagt M1.
+ * Je Blattobjekt einmal berechnet; ohne Verweise ist es dasselbe Objekt.
+ */
+export function zurAnzeige(sheet: Sheet): Sheet {
+  const bekannt = anzeigen.get(sheet)
+  if (bekannt) return bekannt
+  const blocks = loeseMaterialverweise(sheet.blocks)
+  const anzeige = blocks === sheet.blocks ? sheet : { ...sheet, blocks }
+  anzeigen.set(sheet, anzeige)
+  return anzeige
 }
 
 export function taskNumbersFor(sheet: Sheet): Map<string, number> {
@@ -125,6 +144,7 @@ export function vorschauSeiten(anzahl: number, hoechstens = 6): number[] {
 
 export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Partial<WsContextValue> = {}): WsContextValue {
   const insets = contentInsets(ws.design)
+  const update = extra.update
   return {
     mode,
     contentWidthMm: 210 - insets.left - insets.right,
@@ -135,6 +155,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     showStars: ws.meta.showLevelMarks !== false && ws.meta.differentiation.levels > 1 && ws.meta.differentiation.mode === 'combined',
     sheetStars: sheet.stars,
     correctionMargin: ws.meta.correctionMargin,
+    ohneSchreibhilfen: Boolean(ws.meta.ohneSchreibhilfen),
     notesMargin: ws.meta.notesMargin,
     phraseGerman: zeigtUebersetzung(ws.meta, sheet.stars),
     taskStyle: {
@@ -147,7 +168,17 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     wordLimit: ws.meta.wordLimit,
     subjectId: ws.meta.subjectId,
     anrede: anredeFuerMeta(ws.meta),
-    ...extra
+    ...extra,
+    // Getippte Nummern („M3") werden beim Speichern zur Kennung des Materials, das jetzt so heißt – so wandern sie beim Verschieben mit
+    ...(update
+      ? {
+          update: (blockId: string, fn: (draft: WsBlock) => void) =>
+            update(blockId, (draft) => {
+              fn(draft)
+              verschluesseleBaustein(draft, sheet.blocks)
+            })
+        }
+      : {})
   }
 }
 
@@ -228,7 +259,7 @@ export function blockLayout(blocks: WsBlock[], ownPhrasePage = false, mitFreien 
 /** Seiten eines Blattes nach berechneter Aufteilung. */
 export function SheetPages({
   ws,
-  sheet,
+  sheet: gespeichert,
   plans,
   info,
   context,
@@ -247,6 +278,8 @@ export function SheetPages({
    */
   nurSeite?: number
 }): React.JSX.Element {
+  // Dargestellt wird die Fassung mit aufgelösten Materialverweisen (siehe `zurAnzeige`)
+  const sheet = zurAnzeige(gespeichert)
   const ownPhrasePage = phraseSheetModus(ws.meta) === 'blatt'
   const pages = plans && plans.length ? plans : fallbackPlan(sheet, ownPhrasePage)
   const byId = new Map(sheet.blocks.map((b) => [b.id, b]))
@@ -634,8 +667,13 @@ function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Shee
       if (!m.units) return summe + m.height
       const von = it.from ?? 0
       const bis = it.to ?? m.units.length
-      // Auf einem Folgestück zählt der Fortsetzungshinweis mit – sonst fällt die Auffüllung zu groß aus
-      return summe + (von === 0 ? (m.headHeight ?? 0) : (m.continuedHead ?? 0)) + m.units.slice(von, bis).reduce((a, b) => a + b, 0)
+      // Auf einem Folgestück zählt der Fortsetzungshinweis mit – sonst fällt die Auffüllung zu groß aus; der Fuß nur beim letzten Stück
+      return (
+        summe +
+        (von === 0 ? (m.headHeight ?? 0) : (m.continuedHead ?? 0)) +
+        m.units.slice(von, bis).reduce((a, b) => a + b, 0) +
+        (bis >= m.units.length ? (m.footHeight ?? 0) : 0)
+      )
     }, 0)
     const rest = (seite === 0 ? ersteHoehe : weitereHoehe) - genutzt
     // Ein Drittel Zeilenhöhe Reserve gegen Rundung – lieber eine Linie weniger als Überlauf
@@ -653,7 +691,8 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
   const [layouts, setLayouts] = useState<Map<string, PagePlan[]>>(new Map())
   const [tick, setTick] = useState(0)
 
-  const variants = useMemo(() => (ws ? ws.sheets.flatMap((s) => [false, true].map((key) => ({ sheet: s, key }))) : []), [ws])
+  // Gemessen wird, was dargestellt wird – mit aufgelösten Verweisen („M3" ist kürzer als „M{zeitleiste}")
+  const variants = useMemo(() => (ws ? ws.sheets.flatMap((s) => [false, true].map((key) => ({ sheet: zurAnzeige(s), key }))) : []), [ws])
 
   /*
    * VERSTECKT GEMESSEN = FALSCH GEMESSEN (Befund der Lehrkraft, 26.09.2026).
@@ -723,15 +762,33 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
         if (splittable) {
           const units = unitEls.map((u) => u.getBoundingClientRect().height)
           const unitSum = units.reduce((a, b) => a + b, 0)
+          /*
+           * Der FUSS (Wortzahl, Quellenangabe) steht nur unter dem letzten Teilstück. Bis zum
+           * 27.09.2026 steckte er im Kopf und wurde damit dem ERSTEN Stück angerechnet – auf der
+           * Seite davor fehlten dann genau diese Pixel, und ein Absatz, der noch gepasst hätte,
+           * rutschte auf die Folgeseite (PDF „Test": 5 px zu wenig für 269 px Absatz).
+           */
+          const footHeight = Array.from(wrap.querySelectorAll<HTMLElement>('[data-foot]')).reduce((a, f) => a + f.getBoundingClientRect().height, 0)
           items.push({
             id,
             height,
-            headHeight: Math.max(0, height - unitSum),
+            headHeight: Math.max(0, height - unitSum - footHeight),
+            footHeight,
             units,
-            // Zeilennummern zählen nur den Materialtext, nicht die Worterklärungen darunter
+            /*
+             * Zeilennummern zählen nur den Materialtext, nicht die Worterklärungen darunter.
+             *
+             * Gezählt wird mit der ECHTEN Zeilenhöhe des Absatzes (27.09.2026): Vorher galt fest
+             * „Seitenschrift × 1,5" – bei kleiner gesetztem Text kamen so weniger Zeilen heraus als
+             * gedruckt, und die Nummern der Folgeseite liefen davon (28 Zeilen gezählt als 26).
+             */
             unitLines:
               block?.type === 'text' && block.lineNumbers
-                ? unitEls.map((u, k) => (u.classList.contains('ws-glossary') ? 0 : Math.max(1, Math.round(units[k] / (fontPx * 1.5)))))
+                ? unitEls.map((u, k) => {
+                    if (u.classList.contains('ws-glossary')) return 0
+                    const zeile = parseFloat(getComputedStyle(u).lineHeight) || fontPx * 1.5
+                    return Math.max(1, Math.round(units[k] / zeile))
+                  })
                 : undefined,
             keepTogether: true,
             pageBreakBefore: block?.pageBreakBefore,

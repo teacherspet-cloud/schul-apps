@@ -1,7 +1,7 @@
 import { Button, Card, Center, Group, Loader, Progress, Stack, Text, Title } from '@mantine/core'
 import { IconPlus, IconX } from '@tabler/icons-react'
-import { remainingLabel, remainingSeconds } from '../aiProgress'
 import { brichAb, dauerLabel, useSekundentakt, type Auftrag } from '../auftraege'
+import { restAnzeige } from '../restzeit'
 
 /**
  * Statt des Formulars: „wird erzeugt … im Hintergrund".
@@ -14,7 +14,7 @@ import { brichAb, dauerLabel, useSekundentakt, type Auftrag } from '../auftraege
 export default function AuftragsHinweis({ auftrag, neuLabel, onNeu }: { auftrag: Auftrag; neuLabel?: string; onNeu?: () => void }): React.JSX.Element {
   const jetzt = useSekundentakt(true)
   const vergangen = jetzt - auftrag.start
-  const rest = remainingLabel(remainingSeconds(auftrag.anteil, vergangen))
+  const rest = restAnzeige(auftrag, jetzt)
   return (
     <Center h="100%" p="lg">
       <Card withBorder shadow="sm" padding="xl" maw={560} w="100%" role="status" aria-live="polite" data-auftrag-hinweis={auftrag.docId}>

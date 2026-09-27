@@ -23,13 +23,23 @@ export interface MaskottchenPose {
 /** Die zwölf Standardposen (Entscheidung der Lehrkraft, 26.09.2026). */
 export const MASKOTTCHEN_POSEN: MaskottchenPose[] = [
   { id: 'winkend', label: 'winkend', zweck: 'Begrüßung am Anfang', prompt: 'winkt freundlich mit erhobener Hand' },
-  { id: 'zeigend', label: 'zeigend', zweck: 'Merke, Info, Regel', prompt: 'zeigt mit ausgestrecktem Arm und erhobenem Zeigefinger zur Seite, als erkläre es etwas Wichtiges' },
+  {
+    id: 'zeigend',
+    label: 'zeigend',
+    zweck: 'Merke, Info, Regel',
+    prompt: 'zeigt mit ausgestrecktem Arm und erhobenem Zeigefinger zur Seite, als erkläre es etwas Wichtiges'
+  },
   { id: 'denkend', label: 'denkend', zweck: 'Denkaufgabe', prompt: 'denkt nach, Hand am Kinn, Blick nach oben, kleine Fragezeichen über dem Kopf' },
   { id: 'schreibend', label: 'schreibend', zweck: 'Schreibaufgabe', prompt: 'schreibt mit einem Stift auf ein Blatt Papier' },
   { id: 'sprechend', label: 'sprechend', zweck: 'Tipp, Sprechblase', prompt: 'spricht mit offenem Mund und einladender Geste, als gebe es einen Tipp' },
   { id: 'lesend', label: 'lesend', zweck: 'Lesetext, Material', prompt: 'liest konzentriert in einem aufgeschlagenen Buch' },
   { id: 'jubelnd', label: 'jubelnd', zweck: 'Geschafft, Selbstcheck', prompt: 'jubelt mit beiden Armen in der Luft, strahlend' },
-  { id: 'warnend', label: 'warnend', zweck: 'Achtung, Regel', prompt: 'hebt warnend die Hand, ernster, aber freundlicher Blick, kleines Ausrufezeichen daneben' },
+  {
+    id: 'warnend',
+    label: 'warnend',
+    zweck: 'Achtung, Regel',
+    prompt: 'hebt warnend die Hand, ernster, aber freundlicher Blick, kleines Ausrufezeichen daneben'
+  },
   { id: 'hoerend', label: 'hörend', zweck: 'Hörtext', prompt: 'hält die Hand hinter das Ohr und lauscht, Kopfhörer um den Hals' },
   { id: 'rechnend', label: 'rechnend', zweck: 'Rechenaufgabe', prompt: 'rechnet an einer kleinen Tafel mit Zahlen und einem Pluszeichen' },
   { id: 'zeichnend', label: 'zeichnend', zweck: 'Zeichenaufgabe, Diagramm', prompt: 'zeichnet mit Lineal und Buntstift eine Linie auf ein Blatt' },
@@ -56,13 +66,24 @@ export interface MaskottchenInfo extends MaskottchenMeta {
   posen: Record<string, string>
 }
 
+/**
+ * Schlüsselfarbe des Hintergrunds (27.09.2026, Wunsch der Lehrkraft): Vorlage und Posen
+ * entstehen auf NEONGRÜN, nicht auf Weiß. Weiß lässt sich nicht vom Motiv trennen – helle
+ * Federn, Zähne oder Papier gingen mit –, das Chroma-Key-Grün stellt die App nach dem Zeichnen
+ * zuverlässig frei (renderer/shared/imageCleanup.ts, KEY_GREEN). Auf dem Blatt steht dann nur
+ * die Figur, kein Kasten.
+ */
+export const MASKOTTCHEN_KEY_GREEN = '#00b140'
+
+const HINTERGRUND_GRUEN = `Einfarbiger, flächiger neongrüner Hintergrund (genau ${MASKOTTCHEN_KEY_GREEN}, Chroma-Key-Grün) bis zum Bildrand, ohne Schatten, ohne Verlauf, ohne Rahmen; die Figur selbst enthält dieses Neongrün nicht. Ohne Text und ohne Schrift im Bild.`
+
 /** Vorschlag der Bild-KI für eine Pose – ein Bild je Anfrage. */
 export function posePrompt(beschreibung: string, pose: MaskottchenPose): string {
   return [
     `Maskottchen für Unterrichtsmaterialien der Klassen 1 bis 6, GENAU diese Figur: ${beschreibung}.`,
     `Die Figur ${pose.prompt}.`,
     'Ganzfigur, kindgerecht, klare Vektorgrafik-Anmutung mit wenigen Flächen, kräftigen Konturen und weichen Farben – derselbe Stil, dieselben Farben und Merkmale wie in der Beschreibung, damit die Figur wiedererkennbar bleibt.',
-    'Reinweißer, einfarbiger Hintergrund ohne Schatten, ohne Text und ohne Schrift im Bild.',
+    HINTERGRUND_GRUEN,
     'Keine realistische Fotografie, keine Marken, keine realen Personen.'
   ].join(' ')
 }
@@ -72,7 +93,7 @@ export function vorlagePrompt(angabe: string): string {
   return [
     `Maskottchen für Unterrichtsmaterialien der Klassen 1 bis 6: ${angabe}, leicht vermenschlicht, aufrecht stehend, freundlich winkend.`,
     'Ganzfigur, kindgerecht, klare Vektorgrafik-Anmutung mit wenigen Flächen, kräftigen Konturen und weichen Farben.',
-    'Reinweißer, einfarbiger Hintergrund ohne Schatten, ohne Text und ohne Schrift im Bild.',
+    HINTERGRUND_GRUEN,
     'Keine realistische Fotografie, keine Marken, keine realen Personen.'
   ].join(' ')
 }

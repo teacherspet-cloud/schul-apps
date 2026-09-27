@@ -16,7 +16,7 @@ import {
 } from '@mantine/core'
 import { IconAlertTriangle, IconCheck, IconChevronDown, IconExternalLink, IconPlayerStop, IconRefresh, IconX } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { remainingLabel, remainingSeconds } from '../shared/aiProgress'
+import { restAnzeige } from '../shared/restzeit'
 import {
   brichAb,
   brichAlleAb,
@@ -213,7 +213,7 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
   const modul = modules.find((m) => m.id === a.moduleId)
   const Symbol = modul?.icon
   const vergangen = (a.ende ?? jetzt) - a.start
-  const rest = laeuft(a) ? remainingLabel(remainingSeconds(a.anteil, vergangen)) : ''
+  const rest = laeuft(a) ? restAnzeige(a, jetzt) : ''
   // „Öffnen": Ist das Dokument im Programm schon offen, genügt der Wechsel dorthin
   const oeffnen = (): void => {
     if (dokumentOffen(a.id)) openModule(a.moduleId)

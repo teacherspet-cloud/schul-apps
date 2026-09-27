@@ -98,9 +98,20 @@ const seitenHinweis = (await page.locator('[data-testid="seiten-hinweis"]:visibl
 pruefe(/legt die Seitenzahl selbst fest/.test(seitenHinweis), `Arbeitsblatt: Seitenzahl ist standardmäßig automatisch („${seitenHinweis}“)`)
 // Die Anpassungs-Karte steht in „Weitere Optionen“ – eingeklappt also nicht sichtbar
 pruefe(!(await page.locator('[data-testid="profil-karte"]').isVisible()), 'Arbeitsblatt: Profilkarte steht eingeklappt nicht im Formular')
+// Schwierigkeit (27.09.2026): bei einem Niveau fürs Blatt, bei ★ / ★★ je Fassung – Anspruch und Sprache getrennt
+pruefe(await page.getByText('Schwierigkeit', { exact: true }).first().isVisible(), 'Arbeitsblatt: Schwierigkeit steht bei „ein Niveau“ im Formular')
+pruefe((await page.locator('[aria-label="Schwierigkeit: Anspruch"]').count()) === 1, 'Arbeitsblatt: Anspruch ist wählbar')
+pruefe((await page.locator('[aria-label="Schwierigkeit: Sprache"]').count()) === 1, 'Arbeitsblatt: Sprache ist wählbar')
 // Etwas vom Standard abweichen lassen: Differenzierung zählt NICHT mehr (steht oben)
 await page.getByText('★ / ★★', { exact: true }).first().click()
 await page.waitForTimeout(300)
+pruefe(await page.getByText('Schwierigkeit ★', { exact: true }).isVisible(), 'Arbeitsblatt: Schwierigkeit für ★ steht im Formular')
+pruefe(await page.getByText('Schwierigkeit ★★', { exact: true }).isVisible(), 'Arbeitsblatt: Schwierigkeit für ★★ steht im Formular')
+pruefe((await page.locator('[aria-label="Schwierigkeit ★★: Anspruch"]').count()) === 1, 'Arbeitsblatt: Anspruch je Fassung wählbar')
+await page.locator('[aria-label="Schwierigkeit ★★: Anspruch"]').getByText('anspruchsvoll', { exact: true }).click()
+await page.waitForTimeout(200)
+await page.getByText('Schwierigkeit ★★', { exact: true }).scrollIntoViewIfNeeded()
+await page.screenshot({ path: join(out, 'schwierigkeit.png') })
 pruefe(
   !(await page.locator('[data-testid="weitere-optionen-zusammenfassung"]:visible').count()),
   'Arbeitsblatt: sichtbare Felder erscheinen nicht in der Zusammenfassung'

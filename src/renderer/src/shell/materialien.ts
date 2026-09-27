@@ -38,6 +38,8 @@ export interface Material {
   /** Bundesland und Schulform aus den Kopfdaten (Paket 13) – nur, wenn das Programm sie gesichert hat */
   land?: string
   schulform?: string
+  /** Überthema des Materials (27.09.2026) – nennt es einen Themenbereich, kommt es dorthin */
+  ueberthema?: string
 }
 
 export interface Listen {
@@ -84,7 +86,7 @@ function material(
   fach?: string,
   grade?: number,
   thema = '',
-  herkunft: { stateId?: string; schoolTypeId?: string } = {}
+  herkunft: { stateId?: string; schoolTypeId?: string; ueberthema?: string } = {}
 ): Material {
   return {
     moduleId,
@@ -94,6 +96,7 @@ function material(
     thema,
     ...(herkunft.stateId ? { land: herkunft.stateId } : {}),
     ...(herkunft.schoolTypeId ? { schulform: herkunft.schoolTypeId } : {}),
+    ...(herkunft.ueberthema?.trim() ? { ueberthema: herkunft.ueberthema.trim() } : {}),
     id,
     name: name || 'Ohne Namen',
     detail,

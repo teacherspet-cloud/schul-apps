@@ -25,6 +25,8 @@ export interface WsContextValue {
   sheetStars?: Stars
   /** Korrekturrand neben den Schreiblinien */
   correctionMargin?: boolean
+  /** Klausur der Oberstufe: Formhinweise und Notizentabellen der Schreibaufgaben nicht zeigen */
+  ohneSchreibhilfen?: boolean
   /** Notizrand neben den Materialtexten */
   notesMargin?: boolean
   /**

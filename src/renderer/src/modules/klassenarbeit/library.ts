@@ -3,6 +3,8 @@
  * Arbeitsblättern. Gespeichert wird unter `%APPDATA%/schul-apps/klassenarbeiten`.
  */
 import type { SavedExamStats } from '@shared/types'
+import { einsortierenNachSpeichern } from '../../shared/themenbereiche'
+import { ueberthemaVon } from '../../shared/ueberthema'
 import { dokumentName, sichereAlles } from '../../shared/autosave'
 import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
@@ -20,7 +22,8 @@ export function examStats(exam: Exam): SavedExamStats {
     hasTasks: examHasContent(exam),
     minutes: exam.meta.minutes,
     stateId: exam.meta.stateId,
-    schoolTypeId: exam.meta.schoolTypeId
+    schoolTypeId: exam.meta.schoolTypeId,
+    ...(ueberthemaVon(exam.meta) ? { ueberthema: ueberthemaVon(exam.meta) } : {})
   }
 }
 
@@ -49,6 +52,7 @@ export async function saveCurrentExam(name?: string): Promise<void> {
     stats: examStats(exam),
     payload: exam
   })
+  void einsortierenNachSpeichern()
   useKlassenarbeit.getState().markSaved(meta.id, meta.updatedAt, meta.name)
 }
 
@@ -86,6 +90,7 @@ export function legeArbeitAb(docId: string, schnappschuss: Exam, einarbeiten: (e
       },
       speichern: async (id, name, exam) => {
         await window.api.exams.save({ id, name: name ?? defaultExamName(exam), stats: examStats(exam), payload: exam })
+        void einsortierenNachSpeichern()
       }
     },
     docId,
@@ -110,7 +115,8 @@ export function useExamAutosave(): void {
     dokument: (s) => s.docId,
     gesichert: (s) => Boolean(s.savedAt),
     bereit: (s) => lohntSicherung(s.exam),
-    geaendert: (s, prev) => s.exam !== prev.exam,
+    // Ein geänderter Name zählt nur, wenn ihn die Lehrkraft geändert hat – nicht die Bestätigung des Speicherns
+    geaendert: (s, prev) => s.exam !== prev.exam || (s.docName !== prev.docName && s.savedAt === prev.savedAt),
     speichern: () => saveCurrentExam()
   })
 }

@@ -6,6 +6,8 @@ import { RichText } from '../../../shared/richtext/RichText'
 import { fachPfad, ueberthemaVon, type UeberthemaStil } from '../../../shared/ueberthema'
 
 export interface PageInfo {
+  /** Titel in der Kopfzeile direkt im Blatt ändern (27.09.2026) – fehlt = nur lesen */
+  onTitle?: (title: string) => void
   design: DesignTemplate
   meta: WorksheetMeta
   logo: string | null
@@ -194,7 +196,7 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
       {/* Auch der Kopf: ein Mathematikblatt kann „Rechnen mit $a^m \cdot a^n$" heissen */}
       {h.showTitle && (
         <div className="ws-title">
-          <RichText value={title} inline editable={false} />
+          <RichText value={title} inline editable={Boolean(info.onTitle) && !info.isKey} onChange={info.onTitle} />
         </div>
       )}
       {(subjectLine || h.customText) && (
@@ -265,7 +267,7 @@ function CompactHeader({ info }: { info: PageInfo }): React.JSX.Element {
       {info.design.header.showLogo && info.logo && <img className="ws-logo" src={info.logo} alt="" style={{ height: '7mm' }} />}
       <span className="ws-compact-text" data-ueberthema={u.stil === 'path' && u.ueber ? u.ueber : undefined}>
         {kompaktVorTitel(info)}
-        <RichText value={title} inline editable={false} />
+        <RichText value={title} inline editable={Boolean(info.onTitle) && !info.isKey} onChange={info.onTitle} />
       </span>
       {/* Auf Folgeseiten genügt das Überthema selbst – rechts, ohne das Fach ein zweites Mal */}
       {u.block && (

@@ -14,6 +14,7 @@
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { AiCall } from '../../../shared/imageChoice'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
+import { verschluesseleMaterialverweise } from '../../arbeitsblatt/didactics/integrity'
 import { aufgabenIn, punkteNachTeilaufgaben, skalierePunkte } from '../../../shared/punkte'
 import { createRng, newId } from '../../vokabeltest/model/random'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
@@ -214,6 +215,8 @@ export async function generateKurztest(test: Kurztest, variante: string, ai: AiC
   if (!blocks.some((b) => b.type === 'task')) {
     throw new Error('Die KI hat keine Aufgaben geliefert. Bitte erneut versuchen oder das Thema genauer angeben.')
   }
+  // Nummern der KI werden zu Kennungen („M{tabelle}"); die Nummern entstehen beim Darstellen aus der Reihenfolge
+  blocks.splice(0, blocks.length, ...verschluesseleMaterialverweise(blocks))
   if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)
   // Ohne Punkte auf dem Blatt auch keine im Erwartungshorizont – die KI hält sich nicht immer an „0"
   else for (const a of aufgabenIn(blocks)) a.points = 0

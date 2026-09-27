@@ -46,6 +46,12 @@ export interface KurztestMeta {
   ueberthema?: string
   /** true = kein Überthema auf diesem Material */
   ueberthemaAus?: boolean
+  /** Blattoptionen wie beim Arbeitsblatt (27.09.2026): Schulangaben, Ränder, KI-Test */
+  showSchool?: boolean
+  correctionMargin?: boolean
+  notesMargin?: boolean
+  aiCanary?: boolean
+  aiCanaryWords?: string
   subjectId: string
   subjectLabel: string
 

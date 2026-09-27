@@ -16,6 +16,8 @@ export interface MeasuredItem {
    * lief der Inhalt um genau diese Höhe über den Rand hinaus (gemessen 24.09.2026: 6 px).
    */
   continuedHead?: number
+  /** Höhe des FUSSES (Wortzahl, Quellenangabe) – er steht nur unter dem letzten Stück (27.09.2026) */
+  footHeight?: number
   units?: number[]
   /** Zeilen je Einheit (für fortlaufende Zeilennummern) */
   unitLines?: number[]
@@ -144,12 +146,14 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
     if (item.units && item.units.length > 1) {
       let from = 0
       let lineCursor = 0
+      // Der Fuß gehört zur letzten Einheit: Wer sie setzt, setzt auch ihn
+      const mitFuss = (k: number): number => item.units![k] + (k === item.units!.length - 1 ? (item.footHeight ?? 0) : 0)
       while (from < item.units.length) {
         const head = from === 0 ? (item.headHeight ?? 0) : (item.continuedHead ?? 0)
         let used = head
         let to = from
-        while (to < item.units.length && used + item.units[to] <= remaining + EPS) {
-          used += item.units[to]
+        while (to < item.units.length && used + mitFuss(to) <= remaining + EPS) {
+          used += mitFuss(to)
           to++
         }
         /*
@@ -165,7 +169,7 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
           if (to === from) {
             // Einheit größer als eine ganze Seite: trotzdem setzen
             to = from + 1
-            used = head + item.units[from]
+            used = head + mitFuss(from)
             page().overflow = true
           }
         }
@@ -178,7 +182,7 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
           const abgeben = MIN_EINHEITEN - rest
           for (let k = 0; k < abgeben; k++) {
             to--
-            used -= item.units[to]
+            used -= mitFuss(to)
           }
         }
         const lineCount = sum((item.unitLines ?? []).slice(from, to))

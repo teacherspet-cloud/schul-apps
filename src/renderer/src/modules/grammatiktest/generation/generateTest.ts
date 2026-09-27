@@ -14,6 +14,7 @@ import type { AiCall } from '../../../shared/imageChoice'
 import { createRng, newId } from '../../vokabeltest/model/random'
 import { chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf } from '../../arbeitsblatt/didactics/grammar'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
+import { verschluesseleMaterialverweise } from '../../arbeitsblatt/didactics/integrity'
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { knownVocabRulesDe } from '../../../shared/knownVocab'
@@ -174,6 +175,8 @@ export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (messa
   if (!blocks.some((b) => b.type === 'task')) {
     throw new Error('Die KI hat keine Aufgaben geliefert. Bitte erneut versuchen oder eine andere Form wählen.')
   }
+  // Nummern der KI werden zu Kennungen („M{text}"); die Nummern entstehen beim Darstellen aus der Reihenfolge
+  blocks.splice(0, blocks.length, ...verschluesseleMaterialverweise(blocks))
   spreadPoints(blocks, test.meta.points)
   return blocks
 }

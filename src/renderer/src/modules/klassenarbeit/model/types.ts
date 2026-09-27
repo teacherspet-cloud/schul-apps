@@ -208,8 +208,32 @@ export interface ExamMeta {
    * Dieselbe Form wie in der Lernzielkontrolle; sie gehen in jede Anfrage der Erzeugung mit.
    */
   materialQuellen?: StoffQuelle[]
+  /**
+   * Material FÜR die Arbeit (27.09.2026): Dateien oder Webseiten, die in der Arbeit selbst
+   * verwendet werden – bei Lese-, Quellen- und Mediationsteilen als Lesetext, sonst als
+   * inhaltliche Grundlage. Anders als `materialQuellen`, die nur zeigen, was behandelt wurde.
+   */
+  arbeitsmaterial?: StoffQuelle[]
   /** Kopfkasten mit Zeit, Hilfsmitteln und Bewertung auf der Arbeit abdrucken */
   infoBox: boolean
+  /**
+   * Von Hand geänderter Wortlaut des Kopfkastens (27.09.2026): Der Kopf wird sonst aus Zeit,
+   * Hilfsmitteln und Bewertung berechnet; eine Änderung im Blatt landet hier. Leer = berechnet.
+   */
+  kopfText?: string
+  /** Korrektur- und Notizrand wie beim Arbeitsblatt (27.09.2026) – Schalter in den Blattoptionen */
+  correctionMargin?: boolean
+  notesMargin?: boolean
+  /**
+   * Operatorenliste als Anlage (27.09.2026, didactics/operatorenliste.ts): die in den Aufgaben
+   * verwendeten Operatoren mit der amtlichen Definition des Landes. Fehlt der Wert, entscheidet
+   * die Stufe: Sek II ja, Sek I nein.
+   */
+  operatorenliste?: boolean
+  /** Blattoptionen wie beim Arbeitsblatt (27.09.2026): Schulangaben, KI-Test */
+  showSchool?: boolean
+  aiCanary?: boolean
+  aiCanaryWords?: string
   /**
    * Notenschlüssel AUCH auf dem Schülermaterial abdrucken.
    *

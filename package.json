@@ -1,7 +1,7 @@
 {
   "name": "schul-apps",
   "productName": "Schul-Apps",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Werkzeuge für Unterrichtsmaterial und Organisatorisches",
   "main": "./out/main/index.js",
   "author": "Torge Kornahrens",
@@ -11,7 +11,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "build:win": "node scripts/prepare-openmoji.mjs && electron-vite build && electron-builder --win",
+    "build:win": "node scripts/exe-bauen.mjs",
     "prepare:assets": "node scripts/prepare-openmoji.mjs",
     "test:e2e": "electron-vite build && node tests/e2e/smoke.mjs test-results && node tests/e2e/worksheet.mjs test-results/arbeitsblatt && node tests/e2e/grids.mjs test-results/gitternetze && node tests/e2e/exam.mjs test-results/klassenarbeit"
   },

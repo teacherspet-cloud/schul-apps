@@ -60,12 +60,30 @@ export interface ProfilGruppe {
   hinweis?: string
 }
 
-const clampMix = (mix: AfbMix): AfbMix => {
+export const clampMix = (mix: AfbMix): AfbMix => {
   const I = Math.max(0, mix.I)
   const III = Math.max(0, mix.III)
   const II = Math.max(0, 100 - I - III)
   return { I, II, III }
 }
+
+/*
+ * Die drei Regeln, die eine Schwierigkeitsstufe verschiebt (didactics/schwierigkeit.ts). Als
+ * eigene Funktionen, damit `profilFuerStufe` genau diese Sätze im fertigen Profil erkennt und
+ * durch die Fassung mit den verschobenen Werten ersetzt.
+ */
+export const afbRegel = (afbMix: AfbMix): string =>
+  `Verteile die Aufgaben auf die Anforderungsbereiche mit ungefähr ${afbMix.I} % AFB I, ${afbMix.II} % AFB II und ${afbMix.III} % AFB III (±10 %). Der Schwerpunkt liegt auf AFB II; differenziere nach unten über Komplexität, Textmenge, Hilfen und Kontextnähe, nicht durch Weglassen von AFB III.`
+
+export const spracheRegel = (language: LearnerProfile['language']): string =>
+  `Sprache: durchschnittlich etwa ${language.avgSentenceWords} Wörter pro Satz, höchstens ${language.maxSentenceWords}; Lesbarkeitsindex LIX höchstens ${language.lixMax}.`
+
+export const hilfenRegel = (scaffolding: AgeBand['scaffolding']): string =>
+  scaffolding === 'hoch'
+    ? 'Hilfen: umfangreich (Wortspeicher, Satzanfänge, Teilschritte, gestufte Hilfekarten).'
+    : scaffolding === 'mittel'
+      ? 'Hilfen: gezielt (Tipp-Kästen oder Hilfekarten zu den schwierigeren Aufgaben).'
+      : 'Hilfen: nur optional, da ausführliche Anleitungen fortgeschrittene Lernende behindern.'
 
 export function stageForGrade(grade: number, schoolTypeId: string): LearnerProfile['stage'] {
   if (schoolTypeId === 'grundschule') return 'primar'
@@ -156,9 +174,7 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
     `Orientiere dich an den KMK-Bildungsstandards und an typischen Inhalten des ${state.curriculumName}s (${state.name}) für diese Lerngruppe (${topicTimingHint}). Zitiere keine Lehrplanstellen, Kapitel- oder Kompetenznummern. Passt das Thema nicht gut zum Jahrgang, gib dazu einen Hinweis im Feld „teacherNote“.`
   )
   if (gymTiming) rules.push(gymTiming)
-  rules.push(
-    `Verteile die Aufgaben auf die Anforderungsbereiche mit ungefähr ${afbMix.I} % AFB I, ${afbMix.II} % AFB II und ${afbMix.III} % AFB III (±10 %). Der Schwerpunkt liegt auf AFB II; differenziere nach unten über Komplexität, Textmenge, Hilfen und Kontextnähe, nicht durch Weglassen von AFB III.`
-  )
+  rules.push(afbRegel(afbMix))
   if (stage === 'primar') {
     rules.push(
       `Nutze kindgerechte Handlungsverben: ${[...operators.I, ...operators.II].join(', ')}. Abstrakte Operatoren (z. B. erörtern, analysieren) sind nicht erlaubt.`
@@ -168,21 +184,13 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
       `Beginne jede (Teil-)Aufgabe mit einem Operator in **Fettschrift**. Geeignete Operatoren – AFB I: ${operators.I.join(', ')}; AFB II: ${operators.II.join(', ')}; AFB III: ${operators.III.join(', ')}. Ordne jeder Aufgabe ihren Anforderungsbereich begründet zu (die Zuordnung ist fachspezifisch).`
     )
   }
-  rules.push(
-    `Sprache: durchschnittlich etwa ${language.avgSentenceWords} Wörter pro Satz, höchstens ${language.maxSentenceWords}; Lesbarkeitsindex LIX höchstens ${language.lixMax}.`
-  )
+  rules.push(spracheRegel(language))
   rules.push(
     `Umfang: ${ageBand.tasksPerPage[0]}–${ageBand.tasksPerPage[1]} Aufgaben pro Seite, etwa ${ageBand.minutesPerTask[0]}–${ageBand.minutesPerTask[1]} Minuten pro Aufgabe. Aufgabenformate: ${ageBand.formats}.`
   )
   if (ageBand.exampleFirst || foerder || effectiveProfile.id === 'hauptschule') rules.push('Stelle bei Übungsaufgaben ein gelöstes Beispiel an den Anfang.')
   if (ageBand.instructionSymbols) rules.push('Jede Arbeitsanweisung enthält nur eine Handlung.')
-  rules.push(
-    scaffolding === 'hoch'
-      ? 'Hilfen: umfangreich (Wortspeicher, Satzanfänge, Teilschritte, gestufte Hilfekarten).'
-      : scaffolding === 'mittel'
-        ? 'Hilfen: gezielt (Tipp-Kästen oder Hilfekarten zu den schwierigeren Aufgaben).'
-        : 'Hilfen: nur optional, da ausführliche Anleitungen fortgeschrittene Lernende behindern.'
-  )
+  rules.push(hilfenRegel(scaffolding))
   rules.push(...effectiveProfile.rules)
   if (effectiveProfile !== schoolProfile) rules.push(...schoolProfile.rules)
   if (subject.foreignLanguage && input.cefrLevel) {

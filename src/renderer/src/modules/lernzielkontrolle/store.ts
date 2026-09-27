@@ -24,9 +24,13 @@ interface LernzielkontrolleState {
   /** `gruppe` fasst fortlaufendes Tippen in einem Feld (oder einen Zug) zu einem Verlaufsschritt zusammen */
   update: (fn: (draft: Kurztest) => void, gruppe?: string) => void
   markSaved: (id: string, savedAt: string, name: string) => void
+  /** Name in der App – aus der Werkzeugleiste (27.09.2026) */
+  setDocName: (name: string) => void
   /** Die offene Kontrolle wurde aus der Bibliothek gelöscht: Sie gilt wieder als ungesichert. */
   forgetSaved: () => void
   openSaved: (id: string, name: string, test: Kurztest, savedAt: string) => void
+  /** Aus einer Datei: neues Dokument, noch nicht in der Bibliothek */
+  loadFromFile: (test: Kurztest) => void
   reset: () => void
   endGroup: () => void
   undo: () => void
@@ -68,7 +72,19 @@ export const useLernzielkontrolle = create<LernzielkontrolleState>((set, get) =>
   markSaved: (docId, savedAt, docName) => {
     if (docId === get().docId) set({ savedAt, docName })
   },
+  setDocName: (docName) => set({ docName }),
   forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  loadFromFile: (test) =>
+    set({
+      docId: newId(),
+      docName: '',
+      test,
+      savedAt: null,
+      step: test.varianten.some((v) => v.blocks.length) ? 1 : 0,
+      variante: 0,
+      loesung: false,
+      verlauf: leererVerlauf()
+    }),
   openSaved: (docId, docName, test, savedAt) =>
     set({ docId, docName, test, savedAt, step: test.varianten.some((v) => v.blocks.length) ? 1 : 0, variante: 0, verlauf: leererVerlauf() }),
   reset: () => set({ test: null, step: 0, variante: 0, loesung: false, docId: newId(), docName: '', savedAt: null, verlauf: leererVerlauf() }),

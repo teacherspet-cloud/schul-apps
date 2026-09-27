@@ -15,7 +15,9 @@ export async function browserWorksheetImageDeps(auftrag?: {
   return {
     ai: auftrag?.ai ?? aiCall,
     services: browserImageServices(),
-    generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt, undefined, auftrag?.bild)).dataUrl : undefined,
+    // 1024 Punkte: Ein Bild über die ganze Blattbreite (170 mm) braucht bei 150 dpi rund 1000 Punkte (didactics/bildarbeit.ts);
+    // mit den bisherigen 512 wurde jedes Schema im Druck unscharf
+    generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt, 1024, auftrag?.bild)).dataUrl : undefined,
     variants: sourceSearchVariants
   }
 }

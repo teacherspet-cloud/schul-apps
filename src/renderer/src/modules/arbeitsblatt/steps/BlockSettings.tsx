@@ -1,4 +1,5 @@
 import { Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
+import { hatMasse } from '../render/tabelleMasse'
 import { useArbeitsblatt } from '../store'
 import { IconAdjustments } from '@tabler/icons-react'
 import { shuffle, createRng, randomSeed } from '../../vokabeltest/model/random'
@@ -266,8 +267,18 @@ function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: 
       {kartesisch && (
         <>
           <Group grow gap={6}>
-            <TextInput size="xs" label={d.kind === 'schraegbild' ? 'Achse rechts (x₂)' : 'x-Achse'} defaultValue={d.axes.xLabel} onBlur={(e) => set((spec) => (spec.axes.xLabel = e.currentTarget.value))} />
-            <TextInput size="xs" label={d.kind === 'schraegbild' ? 'Achse oben (x₃)' : 'y-Achse'} defaultValue={d.axes.yLabel} onBlur={(e) => set((spec) => (spec.axes.yLabel = e.currentTarget.value))} />
+            <TextInput
+              size="xs"
+              label={d.kind === 'schraegbild' ? 'Achse rechts (x₂)' : 'x-Achse'}
+              defaultValue={d.axes.xLabel}
+              onBlur={(e) => set((spec) => (spec.axes.xLabel = e.currentTarget.value))}
+            />
+            <TextInput
+              size="xs"
+              label={d.kind === 'schraegbild' ? 'Achse oben (x₃)' : 'y-Achse'}
+              defaultValue={d.axes.yLabel}
+              onBlur={(e) => set((spec) => (spec.axes.yLabel = e.currentTarget.value))}
+            />
           </Group>
           {d.kind !== 'spannung' && (
             <>
@@ -281,20 +292,44 @@ function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: 
                 {zahl('y bis', d.axes.yMax, (v) => set((spec) => (spec.axes.yMax = v)))}
                 {zahl('y je Kästchen', d.axes.yStep, (v) => set((spec) => (spec.axes.yStep = v)))}
               </Group>
-              <Switch size="xs" label="Zahlen an den Achsen" checked={d.axes.showNumbers} onChange={(e) => set((spec) => (spec.axes.showNumbers = e.currentTarget.checked))} />
+              <Switch
+                size="xs"
+                label="Zahlen an den Achsen"
+                checked={d.axes.showNumbers}
+                onChange={(e) => set((spec) => (spec.axes.showNumbers = e.currentTarget.checked))}
+              />
             </>
           )}
           {d.kind === 'schraegbild' && (
             <Group grow gap={6}>
-              <TextInput size="xs" label="Achse nach vorn (x₁)" defaultValue={d.z.label} onBlur={(e) => set((spec) => (spec.z.label = e.currentTarget.value))} />
+              <TextInput
+                size="xs"
+                label="Achse nach vorn (x₁)"
+                defaultValue={d.z.label}
+                onBlur={(e) => set((spec) => (spec.z.label = e.currentTarget.value))}
+              />
               {zahl('bis', d.z.max, (v) => set((spec) => (spec.z.max = v)))}
               {zahl('je Einheit', d.z.step, (v) => set((spec) => (spec.z.step = v)))}
             </Group>
           )}
           {d.kind === 'spannung' && (
             <>
-              <Textarea size="xs" label="Schritte auf der x-Achse (eine je Zeile)" autosize minRows={2} defaultValue={d.xCategories.join('\n')} onBlur={(e) => set((spec) => (spec.xCategories = lines(e.currentTarget.value)))} />
-              <Textarea size="xs" label="Stufen der y-Achse von unten nach oben (eine je Zeile)" autosize minRows={2} defaultValue={d.yLevels.join('\n')} onBlur={(e) => set((spec) => (spec.yLevels = lines(e.currentTarget.value)))} />
+              <Textarea
+                size="xs"
+                label="Schritte auf der x-Achse (eine je Zeile)"
+                autosize
+                minRows={2}
+                defaultValue={d.xCategories.join('\n')}
+                onBlur={(e) => set((spec) => (spec.xCategories = lines(e.currentTarget.value)))}
+              />
+              <Textarea
+                size="xs"
+                label="Stufen der y-Achse von unten nach oben (eine je Zeile)"
+                autosize
+                minRows={2}
+                defaultValue={d.yLevels.join('\n')}
+                onBlur={(e) => set((spec) => (spec.yLevels = lines(e.currentTarget.value)))}
+              />
             </>
           )}
         </>
@@ -317,16 +352,47 @@ function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: 
               onChange={(v) => v && set((spec) => (spec.timeline.unit = v as TimelineUnit))}
               allowDeselect={false}
             />
-            <TextInput size="xs" label="Von" placeholder="1914-07-28" defaultValue={t.from} onBlur={(e) => set((spec) => (spec.timeline.from = e.currentTarget.value.trim()))} />
-            <TextInput size="xs" label="Bis" placeholder="1914-08-04" defaultValue={t.to} onBlur={(e) => set((spec) => (spec.timeline.to = e.currentTarget.value.trim()))} />
+            <TextInput
+              size="xs"
+              label="Von"
+              placeholder="1914-07-28"
+              defaultValue={t.from}
+              onBlur={(e) => set((spec) => (spec.timeline.from = e.currentTarget.value.trim()))}
+            />
+            <TextInput
+              size="xs"
+              label="Bis"
+              placeholder="1914-08-04"
+              defaultValue={t.to}
+              onBlur={(e) => set((spec) => (spec.timeline.to = e.currentTarget.value.trim()))}
+            />
             {zahl('Marke alle', t.step, (v) => set((spec) => (spec.timeline.step = Math.max(1, v))))}
           </Group>
           <Text size="xs" c="dimmed">
             Datum als Jahr („1914", „-500" = v. Chr.), Monat („1914-07") oder Tag („1914-07-28").
           </Text>
-          <TextInput size="xs" label="y-Achse (optional), z. B. Eskalation" defaultValue={t.yLabel} onBlur={(e) => set((spec) => (spec.timeline.yLabel = e.currentTarget.value.trim()))} />
-          <Textarea size="xs" label="Stufen der y-Achse von unten nach oben (eine je Zeile)" autosize minRows={1} defaultValue={t.yLevels.join('\n')} onBlur={(e) => set((spec) => (spec.timeline.yLevels = lines(e.currentTarget.value)))} />
-          <Textarea size="xs" label="Stränge (eine je Zeile, z. B. zwei Länder)" autosize minRows={1} defaultValue={t.strands.join('\n')} onBlur={(e) => set((spec) => (spec.timeline.strands = lines(e.currentTarget.value)))} />
+          <TextInput
+            size="xs"
+            label="y-Achse (optional), z. B. Eskalation"
+            defaultValue={t.yLabel}
+            onBlur={(e) => set((spec) => (spec.timeline.yLabel = e.currentTarget.value.trim()))}
+          />
+          <Textarea
+            size="xs"
+            label="Stufen der y-Achse von unten nach oben (eine je Zeile)"
+            autosize
+            minRows={1}
+            defaultValue={t.yLevels.join('\n')}
+            onBlur={(e) => set((spec) => (spec.timeline.yLevels = lines(e.currentTarget.value)))}
+          />
+          <Textarea
+            size="xs"
+            label="Stränge (eine je Zeile, z. B. zwei Länder)"
+            autosize
+            minRows={1}
+            defaultValue={t.strands.join('\n')}
+            onBlur={(e) => set((spec) => (spec.timeline.strands = lines(e.currentTarget.value)))}
+          />
           <Textarea
             size="xs"
             label="Vorgegebene Ereignisse: Datum | Text | Strang | Stufe (eine je Zeile)"
@@ -338,7 +404,12 @@ function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: 
               set((spec) => {
                 spec.timeline.events = lines(e.currentTarget.value).map((z) => {
                   const [date, text, strand, level] = z.split('|').map((x) => x.trim())
-                  return { date: date ?? '', text: text ?? '', ...(strand ? { strand: Number(strand) || 0 } : {}), ...(level ? { level: Number(level) || 0 } : {}) }
+                  return {
+                    date: date ?? '',
+                    text: text ?? '',
+                    ...(strand ? { strand: Number(strand) || 0 } : {}),
+                    ...(level ? { level: Number(level) || 0 } : {})
+                  }
                 })
               })
             }
@@ -568,6 +639,19 @@ export function BlockSettings({
               allowDeselect={false}
             />
           )}
+          {/* Nur im Lösungsteil (27.09.2026): Erwartungshorizont & Co. gehören nicht aufs Schülerblatt */}
+          {['infoBox', 'text', 'table', 'scaffold', 'phrases', 'workspace'].includes(block.type) && (
+            <Switch
+              size="xs"
+              label="Nur im Lösungsteil zeigen"
+              description="Für die Lehrkraft bestimmt – fehlt auf dem Schülerblatt, steht auf den Lösungen"
+              checked={Boolean(block.nurLoesung)}
+              onChange={(e) => {
+                const an = e.currentTarget.checked
+                update((d) => (d.nurLoesung = an ? true : false))
+              }}
+            />
+          )}
           {block.type === 'task' && (
             <>
               <Group grow>
@@ -608,6 +692,18 @@ export function BlockSettings({
                   onChange={(v) => update((d) => d.type === 'task' && (d.minutes = Number(v) || 0))}
                 />
               </Group>
+              {block.brief && (block.brief.audience || block.brief.textType || block.brief.purpose) && (
+                <Switch
+                  size="xs"
+                  label="Adressat · Textsorte · Zweck zeigen"
+                  description="Die Rahmenzeile unter der Arbeitsanweisung; im Blatt Feld für Feld bearbeitbar"
+                  checked={!block.brief.frameHidden}
+                  onChange={(e) => {
+                    const an = e.currentTarget.checked
+                    update((d) => d.type === 'task' && d.brief && (d.brief.frameHidden = an ? undefined : true))
+                  }}
+                />
+              )}
               {block.parts.length === 0 && <AnswerSettings answer={block.answer} onChange={(fn) => update((d) => d.type === 'task' && fn(d.answer))} />}
               {block.parts.map((p, i) => (
                 <Stack key={p.id} gap={4} className="picker-tile" p={6}>
@@ -781,6 +877,30 @@ export function BlockSettings({
                 − Zeile
               </Button>
             </Group>
+          )}
+          {block.type === 'table' && (
+            <Stack gap={2}>
+              <Text size="xs" c="dimmed">
+                Spalten- und Zeilenlinien lassen sich im Blatt ziehen; rechts der letzten Spalte ändert sich die Breite der ganzen Tabelle.
+              </Text>
+              {hatMasse(block) && (
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  onClick={() =>
+                    update((d) => {
+                      if (d.type !== 'table') return
+                      delete d.colWidths
+                      delete d.rowHeightsMm
+                      delete d.headerHeightMm
+                      delete d.widthPercent
+                    })
+                  }
+                >
+                  Maße zurücksetzen
+                </Button>
+              )}
+            </Stack>
           )}
           {block.type === 'workspace' && (
             <Group grow>

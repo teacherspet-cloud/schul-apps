@@ -28,6 +28,31 @@
   color: #555;
 }
 
+/* Maskottchen (27.09.2026): winkend am Kopf, jubelnd unten rechts im Seitenrand – nur Schülerblatt */
+.vt-header {
+  position: relative;
+}
+.vt-header-illu .vt-kopfzeile,
+.vt-header-illu .vt-title-row {
+  padding-right: 16mm;
+}
+.vt-illu {
+  display: block;
+  height: 17mm;
+  width: auto;
+}
+.vt-illu-kopf {
+  position: absolute;
+  top: -4mm;
+  right: -2mm;
+}
+.vt-illu-schluss {
+  position: absolute;
+  right: 6mm;
+  bottom: 4mm;
+  height: 15mm;
+}
+
 /* Satzzeichen bleiben an der Lücke */
 .vt-nowrap {
   white-space: nowrap;

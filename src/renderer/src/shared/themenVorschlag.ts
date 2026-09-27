@@ -59,6 +59,25 @@ export interface ThemenMaterial {
   land?: string
   schulform?: string
   updatedAt: string
+  /**
+   * Überthema, das das Material selbst nennt (27.09.2026): Der Wortlaut eines Bereichs des Fachs
+   * ordnet es dorthin; ein neuer Name legt den Bereich an. Sicherer als Wortähnlichkeit.
+   */
+  ueberthema?: string
+}
+
+const gleich = (a: string, b: string): boolean => a.trim().toLocaleLowerCase('de') === b.trim().toLocaleLowerCase('de')
+
+/**
+ * Bereich, den das Überthema des Materials nennt – im Fach, nach Name (auch als letzter Teil
+ * eines Pfads „Oberbereich › Bereich"); null, wenn es keinen gibt.
+ */
+export function bereichZumUeberthema(m: Pick<ThemenMaterial, 'fachId' | 'ueberthema'>, bereiche: Themenbereich[]): Themenbereich | null {
+  const ue = (m.ueberthema ?? '').trim()
+  if (!ue) return null
+  const letzter = ue.split('›').pop()!.trim()
+  const imFach = bereiche.filter((b) => b.fachId === m.fachId)
+  return imFach.find((b) => gleich(b.name, ue)) ?? imFach.find((b) => gleich(b.name, letzter)) ?? null
 }
 
 /** Ein belegtes Thema aus Lehrplan oder Lehrwerk */
@@ -251,7 +270,7 @@ export function einsortieren(materialien: ThemenMaterial[], daten: ThemenDaten, 
   for (const m of materialien) {
     const k = schluesselVon(m)
     if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
-    const b = besterBereich(m, daten.bereiche, mitglieder)
+    const b = bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder)
     if (b) neu[k] = { bereichId: b.id, von: 'auto', am: heute }
   }
   return neu
@@ -344,9 +363,23 @@ export function automatischEinsortieren(
   for (const m of materialien) {
     const k = schluesselVon(m)
     if (daten.zuordnungen[k] || !automatikAn(daten, m.fachId)) continue
-    const b = besterBereich(m, daten.bereiche, mitglieder)
+    /*
+     * Zuerst das Überthema (27.09.2026): Nennt das Material einen Bereich des Fachs beim Namen,
+     * kommt es dorthin – ohne Raten. Nennt es einen neuen Namen, entsteht der Bereich mit diesem
+     * einen Material (die Mindestgruppe gilt hier nicht: Die Lehrkraft bzw. die Planung hat den
+     * Namen ausdrücklich genannt). Erst danach Wortähnlichkeit und Lehrplan.
+     */
+    const b = bereichZumUeberthema(m, daten.bereiche) ?? besterBereich(m, daten.bereiche, mitglieder)
     if (b) {
       zuordnungen[k] = { bereichId: b.id, von: 'auto', am: heute }
+      continue
+    }
+    const ue = (m.ueberthema ?? '').trim().split('›').pop()!.trim()
+    if (ue) {
+      const schluessel = `${m.fachId}|ueberthema|${ue.toLocaleLowerCase('de')}`
+      const da = gruppen.get(schluessel)
+      if (da) da.schluessel.push(k)
+      else gruppen.set(schluessel, { fachId: m.fachId, name: ue, herkunft: 'ueberthema', schluessel: [k] })
       continue
     }
     const art = `${m.fachId}|${m.land ?? ''}|${m.schulform ?? ''}`
@@ -385,7 +418,7 @@ export function automatischEinsortieren(
    */
   const alle = [...gruppen.values()]
   const pfadText = (u: BereichsUebernahme): string => [...(u.pfad ?? []), u.name].join('›').toLocaleLowerCase('de')
-  const behalten = alle.filter((u) => u.pfad?.length || u.schluessel.length >= MIN_GRUPPE)
+  const behalten = alle.filter((u) => u.pfad?.length || u.herkunft === 'ueberthema' || u.schluessel.length >= MIN_GRUPPE)
   const entstehen = new Set(
     behalten.flatMap((u) =>
       (u.pfad ?? []).map((_, i) =>

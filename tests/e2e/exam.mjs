@@ -65,6 +65,22 @@ const pages = await page.locator('.ws-page').count()
 const text = (await page.locator('body').innerText()).trim()
 await page.screenshot({ path: join(out, 'arbeit.png'), fullPage: true })
 console.log(`Teile: ${info.parts}, Bausteine: ${info.blocks}, Seiten: ${pages}`)
+// Werkzeuge am Baustein wie beim Arbeitsblatt: KI-Menü, Einstellungen, weitere Aktionen; Ränder als Schalter
+await page.locator('.ws-block').nth(2).click()
+await page.waitForTimeout(300)
+const werkzeuge = {
+  ki: await page.locator('[aria-label="KI-Aktionen"]').count(),
+  einstellungen: await page.locator('[aria-label="Baustein einstellen"]').count(),
+  weitere: await page.locator('[aria-label="Weitere Aktionen"]').count(),
+  raender: (await page.getByLabel('Korrekturrand').count()) + (await page.getByLabel('Notizrand').count())
+}
+console.log('Werkzeuge am Baustein:', JSON.stringify(werkzeuge))
+if (werkzeuge.ki < 1 || werkzeuge.einstellungen < 1 || werkzeuge.weitere < 1) throw new Error('Die Baustein-Werkzeuge fehlen im Klausur-Editor')
+if (werkzeuge.raender < 2) throw new Error('Korrektur- und Notizrand fehlen')
+await page
+  .locator('.ws-block')
+  .nth(2)
+  .screenshot({ path: join(out, 'baustein.png') })
 if (text.length < 40) throw new Error('Die Seite ist leer geblieben')
 if (pages < 1) throw new Error('Es wurde keine Seite dargestellt')
 

@@ -64,7 +64,9 @@ import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../didactics/audioR
 import { headerLine } from '../didactics/sourceHeader'
 import { gridDrawing } from '../render/gridSvg'
 import { qrSvg } from '../render/qr'
-import { blockLayout, justifyText, pageInfoFor, taskNumbersFor } from '../render/SheetPages'
+import { blockLayout, justifyText, materialNumbersFor, pageInfoFor, taskNumbersFor, zurAnzeige } from '../render/SheetPages'
+import { stripMaterialNo } from '../render/BlockView'
+import { spaltenBreiten } from '../render/tabelleMasse'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { exampleNote } from '../../../shared/exampleNote'
 import type { Stars } from '../didactics/differentiation'
@@ -131,13 +133,25 @@ interface Ctx {
   sheetStars?: Stars
   /** Deutsche Entsprechungen im Hilfsblatt? Entschieden in `didactics/phraseRules.ts` */
   phraseGerman: boolean
+  /**
+   * Materialnummern M1, M2 … wie am Bildschirm (render/SheetPages.tsx). Bis zum 27.09.2026
+   * fehlten sie in Word ganz: Eine Aufgabe „mithilfe von M2" hatte dort kein M2.
+   */
+  materialNumbers: Map<string, string>
+}
+
+/** „M2 " vor Titel oder Bildunterschrift – dieselbe Nummer wie am Bildschirm */
+const materialNo = (ctx: Ctx, blockId: string): ParagraphChild[] => {
+  const n = ctx.materialNumbers.get(blockId)
+  return n ? [new TextRun({ text: `${n} `, bold: true, size: ctx.size })] : []
 }
 
 export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptions, deps: WorksheetDocxDeps): Promise<Uint8Array> {
   const sections: ISectionOptions[] = []
   const sheets = ws.sheets.filter((s) => opts.sheetIds.includes(s.id))
   const add = async (key: boolean): Promise<void> => {
-    for (const sheet of sheets) sections.push(...(await sheetSections(ws, sheet, key, deps)))
+    // Verweise „M{karte}" → „M3", wie am Bildschirm
+    for (const sheet of sheets) sections.push(...(await sheetSections(ws, zurAnzeige(sheet), key, deps)))
   }
   // Das Deckblatt steht vor allem anderen – aber nicht vor einer reinen Lösungsdatei
   if (deps.deckblatt && ws.meta.coverPage && !opts.keyOnly) sections.push(await deckblattAbschnitt(deps.deckblatt, deps.raster))
@@ -311,7 +325,8 @@ async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: Wo
     contentWidth: Math.round(A4_WIDTH - (insets.left + insets.right) * MM),
     key,
     sheetStars: sheet.stars,
-    phraseGerman: zeigtUebersetzung(ws.meta, sheet.stars)
+    phraseGerman: zeigtUebersetzung(ws.meta, sheet.stars),
+    materialNumbers: materialNumbersFor(sheet)
   }
 
   const headers = { first: await headerFor(ctx, true), default: await headerFor(ctx, false) }
@@ -333,6 +348,13 @@ async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: Wo
   // Texte mit Zeilennummern bekommen einen eigenen fortlaufenden Abschnitt mit Word-Zeilennummerierung
   const sections: ISectionOptions[] = []
   let children: Child[] = []
+  /*
+   * Unsichtbarer KI-Test (27.09.2026) auch in Word: weiß, 1 pt, ohne Abstand – im Text enthalten,
+   * damit er beim Kopieren mitgeht, wie am Bildschirm und im PDF (shared/aiCanary.ts). Nur Schülerblatt.
+   */
+  if (info.canary && !key) {
+    children.push(new Paragraph({ spacing: { before: 0, after: 0, line: 20 }, children: [new TextRun({ text: info.canary, size: 2, color: 'FFFFFF' })] }))
+  }
   const numbers = taskNumbersFor(sheet)
   const flush = (lineNumbers: boolean): void => {
     if (!children.length) return
@@ -521,7 +543,12 @@ export async function boardSection(ws: Worksheet, board: BoardPlan, raster: Math
         }),
         ...sec.points.map((pt) => new Paragraph({ bullet: { level: 0 }, spacing: { after: 40 }, children: runs(pt) })),
         ...(sec.sketch
-          ? [new Paragraph({ spacing: { before: 40 }, children: [run('✎ An die Tafel zeichnen: ', { italics: true, color: '555555', size: size - 3 }), ...runs(sec.sketch)] })]
+          ? [
+              new Paragraph({
+                spacing: { before: 40 },
+                children: [run('✎ An die Tafel zeichnen: ', { italics: true, color: '555555', size: size - 3 }), ...runs(sec.sketch)]
+              })
+            ]
           : []),
         ...(sec.fromTasks ? [p(sec.fromTasks, { color: '777777', size: size - 5 })] : [])
       ]
@@ -611,9 +638,16 @@ export async function boardSection(ws: Worksheet, board: BoardPlan, raster: Math
         width: { size: width, type: WidthType.DXA },
         layout: TableLayoutType.FIXED,
         rows: [
-          new TableRow({ tableHeader: true, children: ['Schritt', 'Arbeitsauftrag / Impuls der Lehrkraft', 'Erwartete Beiträge → Tafel'].map((t, i) => cell(t, i, true)) }),
+          new TableRow({
+            tableHeader: true,
+            children: ['Schritt', 'Arbeitsauftrag / Impuls der Lehrkraft', 'Erwartete Beiträge → Tafel'].map((t, i) => cell(t, i, true))
+          }),
           ...board.steps.map(
-            (st, n) => new TableRow({ cantSplit: true, children: [cell(st.phase.replace(/^\s*\d+[.)]\s*/, ''), 0, false, `${n + 1}. `), cell(st.impulse, 1), cell(st.expected, 2)] })
+            (st, n) =>
+              new TableRow({
+                cantSplit: true,
+                children: [cell(st.phase.replace(/^\s*\d+[.)]\s*/, ''), 0, false, `${n + 1}. `), cell(st.impulse, 1), cell(st.expected, 2)]
+              })
           )
         ]
       })
@@ -912,6 +946,8 @@ async function illustrationDocx(ctx: Ctx, id: string | undefined, pose: string, 
 const key = (ctx: Ctx): boolean => ctx.key
 
 async function blockContent(ctx: Ctx, block: WsBlock, numbers: Map<string, number>): Promise<Child[]> {
+  // Nur im Lösungsteil (didactics/loesungsteil.ts): auf dem Schülerblatt fehlt der Baustein ganz
+  if (block.nurLoesung && !ctx.key) return []
   const inhalt = await blockInhalt(ctx, block, numbers)
   if (!block.illustration || ctx.key) return inhalt
   return [...inhalt, ...(await illustrationDocx(ctx, block.illustration.maskottchenId, block.illustration.pose, block.illustration.bubble, 16))]
@@ -943,9 +979,14 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
     case 'text': {
       const out: Child[] = []
       // Zeilennummern zählen nur den Materialtext (nicht Überschrift, Worterklärungen, Quelle)
-      if (block.title)
+      if (block.title || ctx.materialNumbers.has(block.id))
         out.push(
-          new Paragraph({ keepNext: true, suppressLineNumbers: true, spacing: { after: 80 }, children: await richRun(ctx, block.title, { bold: true }) })
+          new Paragraph({
+            keepNext: true,
+            suppressLineNumbers: true,
+            spacing: { after: 80 },
+            children: [...materialNo(ctx, block.id), ...(await richRun(ctx, stripMaterialNo(block.title), { bold: true }))]
+          })
         )
       /*
        * Materialkopf einer Quelle: Verfasser · Textsorte · Datum – ÜBER dem Text, wie am
@@ -1072,6 +1113,7 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
           new Paragraph({
             alignment: AlignmentType.CENTER,
             children: [
+              ...materialNo(ctx, block.id),
               ...(block.caption ? await richRun(ctx, block.caption, { size: ctx.size - 3 }) : []),
               // Art. 50 Abs. 4 KI-Verordnung: erzeugte Bilder sichtbar kennzeichnen
               ...(block.image?.source === 'ai' ? [run(`${block.caption ? ' ' : ''}(KI-erzeugt)`, { size: ctx.size - 4, color: '666666' })] : [])
@@ -1094,7 +1136,12 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
               indent: { left: 280, hanging: 280 },
               spacing: { after: 30 },
               // Ob die deutsche Entsprechung mitkommt, ist in `contextFor` entschieden
-              children: [run('• '), run(item.text), ...(item.german && ctx.phraseGerman ? [run(` – ${item.german}`, { color: '666666' })] : [])]
+              // **fett** wie am Bildschirm – vorher standen die Sternchen im Dokument
+              children: [
+                run('• '),
+                ...(await richRun(ctx, item.text)),
+                ...(item.german && ctx.phraseGerman ? [run(' – ', { color: '666666' }), ...(await richRun(ctx, item.german, { color: '666666' }))] : [])
+              ]
             })
           )
         }
@@ -1129,8 +1176,20 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
     }
     case 'table': {
       const out: Child[] = []
-      if (block.title) out.push(new Paragraph({ keepNext: true, children: await richRun(ctx, block.title, { bold: true }) }))
-      out.push(await gridTable(ctx, block.headers, block.rows, ctx.contentWidth))
+      if (block.title || ctx.materialNumbers.has(block.id))
+        out.push(new Paragraph({ keepNext: true, children: [...materialNo(ctx, block.id), ...(await richRun(ctx, block.title, { bold: true }))] }))
+      // Von Hand gezogene Maße (render/tabelleMasse.ts) gelten auch in Word
+      out.push(
+        await gridTable(
+          ctx,
+          block.headers,
+          block.rows,
+          Math.round((ctx.contentWidth * (block.widthPercent ?? 100)) / 100),
+          block.colWidths?.length ? spaltenBreiten(block).map((w) => w / 100) : undefined,
+          undefined,
+          { rowHeightsMm: block.rowHeightsMm, headerHeightMm: block.headerHeightMm }
+        )
+      )
       out.push(spacer())
       return out
     }
@@ -1145,7 +1204,7 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
     }
     case 'grid': {
       // Das Gitternetz wird als Bild in exakter Millimetergröße eingebettet, damit der Ausdruck maßhaltig bleibt
-      const drawing = gridDrawing(block, ctx.contentWidth / MM)
+      const drawing = block.diagram ? diagramDrawing(block.diagram, ctx.contentWidth / MM, { raster: false }) : gridDrawing(block, ctx.contentWidth / MM)
       const png = await ctx.deps.raster(drawing.svg, drawing.widthMm * PX_PER_MM, drawing.heightMm * PX_PER_MM)
       const out: Child[] = []
       if (block.title) out.push(new Paragraph({ keepNext: true, children: await richRun(ctx, block.title, { bold: true }) }))
@@ -1287,7 +1346,15 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
   }
 }
 
-async function gridTable(ctx: Ctx, headers: string[], rows: string[][], width: number, weights?: number[], solutionRows?: string[][]): Promise<Table> {
+async function gridTable(
+  ctx: Ctx,
+  headers: string[],
+  rows: string[][],
+  width: number,
+  weights?: number[],
+  solutionRows?: string[][],
+  masse?: { rowHeightsMm?: number[]; headerHeightMm?: number }
+): Promise<Table> {
   const cols = Math.max(headers.length, ...rows.map((r) => r.length), 1)
   const ws = weights ?? Array(cols).fill(1 / cols)
   const border = { style: BorderStyle.SINGLE, size: 6, color: '444444' }
@@ -1309,16 +1376,29 @@ async function gridTable(ctx: Ctx, headers: string[], rows: string[][], width: n
       ]
     })
   const tableRows: TableRow[] = []
-  if (headers.length) tableRows.push(new TableRow({ tableHeader: true, children: await Promise.all(headers.map((h, c) => cell(h, c, true))) }))
+  if (headers.length)
+    tableRows.push(
+      new TableRow({
+        tableHeader: true,
+        ...(masse?.headerHeightMm ? { height: { value: Math.round(masse.headerHeightMm * MM), rule: 'atLeast' } } : {}),
+        children: await Promise.all(headers.map((h, c) => cell(h, c, true)))
+      })
+    )
   for (let r = 0; r < rows.length; r++) {
     tableRows.push(
       new TableRow({
-        height: { value: 420, rule: 'atLeast' },
+        height: { value: Math.max(420, Math.round((masse?.rowHeightsMm?.[r] ?? 0) * MM)), rule: 'atLeast' },
         children: await Promise.all(Array.from({ length: cols }, (_, c) => cell(rows[r][c] ?? '', c, false, solutionRows?.[r]?.[c])))
       })
     )
   }
-  return new Table({ width: { size: width, type: WidthType.DXA }, layout: TableLayoutType.FIXED, rows: tableRows })
+  // Spaltenraster ausdrücklich setzen – sonst zeigt Word gleich breite Spalten, egal was die Zellen sagen
+  return new Table({
+    width: { size: width, type: WidthType.DXA },
+    columnWidths: ws.map((w) => Math.round(width * w)),
+    layout: TableLayoutType.FIXED,
+    rows: tableRows
+  })
 }
 
 function gridArea(ctx: Ctx, heightMm: number, squares: boolean): Table {
@@ -1554,10 +1634,11 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
   if (brief) {
     if (brief.situation)
       out.push(new Paragraph({ indent: { left: indent }, spacing: { before: 60, after: 40 }, children: await richRun(ctx, brief.situation) }))
-    const rahmen = [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
+    const rahmen = brief.frameHidden ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
     if (rahmen) out.push(new Paragraph({ indent: { left: indent }, spacing: { after: 60 }, children: [run(rahmen, { italics: true })] }))
 
-    const notizen = (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
+    // Klausur der Oberstufe: keine Notizentabelle, keine Formhinweise (wie am Bildschirm)
+    const notizen = ctx.ws.meta.ohneSchreibhilfen ? [] : (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
     if (notizen.length) {
       out.push(
         new Table({
@@ -1587,11 +1668,15 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
       )
     }
 
-    for (const p of brief.points) out.push(new Paragraph({ bullet: { level: 0 }, indent: { left: indent + 200 }, children: await richRun(ctx, p) }))
+    // Leere Inhaltspunkte auch hier nicht (wie am Bildschirm)
+    for (const p of brief.points.filter((x) => plainText(x).trim()))
+      out.push(new Paragraph({ bullet: { level: 0 }, indent: { left: indent + 200 }, children: await richRun(ctx, p) }))
 
     // Die Wortzahl nur, wenn das Blatt sie nennen soll – dieselbe Regel wie am Bildschirm
     const zeigtWortzahl = Boolean(ctx.ws.meta.wordLimit) && brief.words > 0
-    const formZeile = [zeigtWortzahl ? `Umfang: etwa ${brief.words} Wörter` : '', ...(brief.form ?? []).filter(Boolean)].filter(Boolean).join(' · ')
+    const formZeile = [zeigtWortzahl ? `Umfang: etwa ${brief.words} Wörter` : '', ...(ctx.ws.meta.ohneSchreibhilfen ? [] : (brief.form ?? []).filter(Boolean))]
+      .filter(Boolean)
+      .join(' · ')
     if (formZeile) out.push(new Paragraph({ indent: { left: indent }, spacing: { before: 60, after: 40 }, children: [run(formZeile, { bold: true })] }))
   }
 

@@ -117,7 +117,13 @@ export function planeGliederung(worksheet: Worksheet, docId: string): void {
           ...aktuell,
           outline,
           originalMaterial: material ?? undefined,
-          meta: { ...aktuell.meta, title: aktuell.meta.title || outline.title, teacherNote: outline.teacherNote }
+          meta: {
+            ...aktuell.meta,
+            title: aktuell.meta.title || outline.title,
+            teacherNote: outline.teacherNote,
+            // Überthema aus der Planung – nur, wenn die Lehrkraft keins gesetzt oder abgeschaltet hat
+            ...(outline.ueberthema && !aktuell.meta.ueberthema?.trim() && !aktuell.meta.ueberthemaAus ? { ueberthema: outline.ueberthema } : {})
+          }
         }),
         1
       )
@@ -142,7 +148,20 @@ export function planeNeu(worksheet: Worksheet, docId: string): void {
       k.melde('Die KI plant die Gliederung neu …')
       return generateOutline(ws.meta, profileFromMeta(ws.meta), ws.sources, k.ai, ws.originalMaterial ?? null)
     },
-    ablegen: (outline, ws) => legeArbeitsblattAb(docId, ws, (aktuell) => ({ ...aktuell, outline }), 1)
+    ablegen: (outline, ws) =>
+      legeArbeitsblattAb(
+        docId,
+        ws,
+        (aktuell) => ({
+          ...aktuell,
+          outline,
+          meta: {
+            ...aktuell.meta,
+            ...(outline.ueberthema && !aktuell.meta.ueberthema?.trim() && !aktuell.meta.ueberthemaAus ? { ueberthema: outline.ueberthema } : {})
+          }
+        }),
+        1
+      )
   })
 }
 

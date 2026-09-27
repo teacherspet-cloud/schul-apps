@@ -153,7 +153,7 @@ describe('Arbeitsblatt: Bilder für alle Fächer', () => {
     expect(original.image).toBeUndefined()
     expect(original.warnings?.[0]).toContain('Bildquelle')
     // reused bleibt 0: Es wurde kein Vorrat früherer Blätter übergeben
-    expect(stats).toEqual({ web: 0, ai: 1, missing: 1, reused: 0 })
+    expect(stats).toEqual({ web: 0, ai: 1, missing: 1, reused: 0, gezeichnet: 0 })
   })
 
   it('„selbst wählen“ lässt die Platzhalter unverändert', async () => {
@@ -192,7 +192,7 @@ describe('Arbeitsblatt: Bildreihe', () => {
       services: fakeServices([], ['nothing']),
       variants: (q: string) => [q]
     })
-    expect(stats).toEqual({ web: 2, ai: 0, missing: 1, reused: 0 })
+    expect(stats).toEqual({ web: 2, ai: 0, missing: 1, reused: 0, gezeichnet: 0 })
     expect(block.items![0].image?.credit).toContain('Wikimedia')
     expect(block.items![2].image).toBeUndefined()
     expect(block.warnings?.some((w) => w.startsWith('Bild 3:'))).toBe(true)

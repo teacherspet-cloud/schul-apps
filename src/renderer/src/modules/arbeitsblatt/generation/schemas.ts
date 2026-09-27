@@ -18,7 +18,20 @@ export const BLOCK_TYPES = [
 ]
 export const VIDEO_KIND_IDS = ['spielfilm', 'kurzfilm', 'dokumentation', 'nachrichten', 'lernvideo', 'experiment', 'reportage']
 export const VIEWING_PHASE_IDS = ['vor', 'waehrend', 'nach']
-export const ANSWER_KINDS = ['lines', 'grid', 'space', 'none', 'gapText', 'matching', 'multipleChoice', 'trueFalse', 'ordering', 'tableFill', 'labels', 'diagram']
+export const ANSWER_KINDS = [
+  'lines',
+  'grid',
+  'space',
+  'none',
+  'gapText',
+  'matching',
+  'multipleChoice',
+  'trueFalse',
+  'ordering',
+  'tableFill',
+  'labels',
+  'diagram'
+]
 export const DIAGRAM_KIND_IDS = ['koordinaten', 'mm', 'klima', 'schraegbild', 'spannung', 'zeitleiste']
 export const TIMELINE_UNIT_IDS = ['day', 'month', 'year']
 export const BLOCK_SIDES = ['auto', 'none', 'left', 'right']
@@ -32,6 +45,9 @@ export const OUTLINE_SCHEMA = obj({
   learningGoals: arr(str(), '1–3 Lernziele als Ich-kann-Sätze'),
   minutes: int('Geschätzte Bearbeitungszeit in Minuten'),
   teacherNote: str('Hinweis an die Lehrkraft (z. B. wenn Thema und Jahrgang schlecht zusammenpassen), sonst leer'),
+  ueberthema: str(
+    'Unterrichtseinheit (Überthema), unter der dieses Blatt im Lehrplan steht: GENAU der Wortlaut eines vorhandenen Themenbereichs des Fachs, wenn einer passt; sonst ein kurzer, lehrplannaher Name (2–5 Wörter)'
+  ),
   items: arr(
     obj({
       type: enumOf(BLOCK_TYPES),
@@ -78,11 +94,17 @@ const DIAGRAM = obj({
     from: str('zeitleiste: Anfang, z. B. „1914-07-28", „1914-07", „1914", „-500" (v. Chr.); sonst leer'),
     to: str('zeitleiste: Ende'),
     step: int('zeitleiste: Marke alle … Einheiten'),
-    sections: arr(obj({ from: str(), to: str(), unit: enumOf(TIMELINE_UNIT_IDS), step: int() }), 'zeitleiste: Abschnitte mit eigener Skala für lange Zeiträume, sonst leer'),
+    sections: arr(
+      obj({ from: str(), to: str(), unit: enumOf(TIMELINE_UNIT_IDS), step: int() }),
+      'zeitleiste: Abschnitte mit eigener Skala für lange Zeiträume, sonst leer'
+    ),
     yLabel: str('zeitleiste: Beschriftung einer y-Achse (z. B. „Eskalation"), sonst leer'),
     yLevels: arr(str(), 'zeitleiste: Stufen der y-Achse von unten nach oben (z. B. Drohung, Ultimatum, Mobilmachung, Krieg), sonst leer'),
     strands: arr(str(), 'zeitleiste: mehrere Stränge an derselben Zeitachse (z. B. zwei Länder), sonst leer'),
-    events: arr(obj({ date: str(), text: str(), strand: int('0-basiert'), level: int('Stufe 0-basiert, -1 = keine') }), 'zeitleiste: VORGEGEBENE Ereignisse auf dem Schülerblatt; leer, wenn die Lernenden selbst eintragen')
+    events: arr(
+      obj({ date: str(), text: str(), strand: int('0-basiert'), level: int('Stufe 0-basiert, -1 = keine') }),
+      'zeitleiste: VORGEGEBENE Ereignisse auf dem Schülerblatt; leer, wenn die Lernenden selbst eintragen'
+    )
   })
 })
 
@@ -112,12 +134,32 @@ export const IMAGE_FUNCTION_IDS = ['organisation', 'repraesentation', 'schmuck']
 export const FLAT_BLOCK = obj({
   outlineIndex: int('Nummer des Gliederungspunkts (ab 0); -1 für zusätzliche Hilfen'),
   type: enumOf(BLOCK_TYPES),
+  ref: str(
+    'NUR Materialbausteine (text, image, table, grid, audio, video): frei gewählte Kurzkennung aus Kleinbuchstaben, Ziffern und Bindestrich (z. B. "zeitleiste", "karte"). Aufgaben und Hilfen verweisen darauf mit M{zeitleiste}; die Nummer vergibt die App. Andere Bausteine: leer'
+  ),
   stars: int('0 = für alle; 1–3 = Niveaustufe'),
   title: str('Überschrift (Text, Kasten, Hilfe, Tabelle, Selbsteinschätzung, Abschnitt)'),
-  body: str('Inhalt (text, infoBox)'),
+  body: str('Inhalt (text, infoBox); phrases: ein Satz, wie und FÜR WELCHE AUFGABE die Hilfe genutzt wird („Für Aufgabe 2: …")'),
   variant: str(
-    'infoBox: merke|definition|beispiel|wissen|regel; scaffold: tipp|satzanfaenge|wortspeicher|hilfekarten; workspace: lines|grid|blank; selfCheck: smileys|ampel|kompetenzraster'
+    'infoBox: merke|definition|beispiel|wissen|regel; scaffold: tipp|satzanfaenge|wortspeicher|hilfekarten; workspace: lines|grid|blank; selfCheck: smileys|ampel|kompetenzraster; grid: karo|mm|koordinaten|klima|zeitleiste'
   ),
+  timeline: obj({
+    unit: enumOf(TIMELINE_UNIT_IDS),
+    from: str('grid mit variant zeitleiste: Anfang der Achse, z. B. „1914-06-28", „1914-07", „1914", „-500"; sonst leer'),
+    to: str('Ende der Achse'),
+    step: int('Marke alle … Einheiten (6–12 Marken)'),
+    sections: arr(
+      obj({ from: str(), to: str(), unit: enumOf(TIMELINE_UNIT_IDS), step: int() }),
+      'Abschnitte mit eigener Skala nur bei sehr langen Zeiträumen, sonst leer'
+    ),
+    yLabel: str('Beschriftung der Stufen-Achse (z. B. „Eskalation"), sonst leer'),
+    yLevels: arr(str(), 'Stufen von unten nach oben (höchstens 5), sonst leer'),
+    strands: arr(str(), 'parallele Stränge (Länder, Akteure), sonst leer'),
+    events: arr(
+      obj({ date: str('„1914-07-28"'), text: str('höchstens 5 Wörter'), strand: int('0-basiert'), level: int('Stufe 0-basiert, -1 = keine') }),
+      'die Ereignisse – die App zeichnet sie an die Achse'
+    )
+  }),
   items: arr(str(), 'learningGoals: Lernziele; scaffold: Einträge; selfCheck: Ich-kann-Sätze'),
   lineNumbers: bool('text: Zeilennummern anzeigen (die App nummeriert selbst – nie Nummern in body schreiben)'),
   source: str('text: Quellenangabe oder leer'),

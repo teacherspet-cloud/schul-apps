@@ -1,5 +1,5 @@
 import { Badge, Button, Container, ScrollArea, Stack } from '@mantine/core'
-import { IconFilePlus } from '@tabler/icons-react'
+import { IconFilePlus, IconFolderOpen } from '@tabler/icons-react'
 import type { SavedKurztestMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import { useMemo } from 'react'
@@ -25,6 +25,7 @@ const dateFormat = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeS
 export default function KurztestLibrary({
   onNew,
   onNeuImBereich,
+  onOpenFile,
   onOpened,
   zurueck,
   onZurueck
@@ -32,6 +33,8 @@ export default function KurztestLibrary({
   onNew: () => void
   /** Neue Kontrolle anlegen und ihre Kennung liefern („Neu in diesem Bereich") */
   onNeuImBereich: () => Promise<string>
+  /** Eine Datei des Programms öffnen (27.09.2026) */
+  onOpenFile: () => void
   onOpened: () => void
   /** Name der offenen Kontrolle – dann gibt es „Zurück zu …" */
   zurueck: string | null
@@ -108,6 +111,9 @@ export default function KurztestLibrary({
           onSuche={bib.setSuche}
           suchHinweis="Name, Thema, Fach, Klasse, Bundesland"
         >
+          <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOpenFile}>
+            Datei öffnen …
+          </Button>
           <Button leftSection={<IconFilePlus size={16} />} onClick={onNew}>
             Neue Kontrolle
           </Button>
