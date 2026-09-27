@@ -214,6 +214,8 @@ export interface AppSettings {
     allgemein: number[]
     jeFach: Record<string, number[]>
   }
+  /** Maskottchen (26.09.2026): bis zu welcher Klasse Illustrationen gelten, und die Standardfigur */
+  illustrationen?: { bisKlasse: number; standardId?: string }
   /**
    * Fachfarben (Paket 10a): eigene Wahl der Lehrkraft je Fach (Kennung → #rrggbb). Fehlt ein
    * Fach oder steht dort '', gilt der Vorschlag aus renderer/shared/fachfarben.ts – so kommen

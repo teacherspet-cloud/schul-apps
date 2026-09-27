@@ -35,6 +35,8 @@ export function newBlock(type: WsBlockType, anrede: Anrede = 'du'): WsBlock {
   switch (type) {
     case 'learningGoals':
       return { id, type, title: anredeText('lernziele', anrede), goals: ['Ich kann …'] }
+    case 'illustration':
+      return { id, type, pose: 'winkend', bubble: '', widthPercent: 22 }
     case 'infoBox':
       return { id, type, variant: 'merke', title: 'Merke', body: '' }
     case 'text':
@@ -114,7 +116,8 @@ export const BLOCK_LABELS: Record<WsBlockType, string> = {
   audio: 'Hörtext',
   video: 'Film / Video',
   selfCheck: 'Selbsteinschätzung',
-  divider: 'Abschnittsüberschrift'
+  divider: 'Abschnittsüberschrift',
+  illustration: 'Illustration (Maskottchen)'
 }
 
 /**

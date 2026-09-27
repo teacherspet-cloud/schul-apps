@@ -10,6 +10,7 @@
  * WELCHE Aufrufe aus dem Netz überhaupt erlaubt sind, steht NICHT hier, sondern im Server
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
+import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
 import type { SchulQuelle, SchulTreffer, SuchOptionen } from './schulsuche'
 import type { DesignTemplate } from '@shared/design'
@@ -284,6 +285,14 @@ export function buildApi(call: Call, extras: ApiExtras) {
       laden: (url: string) => call<GeladeneQuelle>('sources:laden', url),
       /** Titel, Beschreibung und Transkript eines YouTube-Videos – Material aus einer Adresse (26.09.2026) */
       video: (url: string) => call<VideoQuelle>('sources:video', url)
+    },
+    /** Maskottchen für Illustrationen (26.09.2026) – Ablage im Profil unter maskottchen/ */
+    maskottchen: {
+      list: () => call<MaskottchenInfo[]>('maskottchen:list'),
+      save: (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) => call<MaskottchenInfo>('maskottchen:save', eingabe),
+      pose: (id: string, pose: string, dataUrl: string) => call<MaskottchenInfo>('maskottchen:pose', id, pose, dataUrl),
+      deletePose: (id: string, pose: string) => call<MaskottchenInfo | null>('maskottchen:delete-pose', id, pose),
+      delete: (id: string) => call<MaskottchenInfo[]>('maskottchen:delete', id)
     },
     /** Hörtexte vertonen (ElevenLabs) */
     audio: {

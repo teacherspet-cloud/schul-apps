@@ -1,4 +1,5 @@
 import type { LearnerProfile } from '../didactics/profile'
+import { platziereIllustrationen } from './illustrationen'
 import type { Worksheet } from '../model/types'
 import { generateBoard } from './board'
 import type { AiCall, Progress } from './generate'
@@ -60,6 +61,13 @@ export async function finishWorksheet(result: Worksheet, profile: LearnerProfile
     }
   } catch (e) {
     addNote(result, `Bilder konnten nicht automatisch gewählt werden: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  // Illustrationen (26.09.2026): nach Regeln gesetzt, Sprechblasen von der KI – nur bei jüngeren Jahrgängen
+  try {
+    result.sheets = (await platziereIllustrationen(result, { ai: deps.ai })).sheets
+  } catch {
+    /* ohne Figuren weiter */
   }
 
   if (result.meta.boardPlan) {

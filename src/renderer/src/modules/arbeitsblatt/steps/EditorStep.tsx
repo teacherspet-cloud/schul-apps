@@ -18,6 +18,7 @@ import {
   Tooltip
 } from '@mantine/core'
 import {
+  IconMoodSmile,
   IconAdjustmentsHorizontal,
   IconAlertTriangle,
   IconArrowLeft,
@@ -51,6 +52,9 @@ import { fuelleBaustein, regenerateBlock } from '../generation/generate'
 import { generateExample } from '../generation/example'
 import { generateSolution } from '../generation/solution'
 import { KiHinweise } from './KiHinweise'
+import { IllustrationDialog } from './IllustrationDialog'
+import { illustrationenVorschlag, platziereIllustrationen } from '../generation/illustrationen'
+import { useMaskottchen } from '../../../shared/maskottchenStore'
 import { hoerenIstPruefgegenstand } from '../didactics/audioRules'
 import { plainText } from '../../../shared/richtext/parse'
 import { estimateSeconds } from '../generation/convert'
@@ -153,6 +157,9 @@ export default function EditorStep(): React.JSX.Element {
   useEffect(() => {
     window.api.designs.list().then(setDesigns).catch(notifyError)
   }, [])
+  // Maskottchen an einen Baustein heften (26.09.2026)
+  const [illuBlockId, setIlluBlockId] = useState<string | null>(null)
+  const maskottchenListe = useMaskottchen((s) => s.liste)
 
   const sheet = ws?.sheets.find((s) => s.id === activeSheetId) ?? ws?.sheets[0]
   const profile = useMemo(() => (ws ? profileFromMeta(ws.meta) : null), [ws])
@@ -483,6 +490,11 @@ export default function EditorStep(): React.JSX.Element {
           <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => duplizieren(block.id)}>
             Duplizieren
           </Menu.Item>
+          {block.type !== 'illustration' && (
+            <Menu.Item leftSection={<IconMoodSmile size={14} />} onClick={() => setIlluBlockId(block.id)}>
+              {block.illustration ? 'Maskottchen ändern …' : 'Maskottchen anheften …'}
+            </Menu.Item>
+          )}
           <EinfuegenUntermenue titel="Darüber einfügen" onWaehlen={(typ) => einfuegen(block.id, 0, typ)} />
           <EinfuegenUntermenue titel="Darunter einfügen" onWaehlen={(typ) => einfuegen(block.id, 1, typ)} />
           {block.type === 'task' && block.example && (
@@ -525,9 +537,16 @@ export default function EditorStep(): React.JSX.Element {
   const imageBlock = pickerBlockId ? sheet.blocks.find((b) => b.id === pickerBlockId) : undefined
   const pickerItem = imageBlock?.type === 'image' && pickerItemId ? imageBlock.items?.find((it) => it.id === pickerItemId) : undefined
 
+  const illuBlock = illuBlockId ? sheet.blocks.find((b) => b.id === illuBlockId) : undefined
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {measure}
+      <IllustrationDialog
+        opened={Boolean(illuBlock)}
+        onClose={() => setIlluBlockId(null)}
+        wert={illuBlock?.illustration}
+        onChange={(neu) => illuBlock && updateBlock(sheet.id, illuBlock.id, (d) => (neu ? (d.illustration = neu) : delete d.illustration))}
+      />
       <Group px="md" py={8} gap="xs" className="app-toolbar">
         <Button size="xs" variant="default" leftSection={<IconArrowLeft size={14} />} onClick={() => setStep(1)}>
           Gliederung
@@ -605,6 +624,52 @@ export default function EditorStep(): React.JSX.Element {
                * Weil die Quellen sich widersprechen, entscheidet die Lehrkraft – sichtbar und je
                * Arbeitsblatt. Bei Einfacher und Leichter Sprache bleibt es unabhängig davon aus.
                */}
+              {/*
+               * Illustrationen (26.09.2026): Vorschlag nach Jahrgang (Einstellung „bis Klasse"),
+               * am Blatt ein- und ausschaltbar; „neu setzen" verteilt die Figuren nach den Regeln.
+               */}
+              {maskottchenListe.length > 0 && (
+                <>
+                  <Checkbox
+                    size="sm"
+                    label="Illustrationen (Maskottchen)"
+                    description={`Figuren an Kästen, Aufgaben und am Anfang/Ende – ${illustrationenVorschlag(ws.meta.grade) ? 'für diesen Jahrgang vorgesehen' : 'für diesen Jahrgang nicht vorgesehen, hier einschaltbar'}`}
+                    checked={ws.meta.illustrationen?.an ?? illustrationenVorschlag(ws.meta.grade)}
+                    onChange={(e) => {
+                      const an = e.currentTarget.checked
+                      update((w) => (w.meta.illustrationen = { ...w.meta.illustrationen, an }))
+                      if (!an) update((w) => w.sheets.forEach((s) => s.blocks.forEach((b) => delete b.illustration)))
+                    }}
+                  />
+                  {(ws.meta.illustrationen?.an ?? illustrationenVorschlag(ws.meta.grade)) && (
+                    <Group gap="xs">
+                      {maskottchenListe.length > 1 && (
+                        <Select
+                          size="xs"
+                          data={maskottchenListe.map((m) => ({ value: m.id, label: m.name }))}
+                          value={ws.meta.illustrationen?.maskottchenId ?? maskottchenListe[0].id}
+                          onChange={(v) => v && update((w) => (w.meta.illustrationen = { ...w.meta.illustrationen, maskottchenId: v }))}
+                          allowDeselect={false}
+                          w={180}
+                        />
+                      )}
+                      <Button
+                        size="compact-xs"
+                        variant="light"
+                        onClick={() =>
+                          void platziereIllustrationen({ ...ws, meta: { ...ws.meta, illustrationen: { ...ws.meta.illustrationen, an: true } } }).then((neu) =>
+                            update((w) => {
+                              w.sheets = neu.sheets
+                            })
+                          )
+                        }
+                      >
+                        Figuren neu setzen
+                      </Button>
+                    </Group>
+                  )}
+                </>
+              )}
               {/*
                * Korrekturrand: Erst am fertigen Blatt zeigt sich, ob der Platz gebraucht wird –
                * deshalb steht der Schalter hier und nicht in den Vorgaben vor dem Erzeugen.

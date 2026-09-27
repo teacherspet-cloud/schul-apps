@@ -4,6 +4,7 @@ import { IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, I
 import { notifications } from '@mantine/notifications'
 import { useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
+import { useMaskottchen } from './shared/maskottchenStore'
 import { modules } from './modules/registry'
 import Home from './shell/Home'
 import SettingsPage from './shell/SettingsPage'
@@ -103,6 +104,7 @@ export default function App(): React.JSX.Element {
     () =>
       window.api.ai.onModelsUpdated((notes) => {
         void useAppSettings.getState().load()
+        void useMaskottchen.getState().lade()
         notifications.show({ title: 'KI-Modelle aktualisiert', message: notes.join(' '), autoClose: 12000 })
       }),
     []

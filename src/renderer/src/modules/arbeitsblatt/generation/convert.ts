@@ -347,6 +347,9 @@ export function convertBlock(
         heightMm: Math.max(15, Math.min(200, Number(b.heightMm) || 40)),
         label: text(b.title)
       }
+    case 'illustration':
+      // Setzt nur die App (Maskottchen), nie die KI
+      return null
     case 'grid': {
       const kind = pick<GridKind>(b.variant, GRID_KIND_IDS, 'karo')
       const preset = gridDefaults(kind)

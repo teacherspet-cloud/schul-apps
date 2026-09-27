@@ -6,6 +6,7 @@
  * mit einem Kopfbaustein (Zeit, Hilfsmittel, Notenschlüssel), je Teil einer Überschrift und
  * den erzeugten Bausteinen.
  */
+import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
 import { newId } from '../../vokabeltest/model/random'
 import type { Sheet, Worksheet, WsBlock } from '../../arbeitsblatt/model/types'
 import { worksheetMetaFor } from '../generation/generateExam'
@@ -77,7 +78,12 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
  * im Titel des Kopfkastens bzw., ohne Kopfkasten, als eigene Zeile –, damit jedes Blatt
  * sagt, welche Fassung es ist.
  */
+/** Arbeiten bekommen nur Kopf und Schluss eine Figur (26.09.2026) */
 export function examToWorksheet(exam: Exam, fassung = 0): Worksheet {
+  return platziereKopfUndSchluss(examToWorksheetOhneIllustration(exam, fassung))
+}
+
+function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   const meta = worksheetMetaFor(exam)
   const english = exam.meta.subjectId === 'englisch'
   const gesamt = fassungsZahl(exam)

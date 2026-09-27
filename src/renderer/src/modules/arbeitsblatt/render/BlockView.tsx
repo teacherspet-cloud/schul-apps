@@ -19,6 +19,7 @@ import { headerLine } from '../didactics/sourceHeader'
 import { narrationNote } from '../didactics/narration'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../didactics/audioRules'
 import { bereinigeSkizze } from '../generation/solution'
+import { Illustriert, IllustrationView } from './Illustration'
 import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from './mcGrid'
 
 /** Ab dieser Länge gilt ein Text als „länger" und wird im Blocksatz gesetzt */
@@ -40,7 +41,7 @@ const stars = (n?: number): string => (n ? '★'.repeat(n) : '')
  * Tabellenzeile die gesetzte Formel, im Tabellenkopf darüber aber wörtlich `$x^2$`. Formeln
  * und **Fettdruck** gehören in jedes Feld eines Arbeitsblatts, nicht nur in den Fließtext.
  */
-function Feld({
+export function Feld({
   value,
   editable,
   onChange,
@@ -95,13 +96,32 @@ function useSetter<B extends WsBlock>(block: B) {
   return (apply: (draft: B, value: string) => void) => (update ? (v: string) => update(block.id, (d) => apply(d as B, v)) : undefined)
 }
 
+/**
+ * Jeder Baustein mit angehefteter Illustration bekommt die Figur an die Ecke (26.09.2026) –
+ * nur auf dem Schülerblatt; im Lösungsteil lenkt sie nur ab.
+ */
 export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
+  const { mode } = useWs()
+  const set = useSetter(block)
+  const inhalt = <BlockInhalt block={block} placed={placed} />
+  if (!block.illustration || isKeyMode(mode) || placed?.continued) return inhalt
+  return (
+    <Illustriert block={block} editable={mode === 'edit'} onBubble={set((d, v) => (d.illustration ? (d.illustration.bubble = v) : undefined))}>
+      {inhalt}
+    </Illustriert>
+  )
+}
+
+function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
   const ctx = useWs()
   const { mode } = ctx
   const edit = mode === 'edit'
   const set = useSetter(block)
 
   switch (block.type) {
+    case 'illustration':
+      if (isKeyMode(mode)) return null
+      return <IllustrationView block={block} editable={edit} onBubble={set((d, v) => ((d as typeof block).bubble = v))} />
     case 'learningGoals':
       if (isKeyMode(mode)) return null
       return (

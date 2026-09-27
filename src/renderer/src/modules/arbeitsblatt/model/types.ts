@@ -97,6 +97,23 @@ interface BaseBlock {
    * so bleibt die Lage erhalten, wenn sich Schriftgröße oder Seitenränder ändern.
    */
   free?: { page: number; x: number; y: number; width: number }
+  /**
+   * Angeheftetes Maskottchen (26.09.2026): Pose, wahlweise Sprechblase und Seite. Die Figur
+   * sitzt an der Ecke des Bausteins und nimmt keinen Platz im Satz ein; Bilder kommen aus dem
+   * Maskottchen-Speicher (Kennung, sonst die Standardfigur).
+   */
+  illustration?: { maskottchenId?: string; pose: string; bubble?: string; side?: 'left' | 'right' }
+}
+
+/** Eigener Baustein „Illustration" – frei platzierbar, mit Breite und Sprechblase (26.09.2026). */
+export interface IllustrationBlock extends BaseBlock {
+  type: 'illustration'
+  maskottchenId?: string
+  pose: string
+  bubble: string
+  widthPercent: number
+  /** Auf welcher Seite die Figur steht (die Sprechblase auf der anderen) */
+  side?: 'left' | 'right'
 }
 
 export interface LearningGoalsBlock extends BaseBlock {
@@ -653,6 +670,7 @@ export type WsBlock =
   | VideoBlock
   | SelfCheckBlock
   | DividerBlock
+  | IllustrationBlock
 
 export type WsBlockType = WsBlock['type']
 
@@ -947,6 +965,11 @@ export interface WorksheetMeta {
    * Fragen. Ohne Platz dafuer landet das zwischen den Zeilen und ist spaeter unlesbar.
    */
   notesMargin?: boolean
+  /**
+   * Illustrationen (Maskottchen) auf diesem Blatt (26.09.2026): `an` ausdrücklich gewählt,
+   * sonst nach dem Jahrgang (Einstellung „bis Klasse"); `maskottchenId` = Figur, sonst Standard.
+   */
+  illustrationen?: { an?: boolean; maskottchenId?: string }
   imageSource: WorksheetImageSource
   /**
    * Wie viele Bilder das Blatt tragen soll.

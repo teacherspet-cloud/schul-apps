@@ -7,6 +7,7 @@
  * Der Notenschlüssel und das Fehlerprofil stehen im Lösungsteil: Beides gehört zur Lehrkraft.
  * Auf das Schülermaterial kommt der Schlüssel nur, wenn sie es ausdrücklich möchte.
  */
+import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
 import { chosenGrammarTopics } from '../../arbeitsblatt/didactics/grammar'
 import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
@@ -85,7 +86,12 @@ export function worksheetMetaForTest(test: GrammarTest): WorksheetMeta {
 }
 
 /** Übersetzt den Test in ein Arbeitsblatt, das sich anzeigen und exportieren lässt. */
+/** Arbeiten bekommen nur Kopf und Schluss eine Figur (26.09.2026) */
 export function testToWorksheet(test: GrammarTest): Worksheet {
+  return platziereKopfUndSchluss(testToWorksheetOhneIllustration(test))
+}
+
+function testToWorksheetOhneIllustration(test: GrammarTest): Worksheet {
   const head = testHeadBlock(test)
   const blocks: WsBlock[] = head ? [head, ...test.blocks] : [...test.blocks]
   const sheet: Sheet = { id: 'test', label: 'Grammatiktest', blocks }

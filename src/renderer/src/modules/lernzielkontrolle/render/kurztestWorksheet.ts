@@ -13,6 +13,7 @@
  * 23.09.2026). Das deckt sich mit der Rechtslage: Einen Notenspiegel verlangt Berlin
  * (Sek I-VO § 19 Abs. 7) ausdrücklich nur bei Klassenarbeiten.
  */
+import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
 import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
 import { gesamtpunkte, notenspiegel, schluesselHinweis } from '../didactics/bewertung'
@@ -92,7 +93,12 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
 }
 
 /** Übersetzt eine Variante in ein Arbeitsblatt, das sich anzeigen und exportieren lässt. */
+/** Arbeiten bekommen nur Kopf und Schluss eine Figur (26.09.2026) */
 export function kurztestToWorksheet(test: Kurztest, varianteIndex: number, ausEinstellungen?: number[]): Worksheet {
+  return platziereKopfUndSchluss(kurztestToWorksheetOhneIllustration(test, varianteIndex, ausEinstellungen))
+}
+
+function kurztestToWorksheetOhneIllustration(test: Kurztest, varianteIndex: number, ausEinstellungen?: number[]): Worksheet {
   const variante = test.varianten[varianteIndex] ?? test.varianten[0]
   const blocks = [...(variante?.blocks ?? [])]
   const schluessel = schluesselBlock(test, ausEinstellungen)

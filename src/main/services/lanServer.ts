@@ -84,6 +84,7 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'sources:suche',
   'sources:laden',
   'sources:video',
+  'maskottchen:list',
   'ai:websuche',
   'audio:voices',
   'audio:speak',

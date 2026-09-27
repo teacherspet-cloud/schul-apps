@@ -39,6 +39,7 @@ import { fetchAsDataUrl, getOpenMojiSvg, searchOnline, searchOpenMoji } from './
 import { checkMediaSource, checkQuote } from './services/images/sources'
 import { ladeOriginalquelle, sucheOriginalquellen } from './services/sources/materialSuche'
 import { ladeVideo } from './services/sources/video'
+import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePose } from './services/storage/maskottchen'
 import { audioPath, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
 import { deleteExam, getExam, listExams, saveExam } from './services/storage/exams'
@@ -523,6 +524,12 @@ function registerIpc(): void {
   handle('sources:laden', (url: string) => ladeOriginalquelle(url))
   // Video als Material: Titel, Beschreibung, Transkript aus den Untertiteln (26.09.2026)
   handle('sources:video', (url: string) => ladeVideo(url))
+  // Maskottchen für Illustrationen (26.09.2026)
+  handle('maskottchen:list', () => listMaskottchen())
+  handle('maskottchen:save', (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) => saveMaskottchen(eingabe))
+  handle('maskottchen:pose', (id: string, pose: string, dataUrl: string) => savePose(id, pose, dataUrl))
+  handle('maskottchen:delete-pose', (id: string, pose: string) => deletePose(id, pose))
+  handle('maskottchen:delete', (id: string) => deleteMaskottchen(id))
 
   handle('audio:voices', () => listVoices())
   handle('audio:speak', (req: TtsRequest) => speak(req))

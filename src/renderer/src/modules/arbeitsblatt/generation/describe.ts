@@ -53,6 +53,8 @@ export function describeBlock(b: WsBlock): string {
       ]
         .filter(Boolean)
         .join('\n')
+    case 'illustration':
+      return `Illustration (Maskottchen, ${b.pose})${b.bubble ? ` mit Sprechblase: ${b.bubble}` : ''}`
     case 'scaffold':
       return `Hilfe (${b.variant}) „${b.title}“: ${b.items.join(' | ')}`
     case 'table':

@@ -30,6 +30,7 @@ import {
   VerticalPositionRelativeFrom,
   WidthType
 } from 'docx'
+import { maskottchenBild } from '../../../shared/maskottchenStore'
 import { MUSTER_FORMEN } from '../generation/solution'
 import { diagramDrawing } from '../render/diagramSvg'
 import { gradeScaleRows } from '../../../shared/gradeScale'
@@ -892,7 +893,31 @@ function boxTable(ctx: Ctx, children: Child[], opts: { fill?: string; leftColor?
 
 const spacer = (): Paragraph => new Paragraph({ spacing: { after: 120 }, children: [] })
 
+/** Angeheftetes Maskottchen als kleines Bild hinter dem Baustein – Word kennt keine Ecke „darüber" (26.09.2026) */
+async function illustrationDocx(ctx: Ctx, id: string | undefined, pose: string, bubble: string | undefined, hoeheMm: number, indent = 0): Promise<Child[]> {
+  if (key(ctx)) return []
+  const src = maskottchenBild(id, pose)
+  if (!src) return []
+  const dim = await ctx.deps.sizer(src).catch(() => ({ width: 2, height: 3 }))
+  const h = hoeheMm * PX_MM
+  const w = (dim.width / Math.max(1, dim.height)) * h
+  return [
+    new Paragraph({
+      indent: { left: indent },
+      spacing: { before: 40, after: 80 },
+      children: [imageRun(src, w, h), ...(bubble ? [run(`   „${bubble}"`, { italics: true, color: '555555' })] : [])]
+    })
+  ]
+}
+const key = (ctx: Ctx): boolean => ctx.key
+
 async function blockContent(ctx: Ctx, block: WsBlock, numbers: Map<string, number>): Promise<Child[]> {
+  const inhalt = await blockInhalt(ctx, block, numbers)
+  if (!block.illustration || ctx.key) return inhalt
+  return [...inhalt, ...(await illustrationDocx(ctx, block.illustration.maskottchenId, block.illustration.pose, block.illustration.bubble, 16))]
+}
+
+async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number>): Promise<Child[]> {
   const key = ctx.key
   switch (block.type) {
     case 'learningGoals': {
@@ -1248,6 +1273,8 @@ async function blockContent(ctx: Ctx, block: WsBlock, numbers: Map<string, numbe
         spacer()
       ]
     }
+    case 'illustration':
+      return illustrationDocx(ctx, block.maskottchenId, block.pose, block.bubble, 24)
     case 'divider':
       return [
         new Paragraph({
