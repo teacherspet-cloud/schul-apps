@@ -88,6 +88,8 @@ describe('Ankündigungspflicht', () => {
   it('gibt keine Frist an, wo keine gilt', () => {
     for (const f of KURZTEST_FORMATE) {
       if (f.ankuendigung !== 'pflicht') expect(f.fristTage, f.id).toBeNull()
+      // Bremen nennt keine Frist, das Saarland zählt Kalendertage (Feld = Unterrichtstage) – dann steht es im Hinweis
+      else if (f.fristTage === null) expect(f.hinweis ?? '', f.id).toMatch(/frist|kalendertage/i)
       else expect(f.fristTage, f.id).toBeGreaterThan(0)
     }
   })
@@ -144,5 +146,15 @@ describe('Zeitschätzung, kalibriert an echten Vorlagen', () => {
   it('erkennt den Umfang aus der Lernzielkontrolle zu den Potenzgesetzen als zu groß', () => {
     // 10 Aufgaben über drei Seiten, mit Rechenweg – das war der Anlass
     expect(geschaetzteMinuten(10, true)).toBeGreaterThan(20)
+  })
+
+  it('hat für jedes Land mindestens ein belegtes Format (seit 28.09.2026)', () => {
+    for (const land of ['BW', 'BY', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH']) {
+      const f = formateFuer(land)
+      expect(f.length, land).toBeGreaterThan(0)
+      for (const e of f) expect(e.fundstelle && e.url, e.id).toBeTruthy()
+    }
+    // Die Saarländer „Schriftliche Überprüfung" ist kein Kurztest – das muss dranstehen
+    expect(formateFuer('SL').find((e) => e.id === 'SL-schriftliche-ueberpruefung')?.beschreibung).toMatch(/GROSSER Leistungsnachweis/)
   })
 })

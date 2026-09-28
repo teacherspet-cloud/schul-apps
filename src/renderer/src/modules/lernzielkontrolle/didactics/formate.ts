@@ -246,11 +246,146 @@ export const KURZTEST_FORMATE: KurztestFormat[] = [
     url: 'https://www.schulportal-thueringen.de/services/resources/download/public/1671629/thueringer_schulordnung.pdf',
     amtlich: true,
     hinweis: 'Thüringen verweist auf die Lehrpläne. Die App kann hier keine Zeitgrenze nennen.'
+  },
+  /*
+   * HH, HB, SH, SL, ST – recherchiert am 28.09.2026 (recherche/lzk/formate-HH-HB-SH-SL-ST.md mit
+   * Zitaten). Nur Belegtes; was ein Land nicht regelt, steht als null bzw. „nicht normiert".
+   * Achtung Saarland: „Schriftliche Überprüfung" ist dort ein GROSSER Leistungsnachweis.
+   */
+  {
+    id: 'HH-leistungsfeststellung',
+    stateId: 'HH',
+    bezeichnung: 'Bewertete Leistungsfeststellung',
+    beschreibung:
+      'Hamburg kennt kein eigenes Kurztestformat. Bewertete Leistungsfeststellungen gehören zur laufenden Unterrichtsarbeit und dürfen unangekündigt sein.',
+    ankuendigung: 'unangekuendigt',
+    fristTage: null,
+    maxMinuten: null,
+    stoffStunden: null,
+    anzahl: 'nicht normiert (in Latein/Griechisch „regelmäßig", Bildungsplan Teil C Nr. 7 a)',
+    gewichtung:
+      'zählt zur laufenden Unterrichtsarbeit; die Zeugnisnote darf sich nicht überwiegend auf Klassenarbeiten stützen (Mathematik: Klassenarbeiten 50 %). Das Verhältnis legen die Konferenzen fest.',
+    fundstelle: 'Bildungsplan Gymnasium Sek I / Stadtteilschule 5–11, Teil C Leistungsbewertung (BSB 2024), Nr. 2, 3 b, 4',
+    url: 'https://dokumente.hamburg.de/resource/blob/798488/251acd87545f55fad72fc95d6402821c/teil-c-leistungsbewertung-data.pdf',
+    amtlich: true,
+    hinweis:
+      'Dauer, Stoffumfang und Anzahl sind in Hamburg nicht normiert. Die APO-GrundStGy (§ 5) nennt „schriftliche Lernerfolgskontrolle" nur allgemein, ohne Regeln.'
+  },
+  {
+    id: 'HB-kurzarbeit-unangekuendigt',
+    stateId: 'HB',
+    bezeichnung: 'Kurzarbeit',
+    beschreibung: 'Nicht angekündigte Kurzarbeit. In allen Fächern zulässig, „soweit eine selbständige, kurze schriftliche Darstellung sinnvoll ist".',
+    ankuendigung: 'unangekuendigt',
+    fristTage: null,
+    maxMinuten: 30,
+    stoffStunden: null,
+    anzahl:
+      'Je Schulhalbjahr neben den Klassenarbeiten: Mathematik und Fremdsprachen bis zu 2, Deutsch bis zu 3 (einschließlich Diktaten), übrige Fächer bis zu 4 (Nr. 2.2).',
+    gewichtung: 'nicht geregelt; jede Arbeit erhält eine Note (Nr. 4.2).',
+    fundstelle:
+      'Richtlinie 331.01 „Schriftliche Arbeiten im Unterricht der allgemeinbildenden Schulen in den Jahrgangsstufen 5 bis 10" v. 29.10.1982, Nr. 1.2, 2.2, 3',
+    url: 'https://bildung.bremen.de/sixcms/media.php/13/331.01%2B-%2BSchriftliche%2BArbeiten%2Bim%2BUnterricht%2Bder%2Ballgemeinb.pdf',
+    amtlich: true,
+    hinweis:
+      'Stoff: etwa die letzten zwei Unterrichtswochen. Die Richtlinie ist von 1982, steht aber seit 2021 im Transparenzportal Bremen. Nicht gewertet wird, wenn mehr als ein Drittel „mangelhaft" oder „ungenügend" ist (Nr. 4.4).'
+  },
+  {
+    id: 'HB-kurzarbeit-angekuendigt',
+    stateId: 'HB',
+    bezeichnung: 'Kurzarbeit',
+    beschreibung: 'Angekündigte Kurzarbeit. Zählt zu den angekündigten Arbeiten (höchstens eine pro Tag, drei pro Woche).',
+    ankuendigung: 'pflicht',
+    fristTage: null,
+    maxMinuten: 30,
+    stoffStunden: null,
+    anzahl: 'wie die nicht angekündigte Kurzarbeit (gemeinsames Kontingent, Nr. 2.2)',
+    gewichtung: 'nicht geregelt; jede Arbeit erhält eine Note (Nr. 4.2).',
+    fundstelle: 'Richtlinie 331.01 v. 29.10.1982, Nr. 1.2, 2.2, 3',
+    url: 'https://bildung.bremen.de/sixcms/media.php/13/331.01%2B-%2BSchriftliche%2BArbeiten%2Bim%2BUnterricht%2Bder%2Ballgemeinb.pdf',
+    amtlich: true,
+    hinweis: 'Stoff: nur die letzten vier Unterrichtswochen. Eine Ankündigungsfrist nennt die Richtlinie nicht.'
+  },
+  {
+    id: 'SH-test',
+    stateId: 'SH',
+    bezeichnung: 'Test',
+    beschreibung:
+      'Schriftliche Leistungsüberprüfung bis 20 Minuten zum unmittelbaren Unterrichtszusammenhang. Kein Leistungsnachweis, sondern Teil der Unterrichtsbeiträge.',
+    ankuendigung: 'unklar',
+    fristTage: null,
+    maxMinuten: 20,
+    stoffStunden: null,
+    anzahl: 'nicht normiert',
+    gewichtung:
+      'fließt in die Note für Unterrichtsbeiträge ein; diese haben ein stärkeres Gewicht als die Leistungsnachweise (Oberstufe: geben den Ausschlag).',
+    fundstelle:
+      'Erlass „Leistungsnachweise in der Sekundarstufe I" v. 04.06.2025, Nr. 1 a, 2; Erlass Oberstufe v. 23.06.2021 i. d. F. v. 11.04.2026, Nr. II.1–2',
+    url: 'https://www.schleswig-holstein.de/DE/fachinhalte/S/schulrecht/Downloads/Erlasse/Downloads/Leistungsnachweise_Sek_I.pdf?__blob=publicationFile&v=1',
+    amtlich: true,
+    hinweis:
+      'Wer länger als 20 Minuten schreiben lässt oder über den unmittelbaren Unterrichtszusammenhang hinausgeht, schreibt keinen Test mehr, sondern einen Leistungsnachweis, und der zählt auf das vorgeschriebene Kontingent. Der Erlass Sek I gilt bis 31.07.2030.'
+  },
+  {
+    id: 'SL-kleiner-lnw',
+    stateId: 'SL',
+    bezeichnung: 'Kleiner Leistungsnachweis',
+    beschreibung: 'In Umfang und Komplexität kleiner als der große Leistungsnachweis; in allen Fächern möglich.',
+    ankuendigung: 'unangekuendigt',
+    fristTage: null,
+    maxMinuten: null,
+    stoffStunden: null,
+    anzahl:
+      'Die Lehrkraft entscheidet fachbezogen in pädagogischer Verantwortung (Nr. 3.2.3); die Tages- und Wochengrenzen für große Leistungsnachweise gelten nicht (Nr. 3.4.1).',
+    gewichtung:
+      'geht in die Gesamtnote „sonstige Leistungen" ein; diese zählt in schriftlichen Fächern etwa gleich wie die einzelnen Noten der großen Leistungsnachweise (Nr. 3.4.5).',
+    fundstelle: 'Erlass zur Leistungsbewertung in den Schulen des Saarlandes v. 09.07.2024 (Amtsbl. I S. 506), Nr. 3.2.3, 3.4.1, 3.4.4, 3.4.5',
+    url: 'https://www.amtsblatt.saarland.de',
+    amtlich: true,
+    hinweis:
+      'Bewertungskriterien vorher erläutern; Bewertung spätestens zwei Schulwochen danach bekannt geben, Eltern bestätigen per Unterschrift (Nr. 3.4.4). Stoff: „überschaubare, in sich zusammenhängende Unterrichtseinheit". Eine Minutengrenze nennt der Erlass für die Sek I nicht.'
+  },
+  {
+    id: 'SL-schriftliche-ueberpruefung',
+    stateId: 'SL',
+    bezeichnung: 'Schriftliche Überprüfung',
+    beschreibung:
+      'ACHTUNG: Im Saarland ein GROSSER Leistungsnachweis, und zwar nur in nicht schriftlichen Fächern (Gymnasium Kl. 8–10, GemS/FöS Kl. 9–10). Kein Kurztest.',
+    ankuendigung: 'pflicht',
+    fristTage: null,
+    maxMinuten: null,
+    stoffStunden: 6,
+    anzahl: 'ein großer Leistungsnachweis je Halbjahr (Fächer ab zwei Wochenstunden) bzw. je Schuljahr (einstündige Fächer) (Nr. 3.1).',
+    gewichtung: 'großer Leistungsnachweis; in nicht schriftlichen Fächern etwa gleich gewichtet mit der Gesamtnote „sonstige Leistungen" (Nr. 3.4.5).',
+    fundstelle: 'Erlass zur Leistungsbewertung in den Schulen des Saarlandes v. 09.07.2024 (Amtsbl. I S. 506), Nr. 3.1, 3.1.2.1, 3.4.1',
+    url: 'https://www.amtsblatt.saarland.de',
+    amtlich: true,
+    hinweis:
+      'Ankündigung spätestens sieben KALENDERtage vorher (Nr. 3.4.1). Bearbeitungszeit „in der Regel" höchstens eine Unterrichtsstunde. Vor der Rückgabe mindestens drei Arbeiten der Schulleitung vorlegen (Nr. 3.4.3).'
+  },
+  {
+    id: 'ST-lernerfolgskontrolle',
+    stateId: 'ST',
+    bezeichnung: 'Schriftliche Lernerfolgskontrolle',
+    beschreibung: 'Oberbegriff für Diktate, Vokabelkontrollen und Tests unter den „weiteren Formen" neben den Klassenarbeiten.',
+    ankuendigung: 'unklar',
+    fristTage: null,
+    maxMinuten: null,
+    stoffStunden: null,
+    anzahl: 'nicht normiert',
+    gewichtung:
+      'Klassenarbeiten zählen zusammen 25–40 % (Fremdsprachen bei nur einer Klassenarbeit höchstens 20 %); die weiteren Formen bilden den übrigen Anteil (Nr. 4.1.9).',
+    fundstelle:
+      'RdErl. des MK v. 26.06.2012 – 2-83200 „Leistungsbewertung und Beurteilung an allgemeinbildenden Schulen … Sek I und II", Nr. 2.2, 4.1.9, 4.2.1',
+    url: 'https://www.landesrecht.sachsen-anhalt.de/perma?j=VVST-223110-MK-20120626-SF',
+    amtlich: true,
+    hinweis:
+      'Die Ankündigungspflicht von einer Woche (Nr. 4.1.2) gilt nur für Klassenarbeiten und Klausuren. Formen und Gewichtung sind den Schülerinnen und Schülern vorab mitzuteilen, zu allen Formen gibt es eine qualifizierte Rückmeldung (Nr. 2.2). Wortlaut aus der LISA-Fassung mit dem Hinweis, dass nur der Text im SVBl. LSA verbindlich ist.'
   }
 ]
 
-/** Länder, für die gar nichts ermittelt werden konnte – die App sagt das offen. */
-export const NICHT_ERMITTELT = ['HH', 'HB', 'SH', 'SL', 'ST']
+/** Länder, für die gar nichts ermittelt werden konnte – die App sagt das offen. Seit 28.09.2026 keins mehr. */
+export const NICHT_ERMITTELT: string[] = []
 
 export const formateFuer = (stateId: string): KurztestFormat[] => KURZTEST_FORMATE.filter((f) => f.stateId === stateId)
 
