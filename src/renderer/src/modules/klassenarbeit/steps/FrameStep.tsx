@@ -44,8 +44,10 @@ import { grammarTopicsFor } from '../../arbeitsblatt/didactics/grammar'
 import { AIDS_SUGGESTIONS } from '../model/aids'
 import { listeningFormatById, listeningFormatsFor, listeningRules } from '../../arbeitsblatt/didactics/listeningFormats'
 import { defaultExamMeta, defaultMinutes } from '../model/defaults'
-import { courseLevelOptions, gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/schoolProfiles'
+import { courseLevelOptions, gradeRange } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { STATES } from '../../arbeitsblatt/didactics/states'
+import SchulortFelder from '../../../shared/components/SchulortFelder'
+import { mitLerngruppe } from '../../../shared/lerngruppe'
 import { curriculumSource, curriculumTopics } from '../model/curriculumGeschichte'
 import { examWarnings, gradeScaleGroups, scaleLineFuer, stateRules, WORTZAHL_GRUND, wortzahlErlaubt } from '../model/examRules'
 import { notenpunkteFuer } from '../../../shared/notenpunkte'
@@ -62,7 +64,6 @@ import BilingualSchalter from '../../arbeitsblatt/steps/BilingualSchalter'
 import { GLOSSAR_HILFSMITTEL } from '../generation/glossar'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
 import GradeScaleModal from '../../../shared/components/GradeScaleModal'
-import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import StoffQuellen from '../../../shared/components/StoffQuellen'
 import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
@@ -158,7 +159,8 @@ export default function FrameStep(): React.JSX.Element {
   const patchGruppe = (p: Partial<ExamMeta>): void =>
     update(
       (d) => {
-        Object.assign(d.meta, p)
+        // Schulform, Jahrgang und Kursniveau folgen nach denselben Regeln wie in den anderen Programmen (shared/lerngruppe.ts)
+        Object.assign(d.meta, mitLerngruppe(table, d.meta, p))
         const level = d.meta.subjectId === 'englisch' ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, 1, d.meta.grade) : null
         if (level) d.meta.cefrLevel = level.level
       },
@@ -441,48 +443,7 @@ export default function FrameStep(): React.JSX.Element {
                     Lerngruppe
                   </Title>
                   <Stack gap="sm">
-                    <SchulAngabe
-                      stateId={meta.stateId}
-                      stateName={STATES.find((s) => s.id === meta.stateId)?.name ?? meta.stateId}
-                      schoolTypeId={meta.schoolTypeId}
-                      schoolTypeName={meta.schoolTypeName}
-                    >
-                      <Group grow>
-                        <HaeufigSelect
-                          art="bundesland"
-                          label="Bundesland"
-                          data={STATES.map((s) => ({ value: s.id, label: s.name }))}
-                          value={meta.stateId}
-                          onChange={(v) => {
-                            if (!v) return
-                            /*
-                             * Die Schulform mitziehen, wie in Lernzielkontrolle und Grammatiktest: Bis
-                             * 25.09.2026 blieb sie stehen, auch wenn es sie im neuen Land nicht gibt –
-                             * die Auswahl zeigte dann nichts an, gerechnet wurde mit der alten.
-                             */
-                            const list = schoolTypesForState(table, v)
-                            const keep = list.some((t) => t.value === meta.schoolTypeId)
-                            patchGruppe({
-                              stateId: v,
-                              schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
-                              schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
-                            })
-                          }}
-                          allowDeselect={false}
-                        />
-                        <HaeufigSelect
-                          art="schulform"
-                          label="Schulform"
-                          data={schoolTypesForState(table, meta.stateId)}
-                          value={meta.schoolTypeId}
-                          onChange={(v) => {
-                            const name = schoolTypesForState(table, meta.stateId).find((t) => t.value === v)?.label ?? meta.schoolTypeName
-                            if (v) patchGruppe({ schoolTypeId: v, schoolTypeName: name })
-                          }}
-                          allowDeselect={false}
-                        />
-                      </Group>
-                    </SchulAngabe>
+                    <SchulortFelder table={table} stateId={meta.stateId} schoolTypeId={meta.schoolTypeId} schoolTypeName={meta.schoolTypeName} onChange={patchGruppe} />
                     {(courseOptions || meta.subjectId === 'englisch') && (
                       <Group grow>
                         {courseOptions && (

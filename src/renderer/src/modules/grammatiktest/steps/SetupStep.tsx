@@ -9,9 +9,10 @@ import { gradeScaleLine } from '../../../shared/gradeScale'
 import { notifyError } from '../../../shared/util'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { chosenGrammarTopics, GRAMMAR_FORMATS, grammarFormatLabel, hasGrammar } from '../../arbeitsblatt/didactics/grammar'
-import { gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/schoolProfiles'
+import { gradeRange } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { suggestLevel } from '../../../shared/cefr'
-import { STATES } from '../../arbeitsblatt/didactics/states'
+import SchulortFelder from '../../../shared/components/SchulortFelder'
+import { mitLerngruppe } from '../../../shared/lerngruppe'
 import GrammarPicker from '../../arbeitsblatt/steps/GrammarPicker'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import type { WorksheetMeta } from '../../arbeitsblatt/model/types'
@@ -22,7 +23,6 @@ import type { GrammarTest, GrammarTestMeta } from '../model/types'
 import { useGrammatiktest } from '../store'
 import { starteAuftrag } from '../../../shared/auftraege'
 import { defaultTestName, legeTestAb, testOffen } from '../library'
-import SchulAngabe from '../../../shared/components/SchulAngabe'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
@@ -93,7 +93,7 @@ export default function SetupStep(): React.JSX.Element {
   const patch = (p: Partial<GrammarTestMeta>): void => setTest({ ...test, meta: { ...meta, ...p } }, `angaben:${Object.keys(p).sort().join(',')}`)
   /** Lerngruppe ändern (Fach, Jahrgang, Land, Schulform, Fremdsprachenfolge): das Niveau zieht mit */
   const patchGruppe = (p: Partial<GrammarTestMeta>): void =>
-    setTest({ ...test, meta: mitNiveau(table, { ...meta, ...p }) }, `angaben:${Object.keys(p).sort().join(',')}`)
+    setTest({ ...test, meta: mitNiveau(table, { ...meta, ...mitLerngruppe(table, meta, p) }) }, `angaben:${Object.keys(p).sort().join(',')}`)
   const niveauVorschlag = subjectById(meta.subjectId).foreignLanguage
     ? suggestLevel(table, meta.stateId, meta.schoolTypeId, meta.languageOrder, meta.grade)
     : null
@@ -113,7 +113,6 @@ export default function SetupStep(): React.JSX.Element {
   }
 
   const rules = testingRules(meta)
-  const types = schoolTypesForState(table, meta.stateId)
   const range = gradeRange(table, meta.stateId, meta.schoolTypeId)
   const grades = Array.from({ length: range.max - range.min + 1 }, (_, i) => range.min + i)
 
@@ -183,40 +182,7 @@ export default function SetupStep(): React.JSX.Element {
                         allowDeselect={false}
                       />
                     </Group>
-                    <SchulAngabe
-                      stateId={meta.stateId}
-                      stateName={STATES.find((s) => s.id === meta.stateId)?.name ?? meta.stateId}
-                      schoolTypeId={meta.schoolTypeId}
-                      schoolTypeName={meta.schoolTypeName}
-                    >
-                      <Group grow>
-                        <HaeufigSelect
-                          art="bundesland"
-                          label="Bundesland"
-                          data={STATES.map((s) => ({ value: s.id, label: s.name }))}
-                          value={meta.stateId}
-                          onChange={(v) => {
-                            if (!v) return
-                            const list = schoolTypesForState(table, v)
-                            const keep = list.some((t) => t.value === meta.schoolTypeId)
-                            patchGruppe({
-                              stateId: v,
-                              schoolTypeId: keep ? meta.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
-                              schoolTypeName: keep ? meta.schoolTypeName : (list[0]?.label ?? 'Gymnasium')
-                            })
-                          }}
-                          allowDeselect={false}
-                        />
-                        <HaeufigSelect
-                          art="schulform"
-                          label="Schulform"
-                          data={types}
-                          value={meta.schoolTypeId}
-                          onChange={(v) => v && patchGruppe({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
-                          allowDeselect={false}
-                        />
-                      </Group>
-                    </SchulAngabe>
+                    <SchulortFelder table={table} stateId={meta.stateId} schoolTypeId={meta.schoolTypeId} schoolTypeName={meta.schoolTypeName} onChange={patchGruppe} />
                     <Group grow>
                       {subjectById(meta.subjectId).foreignLanguage && (
                         <Select

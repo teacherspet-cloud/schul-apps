@@ -43,8 +43,9 @@ import { istDeutschZuhoeren, ZUHOEREN_MODES, type ZuhoerenMode } from '../didact
 import { hasGrammar } from '../didactics/grammar'
 import GrammarPicker from './GrammarPicker'
 import { LANGUAGE_MODES, LanguageMode } from '../didactics/language'
-import { CourseLevel, courseLevelOptions, gradeRange, schoolTypesForState } from '../didactics/schoolProfiles'
-import { STATES } from '../didactics/states'
+import { CourseLevel, courseLevelOptions, gradeRange } from '../didactics/schoolProfiles'
+import SchulortFelder from '../../../shared/components/SchulortFelder'
+import { mitLerngruppe } from '../../../shared/lerngruppe'
 import { appendCompetence, suggestCompetence } from '../generation/competences'
 import { planeGliederung } from '../auftraege'
 import AbiturCard from './AbiturCard'
@@ -68,7 +69,6 @@ import { seitenBereich, seitenText } from '../didactics/seiten'
 import SeitenWahl from './SeitenWahl'
 import VocabWordsPicker from './VocabWordsPicker'
 import VocabFocusModal, { splitWords } from './VocabFocusModal'
-import SchulAngabe from '../../../shared/components/SchulAngabe'
 import {
   MATERIAL_WARN_CHARS,
   MATERIAL_WORDS,
@@ -262,14 +262,8 @@ export default function TopicStep(): React.JSX.Element {
 
   /** Schulform/Land/Jahrgang ändern und abhängige Werte anpassen. */
   const patchGroup = (p: Partial<WorksheetMeta>): void => {
-    const next = { ...meta, ...p }
-    const types = schoolTypesForState(table, next.stateId)
-    if (!types.some((t) => t.value === next.schoolTypeId)) next.schoolTypeId = types[0]?.value ?? 'gymnasium'
-    next.schoolTypeName = types.find((t) => t.value === next.schoolTypeId)?.label ?? next.schoolTypeName
-    const range = gradeRange(table, next.stateId, next.schoolTypeId)
-    next.grade = Math.min(range.max, Math.max(range.min, next.grade))
-    const courses = courseLevelOptions(next.stateId, next.schoolTypeId, next.grade)
-    if (!courses || !courses.some((c) => c.value === next.courseLevel)) next.courseLevel = 'mixed'
+    // Schulform, Jahrgang und Kursniveau folgen nach denselben Regeln wie in den anderen Programmen (shared/lerngruppe.ts)
+    const next = { ...meta, ...mitLerngruppe(table, meta, p) } as WorksheetMeta
     const sub = subjectById(next.subjectId)
     if (sub.foreignLanguage) {
       const s = suggestLevel(table, next.stateId, next.schoolTypeId, next.languageOrder, next.grade)
@@ -387,32 +381,7 @@ export default function TopicStep(): React.JSX.Element {
                     Lerngruppe
                   </Title>
                   <Stack gap="sm">
-                    <SchulAngabe
-                      stateId={meta.stateId}
-                      stateName={STATES.find((s) => s.id === meta.stateId)?.name ?? meta.stateId}
-                      schoolTypeId={meta.schoolTypeId}
-                      schoolTypeName={schoolTypesForState(table, meta.stateId).find((t) => t.value === meta.schoolTypeId)?.label ?? ''}
-                    >
-                      <Group grow>
-                        <HaeufigSelect
-                          art="bundesland"
-                          label="Bundesland"
-                          data={STATES.map((s) => ({ value: s.id, label: s.name }))}
-                          value={meta.stateId}
-                          onChange={(v) => v && patchGroup({ stateId: v })}
-                          allowDeselect={false}
-                          maxDropdownHeight={400}
-                        />
-                        <HaeufigSelect
-                          art="schulform"
-                          label="Schulform"
-                          data={schoolTypesForState(table, meta.stateId)}
-                          value={meta.schoolTypeId}
-                          onChange={(v) => v && patchGroup({ schoolTypeId: v })}
-                          allowDeselect={false}
-                        />
-                      </Group>
-                    </SchulAngabe>
+                    <SchulortFelder table={table} stateId={meta.stateId} schoolTypeId={meta.schoolTypeId} schoolTypeName={meta.schoolTypeName} onChange={patchGroup} />
                     <Group grow align="start">
                       <Select
                         label="Jahrgang"

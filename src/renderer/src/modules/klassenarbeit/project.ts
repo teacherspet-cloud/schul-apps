@@ -1,34 +1,18 @@
-import { normalizeDesign } from '@shared/design'
+import { erzeugeProjektDatei } from '../../shared/testmodul/projekt'
 import type { Exam } from './model/types'
 
 /**
- * Weitergebbare Datei einer Klassenarbeit (27.09.2026) – wie `.arbeitsblatt` und `.vokabeltest`:
- * „Als Datei speichern" in der Werkzeugleiste, „Datei öffnen …" in der Bibliothek.
+ * Weitergebbare Datei einer Klassenarbeit (27.09.2026) – wie `.arbeitsblatt`: „Als Datei speichern" in der
+ * Werkzeugleiste, „Datei öffnen …" in der Bibliothek. Gerüst gemeinsam mit den anderen
+ * Testprogrammen (shared/testmodul/projekt.ts, Großprogramm 0.4).
  */
-interface ProjectFile {
-  app: 'schul-apps'
-  type: 'klassenarbeit'
-  version: 1
-  exam: Exam
-}
+export const projektDatei = erzeugeProjektDatei<Exam>({
+  typ: 'klassenarbeit',
+  feld: 'exam',
+  bezeichnung: 'Klassenarbeit',
+  gueltig: (d) => Array.isArray(d.parts)
+})
 
-export const EXAM_FILTER = [{ name: 'Klassenarbeit', extensions: ['klassenarbeit'] }]
-
-export function serializeExam(exam: Exam): string {
-  const file: ProjectFile = { app: 'schul-apps', type: 'klassenarbeit', version: 1, exam }
-  return JSON.stringify(file)
-}
-
-export function parseExamFile(data: Uint8Array): Exam {
-  let parsed: ProjectFile
-  try {
-    parsed = JSON.parse(new TextDecoder().decode(data)) as ProjectFile
-  } catch {
-    throw new Error('Die Datei ist keine gültige Klassenarbeit-Datei.')
-  }
-  if (parsed?.type !== 'klassenarbeit' || !Array.isArray(parsed.exam?.parts)) {
-    throw new Error('Die Datei ist keine gültige Klassenarbeit-Datei.')
-  }
-  const exam = parsed.exam
-  return { ...exam, design: normalizeDesign(exam.design) }
-}
+export const EXAM_FILTER = projektDatei.filter
+export const serializeExam = projektDatei.serialisiere
+export const parseExamFile = projektDatei.lies

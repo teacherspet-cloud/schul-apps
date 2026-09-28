@@ -3,11 +3,8 @@
  * Arbeitsblättern. Gespeichert wird unter `%APPDATA%/schul-apps/klassenarbeiten`.
  */
 import type { SavedExamStats } from '@shared/types'
-import { einsortierenNachSpeichern } from '../../shared/themenbereiche'
 import { ueberthemaVon } from '../../shared/ueberthema'
-import { dokumentName, sichereAlles } from '../../shared/autosave'
-import { legeAb } from '../../shared/auftraege'
-import { useStoreAutosave } from '../../shared/useAutosave'
+import { erzeugeBibliothek } from '../../shared/testmodul/bibliothek'
 import type { Exam } from './model/types'
 import { examHasContent } from './render/examWorksheet'
 import { useKlassenarbeit } from './store'
@@ -41,82 +38,28 @@ export function defaultExamName(exam: Exam): string {
  */
 export const lohntSicherung = (exam: Exam | null): boolean => Boolean(exam && (exam.parts.length || exam.meta.topic.trim() || exam.meta.title.trim()))
 
-export async function saveCurrentExam(name?: string): Promise<void> {
-  const state = useKlassenarbeit.getState()
-  const exam = state.exam
-  if (!exam || !lohntSicherung(exam)) return
-  const id = state.docId
-  const meta = await window.api.exams.save({
-    id,
-    name: name?.trim() || dokumentName(id, state.docName, defaultExamName(exam)),
-    stats: examStats(exam),
-    payload: exam
-  })
-  void einsortierenNachSpeichern()
-  useKlassenarbeit.getState().markSaved(meta.id, meta.updatedAt, meta.name)
-}
-
-export async function openSavedExam(id: string): Promise<void> {
-  // Was an der bisherigen Arbeit noch ansteht, zuerst sichern – sonst ginge es beim Wechsel verloren
-  await sichereAlles()
-  const saved = await window.api.exams.get(id)
-  useKlassenarbeit.getState().openSaved(saved.id, saved.name, saved.payload as Exam, saved.updatedAt)
-}
-
-/** Ist genau diese Arbeit gerade im Programm offen? */
-export const arbeitOffen = (docId: string): boolean => {
-  const s = useKlassenarbeit.getState()
-  return s.docId === docId && s.exam !== null
-}
-
-/**
- * Ergebnis eines Hintergrund-Auftrags in der Arbeit `docId` ablegen (siehe
- * shared/auftraege.ts): in der offenen Arbeit als Rückgängig-Schritt, sonst in der Bibliothek.
+/*
+ * Speichern, Öffnen, Ablegen, Neu, automatisch Speichern: gemeinsames Gerüst mit den anderen
+ * Testprogrammen (shared/testmodul/bibliothek.ts, Großprogramm 0.4). Die bisherigen Namen bleiben.
  */
-export function legeArbeitAb(docId: string, schnappschuss: Exam, einarbeiten: (e: Exam) => Exam, schritt?: number): Promise<void> {
-  return legeAb<Exam>(
-    {
-      istOffen: arbeitOffen,
-      imOffenen: (f) => {
-        const s = useKlassenarbeit.getState()
-        if (!s.exam) return
-        s.setExam(f(s.exam))
-        if (schritt !== undefined) s.setStep(schritt)
-      },
-      laden: async (id) => {
-        const e = await window.api.exams.get(id)
-        // Ältere Arbeiten auf den heutigen Stand (Fassungen) – wie beim Öffnen
-        return { name: e.name, dok: normalisiereArbeit(e.payload as Exam) }
-      },
-      speichern: async (id, name, exam) => {
-        await window.api.exams.save({ id, name: name ?? defaultExamName(exam), stats: examStats(exam), payload: exam })
-        void einsortierenNachSpeichern()
-      }
-    },
-    docId,
-    schnappschuss,
-    einarbeiten
-  )
-}
+export const bibliothek = erzeugeBibliothek({
+  store: useKlassenarbeit,
+  dokument: (s) => s.exam,
+  setzeDokument: (s, d) => s.setExam(d),
+  // Erst beim Aufruf nachschlagen – beim Laden des Moduls (auch in Tests) gibt es `window.api` noch nicht
+  api: { save: (i) => window.api.exams.save(i), get: (id) => window.api.exams.get(id) },
+  stats: examStats,
+  standardName: defaultExamName,
+  lohntSicherung,
+  normalisiere: normalisiereArbeit
+})
 
-/** Neue Arbeit beginnen – die bisherige vorher sichern. */
-export async function newExamSafely(): Promise<void> {
-  await sichereAlles()
-  useKlassenarbeit.getState().reset()
-}
-
-/**
- * Automatisches Speichern – als Entwurf, sobald Thema oder Aufbau dastehen, danach nach
- * jeder Änderung. Verzögert, damit nicht jede Eingabe eine Datei schreibt.
- */
-export function useExamAutosave(): void {
-  useStoreAutosave({
-    store: useKlassenarbeit,
-    dokument: (s) => s.docId,
-    gesichert: (s) => Boolean(s.savedAt),
-    bereit: (s) => lohntSicherung(s.exam),
-    // Ein geänderter Name zählt nur, wenn ihn die Lehrkraft geändert hat – nicht die Bestätigung des Speicherns
-    geaendert: (s, prev) => s.exam !== prev.exam || (s.docName !== prev.docName && s.savedAt === prev.savedAt),
-    speichern: () => saveCurrentExam()
-  })
-}
+export const saveCurrentExam = bibliothek.speichern
+export const openSavedExam = bibliothek.oeffnen
+/** Ist genau dieses Dokument gerade im Programm offen? */
+export const arbeitOffen = bibliothek.istOffen
+/** Ergebnis eines Hintergrund-Auftrags ablegen (siehe shared/auftraege.ts) */
+export const legeArbeitAb = bibliothek.legeAb
+/** Neues Dokument beginnen – das bisherige vorher sichern. */
+export const newExamSafely = bibliothek.neuSicher
+export const useExamAutosave = bibliothek.useAutosave

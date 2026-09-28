@@ -32,9 +32,10 @@ import { useAppSettings } from '../../../shared/settingsStore'
 import type { CefrTable } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import StoffQuellen from '../../../shared/components/StoffQuellen'
-import SchulAngabe from '../../../shared/components/SchulAngabe'
-import { gradeRange, schoolTypesForState } from '../../arbeitsblatt/didactics/schoolProfiles'
+import { gradeRange } from '../../arbeitsblatt/didactics/schoolProfiles'
 import { STATES } from '../../arbeitsblatt/didactics/states'
+import SchulortFelder from '../../../shared/components/SchulortFelder'
+import { mitLerngruppe } from '../../../shared/lerngruppe'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import { AUSGLEICH_HILFEN, type AusgleichHilfe } from '../didactics/bausteine'
 import {
@@ -132,7 +133,6 @@ export default function SetupStep(): React.JSX.Element {
   // Fortlaufendes Tippen im selben Feld ist EIN Schritt für Strg+Z, nicht einer je Buchstabe
   const patch = (next: Partial<KurztestMeta>): void => update((d) => Object.assign(d.meta, next), `angaben:${Object.keys(next).sort().join(',')}`)
 
-  const types = schoolTypesForState(table, m.stateId)
   const range = gradeRange(table, m.stateId, m.schoolTypeId)
   const grades = Array.from({ length: range.max - range.min + 1 }, (_, i) => range.min + i)
   const formate = formateFuer(m.stateId)
@@ -223,45 +223,23 @@ export default function SetupStep(): React.JSX.Element {
                         allowDeselect={false}
                       />
                     </Group>
-                    <SchulAngabe
+                    <SchulortFelder
+                      table={table}
                       stateId={m.stateId}
-                      stateName={STATES.find((s) => s.id === m.stateId)?.name ?? m.stateId}
                       schoolTypeId={m.schoolTypeId}
                       schoolTypeName={m.schoolTypeName}
-                    >
-                      <Group grow>
-                        <HaeufigSelect
-                          art="bundesland"
-                          label="Bundesland"
-                          data={STATES.map((s) => ({ value: s.id, label: s.name }))}
-                          value={m.stateId}
-                          onChange={(v) => {
-                            if (!v) return
-                            const list = schoolTypesForState(table, v)
-                            const keep = list.some((t) => t.value === m.schoolTypeId)
-                            const neuFormat = formateFuer(v)[0]
-                            patch({
-                              stateId: v,
-                              schoolTypeId: keep ? m.schoolTypeId : (list[0]?.value ?? 'gymnasium'),
-                              schoolTypeName: keep ? m.schoolTypeName : (list[0]?.label ?? 'Gymnasium'),
-                              formatId: neuFormat?.id ?? '',
-                              bezeichnung: neuFormat?.bezeichnung ?? 'Lernzielkontrolle',
-                              minutes: standardMinuten(neuFormat)
-                            })
-                          }}
-                          allowDeselect={false}
-                          searchable
-                        />
-                        <HaeufigSelect
-                          art="schulform"
-                          label="Schulform"
-                          data={types}
-                          value={m.schoolTypeId}
-                          onChange={(v) => v && patch({ schoolTypeId: v, schoolTypeName: types.find((t) => t.value === v)?.label ?? '' })}
-                          allowDeselect={false}
-                        />
-                      </Group>
-                    </SchulAngabe>
+                      searchable
+                      onChange={(p) => {
+                        // Neues Land: auch das Landesformat neu setzen
+                        const neuFormat = p.stateId ? formateFuer(p.stateId)[0] : null
+                        patch({
+                          ...mitLerngruppe(table, m, p),
+                          ...(neuFormat !== null
+                            ? { formatId: neuFormat?.id ?? '', bezeichnung: neuFormat?.bezeichnung ?? 'Lernzielkontrolle', minutes: standardMinuten(neuFormat) }
+                            : {})
+                        })
+                      }}
+                    />
                   </Stack>
                 </Card>
 

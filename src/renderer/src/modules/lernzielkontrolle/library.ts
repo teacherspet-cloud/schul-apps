@@ -4,13 +4,10 @@
  * `%APPDATA%/schul-apps/lernzielkontrollen`.
  */
 import type { SavedKurztestStats } from '@shared/types'
-import { einsortierenNachSpeichern } from '../../shared/themenbereiche'
 import { ueberthemaVon } from '../../shared/ueberthema'
-import { dokumentName, sichereAlles } from '../../shared/autosave'
-import { legeAb } from '../../shared/auftraege'
-import { useStoreAutosave } from '../../shared/useAutosave'
 import { gesamtpunkte } from './didactics/bewertung'
 import { teilaufgaben } from './didactics/pruefungen'
+import { erzeugeBibliothek } from '../../shared/testmodul/bibliothek'
 import type { Kurztest } from './model/types'
 import { useLernzielkontrolle } from './store'
 
@@ -48,84 +45,27 @@ export function defaultKurztestName(test: Kurztest): string {
   return thema ? `${test.meta.subjectLabel} – ${thema}` : `${test.meta.bezeichnung} ${test.meta.subjectLabel}`
 }
 
-export async function saveCurrentKurztest(name?: string): Promise<void> {
-  const state = useLernzielkontrolle.getState()
-  const test = state.test
-  if (!test || !lohntSicherung(test)) return
-  const id = state.docId
-  const meta = await window.api.kurztests.save({
-    id,
-    name: name?.trim() || dokumentName(id, state.docName, defaultKurztestName(test)),
-    stats: kurztestStats(test),
-    payload: test
-  })
-  void einsortierenNachSpeichern()
-  useLernzielkontrolle.getState().markSaved(meta.id, meta.updatedAt, meta.name)
-}
-
-export async function openSavedKurztest(id: string): Promise<void> {
-  // Was an der bisherigen Kontrolle noch ansteht, zuerst sichern – sonst ginge es beim Wechsel verloren
-  await sichereAlles()
-  const saved = await window.api.kurztests.get(id)
-  useLernzielkontrolle.getState().openSaved(saved.id, saved.name, saved.payload as Kurztest, saved.updatedAt)
-}
-
-/** Ist genau diese Kontrolle gerade im Programm offen? */
-export const kurztestOffen = (docId: string): boolean => {
-  const s = useLernzielkontrolle.getState()
-  return s.docId === docId && s.test !== null
-}
-
-/**
- * Ergebnis eines Hintergrund-Auftrags in der Kontrolle `docId` ablegen (siehe
- * shared/auftraege.ts): im offenen Dokument als Rückgängig-Schritt, sonst in der Bibliothek.
+/*
+ * Speichern, Öffnen, Ablegen, Neu, automatisch Speichern: gemeinsames Gerüst mit den anderen
+ * Testprogrammen (shared/testmodul/bibliothek.ts, Großprogramm 0.4). Die bisherigen Namen bleiben.
  */
-export function legeKurztestAb(docId: string, schnappschuss: Kurztest, einarbeiten: (t: Kurztest) => Kurztest, schritt?: number): Promise<void> {
-  return legeAb<Kurztest>(
-    {
-      istOffen: kurztestOffen,
-      imOffenen: (f) => {
-        const s = useLernzielkontrolle.getState()
-        if (!s.test) return
-        s.setTest(f(s.test))
-        if (schritt !== undefined) s.setStep(schritt)
-      },
-      laden: async (id) => {
-        const t = await window.api.kurztests.get(id)
-        return { name: t.name, dok: t.payload as Kurztest }
-      },
-      speichern: async (id, name, test) => {
-        await window.api.kurztests.save({ id, name: name ?? defaultKurztestName(test), stats: kurztestStats(test), payload: test })
-        void einsortierenNachSpeichern()
-      }
-    },
-    docId,
-    schnappschuss,
-    einarbeiten
-  )
-}
+export const bibliothek = erzeugeBibliothek({
+  store: useLernzielkontrolle,
+  dokument: (s) => s.test,
+  setzeDokument: (s, d) => s.setTest(d),
+  // Erst beim Aufruf nachschlagen – beim Laden des Moduls (auch in Tests) gibt es `window.api` noch nicht
+  api: { save: (i) => window.api.kurztests.save(i), get: (id) => window.api.kurztests.get(id) },
+  stats: kurztestStats,
+  standardName: defaultKurztestName,
+  lohntSicherung
+})
 
-/** Neue Kontrolle beginnen – die bisherige vorher sichern. */
-export async function newKurztestSafely(): Promise<void> {
-  await sichereAlles()
-  useLernzielkontrolle.getState().reset()
-}
-
-/**
- * Automatisches Speichern – als Entwurf ab dem Thema, danach nach jeder Änderung.
- *
- * Verzögert um anderthalb Sekunden, damit nicht jeder Tastendruck im Editor eine Datei
- * schreibt. Ohne diese Verzögerung entstand beim Grammatiktest bei jedem Zeichen ein
- * Schreibvorgang.
- */
-export function useKurztestAutosave(): void {
-  useStoreAutosave({
-    store: useLernzielkontrolle,
-    dokument: (s) => s.docId,
-    gesichert: (s) => Boolean(s.savedAt),
-    bereit: (s) => lohntSicherung(s.test),
-    // Ein geänderter Name zählt nur, wenn ihn die Lehrkraft geändert hat – nicht die Bestätigung des Speicherns
-    geaendert: (s, prev) => s.test !== prev.test || (s.docName !== prev.docName && s.savedAt === prev.savedAt),
-    speichern: () => saveCurrentKurztest()
-  })
-}
+export const saveCurrentKurztest = bibliothek.speichern
+export const openSavedKurztest = bibliothek.oeffnen
+/** Ist genau dieses Dokument gerade im Programm offen? */
+export const kurztestOffen = bibliothek.istOffen
+/** Ergebnis eines Hintergrund-Auftrags ablegen (siehe shared/auftraege.ts) */
+export const legeKurztestAb = bibliothek.legeAb
+/** Neues Dokument beginnen – das bisherige vorher sichern. */
+export const newKurztestSafely = bibliothek.neuSicher
+export const useKurztestAutosave = bibliothek.useAutosave

@@ -105,6 +105,9 @@ try {
     [MANGEL, INFO]
   )
   await page.waitForTimeout(1500)
+  // Die Hinweise stehen in der Werkzeugleiste des Bausteins, die erst beim Überfahren erscheint
+  await page.locator('.editor-block', { hasText: 'Analysiere den Bericht M3' }).first().hover()
+  await page.waitForTimeout(300)
   await page.getByRole('button', { name: '2 Hinweise anzeigen' }).first().click()
   await page.waitForTimeout(300)
   const knoepfe = page.locator('[data-ki-beheben]').filter({ visible: true })

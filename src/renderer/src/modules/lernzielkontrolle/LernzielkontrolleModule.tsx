@@ -1,19 +1,10 @@
-import { sichereAlles } from '../../shared/autosave'
-import { Box, Button, Group, ScrollArea, Stepper } from '@mantine/core'
-import { IconFolder, IconPlus } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
-import { defaultKurztestName, hatInhalt, newKurztestSafely, openSavedKurztest, useKurztestAutosave } from './library'
-import { notifyError } from '../../shared/util'
-import UndoRedoButtons from '../../shared/components/UndoRedoButtons'
-import { useUndoKeys } from '../../shared/useUndoKeys'
+import ZweiSchrittModul from '../../shared/testmodul/ZweiSchrittModul'
+import { bibliothek, defaultKurztestName, hatInhalt } from './library'
+import { projektDatei } from './project'
 import EditorStep from './steps/EditorStep'
 import KurztestLibrary from './steps/KurztestLibrary'
 import SetupStep from './steps/SetupStep'
 import { useLernzielkontrolle } from './store'
-import { KURZTEST_FILTER, parseKurztestFile } from './project'
-import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
-import { useSperrenderAuftrag } from '../../shared/auftraege'
-import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 
 /**
  * Programm „Lernzielkontrolle".
@@ -21,7 +12,7 @@ import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
  * Zwei Schritte: Lerngruppe und Landesformat wählen, dann die erzeugte Kontrolle ansehen,
  * bearbeiten und ausgeben. Beim Öffnen erscheinen die gespeicherten Kontrollen, sofern es
  * welche gibt – wie in den anderen Programmen. Gespeichert wird von selbst, sobald Aufgaben
- * da sind.
+ * da sind. Hülle gemeinsam mit Klassenarbeit und Grammatiktest (shared/testmodul).
  *
  * Warum es ein eigenes Programm ist und keine Einstellung der Klassenarbeit: Das Format hat
  * eine eigene Rechtsgrundlage je Bundesland (Bezeichnung, Höchstdauer, Ankündigungspflicht,
@@ -30,112 +21,25 @@ import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
  * wäre das alles unsichtbar gewesen.
  */
 export default function LernzielkontrolleModule({ active }: { active: boolean }): React.JSX.Element {
-  const { step, setStep, test, docName, undo, redo, verlauf, docId } = useLernzielkontrolle()
-  // Läuft für diese Kontrolle ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
-  const auftrag = useSperrenderAuftrag(docId)
-  const [library, setLibrary] = useState(false)
-  const hatAufgaben = hatInhalt(test)
-  useKurztestAutosave()
-  // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt – in beiden Schritten
-  useUndoKeys(active && !library && !auftrag, undo, redo)
-  const startNew = (): void => {
-    setLibrary(false)
-    newKurztestSafely().catch(notifyError)
-  }
-  // Datei des Programms öffnen (27.09.2026) – wie „Datei öffnen …" beim Arbeitsblatt
-  const openFile = async (): Promise<void> => {
-    try {
-      const file = await window.api.files.open(KURZTEST_FILTER)
-      if (file) {
-        await sichereAlles()
-        useLernzielkontrolle.getState().loadFromFile(parseKurztestFile(file.data))
-        setLibrary(false)
-      }
-    } catch (e) {
-      notifyError(e)
-    }
-  }
-  /*
-   * „Neu in diesem Bereich" (Themenbereiche, Paket 10b): neues Dokument anlegen und seine
-   * Kennung liefern – aus der eigenen Bibliothek und von der übergreifenden Seite aus.
-   */
-  const neuMitKennung = async (): Promise<string> => {
-    setLibrary(false)
-    await newKurztestSafely()
-    return useLernzielkontrolle.getState().docId
-  }
-  useNeuAnleger('lernzielkontrolle', neuMitKennung)
-
-  // „Zuletzt bearbeitet" auf der Startseite (und später „Öffnen" nach einem Auftrag) öffnet hierüber
-  const vonAussen = useDokumentOeffner('lernzielkontrolle', async (id) => {
-    await openSavedKurztest(id)
-    setLibrary(false)
-  })
-
-  useEffect(() => {
-    if (hatInhalt(useLernzielkontrolle.getState().test)) return
-    window.api.kurztests
-      .list()
-      .then((list) => !vonAussen.current && setLibrary(list.length > 0))
-      .catch(() => setLibrary(false))
-  }, [])
-
-  if (library) {
-    // „Zurück zu …" nur, solange eine Kontrolle offen ist
-    return (
-      <KurztestLibrary
-        onNew={startNew}
-        onNeuImBereich={neuMitKennung}
-        onOpenFile={() => void openFile()}
-        onOpened={() => setLibrary(false)}
-        zurueck={test ? docName || defaultKurztestName(test) : null}
-        onZurueck={() => setLibrary(false)}
-      />
-    )
-  }
-
   return (
-    <Box h="100%" style={{ display: 'flex', flexDirection: 'column' }}>
-      {/*
-        `app-toolbar` fehlte hier – damit sah die Leiste nicht nur anders aus als in den
-        übrigen Programmen, es griff auch die Anpassung für schmale Bildschirme nicht: Auf
-        einem Tablet stapelte sie sich auf mehrere Zeilen und nahm dem Blatt den Platz.
-      */}
-      <Group px="lg" py="sm" align="flex-start" className="app-toolbar">
-        <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
-          <Stepper.Step label="Lerngruppe & Format" description="Bundesland, Zeit, Stoff" />
-          <Stepper.Step label="Bearbeiten & Export" description="Prüfung, Word, PDF" disabled={!hatAufgaben} />
-        </Stepper>
-        <Group gap="xs">
-          {/* Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt) */}
-          {step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
-          <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
-            Meine Lernzielkontrollen
-          </Button>
-          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
-            Neue Kontrolle
-          </Button>
-        </Group>
-      </Group>
-      {/*
-        Schritt 1 scrollt selbst: Sein Hauptknopf steht in einer festen Fußleiste unter dem
-        scrollenden Formular (shared/components/Formularfuss.tsx, Paket 6).
-      */}
-      {!auftrag && step === 0 ? (
-        <Box style={{ flex: 1, minHeight: 0 }}>
-          <SetupStep />
-        </Box>
-      ) : (
-        <Box style={{ flex: 1, minHeight: 0 }}>
-          {auftrag ? (
-            <ScrollArea h="100%">
-              <AuftragsHinweis auftrag={auftrag} neuLabel="Neue Kontrolle" onNeu={startNew} />
-            </ScrollArea>
-          ) : (
-            step === 1 && hatAufgaben && <EditorStep />
-          )}
-        </Box>
-      )}
-    </Box>
+    <ZweiSchrittModul
+      active={active}
+      modulId="lernzielkontrolle"
+      useStore={useLernzielkontrolle}
+      dokument={(s) => s.test}
+      hatInhalt={hatInhalt}
+      bibliothek={bibliothek}
+      projekt={projektDatei}
+      standardName={defaultKurztestName}
+      liste={() => window.api.kurztests.list()}
+      BibliotheksSeite={KurztestLibrary}
+      schritte={[
+        { label: 'Lerngruppe & Format', description: 'Bundesland, Zeit, Stoff' },
+        { label: 'Bearbeiten & Export', description: 'Prüfung, Word, PDF' }
+      ]}
+      einstellen={<SetupStep />}
+      bearbeiten={() => <EditorStep />}
+      texte={{ meine: 'Meine Lernzielkontrollen', neu: 'Neue Kontrolle' }}
+    />
   )
 }

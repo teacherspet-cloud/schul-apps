@@ -662,6 +662,13 @@ npm run build:win        # einzelne Schul-Apps.exe nach dist/ (kein Installer) �
 - `src/shared/design.ts`: Designvorlagen (gespeichert in `%APPDATA%\schul-apps\worksheet-designs.json`)
 - `resources/cefr/levels.json`: GER-Zuordnung für alle 16 Länder, mit Quellenangaben
 
+### Gemeinsame Bausteine (Aufräumen 0.4)
+
+- `src/shared/operatoren/`: Operatoren-Bestand aller Länder (`daten/<LAND>.json`, erzeugt mit `scripts/daten/operatoren_bestand.py` aus der Recherche) und Zugriff `anlageFuer(land, fach, { sprache, stufe })`. Die Klausur-Anlage nimmt nur Listen aus Dokumenten des Landes selbst; Niedersachsen bleibt bei den von Hand erfassten Listen. Die Lernzielkontrolle bekommt daraus belegte Länderprofile, wo kein von Hand erfasstes besteht.
+- `src/renderer/src/shared/testmodul/`: Gerüst für Grammatiktest, Lernzielkontrolle und Klassenarbeit. `erzeugeBibliothek` liefert Speichern, Öffnen, Ablegen, Neu und automatisches Speichern. `erzeugeProjektDatei` liefert die Projektdatei. `ZweiSchrittModul` ist die Hülle mit Schritten, Bibliothek und Leiste. Die Module reichen die bisherigen Namen weiter.
+- `src/renderer/src/shared/lerngruppe.ts` und `shared/components/SchulortFelder.tsx`: eine Regel für Land, Schulform, Jahrgang und Kursniveau in Arbeitsblatt, Klassenarbeit, Lernzielkontrolle und Grammatiktest.
+- Große Dateien des Arbeitsblatts sind aufgeteilt: `export/docx/`, `generation/prompts/`, `render/baustein/`, `steps/editor/`. Die alten Dateien reichen die Exporte weiter; der Word-Export ist vor und nach der Aufteilung zeichengleich.
+
 ## Lizenzen
 
 Die Piktogramme stammen von OpenMoji (CC BY-SA 4.0). Ein Bildnachweis wird automatisch auf Tests mit Bildern gedruckt.
