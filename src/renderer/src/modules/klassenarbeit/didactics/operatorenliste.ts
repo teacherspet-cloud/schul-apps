@@ -24,13 +24,43 @@ export interface OperatorDefinition {
   afb?: Afb | 'I–II' | 'II–III' | 'I–III'
   /** Weitere Formen, wie sie in Arbeitsanweisungen stehen („Nimm Stellung", „Setze … in Beziehung") */
   formen?: string[]
+  /*
+   * ALLES, was die Liste des Landes angibt (Wunsch der Lehrkraft vom 28.09.2026): nicht nur die
+   * Erläuterung, sondern auch die illustrierenden Aufgabenbeispiele, der Kompetenzbereich, für den
+   * die Erläuterung gilt, Einschränkungen auf einzelne Fächer und weitere Spalten im Wortlaut.
+   */
+  /** Illustrierende Aufgabenbeispiele im Wortlaut der Liste */
+  beispiele?: string[]
+  /** Kompetenzbereich, für den dieser Eintrag gilt (Englisch NI: Schreiben, Sprachmittlung, Sprechen, Hör-/Hörsehverstehen) */
+  kompetenzbereich?: string
+  /** Gilt nur für diese Fächer (Kennungen aus subjects.ts) – z. B. „darstellen" nur Erdkunde und Politik-Wirtschaft */
+  nurFaecher?: string[]
+  /** Weitere Spalten der Liste im Wortlaut (Spaltenname → Inhalt) */
+  zusatz?: Record<string, string>
 }
 
 export interface Operatorenliste {
   /** Sprache der Liste – bei Fremdsprachen die Zielsprache */
-  sprache: 'de' | 'en'
+  sprache: 'de' | 'en' | 'fr' | 'es'
   quelle: string
   operatoren: OperatorDefinition[]
+  /** Vorbemerkungen der Liste je Kompetenzbereich im Wortlaut (z. B. zur Sprachmittlung) */
+  hinweise?: Record<string, string>
+}
+
+/**
+ * Welcher Kompetenzbereich einer Liste zu welchem Teil der Arbeit gehört. Die Erläuterung eines
+ * Operators unterscheidet sich je Bereich („explain" in der Sprachmittlung: „… taking into account
+ * culture-related differences"). Ohne Zuordnung gilt der erste passende Eintrag.
+ */
+export const KOMPETENZBEREICH_JE_FORMAT: Record<string, string> = {
+  'en-mediation': 'Sprachmittlung',
+  'en-speaking': 'Sprechen',
+  'en-listening': 'Hör-/Hörsehverstehen',
+  'en-writing': 'Schreiben',
+  'en-reading': 'Schreiben',
+  'en-language': 'Schreiben',
+  'en-grammar': 'Schreiben'
 }
 
 export const OPERATOREN_BLOCK_ID = 'exam-operatoren'
@@ -45,10 +75,15 @@ export function amtlicheListe(stateId: string, subjectId: string): Operatorenlis
 
 const normal = (s: string): string => s.toLocaleLowerCase('de').replace(/[*_]/g, '').replace(/\s+/g, ' ').trim()
 
-/** Der Operator einer Arbeitsanweisung: das erste fett gesetzte Wort („**Outline** the …") */
+/**
+ * Der Operator einer Arbeitsanweisung: die fett gesetzten Teile des ersten Satzes
+ * („**Outline** the …" → „Outline"; „**Stelle** die Entwicklung **dar**" → „Stelle dar";
+ * „**Setze** die Quellen **in Beziehung**" → „Setze in Beziehung").
+ */
 export function operatorAusAnweisung(instruction: string): string {
-  const m = /\*\*([^*]{2,40})\*\*/.exec(instruction ?? '')
-  return m ? m[1] : ''
+  const satz = (instruction ?? '').split(/(?<=[.!?])\s/)[0] ?? ''
+  const teile = [...satz.matchAll(/\*\*([^*]{1,40})\*\*/g)].map((m) => m[1].trim()).filter(Boolean)
+  return teile.slice(0, 3).join(' ')
 }
 
 /** Die Operatoren aller Aufgaben und Teilaufgaben in der Reihenfolge des ersten Vorkommens */
@@ -73,6 +108,27 @@ export function operatorenDerArbeit(exam: Exam): string[] {
   return out
 }
 
+/** Jeder Operator mit dem Teil, in dem er zuerst vorkommt (für den Kompetenzbereich) */
+export function operatorVorkommen(exam: Exam): { op: string; formatId: string }[] {
+  const out: { op: string; formatId: string }[] = []
+  const gesehen = new Set<string>()
+  for (const part of exam.parts)
+    for (const liste of alleFassungen(part))
+      for (const b of liste) {
+        if (b.type !== 'task') continue
+        const t = b as TaskBlock
+        for (const roh of [operatorAusAnweisung(t.instruction) || t.operator, ...t.parts.map((x) => operatorAusAnweisung(x.instruction))]) {
+          const op = normal(roh ?? '')
+          const bereich = KOMPETENZBEREICH_JE_FORMAT[part.formatId] ?? ''
+          const k = `${op}|${bereich}`
+          if (!op || gesehen.has(k)) continue
+          gesehen.add(k)
+          out.push({ op, formatId: part.formatId })
+        }
+      }
+  return out
+}
+
 export interface OperatorenBefund {
   /** Verwendete Operatoren mit amtlicher Definition, in der Reihenfolge der Arbeit */
   gefunden: OperatorDefinition[]
@@ -83,14 +139,20 @@ export interface OperatorenBefund {
 
 export function operatorenBefund(exam: Exam): OperatorenBefund {
   const liste = amtlicheListe(exam.meta.stateId, exam.meta.subjectId)
-  const verwendet = operatorenDerArbeit(exam)
-  if (!liste) return { gefunden: [], fehlend: verwendet, liste: null }
+  if (!liste) return { gefunden: [], fehlend: operatorenDerArbeit(exam), liste: null }
+  const fach = exam.meta.subjectId
+  // Einträge, die nur für andere Fächer gelten („darstellen" nur Erdkunde/Politik), zählen nicht
+  const gueltig = liste.operatoren.filter((d) => !d.nurFaecher?.length || d.nurFaecher.includes(fach))
   const gefunden: OperatorDefinition[] = []
   const fehlend: string[] = []
-  for (const op of verwendet) {
-    const treffer = liste.operatoren.find((d) => passt(op, d))
-    if (!treffer) fehlend.push(op)
-    else if (treffer.definition && !gefunden.includes(treffer)) gefunden.push(treffer)
+  for (const { op, formatId } of operatorVorkommen(exam)) {
+    const bereich = KOMPETENZBEREICH_JE_FORMAT[formatId]
+    // Zuerst im Kompetenzbereich des Teils, sonst irgendwo in der Liste
+    const treffer =
+      gueltig.find((d) => passt(op, d) && (!bereich || !d.kompetenzbereich || d.kompetenzbereich === bereich)) ?? gueltig.find((d) => passt(op, d))
+    if (!treffer) {
+      if (!fehlend.includes(op)) fehlend.push(op)
+    } else if ((treffer.definition || treffer.beispiele?.length) && !gefunden.includes(treffer)) gefunden.push(treffer)
   }
   return { gefunden, fehlend, liste }
 }
@@ -119,8 +181,16 @@ export function operatorenBlock(exam: Exam): WsBlock | null {
   if (!operatorenlisteAktiv(exam)) return null
   const { gefunden, liste } = operatorenBefund(exam)
   if (!liste || !gefunden.length) return null
-  const en = liste.sprache === 'en'
-  const zeilen = gefunden.map((d) => `**${d.operator}**${d.afb ? ` (${en ? 'level' : 'AFB'} ${d.afb})` : ''}: ${d.definition}`)
+  const en = liste.sprache !== 'de'
+  // Nach Kompetenzbereich gruppiert, wenn die Liste danach gliedert – mit der Vorbemerkung des Bereichs
+  const bereiche = [...new Set(gefunden.map((d) => d.kompetenzbereich ?? ''))]
+  const zeilen: string[] = []
+  for (const bereich of bereiche) {
+    if (bereich && bereiche.length > 1) zeilen.push(`**${bereich}**`)
+    // Vorbemerkung der Liste zum Bereich (bzw. zur ganzen Liste) im Wortlaut
+    if (liste.hinweise?.[bereich]) zeilen.push(`_${liste.hinweise[bereich]}_`)
+    for (const d of gefunden.filter((x) => (x.kompetenzbereich ?? '') === bereich)) zeilen.push(...operatorZeilen(d, en))
+  }
   const block: InfoBoxBlock = {
     id: OPERATOREN_BLOCK_ID,
     type: 'infoBox',
@@ -129,4 +199,16 @@ export function operatorenBlock(exam: Exam): WsBlock | null {
     body: [...zeilen, '', `${en ? 'Source' : 'Quelle'}: ${liste.quelle}`].join('\n')
   }
   return block
+}
+
+/** Ein Operator mit allem, was die Liste angibt: Erläuterung, AFB, Beispiele, weitere Spalten */
+export function operatorZeilen(d: OperatorDefinition, en: boolean): string[] {
+  const kopf = `**${d.operator}**${d.afb ? ` (${en ? 'level' : 'AFB'} ${d.afb})` : ''}${d.definition ? `: ${d.definition}` : ''}`
+  const out = [kopf]
+  for (const [spalte, inhalt] of Object.entries(d.zusatz ?? {})) if (inhalt) out.push(`${spalte}: ${inhalt}`)
+  if (d.beispiele?.length)
+    out.push(
+      `${en ? (d.beispiele.length > 1 ? 'Examples' : 'Example') : d.beispiele.length > 1 ? 'Beispiele' : 'Beispiel'}: ${d.beispiele.map((b) => (en ? `“${b}”` : `„${b}“`)).join(' · ')}`
+    )
+  return out
 }

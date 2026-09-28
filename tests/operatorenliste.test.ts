@@ -70,7 +70,7 @@ describe('Operatoren aus den Aufgaben', () => {
     expect(examToWorksheet(e).sheets[0].blocks.some((b) => b.id === OPERATOREN_BLOCK_ID)).toBe(false)
   })
 
-  it('Niedersachsen, Englisch: verwendete Operatoren mit amtlichem Wortlaut, Arbeitsanweisungen ohne Eintrag', () => {
+  it('Niedersachsen, Englisch: verwendete Operatoren mit amtlichem Wortlaut und Aufgabenbeispielen', () => {
     const e = arbeit({}, [
       aufgabe('**Tick** the correct answer.'),
       aufgabe('**Outline** the review.', ['**Comment on** the ending.']),
@@ -78,7 +78,7 @@ describe('Operatoren aus den Aufgaben', () => {
     ])
     const b = operatorenBefund(e)
     expect(b.fehlend).toEqual([])
-    expect(b.gefunden.map((d) => d.operator)).toEqual(['outline', 'comment on', 'write'])
+    expect(b.gefunden.map((d) => d.operator)).toEqual(['tick', 'outline', 'comment (on)', 'write (+ text type)'])
     const block = operatorenBlock(e)
     expect(block?.type).toBe('infoBox')
     expect(block && block.type === 'infoBox' ? block.body : '').toContain('**outline** (level I): give the main features')
@@ -96,8 +96,33 @@ describe('Operatoren aus den Aufgaben', () => {
       aufgabe('**Setze** die Quellen **in Beziehung**.')
     ])
     const b = operatorenBefund(e)
-    expect(b.gefunden.map((d) => d.operator)).toEqual(['analysieren', 'erläutern', 'Stellung nehmen'])
-    expect(b.fehlend).toEqual(['setze'])
+    // Getrennte Operatoren werden zusammengesetzt: „**Setze** … **in Beziehung**" → in Beziehung setzen
+    expect(b.gefunden.map((d) => d.operator)).toEqual(['analysieren', 'erläutern', 'Stellung nehmen', 'in Beziehung setzen'])
+    expect(b.fehlend).toEqual([])
     expect(operatorenBlock(e) && (operatorenBlock(e) as { body: string }).body).toContain('**Stellung nehmen** (AFB III)')
+  })
+
+  it('übernimmt alles aus der Liste: Beispiele, Kompetenzbereich, Vorbemerkung, Fächer-Einschränkung (28.09.2026)', () => {
+    // Mediation: die Erläuterung aus dem Kompetenzbereich Sprachmittlung, mit Vorbemerkung und Beispiel
+    const mediation = { ...arbeit({}, [aufgabe('**Write** an email based on M1.')]) }
+    mediation.parts[0].formatId = 'en-mediation'
+    const body = (operatorenBlock(mediation) as { body: string }).body
+    expect(body).toContain('situativen Rahmen')
+    expect(body).toContain('**write (+ text type)**: produce a text with specific features')
+    expect(body).toContain('Example: “Using the information in the input article')
+    // Schreiben: mit Anforderungsbereich und mehreren Beispielen
+    const schreiben = (operatorenBlock(arbeit({}, [aufgabe('**Analyse** the way the atmosphere is created.')])) as { body: string }).body
+    expect(schreiben).toContain('**analyse, examine** (level II): describe and explain in detail')
+    expect(schreiben).toMatch(/Examples: “Analyse the way\(s\) in which/)
+    // „darstellen" gilt nur für Erdkunde und Politik – in Geschichte ist es kein Operator der Liste
+    const ge = arbeit({ subjectId: 'geschichte', subjectLabel: 'Geschichte' }, [
+      aufgabe('**Stelle** die Entwicklung **dar**.'),
+      aufgabe('**Interpretiere** die Quelle.')
+    ])
+    const befundGe = operatorenBefund(ge)
+    expect(befundGe.gefunden.map((d) => d.operator)).toEqual(['interpretieren'])
+    const ek = arbeit({ subjectId: 'erdkunde' as never, subjectLabel: 'Erdkunde' }, [aufgabe('**Stelle** die Entwicklung **dar**.')])
+    expect(operatorenBefund(ek).gefunden.map((d) => d.operator)).toEqual(['darstellen'])
+    expect((operatorenBlock(ge) as { body: string }).body).toContain('Hinweis: Operator, der Leistungen in allen drei Anforderungsbereichen verlangt')
   })
 })
