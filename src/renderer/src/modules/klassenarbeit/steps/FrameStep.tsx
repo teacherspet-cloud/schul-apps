@@ -1,4 +1,5 @@
 import { upperSecondary } from '../generation/generateExam'
+import { useLehrplanVorschlaege } from '../../../shared/lehrplanVorschlaege'
 import { fachDerArbeit, formatArt, inhaltsanteil, istFremdsprache, KLASSENARBEIT_FAECHER, sprachfolge, zweiterTeil } from '../model/faecher'
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
@@ -146,6 +147,8 @@ export default function FrameStep(): React.JSX.Element {
   }, [exam?.meta.subjectId, exam?.meta.stateId, exam?.meta.schoolTypeId, exam?.meta.grade, exam?.meta.courseLevel, exam?.meta.cefrLevel])
 
   const available = useMemo(() => (exam ? formatsFor(exam.meta.subjectId, exam.meta.grade) : []), [exam])
+  // Vor der frühen Rückkehr: Hooks stehen immer in derselben Reihenfolge
+  const lehrplan = useLehrplanVorschlaege(exam?.meta.stateId ?? '', exam?.meta.schoolTypeId, exam?.meta.subjectId ?? '', exam?.meta.grade ?? 0)
   if (!exam) return <Container py="xl">Wird geladen …</Container>
 
   const meta = exam.meta
@@ -174,6 +177,15 @@ export default function FrameStep(): React.JSX.Element {
   const pointsPlanned = examPoints(exam)
   const minutesPlanned = examMinutes(exam)
   const curriculum = curriculumTopics(meta.stateId, meta.schoolTypeId, meta.grade)
+  /*
+   * Themenvorschläge (Großprogramm 0.4): für jedes Fach aus dem Lehrplan des Landes. Geschichte
+   * behält die von Hand erfasste Liste mit Kennungen („3.2: …"), wo es für das Land keine
+   * Lehrplandatei gibt.
+   */
+  const themenVorschlaege =
+    meta.subjectId === 'geschichte' && !lehrplan.ausDatei && curriculum.length
+      ? curriculum.map((t) => (t.code ? `${t.code}: ${t.label}` : t.label))
+      : lehrplan.gruppen
   const source = curriculumSource(curriculum)
   const rules = stateRules(meta.stateId)
   const grades = examGrades(exam)
@@ -316,12 +328,12 @@ export default function FrameStep(): React.JSX.Element {
                         label="Thema"
                         required
                         description={
-                          meta.subjectId === 'geschichte' && curriculum.length
+                          themenVorschlaege.length
                             ? `Themen aus dem Lehrplan für ${meta.schoolTypeName} in Klasse ${meta.grade} – oder frei eintippen.`
                             : undefined
                         }
                         placeholder={fachDerArbeit(meta.subjectId).beispiel}
-                        data={meta.subjectId === 'geschichte' ? curriculum.map((t) => (t.code ? `${t.code}: ${t.label}` : t.label)) : []}
+                        data={themenVorschlaege}
                         value={meta.topic}
                         onChange={(v) => patch({ topic: v })}
                         limit={40}
@@ -335,7 +347,7 @@ export default function FrameStep(): React.JSX.Element {
                         onChange={(e) => patch({ title: e.currentTarget.value })}
                       />
                     </Group>
-                    {meta.subjectId === 'geschichte' && (
+                    {meta.subjectId === 'geschichte' && !lehrplan.ausDatei && (
                       <Text size="xs" c="dimmed">
                         {source ? (
                           <>
