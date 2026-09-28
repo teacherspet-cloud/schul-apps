@@ -1359,7 +1359,7 @@
    "quelle": "hh-gym-chemie",
    "seite": "S. 31",
    "bereich": "Themenfeld 3: Chemische Reaktionen – 3.3",
-   "thema": "Optional: Reaktionen der Metalle",
+   "thema": "Reaktionen der Metalle",
    "herkunft": "wortlaut",
    "unterthemen": [
     {
@@ -1399,7 +1399,8 @@
      ]
     }
    ],
-   "schulformName": "Gymnasium"
+   "schulformName": "Gymnasium",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "chemie",
@@ -5501,7 +5502,7 @@
    "verbindlichkeit": "wahlpflicht",
    "quelle": "hh-gym-geographie",
    "seite": "S. 37",
-   "bereich": "Themenbereich: Auf dem Weg zur Nachhaltigkeit – Miteinander Leben und Wirtschaften in einer dynamischen und sich wandelnden Welt Optional: – 3.5",
+   "bereich": "Themenbereich: Auf dem Weg zur Nachhaltigkeit – Miteinander Leben und Wirtschaften in einer dynamischen und sich wandelnden Welt – 3.5",
    "thema": "Weltweite Entwicklungsunterschiede",
    "herkunft": "wortlaut",
    "unterthemen": [
@@ -5557,7 +5558,8 @@
     }
    ],
    "fachname": "Geographie",
-   "schulformName": "Gymnasium"
+   "schulformName": "Gymnasium",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "erdkunde",
@@ -5571,7 +5573,7 @@
    "verbindlichkeit": "wahlpflicht",
    "quelle": "hh-gym-geographie",
    "seite": "S. 38",
-   "bereich": "Themenbereich: Auf dem Weg zur Nachhaltigkeit – Miteinander Leben und Wirtschaften in einer dynamischen und sich wandelnden Welt Optional: – 3.6",
+   "bereich": "Themenbereich: Auf dem Weg zur Nachhaltigkeit – Miteinander Leben und Wirtschaften in einer dynamischen und sich wandelnden Welt – 3.6",
    "thema": "Weltbevölkerung und Welternährung",
    "herkunft": "wortlaut",
    "unterthemen": [
@@ -5645,7 +5647,8 @@
     }
    ],
    "fachname": "Geographie",
-   "schulformName": "Gymnasium"
+   "schulformName": "Gymnasium",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "geschichte",
@@ -11372,6 +11375,14 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Eigene Umfragen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Häufigkeitstabelle",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Graphische Darstellung erhobener Daten (z. B. Säulen- und Balkendiagramm)",
      "herkunft": "wortlaut"
     },
@@ -11388,7 +11399,15 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "gleichen Sachverhalt in verschiedenen Darstellungsformen",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Vergleich verschiedener Darstellungsformen im Hinblick auf Vor- und Nachteile",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Kenngrößen Durchschnitt bzw. arithmetisches Mittel, Zentralwert bzw. Median, Spannweite",
      "herkunft": "wortlaut"
     }
    ],
@@ -11466,6 +11485,10 @@
       },
       {
        "thema": "Zahlenreihen bei sich fortsetzenden Mustern, auch in Bildern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rechengesetze",
        "herkunft": "wortlaut"
       }
      ]
@@ -11546,11 +11569,51 @@
    "unterthemen": [
     {
      "thema": "Orientierung in der Ebene",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Punkt, Strecke, Strahl und Gerade",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Parallele und senkrechte Geraden",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Längen von Strecken und Abstände",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Punkte im Koordinatensystem",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Grundrisse und grobe Lagepläne mithilfe vorgegebener Raster",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "geometrische Figuren (Dreiecke, Vierecke und Polygone) im Koordinatensystem",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Grundrisse und Lagepläne mit einem selbstgewählten Raster",
+       "herkunft": "wortlaut"
+      }
+     ]
     },
     {
      "thema": "Ebene Figuren",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figuren in der Lebenswelt",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Parallelogramme, Rechtecke und Quadrate",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Gymnasium"
@@ -11578,6 +11641,10 @@
       {
        "thema": "Kopfgeometrie",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Würfelbauten nach Schrägbildern",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -11586,7 +11653,27 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Körper in der Lebenswelt",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Quader, Würfel, Kegel, Zylinder, Kugel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "von Würfeln und Quadern Netze und Modelle",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Quader, Würfel, Pyramide, Prisma, Kegel, Kugel, Zylinder beschreiben ihre definierenden Eigenschaften",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "von Würfeln und Quadern Schrägbilder",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "von Dreiecksprismen Netze, Schrägbilder und Modelle",
        "herkunft": "wortlaut"
       }
      ]
@@ -11619,6 +11706,18 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Brüche in Alltagssituationen (bildhaften Darstellungen)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "einfache und andere Brüche als Bild (u. a. als Bruchstreifen)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Brüche am vorstrukturierten oder selbstgewählten Zahlenstrahl",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Prozentdarstellung",
      "herkunft": "wortlaut"
     },
@@ -11632,6 +11731,22 @@
     },
     {
      "thema": "Zusammenhang zwischen Bild und Kalkül",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "gleichwertige Brüche und Bruchdarstellungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Brüche für eine Prozentdarstellung",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Anteil, Teil und Ganzes aus Text und Bild",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Anteil, Teil und Ganzes von Größen und Mengen",
      "herkunft": "wortlaut"
     }
    ],
@@ -11678,6 +11793,10 @@
       {
        "thema": "Addition und Subtraktion schriftlich im Stellenwertsystem",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rechenalgorithmus der schriftlichen Addition und Subtraktion",
+       "herkunft": "wortlaut"
       }
      ]
     }
@@ -11715,6 +11834,14 @@
       {
        "thema": "Repräsentanten für Standardgrößen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Größen von Alltagsgegenständen mithilfe von Repräsentanten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bezugsgrößen aus der Erfahrungswelt zum Schätzen",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -11724,6 +11851,10 @@
      "unterthemen": [
       {
        "thema": "Umformen von Einheiten (durch Vergleich mit Standardrepräsentanten oder Umrechnungstabellen und Umrechnungszahlen)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "große und sehr kleine Zahlenwerte mit Zehnerpotenzen",
        "herkunft": "wortlaut"
       }
      ]
@@ -11742,6 +11873,10 @@
      "unterthemen": [
       {
        "thema": "maßstabsgetreues Zeichnen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Entfernungen auf Stadtplänen und Landkarten mit Maßstabsleiste",
        "herkunft": "wortlaut"
       }
      ]
@@ -11780,6 +11915,14 @@
       {
        "thema": "Repräsentanten für Standardgrößen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Größen von Alltagsgegenständen mithilfe von Repräsentanten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bezugsgrößen aus der Erfahrungswelt zum Schätzen",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -11795,7 +11938,21 @@
     },
     {
      "thema": "Flächeninhalt und Umfang spezieller Figuren",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Flächeninhalte von Quadrat, Rechteck, rechtwinkligem Dreieck und daraus zusammengesetzten Figuren mit Einheitsquadraten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Umfangsformel und Flächeninhaltsformel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Flächeninhaltsformel",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Gymnasium"
@@ -11831,6 +11988,14 @@
       {
        "thema": "Repräsentanten für Standardgrößen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Größen von Alltagsgegenständen mithilfe von Repräsentanten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bezugsgrößen aus der Erfahrungswelt zum Schätzen",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -11846,7 +12011,25 @@
     },
     {
      "thema": "Volumen und Oberflächeninhalt spezieller Körper",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Volumen von Würfel und Quader mit Einheitswürfeln",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Volumen- und Oberflächenformel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Volumenformel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Gymnasium"
@@ -11880,6 +12063,10 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Addition und Subtraktion einfacher Brüche",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Addition und Subtraktion von Brüchen",
        "herkunft": "wortlaut"
       }
@@ -11890,7 +12077,19 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Anteile von Anteilen am Rechteckfeld",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "rechnerisches Vorgehen bei Multiplizieren von Anteilen am Bild",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Grundvorstellung der Division als „Aufteilen“ und „Passen in“ bei Brüchen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Multiplikation und Division einfacher Brüche",
        "herkunft": "wortlaut"
       },
       {
@@ -11935,11 +12134,27 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Winkel in der Umwelt",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Winkeltypen (spitze, rechte, stumpfe, gestreckte und überstumpfe)",
        "herkunft": "wortlaut"
       },
       {
        "thema": "Beschriftung von Winkeln",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Winkel mit dem Geodreieck",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache (45 °, 90 °, 180 °, 360 °) Winkelgrößen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Winkelgrößen",
        "herkunft": "wortlaut"
       },
       {
@@ -11953,7 +12168,15 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Kreise mit dem Zirkel",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Mittelpunkt, Radius, Durchmesser",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kreismuster mit dem Zirkel",
        "herkunft": "wortlaut"
       }
      ]
@@ -12008,6 +12231,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Symmetrieachsen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Untersuchung von Figuren auf Achsen-, Punkt- und Drehsymmetrie",
        "herkunft": "wortlaut"
       }
@@ -12059,6 +12286,10 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Multiplikation mit und Division durch einfache rationale Zahlen in Dezimalschreibweise",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "schriftliche Multiplikation und Division von abbrechenden Zahlen in Dezimalschreibweise",
      "herkunft": "wortlaut"
     },
@@ -12068,6 +12299,10 @@
     },
     {
      "thema": "einfache (0,25; 0,5; 0,75) und andere Zahlen aus der Dezimalschreibweise in Bruchschreibweise umwandeln und umgekehrt",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Größen in Dezimalschreibweise",
      "herkunft": "wortlaut"
     },
     {
@@ -12084,6 +12319,10 @@
     },
     {
      "thema": "Umkehrrechnung zum Beurteilen des Ergebnisses",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Bruchschreibweise und Dezimalschreibweise",
      "herkunft": "wortlaut"
     }
    ],
@@ -12106,12 +12345,22 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "In „je …, desto ...“-Überlegungen wird der Kovariationsaspekt thematisiert.",
-     "herkunft": "wortlaut"
-    },
-    {
      "thema": "Koordinatensystem",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Wertepaare in ein Koordinatensystem",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Skalierung des Koordinatensystems",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Werte aus Graphen",
+       "herkunft": "wortlaut"
+      }
+     ]
     },
     {
      "thema": "Funktionale Beziehungen",
@@ -12119,6 +12368,10 @@
      "unterthemen": [
       {
        "thema": "Zusammenhänge zwischen zwei Größen aus dem Alltag erkennen, mit eigenen Worten beschreiben und Aufgaben dazu lösen, auch im negativen Zahlenbereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verlauf von Graphen",
        "herkunft": "wortlaut"
       }
      ]
@@ -12144,6 +12397,40 @@
    "unterthemen": [
     {
      "thema": "Wetten zu Zufallsexperimenten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Alltagsbeispiele für sichere und nicht sichere Wetten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Begriffe „sicher“, „unmöglich“ und „wahrscheinlich“ zur Beschreibung von Wahrscheinlichkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "die besten Gewinnchancen bei Wetten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Daten in Tabellen und Strichlisten",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kreisdiagramme",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "relative Häufigkeiten bei Zufallsexperimenten",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "relative Häufigkeiten aus Kreisdiagrammen",
      "herkunft": "wortlaut"
     },
     {
@@ -12152,6 +12439,10 @@
     },
     {
      "thema": "erklären, warum man bei großen Wurfzahlen besser wetten kann",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Würfelergebnisse bei großer Wurfzahl",
      "herkunft": "wortlaut"
     }
    ],
@@ -12202,7 +12493,19 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "zu Termen passende Alltagssituationen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Terme in Langschreibweise mit Klammer und Vorzeichen",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Kurzschreibweise: Rechenzeichen und Vorzeichen werden eins",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "negative und positive Zahlen in Sachkontexten",
      "herkunft": "wortlaut"
     },
     {
@@ -12251,6 +12554,26 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Messungen von abhängigen Größen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "in Tabellen einfache Gesetzmäßigkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "proportionale und antiproportionale Zuordnungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sachsituationen zu vorgegebenen proportionalen und antiproportionalen Zuordnungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Gleichungen durch systematisches Probieren",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Darstellungsform und -wechsel (Sprache, Tabelle, Graph, Term)",
        "herkunft": "wortlaut"
       },
@@ -12266,6 +12589,10 @@
      "unterthemen": [
       {
        "thema": "sachgerechter Umgang mit den Koordinatenachsen, auch mit unterschiedlichen Skalierungen der x - und y -Achse",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Skalierung des Koordinatensystems",
        "herkunft": "wortlaut"
       }
      ]
@@ -12290,14 +12617,6 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "Das Ganze ist der Grundwert.",
-     "herkunft": "wortlaut"
-    },
-    {
-     "thema": "Der Teil ist der Prozentwert.",
-     "herkunft": "wortlaut"
-    },
-    {
      "thema": "Grundvorstellungen zur Prozentrechnung",
      "herkunft": "wortlaut",
      "unterthemen": [
@@ -12318,17 +12637,57 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Prozent-, Dezimal- oder Bruchschreibweise",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Grundwert, Prozentwert und Prozentsatz",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Prozentdarstellungen verwenden und vernetzen: Formel, Dreisatztabelle, Kreisdiagramm, Prozentstreifen",
        "herkunft": "wortlaut"
       }
      ]
     },
     {
+     "thema": "Grundwert, Prozentwert und Prozentsatz in Texten und Grafiken",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Grundwert, Prozentwert und Prozentsatz am Prozentstreifen und in Dreisatztabellen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "einfache und komplexere Grundaufgaben durch (proportionales) Herauf- und Herunterrechnen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Preisrabatte im Kopf",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "prozentuale Zu- und Abnahme von Preisen",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Zinsrechnung in Kontexten",
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Kapital, Zinsen und Zinssatz als Grundwert, Prozentwert und Prozentsatz",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Jahreszinsen und Guthaben nach einem Jahr",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Zinseszinsaufgaben iterativ und durch Potenzieren lösen, auch unter Verwendung von Tabellenkalkulation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "weitere Grundaufgaben zu Kapital, Jahreszins und Zinssatz",
        "herkunft": "wortlaut"
       }
      ]
@@ -12357,7 +12716,35 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Wahrscheinlichkeiten bei einfachen Laplace-Experimenten als Bruch, als Prozentsatz und als Dezimalzahl",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wahrscheinlichkeiten unterschiedlicher Laplace-Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "alle möglichen Ergebnisse eines einfachen Zufallsexperiments",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Anzahlen günstiger und möglicher Ergebnisse mithilfe einfacher Zählprinzipien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Gegenwahrscheinlichkeit bei einfachen Laplace-Zufallsexperimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wahrscheinlichkeiten mit zweistufigem Baumdiagramm",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Erwartungswert",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "faire Gewinnspiele",
        "herkunft": "wortlaut"
       }
      ]
@@ -12368,6 +12755,22 @@
      "unterthemen": [
       {
        "thema": "Strichlisten und Häufigkeitstabellen bei Zufallsexperimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einstufige Zufallsexperimente mit verschiedenen Gegenständen (Münze, Würfel, Glücksrad, Streichholz, Legostein etc.)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Laplace-Zufallsexperimente von Nicht-Laplace-Zufallsexperimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "erwartbare absolute Häufigkeiten eines mehrfach durchgeführten Zufallsexperiments",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Schätzungen, Urteile und Vorurteile im rechnergestützten Versuch",
        "herkunft": "wortlaut"
       }
      ]
@@ -12400,12 +12803,48 @@
      "herkunft": "wortlaut"
     },
     {
-     "thema": "Dreiecke und Konstruktionen",
+     "thema": "Innenwinkelsummensatz",
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Dreiecke und Konstruktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Dreiecksarten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Höhen im Dreieck",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dreiecke mit Lineal, Geodreieck und dynamischer Geometriesoftware",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dreiecke mit Zirkel, Lineal und auch mit dynamischer Geometriesoftware",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
      "thema": "Geometrische Sätze an Dreiecken",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Kongruenz von Dreiecken",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Eigenschaften von Dreiecken zur Analyse von Sachsituationen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Satz des Thales",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Gymnasium"
@@ -12445,14 +12884,40 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "einfache Terme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Terme im Sachzusammenhang",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Werte von Termen durch Einsetzen berechnen, auch mit einem Tabellenkalkulationsprogramm",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zahlenfolgen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Terme mit rationalen Zahlen",
        "herkunft": "wortlaut"
       }
      ]
     },
     {
      "thema": "Gleichungen",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "einfache Gleichungen aus Wortgleichungen und Texten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache lineare Gleichungen",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Gymnasium"
@@ -12492,6 +12957,10 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "gesuchte Werte durch Aufstellen und Lösen von Gleichungen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Herleitung der Flächeninhaltsformel von Parallelogramm und Trapez",
        "herkunft": "wortlaut"
       }
@@ -12525,11 +12994,23 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "unabhängige und abhängige Größen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "lineare vs. Proportionale und antiproportionale Zusammenhänge",
        "herkunft": "wortlaut"
       },
       {
        "thema": "konstante Änderungsrate und Startwert",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Terme zu linearen Zusammenhängen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "zu linearem Term eine Situation",
        "herkunft": "wortlaut"
       },
       {
@@ -12543,6 +13024,22 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "lineare Zusammenhänge in Tabellen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "lineare Zusammenhänge als Graphen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "lineare Zusammenhänge in Funktionstermen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Steigung und y -Achsenabschnitt aus dem Funktionsterm, dem Graphen und der Tabelle",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Darstellungsvernetzung: Term, Graph, Tabelle, Text, auch mit dynamischer Geometriesoftware",
      "herkunft": "wortlaut"
     },
@@ -12552,6 +13049,18 @@
     },
     {
      "thema": "Zu einzelnen Stellen den y-Wert mit Term, Tabelle und Graphen ermitteln – und umgekehrt",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "einfache Lineare Gleichungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "lineare Gleichungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Ergebnisse im Sachkontext",
      "herkunft": "wortlaut"
     },
     {
@@ -12578,9 +13087,33 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "Umfänge von Kreisen mit unterschiedlichen Radien",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Flächeninhalte von Kreisen mit unterschiedlichen Radien",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Flächeninhalt und Umfang",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "Flächeninhalt von Kreisen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Umfang und Durchmesser, bzw. Radius aus gegebenen Flächeninhalten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Flächeninhalte und Umfang von Kreisteilen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Flächeninhalte von Kreisen und Kreisteilen mithilfe digitaler Mathematikwerkzeuge",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "näherungsweise Berechnungen an krummlinig begrenzten Figuren",
        "herkunft": "wortlaut"
@@ -12610,6 +13143,22 @@
      "thema": "Gleichungen",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "einfache lineare Gleichungen in Kontexten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "lineare Gleichungen in Kontexten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache lineare Gleichungen durch Äquivalenzumformungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "lineare Gleichungen durch Äquivalenzumformungen",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "Aufstellen und Interpretieren nichtlinearer Gleichungen, ggf. Lösen dieser durch systematisches Probieren",
        "herkunft": "wortlaut"
@@ -12654,8 +13203,38 @@
      "herkunft": "wortlaut"
     },
     {
-     "thema": "Volumen und Oberflächeninhalt",
+     "thema": "Netze und Modelle von Zylindern",
      "herkunft": "wortlaut"
+    },
+    {
+     "thema": "verschiedene Prismen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Prismen und Zylinder",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Volumen und Oberflächeninhalt",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Oberflächeninhalt und Volumen von Prismen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt und Volumen von Zylindern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt und Volumen aus bekannten zusammengesetzten Körpern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "fehlende Werte durch Aufstellen und Lösen von Gleichungen",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Gymnasium"
@@ -12677,6 +13256,10 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "Daten aus Quellenmaterial",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Planung statistischer Erhebungen, auch unter den Aspekten Stichprobenauswahl und Erhebungsinstrument, auch mithilfe von Tabellenkalkulation",
      "herkunft": "wortlaut"
     },
@@ -12685,7 +13268,23 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Manipulation, Absicht und mögliche Wirkung bei der Darstellung von Daten",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Kenngrößen (Minimum, Maximum, arithmetisches Mittel, Zentralwert (Median), Spannweite)",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "kritische Interpretation grafischer Darstellungen und Tabellen von statistischen Erhebungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Quartile",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Vor- und Nachteile unterschiedlicher Kenngrößen",
      "herkunft": "wortlaut"
     },
     {
@@ -12726,6 +13325,10 @@
       {
        "thema": "grafisches Lösen linearer Gleichungssystemen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Lösbarkeit und Lösungsvielfalt linearer Gleichungssysteme",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -12746,6 +13349,10 @@
        "herkunft": "wortlaut"
       }
      ]
+    },
+    {
+     "thema": "in Kontexten routiniert lineare Gleichungssysteme mit zwei Variablen",
+     "herkunft": "wortlaut"
     },
     {
      "thema": "Vergleich der Effektivität verschiedener Lösungsverfahren für die jeweilige Fragestellung oder das Problem",
@@ -12771,11 +13378,11 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "Probleme ohne Lösung in (z. B. Seitenlänge eines Quadrats ermit2 teln, Quadratflächen verdoppeln, Lösung von",
+     "thema": "nichtabbrechende, nichtperiodische Zahlen in Dezimalschreibweise",
      "herkunft": "wortlaut"
     },
     {
-     "thema": "nichtabbrechende, nichtperiodische Zahlen in Dezimalschreibweise",
+     "thema": "Notwendigkeit der Zahlbereichserweiterung von … nach … am Beispiel",
      "herkunft": "wortlaut"
     },
     {
@@ -12783,7 +13390,27 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Phänomen der Konvergenz mit Rechnerhilfe",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Wurzelschreibweise",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Wurzeln",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Wurzeln auf dem Zahlenstrahl",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Berechnen von Quadrat- und Kubikwurzeln, beispielsweise zum Lösen einfacher Probleme, u. a. unter Verwendung eines Taschenrechners",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Potenzen und Wurzeln als Umkehrungen",
      "herkunft": "wortlaut"
     },
     {
@@ -12810,15 +13437,23 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "Wenn die Summe der Quadrate über zwei Seiten das Quadrat über der dritten Seite ergibt, dann liegt ein rechtwinkliges Dreieck vor.",
+     "thema": "Flächeninhalte von Quadraten über den Seiten spitzer, stumpfer und rechtwinkliger Dreiecke mit dynamischer Geometriesoftware",
      "herkunft": "wortlaut"
     },
     {
-     "thema": "Wenn ein rechtwinkliges Dreieck vorliegt, dann ist die Summe der Quadrate über den Katheten gleich dem Quadrat über der Hypotenuse.",
+     "thema": "Satz des Pythagoras (vorwärts und rückwärts)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Seitenlängen mit dem Satz des Pythagoras",
      "herkunft": "wortlaut"
     },
     {
      "thema": "Anwendungen des Satzes des Pythagoras in Alltagssituationen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Richtigkeit des Satzes von Pythagoras",
      "herkunft": "wortlaut"
     },
     {
@@ -12845,7 +13480,45 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "Pyramide, Kegel und Kugel (auch aus ihrer Umwelt)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Netze und Schrägbilder von Pyramide und Kegel",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Schrägbilder von aus bisher bekannten zusammengesetzten Körpern",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Oberflächeninhalt und Volumen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Oberflächeninhalt und Volumen von Pyramide, Kegel und Kugel mit Formelsammlung und Taschenrechner",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Im Sachkontext gesuchte Werte durch Aufstellen und Lösen von Gleichungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt und Volumen aus bisher bekannten zusammengesetzten Körpern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "funktionale Abhängigkeit der Volumen- und Flächeninhaltsveränderung bei einem der Körper",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Satz von Cavalieri",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Formel für das Volumen einer Pyramide und Kugel",
      "herkunft": "wortlaut"
     }
    ],
@@ -12872,6 +13545,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "funktionale Abhängigkeit zweier Größen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "quadratische Funktionen realitätsnahen Situationen zuordnen und umgekehrt",
        "herkunft": "wortlaut"
       },
@@ -12880,7 +13557,23 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Vor- und Nachteile verschiedener Darstellungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Merkmale der Funktion in den verschiedenen Darstellungen der Funktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "eine der oder alle Formen von quadratischen Funktionen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Einflüsse der Parameter in einer Form oder in verschiedenen Formen des Funktionsterms erkennen und benennen, auch mit dynamischer Geometriesoftware",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "realitätsnahe Probleme mit quadratischen Funktionen auch mit Tabellenkalkulation",
        "herkunft": "wortlaut"
       }
      ]
@@ -12889,6 +13582,18 @@
      "thema": "Gleichungen",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "quadratische Gleichungen numerisch (systematisches Probieren)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "realitätsnahe Probleme durch grafische Bestimmung der Schnittpunkte von Funktionsgraphen auch mit dynamischer Geometriesoftware",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Lösbarkeit und Lösungsvielfalt quadratischer Gleichungen",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "Vergleich der Effektivität verschiedener Lösungsverfahren für vorliegende Probleme",
        "herkunft": "wortlaut"
@@ -12919,6 +13624,18 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Zehnerpotenzschreibweise",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Potenzgesetze an Beispielen mit natürlichen Exponenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Potenzgesetze zum vorteilhaften Rechnen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Berechnen einfacher Potenzen auch ohne Taschenrechner",
        "herkunft": "wortlaut"
       },
@@ -12933,7 +13650,19 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "negative Exponenten mit der Kehrwertbildung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wurzeln als Potenzen mit rationalem Exponenten",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Potenzgesetze bei rationalen Exponenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wurzelgesetze als Potenzgesetze",
        "herkunft": "wortlaut"
       }
      ]
@@ -12970,7 +13699,31 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Gegenwahrscheinlichkeiten für ein- und mehrstufige Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Erwartungswerte für ein- und mehrstufige Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Wahrscheinlichkeit und relative Häufigkeit sowie Erwartungswert und arithmetisches Mittel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zufallserscheinungen aus dem Alltag",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Baumdiagramme als übersichtliche Darstellung aller möglichen Ergebnisse mehrstufiger Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Anzahlen der günstigen und möglichen Ergebnisse mithilfe von Zählprinzipien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "zweistufige Laplace-Experimente",
        "herkunft": "wortlaut"
       }
      ]
@@ -12981,6 +13734,18 @@
      "unterthemen": [
       {
        "thema": "bedingte Wahrscheinlichkeiten in Texten, Visualisierungen und Alltagssituationen erkennen, ohne und mithilfe digitaler Medien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bedingte Wahrscheinlichkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bedingte Wahrscheinlichkeiten mithilfe entsprechender Visualisierungen (Vierfeldertafel und Baumdiagramm)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Texte und Aussagen mit Bezug auf bedingte Wahrscheinlichkeiten",
        "herkunft": "wortlaut"
       },
       {
@@ -13062,6 +13827,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Verhältnisse in ähnlichen rechtwinkligen Dreiecken",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "besondere Verhältnisse: Sinus, Kosinus und Tangens",
        "herkunft": "wortlaut"
       },
@@ -13075,6 +13844,10 @@
      "thema": "Allgemeine Dreiecke",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "ähnliche allgemeine Dreiecke",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "Formulieren von Zusammenhängen zwischen Winkeln und Seitenlängen in allgemeinen Dreiecken (Sinussatz und Kosinussatz)",
        "herkunft": "wortlaut"
@@ -13114,10 +13887,6 @@
       },
       {
        "thema": "Sinusfunktion und Kosinusfunktion",
-       "herkunft": "wortlaut"
-      },
-      {
-       "thema": "Untersuchung von Einflüssen der Parameter bei =",
        "herkunft": "wortlaut"
       },
       {
@@ -13164,11 +13933,39 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "funktionale Abhängigkeit zweier Größen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Exponentialfunktionen der Form realitätsnahen Situationen zuordnen und umgekehrt",
        "herkunft": "wortlaut"
       },
       {
        "thema": "Darstellungsform und -wechsel (Sprache, Tabelle, Graph, Term), auch mit dynamischer Geometriesoftware oder Tabellenkalkulation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Vor- und Nachteile verschiedener Darstellungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Merkmale der Funktion in den verschiedenen Darstellungen der Funktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "realitätsnahe Probleme mit Exponentialfunktionen auch mit dynamischer Geometriesoftware",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "zu Wachstumsprozessen Größen (Funktionswerte und Argumente) mit dem Taschenrechner",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "große Zahlen in Zehnerpotenzschreibweise",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Logarithmieren als eine Umkehrung des Potenzierens",
        "herkunft": "wortlaut"
       },
       {
@@ -13201,11 +13998,39 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Funktionale Abhängigkeit zweier Größen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Exponentialfunktionen der Form",
        "herkunft": "wortlaut"
       },
       {
        "thema": "Darstellungsform und -wechsel (Sprache, Tabelle, Graph, Term), auch mit dynamischer Geometriesoftware oder Tabellenkalkulation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Vor- und Nachteile verschiedener Darstellungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Merkmale der Funktion in den verschiedenen Darstellungen der Funktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "realitätsnahe Probleme mit Exponentialfunktionen auch mit dynamischer Geometriesoftware",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zu Wachstumsprozessen Größen (Funktionswerte und Argumente) mit dem Taschenrechner",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "große Zahlen in Zehnerpotenzschreibweise",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Logarithmieren als eine Umkehrung des Potenzierens",
        "herkunft": "wortlaut"
       },
       {
@@ -13287,7 +14112,15 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "bekannte und neu gelernte Funktionen als Hilfsmittel",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Einsatz digitaler Mathematikwerkzeuge zur Visualisierung und Untersuchung funktionaler Zusammenhänge",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Beziehungen zwischen den verschiedenen Darstellungsarten für Funktionen",
      "herkunft": "wortlaut"
     },
     {
@@ -13320,10 +14153,6 @@
       },
       {
        "thema": "Wurzelfunktion als Beispiel für eine einfache Umkehrfunktion",
-       "herkunft": "wortlaut"
-      },
-      {
-       "thema": "unter einfachen gebrochen rationalen Funktionen werden Funktio= 1 nen verstanden, deren Graph aus dem Graphen zu",
        "herkunft": "wortlaut"
       }
      ]
@@ -24588,7 +25417,7 @@
    "quelle": "hh-sts-chemie",
    "seite": "S. 35",
    "bereich": "Themenfeld 3: Chemische Reaktionen – 3.3",
-   "thema": "Optional: Reaktionen der Metalle",
+   "thema": "Reaktionen der Metalle",
    "herkunft": "wortlaut",
    "unterthemen": [
     {
@@ -24628,7 +25457,8 @@
      ]
     }
    ],
-   "schulformName": "Stadtteilschule"
+   "schulformName": "Stadtteilschule",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "chemie",
@@ -24923,7 +25753,7 @@
    "quelle": "hh-sts-chemie",
    "seite": "S. 40",
    "bereich": "Themenfeld 6: Säuren und Laugen – 6.1",
-   "thema": "Optional: Saure und alkalische Lösungen",
+   "thema": "Saure und alkalische Lösungen",
    "herkunft": "wortlaut",
    "unterthemen": [
     {
@@ -24953,7 +25783,8 @@
      ]
     }
    ],
-   "schulformName": "Stadtteilschule"
+   "schulformName": "Stadtteilschule",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "chemie",
@@ -25045,7 +25876,7 @@
    "quelle": "hh-sts-chemie",
    "seite": "S. 42",
    "bereich": "Themenfeld 7: Organische Verbindungen – 7.2",
-   "thema": "Optional: Einfache Alkohole",
+   "thema": "Einfache Alkohole",
    "herkunft": "wortlaut",
    "unterthemen": [
     {
@@ -25075,7 +25906,8 @@
      ]
     }
    ],
-   "schulformName": "Stadtteilschule"
+   "schulformName": "Stadtteilschule",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "chemie",
@@ -28533,7 +29365,7 @@
    "verbindlichkeit": "wahlpflicht",
    "quelle": "hh-sts-geographie",
    "seite": "S. 42",
-   "bereich": "Themenbereich: Auf dem Weg zur Nachhaltigkeit – Miteinander Leben und Wirtschaften in einer dynamischen und sich wandelnden Welt Optional: – 3.3",
+   "bereich": "Themenbereich: Auf dem Weg zur Nachhaltigkeit – Miteinander Leben und Wirtschaften in einer dynamischen und sich wandelnden Welt – 3.3",
    "thema": "Weltweite Entwicklungsunterschiede",
    "herkunft": "wortlaut",
    "unterthemen": [
@@ -28589,7 +29421,8 @@
     }
    ],
    "fachname": "Geographie",
-   "schulformName": "Stadtteilschule"
+   "schulformName": "Stadtteilschule",
+   "hinweis": "im Plan als optional ausgewiesen"
   },
   {
    "fach": "geschichte",
@@ -36779,6 +37612,14 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "eigene Umfragen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Häufigkeitstabelle",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "graphische Darstellung erhobener Daten (z. B. Säulen- und Balkendiagramm)",
      "herkunft": "wortlaut"
     },
@@ -36795,7 +37636,15 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "gleichen Sachverhalt in verschiedenen Darstellungsformen",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Vergleich verschiedener Darstellungsformen im Hinblick auf Vor- und Nachteile",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Kenngrößen Durchschnitt bzw. arithmetisches Mittel, Zentralwert bzw. Median, Spannweite",
      "herkunft": "wortlaut"
     }
    ],
@@ -36874,6 +37723,10 @@
       {
        "thema": "Zahlenreihen bei sich fortsetzenden einfachen Mustern, auch in Bildern",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rechengesetze",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -36949,11 +37802,55 @@
    "unterthemen": [
     {
      "thema": "Orientierung in der Ebene",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Punkt, Strecke, Strahl und Gerade",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Parallele und senkrechte Geraden",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Längen von Strecken und Abstände",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Punkte im Koordinatensystem",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Grundrisse und grobe Lagepläne mithilfe vorgegebener Raster",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "geometrische Figuren (Dreiecke, Vierecke und Polygone) im Koordinatensystem",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Grundrisse und Lagepläne mit einem selbstgewählten Raster",
+       "herkunft": "wortlaut"
+      }
+     ]
     },
     {
      "thema": "Ebene Figuren",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figuren in der Lebenswelt",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rechtecke und Quadrate",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Parallelogramme, Rechtecke und Quadrate",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -36981,6 +37878,10 @@
       {
        "thema": "Kopfgeometrie",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Würfelbauten nach Schrägbildern",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -36989,7 +37890,27 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Körper in der Lebenswelt",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Quader, Würfel, Kegel, Zylinder, Kugel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "von Würfeln und Quadern Netze und Modelle",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Quader, Würfel, Pyramide, Prisma, Kegel, Kugel, Zylinder beschreiben ihre definierenden Eigenschaften",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "von Würfeln und Quadern Schrägbilder",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "von Dreiecksprismen Netze, Schrägbilder und Modelle",
        "herkunft": "wortlaut"
       }
      ]
@@ -37022,6 +37943,18 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Brüche in Alltagssituationen (bildhaften Darstellungen)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "einfache und andere Brüche als Bild (u. a. als Bruchstreifen)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Brüche am vorstrukturierten oder selbstgewählten Zahlenstrahl",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Prozentdarstellung",
      "herkunft": "wortlaut"
     },
@@ -37035,6 +37968,22 @@
     },
     {
      "thema": "Zusammenhang zwischen Bild und Kalkül",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "gleichwertige Brüche und Bruchdarstellungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Brüche für eine Prozentdarstellung",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Anteil, Teil und Ganzes aus Text und Bild",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Anteil, Teil und Ganzes von Größen und Mengen",
      "herkunft": "wortlaut"
     }
    ],
@@ -37081,6 +38030,10 @@
       {
        "thema": "Addition und Subtraktion schriftlich im Stellenwertsystem",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rechenalgorithmus der schriftlichen Addition und Subtraktion",
+       "herkunft": "wortlaut"
       }
      ]
     }
@@ -37118,6 +38071,14 @@
       {
        "thema": "Repräsentanten für Standardgrößen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Größen von Alltagsgegenständen mithilfe von Repräsentanten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bezugsgrößen aus der Erfahrungswelt zum Schätzen",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -37145,6 +38106,10 @@
      "unterthemen": [
       {
        "thema": "maßstabsgetreues Zeichnen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Entfernungen auf Stadtplänen und Landkarten mit Maßstabsleiste",
        "herkunft": "wortlaut"
       }
      ]
@@ -37183,6 +38148,14 @@
       {
        "thema": "Repräsentanten für Standardgrößen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Größen von Alltagsgegenständen mithilfe von Repräsentanten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bezugsgrößen aus der Erfahrungswelt zum Schätzen",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -37198,7 +38171,21 @@
     },
     {
      "thema": "Flächeninhalt und Umfang spezieller Figuren",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Flächeninhalte von Quadrat, Rechteck, rechtwinkligem Dreieck und daraus zusammengesetzten Figuren mit Einheitsquadraten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Umfangsformel und Flächeninhaltsformel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Flächeninhaltsformel",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -37234,6 +38221,14 @@
       {
        "thema": "Repräsentanten für Standardgrößen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Größen von Alltagsgegenständen mithilfe von Repräsentanten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bezugsgrößen aus der Erfahrungswelt zum Schätzen",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -37244,12 +38239,34 @@
       {
        "thema": "Umformen von Einheiten durch Vergleich mit Standardrepräsentanten oder Umrechnungstabellen und Umrechnungszahlen",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Vergleichen",
+       "herkunft": "wortlaut"
       }
      ]
     },
     {
      "thema": "Volumen und Oberflächeninhalt spezieller Körper",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Volumen von Würfel und Quader mit Einheitswürfeln",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Volumen- und Oberflächenformel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Volumenformel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -37283,6 +38300,10 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Addition und Subtraktion einfacher Brüche",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Addition und Subtraktion von Brüchen",
        "herkunft": "wortlaut"
       }
@@ -37293,7 +38314,19 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Anteile von Anteilen am Rechteckfeld",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rechnerisches Vorgehen bei Multiplizieren von Anteilen am Bild",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Grundvorstellung der Division als „Aufteilen“ und „Passen in“ bei Brüchen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Multiplikation und Division einfacher Brüche",
        "herkunft": "wortlaut"
       },
       {
@@ -37334,6 +38367,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Winkel in der Umwelt",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Winkeltypen (spitze, rechte, stumpfe, gestreckte und überstumpfe)",
        "herkunft": "wortlaut"
       },
@@ -37343,6 +38380,18 @@
       },
       {
        "thema": "spitze, rechte und stumpfe Winkel mit dem Geodreieck zeichnen mindestens auf ein Grad genau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Winkel mit dem Geodreieck",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache (45 °, 90 °, 180 °, 360 °) Winkelgrößen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Winkelgrößen",
        "herkunft": "wortlaut"
       },
       {
@@ -37356,7 +38405,15 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Kreise mit dem Zirkel",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Mittelpunkt, Radius, Durchmesser",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kreismuster mit dem Zirkel",
        "herkunft": "wortlaut"
       }
      ]
@@ -37411,6 +38468,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Symmetrieachsen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Untersuchung von Figuren auf Achsen-, Punkt- und Drehsymmetrie",
        "herkunft": "wortlaut"
       }
@@ -37458,6 +38519,10 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Multiplikation mit und Division durch einfache rationale Zahlen in Dezimalschreibweise",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "schriftliche Multiplikation und Division von abbrechenden Zahlen in Dezimalschreibweise",
      "herkunft": "wortlaut"
     },
@@ -37467,6 +38532,10 @@
     },
     {
      "thema": "einfache (0,25; 0,5; 0,75) und andere Zahlen aus der Dezimalschreibweise in Bruchschreibweise umwandeln und umgekehrt",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Größen in Dezimalschreibweise",
      "herkunft": "wortlaut"
     },
     {
@@ -37483,6 +38552,10 @@
     },
     {
      "thema": "Umkehrrechnung zum Beurteilen des Ergebnisses",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Bruchschreibweise und Dezimalschreibweise",
      "herkunft": "wortlaut"
     }
    ],
@@ -37505,12 +38578,22 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "In „je …, desto ...“-Überlegungen wird der Kovariationsaspekt thematisiert.",
-     "herkunft": "wortlaut"
-    },
-    {
      "thema": "Koordinatensystem",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Wertepaare in ein Koordinatensystem",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Skalierung des Koordinatensystems",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Werte aus Graphen",
+       "herkunft": "wortlaut"
+      }
+     ]
     },
     {
      "thema": "Funktionale Beziehungen",
@@ -37518,6 +38601,10 @@
      "unterthemen": [
       {
        "thema": "Zusammenhängen zwischen zwei Größen anhand von Sachsituationen kennenlernen, auch im negativen Zahlenbereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verlauf von Graphen",
        "herkunft": "wortlaut"
       }
      ]
@@ -37543,6 +38630,40 @@
    "unterthemen": [
     {
      "thema": "Wetten zu Zufallsexperimenten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Alltagsbeispiele für sichere und nicht sichere Wetten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Begriffe „sicher“, „unmöglich“ und „möglich“ zur Beschreibung von Wahrscheinlichkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "die besten Gewinnchancen bei Wetten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Daten in Tabellen und Strichlisten",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kreisdiagramme",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "relative Häufigkeiten bei Zufallsexperimenten",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "relative Häufigkeiten aus Kreisdiagrammen",
      "herkunft": "wortlaut"
     },
     {
@@ -37551,6 +38672,10 @@
     },
     {
      "thema": "erklären, warum man bei großen Wurfzahlen besser wetten kann",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Würfelergebnisse bei großer Wurfzahl",
      "herkunft": "wortlaut"
     }
    ],
@@ -37601,7 +38726,19 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "zu Termen passende Alltagssituationen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Terme in Langschreibweise mit Klammer und Vorzeichen",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Kurzschreibweise: Rechenzeichen und Vorzeichen werden eins",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "negative und positive Zahlen in Sachkontexten",
      "herkunft": "wortlaut"
     },
     {
@@ -37650,6 +38787,26 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Messungen von abhängigen Größen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "in Tabellen einfache Gesetzmäßigkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "proportionale und antiproportionale Zuordnungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sachsituationen zu vorgegebenen proportionalen und antiproportionalen Zuordnungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Gleichungen durch systematisches Probieren",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Darstellungsform und -wechsel (Sprache, Tabelle, Graph, Term)",
        "herkunft": "wortlaut"
       },
@@ -37665,6 +38822,10 @@
      "unterthemen": [
       {
        "thema": "sachgerechter Umgang mit den Koordinatenachsen, auch mit unterschiedlichen Skalierungen der x - und y -Achse",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Skalierung des Koordinatensystems",
        "herkunft": "wortlaut"
       }
      ]
@@ -37697,12 +38858,48 @@
      "herkunft": "wortlaut"
     },
     {
-     "thema": "Dreiecke und Konstruktionen",
+     "thema": "Innenwinkelsummensatz",
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Dreiecke und Konstruktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Dreiecksarten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Höhen im Dreieck",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dreiecke mit Lineal, Geodreieck und dynamischer Geometrie-Software",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dreiecke mit Zirkel, Lineal und auch mit dynamischer Geometrie-Software",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
      "thema": "Geometrische Sätze an Dreiecken",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Kongruenz von Dreiecken",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Eigenschaften von Dreiecken zur Analyse von Sachsituationen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Satz des Thales",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -37725,7 +38922,13 @@
    "unterthemen": [
     {
      "thema": "Variablen",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "verschiedene Aspekte von Variablen in unterschiedlichen Zusammenhängen",
+       "herkunft": "wortlaut"
+      }
+     ]
     },
     {
      "thema": "Terme",
@@ -37736,14 +38939,40 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "einfache Terme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Terme im Sachzusammenhang",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Werte von Termen durch Einsetzen berechnen, auch mit einem Tabellenkalkulationsprogramm",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zahlenfolgen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache Terme mit rationalen Zahlen",
        "herkunft": "wortlaut"
       }
      ]
     },
     {
      "thema": "Gleichungen",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "einfache Gleichungen aus Wortgleichungen und Texten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache lineare Gleichungen",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -37765,14 +38994,6 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "Das Ganze ist der Grundwert.",
-     "herkunft": "wortlaut"
-    },
-    {
-     "thema": "Der Teil ist der Prozentwert.",
-     "herkunft": "wortlaut"
-    },
-    {
      "thema": "Grundvorstellungen zur Prozentrechnung",
      "herkunft": "wortlaut",
      "unterthemen": [
@@ -37793,10 +39014,38 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Prozent-, Dezimal- oder Bruchschreibweise",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Grundwert, Prozentwert und Prozentsatz",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Prozentdarstellungen verwenden und vernetzen: Formel, Dreisatztabelle, Kreisdiagramm, Prozentstreifen",
        "herkunft": "wortlaut"
       }
      ]
+    },
+    {
+     "thema": "Grundwert, Prozentwert und Prozentsatz in Texten und Grafiken",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Grundwert, Prozentwert und Prozentsatz am Prozentstreifen und in Dreisatztabellen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "einfache und komplexere Grundaufgaben durch (proportionales) Herauf- und Herunterrechnen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Preisrabatte im Kopf",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "prozentuale Zu- und Abnahme von Preisen",
+     "herkunft": "wortlaut"
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -37822,7 +39071,19 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Kapital, Zinsen und Zinssatz als Grundwert, Prozentwert und Prozentsatz",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Jahreszinsen und Guthaben nach einem Jahr",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Zinseszinsaufgaben iterativ und durch Potenzieren lösen, auch unter Verwendung von Tabellenkalkulation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "weitere Grundaufgaben zu Kapital, Jahreszins und Zinssatz",
        "herkunft": "wortlaut"
       }
      ]
@@ -37850,6 +39111,22 @@
      "thema": "Gleichungen",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "einfache lineare Gleichungen in Kontexten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "lineare Gleichungen in Kontexten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einfache lineare Gleichungen durch Äquivalenzumformungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "lineare Gleichungen durch Äquivalenzumformungen",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "Aufstellen und Interpretieren nichtlinearer Gleichungen, ggf. Lösen dieser durch systematisches Probieren",
        "herkunft": "wortlaut"
@@ -37908,6 +39185,10 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "gesuchte Werte durch Aufstellen und Lösen von Gleichungen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Herleitung der Flächeninhaltsformel von Parallelogramm, Trapez, Raute und Drachenviereck",
        "herkunft": "wortlaut"
       }
@@ -37933,9 +39214,33 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "Umfänge von Kreisen mit unterschiedlichen Radien",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Flächeninhalte von Kreisen mit unterschiedlichen Radien",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Flächeninhalt und Umfang",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "Flächeninhalt von Kreisen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Umfang und Durchmesser, bzw. Radius aus gegebenen Flächeninhalten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Flächeninhalte und Umfang von Kreisteilen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Flächeninhalte von Kreisen und Kreisteilen mithilfe digitaler Mathematikwerkzeuge",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "näherungsweise Berechnungen an krummlinig begrenzten Figuren",
        "herkunft": "wortlaut"
@@ -37966,8 +39271,38 @@
      "herkunft": "wortlaut"
     },
     {
-     "thema": "Volumen und Oberflächeninhalt",
+     "thema": "Netze und Modelle von Zylindern",
      "herkunft": "wortlaut"
+    },
+    {
+     "thema": "verschiedene Prismen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Prismen und Zylinder",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Volumen und Oberflächeninhalt",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Oberflächeninhalt und Volumen von Prismen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt und Volumen von Zylindern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt und Volumen aus bekannten zusammengesetzten Körpern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "fehlende Werte durch Aufstellen und Lösen von Gleichungen",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -37993,7 +39328,35 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Wahrscheinlichkeiten bei einfachen Laplace-Experimenten als Bruch, als Prozentsatz und als Dezimalzahl",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wahrscheinlichkeiten unterschiedlicher Laplace-Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "alle möglichen Ergebnisse eines einfachen Zufallsexperiments",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Anzahlen günstiger und möglicher Ergebnisse mithilfe einfacher Zählprinzipien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Gegenwahrscheinlichkeit bei einfachen Laplace-Zufallsexperimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wahrscheinlichkeiten mit zweistufigem Baumdiagramm",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Erwartungswert",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "faire Gewinnspiele",
        "herkunft": "wortlaut"
       }
      ]
@@ -38004,6 +39367,22 @@
      "unterthemen": [
       {
        "thema": "Häufigkeitstabellen bei Zufallsexperimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "einstufige Zufallsexperimente mit verschiedenen Gegenständen (Schweinchen, Legostein, Streichholz, Münze, Würfel, Glücksrad etc.)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Laplace-Zufallsexperimente von Nicht-Laplace-Zufallsexperimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Erwartbare absolute Häufigkeiten eines mehrfach durchgeführten Zufallsexperiments",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Schätzungen, Urteile und Vorurteile im rechnergestützten Versuch",
        "herkunft": "wortlaut"
       }
      ]
@@ -38036,11 +39415,23 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "unabhängige und abhängige Größen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "lineare vs. proportionale und antiproportionale Zusammenhänge",
        "herkunft": "wortlaut"
       },
       {
        "thema": "konstante Änderungsrate und Startwert",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Terme zu linearen Zusammenhängen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "zu linearem Term eine Situation",
        "herkunft": "wortlaut"
       },
       {
@@ -38054,6 +39445,22 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "lineare Zusammenhänge in Tabellen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "lineare Zusammenhänge als Graphen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "lineare Zusammenhänge in Funktionstermen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Steigung und y-Achsenabschnitt aus dem Funktionsterm, dem Graphen und der Tabelle",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Darstellungsvernetzung: Term, Graph, Tabelle, Text, auch mit dynamischer Geometrie-Software",
      "herkunft": "wortlaut"
     },
@@ -38063,6 +39470,18 @@
     },
     {
      "thema": "zu einzelnen Stellen den y-Wert mit Term, Tabelle und Graphen ermitteln – und umgekehrt",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "einfache Lineare Gleichungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "lineare Gleichungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Ergebnisse im Sachkontext",
      "herkunft": "wortlaut"
     },
     {
@@ -38089,11 +39508,11 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "Probleme ohne Lösung in (z. B. Seitenlänge eines Quadrats ermit2 teln, Quadratflächen verdoppeln, Lösung von",
+     "thema": "nichtabbrechende, nichtperiodische Zahlen in Dezimalschreibweise",
      "herkunft": "wortlaut"
     },
     {
-     "thema": "nichtabbrechende, nichtperiodische Zahlen in Dezimalschreibweise",
+     "thema": "Notwendigkeit der Zahlbereichserweiterung von … nach … am Beispiel",
      "herkunft": "wortlaut"
     },
     {
@@ -38101,7 +39520,27 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Phänomen der Konvergenz mit Rechnerhilfe",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Wurzelschreibweise",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Wurzeln",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Wurzeln auf dem Zahlenstrahl",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Berechnen von Quadrat- und Kubikwurzeln, beispielsweise zum Lösen einfacher Probleme, u. a. unter Verwendung eines Taschenrechners",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Potenzen und Wurzeln als Umkehrungen",
      "herkunft": "wortlaut"
     },
     {
@@ -38128,15 +39567,23 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
-     "thema": "Wenn die Summe der Quadrate über zwei Seiten das Quadrat über der dritten Seite ergibt, dann liegt ein rechtwinkliges Dreieck vor.",
+     "thema": "Flächeninhalte von Quadraten über den Seiten spitzer, stumpfer und rechtwinkliger Dreiecke mit dynamischer Geometrie-Software",
      "herkunft": "wortlaut"
     },
     {
-     "thema": "Wenn ein rechtwinkliges Dreieck vorliegt, dann ist die Summe der Quadrate über den Katheten gleich dem Quadrat über der Hypotenuse.",
+     "thema": "Satz des Pythagoras (vorwärts und rückwärts)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Seitenlängen mit dem Satz des Pythagoras",
      "herkunft": "wortlaut"
     },
     {
      "thema": "Anwendungen des Satzes des Pythagoras in Alltagssituationen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Richtigkeit des Satzes des Pythagoras",
      "herkunft": "wortlaut"
     },
     {
@@ -38163,7 +39610,45 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "Pyramide, Kegel und Kugel (auch aus ihrer Umwelt)",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Netze und Schrägbilder von Pyramide und Kegel",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Schrägbilder aus bisher bekannten zusammengesetzten Körpern",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Oberflächeninhalt und Volumen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Oberflächeninhalt und Volumen von Pyramide, Kegel und Kugel mit Formelsammlung und Taschenrechner",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "im Sachkontext gesuchte Werte durch Aufstellen und Lösen von Gleichungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Oberflächeninhalt und Volumen aus bisher bekannten zusammengesetzten Körpern",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "funktionale Abhängigkeit der Volumen- und Flächeninhaltsveränderung bei einem der Körper",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Satz von Cavalieri",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Formel für das Volumen einer Pyramide und Kugel",
      "herkunft": "wortlaut"
     }
    ],
@@ -38186,6 +39671,10 @@
    "herkunft": "wortlaut",
    "unterthemen": [
     {
+     "thema": "Daten aus Quellenmaterial",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "Planung statistischer Erhebungen, auch unter den Aspekten Stichprobenauswahl und Erhebungsinstrument, auch mithilfe von Tabellenkalkulation",
      "herkunft": "wortlaut"
     },
@@ -38194,7 +39683,23 @@
      "herkunft": "wortlaut"
     },
     {
+     "thema": "Manipulation, Absicht und mögliche Wirkung bei der Darstellung von Daten",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Kenngrößen (Minimum, Maximum, arithmetisches Mittel, Zentralwert (Median), Spannweite)",
+     "herkunft": "wortlaut"
+    },
+    {
      "thema": "kritische Interpretation grafischer Darstellungen und Tabellen von statistischen Erhebungen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Quartile",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Vor- und Nachteile unterschiedlicher Kenngrößen",
      "herkunft": "wortlaut"
     },
     {
@@ -38252,7 +39757,25 @@
     },
     {
      "thema": "Prozessbezogene Kompetenzen",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Probleme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "mit mathematischen Objekten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "mit Medien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "mit Formelsammlung und Taschenrechner",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
@@ -38288,6 +39811,10 @@
       {
        "thema": "grafisches Lösen linearer Gleichungssysteme",
        "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Lösbarkeit und Lösungsvielfalt linearer Gleichungssysteme",
+       "herkunft": "wortlaut"
       }
      ]
     },
@@ -38308,6 +39835,10 @@
        "herkunft": "wortlaut"
       }
      ]
+    },
+    {
+     "thema": "in Kontexten routiniert lineare Gleichungssysteme mit zwei Variablen",
+     "herkunft": "wortlaut"
     },
     {
      "thema": "Vergleich der Effektivität verschiedener Lösungsverfahren für die jeweilige Fragestellung oder das Problem.",
@@ -38386,6 +39917,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "funktionale Abhängigkeit zweier Größen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "quadratische Funktionen realitätsnahen Situationen zuordnen und umgekehrt",
        "herkunft": "wortlaut"
       },
@@ -38394,7 +39929,23 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Vor- und Nachteile verschiedener Darstellungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Merkmale der Funktion in den verschiedenen Darstellungen der Funktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "eine der oder alle Formen von quadratischen Funktionen",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Einflüsse der Parameter in einer Form oder in verschiedenen Formen des Funktionsterms erkennen und benennen, auch mit dynamischer Geometrie-Software",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "realitätsnahe Probleme mit quadratischen Funktionen auch mit Tabellenkalkulation",
        "herkunft": "wortlaut"
       }
      ]
@@ -38403,6 +39954,18 @@
      "thema": "Gleichungen",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "quadratische Gleichungen numerisch (systematisches Probieren)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "realitätsnahe Probleme durch grafische Bestimmung der Schnittpunkte von Funktionsgraphen auch mit dynamischer Geometrie-Software",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Lösbarkeit und Lösungsvielfalt quadratischer Gleichungen",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "Vergleich der Effektivität verschiedener Lösungsverfahren für vorliegende Probleme",
        "herkunft": "wortlaut"
@@ -38433,6 +39996,10 @@
      "herkunft": "wortlaut",
      "unterthemen": [
       {
+       "thema": "Verhältnisse in ähnlichen rechtwinkligen Dreiecken",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "besondere Verhältnisse: Sinus, Kosinus und Tangens",
        "herkunft": "wortlaut"
       },
@@ -38446,6 +40013,10 @@
      "thema": "Allgemeine Dreiecke",
      "herkunft": "wortlaut",
      "unterthemen": [
+      {
+       "thema": "ähnliche allgemeine Dreiecke",
+       "herkunft": "wortlaut"
+      },
       {
        "thema": "Formulieren von Zusammenhängen zwischen Winkeln und Seitenlängen in allgemeinen Dreiecken (Sinussatz und Kosinussatz)",
        "herkunft": "wortlaut"
@@ -38525,7 +40096,31 @@
        "herkunft": "wortlaut"
       },
       {
+       "thema": "Gegenwahrscheinlichkeiten für ein- und mehrstufige Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Erwartungswerte für ein- und mehrstufige Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
        "thema": "Wahrscheinlichkeit und relative Häufigkeit sowie Erwartungswert und arithmetisches Mittel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Zufallserscheinungen aus dem Alltag",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Baumdiagramme als übersichtliche Darstellung aller möglichen Ergebnisse mehrstufiger Zufallsexperimente",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Anzahlen der günstigen und möglichen Ergebnisse mithilfe von Zählprinzipien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "zweistufige Laplace-Experimente",
        "herkunft": "wortlaut"
       }
      ]
@@ -38536,6 +40131,18 @@
      "unterthemen": [
       {
        "thema": "bedingte Wahrscheinlichkeiten in Texten, Visualisierungen und Alltagssituationen erkennen, ohne und mithilfe digitaler Medien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bedingte Wahrscheinlichkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bedingte Wahrscheinlichkeiten mithilfe entsprechender Visualisierungen (Vierfeldertafel und Baumdiagramm)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Texte und Aussagen mit Bezug auf bedingte Wahrscheinlichkeiten",
        "herkunft": "wortlaut"
       },
       {
@@ -38595,7 +40202,25 @@
     },
     {
      "thema": "Prozessbezogene Kompetenzen",
-     "herkunft": "wortlaut"
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Probleme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "mit mathematischen Objekten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "mit Medien",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "mit Formelsammlung und Taschenrechner",
+       "herkunft": "wortlaut"
+      }
+     ]
     }
    ],
    "schulformName": "Stadtteilschule"
