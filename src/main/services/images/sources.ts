@@ -1,5 +1,6 @@
 import type { MediaCheck, OnlineImageHit, QuoteCheck } from '@shared/types'
 import { politeFetch } from './politeFetch'
+import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { fliesstext } from '../sources/fliesstext'
 
 // Wikimedia verlangt eine aussagekräftige Programmkennung
@@ -172,7 +173,7 @@ export async function fetchText(url: URL): Promise<{ text: string; raw: string }
     if (!res.ok) return { error: `Die Quelle ist nicht erreichbar (${res.status}).` }
     const type = res.headers.get('content-type') ?? ''
     if (!/text\/(html|plain)|xhtml/.test(type)) return { error: 'Die Adresse liefert keinen Text.' }
-    const raw = new TextDecoder().decode((await res.arrayBuffer()).slice(0, 6 * 1024 * 1024))
+    const raw = new TextDecoder().decode(await begrenzteAntwort(res, GRENZEN.text))
     const istHtml = /<html|<body|<p[\s>]/i.test(raw)
     if (!istHtml) return { text: raw, raw }
     /*

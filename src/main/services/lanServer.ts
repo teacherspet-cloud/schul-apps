@@ -152,14 +152,27 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
  * PIN und Port ändern – und dem Rechner den Zugang unter den Füßen wegziehen. Deshalb wird
  * genau dieser Teil entfernt, statt den ganzen Aufruf zu sperren.
  */
+/*
+ * Was ein Gerät im Netz an den Einstellungen NICHT ändern darf (27.09.2026 erweitert):
+ * - `lan`: den Netzzugang selbst
+ * - `ai.cliPaths`: den Pfad des KI-Programms – die App startet dieses Programm (spawn); ein
+ *   fremder Pfad wäre Fremdcode auf dem Rechner
+ * - `ai.access`, `ai.imageAccess`, `ai.subscriptionAccepted`: Umschalten auf den Abo-Weg und
+ *   die Bestätigung der Nutzungsbedingungen gehören an den Rechner
+ */
+export const GESPERRTE_KI_FELDER = ['cliPaths', 'access', 'imageAccess', 'subscriptionAccepted'] as const
+
 export const UMSCHREIBUNG: Record<string, (args: unknown[]) => unknown[]> = {
   'settings:set': (args) => {
     const patch = args[0]
-    if (patch && typeof patch === 'object' && 'lan' in (patch as Record<string, unknown>)) {
-      const { lan: _weg, ...rest } = patch as Record<string, unknown>
-      return [rest, ...args.slice(1)]
+    if (!patch || typeof patch !== 'object') return args
+    const { lan: _weg, ...rest } = patch as Record<string, unknown>
+    if (rest.ai && typeof rest.ai === 'object') {
+      const ai = { ...(rest.ai as Record<string, unknown>) }
+      for (const feld of GESPERRTE_KI_FELDER) delete ai[feld]
+      rest.ai = ai
     }
-    return args
+    return [rest, ...args.slice(1)]
   }
 }
 

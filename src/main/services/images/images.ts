@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs'
 import { OnlineImageHit, OnlineImageSource, OpenMojiHit } from '@shared/types'
 import { politeFetch } from './politeFetch'
+import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { searchWikimedia, WIKIMEDIA_UA } from './sources'
 import { resourcePath } from '../storage/paths'
 
@@ -122,6 +123,7 @@ export async function fetchAsDataUrl(url: string): Promise<string> {
   if (!res.ok) throw new Error(`Bild konnte nicht geladen werden (${res.status}).`)
   const type = res.headers.get('content-type') ?? 'image/jpeg'
   if (!type.startsWith('image/')) throw new Error('Die Adresse liefert kein Bild.')
-  const buf = Buffer.from(await res.arrayBuffer())
+  // Größengrenze (27.09.2026): stückweise lesen, darüber abbrechen – ein Riesenbild füllte sonst den Speicher
+  const buf = Buffer.from(await begrenzteAntwort(res, GRENZEN.bild))
   return `data:${type};base64,${buf.toString('base64')}`
 }

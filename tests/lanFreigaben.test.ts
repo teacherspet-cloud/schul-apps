@@ -47,6 +47,21 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
     }
   })
 
+  it('schneidet aus Einstellungen vom Gerät alles heraus, was den Rechner selbst betrifft', () => {
+    // 27.09.2026: Der Pfad des KI-Programms wird per spawn gestartet – vom Tablet aus nicht setzbar
+    const [rest] = beschneide('settings:set', [
+      {
+        lan: { pin: '1' },
+        ai: { cliPaths: { codex: 'C:\\boese.exe' }, access: 'abo', imageAccess: 'abo', subscriptionAccepted: true, provider: 'openai' },
+        material: { x: 1 }
+      }
+    ]) as [Record<string, unknown>]
+    expect(rest.lan).toBeUndefined()
+    expect(rest.material).toEqual({ x: 1 })
+    expect(rest.ai).toEqual({ provider: 'openai' })
+    expect(beschneide('settings:set', [{ ai: 'kaputt' }])).toEqual([{ ai: 'kaputt' }])
+  })
+
   it('lässt die KI mit den Zugangsdaten des Rechners arbeiten', () => {
     /*
      * Ausdrücklicher Wunsch der Lehrkraft (23.09.2026): Vom Browser aus soll die KI mit den

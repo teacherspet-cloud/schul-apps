@@ -1,6 +1,8 @@
 // Rücksichtsvolle Anfragen an freie Bilddienste (Wikimedia, Openverse): wenige gleichzeitig je Dienst,
 // bei Überlastung (429/503) kurz warten und erneut versuchen.
 
+import { pruefeZiel } from '../netz/zieladresse'
+
 const LIMIT_PER_HOST = 4
 const running = new Map<string, number>()
 const waiting = new Map<string, (() => void)[]>()
@@ -30,7 +32,32 @@ function release(key: string): void {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+/*
+ * Sicherheit (27.09.2026): Jede Adresse wird VOR dem Abruf geprüft (nur https, nicht das eigene
+ * Netz, Name aufgelöst – siehe netz/zieladresse.ts), und Weiterleitungen werden selbst verfolgt,
+ * damit auch jede Zwischenstation geprüft ist. Bis dahin hätte eine Adresse aus einer KI-Antwort
+ * oder vom Tablet den eigenen Rechner oder Router abfragen können.
+ */
+const MAX_WEITERLEITUNGEN = 5
+
 export async function politeFetch(url: string | URL, init: RequestInit = {}, retries = 3): Promise<Response> {
+  let ziel = await pruefeZiel(url)
+  for (let sprung = 0; ; sprung++) {
+    const res = await einmal(ziel, { ...init, redirect: 'manual' }, retries)
+    if (res.status < 300 || res.status > 399) return res
+    const ort = res.headers.get('location')
+    if (!ort) return res
+    if (sprung >= MAX_WEITERLEITUNGEN) throw new Error('Zu viele Weiterleitungen.')
+    await res.body?.cancel().catch(() => undefined)
+    ziel = await pruefeZiel(new URL(ort, ziel))
+    // Nach einer Weiterleitung wird wie ein Browser mit GET weitergemacht
+    if (res.status === 303 || (init.method && init.method !== 'GET' && (res.status === 301 || res.status === 302))) {
+      init = { ...init, method: 'GET', body: undefined }
+    }
+  }
+}
+
+async function einmal(url: URL, init: RequestInit, retries: number): Promise<Response> {
   const key = hostKey(String(url))
   for (let attempt = 0; ; attempt++) {
     await acquire(key)

@@ -10,7 +10,7 @@
  */
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, resolve, sep } from 'path'
 import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
 import { getSecret } from '../storage/settings'
@@ -358,14 +358,27 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
   }
 }
 
+/**
+ * Nur ein schlichter Dateiname aus dem Hörtext-Ordner (27.09.2026, Sicherheitsbefund): Über den
+ * Tablet-Zugang ist `audio:read` freigegeben – ohne diese Prüfung ließ sich mit „..\" jede Datei
+ * des Rechners als Base64 auslesen.
+ */
+export function pruefeAudioName(fileName: string): string {
+  if (typeof fileName !== 'string' || !/^[A-Za-z0-9_-]{1,80}\.mp3$/.test(fileName)) throw new Error('Ungültiger Dateiname für einen Hörtext.')
+  const dir = audioDir()
+  const file = resolve(dir, fileName)
+  if (!file.startsWith(dir + sep)) throw new Error('Ungültiger Dateiname für einen Hörtext.')
+  return file
+}
+
 /** Gespeicherte Datei erneut laden (z. B. beim Öffnen eines Arbeitsblatts). */
 export function readAudio(fileName: string): string | null {
-  const file = join(audioDir(), fileName)
+  const file = pruefeAudioName(fileName)
   if (!existsSync(file)) return null
   return `data:audio/mpeg;base64,${readFileSync(file).toString('base64')}`
 }
 
 /** Pfad des Ordners mit den Hörtexten (für „Im Ordner zeigen“). */
 export function audioPath(fileName: string): string {
-  return join(audioDir(), fileName)
+  return pruefeAudioName(fileName)
 }

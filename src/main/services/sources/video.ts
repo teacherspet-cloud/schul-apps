@@ -20,6 +20,7 @@
  * enthalten können. Ohne Untertitel bleibt die Beschreibung – mit Hinweis.
  */
 import { politeFetch } from '../images/politeFetch'
+import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { BROWSER_UA, stripHtml } from '../images/sources'
 import type { VideoQuelle } from '../../../shared/types'
 
@@ -72,7 +73,16 @@ const CLIENTS = [
   {
     nr: '5',
     ua: 'com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)',
-    client: { clientName: 'IOS', clientVersion: '20.10.4', deviceMake: 'Apple', deviceModel: 'iPhone16,2', osName: 'iPhone', osVersion: '18.3.2.22D82', hl: 'de', gl: 'DE' }
+    client: {
+      clientName: 'IOS',
+      clientVersion: '20.10.4',
+      deviceMake: 'Apple',
+      deviceModel: 'iPhone16,2',
+      osName: 'iPhone',
+      osVersion: '18.3.2.22D82',
+      hl: 'de',
+      gl: 'DE'
+    }
   }
 ]
 
@@ -135,7 +145,7 @@ async function playerUeberSeite(id: string): Promise<PlayerAntwort | null> {
   try {
     const res = await politeFetch(`https://www.youtube.com/watch?v=${id}&hl=de`, { headers: seitenKopf, signal: AbortSignal.timeout(20000) })
     if (!res.ok) return null
-    const html = new TextDecoder().decode((await res.arrayBuffer()).slice(0, 8 * 1024 * 1024))
+    const html = new TextDecoder().decode(await begrenzteAntwort(res, GRENZEN.video))
     return (jsonNach(html, 'ytInitialPlayerResponse') as PlayerAntwort | null) ?? null
   } catch {
     return null
@@ -157,7 +167,7 @@ async function ladeSpur(spur: Spur, ua: string): Promise<string> {
   const url = `${spur.baseUrl}${spur.baseUrl.includes('fmt=') ? '' : '&fmt=json3'}`
   const res = await politeFetch(url, { headers: { 'User-Agent': ua }, signal: AbortSignal.timeout(15000) })
   if (!res.ok) return ''
-  const rohtext = await res.text()
+  const rohtext = new TextDecoder().decode(await begrenzteAntwort(res, GRENZEN.text))
   let stuecke: string[] = []
   try {
     const json = JSON.parse(rohtext) as { events?: { segs?: { utf8?: string }[] }[] }
@@ -190,7 +200,16 @@ async function oembed(adresse: string): Promise<{ titel: string; kanal: string }
 }
 
 export async function ladeVideo(adresse: string): Promise<VideoQuelle> {
-  const leer: VideoQuelle = { url: adresse, titel: '', kanal: '', beschreibung: '', dauerSekunden: 0, transkript: '', transkriptSprache: '', automatisch: false }
+  const leer: VideoQuelle = {
+    url: adresse,
+    titel: '',
+    kanal: '',
+    beschreibung: '',
+    dauerSekunden: 0,
+    transkript: '',
+    transkriptSprache: '',
+    automatisch: false
+  }
   const id = youtubeId(adresse)
   if (!id) return { ...leer, fehler: 'Das ist keine YouTube-Adresse. Andere Videoseiten werden als Webseite gelesen.' }
 

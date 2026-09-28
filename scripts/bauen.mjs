@@ -13,7 +13,7 @@
  * Aufruf: node scripts/bauen.mjs
  */
 import { execSync } from 'child_process'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
 const root = process.cwd()
@@ -27,8 +27,24 @@ function fehlende() {
   return verlangt.filter((f) => !existsSync(join(root, 'out/renderer', f)))
 }
 
+/*
+ * Liegengebliebene Reste: electron-vite bündelt die TypeScript-Konfiguration nach
+ * `electron.vite.config.<zeit>.mjs` und räumt sie bei einem harten Abbruch nicht weg – im
+ * Projektordner lagen 150 davon (27.09.2026). Vor jedem Bau weg damit.
+ */
+for (const f of readdirSync(root)) if (/^electron\.vite\.config\.\d+\.mjs$/.test(f)) rmSync(join(root, f), { force: true })
+
+const warte = (s) => execSync(process.platform === 'win32' ? `powershell -NoProfile -Command "Start-Sleep -Seconds ${s}"` : `sleep ${s}`, { stdio: 'ignore' })
+
 for (let versuch = 1; versuch <= 3; versuch++) {
-  execSync('npx electron-vite build', { stdio: versuch === 1 ? 'inherit' : 'ignore' })
+  try {
+    execSync('npx electron-vite build', { stdio: versuch === 1 ? 'inherit' : 'ignore' })
+  } catch (e) {
+    // Dropbox hält `out/renderer/assets` kurz fest (EPERM) – nach einer Pause klappt es fast immer
+    console.warn(`\nVersuch ${versuch}: Bau abgebrochen (${e instanceof Error ? e.message.split('\n')[0] : e}) – neuer Versuch in 8 s`)
+    if (versuch < 3) warte(8)
+    continue
+  }
   // Dropbox braucht einen Moment; erst danach ist das Ergebnis aussagekräftig
   execSync(process.platform === 'win32' ? 'powershell -NoProfile -Command "Start-Sleep -Seconds 2"' : 'sleep 2', { stdio: 'ignore' })
   const fehlt = fehlende()

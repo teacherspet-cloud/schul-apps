@@ -16,6 +16,7 @@
  */
 import type { GeladeneQuelle, Materialanfrage, Quellentreffer } from '@shared/types'
 import { politeFetch } from '../images/politeFetch'
+import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { fetchText, kennungFuer, stripHtml, WIKIMEDIA_UA } from '../images/sources'
 
 /** Sprachen, für die es eine eigene Wikisource gibt und die in dieser App vorkommen. */
@@ -233,8 +234,13 @@ async function ladePdf(url: URL): Promise<GeladeneQuelle | null> {
   const typ = res.headers.get('content-type') ?? ''
   const nachEndung = /\.pdf($|\?)/i.test(url.pathname + url.search)
   if (!/application\/pdf/i.test(typ) && !nachEndung) return null
-  // 30 MB: Darueber ist es ein Buchscan und kein Unterrichtsmaterial
-  const daten = new Uint8Array((await res.arrayBuffer()).slice(0, 30 * 1024 * 1024))
+  // 30 MB: Darueber ist es ein Buchscan und kein Unterrichtsmaterial – und wird gar nicht erst geladen
+  let daten: Uint8Array
+  try {
+    daten = await begrenzteAntwort(res, GRENZEN.pdf)
+  } catch {
+    return null
+  }
   if (daten.length < 1000) return null
   return { url: url.toString(), titel: '', text: '', wortzahl: 0, pdf: daten }
 }
