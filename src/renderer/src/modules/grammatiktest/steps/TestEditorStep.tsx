@@ -1,4 +1,6 @@
 import { Container, Stack, Box, ScrollArea } from '@mantine/core'
+import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
+import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
@@ -171,7 +173,12 @@ export default function TestEditorStep(): React.JSX.Element {
           }
         }}
         ausgabe={{ onWord: () => setAusgabe('docx'), onPdf: () => setAusgabe('pdf'), onDrucken: () => setAusgabe('print') }}
-        extras={<RueckmeldungKnopf art="grammatiktest" docId={docId} />}
+        extras={
+          <>
+            <RueckmeldungKnopf art="grammatiktest" docId={docId} />
+            <LmsExport titel={test.meta.title || 'Grammatiktest'} bericht={() => fragenAusBlatt(testToWorksheet(test))} />
+          </>
+        }
       />
       <CanaryDialog
         offen={canaryOffen}

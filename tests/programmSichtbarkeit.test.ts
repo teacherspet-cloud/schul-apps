@@ -11,7 +11,16 @@ const ids = (l: { id: string }[]): string[] => l.map((p) => p.id)
 
 describe('Reihenfolge der Programme', () => {
   it('Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten, Vokabellisten', () => {
-    expect(PROGRAMM_REIHENFOLGE).toEqual(['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit', 'vokabelliste', 'rueckmeldung'])
+    expect(PROGRAMM_REIHENFOLGE).toEqual([
+      'arbeitsblatt',
+      'vokabeltest',
+      'grammatiktest',
+      'lernzielkontrolle',
+      'klassenarbeit',
+      'vokabelliste',
+      'rueckmeldung',
+      'elternbrief'
+    ])
   })
 
   it('die Leiste (registry.ts) folgt derselben Reihenfolge', () => {
@@ -31,11 +40,17 @@ describe('Programme nach eigenen Fächern', () => {
   })
 
   it('Geschichte und Mathematik: keine Vokabel- und Grammatikprogramme, Klassenarbeit bleibt (Geschichte)', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['geschichte', 'mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung'])
+    expect(ids(sichtbareProgramme(PROGRAMME, ['geschichte', 'mathematik'], {}))).toEqual([
+      'arbeitsblatt',
+      'lernzielkontrolle',
+      'klassenarbeit',
+      'rueckmeldung',
+      'elternbrief'
+    ])
   })
 
   it('Mathematik allein: auch die Klassenarbeit fällt weg (Mathematik gehört nicht zu den Fächern der Klassenarbeit)', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'rueckmeldung'])
+    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'rueckmeldung', 'elternbrief'])
   })
 
   it('Latein und DaZ zählen zu den Sprachfächern', () => {
@@ -46,7 +61,8 @@ describe('Programme nach eigenen Fächern', () => {
         'grammatiktest',
         'lernzielkontrolle',
         'vokabelliste',
-        'rueckmeldung'
+        'rueckmeldung',
+        'elternbrief'
       ])
   })
 

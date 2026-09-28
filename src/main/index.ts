@@ -242,7 +242,8 @@ function aiStatus(): AiStatus {
     imageAccess,
     hasImageKey: img !== 'none' && (imageAccess === 'subscription' ? ai.subscriptionAccepted[img] : Boolean(getSecret(img))),
     economy: economyActive(ai),
-    hasTts: Boolean(getSecret('elevenlabs')),
+    // Hörtexte über ElevenLabs oder – seit Großprogramm 0.4 (F6) – über einen OpenAI-API-Schlüssel
+    hasTts: Boolean(getSecret('elevenlabs') || getSecret('openai')),
     textOptions: textOptions(ai)
   }
 }

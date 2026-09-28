@@ -19,6 +19,8 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
+import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../../shared/bewertung/raster'
 import { describeBlock } from '../../arbeitsblatt/generation/describe'
@@ -604,6 +606,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               {hasContent ? 'Neu erzeugen' : 'Arbeit erzeugen'}
             </Button>
             {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
+            {hasContent && <LmsExport titel={exam.meta.title || exam.meta.topic} bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))} />}
             {audioBlocks.length > 0 && (
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target>

@@ -23,7 +23,7 @@ import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/programmsymbole')
 mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-symbole-'))
-const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung']
+const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung', 'Elternbriefe']
 /*
  * Programme ohne eigene Illustration (Großprogramm 0.4: Rückmeldung, Elternbrief) zeigen ihr
  * gezeichnetes Symbol. Eine Illustration entstünde über die Bild-KI der Lehrkraft – das kostet

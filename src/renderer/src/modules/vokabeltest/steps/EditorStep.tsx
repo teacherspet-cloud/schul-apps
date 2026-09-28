@@ -18,6 +18,9 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
+import { LANGUAGES } from '../model/types'
+import { fragenAusVokabeln } from '../../../shared/export/lms/fragen'
+import LmsExport from '../../../shared/export/lms/LmsExport'
 import { IconAdjustments, IconArrowDown, IconArrowUp, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ImagePicker from '../../../shared/components/ImagePicker'
@@ -284,6 +287,12 @@ export default function EditorStep(): React.JSX.Element {
           }
         }}
         ausgabe={{ onWord: () => setExportOpen('docx'), onPdf: () => setExportOpen('pdf'), onDrucken: () => setExportOpen('print') }}
+        extras={
+          <LmsExport
+            titel={doc.header.title}
+            bericht={() => fragenAusVokabeln(doc.vocab, LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? 'Zielsprache')}
+          />
+        }
       />
 
       {measure}

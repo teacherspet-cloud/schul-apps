@@ -1,4 +1,6 @@
 import { Accordion, Alert, Badge, Card, Container, Group, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
+import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { IconAlertTriangle, IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -276,7 +278,12 @@ export default function EditorStep(): React.JSX.Element {
           }
         }}
         ausgabe={{ onWord: () => starte('docx'), onPdf: () => starte('pdf'), onDrucken: () => starte('print') }}
-        extras={<RueckmeldungKnopf art="lernzielkontrolle" docId={docId} />}
+        extras={
+          <>
+            <RueckmeldungKnopf art="lernzielkontrolle" docId={docId} />
+            <LmsExport titel={test.meta.title || test.meta.thema} bericht={() => fragenAusBlatt(kurztestToWorksheet(test, variante))} />
+          </>
+        }
       />
       <CanaryDialog
         offen={canaryOffen}

@@ -1,4 +1,6 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { fragenAusBlatt } from '../../../../shared/export/lms/fragen'
+import LmsExport from '../../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../../rueckmeldung/RueckmeldungKnopf'
 import { rasterAuftrag } from '../../auftraege'
 import { StundenverlaufPanel } from '../StundenverlaufPanel'
@@ -670,7 +672,12 @@ export function EditorStep(): React.JSX.Element {
             laeuft={busy.has(`beheben-${sheet.id}`)}
           />
         }
-        extras={<RueckmeldungKnopf art="arbeitsblatt" docId={docId} />}
+        extras={
+          <>
+            <RueckmeldungKnopf art="arbeitsblatt" docId={docId} />
+            <LmsExport titel={ws.meta.title || ws.meta.topic} bericht={() => fragenAusBlatt(ws)} />
+          </>
+        }
       />
 
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">

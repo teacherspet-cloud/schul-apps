@@ -7,6 +7,7 @@ import LernzielkontrolleModule from './lernzielkontrolle/LernzielkontrolleModule
 import VokabellisteModule from './vokabelliste/VokabellisteModule'
 import VokabeltestModule from './vokabeltest/VokabeltestModule'
 import RueckmeldungModule from './rueckmeldung/RueckmeldungModule'
+import ElternbriefModule from './elternbrief/ElternbriefModule'
 import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
 
 /**
@@ -137,5 +138,16 @@ export const modules: SchulModule[] = [
     leistenbild: leistenbild('rueckmeldung'),
     faecher: PROGRAMM_FAECHER.rueckmeldung,
     component: RueckmeldungModule
+  },
+  {
+    id: 'elternbrief',
+    name: 'Elternbriefe',
+    description: 'Elternbriefe aus Anlass und Stichpunkten – verständlich formuliert, mit Rücklaufzettel und übersetzt in die Familiensprachen der Eltern.',
+    icon: programmSymbol('elternbrief', 'yellow'),
+    color: 'yellow',
+    illustration: illustration('elternbrief'),
+    leistenbild: leistenbild('elternbrief'),
+    faecher: PROGRAMM_FAECHER.elternbrief,
+    component: ElternbriefModule
   }
 ]

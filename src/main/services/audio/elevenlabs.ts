@@ -16,6 +16,7 @@ import { join, resolve, sep } from 'path'
 import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
 import { getSecret } from '../storage/settings'
+import { istOpenAiStimme, OPENAI_TTS_MODEL, openAiStimmen, sprichOpenAi } from './openaiTts'
 
 // Basis ohne Fassungsnummer: Die Stimmenliste braucht v2 (nur dort gibt es `sharing`),
 // alles andere v1. Jeder Pfad nennt seine Fassung deshalb selbst.
@@ -167,6 +168,22 @@ export function stimmenNutzbarkeit(v: StimmenRohdaten, tier: string): { ausBibli
  */
 export async function listVoices(): Promise<TtsVoice[]> {
   /*
+   * Seit Großprogramm 0.4 (F6) stehen auch die Stimmen von OpenAI in der Liste – wenn ein
+   * OpenAI-API-Schlüssel hinterlegt ist. Scheitert ElevenLabs (kein oder falscher Schlüssel),
+   * bleiben die OpenAI-Stimmen nutzbar; ohne beide gilt die Meldung von ElevenLabs.
+   */
+  const openai = getSecret('openai') ? openAiStimmen() : []
+  if (!getSecret('elevenlabs') && openai.length) return openai
+  try {
+    return [...(await elevenLabsStimmen()), ...openai]
+  } catch (e) {
+    if (openai.length) return openai
+    throw e
+  }
+}
+
+async function elevenLabsStimmen(): Promise<TtsVoice[]> {
+  /*
    * ABSICHTLICH /v2/voices, nicht /v1/voices.
    *
    * Nur die zweite Fassung liefert `sharing`, `is_owner` und `available_for_tiers` – und
@@ -225,6 +242,15 @@ const previewUrls = new Map<string, string>()
  * nur eigene Quellen, eine fremde Adresse im Audio-Element würde sie blockieren.
  */
 export async function previewVoice(voiceId: string): Promise<string> {
+  // OpenAI hat keine fertigen Hörproben: eine kurze Probe (rund 75 Zeichen) wird erzeugt
+  if (istOpenAiStimme(voiceId)) {
+    const teile = await sprichOpenAi(
+      { id: 'probe', turns: [{ voiceId, text: 'Hallo! So klingt diese Stimme in einem Hörtext. Hello, this is how I sound.' }] },
+      getSecret('openai') ?? ''
+    )
+    merkeVerbrauch('openai', OPENAI_TTS_MODEL, { ttsZeichen: 75 })
+    return `data:audio/mpeg;base64,${Buffer.concat(teile).toString('base64')}`
+  }
   if (!previewUrls.has(voiceId)) await listVoices()
   const url = previewUrls.get(voiceId)
   if (!url) throw new Error('Zu dieser Stimme gibt es keine Hörprobe.')
@@ -345,9 +371,16 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
   if (!turns.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
   const stimmen = new Set(turns.map((t) => t.voiceId))
   const dialog = stimmen.size > 1
-  const parts = dialog ? await sprichDialog({ ...req, turns }) : await sprichSolo({ ...req, turns })
+  // OpenAI-Stimme gewählt (Großprogramm 0.4, F6): der ganze Hörtext über OpenAI
+  const ueberOpenAi = turns.some((t) => istOpenAiStimme(t.voiceId))
+  const parts = ueberOpenAi
+    ? await sprichOpenAi({ ...req, turns }, getSecret('openai') ?? '')
+    : dialog
+      ? await sprichDialog({ ...req, turns })
+      : await sprichSolo({ ...req, turns })
   if (!parts.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
-  merkeVerbrauch('elevenlabs', dialog ? DIALOG_MODEL : TTS_MODEL, { ttsZeichen: turns.reduce((n, t) => n + t.text.length, 0) })
+  const modell = ueberOpenAi ? OPENAI_TTS_MODEL : dialog ? DIALOG_MODEL : TTS_MODEL
+  merkeVerbrauch(ueberOpenAi ? 'openai' : 'elevenlabs', modell, { ttsZeichen: turns.reduce((n, t) => n + t.text.length, 0) })
   const mp3 = Buffer.concat(parts)
   const fileName = `${req.id}.mp3`
   writeAtomic(join(audioDir(), fileName), mp3)
@@ -356,7 +389,7 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
     dataUrl: `data:audio/mpeg;base64,${mp3.toString('base64')}`,
     bytes: mp3.length,
     mode: dialog ? 'dialog' : 'solo',
-    model: dialog ? DIALOG_MODEL : TTS_MODEL,
+    model: modell,
     requests: parts.length
   }
 }

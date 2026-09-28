@@ -43,7 +43,7 @@ try {
   const leiste = async () => page.evaluate(() => [...document.querySelectorAll('.leiste-liste .nav-icon')].map((b) => b.getAttribute('aria-label')))
   pruefe(
     JSON.stringify(await leiste()) ===
-      JSON.stringify(['Arbeitsblatt', 'Vokabeltest', 'Grammatiktest', 'Lernzielkontrolle', 'Klassenarbeiten', 'Vokabellisten', 'Rückmeldung']),
+      JSON.stringify(['Arbeitsblatt', 'Vokabeltest', 'Grammatiktest', 'Lernzielkontrolle', 'Klassenarbeiten', 'Vokabellisten', 'Rückmeldung', 'Elternbriefe']),
     `Reihenfolge der Leiste (${(await leiste()).join(', ')})`
   )
   const kacheln = await page.locator('.home-tile .mantine-Text-root[data-size="lg"]').allInnerTexts()
@@ -67,7 +67,10 @@ try {
   pruefe(lage.fach && lage.jahrgang && Math.abs(lage.fach.y - lage.jahrgang.y) < 4 && lage.jahrgang.x > lage.fach.x, 'Jahrgang steht neben dem Fach')
   pruefe(lage.thema && lage.titel && Math.abs(lage.thema.y - lage.titel.y) < 4 && lage.titel.x > lage.thema.x, 'Titel der Arbeit steht rechts neben dem Thema')
   const kennzeichen = await page.locator('.ger-kennzeichen').filter({ visible: true }).allInnerTexts()
-  pruefe(kennzeichen.length > 0 && kennzeichen.every((k) => /^≈?(A1|A2|B1|B2|C1)/.test(k)), `GER-Kennzeichen an den Vorschlags-Chips (${kennzeichen.join(', ')})`)
+  pruefe(
+    kennzeichen.length > 0 && kennzeichen.every((k) => /^≈?(A1|A2|B1|B2|C1)/.test(k)),
+    `GER-Kennzeichen an den Vorschlags-Chips (${kennzeichen.join(', ')})`
+  )
   await page.locator('.ger-kennzeichen').filter({ visible: true }).first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(out, 'paket12-klassenarbeit-rahmen.png') })
 
@@ -82,7 +85,7 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(500)
   pruefe(
-    JSON.stringify(await leiste()) === JSON.stringify(['Arbeitsblatt', 'Lernzielkontrolle', 'Klassenarbeiten', 'Rückmeldung']),
+    JSON.stringify(await leiste()) === JSON.stringify(['Arbeitsblatt', 'Lernzielkontrolle', 'Klassenarbeiten', 'Rückmeldung', 'Elternbriefe']),
     `Geschichte + Mathematik: nur passende Programme in der Leiste (${(await leiste()).join(', ')})`
   )
   await page.locator('[data-programme-anzeigen]').scrollIntoViewIfNeeded()
