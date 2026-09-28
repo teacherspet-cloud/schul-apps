@@ -72,7 +72,12 @@ try {
   await page.evaluate(() => window.__selftest.wsMaterialtext(20))
   await page.waitForTimeout(2000)
   const vorher = await kopf()
-  pruefe(!vorher.text.includes('›'), `ohne Themenbereich kein Überthema (${vorher.fachzeile})`)
+  /*
+   * Seit Paket 15 sortiert die App ein neues Material selbst in den passenden Themenbereich des
+   * Lehrplans ein – ein Blatt ohne Bereich gibt es nach dem ersten Sichern nicht mehr. Geprüft
+   * wird deshalb, dass dieser Bereich als Überthema im Kopf steht (Pfad „Fach › Bereich").
+   */
+  pruefe(/^Geschichte › \S/.test(vorher.fachzeile), `eingeordnetes Blatt zeigt seinen Bereich als Überthema (${vorher.fachzeile})`)
   await page.evaluate(() => window.__selftest.inBereich('arbeitsblatt', 'Industrialisierung', 'geschichte'))
   await page.waitForTimeout(900)
   const a = await kopf()

@@ -120,7 +120,8 @@ try {
   let fertig = false
   while (Date.now() < ende) {
     const aufgabe = await page.evaluate(() => window.__selftest.worksheetJetzt().sheets[0].blocks.find((b) => b.type === 'task'))
-    if (aufgabe.instruction.includes('M1')) {
+    // Verweise stehen seit dem 27.09.2026 als Kennung M{…} im Text – am neuen Wortlaut erkennen
+    if (aufgabe.instruction.includes('ordne ihn in die Zeit ein')) {
       fertig = true
       break
     }
@@ -343,6 +344,9 @@ try {
       ]
     }
   })
+  // Die Hinweise stehen in der Werkzeugleiste des Bausteins, die erst beim Überfahren erscheint
+  await page.locator('.editor-block').filter({ visible: true }).first().hover()
+  await page.waitForTimeout(300)
   const vtWarnung = page.getByRole('button', { name: '1 Hinweis anzeigen' }).filter({ visible: true })
   pruefe((await vtWarnung.count()) >= 1, 'Vokabeltest: Hinweis an der Aufgabe sichtbar')
   if (await vtWarnung.count()) {
