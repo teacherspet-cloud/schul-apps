@@ -9,7 +9,8 @@
  * Italienisch in Schulqualität spricht.
  */
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { writeAtomic } from '../storage/atomar'
 import { join, resolve, sep } from 'path'
 import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
@@ -347,7 +348,7 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
   if (!parts.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
   const mp3 = Buffer.concat(parts)
   const fileName = `${req.id}.mp3`
-  writeFileSync(join(audioDir(), fileName), mp3)
+  writeAtomic(join(audioDir(), fileName), mp3)
   return {
     fileName,
     dataUrl: `data:audio/mpeg;base64,${mp3.toString('base64')}`,

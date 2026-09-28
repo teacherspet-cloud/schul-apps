@@ -47,7 +47,7 @@ describe('Zielprüfung', () => {
   })
 
   it('liest Antworten nur bis zur Grenze', async () => {
-    const bytes = (n: number): Uint8Array => new Uint8Array(n).fill(7)
+    const bytes = (n: number): ArrayBuffer => new Uint8Array(n).fill(7).buffer
     const antwort = (n: number, laenge?: number): Response =>
       new Response(bytes(n), { headers: laenge !== undefined ? { 'content-length': String(laenge) } : {} })
     expect((await begrenzteAntwort(antwort(1000), 2000)).byteLength).toBe(1000)

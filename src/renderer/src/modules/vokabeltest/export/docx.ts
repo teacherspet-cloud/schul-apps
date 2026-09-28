@@ -169,8 +169,11 @@ function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
     if (fields.length) {
       const totalWeight = fields.reduce((s, [, w]) => s + w, 0)
       const cells: TableCell[] = []
+      // Spaltenraster ausdrücklich (28.09.2026) – sonst setzt Word Standardbreiten und die Beschriftung bricht um
+      const spalten: number[] = []
       for (const [label, weight] of fields) {
         const width = Math.round((CONTENT * weight) / totalWeight)
+        spalten.push(Math.round(width * 0.3), Math.round(width * 0.7))
         cells.push(
           new TableCell({
             width: { size: Math.round(width * 0.3), type: WidthType.DXA },
@@ -189,6 +192,7 @@ function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
         new Table({
           rows: [new TableRow({ children: cells, height: { value: 500, rule: 'atLeast' } })],
           width: { size: CONTENT, type: WidthType.DXA },
+          columnWidths: spalten,
           layout: TableLayoutType.FIXED
         })
       )
@@ -459,9 +463,11 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
       const perCat = block.categories.map((c) => block.words.filter((w) => w.categoryId === c.id))
       const rows = Math.max(1, ...perCat.map((p) => p.length))
       const colW = Math.floor(CONTENT / Math.max(1, block.categories.length))
+      const kategorienRaster = block.categories.map(() => colW)
       out.push(
         new Table({
           width: { size: CONTENT, type: WidthType.DXA },
+          columnWidths: kategorienRaster,
           layout: TableLayoutType.FIXED,
           rows: [
             new TableRow({
@@ -502,9 +508,11 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
       out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(block.topic, { bold: true })] }))
       const rows = Math.ceil(block.items.length / 2)
       const half = Math.floor(CONTENT / 2)
+      const haelftenRaster = [half, CONTENT - half]
       out.push(
         new Table({
           width: { size: CONTENT, type: WidthType.DXA },
+          columnWidths: haelftenRaster,
           layout: TableLayoutType.FIXED,
           rows: Array.from(
             { length: rows },
@@ -582,7 +590,14 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
         }
         rows.push(new TableRow({ cantSplit: true, children: cells }))
       }
-      out.push(new Table({ width: { size: CONTENT, type: WidthType.DXA }, layout: TableLayoutType.FIXED, rows }))
+      out.push(
+        new Table({
+          width: { size: CONTENT, type: WidthType.DXA },
+          columnWidths: Array.from({ length: cols }, () => colW),
+          layout: TableLayoutType.FIXED,
+          rows
+        })
+      )
       break
     }
 

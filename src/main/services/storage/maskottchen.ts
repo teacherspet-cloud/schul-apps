@@ -7,6 +7,7 @@
  */
 import { app } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
+import { writeAtomic } from './atomar'
 import { join } from 'path'
 import type { MaskottchenInfo, MaskottchenMeta } from '../../../shared/maskottchen'
 
@@ -53,7 +54,7 @@ function migriere(): void {
       quelle: alt.quelle === 'upload' ? 'upload' : 'ki',
       angelegt: alt.erstellt ?? new Date().toISOString()
     }
-    writeFileSync(join(ziel, 'figur.json'), JSON.stringify(meta, null, 2), 'utf8')
+    writeAtomic(join(ziel, 'figur.json'), JSON.stringify(meta, null, 2))
     renameSync(png, join(ziel, 'vorlage.png'))
     // Die erste Fassung war die Pose „winkend" – sie zählt gleich als Pose
     if (alt.pose === 'winkend') writeFileSync(join(ziel, 'winkend.png'), readFileSync(join(ziel, 'vorlage.png')))
@@ -98,8 +99,8 @@ export function saveMaskottchen(eingabe: { id: string; name: string; beschreibun
     quelle: eingabe.quelle,
     angelegt: vorhanden?.angelegt ?? new Date().toISOString()
   }
-  writeFileSync(join(ordner, 'figur.json'), JSON.stringify(meta, null, 2), 'utf8')
-  if (eingabe.vorlage) writeFileSync(join(ordner, 'vorlage.png'), dataUrlBytes(eingabe.vorlage))
+  writeAtomic(join(ordner, 'figur.json'), JSON.stringify(meta, null, 2))
+  if (eingabe.vorlage) writeAtomic(join(ordner, 'vorlage.png'), dataUrlBytes(eingabe.vorlage))
   const info = leseFigur(id)
   if (!info) throw new Error('Die Figur konnte nicht gespeichert werden.')
   return info
@@ -110,7 +111,7 @@ export function savePose(id: string, pose: string, dataUrl: string): Maskottchen
   const p = sicher(pose)
   const ordner = join(dir(), k)
   if (!existsSync(join(ordner, 'figur.json'))) throw new Error('Die Figur gibt es nicht.')
-  writeFileSync(join(ordner, `${p}.png`), dataUrlBytes(dataUrl))
+  writeAtomic(join(ordner, `${p}.png`), dataUrlBytes(dataUrl))
   const info = leseFigur(k)
   if (!info) throw new Error('Die Pose konnte nicht gespeichert werden.')
   return info

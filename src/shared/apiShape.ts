@@ -124,7 +124,15 @@ export function buildApi(call: Call, extras: ApiExtras) {
       sicherung: () => call<{ name: string; daten: Uint8Array }>('wartung:sicherung'),
       zuruecksetzen: () => call<{ geloescht: string[] }>('wartung:zuruecksetzen'),
       pruefen: (daten: Uint8Array) => call<{ erstellt: string; ordner: { ordner: string; eintraege: number }[]; dateien: string[] }>('wartung:pruefen', daten),
-      wiederherstellen: (daten: Uint8Array) => call<{ wiederhergestellt: string[] }>('wartung:wiederherstellen', daten)
+      wiederherstellen: (daten: Uint8Array) => call<{ wiederhergestellt: string[] }>('wartung:wiederherstellen', daten),
+      sicherungen: () => call<{ name: string; groesse: number; erstellt: string }[]>('wartung:sicherungen'),
+      sicherungLaden: (name: string) => call<Uint8Array>('wartung:sicherungLaden', name),
+      sichereJetzt: () => call<{ name: string; groesse: number; erstellt: string }>('wartung:sichereJetzt'),
+      sicherungsOrdner: () => call<string | null>('wartung:sicherungsOrdner')
+    },
+    protokoll: {
+      melden: (text: string) => call<void>('protokoll:melden', text),
+      speichern: () => call<string | null>('protokoll:speichern')
     },
     /**
      * Das Fenster soll schließen: Vorher sichert die Oberfläche alles Anstehende und meldet
@@ -289,7 +297,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Maskottchen für Illustrationen (26.09.2026) – Ablage im Profil unter maskottchen/ */
     maskottchen: {
       list: () => call<MaskottchenInfo[]>('maskottchen:list'),
-      save: (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) => call<MaskottchenInfo>('maskottchen:save', eingabe),
+      save: (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) =>
+        call<MaskottchenInfo>('maskottchen:save', eingabe),
       pose: (id: string, pose: string, dataUrl: string) => call<MaskottchenInfo>('maskottchen:pose', id, pose, dataUrl),
       deletePose: (id: string, pose: string) => call<MaskottchenInfo | null>('maskottchen:delete-pose', id, pose),
       delete: (id: string) => call<MaskottchenInfo[]>('maskottchen:delete', id)

@@ -1,5 +1,6 @@
 import { app, safeStorage } from 'electron'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { writeAtomic } from './atomar'
 import { join } from 'path'
 import { AppSettings, DEFAULT_SETTINGS, DeepPartial, SecretName, SavedVocabList } from '@shared/types'
 
@@ -18,7 +19,7 @@ export function readJson<T>(file: string, fallback: T): T {
 }
 
 export function writeJson(file: string, value: unknown): void {
-  writeFileSync(join(dataDir(), file), JSON.stringify(value, null, 2), 'utf8')
+  writeAtomic(join(dataDir(), file), JSON.stringify(value, null, 2))
 }
 
 // ---------- Einstellungen ----------
@@ -46,6 +47,7 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
       economy: (ai.economy as AppSettings['ai']['economy']) ?? base.ai.economy
     },
     appearance: { ...base.appearance, ...stored.appearance },
+    sicherung: { ...base.sicherung, ...(stored.sicherung as object) },
     defaults: { ...base.defaults, ...stored.defaults },
     audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
     // Je Fach zusammenführen: Eine geänderte Fachfarbe darf die übrigen nicht löschen

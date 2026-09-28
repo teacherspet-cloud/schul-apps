@@ -166,7 +166,8 @@ export const UMSCHREIBUNG: Record<string, (args: unknown[]) => unknown[]> = {
   'settings:set': (args) => {
     const patch = args[0]
     if (!patch || typeof patch !== 'object') return args
-    const { lan: _weg, ...rest } = patch as Record<string, unknown>
+    // `sicherung` enthält einen Ordnerpfad dieses Rechners – gehört an den Rechner
+    const { lan: _weg, sicherung: _s, ...rest } = patch as Record<string, unknown>
     if (rest.ai && typeof rest.ai === 'object') {
       const ai = { ...(rest.ai as Record<string, unknown>) }
       for (const feld of GESPERRTE_KI_FELDER) delete ai[feld]

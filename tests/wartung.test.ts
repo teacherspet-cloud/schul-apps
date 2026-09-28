@@ -37,9 +37,11 @@ describe('Sicherung wiederherstellen', () => {
     expect(existsSync(join(wurzel, 'secrets.json'))).toBe(false)
 
     const vorschau = pruefeSicherung(daten)
+    // Seit 27.09.2026 (Version 2) stehen auch die Lehrwerke in der Sicherung
     expect(vorschau.ordner).toEqual([
       { ordner: 'arbeitsblaetter', eintraege: 1 },
-      { ordner: 'klassenarbeiten', eintraege: 1 }
+      { ordner: 'klassenarbeiten', eintraege: 1 },
+      { ordner: 'lehrwerke', eintraege: 1 }
     ])
     expect(vorschau.dateien).toEqual(['settings.json'])
 
@@ -50,12 +52,35 @@ describe('Sicherung wiederherstellen', () => {
     expect(existsSync(join(wurzel, 'secrets.json'))).toBe(false)
   })
 
-  it('lässt die Lehrwerke in jedem Schritt unberührt', () => {
+  it('sichert die Lehrwerke mit, setzt sie aber nie zurück (Version 2, 27.09.2026)', () => {
     const { daten } = sicherung()
-    expect(new TextDecoder().decode(daten)).not.toContain('green-line')
+    // Bis Version 1 fehlten sie in jeder Sicherung – ausgerechnet der Bestand, der sich nicht neu erzeugen lässt
+    expect(new TextDecoder().decode(daten)).toContain('green-line')
     werkszustand()
+    expect(readFileSync(join(wurzel, 'lehrwerke/green-line.json'), 'utf8')).toBe('{"units":[]}')
+    rmSync(join(wurzel, 'lehrwerke/green-line.json'))
     wiederherstellen(daten)
     expect(readFileSync(join(wurzel, 'lehrwerke/green-line.json'), 'utf8')).toBe('{"units":[]}')
+  })
+
+  it('sichert Unterordner (Maskottchen) und die Vokabel-Bibliothek, ohne Pfade zu verlassen', () => {
+    schreibe('maskottchen/fiona/figur.json', '{"name":"Fiona"}')
+    schreibe('vocab-library.json', '[{"id":"l1"}]')
+    const { daten } = sicherung()
+    werkszustand()
+    // Beides überlebt das Zurücksetzen
+    expect(existsSync(join(wurzel, 'maskottchen/fiona/figur.json'))).toBe(true)
+    expect(existsSync(join(wurzel, 'vocab-library.json'))).toBe(true)
+    rmSync(join(wurzel, 'maskottchen'), { recursive: true })
+    rmSync(join(wurzel, 'vocab-library.json'))
+    wiederherstellen(daten)
+    expect(readFileSync(join(wurzel, 'maskottchen/fiona/figur.json'), 'utf8')).toBe('{"name":"Fiona"}')
+    expect(readFileSync(join(wurzel, 'vocab-library.json'), 'utf8')).toBe('[{"id":"l1"}]')
+    // Böse Pfade in einer (manipulierten) Sicherung werden übergangen
+    const boese = new TextEncoder().encode(JSON.stringify({ version: 2, erstellt: '', maskottchen: { '../../boese.txt': 'eA==', 'a/../../b.txt': 'eA==' } }))
+    wiederherstellen(boese)
+    expect(existsSync(join(wurzel, '..', 'boese.txt'))).toBe(false)
+    expect(existsSync(join(wurzel, 'b.txt'))).toBe(false)
   })
 
   it('führt zusammen: Vorhandenes bleibt, Gleichnamiges wird ersetzt', () => {

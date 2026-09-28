@@ -244,6 +244,8 @@ export interface AppSettings {
    * Rechner ausfällt.
    */
   letzteSicherung?: string
+  /** Automatische Sicherung (27.09.2026): an/aus (fehlt = an), zusätzlicher Ordner, Zahl der Stände */
+  sicherung?: { automatisch?: boolean; ordner?: string; behalten?: number }
   /**
    * Zugriff aus dem lokalen Netz (Browser auf Tablet, Handy, zweitem Rechner).
    *

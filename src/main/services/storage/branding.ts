@@ -1,5 +1,6 @@
 import { app } from 'electron'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, rmSync } from 'fs'
+import { writeAtomic } from './atomar'
 import { join } from 'path'
 
 const logoPath = (): string => join(app.getPath('userData'), 'logo.png')
@@ -14,7 +15,7 @@ export function getLogo(): string | null {
 export function setLogo(dataUrl: string): void {
   const match = /^data:image\/png;base64,(.+)$/s.exec(dataUrl)
   if (!match) throw new Error('Das Logo muss als PNG übergeben werden.')
-  writeFileSync(logoPath(), Buffer.from(match[1], 'base64'))
+  writeAtomic(logoPath(), Buffer.from(match[1], 'base64'))
 }
 
 export function removeLogo(): void {

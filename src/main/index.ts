@@ -69,6 +69,8 @@ import type { SuchOptionen } from '@shared/schulsuche'
 import { schulenSuchen, schulLogo, schulQuellen } from './services/storage/schulen'
 import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/themen'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
+import { ladeSicherung, listeSicherungen, sichereJetzt, starteAutoSicherung } from './services/storage/autoSicherung'
+import { fangeAbstuerze, leseProtokoll, protokolliere } from './services/protokoll'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
 import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
 // Kopiert electron-vite beim Bauen nach out/ und liefert den Pfad (liegt damit auch in der .exe)
@@ -357,6 +359,21 @@ function registerIpc(): void {
   handle('wartung:zuruecksetzen', () => werkszustand())
   handle('wartung:pruefen', (daten: Uint8Array) => pruefeSicherung(daten))
   handle('wartung:wiederherstellen', (daten: Uint8Array) => wiederherstellen(daten))
+  // Automatische Sicherung und Protokoll (27.09.2026)
+  handle('wartung:sicherungen', () => listeSicherungen())
+  handle('wartung:sicherungLaden', (name: string) => ladeSicherung(name))
+  handle('wartung:sichereJetzt', () => sichereJetzt())
+  handle('wartung:sicherungsOrdner', async () => {
+    const res = await dialog.showOpenDialog(mainWindow!, { title: 'Ordner für eine Kopie der Sicherungen', properties: ['openDirectory', 'createDirectory'] })
+    return res.canceled || !res.filePaths.length ? null : res.filePaths[0]
+  })
+  handle('protokoll:melden', (text: string) => protokolliere('fehler', 'oberflaeche', String(text ?? '').slice(0, 2000)))
+  handle('protokoll:speichern', async () => {
+    const res = await dialog.showSaveDialog(mainWindow!, { defaultPath: `Schul-Apps Protokoll ${new Date().toISOString().slice(0, 10)}.log` })
+    if (res.canceled || !res.filePath) return null
+    writeFileSync(res.filePath, leseProtokoll(), 'utf8')
+    return res.filePath
+  })
 
   handle('ai:status', () => aiStatus())
   const PING: StructuredRequest = {
@@ -526,7 +543,9 @@ function registerIpc(): void {
   handle('sources:video', (url: string) => ladeVideo(url))
   // Maskottchen für Illustrationen (26.09.2026)
   handle('maskottchen:list', () => listMaskottchen())
-  handle('maskottchen:save', (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) => saveMaskottchen(eingabe))
+  handle('maskottchen:save', (eingabe: { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string }) =>
+    saveMaskottchen(eingabe)
+  )
   handle('maskottchen:pose', (id: string, pose: string, dataUrl: string) => savePose(id, pose, dataUrl))
   handle('maskottchen:delete-pose', (id: string, pose: string) => deletePose(id, pose))
   handle('maskottchen:delete', (id: string) => deleteMaskottchen(id))
@@ -674,8 +693,10 @@ if (!gotLock) {
           }
         })
     })
+    fangeAbstuerze()
     registerIpc()
     createWindow()
+    starteAutoSicherung()
     // Liegengebliebene Arbeitsordner der KI-Programme entfernen. Sie entstehen, wenn die App
     // hart beendet wird – dann kommt das eigene Aufräumen nicht mehr dazu.
     try {

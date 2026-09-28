@@ -57,7 +57,7 @@ import { INFO_VARIANTS, SOCIAL_FORM_SVG } from '../render/icons'
 import { pictogramForSocialForm } from '../render/pictograms'
 import { istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../render/mcGrid'
 import { imageCredits, isHelpCard, isPhraseSheet } from '../render/SheetPages'
-import { contentInsets, footerSlotText, kompaktVorTitel, kopfTitel, kopfUeberthema, PageInfo, sidebarBox, sidebarText } from '../render/PageFrame'
+import { contentInsets, footerSlotText, kompaktVorTitel, kopfTitel, kopfUeberthema, PageInfo, pageLabels, sidebarBox, sidebarText } from '../render/PageFrame'
 import { audioLength, galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraphs } from '../render/BlockView'
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../didactics/audioRules'
@@ -333,6 +333,8 @@ async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: Wo
   const footers = { first: footerFor(ctx), default: footerFor(ctx) }
   const pageProps = {
     page: {
+      // Jedes Blatt zählt seine Seiten selbst (wie die Vorschau) – vorher nannte Word die Seiten des ganzen Dokuments
+      pageNumbers: { start: 1 },
       size: { width: A4_WIDTH, height: A4_HEIGHT },
       margin: {
         top: Math.round((d.page.marginMm + 4) * MM),
@@ -636,6 +638,7 @@ export async function boardSection(ws: Worksheet, board: BoardPlan, raster: Math
       new Paragraph({ spacing: { before: 300, after: 100 }, children: [run('So entsteht das Tafelbild', { bold: true, size: size + 1 })] }),
       new Table({
         width: { size: width, type: WidthType.DXA },
+        columnWidths: cols,
         layout: TableLayoutType.FIXED,
         rows: [
           new TableRow({
@@ -751,7 +754,9 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
       // Auch die Kopfzeile: ein Mathematikblatt kann „Rechnen mit $a^m \cdot a^n$" heissen
       new Paragraph({ alignment: align, children: await richRun(ctx, title, { bold: true, size: Math.round(ctx.size * 1.55), color }) })
     )
-  const subjectLine = [u.fachZeile, `Klasse ${ctx.ws.meta.grade}`, h.customText].filter(Boolean).join(' · ')
+  const labels = pageLabels(ctx.info)
+  // In der Sprache des Blattes (Englischarbeit: „Class 13") – wie die Vorschau
+  const subjectLine = [u.fachZeile, ctx.ws.meta.grade ? labels.grade(ctx.ws.meta.grade) : '', h.customText].filter(Boolean).join(' · ')
   if (subjectLine) textParas.push(new Paragraph({ alignment: align, children: [run(subjectLine, { size: ctx.size - 4, color: color ?? '444444' })] }))
   // Überthema als eigener Block: rechts im Kopf bzw. unter dem zentrierten Kopf
   const ueberParas = (ausrichtung: (typeof AlignmentType)[keyof typeof AlignmentType]): Paragraph[] =>
@@ -808,37 +813,58 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
       if (ueberCell) cells.push(ueberCell)
       if (badgeCell) cells.push(badgeCell)
     }
+    /*
+     * Spaltenraster ausdrücklich setzen (Befund der Lehrkraft vom 28.09.2026): Ohne `columnWidths`
+     * legt Word das Raster mit Standardbreiten an und hält es wegen des festen Layouts ein – das
+     * farbige Kopfband reichte nur über gut die Hälfte der Seite.
+     */
+    const breiten = [
+      ...(h.layout === 'logoRight'
+        ? [badgeCell ? badgeW : 0, textW, ueberCell ? ueberW : 0, logoCell ? logoW : 0]
+        : [logoCell ? logoW : 0, textW, ueberCell ? ueberW : 0, badgeCell ? badgeW : 0])
+    ].filter((w) => w > 0)
     children.push(
-      new Table({ width: { size: ctx.contentWidth, type: WidthType.DXA }, layout: TableLayoutType.FIXED, rows: [new TableRow({ children: cells })] })
+      new Table({
+        width: { size: ctx.contentWidth, type: WidthType.DXA },
+        columnWidths: breiten,
+        layout: TableLayoutType.FIXED,
+        rows: [new TableRow({ children: cells })]
+      })
     )
     if (!white) children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: ctx.accent, space: 1 } }, children: [] }))
   }
 
   if (!ctx.key && (h.fields.name || h.fields.class || h.fields.date)) {
     const fields: [string, number][] = []
-    if (h.fields.name) fields.push(['Name:', 5])
-    if (h.fields.class) fields.push(['Klasse:', 2])
-    if (h.fields.date) fields.push(['Datum:', 2.5])
+    if (h.fields.name) fields.push([labels.name, 5])
+    if (h.fields.class) fields.push([labels.class, 2])
+    if (h.fields.date) fields.push([labels.date, 2.5])
     const total = fields.reduce((s, [, w]) => s + w, 0)
     const cells: TableCell[] = []
+    const spalten: number[] = []
     // Nur das Datum: schmales Feld rechts statt einer Zeile über die ganze Breite
     const dateOnly = fields.length === 1 && h.fields.date
     if (dateOnly) {
+      spalten.push(Math.round(ctx.contentWidth * 0.75))
       cells.push(
         new TableCell({ width: { size: Math.round(ctx.contentWidth * 0.75), type: WidthType.DXA }, borders: NO_BORDERS, children: [new Paragraph('')] })
       )
     }
+    // Breite der Beschriftung nach ihrer Länge (≈ 0,6 Schriftgrad je Zeichen + Luft) – „Klasse:" brach sonst mitten im Wort um
+    const beschriftung = (label: string): number => Math.round(label.length * (ctx.size - 2) * 6.5 + 160)
     for (const [label, weight] of fields) {
       const width = dateOnly ? Math.round(ctx.contentWidth * 0.25) : Math.round((ctx.contentWidth * weight) / total)
+      const lw = Math.min(Math.round(width * 0.6), beschriftung(label))
+      spalten.push(lw, width - lw)
       cells.push(
         new TableCell({
-          width: { size: Math.round(width * 0.32), type: WidthType.DXA },
+          width: { size: lw, type: WidthType.DXA },
           borders: NO_BORDERS,
           verticalAlign: VerticalAlign.BOTTOM,
           children: [new Paragraph({ children: [run(label, { size: ctx.size - 2 })] })]
         }),
         new TableCell({
-          width: { size: Math.round(width * 0.68), type: WidthType.DXA },
+          width: { size: width - lw, type: WidthType.DXA },
           borders: { ...NO_BORDERS, bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000' } },
           children: [new Paragraph('')]
         })
@@ -847,6 +873,7 @@ async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
     children.push(
       new Table({
         width: { size: ctx.contentWidth, type: WidthType.DXA },
+        columnWidths: spalten,
         layout: TableLayoutType.FIXED,
         rows: [new TableRow({ height: { value: 460, rule: 'atLeast' }, children: cells })]
       })
@@ -862,7 +889,13 @@ function footerFor(ctx: Ctx): Footer {
   if (!f.show) return new Footer({ children: [new Paragraph('')] })
   const slot = (s: typeof f.left): ParagraphChild[] => {
     if (s === 'pageNumber')
-      return [new TextRun({ children: ['Seite ', PageNumber.CURRENT, ' / ', PageNumber.TOTAL_PAGES], size: ctx.size - 6, color: '555555' })]
+      return [
+        new TextRun({
+          children: [ctx.info.language === 'en' ? 'Page ' : 'Seite ', PageNumber.CURRENT, ' / ', PageNumber.TOTAL_PAGES_IN_SECTION],
+          size: ctx.size - 6,
+          color: '555555'
+        })
+      ]
     const text = footerSlotText(s, ctx.info, 1, 1)
     return text ? [run(text, { size: ctx.size - 6, color: '555555' })] : []
   }
@@ -900,6 +933,7 @@ function boxTable(ctx: Ctx, children: Child[], opts: { fill?: string; leftColor?
   const line = { style: opts.dashed ? BorderStyle.DASHED : BorderStyle.SINGLE, size: 6, color: opts.color ?? ctx.accent }
   return new Table({
     width: { size: ctx.contentWidth, type: WidthType.DXA },
+    columnWidths: [ctx.contentWidth],
     layout: TableLayoutType.FIXED,
     rows: [
       new TableRow({
@@ -1074,7 +1108,14 @@ async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string, number
           }
           rows.push(new TableRow({ cantSplit: true, children: cells }))
         }
-        out.push(new Table({ width: { size: ctx.contentWidth, type: WidthType.DXA }, layout: TableLayoutType.FIXED, rows }))
+        out.push(
+          new Table({
+            width: { size: ctx.contentWidth, type: WidthType.DXA },
+            columnWidths: Array.from({ length: cols }, () => cellWidth),
+            layout: TableLayoutType.FIXED,
+            rows
+          })
+        )
         if (block.caption) out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: await richRun(ctx, block.caption, { size: ctx.size - 3 }) }))
         out.push(spacer())
         return out
@@ -1608,16 +1649,31 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
     }
   }
   const instruction = await richTextRuns(block.instruction, { size: ctx.size, raster: ctx.deps.raster })
+  /*
+   * Die Situation einer Schreibaufgabe steht VOR dem Auftrag – wie am Bildschirm (Wunsch der
+   * Lehrkraft vom 24.09.2026). In Word stand sie bis 28.09.2026 dahinter und las sich wie eine
+   * zweite Aufgabe. Nummer und Symbol gehören dann an die Situation.
+   */
+  const situation = block.brief?.situation?.trim()
+  if (situation)
+    out.push(
+      new Paragraph({
+        keepNext: true,
+        spacing: { before: 120, after: 40 },
+        indent: { left: indent, hanging: indent },
+        children: [...head, ...(await richRun(ctx, situation))]
+      })
+    )
   out.push(
     new Paragraph({
       keepNext: true,
-      spacing: { before: 120, after: 60 },
-      indent: { left: indent, hanging: indent },
+      spacing: { before: situation ? 0 : 120, after: 60 },
+      indent: situation ? { left: indent } : { left: indent, hanging: indent },
       tabStops: [{ type: TabStopType.RIGHT, position: ctx.contentWidth }],
       // Auf Arbeitsblättern werden keine Punkte vergeben.
       // Der Hinweis auf das gelöste Beispiel tritt hinzu, wenn eines da ist – wie am Bildschirm.
       children: [
-        ...head,
+        ...(situation ? [] : head),
         ...instruction,
         ...(block.example ? [run(` ${exampleNote(subjectById(ctx.ws.meta.subjectId).foreignLanguage ?? 'de')}`, { color: '555555' })] : [])
       ]
@@ -1632,8 +1688,6 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
    */
   const brief = block.brief
   if (brief) {
-    if (brief.situation)
-      out.push(new Paragraph({ indent: { left: indent }, spacing: { before: 60, after: 40 }, children: await richRun(ctx, brief.situation) }))
     const rahmen = brief.frameHidden ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
     if (rahmen) out.push(new Paragraph({ indent: { left: indent }, spacing: { after: 60 }, children: [run(rahmen, { italics: true })] }))
 
@@ -1643,6 +1697,7 @@ async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): Promise
       out.push(
         new Table({
           width: { size: ctx.contentWidth - indent, type: WidthType.DXA },
+          columnWidths: notizen.map(() => Math.floor((ctx.contentWidth - indent) / notizen.length)),
           layout: TableLayoutType.FIXED,
           rows: [
             new TableRow({

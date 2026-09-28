@@ -180,7 +180,7 @@ if (!seiteImNetz) {
   pruefe(false, 'Das Fenster ohne Brücke ließ sich nicht öffnen')
 } else {
   await seiteImNetz.waitForTimeout(2500)
-  const hatPin = await seiteImNetz.evaluate(() => (document.body.textContent ?? '').includes('Gib einmalig die PIN ein'))
+  const hatPin = await seiteImNetz.evaluate(() => (document.body.textContent ?? '').includes('Einmalig die PIN eingeben'))
   pruefe(hatPin, 'Ohne Anmeldung erscheint im Browser die PIN-Abfrage')
   const hatApi = await seiteImNetz.evaluate(() => typeof window.api?.sheets?.list === 'function')
   pruefe(hatApi, 'Die Oberfläche baut sich im Browser dieselbe Schnittstelle auf')

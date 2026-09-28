@@ -10,7 +10,8 @@
  * mitgelieferte Zeichnung zurück; es geht also nie etwas verloren.
  */
 import { app } from 'electron'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
+import { writeAtomic } from './atomar'
 import { join } from 'path'
 
 function dir(): string {
@@ -44,7 +45,7 @@ export function getPictograms(): Record<string, string> {
 export function setPictogram(id: string, dataUrl: string): void {
   const match = /^data:image\/png;base64,(.+)$/s.exec(dataUrl)
   if (!match) throw new Error('Das Piktogramm muss als PNG übergeben werden.')
-  writeFileSync(filePath(id), Buffer.from(match[1], 'base64'))
+  writeAtomic(filePath(id), Buffer.from(match[1], 'base64'))
 }
 
 /** Nimmt die eigene Gestaltung zurück – das mitgelieferte Symbol gilt wieder. */

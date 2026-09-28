@@ -18,7 +18,8 @@
  * Ausnahmeliste, und ein Test hält das fest.
  */
 import { app } from 'electron'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'fs'
+import { writeAtomic } from './atomar'
 import { join } from 'path'
 import { pruefeThemen, type ThemenDaten } from '@shared/themen'
 
@@ -32,6 +33,14 @@ import { pruefeThemen, type ThemenDaten } from '@shared/themen'
  */
 export const GESCHUETZT = [
   'lehrwerke',
+  // Vokabel-Bibliothek (eigene Listen) und Maskottchen: wachsen über Jahre wie die Lehrwerke
+  'vocab-library.json',
+  'maskottchen',
+  // Automatische Sicherungen (27.09.2026) – ein Zurücksetzen darf sie nicht mitnehmen
+  'sicherungen',
+  'protokoll.log',
+  'protokoll.1.log',
+  'verbrauch.json',
   'Cache',
   'Code Cache',
   'GPUCache',
@@ -50,6 +59,18 @@ export const GESCHUETZT = [
 
 /** Ordner mit Material, das die Lehrkraft erzeugt hat. */
 const MATERIAL = ['arbeitsblaetter', 'vokabeltests', 'klassenarbeiten', 'grammatiktests', 'lernzielkontrollen', 'piktogramme', 'hoertexte']
+
+/**
+ * Nur sichern, nie zurücksetzen (27.09.2026): Bis dahin standen Lehrwerke, Vokabel-Bibliothek und
+ * Maskottchen in KEINER Sicherung – ausgerechnet die Bestände, die sich nicht neu erzeugen lassen.
+ * Ordner werden mit Unterordnern gesichert (Maskottchen liegen je Figur in einem eigenen Ordner).
+ */
+export const NUR_SICHERN_ORDNER = ['lehrwerke', 'maskottchen']
+export const NUR_SICHERN_DATEIEN = ['vocab-library.json']
+
+/** Alle Ordner und Dateien, die in eine Sicherung gehören – Grundlage auch für den Vollständigkeitstest */
+export const SICHERUNG_ORDNER = (): string[] => [...MATERIAL, ...NUR_SICHERN_ORDNER]
+export const SICHERUNG_DATEIEN = (): string[] => [...DATEIEN.filter((d) => d !== 'secrets.json'), ...NUR_SICHERN_DATEIEN]
 
 /** Einzelne Dateien mit Einstellungen und Zugängen. */
 const DATEIEN = [
@@ -86,28 +107,42 @@ export function bestand(): { ordner: string; eintraege: number }[] {
  */
 export function sicherung(): { name: string; daten: Uint8Array } {
   const wurzel = userData()
-  const inhalt: Record<string, unknown> = { version: 1, erstellt: new Date().toISOString() }
+  const inhalt: Record<string, unknown> = { version: 2, erstellt: new Date().toISOString() }
 
-  for (const ordner of MATERIAL) {
+  for (const ordner of SICHERUNG_ORDNER()) {
     const pfad = join(wurzel, ordner)
     if (!existsSync(pfad)) continue
     const dateien: Record<string, string> = {}
-    for (const name of readdirSync(pfad)) {
-      const voll = join(pfad, name)
-      if (!statSync(voll).isFile()) continue
-      dateien[name] = readFileSync(voll).toString('base64')
-    }
+    sammle(pfad, '', dateien)
     if (Object.keys(dateien).length) inhalt[ordner] = dateien
   }
 
-  for (const datei of DATEIEN) {
-    if (datei === 'secrets.json') continue
+  for (const datei of SICHERUNG_DATEIEN()) {
     const pfad = join(wurzel, datei)
     if (existsSync(pfad)) inhalt[datei] = readFileSync(pfad).toString('base64')
   }
 
   const tag = new Date().toISOString().slice(0, 10)
   return { name: `Schul-Apps Sicherung ${tag}.json`, daten: new TextEncoder().encode(JSON.stringify(inhalt)) }
+}
+
+/** Dateien eines Ordners samt Unterordnern (eine Ebene tief genügt für Maskottchen; hier allgemein) */
+function sammle(pfad: string, praefix: string, ziel: Record<string, string>): void {
+  for (const name of readdirSync(pfad)) {
+    if (name.endsWith('.tmp')) continue
+    const voll = join(pfad, name)
+    const st = statSync(voll)
+    if (st.isDirectory()) sammle(voll, `${praefix}${name}/`, ziel)
+    else if (st.isFile()) ziel[`${praefix}${name}`] = readFileSync(voll).toString('base64')
+  }
+}
+
+/** Ein Pfad aus einer Sicherung: nur schlichte Namen, höchstens mit „/" getrennt – nie „..", nie absolut */
+export function sichererRelPfad(name: string): string[] | null {
+  if (!name || name.includes('\\') || name.startsWith('/')) return null
+  const teile = name.split('/')
+  if (teile.some((t) => !t || t === '.' || t === '..' || t.includes(':'))) return null
+  return teile
 }
 
 /**
@@ -142,7 +177,8 @@ function lies(daten: Uint8Array): Record<string, unknown> {
   } catch {
     throw new Error('Die Datei ist keine Sicherung von Schul-Apps (kein lesbares JSON).')
   }
-  if (!inhalt || typeof inhalt !== 'object' || (inhalt as { version?: unknown }).version !== 1)
+  const version = (inhalt as { version?: unknown } | null)?.version
+  if (!inhalt || typeof inhalt !== 'object' || (version !== 1 && version !== 2))
     throw new Error('Die Datei ist keine Sicherung von Schul-Apps oder stammt aus einer unbekannten Version.')
   return inhalt as Record<string, unknown>
 }
@@ -156,10 +192,11 @@ function lies(daten: Uint8Array): Record<string, unknown> {
  */
 export function pruefeSicherung(daten: Uint8Array): { erstellt: string; ordner: { ordner: string; eintraege: number }[]; dateien: string[] } {
   const inhalt = lies(daten)
-  const ordner = MATERIAL.filter((o) => inhalt[o] && typeof inhalt[o] === 'object')
+  const ordner = SICHERUNG_ORDNER()
+    .filter((o) => inhalt[o] && typeof inhalt[o] === 'object')
     .map((o) => ({ ordner: o, eintraege: Object.keys(inhalt[o] as Record<string, string>).length }))
     .filter((e) => e.eintraege > 0)
-  const dateien = DATEIEN.filter((d) => d !== 'secrets.json' && typeof inhalt[d] === 'string')
+  const dateien = SICHERUNG_DATEIEN().filter((d) => typeof inhalt[d] === 'string')
   return { erstellt: typeof inhalt.erstellt === 'string' ? inhalt.erstellt : '', ordner, dateien }
 }
 
@@ -179,29 +216,31 @@ export function wiederherstellen(daten: Uint8Array): { wiederhergestellt: string
   const inhalt = lies(daten)
   const wiederhergestellt: string[] = []
 
-  for (const ordner of MATERIAL) {
+  for (const ordner of SICHERUNG_ORDNER()) {
     const dateien = inhalt[ordner]
     if (!dateien || typeof dateien !== 'object') continue
     mkdirSync(join(wurzel, ordner), { recursive: true })
     for (const [name, base64] of Object.entries(dateien as Record<string, unknown>)) {
       if (typeof base64 !== 'string') continue
-      // Kein Pfad im Dateinamen: Ein „../" in der Sicherung dürfte nicht aus dem Ordner führen
-      if (name.includes('/') || name.includes('\\') || name.includes('..')) continue
-      writeFileSync(join(wurzel, ordner, name), Buffer.from(base64, 'base64'))
+      // Kein Ausbruch: Ein „../" in der Sicherung dürfte nicht aus dem Ordner führen
+      const teile = sichererRelPfad(name)
+      if (!teile) continue
+      if (teile.length > 1) mkdirSync(join(wurzel, ordner, ...teile.slice(0, -1)), { recursive: true })
+      writeAtomic(join(wurzel, ordner, ...teile), Buffer.from(base64, 'base64'))
     }
     wiederhergestellt.push(ordner)
   }
 
-  for (const datei of DATEIEN) {
+  for (const datei of SICHERUNG_DATEIEN()) {
     const base64 = inhalt[datei]
-    if (typeof base64 !== 'string' || !base64 || datei === 'secrets.json') continue
+    if (typeof base64 !== 'string' || !base64) continue
     if (datei === 'themenbereiche.json') {
       // Zusammenführen wie beim Material: Bereiche, die es nur hier gibt, bleiben erhalten
-      writeFileSync(join(wurzel, datei), JSON.stringify(themenZusammenfuehren(join(wurzel, datei), Buffer.from(base64, 'base64').toString('utf8'))))
+      writeAtomic(join(wurzel, datei), JSON.stringify(themenZusammenfuehren(join(wurzel, datei), Buffer.from(base64, 'base64').toString('utf8'))))
       wiederhergestellt.push(datei)
       continue
     }
-    writeFileSync(join(wurzel, datei), Buffer.from(base64, 'base64'))
+    writeAtomic(join(wurzel, datei), Buffer.from(base64, 'base64'))
     wiederhergestellt.push(datei)
   }
   return { wiederhergestellt }

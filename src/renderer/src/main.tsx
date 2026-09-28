@@ -18,6 +18,16 @@ import App from './App'
 import { useAppSettings } from './shared/settingsStore'
 import { applyThemeAttributes, buildMantineTheme, themeById, themeCssVariables } from './shared/themes'
 
+/*
+ * Fehler der Oberfläche ins Protokoll des Rechners (27.09.2026): nur Meldung und Stelle, keine
+ * Inhalte. Im Netz (Tablet) nicht – dort gibt es den Kanal nicht.
+ */
+if (!imNetz()) {
+  const melde = (text: string): void => void window.api?.protokoll?.melden(text).catch(() => undefined)
+  window.addEventListener('error', (e) => melde(`${e.message} (${e.filename}:${e.lineno})`))
+  window.addEventListener('unhandledrejection', (e) => melde(`Unbehandelt: ${e.reason instanceof Error ? e.reason.message : String(e.reason)}`))
+}
+
 if (new URLSearchParams(location.search).has('selftest')) void import('./selftest').then((m) => m.installSelftest())
 
 function Root(): React.JSX.Element {

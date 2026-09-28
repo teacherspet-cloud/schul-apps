@@ -1,6 +1,7 @@
 // Klassenarbeiten in der App speichern: je Arbeit eine Datei plus ein kleines Verzeichnis für die Übersicht.
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
+import { writeAtomic } from './atomar'
 import { join } from 'path'
 import { SavedExam, SavedExamInput, SavedExamMeta } from '@shared/types'
 
@@ -15,13 +16,6 @@ const indexFile = (): string => join(dir(), 'index.json')
 function checkId(id: string): string {
   if (!/^[A-Za-z0-9_-]{4,64}$/.test(id)) throw new Error('Ungültige Klassenarbeit-ID.')
   return id
-}
-
-/** Schreibt erst in eine Hilfsdatei und benennt dann um – so bleibt bei einem Absturz die alte Fassung erhalten. */
-function writeAtomic(file: string, content: string): void {
-  const tmp = `${file}.tmp`
-  writeFileSync(tmp, content, 'utf8')
-  renameSync(tmp, file)
 }
 
 export function listExams(): SavedExamMeta[] {

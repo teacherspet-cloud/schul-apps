@@ -83,7 +83,7 @@ export function footerSlotText(slot: FooterSlot, info: PageInfo, page: number, p
     case 'date':
       return new Date().toLocaleDateString('de-DE')
     case 'pageNumber':
-      return pages > 1 ? `Seite ${page} / ${pages}` : ''
+      return pages > 1 ? `${info.language === 'en' ? 'Page' : 'Seite'} ${page} / ${pages}` : ''
     case 'custom':
       return info.design.footer.customText
     default:
