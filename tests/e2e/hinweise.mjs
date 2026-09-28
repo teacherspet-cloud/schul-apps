@@ -41,7 +41,7 @@ pruefe((await symbol.count()) === 0, 'Ohne Hinweise erscheint kein Symbol')
 // Einen Hinweis der KI setzen, wie er nach der Erstellung entsteht
 const HINWEIS = 'Thema und Jahrgang passen nur bedingt zusammen; bitte vor dem Einsatz prüfen.'
 await page.evaluate((text) => {
-  const ws = window.__selftest.worksheetJetzt()
+  const ws = structuredClone(window.__selftest.worksheetJetzt())
   ws.meta.teacherNote = text
   window.__selftest.setWorksheet(ws)
 }, HINWEIS)

@@ -89,7 +89,8 @@ await feld.fill('Nilpferd, Zimtschnecke')
 await page.waitForTimeout(400)
 // Der Dialog zeigt vorab, was auf dem Blatt stehen wird
 const vorschau = await dialog.innerText()
-pruefe(vorschau.includes('Nilpferd und Zimtschnecke'), 'Der Dialog zeigt den Satz, der auf dem Blatt landet')
+// Seit der dritten Fassung (27.09.2026) stehen die Kennwörter in Anführungszeichen: „Nilpferd" und „Zimtschnecke"
+pruefe(vorschau.includes('Nilpferd" und „Zimtschnecke'), 'Der Dialog zeigt den Satz, der auf dem Blatt landet')
 await dialog.screenshot({ path: join(out, 'dialog.png') })
 await dialog.getByRole('button', { name: 'KI-Test einschalten' }).click()
 await page.waitForTimeout(2000)

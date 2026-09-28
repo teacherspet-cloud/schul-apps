@@ -58,7 +58,7 @@ pruefe(!vorher.includes('An Abituraufgaben angelehnt'), 'Im voreingestellten Jah
 const jahrgang = page.locator('.mantine-InputWrapper-root', { hasText: 'Jahrgang' }).locator('input').first()
 await jahrgang.click()
 await page.waitForTimeout(400)
-const option = page.locator('[role="option"]', { hasText: 'Klasse 12' }).first()
+const option = page.locator('[role="option"]', { hasText: 'Klasse 12' }).filter({ visible: true }).first()
 pruefe((await option.count()) > 0, 'Klasse 12 ist am Gymnasium waehlbar')
 await option.scrollIntoViewIfNeeded()
 await option.click()

@@ -72,8 +72,19 @@ export default function EditorLeiste({
         <SegmentedControl size="xs" aria-label={fassungen.ariaLabel ?? 'Fassung'} value={fassungen.value} onChange={fassungen.onChange} data={fassungen.data} />
       )}
       <SegmentedControl size="xs" aria-label={ansichten.ariaLabel ?? 'Ansicht'} value={ansichten.value} onChange={ansichten.onChange} data={ansichten.data} />
+      {/* Blattoptionen unter den Dialogen (Modal 200): Was von hier einen Dialog öffnet (KI-Test-Wörter, Leveln), darf nicht verdeckt werden */}
       {optionen && (
-        <Popover opened={optionenOffen} onChange={setOptionenOffen} width={360} position="bottom-start" shadow="md" withArrow trapFocus={false} keepMounted>
+        <Popover
+          opened={optionenOffen}
+          onChange={setOptionenOffen}
+          width={360}
+          position="bottom-start"
+          shadow="md"
+          withArrow
+          trapFocus={false}
+          keepMounted
+          zIndex={190}
+        >
           <Popover.Target>
             <Button
               size="xs"

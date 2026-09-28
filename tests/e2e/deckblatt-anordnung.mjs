@@ -206,7 +206,8 @@ try {
   // ---- 3) Austauschen ----
   console.log('\nAustauschen')
   const vorTausch = (await karten())[1]
-  await page.mouse.click(vorTausch.x, vorTausch.y)
+  // Die Karte kann unterhalb des Fensters liegen (die Editorleiste ist seit 0.4 höher) – erst ins Bild holen
+  await page.locator(`${DECKBLATT} .ws-cover-thumb[data-seite="${vorTausch.seite}"]`).click()
   await page.waitForTimeout(300)
   await page.locator(`${DECKBLATT} .ws-cover-griffe`).getByRole('button', { name: 'Austauschen …' }).click()
   await page.waitForTimeout(800)
@@ -241,6 +242,7 @@ try {
   // ---- 5) Druck, PDF, Word ----
   console.log('\nDruck, PDF, Word')
   // Eine Karte gedreht lassen, damit die Ausgabe eine eigene Lage zeigt
+  await page.locator(`${DECKBLATT} .ws-cover-thumb`).first().scrollIntoViewIfNeeded()
   const k = (await karten())[0]
   await page.mouse.move(k.x, k.y)
   await page.mouse.down()
