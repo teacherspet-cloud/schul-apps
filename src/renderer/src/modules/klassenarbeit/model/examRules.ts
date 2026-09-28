@@ -12,6 +12,7 @@
  * Die Angaben sind Richtwerte für die Planung und ersetzen nicht den Blick in die
  * aktuelle Fassung; bei BW und Hessen lag nur eine ältere Fassung vor.
  */
+import { istGesellschaftsfach } from '../model/faecher'
 import { gradeScaleLine as sharedGradeScaleLine } from '../../../shared/gradeScale'
 import { notenpunkteFuer, punkteZeile } from '../../../shared/notenpunkte'
 import { examGrades } from './types'
@@ -160,7 +161,7 @@ export function examWarnings(stateId: string, subjectId: string, grade: number, 
     )
   }
   const rules = stateRules(stateId)
-  if (rules && subjectId === 'geschichte' && rules.otherSubject === 'keine') out.push('')
+  if (rules && istGesellschaftsfach(subjectId) && rules.otherSubject === 'keine') out.push('')
   return out.filter(Boolean)
 }
 

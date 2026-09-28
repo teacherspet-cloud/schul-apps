@@ -15,7 +15,9 @@ import type { KnownVocab } from '../../../shared/knownVocab'
 import type { StoffQuelle } from '../../../shared/files/stoffQuelle'
 
 /** Fächer, die das Modul zunächst abdeckt */
-export type ExamSubjectId = 'englisch' | 'geschichte'
+// Seit Phase G (Großprogramm 0.4) in model/faecher.ts – hier weitergereicht
+import type { ExamSubjectId } from './faecher'
+export type { ExamSubjectId }
 
 /**
  * Welcher Note ein Teil zugerechnet wird.
@@ -150,6 +152,8 @@ export interface ExamMeta {
   courseLevel: CourseLevel
   /** nur Fremdsprachen */
   cefrLevel: CefrLevel
+  /** Französisch/Spanisch: 2. oder 3. Fremdsprache (GER-Vorschlag); fehlt = 2, Englisch immer 1 */
+  languageOrder?: number
   /** Grammatikthema, falls die Arbeit einen Grammatikteil enthält */
   grammarTopic: string
   /**

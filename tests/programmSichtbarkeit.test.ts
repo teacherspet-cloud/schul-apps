@@ -39,12 +39,12 @@ describe('Programme nach eigenen Fächern', () => {
   })
 
   it('Latein und DaZ zählen zu den Sprachfächern', () => {
-    for (const fach of ['latein', 'daz', 'franzoesisch'])
+    for (const fach of ['latein', 'daz'])
       expect(ids(sichtbareProgramme(PROGRAMME, [fach], {}))).toEqual(['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'vokabelliste'])
   })
 
-  it('Englisch: alles sichtbar', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['englisch'], {}))).toEqual(PROGRAMM_REIHENFOLGE)
+  it('Englisch, Französisch und Spanisch: alles sichtbar (Klassenarbeit seit Phase G auch in Französisch und Spanisch)', () => {
+    for (const fach of ['englisch', 'franzoesisch', 'spanisch']) expect(ids(sichtbareProgramme(PROGRAMME, [fach], {}))).toEqual(PROGRAMM_REIHENFOLGE)
   })
 
   it('die eigene Wahl geht der Regel vor – in beide Richtungen; null nimmt sie zurück', () => {

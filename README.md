@@ -228,7 +228,14 @@ Gerundet wird kaufmännisch, also ab ,5 aufwärts: 14,49 → 14, 14,5 → 15. Ü
 
 ### Klassenarbeiten (neu, im Aufbau)
 
-Modul `modules/klassenarbeit/` – zunächst für **Englisch** und **Geschichte**.
+Modul `modules/klassenarbeit/` für **Englisch, Französisch, Spanisch, Deutsch, Geschichte, Politik und Erdkunde** (seit 0.4).
+
+- **Fachprofil** (`model/faecher.ts`): Jedes Fach sagt, was es ist – Fremdsprache (GER-Niveau, Teilnote Schreiben, Kopf in der Zielsprache, Wortschatz aus dem Lehrwerk), Deutsch (eine Note; Schreibteile nach Inhalt und Darstellung 70 : 30) oder Sachfach (eine Note, Punkte nach Anteil, dieselbe Quelle in allen Fassungen, Zahl der Arbeiten nach der Nebenfach-Regel des Landes). Die Formate der Fremdsprachen heißen `<sprache>-<art>` (en-writing, fr-writing, es-writing); `formatArt()` findet „den Schreibteil" in jeder Sprache.
+- **Französisch und Spanisch:** dieselben Kompetenzbereiche wie Englisch (KMK-Bildungsstandards für die Fremdsprachen), Beschriftungen in der Zielsprache („Compréhension écrite", „Expresión escrita"), ab Klasse 6, Sprachmittlung ab Klasse 7. Die Lehrkraft wählt 2. oder 3. Fremdsprache – danach richtet sich der GER-Vorschlag. Der ganze Kopf ist französisch bzw. spanisch („Contrôle", „Partie 1", „Nom :", „Documents autorisés : un dictionnaire bilingue"; „Examen", „Parte 1", „Nombre:").
+- **Deutsch:** Erzählen, informierendes und argumentierendes Schreiben, Analyse literarischer Texte, Gedichtinterpretation, Sachtextanalyse, materialgestütztes Schreiben, Leseverstehen, Sprache untersuchen (Kompetenzbereiche der KMK-Bildungsstandards Deutsch, Aufgabenarten der Abiturprüfung).
+- **Politik** (Kompetenzmodell der GPJE, EPA Sozialkunde/Politik) und **Erdkunde** (Bildungsstandards Geographie der DGfG, EPA Geographie): je sieben Formate von Grundwissen über Karikatur, Statistik, Karte und Klimadiagramm bis zu Urteils- und Handlungsaufgaben.
+- Die Operatorenliste der Oberstufe kommt für jedes Fach und Land aus dem gemeinsamen Bestand, in der Sprache der Arbeit; der Operatorabgleich kennt französische und spanische Verbformen („Analysez" ↔ „analyser").
+- Geprüft mit `tests/klassenarbeitFaecher.test.ts` und der Wache `node tests/e2e/exam-faecher.mjs` (Französisch und Deutsch über die Oberfläche, KI-Attrappe).
 
 - **Schritt 1 „Rahmen"** ist fertig: Fach, Thema, Inhalte der Unterrichtseinheit, Bundesland → Schulform → Jahrgang (ggf. Kursniveau, bei Englisch GER-Niveau), Dauer, Gesamtpunkte, Varianten A/B, erlaubte Hilfsmittel, Notenschlüssel, Erwartungshorizont, Designvorlage.
 - **Aufbau der Arbeit:** „Vorschlag erzeugen" verteilt die üblichen Aufgabenformate des Fachs auf Punkte und Minuten; Teile lassen sich ergänzen, umgewichten und entfernen. Ein Hinweis meldet, wenn die Summen nicht zur Vorgabe passen.

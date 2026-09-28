@@ -35,6 +35,7 @@
  * Eine belegte Grenze dafür wurde nicht gefunden. Sie sollen nur verhindern, dass eine Gruppe
  * merklich mehr zu lesen hat.
  */
+import { formatArt, istGesellschaftsfach } from '../model/faecher'
 import { stageForGrade } from '../../arbeitsblatt/didactics/profile'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { aufgabenIn, punkteNachTeilaufgaben, skalierePunkte } from '../../../shared/punkte'
@@ -107,11 +108,12 @@ export type Materialweg = 'gleich' | 'parallel'
 
 /** Bekommt die weitere Fassung DASSELBE Material oder einen Paralleltext? (Begründung oben) */
 export function materialweg(exam: Exam, part: ExamPart): Materialweg {
-  if (part.formatId === 'en-listening') return 'gleich'
+  if (formatArt(part.formatId) === 'listening') return 'gleich'
   const format = formatById(part.formatId)
   const mitMaterial = Boolean(format && format.material !== 'none')
   if (mitMaterial && stageForGrade(exam.meta.grade, exam.meta.schoolTypeId) === 'sek2') return 'gleich'
-  if (mitMaterial && exam.meta.subjectId === 'geschichte') return 'gleich'
+  // Sachfächer: dieselbe Quelle für alle Fassungen, wie in Geschichte
+  if (mitMaterial && istGesellschaftsfach(exam.meta.subjectId)) return 'gleich'
   // Sprechanlass als Bild: dasselbe Bild, andere Impulse
   if (format?.material === 'image') return 'gleich'
   return 'parallel'
@@ -147,7 +149,7 @@ export function parallelAuftrag(exam: Exam, part: ExamPart, label: string, vorla
     '- Anderer Inhalt: andere Items, andere Beispiele, andere Textstellen. Keine Antwort darf sich aus Fassung A übernehmen lassen.',
     '- Gleiche Schwierigkeit: gleiches Sprachniveau, gleicher Wortschatz, gleich lange erwartete Antworten.',
     weg === 'gleich'
-      ? part.formatId === 'en-listening'
+      ? formatArt(part.formatId) === 'listening'
         ? '- Das MATERIAL bleibt dasselbe: Der Hörtext wird der ganzen Klasse vorgespielt. Die App setzt ihn selbst ein. Gib NUR die Aufgaben (type "task") zu diesem Hörtext zurück, kein Material.'
         : '- Das MATERIAL bleibt dasselbe (dieselbe Quelle für alle Fassungen). Die App setzt es selbst ein. Gib NUR die Aufgaben (type "task") zu diesem Material zurück, kein Material.'
       : format?.material && format.material !== 'none'

@@ -1053,7 +1053,7 @@ export interface WorksheetMeta {
    * Fehlt = Deutsch. Englischarbeiten setzen hier 'en', damit auch PDF und Word
    * durchgehend englisch beschriftet sind.
    */
-  labelLanguage?: 'de' | 'en'
+  labelLanguage?: 'de' | 'en' | 'fr' | 'es'
   /**
    * Wort hinter dem Titel im Lösungsteil („– Lösungen"). Fehlt = „Lösungen". Die
    * Klassenarbeit setzt „Erwartungshorizont" – das ist dort der Fachbegriff, auch in

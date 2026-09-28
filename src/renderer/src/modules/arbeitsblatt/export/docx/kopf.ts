@@ -20,6 +20,7 @@ import {
   VerticalPositionRelativeFrom,
   WidthType
 } from 'docx'
+import { SEITE } from '../../render/PageFrame'
 import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { PRINT_MARGINS } from '@shared/design'
 import { dataUrlBytes, imageRun, NO_BORDERS, run, RunOptions } from '../../../../shared/export/docxKit'
@@ -256,7 +257,7 @@ export function footerFor(ctx: Ctx): Footer {
     if (s === 'pageNumber')
       return [
         new TextRun({
-          children: [ctx.info.language === 'en' ? 'Page ' : 'Seite ', PageNumber.CURRENT, ' / ', PageNumber.TOTAL_PAGES_IN_SECTION],
+          children: [`${SEITE[ctx.info.language ?? 'de']} `, PageNumber.CURRENT, ' / ', PageNumber.TOTAL_PAGES_IN_SECTION],
           size: ctx.size - 6,
           color: '555555'
         })

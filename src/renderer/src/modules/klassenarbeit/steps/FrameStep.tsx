@@ -1,4 +1,5 @@
 import { upperSecondary } from '../generation/generateExam'
+import { fachDerArbeit, formatArt, inhaltsanteil, istFremdsprache, KLASSENARBEIT_FAECHER, sprachfolge, zweiterTeil } from '../model/faecher'
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
   ActionIcon,
@@ -68,10 +69,8 @@ import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import StoffQuellen from '../../../shared/components/StoffQuellen'
 import { UeberthemaFeldFuer } from '../../../shared/components/UeberthemaFeld'
 
-const SUBJECTS: { value: ExamSubjectId; label: string }[] = [
-  { value: 'englisch', label: 'Englisch' },
-  { value: 'geschichte', label: 'Geschichte' }
-]
+// Die Fächer der Klassenarbeit stehen im Fachprofil (model/faecher.ts, Großprogramm 0.4)
+const SUBJECTS: { value: ExamSubjectId; label: string }[] = KLASSENARBEIT_FAECHER.map((f) => ({ value: f.id, label: f.label }))
 
 function emptyExam(stateId: string, schoolTypeId: string, schoolTypeName: string, design: DesignTemplate): Exam {
   // Zuletzt gewählte Angaben gelten wieder (Fach, Jahrgang, Kursniveau)
@@ -118,7 +117,8 @@ export default function FrameStep(): React.JSX.Element {
           const typeName = cefr.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.name ?? 'Gymnasium'
           const neu = emptyExam(stateId, schoolTypeId, typeName, ds.find((d) => d.isDefault) ?? ds[0])
           // Ohne gemerktes Niveau: das zum Jahrgang passende statt fest „B1" (auch in Klasse 5)
-          const level = !last.cefrLevel && neu.meta.subjectId === 'englisch' ? suggestLevel(cefr, stateId, schoolTypeId, 1, neu.meta.grade) : null
+          const level =
+            !last.cefrLevel && istFremdsprache(neu.meta.subjectId) ? suggestLevel(cefr, stateId, schoolTypeId, sprachfolge(neu.meta), neu.meta.grade) : null
           if (level) neu.meta.cefrLevel = level.level
           setExam(neu)
         }
@@ -155,13 +155,16 @@ export default function FrameStep(): React.JSX.Element {
    * Land oder Schulform ändern: Das GER-Niveau zieht mit wie beim Jahrgang (Befund der Lehrkraft
    * vom 26.09.2026 – bis dahin nur beim Jahrgang). Englisch ist hier immer 1. Fremdsprache.
    */
-  const niveauVorschlag = exam && exam.meta.subjectId === 'englisch' ? suggestLevel(table, exam.meta.stateId, exam.meta.schoolTypeId, 1, exam.meta.grade) : null
+  const niveauVorschlag =
+    exam && istFremdsprache(exam.meta.subjectId)
+      ? suggestLevel(table, exam.meta.stateId, exam.meta.schoolTypeId, sprachfolge(exam.meta), exam.meta.grade)
+      : null
   const patchGruppe = (p: Partial<ExamMeta>): void =>
     update(
       (d) => {
         // Schulform, Jahrgang und Kursniveau folgen nach denselben Regeln wie in den anderen Programmen (shared/lerngruppe.ts)
         Object.assign(d.meta, mitLerngruppe(table, d.meta, p))
-        const level = d.meta.subjectId === 'englisch' ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, 1, d.meta.grade) : null
+        const level = istFremdsprache(d.meta.subjectId) ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade) : null
         if (level) d.meta.cefrLevel = level.level
       },
       `angaben:${Object.keys(p).sort().join(',')}`
@@ -193,7 +196,7 @@ export default function FrameStep(): React.JSX.Element {
     const points = distribute(shares, d.meta.points)
     d.parts.forEach((part, i) => {
       part.minutes = Math.max(1, minutes[i])
-      if (d.meta.subjectId !== 'englisch') part.points = points[i]
+      if (!istFremdsprache(d.meta.subjectId)) part.points = points[i]
     })
   }
 
@@ -209,7 +212,7 @@ export default function FrameStep(): React.JSX.Element {
       d.parts.forEach((p, i) => {
         p.weight = weights[i]
         p.minutes = Math.max(1, minutes[i])
-        if (d.meta.subjectId !== 'englisch') p.points = points[i]
+        if (!istFremdsprache(d.meta.subjectId)) p.points = points[i]
       })
     })
 
@@ -276,8 +279,10 @@ export default function FrameStep(): React.JSX.Element {
                             d.meta.subjectId = v as ExamSubjectId
                             d.meta.subjectLabel = SUBJECTS.find((s) => s.value === v)?.label ?? ''
                             d.parts = []
-                            // Wechsel nach Englisch: Niveau passend zum Jahrgang
-                            const level = v === 'englisch' ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, 1, d.meta.grade) : null
+                            // Wechsel in eine Fremdsprache: Niveau passend zu Jahrgang und Fremdsprachenfolge
+                            const level = istFremdsprache(v)
+                              ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
+                              : null
                             if (level) d.meta.cefrLevel = level.level
                           })
                         }
@@ -293,11 +298,11 @@ export default function FrameStep(): React.JSX.Element {
                         onChange={(v) => {
                           if (!v) return
                           const grade = Number(v)
-                          const level = suggestLevel(table, meta.stateId, meta.schoolTypeId, 1, grade)
+                          const level = suggestLevel(table, meta.stateId, meta.schoolTypeId, sprachfolge(meta), grade)
                           update((d) => {
                             d.meta.grade = grade
                             d.meta.minutes = defaultMinutes(grade)
-                            if (level && d.meta.subjectId === 'englisch') d.meta.cefrLevel = level.level
+                            if (level && istFremdsprache(d.meta.subjectId)) d.meta.cefrLevel = level.level
                             d.parts = []
                           })
                         }}
@@ -315,7 +320,7 @@ export default function FrameStep(): React.JSX.Element {
                             ? `Themen aus dem Lehrplan für ${meta.schoolTypeName} in Klasse ${meta.grade} – oder frei eintippen.`
                             : undefined
                         }
-                        placeholder={meta.subjectId === 'englisch' ? 'z. B. Going abroad' : 'z. B. Industrialisierung'}
+                        placeholder={fachDerArbeit(meta.subjectId).beispiel}
                         data={meta.subjectId === 'geschichte' ? curriculum.map((t) => (t.code ? `${t.code}: ${t.label}` : t.label)) : []}
                         value={meta.topic}
                         onChange={(v) => patch({ topic: v })}
@@ -345,12 +350,12 @@ export default function FrameStep(): React.JSX.Element {
                         )}
                       </Text>
                     )}
-                    {meta.subjectId === 'englisch' && exam.parts.some((p) => p.formatId === 'en-grammar') && (
+                    {istFremdsprache(meta.subjectId) && exam.parts.some((p) => formatArt(p.formatId) === 'grammar') && (
                       <Autocomplete
                         label="Grammatikthema der Arbeit"
                         description="Aus der Liste wählen oder frei eintippen"
                         data={grammarTopicsFor({
-                          subjectId: 'englisch',
+                          subjectId: meta.subjectId,
                           grade: meta.grade,
                           schoolTypeId: meta.schoolTypeId,
                           stateId: meta.stateId,
@@ -382,7 +387,7 @@ export default function FrameStep(): React.JSX.Element {
                         // Englisch mit Lehrwerk: Thema und Grammatik der gewählten Unit
                         lehrwerkStand: lehrwerkStandAus(meta.vocab),
                         // GER-Kennzeichen an den Chips (Paket 12): Richtwert ist das Niveau der Arbeit
-                        gerRichtwert: meta.subjectId === 'englisch' ? meta.cefrLevel : undefined
+                        gerRichtwert: istFremdsprache(meta.subjectId) ? meta.cefrLevel : undefined
                       }}
                       wert={meta.content}
                       onChange={(content) => patch({ content })}
@@ -424,7 +429,7 @@ export default function FrameStep(): React.JSX.Element {
                       meta={meta}
                       onChange={(bilingual) => patch({ bilingual, aids: mitGlossar(meta.aids, Boolean(bilingual?.an)) })}
                     />
-                    {meta.subjectId === 'englisch' && (
+                    {istFremdsprache(meta.subjectId) && (
                       <div>
                         <Text size="sm" fw={500}>
                           Vokabeln für die Arbeit
@@ -432,7 +437,7 @@ export default function FrameStep(): React.JSX.Element {
                         <Text size="xs" c="dimmed" mb="xs">
                           Nur diese Vokabeln dürfen in der Arbeit vorkommen – geprüft wird, was geübt wurde.
                         </Text>
-                        <ExamVocabPicker language="en" vocab={meta.vocab} onChange={(vocab) => patch({ vocab })} />
+                        <ExamVocabPicker language={fachDerArbeit(meta.subjectId).sprache} vocab={meta.vocab} onChange={(vocab) => patch({ vocab })} />
                       </div>
                     )}
                   </Stack>
@@ -443,8 +448,14 @@ export default function FrameStep(): React.JSX.Element {
                     Lerngruppe
                   </Title>
                   <Stack gap="sm">
-                    <SchulortFelder table={table} stateId={meta.stateId} schoolTypeId={meta.schoolTypeId} schoolTypeName={meta.schoolTypeName} onChange={patchGruppe} />
-                    {(courseOptions || meta.subjectId === 'englisch') && (
+                    <SchulortFelder
+                      table={table}
+                      stateId={meta.stateId}
+                      schoolTypeId={meta.schoolTypeId}
+                      schoolTypeName={meta.schoolTypeName}
+                      onChange={patchGruppe}
+                    />
+                    {(courseOptions || istFremdsprache(meta.subjectId)) && (
                       <Group grow>
                         {courseOptions && (
                           <Select
@@ -455,7 +466,27 @@ export default function FrameStep(): React.JSX.Element {
                             allowDeselect={false}
                           />
                         )}
-                        {meta.subjectId === 'englisch' && (
+                        {/* Französisch/Spanisch: 2. oder 3. Fremdsprache – bestimmt den GER-Vorschlag (Phase G) */}
+                        {istFremdsprache(meta.subjectId) && meta.subjectId !== 'englisch' && (
+                          <Select
+                            label="Fremdsprache"
+                            data={[
+                              { value: '2', label: '2. Fremdsprache' },
+                              { value: '3', label: '3. Fremdsprache' }
+                            ]}
+                            value={String(meta.languageOrder ?? 2)}
+                            onChange={(v) =>
+                              v &&
+                              update((d) => {
+                                d.meta.languageOrder = Number(v)
+                                const level = suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
+                                if (level) d.meta.cefrLevel = level.level
+                              })
+                            }
+                            allowDeselect={false}
+                          />
+                        )}
+                        {istFremdsprache(meta.subjectId) && (
                           <Select
                             label="Sprachniveau (GER)"
                             description={niveauVorschlag ? `Vorschlag: ${niveauVorschlag.level} (${niveauVorschlag.basis})` : undefined}
@@ -488,7 +519,7 @@ export default function FrameStep(): React.JSX.Element {
                         value={meta.minutes}
                         onChange={(v) => patch({ minutes: Number(v) || 45 })}
                       />
-                      {meta.subjectId !== 'englisch' && (
+                      {!istFremdsprache(meta.subjectId) && (
                         <NumberInput
                           label="Gesamtpunkte"
                           min={10}
@@ -536,7 +567,7 @@ export default function FrameStep(): React.JSX.Element {
                       limit={12}
                       filter={suggestAll}
                     />
-                    {exam.parts.some((p) => p.formatId === 'en-listening') && (
+                    {exam.parts.some((p) => formatArt(p.formatId) === 'listening') && (
                       <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
                         <Checkbox
                           label="Hörtext von der KI schreiben lassen"
@@ -627,7 +658,7 @@ export default function FrameStep(): React.JSX.Element {
                                   <Badge variant="outline" color="gray">
                                     AFB {format?.afb.join('/') ?? '–'}
                                   </Badge>
-                                  {meta.subjectId === 'englisch' && meta.separateWritingGrade && (
+                                  {istFremdsprache(meta.subjectId) && meta.separateWritingGrade && (
                                     <Badge variant="light" color={part.gradeGroup === 'writing' ? 'grape' : 'blue'}>
                                       {part.gradeGroup === 'writing' ? 'Note Schreiben' : 'Note weitere Kompetenzen'}
                                     </Badge>
@@ -651,12 +682,14 @@ export default function FrameStep(): React.JSX.Element {
                                       max={90}
                                       step={5}
                                       value={part.contentShare}
-                                      onChange={(v) => update((d) => (d.parts[i].contentShare = Math.max(10, Math.min(90, Number(v) || CONTENT_SHARE))))}
+                                      onChange={(v) =>
+                                        update((d) => (d.parts[i].contentShare = Math.max(10, Math.min(90, Number(v) || inhaltsanteil(d.meta.subjectId)))))
+                                      }
                                     />
                                     <Text size="xs" c="dimmed" pb={6}>
-                                      Sprache {100 - (part.contentShare ?? CONTENT_SHARE)} %
+                                      {zweiterTeil(meta.subjectId)} {100 - (part.contentShare ?? inhaltsanteil(meta.subjectId))} %
                                       {part.points > 0
-                                        ? ` · ${Math.round((part.points * (part.contentShare ?? CONTENT_SHARE)) / 100)} von ${part.points} Punkten auf den Inhalt`
+                                        ? ` · ${Math.round((part.points * (part.contentShare ?? inhaltsanteil(meta.subjectId))) / 100)} von ${part.points} Punkten auf den Inhalt`
                                         : ' · Bewertung über Inhalt und Sprache, nicht über Punkte'}
                                     </Text>
                                   </Group>
@@ -690,25 +723,25 @@ export default function FrameStep(): React.JSX.Element {
                                   defaultValue={part.notes ?? ''}
                                   onBlur={(e) => update((d) => (d.parts[i].notes = e.currentTarget.value))}
                                 />
-                                {(part.formatId === 'en-listening' || part.formatId === 'en-reading') && (
+                                {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
                                   <MultiSelect
                                     mt="xs"
                                     size="xs"
                                     label="Aufgabenformate"
-                                    data={comprehensionFormatsFor(part.formatId === 'en-listening' ? 'listening' : 'reading', meta.grade).map((f) => ({
+                                    data={comprehensionFormatsFor(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade).map((f) => ({
                                       value: f.id,
                                       label: `${f.label} (${f.openness})`
                                     }))}
                                     value={part.formats ?? []}
                                     onChange={(v) => update((d) => (d.parts[i].formats = v))}
-                                    placeholder={defaultComprehensionFormats(part.formatId === 'en-listening' ? 'listening' : 'reading', meta.grade)
+                                    placeholder={defaultComprehensionFormats(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', meta.grade)
                                       .map((id) => comprehensionFormatById(id)?.label)
                                       .filter(Boolean)
                                       .join(' · ')}
                                     clearable
                                   />
                                 )}
-                                {(part.formatId === 'en-listening' || part.formatId === 'en-reading') && (
+                                {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
                                   <NumberInput
                                     mt="xs"
                                     size="xs"
@@ -753,11 +786,11 @@ export default function FrameStep(): React.JSX.Element {
                                       d.parts[i].weight = weight
                                       d.parts[i].minutes = Math.max(1, Math.round((d.meta.minutes * weight) / 100))
                                       // In Geschichte ergibt sich die eine Note aus den Punkten, dort folgen sie dem Anteil
-                                      if (d.meta.subjectId !== 'englisch') d.parts[i].points = pointsFromWeight(weight, d.meta.points)
+                                      if (!istFremdsprache(d.meta.subjectId)) d.parts[i].points = pointsFromWeight(weight, d.meta.points)
                                     })
                                   }}
                                 />
-                                {(meta.subjectId !== 'englisch' || part.points > 0) && (
+                                {(!istFremdsprache(meta.subjectId) || part.points > 0) && (
                                   <NumberInput
                                     size="xs"
                                     w={78}
@@ -822,10 +855,10 @@ export default function FrameStep(): React.JSX.Element {
                           label: f.label,
                           competence: f.competence,
                           weight,
-                          points: d.meta.subjectId === 'englisch' ? (f.defaultPoints ?? 0) : pointsFromWeight(weight, d.meta.points),
+                          points: istFremdsprache(d.meta.subjectId) ? (f.defaultPoints ?? 0) : pointsFromWeight(weight, d.meta.points),
                           minutes: Math.max(1, Math.round((d.meta.minutes * weight) / 100)),
-                          gradeGroup: f.id === 'en-writing' ? 'writing' : 'other',
-                          ...(f.productive ? { contentShare: CONTENT_SHARE } : {}),
+                          gradeGroup: formatArt(f.id) === 'writing' ? 'writing' : 'other',
+                          ...(f.productive ? { contentShare: inhaltsanteil(d.meta.subjectId) } : {}),
                           afbMix: { I: 30, II: 45, III: 25 },
                           blocks: []
                         })
@@ -835,11 +868,11 @@ export default function FrameStep(): React.JSX.Element {
                     }}
                   />
 
-                  {exam.parts.length > 0 && (minutesPlanned !== meta.minutes || (meta.subjectId !== 'englisch' && pointsPlanned !== meta.points)) && (
+                  {exam.parts.length > 0 && (minutesPlanned !== meta.minutes || (!istFremdsprache(meta.subjectId) && pointsPlanned !== meta.points)) && (
                     <Alert color="orange" mt="sm" icon={<IconAlertTriangle size={16} />} p="xs">
                       <Text size="sm">
                         Geplant sind {minutesPlanned} von {meta.minutes} Minuten
-                        {meta.subjectId !== 'englisch' ? ` und ${pointsPlanned} von ${meta.points} Punkten` : ''}.
+                        {!istFremdsprache(meta.subjectId) ? ` und ${pointsPlanned} von ${meta.points} Punkten` : ''}.
                       </Text>
                     </Alert>
                   )}
@@ -883,7 +916,7 @@ export default function FrameStep(): React.JSX.Element {
                   />
                 </Card>
 
-                {meta.subjectId === 'englisch' && exam.parts.length > 0 && (
+                {istFremdsprache(meta.subjectId) && exam.parts.length > 0 && (
                   <Card withBorder>
                     <Group justify="space-between" mb="sm">
                       <Title order={4}>Noten</Title>
@@ -978,7 +1011,7 @@ export default function FrameStep(): React.JSX.Element {
                         allowDeselect={false}
                       />
                     )}
-                    {exam.parts.some((p) => p.formatId?.startsWith('en-writing') || p.formatId === 'en-mediation') && (
+                    {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
                       <Checkbox
                         label="Formulierungshilfen zur Schreibaufgabe mit abdrucken"
                         description="In den Abschlussprüfungen gibt es sie nicht; in Bayern zählen übernommene Wendungen ausdrücklich nicht für die sprachliche Bandbreite. Für eine Übungsarbeit kann es trotzdem sinnvoll sein."
@@ -1002,7 +1035,7 @@ export default function FrameStep(): React.JSX.Element {
                       ))}
                       {rules && (
                         <Text size="sm" c="dimmed">
-                          Zahl: {meta.subjectId === 'geschichte' ? rules.otherSubject : rules.mainSubject} · Dauer: {rules.duration} · Ankündigung:{' '}
+                          Zahl: {fachDerArbeit(meta.subjectId).hauptfach ? rules.mainSubject : rules.otherSubject} · Dauer: {rules.duration} · Ankündigung:{' '}
                           {rules.announce} · höchstens {rules.perDay} pro Tag und {rules.perWeek} pro Woche · Korrektur: {rules.correction}
                           <br />
                           Gewichtung: {rules.weighting}
@@ -1083,7 +1116,7 @@ export default function FrameStep(): React.JSX.Element {
                      * übernommene Wendungen sogar von der Bewertung der Bandbreite aus. Die
                      * Beschreibung sagt das, damit die Entscheidung nicht blind fällt.
                      */}
-                    {exam.parts.some((p) => p.formatId?.startsWith('en-writing') || p.formatId === 'en-mediation') && (
+                    {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
                       <Checkbox
                         label="Wortzahl auf der Arbeit nennen"
                         description={
@@ -1122,7 +1155,7 @@ export default function FrameStep(): React.JSX.Element {
 export function geaenderteOptionen(exam: Exam, designs: DesignTemplate[]): string[] {
   const m = exam.meta
   const standardDesign = designs.find((x) => x.isDefault) ?? designs[0]
-  const schreiben = exam.parts.some((p) => p.formatId?.startsWith('en-writing') || p.formatId === 'en-mediation')
+  const schreiben = exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? ''))
   return [
     m.infoBox ? '' : 'ohne Kopfkasten',
     m.gradeScale ? 'Notenschlüssel auf der Arbeit' : '',

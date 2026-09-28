@@ -19,6 +19,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { inhaltsanteil, zweiterTeil } from '../model/faecher'
 import {
   IconCopy,
   IconFileTypeDocx,
@@ -58,7 +59,7 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { generateExam, reviseExamPart, upperSecondary } from '../generation/generateExam'
-import { CONTENT_SHARE, formatById } from '../model/formats'
+import { formatById } from '../model/formats'
 import type { Exam, ExamPart } from '../model/types'
 import { examGrades } from '../model/types'
 import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, mitBloecken, teilNachUeberarbeitung } from '../model/fassungen'
@@ -680,7 +681,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                         <Text size="sm" c="dimmed">
                           {part.points > 0
                             ? `${part.points} Punkte`
-                            : `Bewertung: ${part.contentShare ?? CONTENT_SHARE} % Inhalt, ${100 - (part.contentShare ?? CONTENT_SHARE)} % Sprache`}{' '}
+                            : `Bewertung: ${part.contentShare ?? inhaltsanteil(exam.meta.subjectId)} % Inhalt, ${100 - (part.contentShare ?? inhaltsanteil(exam.meta.subjectId))} % ${zweiterTeil(exam.meta.subjectId)}`}{' '}
                           · {part.minutes} Minuten
                           {formats.length ? ` · Formate: ${formats.join(', ')}` : ''}
                         </Text>

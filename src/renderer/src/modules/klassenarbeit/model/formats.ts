@@ -10,7 +10,7 @@
  * Handlungskompetenz. Für das Abitur gelten die EPA Geschichte (KMK 2005) mit den Aufgabenarten
  * Quelleninterpretation, Erörterung von Deutungen und historische Darstellung.
  */
-import type { ExamSubjectId } from './types'
+import { formatIdFuer, inhaltsanteil, istFremdsprache, type ExamSubjectId } from './faecher'
 
 export interface ExamFormat {
   id: string
@@ -44,8 +44,7 @@ export interface ExamFormat {
   defaultPoints?: number
 }
 
-export const EXAM_FORMATS: ExamFormat[] = [
-  // ---------- Englisch ----------
+const ENGLISCH: ExamFormat[] = [
   {
     id: 'en-listening',
     subject: 'englisch',
@@ -140,7 +139,10 @@ export const EXAM_FORMATS: ExamFormat[] = [
     material: 'image',
     defaultPoints: 30,
     note: 'In den meisten Ländern kann eine Klassenarbeit pro Schuljahr durch eine Sprechprüfung ersetzt werden.'
-  },
+  }
+]
+
+const SACHFAECHER: ExamFormat[] = [
   // ---------- Geschichte ----------
   {
     id: 'ge-knowledge',
@@ -250,6 +252,360 @@ export const EXAM_FORMATS: ExamFormat[] = [
   }
 ]
 
+/*
+ * Französisch und Spanisch (Großprogramm 0.4, Phase G): dieselben Kompetenzbereiche wie Englisch –
+ * die KMK-Bildungsstandards für die erste Fremdsprache (Englisch/Französisch, 2003/2023) und für die
+ * fortgeführte Fremdsprache in der Oberstufe (2012/2023) gelten für alle modernen Fremdsprachen mit
+ * denselben Bereichen. Bezeichnungen in der Zielsprache, weil der Kopf der Arbeit einsprachig ist.
+ * Beginn als 2. Fremdsprache frühestens in Klasse 6; Sprachmittlung ab Klasse 7.
+ */
+const FREMDSPRACHEN: { fach: ExamSubjectId; praefix: string; labels: Record<string, string> }[] = [
+  {
+    fach: 'franzoesisch',
+    praefix: 'fr',
+    labels: {
+      listening: 'Compréhension orale',
+      reading: 'Compréhension écrite',
+      mediation: 'Médiation',
+      writing: 'Production écrite',
+      language: 'Maîtrise de la langue',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Production orale (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'spanisch',
+    praefix: 'es',
+    labels: {
+      listening: 'Comprensión auditiva',
+      reading: 'Comprensión lectora',
+      mediation: 'Mediación',
+      writing: 'Expresión escrita',
+      language: 'Uso de la lengua',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Expresión oral (Ersatz für eine schriftliche Arbeit)'
+    }
+  }
+]
+
+const ABGELEITET: ExamFormat[] = FREMDSPRACHEN.flatMap(({ fach, praefix, labels }) =>
+  ENGLISCH.map((f) => {
+    const art = f.id.slice(3)
+    const beginn = art === 'mediation' ? 7 : 6
+    return {
+      ...f,
+      id: `${praefix}-${art}`,
+      subject: fach,
+      label: labels[art] ?? f.label,
+      grades: [Math.max(beginn, f.grades[0]), f.grades[1]] as [number, number]
+    }
+  })
+)
+
+/*
+ * Deutsch (Phase G): Kompetenzbereiche der KMK-Bildungsstandards Deutsch (Mittlerer
+ * Schulabschluss 2003/2022, Allgemeine Hochschulreife 2012): Schreiben, Lesen – mit Texten und
+ * Medien umgehen, Sprache und Sprachgebrauch untersuchen. Die Aufgabenarten folgen den
+ * Schreibformen der Standards (erzählend, informierend, argumentierend, analysierend/
+ * interpretierend) und für die Oberstufe den Aufgabenarten der Abiturprüfung (interpretierendes
+ * und analysierendes Schreiben, textbezogenes Erörtern, materialgestütztes Schreiben). Eine Note,
+ * die Punkte werden nach Anteil verteilt wie in den Sachfächern.
+ */
+const DEUTSCH: ExamFormat[] = [
+  {
+    id: 'de-erzaehlen',
+    subject: 'deutsch',
+    label: 'Erzählen',
+    competence: 'Schreiben',
+    description:
+      'Eine Erzählung zu einem Schreibanlass (Bild, Reizwörter, Erzählanfang) oder eine Nacherzählung, mit Spannungsaufbau und passender Erzählperspektive.',
+    afb: ['II', 'III'],
+    share: 100,
+    grades: [5, 7],
+    material: 'none',
+    productive: true
+  },
+  {
+    id: 'de-informieren',
+    subject: 'deutsch',
+    label: 'Informierendes Schreiben',
+    competence: 'Schreiben',
+    description: 'Einen Sachverhalt aus Materialien (Texte, Grafiken) adressatengerecht darstellen – Bericht, Beschreibung, Informationstext.',
+    afb: ['I', 'II'],
+    share: 60,
+    grades: [5, 13],
+    material: 'text',
+    productive: true
+  },
+  {
+    id: 'de-argumentieren',
+    subject: 'deutsch',
+    label: 'Argumentierendes Schreiben (Erörterung)',
+    competence: 'Schreiben',
+    description:
+      'Zu einer strittigen Frage Stellung nehmen: Argumente mit Beispielen, Gegenargumente, begründetes Urteil – als Leserbrief, Stellungnahme oder (textgebundene) Erörterung.',
+    afb: ['II', 'III'],
+    share: 60,
+    grades: [7, 13],
+    material: 'none',
+    productive: true
+  },
+  {
+    id: 'de-textanalyse',
+    subject: 'deutsch',
+    label: 'Analyse eines literarischen Textes',
+    competence: 'Lesen – mit Texten und Medien umgehen',
+    description:
+      'Einen epischen oder dramatischen Text (Kurzgeschichte, Novellenauszug, Szene) erschließen: Inhalt, Aufbau, Figuren, sprachliche und erzählerische Mittel, Deutung mit Textbelegen.',
+    afb: ['I', 'II', 'III'],
+    share: 70,
+    grades: [7, 13],
+    material: 'text',
+    productive: true,
+    note: 'Zeilennummern am Text; Zitate mit Zeilenangabe erwarten.'
+  },
+  {
+    id: 'de-gedicht',
+    subject: 'deutsch',
+    label: 'Gedichtinterpretation',
+    competence: 'Lesen – mit Texten und Medien umgehen',
+    description:
+      'Ein Gedicht erschließen: Inhalt, Form (Strophe, Vers, Reim, Metrum), sprachliche Bilder und ihre Wirkung, Deutung mit Textbelegen – ab Klasse 9 auch im Vergleich zweier Gedichte.',
+    afb: ['I', 'II', 'III'],
+    share: 70,
+    grades: [6, 13],
+    material: 'text',
+    productive: true
+  },
+  {
+    id: 'de-sachtext',
+    subject: 'deutsch',
+    label: 'Analyse eines Sachtextes',
+    competence: 'Lesen – mit Texten und Medien umgehen',
+    description:
+      'Einen Sach- oder Gebrauchstext (Kommentar, Rede, Reportage) analysieren: Thema, Aufbau, Argumentation, sprachliche Mittel, Absicht und Wirkung.',
+    afb: ['I', 'II', 'III'],
+    share: 70,
+    grades: [8, 13],
+    material: 'text',
+    productive: true
+  },
+  {
+    id: 'de-materialgestuetzt',
+    subject: 'deutsch',
+    label: 'Materialgestütztes Schreiben',
+    competence: 'Schreiben',
+    description:
+      'Aus einem Materialdossier (Texte, Grafiken, Tabellen) einen eigenen informierenden oder argumentierenden Text für eine vorgegebene Situation verfassen – Aufgabenart der KMK-Bildungsstandards für die Hochschulreife.',
+    afb: ['II', 'III'],
+    share: 100,
+    grades: [9, 13],
+    material: 'text',
+    productive: true
+  },
+  {
+    id: 'de-lesen',
+    subject: 'deutsch',
+    label: 'Leseverstehen',
+    competence: 'Lesen – mit Texten und Medien umgehen',
+    description: 'Geschlossene und halboffene Aufgaben zu einem Text: Informationen entnehmen, Aussagen prüfen, Textstellen deuten.',
+    afb: ['I', 'II'],
+    share: 40,
+    grades: [5, 10],
+    material: 'text'
+  },
+  {
+    id: 'de-sprache',
+    subject: 'deutsch',
+    label: 'Sprache untersuchen',
+    competence: 'Sprache und Sprachgebrauch untersuchen',
+    description:
+      'Wortarten, Satzglieder, Satzbau, Zeichensetzung und Rechtschreibung an einem zusammenhängenden Text untersuchen und anwenden – nicht an Einzelsätzen.',
+    afb: ['I', 'II'],
+    share: 30,
+    grades: [5, 10],
+    material: 'text'
+  }
+]
+
+/*
+ * Politik (Phase G): Kompetenzmodell der GPJE (Politische Urteilsfähigkeit, Politische
+ * Handlungsfähigkeit, Methodische Fähigkeiten, Konzeptuelles Deutungswissen), auf das sich die
+ * Kerncurricula der Länder stützen; Oberstufe nach den EPA Sozialkunde/Politik (KMK 2005):
+ * Materialanalyse, Erörterung, Gestaltungsaufgabe.
+ */
+const POLITIK: ExamFormat[] = [
+  {
+    id: 'pol-knowledge',
+    subject: 'politik',
+    label: 'Grundwissen',
+    competence: 'Konzeptuelles Deutungswissen',
+    description: 'Fachbegriffe erklären, Institutionen und Verfahren beschreiben (z. B. Gesetzgebung, Wahlen), Zusammenhänge in eigenen Worten darstellen.',
+    afb: ['I'],
+    share: 25,
+    grades: [5, 13],
+    material: 'none'
+  },
+  {
+    id: 'pol-text',
+    subject: 'politik',
+    label: 'Analyse eines politischen Textes',
+    competence: 'Methodische Fähigkeiten',
+    description: 'Einen Zeitungsartikel, Kommentar, eine Rede oder ein Parteiprogramm erschließen: Thema, Position, Argumente, Interessen und Absicht.',
+    afb: ['I', 'II'],
+    share: 40,
+    grades: [7, 13],
+    material: 'text'
+  },
+  {
+    id: 'pol-cartoon',
+    subject: 'politik',
+    label: 'Karikaturanalyse',
+    competence: 'Methodische Fähigkeiten',
+    description: 'Beschreiben, Symbole und Überzeichnungen deuten, die Aussage auf die politische Frage beziehen und beurteilen.',
+    afb: ['I', 'II', 'III'],
+    share: 35,
+    grades: [7, 13],
+    material: 'image'
+  },
+  {
+    id: 'pol-data',
+    subject: 'politik',
+    label: 'Statistik oder Schaubild auswerten',
+    competence: 'Methodische Fähigkeiten',
+    description: 'Zahlen und Schaubilder (Wahlergebnisse, Umfragen, Haushalt) beschreiben, Auffälligkeiten mit Werten belegen und politisch erklären.',
+    afb: ['I', 'II'],
+    share: 25,
+    grades: [7, 13],
+    material: 'data'
+  },
+  {
+    id: 'pol-conflict',
+    subject: 'politik',
+    label: 'Fall- oder Konfliktanalyse',
+    competence: 'Politische Urteilsfähigkeit',
+    description: 'Einen politischen Konflikt oder Fall untersuchen: Beteiligte, Interessen, Lösungsvorschläge, Entscheidungswege.',
+    afb: ['II'],
+    share: 30,
+    grades: [8, 13],
+    material: 'text'
+  },
+  {
+    id: 'pol-judgement',
+    subject: 'politik',
+    label: 'Politische Urteilsbildung',
+    competence: 'Politische Urteilsfähigkeit',
+    description:
+      'Zu einer politischen Streitfrage ein begründetes Sach- oder Werturteil fällen: Kriterien offenlegen (z. B. Effizienz, Legitimität), Gegenargumente abwägen.',
+    afb: ['III'],
+    share: 30,
+    grades: [7, 13],
+    material: 'none'
+  },
+  {
+    id: 'pol-action',
+    subject: 'politik',
+    label: 'Gestaltungs- oder Handlungsaufgabe',
+    competence: 'Politische Handlungsfähigkeit',
+    description: 'Begründet Position beziehen und sie adressatengerecht vertreten – Leserbrief, Rede, Stellungnahme, Brief an eine Abgeordnete.',
+    afb: ['III'],
+    share: 25,
+    grades: [8, 13],
+    material: 'none'
+  }
+]
+
+/*
+ * Erdkunde (Phase G): Kompetenzbereiche der Bildungsstandards im Fach Geographie für den
+ * Mittleren Schulabschluss (DGfG): Fachwissen, Räumliche Orientierung, Erkenntnisgewinnung/
+ * Methoden, Kommunikation, Beurteilung/Bewertung, Handlung; Oberstufe nach den EPA Geographie
+ * (KMK 2005): materialgestützte Problemerörterung.
+ */
+const ERDKUNDE: ExamFormat[] = [
+  {
+    id: 'geo-knowledge',
+    subject: 'erdkunde',
+    label: 'Grundwissen und Topographie',
+    competence: 'Fachwissen / Räumliche Orientierung',
+    description: 'Fachbegriffe erklären, Räume und Lagebeziehungen benennen, eine stumme Karte beschriften, Prozesse in eigenen Worten wiedergeben.',
+    afb: ['I'],
+    share: 25,
+    grades: [5, 13],
+    material: 'none'
+  },
+  {
+    id: 'geo-map',
+    subject: 'erdkunde',
+    label: 'Kartenauswertung',
+    competence: 'Erkenntnisgewinnung / Methoden',
+    description: 'Eine thematische Karte beschreiben (Thema, Raum, Legende), räumliche Verteilungen herausarbeiten und erklären.',
+    afb: ['I', 'II'],
+    share: 35,
+    grades: [5, 13],
+    material: 'image'
+  },
+  {
+    id: 'geo-climate',
+    subject: 'erdkunde',
+    label: 'Klimadiagramm auswerten',
+    competence: 'Erkenntnisgewinnung / Methoden',
+    description:
+      'Ein Klimadiagramm lesen (Station, Lage, Temperatur- und Niederschlagsverlauf), Klimazone bestimmen und Folgen für Vegetation und Nutzung erklären.',
+    afb: ['I', 'II'],
+    share: 30,
+    grades: [6, 13],
+    material: 'data'
+  },
+  {
+    id: 'geo-data',
+    subject: 'erdkunde',
+    label: 'Statistik oder Diagramm auswerten',
+    competence: 'Erkenntnisgewinnung / Methoden',
+    description: 'Zahlenmaterial (Bevölkerung, Wirtschaft, Umwelt) beschreiben, Auffälligkeiten mit Werten belegen und räumlich erklären.',
+    afb: ['I', 'II'],
+    share: 25,
+    grades: [7, 13],
+    material: 'data'
+  },
+  {
+    id: 'geo-image',
+    subject: 'erdkunde',
+    label: 'Bild- oder Luftbildauswertung',
+    competence: 'Erkenntnisgewinnung / Methoden',
+    description: 'Ein Foto, Luft- oder Satellitenbild beschreiben, Merkmale des Raums erkennen und mit Fachwissen deuten.',
+    afb: ['I', 'II'],
+    share: 25,
+    grades: [5, 13],
+    material: 'image'
+  },
+  {
+    id: 'geo-text',
+    subject: 'erdkunde',
+    label: 'Materialgestützte Raumanalyse',
+    competence: 'Erkenntnisgewinnung / Kommunikation',
+    description:
+      'Mehrere Materialien (Text, Karte, Diagramm) zu einem Raumbeispiel auswerten und die Ergebnisse zu einer zusammenhängenden Erklärung verbinden.',
+    afb: ['II', 'III'],
+    share: 40,
+    grades: [8, 13],
+    material: 'text'
+  },
+  {
+    id: 'geo-judgement',
+    subject: 'erdkunde',
+    label: 'Beurteilen und Bewerten',
+    competence: 'Beurteilung / Bewertung',
+    description:
+      'Eine raumbezogene Maßnahme oder einen Nutzungskonflikt (z. B. Staudamm, Tourismus, Flächenverbrauch) unter ökologischen, ökonomischen und sozialen Gesichtspunkten beurteilen.',
+    afb: ['III'],
+    share: 30,
+    grades: [7, 13],
+    material: 'none'
+  }
+]
+
+export const EXAM_FORMATS: ExamFormat[] = [...ENGLISCH, ...ABGELEITET, ...DEUTSCH, ...SACHFAECHER, ...POLITIK, ...ERDKUNDE]
+
 export const formatsFor = (subject: ExamSubjectId, grade: number): ExamFormat[] =>
   EXAM_FORMATS.filter((f) => f.subject === subject && grade >= f.grades[0] && grade <= f.grades[1])
 
@@ -271,7 +627,7 @@ export const CONTENT_SHARE = 40
  */
 export function defaultWeights(subject: ExamSubjectId, grade: number, parts: { formatId: string; gradeGroup: 'writing' | 'other' }[]): number[] {
   if (!parts.length) return []
-  if (subject !== 'englisch') {
+  if (!istFremdsprache(subject)) {
     const shares = parts.map((p) => formatById(p.formatId)?.share ?? 1)
     const total = shares.reduce((n, x) => n + x, 0)
     let rest = 100
@@ -304,6 +660,15 @@ export function defaultWeights(subject: ExamSubjectId, grade: number, parts: { f
   return out
 }
 
+/** Üblicher Aufbau je Fach (Deutsch und Sachfächer) */
+const VORSCHLAG: Partial<Record<ExamSubjectId, (grade: number) => string[]>> = {
+  geschichte: (g) => (g <= 7 ? ['ge-knowledge', 'ge-source', 'ge-judgement'] : ['ge-source', 'ge-comparison', 'ge-judgement']),
+  politik: (g) => (g <= 7 ? ['pol-knowledge', 'pol-data', 'pol-judgement'] : ['pol-text', 'pol-conflict', 'pol-judgement']),
+  erdkunde: (g) => (g <= 7 ? ['geo-knowledge', 'geo-map', 'geo-climate'] : ['geo-map', 'geo-text', 'geo-judgement']),
+  // Deutsch: eine Schreibaufgabe als Hauptteil, in der Sek I mit einem Teil „Sprache untersuchen"
+  deutsch: (g) => (g <= 6 ? ['de-erzaehlen'] : g <= 10 ? ['de-textanalyse', 'de-sprache'] : ['de-textanalyse'])
+}
+
 export interface SuggestedPart {
   formatId: string
   weight: number
@@ -325,14 +690,14 @@ export function suggestParts(
   points: number,
   minutes: number
 ): { formatId: string; points: number; minutes: number; weight: number; gradeGroup: 'writing' | 'other'; contentShare?: number }[] {
-  if (subject === 'englisch') {
+  if (istFremdsprache(subject)) {
     // Jeder Teil hat eigene Punkte; daraus entsteht seine Teilnote. Erst die Teilnoten
     // werden nach ihrem Anteil (30 : 70 bzw. 40 : 60 in Klasse 5) zur Gesamtnote verrechnet.
     const writing = writingWeightFor(grade)
     const other = 100 - writing
-    const otherFormat = grade <= 7 ? 'en-reading' : 'en-mediation'
+    const otherFormat = formatIdFuer(subject, grade <= 7 ? 'reading' : 'mediation')
     const otherDef = formatById(otherFormat)
-    const writingDef = formatById('en-writing')
+    const writingDef = formatById(formatIdFuer(subject, 'writing'))
     const otherMinutes = Math.round((minutes * other) / 100)
     return [
       {
@@ -344,7 +709,7 @@ export function suggestParts(
         ...(otherDef?.productive ? { contentShare: CONTENT_SHARE } : {})
       },
       {
-        formatId: 'en-writing',
+        formatId: formatIdFuer(subject, 'writing'),
         weight: writing,
         points: writingDef?.defaultPoints ?? 0,
         minutes: minutes - otherMinutes,
@@ -353,8 +718,8 @@ export function suggestParts(
       }
     ]
   }
-  // Geschichte: eine Note, die Punkte werden auf die Teile verteilt
-  const ids = grade <= 7 ? ['ge-knowledge', 'ge-source', 'ge-judgement'] : ['ge-source', 'ge-comparison', 'ge-judgement']
+  // Deutsch und Sachfächer: eine Note, die Punkte werden auf die Teile verteilt
+  const ids = VORSCHLAG[subject]?.(grade) ?? []
   const chosen = ids.map((id) => formatById(id)!).filter(Boolean)
   const total = chosen.reduce((n, f) => n + f.share, 0)
   let restMinutes = minutes
@@ -368,6 +733,13 @@ export function suggestParts(
     restWeight -= weight
     restMinutes -= min
     restPoints -= pts
-    return { formatId: f.id, weight, points: pts, minutes: min, gradeGroup: 'other' as const, ...(f.productive ? { contentShare: CONTENT_SHARE } : {}) }
+    return {
+      formatId: f.id,
+      weight,
+      points: pts,
+      minutes: min,
+      gradeGroup: 'other' as const,
+      ...(f.productive ? { contentShare: inhaltsanteil(subject) } : {})
+    }
   })
 }

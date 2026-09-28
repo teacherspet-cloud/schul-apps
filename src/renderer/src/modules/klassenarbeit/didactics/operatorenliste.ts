@@ -11,6 +11,7 @@
  *
  * Die Listen selbst: `operatorenlistenDaten.ts` (Land → Fach → Operatoren mit Quelle).
  */
+import { fachDerArbeit, formatArt } from '../model/faecher'
 import type { InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/types'
 import type { AnlageWunsch } from '@shared/operatoren/zugriff'
 import { anlageFuer } from '@shared/operatoren/zugriff'
@@ -41,6 +42,12 @@ export const KOMPETENZBEREICH_JE_FORMAT: Record<string, string> = {
   'en-grammar': 'Schreiben'
 }
 
+/** Kompetenzbereich eines Teils – für alle Fremdsprachen (fr-mediation wie en-mediation) */
+export function kompetenzbereichFuer(formatId: string): string | undefined {
+  const art = formatArt(formatId)
+  return art ? KOMPETENZBEREICH_JE_FORMAT[`en-${art}`] : undefined
+}
+
 export const OPERATOREN_BLOCK_ID = 'exam-operatoren'
 
 /** Ist der Baustein für diese Arbeit vorgesehen? Fehlt die Wahl, entscheidet die Stufe. */
@@ -58,8 +65,7 @@ export function amtlicheListe(stateId: string, subjectId: string, wunsch: Anlage
 
 /** Sprache und Stufe der Arbeit für die Wahl der Liste */
 export function anlageWunsch(meta: Exam['meta']): AnlageWunsch {
-  const fach: string = meta.subjectId
-  const sprache = fach === 'englisch' || meta.bilingual ? 'en' : fach === 'franzoesisch' ? 'fr' : fach === 'spanisch' ? 'es' : 'de'
+  const sprache = meta.bilingual ? 'en' : fachDerArbeit(meta.subjectId).sprache
   return { sprache, stufe: upperSecondary(meta) ? 'sek2' : 'sek1' }
 }
 
@@ -109,7 +115,7 @@ export function operatorVorkommen(exam: Exam): { op: string; formatId: string }[
         const t = b as TaskBlock
         for (const roh of [operatorAusAnweisung(t.instruction) || t.operator, ...t.parts.map((x) => operatorAusAnweisung(x.instruction))]) {
           const op = normal(roh ?? '')
-          const bereich = KOMPETENZBEREICH_JE_FORMAT[part.formatId] ?? ''
+          const bereich = kompetenzbereichFuer(part.formatId) ?? ''
           const k = `${op}|${bereich}`
           if (!op || gesehen.has(k)) continue
           gesehen.add(k)
@@ -136,7 +142,7 @@ export function operatorenBefund(exam: Exam): OperatorenBefund {
   const gefunden: OperatorDefinition[] = []
   const fehlend: string[] = []
   for (const { op, formatId } of operatorVorkommen(exam)) {
-    const bereich = KOMPETENZBEREICH_JE_FORMAT[formatId]
+    const bereich = kompetenzbereichFuer(formatId)
     // Zuerst im Kompetenzbereich des Teils, sonst irgendwo in der Liste
     const treffer =
       gueltig.find((d) => passt(op, d) && (!bereich || !d.kompetenzbereich || d.kompetenzbereich === bereich)) ?? gueltig.find((d) => passt(op, d))
@@ -147,8 +153,11 @@ export function operatorenBefund(exam: Exam): OperatorenBefund {
   return { gefunden, fehlend, liste }
 }
 
-/** Wortstamm eines Verbs: „analysiere" und „analysieren" → „analysier" */
-const stamm = (w: string): string => w.replace(/(en|n|e)$/, '')
+/**
+ * Wortstamm eines Verbs: „analysiere" und „analysieren" → „analysier"; seit Phase G auch Französisch
+ * („analysez" ↔ „analyser") und Spanisch („analiza" ↔ „analizar", „describid" ↔ „describir").
+ */
+const stamm = (w: string): string => w.replace(/(issez|ez|er|ir|ad|ar|id|en|n|e|a)$/, '')
 
 /**
  * Passt der Operator der Aufgabe zum Eintrag? Gleicher Wortlaut, eine hinterlegte Form

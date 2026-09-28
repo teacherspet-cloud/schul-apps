@@ -7,6 +7,7 @@
  * verwendet wie im Arbeitsblatt – dadurch funktionieren Darstellung, Seitenumbruch und Export
  * unverändert weiter.
  */
+import { fachDerArbeit, formatArt, inhaltsanteil, sprachfolge, zweiterTeil } from '../model/faecher'
 import type { Quellentreffer, StructuredRequest } from '@shared/types'
 import { obj, str } from '../../../shared/aiSchema'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
@@ -71,11 +72,9 @@ export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 
 /** Kompetenzschwerpunkt, der zu einem Aufgabenformat gehört */
 function skillFor(formatId: string): LanguageSkill | 'mixed' {
-  if (formatId === 'en-writing') return 'writing'
-  if (formatId === 'en-mediation') return 'mediation'
-  if (formatId === 'en-listening') return 'listening'
-  if (formatId === 'en-reading') return 'reading'
-  if (formatId === 'en-grammar' || formatId === 'en-language') return 'grammar'
+  const art = formatArt(formatId)
+  if (art === 'writing' || art === 'mediation' || art === 'listening' || art === 'reading') return art
+  if (art === 'grammar' || art === 'language') return 'grammar'
   return 'mixed'
 }
 
@@ -101,6 +100,8 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     grade: m.grade,
     courseLevel: m.courseLevel,
     cefrLevel: m.cefrLevel,
+    // Französisch/Spanisch als 2. (oder 3.) Fremdsprache – bestimmt das GER-Niveau und die Sprachwahl
+    languageOrder: sprachfolge(m),
     minutes: part?.minutes ?? m.minutes,
     pages: 1,
     sheetType: 'lernkontrolle',
@@ -217,7 +218,7 @@ function answerKeyRules(exam: Exam, part: ExamPart): string {
       ? '- solution je Aufgabe: Stichpunkte der erwarteten Inhalte (keine ausformulierten Sätze) UND ein Raster mit Punkten je Kriterium.'
       : '- solution je Aufgabe: eine vollständig ausformulierte Musterlösung, wie sie eine gute Arbeit enthielte, UND ein Raster mit Punkten je Kriterium.',
     productive
-      ? `- Die Schreibleistung wird getrennt bewertet: ${part.contentShare ?? CONTENT_SHARE} % Inhalt (erwartete Inhaltspunkte, je Punkt ein Kriterium) und ${100 - (part.contentShare ?? CONTENT_SHARE)} % Sprache (kommunikative Textgestaltung, Ausdrucksvermögen, Sprachrichtigkeit). Nenne die Kriterien einzeln.`
+      ? `- Die Schreibleistung wird getrennt bewertet: ${part.contentShare ?? inhaltsanteil(m.subjectId)} % Inhalt (erwartete Inhaltspunkte, je Punkt ein Kriterium) und ${100 - (part.contentShare ?? inhaltsanteil(m.subjectId))} % ${zweiterTeil(m.subjectId)} (${fachDerArbeit(m.subjectId).art === 'deutsch' ? 'Aufbau, Textsortenmerkmale, Ausdruck, sprachliche Richtigkeit, Zitieren' : 'kommunikative Textgestaltung, Ausdrucksvermögen, Sprachrichtigkeit'}).${part.points > 0 ? ` Verteile die ${part.points} Punkte entsprechend.` : ''} Nenne die Kriterien einzeln.`
       : part.items && part.items > 0
         ? `- GENAU ${part.items} Items, ein Punkt je Item; insgesamt ${part.points} Punkte. Die Lehrkraft hat die Zahl der Items vorgegeben.`
         : `- Nenne die Punkte je Item; insgesamt ${part.points} Punkte.`,
@@ -250,7 +251,8 @@ export function partNotes(part: ExamPart): string {
  * sprachlichen Bandbreite aus („lifting").
  */
 export function schreibvorgabenRegeln(exam: Exam, part: ExamPart): string {
-  if (!part.formatId?.startsWith('en-writing') && part.formatId !== 'en-mediation') return ''
+  const art = formatArt(part.formatId)
+  if (art !== 'writing' && art !== 'mediation') return ''
   const meta = worksheetMetaFor(exam, part)
   return [
     writingBriefRules(meta),
@@ -390,7 +392,13 @@ export async function quellenangabenErmitteln(quellen: StoffQuelle[], ai: AiCall
 }
 
 /** Textgebundene Teile: Dort steht das Material der Lehrkraft als Lesetext auf der Arbeit */
-export const textgebunden = (part: Pick<ExamPart, 'formatId'>): boolean => QUELLENFORMATE.includes(part.formatId)
+/** Formate, deren Material eine echte, zu analysierende Quelle ist (Begründung bei `brauchtOriginaltext`) */
+const QUELLENFORMATE = ['ge-source', 'ge-comparison', 'pol-text', 'de-textanalyse', 'de-gedicht', 'de-sachtext']
+/** Fremdsprachen: Leseverstehen und Sprachmittlung jeder Sprache */
+function istQuellenformat(formatId: string): boolean {
+  return QUELLENFORMATE.includes(formatId) || ['reading', 'mediation'].includes(formatArt(formatId) ?? '')
+}
+export const textgebunden = (part: Pick<ExamPart, 'formatId'>): boolean => istQuellenformat(part.formatId)
 
 /** Auftragsteil: Material der Lehrkraft als Grundlage (Schreib-, Mediations- und andere Teile) */
 export function arbeitsmaterialTeil(exam: Exam, part: ExamPart): string {
@@ -422,7 +430,9 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
   const m = exam.meta
   const format = formatById(part.formatId)
   const productive = typeof part.contentShare === 'number'
-  const formats = (part.formats?.length ? part.formats : defaultComprehensionFormats(part.formatId === 'en-listening' ? 'listening' : 'reading', m.grade))
+  const formats = (
+    part.formats?.length ? part.formats : defaultComprehensionFormats(formatArt(part.formatId) === 'listening' ? 'listening' : 'reading', m.grade)
+  )
     .map((id) => comprehensionFormatById(id)?.label)
     .filter(Boolean)
   return [
@@ -435,11 +445,13 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
     format?.description ? `Was der Teil verlangt: ${format.description}` : '',
     `Bearbeitungszeit für diesen Teil: ${part.minutes} Minuten.`,
     productive
-      ? `Dieser Teil wird nicht über Punkte bewertet, sondern zu ${part.contentShare ?? CONTENT_SHARE} % über den Inhalt und zu ${100 - (part.contentShare ?? CONTENT_SHARE)} % über die Sprache. Vergib in answer keine Punkte.`
+      ? part.points > 0
+        ? `Dieser Teil hat ${part.points} Punkte: ${part.contentShare ?? inhaltsanteil(m.subjectId)} % für den Inhalt, ${100 - (part.contentShare ?? inhaltsanteil(m.subjectId))} % für die ${zweiterTeil(m.subjectId)}. Nenne die Punkte im Erwartungshorizont.`
+        : `Dieser Teil wird nicht über Punkte bewertet, sondern zu ${part.contentShare ?? CONTENT_SHARE} % über den Inhalt und zu ${100 - (part.contentShare ?? CONTENT_SHARE)} % über die Sprache. Vergib in answer keine Punkte.`
       : part.items && part.items > 0
         ? `Dieser Teil hat GENAU ${part.items} Items und ${part.points} Punkte – ein Punkt je Item. Die Lehrkraft hat die Zahl vorgegeben; halte sie ein und nenne die Punkte je Aufgabe im Feld points.`
         : `Dieser Teil hat insgesamt ${part.points} Punkte. Verteile sie auf die Items und nenne die Punkte je Aufgabe im Feld points.`,
-    ['en-listening', 'en-reading'].includes(part.formatId) && formats.length ? `Benutze diese Aufgabenformate: ${formats.join(', ')}.` : '',
+    ['listening', 'reading'].includes(formatArt(part.formatId) ?? '') && formats.length ? `Benutze diese Aufgabenformate: ${formats.join(', ')}.` : '',
     `Erlaubte Hilfsmittel: ${m.aids || 'keine'}.`,
     vocabRules(exam),
     partNotes(part),
@@ -493,7 +505,7 @@ function profileFor(meta: WorksheetMeta): ReturnType<typeof buildLearnerProfile>
  * ein konstruierter Uebungstext mit gezielt gesetzten Luecken – eine Originalquelle waere
  * dort nicht nur unnoetig, sondern unbrauchbar.
  */
-const QUELLENFORMATE = ['ge-source', 'ge-comparison', 'en-reading', 'en-mediation']
+// QUELLENFORMATE und istQuellenformat stehen weiter oben (vor `textgebunden`)
 
 /**
  * Braucht dieser Teil einen beschafften Originaltext?
@@ -502,7 +514,7 @@ const QUELLENFORMATE = ['ge-source', 'ge-comparison', 'en-reading', 'en-mediatio
  * In der Sekundarstufe I bleibt es beim bisherigen Weg.
  */
 export function brauchtOriginaltext(exam: Exam, part: ExamPart): boolean {
-  return upperSecondary(exam.meta) && QUELLENFORMATE.includes(part.formatId)
+  return upperSecondary(exam.meta) && istQuellenformat(part.formatId)
 }
 
 /**
@@ -546,7 +558,7 @@ export async function generateExamPart(
   // Hörverstehen: erst den Hörtext schreiben (auf Wunsch mit einem stärkeren Modell),
   // dann die Aufgaben dazu – so passen sie wirklich zum Text.
   let script: ListeningScript | null = null
-  if (part.formatId === 'en-listening' && wantsListening(meta)) {
+  if (formatArt(part.formatId) === 'listening' && wantsListening(meta)) {
     try {
       script = await writeListeningScript(meta, profile, ai, { provider: meta.audioProvider, model: meta.audioModel })
     } catch {
@@ -712,7 +724,7 @@ export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgr
           thema: [exam.meta.topic, part.label].filter(Boolean).join(' – '),
           fach: exam.meta.subjectLabel,
           fachId: exam.meta.subjectId,
-          sprache: materialSprache(subjectById(exam.meta.subjectId), part.formatId === 'en-mediation'),
+          sprache: materialSprache(subjectById(exam.meta.subjectId), formatArt(part.formatId) === 'mediation'),
           jahrgang: exam.meta.grade,
           zielWortzahl: sourceTextWords(teilMeta),
           // Klausur: kein Ausweichen auf einen Autorentext

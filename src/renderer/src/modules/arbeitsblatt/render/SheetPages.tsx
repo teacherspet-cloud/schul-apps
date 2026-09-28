@@ -167,6 +167,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     answerLanguage: subjectById(ws.meta.subjectId).foreignLanguage ?? 'de',
     wordLimit: ws.meta.wordLimit,
     subjectId: ws.meta.subjectId,
+    labelLanguage: ws.meta.labelLanguage,
     anrede: anredeFuerMeta(ws.meta),
     ...extra,
     // Getippte Nummern („M3") werden beim Speichern zur Kennung des Materials, das jetzt so heißt – so wandern sie beim Verschieben mit

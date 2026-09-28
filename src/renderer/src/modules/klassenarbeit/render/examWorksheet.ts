@@ -6,6 +6,7 @@
  * mit einem Kopfbaustein (Zeit, Hilfsmittel, Notenschlüssel), je Teil einer Überschrift und
  * den erzeugten Bausteinen.
  */
+import { fachDerArbeit, inhaltsanteil, zweiterTeil } from '../model/faecher'
 import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
 import { newId } from '../../vokabeltest/model/random'
 import type { Sheet, Worksheet, WsBlock } from '../../arbeitsblatt/model/types'
@@ -13,7 +14,7 @@ import { upperSecondary, worksheetMetaFor } from '../generation/generateExam'
 import { translateAids } from '../model/aids'
 import { gradeScaleGroups, scaleLineFuer } from '../model/examRules'
 import { notenpunkteFuer } from '../../../shared/notenpunkte'
-import { CONTENT_SHARE, formatById } from '../model/formats'
+import { formatById } from '../model/formats'
 import type { Exam } from '../model/types'
 import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
 import { operatorenBlock } from '../didactics/operatorenliste'
@@ -28,35 +29,61 @@ import { examGrades, examPoints } from '../model/types'
 export function examHeadBlock(exam: Exam): WsBlock | null {
   const m = exam.meta
   if (!m.infoBox) return null
-  const english = m.subjectId === 'englisch'
+  const fach = fachDerArbeit(m.subjectId)
+  const english = fach.sprache === 'en'
   const grades = examGrades(exam)
-  const t = english
-    ? {
-        title: 'Test',
-        time: (min: number) => `Time: ${min} minutes`,
-        aids: (a: string) => `You may use: ${a || 'nothing'}`,
-        points: (n: number) => `${n} points`,
-        split: (c: number, l: number) => `${c} % content, ${l} % language`,
-        counts: (w: number) => `counts ${w} %`,
-        scale: (line: string) => `Marks: ${line}`,
-        labels: { writing: 'Writing', other: 'Other skills' }
-      }
-    : {
-        title: 'Klassenarbeit',
-        time: (min: number) => `Bearbeitungszeit: ${min} Minuten`,
-        aids: (a: string) => `Erlaubte Hilfsmittel: ${a || 'keine'}`,
-        points: (n: number) => `${n} Punkte`,
-        split: (c: number, l: number) => `${c} % Inhalt, ${l} % Sprache`,
-        counts: (w: number) => `zählt ${w} %`,
-        scale: (line: string) => `Notenschlüssel: ${line}`,
-        labels: { writing: 'Schreiben', other: 'Weitere Kompetenzen' }
-      }
+  const t =
+    fach.sprache === 'fr'
+      ? {
+          title: 'Contrôle',
+          time: (min: number) => `Durée : ${min} minutes`,
+          aids: (a: string) => `Documents autorisés : ${a || 'aucun'}`,
+          points: (n: number) => `${n} points`,
+          split: (c: number, l: number) => `${c} % contenu, ${l} % langue`,
+          counts: (w: number) => `compte pour ${w} %`,
+          scale: (line: string) => `Barème : ${line}`,
+          labels: { writing: 'Production écrite', other: 'Autres compétences' }
+        }
+      : fach.sprache === 'es'
+        ? {
+            title: 'Examen',
+            time: (min: number) => `Tiempo: ${min} minutos`,
+            aids: (a: string) => `Material permitido: ${a || 'ninguno'}`,
+            points: (n: number) => `${n} puntos`,
+            split: (c: number, l: number) => `${c} % contenido, ${l} % lengua`,
+            counts: (w: number) => `cuenta ${w} %`,
+            scale: (line: string) => `Notas: ${line}`,
+            labels: { writing: 'Expresión escrita', other: 'Otras competencias' }
+          }
+        : english
+          ? {
+              title: 'Test',
+              time: (min: number) => `Time: ${min} minutes`,
+              aids: (a: string) => `You may use: ${a || 'nothing'}`,
+              points: (n: number) => `${n} points`,
+              split: (c: number, l: number) => `${c} % content, ${l} % language`,
+              counts: (w: number) => `counts ${w} %`,
+              scale: (line: string) => `Marks: ${line}`,
+              labels: { writing: 'Writing', other: 'Other skills' }
+            }
+          : {
+              title: 'Klassenarbeit',
+              time: (min: number) => `Bearbeitungszeit: ${min} Minuten`,
+              aids: (a: string) => `Erlaubte Hilfsmittel: ${a || 'keine'}`,
+              points: (n: number) => `${n} Punkte`,
+              split: (c: number, l: number) => `${c} % Inhalt, ${l} % ${zweiterTeil(m.subjectId)}`,
+              counts: (w: number) => `zählt ${w} %`,
+              scale: (line: string) => `Notenschlüssel: ${line}`,
+              labels: { writing: 'Schreiben', other: 'Weitere Kompetenzen' }
+            }
   const lines = [
     t.time(m.minutes),
-    t.aids(translateAids(m.aids, english ? 'en' : 'de')),
+    t.aids(translateAids(m.aids, fach.sprache)),
     ...grades.map((g) => {
+      const value = g.points > 0 ? t.points(g.points) : t.split(inhaltsanteil(m.subjectId), 100 - inhaltsanteil(m.subjectId))
+      // Eine einzige Note (Deutsch, Sachfächer): „Gesamt: 60 Punkte" statt „Weitere Kompetenzen … zählt 100 %"
+      if (grades.length === 1) return `${fach.sprache === 'de' ? 'Gesamt' : 'Total'}: ${value}`
       const label = g.group === 'writing' ? t.labels.writing : t.labels.other
-      const value = g.points > 0 ? t.points(g.points) : t.split(CONTENT_SHARE, 100 - CONTENT_SHARE)
       return `${label}: ${value} – ${t.counts(g.weight)}`
     }),
     // Nur bei einer einzigen Note sinnvoll
@@ -87,11 +114,11 @@ export function examToWorksheet(exam: Exam, fassung = 0): Worksheet {
 
 function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   const meta = worksheetMetaFor(exam)
-  const english = exam.meta.subjectId === 'englisch'
+  const kopfText = fachDerArbeit(exam.meta.subjectId).kopf
   const gesamt = fassungsZahl(exam)
   const f = Math.min(Math.max(0, fassung), gesamt - 1)
   const label = fassungsLabel(f, gesamt)
-  const gruppe = label ? `${english ? 'Group' : 'Gruppe'} ${label}` : ''
+  const gruppe = label ? `${kopfText.gruppe} ${label}` : ''
   const head = examHeadBlock(exam)
   const kopf: WsBlock[] = head ? [gruppe && head.type === 'infoBox' ? { ...head, title: `${head.title} – ${gruppe}` } : head] : []
   if (!head && gruppe) kopf.push({ id: 'exam-gruppe', type: 'divider', title: gruppe })
@@ -99,8 +126,8 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   teileDerFassung(exam, f).forEach((part, i) => {
     const format = formatById(part.formatId)
     // Überschrift der Teile in der Sprache des Faches
-    const points = part.points > 0 ? ` (${part.points} ${english ? 'points' : 'Punkte'})` : ''
-    blocks.push({ id: `part-${part.id}`, type: 'divider', title: `${english ? 'Part' : 'Teil'} ${i + 1}: ${format?.label ?? part.label}${points}` })
+    const points = part.points > 0 ? ` (${part.points} ${kopfText.punkte})` : ''
+    blocks.push({ id: `part-${part.id}`, type: 'divider', title: `${kopfText.teil} ${i + 1}: ${format?.label ?? part.label}${points}` })
     blocks.push(...part.blocks.map((b) => ({ ...b, id: b.id || newId() })))
   })
   /*
@@ -126,9 +153,9 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     meta: {
       ...meta,
       // Kopf in der Sprache des Faches
-      title: exam.meta.title || (exam.meta.subjectId === 'englisch' ? 'English test' : `Klassenarbeit ${exam.meta.subjectLabel}`),
-      subjectLabel: exam.meta.subjectId === 'englisch' ? 'English' : exam.meta.subjectLabel,
-      labelLanguage: exam.meta.subjectId === 'englisch' ? ('en' as const) : ('de' as const),
+      title: exam.meta.title || kopfText.titel,
+      subjectLabel: fachDerArbeit(exam.meta.subjectId).art === 'fremdsprache' ? kopfText.fach : exam.meta.subjectLabel,
+      labelLanguage: fachDerArbeit(exam.meta.subjectId).sprache,
       // Der Lösungsteil einer Klassenarbeit ist der Erwartungshorizont – auch im Kopf
       loesungsBegriff: 'Erwartungshorizont',
       // Fachfarbe oder Vorlagenfarbe – gilt für Arbeit und Erwartungshorizont gleichermaßen

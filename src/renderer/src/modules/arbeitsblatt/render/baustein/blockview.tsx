@@ -24,6 +24,9 @@ import { stripMaterialNo, GalleryView } from './galerie'
  * Jeder Baustein mit angehefteter Illustration bekommt die Figur an die Ecke (26.09.2026) –
  * nur auf dem Schülerblatt; im Lösungsteil lenkt sie nur ab.
  */
+
+/** „Wörter" in der Sprache des Kopfes (Klassenarbeit Französisch/Spanisch/Englisch) */
+const WOERTER: Record<'de' | 'en' | 'fr' | 'es', string> = { de: 'Wörter', en: 'words', fr: 'mots', es: 'palabras' }
 export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
   const { mode } = useWs()
   const set = useSetter(block)
@@ -199,7 +202,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           */}
           {to >= paragraphs.length && materialWoerter > 0 && (
             <div className="ws-wortzahl" data-foot>
-              ({materialWoerter} Wörter)
+              ({materialWoerter} {WOERTER[ctx.labelLanguage ?? 'de']})
             </div>
           )}
           {block.source && to >= paragraphs.length && (
