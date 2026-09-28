@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bogenAus, grundlageAusBlatt, pruefeBogen, transkriptUebernehmen } from '../src/renderer/src/modules/rueckmeldung/generation'
+import { bogenAus, grundlageAusBlatt, grundlageAusVokabeltest, pruefeBogen, transkriptUebernehmen } from '../src/renderer/src/modules/rueckmeldung/generation'
 import { boegenHtml } from '../src/renderer/src/modules/rueckmeldung/ausgabe'
 import { naechstesKuerzel, type Abgabe, type Rueckmeldung } from '../src/renderer/src/modules/rueckmeldung/model/types'
 import { sampleWorksheet } from './worksheetExport.test'
@@ -87,5 +87,35 @@ describe('Rückmeldung', () => {
     expect(html).toContain('Das gelingt dir schon')
     // Abgaben ohne Bogen erscheinen nicht
     expect(html.match(/class="seite"/g)).toHaveLength(1)
+  })
+})
+
+describe('Grundlage aus einem Vokabeltest', () => {
+  it('nimmt Aufgaben und Musterantworten der ersten Fassung', () => {
+    const doc = {
+      variants: [
+        {
+          id: 'v1',
+          label: 'A',
+          blocks: [
+            {
+              id: 'b1',
+              kind: 'open',
+              taskType: 'writeSentences',
+              title: 'Sentences',
+              instruction: 'Write a sentence with each word.',
+              pointsPerItem: 2,
+              items: [{ id: 'i1', vocabId: 'e1', prompt: 'journey – your way to school', modelAnswer: 'My journey to school takes twenty minutes.' }]
+            }
+          ]
+        }
+      ]
+    }
+    const g = grundlageAusVokabeltest(doc as never, 'vt-1', 'Unit 3')
+    expect(g).toMatchObject({ art: 'vokabeltest', docId: 'vt-1', titel: 'Unit 3' })
+    expect(g.aufgaben).toContain('Aufgabe 1')
+    expect(g.aufgaben).toContain('Write a sentence with each word.')
+    expect(g.aufgaben).toContain('model answer: My journey to school takes twenty minutes.')
+    expect(g.erwartung).toMatch(/→ answer/)
   })
 })

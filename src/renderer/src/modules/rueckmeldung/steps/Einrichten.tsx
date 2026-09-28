@@ -140,7 +140,9 @@ export default function Einrichten(): React.JSX.Element | null {
                     <Select
                       label="Material"
                       placeholder={
-                        material.length ? 'Arbeitsblatt, Klassenarbeit, Lernzielkontrolle oder Grammatiktest wählen' : 'Noch kein Material gespeichert'
+                        material.length
+                          ? 'Arbeitsblatt, Klassenarbeit, Lernzielkontrolle, Grammatiktest oder Vokabeltest wählen'
+                          : 'Noch kein Material gespeichert'
                       }
                       searchable
                       data={Object.entries(ART_TITEL)

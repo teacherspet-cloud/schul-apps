@@ -16,7 +16,7 @@
 import type { KiHerkunft, KiVermerk } from '@shared/kiKennzeichnung'
 import type { Zuordnung } from '@shared/pseudonymisierung'
 
-export type GrundlageArt = 'arbeitsblatt' | 'klassenarbeit' | 'lernzielkontrolle' | 'grammatiktest' | 'frei'
+export type GrundlageArt = 'arbeitsblatt' | 'klassenarbeit' | 'lernzielkontrolle' | 'grammatiktest' | 'vokabeltest' | 'frei'
 
 export interface Grundlage {
   art: GrundlageArt

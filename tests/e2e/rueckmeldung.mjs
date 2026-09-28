@@ -85,6 +85,23 @@ try {
   await page.getByText('Rückmeldung für Lea Schmidt').waitFor({ timeout: 10000 })
   pruefe(true, 'Die Ansicht zeigt den Namen – eingesetzt am Rechner')
   await page.screenshot({ path: join(out, 'boegen.png') })
+
+  // Vokabeltest als Grundlage: Knopf „Rückmeldung …" im Vokabeltest-Editor
+  await page.click('[aria-label="Vokabeltest"]')
+  await page.waitForTimeout(500)
+  await page.evaluate(() => window.__selftest.vtMitHinweis('[Prüfung] Beispiel'))
+  await page.waitForTimeout(1500)
+  await sichtbar(page.locator('[data-rueckmeldung-zu]')).click()
+  const ende2 = Date.now() + 15000
+  let grundlage = null
+  while (Date.now() < ende2) {
+    grundlage = await page.evaluate(() => window.__selftest.rmJetzt()?.grundlage ?? null)
+    if (grundlage?.art === 'vokabeltest') break
+    await page.waitForTimeout(300)
+  }
+  pruefe(grundlage?.art === 'vokabeltest', 'Aus dem Vokabeltest entsteht eine Rückmeldung mit ihm als Grundlage')
+  pruefe(Boolean(grundlage?.aufgaben?.includes('Write a sentence with each word.')), 'Die Aufgaben des Vokabeltests stehen in der Grundlage')
+  await page.screenshot({ path: join(out, 'vokabeltest-grundlage.png') })
 } catch (e) {
   problems.push(`Abbruch: ${e.message}`)
   await page.screenshot({ path: join(out, 'fehler.png') }).catch(() => undefined)

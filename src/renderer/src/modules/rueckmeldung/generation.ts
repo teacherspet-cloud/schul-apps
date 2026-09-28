@@ -14,6 +14,9 @@ import type { GrammarTest } from '../grammatiktest/model/types'
 import { testToWorksheet } from '../grammatiktest/render/testWorksheet'
 import type { Kurztest } from '../lernzielkontrolle/model/types'
 import { kurztestToWorksheet } from '../lernzielkontrolle/render/kurztestWorksheet'
+import { describeBlock as vokabelBlock } from '../vokabeltest/generation/quality'
+import { LANGUAGES, type TestDocument } from '../vokabeltest/model/types'
+import { fachIdVon } from '../../shared/fachfarben'
 import type { Abgabe, Bogen, Einschaetzung, Grundlage, GrundlageArt, Rueckmeldung } from './model/types'
 
 // ---------- Grundlage aus gespeichertem Material ----------
@@ -28,6 +31,22 @@ export function grundlageAusBlatt(ws: Worksheet, art: GrundlageArt, docId: strin
   return { art, docId, titel, aufgaben, ...(loesungen.length ? { erwartung: loesungen.join('\n') } : {}) }
 }
 
+/**
+ * Vokabeltest als Grundlage: die Aufgaben der ersten Fassung mit ihren Lösungen („→ answer").
+ * Rückmeldung passt hier vor allem zu Aufgaben mit eigenen Sätzen; Lücken und Zuordnungen
+ * zeigen, welche Wörter noch nicht sitzen.
+ */
+export function grundlageAusVokabeltest(doc: TestDocument, docId: string, titel: string): Grundlage {
+  const bloecke = doc.variants[0]?.blocks ?? []
+  return {
+    art: 'vokabeltest',
+    docId,
+    titel,
+    aufgaben: bloecke.map((b, i) => `Aufgabe ${i + 1}\n${vokabelBlock(b)}`).join('\n\n'),
+    erwartung: 'Die Lösungen stehen in den Aufgaben hinter „→ answer" bzw. „→ model answer".'
+  }
+}
+
 export interface MaterialEintrag {
   art: Exclude<GrundlageArt, 'frei'>
   id: string
@@ -40,16 +59,18 @@ export const ART_TITEL: Record<Exclude<GrundlageArt, 'frei'>, string> = {
   arbeitsblatt: 'Arbeitsblatt',
   klassenarbeit: 'Klassenarbeit',
   lernzielkontrolle: 'Lernzielkontrolle',
-  grammatiktest: 'Grammatiktest'
+  grammatiktest: 'Grammatiktest',
+  vokabeltest: 'Vokabeltest'
 }
 
 /** Alle gespeicherten Materialien, aus denen eine Rückmeldung entstehen kann – neueste zuerst */
 export async function materialListe(): Promise<MaterialEintrag[]> {
-  const [ab, ka, lzk, gt] = await Promise.all([
+  const [ab, ka, lzk, gt, vt] = await Promise.all([
     window.api.sheets.list().catch(() => []),
     window.api.exams.list().catch(() => []),
     window.api.kurztests.list().catch(() => []),
-    window.api.grammarTests.list().catch(() => [])
+    window.api.grammarTests.list().catch(() => []),
+    window.api.tests.list().catch(() => [])
   ])
   const eintrag = (art: MaterialEintrag['art']) => (m: { id: string; name: string; updatedAt: string; subjectLabel?: string }) => ({
     art,
@@ -62,7 +83,8 @@ export async function materialListe(): Promise<MaterialEintrag[]> {
     ...ab.map(eintrag('arbeitsblatt')),
     ...ka.map(eintrag('klassenarbeit')),
     ...lzk.map(eintrag('lernzielkontrolle')),
-    ...gt.map(eintrag('grammatiktest'))
+    ...gt.map(eintrag('grammatiktest')),
+    ...vt.map(eintrag('vokabeltest'))
   ].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
@@ -90,6 +112,17 @@ export async function ladeGrundlage(
     return {
       grundlage: grundlageAusBlatt(kurztestToWorksheet(t, 0), art, id, s.name),
       fach: { id: t.meta.subjectId, label: t.meta.subjectLabel, grade: t.meta.grade }
+    }
+  }
+  if (art === 'vokabeltest') {
+    const s = await window.api.tests.get(id)
+    // Die Bibliothek legt Wörter, Einstellungen und den erzeugten Test zusammen ab
+    const doc = (s.payload as { doc?: TestDocument | null }).doc
+    if (!doc?.variants?.length) throw new Error('Dieser Vokabeltest hat noch keine Aufgaben – erst den Test erstellen.')
+    const sprache = LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? doc.settings.targetLanguage
+    return {
+      grundlage: grundlageAusVokabeltest(doc, id, s.name),
+      fach: { id: fachIdVon(doc.settings.targetLanguage) ?? fachIdVon(sprache) ?? 'englisch', label: sprache, grade: doc.settings.grade }
     }
   }
   const s = await window.api.grammarTests.get(id)

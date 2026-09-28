@@ -21,6 +21,7 @@ import {
 import { LANGUAGES } from '../model/types'
 import { fragenAusVokabeln } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
+import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { IconAdjustments, IconArrowDown, IconArrowUp, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ImagePicker from '../../../shared/components/ImagePicker'
@@ -288,10 +289,13 @@ export default function EditorStep(): React.JSX.Element {
         }}
         ausgabe={{ onWord: () => setExportOpen('docx'), onPdf: () => setExportOpen('pdf'), onDrucken: () => setExportOpen('print') }}
         extras={
-          <LmsExport
-            titel={doc.header.title}
-            bericht={() => fragenAusVokabeln(doc.vocab, LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? 'Zielsprache')}
-          />
+          <>
+            <LmsExport
+              titel={doc.header.title}
+              bericht={() => fragenAusVokabeln(doc.vocab, LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? 'Zielsprache')}
+            />
+            <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
+          </>
         }
       />
 
