@@ -12,6 +12,8 @@ export interface SubjectOperators {
   afb: Record<string, Afb | null>
   /** Operatoren stehen in der Zielsprache (moderne Fremdsprachen) */
   targetLanguage?: boolean
+  /** Diese Operatoren nennt die KI-Vorgabe (sonst alle aus `afb`) – z. B. nur die du-Form */
+  zeigen?: string[]
   note?: string
 }
 
@@ -313,15 +315,133 @@ export const FOREIGN_LANGUAGE_OPERATORS = [
   'tick'
 ]
 
+/**
+ * Operatoren der romanischen Sprachen in der Befehlsform, wie sie in Aufgaben stehen (Praxislauf
+ * 28.09.2026: Die französische Klassenarbeit bekam „**Write** un e-mail", weil es nur die
+ * englische Liste gab). Erste Form = Anrede mit „tu", zweite = „vous"/„vosotros"/„voi" – die
+ * Prüfung erkennt beide, die KI-Vorgabe nennt die erste.
+ */
+const ROMANISCHE_OPERATOREN: Record<'fr' | 'es' | 'it', [string, string][]> = {
+  fr: [
+    ['analyse', 'analysez'],
+    ['caractérise', 'caractérisez'],
+    ['commente', 'commentez'],
+    ['compare', 'comparez'],
+    ['décris', 'décrivez'],
+    ['discute', 'discutez'],
+    ['évalue', 'évaluez'],
+    ['examine', 'examinez'],
+    ['explique', 'expliquez'],
+    ['expose', 'exposez'],
+    ['illustre', 'illustrez'],
+    ['interprète', 'interprétez'],
+    ['justifie', 'justifiez'],
+    ['présente', 'présentez'],
+    ['relève', 'relevez'],
+    ['résume', 'résumez'],
+    ['rédige', 'rédigez'],
+    ['écris', 'écrivez'],
+    ['raconte', 'racontez'],
+    ['réponds', 'répondez'],
+    ['complète', 'complétez'],
+    ['relie', 'reliez'],
+    ['nomme', 'nommez'],
+    ['coche', 'cochez'],
+    ['indique', 'indiquez'],
+    ['énumère', 'énumérez'],
+    ['souligne', 'soulignez'],
+    ['choisis', 'choisissez'],
+    ['donne', 'donnez']
+  ],
+  es: [
+    ['analiza', 'analizad'],
+    ['caracteriza', 'caracterizad'],
+    ['comenta', 'comentad'],
+    ['compara', 'comparad'],
+    ['describe', 'describid'],
+    ['discute', 'discutid'],
+    ['evalúa', 'evaluad'],
+    ['examina', 'examinad'],
+    ['explica', 'explicad'],
+    ['expón', 'exponed'],
+    ['ilustra', 'ilustrad'],
+    ['interpreta', 'interpretad'],
+    ['justifica', 'justificad'],
+    ['presenta', 'presentad'],
+    ['señala', 'señalad'],
+    ['resume', 'resumid'],
+    ['redacta', 'redactad'],
+    ['escribe', 'escribid'],
+    ['cuenta', 'contad'],
+    ['responde', 'responded'],
+    ['completa', 'completad'],
+    ['relaciona', 'relacionad'],
+    ['nombra', 'nombrad'],
+    ['marca', 'marcad'],
+    ['indica', 'indicad'],
+    ['enumera', 'enumerad'],
+    ['subraya', 'subrayad'],
+    ['elige', 'elegid'],
+    ['da', 'dad']
+  ],
+  it: [
+    ['analizza', 'analizzate'],
+    ['caratterizza', 'caratterizzate'],
+    ['commenta', 'commentate'],
+    ['confronta', 'confrontate'],
+    ['descrivi', 'descrivete'],
+    ['discuti', 'discutete'],
+    ['valuta', 'valutate'],
+    ['esamina', 'esaminate'],
+    ['spiega', 'spiegate'],
+    ['illustra', 'illustrate'],
+    ['interpreta', 'interpretate'],
+    ['giustifica', 'giustificate'],
+    ['presenta', 'presentate'],
+    ['riassumi', 'riassumete'],
+    ['scrivi', 'scrivete'],
+    ['racconta', 'raccontate'],
+    ['rispondi', 'rispondete'],
+    ['completa', 'completate'],
+    ['abbina', 'abbinate'],
+    ['nomina', 'nominate'],
+    ['segna', 'segnate'],
+    ['indica', 'indicate'],
+    ['elenca', 'elencate'],
+    ['sottolinea', 'sottolineate'],
+    ['scegli', 'scegliete']
+  ]
+}
+
+const HINWEIS_ZIELSPRACHE = 'In den modernen Fremdsprachen stehen die Operatoren in der Zielsprache; der Anforderungsbereich ergibt sich aus der Aufgabe.'
+
 const FOREIGN: SubjectOperators = {
   afb: Object.fromEntries(FOREIGN_LANGUAGE_OPERATORS.map((o) => [o, null])),
   targetLanguage: true,
-  note: 'In den modernen Fremdsprachen stehen die Operatoren in der Zielsprache; der Anforderungsbereich ergibt sich aus der Aufgabe.'
+  note: HINWEIS_ZIELSPRACHE
 }
+
+const ROMANISCH: Record<string, SubjectOperators> = Object.fromEntries(
+  Object.entries(ROMANISCHE_OPERATOREN).map(([sprache, paare]) => [
+    sprache,
+    {
+      // Nur die erste Form steht in der Vorgabe (`zeigen`), erkannt werden beide
+      afb: Object.fromEntries(
+        paare.flatMap(([du, ihr]) => [
+          [du, null],
+          [ihr, null]
+        ])
+      ),
+      zeigen: paare.map(([du]) => du),
+      targetLanguage: true,
+      note: `${HINWEIS_ZIELSPRACHE} Die Operatoren stehen in der Befehlsform am Anfang der Aufgabe (${sprache === 'fr' ? '„Décris …", „Rédige …"' : sprache === 'es' ? '„Describe …", „Redacta …"' : '„Descrivi …", „Scrivi …"'}); in der Oberstufe ist auch die Höflichkeits- bzw. Pluralform üblich.`
+    }
+  ])
+)
 
 /** Operatorenliste des Fachs – für die KI-Vorgabe und die automatische Prüfung. */
 export function subjectOperators(subjectId: string, foreignLanguage?: string): SubjectOperators | null {
-  if (foreignLanguage) return FOREIGN
+  if (foreignLanguage) return ROMANISCH[foreignLanguage] ?? FOREIGN
   return SUBJECT_OPERATORS[subjectId] ?? null
 }
 

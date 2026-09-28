@@ -185,6 +185,47 @@ try {
     }
   })
 
+  const klassenarbeit = async (fach, thema) => {
+    const waehle = async (label, option) => {
+      await sichtbar(page.getByLabel(label, { exact: true })).click()
+      await sichtbar(page.getByRole('option', { name: option, exact: true })).click()
+      await page.waitForTimeout(300)
+    }
+    await page.click('[aria-label="Klassenarbeiten"]')
+    await page.waitForTimeout(800)
+    const neu = page.getByRole('button', { name: 'Neue Klassenarbeit' })
+    if (await neu.count()) await sichtbar(neu).click()
+    await page.waitForSelector('text=Rahmen der Arbeit')
+    await waehle('Fach', fach)
+    await waehle('Jahrgang', 'Klasse 8')
+    await sichtbar(page.getByLabel('Thema', { exact: false })).fill(thema)
+    await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click()
+    await page.waitForTimeout(500)
+    await page.getByRole('button', { name: 'Weiter zu den Aufgaben' }).click()
+    await page.getByRole('button', { name: 'Arbeit erzeugen' }).click()
+    // Fertig, wenn jeder Teil Bausteine hat und kein Auftrag mehr läuft
+    const exam = await warte(() => {
+      const e = window.__selftest.kaJetzt()
+      return e?.parts?.length && e.parts.every((p) => (p.blocks?.length ?? 0) > 0) ? e : null
+    }, null, 900000)
+    await page.waitForTimeout(3000)
+    const text = await page.locator('.ws-editor-pages').first().innerText().catch(() => '')
+    ergebnisse[`klassenarbeit-${fach}`] = { teile: exam?.parts?.map((p) => ({ format: p.formatId, punkte: p.points, bausteine: p.blocks?.length })), blatt: text.slice(0, 6000) }
+    pruefe(Boolean(exam), `Klassenarbeit ${fach}: alle Teile erzeugt`)
+    await page.screenshot({ path: join(out, `klassenarbeit-${fach}.png`), fullPage: false })
+    return { exam, text }
+  }
+
+  await schritt('klassenarbeit-fr', async () => {
+    const { text } = await klassenarbeit('Französisch', 'Les vacances')
+    pruefe(/Contrôle/.test(text) && /Partie 1/.test(text), 'Klassenarbeit Französisch: Kopf und Teile auf Französisch')
+  })
+
+  await schritt('klassenarbeit-de', async () => {
+    const { text } = await klassenarbeit('Deutsch', 'Kurzgeschichten')
+    pruefe(/Teil 1/.test(text), 'Klassenarbeit Deutsch: Teile heißen „Teil"')
+  })
+
   await schritt('openai-tts', async () => {
     const r = await page.evaluate(() =>
       window.api.audio.speak({

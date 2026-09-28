@@ -94,7 +94,7 @@ export function operatorRules(meta: WorksheetMeta, foreignLanguage?: string): st
   const ops = subjectOperators(meta.subjectId, foreignLanguage)
   if (!ops) return ''
   const byAfb: Record<string, string[]> = { I: [], II: [], III: [], offen: [] }
-  for (const [op, afb] of Object.entries(ops.afb)) byAfb[afb ?? 'offen'].push(op)
+  for (const [op, afb] of Object.entries(ops.afb)) if (!ops.zeigen || ops.zeigen.includes(op)) byAfb[afb ?? 'offen'].push(op)
   /*
    * Bilingual: Die Aufgaben stehen in der Arbeitssprache. Stünde hier die deutsche Liste mit
    * „genau einem Operator aus dieser Liste", widerspräche sie der bilingualen Regel – und die
