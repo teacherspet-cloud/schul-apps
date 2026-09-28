@@ -1195,6 +1195,8 @@ export interface Worksheet {
    * wäre für eines von beiden falsch geplant.
    */
   boards?: BoardPlan[]
+  /** Stundenverlauf für die Lehrkraft (Großprogramm 0.4, F4) – erscheint nie auf den Blättern */
+  stundenverlauf?: import('../../../shared/stundenverlauf/stundenverlauf').Stundenverlauf
   /**
    * Im Netz gefundener Originaltext, der als Ausgangsmaterial dient.
    *

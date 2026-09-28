@@ -1,4 +1,5 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { StundenverlaufPanel } from '../StundenverlaufPanel'
 import BlattLeveln from '../BlattLeveln'
 import LevelnMenue from '../LevelnMenue'
 import {
@@ -95,7 +96,7 @@ export function EditorStep(): React.JSX.Element {
   const citationStyle = useAppSettings((s) => s.settings.citationStyle)
   // Nur zum Neuzeichnen: pageInfoFor liest die Fachfarbe außerhalb von React (shared/fachfarben.ts)
   useAppSettings((s) => s.settings.fachfarben)
-  const [view, setView] = useState<'student' | 'key' | 'board' | 'audio'>('student')
+  const [view, setView] = useState<'student' | 'key' | 'board' | 'verlauf' | 'audio'>('student')
   // Ausgeblendete Hinweise zur Seitenzahl („Blatt:Seitenzahl“) – eine neue Abweichung erscheint wieder
   const [seitenAus, setSeitenAus] = useState<string[]>([])
   // Bausteine, an denen gerade ein kleiner Auftrag arbeitet (überarbeiten, füllen, Beispiel)
@@ -547,7 +548,7 @@ export function EditorStep(): React.JSX.Element {
         zurueck={{ label: 'Gliederung', onClick: () => setStep(1) }}
         undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
         fassungen={
-          ws.sheets.length > 1 && view !== 'board' && view !== 'audio'
+          ws.sheets.length > 1 && view !== 'board' && view !== 'verlauf' && view !== 'audio'
             ? { value: sheet.id, onChange: setActiveSheet, data: ws.sheets.map((s) => ({ value: s.id, label: s.label })), ariaLabel: 'Niveaustufe' }
             : null
         }
@@ -558,6 +559,8 @@ export function EditorStep(): React.JSX.Element {
             { value: 'student', label: 'Arbeitsblatt' },
             { value: 'key', label: 'Lösungen' },
             { value: 'board', label: ws.board ? 'Tafelbild' : 'Tafelbild +' },
+            // Stundenverlauf (Großprogramm 0.4, F4) – für die Lehrkraft, nie auf den Blättern
+            { value: 'verlauf', label: ws.stundenverlauf ? 'Verlauf' : 'Verlauf +' },
             ...(hasAudio ? [{ value: 'audio', label: 'Hörtexte' }] : [])
           ]
         }}
@@ -663,6 +666,7 @@ export function EditorStep(): React.JSX.Element {
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">
         <Stack align="center" py="lg" gap="md">
           {view === 'board' && <BoardPanel ws={ws} profile={profile} />}
+          {view === 'verlauf' && <StundenverlaufPanel ws={ws} profile={profile} />}
           {view === 'audio' && <AudioPanel ws={ws} />}
           {view === 'student' && ws.meta.coverPage && deckblatt && (
             <>
@@ -692,7 +696,7 @@ export function EditorStep(): React.JSX.Element {
               onAusblenden={() => setSeitenAus((a) => [...a, abweichungsSchluessel])}
             />
           )}
-          {view !== 'board' && view !== 'audio' && (
+          {view !== 'board' && view !== 'verlauf' && view !== 'audio' && (
             <FitToWidth className={`ws-editor-pages ${key ? 'editor-sheet-key' : ''}`}>
               <SheetPages
                 ws={ws}
@@ -731,7 +735,7 @@ export function EditorStep(): React.JSX.Element {
               </Menu.Dropdown>
             </Menu>
           )}
-          {view !== 'board' && (
+          {view !== 'board' && view !== 'verlauf' && (
             <Text size="xs" c="dimmed" pb="lg">
               Texte anklicken zum Bearbeiten · Formatierung: **fett**, $Formel$ · In der Lösungsansicht richtige Antworten per Klick markieren
             </Text>
