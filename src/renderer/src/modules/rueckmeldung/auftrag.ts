@@ -5,7 +5,7 @@
  * Fehler nur eine Abgabe betrifft.
  */
 import { starteAuftrag } from '../../shared/auftraege'
-import { bogenAnfrage, bogenAus, transkriptAnfrage, transkriptUebernehmen } from './generation'
+import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUebernehmen } from './generation'
 import type { Abgabe, Rueckmeldung } from './model/types'
 import { bibliothek } from './store'
 
@@ -39,8 +39,10 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
         try {
           let a = roh
           if (!a.text.trim() && a.bilder.length) a = transkriptUebernehmen(a, await k.ai<unknown>(transkriptAnfrage(a)))
-          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(rm, a, rueckmeldungSystem(rm))))
-          fertig.set(a.id, { ...a, bogen })
+          // Namen verlassen den Rechner nicht: an die KI geht der bereinigte Text
+          const { text, pseudonyme } = ohneNamen(a)
+          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(rm, { ...a, text }, rueckmeldungSystem(rm))))
+          fertig.set(a.id, { ...a, pseudonyme, bogen })
         } catch (e) {
           if ((e as { name?: string })?.name === 'AbortError') throw e
           fehler.push(`${roh.kuerzel}: ${e instanceof Error ? e.message : String(e)}`)

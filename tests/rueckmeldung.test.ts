@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { bogenAus, grundlageAusBlatt, grundlageAusVokabeltest, pruefeBogen, transkriptUebernehmen } from '../src/renderer/src/modules/rueckmeldung/generation'
+import {
+  bogenAnfrage,
+  bogenAus,
+  grundlageAusBlatt,
+  grundlageAusVokabeltest,
+  ohneNamen,
+  pruefeBogen,
+  transkriptUebernehmen
+} from '../src/renderer/src/modules/rueckmeldung/generation'
 import { boegenHtml } from '../src/renderer/src/modules/rueckmeldung/ausgabe'
 import { naechstesKuerzel, type Abgabe, type Rueckmeldung } from '../src/renderer/src/modules/rueckmeldung/model/types'
 import { sampleWorksheet } from './worksheetExport.test'
@@ -117,5 +125,29 @@ describe('Grundlage aus einem Vokabeltest', () => {
     expect(g.aufgaben).toContain('Write a sentence with each word.')
     expect(g.aufgaben).toContain('model answer: My journey to school takes twenty minutes.')
     expect(g.erwartung).toMatch(/→ answer/)
+  })
+})
+
+describe('Namen verlassen den Rechner nicht (Praxislauf 28.09.2026)', () => {
+  it('ersetzt den eigenen Namen und weitere Vornamen in eingetippten Abgaben', () => {
+    const a = abgabe({
+      name: 'Lea Schmidt',
+      text: 'Liebe Redaktion, ich finde das Verbot falsch. Lea Schmidt sagt auch, dass es unfair ist, und Jonas findet das auch. Viele Grüße, Lea'
+    })
+    const { text, pseudonyme } = ohneNamen(a)
+    expect(text).not.toMatch(/Lea|Schmidt|Jonas/)
+    expect(text).toContain('S1 sagt auch')
+    expect(text).toMatch(/S1-P1 findet/)
+    expect(pseudonyme).toEqual([{ kuerzel: 'S1-P1', name: 'Jonas' }])
+  })
+
+  it('schickt den bereinigten Text in der Anfrage', () => {
+    const r = {
+      meta: { anrede: 'du', subjectLabel: 'Deutsch', grade: 8, schwerpunkt: '' },
+      grundlage: { titel: 'Leserbrief', aufgaben: 'Schreibe einen Leserbrief.' }
+    }
+    const a = abgabe({ name: 'Lea Schmidt', text: 'Lea Schmidt findet das Verbot falsch.' })
+    const anfrage = bogenAnfrage(r as never, { ...a, text: ohneNamen(a).text }, 'System')
+    expect(anfrage.user).not.toMatch(/Lea|Schmidt/)
   })
 })

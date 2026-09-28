@@ -3,7 +3,7 @@
  * Fotos/Scans in Text, Rückmeldebogen ohne Note.
  */
 import type { StructuredRequest } from '@shared/types'
-import { ersetzeNamen } from '@shared/pseudonymisierung'
+import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, obj, str } from '../../shared/aiSchema'
 import { describeBlock, describeSheet } from '../arbeitsblatt/generation/describe'
 import type { Worksheet } from '../arbeitsblatt/model/types'
@@ -162,6 +162,32 @@ export function transkriptUebernehmen(a: Abgabe, daten: unknown): Abgabe {
   const { text, zuordnung } = ersetzeNamen(roh, namen, a.pseudonyme ?? [])
   const hinweis = String(d.unleserlich ?? '').trim()
   return { ...a, text: hinweis ? `${text}\n\n[unleserlich: ${hinweis}]` : text, bilder: [], pseudonyme: zuordnung }
+}
+
+/**
+ * Der Text einer Abgabe, wie er an die KI geht: ohne Namen (Praxislauf 28.09.2026 – eingetippte
+ * und als Datei geladene Abgaben gingen bis dahin unverändert hinaus, nur übertragene Fotos
+ * waren bereinigt). Der eingetragene Name der Person wird zu ihrem Kürzel, weitere erkannte Namen
+ * (Kopfzeile, bekannte Vornamen) zu „S1-P1" usw. Die Zuordnung bleibt an der Abgabe auf diesem
+ * Rechner und setzt die Namen im Bogen wieder ein; der Text selbst bleibt für die Lehrkraft, wie er war.
+ */
+export function ohneNamen(a: Abgabe): { text: string; pseudonyme: Zuordnung[] } {
+  const eigener = a.name.trim()
+  const bisher = a.pseudonyme ?? []
+  const fremde = findeNamen(a.text)
+    .map((f) => f.name)
+    .filter((n) => n.length > 1 && n !== eigener && !eigener.split(/\s+/).includes(n) && !bisher.some((z) => z.name === n))
+  let text = a.text
+  if (eigener) text = ersetzeNamen(text, [eigener], [{ kuerzel: a.kuerzel, name: eigener }]).text
+  const neu: Zuordnung[] = fremde.map((name, i) => ({ kuerzel: `${a.kuerzel}-P${bisher.length + i + 1}`, name }))
+  const alle = [...bisher, ...neu]
+  if (alle.length)
+    text = ersetzeNamen(
+      text,
+      alle.map((z) => z.name),
+      alle
+    ).text
+  return { text, pseudonyme: alle }
 }
 
 // ---------- Rückmeldebogen ----------

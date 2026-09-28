@@ -106,6 +106,8 @@ export function verlaufsAnfrage(system: string, material: string, dauer: number,
       '- Realistische Zeiten: Lesezeit der Texte, Bearbeitungszeit der Aufgaben, Zeit für Wechsel der Sozialform.',
       `- Die Minuten aller Phasen ergeben zusammen GENAU ${dauer}.`,
       '- Sozialformen abwechseln, wo es der Sache dient; keine Methode um ihrer selbst willen.',
+      // Praxislauf 28.09.2026: Die KI schrieb ganze Aufgabentexte samt AFB-Begründung in die Spalte
+      '- „geschehen" ist eine Planungsnotiz, kein Abschrieb: höchstens vier Stichpunkte je Phase, jeder unter 20 Wörtern. Aufgaben nur mit Nummer und Operator nennen („Aufgabe 2: Untersuchen"), NICHT ihren Wortlaut, keine AFB-Begründungen und keine Erwartungshorizonte abschreiben.',
       wunsch ? `WÜNSCHE DER LEHRKRAFT (umsetzen): ${wunsch}` : '',
       'MATERIAL:',
       material

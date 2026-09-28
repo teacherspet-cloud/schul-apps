@@ -64,7 +64,9 @@ try {
   await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.')
   await sichtbar(page.locator('[data-rm-eintippen]')).click()
   await sichtbar(page.getByLabel('Name zu S1')).fill('Lea Schmidt')
-  await sichtbar(page.getByLabel('Text von S1')).fill('Ich finde, das Handyverbot ist falsch. Wir brauchen das Handy für den Unterricht.')
+  await sichtbar(page.getByLabel('Text von S1')).fill(
+    'Ich finde, das Handyverbot ist falsch. Wir brauchen das Handy für den Unterricht. Lea Schmidt sagt, Jonas sieht das auch so.'
+  )
   await page.screenshot({ path: join(out, 'einrichten.png') })
   await sichtbar(page.locator('[data-rm-schreiben]')).click()
 
@@ -80,7 +82,7 @@ try {
   pruefe(bogen?.entfernt === 1, 'Die entfernte Aussage ist vermerkt')
   const a = anfragen().filter((z) => z.schemaName === 'rueckmeldung_bogen')
   pruefe(a.length === 1, 'Eine Anfrage für den Bogen')
-  pruefe(a.length === 1 && !/Lea|Schmidt/.test(a[0].user) && a[0].user.includes('S1'), 'Die KI sieht nur das Kürzel, nicht den Namen')
+  pruefe(a.length === 1 && !/Lea|Schmidt|Jonas/.test(a[0].user) && a[0].user.includes('S1'), 'Die KI sieht nur Kürzel – auch Namen im Text sind ersetzt')
   pruefe(a.length === 1 && /KEINE Note, KEINE Punkte/.test(a[0].user), 'Die Anfrage verbietet Noten und Punkte')
   await page.getByText('Rückmeldung für Lea Schmidt').waitFor({ timeout: 10000 })
   pruefe(true, 'Die Ansicht zeigt den Namen – eingesetzt am Rechner')

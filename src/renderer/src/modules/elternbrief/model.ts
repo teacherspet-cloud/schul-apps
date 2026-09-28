@@ -133,7 +133,7 @@ export function uebersetzungsAnfrage(t: BriefText, sprache: Familiensprache): St
   return {
     system: `Du übersetzt Elternbriefe deutscher Schulen in die Familiensprache der Eltern: ${sprache.name} (${sprache.eigen}). Genau, vollständig, in einfacher, höflicher Alltagssprache; Begriffe des deutschen Schulsystems (Klassenarbeit, Elternabend, Zeugnis) übersetzt und beim ersten Vorkommen kurz erklärt, das deutsche Wort in Klammern dahinter.`,
     user: [
-      `Übersetze diesen Elternbrief ins ${sprache.name}. Platzhalter in eckigen Klammern [ ] bleiben unverändert auf Deutsch stehen. Datumsangaben, Uhrzeiten und Beträge unverändert.`,
+      `Übersetze diesen Elternbrief ins ${sprache.name}. Platzhalter in eckigen Klammern [ ] bleiben unverändert auf Deutsch stehen. Zahlen von Datum, Uhrzeit und Betrag unverändert; Wörter wie „Uhr" oder „bis" werden mitübersetzt.`,
       JSON.stringify({
         betreff: t.betreff,
         anrede: t.anrede,
