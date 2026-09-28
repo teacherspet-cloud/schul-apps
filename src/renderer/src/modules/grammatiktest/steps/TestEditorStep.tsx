@@ -138,6 +138,7 @@ export default function TestEditorStep(): React.JSX.Element {
             designs={designs}
             designId={test.design.id}
             onDesign={(d) => update((x) => (x.design = structuredClone(d)))}
+            kiVermerk={{ wert: test.meta.kiVermerk, ki: test.meta.ki, onChange: (v) => update((d) => (d.meta.kiVermerk = v)) }}
             schulangaben={{ checked: test.meta.showSchool !== false, onChange: (an) => update((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(test.meta.correctionMargin), onChange: (an) => update((d) => (d.meta.correctionMargin = an)) }}
             notizrand={{ checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) }}

@@ -325,7 +325,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     try {
       const mod = await import('../../arbeitsblatt/export/transcriptDocx')
       const title = meta.title || meta.topic || 'Klassenarbeit'
-      const info = { title, subtitle: [meta.subjectLabel, meta.grade ? `Klasse ${meta.grade}` : ''].filter(Boolean).join(' · ') }
+      const info = { title, subtitle: [meta.subjectLabel, meta.grade ? `Klasse ${meta.grade}` : ''].filter(Boolean).join(' · '), ki: meta.ki }
       const path =
         format === 'docx'
           ? await window.api.files.save(
@@ -502,6 +502,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             designs={designs}
             designId={exam.design.id}
             onDesign={(d) => updateExam((x) => (x.design = structuredClone(d)))}
+            kiVermerk={{ wert: meta.kiVermerk, ki: meta.ki, onChange: (v) => updateExam((d) => (d.meta.kiVermerk = v)) }}
             schulangaben={{ checked: meta.showSchool !== false, onChange: (an) => updateExam((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(meta.correctionMargin), onChange: (an) => updateExam((d) => (d.meta.correctionMargin = an)) }}
             notizrand={{ checked: Boolean(meta.notesMargin), onChange: (an) => updateExam((d) => (d.meta.notesMargin = an)) }}

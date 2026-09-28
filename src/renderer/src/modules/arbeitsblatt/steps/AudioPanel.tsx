@@ -284,7 +284,7 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
     try {
       const mod = await import('../export/transcriptDocx')
       const title = ws.meta.title || ws.meta.topic
-      const info = { title, subtitle: [ws.meta.subjectLabel, ws.meta.grade ? `Klasse ${ws.meta.grade}` : ''].filter(Boolean).join(' · ') }
+      const info = { title, subtitle: [ws.meta.subjectLabel, ws.meta.grade ? `Klasse ${ws.meta.grade}` : ''].filter(Boolean).join(' · '), ki: ws.meta.ki }
       const audio = blocks.map((b) => b.block)
       const path =
         format === 'docx'

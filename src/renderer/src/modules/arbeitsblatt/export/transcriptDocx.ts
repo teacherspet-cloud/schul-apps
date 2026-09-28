@@ -12,6 +12,7 @@
  * (wie oft gespielt wird, Hinweis vor dem Hören), dann das Skript mit hervorgehobenen
  * Sprechernamen – so findet man beim Vorlesen die eigene Zeile wieder.
  */
+import { kiMetaTag, kiWordEigenschaften, type KiHerkunft } from '@shared/kiKennzeichnung'
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph } from 'docx'
 import { run } from '../../../shared/export/docxKit'
 import type { AudioBlock } from '../model/types'
@@ -24,6 +25,8 @@ export interface TranscriptInfo {
   /** Fach und Lerngruppe für die Zeile darunter */
   subtitle?: string
   schoolName?: string
+  /** KI-Kennzeichnung (Großprogramm 0.4) */
+  ki?: KiHerkunft
 }
 
 /** Sprecher eines Hörtextes als Zeile: „Anna (Stimme: Rachel) · Ben". */
@@ -102,6 +105,7 @@ export async function buildTranscriptDocx(blocks: AudioBlock[], info: Transcript
   const doc = new Document({
     creator: 'Schul-Apps',
     title: `Hörtexte – ${info.title}`,
+    ...kiWordEigenschaften(info.ki),
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },
     sections: [{ children }]
   })
@@ -150,7 +154,7 @@ export function buildTranscriptHtml(blocks: AudioBlock[], info: TranscriptInfo):
     : '<p>Auf diesem Material gibt es keine Hörtexte.</p>'
 
   return `<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><title>Hörtexte – ${esc(info.title)}</title>
+<html lang="de"><head><meta charset="utf-8"><title>Hörtexte – ${esc(info.title)}</title>${kiMetaTag(info.ki)}
 <style>
   @page { size: A4; margin: 20mm; }
   body { font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.45; color: #000; margin: 0; }

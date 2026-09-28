@@ -1,5 +1,6 @@
 import { DesignTemplate, FooterSlot, PRINT_MARGINS } from '@shared/design'
 import type { WorksheetMeta } from '../model/types'
+import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import type { CitationStyle } from '@shared/types'
 import { CANARY_STYLE } from '../../../shared/aiCanary'
 import { RichText } from '../../../shared/richtext/RichText'
@@ -350,6 +351,12 @@ export function PageFrame({
           </footer>
         )}
       </div>
+      {/* KI-Vermerk (Großprogramm 0.4): unter dem Fuß, außerhalb des Satzspiegels – ändert keinen Seitenumbruch */}
+      {vermerkSichtbar(info.meta.ki, info.meta.kiVermerk, info.isKey) && (
+        <div className="ws-ki-vermerk" style={{ left: `${insets.left}mm`, right: `${insets.right}mm`, bottom: `${PRINT_MARGINS.bleedSafeMm - 2}mm` }}>
+          {kiVermerkText(info.meta.ki!, info.language === 'en' ? 'en' : 'de')}
+        </div>
+      )}
     </div>
   )
 }

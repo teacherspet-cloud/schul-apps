@@ -774,6 +774,10 @@ export interface SeitenPlan {
 export type SheetType = 'erarbeitung' | 'uebung' | 'wiederholung' | 'lesetext' | 'hausaufgabe' | 'lernkontrolle'
 
 export interface WorksheetMeta {
+  /** KI-Kennzeichnung (Großprogramm 0.4): welche KI mitgewirkt hat – gesetzt beim Ablegen eines KI-Ergebnisses */
+  ki?: import('@shared/kiKennzeichnung').KiHerkunft
+  /** Sichtbarer KI-Vermerk: nur im Lösungsteil, überall oder aus (fehlt = Einstellung der App) */
+  kiVermerk?: import('@shared/kiKennzeichnung').KiVermerk
   title: string
   subjectId: string
   subjectLabel: string

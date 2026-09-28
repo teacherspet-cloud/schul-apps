@@ -20,6 +20,7 @@ import {
   VerticalPositionRelativeFrom,
   WidthType
 } from 'docx'
+import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { PRINT_MARGINS } from '@shared/design'
 import { dataUrlBytes, imageRun, NO_BORDERS, run, RunOptions } from '../../../../shared/export/docxKit'
 import { richTextRuns, richTextToParagraphs } from '../../../../shared/richtext/docx'
@@ -239,7 +240,18 @@ export async function headerFor(ctx: Ctx, first: boolean): Promise<Header> {
 
 export function footerFor(ctx: Ctx): Footer {
   const f = ctx.ws.design.footer
-  if (!f.show) return new Footer({ children: [new Paragraph('')] })
+  // KI-Vermerk (Großprogramm 0.4): eigene kleine Zeile im Fuß, nach Wahl nur im Lösungsteil
+  const meta = ctx.ws.meta
+  const vermerk = vermerkSichtbar(meta.ki, meta.kiVermerk, ctx.key)
+    ? [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 60 },
+          children: [new TextRun({ text: kiVermerkText(meta.ki!, ctx.info.language === 'en' ? 'en' : 'de'), size: 13, color: '777777' })]
+        })
+      ]
+    : []
+  if (!f.show) return new Footer({ children: vermerk.length ? vermerk : [new Paragraph('')] })
   const slot = (s: typeof f.left): ParagraphChild[] => {
     if (s === 'pageNumber')
       return [
@@ -261,7 +273,8 @@ export function footerFor(ctx: Ctx): Footer {
           { type: TabStopType.RIGHT, position: ctx.contentWidth }
         ],
         children: [...slot(f.left), run('\t'), ...slot(f.center), run('\t'), ...slot(f.right)]
-      })
+      }),
+      ...vermerk
     ]
   })
 }

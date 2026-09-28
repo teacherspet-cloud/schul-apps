@@ -1,5 +1,6 @@
 import { Checkbox, Select, Tooltip } from '@mantine/core'
 import type { DesignTemplate } from '@shared/design'
+import { KI_VERMERK_STANDARD, type KiHerkunft, type KiVermerk } from '@shared/kiKennzeichnung'
 import { canaryNote, canaryWordFor, canaryWords } from '../aiCanary'
 import type { UeberthemaFelder } from '../ueberthema'
 import UeberthemaFeld from './UeberthemaFeld'
@@ -44,7 +45,8 @@ export default function BlattoptionenFelder({
   vorlagenfarbe,
   ueberthema,
   vorKiTest,
-  kiTest
+  kiTest,
+  kiVermerk
 }: {
   designs: DesignTemplate[]
   designId: string | null
@@ -60,6 +62,8 @@ export default function BlattoptionenFelder({
   ueberthema?: { werte: UeberthemaFelder; bereich: string; onChange: (patch: Pick<UeberthemaFelder, 'ueberthema' | 'ueberthemaAus'>) => void }
   vorKiTest?: React.ReactNode
   kiTest?: KiTestOption
+  /** Sichtbarer KI-Vermerk (Großprogramm 0.4) – nur angeboten, wenn eine KI mitgewirkt hat */
+  kiVermerk?: { wert: KiVermerk | undefined; ki: KiHerkunft | undefined; onChange: (v: KiVermerk) => void }
 }): React.JSX.Element {
   return (
     <>
@@ -133,6 +137,21 @@ export default function BlattoptionenFelder({
             }}
           />
         </Tooltip>
+      )}
+      {kiVermerk?.ki && (
+        <Select
+          size="sm"
+          label="KI-Vermerk"
+          description={`Hinweis auf die KI-Unterstützung (${[kiVermerk.ki.anbieter, kiVermerk.ki.modell].filter(Boolean).join(' · ')}). In den Dateieigenschaften von Word und PDF steht er immer.`}
+          data={[
+            { value: 'loesung', label: 'Nur im Lösungsteil' },
+            { value: 'ueberall', label: 'Auf jeder Seite' },
+            { value: 'aus', label: 'Nicht anzeigen' }
+          ]}
+          value={kiVermerk.wert ?? KI_VERMERK_STANDARD}
+          onChange={(v) => v && kiVermerk.onChange(v as KiVermerk)}
+          allowDeselect={false}
+        />
       )}
     </>
   )

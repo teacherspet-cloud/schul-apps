@@ -620,3 +620,11 @@
 .vt-option-letter {
   flex-shrink: 0;
 }
+
+/* KI-Vermerk (Großprogramm 0.4) */
+.vt-ki-vermerk {
+  margin-top: 4mm;
+  font-size: 6.5pt;
+  color: #777;
+  text-align: center;
+}

@@ -1,4 +1,6 @@
 import { readSheet } from 'read-excel-file/browser'
+import { pruefeHochladen } from '../../../shared/datenschutz'
+import { AbbruchFehler } from '@shared/abbruch'
 import type { StructuredRequest } from '@shared/types'
 import { arr, bool, enumOf, obj, str } from '../../../shared/aiSchema'
 import { extractContent } from '../../../shared/files/extractContent'
@@ -69,7 +71,11 @@ export async function importVocabFromFile(file: File, ai: AiCall, onProgress: Im
   }
 
   // PDF-Seiten auch mit Textebene als Bilder mitschicken, damit graue Schrift und Kästen erkennbar sind
-  const content = await extractContent(file, onProgress, { maxPages: 12, renderPages: true, maxRenderedPages: 6 })
+  const gelesen = await extractContent(file, onProgress, { maxPages: 12, renderPages: true, maxRenderedPages: 6 })
+  // Datenschutz (Großprogramm 0.4): Hinweis beim ersten Hochladen, Namen ersetzen
+  const geprueft = await pruefeHochladen([gelesen])
+  if (!geprueft) throw new AbbruchFehler()
+  const content = geprueft[0]
   onProgress(content.pageImages.length ? 'Texterkennung und Layout-Prüfung laufen …' : 'Vokabeln werden erkannt …')
   const source =
     content.kind === 'docx'

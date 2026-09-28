@@ -591,6 +591,21 @@ function HeaderSettingsInhalt({
       </Group>
       {/* Maskottchen (27.09.2026): winkend am Kopf, jubelnd am Schluss – wie bei Arbeiten; Vorschlag nach Jahrgang */}
       <MaskottchenSchalter doc={doc} onChange={onChange} />
+      {/* KI-Vermerk (Großprogramm 0.4) – nur, wenn eine KI mitgewirkt hat */}
+      {doc.ki && (
+        <Select
+          size="xs"
+          label="KI-Vermerk"
+          data={[
+            { value: 'loesung', label: 'Nur im Lösungsblatt' },
+            { value: 'ueberall', label: 'Auch auf dem Testblatt' },
+            { value: 'aus', label: 'Nicht anzeigen' }
+          ]}
+          value={doc.kiVermerk ?? 'loesung'}
+          onChange={(v) => v && onChange((d) => (d.kiVermerk = v as TestDocument['kiVermerk']))}
+          allowDeselect={false}
+        />
+      )}
       {/* Paket 10a: Kopflinie und Nummern in der Fachfarbe der Sprache – hier abschaltbar */}
       <VorlagenfarbeSchalter
         size="xs"

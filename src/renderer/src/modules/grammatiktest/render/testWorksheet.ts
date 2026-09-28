@@ -48,6 +48,9 @@ export function worksheetMetaForTest(test: GrammarTest): WorksheetMeta {
   const points = testPoints(test) || m.points
   return {
     ...base,
+    // KI-Kennzeichnung bis ins Blatt durchreichen (Großprogramm 0.4)
+    ki: m.ki,
+    kiVermerk: m.kiVermerk,
     subjectId: m.subjectId,
     subjectLabel: m.subjectId === 'englisch' ? 'English' : m.subjectLabel,
     topic: '',

@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { kiMetaTag } from '@shared/kiKennzeichnung'
 import type { ImageRef, TestDocument } from '../model/types'
 import { RenderContext } from './RenderContext'
 import testCss from './test.css?raw'
@@ -60,7 +61,7 @@ export function buildPrintHtml(doc: TestDocument, sel: PrintSelection, layouts?:
   const withCredits = pages
 
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(doc.header.title)}</title>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(doc.header.title)}</title>${kiMetaTag(doc.ki)}
 <style>
 html, body { margin: 0; padding: 0; background: #fff; }
 .vt-page { page-break-after: always; break-after: page; min-height: auto; }

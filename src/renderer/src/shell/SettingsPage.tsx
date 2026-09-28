@@ -167,6 +167,41 @@ export default function SettingsPage(): React.JSX.Element {
               <MaskottchenSettings settings={settings} update={update} />
               <Card withBorder padding="lg">
                 <Title order={4} mb="md">
+                  KI-Kennzeichnung und Datenschutz
+                </Title>
+                <Stack gap="sm">
+                  <Select
+                    label="KI-Vermerk auf neuen Materialien"
+                    description="Mit KI erstellte Materialien tragen in den Dateieigenschaften von Word und PDF immer eine maschinenlesbare Kennzeichnung. Sichtbar steht der Vermerk nach der Wahl hier; am einzelnen Material lässt sie sich in den Blattoptionen ändern."
+                    data={[
+                      { value: 'loesung', label: 'Nur im Lösungsteil' },
+                      { value: 'ueberall', label: 'Auf jeder Seite' },
+                      { value: 'aus', label: 'Nicht anzeigen' }
+                    ]}
+                    value={settings.kiVermerk ?? 'loesung'}
+                    onChange={(v) => v && update({ kiVermerk: v as AppSettings['kiVermerk'] })}
+                    allowDeselect={false}
+                  />
+                  <Switch
+                    label="Namen vor dem Senden an die KI durch Kürzel ersetzen"
+                    description="Erkannte Vor- und Nachnamen in hochgeladenen Texten werden vor der Anfrage durch S1, S2 … ersetzt. Die Zuordnung bleibt auf diesem Rechner. In Fotos und Scans lassen sich Namen nicht zuverlässig finden – die bitte vorher schwärzen."
+                    checked={settings.datenschutz?.namenErsetzen !== false}
+                    onChange={(e) => update({ datenschutz: { ...settings.datenschutz, namenErsetzen: e.currentTarget.checked } })}
+                  />
+                  {settings.datenschutz?.hinweisBestaetigt && (
+                    <Group gap="xs">
+                      <Text size="xs" c="dimmed">
+                        Datenschutzhinweis bestätigt am {new Date(settings.datenschutz.hinweisBestaetigt).toLocaleDateString('de-DE')}.
+                      </Text>
+                      <Button size="compact-xs" variant="subtle" onClick={() => update({ datenschutz: { ...settings.datenschutz, hinweisBestaetigt: '' } })}>
+                        Beim nächsten Hochladen wieder zeigen
+                      </Button>
+                    </Group>
+                  )}
+                </Stack>
+              </Card>
+              <Card withBorder padding="lg">
+                <Title order={4} mb="md">
                   Quellenangaben
                 </Title>
                 <Select

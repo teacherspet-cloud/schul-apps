@@ -579,6 +579,18 @@ In den Bibliotheken (Vokabeltests, Arbeitsblätter, Klassenarbeiten) bestätigt 
 - **Verbrauch:** Karte im Reiter KI-Zugang. Gezählt werden je Monat, Anbieter und Modell Anfragen, Wiederholungen, Token (nur API-Weg), Bilder und vertonte Zeichen (`userData/verbrauch.json`). Keine Kostenrechnung.
 - **Verwaiste Hörtexte:** MP3-Dateien, auf die kein gespeichertes Material mehr verweist und die älter als sieben Tage sind, lassen sich in Wartung per Knopf löschen.
 - Geprüft mit `tests/verlaesslichkeit.test.ts`, `tests/wartung.test.ts` und der Wache `node tests/e2e/protokoll.mjs`.
+- Die Wiederholung greift nur bei kaputtem Aufbau: falsche Datentypen oder eine fehlende Liste bzw. ein fehlendes Objekt der obersten Ebene (etwa `blocks`). Fehlende Texte, Zahlen und Unterlisten zählen nicht. Die strikten Schemata führen Dutzende solcher Felder als Pflicht, der Abo-Weg lässt leere weg, und die Verarbeitung behandelt beides gleich.
+
+### KI-Kennzeichnung und Datenschutz (0.4)
+
+- **Herkunft am Material:** Jedes KI-Ergebnis, das in einem Dokument ankommt (`legeAb` in `shared/auftraege.ts`), stempelt Anbieter, Modell und Datum in `meta.ki` (beim Vokabeltest `doc.ki`), siehe `src/shared/kiKennzeichnung.ts`.
+- **Maschinenlesbar, immer:** Word erhält Beschreibung, Stichwörter „KI-generiert; AI-generated" und eigene Eigenschaften (KI-Anbieter, KI-Modell, KI-Datum). Das PDF erhält dieselben Angaben im Info-Verzeichnis. Die Druckfassung trägt die Herkunft als `<meta name="schulapps-ki">` im HTML-Kopf, und der Hauptprozess schreibt sie nach dem Drucken mit pdf-lib ins PDF (`services/export/pdfMetadaten.ts`).
+- **Sichtbarer Vermerk, nach Wahl:** „Mit KI-Unterstützung erstellt (Anbieter · Modell, Datum) und von der Lehrkraft bearbeitet." Er steht klein unter dem Fuß, standardmäßig nur im Lösungsteil. Die Voreinstellung liegt unter Einstellungen › Material, die Wahl am einzelnen Material in den Blattoptionen („Nur im Lösungsteil", „Auf jeder Seite", „Nicht anzeigen").
+- **Einordnung:** Art. 50 Abs. 2 KI-VO verpflichtet die Anbieter der KI-Systeme. Für Lehrkräfte als Betreiber gilt eine Kennzeichnungspflicht nur in engen Fällen (Deepfakes, ungeprüfte Texte für die Öffentlichkeit). Die App kennzeichnet aus Transparenz.
+- **Datenschutzhinweis vor dem Hochladen** (`shared/datenschutz.tsx`): Beim ersten Hochladen an eine KI erklärt die App, was an welchen Anbieter geht und was dort nicht hingehört. Das gilt für Arbeitsblatt, Klassenarbeit, Lernzielkontrolle und Vokabelimport.
+- **Namen ersetzen** (`src/shared/pseudonymisierung.ts`, Vornamenliste `resources/vornamen.json`): Gefundene Namen werden zum Ersetzen durch S1, S2 … vorgeschlagen. Vorbelegt sind nur Namen aus Kopfzeilen („Name: …"). Namen im Text können gewollt sein, etwa Personen einer Geschichtsquelle, deshalb entscheidet die Lehrkraft. Die Zuordnung bleibt am Dokument auf diesem Rechner. Ohne Fund und nach bestätigtem Hinweis erscheint kein Dialog.
+- **Bildmetadaten:** Hochgeladene Bilder laufen über die Zeichenfläche und verlieren dabei alle Metadaten; ein Test prüft, dass jede gelesene Bilddatei diesen Weg nimmt. Bilder aus der Bildsuche verlieren EXIF, XMP, IPTC und Textblöcke verlustfrei (`src/shared/exifEntfernen.ts`).
+- Geprüft mit `tests/kiKennzeichnung.test.ts`, `tests/pseudonymisierung.test.ts`, `tests/exifEntfernen.test.ts` und der Wache `node tests/e2e/datenschutz-ki.mjs`.
 
 ## Start
 

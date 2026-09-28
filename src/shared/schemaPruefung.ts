@@ -19,6 +19,21 @@ function passtTyp(erwartet: string, v: unknown): boolean {
   return t === erwartet
 }
 
+function darfNullSein(s: unknown): boolean {
+  if (!s || typeof s !== 'object') return false
+  const sch = s as Schema
+  if (sch.type === 'null' || (Array.isArray(sch.type) && sch.type.includes('null'))) return true
+  if (Array.isArray(sch.enum) && sch.enum.includes(null)) return true
+  return Array.isArray(sch.anyOf) && sch.anyOf.some(darfNullSein)
+}
+
+/** Kennzeichnet fehlende Listen und Objekte – nur deren Fehlen bricht den Aufbau einer Antwort */
+function struktur(s: unknown): string {
+  const t = s && typeof s === 'object' ? (s as Schema).type : undefined
+  const typen = Array.isArray(t) ? t : [t]
+  return typen.includes('array') ? ' (Liste)' : typen.includes('object') ? ' (Objekt)' : ''
+}
+
 /** Liste der Abweichungen („pfad: was") – leer, wenn die Antwort passt. Höchstens `max` Einträge. */
 export function pruefeSchema(schema: unknown, wert: unknown, pfad = '$', max = 20): string[] {
   const fehler: string[] = []
@@ -43,7 +58,13 @@ export function pruefeSchema(schema: unknown, wert: unknown, pfad = '$', max = 2
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const obj = v as Record<string, unknown>
       const props = (sch.properties ?? {}) as Record<string, unknown>
-      for (const r of (sch.required as string[] | undefined) ?? []) if (!(r in obj)) fehler.push(`${p}.${r}: fehlt`)
+      /*
+       * Ein fehlendes Pflichtfeld, das null sein darf, gilt als null: Strikte Schemata führen jedes
+       * Feld als Pflicht, und Antworten über die Kommandozeilenprogramme lassen leere Felder oft
+       * weg. Die Verarbeitung behandelt beides gleich – eine Wiederholung dafür kostete nur Kontingent.
+       */
+      for (const r of (sch.required as string[] | undefined) ?? [])
+        if (!(r in obj) && !darfNullSein(props[r])) fehler.push(`${p}.${r}: fehlt${struktur(props[r])}`)
       if (sch.additionalProperties === false) for (const k of Object.keys(obj)) if (!(k in props)) fehler.push(`${p}.${k}: nicht vorgesehen`)
       for (const [k, unter] of Object.entries(props)) if (k in obj) gehe(unter, obj[k], `${p}.${k}`)
     }

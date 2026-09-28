@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import type { StructuredRequest } from '@shared/types'
 import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
+import { aktuelleKi, stempleKi } from '@shared/kiKennzeichnung'
 import type { Netzfund } from '../../../main/services/ai/provider'
 import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPhase } from './aiProgress'
 import { sichereAlles } from './autosave'
@@ -542,7 +543,14 @@ export interface DokumentAblage<D> {
  * wer also danach eingreift (etwa „Erneut versuchen" nach Änderungen), findet den vorigen
  * Stand über Strg+Z wieder.
  */
-export async function legeAb<D>(ablage: DokumentAblage<D>, docId: string, schnappschuss: D, einarbeiten: (aktuell: D) => D): Promise<void> {
+export async function legeAb<D>(ablage: DokumentAblage<D>, docId: string, schnappschuss: D, einarbeitenRoh: (aktuell: D) => D): Promise<void> {
+  /*
+   * KI-Kennzeichnung (Großprogramm 0.4): Jedes Ergebnis, das hier ankommt, stammt von einer KI.
+   * Das Dokument merkt sich, welche – Word und PDF tragen es in die Dateieigenschaften ein.
+   */
+  const { settings } = useAppSettings.getState()
+  const ki = aktuelleKi(settings)
+  const einarbeiten = (aktuell: D): D => stempleKi(einarbeitenRoh(aktuell), ki, settings.kiVermerk)
   if (ablage.istOffen(docId)) {
     ablage.imOffenen(einarbeiten)
     await sichereAlles()

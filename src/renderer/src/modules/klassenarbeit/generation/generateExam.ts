@@ -88,6 +88,9 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
   const skill = part ? skillFor(part.formatId) : 'mixed'
   return {
     ...defaultMeta(m.stateId, m.schoolTypeId, m.schoolTypeName),
+    // KI-Kennzeichnung bis ins Blatt durchreichen (Großprogramm 0.4)
+    ki: m.ki,
+    kiVermerk: m.kiVermerk,
     title: m.title || 'Klassenarbeit',
     subjectId: m.subjectId,
     subjectLabel: m.subjectLabel,

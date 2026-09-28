@@ -40,6 +40,20 @@ const HINWEIS: Record<Fehlerart, string> = {
   server: ''
 }
 
+/**
+ * Welche Abweichung eine (kostenpflichtige) Wiederholung lohnt: falsche Typen und fehlende Listen
+ * oder Objekte der obersten Ebene – ohne sie bricht der Aufbau. Fehlende Texte, Zahlen und Schalter nicht: Die
+ * strikten Schemata führen Dutzende solcher Felder als Pflicht, der Abo-Weg lässt sie bei leerem
+ * Inhalt weg, und die Verarbeitung behandelt ein fehlendes wie ein leeres Feld. Überzählige Felder
+ * stören nie. (Befund 28.09.2026: sonst ging jede Klassenarbeits-Anfrage im Abo-Weg zweimal hinaus.)
+ */
+export function lohntWiederholung(abweichung: string): boolean {
+  if (abweichung.endsWith('nicht vorgesehen')) return false
+  // Nur eine fehlende Liste oder ein fehlendes Objekt der obersten Ebene ($.blocks) – in den flachen Bausteinen stehen viele Listen, die nur für manche Arten gelten
+  if (/: fehlt( \((Liste|Objekt)\))?$/.test(abweichung)) return /^\$\.[^.[\]]+: fehlt \((Liste|Objekt)\)$/.test(abweichung)
+  return true
+}
+
 export interface WiederholungsBericht {
   art: Fehlerart
   meldung: string
@@ -56,8 +70,7 @@ export async function mitWiederholung<T>(
 ): Promise<T> {
   try {
     const antwort = await aufruf(req)
-    // Nur fehlende Pflichtfelder und falsche Typen lohnen eine (kostenpflichtige) Wiederholung – überzählige Felder stören die Verarbeitung nicht
-    const abweichungen = (req.schema ? pruefeSchema(req.schema, antwort) : []).filter((a) => !a.endsWith('nicht vorgesehen'))
+    const abweichungen = (req.schema ? pruefeSchema(req.schema, antwort) : []).filter(lohntWiederholung)
     if (abweichungen.length) throw new SchemaVerletzt(abweichungen)
     return antwort
   } catch (e) {
@@ -71,7 +84,7 @@ export async function mitWiederholung<T>(
      * Prüfung. Die Verarbeitung ist tolerant gebaut; eine strengere Prüfung darf nichts scheitern
      * lassen, was vorher ging. Die Abweichung steht im Protokoll.
      */
-    const rest = req.schema ? pruefeSchema(req.schema, zweite) : []
+    const rest = (req.schema ? pruefeSchema(req.schema, zweite) : []).filter(lohntWiederholung)
     if (rest.length)
       protokolliere(
         'warnung',

@@ -1,4 +1,5 @@
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
+import { pruefeHochladen } from '../../../shared/datenschutz'
 import {
   Alert,
   Badge,
@@ -286,7 +287,11 @@ export default function TopicStep(): React.JSX.Element {
         const c = await extractContent(f, (m) => setReading(`${f.name}: ${m}`))
         added.push({ id: newId(), ...c, useAsBasis: true, embedImage: c.kind === 'image' })
       }
-      setWorksheet({ ...worksheet, sources: added })
+      setReading(null)
+      // Datenschutz (Großprogramm 0.4): Hinweis und Namen ersetzen, bevor etwas zur KI geht
+      const neu = await pruefeHochladen(added.slice(worksheet.sources.length))
+      if (!neu) return
+      setWorksheet({ ...worksheet, sources: [...worksheet.sources, ...neu] })
     } catch (e) {
       notifyError(e, 'Datei konnte nicht gelesen werden')
     } finally {
@@ -381,7 +386,13 @@ export default function TopicStep(): React.JSX.Element {
                     Lerngruppe
                   </Title>
                   <Stack gap="sm">
-                    <SchulortFelder table={table} stateId={meta.stateId} schoolTypeId={meta.schoolTypeId} schoolTypeName={meta.schoolTypeName} onChange={patchGroup} />
+                    <SchulortFelder
+                      table={table}
+                      stateId={meta.stateId}
+                      schoolTypeId={meta.schoolTypeId}
+                      schoolTypeName={meta.schoolTypeName}
+                      onChange={patchGroup}
+                    />
                     <Group grow align="start">
                       <Select
                         label="Jahrgang"

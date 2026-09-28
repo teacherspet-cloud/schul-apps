@@ -48,6 +48,7 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     },
     appearance: { ...base.appearance, ...stored.appearance },
     sicherung: { ...base.sicherung, ...(stored.sicherung as object) },
+    datenschutz: { ...base.datenschutz, ...(stored.datenschutz as object) },
     defaults: { ...base.defaults, ...stored.defaults },
     audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
     // Je Fach zusammenführen: Eine geänderte Fachfarbe darf die übrigen nicht löschen

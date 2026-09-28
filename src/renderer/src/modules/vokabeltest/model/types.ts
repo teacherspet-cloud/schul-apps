@@ -390,6 +390,10 @@ export interface PageLimit {
 }
 
 export interface TestDocument {
+  /** KI-Kennzeichnung (Großprogramm 0.4): welche KI mitgewirkt hat – gesetzt beim Ablegen eines KI-Ergebnisses */
+  ki?: import('@shared/kiKennzeichnung').KiHerkunft
+  /** Sichtbarer KI-Vermerk: nur im Lösungsteil, überall oder aus (fehlt = Einstellung der App) */
+  kiVermerk?: import('@shared/kiKennzeichnung').KiVermerk
   version: 1
   header: TestHeader
   settings: TestSettings

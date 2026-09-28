@@ -22,6 +22,7 @@ import {
   VerticalPositionRelativeFrom,
   WidthType
 } from 'docx'
+import { kiWordEigenschaften } from '@shared/kiKennzeichnung'
 import { gradeScaleRows } from '../../../../shared/gradeScale'
 import { punkteZeilen } from '../../../../shared/notenpunkte'
 import { wordFontName } from '@shared/design'
@@ -60,6 +61,8 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
   const doc = new Document({
     creator: 'Schul-Apps',
     title: ws.meta.title || ws.meta.topic,
+    // KI-Kennzeichnung, maschinenlesbar (Großprogramm 0.4)
+    ...kiWordEigenschaften(ws.meta.ki),
     styles: { default: { document: { run: { font: wordFontName(ws.design.page.fontFamily), size: Math.round(info.fontPt * 2) } } } },
     sections
   })

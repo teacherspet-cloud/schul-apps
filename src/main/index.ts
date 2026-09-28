@@ -33,6 +33,7 @@ import { istAbbruch } from '@shared/abbruch'
 import { freierDateiname } from '@shared/dateiname'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
 import { createProvider, createTextProvider, getModelList, healModelSelection, refreshProvider } from './services/ai/models'
+import { mitPdfMetadaten } from './services/export/pdfMetadaten'
 import { htmlToPdf, PrintOptions, printHtml } from './services/export/pdf'
 import { htmlToPdfWithExtras } from './services/export/fillablePdf'
 import { fetchAsDataUrl, getOpenMojiSvg, searchOnline, searchOpenMoji } from './services/images/images'
@@ -644,7 +645,9 @@ function registerIpc(): void {
   const pdfBytes = async (html: string, opts?: PdfExtras): Promise<Buffer> => {
     const audio = (opts?.audio ?? []).map((a) => ({ id: a.id, fileName: a.fileName, title: a.title, bytes: Buffer.from(a.base64, 'base64') }))
     // Nur den teuren Weg gehen, wenn auch etwas hinzukommt
-    return Buffer.from(opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }) : await htmlToPdf(html))
+    const roh = opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }) : await htmlToPdf(html)
+    // Erzeuger und KI-Kennzeichnung ins Info-Verzeichnis (Großprogramm 0.4)
+    return Buffer.from(await mitPdfMetadaten(new Uint8Array(roh), html))
   }
 
   /**

@@ -71,6 +71,9 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
   const base = defaultMeta(m.stateId, m.schoolTypeId, m.schoolTypeName)
   return {
     ...base,
+    // KI-Kennzeichnung bis ins Blatt durchreichen (Großprogramm 0.4)
+    ki: m.ki,
+    kiVermerk: m.kiVermerk,
     subjectId: m.subjectId,
     subjectLabel: m.subjectLabel,
     topic: m.thema,

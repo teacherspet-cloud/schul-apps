@@ -122,6 +122,10 @@ export interface ExamVocab {
 }
 
 export interface ExamMeta {
+  /** KI-Kennzeichnung (Großprogramm 0.4): welche KI mitgewirkt hat – gesetzt beim Ablegen eines KI-Ergebnisses */
+  ki?: import('@shared/kiKennzeichnung').KiHerkunft
+  /** Sichtbarer KI-Vermerk: nur im Lösungsteil, überall oder aus (fehlt = Einstellung der App) */
+  kiVermerk?: import('@shared/kiKennzeichnung').KiVermerk
   /**
    * „Farbe der Vorlage verwenden" (Paket 10a): true = die Akzentfarbe der Designvorlage statt
    * der Fachfarbe aus den Einstellungen. Fehlt = Fachfarbe.

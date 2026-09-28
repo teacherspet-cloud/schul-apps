@@ -244,6 +244,13 @@ export interface AppSettings {
    * Rechner ausfällt.
    */
   letzteSicherung?: string
+  /** Sichtbarer KI-Vermerk auf neuen Materialien (fehlt = nur im Lösungsteil); maschinenlesbar gekennzeichnet wird immer */
+  kiVermerk?: 'loesung' | 'ueberall' | 'aus'
+  /**
+   * Datenschutz (Großprogramm 0.4): Hinweis vor dem ersten Hochladen an eine KI bestätigt (Datum),
+   * und ob Namen vor dem Senden durch Kürzel ersetzt werden (fehlt = ja).
+   */
+  datenschutz?: { hinweisBestaetigt?: string; namenErsetzen?: boolean }
   /** Automatische Sicherung (27.09.2026): an/aus (fehlt = an), zusätzlicher Ordner, Zahl der Stände */
   sicherung?: { automatisch?: boolean; ordner?: string; behalten?: number }
   /**

@@ -12,7 +12,7 @@ let wurzel = ''
 vi.mock('electron', () => ({ app: { getPath: () => wurzel, getVersion: () => '0.0.0-test' } }))
 
 const { pruefeSchema } = await import('../src/shared/schemaPruefung')
-const { mitWiederholung, wiederholbar, SchemaVerletzt } = await import('../src/main/services/ai/wiederholung')
+const { mitWiederholung, wiederholbar, SchemaVerletzt, lohntWiederholung } = await import('../src/main/services/ai/wiederholung')
 const { merkeVerbrauch, leseVerbrauch, setzeVerbrauchsDatei, monat } = await import('../src/main/services/ai/verbrauch')
 const { verwaisteHoertexte, raeumeHoertexteAuf } = await import('../src/main/services/storage/hoertexteAufraeumen')
 const { dateiname, listeSicherungen, ladeSicherung, raeumeAuf, faellig } = await import('../src/main/services/storage/autoSicherung')
@@ -49,9 +49,18 @@ describe('Schemaprüfung', () => {
     expect(f).toContain('$.titel: fehlt')
     expect(f).toContain('$.extra: nicht vorgesehen')
     expect(f).toContain('$.aufgaben[0].text: fehlt')
+    expect(pruefeSchema(SCHEMA, { titel: 'T' })).toContain('$.aufgaben: fehlt (Liste)')
     expect(f.some((x) => x.startsWith('$.aufgaben[0].punkte: erwartet integer'))).toBe(true)
     expect(f.some((x) => x.startsWith('$.niveau: Wert'))).toBe(true)
     expect(f).toContain('$.art: passt zu keiner erlaubten Form')
+  })
+  it('ein fehlendes Pflichtfeld, das null sein darf, zählt nicht (strikte Schemata, Abo-Weg lässt leere Felder weg)', () => {
+    const sch = {
+      type: 'object',
+      required: ['a', 'b', 'c'],
+      properties: { a: { type: ['string', 'null'] }, b: { anyOf: [{ type: 'number' }, { type: 'null' }] }, c: { type: 'string' } }
+    }
+    expect(pruefeSchema(sch, {})).toEqual(['$.c: fehlt'])
   })
   it('begrenzt die Zahl der Meldungen', () => {
     const viele = { type: 'array', items: { type: 'string' } }
@@ -84,7 +93,7 @@ describe('Wiederholung', () => {
       req,
       async (r) => {
         aufrufe.push((r as { system: string }).system)
-        return aufrufe.length === 1 ? { aufgaben: [] } : { titel: 'gut', aufgaben: [] }
+        return aufrufe.length === 1 ? { titel: 'x' } : { titel: 'gut', aufgaben: [] }
       },
       (b) => berichte.push(b.art)
     )
@@ -92,6 +101,15 @@ describe('Wiederholung', () => {
     expect(aufrufe).toHaveLength(2)
     expect(aufrufe[1]).toMatch(/Schema/)
     expect(berichte).toEqual(['schema'])
+  })
+  it('wiederholt nur für Typfehler und fehlende Listen oder Objekte', () => {
+    expect(lohntWiederholung('$.blocks: fehlt (Liste)')).toBe(true)
+    expect(lohntWiederholung('$.meta: fehlt (Objekt)')).toBe(true)
+    expect(lohntWiederholung('$.blocks[0].items: fehlt (Liste)')).toBe(false)
+    expect(lohntWiederholung('$.titel: fehlt')).toBe(false)
+    expect(lohntWiederholung('$.blocks[0].ref: fehlt')).toBe(false)
+    expect(lohntWiederholung('$.blocks[0].points: erwartet integer, erhalten string')).toBe(true)
+    expect(lohntWiederholung('$.x: nicht vorgesehen')).toBe(false)
   })
   it('wiederholt nicht wegen überzähliger Felder', async () => {
     let n = 0
@@ -105,10 +123,10 @@ describe('Wiederholung', () => {
     let n = 0
     const a = await mitWiederholung(req, async () => {
       n++
-      return { aufgaben: [] }
+      return { titel: 'nur Titel' }
     })
     expect(n).toBe(2)
-    expect(a).toEqual({ aufgaben: [] })
+    expect(a).toEqual({ titel: 'nur Titel' })
     expect(leseProtokoll()).toMatch(/auch die Wiederholung weicht vom Schema ab/)
   })
   it('wiederholt nie nach einem Abbruch', async () => {

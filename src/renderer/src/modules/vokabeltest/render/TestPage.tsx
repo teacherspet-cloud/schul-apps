@@ -1,4 +1,5 @@
 import type { PagePlan } from '../../../shared/render/paginate'
+import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
 import { blockHelp } from './helpTexts'
@@ -86,6 +87,10 @@ export function TestPage({
           })}
           {pi === pages.length - 1 && footer}
           {figur && pi === pages.length - 1 && <MaskottchenBild id={figur.maskottchenId} pose="jubelnd" className="vt-illu vt-illu-schluss" />}
+          {/* KI-Vermerk (Großprogramm 0.4) am Ende der letzten Seite */}
+          {pi === pages.length - 1 && vermerkSichtbar(doc.ki, doc.kiVermerk, showsAnswers(mode)) && (
+            <div className="vt-ki-vermerk">{kiVermerkText(doc.ki!, 'de')}</div>
+          )}
           {pages.length > 1 && (
             <div className="vt-page-number">
               {pi + 1} / {pages.length}

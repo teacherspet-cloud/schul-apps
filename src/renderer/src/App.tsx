@@ -1,4 +1,5 @@
 import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
+import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
@@ -197,6 +198,8 @@ export default function App(): React.JSX.Element {
 
       {/* Laufende und fertige Hintergrund-Aufträge – unten rechts über allen Programmen */}
       <AuftragsLayer />
+      {/* Datenschutzhinweis vor dem Hochladen an eine KI (Großprogramm 0.4) */}
+      <DatenschutzDialog />
     </AppShell>
   )
 }

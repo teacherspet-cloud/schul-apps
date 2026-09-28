@@ -16,6 +16,7 @@ import {
   VerticalAlign,
   WidthType
 } from 'docx'
+import { kiVermerkText, kiWordEigenschaften, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
@@ -85,6 +86,16 @@ export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: Ima
       if (opts.credits?.length) {
         children.push(new Paragraph({ spacing: { before: 400 }, children: [new TextRun({ text: opts.credits.join(' · '), size: 14, color: '777777' })] }))
       }
+      // KI-Vermerk (Großprogramm 0.4)
+      if (vermerkSichtbar(doc.ki, doc.kiVermerk, mode === 'key')) {
+        children.push(
+          new Paragraph({
+            spacing: { before: 300 },
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: kiVermerkText(doc.ki!, 'de'), size: 13, color: '777777' })]
+          })
+        )
+      }
       sections.push({
         properties: { page: { size: { width: PAGE_WIDTH, height: 16838 }, margin: MARGINS } },
         children
@@ -97,6 +108,8 @@ export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: Ima
   const document = new Document({
     creator: 'Schul-Apps',
     title: doc.header.title,
+    // KI-Kennzeichnung, maschinenlesbar (Großprogramm 0.4)
+    ...kiWordEigenschaften(doc.ki),
     styles: { default: { document: { run: { font: 'Calibri', size } } } },
     sections
   })

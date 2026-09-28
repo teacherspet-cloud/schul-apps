@@ -579,6 +579,7 @@ export function EditorStep(): React.JSX.Element {
                 />
               )
             }
+            kiVermerk={{ wert: ws.meta.kiVermerk, ki: ws.meta.ki, onChange: (v) => update((w) => (w.meta.kiVermerk = v)) }}
             schulangaben={{ checked: ws.meta.showSchool !== false, onChange: (an) => update((w) => (w.meta.showSchool = an)) }}
             nachSchule={<IllustrationenOption ws={ws} update={update} />}
             korrekturrand={{ checked: Boolean(ws.meta.correctionMargin), onChange: (an) => update((w) => (w.meta.correctionMargin = an)) }}

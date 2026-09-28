@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs'
+import { exifEntfernen } from '@shared/exifEntfernen'
 import { OnlineImageHit, OnlineImageSource, OpenMojiHit } from '@shared/types'
 import { politeFetch } from './politeFetch'
 import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
@@ -124,6 +125,7 @@ export async function fetchAsDataUrl(url: string): Promise<string> {
   const type = res.headers.get('content-type') ?? 'image/jpeg'
   if (!type.startsWith('image/')) throw new Error('Die Adresse liefert kein Bild.')
   // Größengrenze (27.09.2026): stückweise lesen, darüber abbrechen – ein Riesenbild füllte sonst den Speicher
-  const buf = Buffer.from(await begrenzteAntwort(res, GRENZEN.bild))
+  // Ohne Aufnahmeort, Kamera und Urheber-Metadaten ins Blatt (Großprogramm 0.4) – verlustfrei, ohne Neukodierung
+  const buf = Buffer.from(exifEntfernen(new Uint8Array(await begrenzteAntwort(res, GRENZEN.bild))))
   return `data:${type};base64,${buf.toString('base64')}`
 }

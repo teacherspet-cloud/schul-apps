@@ -1,4 +1,5 @@
 import { ActionIcon, Checkbox, Group, Stack, Text } from '@mantine/core'
+import { pruefeHochladen } from '../datenschutz'
 import { IconWorld, IconMovie, IconFileText, IconPhoto, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
 import DropZone from './DropZone'
@@ -41,7 +42,11 @@ export default function StoffQuellen({ quellen, onHinzu, onAktiv, onEntfernen, t
         const c = await extractContent(f, (msg) => setLese(`${f.name}: ${msg}`))
         neu.push(stoffQuelleAus(c, `q${Date.now()}-${neu.length}`))
       }
-      onHinzu(neu)
+      setLese(null)
+      // Datenschutz (Großprogramm 0.4): Hinweis und Namen ersetzen, bevor etwas zur KI geht
+      const geprueft = await pruefeHochladen(neu.map((q) => ({ ...q, pageImages: q.bilder })))
+      if (!geprueft) return
+      onHinzu(geprueft.map(({ pageImages: _b, ...q }) => q))
     } catch (e) {
       notifyError(e, 'Die Datei konnte nicht gelesen werden')
     } finally {
@@ -59,7 +64,15 @@ export default function StoffQuellen({ quellen, onHinzu, onAktiv, onEntfernen, t
           {quellen.map((q) => (
             <Group key={q.id} gap="xs" wrap="nowrap">
               <Checkbox size="xs" aria-label={`${q.fileName} verwenden`} checked={q.aktiv} onChange={(e) => onAktiv(q.id, e.currentTarget.checked)} />
-              {q.kind === 'image' ? <IconPhoto size={15} /> : q.kind === 'video' ? <IconMovie size={15} /> : q.kind === 'web' ? <IconWorld size={15} /> : <IconFileText size={15} />}
+              {q.kind === 'image' ? (
+                <IconPhoto size={15} />
+              ) : q.kind === 'video' ? (
+                <IconMovie size={15} />
+              ) : q.kind === 'web' ? (
+                <IconWorld size={15} />
+              ) : (
+                <IconFileText size={15} />
+              )}
               <Text size="xs" style={{ flex: 1 }} truncate>
                 {q.fileName}
               </Text>

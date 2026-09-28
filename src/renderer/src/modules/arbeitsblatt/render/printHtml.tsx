@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { kiMetaTag } from '@shared/kiKennzeichnung'
 import type { Worksheet } from '../model/types'
 import type { PagePlan } from './paginate'
 import { BoardPage } from './BoardView'
@@ -69,7 +70,7 @@ export function buildWorksheetHtml(
 
   const title = (ws.meta.title || ws.meta.topic).replace(/[&<>"]/g, '')
   return `<!doctype html>
-<html lang="de"><head><meta charset="utf-8"><title>${title}</title>
+<html lang="de"><head><meta charset="utf-8"><title>${title}</title>${kiMetaTag(ws.meta.ki)}
 <style>
 html, body { margin: 0; padding: 0; background: #fff; }
 .ws-page { page-break-after: always; break-after: page; }

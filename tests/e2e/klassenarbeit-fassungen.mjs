@@ -74,6 +74,8 @@ try {
   // ---------- 1. Material-Datei hineinziehen (über das Dateifeld der Ablagefläche)
   // Nur die Fläche der Klassenarbeit – die übrigen Programme liegen mit ihren Dateifeldern im Hintergrund
   await page.locator('.mantine-Dropzone-root', { hasText: 'Material aus dem Unterricht' }).locator('input[type=file]').setInputFiles(fixture)
+  // Datenschutzhinweis beim ersten Hochladen bestätigen (Großprogramm 0.4)
+  await page.locator('[data-datenschutz-ok]').click({ timeout: 10000 })
   await page.getByText('ka-unterlagen.txt', { exact: true }).waitFor({ timeout: 10000 })
   pruefe(true, 'Die Datei steht in der Liste der Unterlagen')
   await page.screenshot({ path: join(shots, 'paket5-rahmen.png') })
