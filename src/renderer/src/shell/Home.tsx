@@ -11,6 +11,7 @@ import { abgleichen, ladeThemen, useThemen } from '../shared/themenbereiche'
 import { AB_MATERIALIEN } from '../shared/themenVorschlag'
 import { nachfahrenVon, pfadVon, type Themenbereich } from '@shared/themen'
 import { useSichtbareProgramme } from './programme'
+import SchulpaketKnoepfe from './Schulpaket'
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
 const ZULETZT_ANZAHL = 8
@@ -155,6 +156,12 @@ export default function Home(): React.JSX.Element {
             </Alert>
           )}
         </Stack>
+      )}
+
+      {!imNetz() && (
+        <Group justify="flex-end" mb="xs">
+          <SchulpaketKnoepfe eingelesen={() => void ladeMaterialien().then(setMaterialien)} />
+        </Group>
       )}
 
       {(materialien?.length ?? 0) > 0 && (

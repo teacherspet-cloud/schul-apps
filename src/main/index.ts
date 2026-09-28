@@ -73,6 +73,8 @@ import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/theme
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { ladeSicherung, listeSicherungen, sichereJetzt, starteAutoSicherung } from './services/storage/autoSicherung'
 import { raeumeHoertexteAuf, verwaisteHoertexte } from './services/storage/hoertexteAufraeumen'
+import { erstellePaket, leseGeoeffnetesPaketEin, oeffnePaket } from './services/paket/wege'
+import type { PaketArt } from './services/paket/paket'
 import { fangeAbstuerze, leseProtokoll, protokolliere } from './services/protokoll'
 import { mitWiederholung } from './services/ai/wiederholung'
 import { leseVerbrauch, merkeVerbrauch } from './services/ai/verbrauch'
@@ -613,6 +615,21 @@ function registerIpc(): void {
     return { name: basename(path), data: new Uint8Array(readFileSync(path)) }
   })
   handle('files:show', (path: string) => shell.showItemInFolder(path))
+  // Schulpaket (Großprogramm 0.4, F8): Material als Datei weitergeben und einlesen
+  handle('paket:erstellen', async (titel: string, auswahl: { art: PaketArt; id: string }[]) => {
+    const daten = erstellePaket(String(titel ?? '').trim() || 'Schulpaket', auswahl)
+    const name = (String(titel ?? '').trim() || 'Schulpaket').replace(/[\\/:*?"<>|]/g, '-')
+    const res = await dialog.showSaveDialog(mainWindow!, { defaultPath: `${name}.schulpaket`, filters: [{ name: 'Schulpaket', extensions: ['schulpaket'] }] })
+    if (res.canceled || !res.filePath) return null
+    writeFileSync(res.filePath, Buffer.from(daten))
+    return res.filePath
+  })
+  handle('paket:oeffnen', async () => {
+    const res = await dialog.showOpenDialog(mainWindow!, { properties: ['openFile'], filters: [{ name: 'Schulpaket', extensions: ['schulpaket', 'zip'] }] })
+    if (res.canceled || !res.filePaths.length) return null
+    return oeffnePaket(res.filePaths[0])
+  })
+  handle('paket:einlesen', () => leseGeoeffnetesPaketEin())
 
   /*
    * Mehrere Dateien in EINEN Ordner (Anlass 25.09.2026): Beim Arbeitsblatt entstanden Blatt,

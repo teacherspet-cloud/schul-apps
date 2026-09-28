@@ -97,6 +97,15 @@ export interface ApiExtras {
 }
 
 /** Eintrag einer Bibliothek der neuen Programme (Rückmeldung, Elternbrief) */
+export type PaketArt = 'arbeitsblatt' | 'vokabeltest' | 'klassenarbeit' | 'lernzielkontrolle' | 'grammatiktest' | 'rueckmeldung' | 'elternbrief'
+
+export interface PaketVorschau {
+  titel: string
+  erstellt: string
+  eintraege: { art: PaketArt; name: string }[]
+  hoertexte: number
+}
+
 export interface SavedDokumentMeta {
   id: string
   name: string
@@ -156,6 +165,12 @@ export function buildApi(call: Call, extras: ApiExtras) {
         call<
           Record<string, Record<string, { anfragen: number; wiederholungen: number; eingabe: number; ausgabe: number; bilder: number; ttsZeichen: number }>>
         >('verbrauch:get')
+    },
+    /** Schulpaket (F8): Material als Datei weitergeben – im Netzzugang gesperrt */
+    paket: {
+      erstellen: (titel: string, auswahl: { art: PaketArt; id: string }[]) => call<string | null>('paket:erstellen', titel, auswahl),
+      oeffnen: () => call<PaketVorschau | null>('paket:oeffnen'),
+      einlesen: () => call<{ art: PaketArt; id: string; name: string }[]>('paket:einlesen')
     },
     protokoll: {
       melden: (text: string) => call<void>('protokoll:melden', text),
