@@ -1,4 +1,5 @@
 import { Accordion, Alert, Badge, Card, Container, Group, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { IconAlertTriangle, IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
@@ -275,6 +276,7 @@ export default function EditorStep(): React.JSX.Element {
           }
         }}
         ausgabe={{ onWord: () => starte('docx'), onPdf: () => starte('pdf'), onDrucken: () => starte('print') }}
+        extras={<RueckmeldungKnopf art="lernzielkontrolle" docId={docId} />}
       />
       <CanaryDialog
         offen={canaryOffen}

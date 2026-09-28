@@ -19,6 +19,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../../shared/bewertung/raster'
 import { describeBlock } from '../../arbeitsblatt/generation/describe'
 import { systemPrompt } from '../../arbeitsblatt/generation/prompts'
@@ -602,6 +603,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             <Button size="xs" variant="light" leftSection={hasContent ? <IconRefresh size={14} /> : <IconSparkles size={14} />} onClick={run}>
               {hasContent ? 'Neu erzeugen' : 'Arbeit erzeugen'}
             </Button>
+            {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
             {audioBlocks.length > 0 && (
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target>

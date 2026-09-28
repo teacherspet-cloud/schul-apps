@@ -23,7 +23,13 @@ import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/programmsymbole')
 mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-symbole-'))
-const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten']
+const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung']
+/*
+ * Programme ohne eigene Illustration (Großprogramm 0.4: Rückmeldung, Elternbrief) zeigen ihr
+ * gezeichnetes Symbol. Eine Illustration entstünde über die Bild-KI der Lehrkraft – das kostet
+ * Kontingent und bleibt ihre Entscheidung.
+ */
+const OHNE_BILD = ['Rückmeldung', 'Elternbriefe']
 
 const problems = []
 const pruefe = (ok, text) => {
@@ -75,6 +81,10 @@ try {
       const soll = breit ? 30 : 40
       for (const name of PROGRAMME) {
         const k = await knopf(name)
+        if (OHNE_BILD.includes(name)) {
+          pruefe(!!k && k.vektor, `${theme}/${scheme}/${breit ? 'breit' : 'schmal'}: ${name} zeigt sein Symbol`)
+          continue
+        }
         pruefe(
           !!k && k.bild && k.geladen && !k.vektor && k.breite === soll,
           `${theme}/${scheme}/${breit ? 'breit' : 'schmal'}: ${name} zeigt sein Bild (${k?.breite} px)`

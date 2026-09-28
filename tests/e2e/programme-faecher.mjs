@@ -43,7 +43,7 @@ try {
   const leiste = async () => page.evaluate(() => [...document.querySelectorAll('.leiste-liste .nav-icon')].map((b) => b.getAttribute('aria-label')))
   pruefe(
     JSON.stringify(await leiste()) ===
-      JSON.stringify(['Arbeitsblatt', 'Vokabeltest', 'Grammatiktest', 'Lernzielkontrolle', 'Klassenarbeiten', 'Vokabellisten']),
+      JSON.stringify(['Arbeitsblatt', 'Vokabeltest', 'Grammatiktest', 'Lernzielkontrolle', 'Klassenarbeiten', 'Vokabellisten', 'Rückmeldung']),
     `Reihenfolge der Leiste (${(await leiste()).join(', ')})`
   )
   const kacheln = await page.locator('.home-tile .mantine-Text-root[data-size="lg"]').allInnerTexts()
@@ -82,7 +82,7 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(500)
   pruefe(
-    JSON.stringify(await leiste()) === JSON.stringify(['Arbeitsblatt', 'Lernzielkontrolle', 'Klassenarbeiten']),
+    JSON.stringify(await leiste()) === JSON.stringify(['Arbeitsblatt', 'Lernzielkontrolle', 'Klassenarbeiten', 'Rückmeldung']),
     `Geschichte + Mathematik: nur passende Programme in der Leiste (${(await leiste()).join(', ')})`
   )
   await page.locator('[data-programme-anzeigen]').scrollIntoViewIfNeeded()

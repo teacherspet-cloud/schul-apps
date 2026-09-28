@@ -1,4 +1,5 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import RueckmeldungKnopf from '../../../rueckmeldung/RueckmeldungKnopf'
 import { rasterAuftrag } from '../../auftraege'
 import { StundenverlaufPanel } from '../StundenverlaufPanel'
 import BlattLeveln from '../BlattLeveln'
@@ -669,6 +670,7 @@ export function EditorStep(): React.JSX.Element {
             laeuft={busy.has(`beheben-${sheet.id}`)}
           />
         }
+        extras={<RueckmeldungKnopf art="arbeitsblatt" docId={docId} />}
       />
 
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell } from 'electron'
+import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
@@ -514,6 +515,15 @@ function registerIpc(): void {
   handle('exams:get', (id: string) => getExam(id))
   handle('exams:save', (input: SavedExamInput) => saveExam(input))
   handle('exams:delete', (id: string) => deleteExam(id))
+  // Neue Programme (Großprogramm 0.4): Rückmeldung und Elternbrief – gemeinsame Ablage (storage/dokumente.ts)
+  handle('rueckmeldungen:list', () => ABLAGEN.rueckmeldungen.list())
+  handle('rueckmeldungen:get', (id: string) => ABLAGEN.rueckmeldungen.get(id))
+  handle('rueckmeldungen:save', (input: DokumentEingabe) => ABLAGEN.rueckmeldungen.save(input))
+  handle('rueckmeldungen:delete', (id: string) => ABLAGEN.rueckmeldungen.delete(id))
+  handle('elternbriefe:list', () => ABLAGEN.elternbriefe.list())
+  handle('elternbriefe:get', (id: string) => ABLAGEN.elternbriefe.get(id))
+  handle('elternbriefe:save', (input: DokumentEingabe) => ABLAGEN.elternbriefe.save(input))
+  handle('elternbriefe:delete', (id: string) => ABLAGEN.elternbriefe.delete(id))
 
   handle('grammarTests:list', () => listGrammarTests())
   handle('grammarTests:get', (id: string) => getGrammarTest(id))

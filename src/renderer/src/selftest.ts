@@ -1,5 +1,6 @@
 // Prüfmodus: stellt die echten Abläufe (KI, Bildsuche, KI-Prüfung, Tafelbild) für automatisierte Qualitätsprüfungen bereit.
 // Wird nur geladen, wenn die App mit SCHULAPPS_SELFTEST=1 gestartet wird.
+import { useRueckmeldung } from './modules/rueckmeldung/store'
 import { cleanImageBackground } from './shared/imageCleanup'
 import { normalizeImage } from './shared/util'
 import { browserWorksheetImageDeps } from './modules/arbeitsblatt/generation/browserImages'
@@ -1996,6 +1997,8 @@ export function installSelftest(): void {
     gtJetzt: () => useGrammatiktest.getState().test,
     kaJetzt: () => useKlassenarbeit.getState().exam,
     lzkJetzt: () => useLernzielkontrolle.getState().test,
+    // Rückmeldung (Großprogramm 0.4, F3)
+    rmJetzt: () => useRueckmeldung.getState().dok,
     // Ganze Dokumente setzen (Wachen „Mit KI beheben": einen Mangel einbauen) – ein Rückgängig-Schritt
     gtSetzen: (t: GrammarTest) => useGrammatiktest.getState().setTest(t),
     kaSetzen: (e: Exam) => useKlassenarbeit.getState().setExam(e),

@@ -96,7 +96,26 @@ export interface ApiExtras {
   subscribe: (channel: string, cb: (value: unknown) => void) => () => void
 }
 
+/** Eintrag einer Bibliothek der neuen Programme (Rückmeldung, Elternbrief) */
+export interface SavedDokumentMeta {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  subjectLabel?: string
+  grade?: number
+  thema?: string
+  [feld: string]: unknown
+}
+
 export function buildApi(call: Call, extras: ApiExtras) {
+  /** Bibliothek eines neuen Programms (Großprogramm 0.4) – main/services/storage/dokumente.ts */
+  const dokumentAblage = (kanal: 'rueckmeldungen' | 'elternbriefe') => ({
+    list: () => call<SavedDokumentMeta[]>(`${kanal}:list`),
+    get: (id: string) => call<SavedDokumentMeta & { payload: unknown }>(`${kanal}:get`, id),
+    save: (input: { id: string; name: string; stats: Record<string, unknown>; payload: unknown }) => call<SavedDokumentMeta>(`${kanal}:save`, input),
+    delete: (id: string) => call<SavedDokumentMeta[]>(`${kanal}:delete`, id)
+  })
   return {
     /**
      * Zugriff aus dem lokalen Netz. Nur am Rechner selbst bedienbar – im Browser ist der
@@ -220,6 +239,9 @@ export function buildApi(call: Call, extras: ApiExtras) {
       delete: (id: string) => call<SavedTestMeta[]>('tests:delete', id)
     },
     /** In der App gespeicherte Klassenarbeiten */
+    /** Neue Programme (Großprogramm 0.4) – gemeinsame Ablage im Hauptprozess */
+    rueckmeldungen: dokumentAblage('rueckmeldungen'),
+    elternbriefe: dokumentAblage('elternbriefe'),
     exams: {
       list: () => call<SavedExamMeta[]>('exams:list'),
       get: (id: string) => call<SavedExam>('exams:get', id),

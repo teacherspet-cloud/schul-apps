@@ -87,10 +87,12 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
     const speichernd = ERLAUBTE_KANAELE.filter((k) => k.endsWith(':save')).sort()
     expect(speichernd).toEqual([
       'designs:save',
+      'elternbriefe:save',
       'exams:save',
       'grammarTests:save',
       'kurztests:save',
       'library:save',
+      'rueckmeldungen:save',
       'sheets:save',
       'tests:save',
       'textbooks:save'

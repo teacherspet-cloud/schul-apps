@@ -6,6 +6,7 @@ import KlassenarbeitModule from './klassenarbeit/KlassenarbeitModule'
 import LernzielkontrolleModule from './lernzielkontrolle/LernzielkontrolleModule'
 import VokabellisteModule from './vokabelliste/VokabellisteModule'
 import VokabeltestModule from './vokabeltest/VokabeltestModule'
+import RueckmeldungModule from './rueckmeldung/RueckmeldungModule'
 import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
 
 /**
@@ -106,7 +107,7 @@ export const modules: SchulModule[] = [
     id: 'klassenarbeit',
     name: 'Klassenarbeiten',
     description:
-      'Große schriftliche Arbeit in Englisch oder Geschichte – mit Material, Punkteverteilung, Erwartungshorizont und A/B-Fassungen, auch aus eigenen Unterlagen (PDF, Word, Foto).',
+      'Große schriftliche Arbeit in Englisch, Französisch, Spanisch, Deutsch, Geschichte, Politik oder Erdkunde – mit Material, Punkteverteilung, Erwartungshorizont und A/B-Fassungen, auch aus eigenen Unterlagen (PDF, Word, Foto).',
     icon: programmSymbol('klassenarbeit', 'grape'),
     color: 'grape',
     illustration: illustration('klassenarbeit'),
@@ -124,5 +125,17 @@ export const modules: SchulModule[] = [
     leistenbild: leistenbild('vokabelliste'),
     faecher: PROGRAMM_FAECHER.vokabelliste,
     component: VokabellisteModule
+  },
+  {
+    id: 'rueckmeldung',
+    name: 'Rückmeldung',
+    description:
+      'Lernförderliche Rückmeldung ohne Note zu Schülerarbeiten – aus einem Arbeitsblatt, einer Klassenarbeit oder einem Test heraus oder zu einer eigenen Aufgabe. Namen bleiben auf dem Rechner.',
+    icon: programmSymbol('rueckmeldung', 'green'),
+    color: 'green',
+    illustration: illustration('rueckmeldung'),
+    leistenbild: leistenbild('rueckmeldung'),
+    faecher: PROGRAMM_FAECHER.rueckmeldung,
+    component: RueckmeldungModule
   }
 ]

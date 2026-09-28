@@ -1,0 +1,91 @@
+import { describe, expect, it } from 'vitest'
+import { bogenAus, grundlageAusBlatt, pruefeBogen, transkriptUebernehmen } from '../src/renderer/src/modules/rueckmeldung/generation'
+import { boegenHtml } from '../src/renderer/src/modules/rueckmeldung/ausgabe'
+import { naechstesKuerzel, type Abgabe, type Rueckmeldung } from '../src/renderer/src/modules/rueckmeldung/model/types'
+import { sampleWorksheet } from './worksheetExport.test'
+
+/*
+ * Programm „Rückmeldung" (Großprogramm 0.4, F3): keine Noten und Punkte auf dem Bogen, Namen nur
+ * lokal (Kürzel an die KI), Grundlage aus gespeichertem Material.
+ */
+const abgabe = (over: Partial<Abgabe> = {}): Abgabe => ({ id: 'a1', kuerzel: 'S1', name: '', dateiname: 'x', text: 'Text', bilder: [], ...over })
+
+describe('Rückmeldung', () => {
+  it('der Bogen bleibt ohne Note und Punkte – Lob mit „sehr gut" bleibt stehen', () => {
+    const b = pruefeBogen({
+      staerken: ['Deine Einleitung gelingt dir sehr gut.', 'Das wäre eine 2+.', 'Du erreichst 14 von 20 Punkten.'],
+      schritte: ['Achte auf die Kommasetzung vor „dass".', 'Für eine bessere Note brauchst du mehr Belege.'],
+      kriterien: [
+        { kriterium: 'Aufbau', einschaetzung: 'sicher', beleg: 'klare Absätze' },
+        { kriterium: 'Punktzahl', einschaetzung: 'teilweise', beleg: '12 Punkte' }
+      ],
+      schluss: 'Insgesamt befriedigend.'
+    })
+    expect(b.staerken).toEqual(['Deine Einleitung gelingt dir sehr gut.'])
+    expect(b.schritte).toEqual(['Achte auf die Kommasetzung vor „dass".'])
+    expect(b.kriterien.map((k) => k.kriterium)).toEqual(['Aufbau'])
+    expect(b.schluss).toBeUndefined()
+    expect(b.entfernt).toBe(5)
+  })
+
+  it('die KI-Antwort wird bereinigt; unbekannte Einschätzung wird „teilweise"', () => {
+    const b = bogenAus({ staerken: ['A', ''], schritte: ['B'], kriterien: [{ kriterium: 'K', einschaetzung: 'toll' }, { kriterium: '' }], schluss: '' })
+    expect(b.staerken).toEqual(['A'])
+    expect(b.kriterien).toEqual([{ kriterium: 'K', einschaetzung: 'teilweise' }])
+    expect(() => bogenAus({ staerken: [], schritte: [] })).toThrow()
+  })
+
+  it('Übertragung: erkannte Namen werden durch Kürzel ersetzt, die Bilder fallen weg', () => {
+    const a = transkriptUebernehmen(abgabe({ text: '', bilder: ['data:image/png;base64,x'] }), {
+      text: 'Name: Lea Schmidt\nMein Freund Ben hat mir geholfen.',
+      unleserlich: '',
+      erkannteNamen: ['Lea Schmidt', 'Ben']
+    })
+    expect(a.text).not.toMatch(/Lea|Schmidt|Ben/)
+    expect(a.text).toMatch(/S1/)
+    expect(a.bilder).toEqual([])
+    expect(a.pseudonyme?.map((z) => z.name)).toEqual(['Lea Schmidt', 'Ben'])
+    expect(() => transkriptUebernehmen(abgabe(), { text: '' })).toThrow()
+  })
+
+  it('Kürzel fortlaufend, auch nach dem Entfernen einer Abgabe', () => {
+    expect(naechstesKuerzel([])).toBe('S1')
+    expect(naechstesKuerzel([abgabe({ kuerzel: 'S1' }), abgabe({ kuerzel: 'S3' })])).toBe('S4')
+  })
+
+  it('Grundlage aus einem Arbeitsblatt: Aufgaben und Erwartungshorizont', () => {
+    const g = grundlageAusBlatt(sampleWorksheet(), 'arbeitsblatt', 'id1', 'Fotosynthese')
+    expect(g.aufgaben.length).toBeGreaterThan(50)
+    expect(g).toMatchObject({ art: 'arbeitsblatt', docId: 'id1', titel: 'Fotosynthese' })
+  })
+
+  it('der Name steht erst im Ausdruck – eingesetzt anstelle des Kürzels', () => {
+    const r = {
+      version: 1,
+      meta: {
+        title: '',
+        subjectId: 'deutsch',
+        subjectLabel: 'Deutsch',
+        grade: 7,
+        stateId: 'NI',
+        schoolTypeId: 'gymnasium',
+        schoolTypeName: 'Gymnasium',
+        anrede: 'du',
+        schwerpunkt: ''
+      },
+      grundlage: { art: 'frei', titel: 'Leserbrief', aufgaben: 'Schreibe …' },
+      abgaben: [],
+      createdAt: ''
+    } as unknown as Rueckmeldung
+    const a = abgabe({
+      name: 'Lea',
+      bogen: { staerken: ['S1 gliedert klar.'], schritte: ['Belege ergänzen.'], kriterien: [{ kriterium: 'Aufbau', einschaetzung: 'sicher' }] }
+    })
+    const html = boegenHtml(r, [a, abgabe({ id: 'a2', kuerzel: 'S2' })])
+    expect(html).toContain('für Lea')
+    expect(html).toContain('Lea gliedert klar.')
+    expect(html).toContain('Das gelingt dir schon')
+    // Abgaben ohne Bogen erscheinen nicht
+    expect(html.match(/class="seite"/g)).toHaveLength(1)
+  })
+})

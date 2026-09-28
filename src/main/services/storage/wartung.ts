@@ -58,7 +58,17 @@ export const GESCHUETZT = [
 ]
 
 /** Ordner mit Material, das die Lehrkraft erzeugt hat. */
-const MATERIAL = ['arbeitsblaetter', 'vokabeltests', 'klassenarbeiten', 'grammatiktests', 'lernzielkontrollen', 'piktogramme', 'hoertexte']
+const MATERIAL = [
+  'arbeitsblaetter',
+  'vokabeltests',
+  'klassenarbeiten',
+  'grammatiktests',
+  'lernzielkontrollen',
+  'rueckmeldungen',
+  'elternbriefe',
+  'piktogramme',
+  'hoertexte'
+]
 
 /**
  * Nur sichern, nie zurücksetzen (27.09.2026): Bis dahin standen Lehrwerke, Vokabel-Bibliothek und

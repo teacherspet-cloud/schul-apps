@@ -43,7 +43,9 @@ export const PROGRAMM_FAECHER: Record<string, ProgrammFaecher> = {
   grammatiktest: SPRACH_FAECHER,
   lernzielkontrolle: 'alle',
   klassenarbeit: KLASSENARBEIT_FAECHER,
-  vokabelliste: SPRACH_FAECHER
+  vokabelliste: SPRACH_FAECHER,
+  // Neue Programme (Großprogramm 0.4) hinten angehängt: Strg+7, Strg+8
+  rueckmeldung: 'alle'
 }
 
 /** Reihenfolge der Programme überall (Leiste, Startseite, Strg+1 …, Themenbereiche, Einstellungen) */

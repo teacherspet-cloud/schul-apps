@@ -11,7 +11,7 @@ const ids = (l: { id: string }[]): string[] => l.map((p) => p.id)
 
 describe('Reihenfolge der Programme', () => {
   it('Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten, Vokabellisten', () => {
-    expect(PROGRAMM_REIHENFOLGE).toEqual(['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit', 'vokabelliste'])
+    expect(PROGRAMM_REIHENFOLGE).toEqual(['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit', 'vokabelliste', 'rueckmeldung'])
   })
 
   it('die Leiste (registry.ts) folgt derselben Reihenfolge', () => {
@@ -31,16 +31,23 @@ describe('Programme nach eigenen Fächern', () => {
   })
 
   it('Geschichte und Mathematik: keine Vokabel- und Grammatikprogramme, Klassenarbeit bleibt (Geschichte)', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['geschichte', 'mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit'])
+    expect(ids(sichtbareProgramme(PROGRAMME, ['geschichte', 'mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung'])
   })
 
-  it('Mathematik allein: auch die Klassenarbeit fällt weg (das Modul kann nur Englisch und Geschichte)', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle'])
+  it('Mathematik allein: auch die Klassenarbeit fällt weg (Mathematik gehört nicht zu den Fächern der Klassenarbeit)', () => {
+    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'rueckmeldung'])
   })
 
   it('Latein und DaZ zählen zu den Sprachfächern', () => {
     for (const fach of ['latein', 'daz'])
-      expect(ids(sichtbareProgramme(PROGRAMME, [fach], {}))).toEqual(['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'vokabelliste'])
+      expect(ids(sichtbareProgramme(PROGRAMME, [fach], {}))).toEqual([
+        'arbeitsblatt',
+        'vokabeltest',
+        'grammatiktest',
+        'lernzielkontrolle',
+        'vokabelliste',
+        'rueckmeldung'
+      ])
   })
 
   it('Englisch, Französisch und Spanisch: alles sichtbar (Klassenarbeit seit Phase G auch in Französisch und Spanisch)', () => {

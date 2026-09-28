@@ -1,4 +1,5 @@
 import { Container, Stack, Box, ScrollArea } from '@mantine/core'
+import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -170,6 +171,7 @@ export default function TestEditorStep(): React.JSX.Element {
           }
         }}
         ausgabe={{ onWord: () => setAusgabe('docx'), onPdf: () => setAusgabe('pdf'), onDrucken: () => setAusgabe('print') }}
+        extras={<RueckmeldungKnopf art="grammatiktest" docId={docId} />}
       />
       <CanaryDialog
         offen={canaryOffen}

@@ -33,11 +33,13 @@ interface Form {
   vorn: Teil[]
 }
 
-export type ProgrammSymbolForm = 'vokabeltest' | 'vokabelliste' | 'arbeitsblatt' | 'lernzielkontrolle' | 'grammatiktest' | 'klassenarbeit'
+export type ProgrammSymbolForm =
+  'vokabeltest' | 'vokabelliste' | 'arbeitsblatt' | 'lernzielkontrolle' | 'grammatiktest' | 'klassenarbeit' | 'rueckmeldung' | 'elternbrief'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
 const BALKEN = 'M11 16H14V22H11ZM15 12H18V22H15ZM19 7H22V22H19Z'
+const HAKEN_KREIS = 'M18 13A5 5 0 1 0 18 23A5 5 0 1 0 18 13Z'
 const PUZZLETEIL = 'M2 9H5A2.2 2.2 0 1 1 8 9H11V12.5A2.2 2.2 0 1 1 11 15.5V19H2Z'
 const FUELLER = 'M14.5 20L15.1 15.9L19.33 6.76A1.6 1.6 0 0 1 22.19 8.2L17.5 17.1Z'
 const heft = (x: number, y: number, breite: number, hoehe: number): string =>
@@ -115,6 +117,33 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
     vorn: [
       { d: 'M14.86 15.7L19.33 6.76A1.6 1.6 0 0 1 22.19 8.2L17.72 17.14Z', art: 'voll' },
       { d: 'M14.5 20L15.13 15.84L17.45 17Z', art: 'akzent' }
+    ]
+  },
+  // Rückmeldung (Großprogramm 0.4): Sprechblase mit Textzeilen, davor ein Kreis mit Haken – Rückmeldung ohne Note
+  rueckmeldung: {
+    aussparen: HAKEN_KREIS,
+    aussparenBreite: 3,
+    hinten: [
+      { d: 'M4 2H18A2 2 0 0 1 20 4V12A2 2 0 0 1 18 14H9L5 18V14H4A2 2 0 0 1 2 12V4A2 2 0 0 1 4 2Z', art: 'strich' },
+      { d: 'M6 6.5H16M6 10H12', art: 'strich' }
+    ],
+    vorn: [
+      { d: HAKEN_KREIS, art: 'akzent' },
+      { d: 'M15.8 18L17.4 19.6L20.4 16.4', art: 'strich', breite: 1.75 }
+    ]
+  },
+  // Elternbrief (Großprogramm 0.4): Briefumschlag, davor ein Blatt mit farbigem Kopf
+  elternbrief: {
+    aussparen: 'M11 9H21V22H11Z',
+    aussparenBreite: 3,
+    hinten: [
+      { d: 'M3 5H17A1 1 0 0 1 18 6V16A1 1 0 0 1 17 17H3A1 1 0 0 1 2 16V6A1 1 0 0 1 3 5Z', art: 'strich' },
+      { d: 'M2.5 6L10 12L17.5 6', art: 'strich' }
+    ],
+    vorn: [
+      { d: 'M12 10H20V21H12Z', art: 'strich', breite: 1.75 },
+      { d: 'M12 10H20V13H12Z', art: 'akzent' },
+      { d: 'M14 16H18M14 18.5H17', art: 'strich', breite: 1.5 }
     ]
   }
 }
