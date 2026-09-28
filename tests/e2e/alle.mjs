@@ -17,7 +17,7 @@ const filter = process.argv[3] ? new RegExp(process.argv[3]) : null
 mkdirSync(out, { recursive: true })
 
 /** Echte KI, echte Vertonung, Hilfsmittel, Proben gegen die eigene Ablage */
-const AUSGENOMMEN = /(-echt|^gruendlich|^quality-images|^hoertext-vertonen|^praxistest|^probe-|^pdf-ansehen|^aufraeumen|^pruefen|^warten|^alle)\.mjs$/
+const AUSGENOMMEN = /^(.*-echt|gruendlich|quality-images|hoertext-vertonen|praxistest.*|probe-.*|pdf-ansehen|aufraeumen|pruefen|warten|alle)\.mjs$/
 const wachen = readdirSync(hier)
   .filter((f) => f.endsWith('.mjs') && !AUSGENOMMEN.test(f))
   .filter((f) => !filter || filter.test(f))
