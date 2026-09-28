@@ -581,6 +581,14 @@ In den Bibliotheken (Vokabeltests, Arbeitsblätter, Klassenarbeiten) bestätigt 
 - Geprüft mit `tests/verlaesslichkeit.test.ts`, `tests/wartung.test.ts` und der Wache `node tests/e2e/protokoll.mjs`.
 - Die Wiederholung greift nur bei kaputtem Aufbau: falsche Datentypen oder eine fehlende Liste bzw. ein fehlendes Objekt der obersten Ebene (etwa `blocks`). Fehlende Texte, Zahlen und Unterlisten zählen nicht. Die strikten Schemata führen Dutzende solcher Felder als Pflicht, der Abo-Weg lässt leere weg, und die Verarbeitung behandelt beides gleich.
 
+### Landesdaten (0.4)
+
+- **Lehrplan-Themen** für die Themenbereiche liegen als `resources/lehrplaene/<LAND>.json` vor: Niedersachsen, Nordrhein-Westfalen, Bayern (LehrplanPLUS; Gymnasium, Realschule, Mittelschule, Jgst. 5–10) und Baden-Württemberg (Bildungsplan 2016, am Gymnasium die Fassung V3.0 von 2026; Gymnasium und gemeinsamer Plan Sekundarstufe I). Übernommen sind die Überschriften und Inhaltsangaben im Wortlaut, keine Kompetenzsätze. Quellen, Vorgehen und Lücken stehen in `recherche/lehrplaene/<LAND>.quellen.md`, die Werkzeuge unter `recherche/lehrplaene/<LAND>/`. Der Ordner `recherche/` ist nicht versioniert.
+- Für Länder ohne Datei gelten weiter die mitgebrachten Themen.
+- **Operatorenlisten** aller Länder: siehe „Gemeinsame Bausteine" (`src/shared/operatoren/`).
+- **Formate der Lernzielkontrolle** für alle 16 Länder: `lernzielkontrolle/didactics/formate.ts`.
+- Geprüft mit `tests/lehrplanDateien.test.ts`. Er prüft jede Datei im Ordner: gültig, Quellen mit Adresse, keine Kompetenzsätze als Bereichsnamen, Themen in den Kernfächern, keine doppelten Ebenen.
+
 ### KI-Kennzeichnung und Datenschutz (0.4)
 
 - **Herkunft am Material:** Jedes KI-Ergebnis, das in einem Dokument ankommt (`legeAb` in `shared/auftraege.ts`), stempelt Anbieter, Modell und Datum in `meta.ki` (beim Vokabeltest `doc.ki`), siehe `src/shared/kiKennzeichnung.ts`.
