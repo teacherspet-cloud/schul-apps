@@ -570,6 +570,16 @@ In den Bibliotheken (Vokabeltests, Arbeitsblätter, Klassenarbeiten) bestätigt 
 - Der **ElevenLabs-Schlüssel** lässt sich mit „Testen" prüfen (ruft die Stimmenliste ab).
 - Läuft ein **Abo-Zugang** (Programm eingerichtet, angemeldet, Hinweis bestätigt), verschwinden Nutzungsbedingungen und Einrichtungsschritte; sie lassen sich mit „Einrichtung anzeigen" wieder einblenden.
 
+### Verlässlichkeit (0.4)
+
+- **Absturzsicheres Schreiben:** Jede Ablage schreibt erst in eine Zwischendatei und benennt sie dann um (`storage/atomar.ts`). Ein Absturz mitten im Speichern hinterlässt nie eine halbe Datei.
+- **Automatische Sicherung:** Einmal am Tag (erste Prüfung 60 s nach dem Start) legt die App unter `userData/sicherungen` eine vollständige Sicherung an. Standardmäßig bleiben sieben Stände erhalten, optional kommt eine Kopie in einen eigenen Ordner. In Einstellungen › Wartung stehen die Liste mit „Wiederherstellen …", „Jetzt sichern", der Schalter und die Zahl der Stände. Die Sicherung (Version 2) enthält auch Lehrwerke, Vokabel-Bibliothek und Maskottchen; Version 1 bleibt lesbar.
+- **Fehlerprotokoll:** `userData/protokoll.log` (bei 2 MB rotiert) sammelt Abstürze beider Prozesse, Fehler der IPC-Aufrufe und der Oberfläche. Schlüssel werden vorher unkenntlich gemacht. „Protokoll speichern …" in Wartung.
+- **Eine Wiederholung bei unbrauchbarer KI-Antwort:** Strukturierte Antworten werden gegen ihr Schema geprüft (`shared/schemaPruefung.ts`). Bei kaputtem JSON, fehlenden Pflichtfeldern, abgeschnittener oder leerer Antwort und Serverfehlern fragt die App genau einmal neu (`ai/wiederholung.ts`), nie nach einem Abbruch und nie bei Schlüssel- oder Guthabenfehlern.
+- **Verbrauch:** Karte im Reiter KI-Zugang. Gezählt werden je Monat, Anbieter und Modell Anfragen, Wiederholungen, Token (nur API-Weg), Bilder und vertonte Zeichen (`userData/verbrauch.json`). Keine Kostenrechnung.
+- **Verwaiste Hörtexte:** MP3-Dateien, auf die kein gespeichertes Material mehr verweist und die älter als sieben Tage sind, lassen sich in Wartung per Knopf löschen.
+- Geprüft mit `tests/verlaesslichkeit.test.ts`, `tests/wartung.test.ts` und der Wache `node tests/e2e/protokoll.mjs`.
+
 ## Start
 
 `Schul-Apps.exe` direkt starten, eine Installation ist nicht nötig. Beim Start entpackt sich das Programm kurz (einige Sekunden).

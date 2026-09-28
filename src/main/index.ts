@@ -70,7 +70,10 @@ import { schulenSuchen, schulLogo, schulQuellen } from './services/storage/schul
 import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/themen'
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { ladeSicherung, listeSicherungen, sichereJetzt, starteAutoSicherung } from './services/storage/autoSicherung'
+import { raeumeHoertexteAuf, verwaisteHoertexte } from './services/storage/hoertexteAufraeumen'
 import { fangeAbstuerze, leseProtokoll, protokolliere } from './services/protokoll'
+import { mitWiederholung } from './services/ai/wiederholung'
+import { leseVerbrauch, merkeVerbrauch } from './services/ai/verbrauch'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
 import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
 // Kopiert electron-vite beim Bauen nach out/ und liefert den Pfad (liegt damit auch in der .exe)
@@ -297,7 +300,10 @@ function handle<A extends unknown[], R>(channel: string, fn: (...args: A) => R |
     try {
       return { ok: true, value: await fn(...(args as A)) }
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      const meldung = err instanceof Error ? err.message : String(err)
+      // Ins Protokoll: Kanal und Meldung, keine Nutzdaten; Abbrüche durch die Lehrkraft sind kein Fehler
+      if (!/abgebrochen|aborted/i.test(meldung)) protokolliere('fehler', `ipc ${channel}`, meldung)
+      return { ok: false, error: meldung }
     }
   })
 }
@@ -363,6 +369,8 @@ function registerIpc(): void {
   handle('wartung:sicherungen', () => listeSicherungen())
   handle('wartung:sicherungLaden', (name: string) => ladeSicherung(name))
   handle('wartung:sichereJetzt', () => sichereJetzt())
+  handle('wartung:hoertexte', () => verwaisteHoertexte())
+  handle('wartung:hoertexteAufraeumen', () => raeumeHoertexteAuf())
   handle('wartung:sicherungsOrdner', async () => {
     const res = await dialog.showOpenDialog(mainWindow!, { title: 'Ordner für eine Kopie der Sicherungen', properties: ['openDirectory', 'createDirectory'] })
     return res.canceled || !res.filePaths.length ? null : res.filePaths[0]
@@ -438,7 +446,21 @@ function registerIpc(): void {
           sendeEreignis('ai:progress', { id, chars })
         }
       : undefined
-    return kiPlaetze.platz(id, (signal) => provider.structured(req, req.model || model, onChunk, signal))
+    const anbieter = req.provider ?? getSettings().ai.textProvider
+    const modell = req.model || model
+    merkeVerbrauch(anbieter, modell, { anfragen: 1 })
+    // Einmal wiederholen bei kaputter, abgeschnittener oder leerer Antwort und Serverfehlern (27.09.2026)
+    return kiPlaetze.platz(id, (signal) =>
+      mitWiederholung(
+        req,
+        (r) => provider.structured(r, modell, onChunk, signal),
+        ({ art, meldung }) => {
+          if (signal.aborted) return
+          protokolliere('warnung', 'ki', `${req.schemaName ?? 'Anfrage'}: Wiederholung (${art}) – ${meldung}`)
+          merkeVerbrauch(anbieter, modell, { anfragen: 1, wiederholungen: 1 })
+        }
+      )
+    )
   })
   handle('ai:cancel', (id: string) => {
     kiPlaetze.abbrechen(id)
@@ -461,7 +483,11 @@ function registerIpc(): void {
       return []
     }
   })
-  handle('ai:image', (prompt: string, id?: string) => kiPlaetze.platz(id, (signal) => generateImage(prompt, signal), 'bild'))
+  handle('ai:image', (prompt: string, id?: string) => {
+    merkeVerbrauch(getSettings().ai.imageProvider, '', { bilder: 1 })
+    return kiPlaetze.platz(id, (signal) => generateImage(prompt, signal), 'bild')
+  })
+  handle('verbrauch:get', () => leseVerbrauch())
 
   handle('cefr:get', () => getCefrTable())
 

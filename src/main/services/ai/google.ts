@@ -1,4 +1,5 @@
 import { ApiError, GoogleGenAI, Part } from '@google/genai'
+import { merkeVerbrauch } from './verbrauch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel, splitDataUrl } from './provider'
 
@@ -46,6 +47,7 @@ export class GoogleProvider implements AiProvider {
     try {
       if (!onChunk) {
         const response = await this.client.models.generateContent(params)
+        merkeVerbrauch('google', model, { eingabe: response.usageMetadata?.promptTokenCount ?? 0, ausgabe: response.usageMetadata?.candidatesTokenCount ?? 0 })
         const text = response.text
         if (!text) throw new Error('Gemini hat keine Antwort geliefert.')
         return JSON.parse(text) as T
@@ -53,12 +55,15 @@ export class GoogleProvider implements AiProvider {
       // Im Strom: Der Fortschrittsbalken folgt der Länge der Antwort
       const stream = await this.client.models.generateContentStream(params)
       let text = ''
+      let nutzung: { promptTokenCount?: number; candidatesTokenCount?: number } | undefined
       for await (const chunk of stream) {
+        if (chunk.usageMetadata) nutzung = chunk.usageMetadata
         if (chunk.text) {
           text += chunk.text
           onChunk(text.length)
         }
       }
+      merkeVerbrauch('google', model, { eingabe: nutzung?.promptTokenCount ?? 0, ausgabe: nutzung?.candidatesTokenCount ?? 0 })
       if (!text) throw new Error('Gemini hat keine Antwort geliefert.')
       return JSON.parse(text) as T
     } catch (e) {

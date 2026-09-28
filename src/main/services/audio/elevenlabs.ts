@@ -11,6 +11,7 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { writeAtomic } from '../storage/atomar'
+import { merkeVerbrauch } from '../ai/verbrauch'
 import { join, resolve, sep } from 'path'
 import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
@@ -346,6 +347,7 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
   const dialog = stimmen.size > 1
   const parts = dialog ? await sprichDialog({ ...req, turns }) : await sprichSolo({ ...req, turns })
   if (!parts.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
+  merkeVerbrauch('elevenlabs', dialog ? DIALOG_MODEL : TTS_MODEL, { ttsZeichen: turns.reduce((n, t) => n + t.text.length, 0) })
   const mp3 = Buffer.concat(parts)
   const fileName = `${req.id}.mp3`
   writeAtomic(join(audioDir(), fileName), mp3)

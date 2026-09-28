@@ -64,6 +64,8 @@ import MaskottchenSettings from './MaskottchenSettings'
 import FachfarbenSettings from './FachfarbenSettings'
 import NetzwerkCard from './NetzwerkCard'
 import WartungCard from './WartungCard'
+import SicherungenCard from './SicherungenCard'
+import VerbrauchCard from './VerbrauchCard'
 import { imNetz } from '../shared/netzZugang'
 import PictogramStudio from './PictogramStudio'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
@@ -194,7 +196,10 @@ export default function SettingsPage(): React.JSX.Element {
 
           {!imNetz() && (
             <Tabs.Panel value="ki">
-              <AiCard settings={settings} update={update} />
+              <Stack gap="md">
+                <AiCard settings={settings} update={update} />
+                <VerbrauchCard />
+              </Stack>
             </Tabs.Panel>
           )}
 
@@ -251,7 +256,10 @@ export default function SettingsPage(): React.JSX.Element {
           )}
           {!imNetz() && (
             <Tabs.Panel value="wartung">
-              <WartungCard />
+              <Stack gap="md">
+                <SicherungenCard />
+                <WartungCard />
+              </Stack>
             </Tabs.Panel>
           )}
         </Container>

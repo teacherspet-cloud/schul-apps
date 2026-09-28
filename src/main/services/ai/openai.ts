@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { merkeVerbrauch } from './verbrauch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel } from './provider'
 
@@ -36,6 +37,7 @@ export class OpenAiProvider implements AiProvider {
       // Ohne Zuhörer der einfache Weg; mit Zuhörer im Strom, damit der Fortschritt sichtbar wird
       if (!onChunk) {
         const response = await this.client.responses.create(params, { signal })
+        merkeVerbrauch('openai', model, { eingabe: response.usage?.input_tokens ?? 0, ausgabe: response.usage?.output_tokens ?? 0 })
         if (!response.output_text) throw new Error('Die KI hat keine Antwort geliefert.')
         return JSON.parse(response.output_text) as T
       }
@@ -45,6 +47,8 @@ export class OpenAiProvider implements AiProvider {
         if (event.type === 'response.output_text.delta') {
           text += event.delta
           onChunk(text.length)
+        } else if (event.type === 'response.completed') {
+          merkeVerbrauch('openai', model, { eingabe: event.response.usage?.input_tokens ?? 0, ausgabe: event.response.usage?.output_tokens ?? 0 })
         }
       }
       if (!text) throw new Error('Die KI hat keine Antwort geliefert.')

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { merkeVerbrauch } from './verbrauch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel, splitDataUrl } from './provider'
 
@@ -64,6 +65,7 @@ export class AnthropicProvider implements AiProvider {
           })()
         : await this.client.beta.messages.create(params, { signal })
 
+      merkeVerbrauch('anthropic', model, { eingabe: response.usage?.input_tokens ?? 0, ausgabe: response.usage?.output_tokens ?? 0 })
       if (response.stop_reason === 'refusal') {
         throw new Error('Claude hat die Anfrage abgelehnt. Bitte die Vokabeln oder das Thema prüfen.')
       }

@@ -20,7 +20,9 @@ const NAMEN: Record<string, string> = {
   grammatiktests: 'Grammatiktests',
   lernzielkontrollen: 'Lernzielkontrollen',
   piktogramme: 'eigene Piktogramme',
-  hoertexte: 'erzeugte Hörtexte'
+  hoertexte: 'erzeugte Hörtexte',
+  lehrwerke: 'Lehrwerke und Vokabellisten (nur ergänzt, nie gelöscht)',
+  maskottchen: 'Maskottchen'
 }
 
 const DATEI_NAMEN: Record<string, string> = {
@@ -29,18 +31,28 @@ const DATEI_NAMEN: Record<string, string> = {
   'worksheet-designs.json': 'eigene Designvorlagen',
   'themenbereiche.json': 'Themenbereiche und Zuordnung der Materialien',
   'worksheet-designs-version.json': '',
-  'model-cache.json': ''
+  'model-cache.json': '',
+  'vocab-library.json': 'eigene Vokabellisten'
 }
 
 type Vorschau = { erstellt: string; ordner: { ordner: string; eintraege: number }[]; dateien: string[] }
 
-export default function SicherungEinlesen({ variant = 'light' }: { variant?: 'light' | 'subtle' }): React.JSX.Element {
+export default function SicherungEinlesen({
+  variant = 'light',
+  quelle,
+  label = 'Sicherung einlesen …'
+}: {
+  variant?: 'light' | 'subtle' | 'default'
+  /** Statt Dateiauswahl: eine vorhandene (automatische) Sicherung laden */
+  quelle?: { name: string; laden: () => Promise<Uint8Array> }
+  label?: string
+}): React.JSX.Element {
   const [datei, setDatei] = useState<{ name: string; data: Uint8Array; vorschau: Vorschau } | null>(null)
   const [laeuft, setLaeuft] = useState(false)
 
   const waehlen = async (): Promise<void> => {
     try {
-      const f = await window.api.files.open([{ name: 'Sicherung', extensions: ['json'] }])
+      const f = quelle ? { name: quelle.name, data: await quelle.laden() } : await window.api.files.open([{ name: 'Sicherung', extensions: ['json'] }])
       if (!f) return
       const vorschau = await window.api.wartung.pruefen(f.data)
       setDatei({ name: f.name, data: f.data, vorschau })
@@ -75,7 +87,7 @@ export default function SicherungEinlesen({ variant = 'light' }: { variant?: 'li
   return (
     <>
       <Button variant={variant} leftSection={<IconUpload size={16} />} onClick={() => void waehlen()}>
-        Sicherung einlesen …
+        {label}
       </Button>
       <Modal opened={Boolean(datei)} onClose={() => setDatei(null)} title="Sicherung einlesen?" size="lg">
         {v && (

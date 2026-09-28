@@ -128,7 +128,15 @@ export function buildApi(call: Call, extras: ApiExtras) {
       sicherungen: () => call<{ name: string; groesse: number; erstellt: string }[]>('wartung:sicherungen'),
       sicherungLaden: (name: string) => call<Uint8Array>('wartung:sicherungLaden', name),
       sichereJetzt: () => call<{ name: string; groesse: number; erstellt: string }>('wartung:sichereJetzt'),
-      sicherungsOrdner: () => call<string | null>('wartung:sicherungsOrdner')
+      sicherungsOrdner: () => call<string | null>('wartung:sicherungsOrdner'),
+      hoertexte: () => call<{ dateien: string[]; bytes: number }>('wartung:hoertexte'),
+      hoertexteAufraeumen: () => call<{ dateien: string[]; bytes: number }>('wartung:hoertexteAufraeumen')
+    },
+    verbrauch: {
+      get: () =>
+        call<
+          Record<string, Record<string, { anfragen: number; wiederholungen: number; eingabe: number; ausgabe: number; bilder: number; ttsZeichen: number }>>
+        >('verbrauch:get')
     },
     protokoll: {
       melden: (text: string) => call<void>('protokoll:melden', text),
