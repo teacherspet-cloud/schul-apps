@@ -1,4 +1,5 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { rasterAuftrag } from '../../auftraege'
 import { StundenverlaufPanel } from '../StundenverlaufPanel'
 import BlattLeveln from '../BlattLeveln'
 import LevelnMenue from '../LevelnMenue'
@@ -13,7 +14,8 @@ import {
   IconHeadphones,
   IconNumber0Small,
   IconTrash,
-  IconWand
+  IconWand,
+  IconTable
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
@@ -450,6 +452,12 @@ export function EditorStep(): React.JSX.Element {
              * jede Aufgabenstellung; ob es hier trägt, entscheidet die Lehrkraft an der fertigen
              * Aufgabe. Deshalb nachträglich und je Aufgabe; entfernen steht im „⋯“-Menü.
              */}
+            {/* Bewertungsraster (Großprogramm 0.4, F2): als Tabelle hinter der Aufgabe, im Lösungsteil */}
+            {block.type === 'task' && (
+              <Menu.Item leftSection={<IconTable size={14} />} onClick={() => rasterAuftrag(ws, docId, block, profile)} data-raster-erstellen>
+                Bewertungsraster erstellen
+              </Menu.Item>
+            )}
             {block.type === 'task' && !block.example && (
               <Menu.Item leftSection={<IconCircleNumber0 size={14} />} onClick={() => addExample(block)}>
                 Beispiellösung in Aufgabe hinzufügen

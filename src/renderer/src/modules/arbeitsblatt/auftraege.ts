@@ -21,7 +21,11 @@ import { alsAblage, beschaffeOriginalmaterial, materialSprache, type GepruefterT
 import { browserMaterialDienste, browserSourceServices } from './generation/originalSources'
 import { originalSourcesActive, sourceTextWords } from './generation/prompts'
 import { subjectById } from './model/subjects'
-import type { Worksheet, WsBlock } from './model/types'
+import type { TableBlock, TaskBlock, Worksheet, WsBlock } from './model/types'
+import type { LearnerProfile } from './didactics/profile'
+import { describeBlock } from './generation/describe'
+import { newBlock } from './model/factory'
+import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../shared/bewertung/raster'
 import { profileFromMeta } from './render/SheetPages'
 import type { AuftragsKontext } from '../../shared/auftraege'
 import { foxPrompt } from './render/coverDesigns'
@@ -351,4 +355,59 @@ export function hinweiseBeheben(worksheet: Worksheet, docId: string, sheetId: st
         )
       }))
   })
+}
+
+/**
+ * Bewertungsraster zu einer Aufgabe (Großprogramm 0.4, F2): als Tabelle direkt hinter die
+ * Aufgabe, voreingestellt nur im Lösungsteil. Gibt es schon ein Raster zu dieser Aufgabe
+ * (Kennung `raster-<Aufgabe>`), wird es ersetzt.
+ */
+export function rasterAuftrag(worksheet: Worksheet, docId: string, aufgabe: TaskBlock, profile: LearnerProfile): void {
+  const nummer = worksheet.sheets.flatMap((s) => s.blocks.filter((b) => b.type === 'task')).findIndex((b) => b.id === aufgabe.id) + 1
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art: 'Bewertungsraster erstellen',
+    eingabe: worksheet,
+    istOffen: () => blattOffen(docId),
+    sperrt: false,
+    schluessel: `raster-${aufgabe.id}`,
+    fehlerTitel: 'Bewertungsraster fehlgeschlagen',
+    arbeit: async (ws, k) => {
+      k.melde('Die KI entwirft das Bewertungsraster …')
+      const antwort = await k.ai<unknown>(
+        rasterAnfrage({
+          system: systemPrompt(ws.meta, profile),
+          aufgabe: describeBlock(aufgabe),
+          loesung: aufgabe.solution,
+          punkte: aufgabe.points ?? 0,
+          aufteilung: rasterAufteilung(ws.meta.subjectId, Boolean(aufgabe.brief))
+        })
+      )
+      return rasterAus(antwort, `Bewertungsraster${nummer ? ` zu Aufgabe ${nummer}` : ''}`, aufgabe.points ?? 0)
+    },
+    abschluss: () => 'Fertig – das Raster steht hinter der Aufgabe (im Lösungsteil)',
+    ablegen: (raster, ws) =>
+      legeArbeitsblattAb(docId, ws, (aktuell) => ({
+        ...aktuell,
+        sheets: aktuell.sheets.map((s) => {
+          const i = s.blocks.findIndex((b) => b.id === aufgabe.id)
+          if (i < 0) return s
+          const id = `raster-${aufgabe.id}`
+          const tabelle = { ...(newBlock('table') as TableBlock), id, ...rasterAlsTabelle(raster), nurLoesung: true }
+          const blocks = s.blocks.filter((b) => b.id !== id)
+          blocks.splice(blocks.findIndex((b) => b.id === aufgabe.id) + 1, 0, tabelle)
+          return { ...s, blocks }
+        })
+      }))
+  })
+}
+
+/** Inhalt/Sprache bzw. Inhalt/Darstellung nur bei Schreibaufgaben in Fremdsprachen und Deutsch */
+export function rasterAufteilung(fach: string, schreibaufgabe: boolean): { inhalt: number; zweiter: 'Sprache' | 'Darstellung' } | undefined {
+  if (!schreibaufgabe) return undefined
+  if (fach === 'deutsch') return { inhalt: 70, zweiter: 'Darstellung' }
+  if (subjectById(fach).foreignLanguage) return { inhalt: 40, zweiter: 'Sprache' }
+  return undefined
 }

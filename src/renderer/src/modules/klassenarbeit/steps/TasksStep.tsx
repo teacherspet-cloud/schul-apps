@@ -19,6 +19,9 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../../shared/bewertung/raster'
+import { describeBlock } from '../../arbeitsblatt/generation/describe'
+import { systemPrompt } from '../../arbeitsblatt/generation/prompts'
 import LevelnMenue from '../../arbeitsblatt/steps/LevelnMenue'
 import { inhaltsanteil, zweiterTeil } from '../model/faecher'
 import {
@@ -406,6 +409,64 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     })
   }
 
+  /**
+   * Bewertungsraster zu einer Aufgabe (Großprogramm 0.4, F2): als Tabelle hinter der Aufgabe,
+   * nur im Erwartungshorizont. Schreibteile: Inhalt/Sprache bzw. Inhalt/Darstellung nach Fach.
+   */
+  const rasterErstellen = (block: WsBlock): void => {
+    if (block.type !== 'task') return
+    const f = fassung
+    const teil = exam.parts.find((p) => bloeckeDerFassung(p, f).some((b) => b.id === block.id))
+    const schreibteil = typeof teil?.contentShare === 'number'
+    void starteAuftrag({
+      moduleId: 'klassenarbeit',
+      docId,
+      titel,
+      art: 'Bewertungsraster erstellen',
+      eingabe: exam,
+      istOffen: () => arbeitOffen(docId),
+      sperrt: false,
+      schluessel: `raster-${block.id}`,
+      fehlerTitel: 'Das Bewertungsraster konnte nicht erstellt werden',
+      arbeit: async (e, k) => {
+        k.melde('Die KI entwirft das Bewertungsraster …')
+        const ws = examToWorksheet(e, f)
+        const punkte = block.points > 0 ? block.points : (teil?.points ?? 0)
+        const antwort = await k.ai<unknown>(
+          rasterAnfrage({
+            system: systemPrompt(ws.meta, profileFromMeta(ws.meta)),
+            aufgabe: describeBlock(block),
+            loesung: block.solution,
+            punkte,
+            ...(schreibteil
+              ? {
+                  aufteilung: {
+                    inhalt: teil?.contentShare ?? inhaltsanteil(e.meta.subjectId),
+                    zweiter: zweiterTeil(e.meta.subjectId) as 'Sprache' | 'Darstellung'
+                  }
+                }
+              : {})
+          })
+        )
+        return rasterAus(antwort, `Bewertungsraster: ${teil?.label ?? 'Aufgabe'}`, punkte)
+      },
+      abschluss: () => 'Das Raster steht hinter der Aufgabe im Erwartungshorizont.',
+      ablegen: (raster, e) =>
+        legeArbeitAb(docId, e, (aktuell) => ({
+          ...aktuell,
+          parts: aktuell.parts.map((p) => {
+            const bloecke = bloeckeDerFassung(p, f)
+            if (!bloecke.some((b) => b.id === block.id)) return p
+            const id = `raster-${block.id}`
+            const tabelle = { ...(newBlock('table') as Extract<WsBlock, { type: 'table' }>), id, ...rasterAlsTabelle(raster), nurLoesung: true }
+            const neu = bloecke.filter((b) => b.id !== id)
+            neu.splice(neu.findIndex((b) => b.id === block.id) + 1, 0, tabelle)
+            return mitBloecken(p, f, neu)
+          })
+        }))
+    })
+  }
+
   const wrapBlock = (block: WsBlock, placed: PlacedItem, content: React.ReactNode): React.ReactNode => {
     // Kopfkasten: bearbeitbar (Titel und Wortlaut landen in der Arbeit); Teil-Überschriften bleiben berechnet
     if (block.id === 'exam-head') return <WsContext.Provider value={loesung ? nurLesen : kopfBearbeiten}>{content}</WsContext.Provider>
@@ -433,6 +494,11 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)}
               onRegenerate={() => bausteinUeberarbeiten(block)}
             >
+              {block.type === 'task' && (
+                <Menu.Item onClick={() => rasterErstellen(block)} data-raster-erstellen>
+                  Bewertungsraster erstellen
+                </Menu.Item>
+              )}
               {/* Leveln (Großprogramm 0.4, F1) – etwa für eine Fassung mit Nachteilsausgleich */}
               <LevelnMenue block={block} meta={exam.meta} onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)} />
             </KiMenue>
