@@ -403,8 +403,10 @@ describe('Nachgetragene Fachprofile', () => {
   })
 
   it('bleibt bei Fächern ohne Profil beim abgeleiteten Bestand', () => {
-    // Erdkunde ist in keiner der gelesenen Listen eigens geführt
-    expect(istBelegt(profilFuer('NW', 'erdkunde', 'sek2'))).toBe(false)
+    // Kunst ist in keiner der gelesenen Listen eigens geführt
+    expect(istBelegt(profilFuer('NW', 'kunst', 'sek2'))).toBe(false)
+    // Erdkunde seit der Recherche vom 28.09.2026 aus der NRW-Operatorenübersicht Geographie
+    expect(istBelegt(profilFuer('NW', 'erdkunde', 'sek2'))).toBe(true)
   })
 })
 

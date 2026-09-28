@@ -1,0 +1,1444 @@
+{
+ "stateId": "SN",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Verwaltungsvorschrift des SMK zur Vorbereitung auf die Abiturprüfung und die Ergänzungsprüfungen 2027 an allgemeinbildenden Gymnasien, Abendgymnasien und Kollegs (VwV Abiturprüfung 2027) vom 6. Mai 2025 (MBl. SMK S. 46), Sächsisches Staatsministerium für Kultus (SMK), 2025",
+   "url": "https://www.revosax.sachsen.de/vorschrift/21215",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "zeigen",
+     "definition": "wie aufzeigen, das heißt historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren, die Sachverhalte transparent machen",
+     "afb": "I",
+     "formen": [
+      "zeigen/ darlegen"
+     ]
+    },
+    {
+     "operator": "darlegen",
+     "definition": "wie aufzeigen, das heißt historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren, die Sachverhalte transparent machen",
+     "afb": "I",
+     "formen": [
+      "zeigen/ darlegen"
+     ]
+    },
+    {
+     "operator": "erarbeiten",
+     "definition": "wie herausarbeiten, d. h. aus Materialien bestimmte historische Sachverhalte herausfinden und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "verdeutlichen",
+     "definition": "durch zusätzliche Informationen und Beispiele einen Sachverhalt verständlicher machen",
+     "afb": "II"
+    },
+    {
+     "operator": "kennzeichnen",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "VwV Abiturprüfung 2028 vom 10. Juni 2026 (MBl. SMK S. 86), Sächsisches Staatsministerium für Kultus (SMK), 2026",
+   "url": "https://www.revosax.sachsen.de/vorschrift/21595",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "zeigen",
+     "definition": "wie aufzeigen, d. h. historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren, die Sachverhalte transparent machen",
+     "afb": "I",
+     "formen": [
+      "zeigen/ darlegen"
+     ]
+    },
+    {
+     "operator": "darlegen",
+     "definition": "wie aufzeigen, d. h. historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren, die Sachverhalte transparent machen",
+     "afb": "I",
+     "formen": [
+      "zeigen/ darlegen"
+     ]
+    },
+    {
+     "operator": "erarbeiten",
+     "definition": "wie herausarbeiten, d. h. aus Materialien bestimmte historische Sachverhalte herausfinden und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "verdeutlichen",
+     "definition": "durch zusätzliche Informationen und Beispiele einen Sachverhalt verständlicher machen",
+     "afb": "II"
+    },
+    {
+     "operator": "kennzeichnen",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben",
+     "afb": "II"
+    },
+    {
+     "operator": "bestimmen",
+     "definition": "etwas (vor allem materialbezogene Sachverhalte, Positionen) kurz und kriteriengeleitet feststellen und das Ergebnis präzise und fachsprachlich korrekt formulieren",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "KMK-EPA Geschichte (i. d. F. 10.02.2005), per VwV Abiturprüfung 2027/2028 für das Fach Geschichte in Sachsen in Bezug genommen, KMK / Verweis durch SMK, 2005",
+   "url": "https://www.kmk.org/fileadmin/Dateien/veroeffentlichungen_beschluesse/1989/1989_12_01-EPA-Geschichte.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "interpretieren",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und eine begründete Stellungnahme abgeben, die auf einer Analyse, Erläuterung und Bewertung beruht",
+     "afb": "I–III"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Eine These oder Problemstellung durch eine Kette von Für-und-Wider- bzw. Sowohl-als-Auch-Argumenten auf ihren Wert und ihre Stichhaltigkeit hin abwägend prüfen und auf dieser Grundlage eine eigene Stellungnahme dazu entwickeln. Die Erörterung einer historischen Darstellung setzt deren Analyse voraus.",
+     "afb": "I–III"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "historische Entwicklungszusammenhänge und Zustände mit Hilfe von Quellenkenntnissen und Deutungen beschreiben, erklären und beurteilen",
+     "afb": "I–III"
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen zusammentragen, ohne diese zu kommentieren",
+     "afb": "I"
+    },
+    {
+     "operator": "aufzählen",
+     "definition": "zielgerichtet Informationen zusammentragen, ohne diese zu kommentieren",
+     "afb": "I"
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "historische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "schildern",
+     "definition": "historische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "historische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "aufzeigen",
+     "definition": "historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I"
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II"
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen",
+     "afb": "II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen historischen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "historische Sachverhalte durch Wissen und Einsichten in einen Zusammenhang (Theorie, Modell, Regel, Gesetz, Funktionszusammenhang) einordnen und begründen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie erklären, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte historische Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "wie skizzieren, aber zusätzlich argumentierend gewichten",
+     "afb": "II"
+    },
+    {
+     "operator": "widerlegen",
+     "definition": "Argumente dafür anführen, dass eine Behauptung zu Unrecht aufgestellt wird",
+     "afb": "II"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert historischer Sachverhalte in einem Zusammenhang bestimmen, um ohne persönlichen Wertebezug zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie Operator „beurteilen“, aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III"
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "wie Operator „beurteilen“, aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "gewonnene Analyseergebnisse synthetisieren um zu einer eigenen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "sich auseinander setzen",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "formen": [
+      "sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) an historischen Sachverhalten auf ihre Angemessenheit hin untersuchen",
+     "afb": "III"
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) an historischen Sachverhalten auf ihre Angemessenheit hin untersuchen",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "auf der Grundlage von Kriterien historische Sachverhalte problembezogen gegenüberzustellen, um Gemeinsamkeiten, Unterschiede, Teil-Identitäten, Ähnlichkeiten, Abweichungen oder Gegensätze zu beurteilen",
+     "afb": "III"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Englisch (Fassung ab Prüfungsjahr 2027), in Sachsen per VwV Abiturprüfung 2027 als orientierend benannt, per VwV Abiturprüfung 2028 verbindliche Orientierung für Schreiben und Sprachmittlung, IQB / Verweis durch SMK, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyze",
+     "definition": "describe and explain in detail and give evidence from the text, relating the content to relevant aspects of language and form",
+     "beispiele": [
+      "Analyze the way the protagonist is characterized. Focus on narrative techniques and use of language.\nAnalyze how the author’s opinion on social movements is conveyed. Focus on use of language and communicative strategies as well as the function of the photo published with the article."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "examine",
+     "definition": "describe and explain in detail and give evidence from the text, relating the content to relevant aspects of language and form",
+     "beispiele": [
+      "Examine how Jennifer Senior conveys her attitude towards “cancel culture” and its consequences for authors. Focus on structure and use of language."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the relative value, quality or significance of sth., i.e. on the extent to which sth. is effective/true/etc., backing up one’s argumentation with evidence and examples",
+     "beispiele": [
+      "Assess to what extent the cartoon reflects what Choudhury and his family have experienced in the US.\nTaking the quotation as a starting point, assess to what extent educational institutions can help young people realize their potential."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "evaluate",
+     "definition": "express a well-founded opinion on the relative value, quality or significance of sth., i.e. on the extent to which sth. is effective/true/etc., backing up one’s argumentation with evidence and examples",
+     "beispiele": [
+      "Taking the cartoon as a starting point, evaluate the effectiveness of measures taken against discrimination in the US."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment",
+     "definition": "express a well-founded opinion on sth., backing up one’s argumentation with evidence and examples and possibly considering counterarguments",
+     "formen": [
+      "comment (on)"
+     ],
+     "beispiele": [
+      "Comment on the writer’s admission that his view might be seen as “anti-American” (l. 21).\nComment on the message of the cartoon with respect to what makes good journalism in the 21st century."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences and give evidence from the text, relating the content to relevant aspects of language and form",
+     "beispiele": [
+      "Compare how the issue of racism is presented in the two articles. Focus on communicative strategies and the use of language."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "beispiele": [
+      "Describe the old woman and her behavior."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "express a well-founded opinion on sth., considering arguments for both sides of an issue, backing up one’s argumentation with evidence and examples",
+     "beispiele": [
+      "“[S]he would be the first one to join up […] and work for the cause, bleed for the cause, make the cause the central purpose of her life.” (Paul Auster, 4 3 2 1, ll. 57-60) Using Amy’s plea as a starting point, discuss the idea of devoting one’s life to a cause.\nThe author talks of “the influencer game” (l. 41). Taking the article as a starting point, discuss whether the influencer phenomenon is really a “game”."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to the text and its context to clarify how or why sth. is as it is",
+     "beispiele": [
+      "Explain the protagonist’s reservations about the concept of the American Dream.\nExplain how the statistics complement the author’s point of view."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic as specified by the task",
+     "beispiele": [
+      "Outline the information on the life of African Americans in the 1960s as presented in the text."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "summarize",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic as specified by the task",
+     "beispiele": [
+      "Summarize the information on the narrator’s husband."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "sum up",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic as specified by the task",
+     "beispiele": [
+      "Sum up Bono’s view on the European Union and his vision for its future."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out",
+     "definition": "present the main aspects of sth. briefly",
+     "beispiele": [
+      "Point out the effects of climate change on low-lying countries and the measures taken to deal with the situation."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write",
+     "definition": "produce a text with characteristic features",
+     "formen": [
+      "write (+ text type)"
+     ],
+     "beispiele": [
+      "Write a letter to the editor, commenting on the author’s view on technology and his vision of the future.\n“For me, education was power.” (Michelle Obama) Former First Lady Michelle Obama is African American, a successful lawyer and the first academic in her family. Write a blog entry for the website of the international youth project Knowledge – Voice – Action, in which you assess to what extent Michelle Obama’s claim holds true for minorities and the socially disadvantaged."
+     ],
+     "kompetenzbereich": "Schreiben",
+     "zusatz": {
+      "Fußnote": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Englisch (Fassung ab Prüfungsjahr 2027), in Sachsen per VwV Abiturprüfung 2027 als orientierend benannt, per VwV Abiturprüfung 2028 verbindliche Orientierung für Schreiben und Sprachmittlung, IQB / Verweis durch SMK, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "Write an article for the project website, outlining the development and the goals of “Jugend forscht”."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "present",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "Write an email to your friend in which you present the Muldestausee youth council and its accomplishments."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "summarize",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "sum up",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "For their blog, write an entry summing up the information on Danny Beuerbach and his initiatives."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "write",
+     "definition": "produce a text with characteristic features, clarifying culture-related aspects if necessary",
+     "formen": [
+      "write (+ text type)"
+     ],
+     "beispiele": [
+      "Your American friend is active in the National Junior Firefighter Program and is interested in how other countries organize firefighting and what challenges they are facing. Write your friend an email in which you present the situation of firefighting in Germany."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Fußnote": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Englisch (Fassung ab Prüfungsjahr 2027), in Sachsen per VwV Abiturprüfung 2027 als orientierend benannt, per VwV Abiturprüfung 2028 verbindliche Orientierung für Schreiben und Sprachmittlung, IQB / Verweis durch SMK, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "answer",
+     "definition": "",
+     "beispiele": [
+      "While listening, answer the questions. You need not write complete sentences. Unless otherwise specified, name one aspect."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "choose",
+     "definition": "",
+     "beispiele": [
+      "Choose the heading (A-G) that best summarizes each statement (1-6). For each statement, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "complete",
+     "definition": "",
+     "beispiele": [
+      "Complete the sentences below. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "fill in",
+     "definition": "",
+     "beispiele": [
+      "While listening, fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "While listening, match what each person says (1-6) with the headings (A-G). Choose the heading that best summarizes what each person says. For each speaker, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "name",
+     "definition": "",
+     "beispiele": [
+      "Why do some fish generate an electric field? Name two aspects."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "While listening, tick (✓) the correct answer (a, b, or c). There is only one correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Englisch (Fassung ab Prüfungsjahr 2027), in Sachsen per VwV Abiturprüfung 2027 als orientierend benannt, per VwV Abiturprüfung 2028 verbindliche Orientierung für Schreiben und Sprachmittlung, IQB / Verweis durch SMK, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "complete",
+     "definition": "",
+     "beispiele": [
+      "Complete the table below. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "fill in",
+     "definition": "",
+     "beispiele": [
+      "Fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "decide",
+     "definition": "",
+     "beispiele": [
+      "Decide whether the statements (1-6) are true or false according to the text and tick (✓) the corresponding box.\nDecide which heading best fits each paragraph and put the correct number into the box. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "give evidence",
+     "definition": "",
+     "beispiele": [
+      "Read the following article on self-driving cars. Decide whether the statements (1-10) are true or false according to the text and tick (✓) the corresponding box. Always give evidence to support your decisions. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "list",
+     "definition": "",
+     "beispiele": [
+      "List the reasons mentioned in the article. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "name",
+     "definition": "",
+     "beispiele": [
+      "Name the arguments in favour of the proposal. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "Match the comments (1-5) with the headings (A-G). Choose the heading that best summarizes what each comment says. For each comment, there is only one correct answer. There are two more headings than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "state",
+     "definition": "",
+     "beispiele": [
+      "State the main ideas of both reviews in the table below. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "Tick (✓) the correct answer."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Englisch (Fassung ab Prüfungsjahr 2027), in Sachsen per VwV Abiturprüfung 2027 als orientierend benannt, per VwV Abiturprüfung 2028 verbindliche Orientierung für Schreiben und Sprachmittlung, IQB / Verweis durch SMK, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "agree on",
+     "definition": "come to one opinion or an understanding based on arguments",
+     "beispiele": [
+      "Agree on two pictures which could persuade your age group most to do more for the protection of the environment."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "come to an agreement",
+     "definition": "come to one opinion or an understanding based on arguments",
+     "beispiele": [
+      "Come to an agreement on what to be included in your presentation."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "analyze",
+     "definition": "describe, explain and give evidence from the material",
+     "beispiele": [
+      "For a youth conference on American ideals, visions and traditions, you have been asked to give an oral presentation about the cartoon. Analyze the cartoon.\nYou are preparing a photo exhibition for an international youth convention on the topic City Environments. Analyze the photographs."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "examine",
+     "definition": "describe, explain and give evidence from the material",
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "argue",
+     "definition": "make a case based on appropriate evidence for and/or against some given point of view",
+     "beispiele": [
+      "In a discussion about the replacement of textbooks by portable computers at school argue for or against this proposal."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the relative value, quality and significance of sb./sth., i.e. arguing about the extent to which sth. is effective/true/etc., backing up one’s argumentation",
+     "beispiele": [
+      "Assess the suitability of the two cartoons to illustrate your topic."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "evaluate",
+     "definition": "express a well-founded opinion on the relative value, quality and significance of sb./sth., i.e. arguing about the extent to which sth. is effective/true/etc., backing up one’s argumentation",
+     "beispiele": [
+      "Evaluate the chances for an applicant’s personal development described in the job offer at hand."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "comment",
+     "definition": "provide a well-founded opinion on sth., backing up one’s argumentation and possibly considering counterarguments",
+     "formen": [
+      "comment (on)"
+     ],
+     "beispiele": [
+      "As members of your school’s student council you and your partner are expected to organize a panel discussion on the importance of moral issues in today’s society. Comment on the following statistics.\nThe EU has launched a competition entitled Mobility for all. Entries should propose both creative and realistic regional projects. Comment on the material.\nComment on the relevance of the issue covered in the cartoon for (our) society."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences",
+     "beispiele": [
+      "Based on the charts, compare the job situation of young people your age in Germany and in the UK.\nYou are preparing a photo exhibition for an international youth convention on the topic of City Environments. Compare the aspects of city life shown in the photos."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sth./sb. is like",
+     "beispiele": [
+      "You and your partner are participating in an international youth convention on environmental challenges. You are looking for photographs to illustrate your presentation. Describe the pictures to your partner."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "discuss",
+     "definition": "give/exchange arguments or reasons for and against a particular view or idea, backing up one’s argumentation and drawing a well-founded conclusion (together)",
+     "beispiele": [
+      "You and your partner are participating in a youth convention about robotics. Together with your partner, discuss the benefits and challenges of further scientific innovations.\nTogether with your partner, discuss whether options such as community service, gap years, or military service should be mandatory for young people.\nDiscuss the problems shown in the photos and possible solutions."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to examples and its wider context if necessary",
+     "beispiele": [
+      "Explain the following quotation about travelling.\nExplain possible reasons behind the statistics and the impact on both the individual and society."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "make suggestions",
+     "definition": "propose initiatives, measures, etc. and explain why they need to be taken",
+     "beispiele": [
+      "Make suggestions on how discrimination against marginalized groups can be fought. Rank them according to effectiveness."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "relate",
+     "definition": "show the relationship between materials, concepts, etc. by explaining whether/how two or more texts oppose, complement or contradict each other",
+     "formen": [
+      "relate (to)"
+     ],
+     "beispiele": [
+      "Relate the two cartoons to each other."
+     ],
+     "kompetenzbereich": "Sprechen"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Französisch (Fassung ab Prüfungsjahr 2027), Verweis wie Englisch, IQB / Verweis durch SMK, 2024",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/F_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "franzoesisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "fr",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyser",
+     "definition": "relever et expliquer des aspects particuliers du texte",
+     "beispiele": [
+      "Analysez les sentiments de Ryad en tenant compte des procédés d’écriture employés par l’auteur."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "étudier",
+     "definition": "relever et expliquer des aspects particuliers du texte",
+     "beispiele": [
+      "Étudiez le comportement de Florence."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "examiner",
+     "definition": "relever et expliquer des aspects particuliers du texte",
+     "beispiele": [
+      "Examinez comment la journaliste essaie de convaincre les lecteurs en tenant compte des procédés d’écriture utilisés."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "caractériser",
+     "definition": "décrire et analyser un personnage",
+     "beispiele": [
+      "Caractérisez le personnage principal."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "faire le portrait",
+     "definition": "décrire et analyser un personnage",
+     "beispiele": [
+      "Faites le portrait du père de Jamal."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "commenter",
+     "definition": "illustrer une pensée en avançant des arguments qui en confirment ou en infirment la justesse.",
+     "beispiele": [
+      "« Tu sais comment nous sommes, nous ne nous rendons compte de nos richesses qu’une fois que nous les perdons ! » Commentez cette citation."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comparer",
+     "definition": "montrer les points communs et les différences",
+     "beispiele": [
+      "Comparez l’attitude des deux personnages envers la guerre en tenant compte des procédés d’écriture utilisés par l’autrice."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "mettre en rapport",
+     "definition": "montrer les points communs et les différences",
+     "beispiele": [
+      "Mettez en rapport le dessin humoristique avec le texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "décrire",
+     "definition": "montrer différents aspects qui se rapportent à qc/qn",
+     "beispiele": [
+      "Décrivez la scène dans le métro."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "présenter",
+     "definition": "montrer différents aspects qui se rapportent à qc/qn",
+     "beispiele": [
+      "Présentez les expériences faites par la protagoniste."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "dégager",
+     "definition": "faire ressortir, mettre en évidence certains éléments ou structures du texte",
+     "beispiele": [
+      "Dégagez l’opinion de Samuel en tenant compte des procédés d’écriture utilisés."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "exposer",
+     "definition": "faire ressortir, mettre en évidence certains éléments ou structures du texte",
+     "beispiele": [
+      "Exposez la situation de Ryad."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "écrire",
+     "definition": "produire un texte",
+     "beispiele": [
+      "Une semaine après son arrivée à Marseille, Alice écrit une lettre à son meilleur ami/sa meilleure amie dans laquelle elle fait part de ses sentiments et de ses premières expériences. Écrivez / Rédigez cette lettre."
+     ],
+     "kompetenzbereich": "Schreiben",
+     "zusatz": {
+      "Fußnote": "Die Operatoren écrire und rédiger werden in der Regel unter Angabe einer Textsorte situativ eingebettet und ggfs. mit einem anderen Operator kombiniert."
+     }
+    },
+    {
+     "operator": "rédiger",
+     "definition": "produire un texte",
+     "beispiele": [
+      "Une semaine après son arrivée à Marseille, Alice écrit une lettre à son meilleur ami/sa meilleure amie dans laquelle elle fait part de ses sentiments et de ses premières expériences. Écrivez / Rédigez cette lettre."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "évaluer",
+     "definition": "porter un jugement à partir de critères pertinents",
+     "beispiele": [
+      "Évaluez l’impact des voyages écoresponsables sur l’environnement."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "expliquer",
+     "definition": "faire comprendre, clarifier",
+     "beispiele": [
+      "Expliquez pourquoi la narratrice a décidé de porter le voile."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "prendre position et justifier",
+     "definition": "exprimer son avis en avançant des arguments",
+     "beispiele": [
+      "« Les livres – une espèce menacée par le numérique ? » Prenez position et justifiez votre point de vue."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "peser le pour et le contre",
+     "definition": "montrer les avantages et les inconvénients d’un point de vue / d’une attitude et en tirer une conclusion",
+     "beispiele": [
+      "« Et si l’on passait les vacances à la maison pour faire un geste écologique ? » Pesez le pour et le contre de cette proposition."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuter",
+     "definition": "montrer les avantages et les inconvénients d’un point de vue / d’une attitude et en tirer une conclusion",
+     "beispiele": [
+      "Discutez les avantages et les inconvénients des colocations intergénérationnelles."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "résumer",
+     "definition": "donner les informations principales",
+     "beispiele": [
+      "Résumez le conflit entre Maryam et ses parents."
+     ],
+     "kompetenzbereich": "Schreiben"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Französisch (Fassung ab Prüfungsjahr 2027), Verweis wie Englisch, IQB / Verweis durch SMK, 2024",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/F_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "franzoesisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "fr",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "écrire",
+     "definition": "produire un texte",
+     "beispiele": [
+      "Votre correspondant/e français/e vous a demandé des informations concernant des bourses d’études en Allemagne. Écrivez / Rédigez cette lettre à partir des informations du texte."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Fußnote": "Die Operatoren écrire und rédiger werden in der Regel unter Angabe einer Textsorte situativ eingebettet und ggfs. mit einem anderen Operator kombiniert."
+     }
+    },
+    {
+     "operator": "rédiger",
+     "definition": "produire un texte",
+     "beispiele": [
+      "Votre correspondant/e français/e vous a demandé des informations concernant des bourses d’études en Allemagne. Écrivez / Rédigez cette lettre à partir des informations du texte."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "expliquer",
+     "definition": "faire comprendre, clarifier",
+     "beispiele": [
+      "Lors de son séjour en Allemagne, votre correspondant/e a été fasciné/e par les cérémonies de remise des diplômes du baccalauréat, cérémonies inexistantes en France. Après son départ, vous trouvez un article sur les nouvelles tendances concernant leur organisation. Expliquez-lui ces nouvelles tendances dans un e-mail."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "présenter",
+     "definition": "montrer différents aspects qui se rapportent à qc/qn",
+     "beispiele": [
+      "Présentez l’action décrite dans l’extrait sous la forme d’un article pour le blog de Phosphore."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Französisch (Fassung ab Prüfungsjahr 2027), Verweis wie Englisch, IQB / Verweis durch SMK, 2024",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/F_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "franzoesisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "fr",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "associer",
+     "definition": "",
+     "beispiele": [
+      "Associez la lettre au document correspondant."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "citer",
+     "definition": "",
+     "beispiele": [
+      "L’association organise plusieurs activités. Citez-en deux. / Notez-en deux."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "noter",
+     "definition": "",
+     "beispiele": [
+      "L’association organise plusieurs activités. Citez-en deux. / Notez-en deux."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "cocher",
+     "definition": "",
+     "beispiele": [
+      "Cochez la bonne case."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "compléter",
+     "definition": "",
+     "beispiele": [
+      "Complétez la phrase."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "répondre",
+     "definition": "",
+     "beispiele": [
+      "Répondez brièvement aux questions en notant l’information demandée."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Französisch (Fassung ab Prüfungsjahr 2027), Verweis wie Englisch, IQB / Verweis durch SMK, 2024",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/F_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "franzoesisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "fr",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyser",
+     "definition": "relever et expliquer certains aspects particuliers d’un document",
+     "beispiele": [
+      "Analysez le diagramme qui se trouve ci-dessous."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "commenter",
+     "definition": "illustrer une pensée en avançant des arguments qui en confirment ou en infirment la justesse.",
+     "beispiele": [
+      "Commentez la citation."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "comparer",
+     "definition": "montrer les points communs et les différences",
+     "beispiele": [
+      "Comparez les positions présentées dans les documents."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "mettre en rapport",
+     "definition": "montrer les points communs et les différences",
+     "beispiele": [
+      "Mettez le dessin en rapport avec la citation."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "décrire",
+     "definition": "montrer différents aspects qui se rapportent à qc/qn",
+     "beispiele": [
+      "Décrivez la photo."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "présenter",
+     "definition": "montrer différents aspects qui se rapportent à qc/qn",
+     "beispiele": [
+      "Présentez les résultats du sondage"
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "discuter",
+     "definition": "échanger des idées, des arguments sur un sujet",
+     "formen": [
+      "discuter de qc"
+     ],
+     "beispiele": [
+      "Avec votre partenaire, discutez des mesures pour lutter contre le racisme."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "expliquer",
+     "definition": "faire comprendre, clarifier",
+     "beispiele": [
+      "Expliquez le message du dessin humoristique."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "parler",
+     "definition": "exprimer sa pensée au sujet de qc",
+     "beispiele": [
+      "Parlez de vos projets professionnels."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "prendre position et justifier",
+     "definition": "exprimer son avis en avançant des arguments",
+     "beispiele": [
+      "« Les livres – une espèce menacée par le numérique ? » Prenez position et justifiez votre point de vue."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "se mettre d’accord",
+     "definition": "échanger des idées pour trouver un compromis, une solution",
+     "beispiele": [
+      "Dans votre école, on débat sur la possibilité d’introduire l’uniforme scolaire. Discutez-en avec votre partenaire et mettez-vous d’accord avec elle / lui."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "résumer",
+     "definition": "donner les informations principales",
+     "beispiele": [
+      "Résumez le témoignage."
+     ],
+     "kompetenzbereich": "Sprechen"
+    }
+   ]
+  },
+  {
+   "quelle": "IQB-Grundstock von Operatoren Französisch (Fassung ab Prüfungsjahr 2027), Verweis wie Englisch, IQB / Verweis durch SMK, 2024",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/F_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "franzoesisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "fr",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "associer",
+     "definition": "",
+     "beispiele": [
+      "Associez un titre à chaque document."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "citer",
+     "definition": "",
+     "beispiele": [
+      "Pour ne pas s’endormir la nuit, Bastien a essayé plusieurs activités. Citez-en deux. / Notez-en deux."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "indiquer",
+     "definition": "",
+     "beispiele": [
+      "Indiquez le passage qui justifie votre réponse."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "noter",
+     "definition": "",
+     "beispiele": [
+      "Pour ne pas s’endormir la nuit, Bastien a essayé plusieurs activités. Citez-en deux. / Notez-en deux."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "cocher",
+     "definition": "",
+     "beispiele": [
+      "Cochez la bonne case."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "compléter",
+     "definition": "",
+     "beispiele": [
+      "Complétez la phrase."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "répondre",
+     "definition": "",
+     "beispiele": [
+      "Répondez brièvement aux questions en notant l’information demandée."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Verwendung ausgewählter Operatoren in Aufgabenstellungen, Klassenstufen 5 bis 10, Mittelschule (August 2008), Sächsisches Staatsministerium für Kultus (SMK), 2008",
+   "url": "https://www.schule.sachsen.de/download/operatoren_ms_2008.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch",
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Zerlegen und Herausstellen einzelner Aspekte (z. B. des Inhalts, der Struktur, der Wirkungsweise) von Aussagen, bildlichen Darstellungen, Kunstwerken, Multimediaanwendungen, Texten",
+     "formen": [
+      "Analysieren Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Analysieren Sie ..."
+     }
+    },
+    {
+     "operator": "begründen",
+     "definition": "Bestätigen einer Aussage durch Anwendung logischer Schlussregeln, Angabe stützender Argumente",
+     "formen": [
+      "Begründen Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Begründen Sie ..."
+     }
+    },
+    {
+     "operator": "beweisen",
+     "definition": "Bestätigen einer Aussage durch Anwendung logischer Schlussregeln, Angabe stützender Argumente",
+     "formen": [
+      "Beweisen Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Beweisen Sie ..."
+     }
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Bestätigen einer Aussage durch Anwendung logischer Schlussregeln, Angabe stützender Argumente",
+     "formen": [
+      "Weisen Sie nach ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Weisen Sie nach ..."
+     }
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Kennzeichnen der Beschaffenheit eines Gegenstands oder einer Erscheinung, des Ablaufs eines Vorgangs oder Verfahrens, des Aufbaus eines Systems unter Verwendung der jeweiligen Fachsprache in der Regel in Sätzen",
+     "formen": [
+      "Beschreiben Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Beschreiben Sie ..."
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Stellung nehmen zu einem Sachverhalt oder Problem unter Bezug auf Kriterien einer Kategorie",
+     "formen": [
+      "Beurteilen Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Beurteilen Sie ..."
+     }
+    },
+    {
+     "operator": "werten",
+     "definition": "Stellung nehmen zu einem Sachverhalt oder Problem unter Bezug auf Kriterien einer Kategorie",
+     "formen": [
+      "Werten Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Werten Sie ..."
+     }
+    },
+    {
+     "operator": "definieren",
+     "definition": "Festlegen des Gebrauchs von Zeichen, Wörtern, Begriffen",
+     "formen": [
+      "Definieren Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Definieren Sie ..."
+     }
+    },
+    {
+     "operator": "erklären",
+     "definition": "Bestätigen der Gültigkeit einer Schlussfolgerung, der Korrektheit eines Verfahrens, der Funktionalität einer Wirkungsweise durch Rückführung auf bekannte Gesetze, Modelle",
+     "formen": [
+      "Erklären Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Erklären Sie ..."
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Verdeutlichen eines Sachverhalts, Vorgangs, Begriffs, Gesetzes, einer Arbeitsweise in anschaulicher Form unter Nutzung von Beispielen",
+     "formen": [
+      "Erläutern Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Erläutern Sie ..."
+     }
+    },
+    {
+     "operator": "angeben",
+     "definition": "Formulieren von Fakten oder Ergebnissen angestellter Überlegungen ohne Darstellung des Gedankengangs bzw. Lösungswegs und ohne Begründungen, Wertungen",
+     "formen": [
+      "Geben Sie ... an"
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Geben Sie ... an"
+     }
+    },
+    {
+     "operator": "nennen",
+     "definition": "Formulieren von Fakten oder Ergebnissen angestellter Überlegungen ohne Darstellung des Gedankengangs bzw. Lösungswegs und ohne Begründungen, Wertungen",
+     "formen": [
+      "Nennen Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Nennen Sie ..."
+     }
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Festhalten wesentlicher Sachverhalte in knapper Textform bzw. durch grafische Veranschaulichung auch frei Hand",
+     "formen": [
+      "Skizzieren Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Skizzieren Sie ..."
+     }
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Kennzeichnen von Eigenschaften eines Objekts, Aufdecken von Beziehungen zwischen Objekten, Sachverhalten",
+     "formen": [
+      "Untersuchen Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Untersuchen Sie ..."
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Verdeutlichen von Gemeinsamkeiten und Unterschieden zwischen Objekten, Sachverhalten, Prozessen, Systemen unter einem bestimmten Aspekt (z. B. Aufbau, Eigenschaften, Wirkungsweise, Gestaltungsweise, Quantität)",
+     "formen": [
+      "Vergleichen Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Vergleichen Sie ..."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Verwendung ausgewählter Operatoren in Aufgabenstellungen, Klassenstufen 5 bis 10, Mittelschule (August 2008), Sächsisches Staatsministerium für Kultus (SMK), 2008",
+   "url": "https://www.schule.sachsen.de/download/operatoren_ms_2008.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "charakterisieren",
+     "definition": "Herausarbeiten, Kennzeichnen, anschauliches Darstellen der Wesenszüge und Eigenheiten von Prozessen, Sachverhalten, Systemen, Personen, Figuren",
+     "formen": [
+      "Charakterisieren Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Charakterisieren Sie ..."
+     }
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Konzipieren und Realisieren eines Gestaltungsprozesses",
+     "formen": [
+      "Entwickeln Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Entwickeln Sie ..."
+     }
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Diskursives Entfalten von Aussagen, bildlichen Darstellungen, Kunstwerken, Multimediaanwendungen, Texten und argumentatives Entwickeln von Problemstellungen mit dem Ziel einer begründeten Stellungnahme",
+     "formen": [
+      "Erörtern Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Erörtern Sie ..."
+     }
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Auslegen und Deuten, ggf. Vortragen, von Kunstwerken, Multimediaanwendungen, Texten, Aussagen, bildlichen Darstellungen",
+     "formen": [
+      "Interpretieren Sie ..."
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Interpretieren Sie ..."
+     }
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Herstellen des Kontextes zu Aussagen, bildlichen Darstellungen, Kunstwerken, Multimediaanwendungen, Texten",
+     "formen": [
+      "Ordnen Sie ... ein"
+     ],
+     "zusatz": {
+      "Operatoren im Aufgabentext": "Ordnen Sie ... ein"
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,1981 @@
+{
+ "stateId": "HB",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Die Gymnasiale Oberstufe im Land Bremen – Bildungsplan Fortgeführte moderne Fremdsprachen (2015, Änderung Vorwort 2026), Anhang: Englisch – Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2015",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/Bildungsplan_moderne_Fremdsprachen_GyO_2015_%C3%84nderung%20Vorwort%202026.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "outline",
+     "definition": "give the main features, structure or general principles of a topic omitting minor details",
+     "afb": "I",
+     "beispiele": [
+      "Outline the author’s views on globalisation."
+     ]
+    },
+    {
+     "operator": "point out/state",
+     "definition": "identify sth. and present it clearly",
+     "afb": "I",
+     "formen": [
+      "point out",
+      "state"
+     ],
+     "beispiele": [
+      "Point out the author's main ideas on child labour.\nState the author's opinion on some of the benefits of globalisation."
+     ]
+    },
+    {
+     "operator": "present",
+     "definition": "(re)structure sth. and write it down",
+     "afb": "I",
+     "beispiele": [
+      "Present the situation of the married woman described in the text."
+     ]
+    },
+    {
+     "operator": "summarize / write a summary",
+     "definition": "give a concise account of the main points (condense)",
+     "afb": "I",
+     "formen": [
+      "summarize",
+      "write a summary"
+     ],
+     "beispiele": [
+      "Summarize the information given in the text about climate change."
+     ]
+    },
+    {
+     "operator": "describe/depict",
+     "definition": "give a detailed account of what sth. is like",
+     "afb": "I–II",
+     "formen": [
+      "describe",
+      "depict"
+     ],
+     "beispiele": [
+      "Describe the soldier’s outward appearance.\nDescribe the way in which the protagonist reacts to the news."
+     ]
+    },
+    {
+     "operator": "analyse/examine",
+     "definition": "look at sth in detail and explain its meaning or structure",
+     "afb": "II",
+     "formen": [
+      "analyse",
+      "examine"
+     ],
+     "beispiele": [
+      "Analyse the main elements of the poster.\nExamine the opposing views on class held by the two protagonists ."
+     ]
+    },
+    {
+     "operator": "describe the character of/ give / write a characterization of",
+     "definition": "give a detailed account of the typical or most noticeable qualities or features of a person, place or thing",
+     "afb": "II",
+     "formen": [
+      "describe the character of",
+      "give a characterization of",
+      "write a characterization of"
+     ],
+     "beispiele": [
+      "Give a characterization of the mother in the story."
+     ]
+    },
+    {
+     "operator": "illustrate/show",
+     "definition": "use examples to explain or make it clear",
+     "afb": "II",
+     "formen": [
+      "illustrate",
+      "show"
+     ],
+     "beispiele": [
+      "Illustrate the way in which school life in Britain differs from that in Germany."
+     ]
+    },
+    {
+     "operator": "compare",
+     "definition": "show similarities and differences",
+     "afb": "II–III",
+     "beispiele": [
+      "Compare X’s and Y’s views on education."
+     ]
+    },
+    {
+     "operator": "contrast",
+     "definition": "show differences between two or more things",
+     "afb": "II–III",
+     "beispiele": [
+      "Contrast the rights of African Americans in the 1960s and today."
+     ]
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by giving reasons and showing causes",
+     "afb": "II–III",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ]
+    },
+    {
+     "operator": "interpret",
+     "definition": "analyse the form and content of sth. and establish its meaning in a wider context and give your own views on it",
+     "afb": "II–III",
+     "beispiele": [
+      "Interpret the poem/cartoon."
+     ]
+    },
+    {
+     "operator": "relate",
+     "definition": "establish a connection between two things",
+     "afb": "II–III",
+     "beispiele": [
+      "Relate the cartoon to the short story."
+     ]
+    },
+    {
+     "operator": "assess/evaluate",
+     "definition": "express a well-founded opinion about the nature or quality of sb./sth. after careful consideration of the most important aspects in question",
+     "afb": "III",
+     "formen": [
+      "assess",
+      "evaluate"
+     ],
+     "beispiele": [
+      "Assess the importance of learning languages for somebody’s future.\nEvaluate the success of the steps taken so far to reduce the amount of household rubbish."
+     ]
+    },
+    {
+     "operator": "comment",
+     "definition": "state clearly your opinions on the topic in question, giving evidence to support your view",
+     "afb": "III",
+     "beispiele": [
+      "Comment on the thesis expressed in the text that the greenhouse effect is a good thing."
+     ]
+    },
+    {
+     "operator": "discuss",
+     "definition": "investigate an issue by argument; give reasons for and against",
+     "afb": "III",
+     "beispiele": [
+      "Discuss the implications of globalization as presented in the text."
+     ]
+    },
+    {
+     "operator": "justify",
+     "definition": "make understandable a decision/conclusion/view etc. by giving solid reasons",
+     "afb": "III",
+     "beispiele": [
+      "You are the principal of a school. Justify your decision to forbid smoking on the school premises."
+     ]
+    },
+    {
+     "operator": "reflect on",
+     "definition": "express your thoughts on sth. carefully and deeply",
+     "afb": "III",
+     "beispiele": [
+      "Reflect on the situation the main characters are in.\nReflect on your writing."
+     ]
+    },
+    {
+     "operator": "create and write + text type",
+     "definition": "produce sth. that has not existed before",
+     "afb": "III",
+     "formen": [
+      "create",
+      "write"
+     ],
+     "beispiele": [
+      "Create an ending of the Short Story.\nWrite a letter to the editor."
+     ]
+    },
+    {
+     "operator": "imagine and write + text type",
+     "definition": "form a picture in your mind of what sth. might be like and give a detailed account of it",
+     "afb": "III",
+     "formen": [
+      "imagine",
+      "write"
+     ],
+     "beispiele": [
+      "Imagine you were the protagonist. Write his diary entry at the end of the day."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Die Gymnasiale Oberstufe im Land Bremen – Geschichte – Bildungsplan für die Gymnasiale Oberstufe, Qualifikationsphase (Stand 2008), Anhang: Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2008",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/GyO_Geschichte_2008.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "Nennen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Aufzählen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Beschreiben",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Darstellen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Skizzieren",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Veranschaulichen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Zusammenfassen",
+     "definition": "Die zentralen Aussagen eines Materials in bündiger und strukturierter Form mit eigenen Worten auf das Wesentliche reduzieren",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Gliedern",
+     "definition": "Einen Zusammenhang oder ein Material nach selbst gefundenen oder vorgegebenen Gesichtspunkten unterteilen und ordnen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Erläutern",
+     "definition": "Einen Sachverhalt oder ein Material und seine Hintergründe verdeutlichen, in einen Zusammenhang einordnen und anschaulich und verständlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Charakterisieren",
+     "definition": "Typische Merkmale, Strukturen und Besonderheiten eines Sachverhalts oder eines Materials deutlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Herausarbeiten",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Untersuchen",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Analysieren",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Vergleichen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Gegenüberstellen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Anwenden",
+     "definition": "Modelle, Theorien, Regeln auf Sachverhalte oder Materialien übertragen",
+     "afb": "II"
+    },
+    {
+     "operator": "Einordnen",
+     "definition": "Eine Position zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "Entfalten",
+     "definition": "Einen Zusammenhang, einen Sachverhalt oder die eigene Position umfassend und begründet ausführen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erklären",
+     "definition": "Sachverhalte in einen Zusammenhang stellen und Hintergründe bzw. Ursachen aufzeigen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Begründen",
+     "definition": "Sachaussagen, Thesen, Urteile usw. durch geeignete Beispiele stützen und zu nachvollziehbaren Argumenten verarbeiten",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erörtern",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Diskutieren",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Beurteilen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Sich auseinandersetzen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Bewerten",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Erschließen",
+     "definition": "Etwas Neues oder nicht explizit Formuliertes auf der Basis von Theorien und Modellen durch Schlussfolgerungen herleiten",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwerfen",
+     "definition": "Ein begründetes Konzept für eine offene Situation erstellen und dabei die eigenen Analyseergebnisse in einen eigenständigen Beitrag einbringen",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwickeln",
+     "definition": "Gewonnene Analyseergebnisse zu einem Gesamtbild verdichten, um zu einer eigenständigen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "Interpretieren",
+     "definition": "Elemente, Sinnzusammenhänge und strukturelle Kennzeichen aus Materialien oder Sachverhalten unter gegebener Fragestellung herausarbeiten und die Ergebnisse in einer zusammenfassenden Gesamtaussage darstellen, die auf einer Analyse, Erläuterung und Bewertung aufbaut",
+     "afb": "III"
+    },
+    {
+     "operator": "Gestalten",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Formulieren",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Verfassen",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Die Gymnasiale Oberstufe im Land Bremen – Politik – Bildungsplan für die Gymnasiale Oberstufe, Qualifikationsphase (2008), Anhang: Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2008",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/GyO_Politik_2008.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "politik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "Nennen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Aufzählen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Beschreiben",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Darstellen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Skizzieren",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Veranschaulichen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Zusammenfassen",
+     "definition": "Die zentralen Aussagen eines Materials in bündiger und strukturierter Form mit eigenen Worten auf das Wesentliche reduzieren",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Gliedern",
+     "definition": "Einen Zusammenhang oder ein Material nach selbst gefundenen oder vorgegebenen Gesichtspunkten unterteilen und ordnen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Erläutern",
+     "definition": "Einen Sachverhalt oder ein Material und seine Hintergründe verdeutlichen, in einen Zusammenhang einordnen und anschaulich und verständlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Charakterisieren",
+     "definition": "Typische Merkmale, Strukturen und Besonderheiten eines Sachverhalts oder eines Materials deutlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Herausarbeiten",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Untersuchen",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Analysieren",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Vergleichen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Gegenüberstellen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Anwenden",
+     "definition": "Modelle, Theorien, Regeln auf Sachverhalte oder Materialien übertragen",
+     "afb": "II"
+    },
+    {
+     "operator": "Einordnen",
+     "definition": "Eine Position zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "Entfalten",
+     "definition": "Einen Zusammenhang, einen Sachverhalt oder die eigene Position umfassend und begründet ausführen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erklären",
+     "definition": "Sachverhalte in einen Zusammenhang stellen und Hintergründe bzw. Ursachen aufzeigen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Begründen",
+     "definition": "Sachaussagen, Thesen, Urteile usw. durch geeignete Beispiele stützen und zu nachvollziehbaren Argumenten verarbeiten",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erörtern",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Diskutieren",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Beurteilen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Sich auseinandersetzen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Bewerten",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Erschließen",
+     "definition": "Etwas Neues oder nicht explizit Formuliertes auf der Basis von Theorien und Modellen durch Schlussfolgerungen herleiten",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwerfen",
+     "definition": "Ein begründetes Konzept für eine offene Situation erstellen und dabei die eigenen Analyseergebnisse in einen eigenständigen Beitrag einbringen",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwickeln",
+     "definition": "Gewonnene Analyseergebnisse zu einem Gesamtbild verdichten, um zu einer eigenständigen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "Interpretieren",
+     "definition": "Elemente, Sinnzusammenhänge und strukturelle Kennzeichen aus Materialien oder Sachverhalten unter gegebener Fragestellung herausarbeiten und die Ergebnisse in einer zusammenfassenden Gesamtaussage darstellen, die auf einer Analyse, Erläuterung und Bewertung aufbaut",
+     "afb": "III"
+    },
+    {
+     "operator": "Gestalten",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Formulieren",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Verfassen",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Die Gymnasiale Oberstufe im Land Bremen – Geografie – Bildungsplan für die Gymnasiale Oberstufe, Qualifikationsphase (2008), Anhang: Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2008",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/GyO_Geografie_2008.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "Nennen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Aufzählen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Beschreiben",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Darstellen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Skizzieren",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Veranschaulichen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Zusammenfassen",
+     "definition": "Die zentralen Aussagen eines Materials in bündiger und strukturierter Form mit eigenen Worten auf das Wesentliche reduzieren",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Gliedern",
+     "definition": "Einen Zusammenhang oder ein Material nach selbst gefundenen oder vorgegebenen Gesichtspunkten unterteilen und ordnen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Erläutern",
+     "definition": "Einen Sachverhalt oder ein Material und seine Hintergründe verdeutlichen, in einen Zusammenhang einordnen und anschaulich und verständlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Charakterisieren",
+     "definition": "Typische Merkmale, Strukturen und Besonderheiten eines Sachverhalts oder eines Materials deutlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Herausarbeiten",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Untersuchen",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Analysieren",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Vergleichen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Gegenüberstellen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Anwenden",
+     "definition": "Modelle, Theorien, Regeln auf Sachverhalte oder Materialien übertragen",
+     "afb": "II"
+    },
+    {
+     "operator": "Einordnen",
+     "definition": "Eine Position zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "Entfalten",
+     "definition": "Einen Zusammenhang, einen Sachverhalt oder die eigene Position umfassend und begründet ausführen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erklären",
+     "definition": "Sachverhalte in einen Zusammenhang stellen und Hintergründe bzw. Ursachen aufzeigen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Begründen",
+     "definition": "Sachaussagen, Thesen, Urteile usw. durch geeignete Beispiele stützen und zu nachvollziehbaren Argumenten verarbeiten",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erörtern",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Diskutieren",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Beurteilen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Sich auseinandersetzen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Bewerten",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Erschließen",
+     "definition": "Etwas Neues oder nicht explizit Formuliertes auf der Basis von Theorien und Modellen durch Schlussfolgerungen herleiten",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwerfen",
+     "definition": "Ein begründetes Konzept für eine offene Situation erstellen und dabei die eigenen Analyseergebnisse in einen eigenständigen Beitrag einbringen",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwickeln",
+     "definition": "Gewonnene Analyseergebnisse zu einem Gesamtbild verdichten, um zu einer eigenständigen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "Interpretieren",
+     "definition": "Elemente, Sinnzusammenhänge und strukturelle Kennzeichen aus Materialien oder Sachverhalten unter gegebener Fragestellung herausarbeiten und die Ergebnisse in einer zusammenfassenden Gesamtaussage darstellen, die auf einer Analyse, Erläuterung und Bewertung aufbaut",
+     "afb": "III"
+    },
+    {
+     "operator": "Gestalten",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Formulieren",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Verfassen",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Die Gymnasiale Oberstufe im Land Bremen – Geschichte bilingual – Bildungsplan für die Gymnasiale Oberstufe, Qualifikationsphase (2009), Anhang: Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2009",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/GyO_Geschichte_bilingual_2009.17466.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of sth.",
+     "afb": "I–II"
+    },
+    {
+     "operator": "outline",
+     "definition": "give the main features, structure or general principles of a topic omitting minor details",
+     "afb": "I"
+    },
+    {
+     "operator": "state",
+     "definition": "specify clearly",
+     "afb": "I"
+    },
+    {
+     "operator": "summarize / write a summary",
+     "definition": "give a concise account of the main points",
+     "afb": "I",
+     "formen": [
+      "summarize",
+      "write a summary"
+     ]
+    },
+    {
+     "operator": "analyse / examine",
+     "definition": "describe and explain in detail certain aspects and/or features of the text",
+     "afb": "II",
+     "formen": [
+      "analyse",
+      "examine"
+     ]
+    },
+    {
+     "operator": "characterize",
+     "definition": "describe and examine the way in which the character(s) is/are presented",
+     "afb": "II"
+    },
+    {
+     "operator": "classify / categorize",
+     "definition": "arrange sth. in groups according to features that they have in common",
+     "afb": "II",
+     "formen": [
+      "classify",
+      "categorize"
+     ]
+    },
+    {
+     "operator": "compare",
+     "definition": "point out similarities and differences",
+     "afb": "II–III"
+    },
+    {
+     "operator": "contrast",
+     "definition": "emphasize the differences between two or more things",
+     "afb": "II"
+    },
+    {
+     "operator": "explain",
+     "definition": "describe and define in detail",
+     "afb": "II"
+    },
+    {
+     "operator": "illustrate",
+     "definition": "use examples to explain or make clear",
+     "afb": "II"
+    },
+    {
+     "operator": "arrange",
+     "definition": "change the order of specific elements according to a plan",
+     "afb": "II"
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning of sth. and give your own views on it",
+     "afb": "II–III"
+    },
+    {
+     "operator": "assess",
+     "definition": "consider in a balanced way the points for and against sth.",
+     "afb": "III"
+    },
+    {
+     "operator": "comment",
+     "definition": "state clearly your opinions on the topic in question and support your views with evidence",
+     "afb": "III"
+    },
+    {
+     "operator": "discuss",
+     "definition": "investigate or examine by argument; give reasons for and against",
+     "afb": "III"
+    },
+    {
+     "operator": "evaluate",
+     "definition": "form an opinion of the amount, value or quality of sth.",
+     "afb": "III"
+    },
+    {
+     "operator": "develop",
+     "definition": "produce sth. that has not existed before on the basis of what is there",
+     "afb": "III"
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan Englisch – Oberschule 5-10 (2010), Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2010",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/OSch_Englisch_2010.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek1",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of sth.",
+     "afb": "I–II",
+     "beispiele": [
+      "Describe the soldier’s appearance. (I)\nDescribe the way the playwright creates an atmosphere of suspense. (II)"
+     ]
+    },
+    {
+     "operator": "outline",
+     "definition": "give the main features, structure or general principles of a topic omitting minor details",
+     "afb": "I",
+     "beispiele": [
+      "Outline the author’s views on love, marriage and divorce."
+     ]
+    },
+    {
+     "operator": "state",
+     "definition": "specify clearly",
+     "afb": "I",
+     "beispiele": [
+      "State briefly the main developments in the family described in the text."
+     ]
+    },
+    {
+     "operator": "summarize / write a summary",
+     "definition": "give a concise account of the main points",
+     "afb": "I",
+     "formen": [
+      "summarize",
+      "write a summary"
+     ],
+     "beispiele": [
+      "Summarize the information given in the text about the hazards of cloning."
+     ]
+    },
+    {
+     "operator": "analyse/examine",
+     "definition": "describe and explain in detail certain aspects and/or features of the text",
+     "afb": "II",
+     "formen": [
+      "analyse",
+      "examine"
+     ],
+     "beispiele": [
+      "Analyse the opposing views on class held by the two protagonists.\nExamine the author’s use of language."
+     ]
+    },
+    {
+     "operator": "characterize",
+     "definition": "describe and examine the way in which the character(s) is/are presented",
+     "afb": "II",
+     "beispiele": [
+      "Characterize/Write a characterization of the protagonist."
+     ]
+    },
+    {
+     "operator": "classify/categorize",
+     "definition": "arrange sth. in groups according to features that they have in common",
+     "afb": "II",
+     "formen": [
+      "classify",
+      "categorize"
+     ],
+     "beispiele": [
+      "Classify the various forms of pollution the author mentions in his article."
+     ]
+    },
+    {
+     "operator": "compare",
+     "definition": "point out similarities and differences",
+     "afb": "II–III",
+     "beispiele": [
+      "Compare X’s and Y’s views on education."
+     ]
+    },
+    {
+     "operator": "contrast",
+     "definition": "emphasize the differences between two or more things",
+     "afb": "II",
+     "beispiele": [
+      "Contrast the author’s idea of human aggression with the theories of aggression you have read about."
+     ]
+    },
+    {
+     "operator": "explain",
+     "definition": "describe and define in detail",
+     "afb": "II",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ]
+    },
+    {
+     "operator": "illustrate",
+     "definition": "use examples to explain or make clear",
+     "afb": "II",
+     "beispiele": [
+      "Illustrate the author’s use of metaphorical language."
+     ]
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning of sth. and give your own views on it",
+     "afb": "II–III",
+     "beispiele": [
+      "Interpret the message the author wants to convey."
+     ]
+    },
+    {
+     "operator": "assess",
+     "definition": "consider in a balanced way the points for and against sth.",
+     "afb": "III",
+     "beispiele": [
+      "Assess the importance of standards in education."
+     ]
+    },
+    {
+     "operator": "comment",
+     "definition": "state clearly your opinions on the topic in question and support your views with evidence",
+     "afb": "III",
+     "beispiele": [
+      "Comment on the suggestion made in the text that “a lack of women in the armed forces…”."
+     ]
+    },
+    {
+     "operator": "discuss",
+     "definition": "investigate or examine by argument; give reasons for and against",
+     "afb": "III",
+     "beispiele": [
+      "Discuss the implications of globalization as presented in the text."
+     ]
+    },
+    {
+     "operator": "evaluate",
+     "definition": "form an opinion of the amount, value or quality of sth.",
+     "afb": "III",
+     "beispiele": [
+      "Evaluate the success of the steps taken so far to reduce the amount of household rubbish."
+     ]
+    },
+    {
+     "operator": "imagine",
+     "definition": "form a picture in your mind of what sth. might be like",
+     "afb": "III",
+     "beispiele": [
+      "Imagine you are in the position of the protagonist. Write…."
+     ]
+    },
+    {
+     "operator": "invent",
+     "definition": "produce sth. that has not existed before",
+     "afb": "III",
+     "beispiele": [
+      "Invent an ending of the Short Story."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan Englisch – Gymnasium 5-10 (2006), Liste der Operatoren, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2006",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/Gy_Englisch_2006.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek1",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of sth.",
+     "afb": "I–II",
+     "beispiele": [
+      "Describe the soldier’s appearance. (I)\nDescribe the way the playwright creates an atmosphere of suspense. (II)"
+     ]
+    },
+    {
+     "operator": "outline",
+     "definition": "give the main features, structure or general principles of a topic omitting minor details",
+     "afb": "I",
+     "beispiele": [
+      "Outline the author’s views on love, marriage and divorce."
+     ]
+    },
+    {
+     "operator": "state",
+     "definition": "specify clearly",
+     "afb": "I",
+     "beispiele": [
+      "State briefly the main developments in the family described in the text."
+     ]
+    },
+    {
+     "operator": "summarize / write a summary",
+     "definition": "give a concise account of the main points",
+     "afb": "I",
+     "formen": [
+      "summarize",
+      "write a summary"
+     ],
+     "beispiele": [
+      "Summarize the information given in the text about the hazards of cloning."
+     ]
+    },
+    {
+     "operator": "analyse/examine",
+     "definition": "describe and explain in detail certain aspects and/or features of the text",
+     "afb": "II",
+     "formen": [
+      "analyse",
+      "examine"
+     ],
+     "beispiele": [
+      "Analyse the opposing views on class held by the two protagonists.\nExamine the author’s use of language."
+     ]
+    },
+    {
+     "operator": "characterize",
+     "definition": "describe and examine the way in which the character(s) is/are presented",
+     "afb": "II",
+     "beispiele": [
+      "Characterize/Write a characterization of the protagonist."
+     ]
+    },
+    {
+     "operator": "classify/categorize",
+     "definition": "arrange sth. in groups according to features that they have in common",
+     "afb": "II",
+     "formen": [
+      "classify",
+      "categorize"
+     ],
+     "beispiele": [
+      "Classify the various forms of pollution the author mentions in his article."
+     ]
+    },
+    {
+     "operator": "compare",
+     "definition": "point out similarities and differences",
+     "afb": "II–III",
+     "beispiele": [
+      "Compare X’s and Y’s views on education."
+     ]
+    },
+    {
+     "operator": "contrast",
+     "definition": "emphasize the differences between two or more things",
+     "afb": "II",
+     "beispiele": [
+      "Contrast the author’s idea of human aggression with the theories of aggression you have read about."
+     ]
+    },
+    {
+     "operator": "explain",
+     "definition": "describe and define in detail",
+     "afb": "II",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ]
+    },
+    {
+     "operator": "illustrate",
+     "definition": "use examples to explain or make clear",
+     "afb": "II",
+     "beispiele": [
+      "Illustrate the author’s use of metaphorical language."
+     ]
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning of sth. and give your own views on it",
+     "afb": "II–III",
+     "beispiele": [
+      "Interpret the message the author wants to convey."
+     ]
+    },
+    {
+     "operator": "assess",
+     "definition": "consider in a balanced way the points for and against sth.",
+     "afb": "III",
+     "beispiele": [
+      "Assess the importance of standards in education."
+     ]
+    },
+    {
+     "operator": "comment",
+     "definition": "state clearly your opinions on the topic in question and support your views with evidence",
+     "afb": "III",
+     "beispiele": [
+      "Comment on the suggestion made in the text that “a lack of women in the armed forces…”."
+     ]
+    },
+    {
+     "operator": "discuss",
+     "definition": "investigate or examine by argument; give reasons for and against",
+     "afb": "III",
+     "beispiele": [
+      "Discuss the implications of globalization as presented in the text."
+     ]
+    },
+    {
+     "operator": "evaluate",
+     "definition": "form an opinion of the amount, value or quality of sth.",
+     "afb": "III",
+     "beispiele": [
+      "Evaluate the success of the steps taken so far to reduce the amount of household rubbish."
+     ]
+    },
+    {
+     "operator": "imagine",
+     "definition": "form a picture in your mind of what sth. might be like",
+     "afb": "III",
+     "beispiele": [
+      "Imagine you are in the position of the protagonist. Write…."
+     ]
+    },
+    {
+     "operator": "invent",
+     "definition": "produce sth. that has not existed before",
+     "afb": "III",
+     "beispiele": [
+      "Invent an ending of the Short Story."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan Gesellschaft und Politik – Oberschule 5-10 (2010), Liste der Operatoren für die Fächer Geschichte und Politik, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2010",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/OSch_Gesellschaft_Politik_2010.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "Nennen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Aufzählen",
+     "definition": "Einen Sachverhalt oder Bezeichnungen zielgerichtet begrifflich anführen, ohne sie zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "Nennen",
+      "Aufzählen"
+     ]
+    },
+    {
+     "operator": "Beschreiben",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Darstellen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Skizzieren",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Veranschaulichen",
+     "definition": "Einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–II",
+     "formen": [
+      "Beschreiben",
+      "Darstellen",
+      "Skizzieren",
+      "Veranschaulichen"
+     ]
+    },
+    {
+     "operator": "Zusammenfassen",
+     "definition": "Die zentralen Aussagen eines Materials in bündiger und strukturierter Form mit eigenen Worten auf das Wesentliche reduzieren",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Gliedern",
+     "definition": "Einen Zusammenhang oder ein Material nach selbst gefundenen oder vorgegebenen Gesichtspunkten unterteilen und ordnen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "Erläutern",
+     "definition": "Einen Sachverhalt oder ein Material und seine Hintergründe verdeutlichen, in einen Zusammenhang einordnen und anschaulich und verständlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Charakterisieren",
+     "definition": "Typische Merkmale, Strukturen und Besonderheiten eines Sachverhalts oder eines Materials deutlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "Herausarbeiten",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Untersuchen",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Analysieren",
+     "definition": "Einen einzelnen Sachverhalt unter vorgegebener Fragestellung aus einem Material erschließen und kriterienorientiert bzw. aspektgeleitet bearbeiten",
+     "afb": "II",
+     "formen": [
+      "Herausarbeiten",
+      "Untersuchen",
+      "Analysieren"
+     ]
+    },
+    {
+     "operator": "Vergleichen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Gegenüberstellen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Materialien ermitteln, ordnen und gewichten",
+     "afb": "II",
+     "formen": [
+      "Vergleichen",
+      "Gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "Anwenden",
+     "definition": "Modelle, Theorien, Regeln auf Sachverhalte oder Materialien übertragen",
+     "afb": "II"
+    },
+    {
+     "operator": "Einordnen",
+     "definition": "Eine Position zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "Entfalten",
+     "definition": "Einen Zusammenhang, einen Sachverhalt oder die eigene Position umfassend und begründet ausführen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erklären",
+     "definition": "Sachverhalte in einen Zusammenhang stellen und Hintergründe bzw. Ursachen aufzeigen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Begründen",
+     "definition": "Sachaussagen, Thesen, Urteile usw. durch geeignete Beispiele stützen und zu nachvollziehbaren Argumenten verarbeiten",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Erörtern",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Diskutieren",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen auf ihre Stichhaltigkeit und ihren Wert bzw. das Für und Wider gegeneinander abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "formen": [
+      "Erörtern",
+      "Diskutieren"
+     ]
+    },
+    {
+     "operator": "Beurteilen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Sich auseinandersetzen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offen gelegt werden",
+     "afb": "III",
+     "formen": [
+      "Beurteilen",
+      "Sich auseinandersetzen"
+     ]
+    },
+    {
+     "operator": "Bewerten",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Einen Sachverhalt oder ein Material nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "Bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Erschließen",
+     "definition": "Etwas Neues oder nicht explizit Formuliertes auf der Basis von Theorien und Modellen durch Schlussfolgerungen herleiten",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwerfen",
+     "definition": "Ein begründetes Konzept für eine offene Situation erstellen und dabei die eigenen Analyseergebnisse in einen eigenständigen Beitrag einbringen",
+     "afb": "III"
+    },
+    {
+     "operator": "Entwickeln",
+     "definition": "Gewonnene Analyseergebnisse zu einem Gesamtbild verdichten, um zu einer eigenständigen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "Interpretieren",
+     "definition": "Elemente, Sinnzusammenhänge und strukturelle Kennzeichen aus Materialien oder Sachverhalten unter gegebener Fragestellung herausarbeiten und die Ergebnisse in einer zusammenfassenden Gesamtaussage darstellen, die auf einer Analyse, Erläuterung und Bewertung aufbaut",
+     "afb": "III"
+    },
+    {
+     "operator": "Gestalten",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Formulieren",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    },
+    {
+     "operator": "Verfassen",
+     "definition": "Aufgabenstellungen produktorientiert bearbeiten (zum Beispiel durch das Entwerfen von Reden, Briefen, Strategien, Karikaturen, Szenarien, Spots oder anderen medialen Produkten) sowie eigene Handlungsvorschläge und Modelle entwickeln",
+     "afb": "III",
+     "formen": [
+      "Gestalten",
+      "Formulieren",
+      "Verfassen"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan Welt-Umweltkunde, Geschichte, Geografie, Politik – Gymnasium 5-10 (2006), Liste der Operatoren für die Fächer Geschichte und Politik, Die Senatorin für Kinder und Bildung, Freie Hansestadt Bremen (LIS Bremen), 2006",
+   "url": "https://www.lis.bremen.de/sixcms/media.php/13/Gy_WUK_2006.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "Einen Sachverhalt oder eine erlernte Bezeichnung begrifflich anführen; Bezeichnungen – vollständig oder exemplarisch – aufzählen",
+     "afb": "I",
+     "formen": [
+      "nennen",
+      "aufzählen"
+     ],
+     "beispiele": [
+      "Nennen Sie die wichtigsten Aspekte bzw. Gründe für ..."
+     ]
+    },
+    {
+     "operator": "aufzählen",
+     "definition": "Einen Sachverhalt oder eine erlernte Bezeichnung begrifflich anführen; Bezeichnungen – vollständig oder exemplarisch – aufzählen",
+     "afb": "I",
+     "formen": [
+      "nennen",
+      "aufzählen"
+     ]
+    },
+    {
+     "operator": "schildern",
+     "definition": "Einen bekannten Sachverhalt oder Zusammenhang mit eigenen Worten und in strukturierter Form treffend wiedergeben",
+     "afb": "I–II",
+     "formen": [
+      "schildern",
+      "beschreiben",
+      "darstellen"
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Einen bekannten Sachverhalt oder Zusammenhang mit eigenen Worten und in strukturierter Form treffend wiedergeben",
+     "afb": "I–II",
+     "formen": [
+      "schildern",
+      "beschreiben",
+      "darstellen"
+     ],
+     "beispiele": [
+      "Beschreiben Sie den Inhalt und den historischen Hintergrund der preußischen Reformen ab 1807.\nBeschreiben Sie den Inhalt und den politischen Hintergrund der arbeitsmarktpolitischen Reform in der Bundesrepublik Deutschland."
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Einen bekannten Sachverhalt oder Zusammenhang mit eigenen Worten und in strukturierter Form treffend wiedergeben",
+     "afb": "I–II",
+     "formen": [
+      "schildern",
+      "beschreiben",
+      "darstellen"
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Die zentralen Aussagen einer Textquelle in bündiger und geordneter Form erfassen und mit eigenen Worten auf das Wesentliche reduziert wiedergeben",
+     "afb": "I–II",
+     "beispiele": [
+      "Fassen Sie den Text in thesenartiger Form zusammen."
+     ]
+    },
+    {
+     "operator": "gliedern",
+     "definition": "Einen Zusammenhang oder eine Textquelle nach selbst gefundenen oder vorgegebenen Gesichtspunkten unterteilen und ordnen",
+     "afb": "I–II",
+     "beispiele": [
+      "Gliedern Sie die deutsche Nachkriegsgeschichte zwischen 1945 und 1990 in sinnvolle Abschnitte."
+     ]
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Einen Sachverhalt bzw. eine Textquelle und ihre Hintergründe erklären und dadurch anschaulich und verständlich machen",
+     "afb": "II",
+     "beispiele": [
+      "Erläutern Sie die Bedeutung von Bismarcks Kissinger Diktat.\nErläutern Sie die Gründe für das Scheitern der Verhandlungen."
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Aus einer Quelle einen Sachverhalt oder eine Einstellung kriterienorientiert bzw. aspektgeleitet erkennen und mit eigenen Worten darstellen",
+     "afb": "II",
+     "formen": [
+      "herausarbeiten",
+      "untersuchen"
+     ],
+     "beispiele": [
+      "Arbeiten Sie aus der vorliegenden Rede die außenpolitischen Perspektiven heraus."
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Aus einer Quelle einen Sachverhalt oder eine Einstellung kriterienorientiert bzw. aspektgeleitet erkennen und mit eigenen Worten darstellen",
+     "afb": "II",
+     "formen": [
+      "herausarbeiten",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Quellen ermitteln und geordnet sowie gewichtet darstellen",
+     "afb": "II",
+     "formen": [
+      "vergleichen",
+      "gegenüberstellen"
+     ],
+     "beispiele": [
+      "Vergleichen Sie die Außenpolitik Bismarcks mit der Wilhelm II.\nVergleichen Sie die außenpolitischen Ansätze der britischen und der deutschen Regierung zum Irak-Krieg."
+     ]
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "Nach selbst gewählten Kriterien Gemeinsamkeiten und Unterschiede zwischen zwei oder mehreren Sachverhalten oder Quellen ermitteln und geordnet sowie gewichtet darstellen",
+     "afb": "II",
+     "formen": [
+      "vergleichen",
+      "gegenüberstellen"
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Einen oder mehrere Sachverhalte oder Quellen mit erklärenden Hinweisen in einen genannten Zusammenhang stellen",
+     "afb": "II",
+     "beispiele": [
+      "Ordnen Sie den Hitlerputsch in die sogenannten Krisenjahre der Weimarer Republik ein.\nOrdnen Sie den Sechs-Tage-Krieg in seiner Bedeutung für das Palästinenserproblem ein."
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "Hinsichtlich Ursachen und Konsequenzen nachvollziehbare Zusammenhänge herstellen",
+     "afb": "II–III",
+     "beispiele": [
+      "... und begründen Sie Ihre Zuordnung / Einschätzung."
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Elemente, Sinnzusammenhänge und strukturelle Kennzeichen aus Quellen oder Sachverhalten unter gegebener Fragestellung herausarbeiten und die Ergebnisse in einer zusammenfassenden Gesamtaussage darstellen",
+     "afb": "II–III",
+     "beispiele": [
+      "Interpretieren Sie den vorliegenden Auszug aus einer Rede ... im Rahmen der Außenpolitik des Deutschen Reiches / der Bundesrepublik Deutschland."
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Aus einer Quelle mögliche Konsequenzen aufzeigen",
+     "afb": "II–III",
+     "beispiele": [
+      "Entwickeln Sie aus den programmatischen Vorschlägen des Autors die gesellschaftlichen, wirtschaftlichen und politischen Konsequenzen seines Entwurfs."
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Ein Bewertungsproblem erfassen, unterschiedliche Positionen bzw. das Für und Wider geordnet gegeneinander auf ihre Stichhaltigkeit und ihren Wert abwägen und zu einem begründeten Urteil kommen",
+     "afb": "III",
+     "beispiele": [
+      "Erörtern Sie die in den Texten genannten Lösungsvorschläge."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Ein durch Fakten gestütztes selbstständiges Urteil zu einem Sachverhalt formulieren, wobei die Kriterien und die wesentlichen Gründe für die Beurteilung offengelegt werden",
+     "afb": "III",
+     "beispiele": [
+      "Beurteilen Sie die zentralen Aussagen der vorliegenden Quelle."
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Einen Sachverhalt oder eine Quelle nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "bewerten",
+      "Stellung nehmen"
+     ],
+     "beispiele": [
+      "Bewerten Sie die zentralen Aussagen der vorliegenden Rede."
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Einen Sachverhalt oder eine Quelle nach selbst gewählten und begründeten Normen oder Kriterien beurteilen, wobei diese persönlichen Wertbezüge offenbart werden",
+     "afb": "III",
+     "formen": [
+      "bewerten",
+      "Stellung nehmen"
+     ],
+     "beispiele": [
+      "... und nehmen Sie abschließend dazu Stellung."
+     ]
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "Ein begründetes Konzept für eine offene historische oder politische Situation erstellen und dabei die eigenen Analyseergebnisse in einen eigenständigen Beitrag einbringen",
+     "afb": "III",
+     "beispiele": [
+      "Entwerfen Sie einen eigenen Lösungsvorschlag für das vorliegende Problem."
+     ]
+    },
+    {
+     "operator": "Szenarien entwickeln",
+     "definition": "Gegenwärtige Entwicklungslinien gedanklich fortführen und daraus prospektiv ein Konzept erstellen",
+     "afb": "III",
+     "beispiele": [
+      "Entwickeln Sie ein Szenario ..."
+     ]
+    }
+   ]
+  }
+ ]
+}

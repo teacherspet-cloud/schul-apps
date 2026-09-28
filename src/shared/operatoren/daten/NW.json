@@ -1,0 +1,1587 @@
+{
+ "stateId": "NW",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Englisch – Übersicht über die Operatoren (gültig ab dem Abitur 2025): Schreiben/Leseverstehen (integriert), Sprachmittlung und Hörverstehen, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2023",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/e_operatoren_ab_abitur2025.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyse",
+     "definition": "describe and explain in detail",
+     "beispiele": [
+      "Analyse the way(s) in which atmosphere is created in the opening scene."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the nature or quality of sb./sth.",
+     "beispiele": [
+      "Against the background of the ideas put forward in the text, assess the importance of learning languages for a young person’s future."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "evaluate",
+     "definition": "express a well-founded opinion on the nature or quality of sb./sth.",
+     "beispiele": [
+      "Evaluate the success of the steps taken so far to reduce pollution as described in the text"
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "examine",
+     "definition": "describe and explain in detail",
+     "beispiele": [
+      "Examine the opposing views on social class held by the two protagonists."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "give / write a characterization of",
+     "definition": "provide a thorough analysis of a character",
+     "beispiele": [
+      "Give a characterization of the protagonist in the excerpt."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "state one’s opinion clearly and support one’s view with evidence or reasons",
+     "beispiele": [
+      "Comment on the writer’s view on gender roles."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "show similarities and differences",
+     "beispiele": [
+      "Compare the opinions on education held by the experts quoted in the text."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "beispiele": [
+      "Describe the soldier’s situation as depicted in the text."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "give arguments or reasons for and against, especially to come to a well-founded conclusion",
+     "beispiele": [
+      "Discuss the message of the cartoon, referring to work done on the British monarchy."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by giving reasons for and details, aspects of sth.",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "illustrate",
+     "definition": "use examples to explain or make clear",
+     "beispiele": [
+      "Illustrate the way in which according to the author school life in Britain differs from that in Germany."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning, purpose or message of sth.",
+     "beispiele": [
+      "Interpret the sonnet, focusing on the way structure and imagery are used to express the speaker’s insight into the nature of time."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "outline",
+     "definition": "give the main features, structure or general principles of sth.",
+     "beispiele": [
+      "Outline Panem’s history as presented in this excerpt."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out",
+     "definition": "find and explain certain aspects",
+     "beispiele": [
+      "Point out the aspects that underline ..."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "state",
+     "definition": "present the main aspects of sth. briefly and clearly",
+     "beispiele": [
+      "State the author’s key reasons for taking a gap year."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "summarize",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic",
+     "formen": [
+      "sum up"
+     ],
+     "beispiele": [
+      "Summarize/Sum up the information about green energy given in the text."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with specific features",
+     "beispiele": [
+      "Write the ending of the story / a letter to the editor / a dialogue, etc. Write an interior monologue that reflects the character’s view of the situation and her / his feelings."
+     ],
+     "kompetenzbereich": "Schreiben"
+    }
+   ]
+  },
+  {
+   "quelle": "Englisch – Übersicht über die Operatoren (gültig ab dem Abitur 2025): Schreiben/Leseverstehen (integriert), Sprachmittlung und Hörverstehen, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2023",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/e_operatoren_ab_abitur2025.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "explain",
+     "definition": "make sth. clear taking into account culture-related differences if necessary",
+     "beispiele": [
+      "Based on the text on environmental policy explain the principle of waste separation in Germany in an email to your British friend."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "Outline Mr. Liu’s career in Germany in an article for your international school project's website on Successful Immigrants."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "present",
+     "definition": "give a concise account of the main points or ideas of a text clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "For an international school project in the EU, present the relevant information on the image of migrants in German media in a formal email to your partner school in Spain."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "summarize",
+     "definition": "give a concise account of the main points or ideas of a text clarifying culture-related aspects if necessary",
+     "formen": [
+      "sum up"
+     ],
+     "beispiele": [
+      "Sum up Manuel’s views on working and living as a gap year student in India for your blog. Where necessary add information which might help to avoid possible misunderstandings."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with specific features",
+     "beispiele": [
+      "Using the information in the German text write an article in English for your project website in which you inform your Polish partners how to get a sports scholarship at a German university."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    }
+   ]
+  },
+  {
+   "quelle": "Englisch – Übersicht über die Operatoren (gültig ab dem Abitur 2025): Schreiben/Leseverstehen (integriert), Sprachmittlung und Hörverstehen, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2023",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/e_operatoren_ab_abitur2025.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "Complete the sentences below using 1 to 5 words. Fill in the missing information using about 1 to 5 words."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "list",
+     "definition": "",
+     "formen": [
+      "name"
+     ],
+     "beispiele": [
+      "List the most important aspects mentioned in the discussion."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "Match each person with one of the pictures. There is one more picture than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "state",
+     "definition": "",
+     "beispiele": [
+      "State the ideas supported by speaker A."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "Tick the correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Geschichte – Übersicht über die Operatoren, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2015",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/af2-ge_operatoren.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "erörtern",
+     "definition": "Eine These oder Problemstellung auf ihren Wert und ihre Stichhaltigkeit hin abwägend prüfen und auf dieser Grundlage eine eigene Stellungnahme dazu entwickeln. Die Erörterung einer historischen Darstellung setzt deren Analyse voraus.",
+     "afb": "I–III",
+     "zusatz": {
+      "AFB-Bandbreite": "I–III"
+     }
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und eine begründete Stellungnahme abgeben, die auf einer Analyse, Erläuterung und Bewertung beruht",
+     "afb": "I–III",
+     "zusatz": {
+      "AFB-Bandbreite": "I–III"
+     }
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Formale Merkmale von Materialien untersuchen und Inhalt und Gedankengang von Materialien (Quellen, Darstellungen) wiedergeben bzw. Bildelemente (Karikaturen, historische Gemälde) beschreiben",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Merkmale / Aspekte eines Sachverhaltes oder eines Materials detailliert darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert historischer Sachverhalte in einem Zusammenhang bestimmen, um ohne persönlichen Wertebezug zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie Operator „beurteilen\", aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen historischen Zusammenhang stellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "auf der Grundlage erarbeiteter Ergebnisse zu einer eigenen Deutung gelangen; gewonnene Analyseergebnisse verwerten, um in einem vorgegebenen Textformat (z. B. Rede, Leserbrief, Diskussionsbeitrag) zu einer eigenen Deutung zu gelangen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "historische Sachverhalte durch Wissen und Einsichten in einen Zusammenhang einordnen und durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte historische Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "nennen",
+     "definition": "Informationen / Sachverhalte / Merkmale zielgerichtet unkommentiert zusammentragen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "eine Problemstellung / eine Bewertung / eine Position auf der Grundlage fachlicher Kenntnisse prüfen und nach sorgfältiger Abwägung eine Einschätzung formulieren",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "auf der Grundlage von Kriterien historische Sachverhalte problembezogen gegenüberstellen, um Gemeinsamkeiten, Unterschiede, Teil-Identitäten, Ähnlichkeiten, Abweichungen oder Gegensätze darzustellen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Sachverhalte / Aussagen komprimiert darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Geschichte bilingual (Englisch) – Übersicht über die Operatoren, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2015",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/ge-bi-e_operatoren.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "discuss",
+     "definition": "Eine These oder Problemstellung auf ihren Wert und ihre Stichhaltigkeit hin abwägend prüfen und auf dieser Grundlage eine eigene Stellungnahme dazu entwickeln. Die Erörterung einer historischen Darstellung setzt deren Analyse voraus.",
+     "afb": "I–III",
+     "zusatz": {
+      "AFB-Bandbreite": "I–III"
+     }
+    },
+    {
+     "operator": "interpret",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und eine begründete Stellungnahme abgeben, die auf einer Analyse, Erläuterung und Bewertung beruht",
+     "afb": "I–III",
+     "zusatz": {
+      "AFB-Bandbreite": "I–III"
+     }
+    },
+    {
+     "operator": "analyse",
+     "definition": "Formale Merkmale von Materialien untersuchen und Inhalt und Gedankengang von Materialien (Quellen, Darstellungen) wiedergeben bzw. Bildelemente (Karikaturen, historische Gemälde) beschreiben",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "assess",
+     "definition": "den Stellenwert historischer Sachverhalte in einem Zusammenhang bestimmen, um ohne persönlichen Wertebezug zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "characterise",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "compare",
+     "definition": "auf der Grundlage von Kriterien historische Sachverhalte problembezogen gegenüberstellen, um Gemeinsamkeiten, Unterschiede, Teil-Identitäten, Ähnlichkeiten, Abweichungen oder Gegensätze darzustellen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "determine",
+     "definition": "aus Materialien bestimmte historische Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "develop",
+     "definition": "auf der Grundlage erarbeiteter Ergebnisse zu einer eigenen Deutung gelangen gewonnene Analyseergebnisse verwerten, um in einem vorgegebenen Textformat (z. B. Rede, Leserbrief, Diskussionsbeitrag) zu einer eigenen Deutung zu gelangen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "evaluate",
+     "definition": "wie Operator \"assess“, aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "examine",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "explain",
+     "definition": "historische Sachverhalte durch Wissen und Einsichten in einen Zusammenhang einordnen und durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "give reasons for",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "name",
+     "definition": "Informationen / Sachverhalte / Merkmale zielgerichtet unkommentiert zusammentragen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "present",
+     "definition": "Merkmale / Aspekte eines Sachverhaltes oder eines Materials detailliert darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "put … into the context of ...",
+     "definition": "einen oder mehrere historische Sachverhalte in einen historischen Zusammenhang stellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "summarise",
+     "definition": "Sachverhalte / Aussagen komprimiert darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "take a critical stand on",
+     "definition": "eine Problemstellung / eine Bewertung / eine Position auf der Grundlage fachlicher Kenntnisse prüfen und nach sorgfältiger Abwägung eine Einschätzung formulieren",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Sozialwissenschaften – Übersicht über die Operatoren, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2015",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/af2-sw_operatoren.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "politik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte kriterienorientiert oder aspektgeleitet erschließen, in systematische Zusammenhänge einordnen und Hintergründe und Beziehungen herausarbeiten",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten oder Einzelergebnisse zu einer abschließenden Gesamtaussage zusammenführen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "begründen",
+     "definition": "zu einem Sachverhalt komplexe Grundgedanken unter dem Aspekt der Kausalität argumentativ und schlüssig entwickeln",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "benennen",
+     "definition": "Sachverhalte, Strukturen und Prozesse begrifflich präzise aufführen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "wesentliche Aspekte eines Sachverhaltes im logischen Zusammenhang unter Verwendung der Fachsprache wiedergeben",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert von Sachverhalten oder Prozessen in einem Zusammenhang bestimmen, um kriterienorientiert zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie beurteilen, aber zusätzlich mit Reflexion individueller und politischer Wertmaßstäbe, die Pluralität gewährleisten und zu einem begründeten eigenen Werturteil führen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenführen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "darstellen",
+     "definition": "wesentliche Aspekte eines Sachverhaltes im logischen Zusammenhang unter Verwendung der Fachsprache wiedergeben",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einem Sachverhalt, zu einem Konzept, zu einer Problemstellung oder zu einer These etc. eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "einordnen",
+     "definition": "eine Position zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "ein Konzept in seinen wesentlichen Zügen erstellen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "zu einem Sachverhalt oder zu einer Problemstellung ein konkretes Lösungsmodell, eine Gegenposition, ein Lösungskonzept oder einen Regelungsentwurf begründend skizzieren",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte durch Wissen und Einsichten in einen Zusammenhang (Theorie, Modell, Regel, Gesetz, Funktionszusammenhang) einordnen und deuten",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie erklären, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "aus Materialien bestimmte Sachverhalte herausfinden, auch wenn sie nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "erörtern",
+     "definition": "zu einer vorgegebenen Problemstellung eine reflektierte, kontroverse Auseinandersetzung führen und zu einer abschließenden, begründeten Bewertung gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "erschließen",
+     "definition": "aus Materialien bestimmte Sachverhalte herausfinden, auch wenn sie nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "gestalten",
+     "definition": "produktorientierte Bearbeitung von Aufgabenstellungen. Dazu zählen unter anderem das Entwerfen von eigenen Reden, Strategien, Beratungsskizzen, Karikaturen, Szenarien, Spots und von anderen medialen Produkten sowie das Entwickeln von eigenen Handlungsvorschlägen und Modellen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte Sachverhalte herausfinden, auch wenn sie nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Sinnzusammenhänge aus Materialien erschließen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "nennen",
+     "definition": "Kenntnisse (Fachbegriffe, Daten, Fakten, Modelle) und Aussagen in komprimierter Form unkommentiert darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "problematisieren",
+     "definition": "Widersprüche herausarbeiten, Positionen oder Theorien begründend hinterfragen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf der Grundlage eigener Kenntnisse oder mithilfe zusätzlicher Materialien auf ihre sachliche Richtigkeit bzw. auf ihre innere Logik hin untersuchen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "sich auseinandersetzen",
+     "definition": "zu einem Sachverhalt, zu einem Konzept, zu einer Problemstellung oder zu einer These etc. eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "wie beurteilen, aber zusätzlich mit Reflexion individueller und politischer Wertmaßstäbe, die Pluralität gewährleisten und zu einem begründeten eigenen Werturteil führen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf der Grundlage eigener Kenntnisse oder mithilfe zusätzlicher Materialien auf ihre sachliche Richtigkeit bzw. auf ihre innere Logik hin untersuchen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Sachverhalte gegenüberstellen, um Gemeinsamkeiten, Ähnlichkeiten und Unterschiede herauszufinden",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "widerlegen",
+     "definition": "Argumente anführen, dass Daten, eine Behauptung, ein Konzept oder eine Position nicht haltbar sind",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Sozialwissenschaften bilingual (Englisch) – Übersicht über die Operatoren (ab dem Prüfungsjahr 2025), Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2023",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/af2-sw_bil_e_operatoren.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "politik"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "analyse",
+     "definition": "Materialien oder Sachverhalte kriterienorientiert oder aspektgeleitet erschließen, in systematische Zusammenhänge einordnen und Hintergründe und Beziehungen herausarbeiten",
+     "afb": "II",
+     "formen": [
+      "analysieren"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "justify",
+     "definition": "zu einem Sachverhalt komplexe Grundgedanken unter dem Aspekt der Kausalität argumentativ und schlüssig entwickeln",
+     "afb": "III",
+     "formen": [
+      "begründen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "describe",
+     "definition": "wesentliche Aspekte eines Sachverhaltes im logischen Zusammenhang unter Verwendung der Fachsprache wiedergeben",
+     "afb": "I–II",
+     "formen": [
+      "beschreiben"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "assess",
+     "definition": "den Stellenwert von Sachverhalten oder Prozessen in einem Zusammenhang bestimmen, um kriterienorientiert zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III",
+     "formen": [
+      "beurteilen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "evaluate",
+     "definition": "wie beurteilen, aber zusätzlich mit Reflexion individueller und politischer Wertmaßstäbe, die Pluralität gewährleisten und zu einem begründeten eigenen Werturteil führen",
+     "afb": "III",
+     "formen": [
+      "bewerten"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "characterize",
+     "definition": "Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenführen",
+     "afb": "II–III",
+     "formen": [
+      "charakterisieren"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "outline",
+     "definition": "wesentliche Aspekte eines Sachverhaltes im logischen Zusammenhang unter Verwendung der Fachsprache wiedergeben",
+     "afb": "I–II",
+     "formen": [
+      "darstellen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "discuss",
+     "definition": "zu einem Sachverhalt, zu einem Konzept, zu einer Problemstellung oder zu einer These etc. eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "formen": [
+      "diskutieren"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "put… into the context of…",
+     "definition": "eine Position zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II",
+     "formen": [
+      "einordnen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "develop",
+     "definition": "zu einem Sachverhalt oder zu einer Problemstellung ein konkretes Lösungsmodell, eine Gegenposition, ein Lösungskonzept oder einen Regelungsentwurf begründend skizzieren",
+     "afb": "III",
+     "formen": [
+      "entwickeln"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "explain",
+     "definition": "Sachverhalte durch Wissen und Einsichten in einen Zusammenhang (Theorie, Modell, Regel, Gesetz, Funktionszusammenhang) einordnen und deuten",
+     "afb": "II",
+     "formen": [
+      "erklären"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "determine",
+     "definition": "aus Materialien bestimmte Sachverhalte herausfinden, auch wenn sie nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "formen": [
+      "erschließen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "create",
+     "definition": "produktorientierte Bearbeitung von Aufgabenstellungen. Dazu zählen unter anderem das Entwerfen von eigenen Reden, Strategien, Beratungsskizzen, Karikaturen, Szenarien, Spots und von anderen medialen Produkten sowie das Entwickeln von eigenen Handlungsvorschlägen und Modellen",
+     "afb": "III",
+     "formen": [
+      "design",
+      "draft",
+      "gestalten"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "interpret",
+     "definition": "Sinnzusammenhänge aus Materialien erschließen",
+     "afb": "II–III",
+     "formen": [
+      "interpretieren"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "name",
+     "definition": "Kenntnisse (Fachbegriffe, Daten, Fakten, Modelle) und Aussagen in komprimierter Form unkommentiert darstellen",
+     "afb": "I–II",
+     "formen": [
+      "nennen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "comment on",
+     "definition": "zu einem Sachverhalt, zu einem Konzept, zu einer Problemstellung oder zu einer These etc. eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "formen": [
+      "sich auseinandersetzen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "critically evaluate",
+     "definition": "wie beurteilen, aber zusätzlich mit Reflexion individueller und politischer Wertmaßstäbe, die Pluralität gewährleisten und zu einem begründeten eigenen Werturteil führen",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "examine",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf der Grundlage eigener Kenntnisse oder mithilfe zusätzlicher Materialien auf ihre sachliche Richtigkeit bzw. auf ihre innere Logik hin untersuchen",
+     "afb": "II–III",
+     "formen": [
+      "überprüfen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "compare",
+     "definition": "Sachverhalte gegenüberstellen, um Gemeinsamkeiten, Ähnlichkeiten und Unterschiede herauszufinden",
+     "afb": "II–III",
+     "formen": [
+      "vergleichen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "refute",
+     "definition": "Argumente anführen, dass Daten, eine Behauptung, ein Konzept oder eine Position nicht haltbar sind",
+     "afb": "II–III",
+     "formen": [
+      "widerlegen"
+     ],
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Geographie – Übersicht über die Operatoren, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2015",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/af2-ek-o-uebersicht_1.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "komplexe Materialien/Sachverhalte in ihren Einzelaspekten erfassen mit dem Ziel, Entwicklungen/Zusammenhänge zwischen ihnen aufzuzeigen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "anwenden",
+     "definition": "Theorien/Modelle/Regeln mit konkretem Fall-/Raumbeispiel/Sachverhalt in Beziehung setzen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Materialaussagen/Sachverhalte mit eigenen Worten geordnet und fachsprachlich angemessen wiedergeben",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "auf der Basis von Fachkenntnissen/Materialinformationen/eigenen Schlussfolgerungen unter Offenlegung / Reflexion der angewendeten Wertmaßstäbe zu einer sachlich fundierten, qualifizierenden Einschätzung gelangen/eine begründete, differenzierte eigene Meinung entwickeln",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "bewerten",
+     "definition": "auf der Basis von Fachkenntnissen/Materialinformationen/eigenen Schlussfolgerungen unter Offenlegung / Reflexion der angewendeten Wertmaßstäbe zu einer sachlich fundierten, qualifizierenden Einschätzung gelangen/eine begründete, differenzierte eigene Meinung entwickeln",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "darstellen",
+     "definition": "aus dem Unterricht bekannte oder aus dem Material entnehmbare Informationen und Sachzusammenhänge geordnet (graphisch / verbal) verdeutlichen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einem Raum/Sachverhalt auf der Basis festgestellter Merkmale eine bestimmte Position in einem Ordnungsraster zuweisen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "erklären",
+     "definition": "Begründungszusammenhänge, Voraussetzungen und Folgen bestimmter Strukturen und Prozesse darlegen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachzusammenhänge mit Hilfe ergänzender Informationen verdeutlichen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "erörtern",
+     "definition": "einen Sachverhalt unter Abwägen verschiedener Pro- und Contra-Argumente klären und abschließend eine schlüssige Meinung entwickeln",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "kennzeichnen",
+     "definition": "einen Raum/Sachverhalt auf der Basis bestimmter Kriterien begründet charakterisieren",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "lokalisieren",
+     "definition": "Einordnen von Fall-/Raumbeispielen in bekannte topographische Orientierungsraster",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "nennen",
+     "definition": "Informationen/Sachverhalte ohne Kommentierung wiedergeben",
+     "afb": "I",
+     "zusatz": {
+      "AFB-Bandbreite": "I"
+     }
+    },
+    {
+     "operator": "(kritisch) Stellung nehmen",
+     "definition": "unter Abwägung unterschiedlicher Argumente zu einer begründeten Einschätzung eines Sachverhalts/einer Behauptung gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "(Hypo-)Thesen/Argumentationen/Darstellungsweisen auf ihre Angemessenheit/Stichhaltigkeit/Effizienz hin untersuchen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede zwischen (vergleichbaren) Strukturen/Prozessen erfassen und kriterienbezogen verdeutlichen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "einem Raum/Sachverhalt auf der Basis festgestellter Merkmale eine bestimmte Position in einem Ordnungsraster zuweisen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Geographie bilingual (Englisch) – Übersicht über die Operatoren, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw), 2015",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/af2-ek-bi-e_operatoren.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "assess",
+     "definition": "(Hypo-)Thesen/Argumentationen/Darstellungsweisen auf ihre Angemessenheit/Stichhaltigkeit/Effizienz hin untersuchen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "analyse",
+     "definition": "komplexe Materialien/Sachverhalte in ihren Einzelaspekten erfassen mit dem Ziel, Entwicklungen/Zusammenhänge zwischen ihnen aufzuzeigen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "apply",
+     "definition": "Theorien/Modelle/Regeln mit konkretem Fall-/Raumbeispiel/Sachverhalt in Beziehung setzen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "characterize",
+     "definition": "einen Raum/Sachverhalt auf der Basis bestimmter Kriterien begründet charakterisieren",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "classify",
+     "definition": "einem Raum/Sachverhalt auf der Basis festgestellter Merkmale eine bestimmte Position in einem Ordnungsraster zuweisen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "comment on",
+     "definition": "unter Abwägung unterschiedlicher Argumente zu einer begründeten Einschätzung eines Sachverhalts/einer Behauptung gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "compare",
+     "definition": "Gemeinsamkeiten und Unterschiede zwischen (vergleichbaren) Strukturen/Prozessen erfassen und kriterienbezogen verdeutlichen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "describe",
+     "definition": "Materialaussagen/Sachverhalte mit eigenen Worten geordnet und fachsprachlich angemessen wiedergeben",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "discuss",
+     "definition": "einen Sachverhalt unter Abwägen verschiedener Pro- und Contra-Argumente klären und abschließend eine schlüssige Meinung entwickeln",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "evaluate",
+     "definition": "auf der Basis von Fachkenntnissen/Materialinformationen/eigenen Schlussfolgerungen unter Offenlegung / Reflexion der angewendeten Wertmaßstäbe zu einer sachlich fundierten, qualifizierenden Einschätzung gelangen/eine begründete, differenzierte eigene Meinung entwickeln",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "explain",
+     "definition": "Begründungszusammenhänge, Voraussetzungen und Folgen bestimmter Strukturen und Prozesse darlegen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "illustrate",
+     "definition": "Sachzusammenhänge mit Hilfe ergänzender Informationen verdeutlichen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "II"
+     }
+    },
+    {
+     "operator": "list",
+     "definition": "Informationen/Sachverhalte ohne Kommentierung wiedergeben",
+     "afb": "I",
+     "zusatz": {
+      "AFB-Bandbreite": "I"
+     }
+    },
+    {
+     "operator": "locate",
+     "definition": "Einordnen von Fall-/Raumbeispielen in bekannte topographische Orientierungsraster",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "name",
+     "definition": "Informationen/Sachverhalte ohne Kommentierung wiedergeben",
+     "afb": "I",
+     "zusatz": {
+      "AFB-Bandbreite": "I"
+     }
+    },
+    {
+     "operator": "outline",
+     "definition": "aus dem Unterricht bekannte oder aus dem Material entnehmbare Informationen und Sachzusammenhänge geordnet (graphisch / verbal) verdeutlichen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "point out",
+     "definition": "aus dem Unterricht bekannte oder aus dem Material entnehmbare Informationen und Sachzusammenhänge geordnet (graphisch / verbal) verdeutlichen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Geschichte / Sozialwissenschaften – Übersicht über die Operatoren, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, abitur.nrw)",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/af2-gw-operatoren.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "historische Sachverhalte darstellen und unter Beibehaltung des Sinnes auf Wesentliches reduzieren; wesentliche Informationen aus vorgegebenem Material (z. B. auch aus Bildquellen) oder aus Kenntnissen zusammenhängend und schlüssig darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert historischer Sachverhalte in einem Zusammenhang bestimmen, um ohne persönlichen Wertebezug zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie Operator „beurteilen\", aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "definieren",
+     "definition": "eine Begriffsbestimmung geben, den Inhalt eines (fachwissenschaftlichen) Begriffes erklären;",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einem begründeten Urteil oder einer begründeten Bewertung führt",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen historischen Zusammenhang stellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "zu einem Sachverhalt oder einer Problemstellung ein konkretes Lösungsmodell, eine Position oder Gegenposition formulieren",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II - III"
+     }
+    },
+    {
+     "operator": "erklären",
+     "definition": "historische Sachverhalte in einen Zusammenhang (Chronologie, Theorie, Modell, , Funktionszusammenhang) einordnen und begründen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie erklären, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Eine These oder Problemstellung durch eine Kette von Für-und-Wider- bzw. Sowohl-als-Auch-Argumenten auf ihre Stichhaltigkeit hin abwägend prüfen und auf dieser Grundlage eine eigene Stellungnahme dazu entwickeln",
+     "afb": "I–III",
+     "zusatz": {
+      "AFB-Bandbreite": "I–III"
+     }
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "Informationen, Sachverhalte, Argumente, Urteile beschreibend einander entgegensetzen ohne abschließendes Urteil",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte historische Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und eine begründete Stellungnahme abgeben, die auf einer Analyse, Erläuterung und Bewertung beruht",
+     "afb": "I–III",
+     "zusatz": {
+      "AFB-Bandbreite": "I–III"
+     }
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen zusammentragen, ohne diese zu kommentieren",
+     "afb": "I",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. I"
+     }
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) auf ihre sachliche Angemessenheit und Korrektheit hin untersuchen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "sich auseinandersetzen",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einem begründeten Urteil oder einer begründeten Bewertung führt",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "historische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "wie Operator „beurteilen\", aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III",
+     "zusatz": {
+      "AFB-Bandbreite": "III"
+     }
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) auf ihre sachliche Angemessenheit und Korrektheit hin untersuchen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "auf der Grundlage von Kriterien historische Sachverhalte problembezogen gegenüberstellen, um Gemeinsamkeiten, Unterschiede, Teilidentitäten, Ähnlichkeiten, Abweichungen oder Gegensätze festzustellen und abschließend zu beurteilen",
+     "afb": "II–III",
+     "zusatz": {
+      "AFB-Bandbreite": "II–III"
+     }
+    },
+    {
+     "operator": "widerlegen",
+     "definition": "Argumente dafür anführen, dass eine Behauptung falsch ist",
+     "afb": "II",
+     "zusatz": {
+      "AFB-Bandbreite": "überw. II"
+     }
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "Inhalte historischen Materials mit eigenen Worten darstellen",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Inhalte historischen Materials unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I–II",
+     "zusatz": {
+      "AFB-Bandbreite": "I–II"
+     }
+    }
+   ]
+  }
+ ]
+}

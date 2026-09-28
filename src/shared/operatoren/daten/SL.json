@@ -1,0 +1,668 @@
+{
+ "stateId": "SL",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Lehrplan Englisch – Fortgeführte Fremdsprache, Gymnasiale Oberstufe, Hauptphase, Leistungskurs und Grundkurs (2023), Abschnitt 4.3 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2023",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_HP_GOS_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "• While listening, tick (✓) the correct answer (a, b, or c). There is only one correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "• Complete the sentences below using 1 to 5 words. • While listening, fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "answer",
+     "definition": "",
+     "beispiele": [
+      "• While listening, answer the questions. You need not write complete sentences. Unless otherwise specified, name one aspect."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "list",
+     "definition": "",
+     "formen": [
+      "name",
+      "state"
+     ],
+     "beispiele": [
+      "• List the reasons mentioned in the discussion. • Name the most important aspects mentioned in the report. • State the ideas supported by speaker A."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "choose",
+     "definition": "",
+     "formen": [
+      "put",
+      "match"
+     ],
+     "beispiele": [
+      "• Choose the heading that best summarizes what each person says. For each speaker, there is only one correct answer. Put the corresponding letter (A–G) into the correct box (1–5). There are two more headings than you need. • While listening, match what each person says (1-5) with the headings (A-G). Choose the heading that best summarizes what each person says. For each speaker, there is only one correct answer. There are two more headings than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Englisch – Fortgeführte Fremdsprache, Gymnasiale Oberstufe, Hauptphase, Leistungskurs und Grundkurs (2023), Abschnitt 4.3 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2023",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_HP_GOS_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "advise on",
+     "definition": "give an opinion or suggestion to your partner about what should be done in a particular situation",
+     "beispiele": [
+      "• Advise your partner on whether s/he should apply for the internship s/he has presented to you."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "agree on",
+     "definition": "come to one opinion or an understanding; arrive at a settlement",
+     "formen": [
+      "come to an agreement"
+     ],
+     "beispiele": [
+      "• Agree on two strategies to encourage more young people to get involved. • Come to an agreement on what to be included in your presentation."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "analyze",
+     "definition": "describe and explain in detail by referring to relevant means",
+     "beispiele": [
+      "• For a youth conference on American ideals, visions and traditions, you have been asked to give an oral presentation about the cartoon. Analyze the cartoon. • You are preparing a photo exhibition for an international youth convention on the topic City Environments. Analyze the photographs."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "argue",
+     "definition": "make a case based on appropriate evidence for and/or against some given point of view",
+     "beispiele": [
+      "• In a discussion about the replacement of textbooks by portable computers at school argue for or against this proposal."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the nature or quality of sb./sth.",
+     "formen": [
+      "evaluate"
+     ],
+     "beispiele": [
+      "• Assess ecological, economic and social aspects of the extraction of fossil fuels. • Evaluate the chances for an applicant’s personal development described in the job offer at hand."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "state one’s opinion clearly and support one’s view with evidence or reasons",
+     "beispiele": [
+      "• As members of your school’s student council you and your partner are expected to organize a panel discussion on the importance of moral issues in today’s society. Comment on the following statistics. • The media scouts at your school are organizing a panel discussion for an international youth convention. You have found some material. Comment on the material."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "compare",
+     "definition": "show similarities and differences",
+     "beispiele": [
+      "• You are preparing a photo exhibition for an international youth convention on the topic “City Environments”. Compare the aspects of city life shown in the photographs. • Based on the charts, compare the job situation of young people your age in Germany and the UK."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sth. / sb. is like",
+     "beispiele": [
+      "• You and your partner are participating in an international youth convention on environmental challenges. You are looking for photographs to illustrate your presentation. Describe the pictures to your partner."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "discuss",
+     "definition": "examine the different sides of an issue and come to a conclusion – or give the partner(s) the opportunity to come to a conclusion",
+     "beispiele": [
+      "• You and your partner are participating in a youth convention about robotics. Together with your partner discuss the benefits and challenges of further scientific innovations."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear",
+     "beispiele": [
+      "• Explain the message of the cartoon and the means used to convey it."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning/message/purpose of sth.",
+     "beispiele": [
+      "• Interpret the data on the development of volunteerism among young people in the last 20 years."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "present",
+     "definition": "put forward sth. for consideration",
+     "beispiele": [
+      "• Study the diagrams on demographic development in Europe and present possible conclusions for your country. • Present possible strategies to reduce the use of plastics."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "reflect (on)",
+     "definition": "express one’s thoughts in a profound and personal way",
+     "beispiele": [
+      "• For your presentation on social sustainability, reflect on further aspects of the topic to be included."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "summarize",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic",
+     "formen": [
+      "sum up",
+      "outline"
+     ],
+     "beispiele": [
+      "• Summarize the strengths and weaknesses of the various research methods presented in the text."
+     ],
+     "kompetenzbereich": "Sprechen"
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Englisch – Fortgeführte Fremdsprache, Gymnasiale Oberstufe, Hauptphase, Leistungskurs und Grundkurs (2023), Abschnitt 4.3 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2023",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_HP_GOS_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "• Tick (✓) the correct option (a, b, c, or d). There is only one correct answer. • Decide whether the statements (1-6) are true or false according to the text and tick (✓) the corresponding box."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "• Complete the table below using 1 to 5 words. • Fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "list",
+     "definition": "",
+     "formen": [
+      "name",
+      "state",
+      "take notes on"
+     ],
+     "beispiele": [
+      "• List the reasons mentioned in the article. You need not write complete sentences. • State / name the main ideas of both reviews in the table below. You need not write complete sentences. • Take notes on the points mentioned in the following task. You need not write complete sentences"
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "give evidence",
+     "definition": "",
+     "beispiele": [
+      "• Give evidence from the text to support your decision. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "• Match the comments (1-5) with the headings (A-G). Choose the heading that best summarizes what each comment says. For each comment, there is only one correct answer. There are two more headings than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Englisch – Fortgeführte Fremdsprache, Gymnasiale Oberstufe, Hauptphase, Leistungskurs und Grundkurs (2023), Abschnitt 4.3 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2023",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_HP_GOS_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyze",
+     "definition": "describe and explain in detail and give evidence from the text",
+     "formen": [
+      "examine"
+     ],
+     "beispiele": [
+      "• Analyze the way in which Nelson Mandela is portrayed. Refer to the article as well as the photograph published with it. • Analyze the way in which the narrator’s state of mind is reflected in her use of language. • Examine the way the protagonist is characterized. • Examine which ideas conveyed in the article correspond to the information visualized in the graphs."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the nature or quality of sb./sth.",
+     "formen": [
+      "evaluate"
+     ],
+     "beispiele": [
+      "• Assess to what extent the cartoon reflects what Choudhury and his family have experienced in the US. • “I was expected to help my father run his business, one of the many reasons I was in such an agony to escape.” (ll. 34-35) Taking the protagonist’s statement as a starting point, assess to what extent expectations shape young people’s aims and ambitions. • Evaluate the success of the steps taken so far to reduce pollution."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "state one’s opinion clearly and support one’s view with evidence or reasons",
+     "beispiele": [
+      "• Comment on the writer’s admission that his view might be seen as “anti-American” (l. 21). • Comment on Amar’s decision to pursue his own ambitions instead of following his parents’ advice. • Comment on the message of the cartoon."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "show similarities and differences",
+     "beispiele": [
+      "• Compare the opinions on education held by the experts presented in the text. • Compare the way the two newspapers present themselves. Focus on use of language and structure."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "beispiele": [
+      "• Describe the old woman and her behavior."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "give arguments or reasons for and against to come to a well-founded conclusion",
+     "beispiele": [
+      "• “Did you have to burn down the old to make way for the new?” (ll. 64-65) Discuss this question with regard to the excerpt and US American past and present. • Taking Ted Chiang’s vision of the future as a starting point, discuss benefits and risks of recording, storing and sharing one’s personal data."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear",
+     "beispiele": [
+      "• Explain how the statistics complement the author’s point of view."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning/message/purpose of sth.",
+     "beispiele": [
+      "• Interpret the message of the cartoon."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic",
+     "formen": [
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "• Outline the information on the technology used in the narrator’s world. • Summarize the information on the narrator’s husband. • Sum up the author’s view on the European Union and his vision for its future."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out",
+     "definition": "present the main aspects of sth. briefly and clearly",
+     "beispiele": [
+      "• Point out the effects of climate change on low-lying countries and the measures taken to deal with the situation."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "give/write a characterization of",
+     "definition": "provide a thorough analysis of a character",
+     "beispiele": [
+      "• Write a characterization of Patricia."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write (+ genre)",
+     "definition": "produce a text with specific features",
+     "beispiele": [
+      "• “Today, the truth is becoming unfashionable again. […] Moreover, the truth is hard, expensive and sometimes boring, whereas lies are easy, cheap and thrilling” (ll. 22-25). Write a letter to the editor of The Independent, commenting on this statement. • Write an article for an online teen travel magazine, discussing the pros and cons of voluntourism."
+     ],
+     "kompetenzbereich": "Schreiben",
+     "zusatz": {
+      "Fußnote 1": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert i. d. R. ein weiteres handlungsleitendes/funktionales Verb die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Englisch – Fortgeführte Fremdsprache, Gymnasiale Oberstufe, Hauptphase, Leistungskurs und Grundkurs (2023), Abschnitt 4.3 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2023",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Englisch/LP_EN_HP_GOS_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "write (+ genre)",
+     "definition": "produce a text with specific features",
+     "beispiele": [
+      "• You are taking part in an international school project on environmental protection. Write a blog entry for the project website, in which you sum up the positions on how to tackle the plastic problem as presented in the two opinion pieces. • Your American friend is active in the National Junior Firefighter Program and is interested in how other countries organize firefighting and what challenges they are facing. Based on the text below, write him/her an email in which you present the situation of firefighting in Germany. • Your British exchange partner has come across the German board game Catan and would like to know more about the culture of board games in Germany. Write her/him an email in which you outline the information about board games and the reasons for their popularity as given in both texts."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Fußnote 1": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert i. d. R. ein weiteres handlungsleitendes/funktionales Verb die Anforderungen an den zu verfassenden Text.",
+      "Hinweis": "Die Spalte „Illustrierendes Aufgabenbeispiel“ ist für beide Operatoren eine gemeinsame (verbundene) Zelle."
+     }
+    },
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text, clarifying culture-related aspects if necessary",
+     "formen": [
+      "describe",
+      "present",
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "• You are taking part in an international school project on environmental protection. Write a blog entry for the project website, in which you sum up the positions on how to tackle the plastic problem as presented in the two opinion pieces. • Your American friend is active in the National Junior Firefighter Program and is interested in how other countries organize firefighting and what challenges they are facing. Based on the text below, write him/her an email in which you present the situation of firefighting in Germany. • Your British exchange partner has come across the German board game Catan and would like to know more about the culture of board games in Germany. Write her/him an email in which you outline the information about board games and the reasons for their popularity as given in both texts."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Hinweis": "Die Spalte „Illustrierendes Aufgabenbeispiel“ ist für beide Operatoren eine gemeinsame (verbundene) Zelle."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Geschichte (APA Geschichte), Gymnasiale Oberstufe Saar (GOS), Juli 2019, Abschnitt 2.4 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2019",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Geschichte/APA_Geschichte_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "unkommentierte Entnahme von Informationen aus einem vorgegebenen Material oder Auflistung von Kenntnissen ohne Materialvorgaben",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "zusammenhängende strukturierte und fachsprachlich angemessene Wiedergabe von Informationen und Sachverhalten, z.B. auch bildliche Darstellungen und Graphiken",
+     "afb": "I",
+     "formen": [
+      "darstellen",
+      "auswerten"
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Reduktion von Sachverhalten auf wesentliche Aspekte und deren strukturierte und unkommentierte Wiedergabe",
+     "afb": "I"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Beschreibung von Sachverhalten in ihren Eigenarten und Zusammenfassung dieser unter bestimmten Gesichtspunkt",
+     "afb": "II",
+     "formen": [
+      "herausarbeiten"
+     ]
+    },
+    {
+     "operator": "erstellen",
+     "definition": "produktorientierte Bearbeitung von Aufgabenstellungen, z.B. in einem Diagramm, einer Faustskizze oder einem Wirkungsgeflecht",
+     "afb": "II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Einordnung eines Sachverhaltes in einen Zusammenhang",
+     "afb": "II",
+     "formen": [
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "Darstellung von Ursachen und Begründungszusammenhängen bestimmter Strukturen und Prozesse",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie erklären, aber Verdeutlichung durch zusätzliche Informationen und Beispiele",
+     "afb": "II"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "systematische Auswertung von Materialien, Herausarbeitung von Charakteristika und Darstellung von Beziehungszusammenhängen",
+     "afb": "II"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Darstellung von Sinnzusammenhängen aus vorgegebenem Material, die zu einer begründeten Schlussfolgerung führt",
+     "afb": "II"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Herausarbeitung und Darstellung von Gemeinsamkeiten, Ähnlichkeiten und Unterschiede nach bestimmten Gesichtspunkten",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Angabe von Ursachen für einen Sachverhalt und/oder Stützung von Aussagen durch Argumente oder Belege",
+     "afb": "II"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Erstellung von Lösungsmodellen, Positionen, Einschätzungen, Strategien o.a. zu einem Sachverhalt oder einer vorgegebenen Problemstellung",
+     "afb": "III"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Prüfung von Sachverhalten, Prozessen und Thesen, um kriterienorientiert zu einer sachlich fundierten Einschätzung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie beurteilen, aber zusätzlich mit Reflexion individueller Wertmaßstäbe, die zu einem begründeten Werturteil führen",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf der Grundlage eigener Kenntnisse oder mit Hilfe zusätzlicher Materialien auf ihre sachliche Richtigkeit bzw. auf ihre innere Logik hin untersuchen",
+     "afb": "III",
+     "formen": [
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "reflektierte, in der Regel kontroverse Auseinandersetzung zu einer vorgegebenen Problemstellung führen und zu einem abschließenden, begründeten Urteil gelangen",
+     "afb": "III",
+     "formen": [
+      "diskutieren"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Geschichte, Gymnasiale Oberstufe, Grundkurs, Hauptphase – Erprobungsphase – (2023), Anhang: Operatoren der gesellschaftswissenschaftlichen Fächer, Ministerium für Bildung und Kultur des Saarlandes, 2023",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Geschichte/LP_Ge_HP_GK_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "unkommentierte Entnahme von Informationen aus einem vorgegebenen Material oder Auflistung von Kenntnissen ohne Materialvorgaben",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "zusammenhängende strukturierte und fachsprachlich angemessene Wiedergabe von Informationen und Sachverhalten, z.B. auch bildliche Darstellungen und Graphiken",
+     "afb": "I",
+     "formen": [
+      "darstellen",
+      "auswerten"
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Reduktion von Sachverhalten auf wesentliche Aspekte und deren strukturierte und unkommentierte Wiedergabe",
+     "afb": "I"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Einordnung eines Sachverhaltes in einen Zusammenhang",
+     "afb": "II",
+     "formen": [
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Beschreibung von Sachverhalten in ihren Eigenarten und Zusammenfassung dieser unter bestimmten Gesichtspunkten",
+     "afb": "II",
+     "formen": [
+      "herausarbeiten"
+     ]
+    },
+    {
+     "operator": "erstellen",
+     "definition": "produktorientierte Bearbeitung von Aufgabenstellungen, z.B. in einem Diagramm, einer Faustskizze oder einem Wirkungsgeflecht",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Darstellung von Ursachen und Begründungszusammenhängen bestimmter Strukturen und Prozesse",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie erklären, aber Verdeutlichung durch zusätzliche Informationen und Beispiele",
+     "afb": "II"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "systematische Auswertung von Materialien, Herausarbeitung von Charakteristika und Darstellung von Beziehungszusammenhängen",
+     "afb": "II"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Darstellung von Sinnzusammenhängen aus vorgegebenem Material",
+     "afb": "II"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Herausarbeitung und Darstellung von Gemeinsamkeiten, Ähnlichkeiten und Unterschiede nach bestimmten Gesichtspunkten",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Angabe von Ursachen für einen Sachverhalt und/oder Stützung von Aussagen durch Argumente oder Belege",
+     "afb": "II"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Erstellung von Lösungsmodellen, Positionen, Einschätzungen, Strategien o.a. zu einem Sachverhalt oder einer vorgegebenen Problemstellung",
+     "afb": "III"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Prüfung von Sachverhalten, Prozessen und Thesen, um kriterienorientiert zu einer sachlich fundierten Einschätzung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie beurteilen, aber zusätzlich mit Reflexion individueller Wertmaßstäbe, die zu einem begründeten Werturteil führen",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf der Grundlage eigener Kenntnisse oder mit Hilfe zusätzlicher Materialien auf ihre sachliche Richtigkeit bzw. auf ihre innere Logik hin untersuchen",
+     "afb": "III",
+     "formen": [
+      "Überprüfen"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "reflektierte, in der Regel kontroverse Auseinandersetzung zu einer vorgegebenen Problemstellung führen und zu einem abschließenden, begründeten Urteil gelangen",
+     "afb": "III",
+     "formen": [
+      "Diskutieren"
+     ]
+    }
+   ]
+  }
+ ]
+}

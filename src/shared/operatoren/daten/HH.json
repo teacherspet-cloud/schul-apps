@@ -1,0 +1,1254 @@
+{
+ "stateId": "HH",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Anhänge „Liste der Operatoren“ (Englisch, Geographie, Geschichte, Politik/Gesellschaft/Wirtschaft), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyze, examine",
+     "definition": "describe and explain in detail and give evidence from the text, relating the content to relevant aspects of language and form",
+     "formen": [
+      "analyze",
+      "examine"
+     ],
+     "beispiele": [
+      "Examine how Jennifer Senior conveys her attitude towards “cancel culture” and its consequences for authors. Focus on structure and use of language.\nAnalyze the way the protagonist is characterized. Focus on narrative techniques and use of language.\nAnalyze how the author’s opinion on social movements is conveyed. Focus on use of language and communicative strategies as well as the function of the photo published with the article."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess, evaluate",
+     "definition": "express a well-founded opinion on the relative value, quality or significance of sth., i.e. on the extent to which sth. is effective/true/etc., backing up one’s argumentation with evidence and examples",
+     "formen": [
+      "assess",
+      "evaluate"
+     ],
+     "beispiele": [
+      "Assess to what extent the cartoon reflects what Choudhury and his family have experienced in the US.\nTaking the cartoon as a starting point, evaluate the effectiveness of measures taken against discrimination in the US.\nTaking the quotation as a starting point, assess to what extent educational institutions can help young people realize their potential."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "express a well-founded opinion on sth., backing up one’s argumentation with evidence and examples and possibly considering counterarguments",
+     "beispiele": [
+      "Comment on the writer’s admission that his view might be seen as “anti-American” (l. 21).\nComment on the message of the cartoon with respect to what makes good journalism in the 21st century."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences and give evidence from the text, relating the content to relevant aspects of language and form",
+     "beispiele": [
+      "Compare how the issue of racism is presented in the two articles. Focus on communicative strategies and the use of language."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "beispiele": [
+      "Describe the old woman and her behavior."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "express a well-founded opinion on sth., considering arguments for both sides of an issue, backing up one’s argumentation with evidence and examples",
+     "beispiele": [
+      "“[S]he would be the first one to join up […] and work for the cause, bleed for the cause, make the cause the central purpose of her life.” (Paul Auster, 4 3 2 1, ll. 57-60) Using Amy’s plea as a starting point, discuss the idea of devoting one’s life to a cause.\nThe author talks of “the influencer game” (l. 41). Taking the article as a starting point, discuss whether the influencer phenomenon is really a “game”."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to the text and its context to clarify how or why sth. is as it is",
+     "beispiele": [
+      "Explain the protagonist’s reservations about the concept of the American Dream.\nExplain how the statistics complement the author’s point of view."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "outline, summarize, sum up",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic as specified by the task",
+     "formen": [
+      "outline",
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "Outline the information on the life of African Americans in the 1960s as presented in the text.\nSummarize the information on the narrator’s husband.\nSum up Bono’s view on the European Union and his vision for its future."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out",
+     "definition": "present the main aspects of sth. briefly",
+     "beispiele": [
+      "Point out the effects of climate change on low-lying countries and the measures taken to deal with the situation."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with characteristic features",
+     "formen": [
+      "write"
+     ],
+     "beispiele": [
+      "Write a letter to the editor, commenting on the author’s view on technology and his vision of the future.\n“For me, education was power.” (Michelle Obama) Former First Lady Michelle Obama is African American, a successful lawyer and the first academic in her family. Write a blog entry for the website of the international youth project Knowledge – Voice – Action, in which you assess to what extent Michelle Obama’s claim holds true for minorities and the socially disadvantaged."
+     ],
+     "kompetenzbereich": "Schreiben",
+     "zusatz": {
+      "Fußnote": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Anhänge „Liste der Operatoren“ (Englisch, Geographie, Geschichte, Politik/Gesellschaft/Wirtschaft), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "outline, present, summarize, sum up",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "formen": [
+      "outline",
+      "present",
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "Write an article for the project website, outlining the development and the goals of “Jugend forscht”.\nWrite an email to your friend in which you present the Muldestausee youth council and its accomplishments.\nFor their blog, write an entry summing up the information on Danny Beuerbach and his initiatives."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with characteristic features, clarifying culture-related aspects if necessary",
+     "formen": [
+      "write"
+     ],
+     "beispiele": [
+      "Your American friend is active in the National Junior Firefighter Program and is interested in how other countries organize firefighting and what challenges they are facing. Write your friend an email in which you present the situation of firefighting in Germany."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Fußnote": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Anhänge „Liste der Operatoren“ (Englisch, Geographie, Geschichte, Politik/Gesellschaft/Wirtschaft), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "answer",
+     "definition": "",
+     "beispiele": [
+      "While listening, answer the questions. You need not write complete sentences. Unless otherwise specified, name one aspect."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "choose",
+     "definition": "",
+     "beispiele": [
+      "Choose the heading (A-G) that best summarizes each statement (1-6). For each statement, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "complete, fill in",
+     "definition": "",
+     "formen": [
+      "complete",
+      "fill in"
+     ],
+     "beispiele": [
+      "Complete the sentences below. You need not write complete sentences.\nWhile listening, fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "While listening, match what each person says (1-6) with the headings (A-G). Choose the heading that best summarizes what each person says. For each speaker, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "name",
+     "definition": "",
+     "beispiele": [
+      "Why do some fish generate an electric field? Name two aspects."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "While listening, tick (✓) the correct answer (a, b, or c). There is only one correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Anlage 2 zur Richtlinie für die Aufgabenstellung und Bewertung der Leistungen in der Abiturprüfung – Englisch (2021), Abschnitt Operatoren, Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2021",
+   "url": "https://dokumente.hamburg.de/resource/blob/123242/bd6e11f3c391e0a8e1c48fa22b7a1360/02-englisch-arl-2021-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "outline",
+     "definition": "give the main features, structure or general principles of sth.",
+     "afb": "I",
+     "beispiele": [
+      "Outline the writer’s views on love, marriage and divorce."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out, state",
+     "definition": "present the main aspects of sth. briefly and clearly",
+     "afb": "I",
+     "formen": [
+      "point out",
+      "state"
+     ],
+     "beispiele": [
+      "Point out the author’s ideas on…\nState your reasons for applying for a high school year."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "summarize, sum up",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic",
+     "afb": "I",
+     "formen": [
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "Summarize the text.\nSum up the information given about green energy."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "afb": "I–II",
+     "beispiele": [
+      "Describe the soldier’s appearance. (I)\nDescribe the way the playwright creates an atmosphere of suspense. (II)"
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "analyze, examine",
+     "definition": "describe and explain in detail",
+     "afb": "II",
+     "formen": [
+      "analyze",
+      "examine"
+     ],
+     "beispiele": [
+      "Analyze the way(s) in which atmosphere is created.\nExamine the opposing views on social class held by the two protagonists."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "give/write a characterization of",
+     "definition": "provide a thorough analysis of a character",
+     "afb": "II",
+     "formen": [
+      "give a characterization of",
+      "write a characterization of"
+     ],
+     "beispiele": [
+      "Give a characterization of the protagonist in the excerpt given."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "contrast",
+     "definition": "emphasize the differences between two or more things",
+     "afb": "II",
+     "beispiele": [
+      "Contrast the author’s idea of human aggression with the theories of aggression you are familiar with."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear",
+     "afb": "II",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "illustrate",
+     "definition": "use examples to explain or make clear",
+     "afb": "II",
+     "beispiele": [
+      "Illustrate the way in which school life in Britain differs from that in Germany."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "show similarities and differences",
+     "afb": "II–III",
+     "beispiele": [
+      "Compare the opinions on education held by the experts presented in the text."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "interpret",
+     "definition": "explain the meaning or purpose of sth.",
+     "afb": "II–III",
+     "beispiele": [
+      "Interpret the message of the cartoon."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess, evaluate",
+     "definition": "express a well-founded opinion on the nature or quality of sb./sth.",
+     "afb": "III",
+     "formen": [
+      "assess",
+      "evaluate"
+     ],
+     "beispiele": [
+      "Assess the importance of learning languages for somebody’s future.\nEvaluate the success of the steps taken so far to reduce pollution."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "state one’s opinion clearly and support one’s view with evidence or reason",
+     "afb": "III",
+     "beispiele": [
+      "Comment on the writer’s view on gender roles."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "give arguments or reasons for and against; especially to come to a well-founded conclusion",
+     "afb": "III",
+     "beispiele": [
+      "Discuss whether social status determines somebody’s future options."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "justify",
+     "definition": "show adequate grounds for decisions or conclusions",
+     "afb": "III",
+     "beispiele": [
+      "You are the principal of a school. Justify your decision to forbid smoking on the school premises."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with specific features.",
+     "afb": "III",
+     "formen": [
+      "write"
+     ],
+     "beispiele": [
+      "Write the ending of a story / a letter to the editor / a dialogue, etc."
+     ],
+     "kompetenzbereich": "Schreiben"
+    }
+   ]
+  },
+  {
+   "quelle": "Anlage 2 zur Richtlinie für die Aufgabenstellung und Bewertung der Leistungen in der Abiturprüfung – Englisch (2021), Abschnitt Operatoren, Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2021",
+   "url": "https://dokumente.hamburg.de/resource/blob/123242/bd6e11f3c391e0a8e1c48fa22b7a1360/02-englisch-arl-2021-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "explain",
+     "definition": "make sth. clear taking into account culture-related differences if necessary",
+     "beispiele": [
+      "Based on the text on environmental policy explain the principle of waste separation in Germany."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Hinweis": "Die Aufgabenstellung kann abhängig von der Situation auf Deutsch oder Englisch formuliert sein. Die beispielhaften Aufgabenstellungen berücksichtigen Adressatenbezug, Situationsangemessenheit und authentische Handlungssituation."
+     }
+    },
+    {
+     "operator": "outline, present, summarize, sum up",
+     "definition": "give a concise account of the main points or ideas of a text clarifying culture-related aspects if necessary",
+     "formen": [
+      "outline",
+      "present",
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "For an international school project in the EU, present the relevant information on the image of migrants in German media in a formal email."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Hinweis": "Die Aufgabenstellung kann abhängig von der Situation auf Deutsch oder Englisch formuliert sein. Die beispielhaften Aufgabenstellungen berücksichtigen Adressatenbezug, Situationsangemessenheit und authentische Handlungssituation."
+     }
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with specific features",
+     "formen": [
+      "write"
+     ],
+     "beispiele": [
+      "Using the information in the input article write an article in English for your project website in which you inform your British partners how to get a sports scholarship at a German university."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Hinweis": "Die Aufgabenstellung kann abhängig von der Situation auf Deutsch oder Englisch formuliert sein. Die beispielhaften Aufgabenstellungen berücksichtigen Adressatenbezug, Situationsangemessenheit und authentische Handlungssituation."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Anlage 2 zur Richtlinie für die Aufgabenstellung und Bewertung der Leistungen in der Abiturprüfung – Englisch (2021), Abschnitt Operatoren, Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2021",
+   "url": "https://dokumente.hamburg.de/resource/blob/123242/bd6e11f3c391e0a8e1c48fa22b7a1360/02-englisch-arl-2021-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "complete, fill in",
+     "definition": "",
+     "formen": [
+      "complete",
+      "fill in"
+     ],
+     "beispiele": [
+      "Complete the sentences below using 1 to 5 words. Fill in the missing information using about 1 to 5 words."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "list, name",
+     "definition": "",
+     "formen": [
+      "list",
+      "name"
+     ],
+     "beispiele": [
+      "List the most important aspects mentioned in the discussion."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "Match each person with one of the pictures. There is one more picture than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "state",
+     "definition": "",
+     "beispiele": [
+      "State the ideas supported by speaker A."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "Tick the correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Anhänge „Liste der Operatoren“ (Englisch, Geographie, Geschichte, Politik/Gesellschaft/Wirtschaft), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte unter Beibehaltung des Sinnes strukturiert auf Wesentliches reduzieren",
+     "afb": "I",
+     "formen": [
+      "beschreiben",
+      "darstellen",
+      "zusammenfassen"
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte unter Beibehaltung des Sinnes strukturiert auf Wesentliches reduzieren",
+     "afb": "I",
+     "formen": [
+      "beschreiben",
+      "darstellen",
+      "zusammenfassen"
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Sachverhalte unter Beibehaltung des Sinnes strukturiert auf Wesentliches reduzieren",
+     "afb": "I",
+     "formen": [
+      "beschreiben",
+      "darstellen",
+      "zusammenfassen"
+     ]
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "Sachverhalte, Probleme oder Aussagen formulieren",
+     "afb": "I",
+     "formen": [
+      "bezeichnen",
+      "skizzieren"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte, Probleme oder Aussagen formulieren",
+     "afb": "I",
+     "formen": [
+      "bezeichnen",
+      "skizzieren"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen zusammentragen, ohne diese zu kommentieren",
+     "afb": "I"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "unter gezielten Fragestellungen Elemente, Strukturmerkmale und Zusammenhänge herausarbeiten",
+     "afb": "II",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "unter gezielten Fragestellungen Elemente, Strukturmerkmale und Zusammenhänge herausarbeiten",
+     "afb": "II",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "These oder Wertungen durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "formen": [
+      "begründen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "These oder Wertungen durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "formen": [
+      "begründen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen",
+     "afb": "II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "historische Sachverhalte durch Wissen und Einsichten in einen Zusammenhang (Theorie, Modell, Regel, Funktionszusammenhang) einordnen und deuten",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie „erklären“, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte historische Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "mehrere Sachverhalte, Probleme oder Aussagen skizzieren und argumentierend gewichten",
+     "afb": "II"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "auf der Grundlage von Kriterien Gemeinsamkeiten, Ähnlichkeiten und Unterschiede gegliedert darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "widerlegen",
+     "definition": "Argumente anführen, dass eine These oder eine Position nicht haltbar ist",
+     "afb": "II"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "aufgrund ausgewiesener Kriterien zu einem Zusammenhang ein triftiges Sachurteil fällen",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "unter Offenlegung der eigenen normativen Maßstäbe zu einem Sachverhalt, Problem oder einer These ein begründetes und nachvollziehbares Werturteil fällen",
+     "afb": "III",
+     "formen": [
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "unter Offenlegung der eigenen normativen Maßstäbe zu einem Sachverhalt, Problem oder einer These ein begründetes und nachvollziehbares Werturteil fällen",
+     "afb": "III",
+     "formen": [
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "gewonnene Analyseergebnisse synthetisieren, um zu einer eigenen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer Problemstellung oder These eine Pro- und Contra-Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "formen": [
+      "diskutieren",
+      "erörtern"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "zu einer Problemstellung oder These eine Pro- und Contra-Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "formen": [
+      "diskutieren",
+      "erörtern"
+     ]
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) auf der Grundlage eigenen Wissens beurteilen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) auf der Grundlage eigenen Wissens beurteilen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und eine begründete Stellungnahme abgeben, die auf einer Darstellung, Analyse, Erläuterung und Bewertung beruht",
+     "afb": "I–III"
+    }
+   ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Anhänge „Liste der Operatoren“ (Englisch, Geographie, Geschichte, Politik/Gesellschaft/Wirtschaft), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "aufzeigen",
+     "definition": "komplexe Sachverhalte in ihren Grundaussagen knapp wiedergegeben; dabei können Informationen aus verschiedenen Materialien kombiniert werden. Die zugrunde liegende Problemstellung wurde schon im Unterricht behandelt.",
+     "afb": "I",
+     "beispiele": [
+      "Zeigen Sie die Veränderungen in der Flächennutzung im Großraum Oldenburg auf."
+     ]
+    },
+    {
+     "operator": "benennen / nennen",
+     "definition": "Informationen und Sachverhalte aus vorgegebenem Material oder Kenntnisse ohne Kommentierung wiedergeben",
+     "afb": "I",
+     "formen": [
+      "benennen",
+      "nennen"
+     ],
+     "beispiele": [
+      "Nennen Sie charakteristische Merkmale des Lebensraums Wattenmeer."
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Materialaussagen und Kenntnisse mit eigenen Worten zusammenhängend, geordnet und fachsprachlich angemessen wiedergeben",
+     "afb": "I",
+     "beispiele": [
+      "Beschreiben Sie Lage und Dimension des Baikalsees."
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte, Zusammenhänge, Methoden und Bezüge strukturiert wiedergeben. Dabei werden Entwicklungen und / oder Beziehungen verdeutlicht",
+     "afb": "I",
+     "beispiele": [
+      "Stellen Sie mögliche auslösende und verstärkende Faktoren für die Hochwasserereignisse dar."
+     ]
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "gezieltes Erfassen von Fakten zu einem bestimmten Sachverhalt oder Gegenstand aus vorgegebenem Material",
+     "afb": "I",
+     "beispiele": [
+      "Ermitteln Sie seit 1989 geplante und verwirklichte Veränderungen im Hamburger Citybereich."
+     ]
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "Informationen und Sachverhalte aus vorgegebenem Material oder Kenntnisse so wiedergeben, dass die inhaltlichen Schwerpunkte deutlich aufgezeigt werden",
+     "afb": "I",
+     "beispiele": [
+      "Geben Sie die Voraussetzungen für die geplanten Maßnahmen wieder."
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I",
+     "beispiele": [
+      "Fassen Sie die Ziele des Entwicklungshilfeprojekts „Wasser für alle“ zusammen."
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte systematisch untersuchen, auswerten und Strukturen und / oder Zusammenhänge herausarbeiten",
+     "afb": "II",
+     "beispiele": [
+      "Analysieren Sie das naturräumliche Potenzial Nigerias."
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "übertragen geübter Untersuchungsmethoden auf neue räumliche Sachverhalte und Prozesse",
+     "afb": "II",
+     "beispiele": [
+      "Wenden Sie das Stadtmodell nach … auf Hamburg an."
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "komplexe Grundstrukturen argumentativ schlüssig entwickeln und im Zusammenhang darstellen",
+     "afb": "II",
+     "beispiele": [
+      "Begründen Sie regionale Unterschiede in der Landnutzung Malis."
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Einzelaspekte des untersuchten Sachverhaltes oder Raumes systematisch und gewichtet herausarbeiten und dabei ihre Bedeutung und / oder Abfolge herausstellen",
+     "afb": "II",
+     "beispiele": [
+      "Charakterisieren Sie das Wattenmeer als besonderen Lebensraum."
+     ]
+    },
+    {
+     "operator": "ein‐ / zuordnen",
+     "definition": "Sachverhalte und Räume begründet in einen vorgegebenen Zusammenhang stellen oder in ein Ordnungsraster einordnen",
+     "afb": "II",
+     "formen": [
+      "einordnen",
+      "zuordnen"
+     ],
+     "beispiele": [
+      "Ordnen Sie Indonesien in das Modell des demographischen Übergangs ein."
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "Informationen und Sachverhalte so darstellen, dass Bedingungen, Ursachen, Folgen und / oder Gesetzmäßigkeiten verständlich werden",
+     "afb": "II",
+     "beispiele": [
+      "Erklären Sie die Entstehung der in dieser Region vorhandenen Reliefformen."
+     ]
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte im Zusammenhang beschrieben und Beziehungen deutlich machen.",
+     "afb": "II",
+     "beispiele": [
+      "Erläutern Sie die aktuelle Wassersituation in Las Vegas."
+     ]
+    },
+    {
+     "operator": "erstellen",
+     "definition": "Sachverhalte inhaltlich und methodisch angemessen graphisch darstellen und mit fachsprachlichen Begriffen beschriften",
+     "afb": "II",
+     "beispiele": [
+      "Erstellen Sie eine thematische Karte…"
+     ]
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede nach vorgegebenen oder eigenen Kriterien gewichtet einander gegenüberstellen und ein Ergebnis / Fazit formulieren",
+     "afb": "II",
+     "beispiele": [
+      "Vergleichen Sie das Projekt „Hafen City Hamburg“ und „Lingang New City“ vor dem Hintergrund städtischer Entwicklungen im jeweiligen Land."
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "an einen Gegenstand gezielte Arbeitsfragen stellen und gewonnene Erkenntnisse darlegen",
+     "afb": "II",
+     "beispiele": [
+      "Untersuchen Sie die soziale Situation im Stadtteil Eimsbüttel."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen im Zusammenhang auf ihre Stichhaltigkeit bzw. Angemessenheit prüfen und dabei die angewandten Kriterien nennen, ohne persönlich Stellung zu beziehen",
+     "afb": "III",
+     "beispiele": [
+      "Beurteilen Sie das Toshka-Projekt."
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Aussagen, Behauptungen, Vorschläge oder Maßnahmen beurteilen unter Offenlegung der angewandten Wertmaßstäbe und persönlich Stellung nehmen.",
+     "afb": "III",
+     "beispiele": [
+      "Bewerten Sie die Bedeutung des Fremdenverkehrs als Entwicklungsträger für Sri Lanka."
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Sachverhalte und Methoden zielgerichtet miteinander verknüpfen und z.B. eine Hypothese erstellen oder ein Modell entwerfen",
+     "afb": "III",
+     "beispiele": [
+      "Entwickeln Sie eine begründete Zukunftsprognose für die künftige Anbaustruktur in Kansas."
+     ]
+    },
+    {
+     "operator": "erörtern / diskutieren",
+     "definition": "zu einer vorgegebenen Problemstellung durch Abwägen von Pro- und Contra-Argumenten ein begründetes Urteil fällen",
+     "afb": "III",
+     "formen": [
+      "erörtern",
+      "diskutieren"
+     ],
+     "beispiele": [
+      "Erörtern Sie Folgen, die sich aus der Bevölkerungsentwicklung und der sozialräumlichen Gliederung für die Stadtentwicklung Rio de Janeiros ergeben."
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen im Zusammenhang auf ihre Stichhaltigkeit bzw. Angemessenheit prüfen und ein begründetes Urteil fällen",
+     "afb": "III",
+     "beispiele": [
+      "Nehmen Sie Stellung zu der Aussage, dass …"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "vorgegebene Aussagen bzw. Behauptungen, Darstellungsweisen an konkreten Sachverhalten auf ihre innere Stimmigkeit und Angemessenheit hin untersuchen",
+     "afb": "III",
+     "beispiele": [
+      "Prüfen Sie die Gültigkeit der Textaussagen anhand der Materialien."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Anhänge „Liste der Operatoren“ (Englisch, Geographie, Geschichte, Politik/Gesellschaft/Wirtschaft), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "politik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "benennen, bezeichnen",
+     "definition": "Sachverhalte, Strukturen und Prozesse begrifflich präzise aufführen",
+     "afb": "I",
+     "formen": [
+      "benennen",
+      "bezeichnen"
+     ],
+     "beispiele": [
+      "Benennen Sie wesentliche Elemente ..."
+     ]
+    },
+    {
+     "operator": "beschreiben, darlegen, darstellen",
+     "definition": "wesentliche Aspekte eines Sachverhaltes im logischen Zusammenhang unter Verwendung der Fachsprache strukturiert wiedergeben",
+     "afb": "I",
+     "formen": [
+      "beschreiben",
+      "darlegen",
+      "darstellen"
+     ],
+     "beispiele": [
+      "Beschreiben Sie den aktuellen Konjunkturverlauf anhand …\nStellen Sie die Kernaussagen der Autorin dar."
+     ]
+    },
+    {
+     "operator": "einordnen, zuordnen",
+     "definition": "mit erläuternden Hinweisen und – soweit möglich – Textbelegen in einen genannten Zusammenhang einfügen",
+     "afb": "I",
+     "formen": [
+      "einordnen",
+      "zuordnen"
+     ],
+     "beispiele": [
+      "Ordnen Sie die Position einer Ihnen bekannten Grundrichtung zu / in eine Ihnen bekannte Kontroverse ein."
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "das Thema benennen und die Kernaussagen des Textes komprimiert und strukturiert wiedergeben, d. h. sammeln, ordnen, abstrahieren, sachlogisch gliedern und in eigenen Worten formulieren",
+     "afb": "I",
+     "beispiele": [
+      "Fassen Sie das Interview / den Text in Thesen zusammen."
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "unter gezielten Fragestellungen Elemente, Strukturmerkmale und Zusammenhänge herausarbeiten und die Ergebnisse darstellen, d. h. beschreiben, deuten, Fragen beantworten, ggf. Antworten kritisch hinterfragen",
+     "afb": "II",
+     "beispiele": [
+      "Analysieren Sie die vorliegenden Grafiken und Schaubilder unter der Fragestellung…."
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten oder Einzelergebnisse zu einer abschließenden Gesamtaussage zusammenführen",
+     "afb": "II",
+     "beispiele": [
+      "Werten Sie die vorliegenden Materialien unter der Problemstellung … aus."
+     ]
+    },
+    {
+     "operator": "die Position, den Standort des Verfassers bestimmen",
+     "definition": "Zuordnung des Verfassers zu einer bestimmten Partei, Gruppe, Wissenschaftsrichtung etc. unter Verweis auf Textstellen und in Verbindung mit eigenem Wissen",
+     "afb": "II",
+     "beispiele": [
+      "Bestimmen Sie unter Bezug auf den Text den politischen / wissenschaftlichen Standpunkt des Autors."
+     ]
+    },
+    {
+     "operator": "erklären, erläutern",
+     "definition": "Sachverhalte durch Wissen und Einsichten in einen Zusammenhang (Theorie, Modell, Regel, Gesetz, Funktionszusammenhang) einordnen und deuten; ggf. durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II",
+     "formen": [
+      "erklären",
+      "erläutern"
+     ],
+     "beispiele": [
+      "Erklären Sie die Entwicklung des BIP.\nErläutern Sie die Kernaussagen."
+     ]
+    },
+    {
+     "operator": "herausarbeiten, erschließen",
+     "definition": "aus den direkten und indirekten Aussagen des Textes einen Sachverhalt, eine Position erkennen, darstellen und erläutern",
+     "afb": "II",
+     "formen": [
+      "herausarbeiten",
+      "erschließen"
+     ],
+     "beispiele": [
+      "Arbeiten Sie heraus, wie die Rolle und Bedeutung des UN-Sicherheitsrats im vorliegenden Text gesehen wird."
+     ]
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Vergleichsmerkmalen Gemeinsamkeiten, Ähnlichkeiten und Unterschiede gegliedert darstellen und abschließend bewerten",
+     "afb": "II",
+     "beispiele": [
+      "Vergleichen Sie die Aussagen der vorliegenden Texte.\nVergleichen Sie die aktuelle Situation mit der historischen Situation."
+     ]
+    },
+    {
+     "operator": "widerlegen",
+     "definition": "Daten, Behauptungen, Konzepte oder eine Position schlüssig und sachlogisch entkräften und weitere Gegenargumente entwickeln",
+     "afb": "II",
+     "beispiele": [
+      "Widerlegen Sie die Aussagen des Autors."
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "zu einem Sachverhalt komplexe Grundgedanken unter dem Aspekt der Kausalität argumentativ und schlüssig entwickeln",
+     "afb": "III",
+     "beispiele": [
+      "… und begründen Sie, wie es zu dieser Situation gekommen ist."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "zu einem Sachverhalt ein triftiges Sachurteil unter Verwendung von Fachwissen und Fachmethoden auf Grund von ausgewiesenen Kriterien formulieren und begründen",
+     "afb": "III",
+     "beispiele": [
+      "Beurteilen Sie die Aussagen / die Analyse von …\nBeurteilen Sie die Lösungsvorschläge von …"
+     ]
+    },
+    {
+     "operator": "bewerten, Stellung nehmen",
+     "definition": "unter Offenlegung und Reflexion der eigenen normativen Maßstäbe ein begründetes Werturteil formulieren und argumentativ schlüssig begründen",
+     "afb": "III",
+     "formen": [
+      "bewerten",
+      "Stellung nehmen"
+     ],
+     "beispiele": [
+      "Bewerten Sie die Lösungsvorschläge von …"
+     ]
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "ein Konzept in seinen wesentlichen Zügen prospektiv / planend erstellen",
+     "afb": "III",
+     "beispiele": [
+      "Entwerfen Sie einen eigenen Lösungsvorschlag für das in Frage stehende Problem."
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "eine Skizze, ein Modell, ein Szenario schrittweise weiterführen und begründen",
+     "afb": "III",
+     "beispiele": [
+      "Entwickeln Sie aus den Vorschlägen des Autors ein Bild der Gesellschaft im Jahre 2035."
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "ein Beurteilungs- oder Bewertungsproblem darstellen und entwickeln; die zentralen Begriffe der Frage und ihre Maßnahmen auslegen, unterschiedliche Positionen und Pro- und Kontra-Argumente entwickeln, diese dann abwägen und mit einem eigenen Urteil als Ergebnis abschließen",
+     "afb": "III",
+     "beispiele": [
+      "Erörtern Sie die in den Texten angebotenen Lösungsvorschläge."
+     ]
+    },
+    {
+     "operator": "gestalten",
+     "definition": "Reden, Strategien, Beratungsskizzen, Karikaturen, Szenarien, Spots oder andere mediale Produkte entwerfen sowie eigene Handlungsvorschläge und Modelle entwerfen",
+     "afb": "III",
+     "beispiele": [
+      "Gestalten Sie eine politische Rede zur Frage ..."
+     ]
+    },
+    {
+     "operator": "problematisieren",
+     "definition": "Widersprüche herausarbeiten, Positionen oder Theorien hinterfragen",
+     "afb": "III",
+     "beispiele": [
+      "Problematisieren Sie die Reichweite der Theorie / des Lösungsvorschlags."
+     ]
+    },
+    {
+     "operator": "(über)prüfen",
+     "definition": "eine Meinung, Aussage, These, Argumentation auf der Grundlage eigener Kenntnisse oder mithilfe zusätzlicher Materialien auf ihre sachliche Richtigkeit bzw. ihre innere Logik hin untersuchen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ],
+     "beispiele": [
+      "Prüfen Sie die Gültigkeit der Textaussagen anhand der Materialien."
+     ]
+    },
+    {
+     "operator": "Stellung nehmen aus der Sicht von… / eine Erwiderung formulieren aus der Sicht von…",
+     "definition": "eine unbekannte Position, Argumentation oder Theorie kritisieren oder in Frage stellen aus der Sicht einer bekannten Position",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen aus der Sicht von…",
+      "eine Erwiderung formulieren aus der Sicht von…"
+     ],
+     "beispiele": [
+      "Nehmen Sie zu den Aussagen der Autorin Stellung aus der Sicht von …\nFormulieren Sie eine Erwiderung zu der Position aus der Sicht von …"
+     ]
+    },
+    {
+     "operator": "verhandeln",
+     "definition": "zwei Positionen darstellen, ihre Interessen offenlegen und hiervon ausgehend einen Kompromiss entwickeln, der für beide Seiten akzeptabel sein könnte",
+     "afb": "III",
+     "beispiele": [
+      "Verhandeln Sie aus der Sicht eines Bankvorstands und eines Finanzministers Lösungswege…"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Operatoren in den gesellschaftswissenschaftlichen Fächern – Definitionen – Hinweise – Anleitungen (Referat Unterrichtsentwicklung Gesellschaftswissenschaften und Aufgabengebiete), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2020",
+   "url": "",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "darstellen",
+     "definition": "„Darstellen“ fordert dazu auf, einen Sachverhalt, eine Position, Zusammenhänge oder Methoden so darzulegen, dass die Strukturen und der Sinn des Dargestellten, seine Entwicklungen und Beziehungen deutlich werden.",
+     "afb": "I",
+     "zusatz": {
+      "Hinweis": "Der Operator „darstellen“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich I.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Den Sachverhalt oder die Position nennen.\n• Das weitere Vorgehen anführen.\n2. Schritt: Hauptteil\n• Einzelne Elemente bzw. Faktoren des Sachverhalts oder der Position mithilfe einer selbstgewählten oder dem Material entnommenen Struktur darstellen.\n• Grundsätzlich eigene Formulierungen verwenden.\n• Die Ausführungen strukturieren.\n• Fachbegriffe und Fachsprache nutzen.\n• Sich auf das Dargestellte beschränken und nicht mit Beispielen erläutern.\n• Sachlich bleiben und nicht (mit Argumenten) bewerten.\n3. Schritt: Schluss\n• Sofern die nächste Teilaufgabe inhaltlich anschließt: Mit einer überleitenden Formulierung enden."
+     }
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "„Zusammenfassen“ fordert dazu auf, den Inhalt von Texten bzw. Materialien auf das Wesentliche reduziert wiederzugeben.",
+     "afb": "I",
+     "zusatz": {
+      "Hinweis": "Der Operator „zusammenfassen“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich I.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Den/die Verfasser/-in, den Titel und ggf. die Entstehungszeit des Textes angeben.\n• Die Textsorte und das Thema bzw. die Fragestellung nennen.\n2. Schritt: Hauptteil\n• Die zentralen Aussagen und Argumentationen des Textes in eigenen Worten in indirekter Rede wiedergeben.\n• Fachsprache und Fachbegriffe verwenden.\n• Der Sachlogik folgen, die nicht notwendigerweise der der Textabsätze im Ausgangsmaterial entspricht.\n• Textverweise, Zitate und Zeilenverweise sind entbehrlich.\n[3. Schritt: Schluss]\n• Ein Fazit ist bei einer Zusammenfassung nicht erforderlich."
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "„Erläutern“ fordert dazu auf, Positionen, Sachverhalte oder Probleme in ihren Einzelheiten zu verdeutlichen, diese in ihrem Zusammenhang darzustellen und durch Beispiele zu veranschaulichen. Wenn von konkreten Situationen und Daten ausgegangen wird, sind diese in einen allgemeinen Zusammenhang zu stellen und auf Theorien, Modelle, Regeln u. ä. zu beziehen. Geht man hingegen von abstrakten Positionen oder Theorien aus, dann sind diese anhand konkreter Beispiele, Daten oder Situationen zu veranschaulichen.",
+     "afb": "II",
+     "zusatz": {
+      "Hinweis": "Der Operator „erläutern“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich II.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Die zu erläuternden Positionen, Sachverhalte oder Probleme benennen.\n2. Schritt: Hauptteil\n• Die Position, den Sachverhalt oder die Theorie kurz darstellen (sofern dies nicht bereits in der ersten Teilaufgabe erfolgt ist).\n• Ausführen, wie sich ein allgemeiner Zusammenhang (wie er mithilfe von These, Modell, Theorie, Position, Deutungsansatz beschrieben wird) in den konkreten Ereignissen, Situationen, Verhältnissen etc. zeigt.\n• Ggf. weitere Beispiele und zusätzliche Informationen, die den allgemeinen Zusammenhang verdeutlichen, anführen.\n• Begriffe aus dem Material bzw. aus dem Themenzusammenhang nennen und beschreiben, was sie in diesem Kontext bedeuten.\n3. Schritt: Schluss\n• Sofern die nächste Teilaufgabe inhaltlich anschließt: Mit einer überleitenden Formulierung enden."
+     }
+    },
+    {
+     "operator": "analysieren",
+     "definition": "„Analysieren“ fordert dazu auf, das vorgegebene Material hinsichtlich eines oder mehrerer Aspekte mithilfe passender (Analyse-) Methoden zu untersuchen. Eine Analyse erfolgt entlang einer Problemstellung: Sie kann in der Aufgabenstellung explizit oder implizit vorgegeben sein oder sie muss selbstständig gefunden werden. Vielfach ergibt sich die Analysemethode aus einfachen, im Unterricht geübten Arbeitsschritten, die dann nicht explizit ausgewählt und dargestellt werden müssen (z. B. Analyseschritte bei Statistiken, Bildern etc.). Erfordert die Aufgabenstellung jedoch eine ausführliche Analyse, ist eine für das Material (z. B. Fallbeispiel) passende Analyse-Methode begründet auszuwählen, darzustellen und detailliert auf das Material anzuwenden.",
+     "afb": "II",
+     "zusatz": {
+      "Hinweis": "Der Operator „analysieren“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich II. Der je nach Fach geforderte Anteil im Anforderungsbereich III bezieht sich v. a. auf ein differenziertes, reflektiertes und abwägendes Vorgehen.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Die Problemstellung aus der Aufgabe konkretisieren.\n• Die für die Analyse wesentlichen Elemente des Materials kenntlich machen und ggf. verkürzt darstellen.\n• Den Analyseaspekt (ggf. auswählen und) kurz beschreiben.\n• Bei ausführlichen Analysen: Die Analysemethode (ggf. begründet auswählen und) darstellen, sofern sie im Vollzug der Analyse nicht von selbst deutlich wird.\n2. Schritt: Analyse\n• Die wesentlichen Elemente des Materials im Rahmen des dargestellten Analyseaspekts mithilfe einer Analysemethode untersuchen.\n• Dabei die Zusammenhänge von eigenem Hintergrundwissen, Analyseaspekt und Material herausarbeiten und ggf. zusätzlich erläutern.\n3. Schritt: Schluss\n• Das Ergebnis der Analyse zusammenfassen."
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "„Vergleichen“ fordert dazu auf, die Gemeinsamkeiten und Unterschiede zwischen zwei Phänomenen, Deutungen, Modellen, Positionen etc. herauszuarbeiten. Bei einem Vergleich können entweder zunächst Gemeinsamkeiten, danach Unterschiede aufgezeigt werden (Variante A) oder der Vergleich kann nach einzelnen Kriterien strukturiert erfolgen (Variante B). Ein Vergleich erfolgt entlang von Kriterien. Sie können in der Aufgabenstellung explizit oder implizit vorgegeben sein oder sie müssen selbstständig gefunden werden. In allen Fällen gilt: Die Vergleichskriterien müssen in der Bearbeitung deutlich benannt und, sofern sie sich nicht selbst erklären, erläutert werden.",
+     "afb": "II",
+     "zusatz": {
+      "Hinweis": "Der Operator „vergleichen“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich II.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Die zu vergleichenden Phänomene, Deutungen, Modelle, Positionen etc. kurz nennen.\n2. Schritt: Gemeinsamkeiten und Unterschiede (in Variante A)\n• Alle Gemeinsamkeiten nacheinander darstellen und das Vergleichskriterium aufzeigen.\n• Danach alle Unterschiede nacheinander darstellen und das Vergleichskriterium aufzeigen.\n2. Schritt: Gemeinsamkeiten und Unterschiede (in Variante B)\n• Ein Vergleichskriterium benennen und nur die dazu gehörigen Gemeinsamkeiten und Unterschiede ausführen.\n• Ein weiteres Vergleichskriterium benennen und auch hier nur die dazu gehörigen Gemeinsamkeiten und Unterschiede ausführen usw.\n3. Schritt: Fazit\n• In einem kurzen Fazit die Einzelanalysen zusammenfassen oder eine übergreifende Beobachtung festhalten."
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "„Beurteilen“ fordert dazu auf, Sachverhalte, Aussagen, Behauptungen, Vorschläge oder Maßnahmen im Zusammenhang auf ihre Stichhaltigkeit bzw. Angemessenheit zu prüfen. In der Bearbeitung müssen die dem (Sach-) Urteil zugrunde gelegten Kriterien deutlich zum Ausdruck gebracht werden. Im Unterschied zum Operator „bewerten“ fließen weltanschauliche, politische, religiöse oder andere Überzeugungen nicht in das (Sach-) Urteil ein.",
+     "afb": "III",
+     "zusatz": {
+      "Hinweis": "Der Operator „beurteilen“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich III.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Den zu beurteilenden Sachverhalt nennen und problematisieren (ggf. Bezüge zu vorhergehenden Teilaufgaben herstellen).\n2. Schritt: Nennen der Urteilskriterien\n• Kriterien für das Urteil nennen.\n• Die Kriterien können über die Aufgabe vorgegeben sein oder müssen selbstständig gefunden werden.\n3. Schritt: Urteilsfindung\n• Vor dem Hintergrund der verwendeten Kriterien eigene Argumente anführen.\n• Fachliche Kenntnisse, Beweisführungen unter Bezug auf die Materialien sowie Vergleiche mit ähnlichen (oder anders gelagerten) Fällen dabei einbringen.\n4. Schritt: Formulierung des Urteils\n• In einer abschließenden Abwägung ein selbstständiges, begründetes Sachurteil formulieren.\n5. Schritt: Reflexion\n• Ggf. Ausblick und/oder eine methodische Reflexion anstellen."
+     }
+    },
+    {
+     "operator": "bewerten, Stellung nehmen (aus der Sicht von…)",
+     "definition": "„Bewerten“ und „Stellung nehmen“ fordern dazu auf, über eine Problemstellung differenziert und vor dem Hintergrund der eigenen Überzeugung ein Werturteil abzugeben. Anders als bei „beurteilen“ fließen hier weltanschauliche, politische, religiöse oder andere Überzeugungen in die Einschätzung ein. Die zugrundeliegenden Kriterien und Werte werden transparent gemacht.",
+     "afb": "III",
+     "formen": [
+      "bewerten",
+      "Stellung nehmen",
+      "Stellung nehmen aus der Sicht von …"
+     ],
+     "zusatz": {
+      "Hinweis": "Die Operatoren „bewerten“ und „Stellung nehmen“ werden in fast allen gesellschaftswissenschaftlichen Fächern verwendet, ihr Schwerpunkt liegt im Anforderungsbereich III. In einigen Fächern fordert zudem der Operator „Stellung nehmen aus der Sicht von …“ dazu auf, nicht (notwendigerweise) aus der eigenen Perspektive zu bewerten, sondern aus einer in der Aufgabenstellung vorgegebenen Sicht. Die Aufgabenbearbeitung erfolgt aber parallel.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Die Problemstellung (ggf. auch die Frage, den Sachverhalt, die Tatsache, das Ereignis, die Position, die Behauptung, das Argument oder ähnliches) darstellen und kurz erläutern.\n• Sofern dies bereits in einer vorgehenden Teilaufgabe erfolgte, genügt ein zusammenfassender Satz.\n2. Schritt: Nennen der Urteilskriterien\n• Kriterien für das Urteil nennen.\n• Die Kriterien können über die Aufgabe vorgegeben sein oder müssen selbstständig gefunden werden.\n3. Schritt: Argumentation\n• Argumente anführen, die es ermöglichen, mithilfe der aufgezeigten Kriterien die Problemstellung einzuschätzen.\n• Ggf. die Problemstellung kritisch reflektieren.\n4. Schritt: Fazit\n• Eine zustimmende oder ablehnende Einschätzung differenziert formulieren.\n• Eine Bewertung bzw. Stellungnahme kann auch offen bleiben (z. B. wenn herausgearbeitet wird, dass entscheidende Informationen o. ä. fehlen).\n• Die Einschätzung abschließend zusammenfassen.\n5. Schritt: Reflexion\nGgf. Ausblick und/oder eine methodische Reflexion anstellen."
+     }
+    },
+    {
+     "operator": "erörtern",
+     "definition": "„Erörtern“ fordert dazu auf, zu einer Problemstellung (einer These, einer Entscheidung, einer Frage o. ä.) eine Pro- und Contra-Argumentation zu entfalten, die nach Abwägung der aufgeführten Argumente zu einem begründeten und nachvollziehbaren Urteil führt. Dabei kann es sich um ein Sach- oder ein Werturteil handeln.",
+     "afb": "III",
+     "zusatz": {
+      "Hinweis": "Der Operator „erörtern“ wird in allen gesellschaftswissenschaftlichen Fächern verwendet, sein Schwerpunkt liegt im Anforderungsbereich III.",
+      "Arbeitsschritte": "1. Schritt: Einleitung\n• Die Problemstellung, die erörtert werden soll, beschreiben und ihre Relevanz darstellen.\n• (Mindestens) zwei mögliche Positionen zu deren Beantwortung benennen.\n• Die Problemstellung und/oder Positionen können bereits in der Aufgabenstellung vorgegeben sein oder sie müssen (erst aus dem Material) entwickelt werden.\n2. Schritt: Argumentation\nArgumente…\n• formulieren (also Aussagen, aus denen sich Schlüsse zur Beantwortung der Problemstellung ergeben),\n• indem auf gegebenes Material, auf eigenes Hintergrundwissen oder Beispiele verwiesen wird,\n• und sie geordnet aufführen (z. B. nach Pro und Contra zu einer Position).\n3. Schritt: Abwägung\n• Argumente gegeneinander abwägen.\n• Ggf. eine Kompromissposition oder eine Synthese aus den beiden zuvor entfalteten Argumentationslinien entwickeln.\n• Das Kriterium deutlich machen, das den Ausschlag für die eine oder andere Position gibt (bei Sachurteilen z. B. Triftigkeit oder Plausibilität; bei Werturteilen z. B. die Hierarchie der persönlichen Werte und Normen).\n4. Schritt: Fazit\n• Ein eigenes plausibles Urteil formulieren, das Differenzierungen und gegebenenfalls weitere Problematisierungen enthält.\n• Das Fazit kann auch offen bleiben, z. B. wenn herausgearbeitet wird, dass entscheidende Informationen o. ä. fehlen.\n• Ggf. auf noch offene Fragen und Aspekte hinweisen, die sich zwar sachlogisch anschließen, aber im vorgegebenen Rahmen nicht bearbeitet werden können."
+     }
+    }
+   ]
+  }
+ ]
+}

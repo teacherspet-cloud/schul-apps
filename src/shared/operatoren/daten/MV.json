@@ -1,0 +1,621 @@
+{
+ "stateId": "MV",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Operatorenliste – Operatoren im Fach Geschichte und Politische Bildung (Begleitdokument zu den Rahmenplänen Geschichte), Ministerium für Bildung und Kindertagesförderung M-V / Institut für Qualitätsentwicklung (IQ M-V), Bildungsserver M-V, 2019",
+   "url": "https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/Geschichte-Operatorenliste.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "Bestimme die zur Beantwortung der Aufgabenstellung notwendigen Informationen. Äußere sie.",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Bestimme die zur Beantwortung der Aufgabenstellung notwendigen Informationen. Leite aus diesen reduzierende (auf ein Schlagwort gebrachte/verkürzte/vereinfachte) Aussagen ab. Äußere sie.",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Bestimme die zur Beantwortung der Aufgabenstellung notwendigen Informationen. Formuliere zusammenhängend Beziehung/-en zwischen den von dir bestimmten Informationen (= Sachverhalt).",
+     "afb": "I"
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "Gleiche die gegebenen Informationen mit den Definitionen von Kategorien* ab. Formuliere deine Folgerung.",
+     "afb": "II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Nenne Zeit, Raum und konkreten historischen Sachverhalt. Ordne deine Feststellungen einer Kategorie* zu.",
+     "afb": "II"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "Beschreibe den im Material enthalten historischen Sachverhalt. Ordne den [aus der Beschreibung] erarbeiteten Sachverhalt einer Kategorie* zu.",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Beschreibe den gegebenen historischen Sachverhalt. Ordne den [aus der Beschreibung] erarbeiteten Sachverhalt einer Kategorie* zu. Leite aus der von dir zugeordneten Kategorie* einen Funktionszusammenhang für den erarbeiteten Sachverhalt ab.",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Erkläre den gegebenen historischen Sachverhalt. Gleiche die zugeordnete Kategorie* mit anderen historischen Sachverhalten ab. Nenne, die sich aus dem Abgleich ergebenden passenden Beispiele für den zuvor in der Erklärung erarbeiteten Funktionszusammenhang.",
+     "afb": "II"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Fasse den gegebenen konkreten historischen Sachverhalt zusammen. Leite aus den erarbeiteten reduzierenden Aussagen resultierende Merkmale/Schlagworte ab. Ordne dem im Arbeitsauftrag vorgegebenen Aspekt einer Kategorie* zu.",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Beschreibe den in der Aufgabe gegebenen historischen Sachverhalt. Wähle aus den [aus der Beschreibung] erarbeiteten Sachverhalten die für die Beantwortung der Aufgabe notwendigen aus. Formuliere auf dieser Basis zusammenhängend eine strukturierte Argumentation.",
+     "afb": "II"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Begründe die in der Aufgabe enthaltene Aussage. Belege deine Argumentation mit/anhand anderer historischer Sachverhalte.",
+     "afb": "II"
+    },
+    {
+     "operator": "abwägen",
+     "definition": "Begründe die möglichen Zuordnungen des Sachverhalts zu den in der Aufgabe zur Abwägung gestellten Kategorie*. Ordne deine Feststellungen gemäß Für und Wider dem in der Aufgabe gegebenen Kategorien* zu. Formuliere deine Folgerung in Form einer strukturierten Argumentation.",
+     "afb": "III"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Beschreibe den in der Aufgabe gegebenen historischen Sachverhalt. Ordne den [aus der Beschreibung] erarbeiteten Sachverhalt einer Kategorie* zu. Formuliere anhand der von dir zugeordneten Kategorie* eine Aussage zum Stellenwert des gegebenen/erarbeiteten historischen Sachverhalt. Wähle aus den erarbeiteten Sachverhalten diejenigen aus, die deine These stützen. Formuliere eine strukturierte Argumentation.",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Beschreibe den in der Aufgabe gegebenen historischen Sachverhalt. Ordne den [aus der Beschreibung] erarbeiteten Sachverhalt einer Kategorie* zu. Bestimme anhand deiner persönlichen Wertmaßstäbe den Stellenwert der von dir zugeordneten Kategorie* für dich. Wähle aus den erarbeiteten Sachverhalten, diejenigen aus, die deine Einschätzung stützen. Formuliere eine strukturierte Argumentation.",
+     "afb": "III"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Bewerte den gegebenen historischen Sachverhalt. Stelle deine Bewertung zur Disposition, indem Du sie äußerst und auf andere Bewertungen Bezug nimmst.",
+     "afb": "III"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Beschreibe den in der Aufgabe gegebenen historischen Sachverhalt. Ordne den [aus der Beschreibung] erarbeiteten Sachverhalt mindestens zwei sich ausschließenden Kategorien* zu. Bestimme das Für und Wider der einzelnen von dir zugeordneten Kategorien*. Gewichte das Für und Wider der von dir zugeordneten Kategorien*. Formuliere auf dieser Basis eine strukturierte Argumentation.",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Beschreibe die einzelnen gegebenen historischen Sachverhalte. Ordne einzelne [aus der Beschreibung] ersichtlichen Sachaussagen gegebenen/selbstgewählten Kategorien* (= Kriterien) zu. Erkläre die zu den Kriterien zugeordneten Sachaussagen. Gleiche die erklärten Sachaussagen auf Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ab. Formuliere deine Folgerung.",
+     "afb": "III"
+    }
+   ]
+  },
+  {
+   "quelle": "Operatorenliste Geschichte Sek. I – Operatoren Rahmenplan Geschichte, Ministerium für Bildung und Kindertagesförderung M-V / IQ M-V, Bildungsserver M-V, 2023",
+   "url": "https://www.bildung-mv.de/export/sites/bildungsserver/.galleries/dokumente/unterricht/operatorenliste_rp_geschichte_sek_I.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "beschreiben",
+     "definition": "zielgerichtet Informationen bestimmen und diese zusammenhängend, geordnet, fachsprachlich und nachvollziehbar formulieren",
+     "afb": "I",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Sachverhalte, Begriffe und/oder Daten, die zur Beantwortung der Aufgabe notwendig sind. Setze die gefundenen Informationen in eine räumliche (z. B. neben, unter), zeitliche (z. B. zuerst, dann) oder andere Beziehung zueinander."
+     }
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen bestimmen und äußern",
+     "afb": "I",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Sachverhalte, Begriffe und/oder Daten, die zur Beantwortung der Aufgabe notwendig sind."
+     }
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "zielgerichtet Informationen bestimmen und diese reduziert (auf Oberbegriffe bzw. Schlagworte verkürzte) wiedergeben",
+     "afb": "I",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Sachverhalte, Begriffe und/oder Daten, die zur Beantwortung der Aufgabe notwendig sind. Bestimme passende Oberbegriffe bzw. formuliere Schlagworte."
+     }
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Eigentümlichkeiten des zu betrachtenden Sachverhalts fachsprachlich bestimmen und diese zusammenhängend sowie nachvollziehbar formulieren",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Reduziere die Informationen auf typische Merkmale. Ordne diese typischen Merkmale in ihrer Summe einem Oberbegriff mit vergleichbaren Merkmalen zu."
+     }
+    },
+    {
+     "operator": "erklären",
+     "definition": "Informationen zu einem Sachverhalt so in Beziehung zueinander setzen, dass Bedingungen, Ursachen, Folgen und Gesetzmäßigkeiten etc. erkennbar werden",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Setze die Informationen in einen Zusammenhang. Nutze dafür entsprechend der Aufgabenstellung ein allgemeines Deutungsmuster (z. B. Ursache-Wirkung, Mittel-Zweck, fachwissenschaftliches Modell)."
+     }
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Informationen zu einem Sachverhalt so in Beziehung zueinander setzen, dass Bedingungen, Ursachen, Folgen und Gesetzmäßigkeiten etc. erkennbar werden und an einem (weiteren) Beispiel illustrieren",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Setze die Informationen in einen Zusammenhang. Nutze dafür entsprechend der Aufgabenstellung ein allgemeines Deutungsmuster (z. B. Ursache-Wirkung, Mittel-Zweck, fachwissenschaftliches Modell). Konkretisiere deine Aussage(n) an einem (weiteren) Beispiel."
+     }
+    },
+    {
+     "operator": "erschließen",
+     "definition": "aus gegebenen Informationen begründet Vermutungen ableiten",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Gleiche die Informationen mit den Merkmalen von dir bekannten Begriffen oder Deutungsmustern ab. Setze die Informationen in eine Beziehung zueinander und formuliere Vermutungen zum Sachverhalt."
+     }
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Informationen zu einem Sachverhalt in Prozessen oder Modellen verorten",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Bestimme passende Oberbegriffe bzw. formuliere Schlagworte und verorte die Informationen zeitlich (ggf. räumlich). Ordne die Informationen zum Sachverhalt passenden Prozessen oder Modellen zu."
+     }
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Belege für eine Aussage/These bestimmen und argumentativ zusammenführen",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen. Gleiche die Informationen mit den Merkmalen der in der Aussage/These vorgegebenen Begriffe oder Deutungsmuster ab. Wähle die Informationen aus, die die Aussage/These bestätigen. Formuliere eine zusammenhängende Argumentation."
+     }
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "Informationen zu einem Sachverhalt kategorisieren",
+     "afb": "II",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Reduziere die Informationen auf typische Merkmale. Ordne die Informationen zum Sachverhalt passenden Kategorien zu."
+     }
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Aussagen/Thesen innerhalb eines Bezugsrahmens prüfen und ein begründetes Ergebnis formulieren",
+     "afb": "III",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Gleiche die Informationen mit den Merkmalen der in der Aussage/These vorgegebenen Begriffe oder Deutungsmuster ab. Entscheide dich für oder gegen die Aussage/These. Wähle die Informationen aus, die deine Entscheidung bestätigen. Formuliere eine zusammenhängende Argumentation."
+     }
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Aussagen/Thesen innerhalb eines Bezugsrahmens prüfen, anhand persönlicher oder vorgegebener Maßstäbe einschätzen und ein begründetes Ergebnis formulieren",
+     "afb": "III",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Gleiche die Informationen mit den Merkmalen der in der Aussage/These vorgegebenen Begriffe oder Deutungsmuster ab. Bestimme anhand deiner oder vorgegebener Maßstäbe die Bedeutung der Begriffe oder Deutungsmuster. Entscheide dich für oder gegen die Aussage/These. Wähle die Informationen aus, die deine Entscheidung bestätigen. Formuliere eine zusammenhängende Argumentation."
+     }
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Aussagen/Thesen innerhalb eines Bezugsrahmens prüfen und unter Abwägung von Argumenten und Gegenargumenten ein begründetes Ergebnis formulieren",
+     "afb": "III",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen zum Sachverhalt. Gleiche die Informationen mit den Merkmalen der in der Aussage/These vorgegebenen Begriffe oder Deutungsmuster ab. Wähle Informationen für und gegen die Aussage/These aus. Formuliere eine zusammenhängende Argumentation."
+     }
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Informationen gegenüberstellen, anhand von Kriterien aufeinander beziehen und eine Schlussfolgerung formulieren",
+     "afb": "III",
+     "zusatz": {
+      "empfohlene Arbeitsaufträge": "Markiere, notiere oder äußere zentrale Informationen. Ordne die Informationen den in der Aufgabe genannten Vergleichskriterien zu und gleiche sie auf Gemeinsamkeiten und Unterschiede ab. Erkläre die Gemeinsamkeiten und Unterschiede. Formuliere eine Schlussfolgerung, z. B. im Hinblick auf Deutungsmuster."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt auf dem Bildungsserver M-V (Seite Englisch) als „Grundstock von Operatoren_IQB“, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyze",
+     "definition": "describe and explain in detail and give evidence from the text, relating the content to relevant aspects of language and form",
+     "formen": [
+      "examine"
+     ],
+     "beispiele": [
+      "♦ Examine how Jennifer Senior conveys her attitude towards “cancel culture” and its consequences for authors. Focus on structure and use of language. ♦ Analyze the way the protagonist is characterized. Focus on narrative techniques and use of language. ♦ Analyze how the author’s opinion on social movements is conveyed. Focus on use of language and communicative strategies as well as the function of the photo published with the article."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the relative value, quality or significance of sth., i.e. on the extent to which sth. is effective/true/etc., backing up one’s argumentation with evidence and examples",
+     "formen": [
+      "evaluate"
+     ],
+     "beispiele": [
+      "♦ Assess to what extent the cartoon reflects what Choudhury and his family have experienced in the US. ♦ Taking the cartoon as a starting point, evaluate the effectiveness of measures taken against discrimination in the US. ♦ Taking the quotation as a starting point, assess to what extent educational institutions can help young people realize their potential."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "express a well-founded opinion on sth., backing up one’s argumentation with evidence and examples and possibly considering counterarguments",
+     "beispiele": [
+      "♦ Comment on the writer’s admission that his view might be seen as “anti-American” (l. 21). ♦ Comment on the message of the cartoon with respect to what makes good journalism in the 21st century."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences and give evidence from the text, relating the content to relevant aspects of language and form",
+     "beispiele": [
+      "♦ Compare how the issue of racism is presented in the two articles. Focus on communicative strategies and the use of language."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "beispiele": [
+      "♦ Describe the old woman and her behavior."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "express a well-founded opinion on sth., considering arguments for both sides of an issue, backing up one’s argumentation with evidence and examples",
+     "beispiele": [
+      "♦ “[S]he would be the first one to join up […] and work for the cause, bleed for the cause, make the cause the central purpose of her life.” (Paul Auster, 4 3 2 1, ll. 57-60) Using Amy’s plea as a starting point, discuss the idea of devoting one’s life to a cause. ♦ The author talks of “the influencer game” (l. 41). Taking the article as a starting point, discuss whether the influencer phenomenon is really a “game”."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to the text and its context to clarify how or why sth. is as it is",
+     "beispiele": [
+      "♦ Explain the protagonist’s reservations about the concept of the American Dream. ♦ Explain how the statistics complement the author’s point of view."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic as specified by the task",
+     "formen": [
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "♦ Outline the information on the life of African Americans in the 1960s as presented in the text. ♦ Summarize the information on the narrator’s husband. ♦ Sum up Bono’s view on the European Union and his vision for its future."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out",
+     "definition": "present the main aspects of sth. briefly",
+     "beispiele": [
+      "♦ Point out the effects of climate change on low-lying countries and the measures taken to deal with the situation."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with characteristic features",
+     "beispiele": [
+      "♦ Write a letter to the editor, commenting on the author’s view on technology and his vision of the future. ♦ “For me, education was power.” (Michelle Obama) Former First Lady Michelle Obama is African American, a successful lawyer and the first academic in her family. Write a blog entry for the website of the international youth project Knowledge – Voice – Action, in which you assess to what extent Michelle Obama’s claim holds true for"
+     ],
+     "kompetenzbereich": "Schreiben",
+     "zusatz": {
+      "Fußnote 1": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt auf dem Bildungsserver M-V (Seite Englisch) als „Grundstock von Operatoren_IQB“, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "formen": [
+      "present",
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "♦ Write an article for the project website, outlining the development and the goals of “Jugend forscht”. ♦ Write an email to your friend in which you present the Muldestausee youth council and its accomplishments. ♦ For their blog, write an entry summing up the information on Danny Beuerbach and his initiatives."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with characteristic features, clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "♦ Your American friend is active in the National Junior Firefighter Program and is interested in how other countries organize firefighting and what challenges they are facing. Write your friend an email in which you present the situation of firefighting in Germany."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Fußnote 2": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt auf dem Bildungsserver M-V (Seite Englisch) als „Grundstock von Operatoren_IQB“, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "answer",
+     "definition": "",
+     "beispiele": [
+      "♦ While listening, answer the questions. You need not write complete sentences. Unless otherwise specified, name one aspect."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "choose",
+     "definition": "",
+     "beispiele": [
+      "♦ Choose the heading (A-G) that best summarizes each statement (1-6). For each statement, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "♦ Complete the sentences below. You need not write complete sentences. ♦ While listening, fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "♦ While listening, match what each person says (1-6) with the headings (A-G). Choose the heading that best summarizes what each person says. For each speaker, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "name",
+     "definition": "",
+     "beispiele": [
+      "♦ Why do some fish generate an electric field? Name two aspects."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "♦ While listening, tick (✓) the correct answer (a, b, or c). There is only one correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt auf dem Bildungsserver M-V (Seite Englisch) als „Grundstock von Operatoren_IQB“, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "♦ Complete the table below. You need not write complete sentences. ♦ Fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "decide",
+     "definition": "",
+     "beispiele": [
+      "♦ Decide whether the statements (1-6) are true or false according to the text and tick (✓) the corresponding box. ♦ Decide which heading best fits each paragraph and put the correct number into the box. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "give evidence",
+     "definition": "",
+     "beispiele": [
+      "♦ Read the following article on self-driving cars. Decide whether the statements (1-10) are true or false according to the text and tick (✓) the corresponding box. Always give evidence to support your decisions. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "list",
+     "definition": "",
+     "formen": [
+      "name"
+     ],
+     "beispiele": [
+      "♦ List the reasons mentioned in the article. You need not write complete sentences. ♦ Name the arguments in favour of the proposal. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "♦ Match the comments (1-5) with the headings (A-G). Choose the heading that best summarizes what each comment says. For each comment, there is only one correct answer. There are two more headings than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "state",
+     "definition": "",
+     "beispiele": [
+      "♦ State the main ideas of both reviews in the table below. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "♦ Tick (✓) the correct answer."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt auf dem Bildungsserver M-V (Seite Englisch) als „Grundstock von Operatoren_IQB“, 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "agree on",
+     "definition": "come to one opinion or an understanding based on arguments",
+     "formen": [
+      "come to an agreement"
+     ],
+     "beispiele": [
+      "♦ Come to an agreement on what to be included in your presentation. ♦ Agree on two pictures which could persuade your age group most to do more for the protection of the environment."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "analyze",
+     "definition": "describe, explain and give evidence from the material",
+     "formen": [
+      "examine"
+     ],
+     "beispiele": [
+      "♦ For a youth conference on American ideals, visions and traditions, you have been asked to give an oral presentation about the cartoon. Analyze the cartoon. ♦ You are preparing a photo exhibition for an international youth convention on the topic City Environments. Analyze the photographs."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "argue",
+     "definition": "make a case based on appropriate evidence for and/or against some given point of view",
+     "beispiele": [
+      "♦ In a discussion about the replacement of textbooks by portable computers at school argue for or against this proposal."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the relative value, quality and significance of sb./sth., i.e. arguing about the extent to which sth. is effective/true/etc., backing up one’s argumentation",
+     "formen": [
+      "evaluate"
+     ],
+     "beispiele": [
+      "♦ Assess the suitability of the two cartoons to illustrate your topic. ♦ Evaluate the chances for an applicant’s personal development described in the job offer at hand."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "provide a well-founded opinion on sth., backing up one’s argumentation and possibly considering counterarguments",
+     "beispiele": [
+      "♦ As members of your school’s student council you and your partner are expected to organize a panel discussion on the importance of moral issues in today’s society. Comment on the following statistics. ♦ The EU has launched a competition entitled Mobility for all. Entries should propose both creative and realistic regional projects. Comment on the material. ♦ Comment on the relevance of the issue covered in the cartoon for (our) society."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences",
+     "beispiele": [
+      "♦ Based on the charts, compare the job situation of young people your age in Germany and in the UK. ♦ You are preparing a photo exhibition for an international youth convention on the topic of City Environments. Compare the aspects of city life shown in the photos."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sth./sb. is like",
+     "beispiele": [
+      "♦ You and your partner are participating in an international youth convention on environmental challenges. You are looking for photographs to illustrate your presentation. Describe the pictures to your partner."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "discuss",
+     "definition": "give/exchange arguments or reasons for and against a particular view or idea, backing up one’s argumentation and drawing a well-founded conclusion (together)",
+     "beispiele": [
+      "♦ You and your partner are participating in a youth convention about robotics. Together with your partner, discuss the benefits and challenges of further scientific innovations. ♦ Together with your partner, discuss whether options such as community service, gap years, or military service should be mandatory for young people. ♦ Discuss the problems shown in the photos and possible solutions."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to examples and its wider context if necessary",
+     "beispiele": [
+      "♦ Explain the following quotation about travelling. ♦ Explain possible reasons behind the statistics and the impact on both the individual and society."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "make suggestions",
+     "definition": "propose initiatives, measures, etc. and explain why they need to be taken",
+     "beispiele": [
+      "♦ Make suggestions on how discrimination against marginalized groups can be fought. Rank them according to effectiveness."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "relate (to)",
+     "definition": "show the relationship between materials, concepts, etc. by explaining whether/how two or more texts oppose, complement or contradict each other",
+     "beispiele": [
+      "♦ Relate the two cartoons to each other."
+     ],
+     "kompetenzbereich": "Sprechen"
+    }
+   ]
+  }
+ ]
+}

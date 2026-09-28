@@ -1,0 +1,966 @@
+{
+ "stateId": "BW",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Bildungsplan 2016 Gymnasium – Englisch als erste Fremdsprache – 4. Operatoren, Ministerium für Kultus, Jugend und Sport Baden-Württemberg (Bildungspläne 2016, bildungsplaene-bw.de, ZSL), 2016",
+   "url": "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_E1_OP",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "(sich) äußern, ausdrücken",
+     "definition": "Aussagen zu einem Thema machen, Gedanken zum Ausdruck bringen, auch ungeordnet oder unvollständig",
+     "afb": "I–II",
+     "formen": [
+      "(sich) äußern",
+      "ausdrücken"
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "inhaltliche und/oder sprachliche Aspekte eines Textes (zum Beispiel Strukturen, Motive, Intention) herausarbeiten und erklären",
+     "afb": "II–III"
+    },
+    {
+     "operator": "an-/verwenden, nutzen, einsetzen, beachten",
+     "definition": "sprachliche und inhaltliche Kenntnisse sowie Methoden und Lernstrategien durch Abstraktion und Transfer in anderen Kontexten nutzbar machen, Regeln und Konventionen zur Kenntnis nehmen und bewusst einhalten",
+     "afb": "II–III",
+     "formen": [
+      "an-/verwenden",
+      "nutzen",
+      "einsetzen",
+      "beachten"
+     ]
+    },
+    {
+     "operator": "(korrekt) aussprechen, schreiben, vortragen",
+     "definition": "Aussprache, Intonationsmuster und Schreibweise von Wörtern und Sätzen korrekt umsetzen",
+     "afb": "I",
+     "formen": [
+      "(korrekt) aussprechen",
+      "schreiben",
+      "vortragen"
+     ]
+    },
+    {
+     "operator": "austauschen",
+     "definition": "sich im Gespräch gegenseitig Fragen stellen und Informationen über Sachverhalte, Meinungen, Positionen geben",
+     "afb": "I–III"
+    },
+    {
+     "operator": "ein Gespräch / eine Diskussion beginnen, aufrechterhalten (fortführen) und beenden",
+     "definition": "ein Gespräch / eine Diskussion unter Anwendung soziokulturellen Wissens sowie unter Verwendung geeigneter sprachlicher Mittel (auch Floskeln und Wendungen) und Gesprächsstrategien adressatengerecht führen",
+     "afb": "III",
+     "formen": [
+      "ein Gespräch / eine Diskussion beginnen",
+      "aufrechterhalten (fortführen) und beenden"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "Positionen, Auffassungen oder Urteile durch Argumente stützen oder widerlegen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "belegen",
+     "definition": "eine Deutungshypothese durch Verweis auf spezifische Textstellen nachweisen",
+     "afb": "I"
+    },
+    {
+     "operator": "(be-)nennen",
+     "definition": "Sachverhalte präzise bezeichnen, aufzählen oder auflisten",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Gegenstände, Personen und Vorgänge sachlich und präzise darstellen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Sachverhalte, Aussagen, Positionen, Maßnahmen, Lösungen auf ihre Vor- und Nachteile hin prüfen und darauf basierend zu einem begründeten Urteil gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "einen Sachverhalt, ein Zitat oder ein Argument aspekt- und kriterienorientiert mit einem anderen kombinieren oder in einen neuen (gegebenenfalls übergeordneten) Zusammenhang stellen",
+     "afb": "III"
+    },
+    {
+     "operator": "darstellen, darlegen",
+     "definition": "Sachverhalte, Positionen sachbezogen ausführen",
+     "afb": "II",
+     "formen": [
+      "darstellen",
+      "darlegen"
+     ]
+    },
+    {
+     "operator": "erkennen, identifizieren",
+     "definition": "(gelernte) sprachliche oder inhaltliche Sachverhalte (auch Strukturen und Sprechintentionen) in Texten erfassen",
+     "afb": "I",
+     "formen": [
+      "erkennen",
+      "identifizieren"
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte so darstellen, dass Zusammenhänge (wie Ursache, Folge) klar werden, auch unter Verwendung geeigneter Beispiele",
+     "afb": "II"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "eine vorgegebene Problemstellung unter Abwägung von Argumenten diskutieren und zu einem begründeten Urteil kommen",
+     "afb": "III"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "einen sprachlichen oder inhaltlichen Sachverhalt aus dem Kontext heraus und/oder unter Anwendung textexternen Wissens herleiten",
+     "afb": "II–III"
+    },
+    {
+     "operator": "(nach-)erzählen",
+     "definition": "Erlebtes, Erdachtes, Gehörtes oder Gelesenes mit narrativer Struktur ausführen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "formulieren",
+     "definition": "Inhalte, Sachverhalte mit eigenen Worten und unter Beachtung sprachlicher Regeln zum Ausdruck bringen",
+     "afb": "I"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Teilaspekte (zum Beispiel Strukturen, Leitgedanken, Strategien) aus einem Textganzen herauslösen und auf Wesentliches konzentriert darlegen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Informationen entnehmen",
+     "definition": "explizite oder implizite Aussagen in einem Text erfassen",
+     "afb": "I–III"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "den Sinngehalt eines Textes unter Berücksichtigung des Inhalts, des Aufbaus, der sprachlichen Mittel sowie textexterner Aspekte (zum Beispiel historischer, sozialer) erklären",
+     "afb": "III"
+    },
+    {
+     "operator": "kommentieren",
+     "definition": "einen Sachverhalt oder eine Fragestellung kritisch beleuchten beziehungsweise Anmerkungen zu einem Sachverhalt machen",
+     "afb": "III"
+    },
+    {
+     "operator": "Leerstellen füllen",
+     "definition": "fiktionale Texte sach-, textsorten- und/oder aufgabengerecht erweitern",
+     "afb": "III"
+    },
+    {
+     "operator": "nachschlagen",
+     "definition": "Informationen (lexikalische Einheiten, grammatische Phänomene, Aussprache) zur Texterschließung oder zur Textproduktion gezielt in adäquaten Nachschlagewerken auffinden und nutzbar machen",
+     "afb": "I"
+    },
+    {
+     "operator": "eine Perspektive übernehmen",
+     "definition": "sich in eine bestimmte Person oder Rolle hineinversetzen",
+     "afb": "III"
+    },
+    {
+     "operator": "präsentieren",
+     "definition": "Sachverhalte unterschiedlicher Komplexität der Klasse oder einem Publikum vorstellen, gegebenenfalls unter Einsatz geeigneter Präsentationstechniken und -medien",
+     "afb": "III"
+    },
+    {
+     "operator": "reagieren",
+     "definition": "Äußerungen eines Gesprächspartners angemessen verbal und/oder nonverbal begegnen",
+     "afb": "I–III"
+    },
+    {
+     "operator": "eine Rolle gestalten",
+     "definition": "eine Rolle sprachlich und inhaltlich erarbeiten und ausfüllen (szenische Interpretation einer Figur, ausgehend von einer Textvorlage oder einer von Schülerinnen und Schülern ausgearbeiteten Gestaltung einer Leerstelle)",
+     "afb": "III"
+    },
+    {
+     "operator": "Stellung beziehen, den eigenen Standpunkt vertreten",
+     "definition": "den eigenen Standpunkt mit geeigneten Argumenten begründet darlegen beziehungsweise in einer Diskussion verteidigen",
+     "afb": "III",
+     "formen": [
+      "Stellung beziehen",
+      "den eigenen Standpunkt vertreten"
+     ]
+    },
+    {
+     "operator": "strukturieren",
+     "definition": "nach vorgegebenen oder eigenen Kriterien ordnen",
+     "afb": "II"
+    },
+    {
+     "operator": "überarbeiten",
+     "definition": "einen Text anhand bekannter Kriterien und Regeln auf seine Richtigkeit und/oder auf seine stilistische Qualität hin prüfen und gegebenenfalls verbessern",
+     "afb": "II"
+    },
+    {
+     "operator": "übersetzen",
+     "definition": "Sachverhalte in einer anderen Sprache präzise wiedergeben",
+     "afb": "II"
+    },
+    {
+     "operator": "übertragen",
+     "definition": "Inhalte von Texten sach-, adressaten- und situationsgerecht zusammenfassen und sinngemäß in der jeweils anderen Sprache wiedergeben",
+     "afb": "II"
+    },
+    {
+     "operator": "einen Text umgestalten",
+     "definition": "einen Text textsortengerecht umschreiben (zum Beispiel anderer Schluss) oder in eine andere Textsorte überführen",
+     "afb": "III"
+    },
+    {
+     "operator": "einen Text verfassen",
+     "definition": "einen Text unter Anwendung der erforderlichen Textsortenmerkmale schreiben (zum Beispiel innerer Monolog, Tagebucheintrag, Brief)",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede zwischen Sachverhalten, Standpunkten und Personen feststellen und Schlüsse ziehen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "versprachlichen",
+     "definition": "diskontinuierliche Texte, Bilder und Bildsequenzen unter Verwendung angemessener Redemittel präzise und sachbezogen in kontinuierliche Texte übertragen",
+     "afb": "III"
+    },
+    {
+     "operator": "(global, detailliert, selektiv) verstehen",
+     "definition": "einem Text – je nach Lese- oder Hörabsicht – Informationen entnehmen, die aus dem Textganzen, aus für das Textverständnis relevanten Details oder aus ausgewählten Einzeltextstellen hervorgehen",
+     "afb": "I",
+     "formen": [
+      "(global",
+      "detailliert",
+      "selektiv) verstehen"
+     ]
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "Textinhalte mit eigenen Worten ausführen",
+     "afb": "I"
+    },
+    {
+     "operator": "zuordnen, unterscheiden",
+     "definition": "einzelne Inhalte (zum Beispiel Laute) einer vorgegebenen Kategorie zuweisen",
+     "afb": "I",
+     "formen": [
+      "zuordnen",
+      "unterscheiden"
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Texte beziehungsweise einzelne Textaspekte sachbezogen, strukturiert und auf das Wesentliche begrenzt wiedergeben",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan 2016 Sekundarstufe I – Englisch als erste Fremdsprache – 4. Operatoren, Ministerium für Kultus, Jugend und Sport Baden-Württemberg (Bildungspläne 2016, bildungsplaene-bw.de, ZSL), 2016",
+   "url": "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_SEK1_E1_OP",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "(sich) äußern, ausdrücken",
+     "definition": "Aussagen zu einem Thema machen, Gedanken zum Ausdruck bringen, auch ungeordnet oder unvollständig",
+     "afb": "I–II",
+     "formen": [
+      "(sich) äußern",
+      "ausdrücken"
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "inhaltliche und/oder sprachliche Aspekte eines Textes (zum Beispiel Strukturen, Motive, Intention) herausarbeiten und erklären",
+     "afb": "II–III"
+    },
+    {
+     "operator": "an-/verwenden, nutzen, einsetzen, beachten",
+     "definition": "sprachliche und inhaltliche Kenntnisse sowie Methoden und Lernstrategien durch Abstraktion und Transfer in anderen Kontexten nutzbar machen; Regeln und Konventionen zur Kenntnis nehmen und bewusst einhalten",
+     "afb": "II–III",
+     "formen": [
+      "an-/verwenden",
+      "nutzen",
+      "einsetzen",
+      "beachten"
+     ]
+    },
+    {
+     "operator": "(korrekt) aussprechen, schreiben, vortragen",
+     "definition": "Aussprache, Intonationsmuster und Schreibweise von Wörtern und Sätzen korrekt umsetzen",
+     "afb": "I",
+     "formen": [
+      "(korrekt) aussprechen",
+      "schreiben",
+      "vortragen"
+     ]
+    },
+    {
+     "operator": "austauschen",
+     "definition": "sich im Gespräch gegenseitig Fragen stellen und Informationen über Sachverhalte, Meinungen, Positionen geben",
+     "afb": "I–III"
+    },
+    {
+     "operator": "ein Gespräch / eine Diskussion beginnen, aufrechterhalten (fortführen) und beenden",
+     "definition": "ein Gespräch / eine Diskussion unter Anwendung soziokulturellen Wissens sowie unter Verwendung geeigneter sprachlicher Mittel (auch Floskeln und Wendungen) und Gesprächsstrategien adressatengerecht führen",
+     "afb": "III",
+     "formen": [
+      "ein Gespräch / eine Diskussion beginnen",
+      "aufrechterhalten (fortführen) und beenden"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "Positionen, Auffassungen oder Urteile durch Argumente stützen oder widerlegen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "belegen",
+     "definition": "eine Deutungshypothese durch Verweis auf spezifische Textstellen nachweisen",
+     "afb": "I"
+    },
+    {
+     "operator": "(be-)nennen",
+     "definition": "Sachverhalte präzise bezeichnen, aufzählen oder auflisten",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Gegenstände, Personen und Vorgänge sachlich und präzise darstellen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Sachverhalte, Aussagen, Positionen, Maßnahmen, Lösungen auf ihre Vor- und Nachteile hin prüfen und darauf basierend zu einem begründeten Urteil gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "einen Sachverhalt, ein Zitat oder ein Argument aspekt- und kriterienorientiert mit einem anderen kombinieren oder in einen neuen (gegebenenfalls übergeordneten) Zusammenhang stellen",
+     "afb": "III"
+    },
+    {
+     "operator": "darstellen, darlegen",
+     "definition": "Sachverhalte, Positionen sachbezogen ausführen",
+     "afb": "II",
+     "formen": [
+      "darstellen",
+      "darlegen"
+     ]
+    },
+    {
+     "operator": "erkennen, identifizieren",
+     "definition": "(gelernte) sprachliche oder inhaltliche Sachverhalte (auch Strukturen und Sprechintentionen) in Texten erfassen",
+     "afb": "I",
+     "formen": [
+      "erkennen",
+      "identifizieren"
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte so darstellen, dass Zusammenhänge (wie Ursache, Folge) klar werden, auch unter Verwendung geeigneter Beispiele",
+     "afb": "II"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "eine vorgegebene Problemstellung unter Abwägung von Argumenten diskutieren und zu einem begründeten Urteil kommen",
+     "afb": "III"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "einen sprachlichen oder inhaltlichen Sachverhalt aus dem Kontext heraus und/oder unter Anwendung textexternen Wissens herleiten",
+     "afb": "II–III"
+    },
+    {
+     "operator": "(nach-)erzählen",
+     "definition": "Erlebtes, Erdachtes, Gehörtes oder Gelesenes mit narrativer Struktur ausführen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "formulieren",
+     "definition": "Inhalte, Sachverhalte mit eigenen Worten und unter Beachtung sprachlicher Regeln zum Ausdruck bringen",
+     "afb": "I"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Teilaspekte (zum Beispiel Strukturen, Leitgedanken, Strategien) aus einem Textganzen herauslösen und auf Wesentliches konzentriert darlegen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "Informationen entnehmen",
+     "definition": "explizite oder implizite Aussagen in einem Text erfassen",
+     "afb": "I–III"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "den Sinngehalt eines Textes unter Berücksichtigung des Inhalts, des Aufbaus, der sprachlichen Mittel sowie textexterner Aspekte (zum Beispiel historischer, sozialer) erklären",
+     "afb": "III"
+    },
+    {
+     "operator": "kommentieren",
+     "definition": "einen Sachverhalt oder eine Fragestellung kritisch beleuchten beziehungsweise Anmerkungen zu einem Sachverhalt machen",
+     "afb": "III"
+    },
+    {
+     "operator": "Leerstellen füllen",
+     "definition": "fiktionale Texte sach-, textsorten- und/oder aufgabengerecht erweitern",
+     "afb": "III"
+    },
+    {
+     "operator": "nachschlagen",
+     "definition": "Informationen (lexikalische Einheiten, grammatische Phänomene, Aussprache) zur Texterschließung oder zur Textproduktion gezielt in adäquaten Nachschlagewerken auffinden und nutzbar machen",
+     "afb": "I"
+    },
+    {
+     "operator": "eine Perspektive übernehmen",
+     "definition": "sich in eine bestimmte Person oder Rolle hineinversetzen",
+     "afb": "III"
+    },
+    {
+     "operator": "präsentieren",
+     "definition": "Sachverhalte unterschiedlicher Komplexität der Klasse oder einem Publikum vorstellen, gegebenenfalls unter Einsatz geeigneter Präsentationstechniken und -medien",
+     "afb": "III"
+    },
+    {
+     "operator": "reagieren",
+     "definition": "Äußerungen eines Gesprächspartners angemessen verbal und/oder nonverbal begegnen",
+     "afb": "I–III"
+    },
+    {
+     "operator": "eine Rolle gestalten",
+     "definition": "eine Rolle sprachlich und inhaltlich erarbeiten und ausfüllen (szenische Interpretation einer Figur, ausgehend von einer Textvorlage oder einer von Schülerinnen und Schülern ausgearbeiteten Gestaltung einer Leerstelle)",
+     "afb": "III"
+    },
+    {
+     "operator": "Stellung beziehen, den eigenen Standpunkt vertreten",
+     "definition": "den eigenen Standpunkt mit geeigneten Argumenten begründet darlegen beziehungsweise in einer Diskussion verteidigen",
+     "afb": "III",
+     "formen": [
+      "Stellung beziehen",
+      "den eigenen Standpunkt vertreten"
+     ]
+    },
+    {
+     "operator": "strukturieren",
+     "definition": "nach vorgegebenen oder eigenen Kriterien ordnen",
+     "afb": "II"
+    },
+    {
+     "operator": "überarbeiten",
+     "definition": "einen Text anhand bekannter Kriterien und Regeln auf seine Richtigkeit und/oder auf seine stilistische Qualität hin prüfen und gegebenenfalls verbessern",
+     "afb": "II"
+    },
+    {
+     "operator": "übersetzen",
+     "definition": "Sachverhalte in einer anderen Sprache präzise wiedergeben",
+     "afb": "II"
+    },
+    {
+     "operator": "übertragen",
+     "definition": "Inhalte von Texten sach-, adressaten- und situationsgerecht zusammenfassen und sinngemäß in der jeweils anderen Sprache wiedergeben",
+     "afb": "II"
+    },
+    {
+     "operator": "einen Text umgestalten",
+     "definition": "einen Text textsortengerecht umschreiben (zum Beispiel anderer Schluss) oder in eine andere Textsorte überführen",
+     "afb": "III"
+    },
+    {
+     "operator": "einen Text verfassen",
+     "definition": "einen Text unter Anwendung der erforderlichen Textsortenmerkmale schreiben (zum Beispiel innerer Monolog, Tagebucheintrag, Brief)",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede zwischen Sachverhalten, Standpunkten und Personen feststellen und Schlüsse ziehen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "versprachlichen",
+     "definition": "diskontinuierliche Texte, Bilder und Bildsequenzen unter Verwendung angemessener Redemittel präzise und sachbezogen in kontinuierliche Texte übertragen",
+     "afb": "III"
+    },
+    {
+     "operator": "(global, detailliert, selektiv) verstehen",
+     "definition": "einem Text – je nach Lese- oder Hörabsicht – Informationen entnehmen, die aus dem Textganzen, aus für das Textverständnis relevanten Details oder aus ausgewählten Einzeltextstellen hervorgehen",
+     "afb": "I",
+     "formen": [
+      "(global",
+      "detailliert",
+      "selektiv) verstehen"
+     ]
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "Textinhalte mit eigenen Worten ausführen",
+     "afb": "I"
+    },
+    {
+     "operator": "zuordnen, unterscheiden",
+     "definition": "einzelne Inhalte (zum Beispiel Laute) einer vorgegebenen Kategorie zuweisen",
+     "afb": "I",
+     "formen": [
+      "zuordnen",
+      "unterscheiden"
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Texte beziehungsweise einzelne Textaspekte sachbezogen, strukturiert und auf das Wesentliche begrenzt wiedergeben",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan 2016 Gymnasium – Geschichte – 4. Operatoren, Ministerium für Kultus, Jugend und Sport Baden-Württemberg (Bildungspläne 2016, bildungsplaene-bw.de, ZSL), 2016",
+   "url": "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_G_OP",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte systematisch untersuchen und auswerten",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (zum Beispiel eine Behauptung, eine Position) durch Argumente stützen, die durch Beispiele oder andere Belege untermauert werden",
+     "afb": "II"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte schlüssig wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Sachverhalte, Aussagen, Vorschläge oder Maßnahmen untersuchen, die dabei zugrunde gelegten Kriterien benennen und ein begründetes Sachurteil formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Sachverhalte, Aussagen, Vorschläge oder Maßnahmen beurteilen, ein begründetes Werturteil formulieren und die dabei zugrunde gelegten Wertmaßstäbe offenlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "Sachverhalte (insbesondere bei nichtlinearen Texten wie zum Beispiel Tabellen, Schaubildern, Diagrammen oder Karten) begrifflich präzise formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte mit ihren typischen Merkmalen und in ihren Grundzügen bestimmen",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte strukturiert und zusammenhängend verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "ein-, zuordnen",
+     "definition": "Sachverhalte schlüssig in einen vorgegebenen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung einen begründeten Lösungsvorschlag entwerfen",
+     "afb": "III"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte schlüssig aus Kenntnissen in einen Zusammenhang stellen (zum Beispiel Theorie, Modell, Gesetz, Regel, Funktions-, Entwicklungs- und/oder Kausalzusammenhang)",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte mit Beispielen oder Belegen veranschaulichen",
+     "afb": "II"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "zu einer vorgegebenen These oder Problemstellung durch Abwägen von Pro- und Contra-Argumenten ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "erstellen",
+     "definition": "Sachverhalte (insbesondere in grafischer Form) unter Verwendung fachsprachlicher Begriffe strukturiert aufzeigen",
+     "afb": "II"
+    },
+    {
+     "operator": "gestalten",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung ein Produkt rollen- beziehungsweise adressatenorientiert herstellen",
+     "afb": "III"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Sachverhalte unter bestimmten Gesichtspunkten aus vorgegebenem Material entnehmen, wiedergeben und/oder gegebenenfalls berechnen",
+     "afb": "II"
+    },
+    {
+     "operator": "nennen",
+     "definition": "Sachverhalte in knapper Form anführen",
+     "afb": "I"
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen an Sachverhalten auf ihre sachliche Richtigkeit hin untersuchen und ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Vergleichskriterien festlegen, Gemeinsamkeiten und Unterschiede gewichtend einander gegenüberstellen sowie ein Ergebnis formulieren",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan 2016 Gymnasium – Gemeinschaftskunde – 4. Operatoren, Ministerium für Kultus, Jugend und Sport Baden-Württemberg (Bildungspläne 2016, bildungsplaene-bw.de, ZSL), 2016",
+   "url": "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_GK_OP",
+   "belegt": "volltext",
+   "faecher": [
+    "politik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte systematisch untersuchen und auswerten",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (zum Beispiel eine Behauptung, eine Position) durch Argumente stützen, die durch Beispiele oder andere Belege untermauert werden",
+     "afb": "II"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte schlüssig wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen untersuchen, die dabei zugrunde gelegten Kriterien benennen und ein begründetes Sachurteil formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen beurteilen, ein begründetes Werturteil formulieren und die dabei zugrunde gelegten Wertmaßstäbe offenlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "Sachverhalte (insbesondere bei nichtlinearen Texten wie zum Beispiel Tabellen, Schaubildern, Diagrammen oder Karten) begrifflich präzise formulieren.",
+     "afb": "I"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte mit ihren typischen Merkmalen und in ihren Grundzügen bestimmen",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte strukturiert und zusammenhängend verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "ein-, zuordnen",
+     "definition": "Sachverhalte schlüssig in einen vorgegebenen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung einen begründeten Lösungsvorschlag entwerfen",
+     "afb": "III"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte schlüssig aus Kenntnissen in einen Zusammenhang stellen (zum Beispiel Theorie, Modell, Gesetz, Regel, Funktions-, Entwicklungs- und/oder Kausalzusammenhang)",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte mit Beispielen oder Belegen veranschaulichen",
+     "afb": "II"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "zu einer vorgegebenen These oder Problemstellung durch Abwägen von Pro- und Contra-Argumenten ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "erstellen",
+     "definition": "Sachverhalte (insbesondere in grafischer Form) unter Verwendung fachsprachlicher Begriffe strukturiert aufzeigen",
+     "afb": "II"
+    },
+    {
+     "operator": "gestalten",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung ein Produkt rollen- beziehungsweise adressatenorientiert herstellen",
+     "afb": "III"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Sachverhalte unter bestimmten Gesichtspunkten aus vorgegebenem Material entnehmen, wiedergeben und/oder gegebenenfalls berechnen",
+     "afb": "II"
+    },
+    {
+     "operator": "nennen",
+     "definition": "Sachverhalte in knapper Form anführen",
+     "afb": "I"
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen an Sachverhalten auf ihre sachliche Richtigkeit hin untersuchen und ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Vergleichskriterien festlegen, Gemeinsamkeiten und Unterschiede gewichtend einander gegenüberstellen sowie ein Ergebnis formulieren",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan 2016 Gymnasium – Geographie – 4. Operatoren, Ministerium für Kultus, Jugend und Sport Baden-Württemberg (Bildungspläne 2016, bildungsplaene-bw.de, ZSL), 2016",
+   "url": "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_GYM_GEO_OP",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte systematisch untersuchen und auswerten",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (zum Beispiel eine Behauptung, eine Position) durch Argumente stützen, die durch Beispiele oder andere Belege untermauert werden",
+     "afb": "II"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte schlüssig wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen untersuchen, die dabei zugrunde gelegten Kriterien benennen und ein begründetes Sachurteil formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen beurteilen, ein begründetes Werturteil formulieren und die dabei zugrunde gelegten Wertmaßstäbe offenlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "Sachverhalte (insbesondere bei nichtlinearen Texten wie zum Beispiel Tabellen, Schaubildern, Diagrammen oder Karten) begrifflich präzise formulieren.",
+     "afb": "I"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte mit ihren typischen Merkmalen und in ihren Grundzügen bestimmen",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte strukturiert und zusammenhängend verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "ein-, zuordnen",
+     "definition": "Sachverhalte schlüssig in einen vorgegebenen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung einen begründeten Lösungsvorschlag entwerfen",
+     "afb": "III"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte schlüssig aus Kenntnissen in einen Zusammenhang stellen (zum Beispiel Theorie, Modell, Gesetz, Regel, Funktions-, Entwicklungs- und/oder Kausalzusammenhang)",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte mit Beispielen oder Belegen veranschaulichen",
+     "afb": "II"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "zu einer vorgegebenen These oder Problemstellung durch Abwägen von Pro- und Contra-Argumenten ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "erstellen",
+     "definition": "Sachverhalte (insbesondere in grafischer Form) unter Verwendung fachsprachlicher Begriffe strukturiert aufzeigen",
+     "afb": "II"
+    },
+    {
+     "operator": "gestalten",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung ein Produkt rollen- beziehungsweise adressatenorientiert herstellen",
+     "afb": "III"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Sachverhalte unter bestimmten Gesichtspunkten aus vorgegebenem Material entnehmen, wiedergeben und/oder gegebenenfalls berechnen",
+     "afb": "II"
+    },
+    {
+     "operator": "nennen",
+     "definition": "Sachverhalte in knapper Form anführen",
+     "afb": "I"
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen an Sachverhalten auf ihre sachliche Richtigkeit hin untersuchen und ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Vergleichskriterien festlegen, Gemeinsamkeiten und Unterschiede gewichtend einander gegenüberstellen sowie ein Ergebnis formulieren",
+     "afb": "II"
+    }
+   ]
+  },
+  {
+   "quelle": "Bildungsplan 2016 Sekundarstufe I – Geschichte – 4. Operatoren, Ministerium für Kultus, Jugend und Sport Baden-Württemberg (Bildungspläne 2016, bildungsplaene-bw.de, ZSL), 2016",
+   "url": "https://www.bildungsplaene-bw.de/,Lde/BP2016BW_ALLG_SEK1_G_OP",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte",
+    "politik",
+    "erdkunde"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte systematisch untersuchen und auswerten",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (zum Beispiel eine Behauptung, eine Position) durch Argumente stützen, die durch Beispiele oder andere Belege untermauert werden",
+     "afb": "II"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte schlüssig wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Sachverhalte, Aussagen, Vorschläge oder Maßnahmen untersuchen, die dabei zugrunde gelegten Kriterien benennen und ein begründetes Sachurteil formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Sachverhalte, Aussagen, Vorschläge oder Maßnahmen beurteilen, ein begründetes Werturteil formulieren und die dabei zugrunde gelegten Wertmaßstäbe offenlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "Sachverhalte (insbesondere bei nichtlinearen Texten wie zum Beispiel Tabellen, Schaubildern, Diagrammen oder Karten) begrifflich präzise formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte mit ihren typischen Merkmalen und in ihren Grundzügen bestimmen",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte strukturiert und zusammenhängend verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "ein-, zuordnen",
+     "definition": "Sachverhalte schlüssig in einen vorgegebenen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung einen begründeten Lösungsvorschlag entwerfen",
+     "afb": "III"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte schlüssig aus Kenntnissen in einen Zusammenhang stellen (zum Beispiel Theorie, Modell, Gesetz, Regel, Funktions-, Entwicklungs- und/oder Kausalzusammenhang)",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte mit Beispielen oder Belegen veranschaulichen.",
+     "afb": "II"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "zu einer vorgegebenen These oder Problemstellung durch Abwägen von Pro- und Contra-Argumenten ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "erstellen",
+     "definition": "Sachverhalte (insbesondere in grafischer Form) unter Verwendung fachsprachlicher Begriffe strukturiert aufzeigen",
+     "afb": "II"
+    },
+    {
+     "operator": "gestalten",
+     "definition": "zu einer vorgegebenen oder selbst entworfenen Problemstellung ein Produkt rollen- beziehungsweise adressatenorientiert herstellen",
+     "afb": "III"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "Sachverhalte unter bestimmten Gesichtspunkten aus vorgegebenem Material entnehmen, wiedergeben und/oder gegebenenfalls berechnen",
+     "afb": "II"
+    },
+    {
+     "operator": "nennen",
+     "definition": "Sachverhalte in knapper Form anführen",
+     "afb": "I"
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen, Vorschläge oder Maßnahmen an Sachverhalten auf ihre sachliche Richtigkeit hin untersuchen und ein begründetes Ergebnis formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Vergleichskriterien festlegen, Gemeinsamkeiten und Unterschiede gewichtend einander gegenüberstellen sowie ein Ergebnis formulieren",
+     "afb": "II"
+    }
+   ]
+  }
+ ]
+}

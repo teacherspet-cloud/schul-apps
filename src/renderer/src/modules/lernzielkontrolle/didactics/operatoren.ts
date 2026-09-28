@@ -43,6 +43,7 @@
  * Feld „AFB" würde für NRW-Mathematik eine Genauigkeit vortäuschen, die es dort nicht gibt.
  */
 
+import { BESTAND } from '@shared/operatoren/zugriff'
 import { STATES } from '../../arbeitsblatt/didactics/states'
 
 export type Stufe = 'sek1' | 'sek2'
@@ -1917,9 +1918,80 @@ const mehrfachProfile = (): Laenderprofil[] =>
     return quelle ? fuer.map((fach) => ({ ...quelle, fach })) : []
   })
 
+/*
+ * Profile aus dem gemeinsamen Operatoren-Bestand (Großprogramm 0.4, D3; Recherche 28.09.2026).
+ * Nur Listen aus Dokumenten des Landes selbst, nur wo kein von Hand erfasstes Profil für Land,
+ * Fach und Stufe besteht. Fremdsprachen bekommen die Liste in der Zielsprache, alle anderen
+ * Fächer die deutsche. Mehrere Tabellen eines Landes (je Kompetenzbereich) werden zu einem
+ * Profil zusammengeführt. Ob die Quelle ungelistete Operatoren erlaubt, wurde nicht erfasst –
+ * deshalb keine Warnung „nicht in der Landesliste" (Öffnungsklausel angenommen). Ergänzungstabellen
+ * mit weniger als sechs Einträgen und Listen ohne auffindbare Online-Adresse werden kein Profil.
+ */
+const ZIELSPRACHE: Record<string, string> = { englisch: 'en', franzoesisch: 'fr', spanisch: 'es' }
+const AFB_AUS: Record<string, Afb[]> = { I: ['I'], II: ['II'], III: ['III'], 'I–II': ['I', 'II'], 'II–III': ['II', 'III'], 'I–III': ['I', 'II', 'III'] }
+
+function bestandsProfile(): Laenderprofil[] {
+  const out: Laenderprofil[] = []
+  const vorhanden = new Set([...BELEGTE_PROFILE, ...mehrfachProfile()].map((p) => `${p.stateId}|${p.fach}|${p.stufe}`))
+  for (const land of Object.values(BESTAND)) {
+    if (land.stateId === 'KMK') continue
+    const gruppen = new Map<string, typeof land.listen>()
+    for (const l of land.listen) {
+      if (l.belegt !== 'volltext') continue
+      for (const fach of l.faecher) {
+        if (l.sprache !== (ZIELSPRACHE[fach] ?? 'de')) continue
+        const k = `${land.stateId}|${fach}|${l.stufe}`
+        if (vorhanden.has(k)) continue
+        gruppen.set(k, [...(gruppen.get(k) ?? []), l])
+      }
+    }
+    for (const [k, listen] of gruppen) {
+      const [, fach, stufe] = k.split('|')
+      const operatoren: OperatorDefinition[] = []
+      const gesehen = new Set<string>()
+      for (const l of listen)
+        for (const o of l.operatoren) {
+          const schluessel = `${o.operator.toLowerCase()}|${o.kompetenzbereich ?? ''}`
+          if (gesehen.has(schluessel)) continue
+          gesehen.add(schluessel)
+          operatoren.push({
+            name: o.operator,
+            ...(o.formen?.length ? { synonyme: o.formen } : {}),
+            definition: o.definition,
+            ...(o.afb ? { afb: AFB_AUS[o.afb] } : {}),
+            ...(o.kompetenzbereich ? { teilkompetenz: o.kompetenzbereich } : {})
+          })
+        }
+      // Ergänzungstabellen mit zwei, drei Einträgen (BB Englisch Sek II) sind kein Profil; ohne Fundstellen-Adresse auch nicht
+      const url = listen.find((l) => l.url)?.url ?? ''
+      if (operatoren.length < 6 || !url) continue
+      // Die AFB-Logik der Tabelle, die tatsächlich Zuordnungen trägt – gemischte Tabellen ohne Spalte zählen nicht
+      const mitAfb = operatoren.some((o) => o.afb?.length)
+      const logik = mitAfb ? (listen.find((l) => l.afbLogik !== 'keine')?.afbLogik ?? 'mehrfach') : 'keine'
+      out.push({
+        stateId: land.stateId,
+        fach,
+        stufe: stufe as Stufe,
+        quelle: [...new Set(listen.map((l) => l.quelle))].join('; '),
+        url,
+        stand: `Recherchestand ${land.stand}`,
+        amtlich: true,
+        belegt: 'volltext',
+        afbLogik: logik,
+        afbUebernommen: logik !== 'keine',
+        oeffnungsklausel: true,
+        anrede: stufe === 'sek1' ? 'du' : 'sie',
+        operatoren
+      })
+    }
+  }
+  return out
+}
+
 export const LAENDERPROFILE: Laenderprofil[] = [
   ...BELEGTE_PROFILE,
   ...mehrfachProfile(),
+  ...bestandsProfile(),
   /*
    * Für JEDES Land und JEDE Stufe eine Rückfallebene – ausnahmslos.
    *

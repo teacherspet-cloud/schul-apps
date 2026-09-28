@@ -1,0 +1,914 @@
+{
+ "stateId": "SH",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Fachanforderungen Englisch, Allgemein bildende Schulen, Sekundarstufe I, Sekundarstufe II (2014), Anhang: Operatoren Sekundarstufe I und II (Teilkompetenz Schreiben), Ministerium für Bildung und Wissenschaft des Landes Schleswig-Holstein, 2014",
+   "url": "https://fachportal.lernnetz.de/files/Fachanforderungen%20und%20Leitf%C3%A4den/Sekundarstufe/Fachanforderungen/Fachanforderungen%20Englisch%20Sekundarstufe%20%282014%29.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "brief",
+     "definition": "to give sb. all the necessary information about a situation",
+     "afb": "I",
+     "beispiele": [
+      "Brief the journalist about the crime."
+     ]
+    },
+    {
+     "operator": "delineate",
+     "definition": "to describe or draw sth. carefully so that sb. can understand it",
+     "afb": "I",
+     "beispiele": [
+      "Delineate the development of the conflict."
+     ]
+    },
+    {
+     "operator": "describe",
+     "definition": "to give a detailed account of sth.",
+     "afb": "I",
+     "beispiele": [
+      "Describe the mother’s relationship to her daughter."
+     ]
+    },
+    {
+     "operator": "outline",
+     "definition": "to give the main features, structure or general principles of a topic omitting minor details",
+     "afb": "I",
+     "beispiele": [
+      "Outline the author’s views on love, marriage and divorce."
+     ]
+    },
+    {
+     "operator": "portray",
+     "definition": "to describe or show sb. / sth. in a particular way",
+     "afb": "I",
+     "beispiele": [
+      "Portray the protagonist."
+     ]
+    },
+    {
+     "operator": "sketch",
+     "definition": "to describe sth. in a general way, giving basic ideas",
+     "afb": "I",
+     "beispiele": [
+      "Sketch the incidents that led to the catastrophe."
+     ]
+    },
+    {
+     "operator": "verbalise",
+     "definition": "to express sth. in words",
+     "afb": "I",
+     "beispiele": [
+      "Verbalise the unemployment statistics."
+     ]
+    },
+    {
+     "operator": "analyse",
+     "definition": "to study or examine sth. methodically and in detail, typically in order to explain and interpret it",
+     "afb": "II",
+     "beispiele": [
+      "Analyse the consequences of the headmaster’s decision."
+     ]
+    },
+    {
+     "operator": "characterize",
+     "definition": "to examine and describe the qualities / features of sb. or sth.",
+     "afb": "II",
+     "beispiele": [
+      "Characterize the protagonist in the play."
+     ]
+    },
+    {
+     "operator": "classify",
+     "definition": "to decide what group sb. / sth. belongs to",
+     "afb": "II",
+     "beispiele": [
+      "Classify the families according to their income."
+     ]
+    },
+    {
+     "operator": "compare",
+     "definition": "to point out similarities and differences",
+     "afb": "II",
+     "beispiele": [
+      "Compare the attitude of the two characters towards war."
+     ]
+    },
+    {
+     "operator": "contrast",
+     "definition": "to emphasize the differences between two or more things / aspects",
+     "afb": "II",
+     "beispiele": [
+      "Contrast the author’s idea of science with other theories you are familiar with."
+     ]
+    },
+    {
+     "operator": "examine",
+     "definition": "to look at sth. carefully, in order to make a decision, find sth. or check sth.",
+     "afb": "II",
+     "beispiele": [
+      "Examine the impact of global warming on local climates."
+     ]
+    },
+    {
+     "operator": "explain",
+     "definition": "to express sth. in a way that is clear or easy to unterstand",
+     "afb": "II",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ]
+    },
+    {
+     "operator": "illustrate",
+     "definition": "to use examples to explain or make clear(er)",
+     "afb": "II",
+     "beispiele": [
+      "Illustrate the author’s use of metaphorical language."
+     ]
+    },
+    {
+     "operator": "interpret",
+     "definition": "to explain the meaning or purpose of sth.",
+     "afb": "II",
+     "beispiele": [
+      "Interpret the message the author wishes to convey."
+     ]
+    },
+    {
+     "operator": "hypothesise",
+     "definition": "to suggest a possible explanation that has not yet been proven to be true",
+     "afb": "II",
+     "beispiele": [
+      "Hypothesise on M’s reasons for the deed."
+     ]
+    },
+    {
+     "operator": "organise",
+     "definition": "to arrange sth. in a particular order or pattern",
+     "afb": "II",
+     "beispiele": [
+      "Organise X’s notes to prepare her speech."
+     ]
+    },
+    {
+     "operator": "relate",
+     "definition": "to establish a meaningful connection between aspects",
+     "afb": "II",
+     "beispiele": [
+      "Relate the rise in crime to the neighbourhood factors."
+     ]
+    },
+    {
+     "operator": "speculate",
+     "definition": "to guess about the possible causes or effects of sth., without knowing all the facts or details",
+     "afb": "II",
+     "beispiele": [
+      "Speculate on what life would be like for the protagonist if he were king."
+     ]
+    },
+    {
+     "operator": "assess",
+     "definition": "to make a judgement about a person, situation or problem after thinking carefully about it",
+     "afb": "III",
+     "beispiele": [
+      "Assess his suitability for the job."
+     ]
+    },
+    {
+     "operator": "comment on",
+     "definition": "to state clearly one’s opinion and support one’s view with evidence",
+     "afb": "III",
+     "beispiele": [
+      "Comment on the arguments against drinking and driving."
+     ]
+    },
+    {
+     "operator": "discuss",
+     "definition": "to talk or write about sth. in detail and consider different ideas or opinions about it",
+     "afb": "III",
+     "beispiele": [
+      "Discuss the impact of rising taxes on consumers."
+     ]
+    },
+    {
+     "operator": "elaborate on",
+     "definition": "to give more details or information about sth.",
+     "afb": "III",
+     "beispiele": [
+      "Elaborate on the circumstances of Paul’s arrest."
+     ]
+    },
+    {
+     "operator": "evaluate",
+     "definition": "to carefully consider sth. to see how useful or valuable it is",
+     "afb": "III",
+     "beispiele": [
+      "Evaluate the importance of learning for somebody’s future."
+     ]
+    },
+    {
+     "operator": "transform",
+     "definition": "to completely change the form, appearance or character of sb. / sth.",
+     "afb": "III",
+     "beispiele": [
+      "Transform these bureaucratic regulations into a consumer guide."
+     ]
+    },
+    {
+     "operator": "write",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "formen": [
+      "write + text type"
+     ],
+     "beispiele": [
+      "Write a letter to the editor / a personal letter / notes for a speech / an article / a report / a diary entry / a script (film, play…) based on…"
+     ]
+    },
+    {
+     "operator": "continue",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "beispiele": [
+      "Continue the story."
+     ]
+    },
+    {
+     "operator": "tell from a certain point of view",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "beispiele": [
+      "Tell the story from her / his point of view."
+     ]
+    },
+    {
+     "operator": "find a suitable ending",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "beispiele": [
+      "Find a suitable ending."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Fachanforderungen Englisch, Allgemein bildende Schulen, Sekundarstufe I, Sekundarstufe II (2014), Anhang: Operatoren Sekundarstufe I und II (Teilkompetenz Schreiben), Ministerium für Bildung und Wissenschaft des Landes Schleswig-Holstein, 2014",
+   "url": "https://fachportal.lernnetz.de/files/Fachanforderungen%20und%20Leitf%C3%A4den/Sekundarstufe/Fachanforderungen/Fachanforderungen%20Englisch%20Sekundarstufe%20%282014%29.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek1",
+   "sprache": "en",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "brief",
+     "definition": "to give sb. all the necessary information about a situation",
+     "afb": "I",
+     "beispiele": [
+      "Brief the journalist about the crime."
+     ]
+    },
+    {
+     "operator": "describe",
+     "definition": "to give a detailed account of sth.",
+     "afb": "I",
+     "beispiele": [
+      "Describe the mother’s relationship to her daughter."
+     ]
+    },
+    {
+     "operator": "outline",
+     "definition": "to give the main features, structure or general principles of a topic omitting minor details",
+     "afb": "I",
+     "beispiele": [
+      "Outline the author’s views on love, marriage and divorce."
+     ]
+    },
+    {
+     "operator": "sketch",
+     "definition": "to describe sth. in a general way, giving basic ideas",
+     "afb": "I",
+     "beispiele": [
+      "Sketch the incidents that led to the catastrophe."
+     ]
+    },
+    {
+     "operator": "verbalise",
+     "definition": "to express sth. in words",
+     "afb": "I",
+     "beispiele": [
+      "Verbalise the unemployment statistics."
+     ]
+    },
+    {
+     "operator": "analyse",
+     "definition": "to study or examine sth. methodically and in detail, typically in order to explain and interpret it",
+     "afb": "II",
+     "beispiele": [
+      "Analyse the consequences of the headmaster’s decision."
+     ]
+    },
+    {
+     "operator": "characterize",
+     "definition": "to examine and describe the qualities / features of sb. or sth.",
+     "afb": "II",
+     "beispiele": [
+      "Characterize the protagonist in the play."
+     ]
+    },
+    {
+     "operator": "compare",
+     "definition": "to point out similarities and differences",
+     "afb": "II",
+     "beispiele": [
+      "Compare the attitude of the two characters towards war."
+     ]
+    },
+    {
+     "operator": "contrast",
+     "definition": "to emphasize the differences between two or more things / aspects",
+     "afb": "II",
+     "beispiele": [
+      "Contrast the author’s idea of science with other theories you are familiar with."
+     ]
+    },
+    {
+     "operator": "examine",
+     "definition": "to look at sth. carefully, in order to make a decision, find sth. or check sth.",
+     "afb": "II",
+     "beispiele": [
+      "Examine the impact of global warming on local climates."
+     ]
+    },
+    {
+     "operator": "explain",
+     "definition": "to express sth. in a way that is clear or easy to unterstand",
+     "afb": "II",
+     "beispiele": [
+      "Explain the protagonist’s obsession with money."
+     ]
+    },
+    {
+     "operator": "illustrate",
+     "definition": "to use examples to explain or make clear(er)",
+     "afb": "II",
+     "beispiele": [
+      "Illustrate the author’s use of metaphorical language."
+     ]
+    },
+    {
+     "operator": "organise",
+     "definition": "to arrange sth. in a particular order or pattern",
+     "afb": "II",
+     "beispiele": [
+      "Organise X’s notes to prepare her speech."
+     ]
+    },
+    {
+     "operator": "speculate",
+     "definition": "to guess about the possible causes or effects of sth., without knowing all the facts or details",
+     "afb": "II",
+     "beispiele": [
+      "Speculate on what life would be like for the protagonist if he were king."
+     ]
+    },
+    {
+     "operator": "assess",
+     "definition": "to make a judgement about a person, situation or problem after thinking carefully about it",
+     "afb": "III",
+     "beispiele": [
+      "Assess his suitability for the job."
+     ]
+    },
+    {
+     "operator": "comment on",
+     "definition": "to state clearly one’s opinion and support one’s view with evidence",
+     "afb": "III",
+     "beispiele": [
+      "Comment on the arguments against drinking and driving."
+     ]
+    },
+    {
+     "operator": "discuss",
+     "definition": "to talk or write about sth. in detail and consider different ideas or opinions about it",
+     "afb": "III",
+     "beispiele": [
+      "Discuss the impact of rising taxes on consumers."
+     ]
+    },
+    {
+     "operator": "write",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "formen": [
+      "write + text type"
+     ],
+     "beispiele": [
+      "Write a letter to the editor / a personal letter / notes for a speech / an article / a report / a diary entry / a script (film, play…) based on…"
+     ]
+    },
+    {
+     "operator": "continue",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "beispiele": [
+      "Continue the story."
+     ]
+    },
+    {
+     "operator": "tell from a certain point of view",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "beispiele": [
+      "Tell the story from her / his point of view."
+     ]
+    },
+    {
+     "operator": "find a suitable ending",
+     "definition": "creative text production on a topic within the context of a specific text type",
+     "afb": "I–III",
+     "beispiele": [
+      "Find a suitable ending."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Fachanforderungen Geschichte, Allgemein bildende Schulen, Sekundarstufe I, Sekundarstufe II (2016), Anhang: Operatoren (gemäß den Operatoren für das Fach Geschichte der KMK, Stand Oktober 2012), Ministerium für Schule und Berufsbildung des Landes Schleswig-Holstein, 2016",
+   "url": "https://fachportal.lernnetz.de/files/Fachanforderungen%20und%20Leitf%C3%A4den/Sekundarstufe/Fachanforderungen/Fachanforderungen%20Geschichte%20Sekundarstufe%20%282016%29.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "beschreiben",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "aufzeigen",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I",
+     "beispiele": [
+      "Geben Sie die zentralen Thesen des Autors zur Stellung der Frau im Kaiserreich wieder."
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "einen Sachverhalt oder Bezeichnungen ohne weitere Erläuterung auflisten oder aus vorhandenem Material unkommentiert entnehmen",
+     "afb": "I",
+     "beispiele": [
+      "Nennen Sie die wichtigsten Stationen auf dem Weg zum „Potsdamer Abkommen“."
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "historische Sachverhalte, Problemstellungen, Entwicklungen zielgerichtet erfassen und in groben Zügen angemessen darstellen",
+     "afb": "I",
+     "beispiele": [
+      "Skizzieren Sie die Gründung der beiden deutschen Staaten, ausgehend vom 1. Januar 1947."
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen und die Ergebnisse zusammenhängend darstellen",
+     "afb": "II",
+     "beispiele": [
+      "Analysieren Sie das Titelblatt der „Süddeutsche(n) Monatshefte“ aus dem Jahr 1924 im Hinblick auf Kritik an den sozialen Verhältnissen."
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen und die Ergebnisse zusammenhängend darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Thesen, Urteile, Wertungen durch Argumente stützen, die auf historischen Tatsachen und fachwissenschaftlichen Erkenntnissen basieren",
+     "afb": "II"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Thesen, Urteile, Wertungen durch Argumente stützen, die auf historischen Tatsachen und fachwissenschaftlichen Erkenntnissen basieren",
+     "afb": "II",
+     "beispiele": [
+      "Weisen Sie an mindestens zwei Beispielen nach, dass die tieferen Wurzeln der Weltanschauung des Nationalsozialismus in der deutschen bzw. europäischen Geschichte des 19. und frühen 20. Jahrhunderts liegen."
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte, Strukturen, Entwicklungen, Personen mit ihren typischen Merkmalen kriterienorientiert beschreiben und strukturiert darstellen",
+     "afb": "II",
+     "beispiele": [
+      "Charakterisieren Sie die Weimarer Verfassung hinsichtlich typischer Merkmale bzw. Begriffe."
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen größeren Zusammenhang stellen",
+     "afb": "II",
+     "formen": [
+      "ein-/zuordnen"
+     ],
+     "beispiele": [
+      "Ordnen Sie den Auszug der Ihnen vorliegenden Rede in die entsprechende Phase des Ost- West-Konflikts ein."
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen größeren Zusammenhang stellen",
+     "afb": "II",
+     "formen": [
+      "ein-/zuordnen"
+     ]
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen größeren Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "historische Sachverhalte einordnen und durch zusätzliche Informationen und Beispiele konkretisieren",
+     "afb": "II",
+     "beispiele": [
+      "Erläutern Sie Grundzüge des NS-Herrschaftssystems."
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "historische Sachverhalte einordnen und durch zusätzliche Informationen und Beispiele konkretisieren",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "historische Sachverhalte einordnen und durch zusätzliche Informationen und Beispiele konkretisieren",
+     "afb": "II"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "aus Materialien bestimmte Sachverhalte herleiten, die ggf. nicht explizit genannt werden",
+     "afb": "II",
+     "beispiele": [
+      "Erschließen Sie, ausgehend von der Ihnen vorgelegten Quelle, den Standpunkt des Autors."
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte Sachverhalte herleiten, die ggf. nicht explizit genannt werden",
+     "afb": "II",
+     "beispiele": [
+      "Arbeiten Sie aus dem Text heraus, welche Position Hjalmar Schacht gegenüber der Bezeichnung „Machtergreifung“ vertritt."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert historischer Sachverhalte im jeweiligen Kontext bestimmen und anhand der Darlegung der eigenen Maßstäbe zu einem begründeten, an modernen demokratischen Prinzipien orientierten Werturteil gelangen",
+     "afb": "III",
+     "beispiele": [
+      "Beurteilen Sie die Auswirkungen der politischen Position, die der damalige preußische Ministerpräsident Otto von Bismarck in seiner Rede am 30. September 1862 vor der Budgetkommission des preußischen Abgeordnetenhauses formulierte."
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "den Stellenwert historischer Sachverhalte im jeweiligen Kontext bestimmen und anhand der Darlegung der eigenen Maßstäbe zu einem begründeten, an modernen demokratischen Prinzipien orientierten Werturteil gelangen",
+     "afb": "III",
+     "beispiele": [
+      "Bewerten Sie die Ziele und Absichten, die Hitler in seiner Rede vor den Abgeordneten des Reichstags am 24. März 1933 vor der Abstimmung über das sogenannte „Ermächtigungsgesetz“ formuliert."
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "den Stellenwert historischer Sachverhalte im jeweiligen Kontext bestimmen und anhand der Darlegung der eigenen Maßstäbe zu einem begründeten, an modernen demokratischen Prinzipien orientierten Werturteil gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten problembezogen Gemeinsamkeiten, Ähnlichkeiten und Unterschiede historischer Sachverhalte, Entwicklungen, Prozesse ermitteln und strukturiert darstellen",
+     "afb": "III",
+     "beispiele": [
+      "Vergleichen Sie die Reichsgründung von 1871 mit der Entstehung der Weimarer Republik 1918/19 hinsichtlich der Ausgangsbedingungen."
+     ]
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten problembezogen Gemeinsamkeiten, Ähnlichkeiten und Unterschiede historischer Sachverhalte, Entwicklungen, Prozesse ermitteln und strukturiert darstellen",
+     "afb": "III",
+     "beispiele": [
+      "Stellen Sie die Position des Reichstags am Beispiel zweier deutscher Verfassungen seit dem Ende des 19. Jhs. gegenüber."
+     ]
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "beispiele": [
+      "Diskutieren Sie am Beispiel eines militärischen Konflikts nach dem Zweiten Weltkrieg die Möglichkeiten und Grenzen der Weltmacht USA, ihre Vorstellungen von einer globalen Friedensordnung durchzusetzen."
+     ]
+    },
+    {
+     "operator": "abwägen",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Hypothesen, Behauptungen, Urteile im jeweiligen historischen Kontext auf ihre Angemessenheit hin untersuchen bzw. ihre Richtigkeit bestätigen oder begründet widerlegen",
+     "afb": "III",
+     "beispiele": [
+      "Prüfen Sie, inwieweit…"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Hypothesen, Behauptungen, Urteile im jeweiligen historischen Kontext auf ihre Angemessenheit hin untersuchen bzw. ihre Richtigkeit bestätigen oder begründet widerlegen",
+     "afb": "III",
+     "beispiele": [
+      "Überprüfen Sie die These, die NS-Außenpolitik sei eine Fortsetzung der Weimarer Außenpolitik seit 1920 mit anderen Mitteln gewesen."
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "eine These/Problemstellung auf der Basis einer Analyse mittels einer dialektisch strukturierten Argumentationskette auf ihren Wert und ihre Stichhaltigkeit hin überprüfen und eine bilanzierende eigene Stellungnahme formulieren",
+     "afb": "I–III",
+     "beispiele": [
+      "„Die deutsche Armee, aus der preußischen hervorgewachsen, ist unpolitisch seit Jahrhunderten. Ihr Geist ist politisch blind.“ - Erörtern Sie anhand zweier historischer Beispiele aus dem 19. oder 20. Jh., ob diese Behauptung Carl Goerdelers, eines der führenden Vertreter des konservativen Widerstands gegen Hitler, für die deutsche bzw. preußische Armee zutrifft."
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "auf der Grundlage einer Analyse / Beschreibung Sinnzusammenhänge aus Quellen erschließen und durch Erläuterung und Bewertung eine begründete Stellungnahme formulieren",
+     "afb": "I–III",
+     "beispiele": [
+      "Interpretieren Sie die Karikatur v. a. im Hinblick auf die Darstellung außenpolitischer Grundpositionen des Reichkanzlers Otto von Bismarck."
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–III",
+     "beispiele": [
+      "Stellen Sie, ausgehend von einer Erläuterung der Truman-Doktrin, den außenpolitischen Kurs der USA in den 1950er- bis 1970er-Jahren dar."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Fachanforderungen Geschichte, Allgemein bildende Schulen, Sekundarstufe I, Sekundarstufe II (2016), Anhang: Operatoren (gemäß den Operatoren für das Fach Geschichte der KMK, Stand Oktober 2012), Ministerium für Schule und Berufsbildung des Landes Schleswig-Holstein, 2016",
+   "url": "https://fachportal.lernnetz.de/files/Fachanforderungen%20und%20Leitf%C3%A4den/Sekundarstufe/Fachanforderungen/Fachanforderungen%20Geschichte%20Sekundarstufe%20%282016%29.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "beschreiben",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "aufzeigen",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "historische Sachverhalte, ggf. auf Materialgrundlage, auf Wesentliches reduziert und strukturiert darstellen",
+     "afb": "I",
+     "beispiele": [
+      "Geben Sie die zentralen Thesen des Autors zur Stellung der Frau im Kaiserreich wieder."
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "einen Sachverhalt oder Bezeichnungen ohne weitere Erläuterung auflisten oder aus vorhandenem Material unkommentiert entnehmen",
+     "afb": "I",
+     "beispiele": [
+      "Nennen Sie die wichtigsten Stationen auf dem Weg zum „Potsdamer Abkommen“."
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "historische Sachverhalte, Problemstellungen, Entwicklungen zielgerichtet erfassen und in groben Zügen angemessen darstellen",
+     "afb": "I",
+     "beispiele": [
+      "Skizzieren Sie die Gründung der beiden deutschen Staaten, ausgehend vom 1. Januar 1947."
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen und die Ergebnisse zusammenhängend darstellen",
+     "afb": "II",
+     "beispiele": [
+      "Analysieren Sie das Titelblatt der „Süddeutsche(n) Monatshefte“ aus dem Jahr 1924 im Hinblick auf Kritik an den sozialen Verhältnissen."
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen und die Ergebnisse zusammenhängend darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Thesen, Urteile, Wertungen durch Argumente stützen, die auf historischen Tatsachen und fachwissenschaftlichen Erkenntnissen basieren",
+     "afb": "II"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Thesen, Urteile, Wertungen durch Argumente stützen, die auf historischen Tatsachen und fachwissenschaftlichen Erkenntnissen basieren",
+     "afb": "II",
+     "beispiele": [
+      "Weisen Sie an mindestens zwei Beispielen nach, dass die tieferen Wurzeln der Weltanschauung des Nationalsozialismus in der deutschen bzw. europäischen Geschichte des 19. und frühen 20. Jahrhunderts liegen."
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte, Strukturen, Entwicklungen, Personen mit ihren typischen Merkmalen kriterienorientiert beschreiben und strukturiert darstellen",
+     "afb": "II",
+     "beispiele": [
+      "Charakterisieren Sie die Weimarer Verfassung hinsichtlich typischer Merkmale bzw. Begriffe."
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen größeren Zusammenhang stellen",
+     "afb": "II",
+     "formen": [
+      "ein-/zuordnen"
+     ],
+     "beispiele": [
+      "Ordnen Sie den Auszug der Ihnen vorliegenden Rede in die entsprechende Phase des Ost- West-Konflikts ein."
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen größeren Zusammenhang stellen",
+     "afb": "II",
+     "formen": [
+      "ein-/zuordnen"
+     ]
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen größeren Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "historische Sachverhalte einordnen und durch zusätzliche Informationen und Beispiele konkretisieren",
+     "afb": "II",
+     "beispiele": [
+      "Erläutern Sie Grundzüge des NS-Herrschaftssystems."
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "historische Sachverhalte einordnen und durch zusätzliche Informationen und Beispiele konkretisieren",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "historische Sachverhalte einordnen und durch zusätzliche Informationen und Beispiele konkretisieren",
+     "afb": "II"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "aus Materialien bestimmte Sachverhalte herleiten, die ggf. nicht explizit genannt werden",
+     "afb": "II",
+     "beispiele": [
+      "Erschließen Sie, ausgehend von der Ihnen vorgelegten Quelle, den Standpunkt des Autors."
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte Sachverhalte herleiten, die ggf. nicht explizit genannt werden",
+     "afb": "II",
+     "beispiele": [
+      "Arbeiten Sie aus dem Text heraus, welche Position Hjalmar Schacht gegenüber der Bezeichnung „Machtergreifung“ vertritt."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert historischer Sachverhalte im jeweiligen Kontext bestimmen und anhand der Darlegung der eigenen Maßstäbe zu einem begründeten, an modernen demokratischen Prinzipien orientierten Werturteil gelangen",
+     "afb": "III",
+     "beispiele": [
+      "Beurteilen Sie die Auswirkungen der politischen Position, die der damalige preußische Ministerpräsident Otto von Bismarck in seiner Rede am 30. September 1862 vor der Budgetkommission des preußischen Abgeordnetenhauses formulierte."
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "den Stellenwert historischer Sachverhalte im jeweiligen Kontext bestimmen und anhand der Darlegung der eigenen Maßstäbe zu einem begründeten, an modernen demokratischen Prinzipien orientierten Werturteil gelangen",
+     "afb": "III",
+     "beispiele": [
+      "Bewerten Sie die Ziele und Absichten, die Hitler in seiner Rede vor den Abgeordneten des Reichstags am 24. März 1933 vor der Abstimmung über das sogenannte „Ermächtigungsgesetz“ formuliert."
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "den Stellenwert historischer Sachverhalte im jeweiligen Kontext bestimmen und anhand der Darlegung der eigenen Maßstäbe zu einem begründeten, an modernen demokratischen Prinzipien orientierten Werturteil gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten problembezogen Gemeinsamkeiten, Ähnlichkeiten und Unterschiede historischer Sachverhalte, Entwicklungen, Prozesse ermitteln und strukturiert darstellen",
+     "afb": "III",
+     "beispiele": [
+      "Vergleichen Sie die Reichsgründung von 1871 mit der Entstehung der Weimarer Republik 1918/19 hinsichtlich der Ausgangsbedingungen."
+     ]
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten problembezogen Gemeinsamkeiten, Ähnlichkeiten und Unterschiede historischer Sachverhalte, Entwicklungen, Prozesse ermitteln und strukturiert darstellen",
+     "afb": "III",
+     "beispiele": [
+      "Stellen Sie die Position des Reichstags am Beispiel zweier deutscher Verfassungen seit dem Ende des 19. Jhs. gegenüber."
+     ]
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "beispiele": [
+      "Diskutieren Sie am Beispiel eines militärischen Konflikts nach dem Zweiten Weltkrieg die Möglichkeiten und Grenzen der Weltmacht USA, ihre Vorstellungen von einer globalen Friedensordnung durchzusetzen."
+     ]
+    },
+    {
+     "operator": "abwägen",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Hypothesen, Behauptungen, Urteile im jeweiligen historischen Kontext auf ihre Angemessenheit hin untersuchen bzw. ihre Richtigkeit bestätigen oder begründet widerlegen",
+     "afb": "III",
+     "beispiele": [
+      "Prüfen Sie, inwieweit…"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Hypothesen, Behauptungen, Urteile im jeweiligen historischen Kontext auf ihre Angemessenheit hin untersuchen bzw. ihre Richtigkeit bestätigen oder begründet widerlegen",
+     "afb": "III",
+     "beispiele": [
+      "Überprüfen Sie die These, die NS-Außenpolitik sei eine Fortsetzung der Weimarer Außenpolitik seit 1920 mit anderen Mitteln gewesen."
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "eine These/Problemstellung auf der Basis einer Analyse mittels einer dialektisch strukturierten Argumentationskette auf ihren Wert und ihre Stichhaltigkeit hin überprüfen und eine bilanzierende eigene Stellungnahme formulieren",
+     "afb": "I–III",
+     "beispiele": [
+      "„Die deutsche Armee, aus der preußischen hervorgewachsen, ist unpolitisch seit Jahrhunderten. Ihr Geist ist politisch blind.“ - Erörtern Sie anhand zweier historischer Beispiele aus dem 19. oder 20. Jh., ob diese Behauptung Carl Goerdelers, eines der führenden Vertreter des konservativen Widerstands gegen Hitler, für die deutsche bzw. preußische Armee zutrifft."
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "auf der Grundlage einer Analyse / Beschreibung Sinnzusammenhänge aus Quellen erschließen und durch Erläuterung und Bewertung eine begründete Stellungnahme formulieren",
+     "afb": "I–III",
+     "beispiele": [
+      "Interpretieren Sie die Karikatur v. a. im Hinblick auf die Darstellung außenpolitischer Grundpositionen des Reichkanzlers Otto von Bismarck."
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "einen bekannten Sachverhalt bzw. Zusammenhang mit eigenen Worten oder in anderer Form strukturiert und treffend wiedergeben, ohne ihn zu bewerten",
+     "afb": "I–III",
+     "beispiele": [
+      "Stellen Sie, ausgehend von einer Erläuterung der Truman-Doktrin, den außenpolitischen Kurs der USA in den 1950er- bis 1970er-Jahren dar."
+     ]
+    }
+   ]
+  }
+ ]
+}

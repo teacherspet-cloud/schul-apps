@@ -11,42 +11,20 @@
  *
  * Die Listen selbst: `operatorenlistenDaten.ts` (Land → Fach → Operatoren mit Quelle).
  */
-import type { Afb, InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/types'
+import type { InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/types'
+import type { AnlageWunsch } from '@shared/operatoren/zugriff'
+import { anlageFuer } from '@shared/operatoren/zugriff'
+import type { OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
 import { upperSecondary } from '../generation/generateExam'
 import { alleFassungen } from '../model/fassungen'
 import type { Exam } from '../model/types'
 import { OPERATORENLISTEN } from './operatorenlistenDaten'
 
-export interface OperatorDefinition {
-  operator: string
-  /** Leer = bloße Arbeitsanweisung (tick, match …): bekannt, aber ohne Eintrag in der Anlage */
-  definition: string
-  afb?: Afb | 'I–II' | 'II–III' | 'I–III'
-  /** Weitere Formen, wie sie in Arbeitsanweisungen stehen („Nimm Stellung", „Setze … in Beziehung") */
-  formen?: string[]
-  /*
-   * ALLES, was die Liste des Landes angibt (Wunsch der Lehrkraft vom 28.09.2026): nicht nur die
-   * Erläuterung, sondern auch die illustrierenden Aufgabenbeispiele, der Kompetenzbereich, für den
-   * die Erläuterung gilt, Einschränkungen auf einzelne Fächer und weitere Spalten im Wortlaut.
-   */
-  /** Illustrierende Aufgabenbeispiele im Wortlaut der Liste */
-  beispiele?: string[]
-  /** Kompetenzbereich, für den dieser Eintrag gilt (Englisch NI: Schreiben, Sprachmittlung, Sprechen, Hör-/Hörsehverstehen) */
-  kompetenzbereich?: string
-  /** Gilt nur für diese Fächer (Kennungen aus subjects.ts) – z. B. „darstellen" nur Erdkunde und Politik-Wirtschaft */
-  nurFaecher?: string[]
-  /** Weitere Spalten der Liste im Wortlaut (Spaltenname → Inhalt) */
-  zusatz?: Record<string, string>
-}
-
-export interface Operatorenliste {
-  /** Sprache der Liste – bei Fremdsprachen die Zielsprache */
-  sprache: 'de' | 'en' | 'fr' | 'es'
-  quelle: string
-  operatoren: OperatorDefinition[]
-  /** Vorbemerkungen der Liste je Kompetenzbereich im Wortlaut (z. B. zur Sprachmittlung) */
-  hinweise?: Record<string, string>
-}
+/*
+ * Die Typen stehen seit dem gemeinsamen Operatoren-Bestand (Großprogramm 0.4, D3) in
+ * `shared/operatoren/typen.ts`; hier nur weitergereicht, damit bestehende Importe gelten.
+ */
+export type { OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
 
 /**
  * Welcher Kompetenzbereich einer Liste zu welchem Teil der Arbeit gehört. Die Erläuterung eines
@@ -68,9 +46,21 @@ export const OPERATOREN_BLOCK_ID = 'exam-operatoren'
 /** Ist der Baustein für diese Arbeit vorgesehen? Fehlt die Wahl, entscheidet die Stufe. */
 export const operatorenlisteAktiv = (exam: Exam): boolean => exam.meta.operatorenliste ?? upperSecondary(exam.meta)
 
-/** Die amtliche Liste des Landes für das Fach – oder null, wenn keine hinterlegt ist */
-export function amtlicheListe(stateId: string, subjectId: string): Operatorenliste | null {
-  return OPERATORENLISTEN[stateId]?.[subjectId] ?? null
+/**
+ * Die amtliche Liste des Landes für das Fach – oder null, wenn keine hinterlegt ist.
+ * Niedersachsen: von Hand erfasste Listen mit Vorbemerkungen (`operatorenlistenDaten.ts`).
+ * Alle anderen Länder: gemeinsamer Bestand aus der Recherche vom 28.09.2026, nur Listen aus
+ * Dokumenten des Landes selbst.
+ */
+export function amtlicheListe(stateId: string, subjectId: string, wunsch: AnlageWunsch = {}): Operatorenliste | null {
+  return OPERATORENLISTEN[stateId]?.[subjectId] ?? anlageFuer(stateId, subjectId, wunsch)
+}
+
+/** Sprache und Stufe der Arbeit für die Wahl der Liste */
+export function anlageWunsch(meta: Exam['meta']): AnlageWunsch {
+  const fach: string = meta.subjectId
+  const sprache = fach === 'englisch' || meta.bilingual ? 'en' : fach === 'franzoesisch' ? 'fr' : fach === 'spanisch' ? 'es' : 'de'
+  return { sprache, stufe: upperSecondary(meta) ? 'sek2' : 'sek1' }
 }
 
 const normal = (s: string): string => s.toLocaleLowerCase('de').replace(/[*_]/g, '').replace(/\s+/g, ' ').trim()
@@ -138,7 +128,7 @@ export interface OperatorenBefund {
 }
 
 export function operatorenBefund(exam: Exam): OperatorenBefund {
-  const liste = amtlicheListe(exam.meta.stateId, exam.meta.subjectId)
+  const liste = amtlicheListe(exam.meta.stateId, exam.meta.subjectId, anlageWunsch(exam.meta))
   if (!liste) return { gefunden: [], fehlend: operatorenDerArbeit(exam), liste: null }
   const fach = exam.meta.subjectId
   // Einträge, die nur für andere Fächer gelten („darstellen" nur Erdkunde/Politik), zählen nicht

@@ -1,0 +1,1033 @@
+{
+ "stateId": "RP",
+ "stand": "2026-09-28",
+ "listen": [
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt von der Mainzer Studienstufe (mss.rlp.de, Rechtsgrundlagen), 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyze",
+     "definition": "describe and explain in detail and give evidence from the text, relating the content to relevant aspects of language and form",
+     "formen": [
+      "examine"
+     ],
+     "beispiele": [
+      "♦ Examine how Jennifer Senior conveys her attitude towards “cancel culture” and its consequences for authors. Focus on structure and use of language. ♦ Analyze the way the protagonist is characterized. Focus on narrative techniques and use of language. ♦ Analyze how the author’s opinion on social movements is conveyed. Focus on use of language and communicative strategies as well as the function of the photo published with the article."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the relative value, quality or significance of sth., i.e. on the extent to which sth. is effective/true/etc., backing up one’s argumentation with evidence and examples",
+     "formen": [
+      "evaluate"
+     ],
+     "beispiele": [
+      "♦ Assess to what extent the cartoon reflects what Choudhury and his family have experienced in the US. ♦ Taking the cartoon as a starting point, evaluate the effectiveness of measures taken against discrimination in the US. ♦ Taking the quotation as a starting point, assess to what extent educational institutions can help young people realize their potential."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "express a well-founded opinion on sth., backing up one’s argumentation with evidence and examples and possibly considering counterarguments",
+     "beispiele": [
+      "♦ Comment on the writer’s admission that his view might be seen as “anti-American” (l. 21). ♦ Comment on the message of the cartoon with respect to what makes good journalism in the 21st century."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences and give evidence from the text, relating the content to relevant aspects of language and form",
+     "beispiele": [
+      "♦ Compare how the issue of racism is presented in the two articles. Focus on communicative strategies and the use of language."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sb./sth. is like",
+     "beispiele": [
+      "♦ Describe the old woman and her behavior."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discuss",
+     "definition": "express a well-founded opinion on sth., considering arguments for both sides of an issue, backing up one’s argumentation with evidence and examples",
+     "beispiele": [
+      "♦ “[S]he would be the first one to join up […] and work for the cause, bleed for the cause, make the cause the central purpose of her life.” (Paul Auster, 4 3 2 1, ll. 57-60) Using Amy’s plea as a starting point, discuss the idea of devoting one’s life to a cause. ♦ The author talks of “the influencer game” (l. 41). Taking the article as a starting point, discuss whether the influencer phenomenon is really a “game”."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to the text and its context to clarify how or why sth. is as it is",
+     "beispiele": [
+      "♦ Explain the protagonist’s reservations about the concept of the American Dream. ♦ Explain how the statistics complement the author’s point of view."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text, issue or topic as specified by the task",
+     "formen": [
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "♦ Outline the information on the life of African Americans in the 1960s as presented in the text. ♦ Summarize the information on the narrator’s husband. ♦ Sum up Bono’s view on the European Union and his vision for its future."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "point out",
+     "definition": "present the main aspects of sth. briefly",
+     "beispiele": [
+      "♦ Point out the effects of climate change on low-lying countries and the measures taken to deal with the situation."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with characteristic features",
+     "beispiele": [
+      "♦ Write a letter to the editor, commenting on the author’s view on technology and his vision of the future. ♦ “For me, education was power.” (Michelle Obama) Former First Lady Michelle Obama is African American, a successful lawyer and the first academic in her family. Write a blog entry for the website of the international youth project Knowledge – Voice – Action, in which you assess to what extent Michelle Obama’s claim holds true for"
+     ],
+     "kompetenzbereich": "Schreiben",
+     "zusatz": {
+      "Fußnote 1": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt von der Mainzer Studienstufe (mss.rlp.de, Rechtsgrundlagen), 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "outline",
+     "definition": "give a concise account of the main points or ideas of a text as specified by the task, clarifying culture-related aspects if necessary",
+     "formen": [
+      "present",
+      "summarize",
+      "sum up"
+     ],
+     "beispiele": [
+      "♦ Write an article for the project website, outlining the development and the goals of “Jugend forscht”. ♦ Write an email to your friend in which you present the Muldestausee youth council and its accomplishments. ♦ For their blog, write an entry summing up the information on Danny Beuerbach and his initiatives."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "write (+ text type)",
+     "definition": "produce a text with characteristic features, clarifying culture-related aspects if necessary",
+     "beispiele": [
+      "♦ Your American friend is active in the National Junior Firefighter Program and is interested in how other countries organize firefighting and what challenges they are facing. Write your friend an email in which you present the situation of firefighting in Germany."
+     ],
+     "kompetenzbereich": "Sprachmittlung",
+     "zusatz": {
+      "Fußnote 2": "Außer dem Operator „write“ und der zu erstellenden Textsorte präzisiert ein weiterer Operator die Anforderungen an den zu verfassenden Text."
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt von der Mainzer Studienstufe (mss.rlp.de, Rechtsgrundlagen), 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "answer",
+     "definition": "",
+     "beispiele": [
+      "♦ While listening, answer the questions. You need not write complete sentences. Unless otherwise specified, name one aspect."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "choose",
+     "definition": "",
+     "beispiele": [
+      "♦ Choose the heading (A-G) that best summarizes each statement (1-6). For each statement, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "♦ Complete the sentences below. You need not write complete sentences. ♦ While listening, fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "♦ While listening, match what each person says (1-6) with the headings (A-G). Choose the heading that best summarizes what each person says. For each speaker, there is only one correct answer. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "name",
+     "definition": "",
+     "beispiele": [
+      "♦ Why do some fish generate an electric field? Name two aspects."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "♦ While listening, tick (✓) the correct answer (a, b, or c). There is only one correct answer."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt von der Mainzer Studienstufe (mss.rlp.de, Rechtsgrundlagen), 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "complete",
+     "definition": "",
+     "formen": [
+      "fill in"
+     ],
+     "beispiele": [
+      "♦ Complete the table below. You need not write complete sentences. ♦ Fill in the missing information. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "decide",
+     "definition": "",
+     "beispiele": [
+      "♦ Decide whether the statements (1-6) are true or false according to the text and tick (✓) the corresponding box. ♦ Decide which heading best fits each paragraph and put the correct number into the box. There is one more heading than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "give evidence",
+     "definition": "",
+     "beispiele": [
+      "♦ Read the following article on self-driving cars. Decide whether the statements (1-10) are true or false according to the text and tick (✓) the corresponding box. Always give evidence to support your decisions. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "list",
+     "definition": "",
+     "formen": [
+      "name"
+     ],
+     "beispiele": [
+      "♦ List the reasons mentioned in the article. You need not write complete sentences. ♦ Name the arguments in favour of the proposal. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "match",
+     "definition": "",
+     "beispiele": [
+      "♦ Match the comments (1-5) with the headings (A-G). Choose the heading that best summarizes what each comment says. For each comment, there is only one correct answer. There are two more headings than you need."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "state",
+     "definition": "",
+     "beispiele": [
+      "♦ State the main ideas of both reviews in the table below. You need not write complete sentences."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    },
+    {
+     "operator": "tick",
+     "definition": "",
+     "beispiele": [
+      "♦ Tick (✓) the correct answer."
+     ],
+     "kompetenzbereich": "Leseverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Gemeinsame Abituraufgabenpools der Länder – Aufgaben für das Fach Englisch – Grundstock von Operatoren (gilt ab Prüfungsjahr 2027), Institut zur Qualitätsentwicklung im Bildungswesen (IQB); verlinkt von der Mainzer Studienstufe (mss.rlp.de, Rechtsgrundlagen), 2025",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/E_Grundstock_von_Operatoren_-_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "englisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "en",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "agree on",
+     "definition": "come to one opinion or an understanding based on arguments",
+     "formen": [
+      "come to an agreement"
+     ],
+     "beispiele": [
+      "♦ Come to an agreement on what to be included in your presentation. ♦ Agree on two pictures which could persuade your age group most to do more for the protection of the environment."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "analyze",
+     "definition": "describe, explain and give evidence from the material",
+     "formen": [
+      "examine"
+     ],
+     "beispiele": [
+      "♦ For a youth conference on American ideals, visions and traditions, you have been asked to give an oral presentation about the cartoon. Analyze the cartoon. ♦ You are preparing a photo exhibition for an international youth convention on the topic City Environments. Analyze the photographs."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "argue",
+     "definition": "make a case based on appropriate evidence for and/or against some given point of view",
+     "beispiele": [
+      "♦ In a discussion about the replacement of textbooks by portable computers at school argue for or against this proposal."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "assess",
+     "definition": "express a well-founded opinion on the relative value, quality and significance of sb./sth., i.e. arguing about the extent to which sth. is effective/true/etc., backing up one’s argumentation",
+     "formen": [
+      "evaluate"
+     ],
+     "beispiele": [
+      "♦ Assess the suitability of the two cartoons to illustrate your topic. ♦ Evaluate the chances for an applicant’s personal development described in the job offer at hand."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "comment (on)",
+     "definition": "provide a well-founded opinion on sth., backing up one’s argumentation and possibly considering counterarguments",
+     "beispiele": [
+      "♦ As members of your school’s student council you and your partner are expected to organize a panel discussion on the importance of moral issues in today’s society. Comment on the following statistics. ♦ The EU has launched a competition entitled Mobility for all. Entries should propose both creative and realistic regional projects. Comment on the material. ♦ Comment on the relevance of the issue covered in the cartoon for (our) society."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "compare",
+     "definition": "explain similarities and differences",
+     "beispiele": [
+      "♦ Based on the charts, compare the job situation of young people your age in Germany and in the UK. ♦ You are preparing a photo exhibition for an international youth convention on the topic of City Environments. Compare the aspects of city life shown in the photos."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "describe",
+     "definition": "give a detailed account of what sth./sb. is like",
+     "beispiele": [
+      "♦ You and your partner are participating in an international youth convention on environmental challenges. You are looking for photographs to illustrate your presentation. Describe the pictures to your partner."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "discuss",
+     "definition": "give/exchange arguments or reasons for and against a particular view or idea, backing up one’s argumentation and drawing a well-founded conclusion (together)",
+     "beispiele": [
+      "♦ You and your partner are participating in a youth convention about robotics. Together with your partner, discuss the benefits and challenges of further scientific innovations. ♦ Together with your partner, discuss whether options such as community service, gap years, or military service should be mandatory for young people. ♦ Discuss the problems shown in the photos and possible solutions."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "explain",
+     "definition": "make sth. clear by referring to examples and its wider context if necessary",
+     "beispiele": [
+      "♦ Explain the following quotation about travelling. ♦ Explain possible reasons behind the statistics and the impact on both the individual and society."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "make suggestions",
+     "definition": "propose initiatives, measures, etc. and explain why they need to be taken",
+     "beispiele": [
+      "♦ Make suggestions on how discrimination against marginalized groups can be fought. Rank them according to effectiveness."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "relate (to)",
+     "definition": "show the relationship between materials, concepts, etc. by explaining whether/how two or more texts oppose, complement or contradict each other",
+     "beispiele": [
+      "♦ Relate the two cartoons to each other."
+     ],
+     "kompetenzbereich": "Sprechen"
+    }
+   ]
+  },
+  {
+   "quelle": "Einheitliche Prüfungsanforderungen in der Abiturprüfung Geschichte (Beschluss der KMK vom 01.12.1989 i. d. F. vom 10.02.2005), Abschnitt 2.2 Operatoren, Kultusministerkonferenz (KMK), 2005",
+   "url": "https://www.kmk.org/fileadmin/Dateien/veroeffentlichungen_beschluesse/1989/1989_12_01-EPA-Geschichte.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "interpretieren",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und eine begründete Stellungnahme abgeben, die auf einer Analyse, Erläuterung und Bewertung beruht",
+     "afb": "I–III"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Eine These oder Problemstellung durch eine Kette von Für-und-Wider- bzw. Sowohl-als-Auch-Argumenten auf ihren Wert und ihre Stichhaltigkeit hin abwägend prüfen und auf dieser Grundlage eine eigene Stellungnahme dazu entwickeln. Die Erörterung einer historischen Darstellung setzt deren Analyse voraus.",
+     "afb": "I–III"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "historische Entwicklungszusammenhänge und Zustände mit Hilfe von Quellenkenntnissen und Deutungen beschreiben, erklären und beurteilen",
+     "afb": "I–III"
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen zusammentragen, ohne diese zu kommentieren",
+     "afb": "I",
+     "formen": [
+      "aufzählen"
+     ]
+    },
+    {
+     "operator": "bezeichnen",
+     "definition": "historische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I",
+     "formen": [
+      "schildern",
+      "skizzieren"
+     ]
+    },
+    {
+     "operator": "aufzeigen",
+     "definition": "historische Sachverhalte unter Beibehaltung des Sinnes auf Wesentliches reduzieren",
+     "afb": "I",
+     "formen": [
+      "beschreiben",
+      "zusammenfassen",
+      "wiedergeben"
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder historische Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "afb": "II",
+     "formen": [
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen (z. B. Urteil, These, Wertung) durch Argumente stützen, die auf historischen Beispielen und anderen Belegen gründen",
+     "afb": "II",
+     "formen": [
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "historische Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen",
+     "afb": "II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen oder mehrere historische Sachverhalte in einen historischen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "historische Sachverhalte durch Wissen und Einsichten in einen Zusammenhang (Theorie, Modell, Regel, Gesetz, Funktionszusammenhang) einordnen und begründen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "wie erklären, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte historische Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "gegenüberstellen",
+     "definition": "wie skizzieren, aber zusätzlich argumentierend gewichten",
+     "afb": "II"
+    },
+    {
+     "operator": "widerlegen",
+     "definition": "Argumente dafür anführen, dass eine Behauptung zu Unrecht aufgestellt wird",
+     "afb": "II"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert historischer Sachverhalte in einem Zusammenhang bestimmen, um ohne persönlichen Wertebezug zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie Operator „beurteilen“, aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "gewonnene Analyseergebnisse synthetisieren um zu einer eigenen Deutung zu gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "sich auseinander setzen",
+     "definition": "zu einer historischen Problemstellung oder These eine Argumentation entwickeln, die zu einer begründeten Bewertung führt",
+     "afb": "III",
+     "formen": [
+      "diskutieren"
+     ]
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Aussagen (Hypothesen, Behauptungen, Urteile) an historischen Sachverhalten auf ihre Angemessenheit hin untersuchen",
+     "afb": "III",
+     "formen": [
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "auf der Grundlage von Kriterien historische Sachverhalte problembezogen gegenüberzustellen, um Gemeinsamkeiten, Unterschiede, Teil-Identitäten, Ähnlichkeiten, Abweichungen oder Gegensätze zu beurteilen",
+     "afb": "III"
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan bilingual Englisch – Die bilingualen gesellschaftswissenschaftlichen Fächer Erdkunde, Geschichte, Sozialkunde auf Englisch, Sekundarstufe I, Klassen 7-10 (gültig ab 01.08.2026), Anhang Operatoren, Ministerium für Bildung Rheinland-Pfalz, 2026",
+   "url": "https://bildung.rlp.de/lehrplaene/?tx_rlppl_download%5Baction%5D=download&tx_rlppl_download%5Bcontroller%5D=Download&tx_rlppl_download%5Bitem%5D=76442&type=432522&cHash=b8625b107908404db9b39e0d86bbf2be",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde"
+   ],
+   "stufe": "sek1",
+   "sprache": "en",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "describe",
+     "definition": "Strukturiert und fachsprachlich angemessen Materialien vorstellen und/oder Sachverhalte darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "match",
+     "definition": "Aufeinander bezogende Elemente und/oder Materialien zueinander in Beziehung bringen",
+     "afb": "I"
+    },
+    {
+     "operator": "name",
+     "definition": "Geographische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I",
+     "formen": [
+      "state",
+      "list"
+     ],
+     "zusatz": {
+      "Operator (EN)": "name/state/list"
+     }
+    },
+    {
+     "operator": "point out",
+     "definition": "Geographische Sachverhalte auf Wesentliches reduziert wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "sketch",
+     "definition": "Zusammenhänge erkennen und strukturiert formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "structure",
+     "definition": "Geographische Sachverhalte in sinnvolle Einzelaspekte oder Prozessschritte gliedern",
+     "afb": "I"
+    },
+    {
+     "operator": "summarise",
+     "definition": "Sachverhalte auf wesentliche Aspekte reduzieren, distanziert und unkommentiert wiedergeben",
+     "afb": "I",
+     "formen": [
+      "sum up",
+      "outline"
+     ],
+     "zusatz": {
+      "Operator (EN)": "summarise/sum up/outline"
+     }
+    },
+    {
+     "operator": "analyse",
+     "definition": "Materialien und geographische Sachverhalte kriterial oder aspektgeleitet erschließen und strukturiert darstellen",
+     "afb": "II",
+     "formen": [
+      "examine"
+     ],
+     "zusatz": {
+      "Operator (EN)": "analyse/examine"
+     }
+    },
+    {
+     "operator": "characterise",
+     "definition": "Geographische Sachverhalte in ihren Eigenarten beschreiben und unter bestimmten Gesichtspunkten zusammenführen",
+     "afb": "II"
+    },
+    {
+     "operator": "classify",
+     "definition": "Einem Raum oder Sachverhalt auf der Basis festgestellter Merkmale eine bestimmte Position in einem Ordnungsraster zuweisen",
+     "afb": "II"
+    },
+    {
+     "operator": "compare",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede von Sachverhalten kriterial darlegen",
+     "afb": "II"
+    },
+    {
+     "operator": "expound",
+     "definition": "Sachverhalte in ihren komplexen Beziehungen an Beispielen und/oder Theorien verdeutlichen (auf Grundlage von Kenntnissen bzw. Materialanalysen)",
+     "afb": "II",
+     "formen": [
+      "elucidate"
+     ],
+     "zusatz": {
+      "Operator (EN)": "expound/elucidate"
+     }
+    },
+    {
+     "operator": "explain",
+     "definition": "Geographische Sachverhalte so darstellen, dass Bedingungen, Ursachen, Gesetzmäßigkeiten und/oder Funktionszusammenhänge verständlich werden",
+     "afb": "II"
+    },
+    {
+     "operator": "explore",
+     "definition": "Materialien gezielt auf bestimmte Aspekte untersuchen und Zusammenhänge herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "illustrate",
+     "definition": "Wie „explain“, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "transform",
+     "definition": "Materialien von einer Darstellungsform in eine andere überführen",
+     "afb": "II"
+    },
+    {
+     "operator": "assess",
+     "definition": "Den Stellenwert von geographischen Sachverhalten oder Prozessen in einem Zusammenhang überprüfen und zu einem begründeten Sachurteil gelangen",
+     "afb": "III",
+     "formen": [
+      "judge"
+     ],
+     "zusatz": {
+      "Operator (EN)": "assess/judge"
+     }
+    },
+    {
+     "operator": "evaluate",
+     "definition": "Wie „assess/judge“, aber zusätzlich mit Offenlegen und Begründen eigener Wertmaßstäbe, die zu einem Werturteil führen",
+     "afb": "III"
+    },
+    {
+     "operator": "develop",
+     "definition": "Zu einem geographischen Sachverhalt oder Problemstellung eine Einschätzung, ein Lösungsmodell, eine Gegenposition oder ein Konzept inhaltlich weiterführend und/oder zukunftsorientiert darlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "discuss",
+     "definition": "Zu einer vorgegebenen Problemstellung eine reflektierte, abwägende Auseinandersetzung führen und zu einem begründeten Sach- und/oder Werturteil kommen",
+     "afb": "III"
+    },
+    {
+     "operator": "illustrate",
+     "definition": "Wie „explain“, aber durch zusätzliche Informationen und Beispiele verdeutlichen",
+     "afb": "III"
+    },
+    {
+     "operator": "interpret",
+     "definition": "Eine begründete Stellungnahme abgeben, die auf Analyse, Erläuterung und Bewertung beruht",
+     "afb": "III"
+    },
+    {
+     "operator": "prove",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf Grundlage eigener Kenntnisse oder mit Hilfe zusätzlicher Materialien auf sachliche Richtigkeit bzw. innerer Logik hin untersuchen",
+     "afb": "III",
+     "formen": [
+      "verify"
+     ],
+     "zusatz": {
+      "Operator (EN)": "prove/verify"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan bilingual Englisch – Die bilingualen gesellschaftswissenschaftlichen Fächer Erdkunde, Geschichte, Sozialkunde auf Englisch, Sekundarstufe I, Klassen 7-10 (gültig ab 01.08.2026), Anhang Operatoren, Ministerium für Bildung Rheinland-Pfalz, 2026",
+   "url": "https://bildung.rlp.de/lehrplaene/?tx_rlppl_download%5Baction%5D=download&tx_rlppl_download%5Bcontroller%5D=Download&tx_rlppl_download%5Bitem%5D=76442&type=432522&cHash=b8625b107908404db9b39e0d86bbf2be",
+   "belegt": "volltext",
+   "faecher": [
+    "geschichte"
+   ],
+   "stufe": "sek1",
+   "sprache": "en",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "describe",
+     "definition": "Strukturiert und fachsprachlich angemessen Materialien vorstellen und/oder Sachverhalte darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "enumerate",
+     "definition": "Zielgerichtet Informationen zusammentragen, ohne diese zu kommentieren",
+     "afb": "I"
+    },
+    {
+     "operator": "fill in",
+     "definition": "Lücken oder Leerstellen in Materialien sinnvoll und sachlich korrekt ausfüllen",
+     "afb": "I"
+    },
+    {
+     "operator": "give an account of",
+     "definition": "Kenntnisse (Sachverhalte, Fachbegriffe, Daten, Fakten, Modelle) und/oder (Teil-)Aussagen mit eigenen Worten distanziert, strukturiert und unkommentiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "list",
+     "definition": "Informationen/Sachverhalte ohne Kommentierung wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "match",
+     "definition": "Aufeinander bezogene Elemente und/oder Materialien zueinander in Beziehung bringen",
+     "afb": "I"
+    },
+    {
+     "operator": "name",
+     "definition": "Historische Sachverhalte, Probleme oder Aussagen erkennen und zutreffend formulieren",
+     "afb": "I",
+     "formen": [
+      "state"
+     ],
+     "zusatz": {
+      "Operator (EN)": "name/state"
+     }
+    },
+    {
+     "operator": "point out",
+     "definition": "Historische Sachverhalte auf Wesentliches reduzieren",
+     "afb": "I"
+    },
+    {
+     "operator": "present",
+     "definition": "Historische Entwicklungszusammenhänge und Zustände aufgrund von Quellenkenntnissen beschreiben und ggf. erklären",
+     "afb": "I",
+     "formen": [
+      "depict"
+     ],
+     "zusatz": {
+      "Operator (EN)": "present/depict"
+     }
+    },
+    {
+     "operator": "sketch",
+     "definition": "Historische Zusammenhänge erkennen und strukturiert formulieren",
+     "afb": "I"
+    },
+    {
+     "operator": "summarise",
+     "definition": "Sachverhalte auf wesentliche Aspekte reduzieren und distanziert, strukturiert sowie unkommentiert wiedergeben",
+     "afb": "I",
+     "formen": [
+      "sum up",
+      "outline"
+     ],
+     "zusatz": {
+      "Operator (EN)": "summarise/sum up/outline"
+     }
+    },
+    {
+     "operator": "analyse",
+     "definition": "Materialien und historische Sachverhalte kriterial erschließen und strukturiert darstellen",
+     "afb": "II",
+     "formen": [
+      "examine"
+     ],
+     "zusatz": {
+      "Operator (EN)": "analyse/examine"
+     }
+    },
+    {
+     "operator": "characterise",
+     "definition": "Eigenarten historischer Sachverhalte beschreiben und zusammenführen",
+     "afb": "II"
+    },
+    {
+     "operator": "compare",
+     "definition": "Gemeinsamkeiten und Unterschiede kriterial darstellen (Achtung: kann unter Umständen auch Anforderungsbereich III sein)",
+     "afb": "II"
+    },
+    {
+     "operator": "contrast",
+     "definition": "Wie „compare“, aber zusätzlich argumentierend gewichten",
+     "afb": "II"
+    },
+    {
+     "operator": "explain",
+     "definition": "Historische Sachverhalte so darstellen, dass Ursachen, Bedingungen, Gesetzmäßigkeiten und Zusammenhänge verständlich werden",
+     "afb": "II"
+    },
+    {
+     "operator": "explain and illustrate",
+     "definition": "Wie „explain“, aber durch Beispiele und zusätzliche Infos verdeutlichen",
+     "afb": "II"
+    },
+    {
+     "operator": "explore",
+     "definition": "Materialien gezielt auf bestimmte Aspekte untersuchen und Zusammenhänge herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "put into historical context",
+     "definition": "Ereignisse oder Materialien in den historischen Zusammenhang stellen",
+     "afb": "II"
+    },
+    {
+     "operator": "relate",
+     "definition": "Historische Zusammenhänge zwischen Materialien und Sachverhalten herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "show",
+     "definition": "Materialien auf bekannte Elemente hin untersuchen und belegen",
+     "afb": "II"
+    },
+    {
+     "operator": "transform",
+     "definition": "Materialien von einer Darstellungsform in eine andere überführen",
+     "afb": "II"
+    },
+    {
+     "operator": "assess",
+     "definition": "Den Stellenwert von Sachverhalten prüfen und zu einem begründeten Sachurteil gelangen",
+     "afb": "III",
+     "formen": [
+      "judge"
+     ],
+     "zusatz": {
+      "Operator (EN)": "assess/judge"
+     }
+    },
+    {
+     "operator": "comment on",
+     "definition": "Beurteilung mit Reflexion individueller Wertmaßstäbe → eigenes Urteil",
+     "afb": "III"
+    },
+    {
+     "operator": "develop",
+     "definition": "Einschätzung, Lösungsmodell, Gegenposition oder Konzept darlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "discuss (pros and cons)",
+     "definition": "Reflektierte Auseinandersetzung mit Abwägung von Pro und Contra → zu einem Urteil kommen",
+     "afb": "III"
+    },
+    {
+     "operator": "evaluate",
+     "definition": "Wie „assess“, aber unter Offenlegung eigener Wertmaßstäbe, die Pluralität einschließen",
+     "afb": "III"
+    },
+    {
+     "operator": "interpret",
+     "definition": "Sinnzusammenhänge aus Quellen erschließen und begründet Stellung nehmen",
+     "afb": "III"
+    },
+    {
+     "operator": "prove",
+     "definition": "Historische Inhalte, Vermutungen oder Hypothesen auf Richtigkeit oder Logik prüfen",
+     "afb": "III",
+     "formen": [
+      "verify"
+     ],
+     "zusatz": {
+      "Operator (EN)": "prove/verify"
+     }
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan bilingual Englisch – Die bilingualen gesellschaftswissenschaftlichen Fächer Erdkunde, Geschichte, Sozialkunde auf Englisch, Sekundarstufe I, Klassen 7-10 (gültig ab 01.08.2026), Anhang Operatoren, Ministerium für Bildung Rheinland-Pfalz, 2026",
+   "url": "https://bildung.rlp.de/lehrplaene/?tx_rlppl_download%5Baction%5D=download&tx_rlppl_download%5Bcontroller%5D=Download&tx_rlppl_download%5Bitem%5D=76442&type=432522&cHash=b8625b107908404db9b39e0d86bbf2be",
+   "belegt": "volltext",
+   "faecher": [
+    "politik"
+   ],
+   "stufe": "sek1",
+   "sprache": "en",
+   "afbLogik": "genauEiner",
+   "operatoren": [
+    {
+     "operator": "describe",
+     "definition": "Strukturiert und fachsprachlich angemessen Materialien vorstellen und/oder Sachverhalte darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "name",
+     "definition": "Ziel- und aspektgeleitet Informationen auflisten, ohne diese zu kommentieren",
+     "afb": "I"
+    },
+    {
+     "operator": "outline",
+     "definition": "Kenntnisse (Sachverhalte, Fachbegriffe, Daten, Fakten, Modelle) und/oder (Teil-)Aussagen mit eigenen Worten distanziert, strukturiert und unkommentiert darstellen",
+     "afb": "I"
+    },
+    {
+     "operator": "structure",
+     "definition": "Einen Raum, eine Zeit oder einen Sachverhalt nach selbst gewählten oder vorgegebenen Kriterien systematisierend ordnen",
+     "afb": "I"
+    },
+    {
+     "operator": "sum up",
+     "definition": "Sachverhalte auf wesentliche Aspekte reduzieren und sprachlich distanziert, strukturiert und unkommentiert wiedergeben",
+     "afb": "I",
+     "formen": [
+      "summarise"
+     ],
+     "zusatz": {
+      "Operator (EN)": "sum up/summarise"
+     }
+    },
+    {
+     "operator": "analyse",
+     "definition": "Materialien, Sachverhalte oder Räume kriterial oder aspektgeleitet erschließen und strukturiert darstellen",
+     "afb": "II",
+     "formen": [
+      "examine"
+     ],
+     "zusatz": {
+      "Operator (EN)": "analyse/examine"
+     }
+    },
+    {
+     "operator": "characterise",
+     "definition": "Sachverhalte in ihren Eigenarten beschreiben, typische Merkmale kennzeichnen und ggf. unter bestimmten Gesichtspunkten zusammenführen",
+     "afb": "II"
+    },
+    {
+     "operator": "compare",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede von Sachverhalten kriterial darlegen",
+     "afb": "II"
+    },
+    {
+     "operator": "assign",
+     "definition": "Begründet eine Position/Material zuordnen oder einen Sachverhalt in einen Zusammenhang stellen",
+     "afb": "II",
+     "formen": [
+      "put into context"
+     ],
+     "zusatz": {
+      "Operator (EN)": "assign/put into context"
+     }
+    },
+    {
+     "operator": "explain",
+     "definition": "Sachverhalte so darstellen – ggf. mit Theorien und Modellen –, dass Bedingungen, Ursachen, Gesetzmäßigkeiten und/oder Funktionszusammenhänge verständlich werden",
+     "afb": "II"
+    },
+    {
+     "operator": "explore",
+     "definition": "Materialien auf bestimmte, explizit nicht unbedingt genannte Sachverhalte hin untersuchen und Zusammenhänge herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "expound",
+     "definition": "Sachverhalte in ihren komplexen Beziehungen an Beispielen und/oder Theorien verdeutlichen (auf Grundlage von Kenntnissen bzw. Materialanalyse)",
+     "afb": "II",
+     "formen": [
+      "elucidate"
+     ],
+     "zusatz": {
+      "Operator (EN)": "expound/elucidate"
+     }
+    },
+    {
+     "operator": "assess",
+     "definition": "Den Stellenwert von Sachverhalten oder Prozessen in einem Zusammenhang bestimmen, um kriterienorientiert zu einem begründeten Sachurteil zu gelangen",
+     "afb": "III",
+     "formen": [
+      "evaluate"
+     ],
+     "zusatz": {
+      "Operator (EN)": "assess/evaluate"
+     }
+    },
+    {
+     "operator": "discuss",
+     "definition": "Zu einer vorgegebenen Problemstellung eine reflektierte, kontroverse Auseinandersetzung führen und zu einer abschließenden, begründeten Bewertung gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "develop",
+     "definition": "Zu einem Sachverhalt oder einer Problemstellung ein konkretes Lösungsmodell, eine Gegenposition, ein Lösungskonzept oder einen Regelungsentwurf begründend skizzieren",
+     "afb": "III"
+    },
+    {
+     "operator": "prove",
+     "definition": "Inhalte, Sachverhalte, Vermutungen oder Hypothesen auf Grundlage eigener Kenntnisse oder mit Hilfe zusätzlicher Materialien auf sachliche Richtigkeit bzw. innere Logik hin untersuchen",
+     "afb": "III",
+     "formen": [
+      "verify"
+     ],
+     "zusatz": {
+      "Operator (EN)": "prove/verify"
+     }
+    }
+   ]
+  }
+ ]
+}

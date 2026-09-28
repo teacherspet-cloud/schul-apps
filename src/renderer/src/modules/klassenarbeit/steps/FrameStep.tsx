@@ -33,7 +33,7 @@ import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
-import { amtlicheListe } from '../didactics/operatorenliste'
+import { amtlicheListe, anlageWunsch } from '../didactics/operatorenliste'
 import { AiStatus, CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import { suggestLevel } from '../../../shared/cefr'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -992,8 +992,8 @@ export default function FrameStep(): React.JSX.Element {
                     <Switch
                       label="Operatorenliste anhängen"
                       description={
-                        amtlicheListe(meta.stateId, meta.subjectId)
-                          ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${amtlicheListe(meta.stateId, meta.subjectId)!.quelle}) am Ende der Arbeit${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
+                        amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))
+                          ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))!.quelle}) am Ende der Arbeit${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
                           : 'Für dieses Land und Fach ist keine amtliche Operatorenliste hinterlegt – der Baustein bleibt leer'
                       }
                       checked={meta.operatorenliste ?? upperSecondary(meta)}
