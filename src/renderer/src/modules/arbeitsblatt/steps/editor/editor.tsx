@@ -1,4 +1,6 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import BlattLeveln from '../BlattLeveln'
+import LevelnMenue from '../LevelnMenue'
 import {
   IconMoodSmile,
   IconPhoto,
@@ -440,6 +442,8 @@ export function EditorStep(): React.JSX.Element {
             onRevise={(instruction) => reviseBlock(block, instruction)}
             onRegenerate={() => reviseBlock(block)}
           >
+            {/* Leveln (Großprogramm 0.4, F1): leichter, anspruchsvoller, Einfache/Leichte Sprache, GER-Stufe, DaZ-Worterklärungen */}
+            <LevelnMenue block={block} meta={ws.meta} onRevise={(instruction) => reviseBlock(block, instruction)} />
             {/*
              * Gelöstes Beispiel (Punkt 0) – auf Knopfdruck von der KI. ÖSZ 2024 empfiehlt es für
              * jede Aufgabenstellung; ob es hier trägt, entscheidet die Lehrkraft an der fertigen
@@ -589,13 +593,24 @@ export function EditorStep(): React.JSX.Element {
             vorlagenfarbe={{ checked: Boolean(ws.meta.vorlagenfarbe), onChange: (an) => update((w) => (w.meta.vorlagenfarbe = an)) }}
             ueberthema={{ werte: ws.meta, bereich: bereich?.name ?? '', onChange: (patch) => update((w) => Object.assign(w.meta, patch), 'ueberthema') }}
             vorKiTest={
-              <Checkbox
-                size="sm"
-                label="Deckblatt"
-                description="Ein Deckblatt als Seite 0 vor die Arbeitsblätter stellen – für Lehrkräfte, nicht für Lernende"
-                checked={Boolean(ws.meta.coverPage)}
-                onChange={(e) => update((w) => (w.meta.coverPage = e.currentTarget.checked))}
-              />
+              <>
+                {/* Ganzes Blatt leveln (Großprogramm 0.4, F1): jeder Lesetext eine neue Fassung, Originalquellen bleiben */}
+                <BlattLeveln
+                  bloecke={sheet.blocks}
+                  meta={ws.meta}
+                  onLeveln={(liste, instruction) => {
+                    for (const b of liste) reviseBlock(b, instruction)
+                    notifySuccess(`${liste.length} Text${liste.length === 1 ? '' : 'e'} werden umformuliert – jeweils als neue Fassung.`)
+                  }}
+                />
+                <Checkbox
+                  size="sm"
+                  label="Deckblatt"
+                  description="Ein Deckblatt als Seite 0 vor die Arbeitsblätter stellen – für Lehrkräfte, nicht für Lernende"
+                  checked={Boolean(ws.meta.coverPage)}
+                  onChange={(e) => update((w) => (w.meta.coverPage = e.currentTarget.checked))}
+                />
+              </>
             }
             kiTest={{
               an: Boolean(ws.meta.aiCanary),

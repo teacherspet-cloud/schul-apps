@@ -19,6 +19,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import LevelnMenue from '../../arbeitsblatt/steps/LevelnMenue'
 import { inhaltsanteil, zweiterTeil } from '../model/faecher'
 import {
   IconCopy,
@@ -431,7 +432,10 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               busy={laeuft}
               onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)}
               onRegenerate={() => bausteinUeberarbeiten(block)}
-            />
+            >
+              {/* Leveln (Großprogramm 0.4, F1) – etwa für eine Fassung mit Nachteilsausgleich */}
+              <LevelnMenue block={block} meta={exam.meta} onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)} />
+            </KiMenue>
             <BlockSettings block={block} combined={false} update={(fn, gruppe) => updateExam((d) => aendereBaustein(d, block.id, fn), gruppe)} />
           </>
         }
