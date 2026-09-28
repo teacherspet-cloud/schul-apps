@@ -15,6 +15,7 @@ const out = resolve(process.argv[2] ?? 'test-results/paket-teilen')
 mkdirSync(out, { recursive: true })
 const profilA = mkdtempSync(join(tmpdir(), 'schulapps-paket-a-'))
 const profilB = mkdtempSync(join(tmpdir(), 'schulapps-paket-b-'))
+const profilC = mkdtempSync(join(tmpdir(), 'schulapps-paket-c-'))
 const ablage = mkdtempSync(join(tmpdir(), 'schulapps-paket-datei-'))
 const paketDatei = join(ablage, 'Einheit 9b.schulpaket')
 
@@ -25,8 +26,8 @@ const pruefe = (ok, text) => {
   console.log(`${ok ? '  ok  ' : '  !!  '} ${text}`)
 }
 
-async function starte(userData) {
-  const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`], env: { ...process.env, SCHULAPPS_SELFTEST: '1' } })
+async function starte(userData, ...extra) {
+  const app = await electron.launch({ args: ['.', `--user-data-dir=${userData}`, ...extra], env: { ...process.env, SCHULAPPS_SELFTEST: '1' } })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
@@ -40,13 +41,32 @@ try {
   console.log('Rechner A')
   mkdirSync(join(profilA, 'hoertexte'), { recursive: true })
   writeFileSync(join(profilA, 'hoertexte', 'paket_hoertext_1.mp3'), Buffer.from([0x49, 0x44, 0x33, 1, 2, 3]))
+  // Eigenes Maskottchen (Ordner wie storage/maskottchen.ts) – ein 1×1-PNG genügt
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64')
+  mkdirSync(join(profilA, 'maskottchen', 'eule-paket'), { recursive: true })
+  writeFileSync(
+    join(profilA, 'maskottchen', 'eule-paket', 'figur.json'),
+    JSON.stringify({ id: 'eule-paket', name: 'Eule Paula', beschreibung: '', quelle: 'upload', angelegt: '2026-09-28T00:00:00.000Z' })
+  )
+  writeFileSync(join(profilA, 'maskottchen', 'eule-paket', 'vorlage.png'), PNG)
+  writeFileSync(join(profilA, 'maskottchen', 'eule-paket', 'winkend.png'), PNG)
   let { app, page } = await starte(profilA)
   await page.evaluate(async () => {
+    // Eigene Designvorlage: Kopie der Standardvorlage unter eigener Kennung
+    const vorlage = (await window.api.designs.list())[0]
+    const design = { ...vorlage, id: 'eigen-schulfarben', name: 'Schulfarben Paket', isDefault: false }
+    await window.api.designs.save(design)
     await window.api.sheets.save({
       id: 'paket-ab-1',
       name: 'Julikrise Quellenarbeit',
       stats: { subjectLabel: 'Geschichte', grade: 9, sheets: 1, tasks: 1 },
-      payload: { version: 1, meta: { title: 'Julikrise Quellenarbeit' }, sheets: [], audio: 'paket_hoertext_1.mp3' }
+      payload: {
+        version: 1,
+        meta: { title: 'Julikrise Quellenarbeit', illustrationen: { an: true, maskottchenId: 'eule-paket' } },
+        sheets: [],
+        audio: 'paket_hoertext_1.mp3',
+        design
+      }
     })
     await window.api.elternbriefe.save({ id: 'paket-eb-1', name: 'Wandertag 7b', stats: {}, payload: { version: 1, text: null } })
   })
@@ -95,14 +115,26 @@ try {
     'Elternbrief ist in seiner Bibliothek'
   )
   pruefe(existsSync(join(profilB, 'hoertexte', 'paket_hoertext_1.mp3')), 'Hörtext liegt im Ordner des zweiten Rechners')
+  pruefe(vorschau.includes('1 eigene Designvorlage') && vorschau.includes('1 eigene(s) Maskottchen'), 'Vorschau nennt Designvorlage und Maskottchen')
+  const designs = await page.evaluate(async () => (await window.api.designs.list()).map((d) => d.name))
+  pruefe(designs.includes('Schulfarben Paket'), 'Eigene Designvorlage steht beim Empfänger in der Liste')
+  const figuren = await page.evaluate(async () => (await window.api.maskottchen.list()).map((m) => `${m.name}:${Object.keys(m.posen).join('+')}`))
+  pruefe(figuren.includes('Eule Paula:winkend'), `Eigenes Maskottchen samt Pose ist da (${figuren.join(', ')})`)
   const zuletzt = await page.locator('body').innerText()
   pruefe(zuletzt.includes('Julikrise Quellenarbeit'), 'Startseite zeigt das eingelesene Material ohne Neustart')
+  await app.close()
+
+  // ---------- Rechner C: Paket per „Öffnen mit" (Datei als Startargument)
+  console.log('Rechner C')
+  ;({ app, page } = await starte(profilC, paketDatei))
+  await page.waitForSelector('[data-paket-einlesen]', { timeout: 15000 }).catch(() => null)
+  pruefe((await page.locator('[data-paket-einlesen]').count()) === 1, 'Beim Start mit Paketdatei zeigt die App das Paket von selbst')
   await app.close()
 } catch (e) {
   problems.push(`Abbruch: ${e instanceof Error ? e.message : e}`)
   console.log(e)
 } finally {
-  for (const d of [profilA, profilB, ablage]) rmSync(d, { recursive: true, force: true })
+  for (const d of [profilA, profilB, profilC, ablage]) rmSync(d, { recursive: true, force: true })
 }
 
 const echteFehler = errors.filter((e) => !/Autofill|DevTools/.test(e))

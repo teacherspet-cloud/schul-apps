@@ -158,6 +158,8 @@ function PaketEinlesen({
             <Text size="sm" c="dimmed">
               Erstellt am {erstellt.toLocaleDateString('de-DE')}
               {vorschau.hoertexte ? ` · ${vorschau.hoertexte} Hörtext(e)` : ''}
+              {vorschau.designs ? ` · ${vorschau.designs} eigene Designvorlage(n)` : ''}
+              {vorschau.maskottchen ? ` · ${vorschau.maskottchen} eigene(s) Maskottchen` : ''}
             </Text>
           )}
           <ScrollArea.Autosize mah={320} type="auto">
@@ -193,6 +195,20 @@ function PaketEinlesen({
 export default function SchulpaketKnoepfe({ eingelesen }: { eingelesen: () => void }): React.JSX.Element {
   const [erstellen, setErstellen] = useState(false)
   const [vorschau, setVorschau] = useState<PaketVorschau | null>(null)
+  /*
+   * Per Doppelklick bzw. „Öffnen mit" übergebenes Paket: beim Start einmal abholen, und wenn die
+   * App schon läuft, kommt es als Ereignis.
+   */
+  useEffect(() => {
+    window.api.paket
+      .startdatei()
+      .then((v) => v && setVorschau(v))
+      .catch((e) => notifications.show({ color: 'red', title: 'Schulpaket lässt sich nicht öffnen', message: e instanceof Error ? e.message : String(e) }))
+    return window.api.paket.onVonAussen((v) => {
+      if ('fehler' in v) notifications.show({ color: 'red', title: 'Schulpaket lässt sich nicht öffnen', message: v.fehler })
+      else setVorschau(v)
+    })
+  }, [])
   const oeffnen = async (): Promise<void> => {
     try {
       const v = await window.api.paket.oeffnen()

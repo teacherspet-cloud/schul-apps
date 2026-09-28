@@ -160,7 +160,15 @@ export default function Home(): React.JSX.Element {
 
       {!imNetz() && (
         <Group justify="flex-end" mb="xs">
-          <SchulpaketKnoepfe eingelesen={() => void ladeMaterialien().then(setMaterialien)} />
+          <SchulpaketKnoepfe
+            eingelesen={() =>
+              void ladeMaterialien().then((m) => {
+                setMaterialien(m)
+                // Eingelesenes Material gleich in die Themenbereiche einsortieren, wie jedes neue
+                void abgleichen(m.filter((x) => x.moduleId !== 'vokabelliste'))
+              })
+            }
+          />
         </Group>
       )}
 

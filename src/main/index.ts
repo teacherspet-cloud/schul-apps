@@ -73,7 +73,7 @@ import type { BereichsUebernahme, Themenbereich, Zuordnung } from '@shared/theme
 import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } from './services/storage/wartung'
 import { ladeSicherung, listeSicherungen, sichereJetzt, starteAutoSicherung } from './services/storage/autoSicherung'
 import { raeumeHoertexteAuf, verwaisteHoertexte } from './services/storage/hoertexteAufraeumen'
-import { erstellePaket, leseGeoeffnetesPaketEin, oeffnePaket } from './services/paket/wege'
+import { erstellePaket, leseGeoeffnetesPaketEin, oeffnePaket, paketAusArgumenten } from './services/paket/wege'
 import type { PaketArt } from './services/paket/paket'
 import { fangeAbstuerze, leseProtokoll, protokolliere } from './services/protokoll'
 import { mitWiederholung } from './services/ai/wiederholung'
@@ -630,6 +630,13 @@ function registerIpc(): void {
     return oeffnePaket(res.filePaths[0])
   })
   handle('paket:einlesen', () => leseGeoeffnetesPaketEin())
+  // Per Doppelklick bzw. „Öffnen mit" übergebenes Paket – die Startseite fragt einmal danach
+  let startPaket = paketAusArgumenten(process.argv)
+  handle('paket:startdatei', () => {
+    const pfad = startPaket
+    startPaket = null
+    return pfad ? oeffnePaket(pfad) : null
+  })
 
   /*
    * Mehrere Dateien in EINEN Ordner (Anlass 25.09.2026): Beim Arbeitsblatt entstanden Blatt,
@@ -716,10 +723,19 @@ const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
+      // Läuft die App schon und wird ein Schulpaket geöffnet, zeigt das Fenster seinen Inhalt
+      const paket = paketAusArgumenten(argv)
+      if (paket) {
+        try {
+          mainWindow.webContents.send('paket:vonAussen', oeffnePaket(paket))
+        } catch (err) {
+          mainWindow.webContents.send('paket:vonAussen', { fehler: err instanceof Error ? err.message : String(err) })
+        }
+      }
     }
   })
 

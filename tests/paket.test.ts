@@ -3,7 +3,17 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, describe, expect, it } from 'vitest'
-import { hoertexteIn, PAKET_ARTEN, paketBauen, paketEinlesen, paketVorschau, type Ablageweg, type PaketArt } from '../src/main/services/paket/paket'
+import {
+  designIn,
+  hoertexteIn,
+  maskottchenIn,
+  PAKET_ARTEN,
+  paketBauen,
+  paketEinlesen,
+  paketVorschau,
+  type Ablageweg,
+  type PaketArt
+} from '../src/main/services/paket/paket'
 
 /** Ablagen im Speicher – wie die echten: get wirft bei unbekannter Kennung, save legt an/überschreibt */
 function speicher(): { wege: Record<PaketArt, Ablageweg>; inhalt: Record<string, Map<string, Record<string, unknown>>> } {
@@ -119,6 +129,81 @@ describe('Schulpaket', () => {
     paketEinlesen(daten, speicher().wege, (n) => geschrieben.push(n))
     expect(geschrieben).toEqual(['ok.mp3'])
     expect(Object.keys(unzipSync(daten))).toContain('../ausbruch.txt')
+  })
+
+  it('nimmt eigene Designvorlagen und Maskottchen mit – mitgelieferte nicht', () => {
+    const eigenes = { id: 'eigen-1', name: 'Schulfarben', isDefault: true, page: { marginMm: 15 }, header: { layout: 'band' } }
+    expect(designIn({ design: eigenes })).toBe(eigenes)
+    expect(designIn({ design: { ...eigenes, id: 'preset-klassisch' } })).toBeNull()
+    expect(maskottchenIn({ illustration: { maskottchenId: 'eule-1', pose: 'winkend' }, x: { maskottchenId: 'eule-1' } })).toEqual(['eule-1'])
+
+    const q = speicher()
+    q.wege.arbeitsblatt.save({
+      id: 'ab-9',
+      name: 'Mit Eule',
+      stats: {},
+      payload: { design: eigenes, illustration: { maskottchenId: 'eule-1', pose: 'winkend' } }
+    })
+    q.wege.arbeitsblatt.save({ id: 'ab-8', name: 'Mit Fuchs', stats: {}, payload: { illustration: { maskottchenId: 'fuchs', pose: 'winkend' } } })
+    const figuren: Record<string, Record<string, Uint8Array>> = {
+      'eule-1': {
+        'figur.json': strToU8('{"id":"eule-1","name":"Eule"}'),
+        'vorlage.png': new Uint8Array([1]),
+        'winkend.png': new Uint8Array([2]),
+        'boese.exe': new Uint8Array([3])
+      }
+    }
+    const daten = paketBauen(
+      'Design',
+      [
+        { art: 'arbeitsblatt', id: 'ab-9' },
+        { art: 'arbeitsblatt', id: 'ab-8' }
+      ],
+      q.wege,
+      pfad,
+      new Date(),
+      { maskottchenDateien: (id) => figuren[id] ?? null }
+    )
+    const v = paketVorschau(daten)
+    expect(v.designs).toBe(1)
+    expect(v.maskottchen).toBe(1)
+    expect(
+      Object.keys(unzipSync(daten))
+        .filter((n) => n.startsWith('maskottchen/'))
+        .sort()
+    ).toEqual(['maskottchen/eule-1/figur.json', 'maskottchen/eule-1/vorlage.png', 'maskottchen/eule-1/winkend.png'])
+
+    const designs: Record<string, unknown>[] = []
+    const neueFiguren: Record<string, string[]> = {}
+    paketEinlesen(daten, speicher().wege, () => undefined, {
+      design: (d) => designs.push(d),
+      maskottchen: (id, teile) => (neueFiguren[id] = Object.keys(teile).sort())
+    })
+    expect(designs.map((d) => d.id)).toEqual(['eigen-1'])
+    expect(neueFiguren).toEqual({ 'eule-1': ['figur.json', 'vorlage.png', 'winkend.png'] })
+  })
+
+  it('übernimmt keine Maskottchen-Dateien mit fremden Namen', () => {
+    const manifest = {
+      app: 'schul-apps',
+      typ: 'schulpaket',
+      version: 1,
+      titel: 'x',
+      erstellt: '',
+      eintraege: [{ art: 'arbeitsblatt', name: 'x', datei: 'material/1.json' }],
+      hoertexte: []
+    }
+    const daten = zipSync({
+      'manifest.json': strToU8(JSON.stringify(manifest)),
+      'material/1.json': strToU8(JSON.stringify({ name: 'x', payload: {} })),
+      'maskottchen/eule/figur.json': strToU8('{}'),
+      'maskottchen/eule/../../boese.png': new Uint8Array([1]),
+      'maskottchen/eule/skript.js': strToU8('x'),
+      'maskottchen/ohne-figur/pose.png': new Uint8Array([1])
+    })
+    const neueFiguren: Record<string, string[]> = {}
+    paketEinlesen(daten, speicher().wege, () => undefined, { maskottchen: (id, teile) => (neueFiguren[id] = Object.keys(teile)) })
+    expect(neueFiguren).toEqual({ eule: ['figur.json'] })
   })
 
   it('lehnt kaputte, fremde und unvollständige Dateien verständlich ab', () => {

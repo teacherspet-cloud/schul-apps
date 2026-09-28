@@ -104,6 +104,8 @@ export interface PaketVorschau {
   erstellt: string
   eintraege: { art: PaketArt; name: string }[]
   hoertexte: number
+  designs: number
+  maskottchen: number
 }
 
 export interface SavedDokumentMeta {
@@ -170,7 +172,11 @@ export function buildApi(call: Call, extras: ApiExtras) {
     paket: {
       erstellen: (titel: string, auswahl: { art: PaketArt; id: string }[]) => call<string | null>('paket:erstellen', titel, auswahl),
       oeffnen: () => call<PaketVorschau | null>('paket:oeffnen'),
-      einlesen: () => call<{ art: PaketArt; id: string; name: string }[]>('paket:einlesen')
+      einlesen: () => call<{ art: PaketArt; id: string; name: string }[]>('paket:einlesen'),
+      /** Beim Start per „Öffnen mit" übergebenes Paket (einmal) */
+      startdatei: () => call<PaketVorschau | null>('paket:startdatei'),
+      /** Paket, das geöffnet wurde, während die App schon lief */
+      onVonAussen: (cb: (v: PaketVorschau | { fehler: string }) => void) => extras.subscribe('paket:vonAussen', cb as (value: unknown) => void)
     },
     protokoll: {
       melden: (text: string) => call<void>('protokoll:melden', text),
