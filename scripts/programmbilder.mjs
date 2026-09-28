@@ -5,7 +5,7 @@
 //
 // Im Quellordner liegen die gewählten Bilder als <id>.png, also vokabeltest.png,
 // vokabelliste.png, arbeitsblatt.png, lernzielkontrolle.png, grammatiktest.png,
-// klassenarbeit.png. Fehlende werden übersprungen – die Kachel zeigt dann weiter das
+// klassenarbeit.png, rueckmeldung.png, elternbrief.png. Fehlende werden übersprungen – die Kachel zeigt dann weiter das
 // Vektorsymbol (modules/registry.ts findet die Bilder von selbst).
 //
 // Was passiert (Paket 9, 26.09.2026):
@@ -22,7 +22,7 @@ import { app, BrowserWindow } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 
-const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit']
+const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit', 'rueckmeldung', 'elternbrief']
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320
 const KANTE_LEISTE = 96

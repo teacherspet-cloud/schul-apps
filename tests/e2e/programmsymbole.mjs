@@ -25,11 +25,10 @@ mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-symbole-'))
 const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung', 'Elternbriefe']
 /*
- * Programme ohne eigene Illustration (Großprogramm 0.4: Rückmeldung, Elternbrief) zeigen ihr
- * gezeichnetes Symbol. Eine Illustration entstünde über die Bild-KI der Lehrkraft – das kostet
- * Kontingent und bleibt ihre Entscheidung.
+ * Programme ohne eigene Illustration zeigen ihr gezeichnetes Symbol. Seit dem 28.09.2026 haben
+ * alle acht eine (Rückmeldung und Elternbriefe über den ChatGPT-Zugang der App erzeugt).
  */
-const OHNE_BILD = ['Rückmeldung', 'Elternbriefe']
+const OHNE_BILD = []
 
 const problems = []
 const pruefe = (ok, text) => {
