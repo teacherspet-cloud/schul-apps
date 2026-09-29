@@ -1,148 +1,100 @@
-import { Box, Button, Group, Stack, Text } from '@mantine/core'
-import { IconMapPinPlus } from '@tabler/icons-react'
 import { useRef, useState } from 'react'
-import type { Korrekturzeichen } from '../../../shared/korrekturzeichen'
 import { newId } from '../../vokabeltest/model/random'
-import { klemme, scanReihenfolge } from '../korrekturrand'
-import type { Abgabe, RandKommentar } from '../model/types'
-import { ART_FARBE, KommentarZeile } from './RandEditor'
+import { klemme, type NummerierterKommentar } from '../korrekturrand'
+import { RandNotiz } from './RandEditor'
+import { useBlatt } from './blattTeile'
 
 /**
- * Kommentare neben dem eingescannten Schülertext (29.09.2026, abgestimmt: „halbautomatisch,
- * zum Feinjustieren ziehbar"): Die KI setzt nummerierte Marker ungefähr an die Stelle; hier
- * lassen sie sich mit der Maus oder dem Finger genau hinziehen. Mit „Marker setzen" und einem
- * Klick ins Bild entsteht ein eigener Kommentar an dieser Stelle.
+ * Kommentare am eingescannten Schülertext – als Seite des A4-Blatts (29.09.2026, abgestimmt:
+ * „halbautomatisch, zum Feinjustieren ziehbar"): Die KI setzt nummerierte Marker ungefähr an die
+ * Stelle; hier lassen sie sich mit der Maus oder dem Finger genau hinziehen. Ist „Marker setzen"
+ * an (Leiste über dem Blatt), entsteht mit einem Klick ins Bild eine neue Notiz an dieser Stelle.
+ * Die Notizen stehen am Korrekturrand daneben und sind dort direkt bearbeitbar.
  */
 export default function ScanEditor({
-  a,
-  zeichen,
-  setzeRand
+  seite,
+  src,
+  notizen,
+  markerSetzen,
+  gesetzt
 }: {
-  a: Abgabe
-  zeichen: Korrekturzeichen[]
-  setzeRand: (fn: (rand: RandKommentar[]) => void, gruppe?: string) => void
+  seite: number
+  src: string
+  notizen: NummerierterKommentar[]
+  markerSetzen: boolean
+  /** Nach dem Setzen eines Markers (schaltet „Marker setzen" wieder aus) */
+  gesetzt: () => void
 }): React.JSX.Element {
-  const rand = a.bogen?.rand ?? []
-  const reihe = scanReihenfolge(rand)
-  const nummer = new Map(reihe.map((g) => [g.k.id, g.nr]))
-  const [setzen, setSetzen] = useState(false)
+  const c = useBlatt()
   const [zieht, setZieht] = useState<string | null>(null)
-  const flaechen = useRef<(HTMLDivElement | null)[]>([])
+  const flaeche = useRef<HTMLDivElement>(null)
 
-  const lage = (s: number, e: React.PointerEvent | React.MouseEvent): { x: number; y: number } | null => {
-    const el = flaechen.current[s]
+  const lage = (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } | null => {
+    const el = flaeche.current
     if (!el) return null
     const b = el.getBoundingClientRect()
     return { x: klemme(((e.clientX - b.left) / b.width) * 100), y: klemme(((e.clientY - b.top) / b.height) * 100) }
   }
 
-  const index = (id: string): number => rand.findIndex((k) => k.id === id)
-
   return (
-    <Stack gap="sm" data-rm-scan>
-      <Group justify="space-between">
-        <Text size="xs" c="dimmed">
-          Marker ziehen, um sie genau an die Stelle zu setzen.
-        </Text>
-        <Button
-          size="compact-xs"
-          variant={setzen ? 'filled' : 'light'}
-          leftSection={<IconMapPinPlus size={14} />}
-          onClick={() => setSetzen((x) => !x)}
-          data-rm-marker-setzen
+    <div className="bl-block bl-scan" data-rm-scan>
+      <div className="bl-text">
+        <div
+          ref={flaeche}
+          className="bl-scanbild"
+          style={{ cursor: markerSetzen ? 'crosshair' : undefined, touchAction: zieht ? 'none' : undefined, userSelect: 'none' }}
+          onClick={(e) => {
+            if (!markerSetzen) return
+            const p = lage(e)
+            if (!p) return
+            const id = newId()
+            c.setzeRand((r) => r.push({ id, zitat: '', text: '', art: 'fehler', seite, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, gesetzt: true }))
+            c.setFokus(id)
+            gesetzt()
+          }}
+          data-scan-seite={seite}
         >
-          {setzen ? 'Jetzt ins Bild klicken …' : 'Marker setzen'}
-        </Button>
-      </Group>
-      {(a.scans ?? []).map((src, s) => {
-        const hier = reihe.filter((g) => (g.k.seite ?? 0) === s)
-        return (
-          <Group key={s} gap="md" align="flex-start" wrap="nowrap">
-            <Box
-              ref={(el: HTMLDivElement | null) => {
-                flaechen.current[s] = el
+          <img src={src} alt={`Seite ${seite + 1}`} draggable={false} />
+          {notizen.map(({ nr, k }) => (
+            <span
+              key={k.id}
+              className={`bl-marker ${k.art} rm-marker`}
+              style={{ left: `${k.x ?? 50}%`, top: `${k.y ?? 50}%` }}
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+                setZieht(k.id)
               }}
-              pos="relative"
-              style={{ width: '62%', flex: 'none', cursor: setzen ? 'crosshair' : undefined, touchAction: zieht ? 'none' : undefined, userSelect: 'none' }}
-              onClick={(e) => {
-                if (!setzen) return
-                const p = lage(s, e)
-                if (!p) return
-                setzeRand((r) => r.push({ id: newId(), zitat: '', text: '', art: 'hinweis', seite: s, x: p.x, y: p.y, gesetzt: true }))
-                setSetzen(false)
+              onPointerMove={(e) => {
+                if (zieht !== k.id) return
+                const p = lage(e)
+                if (p)
+                  c.setzeRand((r) => {
+                    const x = r.find((y) => y.id === k.id)
+                    if (!x) return
+                    x.x = Math.round(p.x * 10) / 10
+                    x.y = Math.round(p.y * 10) / 10
+                    x.gesetzt = true
+                  }, `marker-${k.id}`)
               }}
-              data-scan-seite={s}
+              onPointerUp={(e) => {
+                ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+                setZieht(null)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Marker ${nr}`}
+              data-marker={nr}
             >
-              <img src={src} alt={`Seite ${s + 1}`} style={{ width: '100%', display: 'block', border: '1px solid var(--mantine-color-default-border)' }} draggable={false} />
-              {hier.map(({ nr, k }) => (
-                <Box
-                  key={k.id}
-                  pos="absolute"
-                  style={{
-                    left: `${k.x ?? 50}%`,
-                    top: `${k.y ?? 50}%`,
-                    transform: 'translate(-50%, -50%)',
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    background: ART_FARBE[k.art],
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 0 0 2px #fff, 0 1px 4px rgba(0,0,0,.4)',
-                    cursor: 'grab',
-                    touchAction: 'none'
-                  }}
-                  onPointerDown={(e) => {
-                    e.stopPropagation()
-                    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                    setZieht(k.id)
-                  }}
-                  onPointerMove={(e) => {
-                    if (zieht !== k.id) return
-                    const p = lage(s, e)
-                    const i = index(k.id)
-                    if (p && i >= 0)
-                      setzeRand((r) => {
-                        r[i].x = Math.round(p.x * 10) / 10
-                        r[i].y = Math.round(p.y * 10) / 10
-                        r[i].gesetzt = true
-                      }, `marker-${k.id}`)
-                  }}
-                  onPointerUp={(e) => {
-                    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-                    setZieht(null)
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Marker ${nr}`}
-                  data-marker={nr}
-                >
-                  {nr}
-                </Box>
-              ))}
-            </Box>
-            <Stack gap="xs" style={{ flex: 1 }}>
-              <Text size="xs" c="dimmed">
-                Seite {s + 1}
-              </Text>
-              {hier.map(({ nr, k }) => (
-                <KommentarZeile
-                  key={k.id}
-                  nr={nummer.get(k.id) ?? nr}
-                  k={k}
-                  zeichen={zeichen}
-                  mitZitat={false}
-                  aendern={(fn, gruppe) => setzeRand((r) => fn(r[index(k.id)]), gruppe)}
-                  entfernen={() => setzeRand((r) => r.splice(index(k.id), 1))}
-                />
-              ))}
-            </Stack>
-          </Group>
-        )
-      })}
-    </Stack>
+              {nr}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="bl-rand">
+        {notizen.map((g) => (
+          <RandNotiz key={g.k.id} g={g} />
+        ))}
+      </div>
+    </div>
   )
 }

@@ -42,9 +42,13 @@ writeFileSync(
         erwartung: '',
         fach: 'deutsch',
         jahrgang: 9,
-        erkennbar: ['Kopfzeile: Deutsch 9a']
+        erkennbar: ['Kopfzeile: Deutsch 9a'],
+        // Teile der Arbeit (29.09.2026) – Pflichtfeld des Schemas, sonst fragt die App ein zweites Mal
+        teile: [{ titel: 'Erörterung', art: 'sonstig', gewichtProzent: 0, punkte: 0, inhaltProzent: 0, ergebnisSprache: '' }]
       },
-      rueckmeldung_erwartung: { erwartung: '- Einleitung mit Hinführung\n- Pro- und Kontra-Argumente mit Beispielen\n- eigenes Urteil' }
+      rueckmeldung_erwartung: { erwartung: '- Einleitung mit Hinführung\n- Pro- und Kontra-Argumente mit Beispielen\n- eigenes Urteil' },
+      // Zauberstab am A4-Blatt (29.09.2026): eine Stelle neu – nur sie wird ersetzt
+      rueckmeldung_stelle: { schluss: 'Neuer Schlusssatz vom Zauberstab.' }
     }
   })
 )
@@ -101,7 +105,7 @@ try {
   pruefe(a.length === 1, 'Eine Anfrage für den Bogen')
   pruefe(a.length === 1 && !/Lea|Schmidt|Jonas/.test(a[0].user) && a[0].user.includes('S1'), 'Die KI sieht nur Kürzel – auch Namen im Text sind ersetzt')
   pruefe(a.length === 1 && /KEINE Note, KEINE Punkte/.test(a[0].user), 'Die Anfrage verbietet Noten und Punkte')
-  await page.getByText('Rückmeldung für Lea Schmidt').waitFor({ timeout: 10000 })
+  await page.getByText('Rückmeldung für Lea Schmidt').first().waitFor({ timeout: 10000 })
   pruefe(true, 'Die Ansicht zeigt den Namen – eingesetzt am Rechner')
   await page.screenshot({ path: join(out, 'boegen.png') })
 
@@ -146,11 +150,95 @@ try {
   pruefe(Boolean(b2) && /Lehrkraft vergibt die Einstufung/.test(b2.user), 'Die KI schlägt nur vor')
   await page.locator('[data-rm-rand]').filter({ visible: true }).first().waitFor({ timeout: 10000 })
   pruefe(true, 'Der Korrekturrand steht im Bogen')
+  // ---------- A4-Blatt (29.09.2026): Schülertext oben mit Randnotizen, Kasten darunter
+  const blatt = page.locator('[data-rm-blatt]').filter({ visible: true }).first()
+  await blatt.waitFor({ timeout: 10000 })
+  pruefe((await blatt.locator('.bl-notiz').count()) === 2, 'Zwei Randnotizen stehen am Rand des Blatts')
+  pruefe((await blatt.locator('.bl-m.lob').count()) === 1 && (await blatt.locator('.bl-notiz.lob .bl-haken').count()) === 1, 'Lob grün angestrichen, Häkchen am Rand')
+  pruefe((await blatt.getByText('Rückmeldung für Lea Schmidt').count()) === 1, 'Der Kasten „Rückmeldung für …" steht unter dem Text')
+  const reihenfolge = await blatt.evaluate((el) => {
+    const y = (s) => el.querySelector(s)?.getBoundingClientRect().top ?? -1
+    return [y('.bl-kopf'), y('.bl-abs'), y('.bl-k.erst')]
+  })
+  pruefe(reihenfolge[0] >= 0 && reihenfolge[0] < reihenfolge[1] && reihenfolge[1] < reihenfolge[2], 'Kopf, dann Schülertext, dann Feedback')
+  const hand = await blatt.locator('.bl-notiz').first().evaluate((el) => getComputedStyle(el).fontFamily)
+  pruefe(/Ink Free|Segoe Print|Comic Sans/.test(hand), `Randnotizen in Handschrift-Anmutung (${hand})`)
+  await blatt.screenshot({ path: join(out, 'blatt.png') })
+  // Direkt auf dem Blatt bearbeiten: Klick in eine Stärke, tippen
+  const staerke = blatt.locator('.bl-staerken [data-rm-edit]').first()
+  await staerke.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' Prima.')
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  const st = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen?.staerken?.[0] ?? '')
+  pruefe(st.endsWith('Prima.') && !/Lea/.test(st), `Stärke direkt auf dem Blatt geändert – gespeichert mit Kürzel („${st}")`)
+  // Text markieren → Notiz
+  await blatt.locator('.bl-text[data-absatz="0"]').evaluate((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+    let n
+    while ((n = walker.nextNode())) {
+      const i = n.textContent.indexOf('brauchen')
+      if (i >= 0) {
+        const range = document.createRange()
+        range.setStart(n, i)
+        range.setEnd(n, i + 'brauchen'.length)
+        const sel = window.getSelection()
+        sel.removeAllRanges()
+        sel.addRange(range)
+        break
+      }
+    }
+    el.closest('section').dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+  })
+  await page.locator('[data-rm-auswahl]').waitFor({ timeout: 5000 })
+  await page.locator('[data-rm-notiz-neu="fehler"]').click()
+  await page.waitForTimeout(200)
+  await page.keyboard.type('Wortwahl prüfen')
+  await page.waitForTimeout(300)
+  const rand3 = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen?.rand ?? [])
+  pruefe(rand3.length === 3 && rand3.some((k) => k.zitat === 'brauchen' && k.text === 'Wortwahl prüfen'), 'Markierte Stelle wird zur Randnotiz')
+  pruefe((await blatt.locator('.bl-notiz').count()) === 3, 'Die neue Notiz steht am Rand')
+  // Export-Sperre: PDF mit unbestätigter Einstufung → Fenster
+  await sichtbar(page.locator('[data-rm-pdf]')).click()
+  const sperre = page.locator('[data-rm-sperre-weiter]').filter({ visible: true })
+  await sperre.waitFor({ timeout: 5000 }).catch(() => undefined)
+  pruefe((await sperre.count()) === 1, 'Vor dem PDF erscheint die Sperre mit der offenen Einstufung')
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: join(out, 'export-sperre.png') })
+  await page.getByRole('button', { name: 'Abbrechen' }).filter({ visible: true }).first().click()
+  await page.waitForTimeout(300)
   await sichtbar(page.locator('[data-rm-bestaetigen]')).click()
   await page.waitForTimeout(300)
   const best = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen?.gesamt?.bestaetigt ?? false)
   pruefe(best === true, 'Die Lehrkraft bestätigt die Einstufung')
   await page.screenshot({ path: join(out, 'boegen-2.png') })
+  // Zauberstab: nur der Schlusssatz wird ersetzt
+  const vorher = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen)
+  await sichtbar(page.locator('[data-rm-stab="schluss"]')).click()
+  await sichtbar(page.locator('[data-rm-stab-modus="ueberarbeiten"]')).click()
+  const ende5 = Date.now() + 15000
+  let nachher = null
+  while (Date.now() < ende5) {
+    nachher = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen)
+    if (nachher?.schluss === 'Neuer Schlusssatz vom Zauberstab.') break
+    await page.waitForTimeout(300)
+  }
+  pruefe(nachher?.schluss === 'Neuer Schlusssatz vom Zauberstab.', 'Zauberstab ersetzt den Schlusssatz')
+  pruefe(JSON.stringify(nachher?.staerken) === JSON.stringify(vorher?.staerken) && nachher?.rand?.length === vorher?.rand?.length, 'Der Rest des Bogens bleibt')
+  const stelleAnfrage = anfragen().filter((z) => z.schemaName === 'rueckmeldung_stelle').pop()
+  pruefe(Boolean(stelleAnfrage) && !/Lea|Schmidt/.test(stelleAnfrage.user) && /BISHERIGE FASSUNG/.test(stelleAnfrage.user), 'Die Anfrage des Zauberstabs kennt nur Kürzel')
+  // PDF ohne Sperre (bestätigt) – Datei entsteht
+  const pdfPfad = join(out, 'blatt-app.pdf')
+  rmSync(pdfPfad, { force: true })
+  await app.evaluate(({ dialog }, pfad) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: pfad })
+  }, pdfPfad)
+  await sichtbar(page.locator('[data-rm-pdf]')).click()
+  const ende6 = Date.now() + 20000
+  while (Date.now() < ende6 && !existsSync(pdfPfad)) await page.waitForTimeout(300)
+  pruefe(existsSync(pdfPfad), 'Nach der Bestätigung entsteht das PDF ohne Rückfrage')
+  await page.locator('[data-rm-blatt]').filter({ visible: true }).first().screenshot({ path: join(out, 'blatt-2.png') })
   await sichtbar(page.locator('[data-rm-ansicht]').getByText('Lerngruppe')).click()
   await page.locator('[data-rm-uebersicht]').filter({ visible: true }).first().waitFor({ timeout: 5000 })
   pruefe((await page.getByText('Belege fehlen', { exact: false }).filter({ visible: true }).count()) > 0, 'Das Fehlerprofil zeigt den Schwerpunkt')
@@ -232,7 +320,7 @@ try {
   pruefe(rm?.meta?.subjectId === 'deutsch' && rm?.meta?.grade === 9, 'Fach und Jahrgang aus dem Material übernommen')
   pruefe((await page.locator('[data-rm-erkannt]').filter({ visible: true }).count()) === 1, 'Hinweis „aus dem Material erkannt“ steht bei der Lerngruppe')
   const aufgabeAnfragen = anfragen().filter((z) => z.schemaName === 'rueckmeldung_aufgabe')
-  pruefe(aufgabeAnfragen.length === 1 && aufgabeAnfragen[0].user.includes('Schuluniform'), 'Die Datei ging an die KI')
+  pruefe(aufgabeAnfragen.length === 1 && aufgabeAnfragen[0].user.includes('Schuluniform'), `Die Datei ging an die KI (${aufgabeAnfragen.length} Anfrage[n]: ${aufgabeAnfragen.map((a) => JSON.stringify(a.user.slice(-50))).join(' | ')})`)
   pruefe((await page.getByText('Zu jeder Abgabe ein Bogen').count()) === 0, 'Der lange Einleitungstext ist weg')
   await page.screenshot({ path: join(out, 'eigene-aufgabe.png') })
 } catch (e) {

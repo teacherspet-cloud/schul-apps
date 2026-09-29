@@ -307,18 +307,21 @@ describe('Ausgabe', () => {
   )
 
   it('unbestätigte Einstufung steht nicht im Ausdruck, bestätigte schon', () => {
-    expect(boegenHtml(r, r.abgaben)).not.toMatch(/class="einstufung"/)
+    expect(boegenHtml(r, r.abgaben)).not.toMatch(/class="bl-note/)
     const bestaetigt = structuredClone(r)
     bestaetigt.abgaben[0].bogen!.gesamt = { ...gesamt, bestaetigt: true }
-    expect(boegenHtml(bestaetigt, bestaetigt.abgaben)).toMatch(/2 \(gut\)/)
+    // Kopf des Blatts: Wert eingekreist, Bezeichnung darunter
+    expect(boegenHtml(bestaetigt, bestaetigt.abgaben)).toMatch(/<small>Note<\/small><span class="bl-note-wert">2<\/span><br><span class="bl-note-text">gut<\/span>/)
   })
 
   it('Korrekturrand, Legende, Großdruck – der Nachteilsausgleich selbst steht nicht auf dem Bogen', () => {
     const html = boegenHtml(r, r.abgaben, { zeichen: zeichenFuer('deutsch') })
-    expect(html).toMatch(/table class="korrektur"/)
-    expect(html).toMatch(/<mark class="fehler">Fehlr<\/mark><sup>1<\/sup>/)
+    // Schülertext oben mit Korrekturrand: Stelle angestrichen und nummeriert, Verbesserung am Rand
+    expect(html).toMatch(/<div class="bl-block bl-abs"><div class="bl-text">Lea schreibt einen Satz mit <span class="bl-m fehler">Fehlr<\/span><sup class="bl-nr-t ">1<\/sup>/)
+    expect(html).toMatch(/<div class="bl-notiz fehler"><span class="bl-nr">1<\/span><span class="bl-zeichen">R:<\/span>Fehler<\/div>/)
+    expect(html.indexOf('bl-abs')).toBeLessThan(html.indexOf('bl-k erst'))
     expect(html).toMatch(/R = Rechtschreibung/)
-    expect(html).toMatch(/class="seite gross"/)
+    expect(html).toMatch(/class="blatt seite gross"/)
     expect(html).toMatch(/Lea schreibt einen Satz/)
     expect(html).not.toMatch(/Notenschutz|Nachteilsausgleich/)
   })

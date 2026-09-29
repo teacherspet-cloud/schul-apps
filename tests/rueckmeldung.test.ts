@@ -94,7 +94,7 @@ describe('Rückmeldung', () => {
     expect(html).toContain('Lea gliedert klar.')
     expect(html).toContain('Das gelingt dir schon')
     // Abgaben ohne Bogen erscheinen nicht
-    expect(html.match(/class="seite"/g)).toHaveLength(1)
+    expect(html.match(/<section class="blatt/g)).toHaveLength(1)
   })
 })
 

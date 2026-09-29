@@ -159,3 +159,15 @@ describe('Bogen', () => {
     expect(boegenHtml(r, r.abgaben)).not.toMatch(/Inhalt 80 %/)
   })
 })
+
+describe('Voreinstellung Inhalt : Sprache nach Land (Recherche 29.09.2026)', () => {
+  it('40 : 60 als Regel, belegte Abweichungen in der Sek I', async () => {
+    const { inhaltVorgabe } = await import('../src/renderer/src/modules/rueckmeldung/teilbewertung')
+    expect(inhaltVorgabe('NW', 8, 'schreiben').inhalt).toBe(40)
+    expect(inhaltVorgabe('SL', 6, 'schreiben').inhalt).toBe(25)
+    expect(inhaltVorgabe('SL', 9, 'schreiben').inhalt).toBe(40)
+    expect(inhaltVorgabe('ST', 6, 'schreiben').inhalt).toBe(50)
+    expect(inhaltVorgabe('BY', 10, 'schreiben', 'realschule').inhalt).toBe(23)
+    expect(inhaltVorgabe('BB', 7, 'sprachmittlung').inhalt).toBe(40)
+  })
+})

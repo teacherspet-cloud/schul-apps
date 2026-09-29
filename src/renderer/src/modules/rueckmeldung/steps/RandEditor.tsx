@@ -1,186 +1,148 @@
-import { ActionIcon, Badge, Box, Button, Group, Select, Stack, Text, Textarea, TextInput } from '@mantine/core'
-import { IconPlus, IconTrash } from '@tabler/icons-react'
+import { ActionIcon, Menu, Tooltip } from '@mantine/core'
+import { IconCheck, IconCursorText, IconTrash } from '@tabler/icons-react'
 import { Fragment } from 'react'
-import type { Korrekturzeichen } from '../../../shared/korrekturzeichen'
-import { newId } from '../../vokabeltest/model/random'
-import { mitName } from '../ausgabe'
-import { randLayout } from '../korrekturrand'
-import type { Abgabe, RandKommentar } from '../model/types'
+import { markenStil } from '../blattLayout'
+import type { NummerierterKommentar, Textteil } from '../korrekturrand'
+import type { RandKommentar } from '../model/types'
+import { Editierbar, useBlatt, Zauberstab } from './blattTeile'
 
-export const ART_FARBE: Record<RandKommentar['art'], string> = { fehler: '#c62828', lob: '#2e7d32', hinweis: '#1565c0' }
-export const ARTEN = [
+export const ART_FARBE: Record<RandKommentar['art'], string> = { fehler: '#c62828', lob: '#2e7d32', hinweis: '#c62828' }
+export const ARTEN: { value: RandKommentar['art']; label: string }[] = [
   { value: 'fehler', label: 'Fehler' },
   { value: 'lob', label: 'Lob' },
   { value: 'hinweis', label: 'Hinweis' }
 ]
 
-/** Eine Zeile der Kommentarliste – für Korrekturrand und Scan gleich */
-export function KommentarZeile({
-  nr,
-  k,
-  zeichen,
-  aendern,
-  entfernen,
-  mitZitat = true,
-  gefunden = true
-}: {
-  nr: number
-  k: RandKommentar
-  zeichen: Korrekturzeichen[]
-  aendern: (fn: (k: RandKommentar) => void, gruppe?: string) => void
-  entfernen: () => void
-  mitZitat?: boolean
-  gefunden?: boolean
-}): React.JSX.Element {
+/**
+ * Eine Randnotiz auf dem Blatt (29.09.2026): Nummer, Häkchen bzw. Korrekturzeichen und Text in
+ * Handschrift – der Text direkt bearbeitbar. Ein Klick auf die Nummer öffnet Art, Korrekturzeichen,
+ * „Textstelle neu markieren" und Löschen; daneben der Zauberstab.
+ */
+export function RandNotiz({ g, verschieben }: { g: NummerierterKommentar; verschieben?: (id: string) => void }): React.JSX.Element {
+  const c = useBlatt()
+  const k = g.k
+  const aendern = (fn: (x: RandKommentar) => void, gruppe?: string): void =>
+    c.setzeRand((rand) => {
+      const x = rand.find((y) => y.id === k.id)
+      if (x) fn(x)
+    }, gruppe)
+  const loeschen = (): void =>
+    c.setzeRand((rand) => {
+      const i = rand.findIndex((y) => y.id === k.id)
+      if (i >= 0) rand.splice(i, 1)
+    })
+  const stelle = { art: 'rand' as const, id: k.id }
   return (
-    <Group gap={6} wrap="nowrap" align="flex-start" data-rand-kommentar>
-      <Badge size="sm" circle style={{ background: ART_FARBE[k.art], flex: 'none' }} mt={4}>
-        {nr}
-      </Badge>
-      <Stack gap={2} style={{ flex: 1 }}>
-        <Group gap={4} wrap="nowrap">
-          <Select
-            size="xs"
-            w={92}
-            data={ARTEN}
-            value={k.art}
-            onChange={(v) => v && aendern((x) => (x.art = v as RandKommentar['art']))}
-            allowDeselect={false}
-            aria-label="Art"
-          />
-          <Select
-            size="xs"
-            w={86}
-            placeholder="Zeichen"
-            data={zeichen.filter((z) => z.zeichen).map((z) => ({ value: z.zeichen, label: z.zeichen }))}
-            value={k.zeichen ?? null}
-            onChange={(v) =>
-              aendern((x) => {
-                if (v) x.zeichen = v
-                else delete x.zeichen
-              })
-            }
-            clearable
-            aria-label="Korrekturzeichen"
-          />
-          {mitZitat && (
-            <TextInput
-              size="xs"
-              style={{ flex: 1 }}
-              value={k.zitat}
-              placeholder="Textstelle (wörtlich)"
-              error={!gefunden}
-              onChange={(e) => {
-                const v = e.currentTarget.value
-                aendern((x) => (x.zitat = v), `zitat-${k.id}`)
-              }}
-              aria-label="Textstelle"
-            />
+    <div className={`bl-notiz ${k.art} rm-notiz${c.laeuft(stelle) ? ' rm-laeuft' : ''}`} data-rand-kommentar data-notiz={k.id}>
+      <Menu position="bottom-start" width={230} withinPortal>
+        <Menu.Target>
+          <span className="bl-nr rm-klick" role="button" tabIndex={0} aria-label={`Notiz ${g.nr}: Art und Zeichen`}>
+            {g.nr}
+          </span>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>Art</Menu.Label>
+          {ARTEN.map((x) => (
+            <Menu.Item key={x.value} leftSection={k.art === x.value ? <IconCheck size={14} /> : <span style={{ width: 14 }} />} onClick={() => aendern((y) => (y.art = x.value))}>
+              {x.label}
+            </Menu.Item>
+          ))}
+          <Menu.Label>Korrekturzeichen</Menu.Label>
+          <div className="rm-zeichenwahl">
+            <button type="button" className={!k.zeichen ? 'aktiv' : ''} onClick={() => aendern((y) => delete y.zeichen)}>
+              –
+            </button>
+            {c.zeichen
+              .filter((z) => z.zeichen)
+              .map((z) => (
+                <Tooltip key={z.zeichen} label={z.bedeutung} withinPortal>
+                  <button type="button" className={k.zeichen === z.zeichen ? 'aktiv' : ''} onClick={() => aendern((y) => (y.zeichen = z.zeichen))}>
+                    {z.zeichen}
+                  </button>
+                </Tooltip>
+              ))}
+          </div>
+          <Menu.Divider />
+          {verschieben && (
+            <Menu.Item leftSection={<IconCursorText size={14} />} onClick={() => verschieben(k.id)} data-rm-verschieben>
+              Textstelle neu markieren
+            </Menu.Item>
           )}
-          <ActionIcon size="sm" variant="subtle" color="red" onClick={entfernen} aria-label="Kommentar entfernen">
+          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={loeschen}>
+            Notiz löschen
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+      {k.art === 'lob' && <span className="bl-haken">✓</span>}
+      {k.zeichen && <span className="bl-zeichen">{k.zeichen}:</span>}
+      <Editierbar
+        wert={c.n(k.text)}
+        onText={(x) => aendern((y) => (y.text = c.roh(x)), `rm-notiz-${k.id}`)}
+        platzhalter="Notiz"
+        label={`Randnotiz ${g.nr}`}
+        mehrzeilig
+        autoFokus={c.fokus === k.id}
+      />
+      {k.ohneWertung && <span className="bl-ow"> (ohne Wertung)</span>}
+      <span className="rm-werkzeug rm-nur-ansicht">
+        <Zauberstab stelle={stelle} label="Notiz mit KI bearbeiten" />
+        <Tooltip label="Notiz löschen">
+          <ActionIcon size="sm" variant="subtle" color="red" onClick={loeschen} aria-label="Notiz löschen">
             <IconTrash size={14} />
           </ActionIcon>
-        </Group>
-        <Textarea
-          size="xs"
-          autosize
-          minRows={1}
-          value={k.text}
-          placeholder="Kommentar"
-          onChange={(e) => {
-            const v = e.currentTarget.value
-            aendern((x) => (x.text = v), `text-${k.id}`)
-          }}
-          aria-label="Kommentar"
-        />
-        {!gefunden && (
-          <Text size="xs" c="orange">
-            Textstelle nicht im Text gefunden – der Kommentar steht im Ausdruck unter „Ohne Stelle im Text".
-          </Text>
-        )}
-        {k.ohneWertung && (
-          <Text size="xs" c="dimmed">
-            Hinweis ohne Wertung (Notenschutz)
-          </Text>
-        )}
-      </Stack>
-    </Group>
+        </Tooltip>
+      </span>
+    </div>
+  )
+}
+
+/** Eine Stelle im Schülertext – angestrichen und nummeriert (wie `teilHtml` im Druck) */
+export function TextTeil({ t, stil }: { t: Textteil; stil: (nr: number | undefined) => ReturnType<typeof markenStil> }): React.JSX.Element {
+  if (!t.art) return <Fragment>{t.text}</Fragment>
+  const s = t.nr != null ? stil(t.nr) : t.art === 'lob' ? 'lob' : t.art === 'hinweis' ? 'hinweis' : 'fehler'
+  return (
+    <>
+      {t.text && <span className={`bl-m ${s}`}>{t.text}</span>}
+      {t.nr != null && (
+        <sup className={`bl-nr-t ${s === 'lob' ? 'lob' : ''}`} data-kein-text>
+          {s === 'lob' ? '✓' : ''}
+          {t.text ? '' : ','}
+          {t.nr}
+        </sup>
+      )}
+    </>
   )
 }
 
 /**
- * Korrekturrand am digitalen Text (29.09.2026): links der Text mit markierten, nummerierten
- * Stellen, rechts die Kommentare – so, wie der Ausdruck aussieht. Darunter lassen sich die
- * Kommentare bearbeiten, ergänzen und löschen.
+ * Ein Absatz des Schülertexts mit seinen Randnotizen (29.09.2026). Im Text lässt sich eine
+ * Stelle markieren – das Blatt bietet dann an, eine Notiz dazu anzulegen.
  */
 export default function RandEditor({
-  a,
-  zeichen,
-  setzeRand
+  index,
+  teile,
+  notizen,
+  stil,
+  verschieben
 }: {
-  a: Abgabe
-  zeichen: Korrekturzeichen[]
-  setzeRand: (fn: (rand: RandKommentar[]) => void, gruppe?: string) => void
+  index: number
+  teile: Textteil[]
+  notizen: NummerierterKommentar[]
+  stil: (nr: number | undefined) => ReturnType<typeof markenStil>
+  verschieben: (id: string) => void
 }): React.JSX.Element {
-  const rand = a.bogen?.rand ?? []
-  const n = (s: string): string => mitName(s, a)
-  const layout = randLayout(n(a.text), rand, n)
-  const ohne = new Set(layout.ohneStelle.map((g) => g.k.id))
-  const nummer = new Map([...layout.absaetze.flatMap((x) => x.kommentare), ...layout.ohneStelle].map((g) => [g.k.id, g.nr]))
-
   return (
-    <Stack gap="sm" data-rm-rand>
-      <Box style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 6, overflow: 'hidden' }}>
-        {layout.absaetze.map((abs, i) => (
-          <Group key={i} gap={0} wrap="nowrap" align="stretch" style={{ borderTop: i ? '1px solid var(--mantine-color-default-border)' : undefined }}>
-            <Text size="sm" p="xs" style={{ flex: 2, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-              {abs.teile.map((t, j) =>
-                t.art ? (
-                  <Fragment key={j}>
-                    <span style={{ textDecoration: 'underline', textDecorationColor: ART_FARBE[t.art], textDecorationThickness: 2, textUnderlineOffset: 3 }}>
-                      {t.text}
-                    </span>
-                    {t.nr != null && <sup style={{ color: ART_FARBE[t.art], fontWeight: 700 }}>{t.text ? '' : ','}{t.nr}</sup>}
-                  </Fragment>
-                ) : (
-                  <Fragment key={j}>{t.text}</Fragment>
-                )
-              )}
-            </Text>
-            <Stack gap={2} p="xs" style={{ flex: 1, background: 'var(--mantine-color-default-hover)' }}>
-              {abs.kommentare.map((g) => (
-                <Text key={g.k.id} size="xs">
-                  <b style={{ color: ART_FARBE[g.k.art] }}>{g.nr}</b> {g.k.zeichen ? <b>{g.k.zeichen} </b> : null}
-                  {n(g.k.text)}
-                </Text>
-              ))}
-            </Stack>
-          </Group>
+    <div className="bl-block bl-abs">
+      <div className="bl-text" data-absatz={index}>
+        {teile.map((t, j) => (
+          <TextTeil key={j} t={t} stil={stil} />
         ))}
-      </Box>
-      <Text fw={600} size="sm">
-        Kommentare bearbeiten
-      </Text>
-      {rand.map((k, i) => (
-        <KommentarZeile
-          key={k.id}
-          nr={nummer.get(k.id) ?? i + 1}
-          k={k}
-          zeichen={zeichen}
-          gefunden={!ohne.has(k.id)}
-          aendern={(fn, gruppe) => setzeRand((r) => fn(r[i]), gruppe)}
-          entfernen={() => setzeRand((r) => r.splice(i, 1))}
-        />
-      ))}
-      <Button
-        size="compact-xs"
-        variant="subtle"
-        w="fit-content"
-        leftSection={<IconPlus size={12} />}
-        onClick={() => setzeRand((r) => r.push({ id: newId(), zitat: '', text: '', art: 'hinweis' }))}
-      >
-        Kommentar hinzufügen
-      </Button>
-    </Stack>
+      </div>
+      <div className="bl-rand">
+        {notizen.map((g) => (
+          <RandNotiz key={g.k.id} g={g} verschieben={verschieben} />
+        ))}
+      </div>
+    </div>
   )
 }

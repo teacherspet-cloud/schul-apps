@@ -1,0 +1,257 @@
+/*
+ * Ansicht des A4-Blatts der Rückmeldung (29.09.2026). Das Aussehen des Blatts selbst steht in
+ * blattLayout.ts (BLATT_CSS, gemeinsam mit dem Druck); hier nur, was es NUR in der App gibt:
+ * Tisch, Seiten mit Schatten und Randlinie, Seitenumbrüche, Bearbeitungsknöpfe.
+ */
+.rm-buehne {
+  background: #e3e5e8;
+  border-radius: 8px;
+  padding: 18px 0 30px;
+  overflow: hidden;
+}
+[data-mantine-color-scheme='dark'] .rm-buehne {
+  background: #2b2d31;
+}
+.rm-seiten {
+  position: relative;
+  width: 210mm;
+  margin: 0 auto;
+}
+.rm-seite {
+  position: absolute;
+  left: 0;
+  width: 210mm;
+  height: 297mm;
+  background: #fff;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.22),
+    0 8px 22px rgba(0, 0, 0, 0.12);
+}
+.rm-seite-linie {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(18mm + 124mm);
+  border-left: 0.45mm solid #ef9a9a;
+}
+.rm-seite-nr {
+  position: absolute;
+  right: 0;
+  bottom: -6.5mm;
+  font: 11px system-ui, sans-serif;
+  color: #8a8f98;
+}
+.rm-seiten > .blatt {
+  position: relative;
+  z-index: 1;
+  width: 210mm;
+  padding: 15mm 12mm 15mm 18mm;
+}
+.rm-umbruch {
+  pointer-events: none;
+}
+
+/* Direkt bearbeitbarer Text */
+.rm-edit {
+  outline: none;
+  border-radius: 2px;
+  cursor: text;
+  transition: background-color 0.12s;
+}
+.rm-edit:hover {
+  background: rgba(255, 213, 79, 0.2);
+}
+.rm-edit:focus {
+  background: rgba(255, 213, 79, 0.3);
+  box-shadow: 0 0 0 1px rgba(245, 159, 0, 0.55);
+}
+.rm-edit:empty::before {
+  content: attr(data-platzhalter);
+  color: #a8a8a8;
+  font-style: italic;
+}
+
+/* Werkzeuge: im Druck gibt es sie nicht, auf dem Blatt erscheinen sie beim Überfahren */
+.rm-notiz {
+  position: relative;
+}
+.rm-werkzeug {
+  position: absolute;
+  right: -3mm;
+  top: -3.5mm;
+  display: none;
+  gap: 1px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  padding: 1px;
+  z-index: 5;
+}
+.rm-notiz:hover .rm-werkzeug,
+.rm-notiz:focus-within .rm-werkzeug,
+.rm-werkzeug:has([aria-expanded='true']),
+.rm-laeuft .rm-werkzeug {
+  display: inline-flex;
+}
+.rm-abschnitt-werkzeug {
+  position: absolute;
+  right: 2mm;
+  top: 1.6mm;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+  z-index: 4;
+}
+/* Im ersten Abschnitt steht der Zauberstab des ganzen Kastens in der Titelzeile – die Werkzeuge des Abschnitts darunter */
+.bl-k.erst > .rm-abschnitt-werkzeug {
+  top: 11.5mm;
+}
+.bl-k:hover .rm-abschnitt-werkzeug,
+.rm-abschnitt-werkzeug:focus-within,
+.rm-abschnitt-werkzeug:has([aria-expanded='true']),
+.rm-abschnitt-werkzeug:has([data-rm-stab-laeuft]) {
+  opacity: 1;
+}
+.rm-zeile {
+  position: relative;
+}
+.rm-zeilen-werkzeug {
+  position: absolute;
+  right: -4.5mm;
+  top: -0.5mm;
+  display: none;
+  gap: 1px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  z-index: 5;
+}
+.rm-zeile:hover > .rm-zeilen-werkzeug,
+.rm-zeile:focus-within > .rm-zeilen-werkzeug,
+.rm-zeilen-werkzeug:has([aria-expanded='true']),
+.rm-laeuft > .rm-zeilen-werkzeug {
+  display: inline-flex;
+}
+td.rm-zeile .rm-zeilen-werkzeug {
+  right: auto;
+  left: -6mm;
+  top: 0.5mm;
+  flex-direction: column;
+}
+.rm-laeuft {
+  opacity: 0.55;
+}
+.rm-stab-laeuft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+}
+.rm-klick {
+  cursor: pointer;
+}
+.rm-klick:hover {
+  background: rgba(198, 40, 40, 0.1);
+}
+.bl-notiz.lob .rm-klick:hover {
+  background: rgba(46, 125, 50, 0.12);
+}
+.rm-wahl {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.rm-wahl:hover {
+  background: rgba(34, 139, 230, 0.1);
+}
+.rm-note-knopf {
+  cursor: pointer;
+}
+.rm-note-knopf:hover .bl-note-wert {
+  box-shadow: 0 0 0 1.5mm rgba(198, 40, 40, 0.08);
+}
+.rm-note-hinweis {
+  display: block;
+  margin-top: 1mm;
+  font: 600 10px system-ui, sans-serif;
+  color: #e8590c;
+}
+.rm-marker {
+  cursor: grab;
+  touch-action: none;
+}
+.rm-zeichenwahl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 10px 8px;
+}
+.rm-zeichenwahl button {
+  font: 600 12px Calibri, 'Segoe UI', sans-serif;
+  min-width: 30px;
+  padding: 2px 6px;
+  border: 1px solid #c9c9c9;
+  border-radius: 4px;
+  background: #fff;
+  color: #222;
+  cursor: pointer;
+}
+.rm-zeichenwahl button.aktiv {
+  background: #c62828;
+  border-color: #c62828;
+  color: #fff;
+}
+.rm-teil-zahl input,
+.rm-zahl {
+  width: 3.4em;
+  border: none;
+  border-bottom: 1px dashed #999;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: right;
+  padding: 0 1px;
+  -moz-appearance: textfield;
+}
+.rm-teil-zahl input::-webkit-inner-spin-button,
+.rm-zahl::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
+.rm-teil-zahl input:focus,
+.rm-zahl:focus {
+  outline: none;
+  background: rgba(255, 213, 79, 0.3);
+}
+.rm-teil-summe {
+  color: #777;
+  font-size: 9pt;
+}
+
+/* Text markiert: Notiz anlegen */
+.rm-auswahl {
+  position: fixed;
+  z-index: 300;
+  transform: translate(-50%, 6px);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 6px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  font: 12px system-ui, sans-serif;
+  color: #333;
+}
+[data-mantine-color-scheme='dark'] .rm-auswahl {
+  background: #25262b;
+  color: #ddd;
+}
+.bl-text[data-absatz] {
+  cursor: text;
+}
+.rm-verschiebt .bl-text[data-absatz] {
+  cursor: crosshair;
+  outline: 1px dashed rgba(198, 40, 40, 0.35);
+}
