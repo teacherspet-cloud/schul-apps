@@ -2,7 +2,8 @@
  * Rückmeldung (Großprogramm 0.4, F3): Grundlage aus gespeichertem Material, Übertragen von
  * Fotos/Scans in Text, Rückmeldebogen ohne Note.
  */
-import { gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
+import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
+import { deutschVerlangt, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
@@ -273,6 +274,9 @@ export function teilRegeln(r: Rueckmeldung): string[] {
     regeln.push(
       `- ${getrennteTeile.map((t) => t.titel).join(', ')}: Inhalt (Aufgabenbezug, Vollständigkeit, Textsorte, Adressatenbezug) und Sprache (Wortschatz, Grammatik, Satzbau, Kohärenz, sprachliche Richtigkeit) GETRENNT beurteilen – auch in Stärken und nächsten Schritten.`
     )
+  // Oberstufe (KMK 2012, IQB, NRW, BE/BB, SH): Ist Inhalt ODER Sprache ungenügend, höchstens 3 Notenpunkte für diesen Teil
+  if (getrennteTeile.length && r.meta.grade >= 11)
+    regeln.push('- Oberstufe: Ist bei einem Schreib-/Sprachmittlungsteil der Inhalt ODER die Sprache ungenügend (unter 20 %), erreicht dieser Teil insgesamt höchstens 20 % (entspricht höchstens 3 Notenpunkten).')
   if (mitTeilen(r))
     regeln.push(
       `- Bewerte JEDEN Teil (Kennung in eckigen Klammern): ${getrennteTeile.length ? 'bei Schreiben/Sprachmittlung Erfüllungsgrad von Inhalt und Sprache getrennt, ' : ''}bei anderen Teilen den Erfüllungsgrad des Teils. Die App verrechnet daraus die Gesamtleistung.`
@@ -388,7 +392,8 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       : '',
     scan ? '- Die Arbeit liegt auch als Bild bei: Gib für jeden Randkommentar Seite und ungefähre Lage (x, y in Prozent) der Stelle im Bild an.' : '',
     hatForm(m, 'ueberarbeitung') ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag.' : '',
-    '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.'
+    '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.',
+    ...abgabeRegeln(r, a)
   ]
   const ausgleich = ausgleichAnweisung(a.ausgleich)
   const land = kiLandesregeln(m, art)
@@ -406,8 +411,10 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : '',
       mitTabelle(r) ? tabelleText(r.tabelle!) : '',
       teileText(r),
-      `ARBEIT VON ${a.kuerzel}:`,
-      a.text
+      `ARBEIT VON ${a.kuerzel} (die Abgabe, zwischen <<<ARBEIT und ARBEIT>>>):`,
+      '<<<ARBEIT',
+      a.text.trim() || (scan ? '(Text nur auf den beigefügten Bildern)' : ''),
+      'ARBEIT>>>'
     ]
       .filter(Boolean)
       .join('\n'),
@@ -481,6 +488,59 @@ export function pruefeBogen(b: Bogen, modus: PruefModus = {}): Bogen {
   }
 }
 
+/**
+ * Regeln zur Abgabe selbst (29.09.2026, Fehlerberichte der Lehrkraft): Die KI schrieb bei einer
+ * kurzen deutschen Abgabe „Da kein eigener Antworttext vorliegt …", und in den Fremdsprachen kam
+ * kein Wort dazu, dass die Abgabe auf Deutsch statt in der Zielsprache verfasst war.
+ */
+export function abgabeRegeln(r: Rueckmeldung, a: Abgabe): string[] {
+  const regeln = [
+    '- Der Text unter ARBEIT (zwischen <<<ARBEIT und ARBEIT>>>) IST die Abgabe – auch wenn er kurz, fehlerhaft oder in der falschen Sprache ist, wird er bewertet. Nie behaupten, es liege keine Abgabe oder kein eigener Antworttext vor, solange dort Text steht. Stehen darin noch Teile der Aufgabenstellung, zählen nur die eigenen Formulierungen.'
+  ]
+  if (!r.meta.subjectId || !fremdsprachlich(r.meta.subjectId)) return regeln
+  const fach = r.meta.subjectLabel
+  regeln.push(
+    `- ZIELSPRACHE ${fach}: Ist die Abgabe – oder ein Schreib- bzw. Sprachmittlungsteil, der in der Zielsprache verlangt ist – auf Deutsch verfasst, ist diese Aufgabe NICHT erfüllt. Das klar und freundlich sagen (erster nächster Schritt: den Text auf ${fach} schreiben), Stärken nur nennen, wo wirklich welche sind, und den Erfüllungsgrad dieses Teils (Inhalt und Sprache) bzw. der Gesamtleistung mit 0 % angeben. Ausnahme: Sprachmittlung ins Deutsche und Aufgaben, die ausdrücklich Deutsch verlangen – dort ist Deutsch richtig.`
+  )
+  const p = pruefeZielsprache(a.text, r.meta.subjectId)
+  if (p.verfehlt || p.teilweise)
+    regeln.push(
+      `- BEFUND DER APP: ${p.verfehlt ? `Die Abgabe ist überwiegend auf Deutsch verfasst (etwa ${Math.round(p.befund.anteilDeutsch * 100)} % der Sätze).` : 'Ein längerer Abschnitt der Abgabe ist auf Deutsch verfasst.'} Das im Feedback ausdrücklich ansprechen.`
+    )
+  return regeln
+}
+
+/**
+ * Deutsch statt Zielsprache (Entscheidung der Lehrkraft 29.09.2026: „Ganze Aufgabe nicht
+ * erfüllt"): Erkennt der Detektor eine überwiegend deutsche Abgabe in einer modernen Fremdsprache,
+ * setzt die App die Einstufung auf 0 % – Teile, Tabelle, Kriterien, Gesamt – und markiert den
+ * Bogen. Verlangt die Aufgabe selbst Deutsch (Sprachmittlung ins Deutsche), nur ein Hinweis.
+ */
+function spracheAnwenden(bogen: Bogen, r: Rueckmeldung, a: Abgabe, art: ReturnType<typeof einstufungVon>, skala: SkalenKontext): void {
+  const p = pruefeZielsprache(a.text, r.meta.subjectId)
+  const erlaubt = deutschVerlangt([r.grundlage.aufgaben, ...(r.grundlage.teile ?? []).map((t) => t.titel)].join('\n'))
+  const hinweis = zielsprachHinweis(p, r.meta.subjectLabel, erlaubt, art !== 'keine')
+  if (!hinweis) return
+  bogen.hinweise = [...(bogen.hinweise ?? []), hinweis]
+  if (!p.verfehlt || erlaubt) return
+  bogen.spracheVerfehlt = true
+  if (art === 'keine') return
+  const grund = `Abgabe auf Deutsch statt auf ${r.meta.subjectLabel} – Aufgabe nicht erfüllt (von der App auf 0 % gesetzt).`
+  if (bogen.teile && r.grundlage.teile) {
+    bogen.teile = r.grundlage.teile.map(
+      (t): TeilWertung => (getrennt(t) ? { teilId: t.id, inhalt: 0, sprache: 0, begruendung: grund } : { teilId: t.id, anteil: 0, begruendung: grund })
+    )
+  }
+  if (bogen.tabelle && r.tabelle) {
+    const schlechteste = Math.max(0, r.tabelle.stufen.length - 1)
+    bogen.tabelle = r.tabelle.kriterien.map((k) =>
+      k.punkte ? { kriteriumId: k.id, punkte: 0, begruendung: grund } : { kriteriumId: k.id, stufe: schlechteste, begruendung: grund }
+    )
+  }
+  if (bogen.kriterienStufen) bogen.kriterienStufen = bogen.kriterienStufen.map(() => vorschlag(art, 0, skala))
+  if (gesamtEinstufen(r.meta)) bogen.gesamt = vorschlag(art, 0, skala, grund)
+}
+
 /** Werte, die ohne Angabe nicht im Bogen stehen sollen (undefined-Felder entfernen) */
 function ohneLeere<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
@@ -532,7 +592,7 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
     if (mitTeilen(r)) {
       const teile = r.grundlage.teile!
       bogen.teile = wertungenAusKi(d.teile, teile)
-      const g = gesamtAusTeilen(teile, bogen.teile, r.grundlage.verrechnung ?? 'prozent')
+      const g = gesamtAusTeilen(teile, bogen.teile, r.grundlage.verrechnung ?? 'prozent', m.grade >= 11)
       if (gesamtEinstufen(m) && !mitTabelle(r) && g) bogen.gesamt = vorschlag(art, g.anteil, skala, begruendungAusTeilen(teile, bogen.teile))
     } else if (mitTabelle(r)) {
       // Gesamt aus der Tabelle (oben)
@@ -572,6 +632,7 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
       if (text(u.auftrag)) bogen.ueberarbeitung = { zitat: text(u.zitat), auftrag: text(u.auftrag) }
     }
     if (m.elternfassung && text(d.eltern)) bogen.eltern = text(d.eltern)
+    spracheAnwenden(bogen, r, a, art, skala)
   }
   const fehler = objekte(d.fehler)
     .filter((f) => text(f.kategorie))

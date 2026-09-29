@@ -138,6 +138,13 @@ export interface Bogen {
   /** Fassung für die Eltern (Deutsch, einfache Sprache) und ihre Übersetzungen je Sprachcode */
   eltern?: string
   elternUebersetzt?: Record<string, string>
+  /**
+   * Abgabe in einer Zielsprachenaufgabe überwiegend auf Deutsch (29.09.2026, sprachErkennung.ts):
+   * Einstufung von der App auf 0 % gesetzt – die Lehrkraft kann sie wie immer ändern.
+   */
+  spracheVerfehlt?: true
+  /** Hinweise der App für die Lehrkraft (nicht für den Ausdruck), z. B. zur Sprache der Abgabe */
+  hinweise?: string[]
 }
 
 /** Nachteilsausgleich bzw. Notenschutz einer Abgabe – Katalog in nachteilsausgleich.ts */
@@ -165,6 +172,13 @@ export interface Abgabe {
    * dem eingescannten Schülertext. `bilder` leert sich wie bisher, sobald der Text da ist.
    */
   scans?: string[]
+  /**
+   * Text vor dem Abtrennen von Aufgabenstellung/Material/Kopfzeilen (29.09.2026, abgabeTrennen.ts) –
+   * „Rückgängig" stellt ihn wieder her. Fehlt, solange nichts abgetrennt wurde.
+   */
+  textOriginal?: string
+  /** Was beim Abtrennen geschah: entfernte Zeilen gegenüber dem Original, Abgleich oder KI */
+  trennung?: { zeilen: number; quelle: 'abgleich' | 'ki'; entfernt?: string[] }
   /** Nachteilsausgleich für diese Abgabe (nur Maßnahmen, nie eine Diagnose) */
   ausgleich?: Nachteilsausgleich
   /** Familiensprache für die Elternfassung (Code aus shared/familiensprachen.ts) */

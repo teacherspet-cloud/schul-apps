@@ -128,12 +128,14 @@ export function teileAusArbeit(exam: Exam): { teile: BewertungsTeil[]; verrechnu
 const begrenze = (x: unknown, max = 100): number => Math.max(0, Math.min(max, Math.round(Number(x) || 0)))
 
 /** Erfüllungsgrad eines Teils aus seiner Wertung (Inhalt und Sprache nach dem Inhaltsanteil) */
-export function teilAnteil(t: BewertungsTeil, w: TeilWertung | undefined): number | null {
+export function teilAnteil(t: BewertungsTeil, w: TeilWertung | undefined, oberstufe = false): number | null {
   if (!w) return null
   if (getrennt(t)) {
     if (typeof w.inhalt !== 'number' && typeof w.sprache !== 'number') return typeof w.anteil === 'number' ? w.anteil : null
     const i = t.inhalt ?? INHALT_STANDARD
-    return Math.round(((w.inhalt ?? 0) * i + (w.sprache ?? 0) * (100 - i)) / 100)
+    const anteil = Math.round(((w.inhalt ?? 0) * i + (w.sprache ?? 0) * (100 - i)) / 100)
+    // Oberstufe: Inhalt oder Sprache ungenügend (unter 20 %) → höchstens 20 % (3 Notenpunkte) für den Teil
+    return oberstufe && Math.min(w.inhalt ?? 0, w.sprache ?? 0) < 20 ? Math.min(anteil, 20) : anteil
   }
   return typeof w.anteil === 'number' ? w.anteil : null
 }
@@ -145,7 +147,9 @@ export function teilAnteil(t: BewertungsTeil, w: TeilWertung | undefined): numbe
 export function gesamtAusTeilen(
   teile: BewertungsTeil[],
   wertungen: TeilWertung[],
-  verrechnung: Verrechnung
+  verrechnung: Verrechnung,
+  /** Oberstufe: Deckel bei ungenügendem Inhalt oder ungenügender Sprache (teilAnteil) */
+  oberstufe = false
 ): { anteil: number; erreicht?: number; moeglich?: number } | null {
   let summe = 0
   let gewichte = 0
@@ -154,7 +158,8 @@ export function gesamtAusTeilen(
   for (const t of teile) {
     const a = teilAnteil(
       t,
-      wertungen.find((w) => w.teilId === t.id)
+      wertungen.find((w) => w.teilId === t.id),
+      oberstufe
     )
     if (a === null) continue
     const g = verrechnung === 'punkte' ? (t.punkte ?? 0) : (t.gewicht ?? 0)

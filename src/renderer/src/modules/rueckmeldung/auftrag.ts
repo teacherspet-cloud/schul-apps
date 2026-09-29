@@ -28,6 +28,7 @@ import { obj, str } from '../../shared/aiSchema'
 import type { StructuredRequest } from '@shared/types'
 import { einstufungVon } from './art'
 import { tabelleAus, tabelleAusDateiAnfrage, tabelleEntwurfAnfrage } from './tabelle'
+import { kiTrennungAnwenden, trennAnfrage, trenneNachAufgabe, trennungAnwenden } from './abgabeTrennen'
 
 /** Lerngruppe und Haltung für jede Anfrage */
 export function rueckmeldungSystem(r: Rueckmeldung): string {
@@ -67,7 +68,11 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
         k.melde(`${roh.kuerzel}: ${roh.text.trim() ? 'Rückmeldung wird geschrieben' : 'Text wird übertragen'} (${i + 1} von ${offen.length}) …`)
         try {
           let a = roh
-          if (!a.text.trim() && a.bilder.length) a = transkriptUebernehmen(a, await k.ai<unknown>(transkriptAnfrage(a)))
+          if (!a.text.trim() && a.bilder.length) {
+            a = transkriptUebernehmen(a, await k.ai<unknown>(transkriptAnfrage(a)))
+            // Mit übertragene Aufgabenzeilen (gedrucktes Arbeitsblatt) per Abgleich abtrennen – rückgängig machbar
+            a = trennungAnwenden(a, trenneNachAufgabe(a.text, rm.grundlage.aufgaben), 'abgleich')
+          }
           // Namen verlassen den Rechner nicht: an die KI geht der bereinigte Text
           const { text, pseudonyme } = ohneNamen(a)
           const anonym = { ...a, text }
@@ -84,6 +89,49 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
     abschluss: ({ fertig, fehler }) =>
       `${fertig.size} Rückmeldung${fertig.size === 1 ? '' : 'en'} fertig${fehler.length ? ` – nicht gelungen: ${fehler.join(' · ')}` : ''}`,
     ablegen: ({ fertig }, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, abgaben: aktuell.abgaben.map((a) => fertig.get(a.id) ?? a) }), 1)
+  })
+}
+
+/**
+ * Aufgabentext per KI abtrennen (29.09.2026, Fehlerbericht der Lehrkraft): für Abgaben, in denen
+ * nach dem Abgleich noch Aufgabenteile vermutet werden oder zu denen keine Aufgabe eingetragen ist.
+ * Die KI sieht nur den Text ohne Namen (Kürzel). Übernommen wird nur, wenn die Lehrkraft den Text
+ * inzwischen nicht geändert hat.
+ */
+export function abgabenTrennen(r: Rueckmeldung, docId: string, ids: string[]): void {
+  const offen = r.abgaben.filter((a) => ids.includes(a.id) && a.text.trim())
+  if (!offen.length) return
+  void starteAuftrag({
+    moduleId: 'rueckmeldung',
+    docId,
+    titel: r.meta.title || r.grundlage.titel || 'Rückmeldung',
+    art: offen.length === 1 ? 'Aufgabentext abtrennen' : `Aufgabentext in ${offen.length} Abgaben abtrennen`,
+    eingabe: r,
+    istOffen: () => bibliothek.istOffen(docId),
+    sperrt: false,
+    schluessel: `rueckmeldung-trennen-${docId}`,
+    fehlerTitel: 'Der Aufgabentext konnte nicht abgetrennt werden',
+    arbeit: async (rm, k) => {
+      const fertig = new Map<string, { vorher: string; abgabe: Abgabe }>()
+      for (const [i, a] of offen.entries()) {
+        k.melde(`${a.kuerzel}: Schülertext wird vom Aufgabentext getrennt (${i + 1} von ${offen.length}) …`)
+        const { text: anonym } = ohneNamen(a)
+        const e = kiTrennungAnwenden(a.text, anonym, await k.ai<unknown>(trennAnfrage(anonym, rm.grundlage.aufgaben)))
+        if (e?.zeilen) fertig.set(a.id, { vorher: a.text, abgabe: trennungAnwenden(a, e, 'ki') })
+      }
+      return fertig
+    },
+    abschluss: (f) => (f.size ? `Aufgabentext in ${f.size} Abgabe${f.size === 1 ? '' : 'n'} abgetrennt.` : 'Kein weiterer Aufgabentext gefunden.'),
+    ablegen: (fertig, rm) =>
+      bibliothek.legeAb(docId, rm, (aktuell) => ({
+        ...aktuell,
+        abgaben: aktuell.abgaben.map((a) => {
+          const f = fertig.get(a.id)
+          // Inzwischen von Hand geändert: nichts überschreiben
+          if (!f || a.text !== f.vorher) return a
+          return { ...a, text: f.abgabe.text, textOriginal: f.abgabe.textOriginal, trennung: f.abgabe.trennung }
+        })
+      }))
   })
 }
 

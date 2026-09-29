@@ -17,7 +17,18 @@ import {
   Tooltip
 } from '@mantine/core'
 import { ANREDE_OPTIONEN, type Anrede } from '../render/texte'
-import { IconFileText, IconFolderOpen, IconHeartHandshake, IconKeyboard, IconMessageCheck, IconPhoto, IconTrash } from '@tabler/icons-react'
+import {
+  IconArrowBackUp,
+  IconFileText,
+  IconFolderOpen,
+  IconHeartHandshake,
+  IconKeyboard,
+  IconLanguage,
+  IconMessageCheck,
+  IconPhoto,
+  IconScissors,
+  IconTrash
+} from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { FAMILIENSPRACHEN } from '../../../shared/familiensprachen'
 import { ladeGedaechtnis, speichereGedaechtnis } from '../ablagen'
@@ -35,7 +46,9 @@ import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractCo
 import { newId } from '../../vokabeltest/model/random'
 import { notifyError } from '../../../shared/util'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
-import { aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
+import { abgabenTrennen, aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
+import { kiTrennungNoetig, trenneNachAufgabe, trennHinweis, trennungAnwenden, trennungZurueck } from '../abgabeTrennen'
+import { deutschVerlangt, pruefeZielsprache, zielsprachHinweis } from '../sprachErkennung'
 import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import MaterialWahl from '../../../shared/components/MaterialWahl'
 import { naechstesKuerzel, type Abgabe, type Nachteilsausgleich } from '../model/types'
@@ -120,6 +133,25 @@ export default function Einrichten(): React.JSX.Element | null {
     }
   }
 
+  /**
+   * Schülertext vom Aufgabentext trennen (29.09.2026, Fehlerbericht der Lehrkraft): erst Abgleich mit
+   * der Aufgabe, dann – bei Verdacht auf weitere Aufgabenteile oder ohne Aufgabe – die KI. Beim
+   * Knopf („erneut") fragt die App die KI auch dann, wenn der Abgleich nichts gefunden hat.
+   */
+  const abtrennen = (ids: string[], erneut = false): void => {
+    const kiIds: string[] = []
+    update((d) => {
+      d.abgaben.forEach((x, j) => {
+        if (!ids.includes(x.id) || !x.text.trim()) return
+        const e = trenneNachAufgabe(x.text, d.grundlage.aufgaben)
+        d.abgaben[j] = trennungAnwenden(x, e, 'abgleich')
+        if (kiTrennungNoetig(e, d.grundlage.aufgaben) || (erneut && !e.zeilen)) kiIds.push(x.id)
+      })
+    })
+    const aktuell = useRueckmeldung.getState().dok
+    if (aktuell && kiIds.length) abgabenTrennen(aktuell, docId, kiIds)
+  }
+
   const dateienLesen = async (files: File[]): Promise<void> => {
     try {
       const gelesen: HochladeInhalt[] = []
@@ -132,6 +164,7 @@ export default function Einrichten(): React.JSX.Element | null {
       // Datenschutz: Hinweis und Namen ersetzen, bevor etwas zur KI geht
       const geprueft = await pruefeHochladen(gelesen)
       if (!geprueft) return
+      const neueIds: string[] = []
       update((d) => {
         for (const g of geprueft) {
           const neu: Abgabe = {
@@ -145,8 +178,11 @@ export default function Einrichten(): React.JSX.Element | null {
             ...(g.pseudonyme?.length ? { pseudonyme: g.pseudonyme } : {})
           }
           d.abgaben.push(neu)
+          if (neu.text) neueIds.push(neu.id)
         }
       })
+      // Aufgabenblatt und Material aus Word/PDF-Abgaben abtrennen – rückgängig machbar
+      if (neueIds.length) abtrennen(neueIds)
     } catch (e) {
       notifyError(e, 'Die Datei konnte nicht gelesen werden')
     } finally {
@@ -155,6 +191,10 @@ export default function Einrichten(): React.JSX.Element | null {
   }
 
   const offen = r.abgaben.filter((a) => !a.bogen && (a.text.trim() || a.bilder.length)).length
+  const mitText = r.abgaben.filter((a) => a.text.trim() && !a.bilder.length)
+  // Deutsch statt Zielsprache (29.09.2026): Warnung schon an der Abgabe
+  const deutschErlaubt = deutschVerlangt([r.grundlage.aufgaben, ...(r.grundlage.teile ?? []).map((t) => t.titel)].join('\n'))
+  const sprachWarnung = (a: Abgabe): string | null => zielsprachHinweis(pruefeZielsprache(a.text, r.meta.subjectId), r.meta.subjectLabel, deutschErlaubt, false)
   const grund = !r.grundlage.aufgaben.trim()
     ? 'Grundlage fehlt'
     : !r.abgaben.length
@@ -343,6 +383,17 @@ export default function Einrichten(): React.JSX.Element | null {
                   minHeight={90}
                 />
                 <Group justify="flex-end">
+                  {mitText.length > 1 && (
+                    <Button
+                      size="xs"
+                      variant="subtle"
+                      leftSection={<IconScissors size={14} />}
+                      onClick={() => abtrennen(mitText.map((a) => a.id))}
+                      data-rm-trennen-alle
+                    >
+                      Aufgabentext aus allen Abgaben abtrennen
+                    </Button>
+                  )}
                   <Button
                     size="xs"
                     variant="subtle"
@@ -397,6 +448,20 @@ export default function Einrichten(): React.JSX.Element | null {
                             <Badge size="xs" color="grape" variant="light">
                               {ausgleichKurz(a.ausgleich)}
                             </Badge>
+                          )}
+                          {a.text.trim() && !a.bilder.length && (
+                            <Tooltip label="Aufgabenstellung, Material und Kopfzeilen aus dem Text abtrennen">
+                              <ActionIcon
+                                size="sm"
+                                variant="subtle"
+                                color="gray"
+                                aria-label={`Aufgabentext aus ${a.kuerzel} abtrennen`}
+                                onClick={() => abtrennen([a.id], true)}
+                                data-rm-trennen
+                              >
+                                <IconScissors size={14} />
+                              </ActionIcon>
+                            </Tooltip>
                           )}
                           <Tooltip label="Abgabe entfernen">
                             <ActionIcon
@@ -462,6 +527,31 @@ export default function Einrichten(): React.JSX.Element | null {
                             }}
                             aria-label={`Text von ${a.kuerzel}`}
                           />
+                        )}
+                        {trennHinweis(a) && (
+                          <Group gap={6} data-rm-getrennt>
+                            <Text size="xs" c="teal">
+                              {trennHinweis(a)}
+                            </Text>
+                            <Button
+                              size="compact-xs"
+                              variant="subtle"
+                              color="teal"
+                              leftSection={<IconArrowBackUp size={12} />}
+                              onClick={() => update((d) => (d.abgaben[i] = trennungZurueck(d.abgaben[i])))}
+                              data-rm-trennen-zurueck
+                            >
+                              Rückgängig
+                            </Button>
+                          </Group>
+                        )}
+                        {a.text.trim() && sprachWarnung(a) && (
+                          <Group gap={6} wrap="nowrap" data-rm-sprachwarnung>
+                            <IconLanguage size={14} color="var(--mantine-color-orange-6)" />
+                            <Text size="xs" c="orange">
+                              {sprachWarnung(a)}
+                            </Text>
+                          </Group>
                         )}
                         {a.bilder.length > 0 && (
                           <Text size="xs" c="dimmed">
