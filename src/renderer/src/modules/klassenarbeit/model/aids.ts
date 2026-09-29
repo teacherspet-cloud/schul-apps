@@ -100,29 +100,29 @@ const SPANISCH: Record<string, string> = {
 }
 
 const ITALIENISCH: Record<string, string> = {
-  'keine hilfsmittel': 'nessun dizionario né altro materiale',
+  'keine hilfsmittel': 'nessuno (né dizionario né altro materiale)',
   keine: 'nessuno',
-  'einsprachiges wörterbuch': 'un dizionario monolingue',
-  'zweisprachiges wörterbuch': 'un dizionario bilingue',
-  'ein- und zweisprachiges wörterbuch': 'un dizionario monolingue e uno bilingue',
-  wörterbuch: 'un dizionario',
-  'wörterbuch nur für den schreibteil': 'un dizionario solo per la produzione scritta',
-  vokabelheft: 'il tuo quaderno di vocaboli',
-  'eigene notizen (eine seite)': 'i tuoi appunti (una pagina)',
-  'eigene notizen': 'i tuoi appunti'
+  'einsprachiges wörterbuch': 'il dizionario monolingue',
+  'zweisprachiges wörterbuch': 'il dizionario bilingue',
+  'ein- und zweisprachiges wörterbuch': 'il dizionario monolingue e il dizionario bilingue',
+  wörterbuch: 'il dizionario',
+  'wörterbuch nur für den schreibteil': 'il dizionario (solo per la produzione scritta)',
+  vokabelheft: 'il quaderno dei vocaboli',
+  'eigene notizen (eine seite)': 'i propri appunti (una pagina)',
+  'eigene notizen': 'i propri appunti'
 }
 
 const RUSSISCH: Record<string, string> = {
-  'keine hilfsmittel': 'без словаря и других пособий',
+  'keine hilfsmittel': 'не разрешены',
   keine: 'нет',
   'einsprachiges wörterbuch': 'толковый словарь',
   'zweisprachiges wörterbuch': 'двуязычный словарь',
-  'ein- und zweisprachiges wörterbuch': 'толковый и двуязычный словарь',
+  'ein- und zweisprachiges wörterbuch': 'толковый и двуязычный словари',
   wörterbuch: 'словарь',
-  'wörterbuch nur für den schreibteil': 'словарь только для письменного задания',
-  vokabelheft: 'твой словарик',
-  'eigene notizen (eine seite)': 'свои записи (одна страница)',
-  'eigene notizen': 'свои записи'
+  'wörterbuch nur für den schreibteil': 'словарь (только для раздела «Письменная речь»)',
+  vokabelheft: 'личный словарик',
+  'eigene notizen (eine seite)': 'собственные записи (одна страница)',
+  'eigene notizen': 'собственные записи'
 }
 
 const WOERTERBUECHER: Record<'en' | 'fr' | 'es' | 'it' | 'ru', Record<string, string>> = { en: ENGLISH, fr: FRANZOESISCH, es: SPANISCH, it: ITALIENISCH, ru: RUSSISCH }

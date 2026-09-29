@@ -615,8 +615,8 @@ export const FREMDSPRACHEN_NEU: {
       listening: 'Аудирование',
       reading: 'Чтение',
       mediation: 'Медиация',
-      writing: 'Письмо',
-      language: 'Лексика и грамматика',
+      writing: 'Письменная речь',
+      language: 'Грамматика и лексика',
       grammar: 'Grammatik im Kontext',
       speaking: 'Говорение (Ersatz für eine schriftliche Arbeit)'
     }

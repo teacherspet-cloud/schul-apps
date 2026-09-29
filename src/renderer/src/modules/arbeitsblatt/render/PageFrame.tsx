@@ -124,7 +124,7 @@ const LABELS = {
   es: { name: 'Nombre:', class: 'Clase:', date: 'Fecha:', grade: (g: number) => `Clase ${g}` },
   // Italienisch- und Russischarbeiten (29.09.2026)
   it: { name: 'Nome:', class: 'Classe:', date: 'Data:', grade: (g: number) => `Classe ${g}` },
-  ru: { name: 'Имя:', class: 'Класс:', date: 'Дата:', grade: (g: number) => `${g} класс` }
+  ru: { name: 'Фамилия, имя:', class: 'Класс:', date: 'Дата:', grade: (g: number) => `${g} класс` }
 }
 
 /** „Seite" in der Sprache des Kopfes */

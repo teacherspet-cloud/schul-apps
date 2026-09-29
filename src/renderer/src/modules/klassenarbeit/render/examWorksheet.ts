@@ -21,6 +21,7 @@ import type { Exam } from '../model/types'
 import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
 import { operatorenBlock } from '../didactics/operatorenliste'
 import { examGrades, examPoints } from '../model/types'
+import { RU_BALL, RU_MINUTA, russischPlural } from '../../../shared/russischPlural'
 
 /**
  * Kopfkasten der Arbeit: Zeit, Hilfsmittel und Bewertung.
@@ -44,17 +45,20 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
           split: (c: number, l: number) => `${c} % contenu, ${l} % langue`,
           counts: (w: number) => `compte pour ${w} %`,
           scale: (line: string) => `Barème : ${line}`,
+          total: 'Total',
           labels: { writing: 'Production écrite', other: 'Autres compétences' }
         }
       : fach.sprache === 'it'
         ? {
+            // Wortlaut nach der Esame di Stato („Durata massima della prova", „È consentito l'uso del dizionario")
             title: 'Verifica',
-            time: (min: number) => `Tempo: ${min} minuti`,
+            time: (min: number) => `Durata: ${min} ${min === 1 ? 'minuto' : 'minuti'}`,
             aids: (a: string) => `Materiale consentito: ${a || 'nessuno'}`,
-            points: (n: number) => `${n} punti`,
+            points: (n: number) => `${n} ${n === 1 ? 'punto' : 'punti'}`,
             split: (c: number, l: number) => `${c} % contenuto, ${l} % lingua`,
-            counts: (w: number) => `conta ${w} %`,
-            scale: (line: string) => `Voti: ${line}`,
+            counts: (w: number) => `vale il ${w} %`,
+            scale: (line: string) => `Scala di valutazione: ${line}`,
+            total: 'Totale',
             labels: {
               writing: 'Produzione scritta',
               other: 'Altre competenze'
@@ -62,14 +66,16 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
           }
         : fach.sprache === 'ru'
           ? {
+              // Wortlaut nach den FIPI-Demoversionen ЕГЭ/ОГЭ 2026; Numerus nach der Zahl (russischPlural)
               title: 'Контрольная работа',
-              time: (min: number) => `Время: ${min} минут`,
-              aids: (a: string) => `Разрешено: ${a || 'ничего'}`,
-              points: (n: number) => `${n} баллов`,
-              split: (c: number, l: number) => `${c} % содержание, ${l} % язык`,
-              counts: (w: number) => `составляет ${w} %`,
-              scale: (line: string) => `Оценки: ${line}`,
-              labels: { writing: 'Письмо', other: 'Другие компетенции' }
+              time: (min: number) => `Время выполнения: ${min} ${russischPlural(min, RU_MINUTA)}`,
+              aids: (a: string) => `Дополнительные материалы: ${a || 'не разрешены'}`,
+              points: (n: number) => `${n} ${russischPlural(n, RU_BALL)}`,
+              split: (c: number, l: number) => `содержание ${c} %, языковое оформление ${l} %`,
+              counts: (w: number) => `${w} % оценки`,
+              scale: (line: string) => `Шкала оценок: ${line}`,
+              total: 'Всего',
+              labels: { writing: 'Письменная речь', other: 'Остальные разделы' }
             }
           : fach.sprache === 'es'
             ? {
@@ -80,6 +86,7 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
                 split: (c: number, l: number) => `${c} % contenido, ${l} % lengua`,
                 counts: (w: number) => `cuenta ${w} %`,
                 scale: (line: string) => `Notas: ${line}`,
+                total: 'Total',
                 labels: {
                   writing: 'Expresión escrita',
                   other: 'Otras competencias'
@@ -94,6 +101,7 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
                   split: (c: number, l: number) => `${c} % content, ${l} % language`,
                   counts: (w: number) => `counts ${w} %`,
                   scale: (line: string) => `Marks: ${line}`,
+                  total: 'Total',
                   labels: { writing: 'Writing', other: 'Other skills' }
                 }
               : {
@@ -104,6 +112,7 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
                   split: (c: number, l: number) => `${c} % Inhalt, ${l} % ${zweiterTeil(m.subjectId)}`,
                   counts: (w: number) => `zählt ${w} %`,
                   scale: (line: string) => `Notenschlüssel: ${line}`,
+                  total: 'Gesamt',
                   labels: {
                     writing: eigeneTeilnoteLabel(m.subjectId),
                     other: istAlteSprache(m.subjectId) ? 'Begleitaufgaben' : 'Weitere Kompetenzen'
@@ -115,7 +124,7 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
     ...grades.map((g) => {
       const value = g.points > 0 ? t.points(g.points) : t.split(inhaltsanteil(m.subjectId), 100 - inhaltsanteil(m.subjectId))
       // Eine einzige Note (Deutsch, Sachfächer): „Gesamt: 60 Punkte" statt „Weitere Kompetenzen … zählt 100 %"
-      if (grades.length === 1) return `${fach.sprache === 'de' ? 'Gesamt' : 'Total'}: ${value}`
+      if (grades.length === 1) return `${t.total}: ${value}`
       const label = g.group === 'writing' ? t.labels.writing : t.labels.other
       return `${label}: ${value} – ${t.counts(g.weight)}`
     }),
@@ -159,7 +168,10 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   teileDerFassung(exam, f).forEach((part, i) => {
     const format = formatById(part.formatId)
     // Überschrift der Teile in der Sprache des Faches
-    const points = part.points > 0 ? ` (${part.points} ${kopfText.punkte})` : ''
+    // Russisch: 1 балл / 2 балла / 5 баллов; Italienisch: 1 punto / 2 punti
+    const sprache = fachDerArbeit(exam.meta.subjectId).sprache
+    const punkteWort = sprache === 'ru' ? russischPlural(part.points, RU_BALL) : sprache === 'it' && part.points === 1 ? 'punto' : kopfText.punkte
+    const points = part.points > 0 ? ` (${part.points} ${punkteWort})` : ''
     blocks.push({
       id: `part-${part.id}`,
       type: 'divider',

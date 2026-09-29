@@ -1,5 +1,6 @@
 import { unneededWordCount } from '../model/blocks'
 import type { Block } from '../model/types'
+import { RU_SLOVO, russischPlural } from '../../../shared/russischPlural'
 
 type HelpKey =
   | 'useEachOnce'
@@ -43,17 +44,17 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     en: 'You may have to change the form of the word (e.g. plural, past tense).',
     fr: 'Il faut parfois changer la forme du mot (p. ex. pluriel, temps du verbe).',
     es: 'A veces tienes que cambiar la forma de la palabra (p. ej. plural, tiempo verbal).',
-    it: 'A volte devi cambiare la forma della parola (p. es. plurale, tempo verbale).',
+    it: 'A volte devi cambiare la forma della parola (ad es. plurale, tempo verbale).',
     nl: 'Soms moet je de vorm van het woord veranderen (bijv. meervoud, verleden tijd).',
-    ru: 'Иногда нужно изменить форму слова (например, множественное число, прошедшее время).'
+    ru: 'Иногда слово нужно поставить в другую форму (например, во множественное число или в прошедшее время).'
   },
   firstLetter: {
     en: 'The first letter is given.',
     fr: 'La première lettre est donnée.',
     es: 'La primera letra ya está escrita.',
-    it: 'La prima lettera è data.',
+    it: 'La prima lettera è già data.',
     nl: 'De eerste letter is gegeven.',
-    ru: 'Первая буква дана.'
+    ru: 'Первая буква уже дана.'
   },
   matchLetters: {
     en: 'Write the correct letter in the box next to each number.',
@@ -69,13 +70,13 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     es: 'No necesitas todas las palabras de la derecha.',
     it: 'Non ti servono tutte le parole a destra.',
     nl: 'Je hebt niet alle woorden rechts nodig.',
-    ru: 'Не все слова справа нужны.'
+    ru: 'Не все слова справа понадобятся.'
   },
   choiceOne: {
     en: 'Only one answer is correct.',
     fr: 'Une seule réponse est correcte.',
     es: 'Solo una respuesta es correcta.',
-    it: 'Solo una risposta è corretta.',
+    it: "C'è una sola risposta corretta.",
     nl: 'Er is maar één antwoord goed.',
     ru: 'Правильный ответ только один.'
   },
@@ -85,7 +86,7 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     es: 'La palabra subrayada es incorrecta. Escribe la palabra correcta en la línea.',
     it: 'La parola sottolineata è sbagliata. Scrivi la parola giusta sulla riga.',
     nl: 'Het onderstreepte woord is fout. Schrijf het juiste woord op de lijn.',
-    ru: 'Подчёркнутое слово неверное. Напиши правильное слово на линии.'
+    ru: 'Подчёркнутое слово употреблено неверно. Напиши правильное слово на линии.'
   },
   twoSentences: {
     en: 'The same word fits in both gaps (a and b). Write it on the line.',
@@ -99,9 +100,9 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     en: 'Use the word in brackets and change its form.',
     fr: 'Utilise le mot entre parenthèses et change sa forme.',
     es: 'Usa la palabra entre paréntesis y cambia su forma.',
-    it: 'Usa la parola tra parentesi e cambia la sua forma.',
+    it: 'Usa la parola tra parentesi nella forma corretta.',
     nl: 'Gebruik het woord tussen haakjes en verander de vorm.',
-    ru: 'Используй слово в скобках и измени его форму.'
+    ru: 'Поставь слово в скобках в нужную форму.'
   },
   pictureBank: {
     en: 'Each picture shows one word from the box.',
@@ -109,7 +110,7 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     es: 'Cada imagen muestra una palabra del recuadro.',
     it: 'Ogni immagine mostra una parola del riquadro.',
     nl: 'Elke afbeelding toont één woord uit het kader.',
-    ru: 'На каждой картинке одно слово из рамки.'
+    ru: 'На каждой картинке изображено одно слово из рамки.'
   },
   scramble: {
     en: 'Use all the letters.',
@@ -149,7 +150,7 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     es: 'La palabra de la izquierda pertenece a la misma familia de palabras.',
     it: 'La parola a sinistra appartiene alla stessa famiglia di parole.',
     nl: 'Het woord links hoort bij dezelfde woordfamilie.',
-    ru: 'Слово слева относится к тому же словообразовательному гнезду.'
+    ru: 'Слово слева и искомое слово – однокоренные.'
   },
   oddOneOut: {
     en: 'Circle one word in each row.',
@@ -180,14 +181,13 @@ export function notNeededText(n: number, lang: string): string {
     case 'es':
       return one ? 'No necesitas una palabra.' : `No necesitas ${n} palabras.`
     case 'it':
-      return one ? 'Non ti serve una parola.' : `Non ti servono ${n} parole.`
+      return one ? "C'è una parola in più." : `Ci sono ${n} parole in più.`
     case 'nl':
       return one ? 'Eén woord heb je niet nodig.' : `${n} woorden heb je niet nodig.`
     case 'ru': {
-      const mod10 = n % 10
-      const mod100 = n % 100
-      const form = mod10 === 1 && mod100 !== 11 ? 'слово' : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'слова' : 'слов'
-      return `${n} ${form} тебе не нужны.`
+      // Verb im Singular nach 1, 21 … („1 слово тебе не понадобится"), sonst im Plural
+      const form = russischPlural(n, RU_SLOVO)
+      return `${n} ${form} тебе не ${form === 'слово' ? 'понадобится' : 'понадобятся'}.`
     }
     default:
       return one ? 'You do not need one word.' : `You do not need ${n} words.`

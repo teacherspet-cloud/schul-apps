@@ -18,7 +18,7 @@
  * Beleg verlangt („Give the line that proves your answer"). Genau das ist nach NRW wertlos,
  * weil sich daran nicht erkennen lässt, ob die richtige Stelle gemeint war.
  *
- * Spanisch und Italienisch sind NICHT belegt: In den geprüften amtlichen Materialien kommt
+ * Spanisch, Italienisch und Russisch sind NICHT belegt: In den geprüften amtlichen Materialien kommt
  * das Format dort nicht vor (DELE benutzt es gar nicht). Die Fassungen sind sinngemäß
  * gebildet und als Vorschlag gekennzeichnet.
  */
@@ -58,6 +58,12 @@ const TEXTS: Record<string, EvidenceText> = {
   it: {
     instruction: 'Segna la casella giusta e giustifica la tua risposta citando il testo.',
     column: 'Citazione dal testo',
+    sourced: false
+  },
+  // Russisch (29.09.2026): ЕГЭ/ОГЭ kennen Richtig/Falsch nur ohne Beleg – sinngemäß gebildet
+  ru: {
+    instruction: 'Отметь правильный ответ и подтверди его короткой цитатой из текста.',
+    column: 'Цитата из текста',
     sourced: false
   }
 }

@@ -162,7 +162,8 @@ export const KLASSENARBEIT_FAECHER: KlassenarbeitFach[] = [
     hauptfach: true,
     beispiel: 'z. B. La mia famiglia',
     // Kopfzeilen nach der Recherche; sprachlich geprüfte Standardbegriffe
-    kopf: { titel: 'Verifica', fach: 'Italiano', teil: 'Parte', punkte: 'punti', gruppe: 'Gruppo' }
+    // „Fila A / Fila B" ist in italienischen Schulen die übliche Bezeichnung paralleler Fassungen
+    kopf: { titel: 'Verifica', fach: 'Italiano', teil: 'Parte', punkte: 'punti', gruppe: 'Fila' }
   },
   {
     id: 'russisch',
@@ -172,7 +173,9 @@ export const KLASSENARBEIT_FAECHER: KlassenarbeitFach[] = [
     praefix: 'ru',
     hauptfach: true,
     beispiel: 'z. B. Моя семья',
-    kopf: { titel: 'Контрольная работа', fach: 'Русский язык', teil: 'Часть', punkte: 'баллы', gruppe: 'Группа' }
+    // Parallele Fassungen heißen in russischen Schulen „Вариант"; „punkte" ist nur der Rückfall –
+    // die Teilüberschrift wählt die Form nach der Zahl (russischPlural: 1 балл / 2 балла / 5 баллов)
+    kopf: { titel: 'Контрольная работа', fach: 'Русский язык', teil: 'Часть', punkte: 'баллов', gruppe: 'Вариант' }
   },
   {
     id: 'latein',
