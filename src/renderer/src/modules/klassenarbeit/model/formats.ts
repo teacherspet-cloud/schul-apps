@@ -320,7 +320,7 @@ const DEUTSCH: ExamFormat[] = [
     label: 'Erzählen',
     competence: 'Schreiben',
     description:
-      'Eine Erzählung zu einem Schreibanlass (Bild, Reizwörter, Erzählanfang) oder eine Nacherzählung, mit Spannungsaufbau und passender Erzählperspektive.',
+      'Eine Erzählung zu einem Schreibanlass (Bild, Reizwörter, Erzählanfang) oder eine Nacherzählung, mit Spannungsaufbau und passender Erzählperspektive. (NRW-Aufgabentyp 1)',
     afb: ['II', 'III'],
     share: 100,
     grades: [5, 7],
@@ -332,7 +332,7 @@ const DEUTSCH: ExamFormat[] = [
     subject: 'deutsch',
     label: 'Informierendes Schreiben',
     competence: 'Schreiben',
-    description: 'Einen Sachverhalt aus Materialien (Texte, Grafiken) adressatengerecht darstellen – Bericht, Beschreibung, Informationstext.',
+    description: 'Einen Sachverhalt aus Materialien (Texte, Grafiken) adressatengerecht darstellen – Bericht, Beschreibung, Informationstext. (NRW-Aufgabentyp 2)',
     afb: ['I', 'II'],
     share: 60,
     grades: [5, 13],
@@ -345,7 +345,7 @@ const DEUTSCH: ExamFormat[] = [
     label: 'Argumentierendes Schreiben (Erörterung)',
     competence: 'Schreiben',
     description:
-      'Zu einer strittigen Frage Stellung nehmen: Argumente mit Beispielen, Gegenargumente, begründetes Urteil – als Leserbrief, Stellungnahme oder (textgebundene) Erörterung.',
+      'Zu einer strittigen Frage Stellung nehmen: Argumente mit Beispielen, Gegenargumente, begründetes Urteil – als Leserbrief, Stellungnahme oder (textgebundene) Erörterung. (NRW-Aufgabentyp 3)',
     afb: ['II', 'III'],
     share: 60,
     grades: [7, 13],
@@ -358,7 +358,7 @@ const DEUTSCH: ExamFormat[] = [
     label: 'Analyse eines literarischen Textes',
     competence: 'Lesen – mit Texten und Medien umgehen',
     description:
-      'Einen epischen oder dramatischen Text (Kurzgeschichte, Novellenauszug, Szene) erschließen: Inhalt, Aufbau, Figuren, sprachliche und erzählerische Mittel, Deutung mit Textbelegen.',
+      'Einen epischen oder dramatischen Text (Kurzgeschichte, Novellenauszug, Szene) erschließen: Inhalt, Aufbau, Figuren, sprachliche und erzählerische Mittel, Deutung mit Textbelegen. (NRW-Aufgabentyp 4a)',
     afb: ['I', 'II', 'III'],
     share: 70,
     grades: [7, 13],
@@ -372,7 +372,7 @@ const DEUTSCH: ExamFormat[] = [
     label: 'Gedichtinterpretation',
     competence: 'Lesen – mit Texten und Medien umgehen',
     description:
-      'Ein Gedicht erschließen: Inhalt, Form (Strophe, Vers, Reim, Metrum), sprachliche Bilder und ihre Wirkung, Deutung mit Textbelegen – ab Klasse 9 auch im Vergleich zweier Gedichte.',
+      'Ein Gedicht erschließen: Inhalt, Form (Strophe, Vers, Reim, Metrum), sprachliche Bilder und ihre Wirkung, Deutung mit Textbelegen – ab Klasse 9 auch im Vergleich zweier Gedichte. (NRW-Aufgabentyp 4a)',
     afb: ['I', 'II', 'III'],
     share: 70,
     grades: [6, 13],
@@ -385,7 +385,7 @@ const DEUTSCH: ExamFormat[] = [
     label: 'Analyse eines Sachtextes',
     competence: 'Lesen – mit Texten und Medien umgehen',
     description:
-      'Einen Sach- oder Gebrauchstext (Kommentar, Rede, Reportage) analysieren: Thema, Aufbau, Argumentation, sprachliche Mittel, Absicht und Wirkung.',
+      'Einen Sach- oder Gebrauchstext (Kommentar, Rede, Reportage) analysieren: Thema, Aufbau, Argumentation, sprachliche Mittel, Absicht und Wirkung. (NRW-Aufgabentyp 4a)',
     afb: ['I', 'II', 'III'],
     share: 70,
     grades: [8, 13],
@@ -398,10 +398,10 @@ const DEUTSCH: ExamFormat[] = [
     label: 'Materialgestütztes Schreiben',
     competence: 'Schreiben',
     description:
-      'Aus einem Materialdossier (Texte, Grafiken, Tabellen) einen eigenen informierenden oder argumentierenden Text für eine vorgegebene Situation verfassen – Aufgabenart der KMK-Bildungsstandards für die Hochschulreife.',
+      'Aus einem Materialdossier (Texte, Grafiken, Tabellen) einen eigenen informierenden oder argumentierenden Text für eine vorgegebene Situation verfassen – Aufgabenart der KMK-Bildungsstandards (MSA 2022 und Hochschulreife); NI: informierend in 7/8, argumentierend in 10 obligatorisch. (NRW-Aufgabentyp 2 bzw. 3)',
     afb: ['II', 'III'],
     share: 100,
-    grades: [9, 13],
+    grades: [7, 13],
     material: 'text',
     productive: true
   },
@@ -410,7 +410,7 @@ const DEUTSCH: ExamFormat[] = [
     subject: 'deutsch',
     label: 'Leseverstehen',
     competence: 'Lesen – mit Texten und Medien umgehen',
-    description: 'Geschlossene und halboffene Aufgaben zu einem Text: Informationen entnehmen, Aussagen prüfen, Textstellen deuten.',
+    description: 'Geschlossene und halboffene Aufgaben zu einem Text: Informationen entnehmen, Aussagen prüfen, Textstellen deuten. (NRW-Aufgabentyp 4b)',
     afb: ['I', 'II'],
     share: 40,
     grades: [5, 10],
@@ -427,6 +427,61 @@ const DEUTSCH: ExamFormat[] = [
     share: 30,
     grades: [5, 10],
     material: 'text'
+  },
+  /*
+   * 29.09.2026, Befunde D1–D3 (recherche/klassenarbeiten-pruefung-vorhandene-faecher-2026-09-29.md):
+   * NI-KC Deutsch Gymnasium S. 33–35, KLP Deutsch G9 NRW Kap. 3.
+   */
+  {
+    id: 'de-rechtschreibung',
+    subject: 'deutsch',
+    label: 'Rechtschreibung und Zeichensetzung',
+    competence: 'Sprache und Sprachgebrauch untersuchen',
+    description:
+      'Diktat (Vorlesetext mit Wortzahl, auch mit zeitlich begrenzter Wörterbuchphase), fehlerhaften Text korrigieren oder geschlossene Regelaufgaben – in Klasse 6–8 auch verbunden mit Grammatik.',
+    afb: ['I', 'II'],
+    share: 30,
+    grades: [5, 9],
+    material: 'text',
+    note: 'Niedersachsen: Überprüfung der Rechtschreibkompetenz in jedem Jahrgang 5–9 obligatorisch (KC Deutsch Gymnasium). NRW: als Teil einer Klassenarbeit möglich.'
+  },
+  {
+    id: 'de-ueberarbeiten',
+    subject: 'deutsch',
+    label: 'Text überarbeiten (mit Begründung)',
+    competence: 'Schreiben',
+    description: 'Einen gegebenen Text kriteriengestützt überarbeiten und die Änderungen begründen. (NRW-Aufgabentyp 5)',
+    afb: ['II', 'III'],
+    share: 60,
+    grades: [5, 10],
+    material: 'text',
+    productive: true
+  },
+  {
+    id: 'de-gestalten',
+    subject: 'deutsch',
+    label: 'Produktionsorientiertes Schreiben',
+    competence: 'Schreiben / Lesen',
+    description:
+      'Zu einem literarischen Text umschreiben, fortsetzen, die Perspektive wechseln oder einen inneren Monolog verfassen – mit einer Reflexionsaufgabe zur eigenen Gestaltung. (NRW-Aufgabentyp 6)',
+    afb: ['II', 'III'],
+    share: 100,
+    grades: [5, 13],
+    material: 'text',
+    productive: true
+  },
+  {
+    id: 'de-inhaltsangabe',
+    subject: 'deutsch',
+    label: 'Inhaltsangabe',
+    competence: 'Schreiben / Lesen',
+    description:
+      'Einen literarischen oder pragmatischen Text sachlich und knapp im Präsens zusammenfassen (Einleitungssatz, Handlungsschritte, keine Zitate); ab Klasse 9 mit analytischen Teilaufgaben. (NRW-Aufgabentyp 4a/4b)',
+    afb: ['I', 'II'],
+    share: 60,
+    grades: [7, 10],
+    material: 'text',
+    productive: true
   }
 ]
 

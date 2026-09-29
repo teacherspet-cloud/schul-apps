@@ -57,7 +57,7 @@ import { mitLerngruppe } from '../../../shared/lerngruppe'
 import { curriculumSource, curriculumTopics } from '../model/curriculumGeschichte'
 import { examWarnings, gradeScaleGroups, scaleLineFuer, stateRules, WORTZAHL_GRUND, wortzahlErlaubt } from '../model/examRules'
 import { notenpunkteFuer } from '../../../shared/notenpunkte'
-import { STUDENT_TEXT_TYPES } from '../../arbeitsblatt/generation/prompts'
+import { textsortenFuer } from '../../arbeitsblatt/generation/prompts'
 import { CONTENT_SHARE, defaultWeights, formatById, formatsFor, suggestParts, writingWeightFor } from '../model/formats'
 import { ANSWER_KEY_DETAILS } from '../model/types'
 import type { Exam, ExamMeta, ExamPart, ExamSubjectId } from '../model/types'
@@ -728,7 +728,7 @@ export default function FrameStep(): React.JSX.Element {
                                     mt="xs"
                                     size="xs"
                                     label="Textsorte des Schülertextes"
-                                    data={STUDENT_TEXT_TYPES.map((t) => ({
+                                    data={textsortenFuer(meta.subjectId).map((t) => ({
                                       value: t.value,
                                       label: t.label
                                     }))}

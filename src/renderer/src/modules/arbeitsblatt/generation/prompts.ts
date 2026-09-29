@@ -31,6 +31,8 @@ export {
   sourceTextWords,
   contextRules,
   STUDENT_TEXT_TYPES,
+  DEUTSCHE_TEXTSORTEN,
+  textsortenFuer,
   studentTextTypeRule,
   writingBriefRules,
   umfangRegeln,

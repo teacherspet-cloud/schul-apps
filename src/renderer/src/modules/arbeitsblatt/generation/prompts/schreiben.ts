@@ -100,6 +100,34 @@ export const STUDENT_TEXT_TYPES: {
   { value: 'review', label: 'Rezension / Empfehlung', english: 'review' }
 ]
 
+/**
+ * Aufsatzformen im Fach Deutsch (29.09.2026, Befund D4): Die Liste oben ist auf die
+ * Fremdsprachen zugeschnitten (E-Mail, Blog …). Deutsch braucht die Aufsatzformen der
+ * Kerncurricula (NI-KC Deutsch, KLP NRW): Inhaltsangabe, Erörterung, Interpretation,
+ * Charakterisierung, Beschreibung, Bericht, Leserbrief, Kommentar, appellativer Text.
+ */
+export const DEUTSCHE_TEXTSORTEN: { value: string; label: string; english: string }[] = [
+  { value: '', label: 'KI wählt passend zur Aufgabe', english: '' },
+  { value: 'erzaehlung', label: 'Erzählung', english: 'Erzählung' },
+  { value: 'bericht-de', label: 'Bericht', english: 'Bericht' },
+  { value: 'vorgangsbeschreibung', label: 'Vorgangsbeschreibung', english: 'Vorgangsbeschreibung' },
+  { value: 'personenbeschreibung', label: 'Personenbeschreibung', english: 'Personenbeschreibung' },
+  { value: 'brief-de', label: 'Persönlicher oder sachlicher Brief', english: 'Brief' },
+  { value: 'appellativ', label: 'Appellativer Text (Aufruf, Flyer)', english: 'appellativer Text' },
+  { value: 'inhaltsangabe', label: 'Inhaltsangabe', english: 'Inhaltsangabe' },
+  { value: 'charakterisierung', label: 'Charakterisierung', english: 'Charakterisierung' },
+  { value: 'interpretation', label: 'Interpretationsaufsatz', english: 'Interpretationsaufsatz' },
+  { value: 'eroerterung-linear', label: 'Lineare Erörterung', english: 'lineare Erörterung' },
+  { value: 'eroerterung-dialektisch', label: 'Dialektische (antithetische) Erörterung', english: 'dialektische Erörterung' },
+  { value: 'eroerterung-textgebunden', label: 'Textgebundene Erörterung', english: 'textgebundene Erörterung' },
+  { value: 'leserbrief', label: 'Leserbrief', english: 'Leserbrief' },
+  { value: 'kommentar', label: 'Kommentar', english: 'Kommentar' }
+]
+
+/** Textsorten für ein Fach: Deutsch mit Aufsatzformen, sonst die Liste der Fremdsprachen */
+export const textsortenFuer = (subjectId: string): { value: string; label: string; english: string }[] =>
+  subjectId === 'deutsch' || subjectId === 'daz' ? DEUTSCHE_TEXTSORTEN : STUDENT_TEXT_TYPES
+
 /** Vorgegebene Textsorte des Schülertextes, falls die Lehrkraft eine gewählt hat. */
 export function studentTextTypeRule(meta: WorksheetMeta): string {
   const chosen = STUDENT_TEXT_TYPES.find((t) => t.value === meta.studentTextType && t.value)

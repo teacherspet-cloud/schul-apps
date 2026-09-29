@@ -37,6 +37,7 @@ import {
   originalSourceRules,
   sourceTextWords,
   STUDENT_TEXT_TYPES,
+  DEUTSCHE_TEXTSORTEN,
   systemPrompt,
   writingBriefRules,
   writingScaffoldRules
@@ -229,7 +230,8 @@ function answerKeyRules(exam: Exam, part: ExamPart): string {
 
 /** Nähere Vorgaben der Lehrkraft für diesen Teil. */
 export function partNotes(part: ExamPart): string {
-  const textType = STUDENT_TEXT_TYPES.find((t) => t.value === part.studentTextType && t.value)
+  // Deutsch: Aufsatzformen (Befund D4), sonst die Textsorten der Fremdsprachen
+  const textType = [...STUDENT_TEXT_TYPES, ...DEUTSCHE_TEXTSORTEN].find((t) => t.value === part.studentTextType && t.value)
   const lines = [
     textType
       ? `TEXTSORTE VORGEGEBEN: Die Lernenden schreiben „${textType.label}“ (brief.textType = "${textType.english}"). Die Situation muss dazu passen, und die Aufgabe verlangt die Merkmale dieser Textsorte.`

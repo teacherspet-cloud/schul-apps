@@ -3,6 +3,7 @@
  * recherche/klassenarbeiten-faecher-neu-2026-09-29.md, Abschnitt 13). Eingebunden in
  * `partPrompt` (generateExam.ts) – je Teil nur, was zu Fach und Format gehört.
  */
+import { kiLandesregeln } from '../../rueckmeldung/laenderRegeln'
 import { pruefungsVersuchRegeln, setzeProtokollInPruefung, versuchAnfrage, versuchAus } from '../../arbeitsblatt/didactics/protokoll'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { fachDerArbeit, hatVersuche } from '../model/faecher'
@@ -87,6 +88,10 @@ export function fachRegeln(exam: Exam, part: ExamPart): string {
       '- Bei „bewerten" und „Stellung nehmen" werden die Wertmaßstäbe offengelegt; unterschiedliche weltanschauliche Positionen werden respektvoll dargestellt.',
       '- Keine Bewertung von Glaubens- oder Gewissensentscheidungen der Lernenden selbst.'
     )
+  // Befund D6 (29.09.2026): Landesregeln zur sprachlichen Richtigkeit (NRW Absenkung um eine Notenstufe, HE Fehlerindex, BE ohne Fehlerquotient …)
+  zeilen.push(kiLandesregeln({ stateId: m.stateId, grade: m.grade, schoolTypeId: m.schoolTypeId, subjectId: m.subjectId }, 'note'))
+  if (m.subjectId === 'deutsch' && m.stateId === 'NI' && m.grade >= 6)
+    zeilen.push('- Niedersachsen: Rechtschreib-, Zeichensetzungs- und Grammatikleistung ab Klasse 6 in die Beurteilung der Aufsätze einbeziehen, in Relation zum Textumfang (KC Deutsch).')
   return zeilen.filter(Boolean).join('\n')
 }
 
