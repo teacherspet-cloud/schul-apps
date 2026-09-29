@@ -9,7 +9,7 @@
  * die Module geben sie unter ihren bisherigen Namen weiter.
  */
 import { legeAb } from '../auftraege'
-import { dokumentName, sichereAlles } from '../autosave'
+import { dokumentName, istGeloescht, sichereAlles } from '../autosave'
 import { einsortierenNachSpeichern } from '../themenbereiche'
 import { useStoreAutosave } from '../useAutosave'
 
@@ -66,6 +66,8 @@ export function erzeugeBibliothek<D, S extends TestStoreZustand<D>, Stats>(b: Bi
     const dok = b.dokument(state)
     if (!dok || !b.lohntSicherung(dok)) return
     const id = state.docId
+    // Ein gelöschtes Dokument wird nicht wieder angelegt (shared/bibliothek.ts, `loescheDokument`)
+    if (istGeloescht(id)) return
     const meta = await b.api.save({ id, name: name?.trim() || dokumentName(id, state.docName, b.standardName(dok)), stats: b.stats(dok), payload: dok })
     void einsortierenNachSpeichern()
     b.store.getState().markSaved(meta.id, meta.updatedAt, meta.name)

@@ -5,9 +5,9 @@
  * Absturzsicher über `writeAtomic`.
  */
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { writeAtomic } from './atomar'
+import { loescheDatei, writeAtomic } from './atomar'
 
 export interface DokumentMeta {
   id: string
@@ -68,7 +68,7 @@ export function erzeugeAblage(ordner: string, bezeichnung: string, wurzel: () =>
       return meta
     },
     delete: (id) => {
-      rmSync(join(dir(), `${checkId(id)}.json`), { force: true })
+      loescheDatei(join(dir(), `${checkId(id)}.json`))
       const rest = list().filter((t) => t.id !== id)
       writeAtomic(indexFile(), JSON.stringify(rest, null, 1))
       return rest

@@ -2,7 +2,7 @@ import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextI
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
-import { kopieName, passtZurSuche } from '../bibliothek'
+import { kopieName, loescheDokument, passtZurSuche } from '../bibliothek'
 import { useMenueFokus } from '../menueFokus'
 import { imNetz } from '../netzZugang'
 import { useConfirmKeys } from '../useConfirmKeys'
@@ -64,8 +64,8 @@ export interface Bibliothek<M extends BibliotheksEintrag> {
  *
  * `offeneId` nennt das gerade im Programm offene Dokument: Wird es umbenannt, übernimmt der
  * Editor den Namen (sonst schriebe die nächste Sicherung den alten zurück); wird es
- * gelöscht, vergisst der Editor die Kennung (sonst legte die nächste Sicherung den Eintrag
- * stillschweigend wieder an).
+ * gelöscht, schließt das Programm es (`geloescht`) – sonst legte die nächste Sicherung den
+ * Eintrag stillschweigend wieder an (siehe `loescheDokument` in shared/bibliothek.ts).
  */
 export function useBibliothek<M extends BibliotheksEintrag>(
   api: BibliotheksApi<M>,
@@ -114,12 +114,12 @@ export function useBibliothek<M extends BibliotheksEintrag>(
   const loeschenBestaetigen = useCallback(async (): Promise<void> => {
     if (!loeschen) return
     try {
-      setEintraege(await api.delete(loeschen.id))
-      if (aktuell.current.offeneId() === loeschen.id) aktuell.current.geloescht?.()
+      // Anstehendes vorher sichern, offenes Dokument schließen, Kennung als gelöscht merken (shared/bibliothek.ts)
+      setEintraege(await loescheDokument((id) => api.delete(id), loeschen.id, aktuell.current))
       if (aktuell.current.moduleId) void zuordnungVergessen(aktuell.current.moduleId, loeschen.id)
       setLoeschen(null)
     } catch (e) {
-      notifyError(e)
+      notifyError(e, 'Das Löschen hat nicht geklappt')
     }
   }, [api, loeschen])
   // Enter bestätigt die Löschen-Rückfrage, Esc bricht ab

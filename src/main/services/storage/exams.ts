@@ -1,7 +1,7 @@
 // Klassenarbeiten in der App speichern: je Arbeit eine Datei plus ein kleines Verzeichnis für die Übersicht.
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
-import { writeAtomic } from './atomar'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { loescheDatei, writeAtomic } from './atomar'
 import { join } from 'path'
 import { SavedExam, SavedExamInput, SavedExamMeta } from '@shared/types'
 
@@ -46,7 +46,7 @@ export function saveExam(input: SavedExamInput): SavedExamMeta {
 }
 
 export function deleteExam(id: string): SavedExamMeta[] {
-  rmSync(join(dir(), `${checkId(id)}.json`), { force: true })
+  loescheDatei(join(dir(), `${checkId(id)}.json`))
   const list = listExams().filter((t) => t.id !== id)
   writeAtomic(indexFile(), JSON.stringify(list, null, 1))
   return list

@@ -137,7 +137,8 @@ export const useVokabeltest = create<VokabeltestState>((set, get) => ({
     }),
 
   setActiveVariant: (activeVariantId) => set({ activeVariantId }),
-  forgetSaved: () => set({ testId: newId(), lastSavedAt: null }),
+  // Gelöscht, während es offen war: schließen statt mit neuer Kennung stehen lassen – sonst legte das automatische Sichern es sofort wieder an (29.09.2026)
+  forgetSaved: () => get().newTest(),
 
   undo: () => {
     const { doc, verlauf, activeVariantId } = get()

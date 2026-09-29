@@ -57,7 +57,8 @@ export function erzeugeDokumentStore<D>(opts: { startSchritt: (d: D) => number; 
       if (docId === get().docId) set({ savedAt, docName })
     },
     setDocName: (docName) => set({ docName }),
-    forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+    // Gelöscht, während es offen war: schließen statt mit neuer Kennung stehen lassen – sonst legte das automatische Sichern es sofort wieder an (29.09.2026)
+    forgetSaved: () => get().reset(),
     openSaved: (docId, docName, roh, savedAt) => {
       const dok = norm(roh)
       set({ docId, docName, dok, savedAt, step: opts.startSchritt(dok), verlauf: leererVerlauf() })

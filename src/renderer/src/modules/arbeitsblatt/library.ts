@@ -3,7 +3,7 @@ import { cleanImageBackground } from '../../shared/imageCleanup'
 import * as pdfjs from 'pdfjs-dist'
 import { useRef } from 'react'
 import type { SavedWorksheetStats } from '@shared/types'
-import { dokumentName, sichereAlles } from '../../shared/autosave'
+import { dokumentName, istGeloescht, sichereAlles } from '../../shared/autosave'
 import { legeAb } from '../../shared/auftraege'
 import { useStoreAutosave } from '../../shared/useAutosave'
 import { buildWorksheetHtml } from './render/printHtml'
@@ -89,6 +89,8 @@ export async function saveCurrentWorksheet(
   const ws = state.worksheet
   if (!ws || !lohntSicherung(ws)) return
   const id = state.docId
+  // Ein gelöschtes Dokument wird nicht wieder angelegt (shared/bibliothek.ts, `loescheDokument`)
+  if (istGeloescht(id)) return
   const name = opts.name?.trim() || dokumentName(id, state.docName, defaultWorksheetName(ws))
   const thumb =
     opts.withThumb === false || !opts.layouts || !ws.sheets.length

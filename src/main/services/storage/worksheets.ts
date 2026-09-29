@@ -1,7 +1,7 @@
 // Arbeitsblätter in der App speichern: je Blatt eine Datei plus ein kleines Verzeichnis (für die Ordneransicht).
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
-import { writeAtomic } from './atomar'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { loescheDatei, writeAtomic } from './atomar'
 import { join } from 'path'
 import { SavedWorksheet, SavedWorksheetInput, SavedWorksheetMeta } from '@shared/types'
 
@@ -46,7 +46,7 @@ export function saveWorksheet(input: SavedWorksheetInput): SavedWorksheetMeta {
 }
 
 export function deleteWorksheet(id: string): SavedWorksheetMeta[] {
-  rmSync(join(dir(), `${checkId(id)}.json`), { force: true })
+  loescheDatei(join(dir(), `${checkId(id)}.json`))
   const list = listWorksheets().filter((t) => t.id !== id)
   writeAtomic(indexFile(), JSON.stringify(list, null, 1))
   return list

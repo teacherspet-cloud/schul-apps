@@ -71,19 +71,25 @@ export function useStoreAutosave<S>(optionen: StoreAutosave<S>): void {
   const o = useRef(optionen)
   o.current = optionen
   const sicherung = useVerzoegertesSichern(() => o.current.speichern())
-  useEffect(() => {
-    const { store } = o.current
-    const kurz = 200
-    const start = store.getState()
-    if (o.current.bereit(start) && !o.current.gesichert(start)) sicherung.plane(kurz)
-    return store.subscribe((s, prev) => {
-      const { dokument, gesichert, bereit, geaendert, verzoegerung = 1500 } = o.current
-      if (dokument(s) !== dokument(prev)) {
-        if (bereit(s) && !gesichert(s)) sicherung.plane(kurz)
-        return
-      }
-      if (!bereit(s) || !geaendert(s, prev)) return
-      sicherung.plane(verzoegerung)
-    })
-  }, [sicherung])
+  useEffect(() => beobachteStore(() => o.current, sicherung), [sicherung])
+}
+
+/**
+ * Die Regeln von `useStoreAutosave` ohne React – so lassen sie sich ohne Oberfläche prüfen
+ * (tests/loeschenBleibt.test.ts). Liefert die Abmeldung vom Store.
+ */
+export function beobachteStore<S>(optionen: () => StoreAutosave<S>, sicherung: Pick<VerzoegerteSicherung, 'plane'>): () => void {
+  const { store, bereit, gesichert } = optionen()
+  const kurz = 200
+  const start = store.getState()
+  if (bereit(start) && !gesichert(start)) sicherung.plane(kurz)
+  return store.subscribe((s, prev) => {
+    const { dokument, gesichert, bereit, geaendert, verzoegerung = 1500 } = optionen()
+    if (dokument(s) !== dokument(prev)) {
+      if (bereit(s) && !gesichert(s)) sicherung.plane(kurz)
+      return
+    }
+    if (!bereit(s) || !geaendert(s, prev)) return
+    sicherung.plane(verzoegerung)
+  })
 }

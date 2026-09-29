@@ -5,7 +5,7 @@ import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
 import { aktuelleKi, stempleKi } from '@shared/kiKennzeichnung'
 import type { Netzfund } from '../../../main/services/ai/provider'
 import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPhase } from './aiProgress'
-import { sichereAlles } from './autosave'
+import { istGeloescht, sichereAlles } from './autosave'
 import { glaetteZiel, kiKennung, merkeAnfrage, merkeAuftrag, schaetzeRest } from './restzeit'
 import { useAppSettings } from './settingsStore'
 
@@ -551,6 +551,8 @@ export async function legeAb<D>(ablage: DokumentAblage<D>, docId: string, schnap
   const { settings } = useAppSettings.getState()
   const ki = aktuelleKi(settings)
   const einarbeiten = (aktuell: D): D => stempleKi(einarbeitenRoh(aktuell), ki, settings.kiVermerk)
+  // Inzwischen gelöscht: Das Ergebnis wird verworfen – sonst legte es das Dokument aus dem Schnappschuss neu an
+  if (istGeloescht(docId)) return
   if (ablage.istOffen(docId)) {
     ablage.imOffenen(einarbeiten)
     await sichereAlles()

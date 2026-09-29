@@ -1,7 +1,7 @@
 // Grammatiktests in der App speichern: je Test eine Datei plus ein kleines Verzeichnis für die Übersicht.
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
-import { writeAtomic } from './atomar'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { loescheDatei, writeAtomic } from './atomar'
 import { join } from 'path'
 import { SavedGrammarTest, SavedGrammarTestInput, SavedGrammarTestMeta } from '@shared/types'
 
@@ -46,7 +46,7 @@ export function saveGrammarTest(input: SavedGrammarTestInput): SavedGrammarTestM
 }
 
 export function deleteGrammarTest(id: string): SavedGrammarTestMeta[] {
-  rmSync(join(dir(), `${checkId(id)}.json`), { force: true })
+  loescheDatei(join(dir(), `${checkId(id)}.json`))
   const list = listGrammarTests().filter((t) => t.id !== id)
   writeAtomic(indexFile(), JSON.stringify(list, null, 1))
   return list

@@ -71,7 +71,8 @@ export const useArbeitsblatt = create<ArbeitsblattState>((set, get) => ({
   markSaved: (docId, savedAt, docName) => {
     if (docId === get().docId) set({ savedAt, docName })
   },
-  forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  // Gelöscht, während es offen war: schließen statt mit neuer Kennung stehen lassen – sonst legte das automatische Sichern es sofort wieder an (29.09.2026)
+  forgetSaved: () => get().newWorksheet(),
   openSaved: (docId, docName, worksheet, savedAt) =>
     set({
       docId,

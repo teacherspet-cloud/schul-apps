@@ -1,7 +1,7 @@
 // Vokabeltests in der App speichern: je Test eine Datei (vollständige Vokabelliste, Einstellungen, Test) plus ein kleines Verzeichnis.
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
-import { writeAtomic } from './atomar'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { loescheDatei, writeAtomic } from './atomar'
 import { join } from 'path'
 import { SavedTest, SavedTestInput, SavedTestMeta } from '@shared/types'
 
@@ -55,7 +55,7 @@ export function saveTest(input: SavedTestInput): SavedTestMeta {
 }
 
 export function deleteTest(id: string): SavedTestMeta[] {
-  rmSync(join(dir(), `${checkId(id)}.json`), { force: true })
+  loescheDatei(join(dir(), `${checkId(id)}.json`))
   const list = listTests().filter((t) => t.id !== id)
   writeAtomic(indexFile(), JSON.stringify(list, null, 1))
   return list

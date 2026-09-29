@@ -58,7 +58,8 @@ export const useGrammatiktest = create<GrammatiktestState>((set, get) => ({
     if (docId === get().docId) set({ savedAt, docName })
   },
   setDocName: (docName) => set({ docName }),
-  forgetSaved: () => set({ docId: newId(), savedAt: null, docName: '' }),
+  // Gelöscht, während es offen war: schließen statt mit neuer Kennung stehen lassen – sonst legte das automatische Sichern es sofort wieder an (29.09.2026)
+  forgetSaved: () => get().reset(),
   loadFromFile: (test) => set({ docId: newId(), docName: '', test, savedAt: null, step: test.blocks.length ? 1 : 0, verlauf: leererVerlauf() }),
   openSaved: (docId, docName, test, savedAt) => set({ docId, docName, test, savedAt, step: test.blocks.length ? 1 : 0, verlauf: leererVerlauf() }),
   reset: () => set({ test: null, step: 0, docId: newId(), docName: '', savedAt: null, verlauf: leererVerlauf() }),

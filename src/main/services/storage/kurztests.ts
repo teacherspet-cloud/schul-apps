@@ -1,8 +1,8 @@
 // Lernzielkontrollen in der App speichern: je Kontrolle eine Datei plus ein kleines
 // Verzeichnis für die Übersicht. Aufbau wie bei den Grammatiktests.
 import { app } from 'electron'
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs'
-import { writeAtomic } from './atomar'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import { loescheDatei, writeAtomic } from './atomar'
 import { join } from 'path'
 import { SavedKurztest, SavedKurztestInput, SavedKurztestMeta } from '@shared/types'
 
@@ -47,7 +47,7 @@ export function saveKurztest(input: SavedKurztestInput): SavedKurztestMeta {
 }
 
 export function deleteKurztest(id: string): SavedKurztestMeta[] {
-  rmSync(join(dir(), `${checkId(id)}.json`), { force: true })
+  loescheDatei(join(dir(), `${checkId(id)}.json`))
   const list = listKurztests().filter((t) => t.id !== id)
   writeAtomic(indexFile(), JSON.stringify(list, null, 1))
   return list

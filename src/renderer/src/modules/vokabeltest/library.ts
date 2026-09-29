@@ -1,6 +1,6 @@
 import { cleanImageBackground } from '../../shared/imageCleanup'
 import type { SavedTestStats } from '@shared/types'
-import { sichereAlles } from '../../shared/autosave'
+import { istGeloescht, sichereAlles } from '../../shared/autosave'
 import { legeAb } from '../../shared/auftraege'
 import { LANGUAGES, type TestDocument } from './model/types'
 import { useStoreAutosave } from '../../shared/useAutosave'
@@ -95,6 +95,8 @@ export async function saveCurrentTest(name?: string, still = false): Promise<voi
   const finalName = (name ?? state.listName).trim() || `Vokabeltest vom ${new Date().toLocaleDateString('de-DE')}`
   if (!still && finalName !== state.listName) state.setListName(finalName)
   const id = state.testId
+  // Ein gelöschtes Dokument wird nicht wieder angelegt (shared/bibliothek.ts, `loescheDokument`)
+  if (istGeloescht(id)) return
   const { payload, stats } = currentPayload()
   const meta = await window.api.tests.save({ id, name: finalName, stats, payload })
   useVokabeltest.getState().markSaved(meta.id, meta.updatedAt)

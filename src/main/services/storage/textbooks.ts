@@ -1,10 +1,11 @@
 // Schulbuch-Vokabeln: mitgelieferte Lehrwerke (resources/lehrwerke) und von der Lehrkraft importierte (userData/lehrwerke).
 import { app } from 'electron'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { MARK_BOX, MARK_EXPLAINED, MARK_GREY } from '@shared/types'
 import type { Textbook, TextbookMeta } from '@shared/types'
 import { resourcePath } from './paths'
+import { loescheDatei } from './atomar'
 import { mitReihe } from '@shared/lehrwerkReihe'
 
 function userDir(): string {
@@ -95,6 +96,6 @@ export function saveTextbooks(books: Textbook[]): TextbookMeta[] {
 }
 
 export function deleteTextbook(id: string): TextbookMeta[] {
-  rmSync(join(userDir(), `${checkId(id)}.json`), { force: true })
+  loescheDatei(join(userDir(), `${checkId(id)}.json`))
   return listTextbooks()
 }
