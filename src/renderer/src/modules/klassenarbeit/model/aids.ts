@@ -45,7 +45,15 @@ const ENGLISH: Record<string, string> = {
   taschenrechner: 'a calculator',
   atlas: 'an atlas',
   formelsammlung: 'a formula sheet',
-  operatorenliste: 'the list of operators'
+  operatorenliste: 'the list of operators',
+  'ohne hilfsmittel (teil a)': 'no aids (part A)',
+  'taschenrechner (nicht grafikfähig)': 'a (non-graphing) calculator',
+  'grafikfähiger taschenrechner / cas': 'a graphing calculator / CAS',
+  'zirkel und geodreieck': 'compasses and a set square',
+  periodensystem: 'the periodic table',
+  tafelwerk: 'a data book',
+  wortangaben: 'the vocabulary notes',
+  'sprachreferenz (informatik)': 'the language reference'
 }
 
 /**

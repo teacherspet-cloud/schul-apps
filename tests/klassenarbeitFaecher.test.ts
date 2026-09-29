@@ -24,7 +24,8 @@ import { examHeadBlock, examToWorksheet } from '../src/renderer/src/modules/klas
  * Klassenarbeit in Französisch, Spanisch, Deutsch, Politik und Erdkunde (Großprogramm 0.4,
  * Phase G). Die Fächer sagen über ihr Profil, was sie sind; die Programmteile fragen danach.
  */
-const FAECHER: ExamSubjectId[] = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde']
+// Seit 29.09.2026 alle Fächer (Wunsch der Lehrkraft: Klassenarbeiten in allen Fächern)
+const FAECHER: ExamSubjectId[] = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst']
 
 const arbeit = (subjectId: ExamSubjectId, over: Partial<Exam['meta']> = {}, parts: ExamPart[] = []): Exam =>
   ({
@@ -36,7 +37,7 @@ const arbeit = (subjectId: ExamSubjectId, over: Partial<Exam['meta']> = {}, part
   }) as unknown as Exam
 
 describe('Fachprofil', () => {
-  it('kennt alle sieben Fächer, die Programmsichtbarkeit dieselben', () => {
+  it('kennt alle Fächer, die Programmsichtbarkeit dieselben', () => {
     expect(KLASSENARBEIT_FAECHER.map((f) => f.id)).toEqual(FAECHER)
     expect([...SICHTBAR_FAECHER].sort()).toEqual([...FAECHER].sort())
   })

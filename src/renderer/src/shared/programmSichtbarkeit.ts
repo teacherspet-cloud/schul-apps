@@ -27,7 +27,7 @@
 export const SPRACH_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'latein', 'daz'] as const
 
 /** Fächer, die die Klassenarbeit kann (klassenarbeit/model/types.ts, `ExamSubjectId`) */
-export const KLASSENARBEIT_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde'] as const
+export const KLASSENARBEIT_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst'] as const
 
 /** 'alle' = jedes Fach; sonst die Fachkennungen, für die das Programm gedacht ist */
 export type ProgrammFaecher = 'alle' | readonly string[]

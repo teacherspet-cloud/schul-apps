@@ -49,21 +49,14 @@ describe('Programme nach eigenen Fächern', () => {
     ])
   })
 
-  it('Mathematik allein: auch die Klassenarbeit fällt weg (Mathematik gehört nicht zu den Fächern der Klassenarbeit)', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'rueckmeldung', 'elternbrief'])
+  it('Mathematik allein: mit Klassenarbeit (seit 29.09.2026 alle Fächer), ohne Vokabel- und Grammatikprogramme', () => {
+    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung', 'elternbrief'])
   })
 
-  it('Latein und DaZ zählen zu den Sprachfächern', () => {
-    for (const fach of ['latein', 'daz'])
-      expect(ids(sichtbareProgramme(PROGRAMME, [fach], {}))).toEqual([
-        'arbeitsblatt',
-        'vokabeltest',
-        'grammatiktest',
-        'lernzielkontrolle',
-        'rueckmeldung',
-        'elternbrief',
-        'vokabelliste'
-      ])
+  it('Latein und DaZ zählen zu den Sprachfächern; Latein hat seit 29.09.2026 auch Klassenarbeiten', () => {
+    const sprache = ['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'rueckmeldung', 'elternbrief', 'vokabelliste']
+    expect(ids(sichtbareProgramme(PROGRAMME, ['daz'], {}))).toEqual(sprache)
+    expect(ids(sichtbareProgramme(PROGRAMME, ['latein'], {}))).toEqual(PROGRAMM_REIHENFOLGE)
   })
 
   it('Englisch, Französisch und Spanisch: alles sichtbar (Klassenarbeit seit Phase G auch in Französisch und Spanisch)', () => {

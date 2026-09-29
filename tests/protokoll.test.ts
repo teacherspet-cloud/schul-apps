@@ -202,5 +202,6 @@ describe('Word-Export', () => {
     const loesung = await xml(true, true)
     expect(loesung).toContain('Kohlenstoffdioxid + Wasser')
     expect(loesung).toContain('Bewertungsraster')
-  })
+    // Dynamische Importe (docx, JSZip) brauchen unter voller Last länger als die üblichen 5 s
+  }, 30000)
 })
