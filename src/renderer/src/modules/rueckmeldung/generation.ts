@@ -35,6 +35,7 @@ import { klemme } from './korrekturrand'
 import { kiLandesregeln } from './laenderRegeln'
 import { ausgleichAnweisung, maxSchritte, ohneRechtschreibung } from './nachteilsausgleich'
 import { tabelleText } from './tabelle'
+import { klartext, ohneKiTest } from './abgabeTrennen'
 import type {
   Abgabe,
   Bogen,
@@ -424,7 +425,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       teileText(r),
       `ARBEIT VON ${a.kuerzel} (die Abgabe, zwischen <<<ARBEIT und ARBEIT>>>):`,
       '<<<ARBEIT',
-      a.text.trim() || (scan ? '(Text nur auf den beigefügten Bildern)' : ''),
+      ohneKiTest(klartext(a.text)).text.trim() || (scan ? '(Text nur auf den beigefügten Bildern)' : ''),
       'ARBEIT>>>'
     ]
       .filter(Boolean)

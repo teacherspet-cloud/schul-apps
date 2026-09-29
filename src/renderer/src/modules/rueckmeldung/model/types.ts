@@ -178,7 +178,7 @@ export interface Abgabe {
    */
   textOriginal?: string
   /** Was beim Abtrennen geschah: entfernte Zeilen gegenüber dem Original, Abgleich oder KI */
-  trennung?: { zeilen: number; quelle: 'abgleich' | 'ki'; entfernt?: string[] }
+  trennung?: { zeilen: number; quelle: 'abgleich' | 'ki'; entfernt?: string[]; keineAntwort?: 'leer' | 'lehrerfassung' }
   /** Nachteilsausgleich für diese Abgabe (nur Maßnahmen, nie eine Diagnose) */
   ausgleich?: Nachteilsausgleich
   /** Familiensprache für die Elternfassung (Code aus shared/familiensprachen.ts) */

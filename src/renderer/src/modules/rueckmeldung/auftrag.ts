@@ -71,7 +71,7 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
           if (!a.text.trim() && a.bilder.length) {
             a = transkriptUebernehmen(a, await k.ai<unknown>(transkriptAnfrage(a)))
             // Mit übertragene Aufgabenzeilen (gedrucktes Arbeitsblatt) per Abgleich abtrennen – rückgängig machbar
-            a = trennungAnwenden(a, trenneNachAufgabe(a.text, rm.grundlage.aufgaben), 'abgleich')
+            a = trennungAnwenden(a, trenneNachAufgabe(a.text, rm.grundlage.aufgaben, rm.grundlage.erwartung), 'abgleich')
           }
           // Namen verlassen den Rechner nicht: an die KI geht der bereinigte Text
           const { text, pseudonyme } = ohneNamen(a)

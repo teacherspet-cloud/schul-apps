@@ -47,7 +47,7 @@ import { newId } from '../../vokabeltest/model/random'
 import { notifyError } from '../../../shared/util'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import { abgabenTrennen, aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
-import { kiTrennungNoetig, trenneNachAufgabe, trennHinweis, trennungAnwenden, trennungZurueck } from '../abgabeTrennen'
+import { kiTrennungNoetig, klartext, ohneKiTest, trenneNachAufgabe, trennHinweis, trennungAnwenden, trennungZurueck } from '../abgabeTrennen'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from '../sprachErkennung'
 import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import MaterialWahl from '../../../shared/components/MaterialWahl'
@@ -143,7 +143,7 @@ export default function Einrichten(): React.JSX.Element | null {
     update((d) => {
       d.abgaben.forEach((x, j) => {
         if (!ids.includes(x.id) || !x.text.trim()) return
-        const e = trenneNachAufgabe(x.text, d.grundlage.aufgaben)
+        const e = trenneNachAufgabe(x.text, d.grundlage.aufgaben, d.grundlage.erwartung)
         d.abgaben[j] = trennungAnwenden(x, e, 'abgleich')
         if (kiTrennungNoetig(e, d.grundlage.aufgaben) || (erneut && !e.zeilen)) kiIds.push(x.id)
       })
@@ -158,7 +158,8 @@ export default function Einrichten(): React.JSX.Element | null {
       for (const f of files) {
         setLese(`${f.name} wird gelesen …`)
         const c = await extractContent(f, (m) => setLese(`${f.name}: ${m}`), { renderPages: false, maxRenderedPages: 4 })
-        gelesen.push({ fileName: c.fileName, text: c.kind === 'image' ? '' : c.text, kind: c.kind, pageImages: c.pageImages })
+        // Word kommt als HTML: nur der Text, ohne Tags und eingebettete Bilder; der unsichtbare KI-Test fällt weg
+        gelesen.push({ fileName: c.fileName, text: c.kind === 'image' ? '' : ohneKiTest(klartext(c.text)).text, kind: c.kind, pageImages: c.pageImages })
       }
       setLese(null)
       // Datenschutz: Hinweis und Namen ersetzen, bevor etwas zur KI geht
@@ -530,7 +531,7 @@ export default function Einrichten(): React.JSX.Element | null {
                         )}
                         {trennHinweis(a) && (
                           <Group gap={6} data-rm-getrennt>
-                            <Text size="xs" c="teal">
+                            <Text size="xs" c={a.trennung?.keineAntwort ? 'orange' : 'teal'} data-rm-keine-antwort={a.trennung?.keineAntwort ?? undefined}>
                               {trennHinweis(a)}
                             </Text>
                             <Button

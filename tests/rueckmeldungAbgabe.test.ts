@@ -58,10 +58,10 @@ describe('Aufgabentext abtrennen: Abgleich', () => {
     expect(trennAnfrage('x', aufgaben).user).not.toMatch(/London/)
   })
 
-  it('bleibt nichts übrig, bleibt alles', () => {
+  it('bleibt nichts übrig: keine Schülerantwort erkennbar (seit 29.09.2026 statt „alles behalten")', () => {
     const e = trenneNachAufgabe(AUFGABE, AUFGABE)
-    expect(e.text).toBe(AUFGABE)
-    expect(e.zeilen).toBe(0)
+    expect(e.text).toBe('')
+    expect(e.keineAntwort).toBe('leer')
   })
 
   it('Verdacht auf weitere Aufgabenteile bzw. keine Aufgabe → KI', () => {

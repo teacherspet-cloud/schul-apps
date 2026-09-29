@@ -6,6 +6,7 @@
  * Eine eigene Ablage am Erwartungshorizont überträgt eine Lösungsdatei.
  */
 import type { StructuredRequest } from '@shared/types'
+import { ohneKiTest } from './abgabeTrennen'
 import { arr, enumOf, int, obj, str } from '../../shared/aiSchema'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 
@@ -29,7 +30,7 @@ const schlicht = (text: string): string =>
 /** Text und Bilder der Dateien für eine Anfrage (Bilder nur, wo kein Text da ist: Fotos, Scans) */
 export function inhalt(dateien: GeleseneDatei[]): { text: string; bilder: string[] } {
   const text = dateien
-    .map((d) => (d.text.trim() ? `--- ${d.fileName} ---\n${schlicht(d.text).slice(0, 20000)}` : `--- ${d.fileName}: als Bild beigefügt ---`))
+    .map((d) => (d.text.trim() ? `--- ${d.fileName} ---\n${ohneKiTest(schlicht(d.text)).text.slice(0, 20000)}` : `--- ${d.fileName}: als Bild beigefügt ---`))
     .join('\n\n')
   const bilder = dateien.flatMap((d) => (d.text.trim() ? [] : (d.pageImages ?? []))).slice(0, 8)
   return { text, bilder }

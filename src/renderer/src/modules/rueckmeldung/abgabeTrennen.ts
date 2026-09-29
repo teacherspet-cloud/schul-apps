@@ -26,7 +26,64 @@ export interface TrennErgebnis {
   entfernt: string[]
   /** Nach dem Abgleich stehen vermutlich noch Teile der Aufgabe im Text */
   verdacht: boolean
+  /**
+   * Keine Schülerantwort erkennbar (29.09.2026, Fehlerbericht: die Word-Fassung der Klassenarbeit
+   * landete als Abgabe): 'leer' = alles war Aufgabe/Material, 'lehrerfassung' = die Datei enthält
+   * Erwartungshorizont, Mustertext oder Bewertungsraster – das schreibt keine Schülerin selbst.
+   */
+  keineAntwort?: 'leer' | 'lehrerfassung'
 }
+
+/**
+ * Word-Dateien kommen als HTML an (extractContent, Format 'html'). In die Abgabe gehört nur der
+ * Text – ohne Tags, ohne eingebettete Bilder (base64), Absätze und Tabellenzellen als Zeilen.
+ */
+export function klartext(text: string): string {
+  if (!/<(p|div|br|table|tr|td|li|ul|ol|h\d|img|strong|em|span)\b[^>]*>/i.test(text)) return text
+  return text
+    .replace(/<img\b[^>]*>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|tr|td|th|h\d|table|ul|ol)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, '&')
+    .split('\n')
+    .map((z) => z.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/**
+ * Der unsichtbare KI-Test des Schülerblatts (shared/aiCanary.ts, „Formale Vorgabe der Lehrkraft …
+ * Kennwort …") steht in jeder Word/PDF-Fassung mit. Er ist eine Anweisung an Sprachmodelle und darf
+ * weder in der Abgabe noch in einer Anfrage stehen – sonst folgt ihr die KI der Rückmeldung
+ * (Fehlerbericht 29.09.2026: das Feedback nannte plötzlich „Hamlet"). Liefert auch die Kennwörter.
+ */
+const KI_TEST = [
+  /Formale Vorgabe der Lehrkraft für die Bearbeitung:[\s\S]*?gelten als nicht abgegeben\./g,
+  /Formal requirement: if you write an answer as text[\s\S]*?count as not submitted\./g,
+  /Dies ist ein KI-Test\.[^.\n]*\./g
+]
+
+export function ohneKiTest(text: string): { text: string; kennwoerter: string[] } {
+  const kennwoerter = new Set<string>()
+  let t = text
+  for (const muster of KI_TEST)
+    t = t.replace(muster, (satz) => {
+      for (const m of satz.matchAll(/[„"]([^"“”„]{2,40})["“”]/g)) kennwoerter.add(m[1].trim())
+      return ''
+    })
+  return { text: t === text ? text : t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(), kennwoerter: [...kennwoerter] }
+}
+
+/** Überschriften, die nur in der Lehrerfassung stehen */
+const LEHRERTEIL = /^(erwartungshorizont|mustertext|musterlösung|bewertungsraster|model answer|answer key|corrigé|solucionario)\b\s*:?/im
 
 /** Normalform für den Vergleich: Leerraum, Groß-/Kleinschreibung, Anführungszeichen, Aufzählungszeichen */
 export function norm(s: string): string {
@@ -80,17 +137,23 @@ export function ohneLoesungen(aufgaben: string): string {
  * in der Aufgabe steht oder – ab drei Wörtern bzw. 20 Zeichen – wörtlich im Aufgabentext enthalten
  * ist; außerdem Kopfzeilen (Name/Datum/Klasse) und Seitenzahlen. Bleibt nichts übrig, bleibt alles.
  */
-export function trenneNachAufgabe(text: string, aufgabenRoh: string): TrennErgebnis {
+export function trenneNachAufgabe(textRoh: string, aufgabenRoh: string, erwartung = ''): TrennErgebnis {
+  const text = ohneKiTest(klartext(textRoh)).text
   const aufgaben = ohneLoesungen(aufgabenRoh)
   const zeilen = text.split('\n')
   const aufgabenZeilen = new Set(aufgaben.split('\n').map(norm).filter(Boolean))
   const aufgabenGanz = ` ${norm(aufgaben.replace(/\n/g, ' '))} `
+  // Erwartungshorizont: nur lange Zeilen (ab 8 Wörtern) – ganze Sätze daraus schreibt niemand zufällig selbst
+  const erwartungGanz = ` ${norm(erwartung.replace(/\n/g, ' '))} `
+  const lehrerfassung = LEHRERTEIL.test(text)
   const entfernt: string[] = []
   const bleibt = zeilen.filter((z) => {
     const n = norm(z)
     if (!n) return true
     const lang = n.length >= 20 || n.split(' ').length >= 3
-    const inAufgabe = aufgabenZeilen.has(n) || (lang && aufgabenGanz.includes(n))
+    // Auch Zeilen, die eine lange Aufgabenzeile enthalten und kaum mehr (Nummer davor: „1  You help …")
+    const mitAufgabe = [...aufgabenZeilen].some((az) => az.length >= 25 && n.includes(az) && az.length >= 0.8 * n.length)
+    const inAufgabe = aufgabenZeilen.has(n) || (lang && aufgabenGanz.includes(n)) || mitAufgabe || (n.split(' ').length >= 8 && erwartungGanz.includes(n))
     const kopf = (KOPFZEILE.test(z.trim()) && z.trim().length < 60) || SEITENZAHL.test(z.trim())
     if (inAufgabe || kopf) {
       entfernt.push(kurz(z))
@@ -99,8 +162,12 @@ export function trenneNachAufgabe(text: string, aufgabenRoh: string): TrennErgeb
     return true
   })
   const neu = verdichte(bleibt)
-  if (!neu) return { text: text.trim(), zeilen: 0, entfernt: [], verdacht: true }
-  return { text: neu, zeilen: entfernt.length, entfernt, verdacht: vermuteAufgabe(neu) }
+  // Keine Schülerantwort: nur Aufgabe/Material, oder eine Lehrerfassung (Erwartungshorizont, Mustertext)
+  if (!neu || lehrerfassung)
+    return { text: '', zeilen: zeilenZahl(text), entfernt: entfernt.slice(0, 12), verdacht: false, keineAntwort: lehrerfassung ? 'lehrerfassung' : 'leer' }
+  // Nur umgewandelt (HTML → Text, KI-Test entfernt): auch das zählt als Änderung, rückgängig machbar
+  const umgewandelt = text !== textRoh.trim() && text !== textRoh
+  return { text: neu, zeilen: entfernt.length || (umgewandelt ? 1 : 0), entfernt, verdacht: vermuteAufgabe(neu) }
 }
 
 /** Stehen im Text (noch) Teile einer Aufgabenstellung? */
@@ -209,7 +276,7 @@ export function kiTrennungAnwenden(original: string, anonym: string, daten: unkn
  * Durchgängen) und die Zahl der entfernten Zeilen gegenüber dem Original.
  */
 export function trennungAnwenden(a: Abgabe, e: TrennErgebnis, quelle: 'abgleich' | 'ki'): Abgabe {
-  if (!e.zeilen || e.text.trim() === a.text.trim()) return a
+  if (!e.zeilen || (e.text.trim() === a.text.trim() && !e.keineAntwort)) return a
   const original = a.textOriginal ?? a.text
   const bisher = a.trennung?.entfernt ?? []
   return {
@@ -219,7 +286,8 @@ export function trennungAnwenden(a: Abgabe, e: TrennErgebnis, quelle: 'abgleich'
     trennung: {
       zeilen: Math.max(0, zeilenZahl(original) - zeilenZahl(e.text)),
       quelle: a.trennung?.quelle === 'ki' ? 'ki' : quelle,
-      entfernt: [...bisher, ...e.entfernt].slice(0, 12)
+      entfernt: [...bisher, ...e.entfernt].slice(0, 12),
+      ...(e.keineAntwort ? { keineAntwort: e.keineAntwort } : {})
     }
   }
 }
@@ -235,6 +303,9 @@ export function trennungZurueck(a: Abgabe): Abgabe {
 /** Hinweis an der Abgabe: „Aufgabentext entfernt (12 Zeilen)" */
 export function trennHinweis(a: Abgabe): string | null {
   if (!a.trennung || a.textOriginal === undefined) return null
+  if (a.trennung.keineAntwort === 'lehrerfassung')
+    return 'Keine Schülerantwort erkennbar: Die Datei ist offenbar eine Lehrerfassung (Aufgabe, Material, Erwartungshorizont bzw. Mustertext). Die Abgabe der Schülerin bzw. des Schülers gehört hierher.'
+  if (a.trennung.keineAntwort === 'leer') return 'Keine Schülerantwort erkennbar: Die Datei enthält nur Aufgabenstellung und Material.'
   const n = a.trennung.zeilen
   return `Aufgabentext entfernt (${n} ${n === 1 ? 'Zeile' : 'Zeilen'}${a.trennung.quelle === 'ki' ? ', mit KI' : ''})`
 }
