@@ -76,7 +76,7 @@ export class ZielAbgelehnt extends Error {}
  * Prüft die Adresse vor dem Abruf. Wirft `ZielAbgelehnt` mit lesbarer Begründung.
  * `aufloesen` lässt sich in Tests ersetzen.
  */
-export async function pruefeZiel(url: string | URL, aufloesen: (host: string) => Promise<string[]> = aufloeseAdressen): Promise<URL> {
+export async function pruefeZiel(url: string | URL, aufloesen: (host: string) => Promise<string[]> = standardAufloeser): Promise<URL> {
   let ziel: URL
   try {
     ziel = url instanceof URL ? url : new URL(url)
@@ -90,6 +90,21 @@ export async function pruefeZiel(url: string | URL, aufloesen: (host: string) =>
   if (!adressen.length) throw new ZielAbgelehnt('Der Rechnername ließ sich nicht auflösen.')
   if (adressen.some(istPrivateAdresse)) throw new ZielAbgelehnt('Der Rechnername zeigt in das eigene Netz.')
   return ziel
+}
+
+type Aufloeser = (host: string) => Promise<string[]>
+
+/*
+ * Austauschbarer Auflöser (29.09.2026, iPad-App): Im WKWebView gibt es keine Namensauflösung.
+ * Dort prüft `pruefeZiel` weiter Schema, Zugangsdaten und Rechnernamen (localhost, .local,
+ * IP-Adressen des eigenen Netzes); der Name selbst wird nicht aufgelöst (src/mobil/start.ts).
+ */
+let aufloeser: Aufloeser = (host) => aufloeseAdressen(host)
+const standardAufloeser: Aufloeser = (host) => aufloeser(host)
+
+/** Ersetzt die Namensauflösung (null = wieder die von Node) */
+export function setzeAufloeser(f: Aufloeser | null): void {
+  aufloeser = f ?? ((host) => aufloeseAdressen(host))
 }
 
 async function aufloeseAdressen(host: string): Promise<string[]> {

@@ -97,8 +97,19 @@ export const MEASURE_SCRIPT = `(() => {
   return { felder, audios, seite: { widthPx: erste.width, heightPx: erste.height }, seiten: seiten.length }
 })()`
 
+/** Ergebnis von Messen und Drucken */
+export interface Gemessen {
+  pdf: Buffer
+  felder: FieldBox[]
+  audios: AudioBox[]
+  seite: PageSize
+}
+
+/** Misst und druckt – am PC im unsichtbaren Fenster, auf dem iPad über das native Plugin (src/mobil/export) */
+export type Messen = (html: string) => Promise<Gemessen>
+
 /** Lädt das HTML, misst Felder und Hörtexte und druckt daraus ein PDF. */
-export async function measureAndPrint(html: string): Promise<{ pdf: Buffer; felder: FieldBox[]; audios: AudioBox[]; seite: PageSize }> {
+export async function measureAndPrint(html: string): Promise<Gemessen> {
   const dir = mkdtempSync(join(tmpdir(), 'schulapps-fill-'))
   const file = join(dir, 'druck.html')
   writeFileSync(file, html, 'utf8')
@@ -215,8 +226,8 @@ export async function htmlToFillablePdf(html: string): Promise<Buffer> {
  * Gemessen wird NUR EINMAL – das Fenster zu öffnen und die Seite zu setzen ist der teure
  * Teil, und zwei getrennte Durchgänge könnten außerdem minimal auseinanderlaufen.
  */
-export async function htmlToPdfWithExtras(html: string, opts: { fillable?: boolean; audio?: AudioFile[] }): Promise<Buffer> {
-  const { pdf, felder, audios, seite } = await measureAndPrint(html)
+export async function htmlToPdfWithExtras(html: string, opts: { fillable?: boolean; audio?: AudioFile[] }, messen: Messen = measureAndPrint): Promise<Buffer> {
+  const { pdf, felder, audios, seite } = await messen(html)
   let bytes = opts.fillable ? await makeFillable(pdf, felder, seite) : pdf
   if (opts.audio?.length) bytes = (await attachAudio(bytes, opts.audio, audios, seite.widthPx)).pdf
   return bytes

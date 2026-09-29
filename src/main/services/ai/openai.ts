@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { merkeVerbrauch } from './verbrauch'
+import { abrufe } from '../images/politeFetch'
 import { StructuredRequest } from '@shared/types'
 import { AiProvider, ChunkListener, RawModel } from './provider'
 
@@ -7,7 +8,7 @@ export class OpenAiProvider implements AiProvider {
   private client: OpenAI
 
   constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 2 })
+    this.client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 2, dangerouslyAllowBrowser: true })
   }
 
   async listModels(): Promise<RawModel[]> {
@@ -65,7 +66,7 @@ export class OpenAiProvider implements AiProvider {
       if (b64) return `data:image/png;base64,${b64}`
       const url = res.data?.[0]?.url
       if (url) {
-        const buf = Buffer.from(await (await fetch(url, { signal })).arrayBuffer())
+        const buf = Buffer.from(await (await abrufe(url, { signal })).arrayBuffer())
         return `data:image/png;base64,${buf.toString('base64')}`
       }
       throw new Error('Kein Bild erhalten.')

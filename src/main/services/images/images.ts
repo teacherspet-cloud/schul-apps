@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { exifEntfernen } from '@shared/exifEntfernen'
 import { OnlineImageHit, OnlineImageSource, OpenMojiHit } from '@shared/types'
-import { politeFetch } from './politeFetch'
+import { abrufe, politeFetch } from './politeFetch'
 import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { searchWikimedia, WIKIMEDIA_UA } from './sources'
 import { resourcePath } from '../storage/paths'
@@ -101,7 +101,7 @@ export async function searchOnline(query: string, source: OnlineImageSource, pix
   }
   if (!pixabayKey) throw new Error('Für die Pixabay-Suche wird ein API-Schlüssel benötigt (Einstellungen).')
   const url = `https://pixabay.com/api/?key=${encodeURIComponent(pixabayKey)}&q=${encodeURIComponent(query)}&safesearch=true&per_page=30`
-  const res = await fetch(url)
+  const res = await abrufe(url)
   if (!res.ok) throw new Error(`Pixabay-Suche fehlgeschlagen (${res.status}).`)
   const json = (await res.json()) as {
     hits: { id: number; previewURL: string; webformatURL: string; tags: string; user: string }[]

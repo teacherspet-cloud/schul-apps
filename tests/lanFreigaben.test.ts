@@ -14,7 +14,8 @@ import { beschneide, ERLAUBTE_KANAELE } from '../src/main/services/lanServer'
  * Nach unten: Was gefährlich ist, darf nie versehentlich hineinrutschen. Der zweite Test
  * schlägt an, sobald jemand einen Schlüssel-, Datei- oder Löschaufruf freigibt.
  */
-const hauptprozess = readFileSync(resolve(__dirname, '../src/main/index.ts'), 'utf8')
+// Seit 29.09.2026 stehen die Aufrufe in main/kanaele.ts (gemeinsam für PC und iPad)
+const hauptprozess = readFileSync(resolve(__dirname, '../src/main/kanaele.ts'), 'utf8')
 const vorhandene = new Set([...hauptprozess.matchAll(/handle\('([^']+)'/g)].map((m) => m[1]))
 
 describe('Freigaben für den Zugriff aus dem Netz', () => {

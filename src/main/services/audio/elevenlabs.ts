@@ -16,6 +16,7 @@ import { join, resolve, sep } from 'path'
 import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
 import { getSecret } from '../storage/settings'
+import { abrufe } from '../images/politeFetch'
 import { istOpenAiStimme, OPENAI_TTS_MODEL, openAiStimmen, sprichOpenAi } from './openaiTts'
 
 // Basis ohne Fassungsnummer: Die Stimmenliste braucht v2 (nur dort gibt es `sharing`),
@@ -77,7 +78,7 @@ function audioDir(): string {
 }
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${API}${path}`, {
+  const res = await abrufe(`${API}${path}`, {
     ...init,
     headers: { 'xi-api-key': key(), 'content-type': 'application/json', ...(init.headers ?? {}) }
   })
@@ -254,7 +255,7 @@ export async function previewVoice(voiceId: string): Promise<string> {
   if (!previewUrls.has(voiceId)) await listVoices()
   const url = previewUrls.get(voiceId)
   if (!url) throw new Error('Zu dieser Stimme gibt es keine Hörprobe.')
-  const res = await fetch(url)
+  const res = await abrufe(url)
   if (!res.ok) throw new Error(`Die Hörprobe konnte nicht geladen werden (${res.status}).`)
   const buf = Buffer.from(await res.arrayBuffer())
   return `data:audio/mpeg;base64,${buf.toString('base64')}`

@@ -12,7 +12,7 @@ export class AnthropicProvider implements AiProvider {
   private client: Anthropic
 
   constructor(apiKey: string) {
-    this.client = new Anthropic({ apiKey, maxRetries: 2 })
+    this.client = new Anthropic({ apiKey, maxRetries: 2, dangerouslyAllowBrowser: true })
   }
 
   async listModels(): Promise<RawModel[]> {

@@ -3,6 +3,23 @@
 
 import { pruefeZiel } from '../netz/zieladresse'
 
+/*
+ * Der eigentliche Abruf ist austauschbar (29.09.2026, iPad-App): Am PC ist es das `fetch` von
+ * Node. Im WKWebView des iPads scheitern Abrufe fremder Seiten an CORS – dort setzt der Start
+ * (src/mobil/start.ts) einen Abrufer über die native HTTP-Schicht von Capacitor ein.
+ */
+type Abrufer = (input: string | URL, init?: RequestInit) => Promise<Response>
+const STANDARD_ABRUFER: Abrufer = (input, init) => fetch(input, init)
+let abrufer: Abrufer = STANDARD_ABRUFER
+
+/** Ersetzt den Abruf (null = wieder das gewöhnliche `fetch`) */
+export function setzeAbrufer(f: Abrufer | null): void {
+  abrufer = f ?? STANDARD_ABRUFER
+}
+
+/** Abruf ohne Prüfung und Drosselung – für feste Adressen bekannter Dienste; nutzt den gesetzten Abrufer */
+export const abrufe: Abrufer = (input, init) => abrufer(input, init)
+
 const LIMIT_PER_HOST = 4
 const running = new Map<string, number>()
 const waiting = new Map<string, (() => void)[]>()
@@ -63,7 +80,7 @@ async function einmal(url: URL, init: RequestInit, retries: number): Promise<Res
     await acquire(key)
     let res: Response
     try {
-      res = await fetch(url, { signal: AbortSignal.timeout(20000), ...init })
+      res = await abrufer(url, { signal: AbortSignal.timeout(20000), ...init })
     } catch (e) {
       release(key)
       if (attempt >= retries) throw e
