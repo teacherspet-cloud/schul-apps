@@ -1,3 +1,4 @@
+import { STUFEN_WERTE, stufenLabel } from '../../../shared/verstehen/stufen'
 import ProtokollEinstellungen from './ProtokollEinstellungen'
 import { Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
 import { hatMasse } from '../render/tabelleMasse'
@@ -655,6 +656,22 @@ export function BlockSettings({
           )}
           {block.type === 'task' && (
             <>
+              {/* Schwierigkeitsstufe bei Verstehensaufgaben (29.09.2026) – nur für die Lehrkraft */}
+              <Select
+                size="xs"
+                label="Schwierigkeitsstufe (Verstehen)"
+                placeholder="keine"
+                data={STUFEN_WERTE.map((s) => ({ value: String(s), label: stufenLabel(s) }))}
+                value={block.stufe ? String(block.stufe) : null}
+                onChange={(v) =>
+                  update((d) => {
+                    if (d.type !== 'task') return
+                    if (v) d.stufe = Number(v) as 1 | 2 | 3 | 4 | 5
+                    else delete d.stufe
+                  })
+                }
+                clearable
+              />
               <Group grow>
                 <Select
                   size="xs"

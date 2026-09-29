@@ -1,3 +1,4 @@
+import { stufenRaster } from '../../../../shared/verstehen/regeln'
 import type { LearnerProfile } from '../../didactics/profile'
 import type { WorksheetMeta } from '../../model/types'
 import { GEZAEHLTE_SEITEN, seitenBereich, seitenVorgabe } from '../../didactics/seiten'
@@ -59,7 +60,9 @@ export function comprehensionRules(meta: WorksheetMeta): string {
     // Die Zahl gilt JE Text: Bei zwei Hörtexten bekommt jeder so viele Fragen.
     meta.itemCount && meta.itemCount > 0 ? `- GENAU ${Math.round(meta.itemCount)} Items je Text – die Lehrkraft hat diese Zahl vorgegeben.` : '',
     '- Die Items folgen der Reihenfolge des Textes und verteilen sich über den ganzen Text.',
-    '- Zwischen Aufgabe und Textstelle soll keine wörtliche Übereinstimmung bestehen – paraphrasiere.',
+    // 29.09.2026 (Entscheidung der Lehrkraft): Wortgleichheit ist kein Fehler, sondern Stufe 1 – das Raster steuert die Schwierigkeit
+    stufenRaster(),
+    '- Mische die Stufen: überwiegend Stufe 2–4; Stufe 1 (1:1 aus dem Text) höchstens für ein Viertel der Items, in Übungen für den Einstieg.',
     '- Jede Antwort steht wörtlich oder sinngemäß im Text; nichts ist aus Vorwissen allein lösbar.',
     '- Bewertet wird nur, ob die Lösung das richtige Verständnis nachweist; sprachliche Verstöße und Rechtschreibung zählen nicht.',
     wantedTasks(meta) === 1 ? '' : '- Mische ein geschlossenes und ein halboffenes Format; zum Ende der Sekundarstufe I überwiegen die offeneren Formate.',

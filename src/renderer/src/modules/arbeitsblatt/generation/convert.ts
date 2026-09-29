@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { stufeAus } from '../../../shared/verstehen/stufen'
 import { newId, Rng, shuffle } from '../../vokabeltest/model/random'
 import type { Stars } from '../didactics/differentiation'
 import { emptyAnswer } from '../model/factory'
@@ -331,7 +332,16 @@ export function convertBlock(
         answer: convertAnswer(b.answer, rng),
         parts: (Array.isArray(b.parts) ? b.parts : [])
           .filter((p: any) => text(p?.instruction))
-          .map((p: any) => ({ id: newId(rng), instruction: text(p.instruction), answer: convertAnswer(p.answer, rng), solution: text(p.solution) })),
+          .map((p: any) => ({
+            id: newId(rng),
+            instruction: text(p.instruction),
+            answer: convertAnswer(p.answer, rng),
+            solution: text(p.solution),
+            ...(stufeAus(p.stufe) ? { stufe: stufeAus(p.stufe) } : {}),
+            ...(stufeAus(p.stufe) && text(p.stufeGrund) ? { stufeGrund: text(p.stufeGrund) } : {})
+          })),
+        ...(stufeAus(b.stufe) ? { stufe: stufeAus(b.stufe) } : {}),
+        ...(stufeAus(b.stufe) && text(b.stufeGrund) ? { stufeGrund: text(b.stufeGrund) } : {}),
         ...(b.skill && LANGUAGE_SKILLS.includes(b.skill) ? { skill: b.skill as LanguageSkill } : {}),
         ...(b.viewingPhase && VIEWING_PHASE_IDS.includes(b.viewingPhase) ? { viewingPhase: b.viewingPhase as ViewingPhase } : {}),
         ...(text(b.observerGroup) ? { observerGroup: text(b.observerGroup).toUpperCase().slice(0, 2) } : {}),

@@ -80,8 +80,8 @@ export const COMPREHENSION_FORMATS: ComprehensionFormat[] = [
     purpose: 'Detailverstehen, besonders in Gesprächen',
     grades: [5, 10],
     answerKind: 'trueFalse',
-    construction: 'Die Aussagen sind paraphrasiert, nicht wörtlich aus dem Text übernommen.',
-    stem: 'Arbeitsanweisung: „True or false? Tick (✓) the correct box." Jede Aussage ist ein vollständiger Aussagesatz in der 3. Person, positiv formuliert und paraphrasiert – nie eine Frage und nie der Wortlaut des Textes.',
+    construction: 'Die Aussagen sind in der Regel paraphrasiert (ab Stufe 2); eine wörtlich übernommene Aussage ist bewusst sehr leicht (Stufe 1) und wird so ausgewiesen.',
+    stem: 'Arbeitsanweisung: „True or false? Tick (✓) the correct box." Jede Aussage ist ein vollständiger Aussagesatz in der 3. Person, positiv formuliert und in der Regel paraphrasiert – nie eine Frage; der Wortlaut des Textes nur bei ausgewiesener Stufe 1.',
     scoring: 'ein Punkt je Item'
   },
   {

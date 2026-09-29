@@ -208,7 +208,19 @@ export const FLAT_BLOCK = obj({
   points: int('Immer 0 – auf Arbeitsblättern werden keine Punkte vergeben'),
   solution: str('task: Lösung / Erwartungshorizont'),
   answer: ANSWER,
-  parts: arr(obj({ instruction: str(), answer: ANSWER, solution: str() }), 'task: Teilaufgaben a), b) … oder leer'),
+  parts: arr(
+    obj({
+      instruction: str(),
+      answer: ANSWER,
+      solution: str(),
+      stufe: int('Verstehensaufgabe: Schwierigkeitsstufe 1–5 dieser Teilaufgabe nach dem Raster, sonst 0'),
+      stufeGrund: str('Verstehensaufgabe: kurze Begründung der Stufe, sonst leer')
+    }),
+    'task: Teilaufgaben a), b) … oder leer'
+  ),
+  // Schwierigkeitsstufe bei Hör-, Lese- und Hör-Seh-Verstehen (29.09.2026, shared/verstehen) – nur für die Lehrkraft
+  stufe: int('task, Verstehensaufgabe (Hören, Lesen, Hör-Seh): Schwierigkeitsstufe 1–5 nach dem Raster; sonst 0'),
+  stufeGrund: str('task, Verstehensaufgabe: kurze Begründung der Stufe (z. B. „Option wörtlich im Text"), sonst leer'),
   headers: arr(str(), 'table: Spaltenköpfe'),
   rows: arr(arr(str()), 'table: Zeilen'),
   heightMm: int('workspace/grid: Höhe in mm'),
