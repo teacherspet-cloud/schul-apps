@@ -69,8 +69,34 @@ export interface InhaltVorgabe {
 
 type Regel = (grade: number, art: TeilArt, schoolTypeId: string) => InhaltVorgabe | null
 
-/** Länderabweichungen von 40 : 60 – nur belegte Werte (Recherche 29.09.2026) */
-export const INHALT_ABWEICHUNGEN: Record<string, Regel> = {}
+/**
+ * Länderabweichungen von 40 : 60 – nur belegte Werte (Recherche 29.09.2026, Abschnitte in
+ * recherche/rueckmeldung-inhalt-sprache-gewichtung-2026-09-29.md). In der Oberstufe gilt überall
+ * 40 : 60 (KMK-Bildungsstandards 2012, IQB-Aufgabenpool), auch für die Sprachmittlung.
+ */
+export const INHALT_ABWEICHUNGEN: Record<string, Regel> = {
+  // Saarland, Gymnasium Englisch: Raster Kl. 5/6 mit vier gleichen Bereichen, Kl. 8 25 : 75 bis 40 : 60
+  SL: (grade, art, schoolTypeId) =>
+    art === 'schreiben' && schoolTypeId === 'gymnasium' && grade <= 8
+      ? grade <= 6
+        ? { inhalt: 25, quelle: 'Saarland, Bewertungsraster Englisch Kl. 5/6 (ein Bereich von vier)' }
+        : { inhalt: 33, quelle: 'Saarland, Lehrplan Englisch Kl. 8: 25 : 75 bis 40 : 60 (Mitte)' }
+      : null,
+  // Brandenburg Kl. 7: Raster 5/5/5 Punkte (Inhalt / Aufbau / Sprache)
+  BB: (grade, art) => (art === 'schreiben' && grade === 7 ? { inhalt: 33, quelle: 'Brandenburg Kl. 7: Raster Inhalt/Aufbau/Sprache je 5 Punkte' } : null),
+  // Mecklenburg-Vorpommern, Prüfung Mittlere Reife: 8/8/8 Punkte
+  MV: (grade, art, schoolTypeId) =>
+    art === 'schreiben' && grade === 10 && schoolTypeId !== 'gymnasium'
+      ? { inhalt: 33, quelle: 'Mecklenburg-Vorpommern, Mittlere Reife: Aufgabenerfüllung/Textgestaltung/Sprache je 8 Punkte' }
+      : null,
+  // Sachsen-Anhalt, zentrale Klassenarbeit Englisch Kl. 6: „Content: 5 BE Language: 5 BE"
+  ST: (grade, art) => (art === 'schreiben' && grade <= 6 ? { inhalt: 50, quelle: 'Sachsen-Anhalt, zentrale Klassenarbeit Kl. 6: Content 5 BE, Language 5 BE' } : null),
+  // Bayern, Realschule Abschlussprüfung (Guided Writing): Task Achievement 7 von 30 Punkten
+  BY: (grade, art, schoolTypeId) =>
+    art === 'schreiben' && grade === 10 && schoolTypeId === 'realschule'
+      ? { inhalt: 23, quelle: 'Bayern, Realschul-Abschlussprüfung: Task Achievement 7 von 30 Punkten' }
+      : null
+}
 
 export function inhaltVorgabe(stateId: string, grade: number, art: TeilArt, schoolTypeId = 'gymnasium'): InhaltVorgabe {
   return INHALT_ABWEICHUNGEN[stateId]?.(grade, art, schoolTypeId) ?? { inhalt: INHALT_STANDARD, quelle: 'übliche Gewichtung 40 : 60 (Inhalt : Sprache)' }
