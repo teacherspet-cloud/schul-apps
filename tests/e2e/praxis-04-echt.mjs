@@ -204,13 +204,24 @@ try {
     await page.getByRole('button', { name: 'Weiter zu den Aufgaben' }).click()
     await page.getByRole('button', { name: 'Arbeit erzeugen' }).click()
     // Fertig, wenn jeder Teil Bausteine hat und kein Auftrag mehr läuft
-    const exam = await warte(() => {
-      const e = window.__selftest.kaJetzt()
-      return e?.parts?.length && e.parts.every((p) => (p.blocks?.length ?? 0) > 0) ? e : null
-    }, null, 900000)
+    const exam = await warte(
+      () => {
+        const e = window.__selftest.kaJetzt()
+        return e?.parts?.length && e.parts.every((p) => (p.blocks?.length ?? 0) > 0) ? e : null
+      },
+      null,
+      900000
+    )
     await page.waitForTimeout(3000)
-    const text = await page.locator('.ws-editor-pages').first().innerText().catch(() => '')
-    ergebnisse[`klassenarbeit-${fach}`] = { teile: exam?.parts?.map((p) => ({ format: p.formatId, punkte: p.points, bausteine: p.blocks?.length })), blatt: text.slice(0, 6000) }
+    const text = await page
+      .locator('.ws-editor-pages')
+      .first()
+      .innerText()
+      .catch(() => '')
+    ergebnisse[`klassenarbeit-${fach}`] = {
+      teile: exam?.parts?.map((p) => ({ format: p.formatId, punkte: p.points, bausteine: p.blocks?.length })),
+      blatt: text.slice(0, 6000)
+    }
     pruefe(Boolean(exam), `Klassenarbeit ${fach}: alle Teile erzeugt`)
     await page.screenshot({ path: join(out, `klassenarbeit-${fach}.png`), fullPage: false })
     return { exam, text }
@@ -224,6 +235,104 @@ try {
   await schritt('klassenarbeit-de', async () => {
     const { text } = await klassenarbeit('Deutsch', 'Kurzgeschichten')
     pruefe(/Teil 1/.test(text), 'Klassenarbeit Deutsch: Teile heißen „Teil"')
+  })
+
+  // ---------- Nacharbeit 29.09.2026: Elternbrief mit Termin, Zauberstab, Neuformulierung
+  await schritt('elternbrief-neu', async () => {
+    await page.evaluate(() =>
+      window.api.settings.set({
+        schoolName: 'Gymnasium Wesermünde',
+        briefkopf: { lehrkraft: 'Frau Müller', strasse: 'Humboldtstraße 12-14', plz: '27570', ort: 'Bremerhaven', telefon: '0471 483670' }
+      })
+    )
+    await page.keyboard.press('Control+8')
+    await page.waitForTimeout(800)
+    const neuKnopf = page.getByRole('button', { name: 'Neuer Elternbrief' })
+    if (await neuKnopf.count()) await sichtbar(neuKnopf).click()
+    await page.getByText('Anlass & Stichpunkte', { exact: true }).waitFor({ timeout: 10000 })
+    await sichtbar(page.locator('[data-eb-stichpunkte]')).fill(
+      'Klasse 9c: Ausflug zur Eisarena, anschließend Weihnachtsmarkt. Treffpunkt an der Eisarena. Eintritt und Schlittschuhverleih 8 €, bitte passend mitgeben. Warme Kleidung, Handschuhe.'
+    )
+    await sichtbar(page.locator('[data-eb-termin]')).fill('2026-12-11')
+    await sichtbar(page.locator('[data-eb-uhrzeit]')).fill('08:00')
+    await sichtbar(page.getByLabel('Mit Rücklaufzettel zum Abschneiden')).check()
+    await sichtbar(page.locator('[data-eb-frist]')).fill('2026-12-04')
+    await sichtbar(page.locator('[data-eb-schreiben]')).click()
+    const brief = await warte(() => window.__selftest.ebJetzt?.()?.text ?? null)
+    const alles = JSON.stringify(brief ?? {})
+    ergebnisse.elternbriefNeu = { brief, pruefung: await page.evaluate(() => window.__selftest.ebJetzt()?.pruefung ?? []) }
+    pruefe(alles.includes('11.12.2026') && alles.includes('8:00'), 'Elternbrief: Termin und Uhrzeit stehen im Brief')
+    pruefe(alles.includes('04.12.2026'), 'Elternbrief: Rückgabefrist steht im Brief')
+    pruefe(!/\[(Datum|Rückgabefrist|Frist|Uhrzeit)\]/i.test(alles), 'Elternbrief: keine offenen Platzhalter für Datum/Frist')
+
+    // Zauberstab am ersten Absatz: einfacher
+    const vorher = brief?.absaetze?.[0] ?? ''
+    await sichtbar(page.locator('[data-eb-teil="absatz-0"] [data-eb-zauberstab]')).click()
+    await sichtbar(page.locator('[data-eb-aktion="einfacher"]')).click()
+    const nachher = await warte((alt) => {
+      const t = window.__selftest.ebJetzt()?.text?.absaetze?.[0]
+      return t && t !== alt ? t : null
+    }, vorher)
+    ergebnisse.elternbriefNeu.zauberstab = { vorher, nachher, pruefung: await page.evaluate(() => window.__selftest.ebJetzt()?.pruefung ?? []) }
+    pruefe(Boolean(nachher), 'Zauberstab „Einfacher": Absatz neu formuliert')
+
+    // Ganzen Brief sachlich, in einfacher Sprache
+    await page.getByLabel('Ton').filter({ visible: true }).first().click()
+    await sichtbar(page.getByRole('option', { name: 'Sachlich', exact: true })).click()
+    await sichtbar(page.getByLabel('Einfache Sprache')).check()
+    const fassungenVorher = await page.evaluate(() => window.__selftest.ebJetzt()?.fassungen?.length ?? 0)
+    await sichtbar(page.locator('[data-eb-neu]')).click()
+    const neu = await warte((n) => ((window.__selftest.ebJetzt()?.fassungen?.length ?? 0) > n ? window.__selftest.ebJetzt() : null), fassungenVorher)
+    const text = JSON.stringify(neu?.text ?? {})
+    ergebnisse.elternbriefNeu.neu = { text: neu?.text, pruefung: neu?.pruefung }
+    pruefe(Boolean(neu), 'Neu formuliert (sachlich, einfache Sprache)')
+    pruefe(
+      text.includes('11.12') && text.includes('8:00') && /8\s?(€|Euro)/.test(text) && text.includes('04.12'),
+      'Neuformulierung: Datum, Uhrzeit, Betrag und Frist erhalten'
+    )
+    pruefe(!(neu?.pruefung ?? []).some((p) => /fehlen/.test(p)), 'Neuformulierung: Prüfung meldet keine verlorenen Angaben')
+    await page.screenshot({ path: join(out, 'elternbrief-neu.png') })
+  })
+
+  // ---------- Nacharbeit 29.09.2026: Rückmeldung – Aufgabe aus einer Datei
+  await schritt('rueckmeldung-datei', async () => {
+    await page.evaluate(() => window.api.settings.set({ datenschutz: { hinweisBestaetigt: new Date().toISOString(), namenErsetzen: true } }))
+    await page.click('[aria-label="Rückmeldung"]')
+    await page.waitForTimeout(800)
+    await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+    await page.waitForTimeout(800)
+    await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+    const ablage = page.locator('.mantine-Dropzone-root', { hasText: 'Aufgabenblatt hierher ziehen' }).filter({ visible: true }).first()
+    await ablage.locator('input[type=file]').setInputFiles({
+      name: 'klassenarbeit-deutsch-9.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(
+        [
+          'Gymnasium Wesermünde · Deutsch · Klasse 9a · 2. Klassenarbeit',
+          'Name: ____________   Datum: ________',
+          '',
+          'Material: Zeitungsartikel „Einheitlich gekleidet?“ (Auszug)',
+          'Immer mehr Schulen diskutieren über Schulkleidung. Befürworter sagen, sie stärke das Gemeinschaftsgefühl und verringere Druck durch Markenkleidung. Gegner betonen, Kleidung sei Ausdruck der Persönlichkeit, und verweisen auf die Kosten für Familien.',
+          '',
+          'Aufgabe: Erörtere auf der Grundlage des Materials, ob an deiner Schule eine einheitliche Schulkleidung eingeführt werden sollte. Wäge Pro- und Kontra-Argumente ab und formuliere ein begründetes Urteil. (30 Punkte)',
+          '',
+          'Hinweis für die Lehrkraft: Bewertung nach Raster des Fachbereichs.'
+        ].join('\n')
+      )
+    })
+    const hochladen = page.getByRole('button', { name: 'Hochladen', exact: true })
+    await hochladen.waitFor({ timeout: 10000 }).catch(() => undefined)
+    if (await hochladen.count()) await hochladen.click()
+    const rm = await warte(() => {
+      const d = window.__selftest.rmJetzt()
+      return d?.grundlage?.erwartung ? d : null
+    })
+    ergebnisse.rueckmeldungDatei = { grundlage: rm?.grundlage, meta: { fach: rm?.meta?.subjectId, jahrgang: rm?.meta?.grade, erkannt: rm?.meta?.erkannt } }
+    pruefe(Boolean(rm?.grundlage?.aufgaben?.includes('Erörtere')), 'Aufgabe aus der Datei übernommen')
+    pruefe(!/Hinweis für die Lehrkraft|30 Punkte|Name: ___/.test(rm?.grundlage?.aufgaben ?? ''), 'Kopf, Punkte und Lehrkraft-Hinweis sind weggelassen')
+    pruefe(Boolean(rm?.grundlage?.erwartung?.startsWith('[Entwurf der KI')), 'Erwartungshorizont als gekennzeichneter Entwurf')
+    pruefe(rm?.meta?.subjectId === 'deutsch' && rm?.meta?.grade === 9, 'Fach Deutsch und Klasse 9 erkannt')
+    await page.screenshot({ path: join(out, 'rueckmeldung-datei.png') })
   })
 
   await schritt('openai-tts', async () => {
