@@ -45,7 +45,7 @@ export function bezugFuer(bloecke: WsBlock[], aufgabeId: string): Bezug | null {
   if (aufgabe.type !== 'task') return null
   const alsBezug = (b: WsBlock): Bezug | null => {
     if (b.type === 'audio' && b.transcript.trim())
-      return { art: 'audio', id: b.id, titel: b.title, text: b.transcript, fremd: b.origin === 'archiv' }
+      return { art: 'audio', id: b.id, titel: b.title, text: b.transcript, fremd: b.origin === 'archiv' || Boolean(b.transkriptFremd) }
     if (b.type === 'text' && b.body.trim())
       return { art: 'text', id: b.id, titel: b.title, text: b.body, fremd: Boolean(b.source?.trim() || b.sourceHeader) }
     return null

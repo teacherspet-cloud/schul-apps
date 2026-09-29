@@ -233,6 +233,7 @@ export function AudioPanel({
         b.transcript = text
         // Ein Transkript aus fremdem Material ist kein KI-Text (Kennzeichnung und Rechtshinweis hängen daran)
         b.origin = 'archiv'
+        b.transkriptFremd = true
         if (!b.audio?.dataUrl) b.seconds = estimateSeconds(text)
       })
       notifySuccess('Transkript übernommen.')

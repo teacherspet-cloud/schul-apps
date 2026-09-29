@@ -555,6 +555,12 @@ export interface AudioBlock extends BaseBlock {
    * Fehlt die Angabe, gilt 'ki': Alle bisher erzeugten Hörtexte stammen von der KI.
    */
   origin?: 'ki' | 'archiv'
+  /**
+   * Das Transkript stammt aus fremdem Material (Verlag, Lehrerband) – 29.09.2026. Bleibt auch
+   * nach „Neu vertonen" stehen (dort wird `origin` zurückgesetzt); daran hängt der
+   * Rechtshinweis vor „Weitere Fragen ergänzen".
+   */
+  transkriptFremd?: boolean
 }
 
 /**

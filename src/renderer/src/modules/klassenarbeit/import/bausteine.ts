@@ -83,6 +83,7 @@ function materialBaustein(m: ImportMaterial, kompetenz: ImportKompetenz): WsBloc
        * „KI-erzeugt" auf dem Schülerblatt.
        */
       origin: 'archiv',
+      transkriptFremd: true,
       warnings: ['Transkript aus dem Material übernommen. Die Original-Hördatei (MP3) im Reiter „Hörtexte" einbinden.']
     }
   }
