@@ -132,12 +132,25 @@ describe('Wörtliche Übernahme aus dem Text', () => {
     expect(wortgleicheStelle('She walked to the park.', 'He drove to the shop.')).toBeNull()
   })
 
-  it('meldet eine abgeschriebene Frage', () => {
+  /*
+   * Stufenraster (29.09.2026, Entscheidung der Lehrkraft): Wortgleichheit ist nur dann ein
+   * Befund, wenn die Aufgabe eine höhere Stufe beansprucht. Wörtlich übernehmbar = Stufe 1.
+   */
+  const mitStufe = (b: WsBlock, stufe: 1 | 2 | 3 | 4 | 5): WsBlock => ({ ...b, stufe }) as WsBlock
+
+  it('meldet eine abgeschriebene Frage, wenn sie Stufe 3 beansprucht', () => {
     const sheet = blatt([
       hoertext('Mr Clarkson: The school library is closed on Fridays because of the building work.'),
-      aufgabe(['When is the school library is closed?', 'Where is it?'])
+      mitStufe(aufgabe(['When is the school library is closed?', 'Where is it?']), 3)
     ])
     expect(meldungen(sheet).some((m) => /Wortlaut des Textes/.test(m))).toBe(true)
+  })
+
+  it('lässt dieselbe Frage als „sehr leicht" oder ohne Stufe in Ruhe', () => {
+    const text = 'Mr Clarkson: The school library is closed on Fridays because of the building work.'
+    const frage = aufgabe(['When is the school library is closed?', 'Where is it?'])
+    expect(meldungen(blatt([hoertext(text), frage])).filter((m) => /Wortlaut des Textes/.test(m))).toEqual([])
+    expect(meldungen(blatt([hoertext(text), mitStufe(frage, 1)])).filter((m) => /Wortlaut des Textes/.test(m))).toEqual([])
   })
 
   it('schweigt bei einer echten Paraphrase', () => {
@@ -152,7 +165,7 @@ describe('Wörtliche Übernahme aus dem Text', () => {
     expect(meldungen(sheet).filter((m) => /Wortlaut des Textes/.test(m))).toEqual([])
   })
 
-  it('meldet eine abgeschriebene Antwortmöglichkeit', () => {
+  it('meldet eine abgeschriebene Antwortmöglichkeit nur, wenn die Stufe sie ausschließt', () => {
     const sheet = blatt([
       hoertext('Tom: We slept at their house because the train was late that evening.'),
       aufgabe(
@@ -163,7 +176,10 @@ describe('Wörtliche Übernahme aus dem Text', () => {
         ]
       )
     ])
-    expect(meldungen(sheet).some((m) => /steht wörtlich im Text/.test(m))).toBe(true)
+    // Ohne Stufe kein Befund – mit Stufe 2 ist der wörtliche Distraktor einer
+    expect(meldungen(sheet).some((m) => /steht wörtlich im Text/.test(m))).toBe(false)
+    const gestuft = blatt([sheet.blocks[0], mitStufe(sheet.blocks[1], 2)])
+    expect(meldungen(gestuft).some((m) => /steht wörtlich im Text/.test(m))).toBe(true)
   })
 
   it('meldet Sammelmöglichkeiten', () => {

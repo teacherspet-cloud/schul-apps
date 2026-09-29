@@ -3,7 +3,7 @@
  *
  * Entscheidung der Lehrkraft (Englisch, Klassenarbeit): Klassenarbeitsvorschläge, Testhefte und
  * Lehrerbände (PDF, Scan, Word) dürfen hineingezogen werden – nach Rechtshinweis und Bestätigung
- * (siehe `rechtshinweis.ts`). Die KI
+ * (siehe `rechtshinweisTexte.ts`). Die KI
  * - analysiert das Material,
  * - verbessert die Formatierung (Layout der App, Lücken, Tabellen, Nummerierung),
  * - zerlegt es in einzelne Aufgaben MIT dem dazugehörigen Material,

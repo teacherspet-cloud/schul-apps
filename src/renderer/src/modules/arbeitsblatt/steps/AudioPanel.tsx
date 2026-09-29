@@ -1,5 +1,18 @@
-import { ActionIcon, Alert, Badge, Button, Card, Chip, Group, Select, Stack, Switch, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
-import { IconDownload, IconExternalLink, IconFileTypeDocx, IconFileTypePdf, IconHeadphones, IconPlayerPlay, IconRefresh, IconVolume } from '@tabler/icons-react'
+import { ActionIcon, Alert, Badge, Button, Card, Chip, FileButton, Group, Select, Stack, Switch, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
+import {
+  IconDownload,
+  IconExternalLink,
+  IconFileText,
+  IconFileTypeDocx,
+  IconFileTypePdf,
+  IconHeadphones,
+  IconMusic,
+  IconPlayerPlay,
+  IconPlaylistAdd,
+  IconRefresh,
+  IconVolume
+} from '@tabler/icons-react'
+import { importiereHoerdatei, leseTranskript } from '../../../shared/verstehen/hoerdatei'
 import { useEffect, useState } from 'react'
 import type { TtsVoice } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
@@ -45,7 +58,16 @@ export function speakerNames(block: AudioBlock): string[] {
  * Klassenarbeiten benutzen denselben Reiter. Sie liegen in einem eigenen Speicher, deshalb
  * kommt die Änderungsfunktion von außen; ohne Angabe gilt der Arbeitsblatt-Speicher.
  */
-export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (ws: Worksheet) => void, gruppe?: string) => void }): React.JSX.Element {
+export function AudioPanel({
+  ws,
+  onUpdate,
+  onZusatzfragen
+}: {
+  ws: Worksheet
+  onUpdate?: (fn: (ws: Worksheet) => void, gruppe?: string) => void
+  /** Klassenarbeit (29.09.2026): „Weitere Fragen im gleichen Format" zum Hörtext mit dieser id */
+  onZusatzfragen?: (audioId: string) => void
+}): React.JSX.Element {
   const updateSheet = useArbeitsblatt((s) => s.update)
   const update = onUpdate ?? updateSheet
   const settings = useAppSettings((s) => s.settings)
@@ -178,6 +200,47 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
     }
   }
 
+  /**
+   * Original-Hördatei einbinden (29.09.2026, Entscheidung der Lehrkraft): Die MP3 – etwa von der
+   * Verlags-CD – landet im Hörtext-Ordner wie eine Vertonung und wird genauso abgespielt,
+   * gespeichert und beim Öffnen wieder geladen. Keine KI-Aufnahme: 'archiv' verhindert den
+   * Vermerk „KI-erzeugt" auf dem Schülerblatt.
+   */
+  const importMp3 = async (block: AudioBlock, file: File | null): Promise<void> => {
+    if (!file) return
+    setBusy(block.id)
+    try {
+      const res = await importiereHoerdatei(block.id, file)
+      setBlock(block.id, (b) => {
+        b.audio = { dataUrl: res.dataUrl, fileName: res.fileName }
+        b.origin = 'archiv'
+        if (res.seconds > 0) b.seconds = res.seconds
+      })
+      notifySuccess(`Hördatei eingebunden (${Math.round(res.bytes / 1024)} kB) – im Unterricht läuft diese Aufnahme.`)
+    } catch (e) {
+      notifyError(e, 'Die Hördatei konnte nicht eingebunden werden')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  /** Transkript aus einer Datei (Text, Word, PDF) als Skript übernehmen – nur für die Lehrkraft und die KI */
+  const importTranskript = async (block: AudioBlock, file: File | null): Promise<void> => {
+    if (!file) return
+    try {
+      const text = await leseTranskript(file)
+      setBlock(block.id, (b) => {
+        b.transcript = text
+        // Ein Transkript aus fremdem Material ist kein KI-Text (Kennzeichnung und Rechtshinweis hängen daran)
+        b.origin = 'archiv'
+        if (!b.audio?.dataUrl) b.seconds = estimateSeconds(text)
+      })
+      notifySuccess('Transkript übernommen.')
+    } catch (e) {
+      notifyError(e, 'Das Transkript konnte nicht gelesen werden')
+    }
+  }
+
   const generate = async (block: AudioBlock): Promise<void> => {
     const turns = scriptTurns(block)
     if (!turns.length) {
@@ -239,6 +302,8 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
       setBlock(block.id, (b) => {
         b.audio = { dataUrl: res.dataUrl, fileName: res.fileName }
         b.seconds = estimateSeconds(b.transcript)
+        // Vertont von der Sprachsynthese: wieder als KI-Aufnahme kennzeichnen (29.09.2026)
+        delete b.origin
       })
       // Der Weg gehört in die Meldung: „Dialog" heißt, dass die Sprecher aufeinander eingehen
       notifySuccess(`Hörtext vertont (${Math.round(res.bytes / 1024)} kB, ${res.mode === 'dialog' ? 'Dialog in einem Stück' : 'eine Stimme'}).`)
@@ -364,6 +429,8 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
               </Group>
 
               <Textarea
+                // Neu aufbauen, wenn ein eingelesenes Transkript das Feld von außen ändert
+                key={`${block.id}-${block.transcript.length}`}
                 label="Skript (Sprecherzeilen als „Name: Text“)"
                 autosize
                 minRows={6}
@@ -375,6 +442,34 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
                   })
                 }
               />
+
+              {/* Original-Hördatei und Transkript (29.09.2026): im Unterricht läuft das Original */}
+              <Group gap="xs" wrap="wrap">
+                <FileButton onChange={(f) => void importMp3(block, f)} accept="audio/mpeg,.mp3">
+                  {(props) => (
+                    <Button {...props} size="compact-sm" variant="light" leftSection={<IconMusic size={14} />} loading={busy === block.id}>
+                      Eigene Hördatei (MP3)
+                    </Button>
+                  )}
+                </FileButton>
+                <FileButton onChange={(f) => void importTranskript(block, f)} accept=".txt,.docx,.pdf,text/plain">
+                  {(props) => (
+                    <Button {...props} size="compact-sm" variant="light" leftSection={<IconFileText size={14} />}>
+                      Transkript einlesen
+                    </Button>
+                  )}
+                </FileButton>
+                {onZusatzfragen && block.transcript.trim() && (
+                  <Button size="compact-sm" variant="light" leftSection={<IconPlaylistAdd size={14} />} onClick={() => onZusatzfragen(block.id)}>
+                    Weitere Fragen ergänzen
+                  </Button>
+                )}
+                {block.origin === 'archiv' && (
+                  <Text size="xs" c="dimmed">
+                    Originalaufnahme – ohne KI-Vermerk auf dem Blatt.
+                  </Text>
+                )}
+              </Group>
 
               {/* Die Filter stehen dort, wo gewählt wird – nicht oben am Reiter. */}
               <Stack gap={6}>
@@ -483,6 +578,7 @@ export function AudioPanel({ ws, onUpdate }: { ws: Worksheet; onUpdate?: (fn: (w
                   loading={busy === block.id}
                   disabled={!voices.length}
                   onClick={() => void generate(block)}
+                  title={block.origin === 'archiv' && block.audio ? 'Ersetzt die eingebundene Originalaufnahme durch eine Vertonung' : undefined}
                 >
                   {block.audio ? 'Neu vertonen' : 'Vertonen'}
                 </Button>

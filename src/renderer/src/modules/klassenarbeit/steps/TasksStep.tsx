@@ -37,7 +37,9 @@ import {
   IconSparkles,
   IconTrash,
   IconChevronDown,
-  IconChevronUp
+  IconChevronUp,
+  IconFileImport,
+  IconPlaylistAdd
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { notifyError, notifySuccess } from '../../../shared/util'
@@ -87,6 +89,8 @@ import { arbeitOffen, defaultExamName, legeArbeitAb } from '../library'
 import { QUELLENAUSWAHL, type QuellenFrage } from '../../arbeitsblatt/auftraege'
 import type { AudioBlock } from '../../arbeitsblatt/model/types'
 import { useThemenbereich } from '../../../shared/themenbereiche'
+import VerlagsImportDialog from '../import/VerlagsImportDialog'
+import ZusatzfragenDialog from '../import/ZusatzfragenDialog'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 
 /** Einen Baustein in ALLEN Fassungen ändern – übernommenes Material steht dort mit derselben id. */
@@ -114,6 +118,9 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   }, [])
   const [canaryOffen, setCanaryOffen] = useState(false)
   const [hoertexte, setHoertexte] = useState(false)
+  // Verlagsmaterial übernehmen und „weitere Fragen im gleichen Format" (29.09.2026)
+  const [importOffen, setImportOffen] = useState(false)
+  const [zusatzFuer, setZusatzFuer] = useState<string | null>(null)
   const [aufbauOffen, setAufbauOffen] = useState(() => !examHasContent(exam))
   const updateExam = useKlassenarbeit((s) => s.update)
   const gesamt = fassungsZahl(exam)
@@ -502,6 +509,12 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                   Bewertungsraster erstellen
                 </Menu.Item>
               )}
+              {/* Hör-/Leseverstehen: weitere Items im gleichen Format mit Stufenmix (29.09.2026) */}
+              {block.type === 'task' && (block.skill === 'listening' || block.skill === 'reading' || block.audioId) && (
+                <Menu.Item leftSection={<IconPlaylistAdd size={14} />} onClick={() => setZusatzFuer(block.id)}>
+                  Weitere Fragen im gleichen Format …
+                </Menu.Item>
+              )}
               {/* Leveln (Großprogramm 0.4, F1) – etwa für eine Fassung mit Nachteilsausgleich */}
               <LevelnMenue block={block} meta={exam.meta} onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)} />
             </KiMenue>
@@ -605,6 +618,12 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             <Button size="xs" variant="light" leftSection={hasContent ? <IconRefresh size={14} /> : <IconSparkles size={14} />} onClick={run}>
               {hasContent ? 'Neu erzeugen' : 'Arbeit erzeugen'}
             </Button>
+            {/* Verlagsmaterial zerlegen und Aufgaben auswählen (29.09.2026) */}
+            <Tooltip label="Klassenarbeitsvorschlag, Testheft oder Lehrerband einlesen, in Aufgaben zerlegen und auswählen">
+              <Button size="xs" variant="light" leftSection={<IconFileImport size={14} />} onClick={() => setImportOffen(true)} data-testid="verlagsimport">
+                Aufgaben aus Material
+              </Button>
+            </Tooltip>
             {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
             {hasContent && <LmsExport titel={exam.meta.title || exam.meta.topic} bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))} />}
             {audioBlocks.length > 0 && (
@@ -654,6 +673,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           setCanaryOffen(false)
         }}
       />
+      <VerlagsImportDialog opened={importOffen} onClose={() => setImportOffen(false)} exam={exam} docId={docId} />
+      <ZusatzfragenDialog aufgabeId={zusatzFuer} onClose={() => setZusatzFuer(null)} exam={exam} fassung={fassung} docId={docId} />
       <ScrollArea style={{ flex: 1, minHeight: 0 }}>
         <Container size="xl" py="lg">
           {/*
@@ -818,7 +839,21 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
 
           {hasContent && hoertexte && (
             <Card withBorder mb="md">
-              <AudioPanel ws={audioSicht} onUpdate={updateAudio} />
+              <AudioPanel
+                ws={audioSicht}
+                onUpdate={updateAudio}
+                // Die erste Aufgabe zum Hörtext (verknüpft oder direkt dahinter) bekommt die neuen Fragen
+                onZusatzfragen={(audioId) => {
+                  for (const p of exam.parts) {
+                    const liste = bloeckeDerFassung(p, fassung)
+                    const i = liste.findIndex((b) => b.id === audioId)
+                    const ziel =
+                      liste.find((b) => b.type === 'task' && b.audioId === audioId) ?? (i >= 0 ? liste.slice(i + 1).find((b) => b.type === 'task') : undefined)
+                    if (ziel) return setZusatzFuer(ziel.id)
+                  }
+                  notifyError(new Error('Zu diesem Hörtext gibt es noch keine Aufgabe, die ergänzt werden könnte.'))
+                }}
+              />
             </Card>
           )}
 
