@@ -209,11 +209,40 @@ const SACHFAECHER: ExamFormat[] = [
     competence: 'Urteilskompetenz',
     description:
       'Zwei Quellen, Positionen oder Epochen werden unter festgelegten Gesichtspunkten verglichen; Gemeinsamkeiten und Unterschiede werden gewichtet.',
-    afb: ['III'],
+    // Befund G2 (29.09.2026): NI-KC Geschichte S. 30 AFB II, NRW-Liste AFB II–III
+    afb: ['II', 'III'],
     share: 30,
     grades: [8, 13],
     material: 'text',
-    note: 'In Geschichte zählt „vergleichen“ zum Anforderungsbereich III.'
+    note: '„vergleichen" steht in Niedersachsen im Anforderungsbereich II, in NRW im Bereich II–III; die Gewichtung der Unterschiede reicht in III.'
+  },
+  /*
+   * 29.09.2026, Befunde G3/G4: EPA Geschichte 3.2.3 „Erörtern von Erklärungen historischer
+   * Sachverhalte aus Darstellungen" – bisher gab es nur Quellen; dazu die historische Karte.
+   */
+  {
+    id: 'ge-darstellung',
+    subject: 'geschichte',
+    label: 'Darstellung analysieren und erörtern',
+    competence: 'Methoden- und Urteilskompetenz',
+    description:
+      'Einen Auszug aus der Fachliteratur (Historikertext) oder einer Dokumentation analysieren: Position und Argumentation herausarbeiten, auf Schlüssigkeit prüfen und die Deutung beurteilen. Darstellung ist keine Quelle.',
+    afb: ['II', 'III'],
+    share: 40,
+    grades: [9, 13],
+    material: 'text',
+    note: 'EPA Geschichte 3.2.3; in der Oberstufe eine der drei Aufgabenarten.'
+  },
+  {
+    id: 'ge-map',
+    subject: 'geschichte',
+    label: 'Geschichtskarte auswerten',
+    competence: 'Methodenkompetenz',
+    description: 'Eine historische Karte beschreiben (Thema, Raum, Zeit, Legende), Veränderungen herausarbeiten und historisch erklären; Geschichtskarte und historische Karte unterscheiden.',
+    afb: ['I', 'II'],
+    share: 30,
+    grades: [6, 13],
+    material: 'image'
   },
   {
     id: 'ge-judgement',
@@ -646,6 +675,18 @@ const ERDKUNDE: ExamFormat[] = [
     share: 40,
     grades: [8, 13],
     material: 'text'
+  },
+  {
+    id: 'geo-sketch',
+    subject: 'erdkunde',
+    label: 'Kartenskizze, Profil oder Wirkungsgefüge erstellen',
+    competence: 'Erkenntnisgewinnung / Kommunikation',
+    description: 'Aus Materialien eine Kartenskizze, ein Profil oder ein Wirkungsgefüge zeichnen und erläutern (Antwort auf einer Zeichenfläche).',
+    afb: ['II', 'III'],
+    share: 30,
+    grades: [7, 13],
+    material: 'data',
+    note: 'Fachübliche Aufgabe; als Pflichtformat nicht amtlich belegt (EPA Geographie nennt nur die materialgebundene Problemerörterung).'
   },
   {
     id: 'geo-judgement',
