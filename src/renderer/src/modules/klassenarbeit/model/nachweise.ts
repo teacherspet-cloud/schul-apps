@@ -544,6 +544,48 @@ export function byGymFsAnzahl(subjectId: string, grade: number): string {
   return text
 }
 
+/**
+ * Wochenstunden im Sinn von GSO § 22 Abs. 1 Nr. 3 (Nachrecherche 2, 29.09.2026): Die
+ * Intensivierungsstunden stehen in Anlage 1 als eigene Zeile neben den Fächern, dienen nach
+ * Fußnote 9 dem Üben, Wiederholen und Vertiefen und nicht der Vermittlung neuer Lehrplaninhalte.
+ * Sie zählen daher nicht als Wochenstunden des Fachs – ausdrücklich geregelt ist das weder in der
+ * GSO noch im KMS vom 18.06.2026. Weicht die Schule nach § 15 Abs. 1 Satz 3 von der Stundentafel ab
+ * (mehr Stunden im Fach), zählen die tatsächlich erteilten Stunden.
+ */
+export const BY_GYM_FS_STUNDEN_HINWEIS =
+  'Maßgeblich sind die Wochenstunden des Fachs: ab vier Wochenstunden mindestens 4 Schulaufgaben, sonst 3. Intensivierungsstunden stehen in der Stundentafel als eigene Zeile, dienen dem Üben und Vertiefen und zählen nach dieser Auslegung nicht mit. Erhöht die Schule die Stundenzahl des Fachs (GSO § 15 Abs. 1), gelten die tatsächlich erteilten Stunden.'
+
+/** Fächer, die nach Anlage 1 Fußnote 5 als gleichzeitig einsetzende 1. und 2. Fremdsprache vorkommen */
+export const BY_GYM_FS_GLEICHZEITIG = ['englisch', 'latein', 'franzoesisch']
+
+/**
+ * Anlage 1 Fußnote 5: Französisch oder Latein (1. FS, zusammen mindestens 13 Wochenstunden in
+ * Jgst. 5–7) und Englisch (2. FS, mindestens 11) können gleichzeitig ab Jgst. 5 beginnen, je
+ * mindestens drei Wochenstunden je Jahrgangsstufe. Die Regel „ab vier Wochenstunden mindestens
+ * vier" bleibt; die Zahl hängt dann von der Stundenverteilung der Schule ab.
+ */
+export const BY_GYM_FS_GLEICHZEITIG_HINWEIS =
+  'Beginnen erste und zweite Fremdsprache gleichzeitig in Jgst. 5 (Latein oder Französisch mit Englisch, je mindestens drei Wochenstunden), richtet sich die Zahl nach der Stundenverteilung der Schule: bei vier und mehr Wochenstunden mindestens 4, bei drei mindestens 3.'
+
+/**
+ * Beispiele für gleichwertige Ersatzformate (GSO § 22 Abs. 2 Satz 1) aus dem KMS „Weiterentwicklung
+ * der Prüfungskultur an den bayerischen Gymnasien" vom 18.06.2026 (VI.3-BS5200.0/88/5).
+ */
+export function byGymErsatzBeispiel(subjectId: string, gruppe: Fachgruppe, grade: number): string | undefined {
+  if (gruppe === 'deutsch') {
+    if (grade === 6 || grade === 8)
+      return 'Hält die Schule vier Schulaufgaben, kann eine davon etwa durch den Jahrgangsstufentest zusammen mit einem schulinternen Test ersetzt werden (KMS vom 18.06.2026).'
+    if (grade >= 9 && grade <= 11)
+      return 'Beispiele für Ersatzformen laut KMS vom 18.06.2026: Debattenschulaufgabe (Jgst. 9) und mündliche Formate in Jgst. 11 wie Literarische Debatte, Epochengespräch, Literarisches Quartett oder Präsentationsprüfung.'
+    return undefined
+  }
+  if (subjectId === 'latein' || subjectId === 'griechisch')
+    return 'Als Ersatzform nennt das KMS vom 18.06.2026 die mündliche Dialogschulaufgabe, die vor allem im Lektüreunterricht bis Jgst. 11 eine zweigeteilte Schulaufgabe ersetzen kann.'
+  if (subjectId === 'physik' || subjectId === 'chemie')
+    return 'Für die Naturwissenschaften nennt das KMS vom 18.06.2026 etwa Laborexperimente oder Freilanduntersuchungen, bei angemessenem Anforderungsniveau.'
+  return undefined
+}
+
 function bayernGymnasium(k: Kontext): Nachweis {
   const quelle = 'GSO §§ 16, 22, 23, 25 und Anlage 1 (Fassung ab 01.08.2026)'
   const klein =
@@ -553,7 +595,11 @@ function bayernGymnasium(k: Kontext): Nachweis {
       ? 'Rückgabe binnen drei Wochen, vorher keine neue Schulaufgabe im Fach.'
       : 'Rückgabe binnen zwei Wochen, vorher keine neue Schulaufgabe im Fach.'
   const ersatz = (): string[] => {
-    const h = ['Höchstens eine Schulaufgabe je Schuljahr ist durch ein gleichwertiges Prüfungsformat ersetzbar (Beschluss der Lehrerkonferenz).']
+    const h = [
+      'Höchstens eine Schulaufgabe je Schuljahr ist durch ein im Anforderungsniveau gleichwertiges Prüfungsformat ersetzbar (Beschluss der Lehrerkonferenz zu Schuljahresbeginn, einheitlich für die Jahrgangsstufe der Ausbildungsrichtung). Auch dafür gelten eine Woche Ankündigung und höchstens ein großer Nachweis am Tag.'
+    ]
+    const beispiel = byGymErsatzBeispiel(k.subjectId, k.gruppe, k.grade)
+    if (beispiel) h.push(beispiel)
     if (k.grade <= 8 && k.gruppe !== 'deutsch')
       h.push(
         'In Jgst. 5–8 können außerdem alle Schulaufgaben des Fachs durch Leistungsnachweise im Abstand von grundsätzlich sechs Unterrichtswochen ersetzt werden (Lehrerkonferenz mit Zustimmung des Elternbeirats).'
@@ -579,7 +625,8 @@ function bayernGymnasium(k: Kontext): Nachweis {
   }
   if (k.gruppe === 'mathematik') return schulaufgabe(k.grade <= 7 ? 'mindestens 4 im Schuljahr' : 'mindestens 3 im Schuljahr', [])
   if (istFs(k.gruppe)) {
-    const hinweise = ['Maßgeblich sind die Wochenstunden nach Stundentafel: ab vier Wochenstunden mindestens 4 Schulaufgaben, sonst 3.']
+    const hinweise = [BY_GYM_FS_STUNDEN_HINWEIS]
+    if (k.grade <= 7 && BY_GYM_FS_GLEICHZEITIG.includes(k.subjectId)) hinweise.push(BY_GYM_FS_GLEICHZEITIG_HINWEIS)
     if (k.gruppe === 'fremdsprache') hinweise.push('In mindestens zwei Jahrgangsstufen wird eine Schulaufgabe ganz oder teilweise mündlich abgehalten.')
     if (k.subjectId === 'griechisch') hinweise.push('Griechisch ist Kernfach am Humanistischen Gymnasium (ab Jgst. 8).')
     return schulaufgabe(byGymFsAnzahl(k.subjectId, k.grade), hinweise)

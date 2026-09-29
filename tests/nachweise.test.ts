@@ -3,7 +3,7 @@
  * Entscheidung der Lehrkraft: automatisch nach Land/Fach, änderbar).
  */
 import { describe, expect, it } from 'vitest'
-import { BY_GYM_ZWEIG_KERNFAECHER, byGymFsAnzahl, fachgruppe, istModerneFremdsprache, nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../src/renderer/src/modules/klassenarbeit/model/nachweise'
+import { BY_GYM_ZWEIG_KERNFAECHER, byGymErsatzBeispiel, byGymFsAnzahl, fachgruppe, istModerneFremdsprache, nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../src/renderer/src/modules/klassenarbeit/model/nachweise'
 
 const LAENDER = ['BW', 'BY', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH']
 const FAECHER = [
@@ -179,6 +179,31 @@ describe('Bayern', () => {
     expect(by('deutsch', 9).hinweis).toContain('zwei Wochen')
     expect(by('mathematik', 6).hinweis).toContain('sechs Unterrichtswochen')
     expect(by('deutsch', 6).hinweis).not.toContain('sechs Unterrichtswochen')
+  })
+
+  // Nachrecherche 2 (29.09.2026): GSO Anlage 1 Fußnoten 5 und 9, KMS vom 18.06.2026
+  it('Fremdsprachen: Intensivierungsstunden zählen nicht, gleichzeitiger Beginn nach Stundenverteilung', () => {
+    const e5 = by('englisch', 5)
+    expect(e5.anzahl).toBe('mindestens 4 im Schuljahr')
+    expect(e5.hinweis).toContain('Intensivierungsstunden')
+    expect(e5.hinweis).toContain('gleichzeitig')
+    expect(by('latein', 7).hinweis).toContain('gleichzeitig')
+    expect(by('englisch', 8).hinweis).not.toContain('gleichzeitig')
+    expect(by('spanisch', 9).hinweis).not.toContain('gleichzeitig')
+    expect(e5.nichtGesichert).toBeFalsy()
+  })
+
+  it('Ersatzformate: Beispiele aus dem KMS vom 18.06.2026 je Fach', () => {
+    expect(by('deutsch', 9).hinweis).toContain('Debattenschulaufgabe')
+    expect(by('deutsch', 11).hinweis).toContain('Literarische Debatte')
+    expect(by('deutsch', 6).hinweis).toContain('Jahrgangsstufentest')
+    expect(by('deutsch', 7).hinweis).not.toContain('Jahrgangsstufentest')
+    expect(by('latein', 10).hinweis).toContain('Dialogschulaufgabe')
+    expect(by('griechisch', 9).hinweis).toContain('Dialogschulaufgabe')
+    expect(by('physik', 9).hinweis).toContain('Laborexperimente')
+    expect(by('mathematik', 9).hinweis).not.toContain('Laborexperimente')
+    expect(by('englisch', 9).hinweis).toContain('eine Woche Ankündigung')
+    expect(byGymErsatzBeispiel('englisch', 'fremdsprache', 9)).toBeUndefined()
   })
 
   it('Tabelle der Ausbildungsrichtungen deckt alle sechs Zweige ab', () => {

@@ -162,7 +162,10 @@ export const EXAM_STATE_RULES: ExamStateRules[] = [
     notes: [
       'Kernfächer (GSO § 16 Abs. 2): Deutsch, zwei Fremdsprachen, Mathematik und Physik, dazu je Ausbildungsrichtung ein weiteres Fach; nur Kernfächer haben Schulaufgaben.',
       'In Ausnahmefällen darf die Mindestzahl in Deutsch, Mathematik und den Fremdsprachen um eine unterschritten werden.',
-      'Höchstens eine Schulaufgabe je Fach und Schuljahr (Jgst. 5–11) ist durch ein gleichwertiges Prüfungsformat ersetzbar; Gruppenarbeitsphasen oder eine Jahresstoff-Prüfung als letzter großer Nachweis brauchen die Zustimmung des Elternbeirats.',
+      'Höchstens eine Schulaufgabe je Fach und Schuljahr (Jgst. 5–11) ist durch ein im Anforderungsniveau gleichwertiges Prüfungsformat ersetzbar; die Lehrerkonferenz entscheidet zu Schuljahresbeginn einheitlich je Jahrgangsstufe und Ausbildungsrichtung, das Schulforum wird angehört. Gruppenarbeitsphasen oder eine Jahresstoff-Prüfung als letzter großer Nachweis brauchen die Zustimmung des Elternbeirats. Ankündigung, Hilfsmittel und Wiederholungsverbot gelten wie für Schulaufgaben (§ 22 Abs. 9).',
+      'Beispiele für Ersatzformate (KMS vom 18.06.2026): Deutsch Debattenschulaufgabe (Jgst. 9) und mündliche Formate in Jgst. 11 (Literarische Debatte, Epochengespräch, Literarisches Quartett, Präsentationsprüfung); Latein/Griechisch Dialogschulaufgabe statt einer zweigeteilten Schulaufgabe; Naturwissenschaften Laborexperimente, Freilanduntersuchungen, hybride Herbarien; Informatik praktische Prüfungen am Computer. Produktorientierte Formate brauchen Prozessbegleitung und Prüfungsteile zur Reflexion.',
+      'Deutsch Jgst. 5–8: Hält eine Schule vier statt drei Schulaufgaben, darf eine davon ersetzt werden, etwa durch den Jahrgangsstufentest (Jgst. 6, 8) zusammen mit einem schulinternen Test; frühere Ersatzformen laufen sonst als kleine Leistungsnachweise weiter.',
+      'Fremdsprachen: Maßgeblich sind die Wochenstunden des Fachs. Intensivierungsstunden sind in der Stundentafel eine eigene Zeile (Üben, Wiederholen, keine neuen Lehrplaninhalte) und zählen nach dieser Auslegung nicht mit. Bei gleichzeitig einsetzender 1. und 2. Fremdsprache ab Jgst. 5 (je mindestens drei Wochenstunden) hängt die Zahl von der Stundenverteilung der Schule ab.',
       'In Jgst. 5–8 können außer in Deutsch alle Schulaufgaben eines Fachs durch Leistungsnachweise im Abstand von grundsätzlich sechs Unterrichtswochen ersetzt werden (Lehrerkonferenz, Zustimmung des Elternbeirats).',
       'Deutsch: Diktate oder grammatische Übungen sind als Schulaufgaben nicht zulässig; bei nur drei Schulaufgaben in Jgst. 5–8 keine Ersetzung durch Formate, die keine Aufsatzschulaufgaben sind.',
       'In modernen Fremdsprachen wird in mindestens zwei Jahrgangsstufen eine Schulaufgabe ganz oder teilweise mündlich abgehalten, in Jgst. 12/13 eine Schulaufgabe mündlich.',
@@ -189,10 +192,13 @@ export const EXAM_STATE_RULES: ExamStateRules[] = [
       'GSO §§ 21–23, 25, 28 (Fassung ab 01.08.2026) – https://www.gesetze-bayern.de/Content/Document/BayGSO-22',
       'GSO Anlage 1 (Stundentafeln Jgst. 5–11) – https://www.gesetze-bayern.de/Content/Document/BayGSO-ANL_1',
       'RSO §§ 17–20 – https://www.gesetze-bayern.de/Content/Document/BayRSO-18',
-      'MSO §§ 12, 13 – https://www.gesetze-bayern.de/Content/Document/BayMSO-12'
+      'MSO §§ 12, 13 – https://www.gesetze-bayern.de/Content/Document/BayMSO-12',
+      'KMS „Weiterentwicklung der Prüfungskultur an den bayerischen Gymnasien" vom 18.06.2026 (VI.3-BS5200.0/88/5) – https://www.isb.bayern.de/fileadmin/user_upload/Gymnasium/Leistungserhebungen/2026_06_KMS_Weiterentwicklung_Pruefungskultur_Gymnasium.pdf',
+      'StMUK: Prüfungskultur am Gymnasium – https://www.km.bayern.de/unterrichten/unterrichtsalltag/pruefungskultur/gymnasium'
     ],
     nichtGesichert: [
-      'Ob Intensivierungsstunden bei der Zahl der Wochenstunden einer Fremdsprache mitzählen (gerechnet wird mit der Stundentafel).',
+      'Intensivierungsstunden: Dass sie nicht als Wochenstunden des Fachs zählen, ist eine Auslegung aus Anlage 1 (eigene Zeile, Fußnote 9); ausdrücklich geregelt ist es nicht. Offen bleiben Intensivierungen zur Klassenteilung, in denen neue Inhalte zulässig sind.',
+      'Zweisprachige Züge: modifizierte Stundentafeln des Staatsministeriums nicht ausgewertet; die Zahl richtet sich auch dort nach den Wochenstunden der Fremdsprache.',
       'Grundschule 3/4, Wirkung von VERA, Notenspiegel.'
     ]
   },
