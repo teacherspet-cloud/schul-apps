@@ -7,6 +7,7 @@
  * verwendet wie im Arbeitsblatt – dadurch funktionieren Darstellung, Seitenumbruch und Export
  * unverändert weiter.
  */
+import { schreibGrammatikRegeln } from '../didactics/schreibGrammatik'
 import { fachRegeln, mitProtokoll, versuchFuerArbeit } from './fachRegeln'
 import { fachDerArbeit, formatArt, inhaltsanteil, sprachfolge, zweiterTeil } from '../model/faecher'
 import type { Quellentreffer, StructuredRequest } from '@shared/types'
@@ -259,6 +260,8 @@ export function schreibvorgabenRegeln(exam: Exam, part: ExamPart): string {
   const meta = worksheetMetaFor(exam, part)
   return [
     writingBriefRules(meta),
+    // Grammatik ausdrücklich mitprüfen (29.09.2026) – nur im Schreibteil
+    art === 'writing' ? schreibGrammatikRegeln(exam, part) : '',
     /*
      * Oberstufe (Befund der Lehrkraft, 27.09.2026): Eine Klausuraufgabe im 13. Jahrgang trug
      * „Use an appropriate salutation and closing · Organise the email in clear paragraphs" –

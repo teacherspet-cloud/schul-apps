@@ -1,3 +1,4 @@
+import SchreibGrammatikFeld from './SchreibGrammatikFeld'
 import { nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../model/nachweise'
 import FachKarte, { FehlerquoteFelder } from './FachKarte'
 import { istAlteSprache } from '../model/faecher'
@@ -735,6 +736,19 @@ export default function FrameStep(): React.JSX.Element {
                                     value={part.studentTextType ?? ''}
                                     onChange={(v) => update((d) => (d.parts[i].studentTextType = v ?? ''))}
                                     allowDeselect={false}
+                                  />
+                                )}
+                                {/* Grammatik ausdrücklich mitprüfen – nur im Schreibteil der Fremdsprachen (29.09.2026) */}
+                                {istFremdsprache(meta.subjectId) && formatArt(part.formatId) === 'writing' && (
+                                  <SchreibGrammatikFeld
+                                    exam={exam}
+                                    part={part}
+                                    setzen={(g) =>
+                                      update((d) => {
+                                        if (g) d.parts[i].grammatik = g
+                                        else delete d.parts[i].grammatik
+                                      })
+                                    }
                                   />
                                 )}
                                 <Textarea

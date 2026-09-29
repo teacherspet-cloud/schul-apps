@@ -95,6 +95,8 @@ export interface ExamPart {
   notes?: string
   /** Produktive Teile: Textsorte, in der die Lernenden schreiben ('' = die KI wählt passend) */
   studentTextType?: string
+  /** Fremdsprachen, Schreibteil: ausdrücklich mitgeprüfte Grammatik (29.09.2026, didactics/schreibGrammatik.ts) */
+  grammatik?: import('../didactics/schreibGrammatik').SchreibGrammatik
   /** Material und Aufgaben des Teils – bei mehreren Fassungen die der Fassung A */
   blocks: WsBlock[]
   /**
