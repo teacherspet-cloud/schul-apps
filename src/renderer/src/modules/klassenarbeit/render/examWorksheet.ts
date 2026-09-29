@@ -50,14 +50,16 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
         }
       : fach.sprache === 'it'
         ? {
-            // Wortlaut nach der Esame di Stato („Durata massima della prova", „È consentito l'uso del dizionario")
+            // Wortlaut nach der Esame di Stato („Durata massima della prova") und der Maturità des RIC
+            // („Materiali e sussidi consentiti:", „per un totale di 45 punti"); Notenschlüssel als „Griglia di valutazione"
+            // wie im Liceo Montale Roma (Punkte → Note)
             title: 'Verifica',
             time: (min: number) => `Durata: ${min} ${min === 1 ? 'minuto' : 'minuti'}`,
-            aids: (a: string) => `Materiale consentito: ${a || 'nessuno'}`,
+            aids: (a: string) => `Materiali e sussidi consentiti: ${a || 'nessuno'}`,
             points: (n: number) => `${n} ${n === 1 ? 'punto' : 'punti'}`,
             split: (c: number, l: number) => `${c} % contenuto, ${l} % lingua`,
             counts: (w: number) => `vale il ${w} %`,
-            scale: (line: string) => `Scala di valutazione: ${line}`,
+            scale: (line: string) => `Griglia di valutazione: ${line}`,
             total: 'Totale',
             labels: {
               writing: 'Produzione scritta',
@@ -66,14 +68,14 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
           }
         : fach.sprache === 'ru'
           ? {
-              // Wortlaut nach den FIPI-Demoversionen ЕГЭ/ОГЭ 2026; Numerus nach der Zahl (russischPlural)
+              // Wortlaut nach den FIPI-Demoversionen ЕГЭ/ОГЭ 2026 und FIPI „Шкала перевода баллов в отметки“; Numerus nach der Zahl (russischPlural)
               title: 'Контрольная работа',
               time: (min: number) => `Время выполнения: ${min} ${russischPlural(min, RU_MINUTA)}`,
               aids: (a: string) => `Дополнительные материалы: ${a || 'не разрешены'}`,
               points: (n: number) => `${n} ${russischPlural(n, RU_BALL)}`,
               split: (c: number, l: number) => `содержание ${c} %, языковое оформление ${l} %`,
-              counts: (w: number) => `${w} % оценки`,
-              scale: (line: string) => `Шкала оценок: ${line}`,
+              counts: (w: number) => `${w} % итоговой отметки`,
+              scale: (line: string) => `Шкала перевода баллов в отметки: ${line}`,
               total: 'Всего',
               labels: { writing: 'Письменная речь', other: 'Остальные разделы' }
             }

@@ -44,7 +44,7 @@ const TEXTS: Record<HelpKey, Record<string, string>> = {
     en: 'You may have to change the form of the word (e.g. plural, past tense).',
     fr: 'Il faut parfois changer la forme du mot (p. ex. pluriel, temps du verbe).',
     es: 'A veces tienes que cambiar la forma de la palabra (p. ej. plural, tiempo verbal).',
-    it: 'A volte devi cambiare la forma della parola (ad es. plurale, tempo verbale).',
+    it: 'A volte devi cambiare la forma della parola (per esempio il plurale o il tempo verbale).',
     nl: 'Soms moet je de vorm van het woord veranderen (bijv. meervoud, verleden tijd).',
     ru: 'Иногда слово нужно поставить в другую форму (например, во множественное число или в прошедшее время).'
   },

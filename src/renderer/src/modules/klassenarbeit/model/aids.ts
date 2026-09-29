@@ -99,17 +99,19 @@ const SPANISCH: Record<string, string> = {
   operatorenliste: 'la lista de operadores'
 }
 
+// Aufzählung ohne Artikel wie im Kopf der slowenischen Maturità (RIC 2015): „Materiali e sussidi consentiti: …
+// dizionario monolingue e dizionario bilingue"
 const ITALIENISCH: Record<string, string> = {
   'keine hilfsmittel': 'nessuno (né dizionario né altro materiale)',
   keine: 'nessuno',
-  'einsprachiges wörterbuch': 'il dizionario monolingue',
-  'zweisprachiges wörterbuch': 'il dizionario bilingue',
-  'ein- und zweisprachiges wörterbuch': 'il dizionario monolingue e il dizionario bilingue',
-  wörterbuch: 'il dizionario',
-  'wörterbuch nur für den schreibteil': 'il dizionario (solo per la produzione scritta)',
-  vokabelheft: 'il quaderno dei vocaboli',
-  'eigene notizen (eine seite)': 'i propri appunti (una pagina)',
-  'eigene notizen': 'i propri appunti'
+  'einsprachiges wörterbuch': 'dizionario monolingue',
+  'zweisprachiges wörterbuch': 'dizionario bilingue',
+  'ein- und zweisprachiges wörterbuch': 'dizionario monolingue e dizionario bilingue',
+  wörterbuch: 'dizionario',
+  'wörterbuch nur für den schreibteil': 'dizionario (solo per la produzione scritta)',
+  vokabelheft: 'quaderno dei vocaboli',
+  'eigene notizen (eine seite)': 'appunti personali (una pagina)',
+  'eigene notizen': 'appunti personali'
 }
 
 const RUSSISCH: Record<string, string> = {

@@ -55,14 +55,18 @@ const TEXTS: Record<string, EvidenceText> = {
     column: 'Cita del texto',
     sourced: false
   },
+  // Italienisch (29.09.2026, Nachrecherche 2): „Segnate con una crocetta la risposta giusta" steht wörtlich in den
+  // NRW-Operatoren Hörverstehen Italienisch (Abitur ab 2025), hier in der du-Form; der Beleg-Teil ist sinngemäß gebildet
   it: {
-    instruction: 'Segna la casella giusta e giustifica la tua risposta citando il testo.',
+    instruction: 'Segna con una crocetta la risposta giusta e giustificala con una breve citazione dal testo.',
     column: 'Citazione dal testo',
     sourced: false
   },
-  // Russisch (29.09.2026): ЕГЭ/ОГЭ kennen Richtig/Falsch nur ohne Beleg – sinngemäß gebildet
+  // Russisch (29.09.2026): ЕГЭ/ОГЭ kennen Richtig/Falsch nur ohne Beleg. Beide Satzteile stehen als Beispiele in der
+  // NRW-Operatorenübersicht Russisch (Abitur ab 2025): „отметьте правильный ответ", „Обоснуйте свою точку зрения цитатами
+  // из текста" – hier in der du-Form verbunden; die Verbindung selbst ist nicht amtlich, daher sourced: false
   ru: {
-    instruction: 'Отметь правильный ответ и подтверди его короткой цитатой из текста.',
+    instruction: 'Отметь правильный ответ и обоснуй его короткой цитатой из текста.',
     column: 'Цитата из текста',
     sourced: false
   }
