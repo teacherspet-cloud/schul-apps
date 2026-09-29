@@ -120,6 +120,21 @@ export default function TeileKarte({
               ) : (
                 <NumberInput size="xs" label={i === 0 ? 'Punkte' : undefined} min={0} value={t.punkte ?? 0} onChange={(v) => setzeTeil(i, { punkte: Number(v) || 0 })} w={90} />
               )}
+              {t.art === 'sprachmittlung' && (
+                <Select
+                  size="xs"
+                  label={i === 0 || teile[0].art !== 'sprachmittlung' ? 'Ergebnis auf' : undefined}
+                  data={[
+                    { value: 'deutsch', label: 'Deutsch' },
+                    { value: 'zielsprache', label: r.meta.subjectLabel || 'Zielsprache' },
+                    { value: 'offen', label: 'unklar' }
+                  ]}
+                  value={t.ergebnisSprache ?? 'offen'}
+                  onChange={(v) => setzeTeil(i, { ergebnisSprache: v === 'deutsch' || v === 'zielsprache' ? v : undefined })}
+                  allowDeselect={false}
+                  w={120}
+                />
+              )}
               {getrennt(t) && (
                 <NumberInput
                   size="xs"

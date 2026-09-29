@@ -133,12 +133,33 @@ export function deutschVerlangt(aufgaben: string): boolean {
   )
 }
 
+/** Aufgabe sieht nach Sprachmittlung aus (Richtung unbekannt) */
+const SPRACHMITTLUNG = /sprachmittlung|\bmediation\b|m[ée]diation|mediaci[oó]n|mediazione|медиаци|\bmediate\b/i
+
+/**
+ * Darf die Abgabe (auch) auf Deutsch sein? (29.09.2026, Wunsch der Lehrkraft: keine 0 %, wenn eine
+ * Sprachmittlung Deutsch verlangt, die Aufgabe das aber nicht ausdrücklich sagt.) Ja, wenn
+ * - die Aufgabe Deutsch ausdrücklich verlangt (`deutschVerlangt`),
+ * - ein Sprachmittlungsteil ins Deutsche geht ODER seine Richtung unklar ist,
+ * - ohne erkannte Teile die Aufgabe nach Sprachmittlung aussieht.
+ * Nur wenn Deutsch sicher falsch ist, setzt die App automatisch auf 0 %.
+ */
+export function deutschMoeglich(g: { aufgaben: string; teile?: { art: string; titel: string; ergebnisSprache?: 'deutsch' | 'zielsprache' }[] }): boolean {
+  const teile = g.teile ?? []
+  if (deutschVerlangt([g.aufgaben, ...teile.map((t) => t.titel)].join('\n'))) return true
+  const mittlung = teile.filter((t) => t.art === 'sprachmittlung')
+  if (mittlung.some((t) => t.ergebnisSprache !== 'zielsprache')) return true
+  // Teile bekannt und alle Sprachmittlungen gehen sicher in die Zielsprache: Deutsch ist falsch
+  if (teile.length) return false
+  return SPRACHMITTLUNG.test(g.aufgaben)
+}
+
 /** Hinweis für die Lehrkraft am Bogen bzw. an der Abgabe */
 export function zielsprachHinweis(p: ZielsprachPruefung, fach: string, deutschErlaubt = false, mitEinstufung = true): string | null {
   const prozent = Math.round(p.befund.anteilDeutsch * 100)
   if (p.verfehlt)
     return deutschErlaubt
-      ? `Abgabe überwiegend auf Deutsch (etwa ${prozent} % der Sätze). Die Aufgabe verlangt teilweise Deutsch – ${mitEinstufung ? 'Einstufung' : 'Rückmeldung'} bitte prüfen.`
+      ? `Abgabe überwiegend auf Deutsch (etwa ${prozent} % der Sätze). Die Aufgabe verlangt womöglich Deutsch (Sprachmittlung) – nichts automatisch auf 0 % gesetzt, ${mitEinstufung ? 'Einstufung' : 'Rückmeldung'} bitte prüfen.`
       : `Abgabe überwiegend auf Deutsch statt auf ${fach} (etwa ${prozent} % der Sätze) – gilt als nicht erfüllt${mitEinstufung ? ', Einstufung auf 0 % gesetzt' : ''}.`
   if (p.teilweise) return `Ein längerer Abschnitt ist auf Deutsch statt auf ${fach} verfasst – betroffenen Teil bitte prüfen.`
   return null

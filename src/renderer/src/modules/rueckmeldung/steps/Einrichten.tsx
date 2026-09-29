@@ -48,7 +48,7 @@ import { notifyError } from '../../../shared/util'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import { abgabenTrennen, aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
 import { kiTrennungNoetig, trenneNachAufgabe, trennHinweis, trennungAnwenden, trennungZurueck } from '../abgabeTrennen'
-import { deutschVerlangt, pruefeZielsprache, zielsprachHinweis } from '../sprachErkennung'
+import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from '../sprachErkennung'
 import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import MaterialWahl from '../../../shared/components/MaterialWahl'
 import { naechstesKuerzel, type Abgabe, type Nachteilsausgleich } from '../model/types'
@@ -193,7 +193,7 @@ export default function Einrichten(): React.JSX.Element | null {
   const offen = r.abgaben.filter((a) => !a.bogen && (a.text.trim() || a.bilder.length)).length
   const mitText = r.abgaben.filter((a) => a.text.trim() && !a.bilder.length)
   // Deutsch statt Zielsprache (29.09.2026): Warnung schon an der Abgabe
-  const deutschErlaubt = deutschVerlangt([r.grundlage.aufgaben, ...(r.grundlage.teile ?? []).map((t) => t.titel)].join('\n'))
+  const deutschErlaubt = deutschMoeglich(r.grundlage)
   const sprachWarnung = (a: Abgabe): string | null => zielsprachHinweis(pruefeZielsprache(a.text, r.meta.subjectId), r.meta.subjectLabel, deutschErlaubt, false)
   const grund = !r.grundlage.aufgaben.trim()
     ? 'Grundlage fehlt'

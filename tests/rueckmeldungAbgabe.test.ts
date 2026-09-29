@@ -218,7 +218,7 @@ describe('Bogen: Abgabe klar abgegrenzt, Zielsprache', () => {
     const b = bogenAus(antwort, rm({}, { aufgaben: 'Mediation: Fasse den Artikel auf Deutsch zusammen.' }), abgabe)
     expect(b.gesamt?.anteil).toBe(55)
     expect(b.spracheVerfehlt).toBeUndefined()
-    expect(b.hinweise?.[0]).toMatch(/verlangt teilweise Deutsch/)
+    expect(b.hinweise?.[0]).toMatch(/verlangt womöglich Deutsch/)
   })
 
   it('ohne Einstufung: Markierung und Hinweis ohne Prozentangabe', () => {
@@ -243,5 +243,23 @@ describe('Oberstufe: Deckel bei ungenügendem Inhalt oder ungenügender Sprache'
     const t = { id: 't', titel: 'Writing', art: 'schreiben' as const, inhalt: 40, quelle: 'vorgabe' as const }
     expect(teilAnteil(t, { teilId: 't', inhalt: 90, sprache: 10 }, true)).toBe(20)
     expect(teilAnteil(t, { teilId: 't', inhalt: 90, sprache: 10 })).toBe(42)
+  })
+})
+
+describe('Sprachmittlung ins Deutsche ohne ausdrückliche Angabe (Wunsch 29.09.2026)', () => {
+  it('Deutsch ist möglich, wenn eine Sprachmittlung ins Deutsche geht oder ihre Richtung unklar ist', async () => {
+    const { deutschMoeglich } = await import('../src/renderer/src/modules/rueckmeldung/sprachErkennung')
+    const m = (ergebnisSprache?: 'deutsch' | 'zielsprache') => ({ titel: 'Aufgabe 3', art: 'sprachmittlung', ergebnisSprache })
+    expect(deutschMoeglich({ aufgaben: 'Task 3: Your parents want to know what the article says.', teile: [m()] })).toBe(true)
+    expect(deutschMoeglich({ aufgaben: 'x', teile: [m('deutsch')] })).toBe(true)
+    expect(deutschMoeglich({ aufgaben: 'x', teile: [m('zielsprache'), { titel: 'Writing', art: 'schreiben' }] })).toBe(false)
+    expect(deutschMoeglich({ aufgaben: 'Mediation: Your friend Paul asks you about the text.' })).toBe(true)
+    expect(deutschMoeglich({ aufgaben: 'Write an email to Eddie.' })).toBe(false)
+  })
+
+  it('übernimmt die von der KI erkannte Richtung', async () => {
+    const { teileAusKi } = await import('../src/renderer/src/modules/rueckmeldung/teilbewertung')
+    const e = teileAusKi([{ titel: 'Mediation', art: 'sprachmittlung', ergebnisSprache: 'deutsch' }], { stateId: 'NW', grade: 8, schoolTypeId: 'gymnasium' })!
+    expect(e.teile[0].ergebnisSprache).toBe('deutsch')
   })
 })

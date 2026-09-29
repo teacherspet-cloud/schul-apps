@@ -29,6 +29,13 @@ export interface BewertungsTeil {
   punkte?: number
   /** Nur Schreiben/Sprachmittlung: Anteil des Inhalts in Prozent; Sprache = 100 − Inhalt */
   inhalt?: number
+  /**
+   * Nur Sprachmittlung: In welcher Sprache das Ergebnis verlangt ist (29.09.2026). 'deutsch' =
+   * Sprachmittlung ins Deutsche (Deutsch ist dort richtig), 'zielsprache' = in die Fremdsprache;
+   * fehlt die Angabe, ist die Richtung unklar – dann setzt die App bei deutschem Text nichts
+   * automatisch auf 0 %, sondern weist nur hin.
+   */
+  ergebnisSprache?: 'deutsch' | 'zielsprache'
   quelle: TeilQuelle
 }
 
@@ -205,6 +212,7 @@ export function teileAusKi(
       const titel = String(d.titel ?? '').trim()
       if (!titel) return null
       const art: TeilArt = d.art === 'schreiben' || d.art === 'sprachmittlung' ? d.art : 'sonstig'
+      const ergebnisSprache = art === 'sprachmittlung' && (d.ergebnisSprache === 'deutsch' || d.ergebnisSprache === 'zielsprache') ? d.ergebnisSprache : undefined
       const gewicht = begrenze(d.gewichtProzent)
       const punkte = begrenze(d.punkte, 1000)
       const inhalt = begrenze(d.inhaltProzent)
@@ -216,6 +224,7 @@ export function teileAusKi(
         ...(gewicht ? { gewicht } : {}),
         ...(punkte ? { punkte } : {}),
         ...(art !== 'sonstig' ? { inhalt: inhalt > 0 && inhalt < 100 ? inhalt : vorgabe.inhalt } : {}),
+        ...(ergebnisSprache ? { ergebnisSprache } : {}),
         quelle: gewicht || punkte || (art !== 'sonstig' && inhalt > 0 && inhalt < 100) ? 'material' : 'vorgabe'
       }
     })

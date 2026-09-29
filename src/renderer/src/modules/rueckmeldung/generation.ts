@@ -3,7 +3,7 @@
  * Fotos/Scans in Text, Rückmeldebogen ohne Note.
  */
 import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
-import { deutschVerlangt, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
+import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
@@ -261,7 +261,18 @@ export function teileText(r: Rueckmeldung): string {
   const v = r.grundlage.verrechnung ?? 'prozent'
   return [
     `TEILE DER ARBEIT (Gesamtleistung nach ${v === 'punkte' ? 'Punkten' : 'prozentualer Gewichtung'}):`,
-    ...teile.map((t) => `[${t.id}] ${teilZeile(t, v)}${getrennt(t) ? ' – Inhalt und Sprache getrennt bewerten' : ''}`)
+    ...teile.map(
+      (t) =>
+        `[${t.id}] ${teilZeile(t, v)}${getrennt(t) ? ' – Inhalt und Sprache getrennt bewerten' : ''}${
+          t.art === 'sprachmittlung'
+            ? t.ergebnisSprache === 'deutsch'
+              ? ' – Ergebnis AUF DEUTSCH verlangt (Deutsch ist hier richtig)'
+              : t.ergebnisSprache === 'zielsprache'
+                ? ' – Ergebnis in der Zielsprache verlangt'
+                : ' – Richtung laut Aufgabenstellung prüfen (ins Deutsche: Deutsch ist richtig)'
+            : ''
+        }`
+    )
   ].join('\n')
 }
 
@@ -518,7 +529,7 @@ export function abgabeRegeln(r: Rueckmeldung, a: Abgabe): string[] {
  */
 function spracheAnwenden(bogen: Bogen, r: Rueckmeldung, a: Abgabe, art: ReturnType<typeof einstufungVon>, skala: SkalenKontext): void {
   const p = pruefeZielsprache(a.text, r.meta.subjectId)
-  const erlaubt = deutschVerlangt([r.grundlage.aufgaben, ...(r.grundlage.teile ?? []).map((t) => t.titel)].join('\n'))
+  const erlaubt = deutschMoeglich(r.grundlage)
   const hinweis = zielsprachHinweis(p, r.meta.subjectLabel, erlaubt, art !== 'keine')
   if (!hinweis) return
   bogen.hinweise = [...(bogen.hinweise ?? []), hinweis]

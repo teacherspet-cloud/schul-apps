@@ -49,7 +49,8 @@ const TEILE_FELD = arr(
     art: enumOf(['schreiben', 'sprachmittlung', 'sonstig']),
     gewichtProzent: int('Anteil an der Gesamtnote in Prozent, NUR wenn er im Material steht – sonst 0'),
     punkte: int('Höchstpunktzahl des Teils, NUR wenn sie im Material steht – sonst 0'),
-    inhaltProzent: int('Nur Schreiben/Sprachmittlung: Anteil des INHALTS in Prozent, NUR wenn er im Material steht (z. B. „Content 40 % / Language 60 %", „Inhalt 12 P. / Sprache 18 P." = 40) – sonst 0')
+    inhaltProzent: int('Nur Schreiben/Sprachmittlung: Anteil des INHALTS in Prozent, NUR wenn er im Material steht (z. B. „Content 40 % / Language 60 %", „Inhalt 12 P. / Sprache 18 P." = 40) – sonst 0'),
+    ergebnisSprache: enumOf(['', 'deutsch', 'zielsprache'])
   })
 )
 
@@ -58,6 +59,7 @@ const TEILE_REGEL = [
   '- „schreiben": freie Textproduktion in der Fremdsprache (Write an email/article/story…, Rédige…, Escribe…, Scrivi…, Напиши…, Comment, Discuss, Describe your…), bei der Inhalt und Sprache bewertet werden;',
   '- „sprachmittlung": Mediation – Inhalte eines Textes für jemanden in die andere Sprache übertragen (Explain to your German friend…, Fasse auf Deutsch zusammen…, Explique à ton ami…);',
   '- „sonstig": alles andere (Hör-/Leseverstehen mit geschlossenen oder kurzen Antworten, Wortschatz, Grammatik, Übersetzung einzelner Sätze).',
+  'Nur bei Sprachmittlung: ergebnisSprache = „deutsch", wenn das Ergebnis auf Deutsch verlangt ist (Quelltext in der Fremdsprache, Adressat versteht nur Deutsch, „auf Deutsch", „für deine Eltern/Oma", „Fasse … zusammen" in deutscher Aufgabe zu fremdsprachigem Material); „zielsprache", wenn es in der Fremdsprache verlangt ist (deutscher Quelltext, Adressat spricht nur die Fremdsprache: „Explain to your exchange partner…", „Explique à ton corres…"); leer, wenn es nicht eindeutig ist.',
   'Gewichte, Punkte und Inhalt/Sprache-Anteile NUR übernehmen, wenn sie im Material stehen – nichts schätzen. Besteht die Arbeit aus nur einer Aufgabe, ist die Liste ein Eintrag.'
 ].join('\n')
 
