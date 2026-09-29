@@ -28,7 +28,7 @@ public class ScannerPlugin: CAPPlugin, CAPBridgedPlugin, VNDocumentCameraViewCon
                 return
             }
             if let alt = self.offen {
-                alt.resolve(["seiten": []])
+                alt.resolve(["seiten": [String]()])
             }
             self.offen = call
             let scanner = VNDocumentCameraViewController()
@@ -54,7 +54,7 @@ public class ScannerPlugin: CAPPlugin, CAPBridgedPlugin, VNDocumentCameraViewCon
 
     public func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
         controller.dismiss(animated: true) {
-            self.offen?.resolve(["seiten": []])
+            self.offen?.resolve(["seiten": [String]()])
             self.offen = nil
         }
     }
