@@ -136,7 +136,8 @@ describe('Kopf und Anlage', () => {
 
   it('Deutsch- und Politikarbeiten bleiben deutsch', () => {
     const de = examToWorksheet(arbeit('politik', {}, [teil('pol-text')]))
-    expect(de.meta.title).toBe('Klassenarbeit Politik')
+    // Niedersachsen: in Politik schriftliche Lernkontrollen (model/nachweise.ts, 29.09.2026)
+    expect(de.meta.title).toBe('Schriftliche Lernkontrolle Politik')
     expect(de.meta.labelLanguage).toBe('de')
   })
 

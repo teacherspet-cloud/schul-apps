@@ -1,3 +1,4 @@
+import { nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../model/nachweise'
 import FachKarte, { FehlerquoteFelder } from './FachKarte'
 import { istAlteSprache } from '../model/faecher'
 import { taktZeile } from '../model/examRules'
@@ -196,8 +197,11 @@ export default function FrameStep(): React.JSX.Element {
     meta.stateId,
     meta.subjectId,
     meta.grade,
-    exam.parts.map((p) => p.formatId)
+    exam.parts.map((p) => p.formatId),
+    meta.schoolTypeId
   )
+  // Art des Leistungsnachweises nach Land, Schulform, Fach und Jahrgang (29.09.2026) – änderbar
+  const nachweis = nachweisFuer({ stateId: meta.stateId, schoolTypeId: meta.schoolTypeId, subjectId: meta.subjectId, grade: meta.grade })
 
   /** Nach dem Hinzufügen oder Löschen die Anteile nach der Regel des Faches setzen */
   const applyWeights = (d: Exam): void => {
@@ -1058,6 +1062,28 @@ export default function FrameStep(): React.JSX.Element {
                       Vorgaben in {STATES.find((x) => x.id === meta.stateId)?.name ?? meta.stateId}
                     </Title>
                     <Stack gap="xs">
+                      <Group gap="xs" align="flex-end" wrap="nowrap" data-nachweis>
+                        <Select
+                          size="xs"
+                          label="Art des Leistungsnachweises"
+                          data={[...new Set([nachweis.bezeichnung, ...NACHWEIS_BEZEICHNUNGEN, ...(meta.nachweis ? [meta.nachweis] : [])])]}
+                          value={meta.nachweis ?? nachweis.bezeichnung}
+                          onChange={(v) => patch({ nachweis: v && v !== nachweis.bezeichnung ? v : undefined })}
+                          searchable
+                          allowDeselect={false}
+                          w={260}
+                        />
+                        <Text size="xs" c="dimmed">
+                          {[nachweis.dauer, nachweis.anzahl].filter(Boolean).join(' · ')}
+                          {nachweis.quelle ? ` (${nachweis.quelle})` : ''}
+                          {nachweis.nichtGesichert ? ' – nicht gesichert' : ''}
+                        </Text>
+                      </Group>
+                      {nachweis.hinweis && !warnings.includes(nachweis.hinweis) && (
+                        <Text size="xs" c="dimmed">
+                          {nachweis.hinweis}
+                        </Text>
+                      )}
                       {warnings.map((w, i) => (
                         <Alert key={i} color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
                           <Text size="sm">{w}</Text>

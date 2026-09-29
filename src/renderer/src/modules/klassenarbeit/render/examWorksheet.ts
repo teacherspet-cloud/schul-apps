@@ -6,6 +6,7 @@
  * mit einem Kopfbaustein (Zeit, Hilfsmittel, Notenschlüssel), je Teil einer Überschrift und
  * den erzeugten Bausteinen.
  */
+import { nachweisFuer } from '../model/nachweise'
 import { eigeneTeilnoteLabel, istAlteSprache } from '../model/faecher'
 import { fachDerArbeit, inhaltsanteil, zweiterTeil } from '../model/faecher'
 import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
@@ -193,7 +194,8 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     meta: {
       ...meta,
       // Kopf in der Sprache des Faches
-      title: exam.meta.title || kopfText.titel,
+      // Deutschsprachige Arbeiten heißen nach der Art des Leistungsnachweises (Schulaufgabe, Lernkontrolle …, model/nachweise.ts)
+      title: exam.meta.title || (fachDerArbeit(exam.meta.subjectId).sprache === 'de' ? grossAnfang(`${exam.meta.nachweis ?? nachweisFuer(exam.meta).bezeichnung} ${fachDerArbeit(exam.meta.subjectId).label}`) : kopfText.titel),
       subjectLabel: fachDerArbeit(exam.meta.subjectId).art === 'fremdsprache' ? kopfText.fach : exam.meta.subjectLabel,
       labelLanguage: fachDerArbeit(exam.meta.subjectId).sprache,
       // Der Lösungsteil einer Klassenarbeit ist der Erwartungshorizont – auch im Kopf
@@ -242,3 +244,6 @@ export const examHasContent = (exam: Exam): boolean => exam.parts.some((p) => p.
 
 /** Punkte der ganzen Arbeit, soweit über Punkte bewertet wird. */
 export const examTotalPoints = (exam: Exam): number => examPoints(exam)
+
+/** Titel beginnen groß („schriftliche Lernkontrolle“ → „Schriftliche Lernkontrolle“) */
+const grossAnfang = (s: string): string => s.charAt(0).toLocaleUpperCase('de') + s.slice(1)
