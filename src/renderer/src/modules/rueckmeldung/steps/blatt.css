@@ -255,3 +255,18 @@ td.rm-zeile .rm-zeilen-werkzeug {
   cursor: crosshair;
   outline: 1px dashed rgba(198, 40, 40, 0.35);
 }
+
+/*
+ * Das Blatt ist immer weißes Papier – auch im dunklen Farbschema. Die Werkzeuge darauf bekommen
+ * deshalb feste Farben; sonst nähmen sie die hellen Farben des dunklen Schemas an und wären auf
+ * dem Papier kaum zu sehen (Prüfung hell/dunkel, 29.09.2026).
+ */
+.rm-buehne .mantine-ActionIcon-root {
+  --ai-color: #5c5f66;
+  --ai-hover: rgba(0, 0, 0, 0.06);
+  color: #5c5f66;
+}
+.rm-buehne .mantine-ActionIcon-root.rm-stab {
+  --ai-color: #9c36b5;
+  color: #9c36b5;
+}

@@ -164,6 +164,21 @@ try {
   const hand = await blatt.locator('.bl-notiz').first().evaluate((el) => getComputedStyle(el).fontFamily)
   pruefe(/Ink Free|Segoe Print|Comic Sans/.test(hand), `Randnotizen in Handschrift-Anmutung (${hand})`)
   await blatt.screenshot({ path: join(out, 'blatt.png') })
+  // Hell und dunkel: Das Blatt bleibt ein weißes Papier mit dunkler Schrift, die Leiste folgt dem Schema
+  for (const colorScheme of ['light', 'dark']) {
+    // Mantine schaltet das Schema über dieses Attribut (ohne Neuladen – der Bogen bleibt offen)
+    await page.evaluate((c) => document.documentElement.setAttribute('data-mantine-color-scheme', c), colorScheme)
+    await page.waitForTimeout(500)
+    const farben = await blatt.evaluate((el) => {
+      const seite = el.querySelector('.rm-seite') ?? el
+      const text = el.querySelector('.bl-abs') ?? el
+      return { grund: getComputedStyle(seite).backgroundColor, schrift: getComputedStyle(text).color }
+    })
+    const hell = (rgb) => (rgb.match(/\d+/g) ?? []).slice(0, 3).reduce((n, x) => n + Number(x), 0) / 3
+    pruefe(hell(farben.grund) > 230 && hell(farben.schrift) < 90, `Blatt im Schema ${colorScheme}: Papier hell, Schrift dunkel (${farben.grund} / ${farben.schrift})`)
+    await page.screenshot({ path: join(out, `blatt-${colorScheme}.png`) })
+  }
+  await page.evaluate(() => document.documentElement.setAttribute('data-mantine-color-scheme', 'light'))
   // Direkt auf dem Blatt bearbeiten: Klick in eine Stärke, tippen
   const staerke = blatt.locator('.bl-staerken [data-rm-edit]').first()
   await staerke.click()
