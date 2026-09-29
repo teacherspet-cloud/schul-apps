@@ -13,6 +13,7 @@ import {
   einstufungHtml,
   kastenTitel,
   mitName,
+  notizGruppen,
   ohneName,
   SEITEN_HOEHE_MM,
   seitenUmbrueche,
@@ -44,9 +45,11 @@ const MM_PX = 96 / 25.4
  * Stelle im Schülertext wird mit einem Klick zur neuen Notiz. Der Zauberstab erzeugt eine Stelle
  * neu oder überarbeitet sie.
  *
- * Mehrseitig wie im Druck: Das Blatt besteht aus Blöcken (Absätze, Abschnitte des Kastens), die
- * nicht zerteilt werden. Die Ansicht misst sie und schiebt einen Block, der nicht mehr passt, auf
- * die nächste Seite – nach denselben Maßen wie der Druck (blattLayout.ts).
+ * Mehrseitig wie im Druck: Das Blatt besteht aus Blöcken (Absätze bzw. Teilblöcke langer Absätze,
+ * Abschnitte des Kastens), die nicht zerteilt werden. Die Ansicht misst sie und schiebt einen Block,
+ * der nicht mehr passt, auf die nächste Seite – nach denselben Maßen wie der Druck (blattLayout.ts).
+ * Lange Absätze zerlegt schon das Modell (`absatzTeilen`), sodass kein Block höher als eine Seite
+ * ist und nichts über den Seitenrand ragt.
  */
 export default function Blatt({
   r,
@@ -107,7 +110,8 @@ export default function Blatt({
     const range = sel.getRangeAt(0)
     const knoten = range.commonAncestorContainer
     const el = knoten instanceof Element ? knoten : knoten.parentElement
-    if (!el?.closest('.bl-text[data-absatz]')) return setAuswahl(null)
+    // Nur im Schülertext – nicht in einer Randnotiz (die steht als Float mitten im Absatz)
+    if (!el?.closest('.bl-text[data-absatz]') || el.closest('.bl-notiz')) return setAuswahl(null)
     const stueck = range.cloneContents()
     stueck.querySelectorAll('[data-kein-text]').forEach((x) => x.remove())
     const text = (stueck.textContent ?? '').replace(/\s+/g, ' ').trim()
@@ -157,20 +161,21 @@ export default function Blatt({
     md.absaetze.forEach((abs, i) =>
       bloecke.push({ key: `abs-${i}`, node: <RandEditor index={i} teile={abs.teile} notizen={abs.notizen} stil={stil} verschieben={setVerschiebt} /> })
     )
-    if (md.ohneStelle.length)
+    notizGruppen(md.ohneStelle, md.gross).forEach((gruppe, k) =>
       bloecke.push({
-        key: 'ohne',
+        key: `ohne-${k}`,
         node: (
           <div className="bl-block bl-ohne">
-            <div className="bl-text">Ohne Stelle im Text:</div>
+            <div className="bl-text">{k ? '' : 'Ohne Stelle im Text:'}</div>
             <div className="bl-rand">
-              {md.ohneStelle.map((g) => (
+              {gruppe.map((g) => (
                 <RandNotiz key={g.k.id} g={g} verschieben={setVerschiebt} />
               ))}
             </div>
           </div>
         )
       })
+    )
   }
   if (md.kasten.length) {
     bloecke.push({ key: 'luft', node: <div className="bl-block bl-luft" /> })

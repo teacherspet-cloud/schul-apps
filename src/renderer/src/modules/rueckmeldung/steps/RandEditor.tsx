@@ -1,7 +1,7 @@
 import { ActionIcon, Menu, Tooltip } from '@mantine/core'
 import { IconCheck, IconCursorText, IconTrash } from '@tabler/icons-react'
 import { Fragment } from 'react'
-import { markenStil } from '../blattLayout'
+import { absatzFolge, markenStil } from '../blattLayout'
 import type { NummerierterKommentar, Textteil } from '../korrekturrand'
 import type { RandKommentar } from '../model/types'
 import { Editierbar, useBlatt, Zauberstab } from './blattTeile'
@@ -33,7 +33,7 @@ export function RandNotiz({ g, verschieben }: { g: NummerierterKommentar; versch
     })
   const stelle = { art: 'rand' as const, id: k.id }
   return (
-    <div className={`bl-notiz ${k.art} rm-notiz${c.laeuft(stelle) ? ' rm-laeuft' : ''}`} data-rand-kommentar data-notiz={k.id}>
+    <div className={`bl-notiz ${k.art} rm-notiz${c.laeuft(stelle) ? ' rm-laeuft' : ''}`} data-rand-kommentar data-notiz={k.id} data-notiz-nr={g.nr} data-kein-text>
       <Menu position="bottom-start" width={230} withinPortal>
         <Menu.Target>
           <span className="bl-nr rm-klick" role="button" tabIndex={0} aria-label={`Notiz ${g.nr}: Art und Zeichen`}>
@@ -117,6 +117,9 @@ export function TextTeil({ t, stil }: { t: Textteil; stil: (nr: number | undefin
 /**
  * Ein Absatz des Schülertexts mit seinen Randnotizen (29.09.2026). Im Text lässt sich eine
  * Stelle markieren – das Blatt bietet dann an, eine Notiz dazu anzulegen.
+ *
+ * Jede Notiz steht direkt hinter ihrer Stelle und floatet von dort in den Korrekturrand – so steht
+ * sie auf der Höhe ihrer Zeile, genau wie im Druck (`absatzFolge`, CSS in blattLayout.ts).
  */
 export default function RandEditor({
   index,
@@ -134,14 +137,9 @@ export default function RandEditor({
   return (
     <div className="bl-block bl-abs">
       <div className="bl-text" data-absatz={index}>
-        {teile.map((t, j) => (
-          <TextTeil key={j} t={t} stil={stil} />
-        ))}
-      </div>
-      <div className="bl-rand">
-        {notizen.map((g) => (
-          <RandNotiz key={g.k.id} g={g} verschieben={verschieben} />
-        ))}
+        {absatzFolge(teile, notizen).map((x, j) =>
+          'teil' in x ? <TextTeil key={j} t={x.teil} stil={stil} /> : <RandNotiz key={x.notiz.k.id} g={x.notiz} verschieben={verschieben} />
+        )}
       </div>
     </div>
   )

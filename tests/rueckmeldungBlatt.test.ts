@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { boegenDocx, boegenHtml } from '../src/renderer/src/modules/rueckmeldung/ausgabe'
-import { blattHtml, blattModell, kastenAbschnitte, markenStil, mitName, ohneName, seitenUmbrueche } from '../src/renderer/src/modules/rueckmeldung/blattLayout'
+import {
+  absatzFolge,
+  absatzHoeheMm,
+  absatzTeilen,
+  blattHtml,
+  blattModell,
+  kastenAbschnitte,
+  markenStil,
+  mitName,
+  notizGruppen,
+  ohneName,
+  SEITEN_HOEHE_MM,
+  teilblockMaxMm,
+  seitenUmbrueche
+} from '../src/renderer/src/modules/rueckmeldung/blattLayout'
+import { bogenStatus, ladeOffen, merkeOffen, passtZurSuche } from '../src/renderer/src/modules/rueckmeldung/steps/bogenListe'
 import {
   stelleAnfrage,
   stelleAuftragsSchluessel,
@@ -152,6 +167,92 @@ describe('Blatt: Modell und Ausdruck', () => {
     expect(seitenUmbrueche([], 500)).toEqual([])
   })
 
+  it('sehr langer Absatz (Bericht der Lehrkraft): Teilblöcke, keiner über der Seitenhöhe, Text und Notizen vollständig', () => {
+    // Ein einziger Absatz von mehreren Seiten, mittendrin eine lange Zeichenkette ohne Leerzeichen
+    const satz = 'Wir brauchen das Handy für den Unterricht, weil man damit schnell etwas nachschlagen kann. '
+    const base64 = 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo'.repeat(60)
+    const text = `Ich finde, das Handyverbot ist falsch. ${satz.repeat(60)}${base64} Es wird total krass dargestelt. ${satz.repeat(40)}`
+    const a = abgabe({ text })
+    const r = doc({}, a)
+    const md = blattModell(r, a)
+    expect(md.absaetze!.length).toBeGreaterThan(3)
+    for (const abs of md.absaetze!) {
+      const h = absatzHoeheMm(abs.teile.map((t) => t.text).join('').length, abs.notizen)
+      expect(h).toBeLessThanOrEqual(teilblockMaxMm())
+    }
+    // Nichts geht verloren, nichts doppelt
+    expect(md.absaetze!.map((x) => x.teile.map((t) => t.text).join('')).join('')).toBe(text)
+    expect(md.absaetze!.flatMap((x) => x.notizen.map((g) => g.k.id)).sort()).toEqual(['r1', 'r2', 'r3', 'r4'])
+    // Jede Notiz steht im Teilblock ihrer Nummer
+    for (const abs of md.absaetze!) for (const g of abs.notizen) expect(abs.teile.some((t) => t.nr === g.nr)).toBe(true)
+    // Die erste Randnotiz steht im ersten Teilblock – direkt unter dem Kopf, Seite 1 bleibt nicht leer
+    expect(md.absaetze![0].notizen.map((g) => g.k.id)).toContain('r1')
+    // Geschnitten wird nach Satzenden (außer in der Zeichenkette ohne Leerzeichen)
+    const enden = md.absaetze!.slice(0, -1).map((x) => x.teile.map((t) => t.text).join(''))
+    expect(enden.every((t) => /[.!?]\s*$/.test(t) || /[A-Za-z0-9]$/.test(t))).toBe(true)
+    expect(enden.filter((t) => /[.!?]\s*$/.test(t)).length).toBeGreaterThanOrEqual(5)
+    // Druck: jeder Teilblock ein eigener Block; Absätze dürfen im Druck umbrechen (orphans/widows)
+    const html = blattHtml(r, a)
+    expect(html.match(/class="bl-block bl-abs"/g)?.length).toBe(md.absaetze!.length)
+    expect(boegenHtml(r, [a])).toMatch(/\.bl-abs, \.bl-ohne, \.bl-k \{ break-inside: auto; page-break-inside: auto; orphans: 2; widows: 2; \}/)
+    expect(boegenHtml(r, [a])).toMatch(/overflow-wrap: anywhere/)
+    // Seitenumbruch der Ansicht: Kopf (~35 mm) und erster Teilblock stehen auf Seite 1
+    const hoehen = [35, ...md.absaetze!.map((x) => absatzHoeheMm(x.teile.map((t) => t.text).join('').length, x.notizen))]
+    const umbrueche = seitenUmbrueche(hoehen, SEITEN_HOEHE_MM)
+    expect(umbrueche[0].index).toBeGreaterThan(1)
+    expect(Math.max(...hoehen)).toBeLessThan(SEITEN_HOEHE_MM)
+  })
+
+  it('Teilen: kurze Absätze bleiben ganz, eine Stelle über dem Schnitt bleibt angestrichen, Nummer am Ende', () => {
+    const kurz = [{ text: 'Kurz.' }]
+    expect(absatzTeilen(kurz, [])).toEqual([{ teile: kurz, notizen: [] }])
+    const lang = 'Wort '.repeat(400)
+    const k = { nr: 1, k: { id: 'x', zitat: '', text: 'Notiz', art: 'fehler' as const } }
+    const teile = absatzTeilen([{ text: lang.slice(0, 1000) }, { text: lang.slice(1000, 1400), art: 'fehler', nr: 1 }, { text: lang.slice(1400) }], [k], false, 80)
+    expect(teile.length).toBeGreaterThan(1)
+    const marken = teile.flatMap((x) => x.teile.filter((t) => t.art))
+    expect(marken.length).toBeGreaterThan(1)
+    expect(marken.filter((t) => t.nr === 1)).toHaveLength(1)
+    expect(marken[marken.length - 1].nr).toBe(1)
+    const mitNotiz = teile.find((x) => x.notizen.length)!
+    expect(mitNotiz.teile.some((t) => t.nr === 1)).toBe(true)
+    // Viele Notizen ohne Stelle: in Gruppen unter der Höchsthöhe
+    const viele = Array.from({ length: 60 }, (_, i) => ({ nr: i + 1, k: { id: `n${i}`, zitat: '', text: 'Eine längere Randnotiz mit etwas Text darin.', art: 'hinweis' as const } }))
+    const gruppen = notizGruppen(viele)
+    expect(gruppen.length).toBeGreaterThan(1)
+    expect(gruppen.flat()).toHaveLength(60)
+  })
+
+  it('Randnotiz auf der Höhe ihrer Zeile: direkt hinter der Stelle, als Float in den Rand; Kasten in der Textspalte', () => {
+    const r = doc()
+    const md = blattModell(r, r.abgaben[0])
+    const folge = absatzFolge(md.absaetze![0].teile, md.absaetze![0].notizen)
+    // Hinter jeder nummerierten Stelle folgt ihre Notiz
+    folge.forEach((x, i) => {
+      if ('notiz' in x) {
+        const davor = folge[i - 1]
+        expect(davor && 'teil' in davor ? davor.teil.nr : davor && 'notiz' in davor ? davor.notiz.nr : null).not.toBeNull()
+      }
+    })
+    const html = blattHtml(r, r.abgaben[0])
+    expect(html).toMatch(/<sup class="bl-nr-t lob">✓1<\/sup><div class="bl-notiz lob"><span class="bl-nr">1<\/span>/)
+    expect(html).not.toMatch(/bl-abs"><div class="bl-text">[^]*?<\/div><div class="bl-rand">/)
+    const css = boegenHtml(r, r.abgaben)
+    expect(css).toMatch(/\.bl-abs \.bl-text \{ display: flow-root; width: 124mm; \}/)
+    expect(css).toMatch(/\.bl-abs \.bl-notiz \{ float: right; clear: right; width: 52mm;/)
+    expect(css).toMatch(/-59\.5mm 1\.5mm 7\.6mm; \}/)
+    expect(css).toMatch(/\.bl-k, \.bl-fuss \{ max-width: 120\.5mm; \}/)
+  })
+
+  it('ältere Abgaben mit HTML aus Word: auf dem Blatt steht nur der Text', () => {
+    const a = abgabe({ text: '<p>Ich finde, das Handyverbot ist <strong>falsch</strong>.</p><p>Es wird total krass dargestelt.</p>' })
+    const r = doc({}, a)
+    const md = blattModell(r, a)
+    const text = md.absaetze!.map((x) => x.teile.map((t) => t.text).join(''))
+    expect(text).toEqual(['Ich finde, das Handyverbot ist falsch.', 'Es wird total krass dargestelt.'])
+    expect(blattHtml(r, a)).not.toMatch(/&lt;p&gt;|<p>Ich/)
+  })
+
   it('Namen: Anzeige mit Namen, gespeichert mit Kürzel', () => {
     const a = abgabe({ pseudonyme: [{ kuerzel: 'S1-P1', name: 'Jonas' }] })
     expect(mitName('S1 und S1-P1', a)).toBe('Lea Schmidt und Jonas')
@@ -162,6 +263,28 @@ describe('Blatt: Modell und Ausdruck', () => {
     const r = doc()
     const bytes = await boegenDocx(r, r.abgaben, { zeichen: STANDARD_ZEICHEN.deutsch })
     expect(bytes.length).toBeGreaterThan(1000)
+  })
+})
+
+describe('Liste der Rückmeldungen: Suche und Status', () => {
+  it('Suche nach Name und Kürzel – groß/klein egal, Umlaute tolerant', () => {
+    const a = { name: 'Jürgen Öztürk', kuerzel: 'S7' }
+    for (const q of ['', 'jürgen', 'JUERGEN', 'jurgen', 'öztürk', 'oeztuerk', 'ozturk', 'Jürgen Ö', 's7']) expect(passtZurSuche(a, q)).toBe(true)
+    for (const q of ['lea', 'S8', 'xyz']) expect(passtZurSuche(a, q)).toBe(false)
+    expect(passtZurSuche({ name: 'Manuel Groß', kuerzel: 'S2' }, 'manu')).toBe(true)
+    expect(passtZurSuche({ name: 'Manuel Groß', kuerzel: 'S2' }, 'gross')).toBe(true)
+    expect(passtZurSuche({ name: '', kuerzel: 'S12' }, 's1')).toBe(true)
+  })
+
+  it('Status: ohne Bogen, Einstufung offen, fertig; Aufklappzustand ohne Speicher kein Fehler', () => {
+    const m = meta()
+    expect(bogenStatus(m, abgabe({ bogen: undefined }))).toBe('ohne')
+    expect(bogenStatus(m, abgabe())).toBe('offen')
+    expect(bogenStatus(m, abgabe({ bogen: bogen({ gesamt: { anteil: 80, wert: '2', bestaetigt: true } }) }))).toBe('fertig')
+    expect(bogenStatus(meta({ einstufung: 'keine' }), abgabe())).toBe('fertig')
+    // In den Tests gibt es kein sessionStorage: leer statt Absturz
+    expect(ladeOffen('x')).toEqual([])
+    expect(() => merkeOffen('x', ['a'])).not.toThrow()
   })
 })
 

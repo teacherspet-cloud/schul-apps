@@ -221,12 +221,15 @@ export function teileErkennen(r: Rueckmeldung, docId: string): void {
       k.melde('Die KI sucht Schreib- und Sprachmittlungsteile und Gewichtungen …')
       const d = await k.ai<{ teile?: unknown }>(teileAnfrage(rm.grundlage.aufgaben, rm.grundlage.erwartung ?? ''))
       const erkannt = teileAusKi(d?.teile, rm.meta)
-      if (!erkannt) throw new Error('In der Aufgabe waren keine Teile zu erkennen.')
+      // Nichts erkannt ist kein Fehler (die Erkennung läuft auch automatisch nach der Wahl der Aufgabe)
+      if (!erkannt) return null
       return { ...erkannt, teile: spracheErgaenzen(erkannt.teile, rm.grundlage.aufgaben, rm.meta.subjectId) }
     },
     abschluss: (e) =>
-      `${e.teile.length} ${e.teile.length === 1 ? 'Teil' : 'Teile'} erkannt${e.teile.some((t) => t.quelle === 'material') ? ' – Gewichtung aus dem Material' : ''}.`,
-    ablegen: (e, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, grundlage: { ...aktuell.grundlage, ...e } }))
+      e
+        ? `${e.teile.length} ${e.teile.length === 1 ? 'Teil' : 'Teile'} erkannt${e.teile.some((t) => t.quelle === 'material') ? ' – Gewichtung aus dem Material' : ''}.`
+        : 'Keine getrennt zu bewertenden Teile erkannt.',
+    ablegen: (e, rm) => (e ? bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, grundlage: { ...aktuell.grundlage, ...e } })) : Promise.resolve())
   })
 }
 

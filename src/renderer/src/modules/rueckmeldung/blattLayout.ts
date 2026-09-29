@@ -5,14 +5,18 @@
  *
  * Abgestimmt (Multiple Choice, 29.09.2026):
  * - Kopf mit Titel, Name, Klasse und der Einstufung rechts (rot, handschriftlich eingekreist).
- * - Schülertext OBEN auf liniertem Papier, rechts der Korrekturrand hinter einer roten Randlinie:
+ * - Schülertext OBEN auf liniertem Papier, rechts der Korrekturrand hinter einer roten Randlinie –
+ *   jede Randnotiz steht auf der Höhe der Zeile, in der ihre Stelle endet (29.09.2026 spät):
  *   Stelle unterstrichen (Wellenlinie bei Ausdrucksfehlern), Nummer, Korrekturzeichen und
  *   Verbesserung in Handschrift-Anmutung und Rot; Lob grün mit Häkchen.
  * - Darunter der Kasten „Rückmeldung": Bewertung nach Teilen, Bewertungstabelle, Stärken, nächste
  *   Schritte, Kriterien, Überarbeitungsauftrag, Schlusssatz (handschriftlich).
  * - Scans: die Seitenbilder mit den nummerierten Markern, die Notizen am Rand daneben.
- * - Mehrseitig: Jeder Absatz und jeder Abschnitt des Kastens ist ein „Block", der nicht zerteilt
- *   wird; die Ansicht bricht die Seiten nach denselben Blöcken um wie der Druck.
+ * - Mehrseitig: Jeder Absatz und jeder Abschnitt des Kastens ist ein „Block"; die Ansicht bricht
+ *   die Seiten nach denselben Blöcken um wie der Druck. Ein langer Absatz wird vorab in Teilblöcke
+ *   (Satzgruppen) zerlegt, von denen keiner höher als ~30 % einer Seite ist (`absatzTeilen`) –
+ *   sonst schob ihn der Druck ganz auf Seite 2 und ließ Seite 1 leer (Bericht der Lehrkraft,
+ *   29.09.2026: leere erste Seite, Text über die Seitenränder hinaus).
  *
  * AUSDRUCK = ANSICHT: Diese Datei liefert das gemeinsame Modell (Kopf, Absätze mit Marken und
  * Randnotizen, Abschnitte des Kastens), das gemeinsame CSS (in Millimetern) und das Druck-HTML.
@@ -27,6 +31,7 @@ import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { legende, type Korrekturzeichen } from '../../shared/korrekturzeichen'
 import { EINSTUFUNGEN, einstufungVon, gesamtEinstufen, hatForm, kriterienEinstufen, LEGENDEN, tabellenSumme, wertText } from './art'
 import { randLayout, scanReihenfolge, type NummerierterKommentar, type Textteil } from './korrekturrand'
+import { klartext } from './abgabeTrennen'
 import { hatMassnahme } from './nachteilsausgleich'
 import { bogenUeberschriften, type BogenUeberschriften } from './render/texte'
 import { teilZeilenFuerBogen } from './teilbewertung'
@@ -200,8 +205,10 @@ export function blattModell(r: Rueckmeldung, a: Abgabe, opt: BlattOptionen = {})
     scans = a.scans!.map((src, s) => ({ src, notizen: reihe.filter((g) => (g.k.seite ?? 0) === s) }))
     for (const g of reihe) stilVon.set(g.nr, markenStil(g.k))
   } else if (a.text.trim()) {
-    const layout = randLayout(n(a.text), rand, n)
-    absaetze = layout.absaetze.map((x) => ({ teile: x.teile, notizen: x.kommentare }))
+    // Ältere Abgaben tragen noch HTML aus Word (<p>…</p>) – auf dem Blatt steht nur der Text
+    const layout = randLayout(n(klartext(a.text)), rand, n)
+    // Lange Absätze in Teilblöcke zerlegen – kein Block höher als eine Seite (Ansicht und Druck)
+    absaetze = layout.absaetze.flatMap((x) => absatzTeilen(x.teile, x.kommentare, hatMassnahme(a.ausgleich, 'grossdruck')))
     ohneStelle = layout.ohneStelle
     for (const g of [...layout.absaetze.flatMap((x) => x.kommentare), ...ohneStelle]) stilVon.set(g.nr, markenStil(g.k))
   }
@@ -212,6 +219,163 @@ export function blattModell(r: Rueckmeldung, a: Abgabe, opt: BlattOptionen = {})
   if (kasten.some((k) => k.art === 'kriterien' && !k.mitStufe)) legendeZeilen.push(EINSCHAETZUNG_LEGENDE)
   if (LEGENDEN[art] && ((w && kopf.einstufung) || kriterienEinstufen(m))) legendeZeilen.push(LEGENDEN[art]!)
   return { kopf, absaetze, ohneStelle, scans, stilVon, kasten, legende: legendeZeilen, gross: hatMassnahme(a.ausgleich, 'grossdruck'), u }
+}
+
+// ---------- Lange Absätze zerlegen ----------
+
+/**
+ * Geschätzte Maße des Schülertexts und der Randnotizen (mm bzw. Zeichen je Zeile) – bewusst
+ * vorsichtig (eher zu viele Zeilen), gemessen an Calibri 12 pt bzw. „Ink Free" 10,5 pt. Die
+ * Schätzung muss nur so gut sein, dass ein Teilblock sicher auf eine Seite passt.
+ */
+const SCHAETZUNG = {
+  normal: { zeile: 8, zeichen: 52, notizZeile: 4.6, notizZeichen: 22 },
+  gross: { zeile: 11, zeichen: 40, notizZeile: 6.1, notizZeichen: 16 }
+} as const
+/**
+ * Höchste Höhe eines Teilblocks: 30 % der nutzbaren Seite – klein genug, dass ein auf die nächste
+ * Seite geschobener Teilblock in der Ansicht höchstens ein knappes Drittel der Seite frei lässt
+ * (bei 60 % blieb Seite 1 zur Hälfte leer). Funktion, weil die Maße weiter unten stehen.
+ */
+export const teilblockMaxMm = (): number => SEITEN_HOEHE_MM * 0.3
+
+export interface Teilblock {
+  teile: Textteil[]
+  notizen: NummerierterKommentar[]
+}
+
+/** Geschätzte Höhe der Randnotizen (mm) */
+export function notizenHoeheMm(notizen: NummerierterKommentar[], gross = false): number {
+  const m = SCHAETZUNG[gross ? 'gross' : 'normal']
+  if (!notizen.length) return 0
+  return 2.3 + notizen.reduce((h, g) => h + Math.max(1, Math.ceil(((g.k.zeichen?.length ?? 0) + g.k.text.length + 5) / m.notizZeichen)) * m.notizZeile + 2, 0)
+}
+
+/** Geschätzte Höhe eines Absatzes mit seinen Randnotizen (mm) */
+export function absatzHoeheMm(textLaenge: number, notizen: NummerierterKommentar[], gross = false): number {
+  const m = SCHAETZUNG[gross ? 'gross' : 'normal']
+  return Math.max(Math.max(1, Math.ceil(textLaenge / m.zeichen)) * m.zeile, notizenHoeheMm(notizen, gross))
+}
+
+/**
+ * Einen Absatz in Teilblöcke zerlegen, von denen keiner höher als `max` (mm, geschätzt) ist.
+ * Geschnitten wird bevorzugt nach einem Satzende, sonst zwischen zwei Wörtern, zuletzt mitten in
+ * einer Zeichenkette ohne Leerzeichen (Base64, lange Adressen). Eine Randnotiz steht in dem
+ * Teilblock, in dem ihre Stelle endet (dort steht auch ihre Nummer); eine angestrichene Stelle, die
+ * über den Schnitt reicht, bleibt in beiden Teilen angestrichen, die Nummer steht am Ende.
+ */
+export function absatzTeilen(teile: Textteil[], notizen: NummerierterKommentar[], gross = false, max = teilblockMaxMm()): Teilblock[] {
+  const text = teile.map((t) => t.text).join('')
+  if (absatzHoeheMm(text.length, notizen, gross) <= max) return [{ teile, notizen }]
+  // Lage jedes Teils im Absatz; Lage jeder Notiz = Ende ihrer nummerierten Stelle
+  const lagen: { t: Textteil; start: number; ende: number }[] = []
+  let pos = 0
+  for (const t of teile) {
+    lagen.push({ t, start: pos, ende: pos + t.text.length })
+    pos += t.text.length
+  }
+  const notizLage = new Map<NummerierterKommentar, number>()
+  for (const g of notizen) notizLage.set(g, lagen.find((l) => l.t.nr === g.nr)?.ende ?? text.length)
+  const notizenIn = (s: number, e: number, erst: boolean): NummerierterKommentar[] =>
+    notizen.filter((g) => {
+      const p = notizLage.get(g)!
+      return (p > s || (erst && p === s)) && p <= e
+    })
+  const passt = (s: number, e: number): boolean => absatzHoeheMm(e - s, notizenIn(s, e, s === 0), gross) <= max
+  // Schnittstellen (Beginn des nächsten Teils): nach Satzende, nach Leerraum, überall
+  const satz: number[] = []
+  const wort: number[] = []
+  for (const m of text.matchAll(/[.!?…:;]["“”'»«)\]]*\s+/g)) satz.push(m.index! + m[0].length)
+  for (const m of text.matchAll(/\s+/g)) wort.push(m.index! + m[0].length)
+  /** Größte Schnittstelle in (s, ende), bis zu der der Teil noch passt (Höhe wächst mit e) */
+  const groesste = (liste: number[], s: number): number | null => {
+    let lo = 0
+    let hi = liste.length - 1
+    let best: number | null = null
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      const e = liste[mid]
+      if (e <= s) lo = mid + 1
+      else if (e >= text.length) hi = mid - 1
+      else if (passt(s, e)) {
+        best = e
+        lo = mid + 1
+      } else hi = mid - 1
+    }
+    return best
+  }
+  const schnitte: number[] = []
+  let s = 0
+  while (!passt(s, text.length)) {
+    // Satzende bevorzugt – außer es schnitte viel früher als die Wortgrenze (ein langer Satz folgt)
+    const es = groesste(satz, s)
+    const ew = groesste(wort, s)
+    let e = es != null && (ew == null || es - s >= (ew - s) / 2) ? es : ew
+    if (e == null) {
+      // Zeichenkette ohne Leerzeichen: so viele Zeichen, wie Zeilen passen (mindestens eines)
+      const m = SCHAETZUNG[gross ? 'gross' : 'normal']
+      e = Math.min(text.length, s + Math.max(1, Math.floor(max / m.zeile) * m.zeichen))
+      while (e > s + 1 && !passt(s, e)) e -= m.zeichen
+      e = Math.max(s + 1, e)
+      // Selbst eine Zeile ist zu hoch (viele Notizen an einer Stelle): Schnitt trotzdem – weiter kommt man nicht
+    }
+    if (e >= text.length) break
+    schnitte.push(e)
+    s = e
+  }
+  if (!schnitte.length) return [{ teile, notizen }]
+  const grenzen = [0, ...schnitte, text.length]
+  const out: Teilblock[] = []
+  for (let k = 0; k < grenzen.length - 1; k++) {
+    const a = grenzen[k]
+    const b = grenzen[k + 1]
+    const stuecke: Textteil[] = []
+    for (const l of lagen) {
+      if (l.start === l.ende) {
+        // Nur eine Nummer (überlappende Stellen): zur Stelle davor
+        if ((l.start > a || (k === 0 && l.start === a)) && l.start <= b) stuecke.push(l.t)
+        continue
+      }
+      const von = Math.max(a, l.start)
+      const bis = Math.min(b, l.ende)
+      if (bis <= von) continue
+      const stueck: Textteil = { text: text.slice(von, bis) }
+      if (l.t.art) stueck.art = l.t.art
+      // Die Nummer steht am Ende der Stelle – im Teil, in dem sie endet
+      if (l.t.nr != null && l.ende <= b) stueck.nr = l.t.nr
+      stuecke.push(stueck)
+    }
+    out.push({ teile: stuecke, notizen: notizenIn(a, b, k === 0) })
+  }
+  return out
+}
+
+/**
+ * Reihenfolge eines Absatzes für Ansicht und Druck: Text und – direkt hinter der nummerierten
+ * Stelle – ihre Randnotiz. Die Notiz ist im Blatt ein Float in den Korrekturrand: Sie steht so auf
+ * der Höhe der Zeile, in der ihre Stelle endet, und mehrere Notizen einer Zeile stapeln sich, ohne
+ * sich zu überdecken – reines CSS, deshalb auch im PDF (das ohne Skripte entsteht) genauso.
+ * Notizen ohne ihre Nummer im Absatz (sollte nicht vorkommen) stehen am Anfang.
+ */
+export function absatzFolge(teile: Textteil[], notizen: NummerierterKommentar[]): ({ teil: Textteil } | { notiz: NummerierterKommentar })[] {
+  const nrn = new Set(teile.filter((t) => t.nr != null).map((t) => t.nr))
+  const out: ({ teil: Textteil } | { notiz: NummerierterKommentar })[] = notizen.filter((g) => !nrn.has(g.nr)).map((g) => ({ notiz: g }))
+  for (const t of teile) {
+    out.push({ teil: t })
+    if (t.nr != null) for (const g of notizen) if (g.nr === t.nr) out.push({ notiz: g })
+  }
+  return out
+}
+
+/** Notizen „ohne Stelle" in Gruppen, von denen keine höher als `max` (mm, geschätzt) ist */
+export function notizGruppen(notizen: NummerierterKommentar[], gross = false, max = teilblockMaxMm()): NummerierterKommentar[][] {
+  const out: NummerierterKommentar[][] = []
+  for (const g of notizen) {
+    const letzte = out[out.length - 1]
+    if (letzte && notizenHoeheMm([...letzte, g], gross) <= max) letzte.push(g)
+    else out.push([g])
+  }
+  return out
 }
 
 // ---------- CSS (Ansicht und Druck) ----------
@@ -248,10 +412,15 @@ export const HANDSCHRIFT = '"Ink Free", "Segoe Print", "Bradley Hand", "Comic Sa
 export const BLATT_CSS = `
 .blatt { --zeile: 8mm; --rot: #c62828; --gruen: #2e7d32; --linie: #d3deec; --hand: ${HANDSCHRIFT};
   font-family: Calibri, Carlito, "Segoe UI", "Segoe UI Emoji", Arial, sans-serif; font-size: 11.5pt; line-height: 1.4; color: #1b1b1b;
-  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; overflow-wrap: anywhere; }
 .blatt.gross { --zeile: 11mm; font-size: 15.5pt; }
 .blatt * { box-sizing: border-box; }
 .bl-block { position: relative; break-inside: avoid; page-break-inside: avoid; }
+/* Textabsätze und Abschnitte des Kastens dürfen im Druck umbrechen (Sicherheitsnetz – die Teilblöcke
+   sind ohnehin kürzer als eine Seite); zusammen bleiben nur kleine Einheiten */
+.bl-abs, .bl-ohne, .bl-k { break-inside: auto; page-break-inside: auto; orphans: 2; widows: 2; }
+.bl-notiz, .bl-tab tr, .bl-k li, .bl-k-kopf, .bl-auftrag, .bl-schluss { break-inside: avoid; page-break-inside: avoid; }
+.bl-k h3 { break-after: avoid; page-break-after: avoid; }
 .bl-kopf { padding-bottom: 5mm; z-index: 1; }
 .bl-kopf-innen { display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm; border-bottom: 0.35mm solid #333; padding-bottom: 2.5mm; background: #fff; }
 .bl-titel { font-size: 16pt; font-weight: 700; line-height: 1.2; }
@@ -268,7 +437,7 @@ export const BLATT_CSS = `
 .bl-note.vorschlag .bl-note-wert { color: #9a9a9a; border-color: #b5b5b5; border-style: dashed; }
 .bl-note.vorschlag .bl-note-text { color: #9a9a9a; }
 .bl-ampel { display: inline-block; width: 6mm; height: 6mm; border-radius: 50%; vertical-align: -0.8mm; }
-.bl-abs, .bl-scan, .bl-ohne { display: grid; grid-template-columns: ${BLATT_MASSE.text}mm ${BLATT_MASSE.rand}mm; }
+.bl-scan, .bl-ohne { display: grid; grid-template-columns: ${BLATT_MASSE.text}mm ${BLATT_MASSE.rand}mm; }
 .bl-text { padding-right: 3.5mm; font-size: 12pt; line-height: var(--zeile); white-space: pre-wrap; overflow-wrap: anywhere;
   background-image: linear-gradient(to bottom, transparent calc(var(--zeile) - 0.3mm), var(--linie) calc(var(--zeile) - 0.3mm));
   background-size: 100% var(--zeile); }
@@ -284,6 +453,13 @@ export const BLATT_CSS = `
 .bl-nr-t.lob { color: var(--gruen); }
 .bl-notiz { font-family: var(--hand); color: var(--rot); font-size: 10.5pt; line-height: 1.22; margin-bottom: 2mm; overflow-wrap: anywhere; }
 .blatt.gross .bl-notiz { font-size: 14pt; }
+/* Schülertext: Die Textspalte umschließt ihre Notizen (flow-root); jede Notiz floatet aus der Zeile ihrer
+   Stelle in den Korrekturrand. Rechnung: Inhalt der Textspalte endet bei ${BLATT_MASSE.text - 3.5} mm; die Notiz
+   (${BLATT_MASSE.rand - 4} mm breit) soll bei ${BLATT_MASSE.text + 4} mm beginnen. Ihr Randkasten ist 0,1 mm breit –
+   so kostet sie der Zeile keinen Platz; „clear: right" schiebt eine zweite Notiz derselben Zeile unter die erste. */
+.bl-abs .bl-text { display: flow-root; width: ${BLATT_MASSE.text}mm; }
+.bl-abs .bl-notiz { float: right; clear: right; width: ${BLATT_MASSE.rand - 4}mm; white-space: normal; text-decoration: none; font-style: normal; font-weight: 400;
+  margin: calc((var(--zeile) - 1.22em) / 2) -${BLATT_MASSE.rand + 3.5}mm 1.5mm ${7.5 + 0.1}mm; }
 .bl-notiz.lob { color: var(--gruen); }
 .bl-nr { display: inline-block; min-width: 4mm; height: 4mm; line-height: 3.6mm; padding: 0 0.6mm; border: 0.25mm solid currentColor; border-radius: 2mm; text-align: center;
   font-family: Calibri, Carlito, Arial, sans-serif; font-size: 7pt; font-weight: 700; margin-right: 1.2mm; vertical-align: 0.4mm; }
@@ -296,6 +472,8 @@ export const BLATT_CSS = `
   display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 0.4mm #fff; font-family: Calibri, Carlito, Arial, sans-serif; }
 .bl-marker.lob { background: var(--gruen); }
 .bl-luft { height: 7mm; }
+/* Der Kasten bleibt in der Textspalte – links der roten Randlinie, wie auf einer echten Korrektur */
+.bl-k, .bl-fuss { max-width: ${BLATT_MASSE.text - 3.5}mm; }
 .bl-k { background: #fff; z-index: 1; border-left: 0.35mm solid #444; border-right: 0.35mm solid #444; padding: 1mm 5.5mm 1.5mm; }
 .bl-k.erst { border-top: 0.35mm solid #444; border-radius: 2.5mm 2.5mm 0 0; padding-top: 3mm; }
 .bl-k.letzt { border-bottom: 0.35mm solid #444; border-radius: 0 0 2.5mm 2.5mm; padding-bottom: 4mm; }
@@ -308,7 +486,7 @@ export const BLATT_CSS = `
 .bl-k li { margin-bottom: 1mm; }
 .bl-k ul.bl-staerken { list-style: none; padding-left: 5.5mm; }
 .bl-k ul.bl-staerken > li::before { content: '✓'; color: var(--gruen); font-weight: 700; display: inline-block; width: 5.5mm; margin-left: -5.5mm; }
-.bl-tab { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+.bl-tab { width: 100%; border-collapse: collapse; font-size: 10.5pt; table-layout: fixed; }
 .blatt.gross .bl-tab { font-size: 14pt; }
 .bl-tab td { border-top: 0.2mm solid #cfcfcf; padding: 1.2mm 1.5mm; vertical-align: top; }
 .bl-tab tr:first-child td { border-top: none; }
@@ -435,12 +613,15 @@ export function blattHtml(r: Rueckmeldung, a: Abgabe, opt: BlattOptionen = {}): 
   } else if (md.absaetze) {
     for (const abs of md.absaetze)
       teile.push(
-        `<div class="bl-block bl-abs"><div class="bl-text">${abs.teile.map((t) => teilHtml(t, stil)).join('')}</div><div class="bl-rand">${abs.notizen
-          .map((g) => notizHtml(g, n))
+        `<div class="bl-block bl-abs"><div class="bl-text">${absatzFolge(abs.teile, abs.notizen)
+          .map((x) => ('teil' in x ? teilHtml(x.teil, stil) : notizHtml(x.notiz, n)))
           .join('')}</div></div>`
       )
-    if (md.ohneStelle.length)
-      teile.push(`<div class="bl-block bl-ohne"><div class="bl-text">Ohne Stelle im Text:</div><div class="bl-rand">${md.ohneStelle.map((g) => notizHtml(g, n)).join('')}</div></div>`)
+    notizGruppen(md.ohneStelle, md.gross).forEach((gruppe, k) =>
+      teile.push(
+        `<div class="bl-block bl-ohne"><div class="bl-text">${k ? '' : 'Ohne Stelle im Text:'}</div><div class="bl-rand">${gruppe.map((g) => notizHtml(g, n)).join('')}</div></div>`
+      )
+    )
   }
   const kasten = kastenHtml(r, a, md.kasten)
   if (kasten.length) {

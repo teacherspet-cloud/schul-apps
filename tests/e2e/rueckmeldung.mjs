@@ -46,6 +46,8 @@ writeFileSync(
         // Teile der Arbeit (29.09.2026) – Pflichtfeld des Schemas, sonst fragt die App ein zweites Mal
         teile: [{ titel: 'Erörterung', art: 'sonstig', gewichtProzent: 0, punkte: 0, inhaltProzent: 0, ergebnisSprache: '' }]
       },
+      // Teile und Antwortsprache (29.09.2026) – startet automatisch nach der Wahl von Material in einer Fremdsprache
+      rueckmeldung_teile: { teile: [] },
       rueckmeldung_erwartung: { erwartung: '- Einleitung mit Hinführung\n- Pro- und Kontra-Argumente mit Beispielen\n- eigenes Urteil' },
       // Zauberstab am A4-Blatt (29.09.2026): eine Stelle neu – nur sie wird ersetzt
       rueckmeldung_stelle: { schluss: 'Neuer Schlusssatz vom Zauberstab.' }
@@ -76,6 +78,14 @@ page.on('pageerror', (e) => problems.push(`Fehler im Fenster: ${e.message}`))
 await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1500, 1050))
 await warteAufOberflaeche(page)
 const sichtbar = (l) => l.filter({ visible: true }).first()
+/** Zeile einer Abgabe in „Bögen & Export" (29.09.2026: auf- und zuklappbar, standardmäßig zu) */
+const zeile = (kuerzel) => page.locator(`[data-rm-zeile="${kuerzel}"]`).filter({ visible: true }).first()
+const aufklappen = async (kuerzel) => {
+  const z = zeile(kuerzel)
+  await z.waitFor({ timeout: 20000 })
+  if ((await z.getAttribute('data-rm-offen')) !== 'ja') await z.locator('[data-rm-aufklappen]').click()
+  await z.locator('[data-rm-blatt]').waitFor({ timeout: 10000 })
+}
 try {
   await page.click('[aria-label="Rückmeldung"]')
   await page.getByText('Rückmeldung ohne Note', { exact: true }).waitFor({ timeout: 10000 })
@@ -105,6 +115,13 @@ try {
   pruefe(a.length === 1, 'Eine Anfrage für den Bogen')
   pruefe(a.length === 1 && !/Lea|Schmidt|Jonas/.test(a[0].user) && a[0].user.includes('S1'), 'Die KI sieht nur Kürzel – auch Namen im Text sind ersetzt')
   pruefe(a.length === 1 && /KEINE Note, KEINE Punkte/.test(a[0].user), 'Die Anfrage verbietet Noten und Punkte')
+  await zeile('S1').waitFor({ timeout: 10000 })
+  pruefe(
+    (await zeile('S1').getAttribute('data-rm-offen')) === 'nein' && (await page.locator('[data-rm-blatt]').filter({ visible: true }).count()) === 0,
+    'Die Rückmeldung ist standardmäßig zugeklappt'
+  )
+  pruefe((await zeile('S1').getByText('Lea Schmidt').count()) > 0, 'Die Zeile zeigt den Namen')
+  await aufklappen('S1')
   await page.getByText('Rückmeldung für Lea Schmidt').first().waitFor({ timeout: 10000 })
   pruefe(true, 'Die Ansicht zeigt den Namen – eingesetzt am Rechner')
   await page.screenshot({ path: join(out, 'boegen.png') })
@@ -148,6 +165,7 @@ try {
   const b2 = anfragen().filter((z) => z.schemaName === 'rueckmeldung_bogen').pop()
   pruefe(Boolean(b2) && /NOTENSCHUTZ/.test(b2.user) && !/Legasthenie|Gutachten/.test(b2.user), 'Der Nachteilsausgleich geht als Maßnahme an die KI – ohne Diagnose')
   pruefe(Boolean(b2) && /Lehrkraft vergibt die Einstufung/.test(b2.user), 'Die KI schlägt nur vor')
+  await aufklappen('S1')
   await page.locator('[data-rm-rand]').filter({ visible: true }).first().waitFor({ timeout: 10000 })
   pruefe(true, 'Der Korrekturrand steht im Bogen')
   // ---------- A4-Blatt (29.09.2026): Schülertext oben mit Randnotizen, Kasten darunter
@@ -163,6 +181,38 @@ try {
   pruefe(reihenfolge[0] >= 0 && reihenfolge[0] < reihenfolge[1] && reihenfolge[1] < reihenfolge[2], 'Kopf, dann Schülertext, dann Feedback')
   const hand = await blatt.locator('.bl-notiz').first().evaluate((el) => getComputedStyle(el).fontFamily)
   pruefe(/Ink Free|Segoe Print|Comic Sans/.test(hand), `Randnotizen in Handschrift-Anmutung (${hand})`)
+  // Randnotiz auf der Höhe ihrer Zeile (29.09.2026 spät): Nummer der Notiz ≈ Zeile der Stelle – außer sie
+  // ist unter eine Notiz derselben Zeile gerutscht (dann direkt darunter, nie überdeckt)
+  const lagen = await blatt.evaluate((el) =>
+    [...el.querySelectorAll('.bl-abs .bl-notiz')].map((n) => {
+      const nr = n.getAttribute('data-notiz-nr')
+      const sup = [...n.closest('.bl-text').querySelectorAll('sup.bl-nr-t')].find((x) => x.textContent.replace(/[^0-9]/g, '') === nr)
+      const mark = sup?.previousElementSibling?.classList.contains('bl-m') ? sup.previousElementSibling : sup
+      const zeilen = mark ? [...mark.getClientRects()] : []
+      const z = zeilen[zeilen.length - 1]
+      const nrRect = n.querySelector('.bl-nr').getBoundingClientRect()
+      const r = n.getBoundingClientRect()
+      return { nr, stelle: z ? (z.top + z.bottom) / 2 : null, notiz: (nrRect.top + nrRect.bottom) / 2, oben: r.top, unten: r.bottom }
+    })
+  )
+  const zeilenTreu = lagen.every((l, i) => {
+    if (l.stelle == null) return false
+    const d = l.notiz - l.stelle
+    if (Math.abs(d) <= 6) return true
+    // gestapelt: unter der vorigen Notiz, nicht höher als die Stelle
+    return d > 0 && i > 0 && l.oben >= lagen[i - 1].unten - 1 && l.oben <= lagen[i - 1].unten + 12
+  })
+  const ueberdeckt = lagen.some((l, i) => i > 0 && l.oben < lagen[i - 1].unten - 1)
+  pruefe(
+    lagen.length === 2 && zeilenTreu && !ueberdeckt,
+    `Randnotizen stehen auf der Höhe ihrer Zeile, ohne sich zu überdecken (${lagen.map((l) => `${l.nr}: ${Math.round(l.notiz - (l.stelle ?? 0))} px`).join(', ')})`
+  )
+  // Der Kasten bleibt links der roten Randlinie
+  const kastenRechts = await blatt.evaluate((el) => {
+    const linie = el.querySelector('.rm-seite-linie').getBoundingClientRect().left
+    return Math.max(...[...el.querySelectorAll('.bl-k, .bl-k table')].map((k) => k.getBoundingClientRect().right)) - linie
+  })
+  pruefe(kastenRechts <= 1, `Der Kasten „Rückmeldung für …" steht in der Textspalte, links der Randlinie (${Math.round(kastenRechts)} px)`)
   await blatt.screenshot({ path: join(out, 'blatt.png') })
   // Hell und dunkel: Das Blatt bleibt ein weißes Papier mit dunkler Schrift, die Leiste folgt dem Schema
   for (const colorScheme of ['light', 'dark']) {
@@ -338,6 +388,124 @@ try {
   pruefe(aufgabeAnfragen.length === 1 && aufgabeAnfragen[0].user.includes('Schuluniform'), `Die Datei ging an die KI (${aufgabeAnfragen.length} Anfrage[n]: ${aufgabeAnfragen.map((a) => JSON.stringify(a.user.slice(-50))).join(' | ')})`)
   pruefe((await page.getByText('Zu jeder Abgabe ein Bogen').count()) === 0, 'Der lange Einleitungstext ist weg')
   await page.screenshot({ path: join(out, 'eigene-aufgabe.png') })
+
+  // ---------- Lange Abgabe + Liste zum Auf- und Zuklappen (29.09.2026, Bericht/Wunsch der Lehrkraft)
+  // Ein einziger Absatz über mehrere Seiten (samt Zeichenkette ohne Leerzeichen) ließ Seite 1 leer
+  // und lief über die Seitenränder. Drei Abgaben: Suche, Aufklappen, Seitengrenzen.
+  await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+  await page.waitForTimeout(800)
+  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.')
+  await sichtbar(page.locator('[data-form="rand"]')).check()
+  await sichtbar(page.locator('[data-einstufung="noteTendenz"]')).check()
+  const satz = 'Wir brauchen das Handy für den Unterricht, weil man damit schnell etwas nachschlagen kann. '
+  const langerText = `Ich finde, das Handyverbot ist falsch. ${satz.repeat(55)}${'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo'.repeat(50)} ${satz.repeat(35)}`
+  const schueler = [
+    ['Tom Berger', 'Ich finde, das Handyverbot ist falsch. Wir brauchen das Handy für den Unterricht.'],
+    ['Jürgen Öztürk', langerText],
+    ['Mia Krause', 'Ich finde, das Handyverbot ist falsch. Im Unterricht stört das Handy aber oft.']
+  ]
+  for (const [k, [name, text]] of schueler.entries()) {
+    await sichtbar(page.locator('[data-rm-eintippen]')).click()
+    await sichtbar(page.getByLabel(`Name zu S${k + 1}`)).fill(name)
+    await sichtbar(page.getByLabel(`Text von S${k + 1}`)).fill(text)
+  }
+  await sichtbar(page.locator('[data-rm-schreiben]')).click()
+  const ende7 = Date.now() + 30000
+  let drei = null
+  while (Date.now() < ende7) {
+    drei = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben ?? [])
+    if (drei.length === 3 && drei.every((a) => a.bogen)) break
+    await page.waitForTimeout(300)
+  }
+  pruefe(drei?.length === 3 && drei.every((a) => a.bogen), 'Drei Bögen sind entstanden')
+  await zeile('S3').waitFor({ timeout: 10000 })
+  const zeilen = page.locator('[data-rm-zeile]').filter({ visible: true })
+  pruefe(
+    (await zeilen.count()) === 3 && (await page.locator('[data-rm-offen="ja"]').filter({ visible: true }).count()) === 0,
+    'Alle drei Rückmeldungen stehen zugeklappt in der Liste'
+  )
+  pruefe((await page.locator('[data-rm-blatt]').filter({ visible: true }).count()) === 0, 'Zugeklappt wird kein Blatt gezeichnet')
+  pruefe((await zeile('S2').locator('[data-rm-status="offen"]').count()) === 1, 'Die Zeile zeigt den Status „Einstufung offen“')
+  await page.screenshot({ path: join(out, 'liste-zu.png') })
+  // Suche: Umlaute tolerant, genau ein Treffer klappt auf
+  await sichtbar(page.locator('[data-rm-suche]')).fill('oeztuerk')
+  await page.waitForTimeout(400)
+  pruefe((await zeilen.count()) === 1 && (await zeile('S2').count()) === 1, 'Die Suche „oeztuerk“ findet „Jürgen Öztürk“ – und nur ihn')
+  await zeile('S2')
+    .locator('[data-rm-blatt]')
+    .waitFor({ timeout: 10000 })
+    .catch(() => undefined)
+  pruefe((await zeile('S2').getAttribute('data-rm-offen')) === 'ja', 'Bei genau einem Treffer klappt die Rückmeldung auf')
+  await page.waitForTimeout(800)
+  // Die lange Abgabe: Schülertext auf Seite 1, nichts ragt über eine Seitengrenze, nichts in die Korrekturspalte
+  const lang = zeile('S2').locator('[data-rm-blatt]')
+  const befund = await lang.evaluate((el) => {
+    const seiten = [...el.querySelectorAll('.rm-seite')].map((s) => s.getBoundingClientRect())
+    const bloecke = [...el.querySelectorAll('.blatt .bl-block')].map((b) => ({ k: b.className, r: b.getBoundingClientRect() }))
+    const inSeite = (r) => seiten.some((s) => r.top >= s.top - 1 && r.bottom <= s.bottom + 1 && r.left >= s.left - 1 && r.right <= s.right + 1)
+    const draussen = bloecke.filter((b) => b.r.height > 0 && !inSeite(b.r)).map((b) => `${b.k} ${Math.round(b.r.top)}–${Math.round(b.r.bottom)}`)
+    const texte = [...el.querySelectorAll('.bl-abs')]
+    const erstesAbs = texte[0]?.getBoundingClientRect()
+    // Schülertext (ohne die Notizen, die als Float in den Rand ragen) endet links der roten Randlinie
+    const linie = el.querySelector('.rm-seite-linie').getBoundingClientRect().left
+    const breit = texte.filter((a) =>
+      [...a.querySelector('.bl-text').childNodes]
+        .filter((k) => !(k instanceof Element && k.classList.contains('bl-notiz')))
+        .some((k) => {
+          const range = document.createRange()
+          range.selectNode(k)
+          return [...range.getClientRects()].some((q) => q.width > 0 && q.right > linie + 1)
+        })
+    ).length
+    return {
+      seiten: seiten.length,
+      draussen,
+      erste: erstesAbs ? erstesAbs.top < seiten[0].bottom && erstesAbs.bottom <= seiten[0].bottom + 1 : false,
+      absaetze: texte.length,
+      breit
+    }
+  })
+  pruefe(befund.seiten >= 3 && befund.absaetze > 3, `Die lange Abgabe steht auf mehreren Seiten, in Teilblöcke zerlegt (${befund.seiten} Seiten, ${befund.absaetze} Teilblöcke)`)
+  pruefe(befund.erste, 'Seite 1 enthält Schülertext direkt unter dem Kopf (keine leere erste Seite)')
+  pruefe(befund.draussen.length === 0, `Kein Block ragt über eine Seitengrenze${befund.draussen.length ? ` (${befund.draussen.join(', ')})` : ''}`)
+  pruefe(befund.breit === 0, 'Lange Zeichenketten brechen um – nichts läuft in die Korrekturspalte')
+  // Bilder der Ansicht: Seite 1 und die Übergänge Seite 1/2 und 2/3 (das Blatt liegt in einer Rollfläche)
+  for (const [k, datei] of [
+    [0, 'lange-abgabe-seite1.png'],
+    [1, 'lange-abgabe-seite2.png'],
+    [2, 'lange-abgabe-seite3.png']
+  ]) {
+    await lang.evaluate((el, k) => el.querySelectorAll('.rm-seite')[k]?.scrollIntoView({ block: k ? 'center' : 'start' }), k)
+    await page.waitForTimeout(200)
+    await page.screenshot({ path: join(out, datei) })
+  }
+  // PDF der langen Abgabe aus der App (nach Bestätigung der Einstufung)
+  await zeile('S2').locator('[data-rm-bestaetigen]').click()
+  await page.waitForTimeout(300)
+  const langPdf = join(out, 'lange-abgabe.pdf')
+  rmSync(langPdf, { force: true })
+  await app.evaluate(({ dialog }, pfad) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: pfad })
+  }, langPdf)
+  await zeile('S2').locator('[data-rm-pdf]').click()
+  const ende8 = Date.now() + 20000
+  while (Date.now() < ende8 && !existsSync(langPdf)) await page.waitForTimeout(300)
+  pruefe(existsSync(langPdf), 'Das PDF der langen Abgabe entsteht')
+  // Suche leeren: alle drei wieder da; alle auf- und zuklappen
+  await sichtbar(page.locator('[data-rm-suche]')).fill('')
+  await page.waitForTimeout(300)
+  pruefe((await zeilen.count()) === 3, 'Ohne Suche stehen wieder alle drei Zeilen da')
+  await sichtbar(page.locator('[data-rm-alle-auf]')).click()
+  await page.waitForTimeout(800)
+  pruefe((await page.locator('[data-rm-blatt]').filter({ visible: true }).count()) === 3, '„Alle aufklappen“ zeigt alle drei Blätter')
+  await sichtbar(page.locator('[data-rm-alle-zu]')).click()
+  await page.waitForTimeout(300)
+  pruefe((await page.locator('[data-rm-blatt]').filter({ visible: true }).count()) === 0, '„Alle zuklappen“ klappt alle zu')
+  await zeile('S3').locator('[data-rm-aufklappen]').click()
+  await zeile('S3').locator('[data-rm-blatt]').waitFor({ timeout: 10000 })
+  pruefe((await zeile('S3').getByText('Rückmeldung für Mia Krause').count()) > 0, 'Aufklappen einer Zeile zeigt ihr Blatt mit Leiste')
+  await page.screenshot({ path: join(out, 'liste-auf.png') })
 } catch (e) {
   problems.push(`Abbruch: ${e.message}`)
   await page.screenshot({ path: join(out, 'fehler.png') }).catch(() => undefined)
