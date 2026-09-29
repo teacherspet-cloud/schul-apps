@@ -52,7 +52,9 @@ export default function Einrichten(): React.JSX.Element | null {
   const [wahlOffen, setWahlOffen] = useState(false)
   const [quelle, setQuelle] = useState<'material' | 'frei'>(r?.grundlage.art === 'frei' ? 'frei' : 'material')
   // Nachteilsausgleich (29.09.2026): Fenster je Abgabe und die lokal gemerkten Ausgleiche
+  // Die Kennung bleibt beim Schließen stehen – sonst verlöre das Fenster während der Ausblendung seinen Inhalt
   const [ausgleichFuer, setAusgleichFuer] = useState<string | null>(null)
+  const [ausgleichOffen, setAusgleichOffen] = useState(false)
   const [gedaechtnis, setGedaechtnis] = useState<AusgleichGedaechtnis | null>(null)
   useEffect(() => {
     void ladeGedaechtnis().then(setGedaechtnis)
@@ -72,7 +74,7 @@ export default function Einrichten(): React.JSX.Element | null {
       setGedaechtnis(neu)
       void speichereGedaechtnis(neu).catch(notifyError)
     }
-    setAusgleichFuer(null)
+    setAusgleichOffen(false)
   }
 
   const waehleMaterial = async (wert: string | null): Promise<void> => {
@@ -380,7 +382,10 @@ export default function Einrichten(): React.JSX.Element | null {
                               variant={hatAusgleich(a.ausgleich) ? 'light' : 'subtle'}
                               color={hatAusgleich(a.ausgleich) ? 'grape' : 'gray'}
                               aria-label={`Nachteilsausgleich für ${a.kuerzel}`}
-                              onClick={() => setAusgleichFuer(a.id)}
+                              onClick={() => {
+                                setAusgleichFuer(a.id)
+                                setAusgleichOffen(true)
+                              }}
                               data-rm-ausgleich-knopf
                             >
                               <IconHeartHandshake size={14} />
@@ -473,8 +478,8 @@ export default function Einrichten(): React.JSX.Element | null {
       <AusgleichFenster
         abgabe={r.abgaben.find((a) => a.id === ausgleichFuer) ?? null}
         meta={r.meta}
-        offen={Boolean(ausgleichFuer)}
-        schliessen={() => setAusgleichFuer(null)}
+        offen={ausgleichOffen && Boolean(ausgleichFuer)}
+        schliessen={() => setAusgleichOffen(false)}
         speichern={(a, merken) => ausgleichFuer && ausgleichSpeichern(ausgleichFuer, a, merken)}
       />
       <Formularfuss grund={grund}>

@@ -26,7 +26,14 @@ writeFileSync(
         staerken: ['S1 nennt gleich zu Beginn ein klares Anliegen.', 'Das sind 12 von 15 Punkten.'],
         schritte: ['Ergänze zu jedem Argument ein Beispiel aus deinem Alltag.'],
         kriterien: [{ kriterium: 'Anliegen', einschaetzung: 'sicher', beleg: 'Ich finde, das Handyverbot ist falsch.' }],
-        schluss: 'Weiter so – mit Beispielen wird dein Brief überzeugender.'
+        schluss: 'Weiter so – mit Beispielen wird dein Brief überzeugender.',
+        // Rückmeldung 2.0 (29.09.2026): Einstufung als Vorschlag, Korrekturrand, Fehlerschwerpunkte
+        gesamt: { anteil: 80, begruendung: 'Klare These, Belege fehlen.' },
+        rand: [
+          { zitat: 'das Handyverbot ist falsch', text: 'Klare These', zeichen: '', art: 'lob' },
+          { zitat: 'Unterricht', text: 'Beispiel ergänzen', zeichen: 'Inh', art: 'hinweis' }
+        ],
+        fehler: [{ kategorie: 'Belege fehlen', beispiel: 'Wir brauchen das Handy' }]
       },
       // Eigene Aufgabe aus einer Datei (29.09.2026)
       rueckmeldung_aufgabe: {
@@ -97,6 +104,64 @@ try {
   await page.getByText('Rückmeldung für Lea Schmidt').waitFor({ timeout: 10000 })
   pruefe(true, 'Die Ansicht zeigt den Namen – eingesetzt am Rechner')
   await page.screenshot({ path: join(out, 'boegen.png') })
+
+  // ---------- Rückmeldung 2.0 (29.09.2026): Formen, Einstufung, Nachteilsausgleich, Gedächtnis
+  await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+  await page.waitForTimeout(800)
+  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  await sichtbar(page.locator('[data-rm-aufgaben]')).fill('Schreibe einen Leserbrief an die Schülerzeitung zum geplanten Handyverbot.')
+  await sichtbar(page.locator('[data-form="rand"]')).check()
+  await sichtbar(page.locator('[data-einstufung="noteTendenz"]')).check()
+  pruefe((await page.getByText('Rückmeldung mit Einstufung', { exact: true }).count()) === 1, 'Mit Einstufung heißt der Schritt „Rückmeldung mit Einstufung"')
+  pruefe((await page.locator('[data-einstufung="notenpunkte"]').filter({ visible: true }).isDisabled()), 'Notenpunkte sind in Klasse 7 gesperrt (nur Oberstufe)')
+  pruefe((await page.locator('[data-rm-landeshinweis]').filter({ visible: true }).count()) > 0, 'Hinweise des Landes mit Fundstelle stehen bei der Einstufung')
+  await page.locator('[data-rm-art]').filter({ visible: true }).first().scrollIntoViewIfNeeded()
+  await page.screenshot({ path: join(out, 'art-der-rueckmeldung.png') })
+  await sichtbar(page.locator('[data-rm-eintippen]')).click()
+  await sichtbar(page.getByLabel('Name zu S1')).fill('Lea Schmidt')
+  await sichtbar(page.getByLabel('Text von S1')).fill('Ich finde, das Handyverbot ist falsch. Wir brauchen das Handy für den Unterricht.')
+  await sichtbar(page.locator('[data-rm-ausgleich-knopf]')).click()
+  const na = page.locator('[data-rm-ausgleich]').filter({ visible: true })
+  await sichtbar(page.locator('[data-massnahme="ns-rechtschreibung"]')).check()
+  await sichtbar(page.locator('[data-rm-ausgleich-eigene]')).fill('wegen Legasthenie laut Gutachten')
+  pruefe((await page.getByText('Gesundheitsangaben gehen nicht an die KI', { exact: false }).count()) > 0, 'Das Fenster warnt vor Diagnosewörtern')
+  await page.screenshot({ path: join(out, 'nachteilsausgleich.png') })
+  await sichtbar(page.locator('[data-rm-ausgleich-ok]')).click()
+  await na.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => undefined)
+  const na1 = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.ausgleich ?? null)
+  pruefe(Boolean(na1?.massnahmen?.includes('ns-rechtschreibung')), 'Der Nachteilsausgleich hängt an der Abgabe')
+  await page.screenshot({ path: join(out, 'einrichten-2.png') })
+  await sichtbar(page.locator('[data-rm-schreiben]')).click()
+  const ende4 = Date.now() + 20000
+  let bogen2 = null
+  while (Date.now() < ende4) {
+    bogen2 = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen ?? null)
+    if (bogen2) break
+    await page.waitForTimeout(300)
+  }
+  pruefe(Boolean(bogen2?.gesamt?.wert) && !bogen2?.gesamt?.bestaetigt, 'Die Einstufung ist ein unbestätigter Vorschlag')
+  pruefe(bogen2?.rand?.length === 2, 'Der Korrekturrand ist entstanden')
+  const b2 = anfragen().filter((z) => z.schemaName === 'rueckmeldung_bogen').pop()
+  pruefe(Boolean(b2) && /NOTENSCHUTZ/.test(b2.user) && !/Legasthenie|Gutachten/.test(b2.user), 'Der Nachteilsausgleich geht als Maßnahme an die KI – ohne Diagnose')
+  pruefe(Boolean(b2) && /Lehrkraft vergibt die Einstufung/.test(b2.user), 'Die KI schlägt nur vor')
+  await page.locator('[data-rm-rand]').filter({ visible: true }).first().waitFor({ timeout: 10000 })
+  pruefe(true, 'Der Korrekturrand steht im Bogen')
+  await sichtbar(page.locator('[data-rm-bestaetigen]')).click()
+  await page.waitForTimeout(300)
+  const best = await page.evaluate(() => window.__selftest.rmJetzt()?.abgaben?.[0]?.bogen?.gesamt?.bestaetigt ?? false)
+  pruefe(best === true, 'Die Lehrkraft bestätigt die Einstufung')
+  await page.screenshot({ path: join(out, 'boegen-2.png') })
+  await sichtbar(page.locator('[data-rm-ansicht]').getByText('Lerngruppe')).click()
+  await page.locator('[data-rm-uebersicht]').filter({ visible: true }).first().waitFor({ timeout: 5000 })
+  pruefe((await page.getByText('Belege fehlen', { exact: false }).filter({ visible: true }).count()) > 0, 'Das Fehlerprofil zeigt den Schwerpunkt')
+  await page.screenshot({ path: join(out, 'lerngruppe.png') })
+  // Gedächtnis: gleicher Name in einer neuen Rückmeldung
+  await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+  await page.waitForTimeout(800)
+  await sichtbar(page.locator('[data-rm-eintippen]')).click()
+  await sichtbar(page.getByLabel('Name zu S1')).fill('lea schmidt')
+  await page.locator('[data-rm-ausgleich-uebernehmen]').filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => undefined)
+  pruefe((await page.locator('[data-rm-ausgleich-uebernehmen]').filter({ visible: true }).count()) === 1, 'Der gemerkte Nachteilsausgleich wird für denselben Namen vorgeschlagen')
 
   // Vokabeltest als Grundlage: Knopf „Rückmeldung …" im Vokabeltest-Editor
   await page.click('[aria-label="Vokabeltest"]')

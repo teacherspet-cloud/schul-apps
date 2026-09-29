@@ -140,7 +140,7 @@ export default function RandEditor({
                     <span style={{ textDecoration: 'underline', textDecorationColor: ART_FARBE[t.art], textDecorationThickness: 2, textUnderlineOffset: 3 }}>
                       {t.text}
                     </span>
-                    {t.nr != null && <sup style={{ color: ART_FARBE[t.art], fontWeight: 700 }}>{t.nr}</sup>}
+                    {t.nr != null && <sup style={{ color: ART_FARBE[t.art], fontWeight: 700 }}>{t.text ? '' : ','}{t.nr}</sup>}
                   </Fragment>
                 ) : (
                   <Fragment key={j}>{t.text}</Fragment>

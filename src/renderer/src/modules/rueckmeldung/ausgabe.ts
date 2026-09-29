@@ -138,7 +138,7 @@ export function boegenHtml(r: Rueckmeldung, abgaben: Abgabe[], opt: AusgabeOptio
         .map(
           (abs) =>
             `<tr><td class="text">${abs.teile
-              .map((t) => (t.art ? `<mark class="${t.art}">${esc(t.text)}</mark>${t.nr != null ? `<sup>${t.nr}</sup>` : ''}` : esc(t.text)))
+              .map((t) => (t.art ? `<mark class="${t.art}">${esc(t.text)}</mark>${t.nr != null ? `<sup>${t.text ? '' : ','}${t.nr}</sup>` : ''}` : esc(t.text)))
               .join('')}</td><td class="rand"><ol>${abs.kommentare.map((g) => kommentarZeile(g, n)).join('')}</ol></td></tr>`
         )
         .join('')
@@ -328,7 +328,7 @@ export async function boegenDocx(r: Rueckmeldung, abgaben: Abgabe[], opt: Ausgab
                     spacing: { line: 360 },
                     children: abs.teile.flatMap((t) => [
                       new TextRun({ text: t.text, ...(t.art ? { underline: { color: farbe(t.art) } } : {}), ...groesse() }),
-                      ...(t.nr != null ? [new TextRun({ text: String(t.nr), superScript: true, bold: true, color: farbe(t.art) })] : [])
+                      ...(t.nr != null ? [new TextRun({ text: `${t.text ? '' : ','}${t.nr}`, superScript: true, bold: true, color: farbe(t.art) })] : [])
                     ])
                   })
                 ]
