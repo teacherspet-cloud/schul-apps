@@ -220,6 +220,11 @@ export interface AppSettings {
    * Voreinstellung aus renderer/shared/korrekturzeichen.ts.
    */
   korrekturzeichen?: Record<string, { zeichen: string; bedeutung: string }[]>
+  /**
+   * Zeitform in Protokollen, wie sie die Fachschaft festgelegt hat (29.09.2026) – gilt ab
+   * Klasse 7 als Vorschlag; leer = Präsens mit man/Passiv (didactics/protokoll.ts).
+   */
+  protokollStil?: 'ichwir' | 'praesens' | 'praeteritum' | ''
   /** Maskottchen (26.09.2026): bis zu welcher Klasse Illustrationen gelten, und die Standardfigur */
   illustrationen?: { bisKlasse: number; standardId?: string }
   /**

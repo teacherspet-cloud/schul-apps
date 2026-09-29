@@ -759,7 +759,7 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
         const height = wrap.getBoundingClientRect().height
         const block = sheet.blocks.find((b) => b.id === id)
         const unitEls = Array.from(wrap.querySelectorAll<HTMLElement>('[data-unit]'))
-        const splittable = (block?.type === 'text' || block?.type === 'table' || block?.type === 'task') && unitEls.length > 1
+        const splittable = (block?.type === 'text' || block?.type === 'table' || block?.type === 'task' || block?.type === 'protocol') && unitEls.length > 1
         if (splittable) {
           const units = unitEls.map((u) => u.getBoundingClientRect().height)
           const unitSum = units.reduce((a, b) => a + b, 0)

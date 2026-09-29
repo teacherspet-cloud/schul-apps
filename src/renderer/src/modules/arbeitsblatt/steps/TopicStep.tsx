@@ -1,3 +1,6 @@
+import VersuchKarte from './VersuchKarte'
+import { versuchAuftrag } from '../auftraege'
+import { hatProtokolle } from '../didactics/protokoll'
 import { nimmFachVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
 import { pruefeHochladen } from '../../../shared/datenschutz'
 import {
@@ -1178,6 +1181,17 @@ export default function TopicStep(): React.JSX.Element {
            * Selten Geändertes eingeklappt (Paket 6, Wunsch der Lehrkraft): Oben bleibt, was jedes
            * Blatt braucht. Die Überschrift nennt, was hier vom Standard abweicht.
            */}
+          {/* Versuch mit Protokoll (29.09.2026) – nur in Fächern mit Versuchen, Messungen, Beobachtungen */}
+          {hatProtokolle(meta.subjectId) && (
+            <Box mt="lg">
+              <VersuchKarte
+                lerngruppe={meta}
+                versuch={meta.versuch}
+                patchVersuch={(versuch) => patch({ versuch })}
+                ausarbeiten={() => versuchAuftrag(useArbeitsblatt.getState().worksheet ?? worksheet, useArbeitsblatt.getState().docId)}
+              />
+            </Box>
+          )}
           <Box mt="lg">
             <WeitereOptionen modul="arbeitsblatt" geaendert={geaenderteOptionen(meta, worksheet.design, designs)}>
               <Grid gap="lg">

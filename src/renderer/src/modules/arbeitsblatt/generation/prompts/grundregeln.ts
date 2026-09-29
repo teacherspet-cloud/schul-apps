@@ -1,3 +1,4 @@
+import { versuchRegeln } from '../../didactics/protokoll'
 import type { LearnerProfile } from '../../didactics/profile'
 import { anredeRegel } from '../../../../shared/anrede'
 import { anredeFuerMeta } from '../../didactics/anrede'
@@ -142,6 +143,8 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     grammarRules(meta),
     phraseSheetRules(meta),
     videoRules(meta),
+    // Versuch mit Protokoll (29.09.2026): Die KI plant die Stelle, die App setzt das Protokoll ein
+    versuchRegeln(meta),
     // Geschichte/Politik: echte Aufnahme SUCHEN statt eine erfinden
     mediaSourceRules(meta.subjectId),
     // Textquellen: Fundstelle aus einer Sammlung statt Wortlaut aus dem Gedaechtnis

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { setzeVersuchEin } from '../didactics/protokoll'
 import type { StructuredRequest } from '@shared/types'
 import { runLimited } from '../../../shared/async'
 import { obj, str } from '../../../shared/aiSchema'
@@ -594,7 +595,9 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
    * Blatt stand. Die Nachbesserung schrieb dann womöglich eine Aufgabe um, die in Ordnung war.
    */
   const mitMaterial = (sheet: Sheet): Sheet => {
-    const mit = ws.originalMaterial ? setzeMaterialEin(sheet, ws.originalMaterial, meta, newId) : sheet
+    // Versuchsprotokoll (29.09.2026): Die App setzt den ausgearbeiteten Versuch selbst ein (didactics/protokoll.ts)
+    const mitVersuch = setzeVersuchEin(sheet, meta)
+    const mit = ws.originalMaterial ? setzeMaterialEin(mitVersuch, ws.originalMaterial, meta, newId) : mitVersuch
     // Gespeichert werden KENNUNGEN: Schreibt die KI trotzdem „M2", wird daraus die Kennung des Materials, das jetzt M2 ist.
     // Erst jetzt, wo alle Materialien an ihrem Platz stehen – auch der eingesetzte Ausgangstext. Die Nummern entstehen beim Darstellen.
     return { ...mit, blocks: verschluesseleMaterialverweise(mit.blocks) }

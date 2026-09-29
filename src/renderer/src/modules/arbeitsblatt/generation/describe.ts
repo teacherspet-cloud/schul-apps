@@ -92,6 +92,15 @@ export function describeBlock(b: WsBlock): string {
       return `Selbsteinschätzung: ${b.statements.join('; ')}`
     case 'divider':
       return `Abschnitt: ${b.title}`
+    case 'protocol':
+      return [
+        `${b.title} (Protokoll, zum Ausfüllen) – Abschnitte: ${b.abschnitte.map((a) => a.titel).join(', ')}`,
+        ...b.abschnitte.filter((a) => a.vorgabe).map((a) => `${a.titel} (vorgegeben): ${a.vorgabe}`),
+        b.chemikalien?.length ? `Chemikalien: ${b.chemikalien.map((c) => c.name).join(', ')}` : '',
+        b.abschnitte.some((a) => a.muster) ? `Erwartung: ${b.abschnitte.filter((a) => a.muster).map((a) => `${a.titel}: ${a.muster}`).join(' | ')}` : ''
+      ]
+        .filter(Boolean)
+        .join('\n')
   }
 }
 

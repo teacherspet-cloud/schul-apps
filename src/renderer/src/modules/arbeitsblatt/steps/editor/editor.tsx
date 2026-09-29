@@ -380,7 +380,7 @@ export function EditorStep(): React.JSX.Element {
       const blocks = d.sheets.find((s) => s.id === sheet.id)?.blocks
       if (!blocks) return
       const i = blocks.findIndex((b) => b.id === nebenId)
-      blocks.splice(i < 0 ? blocks.length : i + versatz, 0, newBlock(typ, anredeFuerMeta(d.meta)))
+      blocks.splice(i < 0 ? blocks.length : i + versatz, 0, newBlock(typ, anredeFuerMeta(d.meta), d.meta))
     })
   const duplizieren = (id: string): void =>
     update((d) => {
@@ -744,7 +744,7 @@ export function EditorStep(): React.JSX.Element {
                 {Object.entries(BLOCK_LABELS).map(([type, label]) => (
                   <Menu.Item
                     key={type}
-                    onClick={() => update((d) => d.sheets.find((s) => s.id === sheet.id)!.blocks.push(newBlock(type as WsBlockType, anredeFuerMeta(d.meta))))}
+                    onClick={() => update((d) => d.sheets.find((s) => s.id === sheet.id)!.blocks.push(newBlock(type as WsBlockType, anredeFuerMeta(d.meta), d.meta)))}
                   >
                     {label}
                   </Menu.Item>

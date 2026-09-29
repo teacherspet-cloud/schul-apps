@@ -1,3 +1,6 @@
+import VersuchKarte from '../../arbeitsblatt/steps/VersuchKarte'
+import { hatProtokolle, versuchAnfrage, versuchAus } from '../../arbeitsblatt/didactics/protokoll'
+import { lzkLerngruppe } from '../model/versuch'
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
 import {
   Alert,
@@ -167,6 +170,12 @@ export default function SetupStep(): React.JSX.Element {
          * Parallel wäre schneller, aber jede Anfrage kostet Kontingent, und bei einem Fehler
          * in der dritten wären die ersten beiden schon bezahlt. Nacheinander bricht sauber ab.
          */
+        // Versuch (29.09.2026): zuerst ausarbeiten – alle Fassungen protokollieren denselben Versuch
+        if (t.meta.versuch?.aktiv && !t.meta.versuch.daten) {
+          k.melde('Die KI arbeitet den Versuch aus …', 0, t.meta.varianten)
+          const daten = versuchAus(await k.ai<unknown>(versuchAnfrage(lzkLerngruppe(t.meta), t.meta.versuch)))
+          t = { ...t, meta: { ...t.meta, versuch: { ...t.meta.versuch, daten } } }
+        }
         const varianten: { id: string; label: string; blocks: WsBlock[] }[] = []
         const anzahl = t.meta.varianten
         for (let i = 0; i < anzahl; i++) {
@@ -176,10 +185,20 @@ export default function SetupStep(): React.JSX.Element {
           varianten.push({ id: `v${i + 1}`, label, blocks })
           k.melde(`${i + 1} von ${anzahl} Fassungen fertig`, i + 1, anzahl)
         }
-        return varianten
+        return { varianten, versuch: t.meta.versuch?.daten }
       },
       // Ein eigener Verlaufsschritt: Strg+Z holt die vorige Fassung zurück (Rückfragen sind abgewählt)
-      ablegen: (varianten, t) => legeKurztestAb(docId, t, (aktuell) => ({ ...aktuell, varianten }), 1)
+      ablegen: (erg, t) =>
+        legeKurztestAb(
+          docId,
+          t,
+          (aktuell) => ({
+            ...aktuell,
+            varianten: erg.varianten,
+            ...(erg.versuch && aktuell.meta.versuch ? { meta: { ...aktuell.meta, versuch: { ...aktuell.meta.versuch, daten: erg.versuch } } } : {})
+          }),
+          1
+        )
     })
   }
 
@@ -437,6 +456,10 @@ export default function SetupStep(): React.JSX.Element {
                     )}
                   </Stack>
                 </Card>
+                {/* Versuch mit Protokoll (29.09.2026) – in Fächern mit Versuchen, Messungen, Beobachtungen */}
+                {hatProtokolle(m.subjectId) && (
+                  <VersuchKarte lerngruppe={lzkLerngruppe(m)} versuch={m.versuch} patchVersuch={(versuch) => patch({ versuch })} pruefung />
+                )}
               </Stack>
             </Grid.Col>
 

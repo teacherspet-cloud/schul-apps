@@ -34,6 +34,7 @@ import { anredeFuerMeta } from '../../didactics/anrede'
 import { Child, PX_PER_MM, PX_MM, tint, Ctx, materialNo } from './grundlagen'
 import { rich, richRun } from './kopf'
 import { taskContent } from './aufgaben'
+import { protokollDocx } from './protokoll'
 
 export function boxTable(ctx: Ctx, children: Child[], opts: { fill?: string; leftColor?: string; dashed?: boolean; color?: string }): Table {
   const line = { style: opts.dashed ? BorderStyle.DASHED : BorderStyle.SINGLE, size: 6, color: opts.color ?? ctx.accent }
@@ -488,6 +489,8 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
     }
     case 'illustration':
       return illustrationDocx(ctx, block.maskottchenId, block.pose, block.bubble, 24)
+    case 'protocol':
+      return protokollDocx(ctx, block)
     case 'divider':
       return [
         new Paragraph({

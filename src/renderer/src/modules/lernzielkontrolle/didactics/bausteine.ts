@@ -44,7 +44,9 @@ export const ERLAUBTE_BAUSTEINE = [
   'grid', // Karo-, Millimeterpapier, Koordinatensystem, Klimadiagramm
   'audio', // Hörtext als Grundlage
   'workspace', // freier Platz zum Rechnen
-  'divider'
+  'divider',
+  // Versuchsprotokoll (29.09.2026): Antwortfläche zur Aufgabe „protokollieren" – ohne Lernhilfen, außer mit Nachteilsausgleich
+  'protocol'
 ] as const
 
 /**

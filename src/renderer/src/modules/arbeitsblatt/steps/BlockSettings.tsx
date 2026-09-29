@@ -1,3 +1,4 @@
+import ProtokollEinstellungen from './ProtokollEinstellungen'
 import { Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
 import { hatMasse } from '../render/tabelleMasse'
 import { useArbeitsblatt } from '../store'
@@ -928,6 +929,7 @@ export function BlockSettings({
             </Group>
           )}
           {block.type === 'grid' && <GridSettings block={block} update={update} />}
+          {block.type === 'protocol' && <ProtokollEinstellungen block={block} update={update} />}
           {block.type === 'audio' && (
             <>
               <Group grow>

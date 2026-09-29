@@ -11,6 +11,7 @@
  * werden gebraucht, weil sich die KI nicht zuverlässig an den Auftrag hält – die
  * Lernzielkontrolle, die den Anlass für dieses Programm gab, war selbst KI-erzeugt.
  */
+import { pruefungsVersuchRegeln, setzeProtokollInPruefung } from '../../arbeitsblatt/didactics/protokoll'
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { AiCall } from '../../../shared/imageChoice'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
@@ -145,6 +146,7 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
       : '',
     '',
     bausteinRegeln(m.nachteilsausgleich),
+    pruefungsVersuchRegeln(m.versuch),
     '',
     operatorRegeln(profil),
     '',
@@ -215,6 +217,9 @@ export async function generateKurztest(test: Kurztest, variante: string, ai: AiC
   if (!blocks.some((b) => b.type === 'task')) {
     throw new Error('Die KI hat keine Aufgaben geliefert. Bitte erneut versuchen oder das Thema genauer angeben.')
   }
+  // Versuchsprotokoll (29.09.2026): Vorlage hinter die Aufgabe „protokollieren"; Lernhilfen nur mit Nachteilsausgleich (Satzanfänge)
+  const mitHilfen = test.meta.nachteilsausgleich.aktiv && test.meta.nachteilsausgleich.hilfen.includes('satzanfaenge')
+  blocks.splice(0, blocks.length, ...setzeProtokollInPruefung(blocks, test.meta.versuch, test.meta, !mitHilfen))
   // Nummern der KI werden zu Kennungen („M{tabelle}"); die Nummern entstehen beim Darstellen aus der Reihenfolge
   blocks.splice(0, blocks.length, ...verschluesseleMaterialverweise(blocks))
   if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)

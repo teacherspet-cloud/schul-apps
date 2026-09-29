@@ -436,5 +436,8 @@ export function convertBlock(
       }
     case 'divider':
       return { ...base, type, title: text(b.title) }
+    case 'protocol':
+      // Platzhalter: Die App setzt das Protokoll aus dem ausgearbeiteten Versuch ein (setzeVersuchEin)
+      return { ...base, type, title: text(b.title) || 'Versuchsprotokoll', art: 'versuch', stufe: 'offen', stil: 'praesens', abschnitte: [] }
   }
 }

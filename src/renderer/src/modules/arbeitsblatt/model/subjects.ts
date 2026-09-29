@@ -43,6 +43,8 @@ export const SUBJECTS: Subject[] = [
   { id: 'kunst', label: 'Kunst' },
   { id: 'musik', label: 'Musik' },
   { id: 'sport', label: 'Sport' },
+  // Technik (29.09.2026, Wunsch der Lehrkraft) – u. a. für Test- und Konstruktionsprotokolle
+  { id: 'technik', label: 'Technik' },
   { id: 'sachunterricht', label: 'Sachunterricht' },
   { id: 'daz', label: 'Deutsch als Zweitsprache (DaZ)' },
   { id: 'anderes', label: 'Anderes Fach …' }

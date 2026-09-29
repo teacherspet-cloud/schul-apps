@@ -69,7 +69,9 @@ export const FACH_PALETTE: PalettenFarbe[] = [
   { hex: '#285a00', name: 'Moosgrün' },
   { hex: '#aa6450', name: 'Terrakotta' },
   { hex: '#823c32', name: 'Rostrot' },
-  { hex: '#786eaa', name: 'Lavendel' }
+  { hex: '#786eaa', name: 'Lavendel' },
+  // 29.09.2026 fuer das neue Fach Technik: per Rechnung gesucht wie oben, kleinster Abstand zur Palette dE00 = 14,3
+  { hex: '#004048', name: 'Tiefseeblau' }
 ]
 
 const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name)!.hex
@@ -108,7 +110,8 @@ export const FACH_VORSCHLAG: Record<string, string> = {
   sachunterricht: farbe('Moosgrün'),
   daz: farbe('Altrosa'),
   niederlaendisch: farbe('Rostrot'),
-  russisch: farbe('Khaki')
+  russisch: farbe('Khaki'),
+  technik: farbe('Tiefseeblau')
 }
 
 /**

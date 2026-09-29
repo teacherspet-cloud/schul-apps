@@ -10,6 +10,8 @@
  * (Hörverstehen verknüpfen, Quellen prüfen, Bilder, Tafelbild) laufen wie bisher. Nur WER sie
  * aufruft und WOHIN das Ergebnis geht, hat sich geändert.
  */
+import { versuchAnfrage, versuchAus } from './didactics/protokoll'
+import type { VersuchDaten } from './model/protokoll'
 import { istAbbruch } from '@shared/abbruch'
 import { starteAuftrag } from '../../shared/auftraege'
 import { notifyInfo } from '../../shared/util'
@@ -108,12 +110,15 @@ export function planeGliederung(worksheet: Worksheet, docId: string): void {
         notifyInfo(`Die Materialsuche ist fehlgeschlagen (${e instanceof Error ? e.message : String(e)}). Das Blatt entsteht mit einem eigenen Text.`)
         return null
       })
+      // Versuch (29.09.2026): zuerst ausarbeiten, damit Gliederung und Aufgaben zu ihm passen
+      const versuch = ws.meta.versuch?.aktiv && !ws.meta.versuch.daten ? await versuchAusarbeiten(ws.meta, k) : null
+      const meta = versuch ? { ...ws.meta, versuch: { ...ws.meta.versuch!, daten: versuch } } : ws.meta
       k.melde('Die KI plant Lernziele, Bausteine und Aufgaben passend zur Lerngruppe …')
-      const outline = await generateOutline(ws.meta, profileFromMeta(ws.meta), ws.sources, k.ai, material)
-      return { outline, material }
+      const outline = await generateOutline(meta, profileFromMeta(meta), ws.sources, k.ai, material)
+      return { outline, material, versuch }
     },
     // Ersetzt wird nur, was geplant wurde; Titel nur, wenn noch keiner dasteht
-    ablegen: ({ outline, material }, ws) =>
+    ablegen: ({ outline, material, versuch }, ws) =>
       legeArbeitsblattAb(
         docId,
         ws,
@@ -123,6 +128,7 @@ export function planeGliederung(worksheet: Worksheet, docId: string): void {
           originalMaterial: material ?? undefined,
           meta: {
             ...aktuell.meta,
+            ...(versuch && aktuell.meta.versuch ? { versuch: { ...aktuell.meta.versuch, daten: versuch } } : {}),
             title: aktuell.meta.title || outline.title,
             teacherNote: outline.teacherNote,
             // Überthema aus der Planung – nur, wenn die Lehrkraft keins gesetzt oder abgeschaltet hat
@@ -410,4 +416,27 @@ export function rasterAufteilung(fach: string, schreibaufgabe: boolean): { inhal
   if (fach === 'deutsch') return { inhalt: 70, zweiter: 'Darstellung' }
   if (subjectById(fach).foreignLanguage) return { inhalt: 40, zweiter: 'Sprache' }
   return undefined
+}
+
+/** Den Versuch der Karte „Versuch" ausarbeiten (29.09.2026, didactics/protokoll.ts) */
+export async function versuchAusarbeiten(meta: WorksheetMeta, k: { melde: (m: string) => void; ai: <T>(req: import('@shared/types').StructuredRequest) => Promise<T> }): Promise<VersuchDaten> {
+  k.melde(meta.versuch?.quelle === 'datei' ? 'Die KI überträgt die Versuchsanleitung …' : 'Die KI arbeitet den Versuch aus …')
+  return versuchAus(await k.ai<unknown>(versuchAnfrage(meta, meta.versuch!)))
+}
+
+/** „Versuch jetzt ausarbeiten" auf der Karte – zum Prüfen und Bearbeiten vor dem Planen */
+export function versuchAuftrag(worksheet: Worksheet, docId: string): void {
+  void starteAuftrag({
+    moduleId: 'arbeitsblatt',
+    docId,
+    titel: titelVon(worksheet),
+    art: 'Versuch ausarbeiten',
+    eingabe: worksheet,
+    istOffen: () => blattOffen(docId),
+    fehlerTitel: 'Der Versuch konnte nicht ausgearbeitet werden',
+    arbeit: (ws, k) => versuchAusarbeiten(ws.meta, k),
+    abschluss: (d) => `Versuch „${d.titel}" ausgearbeitet – Sicherheitsangaben bitte prüfen.`,
+    ablegen: (daten, ws) =>
+      legeArbeitsblattAb(docId, ws, (aktuell) => (aktuell.meta.versuch ? { ...aktuell, meta: { ...aktuell.meta, versuch: { ...aktuell.meta.versuch, daten } } } : aktuell))
+  })
 }

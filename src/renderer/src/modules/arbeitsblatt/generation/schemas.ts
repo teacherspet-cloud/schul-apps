@@ -14,7 +14,9 @@ export const BLOCK_TYPES = [
   'audio',
   'video',
   'selfCheck',
-  'divider'
+  'divider',
+  // Versuchsprotokoll (29.09.2026): Die KI plant nur die Stelle, den Inhalt setzt die App ein (didactics/protokoll.ts)
+  'protocol'
 ]
 export const VIDEO_KIND_IDS = ['spielfilm', 'kurzfilm', 'dokumentation', 'nachrichten', 'lernvideo', 'experiment', 'reportage']
 export const VIEWING_PHASE_IDS = ['vor', 'waehrend', 'nach']

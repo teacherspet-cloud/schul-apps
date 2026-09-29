@@ -113,6 +113,8 @@ export interface KurztestMeta {
   varianten: number
 
   nachteilsausgleich: Nachteilsausgleich
+  /** Versuch mit Protokoll (29.09.2026, arbeitsblatt/model/protokoll.ts) – fehlt = keiner */
+  versuch?: import('../../arbeitsblatt/model/protokoll').VersuchSetup
   bewertung: Bewertungseinstellung
 
   /** Lösungsblatt für die Lehrkraft erzeugen */

@@ -2622,3 +2622,140 @@
   max-width: none;
   flex: 1;
 }
+
+/* ---------- Versuchsprotokoll (29.09.2026, render/baustein/protokoll.tsx) ---------- */
+.ws-protokoll-kopf {
+  font-weight: 700;
+  font-size: 1.1em;
+  border-bottom: 0.4mm solid currentColor;
+  padding-bottom: 1mm;
+  margin-bottom: 2mm;
+  display: flex;
+  gap: 3mm;
+  align-items: baseline;
+}
+.ws-protokoll-art {
+  font-weight: 400;
+  font-size: 0.75em;
+  color: #777;
+}
+.ws-protokoll-pruefen {
+  border: 0.3mm dashed #c77700;
+  background: #fff7e6;
+  color: #7a4a00;
+  font-size: 0.8em;
+  padding: 1.5mm 2mm;
+  margin-bottom: 2mm;
+}
+.ws-protokoll-abschnitt {
+  padding-top: 2mm;
+}
+.ws-protokoll-titel {
+  font-weight: 700;
+}
+.ws-protokoll-leitfrage,
+.ws-protokoll-satz {
+  font-size: 0.85em;
+  color: #555;
+  font-style: italic;
+}
+.ws-protokoll-vorgabe {
+  white-space: pre-wrap;
+  margin-top: 1mm;
+  line-height: 1.6;
+}
+.ws-protokoll-luecke {
+  display: inline-block;
+  min-width: 22mm;
+  border-bottom: 0.25mm solid #666;
+  height: 1em;
+  vertical-align: bottom;
+}
+.ws-protokoll-kopfzeile {
+  display: flex;
+  gap: 2mm;
+  align-items: flex-end;
+}
+.ws-protokoll-feld {
+  display: inline-block;
+  border-bottom: 0.25mm solid #666;
+  width: 30mm;
+  height: 6mm;
+}
+.ws-protokoll-feld-lang {
+  flex: 1;
+}
+.ws-protokoll-skizze {
+  margin-top: 1.5mm;
+  border: 0.25mm solid #999;
+  border-radius: 1mm;
+}
+.ws-protokoll-tabelle,
+.ws-protokoll-stoffe {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5mm;
+}
+.ws-protokoll-tabelle th,
+.ws-protokoll-tabelle td,
+.ws-protokoll-stoffe td {
+  border: 0.25mm solid #666;
+  padding: 1mm 1.5mm;
+  height: 7mm;
+  vertical-align: middle;
+  text-align: left;
+}
+.ws-protokoll-stoffe td {
+  height: auto;
+}
+.ws-protokoll-saetze {
+  font-size: 0.8em;
+}
+.ws-protokoll-ghs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm;
+}
+.ws-ghs {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.ws-ghs small {
+  font-size: 6pt;
+  color: #555;
+}
+.ws-protokoll-schutz {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 4mm;
+  margin-top: 1.5mm;
+  font-size: 0.9em;
+}
+.ws-protokoll-kreuz {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.5mm;
+}
+.ws-protokoll-checkliste .ws-protokoll-kreuz {
+  display: flex;
+  margin-top: 1mm;
+}
+.ws-protokoll-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5mm;
+  height: 3.5mm;
+  border: 0.25mm solid #333;
+  font-size: 0.8em;
+  flex: none;
+}
+.ws-protokoll-muster {
+  white-space: pre-wrap;
+  color: #1b5e20;
+  border-left: 0.6mm solid #1b5e20;
+  padding-left: 2mm;
+  margin-top: 1mm;
+}

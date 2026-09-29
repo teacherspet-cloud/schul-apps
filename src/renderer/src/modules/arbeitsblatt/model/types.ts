@@ -1,3 +1,4 @@
+import type { ProtokollInhalt, VersuchSetup } from './protokoll'
 import type { DesignTemplate } from '@shared/design'
 import type { AiProviderId, CefrLevel, TtsSettings } from '@shared/types'
 import type { SourceCitation } from '../../../shared/citation'
@@ -701,6 +702,11 @@ export interface DividerBlock extends BaseBlock {
   title: string
 }
 
+/** Versuchsprotokoll und verwandte Protokolle (29.09.2026) – Inhalt in model/protokoll.ts */
+export interface ProtocolBlock extends BaseBlock, ProtokollInhalt {
+  type: 'protocol'
+}
+
 export type WsBlock =
   | LearningGoalsBlock
   | InfoBoxBlock
@@ -717,6 +723,7 @@ export type WsBlock =
   | SelfCheckBlock
   | DividerBlock
   | IllustrationBlock
+  | ProtocolBlock
 
 export type WsBlockType = WsBlock['type']
 
@@ -971,6 +978,8 @@ export interface WorksheetMeta {
   pictograms?: boolean
   /** Beobachtungsauftrag zu einem Film, Lernvideo oder Netzvideo (fehlt = keiner) */
   video?: VideoSetup
+  /** Versuch mit Protokoll (29.09.2026, model/protokoll.ts) – fehlt = keiner */
+  versuch?: VersuchSetup
   sheetType: SheetType
   /**
    * Vorgegebene Seitenzahl als Richtwert bzw. Untergrenze einer Spanne – 0 = automatisch, die

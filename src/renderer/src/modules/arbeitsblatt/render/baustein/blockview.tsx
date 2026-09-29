@@ -19,6 +19,7 @@ import { LONG_TEXT_CHARS, splitParagraphs, Feld, gridAlt, audioLength, shortLink
 import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
+import { ProtokollView } from './protokoll'
 
 /**
  * Jeder Baustein mit angehefteter Illustration bekommt die Figur an die Ecke (26.09.2026) –
@@ -621,5 +622,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
         </div>
       )
+    case 'protocol':
+      return <ProtokollView block={block} placed={placed} />
   }
 }

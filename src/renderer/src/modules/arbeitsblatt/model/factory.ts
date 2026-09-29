@@ -1,3 +1,4 @@
+import { leeresProtokoll } from '../didactics/protokoll'
 import { newId } from '../../vokabeltest/model/random'
 import { defaultDiagram } from './diagram'
 import { defaultAxes } from './grid'
@@ -30,7 +31,7 @@ export function emptyAnswer(kind: AnswerKind = 'lines'): Answer {
  * Neuer, leerer Baustein zum Hinzufügen im Editor.
  * `anrede`: Die Platzhalter für die Lernenden duzen in der Sek I und siezen in der Sek II (Paket 8b).
  */
-export function newBlock(type: WsBlockType, anrede: Anrede = 'du'): WsBlock {
+export function newBlock(type: WsBlockType, anrede: Anrede = 'du', lerngruppe: { subjectId: string; grade: number } = { subjectId: 'chemie', grade: 8 }): WsBlock {
   const id = newId()
   switch (type) {
     case 'learningGoals':
@@ -83,6 +84,9 @@ export function newBlock(type: WsBlockType, anrede: Anrede = 'du'): WsBlock {
       return { id, type, title: 'Das kann ich jetzt', statements: ['Ich kann …'], format: 'smileys' }
     case 'divider':
       return { id, type, title: 'Abschnitt' }
+    case 'protocol':
+      // Versuchsprotokoll (29.09.2026): Vorschlag nach Fach und Jahrgang (didactics/protokoll.ts)
+      return { id, type, ...leeresProtokoll(lerngruppe) }
   }
 }
 
@@ -117,7 +121,8 @@ export const BLOCK_LABELS: Record<WsBlockType, string> = {
   video: 'Film / Video',
   selfCheck: 'Selbsteinschätzung',
   divider: 'Abschnittsüberschrift',
-  illustration: 'Illustration (Maskottchen)'
+  illustration: 'Illustration (Maskottchen)',
+  protocol: 'Versuchsprotokoll / Protokoll'
 }
 
 /**
