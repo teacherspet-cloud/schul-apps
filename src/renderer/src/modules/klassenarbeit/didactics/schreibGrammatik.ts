@@ -10,6 +10,9 @@
  *   KC Französisch 2025 S. 40) → nur als Erinnerung, ohne eigene Punkte.
  * - NRW: „Schreiben und Verfügen über sprachliche Mittel (integriert)" ausdrücklich vorgesehen;
  *   BB/SH: Raster darf an die Aufgabe angepasst werden.
+ * - Nachrecherche MV, RP, SL, SN, ST, TH: überall „nicht isoliert, sondern im Kontext"; SL Gymnasium
+ *   Englisch Kl. 8–10 Bandbreite, Inhalt : Sprache 25 : 75 bis 40 : 60 (ab Kl. 9 Voreinstellung Bandbreite); ST zentrale Klassenarbeit Kl. 6 Inhalt : Sprache = 5 : 5;
+ *   TH 2026 nennt Kriterien je grammatischem Phänomen.
  * - Abschlussprüfungen und Oberstufe: keine Vorgabe, bewertet wird die Bandbreite.
  * - Feste Anzahl passt in Lernjahr 1–4, danach „use a variety of …".
  * - Abzug bei fehlender Struktur ist nirgends vorgesehen; bewertet wird nur im eigenen Kriterium.
@@ -67,7 +70,19 @@ export function vorschlag(m: Meta): SchreibGrammatik {
   const lj = lernjahr(m)
   if (m.stateId === 'NI') return { themen: [], modus: 'erinnerung', bewertung: 'integriert' }
   if (m.grade >= 11 || lj >= 5) return { themen: [], modus: 'bandbreite', bewertung: 'integriert' }
+  // Saarland, Gymnasium Kl. 9/10 Englisch (1. und 2. FS): Raster im Lehrplan 2025 – „Bandbreite ist … der ausschlaggebende Faktor"
+  if (m.stateId === 'SL' && m.schoolTypeId === 'gymnasium' && m.subjectId === 'englisch' && m.grade >= 9) return { themen: [], modus: 'bandbreite', bewertung: 'integriert' }
   return { themen: [], modus: lj <= 4 ? 'anzahl' : 'bandbreite', anzahl: lj <= 2 ? 3 : 2, bewertung: 'kriterium' }
+}
+
+/** Landesregeln aus der Nachrecherche 29.09.2026 (Bericht, Abschnitt „Nachrecherche 29.09.") */
+const LANDESHINWEIS: Record<string, string> = {
+  MV: 'Mecklenburg-Vorpommern: Klassenarbeiten prüfen in der Regel mindestens zwei Teilkompetenzen in komplexen Aufgaben. Als sprachliche Kriterien nennt der Rahmenplan u. a. „Repertoire grammatischer und syntaktischer Strukturen" und „Einhaltung der sprachlichen Norm"; Kriterien und Gewichtung legt die Fachkonferenz fest (Rahmenpläne Englisch/Französisch 2025/2026, Kap. 3.3).',
+  RP: 'Rheinland-Pfalz: Sprachliche Mittel sollen nicht isoliert, sondern verknüpft mit einer Kompetenz und in einen situativen Kontext eingebettet überprüft werden – eine Vorgabe in der Schreibaufgabe entspricht dem. Der Mut zur anspruchsvollen Sprachgestaltung ist angemessen zu berücksichtigen (Lehrplan Französisch Sek I 2022; sinngemäß Spanisch 2012).',
+  SL: 'Saarland: Sprachliche Mittel werden nicht isoliert, sondern anwendungsbezogen in einem sprachlich-situativen Kontext überprüft; sie haben dienende Funktion (Lehrpläne Englisch 2023 und Französisch 2024, jahrgangsübergreifender Teil).',
+  SN: 'Sachsen: Kommunikationsfähigkeit ist das oberste Kriterium; Zeitformen werden thematisch eingebettet, nicht isoliert behandelt. Die Bewertungsmatrix Schreiben (Sek I) enthält die Kriterien „Strukturen" (Satzbau variabel und komplex) und „Sprachliche Korrektheit" – dort lässt sich die geforderte Struktur einordnen.',
+  ST: 'Sachsen-Anhalt: Die zentrale Klassenarbeit Englisch Kl. 6 schreibt in der Schreibaufgabe keine Grammatik vor, bewertet Inhalt und Sprache je zur Hälfte (Content 5 BE, Language 5 BE) und prüft Grammatik in einem eigenen Teil „Language in Use". Das LISA empfiehlt, die für eine Schreibaufgabe nötigen Strukturen vorab bewusst zu machen (z. B. simple past bei einem Ferienbericht).',
+  TH: 'Thüringen: Nach den Lehrplänen 2026 (Erprobungsfassungen) werden Grammatikkenntnisse grundsätzlich nicht isoliert, sondern im Kontext bewertet – nach Korrektheit der Bildung und funktionaler, kontextangemessener Anwendung des grammatischen Phänomens. Ein eigenes Kriterium für die geforderte Struktur passt dazu; kommunikativer Erfolg hat Vorrang vor sprachlicher Korrektheit.'
 }
 
 /** Hinweise je Land und Einstellung (Bericht 5.4), unpersönlich */
@@ -84,8 +99,14 @@ export function hinweise(m: Meta, g: SchreibGrammatik): { text: string; warnung?
     out.push({ warnung: true, text: 'Aufgaben, die vorrangig auf ein grammatikalisches Phänomen reduziert sind, erfüllen die Vorgaben des Kerncurriculums nicht; die Schreibaufgabe sollte Gestaltungsspielraum lassen.' })
   if (m.stateId === 'NW') out.push({ text: 'NRW: Die Kombination „Schreiben und Verfügen über sprachliche Mittel (integriert)" ist in den Empfehlungen der Fachaufsicht vorgesehen; das Raster wird an die Aufgabe angepasst.' })
   if (m.stateId === 'HE') out.push({ text: 'Hessen: Sprachliche Mittel sind an kommunikative Situationen anzubinden – die Vorgabe sollte sich aus dem Schreibanlass ergeben.' })
-  if (['MV', 'RP', 'SL', 'SN', 'ST', 'TH'].includes(m.stateId))
-    out.push({ text: 'Für dieses Land liegt keine ausgewertete Regel vor; es gilt der KMK-Grundsatz der dienenden Funktion sprachlicher Mittel.' })
+  const land = LANDESHINWEIS[m.stateId]
+  if (land) out.push({ text: land })
+  if (m.stateId === 'SL' && m.schoolTypeId === 'gymnasium' && m.subjectId === 'englisch' && m.grade >= 8 && m.grade <= 10)
+    out.push({
+      text: `Saarland, Gymnasium Kl. ${m.grade}: Das Bewertungsraster Schreiben im Lehrplan Englisch (2025) bewertet Grammatik vor allem nach der Bandbreite – eine unzureichende Bandbreite lässt sich nicht durch Korrektheit ausgleichen. Empfohlene Gewichtung Inhalt : Sprache ${m.grade === 8 ? '25 : 75 bei gelenkten bis 40 : 60 bei freieren Aufgaben' : '40 : 60'}.`
+    })
+  if (m.stateId === 'ST' && g.modus === 'anzahl')
+    out.push({ text: 'Sachsen-Anhalt: Näher an den LISA-Hinweisen liegt es, die benötigte Struktur vorab bewusst zu machen („Als Erinnerung" oder „Über Inhaltspunkte"), statt eine Anzahl zu verlangen.' })
   if (m.grade >= 11 && g.modus !== 'bandbreite')
     out.push({ warnung: true, text: 'In der Oberstufe ist die Vorgabe bestimmter Grammatik unüblich; bewertet wird die Bandbreite (vgl. Fachbrief Englisch BB Nr. 9, 2025).' })
   else if (lj >= 5 && g.modus === 'anzahl')
@@ -117,16 +138,16 @@ const MUSTER: Record<'en' | 'fr' | 'es' | 'it' | 'ru', Record<GrammatikModus, st
     bandbreite: 'Usa diferentes tiempos verbales y conectores (primero, después, además, sin embargo …).'
   },
   it: {
-    anzahl: 'Usa almeno {n} verbi al {form}.',
+    anzahl: 'Usa almeno {n} volte questa struttura: {form}.',
     erinnerung: 'Ricorda: pensa ai tempi verbali che ti servono.',
     inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
-    bandbreite: 'Usa tempi verbali diversi e connettivi.'
+    bandbreite: 'Usa tempi verbali diversi e connettivi (prima, poi, perché, però …).'
   },
   ru: {
-    anzahl: 'Используй {form} не менее {n} раз.',
-    erinnerung: 'Помни о нужных временах глагола.',
+    anzahl: 'Используй в тексте не менее {n} раз следующую конструкцию: {form}.',
+    erinnerung: 'Обрати внимание на нужные времена глаголов.',
     inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
-    bandbreite: 'Используй разные времена и связующие слова.'
+    bandbreite: 'Используй разные времена глаголов и средства логической связи (сначала, потом, потому что, однако …).'
   }
 }
 

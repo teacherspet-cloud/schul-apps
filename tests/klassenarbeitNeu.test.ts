@@ -5,7 +5,7 @@ import { fachDerArbeit, eigeneTeilnoteLabel, type ExamSubjectId } from '../src/r
 import { formatsFor, suggestParts, UEBERSETZUNGSANTEIL, writingWeightFor } from '../src/renderer/src/modules/klassenarbeit/model/formats'
 import { fehlerSchluessel, fehlerZeile, grenzeFuerLand, noteFuerFehler } from '../src/renderer/src/modules/klassenarbeit/model/fehlerquote'
 import { fachRegeln } from '../src/renderer/src/modules/klassenarbeit/generation/fachRegeln'
-import { hinweise, schreibGrammatikRegeln, strukturenFuer, vorschlag } from '../src/renderer/src/modules/klassenarbeit/didactics/schreibGrammatik'
+import { hinweise, schreibGrammatikRegeln, strukturenFuer, vorschlag, type SchreibGrammatik } from '../src/renderer/src/modules/klassenarbeit/didactics/schreibGrammatik'
 import { examGrades, type Exam, type ExamPart } from '../src/renderer/src/modules/klassenarbeit/model/types'
 
 /*
@@ -96,5 +96,53 @@ describe('Grammatik in Schreibaufgaben', () => {
     expect(r).toMatch(/Verwendung der geforderten Strukturen/)
     const fr = arbeit('franzoesisch', { grade: 8 }, [{ formatId: 'fr-writing', grammatik: { themen: [], frei: 'passé composé', modus: 'anzahl', anzahl: 2, bewertung: 'integriert' } }])
     expect(schreibGrammatikRegeln(fr, fr.parts[0])).toMatch(/Utilise le passé composé au moins 2 fois/)
+  })
+})
+
+describe('Grammatik in Schreibaufgaben: Nachrecherche MV, RP, SL, SN, ST, TH', () => {
+  const g: SchreibGrammatik = { themen: [], modus: 'anzahl', anzahl: 2, bewertung: 'kriterium' }
+  const texte = (over: Partial<Exam['meta']>, einst: SchreibGrammatik = g): string => hinweise(arbeit('englisch', { grade: 7, ...over }).meta, einst).map((h) => h.text).join('\n')
+
+  it('kein Land mehr ohne ausgewertete Regel', () => {
+    for (const stateId of ['MV', 'RP', 'SL', 'SN', 'ST', 'TH']) expect(texte({ stateId })).not.toMatch(/keine ausgewertete Regel/)
+  })
+
+  it('MV: zwei Teilkompetenzen, Kriterium „Repertoire grammatischer … Strukturen", Fachkonferenz', () => {
+    expect(texte({ stateId: 'MV' })).toMatch(/mindestens zwei Teilkompetenzen[\s\S]*Repertoire grammatischer und syntaktischer Strukturen[\s\S]*Fachkonferenz/)
+  })
+
+  it('RP: nicht isoliert, verknüpft mit einer Kompetenz; Mut zur anspruchsvollen Sprachgestaltung', () => {
+    expect(texte({ stateId: 'RP' })).toMatch(/nicht isoliert, sondern verknüpft mit einer Kompetenz[\s\S]*anspruchsvollen Sprachgestaltung/)
+  })
+
+  it('SL: anwendungsbezogen; Gymnasium Englisch mit Bandbreite und Gewichtung 25 : 75 bis 40 : 60, ab Kl. 9 Voreinstellung Bandbreite', () => {
+    expect(texte({ stateId: 'SL' })).toMatch(/nicht isoliert, sondern anwendungsbezogen/)
+    expect(texte({ stateId: 'SL', grade: 8 })).toMatch(/25 : 75 bei gelenkten bis 40 : 60/)
+    expect(texte({ stateId: 'SL', grade: 10 })).toMatch(/Inhalt : Sprache 40 : 60/)
+    expect(texte({ stateId: 'SL', grade: 10, schoolTypeId: 'gemeinschaftsschule' })).not.toMatch(/40 : 60/)
+    expect(vorschlag(arbeit('englisch', { stateId: 'SL', grade: 9, languageOrder: 2 }).meta)).toMatchObject({ modus: 'bandbreite', bewertung: 'integriert' })
+    expect(vorschlag(arbeit('englisch', { stateId: 'NW', grade: 9, languageOrder: 2 }).meta).modus).toBe('anzahl')
+  })
+
+  it('SN: Kommunikationsfähigkeit oberstes Kriterium; Matrix mit „Strukturen" und „Sprachliche Korrektheit"', () => {
+    expect(texte({ stateId: 'SN' })).toMatch(/oberste Kriterium[\s\S]*„Strukturen"[\s\S]*„Sprachliche Korrektheit"/)
+  })
+
+  it('ST: zentrale Klassenarbeit Kl. 6 mit Inhalt : Sprache 5 : 5 und „Language in Use"; bei Anzahl Hinweis auf Erinnerung', () => {
+    expect(texte({ stateId: 'ST' })).toMatch(/Content 5 BE, Language 5 BE[\s\S]*Language in Use/)
+    expect(texte({ stateId: 'ST' })).toMatch(/Als Erinnerung/)
+    expect(texte({ stateId: 'ST' }, { ...g, modus: 'erinnerung' })).not.toMatch(/statt eine Anzahl/)
+  })
+
+  it('TH: Grammatik im Kontext, Kriterien je grammatischem Phänomen (Lehrpläne 2026)', () => {
+    expect(texte({ stateId: 'TH' })).toMatch(/nicht isoliert, sondern im Kontext[\s\S]*grammatischen Phänomens/)
+  })
+
+  it('Landeshinweise ohne Anrede und ohne Warnung', () => {
+    for (const stateId of ['MV', 'RP', 'SL', 'SN', 'ST', 'TH']) {
+      const hs = hinweise(arbeit('englisch', { grade: 7, stateId }).meta, g)
+      expect(hs.some((h) => h.warnung)).toBe(false)
+      expect(hs.map((h) => h.text).join(' ')).not.toMatch(/\b(du|dein|Sie|Ihre)\b/)
+    }
   })
 })
