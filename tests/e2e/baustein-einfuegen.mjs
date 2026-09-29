@@ -179,7 +179,7 @@ pruefe(zahl <= 7, `Die Bausteinleiste ist ausgedünnt (${zahl} Knöpfe)`)
 await page.getByRole('button', { name: 'Blattoptionen' }).click()
 await page.waitForTimeout(400)
 for (const name of ['Korrekturrand', 'Notizrand', 'Blocksatz', 'Deckblatt', 'KI-Test']) {
-  pruefe(await page.locator('label', { hasText: name }).first().isVisible(), `Blattoptionen enthalten „${name}“`)
+  pruefe(await page.locator('label', { hasText: name }).filter({ visible: true }).first().isVisible(), `Blattoptionen enthalten „${name}“`)
 }
 await page.screenshot({ path: join(out, 'paket6-blattoptionen.png') })
 await page.keyboard.press('Escape')

@@ -6,7 +6,7 @@
 //    Programme, die zu keinem Fach passen, verschwinden aus Leiste, Startseite und Strg+1 … 6,
 //    lassen sich unter „Programme anzeigen" einzeln wieder einblenden.
 //  - Fachauswahl: eigene Fächer oben („Eigene Fächer"), Rest unter „Andere Fächer".
-//  - Reihenfolge überall: Arbeitsblätter, Vokabeltest, Grammatiktest, LZK, Klassenarbeiten, Vokabellisten.
+//  - Reihenfolge überall: Arbeitsblätter, Vokabeltest, Grammatiktest, LZK, Klassenarbeiten, Rückmeldung, Elternbriefe, Vokabellisten (seit 29.09.2026).
 import { _electron as electron } from 'playwright-core'
 import { mkdirSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
@@ -43,11 +43,11 @@ try {
   const leiste = async () => page.evaluate(() => [...document.querySelectorAll('.leiste-liste .nav-icon')].map((b) => b.getAttribute('aria-label')))
   pruefe(
     JSON.stringify(await leiste()) ===
-      JSON.stringify(['Arbeitsblatt', 'Vokabeltest', 'Grammatiktest', 'Lernzielkontrolle', 'Klassenarbeiten', 'Vokabellisten', 'Rückmeldung', 'Elternbriefe']),
+      JSON.stringify(['Arbeitsblatt', 'Vokabeltest', 'Grammatiktest', 'Lernzielkontrolle', 'Klassenarbeiten', 'Rückmeldung', 'Elternbriefe', 'Vokabellisten']),
     `Reihenfolge der Leiste (${(await leiste()).join(', ')})`
   )
   const kacheln = await page.locator('.home-tile .mantine-Text-root[data-size="lg"]').allInnerTexts()
-  pruefe(kacheln[0] === 'Arbeitsblatt' && kacheln[5] === 'Vokabellisten', `Reihenfolge der Startseite (${kacheln.join(', ')})`)
+  pruefe(kacheln[0] === 'Arbeitsblatt' && kacheln[7] === 'Vokabellisten', `Reihenfolge der Startseite (${kacheln.join(', ')})`)
 
   // ---------- Klassenarbeit, Rahmen (Paket 12 D): Jahrgang neben Fach, Titel neben Thema, GER-Kennzeichen an den Chips
   await page.click('[aria-label="Klassenarbeiten"]')
