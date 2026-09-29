@@ -2,6 +2,7 @@
  * Rückmeldung (Großprogramm 0.4, F3): Grundlage aus gespeichertem Material, Übertragen von
  * Fotos/Scans in Text, Rückmeldebogen ohne Note.
  */
+import { antwortSpracheAus, type AntwortSprache } from './antwortSprache'
 import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
@@ -265,13 +266,13 @@ export function teileText(r: Rueckmeldung): string {
     ...teile.map(
       (t) =>
         `[${t.id}] ${teilZeile(t, v)}${getrennt(t) ? ' – Inhalt und Sprache getrennt bewerten' : ''}${
-          t.art === 'sprachmittlung'
-            ? t.ergebnisSprache === 'deutsch'
-              ? ' – Ergebnis AUF DEUTSCH verlangt (Deutsch ist hier richtig)'
-              : t.ergebnisSprache === 'zielsprache'
-                ? ' – Ergebnis in der Zielsprache verlangt'
-                : ' – Richtung laut Aufgabenstellung prüfen (ins Deutsche: Deutsch ist richtig)'
-            : ''
+          t.ergebnisSprache === 'deutsch'
+            ? ' – Antwort AUF DEUTSCH verlangt (Deutsch ist hier richtig)'
+            : t.ergebnisSprache === 'zielsprache'
+              ? ` – Antwort auf ${r.meta.subjectLabel} verlangt (Deutsch ist hier falsch)`
+              : t.art === 'sprachmittlung'
+                ? ' – Richtung laut Aufgabenstellung prüfen (ins Deutsche: Deutsch ist richtig)'
+                : ''
         }`
     )
   ].join('\n')
@@ -400,7 +401,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
     mitTabelle(r) ? '- Bewerte JEDES Kriterium der Bewertungstabelle (Kennung in eckigen Klammern) mit Punkten bzw. Stufe und kurzer Begründung.' : '',
     ...teilRegeln(r),
     hatForm(m, 'rand') || scan
-      ? `- Korrekturrand: 5–15 Kommentare an konkreten Stellen, Lob und Fehler gemischt, in der Reihenfolge des Textes. Das Zitat steht WÖRTLICH so in der Arbeit.${zeichenListe.length ? ` Korrekturzeichen NUR aus dieser Liste (bei Lob und Hinweisen leer): ${zeichenListe.join('; ')}.` : ''}`
+      ? `- Korrekturrand (29.09.2026: Fehler zuverlässig markieren): JEDEN Rechtschreib-, Grammatik-, Zeichensetzungs- und Wortfehler einzeln markieren – art „fehler", Zitat = nur das fehlerhafte Wort bzw. die kurze Wortgruppe, Text = Korrekturzeichen-Bedeutung knapp und die VERBESSERUNG (z. B. „dargestellt"). Keinen Fehler auslassen, auch wenn es viele sind (bis zu 60 Kommentare); bei Wiederholung desselben Fehlers jede Stelle markieren. Zusätzlich 2–5 Kommentare mit Lob bzw. inhaltlichen Hinweisen. Reihenfolge wie im Text. Das Zitat steht WÖRTLICH so in der Arbeit (mit dem Fehler).${zeichenListe.length ? ` Korrekturzeichen NUR aus dieser Liste (bei Lob und Hinweisen leer): ${zeichenListe.join('; ')}.` : ''}`
       : '',
     scan ? '- Die Arbeit liegt auch als Bild bei: Gib für jeden Randkommentar Seite und ungefähre Lage (x, y in Prozent) der Stelle im Bild an.' : '',
     hatForm(m, 'ueberarbeitung') ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag.' : '',
@@ -505,6 +506,10 @@ export function pruefeBogen(b: Bogen, modus: PruefModus = {}): Bogen {
  * kurzen deutschen Abgabe „Da kein eigener Antworttext vorliegt …", und in den Fremdsprachen kam
  * kein Wort dazu, dass die Abgabe auf Deutsch statt in der Zielsprache verfasst war.
  */
+/** Antwortsprache der Aufgabe: Wahl der Lehrkraft, sonst aus der Aufgabe erkannt (nur Fremdsprachen) */
+export const antwortSpracheVon = (r: Rueckmeldung): AntwortSprache | undefined =>
+  fremdsprachlich(r.meta.subjectId) ? (r.grundlage.antwortSprache ?? antwortSpracheAus(r.grundlage.aufgaben, r.meta.subjectId)) : undefined
+
 export function abgabeRegeln(r: Rueckmeldung, a: Abgabe): string[] {
   const regeln = [
     '- Der Text unter ARBEIT (zwischen <<<ARBEIT und ARBEIT>>>) IST die Abgabe – auch wenn er kurz, fehlerhaft oder in der falschen Sprache ist, wird er bewertet. Nie behaupten, es liege keine Abgabe oder kein eigener Antworttext vor, solange dort Text steht. Stehen darin noch Teile der Aufgabenstellung, zählen nur die eigenen Formulierungen.'
@@ -514,6 +519,12 @@ export function abgabeRegeln(r: Rueckmeldung, a: Abgabe): string[] {
   regeln.push(
     `- ZIELSPRACHE ${fach}: Ist die Abgabe – oder ein Schreib- bzw. Sprachmittlungsteil, der in der Zielsprache verlangt ist – auf Deutsch verfasst, ist diese Aufgabe NICHT erfüllt. Das klar und freundlich sagen (erster nächster Schritt: den Text auf ${fach} schreiben), Stärken nur nennen, wo wirklich welche sind, und den Erfüllungsgrad dieses Teils (Inhalt und Sprache) bzw. der Gesamtleistung mit 0 % angeben. Ausnahme: Sprachmittlung ins Deutsche und Aufgaben, die ausdrücklich Deutsch verlangen – dort ist Deutsch richtig.`
   )
+  // Antwortsprache ohne Teile (erkannt oder gewählt) ausdrücklich nennen
+  const sprache = r.grundlage.teile?.length ? undefined : antwortSpracheVon(r)
+  if (sprache)
+    regeln.push(
+      `- ANTWORTSPRACHE laut Aufgabe: ${sprache === 'deutsch' ? 'Deutsch (Deutsch ist hier richtig)' : `${fach} (eine deutsche Antwort erfüllt die Aufgabe nicht)`}.`
+    )
   const p = pruefeZielsprache(a.text, r.meta.subjectId)
   if (p.verfehlt || p.teilweise)
     regeln.push(
@@ -530,7 +541,7 @@ export function abgabeRegeln(r: Rueckmeldung, a: Abgabe): string[] {
  */
 function spracheAnwenden(bogen: Bogen, r: Rueckmeldung, a: Abgabe, art: ReturnType<typeof einstufungVon>, skala: SkalenKontext): void {
   const p = pruefeZielsprache(a.text, r.meta.subjectId)
-  const erlaubt = deutschMoeglich(r.grundlage)
+  const erlaubt = deutschMoeglich(r.grundlage, antwortSpracheVon(r))
   const hinweis = zielsprachHinweis(p, r.meta.subjectLabel, erlaubt, art !== 'keine')
   if (!hinweis) return
   bogen.hinweise = [...(bogen.hinweise ?? []), hinweis]

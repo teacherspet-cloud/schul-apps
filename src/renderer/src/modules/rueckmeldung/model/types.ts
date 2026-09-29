@@ -48,6 +48,11 @@ export interface Grundlage {
    */
   teile?: import('../teilbewertung').BewertungsTeil[]
   verrechnung?: import('../teilbewertung').Verrechnung
+  /**
+   * Fremdsprachen ohne erkannte Teile: Antwortsprache, von der Lehrkraft gewählt (29.09.2026).
+   * Fehlt sie, gilt die aus der Aufgabe erkannte (antwortSprache.ts).
+   */
+  antwortSprache?: import('../antwortSprache').AntwortSprache
 }
 
 export type Einschaetzung = 'sicher' | 'teilweise' | 'noch nicht'

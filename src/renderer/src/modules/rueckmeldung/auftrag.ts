@@ -16,7 +16,7 @@ import {
   teileAnfrage,
   type GeleseneDatei
 } from './aufgabeAusMaterial'
-import { fremdsprachlich, teileAusKi } from './teilbewertung'
+import { fremdsprachlich, spracheErgaenzen, teileAusKi } from './teilbewertung'
 import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUebernehmen, type BogenKontext } from './generation'
 import type { Abgabe, Bewertungstabelle, Rueckmeldung } from './model/types'
 import { bibliothek } from './store'
@@ -183,7 +183,9 @@ export function aufgabeAusDateien(r: Rueckmeldung, docId: string, dateien: Geles
         if (teile.length)
           meta.erkannt = `${teile.join(' und ')} aus dem Material erkannt${erkannt.erkennbar.length ? ` (${erkannt.erkennbar.join('; ')})` : ''} – bitte prüfen.`
         // Teile mit Gewichtung (29.09.2026): Schreiben/Sprachmittlung in den Fremdsprachen, mehrere Teilkompetenzen
-        const erkannteTeile = teileAusKi(erkannt.teile, meta)
+        const kiTeile = teileAusKi(erkannt.teile, meta)
+        // Antwortsprache je Teil ergänzen, wo die KI sie offen ließ (29.09.2026)
+        const erkannteTeile = kiTeile && { ...kiTeile, teile: spracheErgaenzen(kiTeile.teile, erkannt.aufgaben, meta.subjectId) }
         const mitTeilen = erkannteTeile && (erkannteTeile.teile.length > 1 || (fremdsprachlich(meta.subjectId) && erkannteTeile.teile.some((t) => t.art !== 'sonstig')))
         return {
           ...aktuell,
@@ -220,7 +222,7 @@ export function teileErkennen(r: Rueckmeldung, docId: string): void {
       const d = await k.ai<{ teile?: unknown }>(teileAnfrage(rm.grundlage.aufgaben, rm.grundlage.erwartung ?? ''))
       const erkannt = teileAusKi(d?.teile, rm.meta)
       if (!erkannt) throw new Error('In der Aufgabe waren keine Teile zu erkennen.')
-      return erkannt
+      return { ...erkannt, teile: spracheErgaenzen(erkannt.teile, rm.grundlage.aufgaben, rm.meta.subjectId) }
     },
     abschluss: (e) =>
       `${e.teile.length} ${e.teile.length === 1 ? 'Teil' : 'Teile'} erkannt${e.teile.some((t) => t.quelle === 'material') ? ' – Gewichtung aus dem Material' : ''}.`,

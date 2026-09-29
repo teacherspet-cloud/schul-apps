@@ -144,13 +144,19 @@ const SPRACHMITTLUNG = /sprachmittlung|\bmediation\b|m[ée]diation|mediaci[oó]n
  * - ohne erkannte Teile die Aufgabe nach Sprachmittlung aussieht.
  * Nur wenn Deutsch sicher falsch ist, setzt die App automatisch auf 0 %.
  */
-export function deutschMoeglich(g: { aufgaben: string; teile?: { art: string; titel: string; ergebnisSprache?: 'deutsch' | 'zielsprache' }[] }): boolean {
+export function deutschMoeglich(
+  g: { aufgaben: string; teile?: { art: string; titel: string; ergebnisSprache?: 'deutsch' | 'zielsprache' }[] },
+  /** Ohne Teile: die aus der Aufgabe erkannte bzw. von der Lehrkraft gewählte Antwortsprache (antwortSprache.ts) */
+  erkannt?: 'deutsch' | 'zielsprache'
+): boolean {
   const teile = g.teile ?? []
-  if (deutschVerlangt([g.aufgaben, ...teile.map((t) => t.titel)].join('\n'))) return true
-  const mittlung = teile.filter((t) => t.art === 'sprachmittlung')
-  if (mittlung.some((t) => t.ergebnisSprache !== 'zielsprache')) return true
-  // Teile bekannt und alle Sprachmittlungen gehen sicher in die Zielsprache: Deutsch ist falsch
-  if (teile.length) return false
+  if (teile.length) {
+    // Ein Teil verlangt Deutsch, oder eine Sprachmittlung hat keine sichere Richtung
+    if (teile.some((t) => t.ergebnisSprache === 'deutsch' || (t.art === 'sprachmittlung' && !t.ergebnisSprache))) return true
+    return deutschVerlangt(teile.map((t) => t.titel).join('\n'))
+  }
+  if (erkannt) return erkannt === 'deutsch'
+  if (deutschVerlangt(g.aufgaben)) return true
   return SPRACHMITTLUNG.test(g.aufgaben)
 }
 

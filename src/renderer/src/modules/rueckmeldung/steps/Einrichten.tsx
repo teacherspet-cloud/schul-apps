@@ -46,10 +46,12 @@ import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractCo
 import { newId } from '../../vokabeltest/model/random'
 import { notifyError } from '../../../shared/util'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
-import { abgabenTrennen, aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
+import { abgabenTrennen, aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen, teileErkennen } from '../auftrag'
 import { kiTrennungNoetig, klartext, ohneKiTest, trenneNachAufgabe, trennHinweis, trennungAnwenden, trennungZurueck } from '../abgabeTrennen'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from '../sprachErkennung'
-import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
+import { antwortSpracheVon, ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
+import { fremdsprachlich } from '../teilbewertung'
+import AntwortSpracheZeile from './AntwortSpracheZeile'
 import MaterialWahl from '../../../shared/components/MaterialWahl'
 import { naechstesKuerzel, type Abgabe, type Nachteilsausgleich } from '../model/types'
 import { useRueckmeldung } from '../store'
@@ -73,6 +75,17 @@ export default function Einrichten(): React.JSX.Element | null {
   useEffect(() => {
     void ladeGedaechtnis().then(setGedaechtnis)
   }, [])
+  // Ältere Abgaben aus Word stehen noch als HTML da (vor 29.09.2026): einmal in Text umwandeln, ohne KI-Test
+  const mitHtml = r?.abgaben.some((a) => klartext(a.text) !== a.text) ?? false
+  useEffect(() => {
+    if (!mitHtml) return
+    update((d) => {
+      for (const a of d.abgaben) {
+        const t = ohneKiTest(klartext(a.text)).text
+        if (t !== a.text) a.text = t
+      }
+    })
+  }, [mitHtml, update])
   if (!r) return null
 
   const ausgleichSpeichern = (id: string, a: Nachteilsausgleich | undefined, merken: boolean): void => {
@@ -104,6 +117,9 @@ export default function Einrichten(): React.JSX.Element | null {
           d.meta.grade = fach.grade || d.meta.grade
         }
       })
+      // Fremdsprachen: Teile und Antwortsprache je Teil gleich erkennen (29.09.2026) – die Klassenarbeit bringt sie schon mit
+      const aktuell = useRueckmeldung.getState().dok
+      if (aktuell && fremdsprachlich(aktuell.meta.subjectId) && !aktuell.grundlage.teile?.length && aktuell.grundlage.aufgaben.trim()) teileErkennen(aktuell, docId)
     } catch (e) {
       notifyError(e, 'Das Material konnte nicht geladen werden')
     }
@@ -194,7 +210,7 @@ export default function Einrichten(): React.JSX.Element | null {
   const offen = r.abgaben.filter((a) => !a.bogen && (a.text.trim() || a.bilder.length)).length
   const mitText = r.abgaben.filter((a) => a.text.trim() && !a.bilder.length)
   // Deutsch statt Zielsprache (29.09.2026): Warnung schon an der Abgabe
-  const deutschErlaubt = deutschMoeglich(r.grundlage)
+  const deutschErlaubt = deutschMoeglich(r.grundlage, antwortSpracheVon(r))
   const sprachWarnung = (a: Abgabe): string | null => zielsprachHinweis(pruefeZielsprache(a.text, r.meta.subjectId), r.meta.subjectLabel, deutschErlaubt, false)
   const grund = !r.grundlage.aufgaben.trim()
     ? 'Grundlage fehlt'
@@ -297,6 +313,7 @@ export default function Einrichten(): React.JSX.Element | null {
                     }}
                     data-rm-aufgaben
                   />
+                  <AntwortSpracheZeile r={r} update={update} />
                   {quelle === 'frei' && (
                     <DropZone
                       onFiles={(f) => void materialLesen(f, 'erwartung')}

@@ -8,6 +8,7 @@
  *
  * Quellen der Voreinstellung: recherche/rueckmeldung-inhalt-sprache-gewichtung-2026-09-29.md.
  */
+import { antwortSpracheAus, textAus } from './antwortSprache'
 import { formatArt } from '../klassenarbeit/model/faecher'
 import { istModerneFremdsprache } from '../klassenarbeit/model/nachweise'
 import type { Exam } from '../klassenarbeit/model/types'
@@ -30,10 +31,11 @@ export interface BewertungsTeil {
   /** Nur Schreiben/Sprachmittlung: Anteil des Inhalts in Prozent; Sprache = 100 − Inhalt */
   inhalt?: number
   /**
-   * Nur Sprachmittlung: In welcher Sprache das Ergebnis verlangt ist (29.09.2026). 'deutsch' =
-   * Sprachmittlung ins Deutsche (Deutsch ist dort richtig), 'zielsprache' = in die Fremdsprache;
-   * fehlt die Angabe, ist die Richtung unklar – dann setzt die App bei deutschem Text nichts
-   * automatisch auf 0 %, sondern weist nur hin.
+   * In welcher Sprache die Antwort verlangt ist (29.09.2026) – für jeden Teil, erkannt aus der
+   * Aufgabe (antwortSprache.ts), von der KI oder von der Lehrkraft. 'deutsch' = Deutsch ist richtig
+   * (Sprachmittlung ins Deutsche, Antworten auf Deutsch), 'zielsprache' = in der Fremdsprache. Fehlt
+   * die Angabe bei einer Sprachmittlung, ist die Richtung unklar – dann setzt die App bei deutschem
+   * Text nichts automatisch auf 0 %, sondern weist nur hin.
    */
   ergebnisSprache?: 'deutsch' | 'zielsprache'
   quelle: TeilQuelle
@@ -117,6 +119,9 @@ export function teileAusArbeit(exam: Exam): { teile: BewertungsTeil[]; verrechnu
     const titel = p.label || formatById(p.formatId)?.label || `Teil ${i + 1}`
     // Andere produktive Teile mit Inhaltsanteil (z. B. Sprechen) werden wie Schreiben getrennt bewertet
     const produktiv = teilArt !== 'sonstig' || typeof p.contentShare === 'number'
+    // Antwortsprache: Schreiben in der Zielsprache, sonst aus dem Text des Teils erkannt
+    const erkannt = antwortSpracheAus(textAus(p.blocks), exam.meta.subjectId)
+    const ergebnisSprache = art === 'writing' && erkannt !== 'deutsch' ? 'zielsprache' : erkannt
     return {
       id: p.id,
       titel,
@@ -124,6 +129,7 @@ export function teileAusArbeit(exam: Exam): { teile: BewertungsTeil[]; verrechnu
       gewicht: p.weight,
       ...(p.points ? { punkte: p.points } : {}),
       ...(produktiv ? { inhalt: p.contentShare ?? INHALT_STANDARD } : {}),
+      ...(fremdsprachlich(exam.meta.subjectId) && ergebnisSprache ? { ergebnisSprache } : {}),
       quelle: 'klassenarbeit'
     }
   })
@@ -212,7 +218,7 @@ export function teileAusKi(
       const titel = String(d.titel ?? '').trim()
       if (!titel) return null
       const art: TeilArt = d.art === 'schreiben' || d.art === 'sprachmittlung' ? d.art : 'sonstig'
-      const ergebnisSprache = art === 'sprachmittlung' && (d.ergebnisSprache === 'deutsch' || d.ergebnisSprache === 'zielsprache') ? d.ergebnisSprache : undefined
+      const ergebnisSprache = d.ergebnisSprache === 'deutsch' || d.ergebnisSprache === 'zielsprache' ? d.ergebnisSprache : undefined
       const gewicht = begrenze(d.gewichtProzent)
       const punkte = begrenze(d.punkte, 1000)
       const inhalt = begrenze(d.inhaltProzent)
@@ -239,6 +245,20 @@ export function teileAusKi(
       ? teile
       : aufHundert(teile)
   return { teile: mitGewicht, verrechnung }
+}
+
+/**
+ * Antwortsprache je Teil ergänzen, wo sie fehlt (29.09.2026): Schreibteile in der Zielsprache; bei
+ * genau einem Teil zählt die aus der ganzen Aufgabe erkannte Sprache; sonst der Titel des Teils.
+ */
+export function spracheErgaenzen(teile: BewertungsTeil[], aufgaben: string, subjectId: string): BewertungsTeil[] {
+  if (!fremdsprachlich(subjectId)) return teile
+  const ganz = antwortSpracheAus(aufgaben, subjectId)
+  return teile.map((t) => {
+    if (t.ergebnisSprache) return t
+    const s = (teile.length === 1 ? ganz : antwortSpracheAus(t.titel, subjectId)) ?? (t.art === 'schreiben' ? 'zielsprache' : undefined)
+    return s ? { ...t, ergebnisSprache: s } : t
+  })
 }
 
 /** Wertungen aus der Antwort der KI (Bogen) – nur zu bekannten Teilen, Werte 0–100 */
