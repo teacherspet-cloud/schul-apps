@@ -154,7 +154,7 @@ describe('Bogen', () => {
     const r = doc()
     const bogen = { staerken: [], schritte: [], kriterien: [], teile: w }
     r.abgaben = [{ ...abgabe, bogen: { ...bogen, gesamt: { anteil: 57, wert: '3', bestaetigt: true } } }]
-    expect(boegenHtml(r, r.abgaben)).toMatch(/Inhalt 80 % · Sprache 50 %/)
+    expect(boegenHtml(r, r.abgaben)).toMatch(/<td class="z">80 %<\/td><td class="z">50 %<\/td>/)
     r.abgaben = [{ ...abgabe, bogen: { ...bogen, gesamt: { anteil: 57, wert: '3' } } }]
     expect(boegenHtml(r, r.abgaben)).not.toMatch(/Inhalt 80 %/)
   })

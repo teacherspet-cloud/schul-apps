@@ -1,7 +1,7 @@
 import { ActionIcon, Menu, Tooltip } from '@mantine/core'
 import { IconCheck, IconCursorText, IconTrash } from '@tabler/icons-react'
 import { Fragment } from 'react'
-import { absatzFolge, markenStil } from '../blattLayout'
+import { absatzFolge, markenStil, notizText } from '../blattLayout'
 import type { NummerierterKommentar, Textteil } from '../korrekturrand'
 import type { RandKommentar } from '../model/types'
 import { Editierbar, useBlatt, Zauberstab } from './blattTeile'
@@ -16,7 +16,8 @@ export const ARTEN: { value: RandKommentar['art']; label: string }[] = [
 /**
  * Eine Randnotiz auf dem Blatt (29.09.2026): Nummer, Häkchen bzw. Korrekturzeichen und Text in
  * Handschrift – der Text direkt bearbeitbar. Ein Klick auf die Nummer öffnet Art, Korrekturzeichen,
- * „Textstelle neu markieren" und Löschen; daneben der Zauberstab.
+ * „Textstelle neu markieren" und Löschen; daneben der Zauberstab. Beginnt der Text schon mit dem
+ * Korrekturzeichen („W: …"), steht es nur einmal da (`notizText`).
  */
 export function RandNotiz({ g, verschieben }: { g: NummerierterKommentar; verschieben?: (id: string) => void }): React.JSX.Element {
   const c = useBlatt()
@@ -76,7 +77,7 @@ export function RandNotiz({ g, verschieben }: { g: NummerierterKommentar; versch
       {k.art === 'lob' && <span className="bl-haken">✓</span>}
       {k.zeichen && <span className="bl-zeichen">{k.zeichen}:</span>}
       <Editierbar
-        wert={c.n(k.text)}
+        wert={c.n(notizText(k))}
         onText={(x) => aendern((y) => (y.text = c.roh(x)), `rm-notiz-${k.id}`)}
         platzhalter="Notiz"
         label={`Randnotiz ${g.nr}`}

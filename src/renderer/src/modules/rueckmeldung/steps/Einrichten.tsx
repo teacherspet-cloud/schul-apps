@@ -46,8 +46,9 @@ import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractCo
 import { newId } from '../../vokabeltest/model/random'
 import { notifyError } from '../../../shared/util'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
-import { abgabenTrennen, aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen, teileErkennen } from '../auftrag'
-import { kiTrennungNoetig, klartext, ohneKiTest, trenneNachAufgabe, trennHinweis, trennungAnwenden, trennungZurueck } from '../abgabeTrennen'
+import { aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen, teileErkennen } from '../auftrag'
+import { klartext, ohneKiTest, trennHinweis, trennungZurueck } from '../abgabeTrennen'
+import { abgabenAnlegen, abgabenLesen, aufgabentextAbtrennen } from '../abgabeAnlegen'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from '../sprachErkennung'
 import { antwortSpracheVon, ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import { fremdsprachlich } from '../teilbewertung'
@@ -149,57 +150,17 @@ export default function Einrichten(): React.JSX.Element | null {
     }
   }
 
-  /**
-   * Schülertext vom Aufgabentext trennen (29.09.2026, Fehlerbericht der Lehrkraft): erst Abgleich mit
-   * der Aufgabe, dann – bei Verdacht auf weitere Aufgabenteile oder ohne Aufgabe – die KI. Beim
-   * Knopf („erneut") fragt die App die KI auch dann, wenn der Abgleich nichts gefunden hat.
-   */
-  const abtrennen = (ids: string[], erneut = false): void => {
-    const kiIds: string[] = []
-    update((d) => {
-      d.abgaben.forEach((x, j) => {
-        if (!ids.includes(x.id) || !x.text.trim()) return
-        const e = trenneNachAufgabe(x.text, d.grundlage.aufgaben, d.grundlage.erwartung)
-        d.abgaben[j] = trennungAnwenden(x, e, 'abgleich')
-        if (kiTrennungNoetig(e, d.grundlage.aufgaben) || (erneut && !e.zeilen)) kiIds.push(x.id)
-      })
-    })
-    const aktuell = useRueckmeldung.getState().dok
-    if (aktuell && kiIds.length) abgabenTrennen(aktuell, docId, kiIds)
-  }
+  /** Schülertext vom Aufgabentext trennen – Abgleich, bei Verdacht die KI (abgabeAnlegen.ts) */
+  const abtrennen = (ids: string[], erneut = false): void => void aufgabentextAbtrennen(update, docId, ids, erneut)
 
+  /** Abgaben lesen, Datenschutz prüfen, anlegen – derselbe Weg wie „Weitere Abgabe" in „Bögen & Export" (abgabeAnlegen.ts) */
   const dateienLesen = async (files: File[]): Promise<void> => {
     try {
-      const gelesen: HochladeInhalt[] = []
-      for (const f of files) {
-        setLese(`${f.name} wird gelesen …`)
-        const c = await extractContent(f, (m) => setLese(`${f.name}: ${m}`), { renderPages: false, maxRenderedPages: 4 })
-        // Word kommt als HTML: nur der Text, ohne Tags und eingebettete Bilder; der unsichtbare KI-Test fällt weg
-        gelesen.push({ fileName: c.fileName, text: c.kind === 'image' ? '' : ohneKiTest(klartext(c.text)).text, kind: c.kind, pageImages: c.pageImages })
-      }
-      setLese(null)
-      // Datenschutz: Hinweis und Namen ersetzen, bevor etwas zur KI geht
-      const geprueft = await pruefeHochladen(gelesen)
+      const geprueft = await abgabenLesen(files, setLese)
       if (!geprueft) return
-      const neueIds: string[] = []
-      update((d) => {
-        for (const g of geprueft) {
-          const neu: Abgabe = {
-            id: newId(),
-            kuerzel: naechstesKuerzel(d.abgaben),
-            name: '',
-            dateiname: g.fileName,
-            // Gescannte PDFs ohne Textebene: Die Seiten werden übertragen
-            text: g.text.trim(),
-            bilder: g.text.trim() ? [] : (g.pageImages ?? []),
-            ...(g.pseudonyme?.length ? { pseudonyme: g.pseudonyme } : {})
-          }
-          d.abgaben.push(neu)
-          if (neu.text) neueIds.push(neu.id)
-        }
-      })
+      const { mitText } = abgabenAnlegen(update, geprueft)
       // Aufgabenblatt und Material aus Word/PDF-Abgaben abtrennen – rückgängig machbar
-      if (neueIds.length) abtrennen(neueIds)
+      if (mitText.length) abtrennen(mitText)
     } catch (e) {
       notifyError(e, 'Die Datei konnte nicht gelesen werden')
     } finally {

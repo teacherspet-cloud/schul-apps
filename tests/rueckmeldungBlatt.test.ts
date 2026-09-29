@@ -4,17 +4,25 @@ import {
   absatzFolge,
   absatzHoeheMm,
   absatzTeilen,
+  blattBloecke,
   blattHtml,
   blattModell,
   kastenAbschnitte,
+  kriteriumTeilen,
   markenStil,
   mitName,
   notizGruppen,
+  notizText,
   ohneName,
+  SEITE_NUTZ_MM,
   SEITEN_HOEHE_MM,
+  tabellenZeilen,
   teilblockMaxMm,
+  teileSchneiden,
+  teilTabelle,
   seitenUmbrueche
 } from '../src/renderer/src/modules/rueckmeldung/blattLayout'
+import { notizenEinpassen, seitenPlanen, type MessBlock } from '../src/renderer/src/modules/rueckmeldung/seitenPlan'
 import { bogenStatus, ladeOffen, merkeOffen, passtZurSuche } from '../src/renderer/src/modules/rueckmeldung/steps/bogenListe'
 import {
   stelleAnfrage,
@@ -383,5 +391,234 @@ describe('Zauberstab: einzelne Stellen', () => {
     expect(neu.kriterienStufen?.every((s) => s?.bestaetigt)).toBe(true)
     expect(neu.rand).toEqual(a.bogen!.rand)
     expect(neu.gesamt).toEqual(a.bogen!.gesamt)
+  })
+})
+
+describe('Eine Paginierung für Ansicht und PDF (29.09.2026 nachts)', () => {
+  /** Ein Absatz mit `zeilen` Zeilen zu 8 mm; Zeile n beginnt bei Zeichen 100·n */
+  const absatz = (key: string, zeilen: number, von = 0): MessBlock => ({
+    key,
+    basis: key.split('@')[0],
+    von,
+    art: 'abs',
+    hoehe: zeilen * 8,
+    text: { oben: 0, zeile: 8, zeilen, start: (n) => (n < zeilen ? von + n * 100 : null) }
+  })
+  const block = (key: string, hoehe: number, art = 'k'): MessBlock => ({ key, basis: key, von: 0, art, hoehe })
+
+  it('ein Absatz, der nicht mehr ganz passt, wird an der Zeile geteilt, an der die Seite endet', () => {
+    // Kopf 40 mm, dann ein Absatz von 40 Zeilen (320 mm): so viele Zeilen, wie auf Seite 1 noch passen
+    const erg = seitenPlanen([block('kopf', 40, 'kopf'), absatz('abs-0', 40)])
+    expect(erg.schnitt).toEqual({ basis: 'abs-0', stellen: [Math.floor((SEITE_NUTZ_MM - 40) / 8) * 100] })
+  })
+
+  it('mindestens zwei Zeilen oben und unten – sonst beginnt der Absatz auf der nächsten Seite', () => {
+    // Nur noch eine Zeile Platz: der ganze Absatz auf Seite 2, Seite 1 behält den Rest als Lücke
+    const erg = seitenPlanen([block('kopf', SEITE_NUTZ_MM - 10, 'kopf'), absatz('abs-0', 5)])
+    expect(erg).toEqual({ schnitt: null, seiten: [{ start: 'abs-0', rest: 10 }], kappen: {} })
+    // Drei von vier Zeilen passen: geteilt wird nach zwei Zeilen (zwei bleiben für unten)
+    const erg2 = seitenPlanen([block('kopf', SEITE_NUTZ_MM - 25, 'kopf'), absatz('abs-0', 4)])
+    expect(erg2.schnitt).toEqual({ basis: 'abs-0', stellen: [200] })
+  })
+
+  it('ein Text über mehrere Seiten wird in einem Durchgang an allen Seitenenden geteilt', () => {
+    const erg = seitenPlanen([absatz('abs-0', 100)])
+    const jeSeite = Math.floor(SEITE_NUTZ_MM / 8)
+    // 100 Zeilen: je Seite jeSeite Zeilen; die letzte Seite behält mindestens zwei Zeilen
+    expect(erg.schnitt?.stellen).toEqual([jeSeite * 100, 2 * jeSeite * 100, 9800])
+  })
+
+  it('geteilte Teile: Seitenanfänge mit Rest; der Rest des Absatzes steht oben auf der neuen Seite', () => {
+    const erg = seitenPlanen([absatz('abs-0', 32), absatz('abs-0@3200', 30, 3200), block('fuss', 10, 'fuss')])
+    expect(erg.schnitt).toBeNull()
+    expect(erg.seiten).toEqual([{ start: 'abs-0@3200', rest: SEITE_NUTZ_MM - 256 }])
+    // Randnotizen des letzten Absatzes stehen unten über: seine Textspalte wird an der Seitenunterkante gekappt
+    const ueber = seitenPlanen([{ ...absatz('abs-0', 30), hoehe: 290 }, absatz('abs-1', 5)])
+    expect(ueber.seiten).toEqual([{ start: 'abs-1', rest: 0 }])
+    expect(ueber.kappen).toEqual({ 'abs-0': SEITE_NUTZ_MM })
+  })
+
+  it('Tabellen werden zwischen Zeilen geteilt, nie in einer Zeile; eine Bereichszeile bleibt bei ihrer ersten Zeile', () => {
+    const posten = [
+      { oben: 10, unten: 16, halten: true },
+      { oben: 16, unten: 60 },
+      { oben: 60, unten: 104 },
+      { oben: 104, unten: 110, halten: true },
+      { oben: 110, unten: 150 },
+      { oben: 150, unten: 156 }
+    ]
+    const tab: MessBlock = { key: 'k-tabelle', basis: 'k-tabelle', von: 0, art: 'k', hoehe: 158, posten, polster: 2 }
+    // Frei: 113 mm → Zeilen bis 110 passen; die Bereichszeile (4.) nicht allein unten → Schnitt vor ihr
+    expect(seitenPlanen([block('kopf', SEITE_NUTZ_MM - 113, 'kopf'), tab]).schnitt).toEqual({ basis: 'k-tabelle', stellen: [3] })
+    // Frei: 20 mm → nur die Bereichszeile passte: die ganze Tabelle auf die nächste Seite
+    expect(seitenPlanen([block('kopf', SEITE_NUTZ_MM - 20, 'kopf'), tab])).toEqual({ schnitt: null, seiten: [{ start: 'k-tabelle', rest: 20 }], kappen: {} })
+  })
+
+  it('Randnotizen, die unten nicht passen, weichen nach oben aus – bei Bedarf kleiner, nie auf die Folgeseite', () => {
+    const seite = 100
+    // Eine hohe Notiz neben den letzten Zeilen: endet bei 120 mm → rückt 20 mm nach oben
+    expect(
+      notizenEinpassen(
+        [
+          { id: '1', oben: 10, hoehe: 20 },
+          { id: '2', oben: 80, hoehe: 40 }
+        ],
+        seite
+      )
+    ).toEqual({ '2': { hoch: 20, mass: 1, hoehe: 40 } })
+    // Der Stapel schiebt die Notiz darüber mit
+    const zwei = notizenEinpassen(
+      [
+        { id: '1', oben: 50, hoehe: 30 },
+        { id: '2', oben: 81, hoehe: 40 }
+      ],
+      seite
+    )
+    expect(zwei['2']).toEqual({ hoch: 21, mass: 1, hoehe: 40 })
+    expect(zwei['1'].hoch).toBeCloseTo(50 + 30 - (60 - 1.5), 5)
+    // Zu wenig Platz unter dem Kopf (minOben): Schrift schrittweise kleiner, höchstens bis 80 %
+    const eng = notizenEinpassen(
+      [
+        { id: '1', oben: 30, hoehe: 40 },
+        { id: '2', oben: 60, hoehe: 45 }
+      ],
+      seite,
+      20
+    )
+    expect(eng['2'].mass).toBeLessThan(1)
+    expect(eng['2'].mass).toBeGreaterThanOrEqual(0.8)
+    expect(Object.values(eng).every((l) => l.hoch >= 0)).toBe(true)
+    // Alles passt: nichts ändert sich
+    expect(notizenEinpassen([{ id: '1', oben: 10, hoehe: 20 }], seite)).toEqual({})
+  })
+
+  it('Schnitte teilen Absätze ohne Verlust; der Druck bekommt feste Seiten-Container und verschobene Notizen', () => {
+    const r = doc()
+    const a = r.abgaben[0]
+    a.bogen!.gesamt!.bestaetigt = true
+    const md = blattModell(r, a, { vorteilen: false })
+    const text = md.absaetze![0].teile.map((t) => t.text).join('')
+    const teile = teileSchneiden(md.absaetze![0].teile, md.absaetze![0].notizen, [20])
+    expect(teile.map((t) => t.teile.map((x) => x.text).join('')).join('')).toBe(text)
+    expect(teile[1].von).toBe(20)
+    const keys = blattBloecke(r, a, md, { 'abs-0': [20], 'k-staerken': [1] }).map((b) => b.key)
+    expect(keys).toContain('abs-0@20')
+    // Liste mit einem Eintrag: ein Schnitt hinter dem letzten Eintrag teilt nichts
+    expect(keys.filter((k) => k.startsWith('k-staerken'))).toEqual(['k-staerken'])
+    const html = blattHtml(r, a, {
+      plan: {
+        schnitte: { 'abs-0': [20] },
+        seiten: [
+          { start: 'abs-0@20', rest: 50 },
+          { start: 'luft', rest: 20 }
+        ],
+        notizen: { '1': { hoch: 4, mass: 0.9, hoehe: 12 } },
+        kappen: { 'abs-0': 40 }
+      }
+    })
+    expect(html.match(/class="bl-seite"/g)).toHaveLength(3)
+    expect(html).toMatch(/data-bl="abs-0" [^>]*><div class="bl-text" style="max-height:40mm">/)
+    expect(html).toMatch(/class="blatt seite paginiert" data-bl-blatt="a1" data-bl-seiten="3"/)
+    expect(html).toMatch(/<div class="bl-notiz lob" style="height:12mm;transform:translateY\(-4mm\);--mass:0.9">/)
+    expect(boegenHtml(r, r.abgaben)).toMatch(/\.bl-seite \{ position: relative; height: 266mm; overflow: hidden;/)
+  })
+})
+
+describe('Bewertungsraster, Teile und Randnotizen (29.09.2026 nachts)', () => {
+  const tabelle = {
+    titel: 'Raster',
+    stufen: ['voll', 'teilweise', 'nicht'],
+    quelle: 'ki' as const,
+    kriterien: [
+      { id: 'k1', bereich: 'Inhalt', kriterium: 'Gewaltinszenierung: Wählt relevante Aussagen der Rezension aus und erläutert sie.', punkte: 10 },
+      { id: 'k2', bereich: 'Inhalt', kriterium: 'Begründete Empfehlung: Beantwortet eindeutig die Frage.', punkte: 10 },
+      { id: 'k3', bereich: 'Darstellung/Sprache', kriterium: 'Sprachrichtigkeit: Beherrscht Grammatik und Wortschatz.', punkte: 20 }
+    ]
+  }
+  const mitTabelle = (): Rueckmeldung => {
+    const r = doc(
+      { formen: ['schriftlich', 'tipps', 'tabelle', 'ueberarbeitung'] },
+      abgabe({
+        bogen: bogen({
+          tabelle: [
+            { kriteriumId: 'k1', punkte: 0 },
+            { kriteriumId: 'k2', punkte: 1, begruendung: 'Knapp.' },
+            { kriteriumId: 'k3', punkte: 18 }
+          ]
+        })
+      })
+    )
+    r.tabelle = tabelle
+    return r
+  }
+
+  it('Kriterium: Name bis zum Doppelpunkt fett, Beschreibung klein darunter', () => {
+    expect(kriteriumTeilen('Sprachrichtigkeit: Beherrscht Grammatik.')).toEqual({ name: 'Sprachrichtigkeit', deskriptor: 'Beherrscht Grammatik.' })
+    expect(kriteriumTeilen('Anliegen')).toEqual({ name: 'Anliegen', deskriptor: '' })
+  })
+
+  it('Raster: Bereiche als Zwischenzeilen mit Zwischensumme, Summe am Ende; Kopfzeile, Punkte rechtsbündig', () => {
+    const r = mitTabelle()
+    const z = tabellenZeilen(r, r.abgaben[0].bogen!)
+    expect(z.map((x) => (x.art === 'kriterium' ? x.name : `${x.art}:${'titel' in x ? x.titel : ''}:${x.erreicht}/${x.moeglich}`))).toEqual([
+      'bereich:Inhalt:1/20',
+      'Gewaltinszenierung',
+      'Begründete Empfehlung',
+      'bereich:Darstellung/Sprache:18/20',
+      'Sprachrichtigkeit',
+      'summe::19/40'
+    ])
+    r.abgaben[0].bogen!.gesamt!.bestaetigt = true
+    const html = blattHtml(r, r.abgaben[0])
+    expect(html).toMatch(/<table class="bl-raster"><colgroup>.*?<thead><tr><th>Kriterium<\/th><th class="p">Punkte<\/th><th>Begründung<\/th><\/tr><\/thead>/)
+    expect(html).toMatch(/<tr class="bereich" data-bl-teil><td>Inhalt<\/td><td class="p">1 \/ 20<\/td>/)
+    expect(html).toMatch(/<span class="kn">Gewaltinszenierung<\/span><span class="kd">Wählt relevante Aussagen/)
+    expect(html).toMatch(/<td class="p">18 \/ 20<\/td>/)
+    expect(html).toMatch(/<tr class="summe" data-bl-teil><td>Summe<\/td><td class="p">19 \/ 40<\/td>/)
+  })
+
+  it('mit Bewertungstabelle kein zweites „Worauf es ankam“ – nie zwei Wertungen desselben Kriteriums', () => {
+    const r = mitTabelle()
+    expect(kastenAbschnitte(r, r.abgaben[0]).map((x) => x.art)).toEqual(['tabelle', 'staerken', 'schritte', 'ueberarbeitung', 'schluss'])
+    expect(kastenAbschnitte(r, r.abgaben[0], true).map((x) => x.art)).not.toContain('kriterien')
+    const ohne = doc()
+    expect(kastenAbschnitte(ohne, ohne.abgaben[0]).map((x) => x.art)).toContain('kriterien')
+  })
+
+  it('Randnotiz „W: W: …“: das Zeichen steht nur einmal', () => {
+    expect(notizText({ zeichen: 'W', text: 'W: Bezug unpräzise' })).toBe('Bezug unpräzise')
+    expect(notizText({ zeichen: 'W', text: 'Wortwahl: unpräzise' })).toBe('Wortwahl: unpräzise')
+    expect(notizText({ text: 'W: bleibt' })).toBe('W: bleibt')
+    const r = doc({}, abgabe({ bogen: bogen({ rand: [{ id: 'w', zitat: 'total krass', text: 'W: Bezug unpräzise', art: 'fehler', zeichen: 'W' }] }) }))
+    expect(blattHtml(r, r.abgaben[0])).toMatch(/<span class="bl-zeichen">W:<\/span>Bezug unpräzise/)
+  })
+
+  it('Bewertung nach Teilen: erreichte Werte getrennt von der Gewichtung, Ergebnis und Rechnung', () => {
+    const r = doc({ subjectId: 'englisch', subjectLabel: 'Englisch', grade: 13, einstufung: 'notenpunkte' })
+    r.grundlage.teile = [{ id: 't1', titel: 'Mediation', art: 'sprachmittlung', gewicht: 100, inhalt: 40, quelle: 'material' }]
+    r.grundlage.verrechnung = 'prozent'
+    const b = r.abgaben[0].bogen!
+    b.teile = [{ teilId: 't1', inhalt: 40, sprache: 60 }]
+    const tt = teilTabelle(r, b)!
+    expect(tt.gewichtEinheitlich).toBe(40)
+    expect(tt.zeilen[0]).toMatchObject({ titel: 'Mediation', zaehlt: '100 %', inhalt: 40, sprache: 60, ergebnis: 52 })
+    expect(tt.zeilen[0].rechnung).toBe('Inhalt 40 % × 0,4 + Sprache 60 % × 0,6 = 52 %')
+    expect(tt.gesamtText).toBe('Gesamt: 52 % (Teile nach Gewichtung verrechnet)')
+    b.gesamt = { anteil: 52, wert: '6', bestaetigt: true }
+    const html = blattHtml(r, r.abgaben[0])
+    expect(html).toMatch(/<th class="z">Inhalt erreicht<small>Gewicht 40 %<\/small><\/th><th class="z">Sprache erreicht<small>Gewicht 60 %<\/small><\/th>/)
+    expect(html).toMatch(/<td>Mediation<\/td><td class="z">100 %<\/td><td class="z">40 %<\/td><td class="z">60 %<\/td><td class="z erg">52 %<\/td>/)
+    expect(html).toMatch(/<p class="bl-teil-gesamt">Gesamt: 52 % \(Teile nach Gewichtung verrechnet\)<\/p>/)
+    // Die Rechnung steht nur in der Ansicht (als Erläuterung), nicht im Ausdruck
+    expect(html).not.toMatch(/× 0,4/)
+  })
+
+  it('Word: Raster und Teile entstehen ohne Fehler', async () => {
+    const r = mitTabelle()
+    r.abgaben[0].bogen!.gesamt!.bestaetigt = true
+    r.grundlage.teile = [{ id: 't1', titel: 'Writing', art: 'schreiben', gewicht: 100, inhalt: 40, quelle: 'material' }]
+    r.abgaben[0].bogen!.teile = [{ teilId: 't1', inhalt: 70, sprache: 50 }]
+    const bytes = await boegenDocx(r, r.abgaben, { zeichen: STANDARD_ZEICHEN.deutsch })
+    expect(bytes.length).toBeGreaterThan(1000)
   })
 })

@@ -1,5 +1,6 @@
-import { Card, Group, NumberInput, Stack, Text } from '@mantine/core'
+import { Card, Group, NumberInput, Stack, Text, Tooltip } from '@mantine/core'
 import { gesamtEinstufen, vorschlag, type SkalenKontext } from '../art'
+import { teilTabelle } from '../blattLayout'
 import type { Bogen, EinstufungsArt, Rueckmeldung } from '../model/types'
 import { gesamtAusTeilen, getrennt, teilAnteil, teilZeile, type TeilWertung } from '../teilbewertung'
 
@@ -8,8 +9,11 @@ import { gesamtAusTeilen, getrennt, teilAnteil, teilZeile, type TeilWertung } fr
  * andere Teile mit ihrem Erfüllungsgrad. Ändert die Lehrkraft einen Wert, folgt die
  * Gesamteinstufung als neuer Vorschlag (wieder zu bestätigen).
  *
- * `variante="blatt"`: als Abschnitt im Kasten des A4-Blatts – dieselben Zeilen wie im Ausdruck,
- * die Prozentwerte direkt auf dem Blatt änderbar.
+ * `variante="blatt"`: als Abschnitt im Kasten des A4-Blatts – dieselbe kleine Tabelle wie im
+ * Ausdruck (29.09.2026 nachts, Bericht der Lehrkraft: „Inhalt 40 % · Sprache 60 % = 52 %" las sich
+ * wie die Gewichtung 40 : 60). Jetzt: Teil | zählt | Inhalt erreicht (Gewicht 40 %) | Sprache
+ * erreicht (Gewicht 60 %) | Ergebnis, darunter die Gesamtleistung. Die Rechnung steht nur in der
+ * Ansicht als Erläuterung am Ergebnis („Inhalt 40 % × 0,4 + Sprache 60 % × 0,6 = 52 %").
  */
 export default function TeileWertung({
   r,
@@ -47,9 +51,10 @@ export default function TeileWertung({
     }, `rm-teil-${teilId}`)
 
   if (variante === 'blatt') {
+    const tt = teilTabelle(r, bogen)
+    if (!tt) return null
     const zahl = (label: string, wert: number | undefined, onChange: (n: number) => void): React.JSX.Element => (
-      <label className="rm-teil-zahl">
-        {label}{' '}
+      <span className="rm-teil-zahl">
         <input
           type="number"
           min={0}
@@ -60,32 +65,86 @@ export default function TeileWertung({
           aria-label={label}
         />{' '}
         %
-      </label>
+      </span>
     )
+    const gewicht = (g: number | null | undefined): React.ReactNode => (g != null ? <small>Gewicht {g} %</small> : null)
     return (
-      <div className="bl-teile" data-rm-teile>
-        {teile.map((t) => {
-          const w = bogen.teile?.find((x) => x.teilId === t.id)
-          const a = teilAnteil(t, w, oberstufe)
-          return (
-            <div key={t.id} className="rm-teil-zeile" title={w?.begruendung}>
-              <span>{teilZeile({ ...t, ...(getrennt(t) ? { art: 'sonstig' as const } : {}) }, v)}:</span>{' '}
-              {getrennt(t) ? (
-                <>
-                  {zahl('Inhalt', w?.inhalt, (n) => setze(t.id, { inhalt: n }))} · {zahl('Sprache', w?.sprache, (n) => setze(t.id, { sprache: n }))}
-                </>
-              ) : (
-                zahl('Erfüllt', w?.anteil, (n) => setze(t.id, { anteil: n }))
-              )}
-              {getrennt(t) && a !== null && <span className="rm-nur-ansicht rm-teil-summe"> = {a} %</span>}
-            </div>
-          )
-        })}
-        {gesamt && (
-          <div className="rm-nur-ansicht rm-teil-summe">
-            Gesamt: {gesamt.anteil} %{gesamt.moeglich ? ` · ${gesamt.erreicht} von ${gesamt.moeglich} Punkten` : ''} ({v === 'punkte' ? 'nach Punkten' : 'nach Gewichtung'})
-          </div>
+      <div data-rm-teile>
+        <table className="bl-teiltab">
+          <thead>
+            {tt.getrennt ? (
+              <tr>
+                <th>Teil</th>
+                <th className="z">zählt</th>
+                <th className="z">
+                  Inhalt erreicht
+                  {gewicht(tt.gewichtEinheitlich)}
+                </th>
+                <th className="z">
+                  Sprache erreicht
+                  {gewicht(tt.gewichtEinheitlich != null ? 100 - tt.gewichtEinheitlich : null)}
+                </th>
+                <th className="z">Ergebnis</th>
+              </tr>
+            ) : (
+              <tr>
+                <th>Teil</th>
+                <th className="z">zählt</th>
+                <th className="z">Ergebnis</th>
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {tt.zeilen.map((z) => {
+              const einzeln = tt.gewichtEinheitlich == null && z.getrennt
+              return (
+                <tr key={z.id} title={z.begruendung}>
+                  <td>{z.titel}</td>
+                  <td className="z">{z.zaehlt}</td>
+                  {tt.getrennt &&
+                    (z.getrennt ? (
+                      <>
+                        <td className="z">
+                          {zahl(`Inhalt erreicht ${z.titel}`, z.inhalt, (n) => setze(z.id, { inhalt: n }))}
+                          {einzeln && gewicht(z.gewichtInhalt)}
+                        </td>
+                        <td className="z">
+                          {zahl(`Sprache erreicht ${z.titel}`, z.sprache, (n) => setze(z.id, { sprache: n }))}
+                          {einzeln && gewicht(100 - (z.gewichtInhalt ?? 0))}
+                        </td>
+                      </>
+                    ) : (
+                      <td className="z" colSpan={2}>
+                        erfüllt {zahl(`Erfüllt ${z.titel}`, z.anteil, (n) => setze(z.id, { anteil: n }))}
+                      </td>
+                    ))}
+                  {!tt.getrennt ? (
+                    <td className="z erg">{zahl(`Erfüllt ${z.titel}`, z.anteil, (n) => setze(z.id, { anteil: n }))}</td>
+                  ) : (
+                    <td className="z erg">
+                      <Tooltip label={z.rechnung || 'Noch ohne Wertung'} multiline w={300} withinPortal>
+                        <span className="rm-rechnung" data-rm-teil-ergebnis>
+                          {z.ergebnis != null ? `${z.ergebnis} %` : '–'}
+                          {z.gedeckelt ? '*' : ''}
+                        </span>
+                      </Tooltip>
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {tt.gesamtText && (
+          <p className="bl-teil-gesamt">
+            <Tooltip label={tt.gesamtRechnung} multiline w={320} withinPortal disabled={!tt.gesamtRechnung}>
+              <span className="rm-rechnung" data-rm-teil-gesamt>
+                {tt.gesamtText}
+              </span>
+            </Tooltip>
+          </p>
         )}
+        {tt.zeilen.some((z) => z.gedeckelt) && <p className="bl-teil-hinweis">* höchstens 20 %, weil Inhalt oder Sprache ungenügend ist</p>}
       </div>
     )
   }
@@ -115,14 +174,14 @@ export default function TeileWertung({
               </Stack>
               {getrennt(t) ? (
                 <>
-                  {zahl('Inhalt', w?.inhalt, (n) => setze(t.id, { inhalt: n }))}
-                  {zahl('Sprache', w?.sprache, (n) => setze(t.id, { sprache: n }))}
+                  {zahl('Inhalt erreicht', w?.inhalt, (n) => setze(t.id, { inhalt: n }))}
+                  {zahl('Sprache erreicht', w?.sprache, (n) => setze(t.id, { sprache: n }))}
                 </>
               ) : (
                 zahl('Erfüllt', w?.anteil, (n) => setze(t.id, { anteil: n }))
               )}
-              <Text size="xs" c="dimmed" w={70}>
-                {a === null ? '–' : `= ${a} %`}
+              <Text size="xs" c="dimmed" w={90}>
+                {a === null ? '–' : `Ergebnis ${a} %`}
               </Text>
             </Group>
           )
@@ -130,7 +189,7 @@ export default function TeileWertung({
         {gesamt && (
           <Text size="xs" c="dimmed">
             Gesamt: {gesamt.anteil} %{gesamt.moeglich ? ` · ${gesamt.erreicht} von ${gesamt.moeglich} Punkten` : ''} (
-            {v === 'punkte' ? 'nach Punkten' : 'nach Gewichtung'})
+            {v === 'punkte' ? 'Teile nach Punkten verrechnet' : 'Teile nach Gewichtung verrechnet'})
           </Text>
         )}
       </Stack>

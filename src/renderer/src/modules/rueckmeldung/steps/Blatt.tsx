@@ -4,26 +4,33 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import type { Korrekturzeichen } from '../../../shared/korrekturzeichen'
 import { newId } from '../../vokabeltest/model/random'
-import { einstufungVon, gesamtAusTabelle, gesamtEinstufen, skalenWerte, tabellenSumme, wertText, type SkalenKontext } from '../art'
+import { einstufungVon, gesamtAusTabelle, gesamtEinstufen, skalenWerte, wertText, type SkalenKontext } from '../art'
 import {
   AMPEL_FARBE,
   BLATT_CSS,
   BLATT_MASSE,
+  blattBloecke,
   blattModell,
   einstufungHtml,
   kastenTitel,
+  leererPlan,
   mitName,
-  notizGruppen,
+  planCss,
   ohneName,
+  RASTER_KOPF,
+  SEITE_NUTZ_MM,
   SEITEN_HOEHE_MM,
-  seitenUmbrueche,
   SYMBOL,
+  tabellenZeilen,
+  type BlattBlock,
   type BlattEinstufung,
-  type KastenAbschnitt,
-  type markenStil
+  type markenStil,
+  type SeitenPlan
 } from '../blattLayout'
 import { stelleAuftragsSchluessel, type Stelle } from '../feedbackUeberarbeiten'
 import type { Abgabe, Bogen, Einschaetzung, Einstufungswert, RandKommentar, Rueckmeldung } from '../model/types'
+import { seitenPlanen } from '../seitenPlan'
+import { blockeMessen, LINEAL_MM, masseVon, MAX_DURCHGAENGE, mitSchnitt, notizenPlanen } from '../seitenMessen'
 import { stelleUeberarbeiten } from '../stelleAuftrag'
 import { BlattKontext, Editierbar, useBlatt, Zauberstab, type BlattZusammenhang } from './blattTeile'
 import RandEditor, { RandNotiz } from './RandEditor'
@@ -34,6 +41,10 @@ import './blatt.css'
 /** Abstand zwischen zwei Seiten in der Ansicht (mm) */
 const SEITEN_ABSTAND = 10
 const MM_PX = 96 / 25.4
+/** Vom Ende des Seiteninhalts bis zum Anfang der nächsten Seite (mm): ungenutzter Rest, Rand unten, Abstand, Rand oben */
+const LUECKE = SEITEN_HOEHE_MM - SEITE_NUTZ_MM + BLATT_MASSE.unten + SEITEN_ABSTAND + BLATT_MASSE.oben
+
+type KastenBlock = Extract<BlattBlock, { art: 'k' }>
 
 /**
  * Das A4-Blatt der Rückmeldung (29.09.2026, Wunsch der Lehrkraft): statt vieler Textfelder eine
@@ -45,11 +56,13 @@ const MM_PX = 96 / 25.4
  * Stelle im Schülertext wird mit einem Klick zur neuen Notiz. Der Zauberstab erzeugt eine Stelle
  * neu oder überarbeitet sie.
  *
- * Mehrseitig wie im Druck: Das Blatt besteht aus Blöcken (Absätze bzw. Teilblöcke langer Absätze,
- * Abschnitte des Kastens), die nicht zerteilt werden. Die Ansicht misst sie und schiebt einen Block,
- * der nicht mehr passt, auf die nächste Seite – nach denselben Maßen wie der Druck (blattLayout.ts).
- * Lange Absätze zerlegt schon das Modell (`absatzTeilen`), sodass kein Block höher als eine Seite
- * ist und nichts über den Seitenrand ragt.
+ * Seiten wie im Druck (29.09.2026 nachts, EINE Paginierung): Das Blatt besteht aus Blöcken
+ * (`blattBloecke`). Nach jedem Zeichnen wird gemessen (seitenMessen.ts) und nach den Regeln in
+ * seitenPlan.ts entschieden, wo eine Seite endet – ein Absatz wird an der Zeile geteilt, eine
+ * Tabelle zwischen zwei Zeilen; Randnotizen, die unten nicht mehr passen, weichen nach oben aus.
+ * Das PDF misst dasselbe Druck-HTML in einem unsichtbaren Rahmen nach denselben Regeln – so haben
+ * Ansicht und PDF dieselben Seiten. Solange ein Text bearbeitet wird, bleibt der Plan stehen (sonst
+ * spränge die Schreibmarke); danach wird neu gemessen.
  */
 export default function Blatt({
   r,
@@ -76,7 +89,7 @@ export default function Blatt({
   const [verschiebt, setVerschiebt] = useState<string | null>(null)
   const [auswahl, setAuswahl] = useState<{ text: string; x: number; y: number } | null>(null)
   const laufend = useLaufendeSchluessel(docId)
-  const md = blattModell(r, a, { zeichen, ansicht: true })
+  const md = blattModell(r, a, { zeichen, ansicht: true, vorteilen: false })
   const stil = (nr: number | undefined): ReturnType<typeof markenStil> => (nr != null ? (md.stilVon.get(nr) ?? 'fehler') : 'fehler')
 
   const c: BlattZusammenhang = {
@@ -148,81 +161,71 @@ export default function Blatt({
     window.getSelection()?.removeAllRanges()
   }
 
-  // ---------- Blöcke ----------
-  const bloecke: { key: string; node: React.ReactNode }[] = [{ key: 'kopf', node: <Kopf e={md.kopf.einstufung} titel={md.kopf.titel} unter={md.kopf.unter} name={md.kopf.name} /> }]
-  if (md.scans)
-    md.scans.forEach((s, i) =>
-      bloecke.push({
-        key: `scan-${i}`,
-        node: <ScanEditor seite={i} src={s.src} notizen={s.notizen} markerSetzen={markerSetzen} gesetzt={() => setMarkerSetzen(false)} />
-      })
-    )
-  else if (md.absaetze) {
-    md.absaetze.forEach((abs, i) =>
-      bloecke.push({ key: `abs-${i}`, node: <RandEditor index={i} teile={abs.teile} notizen={abs.notizen} stil={stil} verschieben={setVerschiebt} /> })
-    )
-    notizGruppen(md.ohneStelle, md.gross).forEach((gruppe, k) =>
-      bloecke.push({
-        key: `ohne-${k}`,
-        node: (
+  // ---------- Seiten ----------
+  const { buehne, blatt, lineal, zoom, plan, weiterMessen, vonVorn } = useSeitenPlan(blattInhalt(r, a, zeichen.length))
+  const bloecke = blattBloecke(r, a, md, plan.schnitte, true)
+  const anfang = new Map(plan.seiten.map((s) => [s.start, s.rest]))
+  const seiten = 1 + plan.seiten.filter((s) => bloecke.some((b) => b.key === s.start)).length
+
+  const knoten = (b: BlattBlock): React.ReactNode => {
+    switch (b.art) {
+      case 'kopf':
+        return <Kopf e={md.kopf.einstufung} titel={md.kopf.titel} unter={md.kopf.unter} name={md.kopf.name} />
+      case 'scan':
+        return <ScanEditor seite={b.seite} src={b.src} notizen={b.notizen} markerSetzen={markerSetzen} gesetzt={() => setMarkerSetzen(false)} />
+      case 'abs':
+        return <RandEditor index={b.index} teile={b.teile} notizen={b.notizen} stil={stil} verschieben={setVerschiebt} />
+      case 'ohne':
+        return (
           <div className="bl-block bl-ohne">
-            <div className="bl-text">{k ? '' : 'Ohne Stelle im Text:'}</div>
+            <div className="bl-text">{b.erst ? 'Ohne Stelle im Text:' : ''}</div>
             <div className="bl-rand">
-              {gruppe.map((g) => (
+              {b.notizen.map((g) => (
                 <RandNotiz key={g.k.id} g={g} verschieben={setVerschiebt} />
               ))}
             </div>
           </div>
         )
-      })
-    )
+      case 'luft':
+        return <div className="bl-block bl-luft" />
+      case 'k':
+        return <KastenTeil teil={b} skala={skala} />
+      case 'fuss':
+        return (
+          <div className="bl-block bl-fuss">
+            {md.legende.map((z, i) => (
+              <span key={i}>
+                <p>{z}</p>
+                <br />
+              </span>
+            ))}
+          </div>
+        )
+    }
   }
-  if (md.kasten.length) {
-    bloecke.push({ key: 'luft', node: <div className="bl-block bl-luft" /> })
-    md.kasten.forEach((x, i) =>
-      bloecke.push({
-        key: `k-${x.art}`,
-        node: <KastenTeil x={x} erst={i === 0} letzt={i === md.kasten.length - 1} skala={skala} />
-      })
-    )
-  }
-  bloecke.push({
-    key: 'fuss',
-    node: (
-      <div className="bl-block bl-fuss">
-        {md.legende.map((z, i) => (
-          <span key={i}>
-            <p>{z}</p>
-            <br />
-          </span>
-        ))}
-      </div>
-    )
-  })
-
-  const { buehne, zoom, lineal, refs, umbruch, seiten } = useSeiten(bloecke.map((b) => b.key))
 
   const kinder: React.ReactNode[] = []
   for (const b of bloecke) {
-    if (umbruch[b.key]) kinder.push(<div key={`u-${b.key}`} className="rm-umbruch" style={{ height: umbruch[b.key] }} />)
+    const rest = anfang.get(b.key)
+    if (rest != null && kinder.length) {
+      // Abstand bis zum Anfang der nächsten Seite; standen Randnotizen über (nach oben gerückt), ist er kleiner
+      const abstand = rest + LUECKE
+      kinder.push(<div key={`u-${b.key}`} className="rm-umbruch" style={{ height: `${Math.max(0, abstand)}mm`, marginTop: `${Math.min(0, abstand)}mm` }} />)
+    }
     kinder.push(
-      <div
-        key={b.key}
-        ref={(el) => {
-          if (el) refs.current.set(b.key, el)
-          else refs.current.delete(b.key)
-        }}
-      >
-        {b.node}
+      <div key={b.key} data-bl={b.key} data-bl-basis={b.basis} data-bl-von={b.von} data-bl-art={b.art}>
+        {knoten(b)}
       </div>
     )
   }
   const hoehe = `calc(${seiten} * ${BLATT_MASSE.hoehe}mm + ${seiten - 1} * ${SEITEN_ABSTAND}mm)`
+  const bereich = `[data-rm-blatt-id="${a.id.replace(/[^\w-]/g, '')}"]`
 
   return (
     <BlattKontext.Provider value={c}>
       <style>{BLATT_CSS}</style>
-      <div className={`rm-buehne${verschiebt ? ' rm-verschiebt' : ''}`} ref={buehne} data-rm-blatt>
+      {(Object.keys(plan.notizen).length > 0 || Object.keys(plan.kappen).length > 0) && <style>{planCss(plan, bereich)}</style>}
+      <div className={`rm-buehne${verschiebt ? ' rm-verschiebt' : ''}`} ref={buehne} data-rm-blatt data-rm-seiten={seiten}>
         <div style={{ zoom }}>
           <div className="rm-seiten" style={{ height: hoehe }}>
             {Array.from({ length: seiten }, (_, k) => (
@@ -235,8 +238,16 @@ export default function Blatt({
                 )}
               </div>
             ))}
-            <section className={`blatt${md.gross ? ' gross' : ''}`} onMouseUp={markiert} data-rm-rand>
-              <div ref={lineal} style={{ position: 'absolute', left: 0, top: 0, width: 1, height: `${SEITEN_HOEHE_MM}mm`, visibility: 'hidden', pointerEvents: 'none' }} />
+            <section
+              className={`blatt${md.gross ? ' gross' : ''}`}
+              ref={blatt}
+              onMouseUp={markiert}
+              onBlur={weiterMessen}
+              onLoadCapture={vonVorn}
+              data-rm-rand
+              data-rm-blatt-id={a.id.replace(/[^\w-]/g, '')}
+            >
+              <div ref={lineal} style={{ position: 'absolute', left: 0, top: 0, width: 1, height: `${LINEAL_MM}mm`, visibility: 'hidden', pointerEvents: 'none' }} />
               {kinder}
             </section>
           </div>
@@ -268,57 +279,91 @@ export default function Blatt({
   )
 }
 
+/** Was auf dem Blatt steht – ändert es sich, beginnt der Seitenplan von vorn (Elternfassung, Hinweise u. Ä. stehen nicht darauf) */
+function blattInhalt(r: Rueckmeldung, a: Abgabe, zeichen: number): string {
+  const { eltern: _e, elternUebersetzt: _u, fehler: _f, hinweise: _h, ...bogen } = a.bogen ?? ({} as Bogen)
+  void [_e, _u, _f, _h]
+  return JSON.stringify([a.text, bogen, a.name, a.ausgleich, a.scans?.length ?? 0, r.meta, r.tabelle, r.grundlage.titel, r.grundlage.teile, r.grundlage.verrechnung, zeichen])
+}
+
+const planLeer = (p: SeitenPlan): boolean => !Object.keys(p.schnitte).length && !p.seiten.length && !Object.keys(p.notizen).length && !Object.keys(p.kappen).length
+
 /**
- * Seiten wie im Druck: Blockhöhen messen, Umbrüche setzen (Abstandhalter vor dem ersten Block
- * einer neuen Seite), Seitenzahl, Zoom auf schmalen Fenstern.
+ * Der Seitenplan der Ansicht: nach jedem Zeichnen messen und planen, bis er steht. Ändert sich der
+ * Inhalt (`inhalt`), beginnt der Plan von vorn – aber erst, wenn nichts mehr bearbeitet wird.
  */
-function useSeiten(keys: string[]): {
+function useSeitenPlan(inhalt: string): {
   buehne: React.RefObject<HTMLDivElement | null>
-  zoom: number
+  blatt: React.RefObject<HTMLElement | null>
   lineal: React.RefObject<HTMLDivElement | null>
-  refs: React.RefObject<Map<string, HTMLElement>>
-  umbruch: Record<string, number>
-  seiten: number
+  zoom: number
+  plan: SeitenPlan
+  weiterMessen: () => void
+  vonVorn: () => void
 } {
   const buehne = useRef<HTMLDivElement>(null)
+  const blatt = useRef<HTMLElement>(null)
   const lineal = useRef<HTMLDivElement>(null)
-  const refs = useRef(new Map<string, HTMLElement>())
-  const [umbruch, setUmbruch] = useState<Record<string, number>>({})
+  const [plan, setPlan] = useState<SeitenPlan>(leererPlan)
   const [zoom, setZoom] = useState(1)
+  // Schriften geladen, Bild geladen: von vorn messen; verlassenes Textfeld: weiter messen
+  const [stand, setStand] = useState(0)
   const [, setTakt] = useState(0)
+  const zustand = useRef({ sig: '', runden: 0 })
+  const sig = `${inhalt}|${zoom}|${stand}`
 
   useLayoutEffect(() => {
-    const seite = lineal.current?.offsetHeight ?? 0
+    const el = blatt.current
+    const m = lineal.current ? masseVon(lineal.current) : null
     // Verstecktes Programm (display: none): nichts messen
-    if (!seite) return
-    const f = seite / SEITEN_HOEHE_MM
-    const luecke = (BLATT_MASSE.unten + SEITEN_ABSTAND + BLATT_MASSE.oben) * f
-    const neu: Record<string, number> = {}
-    for (const u of seitenUmbrueche(
-      keys.map((k) => refs.current.get(k)?.offsetHeight ?? 0),
-      seite
-    ))
-      neu[keys[u.index]] = Math.round((u.rest + luecke) * 10) / 10
-    if (JSON.stringify(neu) !== JSON.stringify(umbruch)) setUmbruch(neu)
+    if (!el || !m) return
+    const aktiv = el.ownerDocument.activeElement as HTMLElement | null
+    if (aktiv && el.contains(aktiv) && (aktiv.isContentEditable || aktiv.matches('input, textarea, select'))) return
+    if (zustand.current.sig !== sig) {
+      zustand.current = { sig, runden: 0 }
+      if (!planLeer(plan)) {
+        setPlan(leererPlan())
+        return
+      }
+    }
+    if (++zustand.current.runden > MAX_DURCHGAENGE) return
+    const { bloecke, els } = blockeMessen(el, m)
+    const erg = seitenPlanen(bloecke)
+    if (erg.schnitt) {
+      const s = erg.schnitt
+      setPlan((p) => mitSchnitt(p, s))
+      return
+    }
+    // Kappen bleiben (gekappt misst der Absatz passend – sonst schaltete der Plan hin und her)
+    const neu: SeitenPlan = { ...plan, seiten: erg.seiten, notizen: notizenPlanen(el, els, erg.seiten, m), kappen: { ...plan.kappen, ...erg.kappen } }
+    if (JSON.stringify(neu) !== JSON.stringify(plan)) setPlan(neu)
+    else zustand.current.runden = 0
   })
 
-  // Größenänderungen ohne neues Zeichnen (Bilder geladen, Schrift da, Fensterbreite)
+  // Fensterbreite → Zoom; Schriften geladen → neu messen
   useEffect(() => {
     const el = buehne.current
     if (!el) return
     const beobachter = new ResizeObserver(() => {
       const breite = el.clientWidth
-      if (breite) setZoom(Math.min(1, Math.max(0.35, (breite - 24) / (BLATT_MASSE.breite * MM_PX))))
-      setTakt((t) => t + 1)
+      if (breite) setZoom(Math.round(Math.min(1, Math.max(0.35, (breite - 24) / (BLATT_MASSE.breite * MM_PX))) * 1000) / 1000)
     })
     beobachter.observe(el)
-    const blatt = el.querySelector('.blatt')
-    if (blatt) beobachter.observe(blatt)
-    void document.fonts?.ready.then(() => setTakt((t) => t + 1))
+    void document.fonts?.ready.then(() => setStand((s) => s + 1))
     return () => beobachter.disconnect()
   }, [])
 
-  return { buehne, zoom, lineal, refs, umbruch, seiten: 1 + Object.keys(umbruch).length }
+  return {
+    buehne,
+    blatt,
+    lineal,
+    zoom,
+    plan,
+    // Nach dem Bearbeiten (Fokus weg): weiter messen – ein geänderter Inhalt beginnt dann von vorn
+    weiterMessen: () => setTakt((t) => t + 1),
+    // Ein Bild ist geladen: seine Höhe ist jetzt bekannt – von vorn
+    vonVorn: () => setStand((s) => s + 1)
+  }
 }
 
 // ---------- Kopf ----------
@@ -415,39 +460,161 @@ function Weg({ onClick, label = 'Zeile entfernen' }: { onClick: () => void; labe
   )
 }
 
-/** Liste (Stärken, Schritte) mit direkt bearbeitbaren Einträgen */
-function Liste({ feld, platzhalter }: { feld: 'staerken' | 'schritte'; platzhalter: string }): React.JSX.Element {
+/** Liste (Stärken, Schritte) mit direkt bearbeitbaren Einträgen – bzw. ihr Teil auf dieser Seite */
+function Liste({ feld, platzhalter, von, bis }: { feld: 'staerken' | 'schritte'; platzhalter: string; von: number; bis: number | null }): React.JSX.Element {
   const c = useBlatt()
   const b = c.a.bogen as Bogen
-  const eintraege = b[feld].map((s, k) => (
-    <li key={k} className="rm-zeile">
-      <Editierbar
-        wert={c.n(s)}
-        onText={(x) => c.setzeBogen((y) => (y[feld][k] = c.roh(x)), `rm-${c.a.id}-${feld}-${k}`)}
-        platzhalter={platzhalter}
-        label={`${platzhalter} ${k + 1}`}
-        mehrzeilig
-        autoFokus={c.fokus === `${feld}-${k}`}
-      />
-      <span className="rm-zeilen-werkzeug rm-nur-ansicht">
-        <Weg onClick={() => c.setzeBogen((y) => y[feld].splice(k, 1))} />
-      </span>
-    </li>
-  ))
-  return feld === 'staerken' ? <ul className="bl-staerken">{eintraege}</ul> : <ol>{eintraege}</ol>
+  const eintraege = b[feld]
+    .map((s, k) => ({ s, k }))
+    .slice(von, bis ?? undefined)
+    .map(({ s, k }) => (
+      <li key={k} className="rm-zeile" data-bl-teil>
+        <Editierbar
+          wert={c.n(s)}
+          onText={(x) => c.setzeBogen((y) => (y[feld][k] = c.roh(x)), `rm-${c.a.id}-${feld}-${k}`)}
+          platzhalter={platzhalter}
+          label={`${platzhalter} ${k + 1}`}
+          mehrzeilig
+          autoFokus={c.fokus === `${feld}-${k}`}
+        />
+        <span className="rm-zeilen-werkzeug rm-nur-ansicht">
+          <Weg onClick={() => c.setzeBogen((y) => y[feld].splice(k, 1))} />
+        </span>
+      </li>
+    ))
+  return feld === 'staerken' ? <ul className="bl-staerken">{eintraege}</ul> : <ol start={von + 1}>{eintraege}</ol>
 }
 
-function KastenTeil({ x, erst, letzt, skala }: { x: KastenAbschnitt; erst: boolean; letzt: boolean; skala: SkalenKontext }): React.JSX.Element {
+/** Bewertungstabelle als Raster (29.09.2026): Kriterium fett, Beschreibung klein, Punkte rechts, Bereiche als Zwischenzeilen */
+function Raster({ skala, von, bis }: { skala: SkalenKontext; von: number; bis: number | null }): React.JSX.Element {
   const c = useBlatt()
   const b = c.a.bogen as Bogen
   const m = c.r.meta
   const art = einstufungVon(m)
+  const t = c.r.tabelle!
+  const zeilen = tabellenZeilen(c.r, b).slice(von, bis ?? undefined)
+  const setzeWertung = (id: string, fn: (w: { punkte?: number; stufe?: number; begruendung?: string }) => void, gruppe?: string): void =>
+    c.setzeBogen((y) => {
+      if (!y.tabelle) y.tabelle = []
+      let w = y.tabelle.find((z) => z.kriteriumId === id)
+      if (!w) {
+        w = { kriteriumId: id }
+        y.tabelle.push(w)
+      }
+      fn(w)
+      // Punkte geändert: Die Einstufung folgt als neuer Vorschlag (wieder zu bestätigen)
+      if (gesamtEinstufen(m)) y.gesamt = gesamtAusTabelle(t, y, art, skala)
+    }, gruppe)
+  return (
+    <table className="bl-raster" data-rm-wertung>
+      <colgroup>
+        <col className="k" />
+        <col className="p" />
+        <col className="b" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>{RASTER_KOPF[0]}</th>
+          <th className="p">{t.kriterien.some((k) => k.punkte) ? RASTER_KOPF[1] : 'Stufe'}</th>
+          <th>{RASTER_KOPF[2]}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {zeilen.map((z, j) => {
+          if (z.art === 'bereich')
+            return (
+              <tr key={`b-${von + j}`} className="bereich" data-bl-teil>
+                <td>{z.titel}</td>
+                <td className="p">{z.moeglich ? `${String(z.erreicht).replace('.', ',')} / ${z.moeglich}` : ''}</td>
+                <td />
+              </tr>
+            )
+          if (z.art === 'summe')
+            return (
+              <tr key="summe" className="summe" data-bl-teil>
+                <td>Summe</td>
+                <td className="p">
+                  {String(z.erreicht).replace('.', ',')} / {z.moeglich}
+                </td>
+                <td />
+              </tr>
+            )
+          return (
+            <tr key={z.id} data-bl-teil>
+              <td>
+                {z.bereich && <span className="kb">{z.bereich}</span>}
+                <span className="kn">{z.name}</span>
+                {z.deskriptor && <span className="kd">{z.deskriptor}</span>}
+              </td>
+              <td className="p">
+                {z.max ? (
+                  <>
+                    <input
+                      className="rm-zahl"
+                      type="number"
+                      min={0}
+                      max={z.max}
+                      step={0.5}
+                      value={z.punkte ?? ''}
+                      placeholder="–"
+                      onChange={(e) => {
+                        const v = e.currentTarget.value
+                        const max = z.max!
+                        setzeWertung(z.id, (w) => (w.punkte = v === '' ? undefined : Math.min(max, Math.max(0, Number(v)))), `rm-w-${z.id}`)
+                      }}
+                      aria-label={`Punkte ${z.name}`}
+                    />
+                    {` / ${z.max}`}
+                  </>
+                ) : (
+                  <Menu withinPortal position="bottom-start">
+                    <Menu.Target>
+                      <span className="rm-wahl" role="button" tabIndex={0} aria-label={`Stufe ${z.name}`}>
+                        {z.stufeText || '–'}
+                      </span>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      {t.stufen.map((s, n) => (
+                        <Menu.Item key={n} onClick={() => setzeWertung(z.id, (w) => (w.stufe = n))}>
+                          {s}
+                        </Menu.Item>
+                      ))}
+                    </Menu.Dropdown>
+                  </Menu>
+                )}
+              </td>
+              <td className="b">
+                <Editierbar
+                  wert={c.n(z.begruendung)}
+                  onText={(v) => setzeWertung(z.id, (w) => (w.begruendung = c.roh(v)), `rm-wb-${z.id}`)}
+                  platzhalter="Begründung"
+                  label={`Begründung ${z.name}`}
+                  mehrzeilig
+                />
+              </td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function KastenTeil({ teil, skala }: { teil: KastenBlock; skala: SkalenKontext }): React.JSX.Element {
+  const c = useBlatt()
+  const b = c.a.bogen as Bogen
+  const m = c.r.meta
+  const art = einstufungVon(m)
+  const x = teil.abschnitt
+  const { von, bis, erst, letzt } = teil
+  const anfang = von === 0
   const kastenLaeuft = c.laeuft({ art: 'kasten' })
   const neueZeile = (feld: 'staerken' | 'schritte'): void => {
     const k = b[feld].length
     c.setzeBogen((y) => y[feld].push(''))
     c.setFokus(`${feld}-${k}`)
   }
+  const titel = anfang ? <h3>{x.titel}</h3> : null
   let inhalt: React.ReactNode = null
   let werkzeug: React.ReactNode = null
   let laeuft = false
@@ -455,223 +622,144 @@ function KastenTeil({ x, erst, letzt, skala }: { x: KastenAbschnitt; erst: boole
     case 'teile':
       inhalt = (
         <>
-          <h3>{x.titel}</h3>
+          {titel}
           <TeileWertung r={c.r} bogen={b} art={art} skala={skala} setzeBogen={c.setzeBogen} variante="blatt" />
         </>
       )
       break
-    case 'tabelle': {
-      const t = c.r.tabelle!
-      const summe = tabellenSumme(t, b.tabelle)
-      const setzeWertung = (id: string, fn: (w: { punkte?: number; stufe?: number; begruendung?: string }) => void, gruppe?: string): void =>
-        c.setzeBogen((y) => {
-          if (!y.tabelle) y.tabelle = []
-          let w = y.tabelle.find((z) => z.kriteriumId === id)
-          if (!w) {
-            w = { kriteriumId: id }
-            y.tabelle.push(w)
-          }
-          fn(w)
-          // Punkte geändert: Die Einstufung folgt als neuer Vorschlag (wieder zu bestätigen)
-          if (gesamtEinstufen(m)) y.gesamt = gesamtAusTabelle(t, y, art, skala)
-        }, gruppe)
+    case 'tabelle':
       inhalt = (
         <>
-          <h3>{x.titel}</h3>
-          <table className="bl-tab" data-rm-wertung>
-            <tbody>
-              {t.kriterien.map((k) => {
-                const w = b.tabelle?.find((z) => z.kriteriumId === k.id)
-                return (
-                  <tr key={k.id}>
-                    <td className="k">
-                      {k.bereich && <small>{k.bereich}</small>}
-                      {k.kriterium}
-                    </td>
-                    <td className="e">
-                      {k.punkte ? (
-                        <>
-                          <input
-                            className="rm-zahl"
-                            type="number"
-                            min={0}
-                            max={k.punkte}
-                            step={0.5}
-                            value={w?.punkte ?? ''}
-                            placeholder="–"
-                            onChange={(e) => {
-                              const v = e.currentTarget.value
-                              setzeWertung(k.id, (z) => (z.punkte = v === '' ? undefined : Math.min(k.punkte!, Math.max(0, Number(v)))), `rm-w-${k.id}`)
-                            }}
-                            aria-label={`Punkte ${k.kriterium}`}
-                          />{' '}
-                          / {k.punkte}
-                        </>
-                      ) : (
-                        <Menu withinPortal position="bottom-start">
-                          <Menu.Target>
-                            <span className="rm-wahl" role="button" tabIndex={0} aria-label={`Stufe ${k.kriterium}`}>
-                              {w?.stufe != null ? (t.stufen[w.stufe] ?? '–') : '–'}
-                            </span>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {t.stufen.map((s, n) => (
-                              <Menu.Item key={n} onClick={() => setzeWertung(k.id, (z) => (z.stufe = n))}>
-                                {s}
-                              </Menu.Item>
-                            ))}
-                          </Menu.Dropdown>
-                        </Menu>
-                      )}
-                    </td>
-                    <td>
-                      <Editierbar
-                        wert={c.n(w?.begruendung ?? '')}
-                        onText={(v) => setzeWertung(k.id, (z) => (z.begruendung = c.roh(v)), `rm-wb-${k.id}`)}
-                        platzhalter="Begründung"
-                        label={`Begründung ${k.kriterium}`}
-                        mehrzeilig
-                      />
-                    </td>
-                  </tr>
-                )
-              })}
-              {summe.moeglich > 0 && (
-                <tr className="summe">
-                  <td className="k">Summe</td>
-                  <td className="e">
-                    {summe.erreicht} / {summe.moeglich}
-                  </td>
-                  <td />
-                </tr>
-              )}
-            </tbody>
-          </table>
+          {titel}
+          <Raster skala={skala} von={von} bis={bis} />
         </>
       )
       break
-    }
     case 'staerken':
       laeuft = c.laeuft({ art: 'staerken' })
-      werkzeug = <Werkzeug stelle={{ art: 'staerken' }} plus={{ label: 'Stärke hinzufügen', onClick: () => neueZeile('staerken') }} />
+      if (anfang) werkzeug = <Werkzeug stelle={{ art: 'staerken' }} plus={{ label: 'Stärke hinzufügen', onClick: () => neueZeile('staerken') }} />
       inhalt = (
         <>
-          <h3>{x.titel}</h3>
-          <Liste feld="staerken" platzhalter="Stärke" />
+          {titel}
+          <Liste feld="staerken" platzhalter="Stärke" von={von} bis={bis} />
         </>
       )
       break
     case 'schritte':
       laeuft = c.laeuft({ art: 'schritte' })
-      werkzeug = <Werkzeug stelle={{ art: 'schritte' }} plus={{ label: 'Schritt hinzufügen', onClick: () => neueZeile('schritte') }} />
+      if (anfang) werkzeug = <Werkzeug stelle={{ art: 'schritte' }} plus={{ label: 'Schritt hinzufügen', onClick: () => neueZeile('schritte') }} />
       inhalt = (
         <>
-          <h3>{x.titel}</h3>
-          <Liste feld="schritte" platzhalter="Schritt" />
+          {titel}
+          <Liste feld="schritte" platzhalter="Schritt" von={von} bis={bis} />
         </>
       )
       break
     case 'kriterien':
-      werkzeug = (
-        <Werkzeug
-          plus={{
-            label: 'Kriterium hinzufügen',
-            onClick: () =>
-              c.setzeBogen((y) => {
-                y.kriterien.push({ kriterium: '', einschaetzung: 'teilweise' })
-                if (y.kriterienStufen) y.kriterienStufen.push(null)
-              })
-          }}
-        />
-      )
+      if (anfang)
+        werkzeug = (
+          <Werkzeug
+            plus={{
+              label: 'Kriterium hinzufügen',
+              onClick: () =>
+                c.setzeBogen((y) => {
+                  y.kriterien.push({ kriterium: '', einschaetzung: 'teilweise' })
+                  if (y.kriterienStufen) y.kriterienStufen.push(null)
+                })
+            }}
+          />
+        )
       inhalt = (
         <>
-          <h3>{x.titel}</h3>
+          {titel}
           <table className="bl-tab">
             <tbody>
-              {b.kriterien.map((k, i) => {
-                const stelle: Stelle = { art: 'kriterium', index: i }
-                const w = b.kriterienStufen?.[i]
-                return (
-                  <tr key={i} className={c.laeuft(stelle) ? 'rm-laeuft' : undefined}>
-                    <td className="k rm-zeile">
-                      <Editierbar
-                        wert={c.n(k.kriterium)}
-                        onText={(v) => c.setzeBogen((y) => (y.kriterien[i].kriterium = c.roh(v)), `rm-k-${i}`)}
-                        platzhalter="Kriterium"
-                        label={`Kriterium ${i + 1}`}
-                      />
-                      <span className="rm-zeilen-werkzeug rm-nur-ansicht">
-                        <Zauberstab stelle={stelle} label="Kriterium mit KI bearbeiten" />
-                        <Weg
-                          label="Kriterium entfernen"
-                          onClick={() =>
-                            c.setzeBogen((y) => {
-                              y.kriterien.splice(i, 1)
-                              y.kriterienStufen?.splice(i, 1)
-                            })
-                          }
+              {b.kriterien
+                .map((k, i) => ({ k, i }))
+                .slice(von, bis ?? undefined)
+                .map(({ k, i }) => {
+                  const stelle: Stelle = { art: 'kriterium', index: i }
+                  const w = b.kriterienStufen?.[i]
+                  return (
+                    <tr key={i} className={c.laeuft(stelle) ? 'rm-laeuft' : undefined} data-bl-teil>
+                      <td className="k rm-zeile">
+                        <Editierbar
+                          wert={c.n(k.kriterium)}
+                          onText={(v) => c.setzeBogen((y) => (y.kriterien[i].kriterium = c.roh(v)), `rm-k-${i}`)}
+                          platzhalter="Kriterium"
+                          label={`Kriterium ${i + 1}`}
                         />
-                      </span>
-                    </td>
-                    <td className="e">
-                      {x.mitStufe ? (
-                        <Menu withinPortal position="bottom-start">
-                          <Menu.Target>
-                            <span className={`rm-wahl${w?.bestaetigt ? '' : ' rm-vorschlag'}`} role="button" tabIndex={0} aria-label={`Einstufung ${k.kriterium}`}>
-                              {w?.wert ? (art === 'ampel' ? <span className="bl-ampel" style={{ background: AMPEL_FARBE[w.wert] }} /> : wertText(art, w.wert)) : '–'}
-                              {w?.wert && !w.bestaetigt && <span className="rm-note-hinweis rm-nur-ansicht">Vorschlag</span>}
-                            </span>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {skalenWerte(art).map((v) => (
-                              <Menu.Item
-                                key={v}
-                                leftSection={w?.wert === v ? <IconCheck size={14} /> : <span style={{ width: 14 }} />}
-                                onClick={() =>
-                                  c.setzeBogen((y) => {
-                                    if (!y.kriterienStufen) y.kriterienStufen = y.kriterien.map(() => null)
-                                    y.kriterienStufen[i] = { anteil: w?.anteil ?? 0, wert: v, bestaetigt: true }
-                                  })
-                                }
-                              >
-                                {wertText(art, v)}
-                                {w?.wert === v && !w.bestaetigt ? ' – bestätigen' : ''}
-                              </Menu.Item>
-                            ))}
-                          </Menu.Dropdown>
-                        </Menu>
-                      ) : (
-                        <Menu withinPortal position="bottom-start">
-                          <Menu.Target>
-                            <span className="rm-wahl" role="button" tabIndex={0} aria-label={`Einschätzung ${k.kriterium}`}>
-                              {SYMBOL[k.einschaetzung]} {k.einschaetzung}
-                            </span>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {(['sicher', 'teilweise', 'noch nicht'] as Einschaetzung[]).map((v) => (
-                              <Menu.Item key={v} onClick={() => c.setzeBogen((y) => (y.kriterien[i].einschaetzung = v))}>
-                                {SYMBOL[v]} {v}
-                              </Menu.Item>
-                            ))}
-                          </Menu.Dropdown>
-                        </Menu>
-                      )}
-                    </td>
-                    <td>
-                      {k.beleg ? '„' : ''}
-                      <Editierbar
-                        wert={c.n(k.beleg ?? '')}
-                        onText={(v) => c.setzeBogen((y) => (y.kriterien[i].beleg = c.roh(v)), `rm-b-${i}`)}
-                        platzhalter="Beleg"
-                        label={`Beleg ${i + 1}`}
-                        mehrzeilig
-                      />
-                      {k.beleg ? '“' : ''}
-                    </td>
-                  </tr>
-                )
-              })}
+                        <span className="rm-zeilen-werkzeug rm-nur-ansicht">
+                          <Zauberstab stelle={stelle} label="Kriterium mit KI bearbeiten" />
+                          <Weg
+                            label="Kriterium entfernen"
+                            onClick={() =>
+                              c.setzeBogen((y) => {
+                                y.kriterien.splice(i, 1)
+                                y.kriterienStufen?.splice(i, 1)
+                              })
+                            }
+                          />
+                        </span>
+                      </td>
+                      <td className="e">
+                        {x.mitStufe ? (
+                          <Menu withinPortal position="bottom-start">
+                            <Menu.Target>
+                              <span className={`rm-wahl${w?.bestaetigt ? '' : ' rm-vorschlag'}`} role="button" tabIndex={0} aria-label={`Einstufung ${k.kriterium}`}>
+                                {w?.wert ? art === 'ampel' ? <span className="bl-ampel" style={{ background: AMPEL_FARBE[w.wert] }} /> : wertText(art, w.wert) : '–'}
+                                {w?.wert && !w.bestaetigt && <span className="rm-note-hinweis rm-nur-ansicht">Vorschlag</span>}
+                              </span>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              {skalenWerte(art).map((v) => (
+                                <Menu.Item
+                                  key={v}
+                                  leftSection={w?.wert === v ? <IconCheck size={14} /> : <span style={{ width: 14 }} />}
+                                  onClick={() =>
+                                    c.setzeBogen((y) => {
+                                      if (!y.kriterienStufen) y.kriterienStufen = y.kriterien.map(() => null)
+                                      y.kriterienStufen[i] = { anteil: w?.anteil ?? 0, wert: v, bestaetigt: true }
+                                    })
+                                  }
+                                >
+                                  {wertText(art, v)}
+                                  {w?.wert === v && !w.bestaetigt ? ' – bestätigen' : ''}
+                                </Menu.Item>
+                              ))}
+                            </Menu.Dropdown>
+                          </Menu>
+                        ) : (
+                          <Menu withinPortal position="bottom-start">
+                            <Menu.Target>
+                              <span className="rm-wahl" role="button" tabIndex={0} aria-label={`Einschätzung ${k.kriterium}`}>
+                                {SYMBOL[k.einschaetzung]} {k.einschaetzung}
+                              </span>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              {(['sicher', 'teilweise', 'noch nicht'] as Einschaetzung[]).map((v) => (
+                                <Menu.Item key={v} onClick={() => c.setzeBogen((y) => (y.kriterien[i].einschaetzung = v))}>
+                                  {SYMBOL[v]} {v}
+                                </Menu.Item>
+                              ))}
+                            </Menu.Dropdown>
+                          </Menu>
+                        )}
+                      </td>
+                      <td>
+                        {k.beleg ? '„' : ''}
+                        <Editierbar
+                          wert={c.n(k.beleg ?? '')}
+                          onText={(v) => c.setzeBogen((y) => (y.kriterien[i].beleg = c.roh(v)), `rm-b-${i}`)}
+                          platzhalter="Beleg"
+                          label={`Beleg ${i + 1}`}
+                          mehrzeilig
+                        />
+                        {k.beleg ? '“' : ''}
+                      </td>
+                    </tr>
+                  )
+                })}
             </tbody>
           </table>
         </>
@@ -682,7 +770,7 @@ function KastenTeil({ x, erst, letzt, skala }: { x: KastenAbschnitt; erst: boole
       werkzeug = <Werkzeug stelle={{ art: 'ueberarbeitung' }} />
       inhalt = (
         <>
-          <h3>{x.titel}</h3>
+          {titel}
           <div className="bl-auftrag">
             <p className="bl-zitat">
               „
@@ -725,7 +813,7 @@ function KastenTeil({ x, erst, letzt, skala }: { x: KastenAbschnitt; erst: boole
       break
   }
   return (
-    <div className={`bl-block bl-k${erst ? ' erst' : ''}${letzt ? ' letzt' : ''}${laeuft || kastenLaeuft ? ' rm-laeuft' : ''}`} data-rm-abschnitt={x.art}>
+    <div className={`bl-block bl-k${erst ? ' erst' : ''}${letzt ? ' letzt' : ''}${von ? ' fort' : ''}${laeuft || kastenLaeuft ? ' rm-laeuft' : ''}`} data-rm-abschnitt={x.art}>
       {erst && (
         <div className="bl-k-kopf">
           <span>{kastenTitel(c.a.name.trim() || c.a.kuerzel)}</span>

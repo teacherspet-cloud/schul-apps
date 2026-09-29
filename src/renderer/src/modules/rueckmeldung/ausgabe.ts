@@ -40,8 +40,13 @@ import {
   blattModell,
   kastenTitel,
   mitName,
+  notizText,
+  RASTER_KOPF,
   skalenName,
   SYMBOL,
+  tabellenZeilen,
+  tabWert,
+  teilTabelle,
   titelZeile,
   type BlattEinstufung,
   type markenStil
@@ -69,7 +74,10 @@ const bestaetigt = (w: Einstufungswert | null | undefined): Einstufungswert | nu
 
 // ---------- PDF (HTML) ----------
 
-/** Die Bögen als Druck-HTML – dasselbe Blatt wie in der Ansicht (blattLayout.ts) */
+/**
+ * Die Bögen als Druck-HTML im freien Fluss – ohne Messung (Tests, Notfall). Die App druckt mit
+ * gemessenem Seitenplan: `boegenDruckHtml` in seitenMessen.ts (dieselben Seiten wie die Ansicht).
+ */
 export function boegenHtml(r: Rueckmeldung, abgaben: Abgabe[], opt: AusgabeOptionen = {}): string {
   const blaetter = abgaben.filter((a) => a.bogen).map((a) => blattHtml(r, a, { zeichen: opt.zeichen }))
   return blattDokument(titelZeile(r), blaetter, kiMetaTag(r.meta.ki))
@@ -152,7 +160,7 @@ export async function boegenDocx(r: Rueckmeldung, abgaben: Abgabe[], opt: Ausgab
           new TextRun({ text: `${g.nr} `, bold: true, color: g.k.art === 'lob' ? GRUEN : ROT, size: pt(15), font: 'Calibri' }),
           ...(g.k.art === 'lob' ? [hand('✓ ', GRUEN)] : []),
           ...(g.k.zeichen ? [new TextRun({ text: `${g.k.zeichen}: `, bold: true, font: HAND, color: ROT, size: pt(21) })] : []),
-          hand(n(g.k.text), g.k.art === 'lob' ? GRUEN : ROT),
+          hand(n(notizText(g.k)), g.k.art === 'lob' ? GRUEN : ROT),
           ...(g.k.ohneWertung ? [new TextRun({ text: ' (ohne Wertung)', size: 16, color: '777777' })] : [])
         ]
       })
@@ -249,28 +257,128 @@ export async function boegenDocx(r: Rueckmeldung, abgaben: Abgabe[], opt: Ausgab
             })
         )
       })
+    // Bewertungsraster (29.09.2026): Kriterium fett, Beschreibung klein darunter, Punkte rechts, Bereiche als
+    // Zwischenzeilen mit Zwischensumme; die Kopfzeile wiederholt sich auf jeder Seite, keine Zeile bricht um
+    const rasterSpalten = [0.45, 0.13, 0.42].map((x) => Math.round(innen * x))
+    const rasterZelle = (children: Paragraph[], s: number, o: { grau?: boolean; kopf?: boolean; oben?: boolean } = {}): TableCell =>
+      new TableCell({
+        width: { size: rasterSpalten[s], type: WidthType.DXA },
+        borders: { ...ohneRahmen, ...(o.kopf ? { bottom: linie('777777', 6) } : o.oben ? { top: linie('D4D4D4', 4) } : {}) },
+        ...(o.grau ? { shading: { fill: 'F0F2F4' } } : {}),
+        margins: { top: 50, bottom: 50, left: 60, right: 60 },
+        children
+      })
+    const absatz = (text: string, o: { bold?: boolean; color?: string; size?: number; rechts?: boolean } = {}): Paragraph =>
+      new Paragraph({ ...(o.rechts ? { alignment: AlignmentType.RIGHT } : {}), children: [tr(text, { bold: o.bold, color: o.color, size: pt(o.size ?? 20) })] })
+    const raster = (zeilen: ReturnType<typeof tabellenZeilen>, mitPunkten: boolean): Table =>
+      new Table({
+        layout: TableLayoutType.FIXED,
+        width: { size: innen, type: WidthType.DXA },
+        columnWidths: rasterSpalten,
+        borders: ohneRahmen,
+        rows: [
+          new TableRow({
+            tableHeader: true,
+            cantSplit: true,
+            children: [RASTER_KOPF[0], mitPunkten ? RASTER_KOPF[1] : 'Stufe', RASTER_KOPF[2]].map((k, s) =>
+              rasterZelle([absatz(k, { bold: true, color: '555555', size: 17, rechts: s === 1 })], s, { kopf: true })
+            )
+          }),
+          ...zeilen.map((z, j) => {
+            if (z.art === 'bereich' || z.art === 'summe') {
+              const titel = z.art === 'bereich' ? z.titel : 'Summe'
+              const wert = z.moeglich ? `${String(z.erreicht).replace('.', ',')} / ${z.moeglich}` : ''
+              const o = { grau: z.art === 'bereich', oben: j > 0 }
+              return new TableRow({
+                cantSplit: true,
+                children: [
+                  rasterZelle([absatz(titel, { bold: true, size: 19 })], 0, o),
+                  rasterZelle([absatz(wert, { bold: true, size: 19, rechts: true })], 1, o),
+                  rasterZelle([absatz('')], 2, o)
+                ]
+              })
+            }
+            return new TableRow({
+              cantSplit: true,
+              children: [
+                rasterZelle(
+                  [
+                    ...(z.bereich ? [absatz(z.bereich.toUpperCase(), { color: '777777', size: 15 })] : []),
+                    absatz(z.name, { bold: true }),
+                    ...(z.deskriptor ? [absatz(z.deskriptor, { color: '666666', size: 17 })] : [])
+                  ],
+                  0,
+                  { oben: j > 0 }
+                ),
+                rasterZelle([absatz(tabWert(z), { rechts: true })], 1, { oben: j > 0 }),
+                rasterZelle([absatz(z.begruendung ? n(z.begruendung) : '', { color: '333333', size: 19 })], 2, { oben: j > 0 })
+              ]
+            })
+          })
+        ]
+      })
+    // Bewertung nach Teilen als kleine Tabelle: erreichte Werte und Gewichte getrennt
+    const teilTab = (tt: NonNullable<ReturnType<typeof teilTabelle>>): Table => {
+      const anteile = tt.getrennt ? [0.3, 0.13, 0.19, 0.19, 0.19] : [0.5, 0.25, 0.25]
+      const breiten = anteile.map((x) => Math.round(innen * x))
+      const zelle = (text: string[], s: number, o: { bold?: boolean; kopf?: boolean; span?: number } = {}): TableCell =>
+        new TableCell({
+          width: { size: breiten[s] * (o.span ?? 1), type: WidthType.DXA },
+          ...(o.span ? { columnSpan: o.span } : {}),
+          borders: { ...ohneRahmen, ...(o.kopf ? { bottom: linie('777777', 6) } : { top: linie('D4D4D4', 4) }) },
+          margins: { top: 40, bottom: 40, left: 60, right: 60 },
+          children: text.map((t, k) => absatz(t, { bold: o.bold && k === 0, color: k ? '777777' : o.kopf ? '555555' : undefined, size: k ? 15 : o.kopf ? 17 : 20, rechts: s > 0 }))
+        })
+      const g = (x: number | null | undefined): string[] => (x != null ? [`Gewicht ${x} %`] : [])
+      const kopf = tt.getrennt
+        ? [
+            zelle(['Teil'], 0, { kopf: true, bold: true }),
+            zelle(['zählt'], 1, { kopf: true, bold: true }),
+            zelle(['Inhalt erreicht', ...g(tt.gewichtEinheitlich)], 2, { kopf: true, bold: true }),
+            zelle(['Sprache erreicht', ...g(tt.gewichtEinheitlich != null ? 100 - tt.gewichtEinheitlich : null)], 3, { kopf: true, bold: true }),
+            zelle(['Ergebnis'], 4, { kopf: true, bold: true })
+          ]
+        : [zelle(['Teil'], 0, { kopf: true, bold: true }), zelle(['zählt'], 1, { kopf: true, bold: true }), zelle(['Ergebnis'], 2, { kopf: true, bold: true })]
+      const p = (x: number | undefined | null): string => (x != null ? `${x} %` : '–')
+      const reihen = tt.zeilen.map((z) => {
+        const einzeln = tt.gewichtEinheitlich == null && z.getrennt
+        const mitte = tt.getrennt
+          ? z.getrennt
+            ? [zelle([p(z.inhalt), ...(einzeln ? g(z.gewichtInhalt) : [])], 2), zelle([p(z.sprache), ...(einzeln ? g(100 - (z.gewichtInhalt ?? 0)) : [])], 3)]
+            : [zelle([`erfüllt ${p(z.anteil)}`], 2, { span: 2 })]
+          : []
+        return new TableRow({
+          cantSplit: true,
+          children: [zelle([z.titel], 0), zelle([z.zaehlt], 1), ...mitte, zelle([`${p(z.ergebnis)}${z.gedeckelt ? '*' : ''}`], tt.getrennt ? 4 : 2, { bold: true })]
+        })
+      })
+      return new Table({
+        layout: TableLayoutType.FIXED,
+        width: { size: innen, type: WidthType.DXA },
+        columnWidths: breiten,
+        borders: ohneRahmen,
+        rows: [new TableRow({ tableHeader: true, cantSplit: true, children: kopf }), ...reihen]
+      })
+    }
     const kasten: (Paragraph | Table)[] = []
     for (const x of md.kasten) {
       switch (x.art) {
-        case 'teile':
-          kasten.push(ueber(x.titel), ...x.zeilen.map((z) => new Paragraph({ children: [tr(z, { color: '333333', size: pt(21) })] })))
-          break
-        case 'tabelle': {
-          const t = r.tabelle!
-          const summe = tabellenSumme(t, b.tabelle)
-          const reihen = t.kriterien.map((k) => {
-            const w = b.tabelle!.find((y) => y.kriteriumId === k.id)
-            const wert = k.punkte ? `${w?.punkte ?? '–'} / ${k.punkte}` : w?.stufe != null ? (t.stufen[w.stufe] ?? '') : '–'
-            return [`${k.bereich ? `${k.bereich}: ` : ''}${k.kriterium}`, wert, w?.begruendung ? n(w.begruendung) : '']
-          })
-          const fett = reihen.map(() => false)
-          if (summe.moeglich) {
-            reihen.push(['Summe', `${summe.erreicht} / ${summe.moeglich}`, ''])
-            fett.push(true)
-          }
-          kasten.push(ueber(x.titel), tabelle(reihen, fett))
+        case 'teile': {
+          const tt = teilTabelle(r, b)
+          if (tt)
+            kasten.push(
+              ueber(x.titel),
+              teilTab(tt),
+              ...(tt.gesamtText ? [new Paragraph({ spacing: { before: 60 }, children: [tr(tt.gesamtText, { bold: true, size: pt(20) })] })] : []),
+              ...(tt.zeilen.some((z) => z.gedeckelt)
+                ? [new Paragraph({ children: [tr('* höchstens 20 %, weil Inhalt oder Sprache ungenügend ist', { color: '777777', size: 16 })] })]
+                : [])
+            )
           break
         }
+        case 'tabelle':
+          kasten.push(ueber(x.titel), raster(tabellenZeilen(r, b), r.tabelle!.kriterien.some((k) => k.punkte)))
+          break
         case 'staerken':
           kasten.push(ueber(x.titel), ...b.staerken.map((s) => new Paragraph({ indent: { left: 300, hanging: 300 }, children: [tr('✓ ', { color: GRUEN, bold: true }), tr(n(s))] })))
           break

@@ -317,7 +317,7 @@ describe('Ausgabe', () => {
   it('Korrekturrand, Legende, Großdruck – der Nachteilsausgleich selbst steht nicht auf dem Bogen', () => {
     const html = boegenHtml(r, r.abgaben, { zeichen: zeichenFuer('deutsch') })
     // Schülertext oben mit Korrekturrand: Stelle angestrichen und nummeriert, Verbesserung am Rand
-    expect(html).toMatch(/<div class="bl-block bl-abs"><div class="bl-text">Lea schreibt einen Satz mit <span class="bl-m fehler">Fehlr<\/span><sup class="bl-nr-t ">1<\/sup>/)
+    expect(html).toMatch(/<div class="bl-block bl-abs"[^>]*><div class="bl-text">Lea schreibt einen Satz mit <span class="bl-m fehler">Fehlr<\/span><sup class="bl-nr-t ">1<\/sup>/)
     expect(html).toMatch(/<div class="bl-notiz fehler"><span class="bl-nr">1<\/span><span class="bl-zeichen">R:<\/span>Fehler<\/div>/)
     expect(html.indexOf('bl-abs')).toBeLessThan(html.indexOf('bl-k erst'))
     expect(html).toMatch(/R = Rechtschreibung/)

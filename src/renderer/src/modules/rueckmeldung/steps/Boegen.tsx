@@ -6,6 +6,7 @@ import {
   Card,
   Container,
   Group,
+  Loader,
   Paper,
   ScrollArea,
   SegmentedControl,
@@ -29,6 +30,7 @@ import {
   IconLanguage,
   IconMapPinPlus,
   IconPlayerStop,
+  IconPlus,
   IconPrinter,
   IconRefresh,
   IconSearch,
@@ -36,6 +38,7 @@ import {
   IconX
 } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
+import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
 import { FAMILIENSPRACHEN, spracheNach } from '../../../shared/familiensprachen'
 import { thresholdsForSubject } from '../../../shared/gradeScale'
@@ -44,7 +47,9 @@ import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
 import { einstufungVon, gesamtEinstufen, offeneBestaetigungen, tabellenSumme, wertText, type SkalenKontext } from '../art'
 import { AMPEL_FARBE } from '../blattLayout'
-import { aufScan, boegenDocx, boegenHtml, bogenVorlesetext, elternDocx, elternHtml } from '../ausgabe'
+import { aufScan, boegenDocx, bogenVorlesetext, elternDocx, elternHtml } from '../ausgabe'
+import { trennSchluessel } from '../abgabeAnlegen'
+import { boegenDruckHtml } from '../seitenMessen'
 import { elternUebersetzen, rueckmeldungenErzeugen } from '../auftrag'
 import { hatAusgleich, hatMassnahme } from '../nachteilsausgleich'
 import { scanBilderFuer } from '../scanBild'
@@ -56,6 +61,7 @@ import { bogenStatus, ladeOffen, merkeOffen, passtZurSuche, STATUS_FARBE, STATUS
 import EinstufungWahl from './EinstufungWahl'
 import ExportSperre, { allesBestaetigen, offeneAbgaben } from './ExportSperre'
 import Uebersicht from './Uebersicht'
+import WeitereAbgabe from './WeitereAbgabe'
 
 /** Hinweise der Prüfung am Bogen (z. B. Sprache verfehlt) – nur für die Lehrkraft, nicht im Ausdruck */
 const hinweiseVon = (b: Bogen | undefined): string[] => (Array.isArray(b?.hinweise) ? b.hinweise.filter((h): h is string => typeof h === 'string' && Boolean(h.trim())) : [])
@@ -75,6 +81,10 @@ const hinweiseVon = (b: Bogen | undefined): string[] => (Array.isArray(b?.hinwei
  * Suchfeld (Name oder Kürzel, Umlaute tolerant; bei genau einem Treffer klappt er auf). Zugeklappte
  * Blätter werden nicht gezeichnet (kein Messen, kein Seitenumbruch). Der Aufklappzustand gilt für
  * die Sitzung (sessionStorage je Dokument).
+ *
+ * Seit 29.09.2026 nachts: PDF und Drucken mit gemessenem Seitenplan (seitenMessen.ts) – dieselben
+ * Seiten wie das Blatt in der Ansicht. Oben der Knopf „Weitere Abgabe" (Fenster WeitereAbgabe.tsx):
+ * Die neue Abgabe erscheint aufgeklappt in der Liste, mit Lader, bis ihr Bogen da ist.
  */
 export default function Boegen(): React.JSX.Element | null {
   const { dok: r, update, docId } = useRueckmeldung()
@@ -86,6 +96,10 @@ export default function Boegen(): React.JSX.Element | null {
   const [sperre, setSperre] = useState<{ ids: string[]; weiter: () => void } | null>(null)
   const [suche, setSuche] = useState('')
   const [offen, setOffen] = useState<string[]>(() => ladeOffen(docId))
+  const [weitere, setWeitere] = useState(false)
+  // Über „Weitere Abgabe" angelegt: aufgeklappt mit Lader, bis der Bogen da ist
+  const [erwartet, setErwartet] = useState<string[]>([])
+  const laufend = useLaufendeSchluessel(docId)
   useEffect(() => {
     void window.api.ai
       .status()
@@ -136,19 +150,23 @@ export default function Boegen(): React.JSX.Element | null {
       if (!f?.liste.length) return
       const { d, liste } = f
       const basis = safeFileName(`${d.meta.title || d.grundlage.titel || 'Rückmeldung'}${liste.length === 1 ? ` - ${liste[0].name.trim() || liste[0].kuerzel}` : ''}`)
-      void speichereAusgabe(
-        dateiart === 'pdf'
-          ? [{ name: `${basis}.pdf`, html: boegenHtml(d, liste, { zeichen }) }]
-          : [{ name: `${basis}.docx`, filter: WORD_FILTER, daten: async () => boegenDocx(d, liste, { zeichen, scanBilder: await scanBilderFuer(liste) }) }],
-        liste.length === 1 ? 'Rückmeldung gespeichert.' : `${liste.length} Rückmeldungen gespeichert.`
-      ).catch(notifyError)
+      void (async () => {
+        // PDF: Seiten gemessen wie in der Ansicht (auch für Bögen, die gerade zugeklappt sind)
+        const datei =
+          dateiart === 'pdf'
+            ? { name: `${basis}.pdf`, html: await boegenDruckHtml(d, liste, { zeichen }) }
+            : { name: `${basis}.docx`, filter: WORD_FILTER, daten: async () => boegenDocx(d, liste, { zeichen, scanBilder: await scanBilderFuer(liste) }) }
+        await speichereAusgabe([datei], liste.length === 1 ? 'Rückmeldung gespeichert.' : `${liste.length} Rückmeldungen gespeichert.`)
+      })().catch(notifyError)
     })
 
   const drucken = (ids: string[]): void =>
     mitFreigabe(ids, () => {
       const f = frisch(ids)
       if (!f?.liste.length) return
-      void window.api.exporter.print(boegenHtml(f.d, f.liste, { zeichen })).catch(notifyError)
+      void boegenDruckHtml(f.d, f.liste, { zeichen })
+        .then((html) => window.api.exporter.print(html))
+        .catch(notifyError)
     })
 
   const elternSpeichern = (dateiart: 'pdf' | 'docx'): void => {
@@ -220,6 +238,9 @@ export default function Boegen(): React.JSX.Element | null {
             />
           </Group>
           <Group gap="xs">
+            <Button size="xs" variant="light" color="teal" leftSection={<IconPlus size={14} />} onClick={() => setWeitere(true)} data-rm-weitere-knopf>
+              Weitere Abgabe
+            </Button>
             {r.abgaben.some((a) => !a.bogen && (a.text.trim() || a.bilder.length)) && (
               <Button size="xs" variant="light" onClick={() => rueckmeldungenErzeugen(r, docId)}>
                 Fehlende Bögen schreiben
@@ -306,14 +327,29 @@ export default function Boegen(): React.JSX.Element | null {
             )}
             {sichtbar.map((a) => {
               const auf = Boolean(a.bogen) && offen.includes(a.id)
+              const wartet = !a.bogen && erwartet.includes(a.id)
+              const schreibt = laufend.has(`rueckmeldung-${docId}`) || laufend.has(trennSchluessel(docId))
               return (
-                <Paper key={a.id} withBorder radius="md" data-rm-zeile={a.kuerzel} data-rm-offen={auf ? 'ja' : 'nein'}>
-                  <BogenKopf r={r} a={a} auf={auf} umschalten={() => umschalten(a.id)} />
+                <Paper key={a.id} withBorder radius="md" data-rm-zeile={a.kuerzel} data-rm-id={a.id} data-rm-offen={auf || wartet ? 'ja' : 'nein'}>
+                  <BogenKopf r={r} a={a} auf={auf || wartet} umschalten={() => umschalten(a.id)} />
                   {/* Zugeklappt wird das Blatt gar nicht gezeichnet – kein Messen, kein Umbruch */}
                   {auf && (
                     <div style={{ padding: '0 12px 12px' }}>
                       <BogenInhalt a={a} x={aktionen} />
                     </div>
+                  )}
+                  {wartet && (
+                    <Group gap="sm" px="md" pb="md" data-rm-wartet>
+                      {schreibt ? <Loader size="sm" /> : null}
+                      <Text size="sm" c="dimmed">
+                        {schreibt ? 'Die Rückmeldung wird geschrieben …' : 'Noch ohne Bogen.'}
+                      </Text>
+                      {!schreibt && (a.text.trim() || a.bilder.length > 0) && (
+                        <Button size="compact-xs" variant="light" onClick={() => rueckmeldungenErzeugen({ ...r, abgaben: [a] }, docId)}>
+                          Bogen schreiben
+                        </Button>
+                      )}
+                    </Group>
                   )}
                 </Paper>
               )
@@ -322,6 +358,18 @@ export default function Boegen(): React.JSX.Element | null {
         )}
       </Container>
       <ExportSperre ids={sperre?.ids ?? null} weiter={() => sperre?.weiter()} schliessen={() => setSperre(null)} />
+      <WeitereAbgabe
+        offen={weitere}
+        schliessen={() => setWeitere(false)}
+        angelegt={(id) => {
+          setAnsicht('boegen')
+          setSuche('')
+          setErwartet((e) => [...e, id])
+          setOffen((o) => (o.includes(id) ? o : [...o, id]))
+          // Die neue Zeile ins Bild holen
+          window.setTimeout(() => document.querySelector(`[data-rm-id="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80)
+        }}
+      />
     </ScrollArea>
   )
 }

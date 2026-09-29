@@ -228,6 +228,28 @@ td.rm-zeile .rm-zeilen-werkzeug {
   color: #777;
   font-size: 9pt;
 }
+/* Eingaben in den Tabellen des Kastens: schmal, damit die Zeile so hoch bleibt wie im Ausdruck */
+.bl-raster .rm-zahl {
+  width: 1.9em;
+  line-height: inherit;
+}
+.bl-teiltab .rm-teil-zahl input {
+  width: 2.4em;
+  line-height: inherit;
+}
+.bl-raster .rm-zahl::-webkit-inner-spin-button,
+.bl-raster .rm-zahl::-webkit-outer-spin-button,
+.bl-teiltab .rm-teil-zahl input::-webkit-inner-spin-button,
+.bl-teiltab .rm-teil-zahl input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Ergebnis und Gesamtleistung: die Rechnung steht als Erläuterung daran (nur in der Ansicht) */
+.rm-rechnung {
+  cursor: help;
+  text-decoration: underline dotted #9aa0a6;
+  text-underline-offset: 2px;
+}
 
 /* Text markiert: Notiz anlegen */
 .rm-auswahl {
