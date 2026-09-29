@@ -42,6 +42,12 @@ export interface Grundlage {
   aufgaben: string
   /** Erwartungshorizont bzw. Lösungen, falls vorhanden */
   erwartung?: string
+  /**
+   * Teile der Arbeit mit Gewichtung (29.09.2026, teilbewertung.ts): Schreib- und
+   * Sprachmittlungsteile getrennt nach Inhalt und Sprache, Gesamtleistung nach Prozent oder Punkten.
+   */
+  teile?: import('../teilbewertung').BewertungsTeil[]
+  verrechnung?: import('../teilbewertung').Verrechnung
 }
 
 export type Einschaetzung = 'sicher' | 'teilweise' | 'noch nicht'
@@ -124,6 +130,8 @@ export interface Bogen {
   rand?: RandKommentar[]
   /** Wertung je Kriterium der Bewertungstabelle */
   tabelle?: TabellenWertung[]
+  /** Wertung je Teil der Arbeit (Inhalt/Sprache bzw. Erfüllungsgrad) – teilbewertung.ts */
+  teile?: import('../teilbewertung').TeilWertung[]
   /** Überarbeitungsauftrag zu einer Stelle */
   ueberarbeitung?: { zitat: string; auftrag: string }
   fehler?: Fehlerschwerpunkt[]

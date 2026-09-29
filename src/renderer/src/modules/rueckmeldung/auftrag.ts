@@ -13,8 +13,10 @@ import {
   erwartungAus,
   erwartungAusDateiAnfrage,
   erwartungsEntwurfAnfrage,
+  teileAnfrage,
   type GeleseneDatei
 } from './aufgabeAusMaterial'
+import { fremdsprachlich, teileAusKi } from './teilbewertung'
 import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUebernehmen, type BogenKontext } from './generation'
 import type { Abgabe, Bewertungstabelle, Rueckmeldung } from './model/types'
 import { bibliothek } from './store'
@@ -132,6 +134,9 @@ export function aufgabeAusDateien(r: Rueckmeldung, docId: string, dateien: Geles
         }
         if (teile.length)
           meta.erkannt = `${teile.join(' und ')} aus dem Material erkannt${erkannt.erkennbar.length ? ` (${erkannt.erkennbar.join('; ')})` : ''} – bitte prüfen.`
+        // Teile mit Gewichtung (29.09.2026): Schreiben/Sprachmittlung in den Fremdsprachen, mehrere Teilkompetenzen
+        const erkannteTeile = teileAusKi(erkannt.teile, meta)
+        const mitTeilen = erkannteTeile && (erkannteTeile.teile.length > 1 || (fremdsprachlich(meta.subjectId) && erkannteTeile.teile.some((t) => t.art !== 'sonstig')))
         return {
           ...aktuell,
           meta,
@@ -139,10 +144,39 @@ export function aufgabeAusDateien(r: Rueckmeldung, docId: string, dateien: Geles
             art: 'frei',
             titel: aktuell.grundlage.titel.trim() || erkannt.titel,
             aufgaben: erkannt.aufgaben,
-            erwartung: erwartung ? (entwurf ? `${ENTWURF_VERMERK}\n${erwartung}` : erwartung) : aktuell.grundlage.erwartung
+            erwartung: erwartung ? (entwurf ? `${ENTWURF_VERMERK}\n${erwartung}` : erwartung) : aktuell.grundlage.erwartung,
+            ...(mitTeilen ? erkannteTeile : {})
           }
         }
       })
+  })
+}
+
+/**
+ * „Teile erkennen" (29.09.2026): Schreib- und Sprachmittlungsteile und Gewichtungen aus der schon
+ * eingetragenen Aufgabe (Material aus der Bibliothek, getippte Aufgabe).
+ */
+export function teileErkennen(r: Rueckmeldung, docId: string): void {
+  void starteAuftrag({
+    moduleId: 'rueckmeldung',
+    docId,
+    titel: r.meta.title || r.grundlage.titel || 'Rückmeldung',
+    art: 'Teile der Arbeit erkennen',
+    eingabe: r,
+    istOffen: () => bibliothek.istOffen(docId),
+    sperrt: false,
+    schluessel: `rueckmeldung-teile-${docId}`,
+    fehlerTitel: 'Die Teile der Arbeit konnten nicht erkannt werden',
+    arbeit: async (rm, k) => {
+      k.melde('Die KI sucht Schreib- und Sprachmittlungsteile und Gewichtungen …')
+      const d = await k.ai<{ teile?: unknown }>(teileAnfrage(rm.grundlage.aufgaben, rm.grundlage.erwartung ?? ''))
+      const erkannt = teileAusKi(d?.teile, rm.meta)
+      if (!erkannt) throw new Error('In der Aufgabe waren keine Teile zu erkennen.')
+      return erkannt
+    },
+    abschluss: (e) =>
+      `${e.teile.length} ${e.teile.length === 1 ? 'Teil' : 'Teile'} erkannt${e.teile.some((t) => t.quelle === 'material') ? ' – Gewichtung aus dem Material' : ''}.`,
+    ablegen: (e, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, grundlage: { ...aktuell.grundlage, ...e } }))
   })
 }
 

@@ -26,6 +26,7 @@ import { ausgleichKurz, gemerkterAusgleich, hatAusgleich, merkeAusgleich, type A
 import ArtKarte from './ArtKarte'
 import AusgleichFenster from './AusgleichFenster'
 import TabelleKarte from './TabelleKarte'
+import TeileKarte from './TeileKarte'
 import { pruefeHochladen, type HochladeInhalt } from '../../../shared/datenschutz'
 import DropZone from '../../../shared/components/DropZone'
 import Formularfuss from '../../../shared/components/Formularfuss'
@@ -326,6 +327,7 @@ export default function Einrichten(): React.JSX.Element | null {
               </Card>
               <ArtKarte />
               {hatForm(r.meta, 'tabelle') && <TabelleKarte />}
+              <TeileKarte r={r} docId={docId} update={update} />
             </Stack>
             <Card withBorder>
               <Title order={4} mb="sm">

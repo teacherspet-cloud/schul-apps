@@ -2,6 +2,7 @@
  * Rückmeldung (Großprogramm 0.4, F3): Grundlage aus gespeichertem Material, Übertragen von
  * Fotos/Scans in Text, Rückmeldebogen ohne Note.
  */
+import { gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
 import type { StructuredRequest } from '@shared/types'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
@@ -127,8 +128,10 @@ export async function ladeGrundlage(
   if (art === 'klassenarbeit') {
     const s = await window.api.exams.get(id)
     const e = normalisiereArbeit(s.payload as Exam)
+    // Teile mit Gewicht, Punkten und Inhaltsanteil stehen in der Arbeit fest (29.09.2026)
+    const { teile, verrechnung } = teileAusArbeit(e)
     return {
-      grundlage: grundlageAusBlatt(examToWorksheet(e, 0), art, id, s.name),
+      grundlage: { ...grundlageAusBlatt(examToWorksheet(e, 0), art, id, s.name), ...(teile.length > 1 || teile.some(getrennt) ? { teile, verrechnung } : {}) },
       fach: { id: e.meta.subjectId, label: e.meta.subjectLabel, grade: e.meta.grade }
     }
   }
@@ -244,6 +247,51 @@ export const textRand = (r: Rueckmeldung, a: Abgabe): boolean => hatForm(r.meta,
 const mitTabelle = (r: Rueckmeldung): boolean => hatForm(r.meta, 'tabelle') && Boolean(r.tabelle?.kriterien.length)
 
 /** Das Antwortschema passt sich den gewählten Formen an – die KI liefert nur, was gebraucht wird */
+/**
+ * Bewertung nach Teilen (29.09.2026): nur mit Einstufung – ohne Note bleibt es bei einer
+ * Rückmeldung in Worten, die Inhalt und Sprache aber getrennt anspricht (`teilRegeln`).
+ */
+export const mitTeilen = (r: Rueckmeldung): boolean => Boolean(r.grundlage.teile?.length) && einstufungVon(r.meta) !== 'keine'
+
+/** Teile der Arbeit für die Anfrage – mit Kennung, Gewicht und Inhaltsanteil */
+export function teileText(r: Rueckmeldung): string {
+  const teile = r.grundlage.teile
+  if (!teile?.length) return ''
+  const v = r.grundlage.verrechnung ?? 'prozent'
+  return [
+    `TEILE DER ARBEIT (Gesamtleistung nach ${v === 'punkte' ? 'Punkten' : 'prozentualer Gewichtung'}):`,
+    ...teile.map((t) => `[${t.id}] ${teilZeile(t, v)}${getrennt(t) ? ' – Inhalt und Sprache getrennt bewerten' : ''}`)
+  ].join('\n')
+}
+
+export function teilRegeln(r: Rueckmeldung): string[] {
+  const teile = r.grundlage.teile
+  if (!teile?.length) return []
+  const getrennteTeile = teile.filter(getrennt)
+  const regeln: string[] = []
+  if (getrennteTeile.length)
+    regeln.push(
+      `- ${getrennteTeile.map((t) => t.titel).join(', ')}: Inhalt (Aufgabenbezug, Vollständigkeit, Textsorte, Adressatenbezug) und Sprache (Wortschatz, Grammatik, Satzbau, Kohärenz, sprachliche Richtigkeit) GETRENNT beurteilen – auch in Stärken und nächsten Schritten.`
+    )
+  if (mitTeilen(r))
+    regeln.push(
+      `- Bewerte JEDEN Teil (Kennung in eckigen Klammern): ${getrennteTeile.length ? 'bei Schreiben/Sprachmittlung Erfüllungsgrad von Inhalt und Sprache getrennt, ' : ''}bei anderen Teilen den Erfüllungsgrad des Teils. Die App verrechnet daraus die Gesamtleistung.`
+    )
+  return regeln
+}
+
+/** Kurzbegründung der Gesamtleistung aus den Teilwertungen */
+function begruendungAusTeilen(teile: BewertungsTeil[], w: TeilWertung[]): string {
+  return teile
+    .map((t) => {
+      const x = w.find((y) => y.teilId === t.id)
+      if (!x) return ''
+      return getrennt(t) ? `${t.titel}: Inhalt ${x.inhalt ?? 0} %, Sprache ${x.sprache ?? 0} %` : `${t.titel}: ${x.anteil ?? 0} %`
+    })
+    .filter(Boolean)
+    .join(' · ')
+}
+
 export function bogenSchema(r: Rueckmeldung, a: Abgabe, ctx: BogenKontext = OHNE_KONTEXT): Schema {
   const m = r.meta
   const felder: Record<string, Schema> = {}
@@ -260,7 +308,17 @@ export function bogenSchema(r: Rueckmeldung, a: Abgabe, ctx: BogenKontext = OHNE
       })
     )
   if (schriftlich) felder.schluss = str('Ein ermutigender, ehrlicher Schlusssatz – ohne Floskel')
-  if (gesamtEinstufen(m) && !mitTabelle(r))
+  if (mitTeilen(r))
+    felder.teile = arr(
+      obj({
+        id: str('Kennung des Teils in eckigen Klammern, ohne Klammern'),
+        inhalt: int('Nur Schreiben/Sprachmittlung: Erfüllungsgrad des INHALTS in Prozent (0–100) – sonst 0'),
+        sprache: int('Nur Schreiben/Sprachmittlung: Erfüllungsgrad der SPRACHE in Prozent (0–100) – sonst 0'),
+        anteil: int('Nur andere Teile: Erfüllungsgrad des Teils in Prozent (0–100) – sonst 0'),
+        begruendung: str('Kurze Begründung mit Bezug auf die Arbeit')
+      })
+    )
+  if (gesamtEinstufen(m) && !mitTabelle(r) && !mitTeilen(r))
     felder.gesamt = obj({
       anteil: int('Erfüllungsgrad der Gesamtleistung in Prozent (0–100), gemessen am Erwartungshorizont und an der Jahrgangsstufe'),
       begruendung: str('Begründung der Einschätzung in 1–2 Sätzen für die Lehrkraft')
@@ -324,6 +382,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       ? '- KEINE Note, KEINE Punkte, KEINE Prozentwerte, keine Einstufung wie „gut" oder „ausreichend" – die Rückmeldung ist lernförderlich, nicht bewertend.'
       : `- Die Lehrkraft vergibt die Einstufung (${EINSTUFUNGEN.find((e) => e.id === art)?.label}) selbst. Du schlägst nur den ERFÜLLUNGSGRAD in Prozent vor${mitTabelle(r) ? ' bzw. die Punkte je Kriterium der Tabelle' : ''}. In den Texten steht KEINE Note und keine Notenbezeichnung.`,
     mitTabelle(r) ? '- Bewerte JEDES Kriterium der Bewertungstabelle (Kennung in eckigen Klammern) mit Punkten bzw. Stufe und kurzer Begründung.' : '',
+    ...teilRegeln(r),
     hatForm(m, 'rand') || scan
       ? `- Korrekturrand: 5–15 Kommentare an konkreten Stellen, Lob und Fehler gemischt, in der Reihenfolge des Textes. Das Zitat steht WÖRTLICH so in der Arbeit.${zeichenListe.length ? ` Korrekturzeichen NUR aus dieser Liste (bei Lob und Hinweisen leer): ${zeichenListe.join('; ')}.` : ''}`
       : '',
@@ -346,6 +405,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       r.grundlage.aufgaben,
       r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : '',
       mitTabelle(r) ? tabelleText(r.tabelle!) : '',
+      teileText(r),
       `ARBEIT VON ${a.kuerzel}:`,
       a.text
     ]
@@ -468,6 +528,14 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
         })
       })
       if (gesamtEinstufen(m)) bogen.gesamt = vorschlag(art, tabellenSumme(t, bogen.tabelle).anteil, skala)
+    }
+    if (mitTeilen(r)) {
+      const teile = r.grundlage.teile!
+      bogen.teile = wertungenAusKi(d.teile, teile)
+      const g = gesamtAusTeilen(teile, bogen.teile, r.grundlage.verrechnung ?? 'prozent')
+      if (gesamtEinstufen(m) && !mitTabelle(r) && g) bogen.gesamt = vorschlag(art, g.anteil, skala, begruendungAusTeilen(teile, bogen.teile))
+    } else if (mitTabelle(r)) {
+      // Gesamt aus der Tabelle (oben)
     } else if (gesamtEinstufen(m)) {
       const g = (d.gesamt ?? {}) as Record<string, unknown>
       bogen.gesamt = vorschlag(art, Number(g.anteil), skala, text(g.begruendung) || undefined)

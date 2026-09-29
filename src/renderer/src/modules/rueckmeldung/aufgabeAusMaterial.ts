@@ -39,6 +39,28 @@ export const ENTWURF_VERMERK = '[Entwurf der KI – bitte prüfen]'
 
 const FAECHER = SUBJECTS.map((s) => s.id)
 
+/**
+ * Teile der Arbeit (29.09.2026): Schreib- und Sprachmittlungsaufgaben erkennen und Gewichtungen,
+ * die auf dem Material stehen, übernehmen. teilbewertung.ts rechnet damit.
+ */
+const TEILE_FELD = arr(
+  obj({
+    titel: str('Name des Teils bzw. der Aufgabe, wie im Material (z. B. „Part C: Writing", „Aufgabe 3 – Mediation")'),
+    art: enumOf(['schreiben', 'sprachmittlung', 'sonstig']),
+    gewichtProzent: int('Anteil an der Gesamtnote in Prozent, NUR wenn er im Material steht – sonst 0'),
+    punkte: int('Höchstpunktzahl des Teils, NUR wenn sie im Material steht – sonst 0'),
+    inhaltProzent: int('Nur Schreiben/Sprachmittlung: Anteil des INHALTS in Prozent, NUR wenn er im Material steht (z. B. „Content 40 % / Language 60 %", „Inhalt 12 P. / Sprache 18 P." = 40) – sonst 0')
+  })
+)
+
+const TEILE_REGEL = [
+  'Teile der Arbeit: Liste jeden Aufgabenteil bzw. jede Teilkompetenz (Hören, Lesen, Schreiben, Sprachmittlung, Wortschatz/Grammatik …) mit art:',
+  '- „schreiben": freie Textproduktion in der Fremdsprache (Write an email/article/story…, Rédige…, Escribe…, Scrivi…, Напиши…, Comment, Discuss, Describe your…), bei der Inhalt und Sprache bewertet werden;',
+  '- „sprachmittlung": Mediation – Inhalte eines Textes für jemanden in die andere Sprache übertragen (Explain to your German friend…, Fasse auf Deutsch zusammen…, Explique à ton ami…);',
+  '- „sonstig": alles andere (Hör-/Leseverstehen mit geschlossenen oder kurzen Antworten, Wortschatz, Grammatik, Übersetzung einzelner Sätze).',
+  'Gewichte, Punkte und Inhalt/Sprache-Anteile NUR übernehmen, wenn sie im Material stehen – nichts schätzen. Besteht die Arbeit aus nur einer Aufgabe, ist die Liste ein Eintrag.'
+].join('\n')
+
 const AUFGABE_SCHEMA = obj({
   titel: str('Kurzer Titel der Aufgabe (z. B. „Leserbrief zum Handyverbot“)'),
   aufgaben: str(
@@ -47,6 +69,7 @@ const AUFGABE_SCHEMA = obj({
   erwartung: str('Erwartungshorizont bzw. Lösungen, WENN sie im Material stehen (wörtlich) – sonst leer'),
   fach: enumOf(['', ...FAECHER]),
   jahrgang: int('Jahrgangsstufe, wenn sie im Material steht oder sicher erkennbar ist – sonst 0'),
+  teile: TEILE_FELD,
   erkennbar: arr(str('Woran Fach und Jahrgang erkannt wurden (z. B. „Kopfzeile: Deutsch 8b“)'))
 })
 
@@ -60,6 +83,7 @@ export function aufgabeAnfrage(dateien: GeleseneDatei[]): StructuredRequest {
       '1. Übernimm die Aufgabenstellung(en) wörtlich und darunter nur das Material, das zum Verstehen der Aufgaben nötig ist (bei langen Texten: Titel, Quelle und die ersten Sätze bzw. die Stellen, auf die sich Aufgaben beziehen).',
       '2. Steht ein Erwartungshorizont oder eine Lösung im Material, übernimm ihn wörtlich in „erwartung“. Steht keiner drin, bleibt „erwartung“ leer.',
       '3. Erkenne Fach und Jahrgang nur, wenn es im Material steht oder eindeutig ist; sonst fach leer und jahrgang 0.',
+      `4. ${TEILE_REGEL}`,
       'MATERIAL:',
       text
     ].join('\n'),
@@ -70,6 +94,8 @@ export function aufgabeAnfrage(dateien: GeleseneDatei[]): StructuredRequest {
 }
 
 export interface AufgabeErkannt {
+  /** Rohdaten der Teile – teileAusKi (teilbewertung.ts) übernimmt sie mit der Lerngruppe */
+  teile?: unknown
   titel: string
   aufgaben: string
   erwartung: string
@@ -85,12 +111,23 @@ export function aufgabeAus(daten: unknown): AufgabeErkannt {
   const fach = String(d.fach ?? '')
   const jahrgang = Math.round(Number(d.jahrgang) || 0)
   return {
+    teile: d.teile,
     titel: String(d.titel ?? '').trim(),
     aufgaben,
     erwartung: String(d.erwartung ?? '').trim(),
     fach: FAECHER.includes(fach) ? fach : '',
     jahrgang: jahrgang >= 1 && jahrgang <= 13 ? jahrgang : 0,
     erkennbar: Array.isArray(d.erkennbar) ? d.erkennbar.map((x) => String(x ?? '').trim()).filter(Boolean) : []
+  }
+}
+
+/** „Teile erkennen" für eine schon eingetragene Aufgabe (Material aus der Bibliothek, getippte Aufgabe) */
+export function teileAnfrage(aufgaben: string, erwartung: string): StructuredRequest {
+  return {
+    system: 'Du hilfst einer Lehrkraft, eine Arbeit für die Bewertung vorzubereiten. Du erfindest nichts und übernimmst nur, was im Material steht.',
+    user: [TEILE_REGEL, 'AUFGABE:', aufgaben.slice(0, 15000), erwartung.trim() ? `ERWARTUNGSHORIZONT:\n${erwartung.slice(0, 5000)}` : ''].filter(Boolean).join('\n'),
+    schemaName: 'rueckmeldung_teile',
+    schema: obj({ teile: TEILE_FELD })
   }
 }
 

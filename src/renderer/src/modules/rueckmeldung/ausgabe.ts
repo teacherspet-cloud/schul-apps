@@ -10,6 +10,7 @@
  * Ein Nachteilsausgleich steht NIE auf dem Bogen der Lernenden – nur in der Notenübersicht der
  * Lehrkraft.
  */
+import { teilZeilenFuerBogen } from './teilbewertung'
 import { bogenUeberschriften, type BogenUeberschriften } from './render/texte'
 import { AlignmentType, Document, Packer, PageBreak, Paragraph, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from 'docx'
 import { kiMetaTag, kiVermerkText, kiWordEigenschaften, vermerkSichtbar } from '@shared/kiKennzeichnung'
@@ -88,6 +89,11 @@ export function boegenHtml(r: Rueckmeldung, abgaben: Abgabe[], opt: AusgabeOptio
         gesamt ? `<div class="einstufung"><small>${esc(skalenName(r))}</small><strong>${einstufungHtml(r, gesamt, esc)}</strong></div>` : ''
       }</div>`
     )
+    // Bewertung nach Teilen (29.09.2026) – nur mit bestätigter Einstufung
+    if (gesamt) {
+      const zeilen = teilZeilenFuerBogen(r.grundlage.teile, b.teile, r.grundlage.verrechnung)
+      if (zeilen.length) teile.push(`<p class="teile">${zeilen.map((z) => esc(z)).join('<br>')}</p>`)
+    }
     if (hatForm(m, 'schriftlich') && b.staerken.length) teile.push(`<h2>${u.staerken}</h2><ul>${b.staerken.map((s) => `<li>${n(s)}</li>`).join('')}</ul>`)
     if (hatForm(m, 'tipps') && b.schritte.length) teile.push(`<h2>${u.schritte}</h2><ol>${b.schritte.map((s) => `<li>${n(s)}</li>`).join('')}</ol>`)
     if (b.kriterien.length && (hatForm(m, 'schriftlich') || kriterienEinstufen(m))) {
@@ -224,6 +230,9 @@ export async function boegenDocx(r: Rueckmeldung, abgaben: Abgabe[], opt: Ausgab
           children: [new TextRun({ text: `${skalenName(r)}: `, ...groesse() }), new TextRun({ text: wertText(art, gesamt.wert), bold: true, size: gross ? 40 : 30 })]
         })
       )
+    if (gesamt)
+      for (const z of teilZeilenFuerBogen(r.grundlage.teile, b.teile, r.grundlage.verrechnung))
+        kinder.push(new Paragraph({ spacing: { after: 40 }, children: [tr(z, { color: '444444' })] }))
     if (hatForm(m, 'schriftlich') && b.staerken.length) kinder.push(ueber(u.staerken), ...b.staerken.map((s) => new Paragraph({ bullet: { level: 0 }, children: [tr(n(s))] })))
     if (hatForm(m, 'tipps') && b.schritte.length) kinder.push(ueber(u.schritte), ...b.schritte.map((s, k) => new Paragraph({ children: [tr(`${k + 1}. ${n(s)}`)] })))
     if (b.kriterien.length && (hatForm(m, 'schriftlich') || kriterienEinstufen(m))) {

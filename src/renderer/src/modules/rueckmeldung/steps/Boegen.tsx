@@ -54,6 +54,7 @@ import {
 } from '../art'
 import { aufScan, boegenDocx, boegenHtml, bogenVorlesetext, elternDocx, elternHtml } from '../ausgabe'
 import { elternUebersetzen, rueckmeldungenErzeugen } from '../auftrag'
+import TeileWertung from './TeileWertung'
 import { hatAusgleich, hatMassnahme } from '../nachteilsausgleich'
 import { scanBilderFuer } from '../scanBild'
 import { alsMp3, vorlesen, vorlesenMoeglich, vorlesenStopp } from '../vorlesen'
@@ -387,6 +388,7 @@ export default function Boegen(): React.JSX.Element | null {
                       </Card>
                     )}
 
+                    <TeileWertung r={r} bogen={aktiv.bogen} art={art} skala={skala} setzeBogen={setzeBogen} />
                     {hatForm(m, 'schriftlich') && liste('staerken', u.staerken)}
                     {hatForm(m, 'tipps') && liste('schritte', u.schritte)}
 
