@@ -55,7 +55,7 @@ function RueckmeldungBibliothek(props: BibliotheksSeiteProps): React.JSX.Element
 }
 
 /**
- * Programm „Rückmeldung" (Großprogramm 0.4, F3; Strg+7): lernförderliche Rückmeldung ohne Note
+ * Programm „Rückmeldung" (Großprogramm 0.4, F3; Strg+6): lernförderliche Rückmeldung ohne Note
  * zu Schülerarbeiten – aus einem gespeicherten Material heraus oder zu einer eigenen Aufgabe.
  */
 export default function RueckmeldungModule({ active }: { active: boolean }): React.JSX.Element {

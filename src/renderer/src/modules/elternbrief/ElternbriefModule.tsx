@@ -47,7 +47,7 @@ function ElternbriefBibliothek(props: BibliotheksSeiteProps): React.JSX.Element 
   )
 }
 
-/** Programm „Elternbrief" (Großprogramm 0.4, F7; Strg+8) */
+/** Programm „Elternbrief" (Großprogramm 0.4, F7; Strg+7) */
 export default function ElternbriefModule({ active }: { active: boolean }): React.JSX.Element {
   const dok = useElternbrief((s) => s.dok)
   // Nach „Neuer Elternbrief" (und beim ersten Öffnen) ein leeres Dokument anlegen

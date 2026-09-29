@@ -72,10 +72,10 @@ await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setS
 await warteAufOberflaeche(page)
 const sichtbar = (l) => l.filter({ visible: true }).first()
 try {
-  // Strg+8 öffnet das achte Programm
-  await page.keyboard.press('Control+8')
+  // Strg+7 öffnet das siebte Programm
+  await page.keyboard.press('Control+7')
   await page.getByText('Anlass & Stichpunkte', { exact: true }).waitFor({ timeout: 10000 })
-  pruefe(true, 'Strg+8 öffnet „Elternbriefe"')
+  pruefe(true, 'Strg+7 öffnet „Elternbriefe"')
   // Briefkopf aus den Einstellungen (Anschrift, Lehrkraft)
   await page.evaluate(() =>
     window.api.settings.set({

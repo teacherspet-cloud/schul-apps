@@ -10,16 +10,16 @@ const PROGRAMME = PROGRAMM_REIHENFOLGE.map((id) => ({ id, faecher: PROGRAMM_FAEC
 const ids = (l: { id: string }[]): string[] => l.map((p) => p.id)
 
 describe('Reihenfolge der Programme', () => {
-  it('Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten, Vokabellisten', () => {
+  it('Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten, Rückmeldung, Elternbriefe, Vokabellisten', () => {
     expect(PROGRAMM_REIHENFOLGE).toEqual([
       'arbeitsblatt',
       'vokabeltest',
       'grammatiktest',
       'lernzielkontrolle',
       'klassenarbeit',
-      'vokabelliste',
       'rueckmeldung',
-      'elternbrief'
+      'elternbrief',
+      'vokabelliste'
     ])
   })
 
@@ -60,9 +60,9 @@ describe('Programme nach eigenen Fächern', () => {
         'vokabeltest',
         'grammatiktest',
         'lernzielkontrolle',
-        'vokabelliste',
         'rueckmeldung',
-        'elternbrief'
+        'elternbrief',
+        'vokabelliste'
       ])
   })
 

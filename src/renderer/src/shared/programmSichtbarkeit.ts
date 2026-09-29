@@ -3,7 +3,7 @@
  * (Paket 12, Wunsch der Lehrkraft vom 26.09.2026).
  *
  * Eine Geschichts- und Mathematiklehrkraft braucht weder Vokabeltest noch Grammatiktest;
- * die Symbole standen trotzdem in der Leiste, auf der Startseite und unter Strg+1 … Strg+6.
+ * die Symbole standen trotzdem in der Leiste, auf der Startseite und unter Strg+1 … Strg+8.
  * Jetzt wählt die Lehrkraft in den Einstellungen (Reiter „Schule") und im
  * Einrichtungsassistenten ihre Fächer, und nur die passenden Programme bleiben sichtbar.
  *
@@ -35,7 +35,8 @@ export type ProgrammFaecher = 'alle' | readonly string[]
 /**
  * Die Zuordnung Programm ↔ Fächer – in der Reihenfolge der Leiste (Wunsch der Lehrkraft vom
  * 26.09.2026): Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen,
- * Klassenarbeiten, Vokabellisten. registry.ts ordnet die Programme genauso.
+ * Klassenarbeiten, Rückmeldung, Elternbriefe, Vokabellisten (Vokabellisten seit 29.09.2026 zuletzt).
+ * registry.ts ordnet die Programme genauso.
  */
 export const PROGRAMM_FAECHER: Record<string, ProgrammFaecher> = {
   arbeitsblatt: 'alle',
@@ -43,10 +44,10 @@ export const PROGRAMM_FAECHER: Record<string, ProgrammFaecher> = {
   grammatiktest: SPRACH_FAECHER,
   lernzielkontrolle: 'alle',
   klassenarbeit: KLASSENARBEIT_FAECHER,
-  vokabelliste: SPRACH_FAECHER,
-  // Neue Programme (Großprogramm 0.4) hinten angehängt: Strg+7, Strg+8
   rueckmeldung: 'alle',
-  elternbrief: 'alle'
+  elternbrief: 'alle',
+  // Die Listen als Werkzeug der Vokabeltests ganz am Ende (Wunsch der Lehrkraft, 29.09.2026)
+  vokabelliste: SPRACH_FAECHER
 }
 
 /** Reihenfolge der Programme überall (Leiste, Startseite, Strg+1 …, Themenbereiche, Einstellungen) */
@@ -73,7 +74,7 @@ export function programmSichtbar(
   return programmPasst(faecher, eigene)
 }
 
-/** Die sichtbaren Programme in ihrer Reihenfolge – für Leiste, Startseite und Strg+1 … Strg+6 */
+/** Die sichtbaren Programme in ihrer Reihenfolge – für Leiste, Startseite und Strg+1 … Strg+8 */
 export function sichtbareProgramme<T extends { id: string; faecher?: ProgrammFaecher }>(
   programme: readonly T[],
   eigene: readonly string[] | undefined,

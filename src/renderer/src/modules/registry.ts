@@ -15,10 +15,11 @@ import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtb
  * Neues Programm: Ordner unter modules/ anlegen und hier eintragen –
  * es erscheint dann automatisch als Kachel auf der Startseite und in der Leiste.
  *
- * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+6 – gezählt werden nur die
+ * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+8 – gezählt werden nur die
  * sichtbaren Programme. Seit Paket 12 (Wunsch der Lehrkraft, 26.09.2026) gilt überall:
  * Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten,
- * Vokabellisten – die meistgenutzten zuerst, die Listen als Werkzeug der Vokabeltests zuletzt.
+ * Rückmeldung, Elternbriefe, Vokabellisten – die meistgenutzten zuerst, die Listen als Werkzeug der
+ * Vokabeltests zuletzt (seit 29.09.2026 auch hinter den Elternbriefen, Wunsch der Lehrkraft).
  * Dieselbe Folge steht in shared/programmSichtbarkeit.ts (`PROGRAMM_REIHENFOLGE`).
  *
  * Die Kacheltexte sagen, WANN man welches Programm nimmt – vor allem bei Lernzielkontrolle,
@@ -117,17 +118,6 @@ export const modules: SchulModule[] = [
     component: KlassenarbeitModule
   },
   {
-    id: 'vokabelliste',
-    name: 'Vokabellisten',
-    description: 'Schulbuchvokabeln und eigene Listen anlegen und pflegen – Grundlage für Vokabeltests und Klassenarbeiten.',
-    icon: programmSymbol('vokabelliste', 'cyan'),
-    color: 'cyan',
-    illustration: illustration('vokabelliste'),
-    leistenbild: leistenbild('vokabelliste'),
-    faecher: PROGRAMM_FAECHER.vokabelliste,
-    component: VokabellisteModule
-  },
-  {
     id: 'rueckmeldung',
     name: 'Rückmeldung',
     description:
@@ -149,5 +139,16 @@ export const modules: SchulModule[] = [
     leistenbild: leistenbild('elternbrief'),
     faecher: PROGRAMM_FAECHER.elternbrief,
     component: ElternbriefModule
+  },
+  {
+    id: 'vokabelliste',
+    name: 'Vokabellisten',
+    description: 'Schulbuchvokabeln und eigene Listen anlegen und pflegen – Grundlage für Vokabeltests und Klassenarbeiten.',
+    icon: programmSymbol('vokabelliste', 'cyan'),
+    color: 'cyan',
+    illustration: illustration('vokabelliste'),
+    leistenbild: leistenbild('vokabelliste'),
+    faecher: PROGRAMM_FAECHER.vokabelliste,
+    component: VokabellisteModule
   }
 ]

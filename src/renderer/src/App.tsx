@@ -76,7 +76,7 @@ export default function App(): React.JSX.Element {
   }, [])
 
   /*
-   * Tastenkürzel der Hauptapp: Strg+1 … Strg+6 öffnen die SICHTBAREN Programme in der
+   * Tastenkürzel der Hauptapp: Strg+1 … Strg+8 öffnen die SICHTBAREN Programme in der
    * Reihenfolge der Leiste (ausgeblendete zählen nicht mit – sonst stimmte die Ziffer nicht mit
    * der Stelle in der Leiste überein), Strg+0 die Startseite, Strg+P den Druck des vorderen Programms – aber nur, wenn
    * dort ein Editor mit Druck offen ist. Sonst bleibt Strg+P ohne Wirkung (am Rechner) bzw.

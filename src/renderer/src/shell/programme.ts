@@ -5,7 +5,7 @@ import { sichtbareProgramme } from '../shared/programmSichtbarkeit'
 
 /**
  * Die sichtbaren Programme in der Reihenfolge der Leiste (Paket 12) – für Leiste, Startseite,
- * Strg+1 … Strg+6 und „Neu in diesem Bereich". Alle Programme bleiben trotzdem geladen
+ * Strg+1 … Strg+8 und „Neu in diesem Bereich". Alle Programme bleiben trotzdem geladen
  * (App.tsx): Ein Material eines ausgeblendeten Programms öffnet sich aus „Zuletzt bearbeitet"
  * oder der Suche weiterhin.
  */
