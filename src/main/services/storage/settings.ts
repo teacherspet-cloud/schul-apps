@@ -54,6 +54,11 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
     // Je Fach zusammenführen: Eine geänderte Fachfarbe darf die übrigen nicht löschen
     fachfarben: { ...base.fachfarben, ...(stored.fachfarben as Record<string, string>) },
+    // Korrekturzeichen je Fachgruppe: Das Ändern der einen Gruppe darf die übrigen nicht löschen
+    korrekturzeichen: {
+      ...base.korrekturzeichen,
+      ...(stored.korrekturzeichen as Record<string, { zeichen: string; bedeutung: string }[]>)
+    },
     // Ebenso je Programm: Das Einblenden des einen darf die Wahl bei den anderen nicht löschen
     // (null nimmt die Festlegung für ein Programm zurück – dann gilt wieder die Regel nach den Fächern)
     programmeAnzeigen: Object.fromEntries(

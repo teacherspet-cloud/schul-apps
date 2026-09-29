@@ -91,7 +91,8 @@ export function paketBauen(
   const figuren = new Set<string>()
   auswahl.forEach(({ art, id }, i) => {
     if (!PAKET_ARTEN.includes(art)) throw new Error(`Unbekannte Materialart: ${art}`)
-    const eintrag = wege[art].get(id)
+    // Rückmeldungen: Nachteilsausgleich und Notenschutz sind sensible Angaben und verlassen den Rechner nicht (29.09.2026)
+    const eintrag = art === 'rueckmeldung' ? ohneAusgleich(wege[art].get(id)) : wege[art].get(id)
     const datei = `material/${i + 1}.json`
     dateien[datei] = strToU8(JSON.stringify(eintrag))
     eintraege.push({ art, name: String(eintrag.name ?? ''), datei })
@@ -235,4 +236,21 @@ export function paketEinlesen(
     neu.push({ art: e.art, id, name: String(name ?? e.name) })
   }
   return neu
+}
+
+/** Rückmeldung ohne Nachteilsausgleich der Abgaben – für die Weitergabe im Schulpaket */
+export function ohneAusgleich<T extends { payload?: unknown }>(eintrag: T): T {
+  const p = eintrag.payload as { abgaben?: Record<string, unknown>[] } | undefined
+  if (!p || !Array.isArray(p.abgaben)) return eintrag
+  return {
+    ...eintrag,
+    payload: {
+      ...p,
+      abgaben: p.abgaben.map((a) => {
+        const { ausgleich: _a, ...rest } = a
+        void _a
+        return rest
+      })
+    }
+  }
 }

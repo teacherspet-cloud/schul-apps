@@ -121,7 +121,7 @@ export interface SavedDokumentMeta {
 
 export function buildApi(call: Call, extras: ApiExtras) {
   /** Bibliothek eines neuen Programms (Großprogramm 0.4) – main/services/storage/dokumente.ts */
-  const dokumentAblage = (kanal: 'rueckmeldungen' | 'elternbriefe') => ({
+  const dokumentAblage = (kanal: 'rueckmeldungen' | 'elternbriefe' | 'bewertungstabellen' | 'nachteilsausgleiche') => ({
     list: () => call<SavedDokumentMeta[]>(`${kanal}:list`),
     get: (id: string) => call<SavedDokumentMeta & { payload: unknown }>(`${kanal}:get`, id),
     save: (input: { id: string; name: string; stats: Record<string, unknown>; payload: unknown }) => call<SavedDokumentMeta>(`${kanal}:save`, input),
@@ -270,6 +270,9 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Neue Programme (Großprogramm 0.4) – gemeinsame Ablage im Hauptprozess */
     rueckmeldungen: dokumentAblage('rueckmeldungen'),
     elternbriefe: dokumentAblage('elternbriefe'),
+    /** Rückmeldung (29.09.2026): Vorlagen für Bewertungstabellen, gemerkte Nachteilsausgleiche (nur auf diesem Rechner) */
+    bewertungstabellen: dokumentAblage('bewertungstabellen'),
+    nachteilsausgleiche: dokumentAblage('nachteilsausgleiche'),
     exams: {
       list: () => call<SavedExamMeta[]>('exams:list'),
       get: (id: string) => call<SavedExam>('exams:get', id),

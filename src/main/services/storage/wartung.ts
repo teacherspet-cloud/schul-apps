@@ -66,6 +66,8 @@ const MATERIAL = [
   'lernzielkontrollen',
   'rueckmeldungen',
   'elternbriefe',
+  'bewertungstabellen',
+  'nachteilsausgleiche',
   'piktogramme',
   'hoertexte'
 ]

@@ -4,7 +4,7 @@
  */
 import type { StructuredRequest } from '@shared/types'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
-import { arr, enumOf, obj, str } from '../../shared/aiSchema'
+import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
 import { describeBlock, describeSheet } from '../arbeitsblatt/generation/describe'
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { normalisiereArbeit } from '../klassenarbeit/model/fassungen'
@@ -17,7 +17,33 @@ import { kurztestToWorksheet } from '../lernzielkontrolle/render/kurztestWorkshe
 import { describeBlock as vokabelBlock } from '../vokabeltest/generation/quality'
 import { LANGUAGES, type TestDocument } from '../vokabeltest/model/types'
 import { fachIdVon } from '../../shared/fachfarben'
-import type { Abgabe, Bogen, Einschaetzung, Grundlage, GrundlageArt, Rueckmeldung } from './model/types'
+import type { Korrekturzeichen } from '../../shared/korrekturzeichen'
+import { newId } from '../vokabeltest/model/random'
+import {
+  EINSTUFUNGEN,
+  einstufungVon,
+  gesamtEinstufen,
+  hatForm,
+  kriterienEinstufen,
+  tabellenSumme,
+  vorschlag,
+  type SkalenKontext
+} from './art'
+import { klemme } from './korrekturrand'
+import { kiLandesregeln } from './laenderRegeln'
+import { ausgleichAnweisung, maxSchritte, ohneRechtschreibung } from './nachteilsausgleich'
+import { tabelleText } from './tabelle'
+import type {
+  Abgabe,
+  Bogen,
+  BogenKriterium,
+  Einschaetzung,
+  Einstufungswert,
+  Grundlage,
+  GrundlageArt,
+  RandKommentar,
+  Rueckmeldung
+} from './model/types'
 
 // ---------- Grundlage aus gespeichertem Material ----------
 
@@ -161,7 +187,14 @@ export function transkriptUebernehmen(a: Abgabe, daten: unknown): Abgabe {
   // Alle erkannten Namen bekommen das Kürzel der Abgabe – die Arbeit gehört EINER Person; Namen Dritter werden ebenfalls unkenntlich
   const { text, zuordnung } = ersetzeNamen(roh, namen, a.pseudonyme ?? [])
   const hinweis = String(d.unleserlich ?? '').trim()
-  return { ...a, text: hinweis ? `${text}\n\n[unleserlich: ${hinweis}]` : text, bilder: [], pseudonyme: zuordnung }
+  // Die Seitenbilder bleiben als `scans` erhalten – für Kommentare neben dem eingescannten Text (29.09.2026)
+  return {
+    ...a,
+    text: hinweis ? `${text}\n\n[unleserlich: ${hinweis}]` : text,
+    bilder: [],
+    scans: a.scans?.length ? a.scans : a.bilder,
+    pseudonyme: zuordnung
+  }
 }
 
 /**
@@ -194,87 +227,299 @@ export function ohneNamen(a: Abgabe): { text: string; pseudonyme: Zuordnung[] } 
 
 const EINSCHAETZUNGEN: Einschaetzung[] = ['sicher', 'teilweise', 'noch nicht']
 
-const BOGEN = obj({
-  staerken: arr(str('Was schon gelingt – konkret, mit Bezug auf eine Stelle der Arbeit, ein Satz')),
-  schritte: arr(str('Nächster Schritt als Handlung („Achte beim nächsten Mal darauf, …"), ein Satz, mit Beispiel aus der Arbeit')),
-  kriterien: arr(
-    obj({
-      kriterium: str('Kriterium aus der Aufgabe bzw. dem Schwerpunkt der Lehrkraft'),
-      einschaetzung: enumOf(EINSCHAETZUNGEN),
-      beleg: str('Kurzes Zitat oder Stelle aus der Arbeit, die die Einschätzung belegt')
-    })
-  ),
-  schluss: str('Ein ermutigender, ehrlicher Schlusssatz – ohne Floskel')
-})
+/** Was der Bogen braucht, das nicht im Dokument steht (Einstellungen der Lehrkraft) */
+export interface BogenKontext {
+  /** Erlaubte Korrekturzeichen des Fachs (shared/korrekturzeichen.ts) */
+  zeichen: Korrekturzeichen[]
+  /** Prozentschwellen der Noten 1–6 (Notenschlüssel der Einstellungen) */
+  schwellen?: number[]
+}
 
-export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string): StructuredRequest {
-  const du = r.meta.anrede === 'du'
+const OHNE_KONTEXT: BogenKontext = { zeichen: [] }
+
+/** Kommentare am Scan: Hat die Abgabe Bilder und ist die Form gewählt? */
+export const scanKommentare = (r: Rueckmeldung, a: Abgabe): boolean => hatForm(r.meta, 'scan') && Boolean(a.scans?.length || a.bilder.length)
+/** Korrekturrand am Text: gewählt und (bei Scans) nicht schon am Bild */
+export const textRand = (r: Rueckmeldung, a: Abgabe): boolean => hatForm(r.meta, 'rand') && !scanKommentare(r, a)
+const mitTabelle = (r: Rueckmeldung): boolean => hatForm(r.meta, 'tabelle') && Boolean(r.tabelle?.kriterien.length)
+
+/** Das Antwortschema passt sich den gewählten Formen an – die KI liefert nur, was gebraucht wird */
+export function bogenSchema(r: Rueckmeldung, a: Abgabe, ctx: BogenKontext = OHNE_KONTEXT): Schema {
+  const m = r.meta
+  const felder: Record<string, Schema> = {}
+  const schriftlich = hatForm(m, 'schriftlich')
+  if (schriftlich) felder.staerken = arr(str('Was schon gelingt – konkret, mit Bezug auf eine Stelle der Arbeit, ein Satz'))
+  if (hatForm(m, 'tipps')) felder.schritte = arr(str('Nächster Schritt als Handlung („Achte beim nächsten Mal darauf, …"), ein Satz, mit Beispiel aus der Arbeit'))
+  if (schriftlich || kriterienEinstufen(m))
+    felder.kriterien = arr(
+      obj({
+        kriterium: str('Kriterium aus der Aufgabe bzw. dem Schwerpunkt der Lehrkraft'),
+        einschaetzung: enumOf(EINSCHAETZUNGEN),
+        beleg: str('Kurzes Zitat oder Stelle aus der Arbeit, die die Einschätzung belegt'),
+        ...(kriterienEinstufen(m) ? { anteil: int('Erfüllungsgrad dieses Kriteriums in Prozent (0–100)') } : {})
+      })
+    )
+  if (schriftlich) felder.schluss = str('Ein ermutigender, ehrlicher Schlusssatz – ohne Floskel')
+  if (gesamtEinstufen(m) && !mitTabelle(r))
+    felder.gesamt = obj({
+      anteil: int('Erfüllungsgrad der Gesamtleistung in Prozent (0–100), gemessen am Erwartungshorizont und an der Jahrgangsstufe'),
+      begruendung: str('Begründung der Einschätzung in 1–2 Sätzen für die Lehrkraft')
+    })
+  if (mitTabelle(r))
+    felder.tabelle = arr(
+      obj({
+        id: str('Kennung des Kriteriums in eckigen Klammern, ohne Klammern'),
+        punkte: int('Erreichte Punkte – bei Kriterien mit Stufen 0'),
+        stufe: int('Stufe (0 = beste) – bei Kriterien mit Punkten 0'),
+        begruendung: str('Kurze Begründung mit Bezug auf die Arbeit')
+      })
+    )
+  if (hatForm(m, 'rand') || scanKommentare(r, a)) {
+    const zeichen = ['', ...ctx.zeichen.map((z) => z.zeichen).filter(Boolean)]
+    felder.rand = arr(
+      obj({
+        zitat: str('Die Stelle WÖRTLICH aus der Arbeit, 1–8 Wörter, genau so geschrieben wie dort (auch mit Fehlern)'),
+        text: str('Kommentar am Rand: kurz, konkret, bei Fehlern mit Verbesserung'),
+        zeichen: enumOf(zeichen),
+        art: enumOf(['lob', 'fehler', 'hinweis']),
+        ...(scanKommentare(r, a)
+          ? {
+              seite: int('Seite des Bildes, auf der die Stelle steht (0 = erstes Bild)'),
+              x: int('Waagerechte Lage der Stelle in Prozent der Bildbreite (0 = links)'),
+              y: int('Senkrechte Lage der Stelle in Prozent der Bildhöhe (0 = oben)')
+            }
+          : {})
+      })
+    )
+  }
+  if (hatForm(m, 'ueberarbeitung'))
+    felder.ueberarbeitung = obj({
+      zitat: str('Die Stelle, die überarbeitet werden soll, wörtlich (ein Satz oder Absatzanfang)'),
+      auftrag: str('Konkreter Überarbeitungsauftrag als Handlung, 1–3 Sätze')
+    })
+  felder.fehler = arr(
+    obj({
+      kategorie: str('Fehlerschwerpunkt als kurze Kategorie (z. B. „Kommasetzung vor dass“, „Belege fehlen“, „Vorzeichen“)'),
+      beispiel: str('Ein Beispiel aus der Arbeit')
+    })
+  )
+  if (m.elternfassung) felder.eltern = str('Fassung für die Eltern: 3–5 Sätze in einfacher Sprache, Anrede „Sie“, ohne Note – was gelingt, woran gearbeitet wird, wie zu Hause geholfen werden kann')
+  return obj(felder)
+}
+
+export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: BogenKontext = OHNE_KONTEXT): StructuredRequest {
+  const m = r.meta
+  const du = m.anrede === 'du'
+  const art = einstufungVon(m)
+  const scan = scanKommentare(r, a)
+  const zeichenListe = ctx.zeichen.filter((z) => z.zeichen).map((z) => `${z.zeichen} = ${z.bedeutung}`)
+  const regeln = [
+    `- ${hatForm(m, 'schriftlich') ? '2–4 Stärken' : ''}${hatForm(m, 'schriftlich') && hatForm(m, 'tipps') ? ' und ' : ''}${hatForm(m, 'tipps') ? `bis zu ${maxSchritte(a.ausgleich)} nächste Schritte` : ''}, jeweils konkret mit Bezug auf eine Stelle der Arbeit; Schritte machbar und nach Wichtigkeit geordnet.`,
+    hatForm(m, 'schriftlich') || kriterienEinstufen(m)
+      ? '- Kriterien aus der Aufgabe (und dem Schwerpunkt der Lehrkraft) mit Einschätzung „sicher", „teilweise" oder „noch nicht" und einem Beleg aus der Arbeit.'
+      : '',
+    '- Freundlich und ehrlich; keine Übertreibung, keine allgemeinen Floskeln.',
+    '- Personen nur mit ihrem Kürzel nennen (S1, S2 …).',
+    art === 'keine'
+      ? '- KEINE Note, KEINE Punkte, KEINE Prozentwerte, keine Einstufung wie „gut" oder „ausreichend" – die Rückmeldung ist lernförderlich, nicht bewertend.'
+      : `- Die Lehrkraft vergibt die Einstufung (${EINSTUFUNGEN.find((e) => e.id === art)?.label}) selbst. Du schlägst nur den ERFÜLLUNGSGRAD in Prozent vor${mitTabelle(r) ? ' bzw. die Punkte je Kriterium der Tabelle' : ''}. In den Texten steht KEINE Note und keine Notenbezeichnung.`,
+    mitTabelle(r) ? '- Bewerte JEDES Kriterium der Bewertungstabelle (Kennung in eckigen Klammern) mit Punkten bzw. Stufe und kurzer Begründung.' : '',
+    hatForm(m, 'rand') || scan
+      ? `- Korrekturrand: 5–15 Kommentare an konkreten Stellen, Lob und Fehler gemischt, in der Reihenfolge des Textes. Das Zitat steht WÖRTLICH so in der Arbeit.${zeichenListe.length ? ` Korrekturzeichen NUR aus dieser Liste (bei Lob und Hinweisen leer): ${zeichenListe.join('; ')}.` : ''}`
+      : '',
+    scan ? '- Die Arbeit liegt auch als Bild bei: Gib für jeden Randkommentar Seite und ungefähre Lage (x, y in Prozent) der Stelle im Bild an.' : '',
+    hatForm(m, 'ueberarbeitung') ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag.' : '',
+    '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.'
+  ]
+  const ausgleich = ausgleichAnweisung(a.ausgleich)
+  const land = kiLandesregeln(m, art)
   return {
     system,
     user: [
-      `Schreibe eine Rückmeldung zur Arbeit von ${a.kuerzel} (${r.meta.subjectLabel}, Klasse ${r.meta.grade}). Sprich die Person mit „${du ? 'du' : 'Sie'}" an.`,
+      `Schreibe eine Rückmeldung zur Arbeit von ${a.kuerzel} (${m.subjectLabel}, Klasse ${m.grade}). Sprich die Person mit „${du ? 'du' : 'Sie'}" an.`,
       'REGELN:',
-      '- KEINE Note, KEINE Punkte, KEINE Prozentwerte, keine Einstufung wie „gut" oder „ausreichend" – die Rückmeldung ist lernförderlich, nicht bewertend.',
-      '- 2–4 Stärken und 2–3 nächste Schritte, jeweils konkret mit Bezug auf eine Stelle der Arbeit; die Schritte sind machbar und in der Reihenfolge ihrer Wichtigkeit.',
-      '- Kriterien aus der Aufgabe (und dem Schwerpunkt der Lehrkraft) mit Einschätzung „sicher", „teilweise" oder „noch nicht" und einem Beleg aus der Arbeit.',
-      '- Freundlich und ehrlich; keine Übertreibung, keine allgemeinen Floskeln.',
-      '- Personen nur mit ihrem Kürzel nennen (S1, S2 …).',
-      r.meta.schwerpunkt.trim() ? `SCHWERPUNKT DER LEHRKRAFT: ${r.meta.schwerpunkt.trim()}` : '',
+      ...regeln,
+      land,
+      ausgleich,
+      m.schwerpunkt.trim() ? `SCHWERPUNKT DER LEHRKRAFT: ${m.schwerpunkt.trim()}` : '',
       `AUFGABE${r.grundlage.titel ? ` (${r.grundlage.titel})` : ''}:`,
       r.grundlage.aufgaben,
       r.grundlage.erwartung ? `ERWARTUNGSHORIZONT:\n${r.grundlage.erwartung}` : '',
+      mitTabelle(r) ? tabelleText(r.tabelle!) : '',
       `ARBEIT VON ${a.kuerzel}:`,
       a.text
     ]
       .filter(Boolean)
       .join('\n'),
+    ...(scan ? { images: (a.scans?.length ? a.scans : a.bilder).slice(0, 8) } : {}),
     schemaName: 'rueckmeldung_bogen',
-    schema: BOGEN
+    schema: bogenSchema(r, a, ctx)
   }
 }
 
 /**
  * Entfernt, was nach Note oder Punkten aussieht – auch wenn die KI sich nicht daran hält.
  * Liefert die Zahl der entfernten Sätze.
+ *
+ * Seit 29.09.2026: Mit gewählter Einstufung steht die Note in ihrem eigenen Feld (von der
+ * Lehrkraft bestätigt). Aus den TEXTEN verschwinden dann weiter Noten und Notenbezeichnungen –
+ * sonst widerspräche der Text womöglich der bestätigten Note –, Punkte dürfen dort stehen,
+ * wenn die Bewertungstabelle mit Punkten arbeitet.
  */
-const NOTE =
-  /\b(Note|Noten|Notenpunkte?|Zensur|Punkte?|Prozent)\b|\d+\s*(\/|von)\s*\d+|\d+\s*%|\b(befriedigend|ausreichend|mangelhaft|ungenügend)\b|\bNote\s*[1-6]|\b[1-6][+-](?!\w)/i
+const NOTE_WORT = /\b(Note|Noten|Notenpunkte?|Zensur)\b|\b(befriedigend|ausreichend|mangelhaft|ungenügend)\b|\bNote\s*[1-6]|\b[1-6][+\-−](?![\w])/i
+const PUNKTE = /\b(Punkte?|Prozent)\b|\d+\s*(\/|von)\s*\d+|\d+\s*%/i
 
-export function pruefeBogen(b: Bogen): Bogen {
+export interface PruefModus {
+  /** Punkte und Prozent dürfen im Text stehen (Tabelle mit Punkten) */
+  punkteErlaubt?: boolean
+}
+
+export function pruefeBogen(b: Bogen, modus: PruefModus = {}): Bogen {
   let entfernt = 0
+  const verboten = (s: string | undefined): boolean => Boolean(s) && (NOTE_WORT.test(s!) || (!modus.punkteErlaubt && PUNKTE.test(s!)))
   const sauber = (liste: string[]): string[] =>
     liste.filter((s) => {
-      if (NOTE.test(s)) {
+      if (verboten(s)) {
         entfernt++
         return false
       }
       return true
     })
-  const kriterien = b.kriterien.filter((k) => {
-    if (NOTE.test(k.kriterium) || NOTE.test(k.beleg ?? '')) {
+  const kriterien: BogenKriterium[] = []
+  const stufen: (Einstufungswert | null)[] = []
+  b.kriterien.forEach((k, i) => {
+    if (verboten(k.kriterium) || verboten(k.beleg)) {
+      entfernt++
+      return
+    }
+    kriterien.push(k)
+    if (b.kriterienStufen) stufen.push(b.kriterienStufen[i] ?? null)
+  })
+  const schluss = b.schluss && verboten(b.schluss) ? (entfernt++, undefined) : b.schluss
+  const rand = b.rand?.filter((k) => {
+    if (verboten(k.text)) {
       entfernt++
       return false
     }
     return true
   })
-  const schluss = b.schluss && NOTE.test(b.schluss) ? (entfernt++, undefined) : b.schluss
-  return { staerken: sauber(b.staerken), schritte: sauber(b.schritte), kriterien, ...(schluss ? { schluss } : {}), ...(entfernt ? { entfernt } : {}) }
+  const ueberarbeitung = b.ueberarbeitung && verboten(b.ueberarbeitung.auftrag) ? (entfernt++, undefined) : b.ueberarbeitung
+  const eltern = b.eltern && NOTE_WORT.test(b.eltern) ? (entfernt++, undefined) : b.eltern
+  const { entfernt: _alt, ...rest } = b
+  void _alt
+  return {
+    ...rest,
+    staerken: sauber(b.staerken),
+    schritte: sauber(b.schritte),
+    kriterien,
+    ...(b.kriterienStufen ? { kriterienStufen: stufen } : {}),
+    schluss,
+    ...(rand ? { rand } : {}),
+    ueberarbeitung,
+    eltern,
+    ...(entfernt ? { entfernt } : {})
+  }
 }
 
-export function bogenAus(daten: unknown): Bogen {
+/** Werte, die ohne Angabe nicht im Bogen stehen sollen (undefined-Felder entfernen) */
+function ohneLeere<T extends object>(o: T): T {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+}
+
+/**
+ * Die Antwort der KI → Bogen. Ohne Dokument (ältere Aufrufe, Tests) wie bisher: nur Stärken,
+ * Schritte, Kriterien, Schluss, ohne Note. Mit Dokument und Abgabe: Einstufung als Vorschlag,
+ * Tabelle, Rand, Überarbeitung, Fehler, Elternfassung.
+ */
+export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: BogenKontext = OHNE_KONTEXT): Bogen {
   const d = (daten ?? {}) as Record<string, unknown>
   const liste = (x: unknown): string[] => (Array.isArray(x) ? x.map((s) => String(s ?? '').trim()).filter(Boolean) : [])
-  const kriterien = (Array.isArray(d.kriterien) ? d.kriterien : [])
-    .map((k) => (k ?? {}) as Record<string, unknown>)
-    .filter((k) => String(k.kriterium ?? '').trim())
-    .map((k) => ({
-      kriterium: String(k.kriterium).trim(),
-      einschaetzung: (EINSCHAETZUNGEN.includes(k.einschaetzung as Einschaetzung) ? k.einschaetzung : 'teilweise') as Einschaetzung,
-      ...(String(k.beleg ?? '').trim() ? { beleg: String(k.beleg).trim() } : {})
-    }))
-  const bogen = pruefeBogen({ staerken: liste(d.staerken), schritte: liste(d.schritte), kriterien, schluss: String(d.schluss ?? '').trim() || undefined })
-  if (!bogen.staerken.length && !bogen.schritte.length) throw new Error('Die KI hat keine Rückmeldung geliefert.')
-  return bogen
+  const objekte = (x: unknown): Record<string, unknown>[] => (Array.isArray(x) ? x.map((k) => (k ?? {}) as Record<string, unknown>) : [])
+  const text = (x: unknown): string => String(x ?? '').trim()
+  const m = r?.meta
+  const art = m ? einstufungVon(m) : 'keine'
+  const skala: SkalenKontext | null = r ? { meta: r.meta, schwellen: ctx.schwellen } : null
+
+  const rohKriterien = objekte(d.kriterien).filter((k) => text(k.kriterium))
+  const kriterien: BogenKriterium[] = rohKriterien.map((k) => ({
+    kriterium: text(k.kriterium),
+    einschaetzung: (EINSCHAETZUNGEN.includes(k.einschaetzung as Einschaetzung) ? k.einschaetzung : 'teilweise') as Einschaetzung,
+    ...(text(k.beleg) ? { beleg: text(k.beleg) } : {})
+  }))
+  const bogen: Bogen = {
+    staerken: liste(d.staerken),
+    schritte: liste(d.schritte).slice(0, a ? maxSchritte(a.ausgleich) : 3),
+    kriterien,
+    schluss: text(d.schluss) || undefined
+  }
+  if (r && a && m && skala) {
+    if (kriterienEinstufen(m))
+      bogen.kriterienStufen = rohKriterien.map((k) => (Number.isFinite(Number(k.anteil)) ? vorschlag(art, Number(k.anteil), skala) : null))
+    if (mitTabelle(r)) {
+      const t = r.tabelle!
+      bogen.tabelle = t.kriterien.map((k) => {
+        const w = objekte(d.tabelle).find((x) => text(x.id).replace(/[[\]]/g, '') === k.id)
+        const n = t.stufen.length
+        return ohneLeere({
+          kriteriumId: k.id,
+          ...(k.punkte ? { punkte: w ? Math.max(0, Math.min(k.punkte, Math.round(Number(w.punkte) || 0))) : undefined } : {}),
+          ...(!k.punkte ? { stufe: w ? Math.max(0, Math.min(n - 1, Math.round(Number(w.stufe) || 0))) : undefined } : {}),
+          begruendung: w ? text(w.begruendung) || undefined : undefined
+        })
+      })
+      if (gesamtEinstufen(m)) bogen.gesamt = vorschlag(art, tabellenSumme(t, bogen.tabelle).anteil, skala)
+    } else if (gesamtEinstufen(m)) {
+      const g = (d.gesamt ?? {}) as Record<string, unknown>
+      bogen.gesamt = vorschlag(art, Number(g.anteil), skala, text(g.begruendung) || undefined)
+    }
+    if (hatForm(m, 'rand') || scanKommentare(r, a)) {
+      const erlaubt = new Set(ctx.zeichen.map((z) => z.zeichen))
+      const scan = scanKommentare(r, a)
+      const seiten = (a.scans?.length ? a.scans : a.bilder).length
+      bogen.rand = objekte(d.rand)
+        .filter((k) => text(k.zitat) && text(k.text))
+        .map((k) => {
+          const zeichen = erlaubt.has(text(k.zeichen)) ? text(k.zeichen) : ''
+          const kommentarArt = (['lob', 'fehler', 'hinweis'].includes(text(k.art)) ? text(k.art) : 'hinweis') as RandKommentar['art']
+          return ohneLeere({
+            id: newId(),
+            zitat: text(k.zitat),
+            text: text(k.text),
+            art: kommentarArt,
+            zeichen: zeichen || undefined,
+            ...(scan
+              ? {
+                  seite: Math.max(0, Math.min(Math.max(0, seiten - 1), Math.round(Number(k.seite) || 0))),
+                  x: klemme(Number(k.x)),
+                  y: klemme(Number(k.y))
+                }
+              : {}),
+            // Notenschutz Rechtschreibung: R-Kommentare sind nur Hinweise ohne Wertung
+            ohneWertung: zeichen === 'R' && ohneRechtschreibung(a.ausgleich) ? true : undefined
+          })
+        })
+    }
+    if (hatForm(m, 'ueberarbeitung')) {
+      const u = (d.ueberarbeitung ?? {}) as Record<string, unknown>
+      if (text(u.auftrag)) bogen.ueberarbeitung = { zitat: text(u.zitat), auftrag: text(u.auftrag) }
+    }
+    if (m.elternfassung && text(d.eltern)) bogen.eltern = text(d.eltern)
+  }
+  const fehler = objekte(d.fehler)
+    .filter((f) => text(f.kategorie))
+    .slice(0, 4)
+    .map((f) => ohneLeere({ kategorie: text(f.kategorie), beispiel: text(f.beispiel) || undefined }))
+  if (fehler.length) bogen.fehler = fehler
+  const geprueft = ohneLeere(pruefeBogen(bogen, { punkteErlaubt: Boolean(r && art !== 'keine' && mitTabelle(r)) }))
+  const leer =
+    !geprueft.staerken.length &&
+    !geprueft.schritte.length &&
+    !geprueft.kriterien.length &&
+    !geprueft.rand?.length &&
+    !geprueft.tabelle?.length &&
+    !geprueft.ueberarbeitung
+  if (leer) throw new Error('Die KI hat keine Rückmeldung geliefert.')
+  return geprueft
 }
 
 /** Beschreibung einer einzelnen Aufgabe (für „Rückmeldung zu dieser Aufgabe" aus anderen Programmen) */

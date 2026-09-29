@@ -31,3 +31,26 @@ export function nimmFachVorgabe(moduleId: string): string | null {
   offen.delete(moduleId)
   return fach
 }
+
+/**
+ * Thema für ein neues Arbeitsblatt vorgeben (29.09.2026): „Übungsblatt dazu erstellen" aus dem
+ * Fehlerprofil der Rückmeldung. Wie das Fach wird die Vorgabe beim Anlegen genau einmal abgeholt.
+ */
+export interface ThemaVorgabe {
+  topic: string
+  learningGoals?: string
+  priorKnowledge?: string
+  grade?: number
+}
+
+const themen = new Map<string, ThemaVorgabe>()
+
+export function setzeThemaVorgabe(moduleId: string, v: ThemaVorgabe): void {
+  if (v.topic.trim()) themen.set(moduleId, v)
+}
+
+export function nimmThemaVorgabe(moduleId: string): ThemaVorgabe | null {
+  const v = themen.get(moduleId) ?? null
+  themen.delete(moduleId)
+  return v
+}

@@ -79,5 +79,8 @@ export function erzeugeAblage(ordner: string, bezeichnung: string, wurzel: () =>
 /** Die Ablagen der neuen Programme – Ordnernamen stehen auch in wartung.ts (Sicherung) */
 export const ABLAGEN = {
   rueckmeldungen: erzeugeAblage('rueckmeldungen', 'Rückmeldung'),
-  elternbriefe: erzeugeAblage('elternbriefe', 'Elternbrief')
+  elternbriefe: erzeugeAblage('elternbriefe', 'Elternbrief'),
+  // Rückmeldung (29.09.2026): Vorlagen für Bewertungstabellen und die lokal gemerkten Nachteilsausgleiche
+  bewertungstabellen: erzeugeAblage('bewertungstabellen', 'Bewertungstabelle'),
+  nachteilsausgleiche: erzeugeAblage('nachteilsausgleiche', 'Nachteilsausgleich')
 }

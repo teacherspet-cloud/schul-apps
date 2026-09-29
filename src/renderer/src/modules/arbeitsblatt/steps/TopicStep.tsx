@@ -1,4 +1,4 @@
-import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
+import { nimmFachVorgabe, nimmThemaVorgabe } from '../../../shared/fachVorgabe'
 import { pruefeHochladen } from '../../../shared/datenschutz'
 import {
   Alert,
@@ -158,6 +158,8 @@ export default function TopicStep(): React.JSX.Element {
           const typeName = cefr.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.name ?? 'Gymnasium'
           // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor (shared/fachVorgabe.ts)
           const vorgabe = nimmFachVorgabe('arbeitsblatt')
+          // „Übungsblatt dazu erstellen" aus der Rückmeldung gibt zusätzlich Thema und Jahrgang vor
+          const thema = nimmThemaVorgabe('arbeitsblatt')
           const fachId = vorgabe && subjectById(vorgabe).id === vorgabe ? vorgabe : last.subjectId
           const subject = fachId ? subjectById(fachId) : null
           const ws: Worksheet = {
@@ -166,6 +168,14 @@ export default function TopicStep(): React.JSX.Element {
               ...defaultMeta(stateId, schoolTypeId, typeName),
               ...(subject ? { subjectId: subject.id, subjectLabel: subject.label } : {}),
               ...(last.grade ? { grade: last.grade } : {}),
+              ...(thema
+                ? {
+                    topic: thema.topic,
+                    ...(thema.learningGoals ? { learningGoals: thema.learningGoals } : {}),
+                    ...(thema.priorKnowledge ? { priorKnowledge: thema.priorKnowledge } : {}),
+                    ...(thema.grade ? { grade: thema.grade } : {})
+                  }
+                : {}),
               ...(last.courseLevel ? { courseLevel: last.courseLevel as WorksheetMeta['courseLevel'] } : {}),
               ...(last.languageOrder ? { languageOrder: last.languageOrder } : {}),
               ...(last.cefrLevel ? { cefrLevel: last.cefrLevel as WorksheetMeta['cefrLevel'] } : {})

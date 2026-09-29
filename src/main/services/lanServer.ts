@@ -106,6 +106,9 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'rueckmeldungen:get',
   'elternbriefe:list',
   'elternbriefe:get',
+  'bewertungstabellen:list',
+  'bewertungstabellen:get',
+  'nachteilsausgleiche:get',
   // Themenbereiche (Paket 10b): Bereiche und Zuordnungen lesen
   'themen:list',
   // Lehrplan-Themen lesen (Paket 12) – mitgelieferte Daten, nichts vom Rechner der Lehrkraft
@@ -128,6 +131,8 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'grammarTests:save',
   'rueckmeldungen:save',
   'elternbriefe:save',
+  'bewertungstabellen:save',
+  'nachteilsausgleiche:save',
   'textbooks:save',
   'library:save',
   /*

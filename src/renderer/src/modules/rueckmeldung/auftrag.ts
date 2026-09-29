@@ -15,21 +15,38 @@ import {
   erwartungsEntwurfAnfrage,
   type GeleseneDatei
 } from './aufgabeAusMaterial'
-import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUebernehmen } from './generation'
-import type { Abgabe, Rueckmeldung } from './model/types'
+import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUebernehmen, type BogenKontext } from './generation'
+import type { Abgabe, Bewertungstabelle, Rueckmeldung } from './model/types'
 import { bibliothek } from './store'
+import { useAppSettings } from '../../shared/settingsStore'
+import { thresholdsForSubject } from '../../shared/gradeScale'
+import { zeichenFuer } from '../../shared/korrekturzeichen'
+import { spracheNach } from '../../shared/familiensprachen'
+import { obj, str } from '../../shared/aiSchema'
+import type { StructuredRequest } from '@shared/types'
+import { einstufungVon } from './art'
+import { tabelleAus, tabelleAusDateiAnfrage, tabelleEntwurfAnfrage } from './tabelle'
 
 /** Lerngruppe und Haltung für jede Anfrage */
 export function rueckmeldungSystem(r: Rueckmeldung): string {
   return [
     `Du bist eine erfahrene Lehrkraft für ${r.meta.subjectLabel} (Klasse ${r.meta.grade}, ${r.meta.schoolTypeName}) und schreibst lernförderliche Rückmeldungen zu Schülerarbeiten.`,
     'Grundlage ist das Modell von Hattie und Timperley: Wo steht die Arbeit (Feed Back), was ist das Ziel (Feed Up), was ist der nächste Schritt (Feed Forward).',
-    'Du schreibst auf Deutsch, in der Sprache der Lerngruppe, konkret und ermutigend – ohne Noten, ohne Punkte.'
+    einstufungVon(r.meta) === 'keine'
+      ? 'Du schreibst auf Deutsch, in der Sprache der Lerngruppe, konkret und ermutigend – ohne Noten, ohne Punkte.'
+      : 'Du schreibst auf Deutsch, in der Sprache der Lerngruppe, konkret und ermutigend. Die Note vergibt die Lehrkraft; du lieferst nur einen begründeten Vorschlag in den dafür vorgesehenen Feldern.'
   ].join('\n')
+}
+
+/** Korrekturzeichen und Notenschlüssel aus den Einstellungen der Lehrkraft */
+export function bogenKontext(r: Rueckmeldung): BogenKontext {
+  const settings = useAppSettings.getState().settings
+  return { zeichen: zeichenFuer(r.meta.subjectId, settings), schwellen: thresholdsForSubject(settings.gradeScale, r.meta.subjectId) }
 }
 
 export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
   const offen = r.abgaben.filter((a) => !a.bogen && (a.text.trim() || a.bilder.length))
+  const ctx = bogenKontext(r)
   if (!offen.length) return
   void starteAuftrag({
     moduleId: 'rueckmeldung',
@@ -51,7 +68,8 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
           if (!a.text.trim() && a.bilder.length) a = transkriptUebernehmen(a, await k.ai<unknown>(transkriptAnfrage(a)))
           // Namen verlassen den Rechner nicht: an die KI geht der bereinigte Text
           const { text, pseudonyme } = ohneNamen(a)
-          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(rm, { ...a, text }, rueckmeldungSystem(rm))))
+          const anonym = { ...a, text }
+          const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(rm, anonym, rueckmeldungSystem(rm), ctx)), rm, anonym, ctx)
           fertig.set(a.id, { ...a, pseudonyme, bogen })
         } catch (e) {
           if ((e as { name?: string })?.name === 'AbortError') throw e
@@ -146,5 +164,79 @@ export function erwartungAusDateien(r: Rueckmeldung, docId: string, dateien: Gel
     },
     abschluss: () => 'Erwartungshorizont übernommen.',
     ablegen: (erwartung, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, grundlage: { ...aktuell.grundlage, erwartung } }))
+  })
+}
+
+/**
+ * Bewertungstabelle (29.09.2026): aus hineingezogenen Dateien übertragen oder aus Aufgaben und
+ * Erwartungshorizont entwerfen – gilt danach für alle Abgaben dieser Rückmeldung.
+ */
+export function tabelleErzeugen(r: Rueckmeldung, docId: string, dateien: GeleseneDatei[] | null): void {
+  void starteAuftrag({
+    moduleId: 'rueckmeldung',
+    docId,
+    titel: r.meta.title || r.grundlage.titel || 'Rückmeldung',
+    art: dateien ? 'Bewertungstabelle übernehmen' : 'Bewertungstabelle entwerfen',
+    eingabe: r,
+    istOffen: () => bibliothek.istOffen(docId),
+    sperrt: false,
+    schluessel: `rueckmeldung-tabelle-${docId}`,
+    fehlerTitel: 'Die Bewertungstabelle konnte nicht erstellt werden',
+    arbeit: async (rm, k): Promise<Bewertungstabelle> => {
+      k.melde(dateien ? 'Die KI überträgt die Bewertungstabelle …' : 'Die KI entwirft eine Bewertungstabelle …')
+      return tabelleAus(await k.ai<unknown>(dateien ? tabelleAusDateiAnfrage(dateien) : tabelleEntwurfAnfrage(rm)), dateien ? 'datei' : 'ki')
+    },
+    abschluss: (t) => `Bewertungstabelle mit ${t.kriterien.length} Kriterien${t.entwurf ? ' – Entwurf der KI, bitte prüfen' : ''}.`,
+    ablegen: (tabelle, rm) => bibliothek.legeAb(docId, rm, (aktuell) => ({ ...aktuell, tabelle }))
+  })
+}
+
+const UEBERSETZT = obj({ text: str('Die Übersetzung') })
+
+export function elternUebersetzungsAnfrage(text: string, code: string): StructuredRequest {
+  const sprache = spracheNach(code)
+  return {
+    system: `Du übersetzt Rückmeldungen deutscher Schulen an Eltern in die Familiensprache: ${sprache?.name ?? code} (${sprache?.eigen ?? ''}). Genau, vollständig, einfache und höfliche Alltagssprache; Begriffe des deutschen Schulsystems übersetzt und beim ersten Vorkommen kurz erklärt.`,
+    user: `Übersetze ins ${sprache?.name ?? code}. Namen und Kürzel bleiben unverändert.\n\n${text}`,
+    schemaName: 'rueckmeldung_eltern_uebersetzung',
+    schema: UEBERSETZT
+  }
+}
+
+/** Elternfassungen in die gewählten Familiensprachen übersetzen (nur Abgaben mit Sprache und ohne Übersetzung) */
+export function elternUebersetzen(r: Rueckmeldung, docId: string): void {
+  const offen = r.abgaben.filter((a) => a.familiensprache && a.bogen?.eltern && !a.bogen.elternUebersetzt?.[a.familiensprache])
+  if (!offen.length) return
+  void starteAuftrag({
+    moduleId: 'rueckmeldung',
+    docId,
+    titel: r.meta.title || r.grundlage.titel || 'Rückmeldung',
+    art: offen.length === 1 ? 'Elternfassung übersetzen' : `${offen.length} Elternfassungen übersetzen`,
+    eingabe: r,
+    istOffen: () => bibliothek.istOffen(docId),
+    sperrt: false,
+    schluessel: `rueckmeldung-eltern-${docId}`,
+    fehlerTitel: 'Die Elternfassung konnte nicht übersetzt werden',
+    arbeit: async (_rm, k) => {
+      const fertig = new Map<string, { code: string; text: string }>()
+      for (const [i, a] of offen.entries()) {
+        k.melde(`${a.kuerzel}: Übersetzung (${i + 1} von ${offen.length}) …`)
+        // Die Elternfassung kennt nur Kürzel – Namen setzt erst der Ausdruck ein
+        const d = (await k.ai<unknown>(elternUebersetzungsAnfrage(a.bogen!.eltern!, a.familiensprache!))) as { text?: unknown }
+        const text = String(d?.text ?? '').trim()
+        if (text) fertig.set(a.id, { code: a.familiensprache!, text })
+      }
+      return fertig
+    },
+    abschluss: (f) => `${f.size} Elternfassung${f.size === 1 ? '' : 'en'} übersetzt.`,
+    ablegen: (fertig, rm) =>
+      bibliothek.legeAb(docId, rm, (aktuell) => ({
+        ...aktuell,
+        abgaben: aktuell.abgaben.map((a) => {
+          const u = fertig.get(a.id)
+          if (!u || !a.bogen) return a
+          return { ...a, bogen: { ...a.bogen, elternUebersetzt: { ...(a.bogen.elternUebersetzt ?? {}), [u.code]: u.text } } }
+        })
+      }))
   })
 }

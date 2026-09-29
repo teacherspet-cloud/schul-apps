@@ -12,8 +12,28 @@ export const ANREDE_OPTIONEN: { value: Anrede; label: string }[] = [
   { value: 'sie', label: 'Sie' }
 ]
 
-export function bogenUeberschriften(anrede: Anrede): { staerken: string; schritte: string; kriterien: string } {
+export interface BogenUeberschriften {
+  staerken: string
+  schritte: string
+  kriterien: string
+  tabelle: string
+  rand: string
+  scan: string
+  ueberarbeitung: string
+  einstufung: string
+  eltern: string
+}
+
+export function bogenUeberschriften(anrede: Anrede): BogenUeberschriften {
+  const gemeinsam = {
+    kriterien: 'Worauf es ankam',
+    tabelle: 'Bewertung nach Kriterien',
+    rand: 'Anmerkungen am Rand',
+    scan: 'Anmerkungen zur Arbeit',
+    einstufung: 'Einstufung',
+    eltern: 'Rückmeldung für die Eltern'
+  }
   return anrede === 'du'
-    ? { staerken: 'Das gelingt dir schon', schritte: 'Deine nächsten Schritte', kriterien: 'Worauf es ankam' }
-    : { staerken: 'Das gelingt Ihnen schon', schritte: 'Ihre nächsten Schritte', kriterien: 'Worauf es ankam' }
+    ? { ...gemeinsam, staerken: 'Das gelingt dir schon', schritte: 'Deine nächsten Schritte', ueberarbeitung: 'Dein Überarbeitungsauftrag' }
+    : { ...gemeinsam, staerken: 'Das gelingt Ihnen schon', schritte: 'Ihre nächsten Schritte', ueberarbeitung: 'Ihr Überarbeitungsauftrag' }
 }

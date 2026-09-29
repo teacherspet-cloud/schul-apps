@@ -1,6 +1,6 @@
 // Kleine Helfer für JSON-Schemas im „strict"-Format (alle Felder Pflicht, keine Zusatzfelder).
 
-type Schema = Record<string, unknown>
+export type Schema = Record<string, unknown>
 
 export const str = (description?: string): Schema => ({ type: 'string', ...(description ? { description } : {}) })
 export const int = (description?: string): Schema => ({ type: 'integer', ...(description ? { description } : {}) })

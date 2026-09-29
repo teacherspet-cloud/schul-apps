@@ -86,12 +86,15 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
      */
     const speichernd = ERLAUBTE_KANAELE.filter((k) => k.endsWith(':save')).sort()
     expect(speichernd).toEqual([
+      'bewertungstabellen:save',
       'designs:save',
       'elternbriefe:save',
       'exams:save',
       'grammarTests:save',
       'kurztests:save',
       'library:save',
+      // Rückmeldung (29.09.2026): Tabellenvorlagen und gemerkte Nachteilsausgleiche
+      'nachteilsausgleiche:save',
       'rueckmeldungen:save',
       'sheets:save',
       'tests:save',

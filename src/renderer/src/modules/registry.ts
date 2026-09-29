@@ -121,7 +121,7 @@ export const modules: SchulModule[] = [
     id: 'rueckmeldung',
     name: 'Rückmeldung',
     description:
-      'Lernförderliche Rückmeldung ohne Note zu Schülerarbeiten – aus einem Arbeitsblatt, einer Klassenarbeit oder einem Test heraus oder zu einer eigenen Aufgabe. Namen bleiben auf dem Rechner.',
+      'Rückmeldung zu Schülerarbeiten – schriftlich, mit Tipps, Bewertungstabelle, Korrekturrand oder Kommentaren am Scan; ohne Note oder mit Einstufung, Nachteilsausgleich je Abgabe. Namen bleiben auf dem Rechner.',
     icon: programmSymbol('rueckmeldung', 'green'),
     color: 'green',
     illustration: illustration('rueckmeldung'),

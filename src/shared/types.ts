@@ -214,6 +214,12 @@ export interface AppSettings {
     allgemein: number[]
     jeFach: Record<string, number[]>
   }
+  /**
+   * Korrekturzeichen für die Rückmeldung (29.09.2026) je Fachgruppe (deutsch, fremdsprache,
+   * mathematik, naturwissenschaft, gesellschaft, allgemein). Fehlt eine Gruppe, gilt die
+   * Voreinstellung aus renderer/shared/korrekturzeichen.ts.
+   */
+  korrekturzeichen?: Record<string, { zeichen: string; bedeutung: string }[]>
   /** Maskottchen (26.09.2026): bis zu welcher Klasse Illustrationen gelten, und die Standardfigur */
   illustrationen?: { bisKlasse: number; standardId?: string }
   /**

@@ -17,8 +17,15 @@ import {
   Tooltip
 } from '@mantine/core'
 import { ANREDE_OPTIONEN, type Anrede } from '../render/texte'
-import { IconFileText, IconFolderOpen, IconKeyboard, IconMessageCheck, IconPhoto, IconTrash } from '@tabler/icons-react'
-import { useState } from 'react'
+import { IconFileText, IconFolderOpen, IconHeartHandshake, IconKeyboard, IconMessageCheck, IconPhoto, IconTrash } from '@tabler/icons-react'
+import { useEffect, useState } from 'react'
+import { FAMILIENSPRACHEN } from '../../../shared/familiensprachen'
+import { ladeGedaechtnis, speichereGedaechtnis } from '../ablagen'
+import { einstufungVon, hatForm } from '../art'
+import { ausgleichKurz, gemerkterAusgleich, hatAusgleich, merkeAusgleich, type AusgleichGedaechtnis } from '../nachteilsausgleich'
+import ArtKarte from './ArtKarte'
+import AusgleichFenster from './AusgleichFenster'
+import TabelleKarte from './TabelleKarte'
 import { pruefeHochladen, type HochladeInhalt } from '../../../shared/datenschutz'
 import DropZone from '../../../shared/components/DropZone'
 import Formularfuss from '../../../shared/components/Formularfuss'
@@ -30,7 +37,7 @@ import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
 import { aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
 import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
 import MaterialWahl from '../../../shared/components/MaterialWahl'
-import { naechstesKuerzel, type Abgabe } from '../model/types'
+import { naechstesKuerzel, type Abgabe, type Nachteilsausgleich } from '../model/types'
 import { useRueckmeldung } from '../store'
 
 /**
@@ -44,7 +51,29 @@ export default function Einrichten(): React.JSX.Element | null {
   const [leseErwartung, setLeseErwartung] = useState<string | null>(null)
   const [wahlOffen, setWahlOffen] = useState(false)
   const [quelle, setQuelle] = useState<'material' | 'frei'>(r?.grundlage.art === 'frei' ? 'frei' : 'material')
+  // Nachteilsausgleich (29.09.2026): Fenster je Abgabe und die lokal gemerkten Ausgleiche
+  const [ausgleichFuer, setAusgleichFuer] = useState<string | null>(null)
+  const [gedaechtnis, setGedaechtnis] = useState<AusgleichGedaechtnis | null>(null)
+  useEffect(() => {
+    void ladeGedaechtnis().then(setGedaechtnis)
+  }, [])
   if (!r) return null
+
+  const ausgleichSpeichern = (id: string, a: Nachteilsausgleich | undefined, merken: boolean): void => {
+    const abgabe = r.abgaben.find((x) => x.id === id)
+    update((d) => {
+      const x = d.abgaben.find((y) => y.id === id)
+      if (!x) return
+      if (a) x.ausgleich = a
+      else delete x.ausgleich
+    })
+    if (merken && abgabe?.name.trim()) {
+      const neu = merkeAusgleich(gedaechtnis, abgabe.name, a ?? null)
+      setGedaechtnis(neu)
+      void speichereGedaechtnis(neu).catch(notifyError)
+    }
+    setAusgleichFuer(null)
+  }
 
   const waehleMaterial = async (wert: string | null): Promise<void> => {
     if (!wert) return
@@ -123,14 +152,22 @@ export default function Einrichten(): React.JSX.Element | null {
   }
 
   const offen = r.abgaben.filter((a) => !a.bogen && (a.text.trim() || a.bilder.length)).length
-  const grund = !r.grundlage.aufgaben.trim() ? 'Grundlage fehlt' : !r.abgaben.length ? 'Noch keine Abgabe' : !offen ? 'Alle Abgaben haben einen Bogen' : ''
+  const grund = !r.grundlage.aufgaben.trim()
+    ? 'Grundlage fehlt'
+    : !r.abgaben.length
+      ? 'Noch keine Abgabe'
+      : hatForm(r.meta, 'tabelle') && !r.tabelle?.kriterien.length
+        ? 'Bewertungstabelle fehlt'
+        : !offen
+          ? 'Alle Abgaben haben einen Bogen'
+          : ''
 
   return (
     <Stack h="100%" gap={0}>
       <ScrollArea style={{ flex: 1 }}>
         <Container size="xl" py="lg">
           <Title order={2} mb="md">
-            Rückmeldung ohne Note
+            {einstufungVon(r.meta) === 'keine' ? 'Rückmeldung ohne Note' : 'Rückmeldung mit Einstufung'}
           </Title>
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <Stack>
@@ -285,6 +322,8 @@ export default function Einrichten(): React.JSX.Element | null {
                   </Text>
                 )}
               </Card>
+              <ArtKarte />
+              {hatForm(r.meta, 'tabelle') && <TabelleKarte />}
             </Stack>
             <Card withBorder>
               <Title order={4} mb="sm">
@@ -335,6 +374,23 @@ export default function Einrichten(): React.JSX.Element | null {
                             {a.bilder.length ? <IconPhoto size={12} /> : <IconFileText size={12} />} {a.dateiname}
                             {a.bogen ? ' · Bogen fertig' : ''}
                           </Text>
+                          <Tooltip label={hatAusgleich(a.ausgleich) ? 'Nachteilsausgleich ändern' : 'Nachteilsausgleich'}>
+                            <ActionIcon
+                              size="sm"
+                              variant={hatAusgleich(a.ausgleich) ? 'light' : 'subtle'}
+                              color={hatAusgleich(a.ausgleich) ? 'grape' : 'gray'}
+                              aria-label={`Nachteilsausgleich für ${a.kuerzel}`}
+                              onClick={() => setAusgleichFuer(a.id)}
+                              data-rm-ausgleich-knopf
+                            >
+                              <IconHeartHandshake size={14} />
+                            </ActionIcon>
+                          </Tooltip>
+                          {hatAusgleich(a.ausgleich) && (
+                            <Badge size="xs" color="grape" variant="light">
+                              {ausgleichKurz(a.ausgleich)}
+                            </Badge>
+                          )}
                           <Tooltip label="Abgabe entfernen">
                             <ActionIcon
                               size="sm"
@@ -347,6 +403,44 @@ export default function Einrichten(): React.JSX.Element | null {
                             </ActionIcon>
                           </Tooltip>
                         </Group>
+                        {!hatAusgleich(a.ausgleich) && gemerkterAusgleich(gedaechtnis, a.name) && (
+                          <Group gap={6}>
+                            <Text size="xs" c="grape">
+                              Für „{a.name.trim()}" ist ein Nachteilsausgleich gemerkt.
+                            </Text>
+                            <Button
+                              size="compact-xs"
+                              variant="light"
+                              color="grape"
+                              onClick={() =>
+                                update((d) => {
+                                  const g = gemerkterAusgleich(gedaechtnis, a.name)
+                                  if (g) d.abgaben[i].ausgleich = g
+                                })
+                              }
+                              data-rm-ausgleich-uebernehmen
+                            >
+                              Übernehmen
+                            </Button>
+                          </Group>
+                        )}
+                        {r.meta.elternfassung && (
+                          <Select
+                            size="xs"
+                            placeholder="Familiensprache für die Elternfassung (optional)"
+                            data={FAMILIENSPRACHEN.map((f) => ({ value: f.code, label: `${f.name} – ${f.eigen}` }))}
+                            value={a.familiensprache ?? null}
+                            onChange={(v) =>
+                              update((d) => {
+                                if (v) d.abgaben[i].familiensprache = v
+                                else delete d.abgaben[i].familiensprache
+                              })
+                            }
+                            clearable
+                            searchable
+                            aria-label={`Familiensprache zu ${a.kuerzel}`}
+                          />
+                        )}
                         {!a.bilder.length && (
                           <Textarea
                             size="xs"
@@ -376,6 +470,13 @@ export default function Einrichten(): React.JSX.Element | null {
           </SimpleGrid>
         </Container>
       </ScrollArea>
+      <AusgleichFenster
+        abgabe={r.abgaben.find((a) => a.id === ausgleichFuer) ?? null}
+        meta={r.meta}
+        offen={Boolean(ausgleichFuer)}
+        schliessen={() => setAusgleichFuer(null)}
+        speichern={(a, merken) => ausgleichFuer && ausgleichSpeichern(ausgleichFuer, a, merken)}
+      />
       <Formularfuss grund={grund}>
         <Button leftSection={<IconMessageCheck size={16} />} disabled={Boolean(grund)} onClick={() => rueckmeldungenErzeugen(r, docId)} data-rm-schreiben>
           {offen > 1 ? `${offen} Rückmeldungen schreiben` : 'Rückmeldung schreiben'}

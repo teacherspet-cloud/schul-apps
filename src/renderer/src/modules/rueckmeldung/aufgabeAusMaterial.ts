@@ -27,7 +27,7 @@ const schlicht = (text: string): string =>
     .trim()
 
 /** Text und Bilder der Dateien für eine Anfrage (Bilder nur, wo kein Text da ist: Fotos, Scans) */
-function inhalt(dateien: GeleseneDatei[]): { text: string; bilder: string[] } {
+export function inhalt(dateien: GeleseneDatei[]): { text: string; bilder: string[] } {
   const text = dateien
     .map((d) => (d.text.trim() ? `--- ${d.fileName} ---\n${schlicht(d.text).slice(0, 20000)}` : `--- ${d.fileName}: als Bild beigefügt ---`))
     .join('\n\n')
