@@ -225,6 +225,13 @@ export interface AppSettings {
    * Klasse 7 als Vorschlag; leer = Präsens mit man/Passiv (didactics/protokoll.ts).
    */
   protokollStil?: 'ichwir' | 'praesens' | 'praeteritum' | ''
+  /**
+   * Anteil des Schreibteils an der Note in den modernen Fremdsprachen, wie ihn die Fachschaft
+   * festgelegt hat (29.09.2026) – je Fach (Kennung) für Klasse 5 und ab Klasse 6. Fehlt ein Fach,
+   * gilt die bisherige Voreinstellung 60 / 70 % (in den Kerncurricula nicht belegt, eher
+   * Fachkonferenzbeschluss – recherche/klassenarbeiten-pruefung-vorhandene-faecher-2026-09-29.md).
+   */
+  schreibanteil?: Record<string, { k5: number; ab6: number }>
   /** Maskottchen (26.09.2026): bis zu welcher Klasse Illustrationen gelten, und die Standardfigur */
   illustrationen?: { bisKlasse: number; standardId?: string }
   /**

@@ -61,6 +61,7 @@ import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '.
 import { CITATION_STYLES } from '../shared/citation'
 import GradeScaleSettings from './GradeScaleSettings'
 import KorrekturzeichenSettings from './KorrekturzeichenSettings'
+import SchreibanteilSettings from './SchreibanteilSettings'
 import MaskottchenSettings from './MaskottchenSettings'
 import FachfarbenSettings from './FachfarbenSettings'
 import NetzwerkCard from './NetzwerkCard'
@@ -167,6 +168,7 @@ export default function SettingsPage(): React.JSX.Element {
               <FachfarbenSettings settings={settings} update={update} />
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />
+              <SchreibanteilSettings settings={settings} update={update} />
               <MaskottchenSettings settings={settings} update={update} />
               <Card withBorder padding="lg">
                 <Title order={4} mb="md">

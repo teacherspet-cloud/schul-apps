@@ -54,6 +54,8 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     audio: { voices: { ...base.audio.voices, ...(stored.audio?.voices as Record<string, string>) } },
     // Je Fach zusammenführen: Eine geänderte Fachfarbe darf die übrigen nicht löschen
     fachfarben: { ...base.fachfarben, ...(stored.fachfarben as Record<string, string>) },
+    // Schreibanteil je Fach: Das Ändern des einen Fachs darf die übrigen nicht löschen
+    schreibanteil: { ...base.schreibanteil, ...(stored.schreibanteil as Record<string, { k5: number; ab6: number }>) },
     // Korrekturzeichen je Fachgruppe: Das Ändern der einen Gruppe darf die übrigen nicht löschen
     korrekturzeichen: {
       ...base.korrekturzeichen,

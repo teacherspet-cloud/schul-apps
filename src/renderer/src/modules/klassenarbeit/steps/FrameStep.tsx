@@ -205,7 +205,7 @@ export default function FrameStep(): React.JSX.Element {
 
   /** Nach dem Hinzufügen oder Löschen die Anteile nach der Regel des Faches setzen */
   const applyWeights = (d: Exam): void => {
-    const weights = defaultWeights(d.meta.subjectId, d.meta.grade, d.parts)
+    const weights = defaultWeights(d.meta.subjectId, d.meta.grade, d.parts, appSettings.schreibanteil?.[d.meta.subjectId])
     d.parts.forEach((part, i) => {
       part.weight = weights[i] ?? part.weight
     })
@@ -237,7 +237,7 @@ export default function FrameStep(): React.JSX.Element {
 
   const fillParts = (): void =>
     update((d) => {
-      d.parts = suggestParts(d.meta.subjectId, d.meta.grade, d.meta.points, d.meta.minutes).map((p): ExamPart => ({
+      d.parts = suggestParts(d.meta.subjectId, d.meta.grade, d.meta.points, d.meta.minutes, appSettings.schreibanteil?.[d.meta.subjectId]).map((p): ExamPart => ({
         id: newId(),
         formatId: p.formatId,
         label: formatById(p.formatId)?.label ?? '',
@@ -999,7 +999,7 @@ export default function FrameStep(): React.JSX.Element {
                       )}
                       {istAlteSprache(meta.subjectId) && <FehlerquoteFelder exam={exam} patch={patch} />}
                       <MehrText
-                        text={`In Niedersachsen erhält der Schreibteil eine eigenständige Note; die übrigen geprüften Kompetenzen ergeben zusammen die zweite Note. Jeder Teil hat eigene Punkte – daraus entsteht seine Teilnote, und erst die Teilnoten werden nach ihrem Anteil verrechnet: ${writingWeightFor(meta.grade)} % Schreiben und ${100 - writingWeightFor(meta.grade)} % weitere Kompetenz in Klasse ${meta.grade}. Leseverstehen und Hörverstehen sind mit 21 Punkten vorbelegt. Schreiben und Sprachmittlung werden im Verhältnis ${CONTENT_SHARE} % Inhalt zu ${100 - CONTENT_SHARE} % Sprache bewertet.`}
+                        text={`In Niedersachsen erhält der Schreibteil eine eigenständige Note; die übrigen geprüften Kompetenzen ergeben zusammen die zweite Note. Jeder Teil hat eigene Punkte – daraus entsteht seine Teilnote, und erst die Teilnoten werden nach ihrem Anteil verrechnet: ${writingWeightFor(meta.grade, appSettings.schreibanteil?.[meta.subjectId])} % Schreiben und ${100 - writingWeightFor(meta.grade, appSettings.schreibanteil?.[meta.subjectId])} % weitere Kompetenz in Klasse ${meta.grade} (Voreinstellung der Fachschaft, änderbar unter Einstellungen › Material). Leseverstehen und Hörverstehen sind mit 21 Punkten vorbelegt. Schreiben und Sprachmittlung werden im Verhältnis ${CONTENT_SHARE} % Inhalt zu ${100 - CONTENT_SHARE} % Sprache bewertet.`}
                       />
                     </Stack>
                   </Card>

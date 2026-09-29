@@ -616,7 +616,8 @@ export const formatById = (id: string): ExamFormat | undefined => EXAM_FORMATS.f
  * Anteil des Schreibteils an der Arbeit. In Niedersachsen erhält der Schreibteil eine
  * eigenständige Note; üblich sind 60 % in Klasse 5 und 70 % ab Klasse 6.
  */
-export const writingWeightFor = (grade: number): number => (grade <= 5 ? 60 : 70)
+export const writingWeightFor = (grade: number, fachschaft?: { k5: number; ab6: number }): number =>
+  grade <= 5 ? (fachschaft?.k5 ?? 60) : (fachschaft?.ab6 ?? 70)
 
 /** Übliche Aufteilung eines produktiven Teils in Inhalt und Sprache */
 export const CONTENT_SHARE = 40
@@ -626,7 +627,13 @@ export const CONTENT_SHARE = 40
  * 70 % (Klasse 5: 60 %), die übrigen geprüften Kompetenzen teilen sich den Rest.
  * Gibt es keinen Schreibteil, teilen sich alle Teile die 100 % gleichmäßig.
  */
-export function defaultWeights(subject: ExamSubjectId, grade: number, parts: { formatId: string; gradeGroup: 'writing' | 'other' }[]): number[] {
+export function defaultWeights(
+  subject: ExamSubjectId,
+  grade: number,
+  parts: { formatId: string; gradeGroup: 'writing' | 'other' }[],
+  /** Schreibanteil der Fachschaft (Einstellungen) */
+  fachschaft?: { k5: number; ab6: number }
+): number[] {
   if (!parts.length) return []
   if (!istFremdsprache(subject) && !istAlteSprache(subject)) {
     const shares = parts.map((p) => formatById(p.formatId)?.share ?? 1)
@@ -645,7 +652,7 @@ export function defaultWeights(subject: ExamSubjectId, grade: number, parts: { f
     const even = Math.floor(100 / parts.length)
     return parts.map((_, i) => (i === parts.length - 1 ? 100 - even * (parts.length - 1) : even))
   }
-  const writingTotal = istAlteSprache(subject) ? UEBERSETZUNGSANTEIL : writingWeightFor(grade)
+  const writingTotal = istAlteSprache(subject) ? UEBERSETZUNGSANTEIL : writingWeightFor(grade, fachschaft)
   const otherTotal = 100 - writingTotal
   const out = new Array(parts.length).fill(0)
   const spread = (idx: number[], total: number): void => {
@@ -699,12 +706,14 @@ export function suggestParts(
   subject: ExamSubjectId,
   grade: number,
   points: number,
-  minutes: number
+  minutes: number,
+  /** Schreibanteil der Fachschaft (Einstellungen) */
+  fachschaft?: { k5: number; ab6: number }
 ): { formatId: string; points: number; minutes: number; weight: number; gradeGroup: 'writing' | 'other'; contentShare?: number }[] {
   if (istFremdsprache(subject)) {
     // Jeder Teil hat eigene Punkte; daraus entsteht seine Teilnote. Erst die Teilnoten
     // werden nach ihrem Anteil (30 : 70 bzw. 40 : 60 in Klasse 5) zur Gesamtnote verrechnet.
-    const writing = writingWeightFor(grade)
+    const writing = writingWeightFor(grade, fachschaft)
     const other = 100 - writing
     const otherFormat = formatIdFuer(subject, grade <= 7 ? 'reading' : 'mediation')
     const otherDef = formatById(otherFormat)
