@@ -72,6 +72,7 @@ import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
 import HaeufigSelect from '../shared/components/HaeufigSelect'
 import SchulnameFeld from './Schulsuche'
+import BriefkopfFelder from './BriefkopfFelder'
 import { stateInfo } from '../modules/arbeitsblatt/didactics/states'
 import { EigeneFaecherFeld, ProgrammeAnzeigenCard } from './ProgrammeAnzeigen'
 
@@ -942,6 +943,7 @@ export function SchoolCard({ settings, update }: { settings: AppSettings; update
         {/* Mit Schulsuche im Verzeichnis der Länder (Paket 13) – auch im Einrichtungsassistenten */}
         <SchulnameFeld settings={settings} update={update} table={table} disabled={settings.showSchool === false} />
         <LogoField />
+        {!imNetz() && <BriefkopfFelder settings={settings} update={update} />}
         <Group grow>
           <HaeufigSelect
             art="bundesland"

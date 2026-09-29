@@ -15,6 +15,8 @@ export default function Inhalt(): React.JSX.Element | null {
   const m = b.meta
   const setze = (fn: (d: Elternbrief) => void, gruppe?: string): void => update(fn, gruppe)
   const grund = !m.stichpunkte.trim() ? 'Stichpunkte fehlen' : ''
+  // Kein Hindernis, aber ein Hinweis: Ohne Frist setzt die KI sonst einen Platzhalter
+  const ohneFrist = m.ruecklauf && !m.rueckgabeBis
   return (
     <Stack h="100%" gap={0}>
       <ScrollArea style={{ flex: 1 }}>
@@ -44,6 +46,30 @@ export default function Inhalt(): React.JSX.Element | null {
                   }}
                   data-eb-stichpunkte
                 />
+                <Group grow align="flex-start">
+                  <TextInput
+                    label="Termin (Datum)"
+                    description="Tag des Anlasses – steht so im Brief"
+                    type="date"
+                    value={m.termin?.datum ?? ''}
+                    onChange={(e) => {
+                      const x = e.currentTarget.value
+                      setze((d) => (d.meta.termin = { ...d.meta.termin, datum: x }), 'eb-termin')
+                    }}
+                    data-eb-termin
+                  />
+                  <TextInput
+                    label="Uhrzeit"
+                    description="Beginn bzw. Treffpunkt"
+                    type="time"
+                    value={m.termin?.uhrzeit ?? ''}
+                    onChange={(e) => {
+                      const x = e.currentTarget.value
+                      setze((d) => (d.meta.termin = { ...d.meta.termin, uhrzeit: x }), 'eb-uhrzeit')
+                    }}
+                    data-eb-uhrzeit
+                  />
+                </Group>
                 <Switch
                   label="Mit Rücklaufzettel zum Abschneiden"
                   checked={m.ruecklauf}
@@ -52,6 +78,19 @@ export default function Inhalt(): React.JSX.Element | null {
                     setze((d) => (d.meta.ruecklauf = x))
                   }}
                 />
+                {m.ruecklauf && (
+                  <TextInput
+                    label="Rückgabe des Rücklaufzettels bis"
+                    type="date"
+                    value={m.rueckgabeBis ?? ''}
+                    error={ohneFrist ? 'Ohne Frist steht im Brief nur ein Platzhalter.' : undefined}
+                    onChange={(e) => {
+                      const x = e.currentTarget.value
+                      setze((d) => (d.meta.rueckgabeBis = x), 'eb-frist')
+                    }}
+                    data-eb-frist
+                  />
+                )}
               </Stack>
             </Card>
             <Card withBorder>
@@ -67,6 +106,7 @@ export default function Inhalt(): React.JSX.Element | null {
                 />
                 <TextInput
                   label="Unterschrift"
+                  description="Vorgabe aus Einstellungen › Schule"
                   placeholder="Name der Lehrkraft"
                   value={m.absender}
                   onChange={(e) => {
@@ -75,7 +115,7 @@ export default function Inhalt(): React.JSX.Element | null {
                   }}
                 />
                 <TextInput
-                  label="Datum"
+                  label="Datum des Briefes"
                   type="date"
                   value={m.datum}
                   onChange={(e) => {

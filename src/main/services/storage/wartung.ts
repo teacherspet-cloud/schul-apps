@@ -87,6 +87,8 @@ const DATEIEN = [
   'settings.json',
   'secrets.json',
   'logo.png',
+  // Unterschrift der Lehrkraft für Elternbriefe (29.09.2026)
+  'unterschrift.png',
   'worksheet-designs.json',
   'worksheet-designs-version.json',
   'model-cache.json',

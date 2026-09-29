@@ -57,14 +57,23 @@ export interface Elternbrief {
     klasse: string
     /** Unterschrift (Name der Lehrkraft) */
     absender: string
+    /** Datum des Briefes (steht rechts über dem Betreff) */
     datum: string
     ruecklauf: boolean
+    /** Termin des Anlasses (29.09.2026): Datum JJJJ-MM-TT und Uhrzeit HH:MM – die KI übernimmt beides wörtlich */
+    termin?: { datum?: string; uhrzeit?: string }
+    /** Rückgabe des Rücklaufzettels bis (JJJJ-MM-TT) */
+    rueckgabeBis?: string
     subjectLabel?: string
     ki?: KiHerkunft
     kiVermerk?: KiVermerk
   }
   text: BriefText | null
   uebersetzungen: Uebersetzung[]
+  /** Frühere Fassungen des deutschen Textes (neueste zuerst, höchstens 10) – „Vorige Fassung zurück" */
+  fassungen?: { am: string; anlass: string; text: BriefText }[]
+  /** Befunde der Prüfung nach dem Schreiben (offene Platzhalter, verlorene Angaben) */
+  pruefung?: string[]
   createdAt: string
   design?: unknown
 }
@@ -73,7 +82,7 @@ export const hatText = (b: Elternbrief | null): boolean => Boolean(b?.text?.absa
 export const lohntSicherung = (b: Elternbrief | null): boolean => Boolean(b && (b.meta.stichpunkte.trim() || b.meta.title.trim() || b.text))
 export const standardName = (b: Elternbrief): string => b.meta.title.trim() || b.text?.betreff || `Elternbrief: ${b.meta.anlass}`
 
-const BRIEF_SCHEMA = obj({
+export const BRIEF_SCHEMA = obj({
   betreff: str('Betreffzeile, knapp'),
   anrede: str('Anrede („Liebe Eltern und Erziehungsberechtigte der Klasse 7b,")'),
   absaetze: arr(str('Ein Absatz des Briefes')),
@@ -82,8 +91,29 @@ const BRIEF_SCHEMA = obj({
   ruecklaufZeilen: arr(str('Eine Zeile des Rücklaufzettels, z. B. „☐ Mein Kind nimmt teil." oder „Unterschrift: ____"'))
 })
 
+const WOCHENTAG = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
+
+/** „Freitag, 12.12.2026" aus JJJJ-MM-TT; leer, wenn kein gültiges Datum */
+export function datumLang(iso?: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '')
+  if (!m) return ''
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return `${WOCHENTAG[d.getDay()]}, ${m[3]}.${m[2]}.${m[1]}`
+}
+
+/** Termin und Rückgabefrist als Zeilen für die KI – leer, was nicht eingetragen ist */
+export function festeAngaben(m: Elternbrief['meta']): string[] {
+  const zeilen: string[] = []
+  const tag = datumLang(m.termin?.datum)
+  if (tag) zeilen.push(`TERMIN: ${tag}${m.termin?.uhrzeit ? `, ${m.termin.uhrzeit} Uhr` : ''}`)
+  const frist = datumLang(m.rueckgabeBis)
+  if (m.ruecklauf && frist) zeilen.push(`RÜCKGABE DES RÜCKLAUFZETTELS BIS: ${frist}`)
+  return zeilen
+}
+
 export function briefAnfrage(b: Elternbrief, schule: string): StructuredRequest {
   const m = b.meta
+  const fest = festeAngaben(m)
   return {
     system:
       'Du schreibst Elternbriefe für Lehrkräfte an deutschen Schulen: klar, freundlich, in verständlichem Deutsch (kurze Sätze, keine Fachbegriffe ohne Erklärung), rechtlich unverfänglich. Termine, Orte, Beträge und Fristen stehen gut auffindbar.',
@@ -96,9 +126,15 @@ export function briefAnfrage(b: Elternbrief, schule: string): StructuredRequest 
       m.ruecklauf
         ? '- Mit Rücklaufzettel: Überschrift und Zeilen zum Ankreuzen bzw. Ausfüllen (Name des Kindes, Unterschrift eines Erziehungsberechtigten, Datum).'
         : '- Ohne Rücklaufzettel: ruecklaufTitel leer, ruecklaufZeilen leer.',
+      fest.length
+        ? '- FESTE ANGABEN (unten): Datum, Uhrzeit und Frist stehen im Brief GENAU in dieser Schreibweise (z. B. „Freitag, 12.12.2026"); kein Platzhalter dafür. Die Rückgabefrist steht im Brief und auf dem Rücklaufzettel.'
+        : '',
+      ...(fest.length ? ['FESTE ANGABEN:', ...fest] : []),
       'STICHPUNKTE DER LEHRKRAFT:',
       m.stichpunkte
-    ].join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     schemaName: 'elternbrief_text',
     schema: BRIEF_SCHEMA
   }

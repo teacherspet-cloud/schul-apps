@@ -251,6 +251,12 @@ export interface AppSettings {
    * und ob Namen vor dem Senden durch Kürzel ersetzt werden (fehlt = ja).
    */
   datenschutz?: { hinweisBestaetigt?: string; namenErsetzen?: boolean }
+  /**
+   * Briefkopf (29.09.2026): Absender der Elternbriefe. Straße, PLZ, Ort und Telefon kommen bei der
+   * Schulwahl aus dem Schulverzeichnis und bleiben änderbar; `zertifikat` = Pfad einer .pfx/.p12-Datei
+   * zum digitalen Signieren der Brief-PDFs (das Passwort wird nie gespeichert).
+   */
+  briefkopf?: { lehrkraft?: string; strasse?: string; plz?: string; ort?: string; telefon?: string; zertifikat?: string; signieren?: boolean }
   /** Automatische Sicherung (27.09.2026): an/aus (fehlt = an), zusätzlicher Ordner, Zahl der Stände */
   sicherung?: { automatisch?: boolean; ordner?: string; behalten?: number }
   /**

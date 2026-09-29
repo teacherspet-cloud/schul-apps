@@ -48,7 +48,7 @@ import { deleteExam, getExam, listExams, saveExam } from './services/storage/exa
 import { deleteWorksheet, getWorksheet, listWorksheets, saveWorksheet } from './services/storage/worksheets'
 import { docxToHtml } from './services/ocr/docx'
 import type { DesignTemplate } from '@shared/design'
-import { getLogo, removeLogo, setLogo } from './services/storage/branding'
+import { getLogo, getUnterschrift, removeLogo, removeUnterschrift, setLogo, setUnterschrift } from './services/storage/branding'
 import { getPictograms, removeAllPictograms, removePictogram, setPictogram } from './services/storage/pictograms'
 import { deleteGrammarTest, getGrammarTest, listGrammarTests, saveGrammarTest } from './services/storage/grammarTests'
 import { deleteKurztest, getKurztest, listKurztests, saveKurztest } from './services/storage/kurztests'
@@ -74,6 +74,7 @@ import { bestand, pruefeSicherung, sicherung, werkszustand, wiederherstellen } f
 import { ladeSicherung, listeSicherungen, sichereJetzt, starteAutoSicherung } from './services/storage/autoSicherung'
 import { raeumeHoertexteAuf, verwaisteHoertexte } from './services/storage/hoertexteAufraeumen'
 import { erstellePaket, leseGeoeffnetesPaketEin, oeffnePaket, paketAusArgumenten } from './services/paket/wege'
+import { leseZertifikat, signierePdf } from './services/export/pdfSignatur'
 import type { PaketArt } from './services/paket/paket'
 import { fangeAbstuerze, leseProtokoll, protokolliere } from './services/protokoll'
 import { mitWiederholung } from './services/ai/wiederholung'
@@ -499,6 +500,18 @@ function registerIpc(): void {
   handle('branding:get-logo', () => getLogo())
   handle('branding:set-logo', (dataUrl: string) => setLogo(dataUrl))
   handle('branding:remove-logo', () => removeLogo())
+  // Unterschrift (29.09.2026) – im Netzzugang gesperrt (nicht in ERLAUBTE_KANAELE)
+  handle('branding:get-unterschrift', () => getUnterschrift())
+  handle('branding:set-unterschrift', (dataUrl: string) => setUnterschrift(dataUrl))
+  handle('branding:remove-unterschrift', () => removeUnterschrift())
+  handle('briefkopf:zertifikat', async () => {
+    const res = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Zertifikat zum Signieren wählen',
+      properties: ['openFile'],
+      filters: [{ name: 'Zertifikat mit privatem Schlüssel', extensions: ['pfx', 'p12'] }]
+    })
+    return res.canceled || !res.filePaths.length ? null : res.filePaths[0]
+  })
 
   handle('pictograms:get', () => getPictograms())
   handle('pictograms:set', (id: string, dataUrl: string) => setPictogram(id, dataUrl))
@@ -676,13 +689,28 @@ function registerIpc(): void {
     if (fehler) throw new Error(fehler)
   })
 
-  type PdfExtras = { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }
+  type PdfExtras = {
+    fillable?: boolean
+    audio?: { id: string; fileName: string; title: string; base64: string }[]
+    /** Digital signieren mit dem Zertifikat aus den Einstellungen (Elternbriefe, 29.09.2026) */
+    signatur?: { passwort: string; grund?: string; name?: string }
+  }
   const pdfBytes = async (html: string, opts?: PdfExtras): Promise<Buffer> => {
     const audio = (opts?.audio ?? []).map((a) => ({ id: a.id, fileName: a.fileName, title: a.title, bytes: Buffer.from(a.base64, 'base64') }))
     // Nur den teuren Weg gehen, wenn auch etwas hinzukommt
     const roh = opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }) : await htmlToPdf(html)
     // Erzeuger und KI-Kennzeichnung ins Info-Verzeichnis (Großprogramm 0.4)
-    return Buffer.from(await mitPdfMetadaten(new Uint8Array(roh), html))
+    const mitMeta = await mitPdfMetadaten(new Uint8Array(roh), html)
+    if (!opts?.signatur) return Buffer.from(mitMeta)
+    // Signieren zuletzt – jede spätere Änderung würde die Signatur ungültig machen
+    const { briefkopf } = getSettings()
+    return Buffer.from(
+      await signierePdf(mitMeta, leseZertifikat(briefkopf?.zertifikat), opts.signatur.passwort, {
+        grund: opts.signatur.grund,
+        name: opts.signatur.name,
+        ort: briefkopf?.ort
+      })
+    )
   }
 
   /**

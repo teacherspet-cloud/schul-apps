@@ -85,7 +85,9 @@ describe('Hochgeladene Bilder', () => {
       zeilen.forEach((z, i) => {
         if (!z.includes('readFileAsDataUrl(') || z.includes('export function readFileAsDataUrl')) return
         const umgebung = zeilen.slice(i, i + 3).join(' ')
-        if (!/normalizeImage|preparePickedImage|cleanImageBackground|normalizeImage\(await readFileAsDataUrl/.test(umgebung)) roh.push(`${p}:${i + 1}`)
+        // unterschriftAusBild (Briefkopf, 29.09.2026) zeichnet ebenfalls neu auf eine Zeichenfläche
+        if (!/normalizeImage|preparePickedImage|cleanImageBackground|unterschriftAusBild|normalizeImage\(await readFileAsDataUrl/.test(umgebung))
+          roh.push(`${p}:${i + 1}`)
       })
     }
     expect(roh).toEqual([])

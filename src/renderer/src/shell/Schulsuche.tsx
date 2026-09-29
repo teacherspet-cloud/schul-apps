@@ -80,7 +80,22 @@ export default function SchulnameFeld({ settings, update, table, disabled }: Pro
   const waehle = async (t: SchulTreffer): Promise<void> => {
     setText(t.name)
     combobox.closeDropdown()
-    await update({ schoolName: t.name })
+    // Anschrift für den Briefkopf der Elternbriefe (29.09.2026). Andere Schule: Anschrift ganz aus dem
+    // Verzeichnis (Fehlendes bleibt leer). Dieselbe Schule erneut gewählt: nur Leeres ergänzen.
+    const { settings: aktuell } = useAppSettings.getState()
+    const bisher = aktuell.briefkopf ?? {}
+    const gleich = aktuell.schoolName.trim() === t.name
+    const wert = (neu: string, alt?: string): string => (gleich ? alt || neu : neu)
+    await update({
+      schoolName: t.name,
+      briefkopf: {
+        ...bisher,
+        strasse: wert(t.strasse, bisher.strasse),
+        plz: wert(t.plz, bisher.plz),
+        ort: wert(t.ort, bisher.ort),
+        telefon: wert(t.telefon, bisher.telefon)
+      }
+    })
     setGewaehlt(t)
     setLogoFrage(null)
     if (!t.logo) return

@@ -19,7 +19,11 @@ import { notifyError, notifySuccess } from '../util'
  *    jede Datei heruntergeladen (netzZugang.ts).
  */
 
-type PdfZusatz = { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }
+type PdfZusatz = {
+  fillable?: boolean
+  audio?: { id: string; fileName: string; title: string; base64: string }[]
+  signatur?: { passwort: string; grund?: string; name?: string }
+}
 
 export type AusgabeDatei =
   /** Fertige Daten (Word, MP3, …) – gern als Funktion, dann wird erst nach der Ordnerwahl gebaut */

@@ -168,6 +168,10 @@ export function buildApi(call: Call, extras: ApiExtras) {
           Record<string, Record<string, { anfragen: number; wiederholungen: number; eingabe: number; ausgabe: number; bilder: number; ttsZeichen: number }>>
         >('verbrauch:get')
     },
+    /** Briefkopf (29.09.2026): Zertifikat für die digitale Signatur wählen – im Netzzugang gesperrt */
+    briefkopf: {
+      zertifikatWaehlen: () => call<string | null>('briefkopf:zertifikat')
+    },
     /** Schulpaket (F8): Material als Datei weitergeben – im Netzzugang gesperrt */
     paket: {
       erstellen: (titel: string, auswahl: { art: PaketArt; id: string }[]) => call<string | null>('paket:erstellen', titel, auswahl),
@@ -243,7 +247,10 @@ export function buildApi(call: Call, extras: ApiExtras) {
     branding: {
       getLogo: () => call<string | null>('branding:get-logo'),
       setLogo: (pngDataUrl: string) => call<void>('branding:set-logo', pngDataUrl),
-      removeLogo: () => call<void>('branding:remove-logo')
+      removeLogo: () => call<void>('branding:remove-logo'),
+      getUnterschrift: () => call<string | null>('branding:get-unterschrift'),
+      setUnterschrift: (pngDataUrl: string) => call<void>('branding:set-unterschrift', pngDataUrl),
+      removeUnterschrift: () => call<void>('branding:remove-unterschrift')
     },
     /** Selbst gestaltete Piktogramme; gelten für alle Programme */
     pictograms: {
@@ -378,8 +385,15 @@ export function buildApi(call: Call, extras: ApiExtras) {
       pathOf: (file: File) => extras.pathOf(file)
     },
     exporter: {
-      pdf: (html: string, defaultName: string, opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }) =>
-        call<string | null>('export:pdf', html, defaultName, opts),
+      pdf: (
+        html: string,
+        defaultName: string,
+        opts?: {
+          fillable?: boolean
+          audio?: { id: string; fileName: string; title: string; base64: string }[]
+          signatur?: { passwort: string; grund?: string; name?: string }
+        }
+      ) => call<string | null>('export:pdf', html, defaultName, opts),
       /** Wie `pdf`, aber ohne Dialog in einen schon gewählten Ordner (siehe files.chooseFolder) */
       pdfInFolder: (
         folder: string,

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useAppSettings } from '../../shared/settingsStore'
 import EinfacheBibliothek from '../../shared/testmodul/EinfacheBibliothek'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { hatText, standardName, type Elternbrief } from './model'
@@ -15,7 +16,8 @@ export function leererBrief(): Elternbrief {
       ton: 'freundlich',
       stichpunkte: '',
       klasse: '',
-      absender: '',
+      // Name der Lehrkraft aus Einstellungen › Schule (29.09.2026) – am Brief änderbar
+      absender: useAppSettings.getState().settings.briefkopf?.lehrkraft ?? '',
       datum: new Date().toISOString().slice(0, 10),
       ruecklauf: false
     },

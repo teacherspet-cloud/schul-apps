@@ -174,6 +174,11 @@ export const UMSCHREIBUNG: Record<string, (args: unknown[]) => unknown[]> = {
     if (!patch || typeof patch !== 'object') return args
     // `sicherung` enthält einen Ordnerpfad dieses Rechners – gehört an den Rechner
     const { lan: _weg, sicherung: _s, ...rest } = patch as Record<string, unknown>
+    // Zertifikat (Pfad auf diesem Rechner) und Signieren stellt nur, wer am Rechner sitzt
+    if (rest.briefkopf && typeof rest.briefkopf === 'object') {
+      const { zertifikat: _z, signieren: _si, ...kopf } = rest.briefkopf as Record<string, unknown>
+      rest.briefkopf = kopf
+    }
     if (rest.ai && typeof rest.ai === 'object') {
       const ai = { ...(rest.ai as Record<string, unknown>) }
       for (const feld of GESPERRTE_KI_FELDER) delete ai[feld]

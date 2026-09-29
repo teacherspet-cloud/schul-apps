@@ -13,8 +13,8 @@
 /** Schulform-Kürzel der Datei (Feld `schulformen`) */
 export type SchulformKuerzel = 'gs' | 'hs' | 'rs' | 'igs' | 'gym' | 'fs' | 'bbs' | 'sonst'
 
-/** Eine Zeile der Datei: [name, ort, plz, land, schulformen, id] */
-export type SchulZeile = [string, string, string, string, string[], string]
+/** Eine Zeile der Datei: [name, ort, plz, land, schulformen, id, strasse?, telefon?] – Anschrift seit 29.09.2026 */
+export type SchulZeile = [string, string, string, string, string[], string, string?, string?]
 
 export interface SchulTreffer {
   id: string
@@ -26,6 +26,10 @@ export interface SchulTreffer {
   schulformen: string[]
   /** Für diese Schule liegt ein Vorgabe-Logo bei (resources/schulen/logos/<id>.png) */
   logo: boolean
+  /** Straße mit Hausnummer – leer, wenn die Quelle keine führt */
+  strasse: string
+  /** Telefon der Schule – leer, wenn die Quelle keins führt (z. B. BY, RP, SH) */
+  telefon: string
 }
 
 export interface SchulQuelle {
@@ -170,8 +174,8 @@ export function sucheSchulen(index: SchulEintrag[], eingabe: string, opt: SuchOp
   }
   bewertet.sort((a, b) => b.wert - a.wert || a.e.zeile[0].localeCompare(b.e.zeile[0], 'de') || a.e.zeile[1].localeCompare(b.e.zeile[1], 'de'))
   return bewertet.slice(0, max).map(({ e }) => {
-    const [name, ort, plz, land, schulformen, id] = e.zeile
-    return { id, name, ort, plz, land, schulformen, logo: hatLogo(id) }
+    const [name, ort, plz, land, schulformen, id, strasse, telefon] = e.zeile
+    return { id, name, ort, plz, land, schulformen, logo: hatLogo(id), strasse: strasse ?? '', telefon: telefon ?? '' }
   })
 }
 
