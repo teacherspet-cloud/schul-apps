@@ -150,7 +150,7 @@ export default function FrameStep(): React.JSX.Element {
     })
   }, [exam?.meta.subjectId, exam?.meta.stateId, exam?.meta.schoolTypeId, exam?.meta.grade, exam?.meta.courseLevel, exam?.meta.cefrLevel])
 
-  const available = useMemo(() => (exam ? formatsFor(exam.meta.subjectId, exam.meta.grade) : []), [exam])
+  const available = useMemo(() => (exam ? formatsFor(exam.meta.subjectId, exam.meta.grade, exam.meta.stateId) : []), [exam])
   // Vor der frühen Rückkehr: Hooks stehen immer in derselben Reihenfolge
   const lehrplan = useLehrplanVorschlaege(exam?.meta.stateId ?? '', exam?.meta.schoolTypeId, exam?.meta.subjectId ?? '', exam?.meta.grade ?? 0)
   if (!exam) return <Container py="xl">Wird geladen …</Container>
@@ -237,7 +237,7 @@ export default function FrameStep(): React.JSX.Element {
 
   const fillParts = (): void =>
     update((d) => {
-      d.parts = suggestParts(d.meta.subjectId, d.meta.grade, d.meta.points, d.meta.minutes, appSettings.schreibanteil?.[d.meta.subjectId]).map((p): ExamPart => ({
+      d.parts = suggestParts(d.meta.subjectId, d.meta.grade, d.meta.points, d.meta.minutes, appSettings.schreibanteil?.[d.meta.subjectId], d.meta.stateId).map((p): ExamPart => ({
         id: newId(),
         formatId: p.formatId,
         label: formatById(p.formatId)?.label ?? '',
@@ -309,6 +309,10 @@ export default function FrameStep(): React.JSX.Element {
                             if (art === 'mathematik') d.meta.aids = 'Taschenrechner (nicht grafikfähig), Formelsammlung'
                             else if (art === 'alte-sprache') d.meta.aids = 'Wortangaben'
                             else if (art === 'naturwissenschaft') d.meta.aids = 'Taschenrechner'
+                            else if (v === 'erdkunde') d.meta.aids = 'Atlas'
+                            // Befund F8: Oberstufe Fremdsprache ein- und zweisprachiges Wörterbuch, sonst keine Hilfsmittel
+                            else if (art === 'fremdsprache' && d.meta.grade >= 11) d.meta.aids = 'ein- und zweisprachiges Wörterbuch'
+                            else d.meta.aids = 'keine Hilfsmittel'
                           })
                         }
                         allowDeselect={false}

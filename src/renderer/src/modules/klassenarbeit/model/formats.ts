@@ -139,7 +139,8 @@ const ENGLISCH: ExamFormat[] = [
     grades: [5, 13],
     material: 'image',
     defaultPoints: 30,
-    note: 'In den meisten Ländern kann eine Klassenarbeit pro Schuljahr durch eine Sprechprüfung ersetzt werden.'
+    // Befund F7 (29.09.2026): Häufigkeit ist Ländersache – nicht „in den meisten Ländern einmal jährlich"
+    note: 'Ob und wie oft eine Sprechprüfung eine Arbeit ersetzt, regelt das Land: Niedersachsen je Doppeljahrgang, NRW einmal im Jahr möglich und im letzten Schuljahr der Sek I Pflicht, Bayern auch teilweise mündlich.'
   }
 ]
 
@@ -607,8 +608,19 @@ const ERDKUNDE: ExamFormat[] = [
 
 export const EXAM_FORMATS: ExamFormat[] = [...ENGLISCH, ...ABGELEITET, ...DEUTSCH, ...SACHFAECHER, ...POLITIK, ...ERDKUNDE, ...FORMATE_NEU]
 
-export const formatsFor = (subject: ExamSubjectId, grade: number): ExamFormat[] =>
-  EXAM_FORMATS.filter((f) => f.subject === subject && grade >= f.grades[0] && grade <= f.grades[1])
+/**
+ * Formate eines Fachs für den Jahrgang. Befund F2 (29.09.2026): In Niedersachsen ist eine
+ * isolierte Überprüfung sprachlicher Mittel „nicht möglich" (KC Englisch 2026, S. 61 f.; ebenso
+ * Französisch und Spanisch) – dort fehlen die Teile „Use of English" und „Grammatik im Kontext".
+ */
+export const formatsFor = (subject: ExamSubjectId, grade: number, stateId?: string): ExamFormat[] =>
+  EXAM_FORMATS.filter(
+    (f) =>
+      f.subject === subject &&
+      grade >= f.grades[0] &&
+      grade <= f.grades[1] &&
+      !(stateId === 'NI' && istFremdsprache(subject) && /-(language|grammar)$/.test(f.id))
+  )
 
 export const formatById = (id: string): ExamFormat | undefined => EXAM_FORMATS.find((f) => f.id === id)
 
@@ -708,14 +720,17 @@ export function suggestParts(
   points: number,
   minutes: number,
   /** Schreibanteil der Fachschaft (Einstellungen) */
-  fachschaft?: { k5: number; ab6: number }
+  fachschaft?: { k5: number; ab6: number },
+  stateId?: string
 ): { formatId: string; points: number; minutes: number; weight: number; gradeGroup: 'writing' | 'other'; contentShare?: number }[] {
   if (istFremdsprache(subject)) {
     // Jeder Teil hat eigene Punkte; daraus entsteht seine Teilnote. Erst die Teilnoten
     // werden nach ihrem Anteil (30 : 70 bzw. 40 : 60 in Klasse 5) zur Gesamtnote verrechnet.
     const writing = writingWeightFor(grade, fachschaft)
     const other = 100 - writing
-    const otherFormat = formatIdFuer(subject, grade <= 7 ? 'reading' : 'mediation')
+    // Befund F6: Niedersachsen Kl. 5 gewichtet Hörverstehen stärker; Französisch-Sprachmittlung dort erst ab Kl. 9 (F3)
+    const zweiter = stateId === 'NI' && grade <= 5 ? 'listening' : grade <= 7 || (stateId === 'NI' && subject === 'franzoesisch' && grade < 9) ? 'reading' : 'mediation'
+    const otherFormat = formatIdFuer(subject, zweiter)
     const otherDef = formatById(otherFormat)
     const writingDef = formatById(formatIdFuer(subject, 'writing'))
     const otherMinutes = Math.round((minutes * other) / 100)

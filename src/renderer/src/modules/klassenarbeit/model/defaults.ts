@@ -26,7 +26,8 @@ export function defaultExamMeta(stateId: string, schoolTypeId: string, schoolTyp
     vocab: [],
     minutes: defaultMinutes(grade),
     points: 60,
-    aids: 'einsprachiges Wörterbuch',
+    // Befund F8 (29.09.2026): Für Sek-I-Klassenarbeiten ist keine Wörterbuchvorgabe belegt – voreingestellt „keine"; beim Fachwechsel passt die App es an
+    aids: 'keine Hilfsmittel',
     variants: 1,
     infoBox: true,
     // Der Schlüssel steht im Erwartungshorizont; auf der Arbeit selbst nur auf Wunsch
