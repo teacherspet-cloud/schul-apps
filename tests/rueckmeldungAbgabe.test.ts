@@ -241,7 +241,7 @@ describe('Oberstufe: Deckel bei ungenügendem Inhalt oder ungenügender Sprache'
   it('höchstens 20 % (3 Notenpunkte) für den Teil, in der Sek I nicht', async () => {
     const { teilAnteil } = await import('../src/renderer/src/modules/rueckmeldung/teilbewertung')
     const t = { id: 't', titel: 'Writing', art: 'schreiben' as const, inhalt: 40, quelle: 'vorgabe' as const }
-    expect(teilAnteil(t, { teilId: 't', inhalt: 90, sprache: 10 }, true)).toBe(20)
+    expect(teilAnteil(t, { teilId: 't', inhalt: 90, sprache: 10 }, true)).toBe(38)
     expect(teilAnteil(t, { teilId: 't', inhalt: 90, sprache: 10 })).toBe(42)
   })
 })

@@ -19,6 +19,7 @@
  */
 import { gehoertZurSekII } from '../arbeitsblatt/didactics/bildungsgang'
 import type { EinstufungsArt, RueckmeldungMeta } from './model/types'
+import { fremdsprachlich } from './teilbewertung'
 
 export interface LandesHinweis {
   text: string
@@ -41,6 +42,11 @@ interface LandRegel {
   spracheSekII: string
   /** Vorgaben zur Kommentierung von Arbeiten – für die KI */
   kommentar?: string
+  /**
+   * Maßstab der sprachlichen Leistung (Komplexität, Umfang) – für die KI, nur Belegtes
+   * (recherche/sprachliche-bewertungsmassstaebe-2026-09-29.md). `nurFS`: nur moderne Fremdsprachen.
+   */
+  spracheLeistung?: { text: string; nurFS?: boolean }
   /** Notenpunkte schon in der Sek I (Saarland) */
   punkteSekI?: string
   ausgleich: LandesHinweis
@@ -74,6 +80,7 @@ export const LAENDER: Record<string, LandRegel> = {
     },
     spracheSekI: 'Verstöße gegen die sprachliche Richtigkeit werden in allen Fächern gekennzeichnet und angemessen bewertet.',
     spracheSekII: KMK_SEK_II,
+    spracheLeistung: { text: 'Realschule, Englisch (ISB, Guided Writing 2023): Grundlage ist die tatsächlich geschriebene Wortzahl – bei höchstens 25/50/75 % des Umfangs in Kohärenz, Grammatik und Wortschatz höchstens Band 1/3/5 von 7; ein fehlerfreier Text mit nur einfachen Strukturen höchstens Band 4 von 7.', nurFS: true },
     ausgleich: {
       text: 'Nachteilsausgleich (§ 33 BaySchO) passt nur die Bedingungen an, kein Zeugnisvermerk. Notenschutz nur in den Fällen des § 34 BaySchO – bei Rechtschreibstörung Verzicht auf die Bewertung der Rechtschreibung, bei Lesestörung auf die des Vorlesens – mit Zeugnisvermerk (§ 36 Abs. 7). Für Rechenstörung weder Nachteilsausgleich noch Notenschutz; ADHS gilt nicht als nachteilsausgleichsfähig. Reduzierter Aufgabenumfang ist in Leistungserhebungen unzulässig.',
       quelle: 'Art. 52 Abs. 5 BayEUG; §§ 31–36 BaySchO'
@@ -89,6 +96,7 @@ export const LAENDER: Record<string, LandRegel> = {
     },
     spracheSekI: 'Sprachmängel werden in allen Fächern gekennzeichnet und mitbewertet; ein Fehlerquotient ist unzulässig.',
     spracheSekII: 'Sprachliche Richtigkeit angemessen berücksichtigen; ab dem 3. Kurshalbjahr Abiturmaßstab (bis 2 Punkte Abzug).',
+    spracheLeistung: { text: 'Fachbrief Moderne Fremdsprachen Nr. 19 (2026): Bei nur wenigen Sätzen ist die Bandbreite in Lexik und Grammatik höchstens „mangelhaft" bis „schwach ausreichend"; die Korrektheit kann besser liegen.', nurFS: true },
     kommentar: 'Die Arbeit erhält förderliche Hinweise (Sek I-VO § 19 Abs. 6).',
     ausgleich: {
       text: 'Nachteilsausgleich (§ 58 Abs. 8 SchulG, § 15 Sek I-VO) lässt das Anforderungsniveau unverändert, kein Zeugnisvermerk. Notenschutz bei stark ausgeprägten Lese-/Rechtschreibschwierigkeiten auf Antrag je Schuljahr, Entscheidung der Schulleitung, mit Zeugnisvermerk. Nichtdeutsche Herkunftssprache: u. a. Zeitverlängerung und zweisprachiges Wörterbuch (§ 17 Sek I-VO).',
@@ -104,6 +112,7 @@ export const LAENDER: Record<string, LandRegel> = {
       quelle: 'VV-Leistungsbewertung Nr. 3 Abs. 2, Nr. 6 Abs. 2'
     },
     spracheSekII: KMK_SEK_II,
+    spracheLeistung: { text: 'IQB-Raster (Fachbrief Englisch Nr. 9, 2025): Bandbreite und Korrektheit getrennt; eine unzureichende Bandbreite kann nicht durch ein hohes Maß an Korrektheit ausgeglichen werden.', nurFS: true },
     ausgleich: {
       text: 'Nachteilsausgleich bei LRS und bei Rechenschwierigkeiten (nur bis Jgst. 10) lässt die Anforderungen unverändert, kein Zeugnisvermerk. Abweichen von den Bewertungsgrundsätzen (z. B. keine Bewertung der Rechtschreibung) nur bei LRS, auf Antrag, durch Konferenzbeschluss und mit Zeugnisvermerk; in der Sek II nur mit fachärztlichem Attest.',
       quelle: 'BbgSchulG § 57 Abs. 2 Nr. 5; LRSRV §§ 5, 7, 8'
@@ -133,6 +142,7 @@ export const LAENDER: Record<string, LandRegel> = {
     },
     spracheSekI: 'Sprachliche Richtigkeit angemessen berücksichtigen.',
     spracheSekII: KMK_SEK_II,
+    spracheLeistung: { text: 'Richtlinie Abitur Englisch 2021: Sprachrichtigkeit nicht allein nach der Zahl der Verstöße beurteilen; Mut zur anspruchsvolleren Sprachgestaltung zählt positiv.', nurFS: true },
     kommentar: 'Korrekturanmerkungen machen Vorzüge und Defizite kenntlich.',
     ausgleich: {
       text: 'Notenschutz nur bei festgestellten besonderen Lese- oder Rechtschreibschwierigkeiten, auf Antrag und nach Beschluss der Zeugniskonferenz; vorrangig zurückhaltende Gewichtung, Nichtbewertung nur ausnahmsweise. Notenschutz wird im Zeugnis vermerkt, Nachteilsausgleich nicht.',
@@ -178,6 +188,7 @@ export const LAENDER: Record<string, LandRegel> = {
       quelle: 'Erlass „Schriftliche Arbeiten" Nr. 7 i. V. m. Zeugniserlass Nr. 3.5.2'
     },
     spracheSekII: KMK_SEK_II,
+    spracheLeistung: { text: 'Kerncurricula: kein rein quantifizierendes Verfahren – das Gewicht der Fehler in Relation zu Wortzahl, Wortschatz und Satzbau setzen.' },
     ausgleich: {
       text: 'Vorrang haben Hilfen im Sinne eines Nachteilsausgleichs. Abweichen von den Bewertungsgrundsätzen (etwa zeitweiliger Verzicht auf die Bewertung der Rechtschreibung) beschließt die Klassenkonferenz nur in besonders begründeten Ausnahmefällen (Rechnen nur Grundschule); Zeugnisvermerk, nicht in Abgangs- und Abschlusszeugnissen. In der Oberstufe nicht zulässig.',
       quelle: 'RdErl. 04.10.2005'
@@ -193,6 +204,7 @@ export const LAENDER: Record<string, LandRegel> = {
     },
     spracheSekI: 'Häufige Verstöße gegen die sprachliche Richtigkeit können die Note um bis zu eine Notenstufe absenken (APO-S I § 6 Abs. 6).',
     spracheSekII: 'Sprachliche Richtigkeit: Einführungsphase bis eine Notenstufe, Qualifikationsphase bis 2 Notenpunkte (APO-GOSt § 13 Abs. 2).',
+    spracheLeistung: { text: 'Konstruktionshinweise Klausuren moderne Fremdsprachen GOSt 2025: Kommunikative Textgestaltung verlangt einen hinreichend ausführlichen Text; Komplexität zählt im Ausdrucksvermögen (variabler Satzbau, differenzierter Wortschatz), Sprachrichtigkeit wird über Verstöße beschrieben.', nurFS: true },
     ausgleich: {
       text: 'Nachteilsausgleich (APO-S I § 6 Abs. 9, APO-GOSt § 13 Abs. 7) ändert die Rahmenbedingungen, nicht die fachlichen Anforderungen, kein Zeugnisvermerk. Bei LRS fließt die Rechtschreibung in Klasse 3–6, in Einzelfällen bis 10, nicht in die Bewertung schriftlicher Arbeiten ein. Für Abschlusszeugnisse ist nach neuerer Erlasslage die Rechtschreibung zu bewerten (nicht gesichert).',
       quelle: 'BASS 14-01 Nr. 1 (LRS-Erlass)'
@@ -208,6 +220,7 @@ export const LAENDER: Record<string, LandRegel> = {
     },
     spracheSekI: 'Deutsch Klasse 7–10: Sprachverstöße senken die Note höchstens um eine Notenstufe (Fachberatung; nicht amtlich gesichert).',
     spracheSekII: 'Sprachliche Richtigkeit: ein oder zwei MSS-Punkte Abzug.',
+    spracheLeistung: { text: 'Lehrplan (Italienisch): Die Sprachrichtigkeit ergibt sich nicht aus dem Verhältnis Wortzahl : Fehlerzahl; Mut zur anspruchsvolleren Sprachgestaltung wird berücksichtigt.', nurFS: true },
     ausgleich: {
       text: 'Nachteilsausgleich senkt die Anforderungen nicht, kein Zeugnisvermerk. Abweichen (etwa Verzicht auf die Bewertung der Rechtschreibung) nur bei LRS in der Sek I, mit Klassenkonferenzbeschluss und Förderplan, Vermerk unter „Bemerkungen". In der Oberstufe nicht zulässig.',
       quelle: 'VV LRS 28.08.2007'
@@ -224,6 +237,7 @@ export const LAENDER: Record<string, LandRegel> = {
     punkteSekI: 'Im Saarland erhalten große Leistungsnachweise schon ab Klasse 5 einen Punktwert (Erlass Leistungsbewertung 2024 Nr. 3.4.2).',
     spracheSekI: 'Sprachliche und formale Richtigkeit wird in angemessenem Umfang berücksichtigt.',
     spracheSekII: 'Sprachliche Richtigkeit: Abzug bis zu 3 Punkten (GOS-VO § 24 Abs. 6).',
+    spracheLeistung: { text: 'Lehrpläne Englisch Gymnasium 2025: Bei deutlicher Unterschreitung des geforderten Textumfangs können auch in den sprachlichen Kategorien Abzüge vorgenommen werden.', nurFS: true },
     kommentar: 'Pflicht: Korrekturhinweise und ein kurzer zusammenfassender Kommentar, der erworbene Teilkompetenzen würdigt und Hinweise zur Verbesserung gibt, auch zu Sprache und Form.',
     ausgleich: {
       text: 'Bei festgestellter Lese-/Rechtschreibstörung wird die Rechtschreibung bis einschließlich Klasse 9 außerhalb reiner Rechtschreibprüfungen gekennzeichnet, aber nicht bewertet; Vermerk unter der Arbeit und im Zeugnis. Nachteilsausgleich (z. B. bis 50 % mehr Zeit, Wörterbuch) erscheint weder im Zeugnis noch unter der Arbeit. Reduzierter Umfang gilt als Abweichen.',
@@ -333,6 +347,9 @@ export function kiLandesregeln(m: Meta, art: EinstufungsArt): string {
   if (art !== 'keine') {
     const sprache = sekII(m) ? r.spracheSekII : r.spracheSekI
     if (sprache) zeilen.push(`- Sprachliche Richtigkeit (${r.name}): ${sprache}`)
+    const fs = Boolean(m.subjectId) && fremdsprachlich(m.subjectId)
+    if (r.spracheLeistung && (fs || (!r.spracheLeistung.nurFS && (m.subjectId === 'deutsch' || m.subjectId === 'daz'))))
+      zeilen.push(`- Sprachliche Leistung (${r.name}): ${r.spracheLeistung.text}`)
   }
   if (r.kommentar) zeilen.push(`- Kommentierung (${r.name}): ${r.kommentar}`)
   return zeilen.length ? ['VORGABEN DES LANDES:', ...zeilen].join('\n') : ''

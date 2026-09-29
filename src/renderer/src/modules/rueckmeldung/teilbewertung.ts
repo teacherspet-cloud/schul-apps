@@ -138,6 +138,17 @@ export function teileAusArbeit(exam: Exam): { teile: BewertungsTeil[]; verrechnu
   return { teile, verrechnung }
 }
 
+/** Unter diesem Erfüllungsgrad gilt ein Bereich als ungenügend (0 Notenpunkte im KMK-Raster: unter 20 %) */
+export const UNGENUEGEND = 20
+
+/**
+ * Deckel der Oberstufe (KMK-Bildungsstandards 2012, Abschn. 3.2.1.3; IQB; BB, SH): Ist Inhalt ODER
+ * Sprache ungenügend, erreicht der Prüfungsteil höchstens 3 Notenpunkte – die App setzt ihn auf
+ * höchstens 38 % (oberes Ende von 3 Punkten im üblichen Oberstufenschlüssel; vorher 20 % = 1 Punkt,
+ * strenger als belegt).
+ */
+export const OBERSTUFEN_DECKEL = 38
+
 const begrenze = (x: unknown, max = 100): number => Math.max(0, Math.min(max, Math.round(Number(x) || 0)))
 
 /** Erfüllungsgrad eines Teils aus seiner Wertung (Inhalt und Sprache nach dem Inhaltsanteil) */
@@ -147,8 +158,8 @@ export function teilAnteil(t: BewertungsTeil, w: TeilWertung | undefined, oberst
     if (typeof w.inhalt !== 'number' && typeof w.sprache !== 'number') return typeof w.anteil === 'number' ? w.anteil : null
     const i = t.inhalt ?? INHALT_STANDARD
     const anteil = Math.round(((w.inhalt ?? 0) * i + (w.sprache ?? 0) * (100 - i)) / 100)
-    // Oberstufe: Inhalt oder Sprache ungenügend (unter 20 %) → höchstens 20 % (3 Notenpunkte) für den Teil
-    return oberstufe && Math.min(w.inhalt ?? 0, w.sprache ?? 0) < 20 ? Math.min(anteil, 20) : anteil
+    // Oberstufe: Inhalt oder Sprache ungenügend (unter 20 %) → höchstens 3 Notenpunkte für den Teil
+    return oberstufe && Math.min(w.inhalt ?? 0, w.sprache ?? 0) < UNGENUEGEND ? Math.min(anteil, OBERSTUFEN_DECKEL) : anteil
   }
   return typeof w.anteil === 'number' ? w.anteil : null
 }

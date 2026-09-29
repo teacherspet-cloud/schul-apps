@@ -17,6 +17,7 @@ import { gehoertZurSekII } from '../arbeitsblatt/didactics/bildungsgang'
 import { gradeForPoints, normalizeThresholds } from '../../shared/gradeScale'
 import { punkteFuerErreicht, punkteRegelFuer } from '../../shared/notenpunkte'
 import { punkteInSekI } from './laenderRegeln'
+import { begruendungMitDeckel, kriteriumAnteil as anteilVon, tabellenOberstufenDeckel } from './sprachmassstab'
 import type {
   Bewertungstabelle,
   Bogen,
@@ -189,23 +190,30 @@ export interface TabellenSumme {
   /** Summe der erreichten Punkte (nur Kriterien mit Punkten) */
   erreicht: number
   moeglich: number
-  /** Erfüllungsgrad über alle Kriterien in Prozent – Punkte gewichtet, Stufen gleichmäßig */
+  /** Erfüllungsgrad über alle Kriterien in Prozent – Punkte gewichtet, Stufen gleichmäßig; mit Lerngruppe ggf. gedeckelt */
   anteil: number
   /** Kriterien ohne Wertung */
   offen: number
+  /** Oberstufen-Deckel (Inhalt oder Sprache ungenügend → höchstens 3 Notenpunkte), nur mit Lerngruppe */
+  gedeckelt?: { max: number; grund: string; ohneDeckel: number }
 }
 
 /** Anteil eines Kriteriums (0–1) aus seiner Wertung */
 function kriteriumAnteil(t: Bewertungstabelle, id: string, w: TabellenWertung | undefined): number | null {
   const k = t.kriterien.find((x) => x.id === id)
-  if (!k || !w) return null
-  if (k.punkte && k.punkte > 0) return w.punkte == null ? null : Math.max(0, Math.min(k.punkte, w.punkte)) / k.punkte
-  const n = t.stufen.length
-  if (w.stufe == null || n < 2) return null
-  return (n - 1 - Math.max(0, Math.min(n - 1, w.stufe))) / (n - 1)
+  return k ? anteilVon(t, k, w) : null
 }
 
-export function tabellenSumme(t: Bewertungstabelle, wertung: TabellenWertung[] = []): TabellenSumme {
+/**
+ * Summe der Tabelle. Mit der Lerngruppe (`meta`) gilt zusätzlich der Oberstufen-Deckel der
+ * modernen Fremdsprachen (sprachmassstab.ts): Die Punkte bleiben, der Erfüllungsgrad für die
+ * Einstufung sinkt auf höchstens 3 Notenpunkte.
+ */
+export function tabellenSumme(
+  t: Bewertungstabelle,
+  wertung: TabellenWertung[] = [],
+  meta?: Pick<RueckmeldungMeta, 'grade' | 'schoolTypeId' | 'stateId' | 'subjectId'>
+): TabellenSumme {
   let erreicht = 0
   let moeglich = 0
   let gewicht = 0
@@ -228,14 +236,17 @@ export function tabellenSumme(t: Bewertungstabelle, wertung: TabellenWertung[] =
     summe += a * g
     gewicht += g
   }
-  return { erreicht, moeglich, anteil: gewicht ? Math.round((summe / gewicht) * 1000) / 10 : 0, offen }
+  const anteil = gewicht ? Math.round((summe / gewicht) * 1000) / 10 : 0
+  const deckel = meta ? tabellenOberstufenDeckel(t, wertung, meta) : null
+  if (deckel && anteil > deckel.max) return { erreicht, moeglich, anteil: deckel.max, offen, gedeckelt: { ...deckel, ohneDeckel: anteil } }
+  return { erreicht, moeglich, anteil, offen }
 }
 
-/** Einstufung der Gesamtleistung neu aus der Tabelle, wenn die Lehrkraft Punkte ändert */
+/** Einstufung der Gesamtleistung neu aus der Tabelle, wenn die Lehrkraft Punkte ändert (mit Oberstufen-Deckel) */
 export function gesamtAusTabelle(t: Bewertungstabelle, b: Bogen, art: EinstufungsArt, k: SkalenKontext): Einstufungswert | undefined {
   if (!b.tabelle?.length) return b.gesamt
-  const s = tabellenSumme(t, b.tabelle)
-  return { ...vorschlag(art, s.anteil, k, b.gesamt?.begruendung), bestaetigt: false }
+  const s = tabellenSumme(t, b.tabelle, k.meta)
+  return { ...vorschlag(art, s.anteil, k, begruendungMitDeckel(b.gesamt?.begruendung, s.gedeckelt?.grund)), bestaetigt: false }
 }
 
 /** Noch offene Bestätigungen eines Bogens (leer = exportbereit) */

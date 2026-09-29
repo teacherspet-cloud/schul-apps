@@ -46,7 +46,7 @@ const doc = (over: Partial<Rueckmeldung['grundlage']> = {}, m: Partial<Rueckmeld
   abgaben: [],
   createdAt: ''
 })
-const abgabe: Abgabe = { id: 'a1', kuerzel: 'S1', name: '', dateiname: 'x', text: 'Dear Tom …', bilder: [] }
+const abgabe: Abgabe = { id: 'a1', kuerzel: 'S1', name: '', dateiname: 'x', text: `Dear Tom, ${'thank you for your letter about the school trip to London and the museum visit. '.repeat(6)}Best wishes`, bilder: [] }
 
 describe('Rechnen', () => {
   it('Schreiben: Inhalt und Sprache nach dem Inhaltsanteil', () => {

@@ -36,6 +36,7 @@ import { klemme } from './korrekturrand'
 import { kiLandesregeln } from './laenderRegeln'
 import { ausgleichAnweisung, maxSchritte, ohneRechtschreibung } from './nachteilsausgleich'
 import { tabelleText } from './tabelle'
+import { begruendungMitDeckel, oberstufeVon, sprachRegeln, tabelleDeckeln, teileDeckeln, teileDeckelSatz, umfangBefund } from './sprachmassstab'
 import { klartext, ohneKiTest } from './abgabeTrennen'
 import type {
   Abgabe,
@@ -289,7 +290,7 @@ export function teilRegeln(r: Rueckmeldung): string[] {
     )
   // Oberstufe (KMK 2012, IQB, NRW, BE/BB, SH): Ist Inhalt ODER Sprache ungenügend, höchstens 3 Notenpunkte für diesen Teil
   if (getrennteTeile.length && r.meta.grade >= 11)
-    regeln.push('- Oberstufe: Ist bei einem Schreib-/Sprachmittlungsteil der Inhalt ODER die Sprache ungenügend (unter 20 %), erreicht dieser Teil insgesamt höchstens 20 % (entspricht höchstens 3 Notenpunkten).')
+    regeln.push('- Oberstufe: Ist bei einem Schreib-/Sprachmittlungsteil der Inhalt ODER die Sprache ungenügend (unter 20 %), erreicht dieser Teil insgesamt höchstens 38 % (KMK: höchstens 3 Notenpunkte; die App deckelt).')
   if (mitTeilen(r))
     regeln.push(
       `- Bewerte JEDEN Teil (Kennung in eckigen Klammern): ${getrennteTeile.length ? 'bei Schreiben/Sprachmittlung Erfüllungsgrad von Inhalt und Sprache getrennt, ' : ''}bei anderen Teilen den Erfüllungsgrad des Teils. Die App verrechnet daraus die Gesamtleistung.`
@@ -406,6 +407,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
     scan ? '- Die Arbeit liegt auch als Bild bei: Gib für jeden Randkommentar Seite und ungefähre Lage (x, y in Prozent) der Stelle im Bild an.' : '',
     hatForm(m, 'ueberarbeitung') ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag.' : '',
     '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.',
+    ...sprachRegeln(r, a, art !== 'keine'),
     ...abgabeRegeln(r, a)
   ]
   const ausgleich = ausgleichAnweisung(a.ausgleich)
@@ -596,6 +598,9 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
     schluss: text(d.schluss) || undefined
   }
   if (r && a && m && skala) {
+    // Leitplanke Sprachmaßstab (29.09.2026): Umfang, Komplexität, Oberstufen-Deckel – sprachmassstab.ts
+    const umfang = umfangBefund(r, a)
+    const kappungen: string[] = []
     if (kriterienEinstufen(m))
       bogen.kriterienStufen = rohKriterien.map((k) => (Number.isFinite(Number(k.anteil)) ? vorschlag(art, Number(k.anteil), skala) : null))
     if (mitTabelle(r)) {
@@ -610,13 +615,28 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
           begruendung: w ? text(w.begruendung) || undefined : undefined
         })
       })
-      if (gesamtEinstufen(m)) bogen.gesamt = vorschlag(art, tabellenSumme(t, bogen.tabelle).anteil, skala)
+      const gedeckelt = tabelleDeckeln(t, bogen.tabelle, umfang)
+      bogen.tabelle = gedeckelt.wertung
+      kappungen.push(...gedeckelt.notizen)
+      if (gesamtEinstufen(m)) {
+        const s = tabellenSumme(t, bogen.tabelle, m)
+        bogen.gesamt = vorschlag(art, s.anteil, skala, begruendungMitDeckel(gedeckelt.notizen.join(' '), s.gedeckelt?.grund))
+      }
     }
     if (mitTeilen(r)) {
       const teile = r.grundlage.teile!
-      bogen.teile = wertungenAusKi(d.teile, teile)
-      const g = gesamtAusTeilen(teile, bogen.teile, r.grundlage.verrechnung ?? 'prozent', m.grade >= 11)
-      if (gesamtEinstufen(m) && !mitTabelle(r) && g) bogen.gesamt = vorschlag(art, g.anteil, skala, begruendungAusTeilen(teile, bogen.teile))
+      const oberstufe = oberstufeVon(m)
+      const gedeckelt = teileDeckeln(teile, wertungenAusKi(d.teile, teile), umfang)
+      bogen.teile = gedeckelt.wertungen
+      kappungen.push(...gedeckelt.notizen)
+      const g = gesamtAusTeilen(teile, bogen.teile, r.grundlage.verrechnung ?? 'prozent', oberstufe)
+      if (gesamtEinstufen(m) && !mitTabelle(r) && g)
+        bogen.gesamt = vorschlag(
+          art,
+          g.anteil,
+          skala,
+          begruendungMitDeckel([begruendungAusTeilen(teile, bogen.teile), ...gedeckelt.notizen].join(' · '), teileDeckelSatz(teile, bogen.teile, oberstufe))
+        )
     } else if (mitTabelle(r)) {
       // Gesamt aus der Tabelle (oben)
     } else if (gesamtEinstufen(m)) {
@@ -655,6 +675,8 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
       if (text(u.auftrag)) bogen.ueberarbeitung = { zitat: text(u.zitat), auftrag: text(u.auftrag) }
     }
     if (m.elternfassung && text(d.eltern)) bogen.eltern = text(d.eltern)
+    // Die Kappung steht auch bei den Hinweisen für die Lehrkraft (einmal, auch wenn Tabelle und Teile gedeckelt wurden)
+    if (kappungen.length) bogen.hinweise = [...(bogen.hinweise ?? []), ...new Set(kappungen)]
     spracheAnwenden(bogen, r, a, art, skala)
   }
   const fehler = objekte(d.fehler)
