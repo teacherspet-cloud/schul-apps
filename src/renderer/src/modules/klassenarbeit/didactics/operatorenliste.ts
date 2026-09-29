@@ -65,7 +65,9 @@ export function amtlicheListe(stateId: string, subjectId: string, wunsch: Anlage
 
 /** Sprache und Stufe der Arbeit für die Wahl der Liste */
 export function anlageWunsch(meta: Exam['meta']): AnlageWunsch {
-  const sprache = meta.bilingual ? 'en' : fachDerArbeit(meta.subjectId).sprache
+  const zielsprache = meta.bilingual ? 'en' : fachDerArbeit(meta.subjectId).sprache
+  // Amtliche Operatorenlisten gibt es in Deutsch, Englisch, Französisch und Spanisch – Italienisch und Russisch ohne Liste
+  const sprache = zielsprache === 'it' || zielsprache === 'ru' ? undefined : zielsprache
   return { sprache, stufe: upperSecondary(meta) ? 'sek2' : 'sek1' }
 }
 

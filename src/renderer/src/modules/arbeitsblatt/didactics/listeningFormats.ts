@@ -21,6 +21,7 @@
  */
 import type { CefrLevel } from '@shared/types'
 import { levelAtLeast } from '../../../shared/cefr'
+import { stufenVorschlag, type StufenEinsatz, type StufenVerteilung } from '../../../shared/verstehen/stufen'
 
 export type ListeningMode = 'monolog' | 'dialog'
 
@@ -391,4 +392,15 @@ export function listeningWords(level: CefrLevel, language?: string, chosenSecond
 export function suggestListeningFormat(level: CefrLevel, seed = 0): ListeningFormat {
   const fits = listeningFormatsFor(level).filter((f) => f.seconds[0] <= listeningRules(level).seconds[1])
   return fits[Math.abs(Math.round(seed)) % Math.max(1, fits.length)] ?? LISTENING_FORMATS[0]
+}
+
+/**
+ * Vorschlag für die Verteilung der Schwierigkeitsstufen je Niveau (29.09.2026).
+ *
+ * Das Raster und die Verteilungen stehen in shared/verstehen/stufen.ts – gemeinsam für Hören,
+ * Lesen und Hör-Seh-Verstehen. Hier nur der Zugang über das GER-Niveau und den Jahrgang, wie
+ * ihn Hörtexte und Aufgabenformate ohnehin benutzen.
+ */
+export function listeningStufen(level: CefrLevel, grade?: number, einsatz: StufenEinsatz = 'klassenarbeit'): StufenVerteilung {
+  return stufenVorschlag({ grade, cefrLevel: level, einsatz })
 }

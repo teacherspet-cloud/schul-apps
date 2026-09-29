@@ -10,7 +10,8 @@
  * Handlungskompetenz. Für das Abitur gelten die EPA Geschichte (KMK 2005) mit den Aufgabenarten
  * Quelleninterpretation, Erörterung von Deutungen und historische Darstellung.
  */
-import { formatIdFuer, inhaltsanteil, istFremdsprache, type ExamSubjectId } from './faecher'
+import { formatIdFuer, inhaltsanteil, istAlteSprache, istFremdsprache, type ExamSubjectId } from './faecher'
+import { FORMATE_NEU, FREMDSPRACHEN_NEU, VORSCHLAG_NEU } from './formateNeu'
 
 export interface ExamFormat {
   id: string
@@ -288,7 +289,7 @@ const FREMDSPRACHEN: { fach: ExamSubjectId; praefix: string; labels: Record<stri
   }
 ]
 
-const ABGELEITET: ExamFormat[] = FREMDSPRACHEN.flatMap(({ fach, praefix, labels }) =>
+const ABGELEITET: ExamFormat[] = [...FREMDSPRACHEN, ...FREMDSPRACHEN_NEU].flatMap(({ fach, praefix, labels }) =>
   ENGLISCH.map((f) => {
     const art = f.id.slice(3)
     const beginn = art === 'mediation' ? 7 : 6
@@ -604,7 +605,7 @@ const ERDKUNDE: ExamFormat[] = [
   }
 ]
 
-export const EXAM_FORMATS: ExamFormat[] = [...ENGLISCH, ...ABGELEITET, ...DEUTSCH, ...SACHFAECHER, ...POLITIK, ...ERDKUNDE]
+export const EXAM_FORMATS: ExamFormat[] = [...ENGLISCH, ...ABGELEITET, ...DEUTSCH, ...SACHFAECHER, ...POLITIK, ...ERDKUNDE, ...FORMATE_NEU]
 
 export const formatsFor = (subject: ExamSubjectId, grade: number): ExamFormat[] =>
   EXAM_FORMATS.filter((f) => f.subject === subject && grade >= f.grades[0] && grade <= f.grades[1])
@@ -627,7 +628,7 @@ export const CONTENT_SHARE = 40
  */
 export function defaultWeights(subject: ExamSubjectId, grade: number, parts: { formatId: string; gradeGroup: 'writing' | 'other' }[]): number[] {
   if (!parts.length) return []
-  if (!istFremdsprache(subject)) {
+  if (!istFremdsprache(subject) && !istAlteSprache(subject)) {
     const shares = parts.map((p) => formatById(p.formatId)?.share ?? 1)
     const total = shares.reduce((n, x) => n + x, 0)
     let rest = 100
@@ -644,7 +645,7 @@ export function defaultWeights(subject: ExamSubjectId, grade: number, parts: { f
     const even = Math.floor(100 / parts.length)
     return parts.map((_, i) => (i === parts.length - 1 ? 100 - even * (parts.length - 1) : even))
   }
-  const writingTotal = writingWeightFor(grade)
+  const writingTotal = istAlteSprache(subject) ? UEBERSETZUNGSANTEIL : writingWeightFor(grade)
   const otherTotal = 100 - writingTotal
   const out = new Array(parts.length).fill(0)
   const spread = (idx: number[], total: number): void => {
@@ -666,8 +667,18 @@ const VORSCHLAG: Partial<Record<ExamSubjectId, (grade: number) => string[]>> = {
   politik: (g) => (g <= 7 ? ['pol-knowledge', 'pol-data', 'pol-judgement'] : ['pol-text', 'pol-conflict', 'pol-judgement']),
   erdkunde: (g) => (g <= 7 ? ['geo-knowledge', 'geo-map', 'geo-climate'] : ['geo-map', 'geo-text', 'geo-judgement']),
   // Deutsch: eine Schreibaufgabe als Hauptteil, in der Sek I mit einem Teil „Sprache untersuchen"
-  deutsch: (g) => (g <= 6 ? ['de-erzaehlen'] : g <= 10 ? ['de-textanalyse', 'de-sprache'] : ['de-textanalyse'])
+  deutsch: (g) => (g <= 6 ? ['de-erzaehlen'] : g <= 10 ? ['de-textanalyse', 'de-sprache'] : ['de-textanalyse']),
+  // Die Fächer vom 29.09.2026 (formateNeu.ts)
+  ...VORSCHLAG_NEU
 }
+
+/**
+ * Latein und Griechisch (29.09.2026): Übersetzung und Begleitaufgaben im Verhältnis 2 : 1 (EPA;
+ * mindestens 1 : 1). Die Übersetzung ist die eigene Teilnote (Gruppe „writing", Fehlerquote),
+ * die Begleitaufgaben werden über Punkte bewertet.
+ */
+export const UEBERSETZUNGSANTEIL = 67
+export const istUebersetzungsformat = (formatId: string | undefined): boolean => /-uebersetzung$/.test(formatId ?? '')
 
 export interface SuggestedPart {
   formatId: string
@@ -717,6 +728,27 @@ export function suggestParts(
         contentShare: CONTENT_SHARE
       }
     ]
+  }
+  // Latein, Griechisch: Übersetzung (eigene Teilnote, Fehlerquote) + Begleitaufgaben (Punkte), 2 : 1
+  if (istAlteSprache(subject)) {
+    const ids = VORSCHLAG[subject]?.(grade) ?? []
+    const uebersetzung = ids.find(istUebersetzungsformat)
+    const begleit = ids.filter((id) => !istUebersetzungsformat(id))
+    const minU = Math.round((minutes * UEBERSETZUNGSANTEIL) / 100)
+    let restMin = minutes - minU
+    let restW = 100 - UEBERSETZUNGSANTEIL
+    let restP = points
+    const teile = begleit.map((id, i) => {
+      const last = i === begleit.length - 1
+      const w = last ? restW : Math.round((100 - UEBERSETZUNGSANTEIL) / begleit.length)
+      const m = last ? restMin : Math.round((minutes - minU) / begleit.length)
+      const p = last ? restP : Math.round(points / begleit.length)
+      restW -= w
+      restMin -= m
+      restP -= p
+      return { formatId: id, weight: w, points: p, minutes: m, gradeGroup: 'other' as const }
+    })
+    return [...(uebersetzung ? [{ formatId: uebersetzung, weight: UEBERSETZUNGSANTEIL, points: 0, minutes: minU, gradeGroup: 'writing' as const }] : []), ...teile]
   }
   // Deutsch und Sachfächer: eine Note, die Punkte werden auf die Teile verteilt
   const ids = VORSCHLAG[subject]?.(grade) ?? []

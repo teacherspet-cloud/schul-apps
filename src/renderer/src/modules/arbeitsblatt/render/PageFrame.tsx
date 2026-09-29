@@ -18,7 +18,7 @@ export interface PageInfo {
   lineHeight: number
   isKey: boolean
   /** Sprache der festen Beschriftungen (Name, Klasse, Datum) – bei Englischarbeiten englisch */
-  language?: 'de' | 'en' | 'fr' | 'es'
+  language?: 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'
   /** z. B. „★★" bei getrennten Niveau-Blättern */
   levelMark?: string
   /** Regelwerk für die Quellenangaben auf der Nachweisseite */
@@ -121,11 +121,14 @@ const LABELS = {
   en: { name: 'Name:', class: 'Class:', date: 'Date:', grade: (g: number) => `Class ${g}` },
   // Französisch- und Spanischarbeiten (Großprogramm 0.4, Phase G): Kopf einsprachig in der Zielsprache
   fr: { name: 'Nom :', class: 'Classe :', date: 'Date :', grade: (g: number) => `Classe ${g}` },
-  es: { name: 'Nombre:', class: 'Clase:', date: 'Fecha:', grade: (g: number) => `Clase ${g}` }
+  es: { name: 'Nombre:', class: 'Clase:', date: 'Fecha:', grade: (g: number) => `Clase ${g}` },
+  // Italienisch- und Russischarbeiten (29.09.2026)
+  it: { name: 'Nome:', class: 'Classe:', date: 'Data:', grade: (g: number) => `Classe ${g}` },
+  ru: { name: 'Имя:', class: 'Класс:', date: 'Дата:', grade: (g: number) => `${g} класс` }
 }
 
 /** „Seite" in der Sprache des Kopfes */
-export const SEITE: Record<'de' | 'en' | 'fr' | 'es', string> = { de: 'Seite', en: 'Page', fr: 'Page', es: 'Página' }
+export const SEITE: Record<'de' | 'en' | 'fr' | 'es' | 'it' | 'ru', string> = { de: 'Seite', en: 'Page', fr: 'Page', es: 'Página', it: 'Pagina', ru: 'Страница' }
 
 export const pageLabels = (info: PageInfo): (typeof LABELS)['de'] => LABELS[info.language ?? 'de']
 

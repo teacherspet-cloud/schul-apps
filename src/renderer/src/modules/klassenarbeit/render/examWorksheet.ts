@@ -6,6 +6,7 @@
  * mit einem Kopfbaustein (Zeit, Hilfsmittel, Notenschlüssel), je Teil einer Überschrift und
  * den erzeugten Bausteinen.
  */
+import { eigeneTeilnoteLabel, istAlteSprache } from '../model/faecher'
 import { fachDerArbeit, inhaltsanteil, zweiterTeil } from '../model/faecher'
 import { platziereKopfUndSchluss } from '../../arbeitsblatt/generation/illustrationen'
 import { newId } from '../../vokabeltest/model/random'
@@ -44,38 +45,69 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
           scale: (line: string) => `Barème : ${line}`,
           labels: { writing: 'Production écrite', other: 'Autres compétences' }
         }
-      : fach.sprache === 'es'
+      : fach.sprache === 'it'
         ? {
-            title: 'Examen',
-            time: (min: number) => `Tiempo: ${min} minutos`,
-            aids: (a: string) => `Material permitido: ${a || 'ninguno'}`,
-            points: (n: number) => `${n} puntos`,
-            split: (c: number, l: number) => `${c} % contenido, ${l} % lengua`,
-            counts: (w: number) => `cuenta ${w} %`,
-            scale: (line: string) => `Notas: ${line}`,
-            labels: { writing: 'Expresión escrita', other: 'Otras competencias' }
+            title: 'Verifica',
+            time: (min: number) => `Tempo: ${min} minuti`,
+            aids: (a: string) => `Materiale consentito: ${a || 'nessuno'}`,
+            points: (n: number) => `${n} punti`,
+            split: (c: number, l: number) => `${c} % contenuto, ${l} % lingua`,
+            counts: (w: number) => `conta ${w} %`,
+            scale: (line: string) => `Voti: ${line}`,
+            labels: {
+              writing: 'Produzione scritta',
+              other: 'Altre competenze'
+            }
           }
-        : english
+        : fach.sprache === 'ru'
           ? {
-              title: 'Test',
-              time: (min: number) => `Time: ${min} minutes`,
-              aids: (a: string) => `You may use: ${a || 'nothing'}`,
-              points: (n: number) => `${n} points`,
-              split: (c: number, l: number) => `${c} % content, ${l} % language`,
-              counts: (w: number) => `counts ${w} %`,
-              scale: (line: string) => `Marks: ${line}`,
-              labels: { writing: 'Writing', other: 'Other skills' }
+              title: 'Контрольная работа',
+              time: (min: number) => `Время: ${min} минут`,
+              aids: (a: string) => `Разрешено: ${a || 'ничего'}`,
+              points: (n: number) => `${n} баллов`,
+              split: (c: number, l: number) => `${c} % содержание, ${l} % язык`,
+              counts: (w: number) => `составляет ${w} %`,
+              scale: (line: string) => `Оценки: ${line}`,
+              labels: { writing: 'Письмо', other: 'Другие компетенции' }
             }
-          : {
-              title: 'Klassenarbeit',
-              time: (min: number) => `Bearbeitungszeit: ${min} Minuten`,
-              aids: (a: string) => `Erlaubte Hilfsmittel: ${a || 'keine'}`,
-              points: (n: number) => `${n} Punkte`,
-              split: (c: number, l: number) => `${c} % Inhalt, ${l} % ${zweiterTeil(m.subjectId)}`,
-              counts: (w: number) => `zählt ${w} %`,
-              scale: (line: string) => `Notenschlüssel: ${line}`,
-              labels: { writing: 'Schreiben', other: 'Weitere Kompetenzen' }
-            }
+          : fach.sprache === 'es'
+            ? {
+                title: 'Examen',
+                time: (min: number) => `Tiempo: ${min} minutos`,
+                aids: (a: string) => `Material permitido: ${a || 'ninguno'}`,
+                points: (n: number) => `${n} puntos`,
+                split: (c: number, l: number) => `${c} % contenido, ${l} % lengua`,
+                counts: (w: number) => `cuenta ${w} %`,
+                scale: (line: string) => `Notas: ${line}`,
+                labels: {
+                  writing: 'Expresión escrita',
+                  other: 'Otras competencias'
+                }
+              }
+            : english
+              ? {
+                  title: 'Test',
+                  time: (min: number) => `Time: ${min} minutes`,
+                  aids: (a: string) => `You may use: ${a || 'nothing'}`,
+                  points: (n: number) => `${n} points`,
+                  split: (c: number, l: number) => `${c} % content, ${l} % language`,
+                  counts: (w: number) => `counts ${w} %`,
+                  scale: (line: string) => `Marks: ${line}`,
+                  labels: { writing: 'Writing', other: 'Other skills' }
+                }
+              : {
+                  title: 'Klassenarbeit',
+                  time: (min: number) => `Bearbeitungszeit: ${min} Minuten`,
+                  aids: (a: string) => `Erlaubte Hilfsmittel: ${a || 'keine'}`,
+                  points: (n: number) => `${n} Punkte`,
+                  split: (c: number, l: number) => `${c} % Inhalt, ${l} % ${zweiterTeil(m.subjectId)}`,
+                  counts: (w: number) => `zählt ${w} %`,
+                  scale: (line: string) => `Notenschlüssel: ${line}`,
+                  labels: {
+                    writing: eigeneTeilnoteLabel(m.subjectId),
+                    other: istAlteSprache(m.subjectId) ? 'Begleitaufgaben' : 'Weitere Kompetenzen'
+                  }
+                }
   const lines = [
     t.time(m.minutes),
     t.aids(translateAids(m.aids, fach.sprache)),
@@ -127,7 +159,11 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     const format = formatById(part.formatId)
     // Überschrift der Teile in der Sprache des Faches
     const points = part.points > 0 ? ` (${part.points} ${kopfText.punkte})` : ''
-    blocks.push({ id: `part-${part.id}`, type: 'divider', title: `${kopfText.teil} ${i + 1}: ${format?.label ?? part.label}${points}` })
+    blocks.push({
+      id: `part-${part.id}`,
+      type: 'divider',
+      title: `${kopfText.teil} ${i + 1}: ${format?.label ?? part.label}${points}`
+    })
     blocks.push(...part.blocks.map((b) => ({ ...b, id: b.id || newId() })))
   })
   /*
@@ -147,7 +183,11 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     bloecke.splice(letzteAufgabe + 1, 0, operatoren)
   }
   // Fassung A behält die bisherige Blattkennung – so bleibt alles gültig, was sich darauf bezieht
-  const sheet: Sheet = { id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`, label: label ? `Fassung ${label}` : 'Klassenarbeit', blocks: bloecke }
+  const sheet: Sheet = {
+    id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`,
+    label: label ? `Fassung ${label}` : 'Klassenarbeit',
+    blocks: bloecke
+  }
   return {
     version: 1,
     meta: {
@@ -173,7 +213,13 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
       }
     },
     // Auf einer Klassenarbeit tragen die Lernenden Name, Klasse und Datum ein
-    design: { ...exam.design, header: { ...exam.design.header, fields: { name: true, class: true, date: true } } },
+    design: {
+      ...exam.design,
+      header: {
+        ...exam.design.header,
+        fields: { name: true, class: true, date: true }
+      }
+    },
     outline: null,
     sheets: [sheet],
     sources: [],

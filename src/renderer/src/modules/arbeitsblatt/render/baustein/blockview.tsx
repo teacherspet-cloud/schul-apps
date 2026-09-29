@@ -27,7 +27,7 @@ import { ProtokollView } from './protokoll'
  */
 
 /** „Wörter" in der Sprache des Kopfes (Klassenarbeit Französisch/Spanisch/Englisch) */
-const WOERTER: Record<'de' | 'en' | 'fr' | 'es', string> = { de: 'Wörter', en: 'words', fr: 'mots', es: 'palabras' }
+const WOERTER: Record<'de' | 'en' | 'fr' | 'es' | 'it' | 'ru', string> = { de: 'Wörter', en: 'words', fr: 'mots', es: 'palabras', it: 'parole', ru: 'слов' }
 export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
   const { mode } = useWs()
   const set = useSetter(block)

@@ -318,7 +318,8 @@ export interface Answer {
   options: string[]
   correct: number[]
   /** trueFalse */
-  statements: { text: string; isTrue: boolean }[]
+  /** trueFalse; `stufe` = Schwierigkeitsstufe dieser Aussage (29.09.2026, nur für die Lehrkraft) */
+  statements: { text: string; isTrue: boolean; stufe?: 1 | 2 | 3 | 4 | 5 }[]
   /** ordering: Elemente in richtiger Reihenfolge; displayOrder = Anzeige-Reihenfolge (Indizes) */
   items: string[]
   displayOrder: number[]
@@ -341,6 +342,10 @@ export interface TaskPart {
   modelAnswer?: string
   /** Skizze zur Musterlösung als SVG – siehe `TaskBlock.modelSketch` */
   modelSketch?: string
+  /** Verstehen: Schwierigkeitsstufe dieses Items – siehe `TaskBlock.stufe` */
+  stufe?: 1 | 2 | 3 | 4 | 5
+  /** Begründung der Stufe (Textstelle, Synonym …) – nur für die Lehrkraft */
+  stufeGrund?: string
 }
 
 /**
@@ -490,6 +495,15 @@ export interface TaskBlock extends BaseBlock {
    * sondern „welcher Fehler".
    */
   grammar?: { topicId: string; error: string }
+  /**
+   * Verstehen (Hören, Lesen, Hör-Seh-Verstehen): Schwierigkeitsstufe 1–5 des Items bzw. aller
+   * Teilaufgaben ohne eigene Stufe (shared/verstehen/stufen.ts, Entscheidung der Lehrkraft
+   * 29.09.2026). Nur für die Lehrkraft sichtbar – nie auf dem Schülerblatt. Optional: ältere
+   * Blätter haben keine Stufe.
+   */
+  stufe?: 1 | 2 | 3 | 4 | 5
+  /** Begründung der Stufe – nur für die Lehrkraft */
+  stufeGrund?: string
 }
 
 /** Sprecherin oder Sprecher eines Hörtextes (Stimme von ElevenLabs). */
@@ -1062,7 +1076,7 @@ export interface WorksheetMeta {
    * Fehlt = Deutsch. Englischarbeiten setzen hier 'en', damit auch PDF und Word
    * durchgehend englisch beschriftet sind.
    */
-  labelLanguage?: 'de' | 'en' | 'fr' | 'es'
+  labelLanguage?: 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'
   /**
    * Wort hinter dem Titel im Lösungsteil („– Lösungen"). Fehlt = „Lösungen". Die
    * Klassenarbeit setzt „Erwartungshorizont" – das ist dort der Fachbegriff, auch in

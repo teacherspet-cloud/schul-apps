@@ -17,7 +17,16 @@ export const AIDS_SUGGESTIONS = [
   'Taschenrechner',
   'Atlas',
   'Formelsammlung',
-  'Operatorenliste'
+  'Operatorenliste',
+  // 29.09.2026 für die neuen Fächer (recherche/klassenarbeiten-faecher-neu-2026-09-29.md)
+  'ohne Hilfsmittel (Teil A)',
+  'Taschenrechner (nicht grafikfähig)',
+  'grafikfähiger Taschenrechner / CAS',
+  'Zirkel und Geodreieck',
+  'Periodensystem',
+  'Tafelwerk',
+  'Wortangaben',
+  'Sprachreferenz (Informatik)'
 ]
 
 const ENGLISH: Record<string, string> = {
@@ -82,9 +91,35 @@ const SPANISCH: Record<string, string> = {
   operatorenliste: 'la lista de operadores'
 }
 
-const WOERTERBUECHER: Record<'en' | 'fr' | 'es', Record<string, string>> = { en: ENGLISH, fr: FRANZOESISCH, es: SPANISCH }
+const ITALIENISCH: Record<string, string> = {
+  'keine hilfsmittel': 'nessun dizionario né altro materiale',
+  keine: 'nessuno',
+  'einsprachiges wörterbuch': 'un dizionario monolingue',
+  'zweisprachiges wörterbuch': 'un dizionario bilingue',
+  'ein- und zweisprachiges wörterbuch': 'un dizionario monolingue e uno bilingue',
+  wörterbuch: 'un dizionario',
+  'wörterbuch nur für den schreibteil': 'un dizionario solo per la produzione scritta',
+  vokabelheft: 'il tuo quaderno di vocaboli',
+  'eigene notizen (eine seite)': 'i tuoi appunti (una pagina)',
+  'eigene notizen': 'i tuoi appunti'
+}
 
-export function translateAids(aids: string, language: 'de' | 'en' | 'fr' | 'es'): string {
+const RUSSISCH: Record<string, string> = {
+  'keine hilfsmittel': 'без словаря и других пособий',
+  keine: 'нет',
+  'einsprachiges wörterbuch': 'толковый словарь',
+  'zweisprachiges wörterbuch': 'двуязычный словарь',
+  'ein- und zweisprachiges wörterbuch': 'толковый и двуязычный словарь',
+  wörterbuch: 'словарь',
+  'wörterbuch nur für den schreibteil': 'словарь только для письменного задания',
+  vokabelheft: 'твой словарик',
+  'eigene notizen (eine seite)': 'свои записи (одна страница)',
+  'eigene notizen': 'свои записи'
+}
+
+const WOERTERBUECHER: Record<'en' | 'fr' | 'es' | 'it' | 'ru', Record<string, string>> = { en: ENGLISH, fr: FRANZOESISCH, es: SPANISCH, it: ITALIENISCH, ru: RUSSISCH }
+
+export function translateAids(aids: string, language: 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'): string {
   const text = (aids ?? '').trim()
   if (language === 'de' || !text) return text
   const woerter = WOERTERBUECHER[language]

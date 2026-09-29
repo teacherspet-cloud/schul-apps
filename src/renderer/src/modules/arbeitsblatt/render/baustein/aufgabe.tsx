@@ -14,6 +14,7 @@ import { continuedNote } from '../../../../shared/continuedNote'
 import { bereinigeSkizze } from '../../generation/solution'
 import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
 import { stars, useSetter } from './hilfen'
+import { stufenZeile } from '../../../../shared/verstehen/anzeige'
 import { briefAbschnitte, erwartungsAbschnitte, Abschnitt, gruppiereTeilaufgaben } from './brief'
 
 export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }): React.JSX.Element {
@@ -350,12 +351,15 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     if (block.brief) {
       for (const n of erwartungsAbschnitte({ block, edit: keyEdit, set, mitMustertext: !mustertextGezeigt })) abschnitte.push({ node: n })
     }
-    if (block.afb || block.operator || taskItems(block) > 1) {
+    // Schwierigkeitsstufe (29.09.2026): nur hier im Lösungsteil, nie auf dem Schülerblatt
+    const stufe = stufenZeile(block)
+    if (block.afb || block.operator || taskItems(block) > 1 || stufe) {
       abschnitte.push({
         node: (
           <div className="ws-teacher-note" data-unit key="hinweis">
             {[
               block.afb ? `AFB ${block.afb}` : '',
+              stufe,
               block.operator ? `Operator: ${block.operator}` : '',
               /* Zahl der einzeln bewerteten Einheiten – sonst muss die Lehrkraft beim
                  Korrigieren nachzählen, ob die Punkte zur Aufgabe passen. Erst ab zwei:

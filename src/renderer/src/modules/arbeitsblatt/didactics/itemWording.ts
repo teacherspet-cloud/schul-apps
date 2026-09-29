@@ -26,6 +26,11 @@
  *   Koyama, Sun & Ockey (2016), LL&T 20(1) – Lernende greifen dann zur „lexical matching
  *   strategy" und lösen über Wortgleichheit statt über Verstehen.
  *
+ * STUFENRASTER (29.09.2026, Entscheidung der Lehrkraft): Die NRW-Regel gegen wiederholte
+ * Formulierungen gilt als Merkmal der HÖHEREN Stufen. Wörtlich übernehmbar ist „sehr leicht"
+ * (Stufe 1) und damit kein Fehler; die Prüfung der Wortgleichheit steht jetzt in
+ * `shared/verstehen/pruefung.ts` und meldet nur, was nicht zur ausgewiesenen Stufe passt.
+ *
  * Was hier NICHT geprüft wird, weil es sich lokal nicht entscheiden lässt: ob eine Frage
  * allein aus Weltwissen lösbar ist, ob die Distraktoren plausibel sind und ob genau eine
  * Antwort richtig ist. Das bleibt der KI-Prüfung und der Lehrkraft.
@@ -33,10 +38,12 @@
 import { plainText } from '../../../shared/richtext/parse'
 import type { Sheet, TaskBlock, WorksheetMeta } from '../model/types'
 import type { DidacticWarning } from './checks'
+import { pruefeAufgabeStufen } from '../../../shared/verstehen/pruefung'
 
 /** Zählt als Verstehensaufgabe – nur dort gelten diese Regeln. */
 const istVerstehen = (b: TaskBlock, meta: WorksheetMeta): boolean =>
-  b.skill === 'listening' || b.skill === 'reading' || meta.skillFocus === 'listening' || meta.skillFocus === 'reading'
+  // Hör-Seh-Verstehen (Filmaufgabe mit videoId) gehört dazu – das Stufenraster gilt dort ebenso (29.09.2026)
+  b.skill === 'listening' || b.skill === 'reading' || Boolean(b.videoId) || meta.skillFocus === 'listening' || meta.skillFocus === 'reading'
 
 /**
  * Verneinungen als GANZE Wörter.
@@ -169,31 +176,32 @@ export function checkItemWording(sheet: Sheet, meta: WorksheetMeta): DidacticWar
           message: `${label} ist mit ${anzahl} Wörtern lang. Beim Verstehen soll die Leseleistung der Frage gering bleiben – höchstens etwa ${ITEM_MAX_WOERTER} Wörter.`
         })
       }
-      const gleich = text ? wortgleicheStelle(roh, text) : null
-      if (gleich) {
-        out.push({
-          kind: 'itemWording',
-          message: `${label} übernimmt den Wortlaut des Textes („${gleich}"). Dann wird über Wortgleichheit gelöst, nicht über Verstehen – paraphrasiere.`
-        })
-      }
       for (const o of it.optionen) {
         const ot = plainText(o).trim()
         if (SAMMELOPTION.test(ot)) {
           out.push({ kind: 'itemWording', message: `${label}: „${kurz(ot)}" ist als Antwortmöglichkeit ungeeignet – sie prüft Logik statt Verstehen.` })
           break
         }
-        const treffer = text ? wortgleicheStelle(ot, text) : null
-        if (treffer) {
-          out.push({
-            kind: 'itemWording',
-            message: `${label}: Die Antwortmöglichkeit „${kurz(ot)}" steht wörtlich im Text. Auch die falschen Möglichkeiten dürfen den Wortlaut nicht wiederholen.`
-          })
-          break
-        }
       }
     }
+    /*
+     * Wortgleichheit (29.09.2026, Entscheidung der Lehrkraft): Bis hierher meldete die Prüfung
+     * JEDE wörtlich übernommene Frage oder Option. Nach dem Stufenraster
+     * (shared/verstehen/stufen.ts) ist 1:1 übernehmbar aber „sehr leicht" – eine Stufe, kein
+     * Fehler. Gemeldet wird nur noch, wenn die ausgewiesene Stufe nicht zur Wortgleichheit
+     * passt; Items ohne Stufe bleiben unbewertet.
+     */
+    const bezug = bezugstextFuer(block, sheet) || text
+    for (const befund of pruefeAufgabeStufen(block, bezug)) out.push({ kind: 'itemWording', message: befund.meldung })
   }
   return out
+}
+
+/** Bezugstext einer Aufgabe: ihr Hörtext (audioId), sonst leer – dann gelten alle Texte des Blattes. */
+function bezugstextFuer(block: TaskBlock, sheet: Sheet): string {
+  if (!block.audioId) return ''
+  const audio = sheet.blocks.find((b) => b.id === block.audioId)
+  return audio?.type === 'audio' ? audio.transcript : ''
 }
 
 /**

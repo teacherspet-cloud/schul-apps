@@ -43,6 +43,7 @@ import { ladeOriginalquelle, sucheOriginalquellen } from './services/sources/mat
 import { ladeVideo } from './services/sources/video'
 import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePose } from './services/storage/maskottchen'
 import { audioPath, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
+import { importiereAudio } from './services/audio/importAudio'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
 import { deleteExam, getExam, listExams, saveExam } from './services/storage/exams'
 import { deleteWorksheet, getWorksheet, listWorksheets, saveWorksheet } from './services/storage/worksheets'
@@ -615,6 +616,8 @@ function registerIpc(): void {
   handle('audio:speak', (req: TtsRequest) => speak(req))
   handle('audio:preview', (voiceId: string) => previewVoice(voiceId))
   handle('audio:read', (fileName: string) => readAudio(fileName))
+  // Original-Hördatei (MP3) der Lehrkraft übernehmen, etwa von der Verlags-CD (29.09.2026)
+  handle('audio:import', (id: string, daten: Uint8Array) => importiereAudio(id, daten))
   handle('audio:show', (fileName: string) => shell.showItemInFolder(audioPath(fileName)))
 
   handle('files:docx-html', (data: Uint8Array) => docxToHtml(data))

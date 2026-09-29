@@ -586,3 +586,13 @@ export function listeningStateRulesText(stateId: string | undefined, stage: List
   }
   return lines.join('\n')
 }
+
+/**
+ * Sind Richtig/Falsch-Items im Land und auf der Stufe zugelassen? (29.09.2026)
+ * Die KI-Ergänzung „weitere Fragen im gleichen Format" darf bei einem Verbot kein solches Item
+ * neu anlegen – auch nicht auf Stufe 5 („not given" gegenüber „false").
+ */
+export function trueFalseZugelassen(stateId: string | undefined, stage: ListeningStage = 'sek1'): boolean {
+  const rules = listeningStateRules(stateId)
+  return stage === 'sek2' ? rules.sek2.trueFalse : rules.sek1.trueFalse
+}

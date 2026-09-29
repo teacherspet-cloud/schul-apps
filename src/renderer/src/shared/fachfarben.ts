@@ -71,7 +71,12 @@ export const FACH_PALETTE: PalettenFarbe[] = [
   { hex: '#823c32', name: 'Rostrot' },
   { hex: '#786eaa', name: 'Lavendel' },
   // 29.09.2026 fuer das neue Fach Technik: per Rechnung gesucht wie oben, kleinster Abstand zur Palette dE00 = 14,3
-  { hex: '#004048', name: 'Tiefseeblau' }
+  { hex: '#004048', name: 'Tiefseeblau' },
+  // 29.09.2026 für Griechisch, Wirtschaft, Ethik, Philosophie – nacheinander so gesucht, jeweils ΔE₀₀ ≥ 12,5 zu allen übrigen
+  { hex: '#480088', name: 'Indigo' },
+  { hex: '#581840', name: 'Aubergine' },
+  { hex: '#582000', name: 'Kastanie' },
+  { hex: '#907050', name: 'Nougat' }
 ]
 
 const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name)!.hex
@@ -111,7 +116,11 @@ export const FACH_VORSCHLAG: Record<string, string> = {
   daz: farbe('Altrosa'),
   niederlaendisch: farbe('Rostrot'),
   russisch: farbe('Khaki'),
-  technik: farbe('Tiefseeblau')
+  technik: farbe('Tiefseeblau'),
+  griechisch: farbe('Kastanie'),
+  wirtschaft: farbe('Nougat'),
+  ethik: farbe('Indigo'),
+  philosophie: farbe('Aubergine')
 }
 
 /**
@@ -119,8 +128,8 @@ export const FACH_VORSCHLAG: Record<string, string> = {
  * übrigen Programme) – damit auch sie eine Farbe haben und in den Einstellungen stehen.
  */
 export const WEITERE_FAECHER: { id: string; label: string }[] = [
-  { id: 'niederlaendisch', label: 'Niederländisch' },
-  { id: 'russisch', label: 'Russisch' }
+  // Russisch ist seit 29.09.2026 ein Fach der Fächerliste
+  { id: 'niederlaendisch', label: 'Niederländisch' }
 ]
 
 /** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) */

@@ -16,7 +16,7 @@
  * Länder: AFB I gibt Gelerntes wieder, AFB II wendet es auf einen neuen Zusammenhang an,
  * AFB III urteilt und gestaltet. Ein Operator allein sagt darüber nichts – erst die Aufgabe.
  */
-import type { Afb, Sheet, WsBlock } from '../model/types'
+import type { Afb, Sheet, TaskBlock, WsBlock } from '../model/types'
 import type { IntegrityFinding } from './integrity'
 
 /** Wörter eines Textes in Kleinschreibung, ohne Satzzeichen und ohne sehr kurze Wörter. */
@@ -69,6 +69,15 @@ function materialTableHeaders(blocks: WsBlock[]): string[][] {
 const demanding = (afb?: Afb): boolean => afb === 'II' || afb === 'III'
 
 /**
+ * Beansprucht die Aufgabe mehr als Wiedergeben? Bis 29.09.2026 entschied das allein der AFB.
+ * Seit dem Stufenraster (shared/verstehen/stufen.ts) gilt: Wortgleichheit ist nur dann ein
+ * Befund, wenn die Aufgabe eine höhere Stufe beansprucht – also AFB II/III ODER eine
+ * ausgewiesene Stufe ab 3 (an der Aufgabe oder einer Teilaufgabe).
+ */
+const beanspruchtMehr = (block: TaskBlock): boolean =>
+  demanding(block.afb) || (block.stufe ?? 0) >= 3 || block.parts.some((p) => (p.stufe ?? 0) >= 3)
+
+/**
  * Operatoren, bei denen der Wortlaut des Materials in der Lösung stehen SOLL.
  * „Belege am Text" verlangt genau das – hier wäre eine Meldung falsch.
  */
@@ -90,15 +99,23 @@ export function checkDemand(sheet: Sheet): IntegrityFinding[] {
 
   for (const block of sheet.blocks) {
     if (block.type === 'task') {
-      // 1. Lösung wörtlich im Material, obwohl der Operator mehr verlangt
-      if (demanding(block.afb) && !wantsQuotation(block.operator, block.instruction)) {
-        const solutions = [block.solution, ...block.parts.map((p) => p.solution ?? '')].filter((s) => words(s).length >= 8)
-        for (const solution of solutions) {
+      // 1. Lösung wörtlich im Material, obwohl der Operator (oder die Stufe) mehr verlangt
+      if (beanspruchtMehr(block) && !wantsQuotation(block.operator, block.instruction)) {
+        const eintraege = [
+          { solution: block.solution, stufe: block.stufe },
+          ...block.parts.map((p) => ({ solution: p.solution ?? '', stufe: p.stufe ?? block.stufe }))
+        ].filter((e) => words(e.solution).length >= 8)
+        for (const { solution, stufe } of eintraege) {
+          // Stufe 1–2 ausdrücklich ausgewiesen: Wortgleichheit ist dort gewollt (Stufenraster, 29.09.2026)
+          if (stufe !== undefined && stufe <= 2) continue
           if (verbatimShare(solution, material) >= VERBATIM_LIMIT) {
             findings.push({
               blockId: block.id,
               severity: 'hoch',
-              message: `Die Aufgabe verlangt „${block.operator}" (Anforderungsbereich ${block.afb}), die Lösung steht aber fast wörtlich im Material. So ist es in Wahrheit ein Wiedergeben. Das Material darf die Antwort nicht als fertigen Satz enthalten – sie muss aus mehreren Stellen erschlossen werden.`
+              message:
+                stufe !== undefined && !demanding(block.afb)
+                  ? `Die Aufgabe ist als Schwierigkeitsstufe ${stufe} ausgewiesen, die Lösung steht aber fast wörtlich im Material. Das entspricht Stufe 1 („sehr leicht"). Entweder die Stufe senken oder die Aufgabe so zuschneiden, dass die Lösung umformuliert oder aus mehreren Stellen erschlossen werden muss.`
+                  : `Die Aufgabe verlangt „${block.operator}" (Anforderungsbereich ${block.afb}), die Lösung steht aber fast wörtlich im Material. So ist es in Wahrheit ein Wiedergeben. Das Material darf die Antwort nicht als fertigen Satz enthalten – sie muss aus mehreren Stellen erschlossen werden.`
             })
             break
           }

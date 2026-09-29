@@ -1,3 +1,6 @@
+import FachKarte, { FehlerquoteFelder } from './FachKarte'
+import { istAlteSprache } from '../model/faecher'
+import { taktZeile } from '../model/examRules'
 import { upperSecondary } from '../generation/generateExam'
 import { useLehrplanVorschlaege } from '../../../shared/lehrplanVorschlaege'
 import { fachDerArbeit, formatArt, inhaltsanteil, istFremdsprache, KLASSENARBEIT_FAECHER, sprachfolge, zweiterTeil } from '../model/faecher'
@@ -296,6 +299,12 @@ export default function FrameStep(): React.JSX.Element {
                               ? suggestLevel(table, d.meta.stateId, d.meta.schoolTypeId, sprachfolge(d.meta), d.meta.grade)
                               : null
                             if (level) d.meta.cefrLevel = level.level
+                            // 29.09.2026: eigene Teilnote für Schreiben (Fremdsprachen) bzw. Übersetzung (Latein, Griechisch)
+                            d.meta.separateWritingGrade = istFremdsprache(v) || istAlteSprache(v)
+                            const art = fachDerArbeit(v).art
+                            if (art === 'mathematik') d.meta.aids = 'Taschenrechner (nicht grafikfähig), Formelsammlung'
+                            else if (art === 'alte-sprache') d.meta.aids = 'Wortangaben'
+                            else if (art === 'naturwissenschaft') d.meta.aids = 'Taschenrechner'
                           })
                         }
                         allowDeselect={false}
@@ -928,13 +937,16 @@ export default function FrameStep(): React.JSX.Element {
                   />
                 </Card>
 
-                {istFremdsprache(meta.subjectId) && exam.parts.length > 0 && (
+                {/* Fachbesonderheiten (29.09.2026): Mathe Teil A, Informatik am Rechner, Versuch mit Protokoll */}
+                <FachKarte exam={exam} patch={patch} />
+
+                {(istFremdsprache(meta.subjectId) || istAlteSprache(meta.subjectId)) && exam.parts.length > 0 && (
                   <Card withBorder>
                     <Group justify="space-between" mb="sm">
                       <Title order={4}>Noten</Title>
                       <Switch
                         size="xs"
-                        label="Schreibteil mit eigener Note"
+                        label={istAlteSprache(meta.subjectId) ? 'Übersetzung mit eigener Note' : 'Schreibteil mit eigener Note'}
                         checked={meta.separateWritingGrade}
                         onChange={(e) => patch({ separateWritingGrade: e.currentTarget.checked })}
                       />
@@ -948,7 +960,12 @@ export default function FrameStep(): React.JSX.Element {
                                 {g.label}
                               </Text>
                               <Text size="sm" c="dimmed">
-                                {g.points > 0 ? `Teilnote aus ${g.points} Punkten` : 'Teilnote aus Inhalt und Sprache'} · zählt {g.weight} %
+                                {g.points > 0
+                                  ? `Teilnote aus ${g.points} Punkten`
+                                  : istAlteSprache(meta.subjectId)
+                                    ? 'Teilnote aus der Fehlerquote'
+                                    : 'Teilnote aus Inhalt und Sprache'}{' '}
+                                · zählt {g.weight} %
                                 {g.content !== undefined ? ` · Inhalt ${g.content} / Sprache ${g.language} Punkte` : ''}
                               </Text>
                             </Group>
@@ -976,6 +993,7 @@ export default function FrameStep(): React.JSX.Element {
                           <Text size="sm">Die Anteile ergeben {examWeight(exam)} % statt 100 %.</Text>
                         </Alert>
                       )}
+                      {istAlteSprache(meta.subjectId) && <FehlerquoteFelder exam={exam} patch={patch} />}
                       <MehrText
                         text={`In Niedersachsen erhält der Schreibteil eine eigenständige Note; die übrigen geprüften Kompetenzen ergeben zusammen die zweite Note. Jeder Teil hat eigene Punkte – daraus entsteht seine Teilnote, und erst die Teilnoten werden nach ihrem Anteil verrechnet: ${writingWeightFor(meta.grade)} % Schreiben und ${100 - writingWeightFor(meta.grade)} % weitere Kompetenz in Klasse ${meta.grade}. Leseverstehen und Hörverstehen sind mit 21 Punkten vorbelegt. Schreiben und Sprachmittlung werden im Verhältnis ${CONTENT_SHARE} % Inhalt zu ${100 - CONTENT_SHARE} % Sprache bewertet.`}
                       />
@@ -1048,7 +1066,7 @@ export default function FrameStep(): React.JSX.Element {
                       {rules && (
                         <Text size="sm" c="dimmed">
                           Zahl: {fachDerArbeit(meta.subjectId).hauptfach ? rules.mainSubject : rules.otherSubject} · Dauer: {rules.duration} · Ankündigung:{' '}
-                          {rules.announce} · höchstens {rules.perDay} pro Tag und {rules.perWeek} pro Woche · Korrektur: {rules.correction}
+                          {rules.announce} · {taktZeile(rules)} · Korrektur: {rules.correction}
                           <br />
                           Gewichtung: {rules.weighting}
                         </Text>

@@ -16,7 +16,7 @@ import type { StoffQuelle } from '../../../shared/files/stoffQuelle'
 
 /** Fächer, die das Modul zunächst abdeckt */
 // Seit Phase G (Großprogramm 0.4) in model/faecher.ts – hier weitergereicht
-import type { ExamSubjectId } from './faecher'
+import { eigeneTeilnoteLabel, istAlteSprache, type ExamSubjectId } from './faecher'
 export type { ExamSubjectId }
 
 /**
@@ -167,6 +167,19 @@ export interface ExamMeta {
   points: number
   /** Erlaubte Hilfsmittel (z. B. „einsprachiges Wörterbuch“) */
   aids: string
+  /**
+   * Bezeichnung des Leistungsnachweises (29.09.2026: „automatisch nach Land/Fach, änderbar") –
+   * fehlt sie, gilt der Vorschlag für Land, Schulform, Fach und Jahrgang (model/nachweise.ts).
+   */
+  nachweis?: string
+  /** Latein, Griechisch: Wortzahl und Grenze der Fehlerquote für die Übersetzung (model/fehlerquote.ts) */
+  uebersetzung?: import('./fehlerquote').Fehlerquote
+  /** Mathematik: Teil A ohne Hilfsmittel, eigene Abgabe (Voreinstellung an) */
+  hilfsmittelfreierTeil?: boolean
+  /** Informatik: Bearbeitung am Rechner statt auf Papier */
+  amRechner?: boolean
+  /** Naturwissenschaften: Versuch mit Protokoll (arbeitsblatt/model/protokoll.ts) */
+  versuch?: import('../../arbeitsblatt/model/protokoll').VersuchSetup
   /**
    * Fremdsprachen: Formulierungshilfen zur Schreibaufgabe auf dem Arbeitsblatt der Arbeit.
    *
@@ -320,7 +333,7 @@ export function examGrades(exam: Exam): { group: GradeGroup; label: string; weig
       const content = productive.length && points > 0 ? Math.round(productive.reduce((n, p) => n + (p.points * (p.contentShare ?? 40)) / 100, 0)) : undefined
       return {
         group,
-        label: group === 'writing' ? 'Schreiben' : 'Weitere Kompetenzen',
+        label: group === 'writing' ? eigeneTeilnoteLabel(exam.meta.subjectId) : istAlteSprache(exam.meta.subjectId) ? 'Begleitaufgaben' : 'Weitere Kompetenzen',
         weight,
         points,
         content,

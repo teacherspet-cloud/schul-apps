@@ -16,7 +16,8 @@ import { arr, int, obj, str } from '../../../shared/aiSchema'
 import { listeningCount, listeningFormatById, listeningRules, suggestListeningFormat } from '../didactics/listeningFormats'
 import type { LearnerProfile } from '../didactics/profile'
 import { subjectById } from '../model/subjects'
-import type { WorksheetMeta, WsBlock } from '../model/types'
+import type { AudioBlock, WorksheetMeta, WsBlock } from '../model/types'
+import { stufenMixHinweis } from '../../../shared/verstehen/regeln'
 import { listeningTextRules, systemPrompt } from './prompts'
 import { istDeutschZuhoeren } from '../didactics/zuhoeren'
 import type { AiCall } from './generate'
@@ -167,7 +168,7 @@ export async function writeListeningScript(
  * zum Text passen, steht hier auch, dass jede Antwort im Skript stehen muss – und bei mehreren
  * Hörtexten, in welcher Reihenfolge alles auf das Blatt kommt.
  */
-export function scriptForSheet(scripts: ListeningScript | ListeningScript[] | null): string {
+export function scriptForSheet(scripts: ListeningScript | ListeningScript[] | null, stufenAnteile?: readonly number[]): string {
   const list = (Array.isArray(scripts) ? scripts : scripts ? [scripts] : []).filter((s) => s.transcript.trim())
   if (!list.length) return ''
   const many = list.length > 1
@@ -193,12 +194,39 @@ export function scriptForSheet(scripts: ListeningScript | ListeningScript[] | nu
     '- Kürze, ergänze und glätte nichts am Skript – es wird genau so vertont.',
     '- Baue die Hörverstehensaufgaben genau zu diesen Texten: Jede Antwort steht wörtlich oder sinngemäß im zugehörigen Skript. Prüfe jede Aufgabe daraufhin, bevor du sie schreibst.',
     '- Keine Aufgabe fragt nach etwas, das im Skript nicht vorkommt.',
+    // Stufenraster (29.09.2026): wörtlich = „sehr leicht", Paraphrase = mittel – bewusst mischen statt Wortgleichheit zu verbieten
+    '- Wörtlich übernehmbare Antworten sind erlaubt, aber nur als „sehr leichte" Items (Stufe 1). Mische die Stufen: Paraphrase, Synonym und das Zusammenführen mehrerer Stellen machen Items schwerer.',
+    stufenAnteile ? stufenMixHinweis(stufenAnteile) : '',
     many
       ? '- Reihenfolge auf dem Blatt: Hörtext 1, dann alle Aufgaben zu Hörtext 1, dann Hörtext 2, dann alle Aufgaben zu Hörtext 2 – und so weiter. Jede Aufgabe nennt in der Arbeitsanweisung, zu welchem Hörtext sie gehört.'
       : '- Die Aufgaben stehen unter dem Hörtext.',
     `- Erfinde keine weiteren Hörtexte; es sind genau ${list.length}.`
   )
-  return lines.join('\n')
+  return lines.filter(Boolean).join('\n')
+}
+
+/**
+ * Ein vorhandener Hörtext-Baustein als Skript – etwa wenn die Lehrkraft das Transkript eines
+ * Verlagshörtextes eingelesen hat (29.09.2026). Dann schreibt die KI keinen neuen Text; die
+ * Aufgaben entstehen zum eingelesenen Transkript, gespielt wird die Originalaufnahme.
+ */
+export function skriptAusBaustein(block: Pick<AudioBlock, 'title' | 'textType' | 'transcript' | 'plays' | 'beforeListening'>): ListeningScript {
+  const namen = [
+    ...new Set(
+      block.transcript
+        .split('\n')
+        .map((z) => /^([\p{Lu}][\p{L}\s.'-]{0,24}):/u.exec(z.trim())?.[1]?.trim() ?? '')
+        .filter(Boolean)
+    )
+  ].slice(0, 4)
+  return {
+    title: block.title.trim() || 'Listening',
+    textType: block.textType.trim() || 'Hörtext',
+    transcript: block.transcript.trim(),
+    speakers: namen,
+    beforeListening: block.beforeListening.trim(),
+    plays: Math.max(1, Math.min(3, Math.round(block.plays) || 2))
+  }
 }
 
 /**

@@ -23,6 +23,13 @@ export const SUBJECTS: Subject[] = [
   { id: 'spanisch', label: 'Spanisch', foreignLanguage: 'es' },
   { id: 'italienisch', label: 'Italienisch', foreignLanguage: 'it' },
   { id: 'latein', label: 'Latein', uebersetzungssprache: 'la' },
+  /*
+   * 29.09.2026 (Wunsch der Lehrkraft: Klassenarbeiten in allen Fächern): Russisch als
+   * Schulfach (bisher nur als Vokabeltest-Sprache), Griechisch wie Latein als Übersetzungsfach,
+   * Wirtschaft, Ethik und Philosophie als eigene Fächer (eigene Kerncurricula und Operatoren).
+   */
+  { id: 'russisch', label: 'Russisch', foreignLanguage: 'ru' },
+  { id: 'griechisch', label: 'Griechisch', uebersetzungssprache: 'grc' },
   { id: 'mathematik', label: 'Mathematik', formulas: true },
   { id: 'biologie', label: 'Biologie', formulas: true },
   { id: 'chemie', label: 'Chemie', formulas: true },
@@ -31,6 +38,7 @@ export const SUBJECTS: Subject[] = [
   { id: 'geschichte', label: 'Geschichte' },
   { id: 'erdkunde', label: 'Erdkunde / Geographie' },
   { id: 'politik', label: 'Politik / Wirtschaft / Sozialkunde' },
+  { id: 'wirtschaft', label: 'Wirtschaft' },
   { id: 'religion', label: 'Religion / Ethik' },
   /*
    * Werte und Normen ist ein eigenes Fach, kein Religionsersatz mit anderem Namen: In
@@ -40,6 +48,8 @@ export const SUBJECTS: Subject[] = [
    * unterscheidbar.
    */
   { id: 'werte-und-normen', label: 'Werte und Normen' },
+  { id: 'ethik', label: 'Ethik' },
+  { id: 'philosophie', label: 'Philosophie' },
   { id: 'kunst', label: 'Kunst' },
   { id: 'musik', label: 'Musik' },
   { id: 'sport', label: 'Sport' },

@@ -7,6 +7,7 @@
  * verwendet wie im Arbeitsblatt – dadurch funktionieren Darstellung, Seitenumbruch und Export
  * unverändert weiter.
  */
+import { fachRegeln, mitProtokoll, versuchFuerArbeit } from './fachRegeln'
 import { fachDerArbeit, formatArt, inhaltsanteil, sprachfolge, zweiterTeil } from '../model/faecher'
 import type { Quellentreffer, StructuredRequest } from '@shared/types'
 import { obj, str } from '../../../shared/aiSchema'
@@ -328,7 +329,13 @@ export function unterlagenTeil(exam: Exam): string {
  * beschaffter Originaltext von der APP eingesetzt; alle gehen als Grundlage in den Auftrag.
  */
 export function arbeitsmaterialQuellen(exam: Exam): StoffQuelle[] {
-  return (exam.meta.arbeitsmaterial ?? []).filter((q) => q.aktiv && q.text.trim())
+  /*
+   * Befund 29.09.2026: Der Filter verlangte Text – Scans und Fotos ohne Textebene (etwa ein
+   * gescannter Klassenarbeitsvorschlag des Verlags) fielen dadurch STILLSCHWEIGEND heraus, und
+   * ihre Seitenbilder gingen nie an die KI. Jetzt zählt auch eine Quelle, die nur Bilder hat;
+   * die Bilder hängt `unterlagenBilder` an jede Anfrage.
+   */
+  return (exam.meta.arbeitsmaterial ?? []).filter((q) => q.aktiv && (q.text.trim() || (q.bilder?.length ?? 0) > 0))
 }
 
 /** Die Kopfzeilen, die `urlQuelle` dem Text einer Webseite voranstellt, abschneiden */
@@ -336,7 +343,8 @@ export const ohneWebseitenKopf = (text: string): string => text.replace(/^\s*(?:
 
 /** Das erste Material als Ablage, wie sie `materialBausteine` versteht – die App setzt es wörtlich ein */
 export function arbeitsmaterialAblage(exam: Exam): OriginalMaterialAblage | null {
-  const q = arbeitsmaterialQuellen(exam)[0]
+  // Wörtlich einsetzen lässt sich nur Text – ein Scan ohne Textebene geht als Bild an die KI (29.09.2026)
+  const q = arbeitsmaterialQuellen(exam).find((x) => x.text.trim())
   if (!q) return null
   const titel = q.fileName.replace(/\.[^.]+$/, '').trim() || 'Material'
   return {
@@ -414,14 +422,26 @@ export function arbeitsmaterialTeil(exam: Exam, part: ExamPart): string {
   ]
   for (const q of quellen) {
     out.push(`--- ${q.fileName}${q.url ? ` (${q.url})` : ''} ---`)
-    out.push(q.text.trim().slice(0, 8000))
+    // Scan oder Foto ohne Textebene: Der Inhalt kommt über das Bild (29.09.2026)
+    out.push(q.text.trim() ? q.text.trim().slice(0, 8000) : '(Scan bzw. Foto ohne auslesbaren Text – der Inhalt steht im beigefügten Bild; lies ihn von dort)')
   }
   return out.join('\n')
 }
 
-/** Die Seitenbilder der Unterlagen als Zusatz einer Anfrage (leer, wenn es keine gibt). */
+/**
+ * Die Seitenbilder als Zusatz einer Anfrage (leer, wenn es keine gibt).
+ *
+ * Seit 29.09.2026 auch die Bilder des Materials FÜR die Arbeit – zuerst, weil es in der Arbeit
+ * verwendet wird; die Unterlagen aus dem Unterricht füllen bis zur Obergrenze auf. Vorher gingen
+ * gescannte Arbeitsmaterialien gar nicht an die KI.
+ */
 export function unterlagenBilder(exam: Exam): { images?: string[] } {
-  const images = stoffBilder(exam.meta.materialQuellen)
+  // Nur Material ohne Text: Bei einer digitalen PDF steht der Inhalt schon als Text im Auftrag
+  const material = stoffBilder(
+    (exam.meta.arbeitsmaterial ?? []).filter((q) => !q.text.trim()),
+    6
+  )
+  const images = [...material, ...stoffBilder(exam.meta.materialQuellen, 8 - material.length)].slice(0, 8)
   return images.length ? { images } : {}
 }
 
@@ -455,6 +475,8 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
     `Erlaubte Hilfsmittel: ${m.aids || 'keine'}.`,
     vocabRules(exam),
     partNotes(part),
+    // Fächer vom 29.09.2026: Mathematik (Teil A/B), Latein/Griechisch (Fehlerquote), NaWi (Versuch), Informatik, Musik/Kunst, Werte-Fächer
+    fachRegeln(exam, part),
     schreibvorgabenRegeln(exam, part),
     '',
     upperSecondaryRules(m, material),
@@ -573,10 +595,15 @@ export async function generateExamPart(
     ...unterlagenBilder(exam)
   })
   const rng = createRng(randomSeed())
-  const blocks = (res.blocks ?? [])
-    .map((b) => convertBlock(b, rng, []))
-    .filter((b): b is WsBlock => Boolean(b))
-    .map((b) => (b.type === 'task' ? { ...b, id: b.id || newId(rng) } : b))
+  // Versuchsteil (29.09.2026): Protokollvorlage hinter die Aufgabe „protokollieren"
+  const blocks = mitProtokoll(
+    exam,
+    part,
+    (res.blocks ?? [])
+      .map((b) => convertBlock(b, rng, []))
+      .filter((b): b is WsBlock => Boolean(b))
+      .map((b) => (b.type === 'task' ? { ...b, id: b.id || newId(rng) } : b))
+  )
   /*
    * Den Originaltext setzt die APP ein, nicht die KI. Ein Sprachmodell, das einen Text
    * „uebernimmt", aendert dabei Kleinigkeiten – in einer Klausur staende das mit
@@ -685,7 +712,10 @@ export interface ExamOptions {
   bild?: (prompt: string) => Promise<string>
 }
 
-export async function generateExam(exam: Exam, ai: AiCall, onProgress: ExamProgress = () => undefined, opts: ExamOptions = {}): Promise<Exam> {
+export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: ExamProgress = () => undefined, opts: ExamOptions = {}): Promise<Exam> {
+  // Versuch mit Protokoll (29.09.2026): einmal ausarbeiten, alle Fassungen protokollieren denselben Versuch
+  if (examEingabe.meta.versuch?.aktiv && !examEingabe.meta.versuch.daten) onProgress('Die KI arbeitet den Versuch aus …')
+  let exam = await versuchFuerArbeit(examEingabe, ai)
   /*
    * Fassungen (A/B, A/B/C): Je Teil entsteht zuerst Fassung A, gleich danach ihre
    * Gegenstücke – so liegt die Vorlage vor, zu der B gleichwertig sein muss (model/fassungen.ts).

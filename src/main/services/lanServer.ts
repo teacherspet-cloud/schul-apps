@@ -90,6 +90,8 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'audio:speak',
   'audio:preview',
   'audio:read',
+  // Eigene Hördatei vom Gerät hochladen – schreibt nur in den Hörtext-Ordner, Name geprüft (29.09.2026)
+  'audio:import',
 
   // --- Material lesen ---
   'sheets:list',
