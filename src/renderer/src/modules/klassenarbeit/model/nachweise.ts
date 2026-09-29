@@ -15,6 +15,10 @@
  * Fundstelle steht je Ergebnis in `quelle`; was der Bericht „nicht gesichert" nennt, trägt
  * `nichtGesichert: true` und sagt das im Hinweis.
  *
+ * Bayern (Gymnasium G9 je Ausbildungsrichtung, Realschule, Mittelschule) seit 29.09.2026 nach
+ * `recherche/bayern-schulaufgaben-2026-09-29.md` (GSO §§ 16, 21–25 und Anlage 1, RSO §§ 17–20,
+ * MSO § 12, jeweils Fassung ab 01.08.2026).
+ *
  * Wo der Bericht nichts belegt, heißt der Vorschlag neutral „Klassenarbeit" – ohne Anzahl,
  * Dauer oder Behauptung.
  *
@@ -64,6 +68,7 @@ export const NACHWEIS_BEZEICHNUNGEN = [
   'schriftliche Kurzkontrolle',
   'großer Leistungsnachweis',
   'kleiner Leistungsnachweis',
+  'schriftlicher Leistungsnachweis',
   'Leistungsnachweis',
   'Test'
 ] as const
@@ -228,13 +233,35 @@ function istOberstufe(k: Kontext): boolean {
 function oberstufe(k: Kontext): Nachweis {
   const klausur = (n: Omit<Nachweis, 'bezeichnung'>): Nachweis => ({ bezeichnung: 'Klausur', ...n })
   switch (k.stateId) {
-    case 'BY':
+    case 'BY': {
+      // GSO § 21 Abs. 3, § 22 Abs. 3 und 5, § 25 Abs. 1 (Fassung ab 01.08.2026; Recherche 29.09.2026)
+      const quelle = 'GSO §§ 21, 22, 25 (Fassung ab 01.08.2026)'
+      if (k.gruppe === 'sport') {
+        return {
+          bezeichnung: 'Leistungsnachweis',
+          keineKlassenarbeit: true,
+          hinweis:
+            'In Sport treten an die Stelle der Schulaufgabe praktische Leistungsnachweise; nur im Leistungsfach Sport kommt je Ausbildungsabschnitt eine Schulaufgabe aus der Sporttheorie hinzu.',
+          quelle
+        }
+      }
+      const hinweise = [
+        'In 13/2 haben Fächer auf grundlegendem Niveau keine Schulaufgabe, sondern mindestens zwei kleine Leistungsnachweise (je ein schriftlicher und ein mündlicher).',
+        'In Jgst. 13 kann in den Abiturfächern je eine Schulaufgabe im Umfang einer Prüfungsaufgabe gehalten werden.'
+      ]
+      if (k.gruppe === 'fremdsprache')
+        hinweise.push('Eine Schulaufgabe in Jgst. 12 oder 13 wird mündlich abgehalten, möglichst als Partner- oder Gruppenprüfung.')
+      if (k.subjectId === 'kunst') hinweise.push('Kombinierte Aufgaben mit bildnerisch-praktischem und schriftlich-theoretischem Teil.')
+      if (k.subjectId === 'musik') hinweise.push('Hörzeiten zählen nicht zur Arbeitszeit; im Leistungsfach kommt eine praktische Prüfung hinzu.')
+      hinweise.push('Rückgabe binnen drei Wochen, vorher keine neue Schulaufgabe im Fach.')
       return {
         bezeichnung: 'Schulaufgabe',
-        anzahl: 'je Fach und Halbjahr eine (12/1–13/1; in 13/2 nur Fächer auf erhöhtem Niveau)',
+        anzahl: 'je Fach und Ausbildungsabschnitt eine (12/1–13/1; in 13/2 nur Fächer auf erhöhtem Niveau)',
         dauer: k.subjectId === 'kunst' ? 'bis 180 min' : 'höchstens 90 min',
-        quelle: 'GSO §§ 22, 23 (Fassung ab 01.08.2026)'
+        hinweis: hinweise.join(' '),
+        quelle
       }
+    }
     case 'NW':
       return klausur({
         anzahl: k.grade === 11 ? 'Einführungsphase: D, M, Fremdsprachen je 2 pro Halbjahr' : undefined,
@@ -386,79 +413,268 @@ function nordrheinWestfalen(k: Kontext): Nachweis {
   return { bezeichnung: 'Klassenarbeit', anzahl, dauer: nwDauer(k), hinweis: hinweise.join(' '), quelle }
 }
 
-/** Fächer, die am bayerischen Gymnasium je nach Ausbildungsrichtung Kernfach sein können */
-const BY_AUSBILDUNGSRICHTUNG = new Set(['physik', 'chemie', 'wirtschaft', 'informatik', 'musik', 'kunst'])
+/**
+ * Bayern, Gymnasium (G9): weitere Kernfächer je Ausbildungsrichtung.
+ *
+ * GSO § 16 Abs. 2 (Fassung ab 01.08.2026): Kernfächer sind überall Deutsch, zwei Fremdsprachen,
+ * Mathematik und Physik, dazu je Ausbildungsrichtung EIN weiteres Fach. In den „übrigen
+ * Kernfächern" sind mindestens zwei Schulaufgaben zu halten (§ 22 Abs. 1 Satz 2); Fächer ohne
+ * Kernfach-Status haben keine Schulaufgaben (§ 28 Abs. 2). Recherche 29.09.2026:
+ * `recherche/bayern-schulaufgaben-2026-09-29.md`.
+ *
+ * `jahrgaenge`: in welchen Jahrgangsstufen das Fach in dieser Ausbildungsrichtung laut
+ * Stundentafel (GSO Anlage 1) unterrichtet wird. `nurDort`: Jahrgangsstufen, in denen das Fach
+ * AUSSCHLIESSLICH in dieser Ausbildungsrichtung unterrichtet wird – dort steht die Richtung
+ * mit dem Fach schon fest, und der Vorschlag kann ohne Zweig-Angabe „Schulaufgabe" lauten.
+ *
+ * Die App kennt die Ausbildungsrichtung der Klasse (noch) nicht; in den übrigen Jahrgängen
+ * nennt der Hinweis deshalb beide Fälle.
+ */
+export interface ByZweigKernfach {
+  zweig: 'HG' | 'SG' | 'NTG' | 'MuG' | 'WWG' | 'SWG'
+  name: string
+  /** Dativ für Hinweise („am Musischen Gymnasium") */
+  am: string
+  fach: string
+  subjectIds: string[]
+  jahrgaenge: [number, number]
+  nurDort: number[]
+}
 
-function bayern(k: Kontext): Nachweis {
-  if (k.gym) {
-    const quelle = 'GSO §§ 22, 23, 25 (Fassung ab 01.08.2026)'
-    const klein = 'kleiner Leistungsnachweis: Kurzarbeit höchstens 30 min (eine Woche vorher angekündigt) oder Stegreifaufgabe höchstens 20 min (unangekündigt)'
-    if (k.kern) {
-      const anzahl =
-        k.gruppe === 'deutsch'
-          ? 'mindestens 3 im Schuljahr'
-          : k.gruppe === 'mathematik'
-            ? k.grade <= 7
-              ? 'mindestens 4 im Schuljahr'
-              : 'mindestens 3 im Schuljahr'
-            : 'mindestens 3 im Schuljahr (ab vier Wochenstunden mindestens 4)'
-      const hinweise: string[] = []
-      if (k.gruppe === 'fremdsprache') hinweise.push('In mindestens zwei Jahrgangsstufen wird eine Schulaufgabe ganz oder teilweise mündlich abgehalten.')
-      if (k.grade <= 8 && k.gruppe !== 'deutsch') hinweise.push('In Jgst. 5–8 sind die Schulaufgaben auf Beschluss der Lehrerkonferenz durch andere Leistungsnachweise ersetzbar.')
-      hinweise.push('Rückgabe binnen zwei Wochen, vorher keine neue Schulaufgabe.')
-      return {
-        bezeichnung: 'Schulaufgabe',
-        anzahl,
-        dauer: k.gruppe === 'deutsch' && k.grade >= 8 ? 'höchstens 60 min (in Deutsch ab Jgst. 8 länger möglich)' : 'höchstens 60 min',
-        hinweis: hinweise.join(' '),
-        quelle
-      }
-    }
-    if (BY_AUSBILDUNGSRICHTUNG.has(k.subjectId)) {
+export const BY_GYM_ZWEIG_KERNFAECHER: ByZweigKernfach[] = [
+  {
+    zweig: 'HG',
+    name: 'Humanistisches Gymnasium',
+    am: 'am Humanistischen Gymnasium',
+    fach: 'Griechisch',
+    subjectIds: ['griechisch'],
+    jahrgaenge: [8, 11],
+    nurDort: [8, 9, 10, 11]
+  },
+  {
+    zweig: 'SG',
+    name: 'Sprachliches Gymnasium',
+    am: 'am Sprachlichen Gymnasium',
+    fach: 'dritte Fremdsprache',
+    subjectIds: ['franzoesisch', 'italienisch', 'russisch', 'spanisch', 'chinesisch'],
+    jahrgaenge: [8, 11],
+    nurDort: []
+  },
+  {
+    zweig: 'NTG',
+    name: 'Naturwissenschaftlich-technologisches Gymnasium',
+    am: 'am Naturwissenschaftlich-technologischen Gymnasium',
+    fach: 'Chemie',
+    subjectIds: ['chemie'],
+    jahrgaenge: [8, 11],
+    nurDort: [8, 11]
+  },
+  {
+    zweig: 'MuG',
+    name: 'Musisches Gymnasium',
+    am: 'am Musischen Gymnasium',
+    fach: 'Musik',
+    subjectIds: ['musik'],
+    jahrgaenge: [5, 11],
+    nurDort: []
+  },
+  {
+    zweig: 'WWG',
+    name: 'Wirtschaftswissenschaftliches Gymnasium',
+    am: 'am Wirtschaftswissenschaftlichen Gymnasium',
+    fach: 'Wirtschaft und Recht',
+    subjectIds: ['wirtschaft'],
+    jahrgaenge: [8, 11],
+    nurDort: [8, 9]
+  },
+  {
+    zweig: 'SWG',
+    name: 'Sozialwissenschaftliches Gymnasium',
+    am: 'am Sozialwissenschaftlichen Gymnasium',
+    fach: 'Politik und Gesellschaft',
+    subjectIds: ['politik'],
+    jahrgaenge: [8, 11],
+    nurDort: [8, 9]
+  }
+]
+
+/**
+ * Wochenstunden der Fremdsprachen je Jahrgangsstufe 5–11 laut GSO Anlage 1 (in allen
+ * Ausbildungsrichtungen gleich): 1., 2. und 3. Fremdsprache (3. = SG, Griechisch am HG).
+ * Ab vier Wochenstunden gelten mindestens vier Schulaufgaben (§ 22 Abs. 1 Nr. 3). Eine in
+ * Jgst. 11 neu einsetzende spät beginnende Fremdsprache hat vier Wochenstunden (Fußnote 7).
+ */
+export const BY_GYM_FS_WOCHENSTUNDEN: Record<1 | 2 | 3, number[]> = {
+  1: [5, 4, 4, 3, 3, 3, 3],
+  2: [0, 4, 4, 4, 3, 3, 3],
+  3: [0, 0, 0, 4, 4, 3, 3]
+}
+
+/** Als wievielte Fremdsprache ein Fach am bayerischen Gymnasium vorkommen kann (Anlage 1) */
+function byFsFolgen(subjectId: string): (1 | 2 | 3)[] {
+  if (subjectId === 'griechisch') return [3]
+  if (subjectId === 'englisch' || subjectId === 'latein') return [1, 2]
+  if (subjectId === 'franzoesisch') return [1, 2, 3]
+  return [3]
+}
+
+/** Mindestzahl der Schulaufgaben in einer Fremdsprache am bayerischen Gymnasium, Jgst. 5–11 */
+export function byGymFsAnzahl(subjectId: string, grade: number): string {
+  const i = grade - 5
+  const teile = byFsFolgen(subjectId)
+    .map((folge) => ({
+      folge,
+      stunden: BY_GYM_FS_WOCHENSTUNDEN[folge][i] ?? 0
+    }))
+    .filter((t) => t.stunden > 0)
+    .map((t) => ({ folge: t.folge, zahl: t.stunden >= 4 ? 4 : 3 }))
+  const spaet = grade === 11 && subjectId !== 'englisch' && subjectId !== 'latein' && subjectId !== 'griechisch'
+  if (!teile.length)
+    return spaet ? 'als spät beginnende Fremdsprache (vierstündig) mindestens 4 im Schuljahr' : 'mindestens 3 im Schuljahr (ab vier Wochenstunden mindestens 4)'
+  const zahlen = new Set(teile.map((t) => t.zahl))
+  let text =
+    zahlen.size === 1
+      ? `mindestens ${teile[0].zahl} im Schuljahr`
+      : `${teile.map((t) => `als ${t.folge}. Fremdsprache mindestens ${t.zahl}`).join(', ')} im Schuljahr`
+  if (spaet) text += '; als spät beginnende Fremdsprache (vierstündig) mindestens 4'
+  return text
+}
+
+function bayernGymnasium(k: Kontext): Nachweis {
+  const quelle = 'GSO §§ 16, 22, 23, 25 und Anlage 1 (Fassung ab 01.08.2026)'
+  const klein =
+    'kleiner Leistungsnachweis: Kurzarbeit höchstens 30 min über höchstens zehn vorangegangene Stunden (eine Woche vorher angekündigt) oder Stegreifaufgabe höchstens 20 min über höchstens zwei Stunden (unangekündigt)'
+  const rueckgabe =
+    k.gruppe === 'deutsch' && k.grade >= 10
+      ? 'Rückgabe binnen drei Wochen, vorher keine neue Schulaufgabe im Fach.'
+      : 'Rückgabe binnen zwei Wochen, vorher keine neue Schulaufgabe im Fach.'
+  const ersatz = (): string[] => {
+    const h = ['Höchstens eine Schulaufgabe je Schuljahr ist durch ein gleichwertiges Prüfungsformat ersetzbar (Beschluss der Lehrerkonferenz).']
+    if (k.grade <= 8 && k.gruppe !== 'deutsch')
+      h.push(
+        'In Jgst. 5–8 können außerdem alle Schulaufgaben des Fachs durch Leistungsnachweise im Abstand von grundsätzlich sechs Unterrichtswochen ersetzt werden (Lehrerkonferenz mit Zustimmung des Elternbeirats).'
+      )
+    return h
+  }
+  const schulaufgabe = (anzahl: string, hinweise: string[], dauer = 'höchstens 60 min'): Nachweis => ({
+    bezeichnung: 'Schulaufgabe',
+    anzahl,
+    dauer,
+    hinweis: [...hinweise, ...ersatz(), rueckgabe].join(' '),
+    quelle
+  })
+
+  if (k.gruppe === 'deutsch') {
+    const hinweise = ['Diktate oder grammatische Übungen sind als Schulaufgaben nicht zulässig.']
+    if (k.grade <= 8) hinweise.push('Bei nur drei Schulaufgaben ist in Jgst. 5–8 keine Ersetzung durch Formate zulässig, die keine Aufsatzschulaufgaben sind.')
+    return schulaufgabe(
+      'mindestens 3 im Schuljahr',
+      hinweise,
+      k.grade >= 8 ? 'höchstens 60 min (in Deutsch ab Jgst. 8 angemessen länger möglich)' : 'höchstens 60 min'
+    )
+  }
+  if (k.gruppe === 'mathematik') return schulaufgabe(k.grade <= 7 ? 'mindestens 4 im Schuljahr' : 'mindestens 3 im Schuljahr', [])
+  if (istFs(k.gruppe)) {
+    const hinweise = ['Maßgeblich sind die Wochenstunden nach Stundentafel: ab vier Wochenstunden mindestens 4 Schulaufgaben, sonst 3.']
+    if (k.gruppe === 'fremdsprache') hinweise.push('In mindestens zwei Jahrgangsstufen wird eine Schulaufgabe ganz oder teilweise mündlich abgehalten.')
+    if (k.subjectId === 'griechisch') hinweise.push('Griechisch ist Kernfach am Humanistischen Gymnasium (ab Jgst. 8).')
+    return schulaufgabe(byGymFsAnzahl(k.subjectId, k.grade), hinweise)
+  }
+  if (k.subjectId === 'physik') {
+    if (k.grade < 8) {
       return {
         bezeichnung: 'Kurzarbeit',
         dauer: 'höchstens 30 min',
-        hinweis: `Je nach Ausbildungsrichtung ist ${k.fach} ein weiteres Kernfach mit mindestens 2 Schulaufgaben (nicht gesichert, welche Jahrgänge); sonst ${klein}.`,
-        quelle,
-        nichtGesichert: true
+        keineKlassenarbeit: true,
+        hinweis: `Physik wird am bayerischen Gymnasium erst ab Jgst. 8 unterrichtet (davor Natur und Technik ohne Schulaufgaben); die Arbeit gilt als ${klein}.`,
+        quelle
       }
+    }
+    return schulaufgabe('mindestens 2 im Schuljahr', ['Physik ist ab Jgst. 8 in allen Ausbildungsrichtungen Kernfach.'])
+  }
+  const zweig = BY_GYM_ZWEIG_KERNFAECHER.find((z) => z.subjectIds.includes(k.subjectId) && z.zweig !== 'SG')
+  if (zweig && k.grade >= zweig.jahrgaenge[0] && k.grade <= zweig.jahrgaenge[1]) {
+    if (zweig.nurDort.includes(k.grade)) {
+      return schulaufgabe('mindestens 2 im Schuljahr', [
+        `${zweig.fach} wird in Jgst. ${k.grade} nur ${zweig.am} (${zweig.zweig}) unterrichtet und ist dort Kernfach.`
+      ])
     }
     return {
       bezeichnung: 'Kurzarbeit',
+      anzahl: `am ${zweig.zweig} mindestens 2 Schulaufgaben im Schuljahr, sonst keine`,
       dauer: 'höchstens 30 min',
-      keineKlassenarbeit: true,
-      hinweis: `Schulaufgaben gibt es am bayerischen Gymnasium in Deutsch, Mathematik, den Fremdsprachen und den Kernfächern der Ausbildungsrichtung; in ${k.fach} gilt die Arbeit als ${klein}. Ob ${k.fach} in einzelnen Jahrgängen Schulaufgaben hat, ist nicht gesichert.`,
-      quelle,
-      nichtGesichert: true
-    }
-  }
-  if (k.schoolTypeId === 'realschule') {
-    const quelle = 'RSO § 18'
-    const sa = (anzahl: string, hinweis?: string, nichtGesichert?: boolean): Nachweis => ({
-      bezeichnung: 'Schulaufgabe',
-      anzahl,
-      dauer: 'höchstens 60 min',
-      hinweis: [hinweis, k.gruppe === 'deutsch' ? undefined : 'Außer in Deutsch sind Schulaufgaben durch mindestens fünf angesagte Tests ersetzbar.'].filter(Boolean).join(' '),
-      quelle,
-      nichtGesichert
-    })
-    if (k.subjectId === 'deutsch' || k.subjectId === 'englisch') return sa(`${jeJahrgang([4, 4, 4, 4, 3, 3], k.grade)} im Schuljahr`)
-    if (k.subjectId === 'mathematik')
-      return sa(`Wahlpflichtfächergruppe I: ${jeJahrgang([4, 4, 4, 4, 4, 3], k.grade)}, Gruppe II/III: ${jeJahrgang([4, 4, 3, 3, 3, 3], k.grade)} im Schuljahr`)
-    if (k.subjectId === 'physik' && k.grade >= 7) return sa(`${jeJahrgang([2, 2, 3, 3], k.grade, 7)} im Schuljahr`, 'Nur in der Wahlpflichtfächergruppe I.')
-    if (k.subjectId === 'franzoesisch' && k.grade >= 7) return sa('3 im Schuljahr', 'In der Wahlpflichtfächergruppe III.')
-    if (k.subjectId === 'wirtschaft' && k.grade >= 7) return sa('3 im Schuljahr', 'Als Betriebswirtschaftslehre/Rechnungswesen in der Wahlpflichtfächergruppe II.')
-    if (k.subjectId === 'chemie') return sa('2 im Schuljahr', 'Für welche Jahrgänge und Gruppen das gilt, ist nicht gesichert.', true)
-    if (k.subjectId === 'kunst' && k.grade >= 7 && k.grade <= 9) return sa('3 im Schuljahr', 'Als Profilfach der Wahlpflichtfächergruppe III.')
-    return {
-      bezeichnung: 'kleiner Leistungsnachweis',
-      keineKlassenarbeit: true,
-      hinweis: `An der bayerischen Realschule sind in ${k.fach} keine Schulaufgaben vorgesehen (RSO § 18); die Arbeit gilt als kleiner Leistungsnachweis.`,
+      hinweis: `${zweig.fach} ist nur ${zweig.am} (${zweig.zweig}) Kernfach mit mindestens 2 Schulaufgaben (höchstens 60 min); dort passt die Bezeichnung „Schulaufgabe". In den übrigen Ausbildungsrichtungen gilt die Arbeit als ${klein}.`,
       quelle
     }
   }
-  if (k.schoolTypeId === 'mittelschule' && (k.kern || k.gruppe === 'fremdsprache')) {
-    return { bezeichnung: 'Schulaufgabe', anzahl: 'keine feste Zahl', hinweis: 'Ankündigung eine Woche vorher, höchstens eine am Tag.', quelle: 'MSO § 12' }
+  return {
+    bezeichnung: 'Kurzarbeit',
+    dauer: 'höchstens 30 min',
+    keineKlassenarbeit: true,
+    hinweis: `Schulaufgaben gibt es am bayerischen Gymnasium nur in den Kernfächern: Deutsch, zwei Fremdsprachen, Mathematik, Physik und je Ausbildungsrichtung Griechisch (HG), eine dritte Fremdsprache (SG), Chemie (NTG), Musik (MuG), Wirtschaft und Recht (WWG) oder Politik und Gesellschaft (SWG). In ${k.fach} gilt die Arbeit in Jgst. ${k.grade} als ${klein}.`,
+    quelle
+  }
+}
+
+function bayern(k: Kontext): Nachweis {
+  if (k.gym) return bayernGymnasium(k)
+  if (k.schoolTypeId === 'realschule') {
+    const quelle = 'RSO §§ 17–20 (Fassung ab 01.08.2026)'
+    const sa = (anzahl: string, hinweis?: string, gruppe?: string): Nachweis => {
+      const h: string[] = []
+      if (hinweis) h.push(hinweis)
+      if (k.gruppe === 'deutsch' && k.grade <= 7)
+        h.push('In Jgst. 5–7 kann je eine Aufgabe aus Rechtschreibung und Grammatik als eine Schulaufgabe gegeben werden.')
+      if (k.gruppe !== 'deutsch')
+        h.push('Außer in Deutsch sind Schulaufgaben auf Beschluss der Lehrerkonferenz durch mindestens fünf angesagte Tests ersetzbar.')
+      if (k.subjectId === 'kunst') h.push('Eine Schulaufgabe wird als praktischer Leistungsnachweis durchgeführt.')
+      else if (k.grade <= 9)
+        h.push('In Fächern mit mehr als zwei Schulaufgaben ist in Jgst. 5–9 eine durch zwei Kurzarbeiten oder ein gleichwertiges Prüfungsformat ersetzbar.')
+      if (k.grade === 10) h.push('In den Fächern der Abschlussprüfung dürfen höchstens zwei Schulaufgaben den Umfang einer Prüfungsaufgabe haben.')
+      h.push(k.gruppe === 'deutsch' && k.grade === 10 ? 'Rückgabe binnen drei Wochen.' : 'Rückgabe binnen zwei Wochen.')
+      return {
+        bezeichnung: 'Schulaufgabe',
+        anzahl: gruppe ? `${anzahl} (${gruppe})` : anzahl,
+        dauer: 'höchstens 60 min',
+        hinweis: h.join(' '),
+        quelle
+      }
+    }
+    const jahr = (werte: number[]): string => `${jeJahrgang(werte, k.grade)} im Schuljahr`
+    if (k.subjectId === 'deutsch' || k.subjectId === 'englisch') return sa(jahr([4, 4, 4, 4, 3, 3]))
+    if (k.subjectId === 'mathematik')
+      return sa(`Wahlpflichtfächergruppe I: ${jeJahrgang([4, 4, 4, 4, 4, 3], k.grade)}, Gruppe II/III: ${jeJahrgang([4, 4, 3, 3, 3, 3], k.grade)} im Schuljahr`)
+    if (k.subjectId === 'physik' && k.grade >= 7) {
+      return k.grade === 7
+        ? sa('2 im Schuljahr', 'Nur in der Wahlpflichtfächergruppe I; in Gruppe II/III ab Jgst. 8.')
+        : sa(`Wahlpflichtfächergruppe I: ${jeJahrgang([2, 2, 3, 3], k.grade, 7)}, Gruppe II/III: 2 im Schuljahr`)
+    }
+    if (k.subjectId === 'chemie' && k.grade >= 8) {
+      return k.grade === 8 ? sa('2 im Schuljahr', 'Nur in der Wahlpflichtfächergruppe I; in Gruppe II/III ab Jgst. 9.') : sa('2 im Schuljahr')
+    }
+    if (k.subjectId === 'franzoesisch' && k.grade >= 7) return sa('3 im Schuljahr', undefined, 'Wahlpflichtfächergruppe III')
+    if (k.subjectId === 'wirtschaft' && k.grade >= 7) return sa('3 im Schuljahr', 'Als Betriebswirtschaftslehre/Rechnungswesen.', 'Wahlpflichtfächergruppe II')
+    if (k.subjectId === 'kunst' && k.grade >= 7)
+      return sa('3 im Schuljahr', 'Als Prüfungsfach der Wahlpflichtfächergruppe III (ebenso Werken, Ernährung und Gesundheit, Sozialwesen).')
+    return {
+      bezeichnung: 'kleiner Leistungsnachweis',
+      keineKlassenarbeit: true,
+      hinweis: `An der bayerischen Realschule sind in ${k.fach} in Jgst. ${k.grade} keine Schulaufgaben vorgesehen (RSO § 18); die Arbeit gilt als kleiner Leistungsnachweis (Kurzarbeit höchstens 30 min, Stegreifaufgabe höchstens 20 min).`,
+      quelle
+    }
+  }
+  if (k.schoolTypeId === 'mittelschule') {
+    const hinweise = [
+      'Die Mittelschulordnung kennt keine Schulaufgaben und keine festen Zahlen; die Lehrerkonferenz legt die Leistungsnachweise zu Schuljahresbeginn fest.',
+      'Angekündigt wird spätestens eine Woche vorher, höchstens einer am Tag und in der Regel höchstens zwei in der Woche.'
+    ]
+    if (k.grade <= 7) hinweise.push('In Jgst. 5–7 findet in einem Fach je Schuljahr eine Projektarbeit als Leistungsnachweis statt.')
+    return {
+      bezeichnung: 'schriftlicher Leistungsnachweis',
+      anzahl: 'keine feste Zahl',
+      hinweis: hinweise.join(' '),
+      quelle: 'MSO § 12'
+    }
   }
   return NEUTRAL(k)
 }

@@ -3,7 +3,7 @@
  * Entscheidung der Lehrkraft: automatisch nach Land/Fach, änderbar).
  */
 import { describe, expect, it } from 'vitest'
-import { fachgruppe, istModerneFremdsprache, nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../src/renderer/src/modules/klassenarbeit/model/nachweise'
+import { BY_GYM_ZWEIG_KERNFAECHER, byGymFsAnzahl, fachgruppe, istModerneFremdsprache, nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../src/renderer/src/modules/klassenarbeit/model/nachweise'
 
 const LAENDER = ['BW', 'BY', 'BE', 'BB', 'HB', 'HH', 'HE', 'MV', 'NI', 'NW', 'RP', 'SL', 'SN', 'ST', 'SH', 'TH']
 const FAECHER = [
@@ -115,7 +115,94 @@ describe('Bayern', () => {
   it('Oberstufe: Schulaufgabe mit 90 Minuten', () => {
     expect(by('deutsch', 12).bezeichnung).toBe('Schulaufgabe')
     expect(by('deutsch', 12).dauer).toBe('höchstens 90 min')
+    expect(by('deutsch', 12).hinweis).toContain('drei Wochen')
     expect(by('deutsch', 11).dauer).toContain('60 min')
+    expect(by('englisch', 13).hinweis).toContain('mündlich')
+    expect(by('sport', 12).keineKlassenarbeit).toBe(true)
+  })
+
+  // GSO § 16 Abs. 2 und Anlage 1 (Recherche 29.09.2026)
+  it('Physik ist ab Jgst. 8 überall Kernfach mit mindestens 2 Schulaufgaben', () => {
+    expect(by('physik', 8)).toMatchObject({
+      bezeichnung: 'Schulaufgabe',
+      anzahl: 'mindestens 2 im Schuljahr'
+    })
+    expect(by('physik', 8).nichtGesichert).toBeFalsy()
+    expect(by('physik', 7).keineKlassenarbeit).toBe(true)
+    expect(by('physik', 7).hinweis).toContain('Natur und Technik')
+  })
+
+  it('Kernfach der Ausbildungsrichtung: Schulaufgabe, wo nur diese Richtung das Fach hat', () => {
+    // Chemie in Jgst. 8 und 11 nur am NTG, Wirtschaft und Recht in Jgst. 8/9 nur am WWG, Politik und Gesellschaft nur am SWG
+    for (const [fach, grade] of [
+      ['chemie', 8],
+      ['chemie', 11],
+      ['wirtschaft', 9],
+      ['politik', 8]
+    ] as const) {
+      expect(by(fach, grade).bezeichnung, `${fach} ${grade}`).toBe('Schulaufgabe')
+      expect(by(fach, grade).anzahl).toBe('mindestens 2 im Schuljahr')
+    }
+    // Sonst hängt es an der Ausbildungsrichtung: Vorschlag Kurzarbeit, Hinweis nennt beide Fälle
+    const ch = by('chemie', 9)
+    expect(ch.bezeichnung).toBe('Kurzarbeit')
+    expect(ch.keineKlassenarbeit).toBeFalsy()
+    expect(ch.anzahl).toContain('NTG')
+    expect(ch.hinweis).toContain('Naturwissenschaftlich-technologischen')
+    expect(by('musik', 6).anzahl).toContain('MuG')
+    expect(by('wirtschaft', 10).anzahl).toContain('WWG')
+    expect(by('politik', 11).anzahl).toContain('SWG')
+  })
+
+  it('Fächer ohne Kernfach-Status: belegt keine Schulaufgaben', () => {
+    for (const fach of ['biologie', 'geschichte', 'erdkunde', 'informatik', 'kunst', 'religion']) {
+      const n = by(fach, 9)
+      expect(n.keineKlassenarbeit, fach).toBe(true)
+      expect(n.nichtGesichert, fach).toBeFalsy()
+    }
+    expect(by('wirtschaft', 7).keineKlassenarbeit).toBe(true)
+  })
+
+  it('Fremdsprachen: Mindestzahl nach Wochenstunden der Stundentafel', () => {
+    expect(byGymFsAnzahl('englisch', 5)).toBe('mindestens 4 im Schuljahr')
+    expect(byGymFsAnzahl('englisch', 7)).toBe('mindestens 4 im Schuljahr')
+    expect(byGymFsAnzahl('englisch', 8)).toBe('als 1. Fremdsprache mindestens 3, als 2. Fremdsprache mindestens 4 im Schuljahr')
+    expect(byGymFsAnzahl('latein', 10)).toBe('mindestens 3 im Schuljahr')
+    expect(byGymFsAnzahl('griechisch', 9)).toBe('mindestens 4 im Schuljahr')
+    expect(byGymFsAnzahl('spanisch', 11)).toContain('spät beginnende Fremdsprache (vierstündig) mindestens 4')
+    expect(by('franzoesisch', 9).anzahl).toContain('als 3. Fremdsprache mindestens 4')
+  })
+
+  it('Deutsch: keine Diktate, Korrekturfrist ab Jgst. 10 drei Wochen', () => {
+    expect(by('deutsch', 6).hinweis).toContain('Diktate')
+    expect(by('deutsch', 10).hinweis).toContain('drei Wochen')
+    expect(by('deutsch', 9).hinweis).toContain('zwei Wochen')
+    expect(by('mathematik', 6).hinweis).toContain('sechs Unterrichtswochen')
+    expect(by('deutsch', 6).hinweis).not.toContain('sechs Unterrichtswochen')
+  })
+
+  it('Tabelle der Ausbildungsrichtungen deckt alle sechs Zweige ab', () => {
+    expect(BY_GYM_ZWEIG_KERNFAECHER.map((z) => z.zweig)).toEqual(['HG', 'SG', 'NTG', 'MuG', 'WWG', 'SWG'])
+    for (const z of BY_GYM_ZWEIG_KERNFAECHER) for (const g of z.nurDort) expect(g >= z.jahrgaenge[0] && g <= z.jahrgaenge[1], z.zweig).toBe(true)
+  })
+
+  it('Realschule: Physik und Chemie auch in Gruppe II/III, Kunst bis Jgst. 10', () => {
+    expect(by('physik', 9, 'realschule').anzahl).toContain('Gruppe II/III: 2')
+    expect(by('chemie', 8, 'realschule').hinweis).toContain('ab Jgst. 9')
+    expect(by('chemie', 10, 'realschule')).toMatchObject({
+      bezeichnung: 'Schulaufgabe',
+      anzahl: '2 im Schuljahr'
+    })
+    expect(by('chemie', 10, 'realschule').nichtGesichert).toBeFalsy()
+    expect(by('kunst', 10, 'realschule').bezeichnung).toBe('Schulaufgabe')
+    expect(by('deutsch', 10, 'realschule').hinweis).toContain('drei Wochen')
+  })
+
+  it('Mittelschule: keine Schulaufgaben, angekündigte schriftliche Leistungsnachweise', () => {
+    const n = by('deutsch', 6, 'mittelschule')
+    expect(n.bezeichnung).toBe('schriftlicher Leistungsnachweis')
+    expect(n.hinweis).toContain('Projektarbeit')
+    expect(by('geschichte', 8, 'mittelschule').quelle).toBe('MSO § 12')
   })
 })
 

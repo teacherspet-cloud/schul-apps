@@ -18,7 +18,8 @@
  * - NI: RdErl. „Schriftliche Arbeiten" 22.3.2012 (SVBl. S. 266, vorläufig weiter gültig);
  *   Gymnasium RdErl. 1.8.2025 (SVBl. S. 492) Nr. 6.4–6.7; HS/RS/OBS Erlasse vom 18.08.2026
  * - NW: APO-S I § 6 mit VV 6.1.1–6.1.3 (BASS 13-21 Nr. 1.1/1.2), BASS 12-63 Nr. 3
- * - BY: GSO §§ 21–23, 25, 26, 28 (Fassung ab 01.08.2026); RSO §§ 17–21; MSO §§ 12, 13
+ * - BY: GSO §§ 16, 21–23, 25, 28 und Anlage 1 (Fassung ab 01.08.2026); RSO §§ 17–20; MSO §§ 12, 13
+ *   (Kernfächer je Ausbildungsrichtung ergänzt am 29.09.2026, `recherche/bayern-schulaufgaben-2026-09-29.md`)
  * - BW: Notenbildungsverordnung §§ 7–9, 9a (zuletzt geändert 08.04.2026)
  * - HE: VOGSV §§ 28, 32–34 und Anlage 2 Nr. 4–7
  * - BE: Sek I-VO §§ 19, 20 und Anlage 4
@@ -147,29 +148,50 @@ export const EXAM_STATE_RULES: ExamStateRules[] = [
   },
   {
     stateId: 'BY',
-    duration: 'Schulaufgabe Jgst. 5–11 höchstens 60 min (Deutsch ab Jgst. 8 länger möglich), Jgst. 12/13 höchstens 90 min',
-    announce: 'spätestens eine Woche vorher',
+    duration: 'Schulaufgabe Jgst. 5–11 höchstens 60 min (Deutsch ab Jgst. 8 angemessen länger), Jgst. 12/13 höchstens 90 min (Kunst bis 180 min)',
+    announce: 'spätestens eine Woche vorher (Kurzarbeit ebenso; Stegreifaufgabe unangekündigt)',
     perDay: 1,
-    perWeek: 2,
+    perWeek: 2, // „soll"; gilt für große schriftliche Leistungsnachweise (GSO § 22 Abs. 4)
     correction: 'zwei Wochen; Deutsch ab Jgst. 10 und Jgst. 12/13 drei Wochen; vor Rückgabe keine neue Schulaufgabe',
-    weighting: 'große zu kleine Leistungsnachweise 1:1 bei zwei Schulaufgaben, sonst 2:1',
-    mainSubject: 'Deutsch mind. 3; Mathematik Jgst. 5–7 mind. 4, 8–11 mind. 3; Fremdsprachen mind. 3 (ab vier Wochenstunden mind. 4)',
-    otherSubject: 'übrige Kernfächer mind. 2; sonst Note aus kleinen Leistungsnachweisen',
+    weighting: 'große zu kleine Leistungsnachweise 1:1 bei zwei Schulaufgaben, sonst 2:1; Fächer ohne Schulaufgaben nur kleine Leistungsnachweise',
+    mainSubject:
+      'Deutsch mind. 3; Mathematik Jgst. 5–7 mind. 4, 8–11 mind. 3; Fremdsprachen mind. 3, ab vier Wochenstunden mind. 4 (1. FS Jgst. 5–7, 2. FS Jgst. 6–8, 3. FS Jgst. 8–9)',
+    otherSubject:
+      'übrige Kernfächer mind. 2: Physik (ab Jgst. 8) und je Ausbildungsrichtung Griechisch (HG), 3. Fremdsprache (SG), Chemie (NTG), Musik (MuG), Wirtschaft und Recht (WWG), Politik und Gesellschaft (SWG); alle anderen Fächer ohne Schulaufgaben',
     notes: [
-      'Höchstens eine Schulaufgabe je Fach und Schuljahr kann durch ein gleichwertiges Format ersetzt werden; in Jgst. 5–8 können außer in Deutsch alle Schulaufgaben durch Leistungsnachweise ersetzt werden (Beschluss der Lehrerkonferenz).',
-      'In modernen Fremdsprachen wird in mindestens zwei Jahrgangsstufen eine Schulaufgabe ganz oder teilweise mündlich abgehalten.',
-      'Keine Drittel-Regel: Die Schulleitung kann eine Schulaufgabe bei unangemessenen Anforderungen für ungültig erklären.',
-      'Kurzarbeit höchstens 30 min (eine Woche Ankündigung), Stegreifaufgabe höchstens 20 min (unangekündigt).',
-      'Realschule: feste Zahlen je Fach und Wahlpflichtfächergruppe (RSO § 18), höchstens 60 min; Mittelschule ohne feste Schulaufgabenzahlen.'
+      'Kernfächer (GSO § 16 Abs. 2): Deutsch, zwei Fremdsprachen, Mathematik und Physik, dazu je Ausbildungsrichtung ein weiteres Fach; nur Kernfächer haben Schulaufgaben.',
+      'In Ausnahmefällen darf die Mindestzahl in Deutsch, Mathematik und den Fremdsprachen um eine unterschritten werden.',
+      'Höchstens eine Schulaufgabe je Fach und Schuljahr (Jgst. 5–11) ist durch ein gleichwertiges Prüfungsformat ersetzbar; Gruppenarbeitsphasen oder eine Jahresstoff-Prüfung als letzter großer Nachweis brauchen die Zustimmung des Elternbeirats.',
+      'In Jgst. 5–8 können außer in Deutsch alle Schulaufgaben eines Fachs durch Leistungsnachweise im Abstand von grundsätzlich sechs Unterrichtswochen ersetzt werden (Lehrerkonferenz, Zustimmung des Elternbeirats).',
+      'Deutsch: Diktate oder grammatische Übungen sind als Schulaufgaben nicht zulässig; bei nur drei Schulaufgaben in Jgst. 5–8 keine Ersetzung durch Formate, die keine Aufsatzschulaufgaben sind.',
+      'In modernen Fremdsprachen wird in mindestens zwei Jahrgangsstufen eine Schulaufgabe ganz oder teilweise mündlich abgehalten, in Jgst. 12/13 eine Schulaufgabe mündlich.',
+      'Keine Drittel-Regel: Die Schulleitung kann eine Schulaufgabe bei unangemessenen Anforderungen für ungültig erklären; eine freiwillige Wiederholung ist unzulässig.',
+      'Kurzarbeit höchstens 30 min über höchstens zehn vorangegangene Stunden (eine Woche Ankündigung), Stegreifaufgabe höchstens 20 min über höchstens zwei Stunden (unangekündigt), fachlicher Leistungstest höchstens 45 min.',
+      'Qualifikationsphase: je Fach und Ausbildungsabschnitt eine Schulaufgabe (12/1–13/1; in 13/2 nur auf erhöhtem Niveau); Sport praktisch.',
+      'Realschule: feste Zahlen je Fach und Wahlpflichtfächergruppe (RSO § 18), höchstens 60 min; höchstens 3 angekündigte Nachweise pro Woche, davon höchstens 2 Schulaufgaben.',
+      'Mittelschule: keine Schulaufgaben und keine festen Zahlen; angekündigte schriftliche Leistungsnachweise höchstens einer am Tag, in der Regel höchstens zwei pro Woche (MSO § 12).'
     ],
-    subjects: ['Deutsch', 'Mathematik', 'Fremdsprachen (auch Latein)', 'weitere Kernfächer je Ausbildungsrichtung (z. B. Physik, Chemie, Wirtschaft und Recht)'],
+    subjects: [
+      'Deutsch',
+      'Mathematik',
+      'zwei Fremdsprachen (auch Latein)',
+      'Physik (ab Jgst. 8)',
+      'HG: Griechisch',
+      'SG: dritte Fremdsprache',
+      'NTG: Chemie',
+      'MuG: Musik',
+      'WWG: Wirtschaft und Recht',
+      'SWG: Politik und Gesellschaft'
+    ],
     sources: [
-      'GSO §§ 21–23, 25, 26, 28 (Fassung ab 01.08.2026) – https://www.gesetze-bayern.de/Content/Document/BayGSO-22',
-      'RSO §§ 17–21 – https://www.gesetze-bayern.de/Content/Document/BayRSO-18',
+      'GSO § 16 Abs. 2 (Kernfächer) – https://www.gesetze-bayern.de/Content/Document/BayGSO-16',
+      'GSO §§ 21–23, 25, 28 (Fassung ab 01.08.2026) – https://www.gesetze-bayern.de/Content/Document/BayGSO-22',
+      'GSO Anlage 1 (Stundentafeln Jgst. 5–11) – https://www.gesetze-bayern.de/Content/Document/BayGSO-ANL_1',
+      'RSO §§ 17–20 – https://www.gesetze-bayern.de/Content/Document/BayRSO-18',
       'MSO §§ 12, 13 – https://www.gesetze-bayern.de/Content/Document/BayMSO-12'
     ],
     nichtGesichert: [
-      'Welche Fächer je Ausbildungsrichtung weitere Kernfächer mit Schulaufgaben sind (z. B. Geschichte, Geographie, Sozialkunde).',
+      'Ob Intensivierungsstunden bei der Zahl der Wochenstunden einer Fremdsprache mitzählen (gerechnet wird mit der Stundentafel).',
       'Grundschule 3/4, Wirkung von VERA, Notenspiegel.'
     ]
   },

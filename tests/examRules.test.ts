@@ -56,6 +56,16 @@ describe('Länderregeln: Bestand', () => {
     // BW: § 9 ab 01.08.2026
     expect(stateRules('BW')!.mainSubject).toContain('dreistündige Kernfächer mind. 3')
   })
+
+  it('Bayern: Kernfächer je Ausbildungsrichtung nach GSO § 16 Abs. 2 (29.09.2026)', () => {
+    const by = stateRules('BY')!
+    for (const fach of ['Physik', 'Griechisch (HG)', 'Chemie (NTG)', 'Musik (MuG)', 'Wirtschaft und Recht (WWG)', 'Politik und Gesellschaft (SWG)']) {
+      expect(by.otherSubject).toContain(fach)
+    }
+    expect(by.sources.join(' ')).toContain('BayGSO-16')
+    expect(by.nichtGesichert.join(' ')).not.toMatch(/Ausbildungsrichtung/)
+    expect(by.notes.some((n) => n.startsWith('Mittelschule: keine Schulaufgaben'))).toBe(true)
+  })
 })
 
 describe('Niedersachsen: Regeln für alle modernen Fremdsprachen', () => {
