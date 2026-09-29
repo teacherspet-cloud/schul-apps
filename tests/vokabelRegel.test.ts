@@ -83,7 +83,7 @@ describe('Beide Wege zum Test mit denselben Grundeinstellungen', () => {
     expect(s.variantCount).toBe(2)
     expect(s.targetLanguage).toBe('fr')
     expect(s.stateId).toBe('BY')
-    expect(s.vocabCount).toBe(12)
+    expect(s.vocabCount).toBe(16) // Standardumfang 14–18 (29.09.2026)
     expect(s.pageLimit?.mode).toBe('auto')
   })
   it('Latein beginnt mit der Nennform-Aufgabe', () => {

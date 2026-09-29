@@ -39,7 +39,8 @@ export interface Herkunft {
 export function grundEinstellungen(app: Pick<AppSettings, 'defaults'>, table: CefrTable, herkunft: Herkunft | null, vokabeln: number): TestSettings {
   const last = loadLastChoice('vokabeltest')
   const sprache = herkunft?.language || last.targetLanguage || app.defaults.targetLanguage
-  const count = Math.min(12, vokabeln)
+  // Standardumfang 14–18 (29.09.2026); ohne KI-Vorschlag die Mitte
+  const count = Math.min(16, vokabeln)
   const tasks = distributeEvenly(
     (istLatein(sprache) ? DEFAULT_TASKS_LATEIN : DEFAULT_TASKS).map((type) => ({ type, count: 0, pointsPerItem: TASK_TYPES[type].defaultPoints })),
     count

@@ -185,31 +185,46 @@ const PLAN_SCHEMA = obj({
 })
 
 /**
- * Lässt die KI passende Aufgabenformate wählen (Wortarten, Wendungen, Niveau, Abwechslung)
- * und verteilt die Vokabeln darauf. Bei Problemen greift eine regelbasierte Auswahl.
+ * Schwierigkeit der Formate nach Klasse (29.09.2026, Wunsch der Lehrkraft): Die aus dem
+ * Lehrwerk bzw. der Liste geschätzte Klasse bestimmt die Vorauswahl mit – jüngere Klassen und
+ * frühe Lernjahre bekommen mehr geschlossene Formate, ältere mehr Anwendung und Produktion.
  */
-export async function planAutoTasks(
-  vocab: VocabEntry[],
-  settings: TestSettings,
-  totalPoints: number,
-  ai: AiCall,
-  /** Zufallsquelle für die Formatauswahl – im Test austauschbar */
-  rnd: () => number = Math.random
-): Promise<{ tasks: TaskSelection[]; vocabCount: number; reasons: string[] }> {
-  const vocabCount = vocabCountFor(totalPoints, vocab.length)
+export function schwierigkeitNachKlasse(settings: Pick<TestSettings, 'grade' | 'level'>): string {
+  if (settings.grade <= 6 || !levelAtLeast(settings.level, 'A2'))
+    return `Grade ${settings.grade} (${settings.level}): young beginners. Mostly closed recognition formats and short context gaps with clear support (word banks, pictures, first letters); at most one short productive task.`
+  if (settings.grade <= 8 || !levelAtLeast(settings.level, 'B1'))
+    return `Grade ${settings.grade} (${settings.level}): lower secondary. Balance recognition and use in context; one guided productive task (e.g. sentences with given words) is welcome.`
+  return `Grade ${settings.grade} (${settings.level}): upper classes. Emphasise use in context and own production (word formation, collocations, definitions, sentences); keep at most one purely closed recognition task.`
+}
+
+/** Ergebnis einer KI-Planung, bevor Anzahl und Mindestmengen geprüft sind */
+interface KiPlan {
+  planned: { type: TaskTypeId; count: number }[]
+  reasons: string[]
+}
+
+/**
+ * Die eigentliche KI-Anfrage für eine Zusammensetzung. `ziel` ist entweder eine feste Zahl
+ * (Test automatisch erstellen: Punkte bestimmen die Zahl) oder ein Bereich (Test einstellen:
+ * die KI wählt die ideale Zahl, standardmäßig 14–18).
+ */
+async function kiPlan(vocab: VocabEntry[], settings: TestSettings, ziel: { min: number; max: number }, ai: AiCall, rnd: () => number): Promise<KiPlan> {
   const allowed = availableAutoTypes(settings)
   // Gezogener Vorschlag: Ohne ihn wählt die KI fast immer dieselben drei Formate.
-  const suggested = fallbackTypes(settings, vocabCount, rnd)
-  let planned: { type: TaskTypeId; count: number }[] = []
-  let reasons: string[] = []
+  const suggested = fallbackTypes(settings, ziel.max, rnd)
+  const fest = ziel.min === ziel.max
   try {
     const res = await ai<{ tasks: { type: TaskTypeId; count: number; reason: string }[] }>({
       system: systemPrompt(settings),
       user: [
-        `Plan a vocabulary test for the following ${vocab.length} words. Exactly ${vocabCount} words will be tested in total.`,
-        'Choose 2 to 5 varied, suitable, context-based task formats and decide how many words each task tests. The counts must add up exactly to ' +
-          `${vocabCount}.`,
+        fest
+          ? `Plan a vocabulary test for the following ${vocab.length} words. Exactly ${ziel.max} words will be tested in total.`
+          : `Plan a vocabulary test for the following ${vocab.length} words. Choose the ideal number of tested words between ${ziel.min} and ${ziel.max} (fewer only if the list is shorter) – enough for a reliable test that students can finish in a lesson.`,
+        fest
+          ? `Choose 2 to 5 varied, suitable, context-based task formats and decide how many words each task tests. The counts must add up exactly to ${ziel.max}.`
+          : `Choose 2 to 5 varied, suitable, context-based task formats and decide how many words each task tests. The counts must add up to a number between ${ziel.min} and ${ziel.max}.`,
         'Consider parts of speech and the kind of expressions (single words, phrases, verbs, adjectives), the CEFR level and variety for students.',
+        schwierigkeitNachKlasse(settings),
         suggested.length
           ? `Start from this mix, which was drawn for variety so that not every test looks the same: ${suggested.join(', ')}. Keep a format only if the words really suit it; otherwise replace it with another suitable format of a similar kind (recognition / use in context / own production).`
           : '',
@@ -229,30 +244,80 @@ export async function planAutoTasks(
       schemaName: 'testplan',
       schema: PLAN_SCHEMA
     })
-    planned = res.tasks.filter((t) => allowed.includes(t.type) && t.count > 0)
-    reasons = res.tasks.map((t) => `${TASK_TYPES[t.type]?.label ?? t.type}: ${t.reason}`)
+    const planned = res.tasks.filter((t) => allowed.includes(t.type) && t.count > 0)
+    // Doppelte Formate zusammenfassen
+    const merged = new Map<TaskTypeId, number>()
+    for (const t of planned) merged.set(t.type, (merged.get(t.type) ?? 0) + t.count)
+    return {
+      planned: [...merged].map(([type, count]) => ({ type, count })),
+      reasons: res.tasks.filter((t) => TASK_TYPES[t.type]).map((t) => `${TASK_TYPES[t.type].label}: ${t.reason}`)
+    }
   } catch {
-    planned = []
+    return { planned: [], reasons: [] }
   }
-  // Doppelte Formate zusammenfassen
-  const merged = new Map<TaskTypeId, number>()
-  for (const t of planned) merged.set(t.type, (merged.get(t.type) ?? 0) + t.count)
-  let tasks = normalizeTasks(
-    [...merged].map(([type, count]) => ({ type, count })),
-    vocabCount
-  )
-  if (!tasks.length || tasks.reduce((s, t) => s + t.count, 0) !== vocabCount) {
-    const types = fallbackTypes(settings, vocabCount, rnd)
-    tasks = normalizeTasks(
+}
+
+/** Plan auf genau `vocabCount` bringen; misslingt das, regelbasiert auswählen */
+function festigen(plan: KiPlan, settings: TestSettings, vocabCount: number, rnd: () => number): { tasks: TaskSelection[]; reasons: string[] } {
+  const tasks = normalizeTasks(plan.planned, vocabCount)
+  if (tasks.length && tasks.reduce((s, t) => s + t.count, 0) === vocabCount) return { tasks, reasons: plan.reasons }
+  const types = fallbackTypes(settings, vocabCount, rnd)
+  return {
+    tasks: normalizeTasks(
       distributeEvenly(
         types.map((type) => ({ type, count: 0, pointsPerItem: 1 })),
         vocabCount
       ),
       vocabCount
-    )
-    reasons = []
+    ),
+    reasons: []
   }
+}
+
+/**
+ * Lässt die KI passende Aufgabenformate wählen (Wortarten, Wendungen, Niveau, Abwechslung)
+ * und verteilt die Vokabeln darauf. Bei Problemen greift eine regelbasierte Auswahl.
+ */
+export async function planAutoTasks(
+  vocab: VocabEntry[],
+  settings: TestSettings,
+  totalPoints: number,
+  ai: AiCall,
+  /** Zufallsquelle für die Formatauswahl – im Test austauschbar */
+  rnd: () => number = Math.random
+): Promise<{ tasks: TaskSelection[]; vocabCount: number; reasons: string[] }> {
+  const vocabCount = vocabCountFor(totalPoints, vocab.length)
+  const { tasks, reasons } = festigen(await kiPlan(vocab, settings, { min: vocabCount, max: vocabCount }, ai, rnd), settings, vocabCount, rnd)
   return { tasks: fitPoints(tasks, totalPoints), vocabCount, reasons }
+}
+
+/** Standardumfang eines Vokabeltests (29.09.2026, Wunsch der Lehrkraft): 14–18 geprüfte Vokabeln */
+export const STANDARD_UMFANG = { min: 14, max: 18 } as const
+
+/** Zielbereich für eine Liste mit `verfuegbar` abfragbaren Vokabeln – kürzere Listen ganz */
+export function umfangFuer(verfuegbar: number): { min: number; max: number } {
+  return { min: Math.min(STANDARD_UMFANG.min, verfuegbar), max: Math.min(STANDARD_UMFANG.max, verfuegbar) }
+}
+
+/**
+ * „Test einstellen" (29.09.2026): Die KI stellt aus den gewählten Vokabeln die ideale
+ * Zusammensetzung der Aufgabentypen zusammen – Zahl der Vokabeln im Bereich 14–18, Formate nach
+ * Wortarten, Niveau und Klasse. Punkte bleiben die Standardpunkte der Formate; alles ist danach
+ * änderbar. Ohne KI (oder bei Fehlern) regelbasiert mit 16 Vokabeln.
+ */
+export async function planeZusammensetzung(
+  vocab: VocabEntry[],
+  settings: TestSettings,
+  ai: AiCall | null,
+  rnd: () => number = Math.random
+): Promise<{ tasks: TaskSelection[]; vocabCount: number; reasons: string[] }> {
+  const ziel = umfangFuer(vocab.length)
+  const plan = ai ? await kiPlan(vocab, settings, ziel, ai, rnd) : { planned: [], reasons: [] }
+  const summe = plan.planned.reduce((s, t) => s + t.count, 0)
+  const mitte = Math.min(vocab.length, Math.round((ziel.min + ziel.max) / 2))
+  const vocabCount = summe >= ziel.min && summe <= ziel.max ? summe : summe ? Math.max(ziel.min, Math.min(ziel.max, summe)) : mitte
+  const { tasks, reasons } = festigen(plan, settings, vocabCount, rnd)
+  return { tasks, vocabCount: tasks.reduce((s, t) => s + t.count, 0) || vocabCount, reasons }
 }
 
 const pointSum = (tasks: TaskSelection[]): number => tasks.reduce((s, t) => s + t.count * t.pointsPerItem, 0)

@@ -7,6 +7,7 @@ import {
   Container,
   Grid,
   Group,
+  Loader,
   NumberInput,
   Radio,
   ScrollArea,
@@ -19,23 +20,24 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconAlertTriangle, IconArrowLeft, IconSparkles } from '@tabler/icons-react'
+import { IconAlertTriangle, IconArrowLeft, IconRefresh, IconSparkles } from '@tabler/icons-react'
 import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
 import { notifyError } from '../../../shared/util'
 import { distributeEvenly, requestedCount } from '../generation/distribute'
 import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
-import { passtZurSprache } from '../didactics/latein'
+import { istLatein, passtZurSprache } from '../didactics/latein'
+import { planeZusammensetzung, suggestLevelFromVocab, STANDARD_UMFANG } from '../generation/autoPlan'
 import { gradeOptions, languageTracks, levelAtLeast, suggestLevel } from '../model/cefr'
 import { randomSeed } from '../model/random'
 import { LANGUAGES, PageLimit, TaskTypeId, TestSettings } from '../model/types'
 import { includedVocab } from '../model/vocab'
-import { useVokabeltest } from '../store'
+import { aiCall, useVokabeltest } from '../store'
 import { saveLastChoice } from '../../../shared/lastChoice'
 import { grundEinstellungen } from '../model/grundeinstellungen'
 import SchulAngabe from '../../../shared/components/SchulAngabe'
@@ -45,7 +47,7 @@ import { pageLimitText } from '../render/useTestLayout'
 import SeitenVorgabe from './SeitenVorgabe'
 
 export default function SettingsStep(): React.JSX.Element {
-  const { vocab, settings: stored, setSettings, setStep, doc, updateDoc, listContext } = useVokabeltest()
+  const { vocab, settings: stored, setSettings, setStep, doc, updateDoc, listContext, listName } = useVokabeltest()
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [settings, setLocal] = useState<TestSettings | null>(stored)
   const [review, setReview] = useState(true)
@@ -65,6 +67,40 @@ export default function SettingsStep(): React.JSX.Element {
   const [hasKey, setHasKey] = useState(true)
   // Nur die Vokabeln, die in der Liste auf „abfragen“ stehen
   const usable = includedVocab(vocab)
+  /*
+   * KI-Vorschlag der Zusammensetzung (29.09.2026, Wunsch der Lehrkraft): beim ersten Öffnen
+   * stellt die KI aus den gewählten Vokabeln die Aufgabentypen zusammen (14–18 Vokabeln). Die
+   * Klasse kommt aus dem Lehrwerk; ohne Lehrwerk schätzt die KI sie aus der Liste. Sie bestimmt
+   * die Schwierigkeit der Formate mit. Hat die Lehrkraft inzwischen selbst etwas geändert,
+   * überschreibt der Vorschlag das nicht.
+   */
+  const [vorschlag, setVorschlag] = useState<{ laeuft: boolean; gruende: string[]; klasse?: string }>({ laeuft: false, gruende: [] })
+  const angefasst = useRef(false)
+  const schlageVor = async (basis: TestSettings, mitKlasse: boolean, table: CefrTable, kiDa: boolean): Promise<void> => {
+    if (istLatein(basis.targetLanguage) || usable.length < 2) return
+    angefasst.current = false
+    setVorschlag({ laeuft: true, gruende: [] })
+    let s = basis
+    let klasse: string | undefined
+    try {
+      if (listContext?.grade) klasse = `Klasse ${listContext.grade} laut Lehrwerk${listContext.bookName ? ` (${listContext.bookName})` : ''}`
+      else if (mitKlasse && kiDa) {
+        const grades = gradeOptions(table, s.stateId, s.schoolTypeId, s.languageOrder)
+        const est = await suggestLevelFromVocab(usable, listName, s, grades, aiCall).catch(() => null)
+        if (est) {
+          s = { ...s, grade: est.grade, level: est.level, topic: s.topic || est.topic }
+          klasse = `Klasse ${est.grade} geschätzt${est.reason ? `: ${est.reason}` : ''}`
+        }
+      }
+      const plan = await planeZusammensetzung(usable, s, kiDa ? aiCall : null)
+      if (angefasst.current) return setVorschlag({ laeuft: false, gruende: [], klasse })
+      setLocal((cur) => (cur ? { ...cur, grade: s.grade, level: s.level, topic: s.topic, tasks: plan.tasks, vocabCount: plan.vocabCount } : cur))
+      setVorschlag({ laeuft: false, gruende: plan.reasons, klasse })
+    } catch (e) {
+      setVorschlag({ laeuft: false, gruende: [] })
+      notifyError(e)
+    }
+  }
 
   useEffect(() => {
     Promise.all([window.api.cefr.get(), window.api.settings.get(), window.api.ai.status()])
@@ -76,13 +112,17 @@ export default function SettingsStep(): React.JSX.Element {
           // Dieselben Vorgaben wie „Test automatisch erstellen" (model/grundeinstellungen.ts)
           const initial = grundEinstellungen(app, cefr, listContext, usable.length)
           setLocal(initial)
+          void schlageVor(initial, true, cefr, status.hasTextKey)
         }
       })
       .catch(notifyError)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const patch = (p: Partial<TestSettings>): void => setLocal((s) => (s ? { ...s, ...p } : s))
+  const patch = (p: Partial<TestSettings>): void => {
+    angefasst.current = true
+    setLocal((s) => (s ? { ...s, ...p } : s))
+  }
 
   useEffect(() => {
     if (settings) setSettings(settings)
@@ -107,6 +147,7 @@ export default function SettingsStep(): React.JSX.Element {
   const suggestion = settings ? suggestLevel(table, settings.stateId, settings.schoolTypeId, settings.languageOrder, settings.grade) : null
 
   const applyGradeContext = (p: Partial<TestSettings>): void => {
+    angefasst.current = true
     if (!settings) return
     const next = { ...settings, ...p }
     const opts = gradeOptions(table, next.stateId, next.schoolTypeId, next.languageOrder)
@@ -377,9 +418,44 @@ export default function SettingsStep(): React.JSX.Element {
 
             <Grid.Col span={{ base: 12, md: 7 }}>
               <Card withBorder>
-                <Title order={4} mb={4}>
-                  Aufgabentypen
-                </Title>
+                <Group justify="space-between" align="center" mb={4}>
+                  <Title order={4}>Aufgabentypen</Title>
+                  {!istLatein(settings.targetLanguage) && (
+                    <Button
+                      size="xs"
+                      variant="light"
+                      leftSection={<IconRefresh size={14} />}
+                      loading={vorschlag.laeuft}
+                      disabled={usable.length < 2}
+                      onClick={() => void schlageVor(settings, false, table, hasKey)}
+                      data-zusammensetzung
+                    >
+                      {hasKey ? 'KI-Vorschlag neu' : 'Vorschlag neu'}
+                    </Button>
+                  )}
+                </Group>
+                {vorschlag.laeuft ? (
+                  <Group gap="xs" mb="sm">
+                    <Loader size="xs" />
+                    <Text size="sm" c="dimmed">
+                      Die KI stellt die Aufgaben für die gewählten Vokabeln zusammen ({STANDARD_UMFANG.min}–{STANDARD_UMFANG.max} Vokabeln) …
+                    </Text>
+                  </Group>
+                ) : (
+                  (vorschlag.klasse || vorschlag.gruende.length > 0) && (
+                    <Alert variant="light" color="blue" p="xs" mb="sm" icon={<IconSparkles size={16} />} data-vorschlag>
+                      {vorschlag.klasse && <Text size="xs">{vorschlag.klasse}. Die Klasse bestimmt die Schwierigkeit der vorgeschlagenen Formate mit.</Text>}
+                      {vorschlag.gruende.map((g, i) => (
+                        <Text key={i} size="xs" c="dimmed">
+                          {g}
+                        </Text>
+                      ))}
+                      <Text size="xs" c="dimmed" mt={4}>
+                        Vorschlag – Aufgaben, Anzahl und Punkte bleiben frei änderbar.
+                      </Text>
+                    </Alert>
+                  )
+                )}
                 <Text size="sm" c="dimmed" mb="md">
                   Alle Aufgaben prüfen die Vokabeln im Kontext der Zielsprache. Die Zahl gibt an, wie viele Vokabeln in der Aufgabe vorkommen.
                 </Text>
