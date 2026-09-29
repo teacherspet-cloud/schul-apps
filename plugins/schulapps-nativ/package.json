@@ -1,0 +1,28 @@
+{
+  "name": "schulapps-nativ",
+  "version": "0.1.0",
+  "description": "Native iOS-Bausteine der Schul-Apps: PDF-Erzeugung und AirPrint, Schluesselbund, Dokumentenscanner",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "web.js",
+    "ios/Sources",
+    "Package.swift",
+    "SchulappsNativ.podspec"
+  ],
+  "author": "Torge Kornahrens",
+  "license": "UNLICENSED",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  }
+}

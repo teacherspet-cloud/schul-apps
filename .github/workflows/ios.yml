@@ -1,0 +1,123 @@
+# Baut die iPad-/iPhone-App (Capacitor) als UNSIGNIERTE .ipa zum Aufspielen per Sideloadly.
+# Start: manuell (Actions → iOS → Run workflow) oder per Tag `ios-v*`.
+# macOS-Minuten zählen zehnfach: Die Web-Oberfläche entsteht deshalb im Linux-Job, der
+# macOS-Job übernimmt nur noch Sync, Info.plist und xcodebuild.
+name: iOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['ios-v*']
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+jobs:
+  web:
+    name: Web-Oberfläche (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: build:mobil (oder Platzhalter)
+        run: |
+          if [ -f vite.mobil.config.ts ] && node -e "process.exit(require('./package.json').scripts?.['build:mobil'] ? 0 : 1)"; then
+            npm run build:mobil
+          else
+            echo "::warning::build:mobil fehlt noch – Platzhalter-Oberfläche wird verpackt."
+            mkdir -p out/mobil && cp -R mobil-platzhalter/. out/mobil/
+          fi
+          test -f out/mobil/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-mobil
+          path: out/mobil
+          retention-days: 1
+
+  ipa:
+    name: Unsignierte .ipa (macOS)
+    needs: web
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Abhängigkeiten
+        run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-mobil
+          path: out/mobil
+      - name: Capacitor-Sync
+        run: |
+          [ -d ios ] || npx cap add ios
+          npx cap sync ios
+      - name: App-Symbole
+        run: |
+          mkdir -p out/cap-assets
+          sips -z 1024 1024 build/icon.png --out out/cap-assets/icon-only.png >/dev/null
+          if npm rebuild sharp >/dev/null 2>&1 && npx capacitor-assets generate --ios --assetPath out/cap-assets \
+               --iconBackgroundColor '#12325e' --iconBackgroundColorDark '#12325e' \
+               --splashBackgroundColor '#12325e' --splashBackgroundColorDark '#12325e'; then
+            echo "Symbole mit @capacitor/assets erzeugt."
+          else
+            echo "::warning::@capacitor/assets fehlgeschlagen – eingechecktes App-Symbol bleibt."
+          fi
+      - name: Info.plist
+        run: bash scripts/ios-plist.sh ios/App/App/Info.plist
+      - name: xcodebuild (ohne Signatur)
+        run: |
+          set -o pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cd ios/App
+          if [ -d App.xcworkspace ]; then ZIEL=(-workspace App.xcworkspace); else ZIEL=(-project App.xcodeproj); fi
+          xcodebuild "${ZIEL[@]}" -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            -skipPackagePluginValidation -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            IPHONEOS_DEPLOYMENT_TARGET=16.4 TARGETED_DEVICE_FAMILY="1,2" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            build 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: .*(Schulapps|PdfDruck|Scanner|Schluesselbund)|\*\* BUILD" || true
+          grep -q "\*\* BUILD SUCCEEDED \*\*" "$RUNNER_TEMP/xcodebuild.log"
+      - name: .ipa packen
+        run: |
+          APP="$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/App.app"
+          test -d "$APP"
+          NAME="Schul-Apps-${VERSION}-${{ github.run_number }}.ipa"
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$NAME" Payload)
+          mkdir -p dist-ios && mv "$RUNNER_TEMP/ipa/$NAME" dist-ios/
+          ls -la dist-ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Schul-Apps-ipa-${{ github.run_number }}
+          path: dist-ios/*.ipa
+          retention-days: 30
+          compression-level: 0
+      - name: Build-Protokoll bei Fehler
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log-${{ github.run_number }}
+          path: ${{ runner.temp }}/xcodebuild.log
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,0 +1,45 @@
+# Günstige Prüfung bei jedem Push: Baut die mobile Web-Oberfläche (npm run build:mobil),
+# sobald Skript und vite.mobil.config.ts existieren. Kein macOS, keine .ipa.
+name: Mobil-Web
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**/*.md'
+      - 'recherche/**'
+  workflow_dispatch:
+
+concurrency:
+  group: mobil-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+jobs:
+  build-mobil:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vorhanden?
+        id: pruefen
+        run: |
+          if [ -f vite.mobil.config.ts ] && node -e "process.exit(require('./package.json').scripts?.['build:mobil'] ? 0 : 1)"; then
+            echo "da=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "build:mobil gibt es noch nicht – nichts zu prüfen."
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.pruefen.outputs.da == '1'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.pruefen.outputs.da == '1'
+        run: npm ci --ignore-scripts
+      - if: steps.pruefen.outputs.da == '1'
+        run: |
+          npm run build:mobil
+          test -f out/mobil/index.html
