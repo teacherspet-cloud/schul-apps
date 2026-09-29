@@ -174,6 +174,8 @@ export interface ExamMeta {
    * fehlt sie, gilt der Vorschlag für Land, Schulform, Fach und Jahrgang (model/nachweise.ts).
    */
   nachweis?: string
+  /** Bayern, Gymnasium: Ausbildungsrichtung der Klasse (29.09.2026) – macht den Vorschlag Schulaufgabe/Kurzarbeit eindeutig */
+  ausbildungsrichtung?: import('./nachweise').ByZweig
   /** Latein, Griechisch: Wortzahl und Grenze der Fehlerquote für die Übersetzung (model/fehlerquote.ts) */
   uebersetzung?: import('./fehlerquote').Fehlerquote
   /** Mathematik: Teil A ohne Hilfsmittel, eigene Abgabe (Voreinstellung an) */

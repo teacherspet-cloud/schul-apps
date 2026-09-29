@@ -1,5 +1,5 @@
 import SchreibGrammatikFeld from './SchreibGrammatikFeld'
-import { nachweisFuer, NACHWEIS_BEZEICHNUNGEN } from '../model/nachweise'
+import { BY_GYM_ZWEIG_KERNFAECHER as BY_GYM_ZWEIGE, nachweisFuer, NACHWEIS_BEZEICHNUNGEN, type ByZweig } from '../model/nachweise'
 import FachKarte, { FehlerquoteFelder } from './FachKarte'
 import { istAlteSprache } from '../model/faecher'
 import { taktZeile } from '../model/examRules'
@@ -199,10 +199,19 @@ export default function FrameStep(): React.JSX.Element {
     meta.subjectId,
     meta.grade,
     exam.parts.map((p) => p.formatId),
-    meta.schoolTypeId
+    meta.schoolTypeId,
+    meta.ausbildungsrichtung
   )
   // Art des Leistungsnachweises nach Land, Schulform, Fach und Jahrgang (29.09.2026) – änderbar
-  const nachweis = nachweisFuer({ stateId: meta.stateId, schoolTypeId: meta.schoolTypeId, subjectId: meta.subjectId, grade: meta.grade })
+  const nachweis = nachweisFuer({
+    stateId: meta.stateId,
+    schoolTypeId: meta.schoolTypeId,
+    subjectId: meta.subjectId,
+    grade: meta.grade,
+    ausbildungsrichtung: meta.ausbildungsrichtung
+  })
+  // Bayern, Gymnasium bis Jgst. 11: Ausbildungsrichtung macht den Vorschlag eindeutig (29.09.2026)
+  const mitZweig = meta.stateId === 'BY' && meta.schoolTypeId === 'gymnasium' && meta.grade <= 11
 
   /** Nach dem Hinzufügen oder Löschen die Anteile nach der Regel des Faches setzen */
   const applyWeights = (d: Exam): void => {
@@ -1091,6 +1100,19 @@ export default function FrameStep(): React.JSX.Element {
                           allowDeselect={false}
                           w={260}
                         />
+                        {mitZweig && (
+                          <Select
+                            size="xs"
+                            label="Ausbildungsrichtung"
+                            placeholder="nicht angegeben"
+                            data={BY_GYM_ZWEIGE.map((z) => ({ value: z.zweig, label: `${z.zweig} – ${z.name}` }))}
+                            value={meta.ausbildungsrichtung ?? null}
+                            onChange={(v) => patch({ ausbildungsrichtung: (v as ByZweig | null) ?? undefined })}
+                            clearable
+                            w={260}
+                            data-ausbildungsrichtung
+                          />
+                        )}
                         <Text size="xs" c="dimmed">
                           {[nachweis.dauer, nachweis.anzahl].filter(Boolean).join(' · ')}
                           {nachweis.quelle ? ` (${nachweis.quelle})` : ''}

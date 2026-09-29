@@ -715,8 +715,16 @@ export const formatsFor = (subject: ExamSubjectId, grade: number, stateId?: stri
       f.subject === subject &&
       grade >= f.grades[0] &&
       grade <= f.grades[1] &&
-      !(stateId === 'NI' && istFremdsprache(subject) && /-(language|grammar)$/.test(f.id))
+      !(ohneIsolierteSprachmittel(stateId) && istFremdsprache(subject) && /-(language|grammar)$/.test(f.id))
   )
+
+/**
+ * Länder, in denen sprachliche Mittel in Fremdsprachen-Klassenarbeiten nicht isoliert geprüft
+ * werden: NI (KC), RP (Lehrplan Französisch 2022, Spanisch 2012), SL (Englisch/Französisch
+ * 2023/24), TH (neue Lehrpläne 2026). 29.09.2026, Nachrecherche in
+ * recherche/grammatik-in-schreibaufgaben-2026-09-29.md.
+ */
+export const ohneIsolierteSprachmittel = (stateId?: string): boolean => stateId === 'NI' || stateId === 'RP' || stateId === 'SL' || stateId === 'TH'
 
 export const formatById = (id: string): ExamFormat | undefined => EXAM_FORMATS.find((f) => f.id === id)
 

@@ -7,6 +7,8 @@ import { fehlerSchluessel, fehlerZeile, grenzeFuerLand, noteFuerFehler } from '.
 import { fachRegeln } from '../src/renderer/src/modules/klassenarbeit/generation/fachRegeln'
 import { hinweise, schreibGrammatikRegeln, strukturenFuer, vorschlag, type SchreibGrammatik } from '../src/renderer/src/modules/klassenarbeit/didactics/schreibGrammatik'
 import { examGrades, type Exam, type ExamPart } from '../src/renderer/src/modules/klassenarbeit/model/types'
+import { examWarnings } from '../src/renderer/src/modules/klassenarbeit/model/examRules'
+import { nachweisFuer } from '../src/renderer/src/modules/klassenarbeit/model/nachweise'
 
 /*
  * Klassenarbeiten in allen Fächern (29.09.2026, Wunsch der Lehrkraft): neue Fächer, Latein mit
@@ -144,5 +146,26 @@ describe('Grammatik in Schreibaufgaben: Nachrecherche MV, RP, SL, SN, ST, TH', (
       expect(hs.some((h) => h.warnung)).toBe(false)
       expect(hs.map((h) => h.text).join(' ')).not.toMatch(/\b(du|dein|Sie|Ihre)\b/)
     }
+  })
+})
+
+describe('Nachträge 29.09.: Sprachmittel nicht isoliert, bayerische Ausbildungsrichtung', () => {
+  it('RP, SL und TH bieten wie NI keine isolierten Grammatik-/Sprachmittelteile an; ältere Arbeiten warnen', () => {
+    for (const land of ['NI', 'RP', 'SL', 'TH']) {
+      expect(formatsFor('englisch', 7, land).some((f) => /-(language|grammar)$/.test(f.id))).toBe(false)
+    }
+    expect(formatsFor('englisch', 7, 'BW').some((f) => /-(language|grammar)$/.test(f.id))).toBe(true)
+    expect(examWarnings('SL', 'englisch', 7, ['en-language'], 'gymnasium').join(' ')).toMatch(/Im Saarland .*nicht isoliert/)
+    expect(examWarnings('RP', 'franzoesisch', 7, ['fr-grammar'], 'gymnasium').join(' ')).toMatch(/In Rheinland-Pfalz/)
+  })
+
+  it('Bayern, Gymnasium: mit Ausbildungsrichtung eindeutig Schulaufgabe bzw. Kurzarbeit', () => {
+    const anfrage = { stateId: 'BY', schoolTypeId: 'gymnasium', subjectId: 'chemie', grade: 9 }
+    expect(nachweisFuer(anfrage).anzahl).toMatch(/am NTG/)
+    expect(nachweisFuer({ ...anfrage, ausbildungsrichtung: 'NTG' }).bezeichnung).toBe('Schulaufgabe')
+    const sg = nachweisFuer({ ...anfrage, ausbildungsrichtung: 'SG' })
+    expect(sg).toMatchObject({ bezeichnung: 'Kurzarbeit', keineKlassenarbeit: true })
+    expect(sg.hinweis).toMatch(/Ausbildungsrichtung SG/)
+    expect(nachweisFuer({ ...anfrage, subjectId: 'musik', grade: 6, ausbildungsrichtung: 'MuG' }).bezeichnung).toBe('Schulaufgabe')
   })
 })

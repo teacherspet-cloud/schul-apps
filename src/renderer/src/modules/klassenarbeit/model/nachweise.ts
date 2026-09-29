@@ -33,6 +33,8 @@ export interface NachweisAnfrage {
   schoolTypeId: string
   subjectId: string
   grade: number
+  /** Bayern, Gymnasium: Ausbildungsrichtung der Klasse (29.09.2026) – ohne Angabe nennt der Hinweis beide Fälle */
+  ausbildungsrichtung?: ByZweig
 }
 
 export interface Nachweis {
@@ -427,11 +429,13 @@ function nordrheinWestfalen(k: Kontext): Nachweis {
  * AUSSCHLIESSLICH in dieser Ausbildungsrichtung unterrichtet wird – dort steht die Richtung
  * mit dem Fach schon fest, und der Vorschlag kann ohne Zweig-Angabe „Schulaufgabe" lauten.
  *
- * Die App kennt die Ausbildungsrichtung der Klasse (noch) nicht; in den übrigen Jahrgängen
- * nennt der Hinweis deshalb beide Fälle.
+ * Ist die Ausbildungsrichtung der Klasse angegeben (`meta.ausbildungsrichtung`), ist der Vorschlag
+ * eindeutig; sonst nennt der Hinweis in den übrigen Jahrgängen beide Fälle.
  */
+export type ByZweig = 'HG' | 'SG' | 'NTG' | 'MuG' | 'WWG' | 'SWG'
+
 export interface ByZweigKernfach {
-  zweig: 'HG' | 'SG' | 'NTG' | 'MuG' | 'WWG' | 'SWG'
+  zweig: ByZweig
   name: string
   /** Dativ für Hinweise („am Musischen Gymnasium") */
   am: string
@@ -594,6 +598,19 @@ function bayernGymnasium(k: Kontext): Nachweis {
   }
   const zweig = BY_GYM_ZWEIG_KERNFAECHER.find((z) => z.subjectIds.includes(k.subjectId) && z.zweig !== 'SG')
   if (zweig && k.grade >= zweig.jahrgaenge[0] && k.grade <= zweig.jahrgaenge[1]) {
+    // Ausbildungsrichtung angegeben: Vorschlag eindeutig
+    if (k.ausbildungsrichtung === zweig.zweig) {
+      return schulaufgabe('mindestens 2 im Schuljahr', [`${zweig.fach} ist ${zweig.am} (${zweig.zweig}) Kernfach.`])
+    }
+    if (k.ausbildungsrichtung) {
+      return {
+        bezeichnung: 'Kurzarbeit',
+        dauer: 'höchstens 30 min',
+        keineKlassenarbeit: true,
+        hinweis: `${zweig.fach} ist nur ${zweig.am} (${zweig.zweig}) Kernfach; in der Ausbildungsrichtung ${k.ausbildungsrichtung} gilt die Arbeit als ${klein}.`,
+        quelle
+      }
+    }
     if (zweig.nurDort.includes(k.grade)) {
       return schulaufgabe('mindestens 2 im Schuljahr', [
         `${zweig.fach} wird in Jgst. ${k.grade} nur ${zweig.am} (${zweig.zweig}) unterrichtet und ist dort Kernfach.`

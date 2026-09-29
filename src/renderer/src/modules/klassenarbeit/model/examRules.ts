@@ -38,10 +38,11 @@
  * geltende Fassung. Art und Bezeichnung je Fach/Jahrgang (Schulaufgabe, Kurzarbeit, Klausur …)
  * liefert `nachweisFuer` in model/nachweise.ts.
  */
+import { ohneIsolierteSprachmittel } from './formats'
 import { gradeScaleLine as sharedGradeScaleLine } from '../../../shared/gradeScale'
 import { notenpunkteFuer, punkteZeile } from '../../../shared/notenpunkte'
 import { formatArt } from './faecher'
-import { fachName, istModerneFremdsprache, nachweisFuer } from './nachweise'
+import { fachName, istModerneFremdsprache, nachweisFuer, type ByZweig } from './nachweise'
 import { examGrades } from './types'
 import type { Exam } from './types'
 
@@ -626,9 +627,16 @@ export const WORTZAHL_GRUND =
  *
  * `schoolTypeId` ist optional (Standard Gymnasium), damit ältere Aufrufer weiter passen.
  */
-export function examWarnings(stateId: string, subjectId: string, grade: number, formatIds: string[], schoolTypeId = 'gymnasium'): string[] {
+export function examWarnings(
+  stateId: string,
+  subjectId: string,
+  grade: number,
+  formatIds: string[],
+  schoolTypeId = 'gymnasium',
+  ausbildungsrichtung?: ByZweig
+): string[] {
   const out: string[] = []
-  const nachweis = nachweisFuer({ stateId, schoolTypeId, subjectId, grade })
+  const nachweis = nachweisFuer({ stateId, schoolTypeId, subjectId, grade, ausbildungsrichtung })
   if (nachweis.keineKlassenarbeit && nachweis.hinweis) out.push(nachweis.hinweis)
 
   const arten = formatIds.map((f) => formatArt(f))
@@ -643,6 +651,14 @@ export function examWarnings(stateId: string, subjectId: string, grade: number, 
   if (stateId === 'NI' && fremdsprache && (arten.includes('grammar') || arten.includes('language'))) {
     out.push(
       'In Niedersachsen wird das Verfügen über sprachliche Mittel nicht isoliert bewertet. Die Grammatik wird deshalb eingebettet in eine andere Teilkompetenz geprüft.'
+    )
+  }
+  // RP (Lehrplan Französisch 2022, Spanisch 2012), SL (Englisch/Französisch 2023/24), TH (neue Lehrpläne 2026):
+  // Sprachmittel nicht isoliert – solche Teile bietet die App dort nicht mehr an (formatsFor); ältere Arbeiten warnen
+  if (ohneIsolierteSprachmittel(stateId) && stateId !== 'NI' && fremdsprache && (arten.includes('grammar') || arten.includes('language'))) {
+    const land = stateId === 'RP' ? 'In Rheinland-Pfalz' : stateId === 'SL' ? 'Im Saarland' : 'In Thüringen'
+    out.push(
+      `${land} werden sprachliche Mittel nicht isoliert, sondern anwendungsbezogen in einer Teilkompetenz geprüft. Ein eigener Grammatik- oder Sprachmittelteil entspricht nicht den Lehrplänen.`
     )
   }
   // NI, KC Französisch 2025 S. 40: höchstens zwei Teilkompetenzen, Sprachmittlung ab Jg. 9
