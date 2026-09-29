@@ -69,6 +69,7 @@ import WartungCard from './WartungCard'
 import SicherungenCard from './SicherungenCard'
 import VerbrauchCard from './VerbrauchCard'
 import { imNetz } from '../shared/netzZugang'
+import { amPc, aufIos } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
@@ -96,7 +97,7 @@ export default function SettingsPage(): React.JSX.Element {
   const gewuenscht = useNavigation((s) => s.settingsTab)
   const setTab = useNavigation((s) => s.setSettingsTab)
   // KI-Zugang, Netzwerk und Wartung gibt es nur am Rechner – vom Tablet aus gilt dann der erste Reiter
-  const tab = imNetz() && ['ki', 'netzwerk', 'wartung'].includes(gewuenscht) ? 'schule' : gewuenscht
+  const tab = (imNetz() && ['ki', 'netzwerk', 'wartung'].includes(gewuenscht)) || (aufIos() && gewuenscht === 'netzwerk') ? 'schule' : gewuenscht
 
   return (
     <Tabs
@@ -137,7 +138,8 @@ export default function SettingsPage(): React.JSX.Element {
           <Tabs.Tab value="dienste" leftSection={<IconPhoto size={16} />}>
             Bilder und Hörtexte
           </Tabs.Tab>
-          {!imNetz() && (
+          {/* Den Zugang aus dem Netz gibt es nur am PC – nicht im Browser und nicht in der iPad-App */}
+          {amPc() && (
             <Tabs.Tab value="netzwerk" leftSection={<IconDeviceTablet size={16} />}>
               Netzwerk
             </Tabs.Tab>
@@ -289,7 +291,7 @@ export default function SettingsPage(): React.JSX.Element {
             </Stack>
           </Tabs.Panel>
 
-          {!imNetz() && (
+          {amPc() && (
             <Tabs.Panel value="netzwerk">
               <NetzwerkCard settings={settings} update={update} />
             </Tabs.Panel>
@@ -487,6 +489,9 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
   const { ai } = settings
   const textInfo = AI_PROVIDERS.find((p) => p.id === ai.textProvider)!
   const [reloadKey, setReloadKey] = useState(0)
+  // Den Abo-Zugang gibt es auf dem iPad nicht (kein Programm des Anbieters) – dort immer API-Schlüssel
+  const ios = aufIos()
+  const zugang: AiAccess = ios ? 'api' : ai.access[ai.textProvider]
 
   return (
     <Card withBorder padding="lg">
@@ -494,9 +499,10 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
         Künstliche Intelligenz
       </Title>
       <Text size="sm" c="dimmed" mb="md">
-        Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang entweder über einen API-Schlüssel (schnell, nutzungsabhängig bezahlt; Schlüssel
-        werden verschlüsselt auf diesem PC gespeichert) oder über ein privates Abo mithilfe des offiziellen Programms des Anbieters (langsamer, mit
-        Nutzungsgrenzen des Abos). Die KI für Bilder steht im Reiter{' '}
+        {ios
+          ? 'Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang über einen API-Schlüssel (nutzungsabhängig bezahlt); er liegt verschlüsselt im Schlüsselbund dieses Geräts. Den Abo-Zugang gibt es nur in der App am PC.'
+          : 'Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang entweder über einen API-Schlüssel (schnell, nutzungsabhängig bezahlt; Schlüssel werden verschlüsselt auf diesem PC gespeichert) oder über ein privates Abo mithilfe des offiziellen Programms des Anbieters (langsamer, mit Nutzungsgrenzen des Abos).'}{' '}
+        Die KI für Bilder steht im Reiter{' '}
         <Anchor component="button" size="sm" onClick={() => openSettings('dienste')}>
           Bilder und Hörtexte
         </Anchor>
@@ -511,18 +517,20 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
           onChange={(v) => v && update({ ai: { textProvider: v as AiProviderId } })}
           allowDeselect={false}
         />
-        <SegmentedControl
-          value={ai.access[ai.textProvider]}
-          onChange={(v) => update({ ai: { access: { [ai.textProvider]: v as AiAccess } } })}
-          data={[
-            { value: 'api', label: 'API-Schlüssel' },
-            {
-              value: 'subscription',
-              label: `Abo (${SUBSCRIPTIONS[ai.textProvider].plan})`
-            }
-          ]}
-        />
-        {ai.access[ai.textProvider] === 'subscription' ? (
+        {!ios && (
+          <SegmentedControl
+            value={ai.access[ai.textProvider]}
+            onChange={(v) => update({ ai: { access: { [ai.textProvider]: v as AiAccess } } })}
+            data={[
+              { value: 'api', label: 'API-Schlüssel' },
+              {
+                value: 'subscription',
+                label: `Abo (${SUBSCRIPTIONS[ai.textProvider].plan})`
+              }
+            ]}
+          />
+        )}
+        {zugang === 'subscription' ? (
           <SubscriptionSetup key={`sub-${ai.textProvider}`} provider={ai.textProvider} settings={settings} update={update} />
         ) : (
           <>
@@ -587,7 +595,10 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
 export function ImageAiCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
   const { ai } = settings
   const imageProvider = ai.imageProvider === 'none' ? null : ai.imageProvider
-  const imageAccess = imageProvider ? ai.imageAccess[imageProvider] : 'api'
+  // iPad: nur API-Schlüssel (siehe AiCard)
+  const ios = aufIos()
+  const imageAccess = imageProvider && !ios ? ai.imageAccess[imageProvider] : 'api'
+  const textZugang: AiAccess = ios ? 'api' : ai.access[ai.textProvider]
   const [reloadKey, setReloadKey] = useState(0)
 
   return (
@@ -617,23 +628,25 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
         />
         {imageProvider && (
           <>
-            <SegmentedControl
-              value={imageAccess}
-              onChange={(v) =>
-                update({
-                  ai: { imageAccess: { [imageProvider]: v as AiAccess } }
-                })
-              }
-              data={[
-                { value: 'api', label: 'API-Schlüssel' },
-                {
-                  value: 'subscription',
-                  label: `Abo (${SUBSCRIPTIONS[imageProvider].plan})`
+            {!ios && (
+              <SegmentedControl
+                value={imageAccess}
+                onChange={(v) =>
+                  update({
+                    ai: { imageAccess: { [imageProvider]: v as AiAccess } }
+                  })
                 }
-              ]}
-            />
+                data={[
+                  { value: 'api', label: 'API-Schlüssel' },
+                  {
+                    value: 'subscription',
+                    label: `Abo (${SUBSCRIPTIONS[imageProvider].plan})`
+                  }
+                ]}
+              />
+            )}
             {imageAccess === 'subscription' ? (
-              ai.access[ai.textProvider] === 'subscription' && ai.textProvider === imageProvider ? (
+              textZugang === 'subscription' && ai.textProvider === imageProvider ? (
                 <ImageTestRow
                   provider={imageProvider}
                   note={`Nutzt den im Reiter „KI-Zugang“ eingerichteten Abo-Zugang. ${SUBSCRIPTIONS[imageProvider].imageNote}`}
@@ -643,7 +656,7 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
               )
             ) : (
               <>
-                {(imageProvider !== ai.textProvider || ai.access[ai.textProvider] === 'subscription') && (
+                {(imageProvider !== ai.textProvider || textZugang === 'subscription') && (
                   <SecretField
                     key={`image-${imageProvider}`}
                     name={imageProvider}

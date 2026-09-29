@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react'
 import type { TtsVoice } from '@shared/types'
 import { notifyError, notifySuccess } from '../../../shared/util'
 import { imNetz } from '../../../shared/netzZugang'
+import { aufIos } from '../../../shared/plattform'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { estimateSeconds } from '../generation/convert'
 import { subjectById } from '../model/subjects'
@@ -605,7 +606,8 @@ export function AudioPanel({
                       leftSection={<IconExternalLink size={14} />}
                       onClick={() => block.audio?.fileName && void window.api.audio.showInFolder(block.audio.fileName).catch(notifyError)}
                     >
-                      Im Ordner zeigen
+                      {/* iPad: kein Explorer – die Datei geht ins Teilen-Menü */}
+                      {aufIos() ? 'Teilen' : 'Im Ordner zeigen'}
                     </Button>
                   )}
                 </Group>

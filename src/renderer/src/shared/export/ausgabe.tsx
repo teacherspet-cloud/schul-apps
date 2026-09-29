@@ -1,8 +1,9 @@
 import { Button, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { IconFolderOpen } from '@tabler/icons-react'
+import { IconFolderOpen, IconShare } from '@tabler/icons-react'
 import type { FileFilter } from '@shared/types'
 import { imNetz } from '../netzZugang'
+import { aufIos } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 
 /**
@@ -17,6 +18,8 @@ import { notifyError, notifySuccess } from '../util'
  *    Hinweis mit „Ordner öffnen".
  *  - Im Browser (Tablet, Netzzugang) gibt es keinen Ordner des Rechners – dort wird wie bisher
  *    jede Datei heruntergeladen (netzZugang.ts).
+ *  - In der iPad-App (29.09.2026) landet alles in einem neuen Ordner unter Dokumente/Ausgaben
+ *    (Dateien-App); danach öffnet sich das Teilen-Menü mit allen Dateien (mobil/umgebung.ts).
  */
 
 type PdfZusatz = {
@@ -69,6 +72,9 @@ export async function speichereAusgabe(dateien: AusgabeDatei[], meldung: string)
   if (!ordner) return 0
   const pfade: string[] = []
   for (const d of dateien) pfade.push(await inOrdner(ordner, d))
+  const ios = aufIos()
+  // iPad: gleich alle Dateien zum Teilen anbieten (AirDrop, Mail, „In Dateien sichern" …)
+  if (ios) void window.api.files.openFolder(ordner).catch((e: unknown) => notifyError(e, 'Die Dateien ließen sich nicht teilen'))
   // Hat eine Datei einen anderen Namen bekommen, weil es den gewünschten schon gab? Dann sagen, warum.
   const umbenannt = pfade.filter((p, i) => dateiname(p) !== dateien[i].name.replace(/[\\/]/g, ''))
   notifications.show({
@@ -83,10 +89,14 @@ export async function speichereAusgabe(dateien: AusgabeDatei[], meldung: string)
         <Button
           size="compact-xs"
           variant="light"
-          leftSection={<IconFolderOpen size={14} />}
-          onClick={() => void window.api.files.openFolder(ordner).catch((e: unknown) => notifyError(e, 'Der Ordner ließ sich nicht öffnen'))}
+          leftSection={ios ? <IconShare size={14} /> : <IconFolderOpen size={14} />}
+          onClick={() =>
+            void window.api.files
+              .openFolder(ordner)
+              .catch((e: unknown) => notifyError(e, ios ? 'Die Dateien ließen sich nicht teilen' : 'Der Ordner ließ sich nicht öffnen'))
+          }
         >
-          Ordner öffnen
+          {ios ? 'Teilen' : 'Ordner öffnen'}
         </Button>
       </Stack>
     )

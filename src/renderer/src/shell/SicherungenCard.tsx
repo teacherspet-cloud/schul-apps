@@ -2,6 +2,7 @@ import { Button, Card, Group, NumberInput, Stack, Switch, Table, Text, Title } f
 import { IconDeviceFloppy, IconFileText, IconFolder, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
+import { aufIos } from '../shared/plattform'
 import { notifyError, notifySuccess } from '../shared/util'
 import SicherungEinlesen from './SicherungEinlesen'
 
@@ -76,21 +77,29 @@ export default function SicherungenCard(): React.JSX.Element {
             Jetzt sichern
           </Button>
         </Group>
-        <Group gap="xs">
-          <Button variant="default" size="xs" leftSection={<IconFolder size={14} />} onClick={() => void ordnerWaehlen()}>
-            {sicherung?.ordner ? 'Anderen Ordner wählen …' : 'Zusätzlich in einen Ordner sichern …'}
-          </Button>
-          {sicherung?.ordner && (
-            <>
-              <Text size="xs" c="dimmed">
-                Kopie nach: {sicherung.ordner}
-              </Text>
-              <Button variant="subtle" size="xs" color="gray" onClick={() => void update({ sicherung: { ...sicherung, ordner: '' } })}>
-                keine Kopie
-              </Button>
-            </>
-          )}
-        </Group>
+        {/* iPad: Die Sicherungen liegen schon sichtbar in der Dateien-App – ein zweiter Ordner entfällt */}
+        {aufIos() ? (
+          <Text size="xs" c="dimmed">
+            Die Sicherungen liegen in der Dateien-App unter „Auf meinem iPad › Schul-Apps › Sicherungen“ und lassen sich von dort in die iCloud oder auf den PC
+            kopieren.
+          </Text>
+        ) : (
+          <Group gap="xs">
+            <Button variant="default" size="xs" leftSection={<IconFolder size={14} />} onClick={() => void ordnerWaehlen()}>
+              {sicherung?.ordner ? 'Anderen Ordner wählen …' : 'Zusätzlich in einen Ordner sichern …'}
+            </Button>
+            {sicherung?.ordner && (
+              <>
+                <Text size="xs" c="dimmed">
+                  Kopie nach: {sicherung.ordner}
+                </Text>
+                <Button variant="subtle" size="xs" color="gray" onClick={() => void update({ sicherung: { ...sicherung, ordner: '' } })}>
+                  keine Kopie
+                </Button>
+              </>
+            )}
+          </Group>
+        )}
         {liste.length > 0 ? (
           <Table striped withTableBorder fz="sm">
             <Table.Thead>

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { PrinterInfo } from '../../../../preload/index'
 import { parsePageRanges } from '../printRanges'
 import { druckeImBrowser, imNetz } from '../netzZugang'
+import { aufIos } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -74,6 +75,8 @@ export default function PrintPreview({
   const [duplex, setDuplex] = useState<'simplex' | 'longEdge' | 'shortEdge'>('simplex')
   const [color, setColor] = useState<'color' | 'bw'>('bw')
   const [printing, setPrinting] = useState(false)
+  // iPad: Drucker, Exemplare, Seiten, Duplex und Farbe wählt AirPrint selbst
+  const ios = aufIos()
 
   useEffect(() => {
     if (!html) return
@@ -151,8 +154,24 @@ export default function PrintPreview({
     }
   }
 
+  /** iPad: je Dokument der Druckdialog von AirPrint (main/kanaele.ts → mobil/export/druckmaschine.ts) */
+  const druckeAufIos = async (): Promise<void> => {
+    if (!html) return
+    setPrinting(true)
+    try {
+      await window.api.exporter.print(html)
+      if (loesung && mitLoesung) await window.api.exporter.print(loesung.html)
+      onClose()
+    } catch (e) {
+      notifyError(e, 'Drucken fehlgeschlagen')
+    } finally {
+      setPrinting(false)
+    }
+  }
+
   const print = async (): Promise<void> => {
     if (imNetz()) return druckeImNetz()
+    if (ios) return druckeAufIos()
     if (!html || !printer) return
     setPrinting(true)
     try {
@@ -213,7 +232,7 @@ export default function PrintPreview({
                       width: 'min(560px, 100%)',
                       background: '#fff',
                       boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
-                      filter: color === 'bw' ? 'grayscale(1)' : undefined,
+                      filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
                       opacity: selected.has(i + 1) ? 1 : 0.35
                     }}
                   />
@@ -239,7 +258,7 @@ export default function PrintPreview({
                         width: 'min(560px, 100%)',
                         background: '#fff',
                         boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
-                        filter: color === 'bw' ? 'grayscale(1)' : undefined,
+                        filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
                         opacity: loesungExemplare > 0 ? 1 : 0.35
                       }}
                     />
@@ -263,19 +282,26 @@ export default function PrintPreview({
         <Stack className="pv-seite" gap="sm">
           <ScrollArea className="pv-felder" type="auto" offsetScrollbars>
             <Stack gap="sm">
-              <Select
-                label="Drucker"
-                data={printers.map((p) => ({ value: p.name, label: p.displayName }))}
-                value={printer}
-                onChange={setPrinter}
-                placeholder={printers.length ? 'Drucker wählen' : 'Kein Drucker gefunden'}
-                allowDeselect={false}
-                searchable
-              />
-              <NumberInput label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />
+              {ios && (
+                <Text size="sm" c="dimmed" data-airprint-hinweis>
+                  Drucker, Exemplare, Seiten, Doppelseitig und Farbe stehen im Druckdialog von AirPrint.
+                </Text>
+              )}
+              {!ios && (
+                <Select
+                  label="Drucker"
+                  data={printers.map((p) => ({ value: p.name, label: p.displayName }))}
+                  value={printer}
+                  onChange={setPrinter}
+                  placeholder={printers.length ? 'Drucker wählen' : 'Kein Drucker gefunden'}
+                  allowDeselect={false}
+                  searchable
+                />
+              )}
+              {!ios && <NumberInput label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />}
               {loesung && (
                 <NumberInput
-                  label={`Exemplare ${loesung.titel}`}
+                  label={ios ? `${loesung.titel} drucken (1 = ja, 0 = nein)` : `Exemplare ${loesung.titel}`}
                   description="0 = nicht drucken"
                   min={0}
                   max={999}
@@ -283,60 +309,64 @@ export default function PrintPreview({
                   onChange={(v) => setLoesungExemplare(Math.max(0, Number(v) || 0))}
                 />
               )}
-              <div>
-                <Text size="sm" fw={500} mb={4}>
-                  Seiten
-                </Text>
-                <SegmentedControl
-                  fullWidth
-                  value={rangeMode}
-                  onChange={(v) => setRangeMode(v as 'all' | 'range')}
-                  data={[
-                    { value: 'all', label: 'Alle' },
-                    { value: 'range', label: 'Auswahl' }
-                  ]}
-                />
-                {rangeMode === 'range' && (
-                  <TextInput
-                    mt={6}
-                    placeholder="z. B. 1-2, 4"
-                    value={range}
-                    onChange={(e) => setRange(e.currentTarget.value)}
-                    error={invalidRange && range.trim() ? `Seiten 1 bis ${pageCount}, z. B. 1-2, 4` : undefined}
-                  />
-                )}
-              </div>
-              <div>
-                <Text size="sm" fw={500} mb={4}>
-                  Doppelseitig
-                </Text>
-                <SegmentedControl
-                  fullWidth
-                  orientation="vertical"
-                  value={duplex}
-                  onChange={(v) => setDuplex(v as typeof duplex)}
-                  data={[
-                    { value: 'simplex', label: 'Einseitig' },
-                    { value: 'longEdge', label: 'Beidseitig (lange Kante)' },
-                    { value: 'shortEdge', label: 'Beidseitig (kurze Kante)' }
-                  ]}
-                />
-              </div>
-              <div>
-                <Text size="sm" fw={500} mb={4}>
-                  Farbe
-                </Text>
-                <SegmentedControl
-                  fullWidth
-                  value={color}
-                  onChange={(v) => setColor(v as 'color' | 'bw')}
-                  data={[
-                    { value: 'bw', label: 'Schwarzweiß' },
-                    { value: 'color', label: 'Farbe' }
-                  ]}
-                />
-              </div>
-              {pages && (
+              {!ios && (
+                <>
+                  <div>
+                    <Text size="sm" fw={500} mb={4}>
+                      Seiten
+                    </Text>
+                    <SegmentedControl
+                      fullWidth
+                      value={rangeMode}
+                      onChange={(v) => setRangeMode(v as 'all' | 'range')}
+                      data={[
+                        { value: 'all', label: 'Alle' },
+                        { value: 'range', label: 'Auswahl' }
+                      ]}
+                    />
+                    {rangeMode === 'range' && (
+                      <TextInput
+                        mt={6}
+                        placeholder="z. B. 1-2, 4"
+                        value={range}
+                        onChange={(e) => setRange(e.currentTarget.value)}
+                        error={invalidRange && range.trim() ? `Seiten 1 bis ${pageCount}, z. B. 1-2, 4` : undefined}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" fw={500} mb={4}>
+                      Doppelseitig
+                    </Text>
+                    <SegmentedControl
+                      fullWidth
+                      orientation="vertical"
+                      value={duplex}
+                      onChange={(v) => setDuplex(v as typeof duplex)}
+                      data={[
+                        { value: 'simplex', label: 'Einseitig' },
+                        { value: 'longEdge', label: 'Beidseitig (lange Kante)' },
+                        { value: 'shortEdge', label: 'Beidseitig (kurze Kante)' }
+                      ]}
+                    />
+                  </div>
+                  <div>
+                    <Text size="sm" fw={500} mb={4}>
+                      Farbe
+                    </Text>
+                    <SegmentedControl
+                      fullWidth
+                      value={color}
+                      onChange={(v) => setColor(v as 'color' | 'bw')}
+                      data={[
+                        { value: 'bw', label: 'Schwarzweiß' },
+                        { value: 'color', label: 'Farbe' }
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
+              {pages && !ios && (
                 <Text size="xs" c="dimmed">
                   {selected.size} {selected.size === 1 ? 'Seite' : 'Seiten'} × {copies} = {sheets * copies} {sheets * copies === 1 ? 'Blatt' : 'Blätter'}
                   {mitLoesung && loesungPages && `, dazu ${loesungBlaetter * loesungExemplare} für ${loesung!.titel}`}
@@ -351,7 +381,7 @@ export default function PrintPreview({
               leftSection={<IconPrinter size={16} />}
               onClick={() => void print()}
               loading={printing}
-              disabled={!pages || (!printer && !imNetz()) || invalidRange || (Boolean(loesung) && !loesungPages)}
+              disabled={!pages || (!printer && !imNetz() && !ios) || invalidRange || (Boolean(loesung) && !loesungPages)}
             >
               Drucken
             </Button>
@@ -360,7 +390,7 @@ export default function PrintPreview({
             </Button>
           </div>
           {/* Im Browser gäbe es nur den Dialog des entfernten Rechners – dort druckt „Drucken" über den Tab */}
-          {!imNetz() && (
+          {!imNetz() && !ios && (
             <Button className="pv-systemdialog" variant="subtle" size="xs" onClick={() => void systemDialog()} disabled={!html}>
               Druckdialog von Windows öffnen
             </Button>
