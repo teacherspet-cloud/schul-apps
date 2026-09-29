@@ -27,7 +27,17 @@ writeFileSync(
         schritte: ['Ergänze zu jedem Argument ein Beispiel aus deinem Alltag.'],
         kriterien: [{ kriterium: 'Anliegen', einschaetzung: 'sicher', beleg: 'Ich finde, das Handyverbot ist falsch.' }],
         schluss: 'Weiter so – mit Beispielen wird dein Brief überzeugender.'
-      }
+      },
+      // Eigene Aufgabe aus einer Datei (29.09.2026)
+      rueckmeldung_aufgabe: {
+        titel: 'Erörterung Schuluniform',
+        aufgaben: '1. Erörtere, ob an eurer Schule eine Schuluniform eingeführt werden sollte.\nMaterial: Zeitungsartikel „Einheitlich gekleidet?“ (Auszug)',
+        erwartung: '',
+        fach: 'deutsch',
+        jahrgang: 9,
+        erkennbar: ['Kopfzeile: Deutsch 9a']
+      },
+      rueckmeldung_erwartung: { erwartung: '- Einleitung mit Hinführung\n- Pro- und Kontra-Argumente mit Beispielen\n- eigenes Urteil' }
     }
   })
 )
@@ -104,6 +114,62 @@ try {
   pruefe(grundlage?.art === 'vokabeltest', 'Aus dem Vokabeltest entsteht eine Rückmeldung mit ihm als Grundlage')
   pruefe(Boolean(grundlage?.aufgaben?.includes('Write a sentence with each word.')), 'Die Aufgaben des Vokabeltests stehen in der Grundlage')
   await page.screenshot({ path: join(out, 'vokabeltest-grundlage.png') })
+
+  // ---------- Material über das Auswahlfenster (wie Themenbereiche)
+  await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+  await page.waitForTimeout(800)
+  await sichtbar(page.locator('[data-rm-material]')).click()
+  const fenster = page.locator('.mantine-Modal-content', { hasText: 'Material wählen' })
+  await fenster.waitFor({ timeout: 10000 })
+  const eintrag = fenster.locator('[data-material-wahl^="vokabeltest:"]').first()
+  await eintrag.waitFor({ timeout: 10000 })
+  pruefe((await eintrag.count()) === 1, 'Auswahlfenster zeigt das Material nach Fach gegliedert')
+  await page.screenshot({ path: join(out, 'material-wahl.png') })
+  await eintrag.click()
+  const gewaehlt = await (async () => {
+    const e = Date.now() + 10000
+    while (Date.now() < e) {
+      const g = await page.evaluate(() => window.__selftest.rmJetzt()?.grundlage ?? null)
+      if (g?.art === 'vokabeltest') return g
+      await page.waitForTimeout(300)
+    }
+    return null
+  })()
+  pruefe(gewaehlt?.art === 'vokabeltest', 'Ein Klick im Fenster übernimmt das Material als Grundlage')
+
+  // ---------- Eigene Aufgabe: Datei in die Aufgabenstellung ziehen
+  await page.evaluate(() => window.api.settings.set({ datenschutz: { hinweisBestaetigt: new Date().toISOString(), namenErsetzen: true } }))
+  await sichtbar(page.getByRole('button', { name: 'Neue Rückmeldung' })).click()
+  await page.waitForTimeout(800)
+  await sichtbar(page.getByText('Eigene Aufgabe', { exact: true })).click()
+  const ablage = page.locator('.mantine-Dropzone-root', { hasText: 'Aufgabenblatt hierher ziehen' }).filter({ visible: true }).first()
+  await ablage.locator('input[type=file]').setInputFiles({
+    name: 'aufgabe.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Deutsch 9a – Klassenarbeit\n1. Erörtere, ob an eurer Schule eine Schuluniform eingeführt werden sollte.')
+  })
+  // Datenschutzhinweis vor dem Hochladen bestätigen
+  const hochladen = page.getByRole('button', { name: 'Hochladen', exact: true })
+  await hochladen.waitFor({ timeout: 10000 }).catch(() => undefined)
+  if (await hochladen.count()) await hochladen.click()
+  const ende3 = Date.now() + 20000
+  let rm = null
+  while (Date.now() < ende3) {
+    rm = await page.evaluate(() => window.__selftest.rmJetzt())
+    if (rm?.grundlage?.erwartung) break
+    await page.waitForTimeout(300)
+  }
+  pruefe(Boolean(rm?.grundlage?.aufgaben?.startsWith('1. Erörtere')), 'Die Aufgabe steht in der Aufgabenstellung')
+  pruefe(
+    Boolean(rm?.grundlage?.erwartung?.startsWith('[Entwurf der KI – bitte prüfen]')),
+    'Ohne Erwartungshorizont im Material: Entwurf der KI, gekennzeichnet'
+  )
+  pruefe(rm?.meta?.subjectId === 'deutsch' && rm?.meta?.grade === 9, 'Fach und Jahrgang aus dem Material übernommen')
+  pruefe((await page.locator('[data-rm-erkannt]').filter({ visible: true }).count()) === 1, 'Hinweis „aus dem Material erkannt“ steht bei der Lerngruppe')
+  const aufgabeAnfragen = anfragen().filter((z) => z.schemaName === 'rueckmeldung_aufgabe')
+  pruefe(aufgabeAnfragen.length === 1 && aufgabeAnfragen[0].user.includes('Schuluniform'), 'Die Datei ging an die KI')
+  pruefe((await page.getByText('Zu jeder Abgabe ein Bogen').count()) === 0, 'Der lange Einleitungstext ist weg')
+  await page.screenshot({ path: join(out, 'eigene-aufgabe.png') })
 } catch (e) {
   problems.push(`Abbruch: ${e.message}`)
   await page.screenshot({ path: join(out, 'fehler.png') }).catch(() => undefined)

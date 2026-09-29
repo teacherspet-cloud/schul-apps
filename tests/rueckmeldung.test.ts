@@ -151,3 +151,35 @@ describe('Namen verlassen den Rechner nicht (Praxislauf 28.09.2026)', () => {
     expect(anfrage.user).not.toMatch(/Lea|Schmidt/)
   })
 })
+
+describe('Eigene Aufgabe aus einer Datei (29.09.2026)', () => {
+  it('Anfrage verlangt Aufgabe wörtlich, nötiges Material, Erwartungshorizont nur aus dem Material; Bilder nur ohne Text', async () => {
+    const { aufgabeAnfrage } = await import('../src/renderer/src/modules/rueckmeldung/aufgabeAusMaterial')
+    const a = aufgabeAnfrage([
+      { fileName: 'blatt.docx', text: '<p>Deutsch 8b</p><p>1. Schreibe einen Leserbrief.</p>' },
+      { fileName: 'foto.jpg', text: '', pageImages: ['data:image/jpeg;base64,AAAA'] }
+    ])
+    expect(a.schemaName).toBe('rueckmeldung_aufgabe')
+    expect(a.user).toMatch(/wörtlich/)
+    expect(a.user).toContain('1. Schreibe einen Leserbrief.')
+    expect(a.user).not.toContain('<p>')
+    expect(a.images).toEqual(['data:image/jpeg;base64,AAAA'])
+  })
+
+  it('übernimmt nur gültige Fächer und Jahrgänge', async () => {
+    const { aufgabeAus } = await import('../src/renderer/src/modules/rueckmeldung/aufgabeAusMaterial')
+    expect(aufgabeAus({ titel: 'X', aufgaben: 'A', erwartung: '', fach: 'deutsch', jahrgang: 8, erkennbar: ['Kopfzeile'] })).toMatchObject({
+      fach: 'deutsch',
+      jahrgang: 8
+    })
+    expect(aufgabeAus({ aufgaben: 'A', fach: 'astrologie', jahrgang: 17 })).toMatchObject({ fach: '', jahrgang: 0 })
+    expect(() => aufgabeAus({ aufgaben: '' })).toThrow(/keine Aufgabenstellung/)
+  })
+
+  it('Entwurf des Erwartungshorizonts ohne Punkte und Noten', async () => {
+    const { erwartungsEntwurfAnfrage } = await import('../src/renderer/src/modules/rueckmeldung/aufgabeAusMaterial')
+    const a = erwartungsEntwurfAnfrage('Schreibe einen Leserbrief.', 'Deutsch', 8)
+    expect(a.user).toMatch(/KEINE Punkte und KEINE Noten/)
+    expect(a.user).toContain('(Deutsch, Klasse 8)')
+  })
+})

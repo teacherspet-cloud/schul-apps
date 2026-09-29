@@ -17,8 +17,8 @@ import {
   Tooltip
 } from '@mantine/core'
 import { ANREDE_OPTIONEN, type Anrede } from '../render/texte'
-import { IconFileText, IconKeyboard, IconMessageCheck, IconPhoto, IconTrash } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { IconFileText, IconFolderOpen, IconKeyboard, IconMessageCheck, IconPhoto, IconTrash } from '@tabler/icons-react'
+import { useState } from 'react'
 import { pruefeHochladen, type HochladeInhalt } from '../../../shared/datenschutz'
 import DropZone from '../../../shared/components/DropZone'
 import Formularfuss from '../../../shared/components/Formularfuss'
@@ -27,8 +27,9 @@ import { extractContent, MATERIAL_ACCEPT } from '../../../shared/files/extractCo
 import { newId } from '../../vokabeltest/model/random'
 import { notifyError } from '../../../shared/util'
 import { SUBJECTS, subjectById } from '../../arbeitsblatt/model/subjects'
-import { rueckmeldungenErzeugen } from '../auftrag'
-import { ART_TITEL, ladeGrundlage, materialListe, type MaterialEintrag } from '../generation'
+import { aufgabeAusDateien, erwartungAusDateien, rueckmeldungenErzeugen } from '../auftrag'
+import { ART_TITEL, ladeGrundlage, type MaterialEintrag } from '../generation'
+import MaterialWahl from '../../../shared/components/MaterialWahl'
 import { naechstesKuerzel, type Abgabe } from '../model/types'
 import { useRueckmeldung } from '../store'
 
@@ -38,12 +39,11 @@ import { useRueckmeldung } from '../store'
  */
 export default function Einrichten(): React.JSX.Element | null {
   const { dok: r, update, docId } = useRueckmeldung()
-  const [material, setMaterial] = useState<MaterialEintrag[]>([])
   const [lese, setLese] = useState<string | null>(null)
+  const [leseAufgabe, setLeseAufgabe] = useState<string | null>(null)
+  const [leseErwartung, setLeseErwartung] = useState<string | null>(null)
+  const [wahlOffen, setWahlOffen] = useState(false)
   const [quelle, setQuelle] = useState<'material' | 'frei'>(r?.grundlage.art === 'frei' ? 'frei' : 'material')
-  useEffect(() => {
-    void materialListe().then(setMaterial)
-  }, [])
   if (!r) return null
 
   const waehleMaterial = async (wert: string | null): Promise<void> => {
@@ -61,6 +61,30 @@ export default function Einrichten(): React.JSX.Element | null {
       })
     } catch (e) {
       notifyError(e, 'Das Material konnte nicht geladen werden')
+    }
+  }
+
+  /** Aufgabenblatt bzw. Lösung lesen, Datenschutz prüfen, dann den Auftrag starten */
+  const materialLesen = async (files: File[], ziel: 'aufgabe' | 'erwartung'): Promise<void> => {
+    const melde = ziel === 'aufgabe' ? setLeseAufgabe : setLeseErwartung
+    try {
+      const gelesen: HochladeInhalt[] = []
+      for (const f of files) {
+        melde(`${f.name} wird gelesen …`)
+        const c = await extractContent(f, (m) => melde(`${f.name}: ${m}`), { renderPages: false, maxRenderedPages: 6 })
+        gelesen.push({ fileName: c.fileName, text: c.kind === 'image' ? '' : c.text, kind: c.kind, pageImages: c.pageImages })
+      }
+      melde(null)
+      const geprueft = await pruefeHochladen(gelesen)
+      if (!geprueft) return
+      const aktuell = useRueckmeldung.getState().dok
+      if (!aktuell) return
+      if (ziel === 'aufgabe') aufgabeAusDateien(aktuell, docId, geprueft)
+      else erwartungAusDateien(aktuell, docId, geprueft)
+    } catch (e) {
+      notifyError(e, 'Die Datei konnte nicht gelesen werden')
+    } finally {
+      melde(null)
     }
   }
 
@@ -105,11 +129,9 @@ export default function Einrichten(): React.JSX.Element | null {
     <Stack h="100%" gap={0}>
       <ScrollArea style={{ flex: 1 }}>
         <Container size="xl" py="lg">
-          <Title order={2}>Rückmeldung ohne Note</Title>
-          <Text c="dimmed" mb="md">
-            Zu jeder Abgabe ein Bogen: was schon gelingt, die nächsten Schritte, Kriterien mit Einschätzung in Worten. Namen bleiben auf diesem Rechner – die KI
-            sieht nur Kürzel (S1, S2 …).
-          </Text>
+          <Title order={2} mb="md">
+            Rückmeldung ohne Note
+          </Title>
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
             <Stack>
               <Card withBorder>
@@ -137,36 +159,50 @@ export default function Einrichten(): React.JSX.Element | null {
                     }}
                   />
                   {quelle === 'material' ? (
-                    <Select
-                      label="Material"
-                      placeholder={
-                        material.length
-                          ? 'Arbeitsblatt, Klassenarbeit, Lernzielkontrolle, Grammatiktest oder Vokabeltest wählen'
-                          : 'Noch kein Material gespeichert'
-                      }
-                      searchable
-                      data={Object.entries(ART_TITEL)
-                        .map(([art, titel]) => ({
-                          group: titel,
-                          items: material
-                            .filter((m) => m.art === art)
-                            .map((m) => ({ value: `${m.art}|${m.id}`, label: `${m.name}${m.fach ? ` (${m.fach})` : ''}` }))
-                        }))
-                        .filter((g) => g.items.length)}
-                      value={r.grundlage.docId ? `${r.grundlage.art}|${r.grundlage.docId}` : null}
-                      onChange={(v) => void waehleMaterial(v)}
-                      data-rm-material
-                    />
+                    <div>
+                      <Text size="sm" fw={500} mb={4}>
+                        Material
+                      </Text>
+                      <Button
+                        variant="default"
+                        fullWidth
+                        justify="space-between"
+                        rightSection={<IconFolderOpen size={16} />}
+                        onClick={() => setWahlOffen(true)}
+                        data-rm-material
+                      >
+                        {r.grundlage.docId && r.grundlage.art !== 'frei'
+                          ? `${r.grundlage.titel} · ${ART_TITEL[r.grundlage.art]}`
+                          : 'Arbeitsblatt, Klassenarbeit, Lernzielkontrolle, Grammatiktest oder Vokabeltest wählen …'}
+                      </Button>
+                      <MaterialWahl
+                        offen={wahlOffen}
+                        schliessen={() => setWahlOffen(false)}
+                        programme={Object.keys(ART_TITEL)}
+                        gewaehlt={r.grundlage.docId ? `${r.grundlage.art}:${r.grundlage.docId}` : null}
+                        onWahl={(programm, id) => void waehleMaterial(`${programm}|${id}`)}
+                      />
+                    </div>
                   ) : (
-                    <TextInput
-                      label="Titel der Aufgabe"
-                      placeholder="z. B. Leserbrief zum Handyverbot"
-                      value={r.grundlage.titel}
-                      onChange={(e) => {
-                        const x = e.currentTarget.value
-                        update((d) => (d.grundlage.titel = x), 'rm-titel')
-                      }}
-                    />
+                    <>
+                      <TextInput
+                        label="Titel der Aufgabe"
+                        placeholder="z. B. Leserbrief zum Handyverbot"
+                        value={r.grundlage.titel}
+                        onChange={(e) => {
+                          const x = e.currentTarget.value
+                          update((d) => (d.grundlage.titel = x), 'rm-titel')
+                        }}
+                      />
+                      <DropZone
+                        onFiles={(f) => void materialLesen(f, 'aufgabe')}
+                        accept={MATERIAL_ACCEPT}
+                        title={leseAufgabe ?? 'Aufgabenblatt hierher ziehen'}
+                        hint="Foto, Scan, PDF, Word oder Text – die KI übernimmt Aufgabe und nötiges Material, den Erwartungshorizont und erkennt Fach und Jahrgang."
+                        loading={Boolean(leseAufgabe)}
+                        minHeight={70}
+                      />
+                    </>
                   )}
                   <Textarea
                     label={quelle === 'material' ? 'Aufgaben (aus dem Material, anpassbar)' : 'Aufgabenstellung'}
@@ -180,6 +216,16 @@ export default function Einrichten(): React.JSX.Element | null {
                     }}
                     data-rm-aufgaben
                   />
+                  {quelle === 'frei' && (
+                    <DropZone
+                      onFiles={(f) => void materialLesen(f, 'erwartung')}
+                      accept={MATERIAL_ACCEPT}
+                      title={leseErwartung ?? 'Lösung oder Erwartungshorizont hierher ziehen (optional)'}
+                      hint="Wird übertragen und ersetzt den Text darunter"
+                      loading={Boolean(leseErwartung)}
+                      minHeight={50}
+                    />
+                  )}
                   <Textarea
                     label="Erwartungshorizont (optional)"
                     autosize
@@ -214,7 +260,7 @@ export default function Einrichten(): React.JSX.Element | null {
                     label="Fach"
                     data={SUBJECTS.map((s) => ({ value: s.id, label: s.label }))}
                     value={r.meta.subjectId}
-                    onChange={(v) => v && update((d) => ((d.meta.subjectId = v), (d.meta.subjectLabel = subjectById(v).label)))}
+                    onChange={(v) => v && update((d) => ((d.meta.subjectId = v), (d.meta.subjectLabel = subjectById(v).label), delete d.meta.erkannt))}
                     allowDeselect={false}
                     searchable
                   />
@@ -222,7 +268,7 @@ export default function Einrichten(): React.JSX.Element | null {
                     label="Jahrgang"
                     data={Array.from({ length: 13 }, (_, i) => ({ value: String(i + 1), label: `Klasse ${i + 1}` }))}
                     value={String(r.meta.grade)}
-                    onChange={(v) => v && update((d) => (d.meta.grade = Number(v)))}
+                    onChange={(v) => v && update((d) => ((d.meta.grade = Number(v)), delete d.meta.erkannt))}
                     allowDeselect={false}
                   />
                   <Select
@@ -233,6 +279,11 @@ export default function Einrichten(): React.JSX.Element | null {
                     allowDeselect={false}
                   />
                 </Group>
+                {r.meta.erkannt && (
+                  <Text size="xs" c="teal" mt={6} data-rm-erkannt>
+                    {r.meta.erkannt}
+                  </Text>
+                )}
               </Card>
             </Stack>
             <Card withBorder>

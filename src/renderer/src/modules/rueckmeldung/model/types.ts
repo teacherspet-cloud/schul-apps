@@ -78,6 +78,8 @@ export interface RueckmeldungMeta {
   anrede: 'du' | 'sie'
   /** Worauf die Lehrkraft achten will (Kriterien, Schwerpunkt) */
   schwerpunkt: string
+  /** Aus hineingezogenem Material erkannte Lerngruppe (29.09.2026) – Hinweis neben den Feldern */
+  erkannt?: string
   ki?: KiHerkunft
   kiVermerk?: KiVermerk
 }
