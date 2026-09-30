@@ -51,8 +51,8 @@ const LATE_FS2_STATES = ['NW', 'NRW']
 
 /**
  * Voreinstellung der Fremdsprachenfolge, solange die Lehrkraft nichts anderes wählt.
- * Englisch ist an fast allen Schulen die 1. Fremdsprache; Französisch und Latein sind
- * üblicherweise die zweite, Spanisch und Italienisch die zweite oder dritte.
+ * Englisch ist an fast allen Schulen die 1. Fremdsprache; Französisch, Latein und Russisch sind
+ * üblicherweise die zweite, Spanisch und Italienisch die zweite oder dritte, Griechisch die dritte.
  */
 export function defaultSequence(subjectId: string, grade: number): LanguageSequence {
   if (subjectId === 'englisch') return 'fs1'
@@ -60,6 +60,8 @@ export function defaultSequence(subjectId: string, grade: number): LanguageSeque
     if (grade >= 11) return 'spaet'
     return grade >= 8 ? 'fs3' : 'fs2'
   }
+  // Griechisch ist fast überall 3. Fremdsprache ab Klasse 8 (Bayern, Baden-Württemberg, NRW)
+  if (subjectId === 'griechisch') return grade >= 8 ? 'fs3' : 'fs2'
   return 'fs2'
 }
 
@@ -74,12 +76,13 @@ export function learningYear(grade: number, sequence: LanguageSequence, stateId 
 }
 
 /** Fächer, für die ein Grammatik-Schwerpunkt angeboten wird */
-export const GRAMMAR_SUBJECTS = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'latein', 'deutsch', 'daz']
+export const GRAMMAR_SUBJECTS = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch', 'latein', 'griechisch', 'deutsch', 'daz']
 
 export const hasGrammar = (subjectId: string): boolean => GRAMMAR_SUBJECTS.includes(subjectId)
 
 /** Fächer, bei denen die Fremdsprachenfolge über das Lernjahr entscheidet */
-export const needsSequence = (subjectId: string): boolean => ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'latein'].includes(subjectId)
+export const needsSequence = (subjectId: string): boolean =>
+  ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch', 'latein', 'griechisch'].includes(subjectId)
 
 /** Übungsformate, die die Recherche je Thema empfiehlt. */
 export const GRAMMAR_FORMATS: { id: string; label: string; open: boolean }[] = [

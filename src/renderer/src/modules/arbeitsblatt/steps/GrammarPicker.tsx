@@ -179,6 +179,12 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
       {picked.map((t) => (
         <Alert key={t.id} color="gray" p="xs" title={t.label}>
           <Stack gap={2}>
+            {t.description && <Text size="xs">{t.description}</Text>}
+            {t.examples && t.examples.length > 0 && (
+              <Text size="xs">
+                <b>Beispiele:</b> {t.examples.join(' · ')}
+              </Text>
+            )}
             {t.errors && (
               <Text size="xs">
                 <b>Typische Fehler:</b> {t.errors}
@@ -187,6 +193,11 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
             {t.formats.length > 0 && (
               <Text size="xs">
                 <b>Passende Übungsformate:</b> {t.formats.map(grammarFormatLabel).join(' · ')}
+              </Text>
+            )}
+            {t.source && (
+              <Text size="xs" c="dimmed">
+                Einordnung: {t.source}
               </Text>
             )}
             {t.contested && (

@@ -36,6 +36,10 @@ export function testPrompt(test: GrammarTest): string {
   return [
     `Du entwirfst einen GRAMMATIKTEST für ${target}, Klasse ${m.grade}${german ? '' : `, ${year}. Lernjahr`}, Niveau ${m.cefrLevel}.`,
     `Geprüfte Form${topics.length === 1 ? '' : 'en'}: ${topics.map((t) => `${t.label}${t.term && t.term !== t.label ? ` (${t.term})` : ''}`).join(', ')}.`,
+    // Ergänzte Themen (30.09.2026) bringen Beschreibung und Beispiele mit – sie grenzen die Form ab
+    ...topics
+      .filter((t) => t.description || t.examples?.length)
+      .map((t) => `- ${t.label}: ${[t.description, t.examples?.length ? `Beispiele: ${t.examples.join(' | ')}` : ''].filter(Boolean).join(' ')}`),
     `Umfang: ${m.minutes} Minuten, insgesamt ${m.points} Punkte.`,
     '',
     'ART DER AUFGABEN:',

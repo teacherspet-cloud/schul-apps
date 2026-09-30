@@ -3,7 +3,7 @@
  *
  * NICHT von Hand bearbeiten: Die Datei entsteht aus `scratchpad/grammar_gen.py` und den beiden
  * Rechercheberichten. Wer etwas ändern will, ändert die Recherche oder trägt eine Ausnahme in
- * `grammar.ts` nach.
+ * `grammar.ts` nach. Neue Themen kommen von Hand in `grammarTopicsErgaenzung.ts` (seit 30.09.2026).
  *
  * Quellen der Zuordnung: LehrplanPLUS Bayern (Struktur erscheint dort nur im Jahr der
  * Ersteinführung), Bildungsplan 2016 Baden-Württemberg, Kernlehrpläne Nordrhein-Westfalen,
@@ -20,6 +20,8 @@
  * - **Wo Quellen sich widersprechen, steht das da** (`contested`): Die Spannen reichen bis zu
  *   vier Lernjahren, etwa beim Bedingungssatz Typ III (Bayern Lernjahr 3, Baden-Württemberg 5–6).
  */
+
+import { ERGAENZTE_GRAMMATIKTHEMEN } from './grammarTopicsErgaenzung'
 
 export type GrammarScale = 'lernjahr' | 'jahrgang' | 'erwerbsstufe'
 
@@ -52,9 +54,15 @@ export interface GrammarTopic {
   formats: string[]
   /** Formatempfehlung im Wortlaut der Recherche */
   formatsText: string
+  /** Kurzbeschreibung der Form (ergänzte Themen, siehe grammarTopicsErgaenzung.ts) */
+  description?: string
+  /** Beispiele in der Zielsprache */
+  examples?: string[]
+  /** Beleg der Einordnung, knapp (Lehrplan, Lehrwerk oder „Faustregel") */
+  source?: string
 }
 
-export const GRAMMAR_TOPICS: GrammarTopic[] = [
+const ERZEUGTE_THEMEN: GrammarTopic[] = [
   {
     id: 'daz.chunks',
     subject: 'daz',
@@ -4501,3 +4509,10 @@ export const GRAMMAR_TOPICS: GrammarTopic[] = [
     formatsText: 'Zukunftspläne, Entscheidungsaufgabe'
   }
 ]
+
+/**
+ * Alle Themen: die erzeugte Tabelle und die von Hand ergänzten Themen vom 30.09.2026
+ * (grammarTopicsErgaenzung.ts – u. a. emphatic forms, causative have, Italienisch, Russisch,
+ * Griechisch; Quellen in recherche/grammatik-themen-2026-09-30.md).
+ */
+export const GRAMMAR_TOPICS: GrammarTopic[] = [...ERZEUGTE_THEMEN, ...ERGAENZTE_GRAMMATIKTHEMEN]

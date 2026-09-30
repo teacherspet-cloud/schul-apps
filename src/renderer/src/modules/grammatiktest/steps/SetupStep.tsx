@@ -45,6 +45,9 @@ function mitNiveau(table: CefrTable, m: GrammarTestMeta): GrammarTestMeta {
   return s ? { ...m, cefrLevel: s.level } : m
 }
 
+/** Übliche Stellung in der Fremdsprachenfolge beim Fachwechsel: Englisch 1., Griechisch 3., sonst 2. Fremdsprache */
+const folgeFuer = (fach: string): number => (fach === 'englisch' ? 1 : fach === 'griechisch' ? 3 : 2)
+
 /** Fächer, für die es eine Grammatikliste gibt. */
 const TEST_SUBJECTS = SUBJECTS.filter((s) => hasGrammar(s.id))
 
@@ -75,7 +78,7 @@ export default function SetupStep(): React.JSX.Element {
           const neu = newTest(ds.find((d) => d.isDefault) ?? ds[0], stateId, schoolTypeId, name)
           // „Neu in diesem Bereich" gibt das Fach des Themenbereichs vor – sofern es Grammatiktests hat
           const vorgabe = TEST_SUBJECTS.find((s) => s.id === nimmFachVorgabe('grammatiktest'))
-          if (vorgabe) neu.meta = { ...neu.meta, subjectId: vorgabe.id, subjectLabel: vorgabe.label, languageOrder: vorgabe.id === 'englisch' ? 1 : 2 }
+          if (vorgabe) neu.meta = { ...neu.meta, subjectId: vorgabe.id, subjectLabel: vorgabe.label, languageOrder: folgeFuer(vorgabe.id) }
           // Auch der neue Test startet mit dem Niveau, das zu Jahrgang und Fremdsprachenfolge passt
           neu.meta = mitNiveau(cefr, neu.meta)
           setTest(neu)
@@ -171,7 +174,7 @@ export default function SetupStep(): React.JSX.Element {
                           if (!v) return
                           const s = subjectById(v)
                           // Fachwechsel: Die Themen des alten Fachs gelten nicht weiter
-                          patchGruppe({ subjectId: v, subjectLabel: s.label, topics: [], formats: [], languageOrder: v === 'englisch' ? 1 : 2 })
+                          patchGruppe({ subjectId: v, subjectLabel: s.label, topics: [], formats: [], languageOrder: folgeFuer(v) })
                         }}
                         allowDeselect={false}
                       />

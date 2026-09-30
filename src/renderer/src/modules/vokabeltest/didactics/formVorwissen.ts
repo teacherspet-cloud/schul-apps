@@ -14,7 +14,8 @@
  * - Einführung in einem späteren Lernjahr → noch nicht.
  * Ist das Lehrwerk mit Unit gewählt, kommen die Grammatikangaben der Units dazu
  * (shared/lehrwerkThemen.ts); sie sind genauer als die Tabelle.
- * Ohne Daten (Italienisch, Niederländisch, Russisch) gilt eine vorsichtige Faustregel je Lernjahr.
+ * Ohne Daten (Niederländisch) gilt eine vorsichtige Faustregel je Lernjahr. Italienisch und Russisch
+ * haben seit 30.09.2026 eigene Themen in der Tabelle (grammarTopicsErgaenzung.ts).
  */
 import { cefrIndex, type CefrLevel } from '@shared/types'
 import { einfuehrungsNiveau, GRAMMAR_TOPICS, learningYear, topicStart, type GrammarTopic, type LanguageSequence } from '../../arbeitsblatt/didactics/grammar'
@@ -53,6 +54,7 @@ const FACH: Record<string, string> = {
   fr: 'franzoesisch',
   es: 'spanisch',
   it: 'italienisch',
+  ru: 'russisch',
   la: 'latein'
 }
 
@@ -65,6 +67,8 @@ const VERGANGENHEIT: Record<string, string[]> = {
   englisch: ['en.verb.past_simple'],
   franzoesisch: ['fr.verb.passe_compose'],
   spanisch: ['es.verb.indefinido_reg'],
+  italienisch: ['it.verb.passato_prossimo'],
+  russisch: ['ru.verb.praeteritum'],
   latein: ['la.form.perfekt']
 }
 
@@ -170,7 +174,7 @@ export function formVorwissen(s: FormSettings, known?: KnownVocab): FormVorwisse
     bekannt: liste('bekannt'),
     vielleicht: liste('vielleicht'),
     nochNicht: liste('nochNicht'),
-    // Ohne Wortbildungsthema in der Tabelle (Spanisch, Latein): Faustregel ab Lernjahr 3
+    // Ohne Wortbildungsthema in der Tabelle (Spanisch, Latein, Russisch): Faustregel ab Lernjahr 3
     wortbildung: wb.length ? wb.some((x) => x.stand === 'bekannt') : lj >= 3,
     vergangenheit: eingeordnet.some((x) => vergangen.includes(x.t.id) && x.stand === 'bekannt'),
     lehrwerk,

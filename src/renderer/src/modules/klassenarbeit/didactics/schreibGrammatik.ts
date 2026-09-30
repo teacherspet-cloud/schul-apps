@@ -19,6 +19,7 @@
  * Die Formulierungen in der Zielsprache sind fachübliche Muster, kein amtlicher Wortlaut.
  */
 import { GRAMMAR_TOPICS, type GrammarTopic } from '../../arbeitsblatt/didactics/grammarTopics'
+import { defaultSequence, topicStart, type LanguageSequence } from '../../arbeitsblatt/didactics/grammar'
 import { lernjahrFuer } from '../../arbeitsblatt/didactics/vorwissen/vorwissen'
 import type { Exam, ExamPart } from '../model/types'
 
@@ -28,7 +29,7 @@ export type GrammatikModus = 'anzahl' | 'erinnerung' | 'bandbreite' | 'inhaltspu
 export interface SchreibGrammatik {
   /** Kennungen aus grammarTopics.ts */
   themen: string[]
-  /** Freie Angabe (Italienisch, Russisch oder was in der Liste fehlt) */
+  /** Freie Angabe (was in der Liste fehlt) */
   frei?: string
   modus: GrammatikModus
   /** Mindestanzahl bei „anzahl" */
@@ -56,12 +57,28 @@ export const lernjahr = (m: Meta): number =>
 /** Ausgeschlossene Bereiche: reine Formenbereiche und Wortbildung (Bericht 4) */
 const UNGEEIGNET = /Nomen\/Begleiter|Wortbildung|Morphologie|Orthografie/
 
+/** Fremdsprachenfolge der Arbeit – wie `lernjahrFuer` (ohne Angabe die übliche Folge des Fachs) */
+function folge(m: Meta): LanguageSequence {
+  if (m.languageOrder === undefined) return defaultSequence(m.subjectId, m.grade)
+  if (m.languageOrder >= 3) return 'fs3'
+  return m.languageOrder === 2 ? 'fs2' : 'fs1'
+}
+
+/**
+ * Lernjahr der Einführung für diese Arbeit. Seit 30.09.2026 über `topicStart` wie Grammatiktest und
+ * Vokabeltest: In der 3. Fremdsprache (Italienisch, Russisch, Griechisch meist ab Kl. 8) ist die
+ * Progression gestrafft – mit `t.from` allein erschienen dort Strukturen zu spät.
+ */
+export const einfuehrungFuer = (t: GrammarTopic, m: Meta): number => topicStart(t, folge(m))
+
 /** Auswählbare Strukturen: Fach passt, nicht nur rezeptiv, kein reiner Formenbereich; eingeführt bis zum Lernjahr (+1 als „bald") */
 export function strukturenFuer(m: Meta): { topic: GrammarTopic; eingefuehrt: boolean }[] {
   const lj = lernjahr(m)
-  return GRAMMAR_TOPICS.filter((t) => t.subject === m.subjectId && t.scale === 'lernjahr' && !t.receptive && !UNGEEIGNET.test(t.area) && t.from <= lj + 1).map((t) => ({
+  return GRAMMAR_TOPICS.filter(
+    (t) => t.subject === m.subjectId && t.scale === 'lernjahr' && !t.receptive && !UNGEEIGNET.test(t.area) && einfuehrungFuer(t, m) <= lj + 1
+  ).map((t) => ({
     topic: t,
-    eingefuehrt: t.from <= lj
+    eingefuehrt: einfuehrungFuer(t, m) <= lj
   }))
 }
 
@@ -111,7 +128,9 @@ export function hinweise(m: Meta, g: SchreibGrammatik): { text: string; warnung?
     out.push({ warnung: true, text: 'In der Oberstufe ist die Vorgabe bestimmter Grammatik unüblich; bewertet wird die Bandbreite (vgl. Fachbrief Englisch BB Nr. 9, 2025).' })
   else if (lj >= 5 && g.modus === 'anzahl')
     out.push({ text: 'Zentrale Abschlussprüfungen (z. B. ZP10 NRW, Realschulabschluss Bayern) schreiben keine Grammatik vor, sondern bewerten die Bandbreite – empfohlen: „Use a variety of …" statt fester Anzahl.' })
-  for (const t of themen) if (t.from > lj) out.push({ warnung: true, text: `„${t.label}" wird laut Lehrplan- und Lehrwerksauswertung erst ab Lernjahr ${t.from} eingeführt.` })
+  for (const t of themen)
+    if (einfuehrungFuer(t, m) > lj)
+      out.push({ warnung: true, text: `„${t.label}" wird laut Lehrplan- und Lehrwerksauswertung erst ab Lernjahr ${einfuehrungFuer(t, m)} eingeführt.` })
   if (g.modus === 'anzahl' && themen.length > 2) out.push({ text: 'Mehr als zwei geforderte Formen können den Text unnatürlich machen; eine Strukturgruppe („different past tenses") ist oft sinnvoller.' })
   if (g.unterstreichen) out.push({ text: 'Das Unterstreichen erleichtert die Korrektur, kostet aber Schreibzeit.' })
   return out
