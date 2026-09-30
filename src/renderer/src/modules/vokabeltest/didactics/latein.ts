@@ -1,3 +1,4 @@
+import { istVerbSprache } from '@shared/verben'
 import type { LatinWordClass, TaskTypeId, VocabEntry } from '../model/types'
 
 /**
@@ -63,6 +64,8 @@ export const NUR_LATEIN: TaskTypeId[] = ['latinForms', 'latinLoanWords', 'latinW
 
 /** Passt diese Aufgabenart zur gewählten Sprache? */
 export function passtZurSprache(id: TaskTypeId, targetLanguage: string): boolean {
+  // Unregelmäßige Verben (30.09.2026): nur in Sprachen mit Verbliste (nicht Niederländisch)
+  if (id === 'irregularVerbs') return istVerbSprache(targetLanguage)
   if (istLatein(targetLanguage)) return !NICHT_IN_LATEIN.includes(id)
   return !NUR_LATEIN.includes(id)
 }

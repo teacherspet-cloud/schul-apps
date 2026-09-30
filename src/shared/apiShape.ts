@@ -12,6 +12,7 @@
  */
 import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
+import type { VerbListe, VerbListeMeta } from './verben'
 import type { SchulQuelle, SchulTreffer, SuchOptionen } from './schulsuche'
 import type { DesignTemplate } from '@shared/design'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
@@ -321,6 +322,13 @@ export function buildApi(call: Call, extras: ApiExtras) {
       get: (id: string) => call<Textbook>('textbooks:get', id),
       save: (books: Textbook[]) => call<TextbookMeta[]>('textbooks:save', books),
       delete: (id: string) => call<TextbookMeta[]>('textbooks:delete', id)
+    },
+    /** Listen unregelmäßiger Verben je Lehrwerk-Band (30.09.2026, shared/verben.ts) */
+    verbLists: {
+      list: () => call<VerbListeMeta[]>('verbLists:list'),
+      get: (id: string) => call<VerbListe>('verbLists:get', id),
+      save: (liste: VerbListe) => call<VerbListeMeta[]>('verbLists:save', liste),
+      delete: (id: string) => call<VerbListeMeta[]>('verbLists:delete', id)
     },
     /**
      * Themenbereiche je Fach und die Zuordnung der Materialien (Paket 10b, src/shared/themen.ts).

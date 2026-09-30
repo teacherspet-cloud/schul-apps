@@ -628,3 +628,24 @@
   color: #777;
   text-align: center;
 }
+
+/* Unregelmäßige Verben (30.09.2026): Tabelle wie im Schulbuch, Lücken mit Schreibraum */
+.vt-verb-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 2mm;
+}
+.vt-verb-table th,
+.vt-verb-table td {
+  border: 0.3mm solid #555;
+  padding: 1.2mm 2mm;
+  text-align: left;
+  vertical-align: middle;
+}
+.vt-verb-table th {
+  font-weight: 600;
+  background: #f1f3f5;
+}
+.vt-verb-table td.vt-verb-blank {
+  height: 8mm;
+}

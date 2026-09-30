@@ -8,11 +8,16 @@ import { ueberthemaVon } from '../../shared/ueberthema'
 import { chosenGrammarTopics } from '../arbeitsblatt/didactics/grammar'
 import { erzeugeBibliothek } from '../../shared/testmodul/bibliothek'
 import type { GrammarTest } from './model/types'
-import { testHasContent, testPoints, testTaskCount } from './model/types'
+import { istVerbTest, testHasContent, testPoints, testTaskCount } from './model/types'
 import { useGrammatiktest } from './store'
 
 /** Die geprüften Formen ausgeschrieben – in der Übersicht ist das die eigentliche Kennzeichnung. */
 export function testTopicLine(test: GrammarTest): string {
+  // Unregelmäßige Verben (30.09.2026): die Liste statt eines Grammatikthemas
+  if (istVerbTest(test)) {
+    const v = test.meta.verben!
+    return `Unregelmäßige Verben${v.quelle === 'lehrwerk' && v.listenName ? ` (${v.listenName})` : ''}`
+  }
   return chosenGrammarTopics({ ...test.meta, grammarTopics: test.meta.topics } as never)
     .map((t) => t.label)
     .join(', ')
@@ -46,7 +51,7 @@ export function defaultTestName(test: GrammarTest): string {
  * nicht erst nach dem Erzeugen. Ein leeres Formular soll die Übersicht aber nicht füllen.
  */
 export const lohntSicherung = (test: GrammarTest | null): boolean =>
-  Boolean(test && (testHasContent(test) || test.meta.topics.length || test.meta.title.trim()))
+  Boolean(test && (testHasContent(test) || test.meta.topics.length || test.meta.title.trim() || (istVerbTest(test) && test.meta.verben!.verben.length)))
 
 /*
  * Speichern, Öffnen, Ablegen, Neu, automatisch Speichern: gemeinsames Gerüst mit den anderen

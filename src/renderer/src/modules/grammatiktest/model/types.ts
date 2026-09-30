@@ -51,6 +51,17 @@ export interface GrammarTestMeta {
   /** DaZ: erreichte Erwerbsstufe; sperrt Themen mehr als eine Stufe darüber */
   acquisitionStage?: number
 
+  /**
+   * Art des Tests (30.09.2026): Grammatikformen (Standard) oder unregelmäßige Verben. Bei den Verben
+   * entstehen Tabellen, Ankreuzen, Fehler finden und Zuordnen ohne KI aus der Verbliste des
+   * Lehrwerks bzw. der Standardliste (shared/verben); nur Sätze im Zusammenhang schreibt die KI.
+   */
+  modus?: 'formen' | 'verben'
+  /** Einstellungen der Verb-Aufgabe (nur bei modus = 'verben') */
+  verben?: import('../../../shared/verben/formate').VerbAufgabe
+  /** Zwei Fassungen (Gruppe A und B) – bisher nur bei den unregelmäßigen Verben */
+  fassungen?: 1 | 2
+
   /** Geprüfte Grammatikthemen (Kennungen aus grammarTopics.ts) */
   topics: string[]
   /** Aufgabenformate (Kennungen aus GRAMMAR_FORMATS); vorbelegt aus den Themen */
@@ -97,6 +108,8 @@ export interface GrammarTest {
   design: DesignTemplate
   /** Die Aufgaben des Tests – dieselben Bausteine wie im Arbeitsblatt */
   blocks: WsBlock[]
+  /** Gruppe B (30.09.2026, unregelmäßige Verben) – fehlt bei einer einzigen Fassung */
+  blocksB?: WsBlock[]
   createdAt: string
 }
 
@@ -109,3 +122,6 @@ export function testPoints(test: GrammarTest): number {
 export const testTaskCount = (test: GrammarTest): number => test.blocks.filter((b) => b.type === 'task').length
 
 export const testHasContent = (test: GrammarTest): boolean => testTaskCount(test) > 0
+
+/** Test zu unregelmäßigen Verben? */
+export const istVerbTest = (test: Pick<GrammarTest, 'meta'>): boolean => test.meta.modus === 'verben' && Boolean(test.meta.verben)

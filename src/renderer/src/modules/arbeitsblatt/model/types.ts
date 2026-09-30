@@ -983,6 +983,11 @@ export interface WorksheetMeta {
   /** Gewählte Grammatikthemen (Kennungen aus grammarTopics.ts) */
   grammarTopics?: string[]
   /**
+   * Unregelmäßige Verben (30.09.2026): Aufgaben aus der Verbliste des Lehrwerks bzw. der
+   * Standardliste, die die App nach dem Ausformulieren anhängt (shared/verben). Fehlt = keine.
+   */
+  verbAufgabe?: import('../../../shared/verben/formate').VerbAufgabe
+  /**
    * Spät beginnende Fremdsprache (Beginn in der Oberstufe).
    * Das Lernjahr ergibt sich sonst aus `languageOrder`; nur dieser Fall lässt sich damit
    * nicht ausdrücken, weil die Progression eine ganz eigene ist.

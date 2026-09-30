@@ -105,7 +105,9 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
       // Tafelbilder (30.09.2026)
       'tafelbilder:save',
       'tests:save',
-      'textbooks:save'
+      'textbooks:save',
+      // Verblisten je Lehrwerk-Band (30.09.2026)
+      'verbLists:save'
     ])
   })
 

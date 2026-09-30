@@ -420,6 +420,32 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
       })
       break
 
+    // Unregelmäßige Verben (30.09.2026): Tabelle wie im Schulbuch, Lösungen rot in den Lücken
+    case 'verbTable': {
+      const breite = Math.floor(CONTENT / Math.max(1, block.headers.length))
+      const zelle = (text: string, opts: { bold?: boolean; color?: string } = {}): TableCell =>
+        new TableCell({
+          width: { size: breite, type: WidthType.DXA },
+          borders: ALL_BORDERS,
+          margins: { top: 80, bottom: 80, left: 100, right: 100 },
+          verticalAlign: VerticalAlign.CENTER,
+          children: [new Paragraph({ children: [run(text, opts)] })]
+        })
+      out.push(
+        new Table({
+          width: { size: CONTENT, type: WidthType.DXA },
+          layout: TableLayoutType.FIXED,
+          rows: [
+            new TableRow({ tableHeader: true, children: block.headers.map((h) => zelle(h, { bold: true })) }),
+            ...block.rows.map(
+              (r) => new TableRow({ children: r.cells.map((c, i) => (c ? zelle(c) : zelle(mode === 'key' ? (r.solution[i] ?? '') : '', { color: RED }))) })
+            )
+          ]
+        })
+      )
+      break
+    }
+
     case 'open':
       block.items.forEach((it, i) => {
         out.push(numbered(i + 1, [run(it.prompt)], { keepNext: true }))

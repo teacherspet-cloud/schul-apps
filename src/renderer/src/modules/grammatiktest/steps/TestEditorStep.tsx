@@ -51,6 +51,8 @@ export default function TestEditorStep(): React.JSX.Element {
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   const [view, setView] = useState<'student' | 'key'>('student')
+  // Gruppe A/B (30.09.2026, unregelmäßige Verben): welche Fassung der Editor zeigt
+  const [fassung, setFassung] = useState(0)
   /*
    * Word, PDF und Drucken fragen jetzt nach den Lösungen (ohne / anhängen / eigene Datei) –
    * vorher wurden sie stillschweigend angehängt, sobald sie eingeschaltet waren. Gedruckt wird
@@ -85,14 +87,17 @@ export default function TestEditorStep(): React.JSX.Element {
   drucken.current = () => setAusgabe('print')
   if (!test || !ws) return <Container py="xl">Kein Test geladen.</Container>
 
-  const sheet = ws.sheets[0]
+  const sheet = ws.sheets[Math.min(fassung, ws.sheets.length - 1)]
+  /** Die Bausteine der angezeigten Fassung im Entwurf */
+  const bloeckeVon = (d: typeof test): WsBlock[] => (ws.sheets.indexOf(sheet) === 1 && d.blocksB ? d.blocksB : d.blocks)
   const key = view === 'key'
   const points = testPoints(test)
 
   const quelle: BlattQuelle = {
     ws,
     layouts,
-    sheetIds: [sheet.id],
+    // Beide Gruppen gehen in die Ausgabe – wie bei der Lernzielkontrolle
+    sheetIds: ws.sheets.map((s) => s.id),
     name: ws.meta.title || 'Grammatiktest',
     logo,
     schoolName: settings.schoolName,
@@ -110,21 +115,22 @@ export default function TestEditorStep(): React.JSX.Element {
       placed={placed}
       onUpdate={(fn, gruppe) =>
         update((d) => {
-          const b = d.blocks.find((x) => x.id === block.id)
+          const b = bloeckeVon(d).find((x) => x.id === block.id)
           if (b) fn(b)
         }, gruppe)
       }
       onMove={(richtung) =>
         update((d) => {
-          const i = d.blocks.findIndex((x) => x.id === block.id)
+          const liste = bloeckeVon(d)
+          const i = liste.findIndex((x) => x.id === block.id)
           const j = i + richtung
-          if (i < 0 || j < 0 || j >= d.blocks.length) return
-          ;[d.blocks[i], d.blocks[j]] = [d.blocks[j], d.blocks[i]]
+          if (i < 0 || j < 0 || j >= liste.length) return
+          ;[liste[i], liste[j]] = [liste[j], liste[i]]
         })
       }
       extras={
         // Zauberstab und Kreis mit Änderungswunsch (30.09.2026) – nicht am errechneten Kopfkasten
-        test.blocks.some((b) => b.id === block.id) ? (
+        [...test.blocks, ...(test.blocksB ?? [])].some((b) => b.id === block.id) ? (
           <KiWunschKnoepfe
             blockId={block.id}
             kontext={() => wunschKontextFuer(block, ws.meta, 'Grammatiktest')}
@@ -145,7 +151,7 @@ export default function TestEditorStep(): React.JSX.Element {
    */
   const aendere = (blockId: string, fn: (b: WsBlock) => void): void =>
     update((d) => {
-      if (blockId === 'test-head') {
+      if (blockId.startsWith('test-head')) {
         const kopf = testHeadBlock(d)
         if (!kopf || kopf.type !== 'infoBox') return
         const entwurf = structuredClone(kopf)
@@ -155,7 +161,7 @@ export default function TestEditorStep(): React.JSX.Element {
         d.meta.kopfText = entwurf.body
         return
       }
-      const block = d.blocks.find((b) => b.id === blockId)
+      const block = [...d.blocks, ...(d.blocksB ?? [])].find((b) => b.id === blockId)
       if (block) fn(block)
     })
 
@@ -164,7 +170,11 @@ export default function TestEditorStep(): React.JSX.Element {
       <EditorLeiste
         zurueck={{ label: 'Einstellungen', onClick: () => setStep(0) }}
         undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
-        fassungen={null}
+        fassungen={
+          ws.sheets.length > 1
+            ? { value: String(fassung), onChange: (v) => setFassung(Number(v)), data: ws.sheets.map((s, i) => ({ value: String(i), label: s.label })), ariaLabel: 'Gruppe' }
+            : null
+        }
         ansichten={{
           value: view,
           onChange: (v) => setView(v as 'student' | 'key'),

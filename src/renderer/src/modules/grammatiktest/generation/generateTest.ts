@@ -22,10 +22,27 @@ import { anredeRegel } from '../../../shared/anrede'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { errorTargets, testingRules } from '../model/testRules'
 import type { GrammarTest } from '../model/types'
+import { brauchtKi, erzeugeVerbBloecke } from '../../../shared/verben/aufgaben'
+import { VERB_SPALTEN } from '@shared/verben'
 
 /** Auftrag an die KI. */
 export function testPrompt(test: GrammarTest): string {
   const m = test.meta
+  // Unregelmäßige Verben (30.09.2026): Zauberstab und Kreis überarbeiten Bausteine mit diesem Auftrag
+  if (m.modus === 'verben' && m.verben) {
+    const spalten = VERB_SPALTEN[m.verben.sprache]
+    return [
+      `Du bearbeitest einen Test zu unregelmäßigen Verben (${m.subjectLabel}, Klasse ${m.grade}, Niveau ${m.cefrLevel}).`,
+      'Die Formen stammen aus der Verbliste des Schulbuchs und sind VERBINDLICH – ändere keine Verbform und keine Lösung, die nicht ausdrücklich verlangt ist.',
+      `Spalten der Liste: ${spalten.map((s) => s.label).join(' | ')}.`,
+      `Verben: ${m.verben.verben
+        .slice(0, 60)
+        .map((e) => spalten.map((s) => e.formen[s.id]).filter(Boolean).join(' – '))
+        .join('; ')}.`,
+      '- Geprüft wird, nicht erarbeitet: keine Merkkästen, keine Hilfekarten.',
+      '- Je Form ein Punkt; die Arbeitsanweisung nennt die Punktzahl nicht.'
+    ].join('\n')
+  }
   const topics = chosenGrammarTopics({ ...m, grammarTopics: m.topics } as never)
   const german = m.subjectId === 'deutsch' || m.subjectId === 'daz'
   const target = m.subjectLabel
@@ -187,3 +204,24 @@ export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (messa
 
 /** Hinweise, die beim Erstellen oben stehen (Landesvorgaben und Anlage des Tests). */
 export const testHints = (test: GrammarTest): string[] => testingRules(test.meta).map((r) => (r.suggestion ? `${r.text} ${r.suggestion}` : r.text))
+
+/**
+ * Test zu unregelmäßigen Verben (30.09.2026): Tabellen, Ankreuzen, Fehler finden und Zuordnen
+ * entstehen ohne KI aus der Verbliste; nur Sätze im Zusammenhang schreibt die KI (shared/verben).
+ * Bei zwei Fassungen bekommt Gruppe B andere Verben, sofern die Auswahl reicht.
+ */
+export async function generateVerbTest(
+  test: GrammarTest,
+  ai: AiCall | null,
+  onStep: (message: string) => void = () => undefined
+): Promise<{ blocks: WsBlock[]; blocksB?: WsBlock[] }> {
+  const a = test.meta.verben
+  if (!a) throw new Error('Es sind keine Verben gewählt.')
+  const anrede = anredeFuer(test.meta.grade, test.meta.schoolTypeId, test.meta.stateId)
+  const n = test.meta.fassungen === 2 ? 2 : 1
+  onStep(brauchtKi(a) ? 'Tabellen entstehen, die KI schreibt die Sätze …' : 'Die Aufgaben entstehen aus der Verbliste …')
+  const blocks = await erzeugeVerbBloecke(a, anrede, ai, 0, n)
+  if (n < 2) return { blocks }
+  onStep('Gruppe B wird erstellt …')
+  return { blocks, blocksB: await erzeugeVerbBloecke(a, anrede, ai, 1, n) }
+}

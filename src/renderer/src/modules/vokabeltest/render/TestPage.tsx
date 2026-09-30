@@ -674,6 +674,45 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
         </table>
       )
 
+    /*
+     * Unregelmäßige Verben (30.09.2026): die Tabelle des Schulbuchs – vorgegebene Zellen stehen da,
+     * leere werden ergänzt; im Lösungsteil stehen die Formen der Liste in den Lücken.
+     */
+    case 'verbTable':
+      return (
+        <table className="vt-verb-table" data-verbtabelle>
+          <thead>
+            <tr>
+              {block.headers.map((h, c) => (
+                <th key={c}>
+                  <T value={h} onChange={set((d, v) => ((d as typeof block).headers[c] = v))} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.slice(range?.from ?? 0, range?.to ?? block.rows.length).map((r, i) => {
+              const idx = (range?.from ?? 0) + i
+              return (
+                <tr key={r.id}>
+                  {r.cells.map((cell, c) =>
+                    cell ? (
+                      <td key={c}>
+                        <T value={cell} onChange={set((d, v) => ((d as typeof block).rows[idx].cells[c] = v))} />
+                      </td>
+                    ) : (
+                      <td key={c} className="vt-verb-blank">
+                        {answers && <T className="vt-key-text" value={r.solution[c] ?? ''} onChange={set((d, v) => ((d as typeof block).rows[idx].solution[c] = v))} />}
+                      </td>
+                    )
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )
+
     case 'trueFalse':
       return (
         <ItemList

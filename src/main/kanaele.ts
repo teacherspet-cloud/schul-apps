@@ -57,6 +57,8 @@ import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePo
 import { audioPath, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
 import { importiereAudio } from './services/audio/importAudio'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
+import { deleteVerbList, getVerbList, listVerbLists, saveVerbList } from './services/storage/verbListen'
+import type { VerbListe } from '@shared/verben'
 import { deleteExam, getExam, listExams, saveExam } from './services/storage/exams'
 import { deleteWorksheet, getWorksheet, listWorksheets, saveWorksheet } from './services/storage/worksheets'
 import { docxToHtml } from './services/ocr/docx'
@@ -413,6 +415,11 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('textbooks:get', (id: string) => getTextbook(id))
   handle('textbooks:save', (books: Textbook[]) => saveTextbooks(books))
   handle('textbooks:delete', (id: string) => deleteTextbook(id))
+  // Unregelmäßige Verben je Lehrwerk-Band (30.09.2026) – Ablage im geschützten Ordner der Lehrwerke
+  handle('verbLists:list', () => listVerbLists())
+  handle('verbLists:get', (id: string) => getVerbList(id))
+  handle('verbLists:save', (liste: VerbListe) => saveVerbList(liste))
+  handle('verbLists:delete', (id: string) => deleteVerbList(id))
   /*
    * Themenbereiche (Paket 10b): Bereiche je Fach und die Zuordnung der Materialien. Löschen
    * heißt wie bei den Materialien `…:delete` und ist damit über das Netz gesperrt.

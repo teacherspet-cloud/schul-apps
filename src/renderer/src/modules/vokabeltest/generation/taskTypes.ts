@@ -8,6 +8,7 @@ import type { KnownVocab } from '../../../shared/knownVocab'
 import { baseForm } from '../render/helpTexts'
 import { NENNFORM_PUNKTE, nennformLabel } from '../didactics/latein'
 import { mitNennform } from '../input/lateinNennform'
+import { baueVerbBlock } from './verbAufgabe'
 
 export interface GenContext {
   settings: TestSettings
@@ -924,6 +925,28 @@ ${vocabLines(vocab)}`,
           ]
         })
       }
+    }
+  },
+  /*
+   * ---------- UNREGELMÄSSIGE VERBEN (30.09.2026) ----------
+   *
+   * Ohne KI aus der Verbliste des Lehrwerks bzw. der Standardliste (shared/verben) – dieselben
+   * Aufgaben wie im Grammatiktest und im Arbeitsblatt. Die Verben stellt die Lehrkraft bei der
+   * Aufgabe ein; ohne Einstellung nimmt die App die unregelmäßigen Verben der Vokabelliste.
+   */
+  {
+    id: 'irregularVerbs',
+    label: 'Unregelmäßige Verben (Tabelle)',
+    description: 'Formentabelle aus der Verbliste des Lehrwerks (z. B. infinitive – simple past – past participle – German), je Form ein Punkt.',
+    kind: 'verbTable',
+    minLevel: 'A1',
+    usesVocab: false,
+    defaultPoints: 1,
+    defaultTitle: 'Irregular verbs',
+    // Die Anweisung setzt der Erzeuger (Zielsprache bzw. Deutsch mit du/Sie, shared/verben/formate.ts)
+    defaultInstruction: 'Complete the table.',
+    build(_vocab, data, ctx) {
+      return baueVerbBlock(ctx.settings, ctx.allVocab, ctx.rng, base(this, data, ctx), ctx.known)
     }
   }
 ]

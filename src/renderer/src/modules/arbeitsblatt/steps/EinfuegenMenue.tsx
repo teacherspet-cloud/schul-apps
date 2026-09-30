@@ -12,10 +12,13 @@ import type { WsBlockType } from '../model/types'
  */
 export function EinfuegenUntermenue({
   titel,
-  onWaehlen
+  onWaehlen,
+  onVerben
 }: {
   titel: 'Darüber einfügen' | 'Darunter einfügen'
   onWaehlen: (typ: WsBlockType) => void
+  /** Sprachen mit Verbliste (30.09.2026): Aufgaben zu unregelmäßigen Verben an dieser Stelle */
+  onVerben?: () => void
 }): React.JSX.Element {
   return (
     <Menu.Sub position="left-start">
@@ -28,6 +31,14 @@ export function EinfuegenUntermenue({
             {label}
           </Menu.Item>
         ))}
+        {onVerben && (
+          <>
+            <Menu.Divider />
+            <Menu.Item onClick={onVerben} data-menue-verben>
+              Unregelmäßige Verben …
+            </Menu.Item>
+          </>
+        )}
       </Menu.Sub.Dropdown>
     </Menu.Sub>
   )

@@ -22,6 +22,9 @@ export function itemCount(block: Block): number {
       return block.entries.length
     case 'latinForms':
       return block.items.length
+    // Je auszufüllende Form ein Punkt
+    case 'verbTable':
+      return block.rows.reduce((n, r) => n + r.cells.filter((c) => !c).length, 0)
     case 'freeText':
       return 0
   }

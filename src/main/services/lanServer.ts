@@ -60,6 +60,9 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'pictograms:get',
   'textbooks:list',
   'textbooks:get',
+  // Unregelmäßige Verben je Lehrwerk-Band (30.09.2026)
+  'verbLists:list',
+  'verbLists:get',
   'library:list',
 
   /*
@@ -155,6 +158,7 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'bewertungstabellen:save',
   'nachteilsausgleiche:save',
   'textbooks:save',
+  'verbLists:save',
   'library:save',
   /*
    * Themenbereiche ordnen wie die übrigen Bibliotheks-Schreibwege: anlegen, umbenennen,

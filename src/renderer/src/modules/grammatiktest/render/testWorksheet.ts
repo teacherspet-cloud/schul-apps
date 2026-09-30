@@ -12,28 +12,40 @@ import { chosenGrammarTopics } from '../../arbeitsblatt/didactics/grammar'
 import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
 import type { GrammarTest } from '../model/types'
-import { testPoints } from '../model/types'
+import { istVerbTest, testPoints } from '../model/types'
+import { TITEL } from '../../../shared/verben/formate'
 import { gradeScaleLine } from '../../../shared/gradeScale'
 import { notenpunkteFuer, punkteZeile } from '../../../shared/notenpunkte'
 
-/** Kopfkasten: Zeit, Punkte und – auf Wunsch – der Notenschlüssel. */
-export function testHeadBlock(test: GrammarTest): WsBlock | null {
+/** Kopfkasten: Zeit, Punkte und – auf Wunsch – der Notenschlüssel. `gruppe` = „A"/„B" bei zwei Fassungen. */
+export function testHeadBlock(test: GrammarTest, gruppe = ''): WsBlock | null {
   const m = test.meta
   if (!m.infoBox) return null
   const english = m.subjectId === 'englisch'
   const points = testPoints(test) || m.points
   const topics = chosenGrammarTopics({ ...m, grammarTopics: m.topics } as never)
+  // Unregelmäßige Verben (30.09.2026): Schwerpunkt ist die Liste, nicht ein Grammatikthema
+  const verben = istVerbTest(test) ? `${TITEL[m.verben!.sprache]}${m.verben!.listenName && m.verben!.quelle === 'lehrwerk' ? ` (${m.verben!.listenName})` : ''}` : ''
   const lines = [
+    gruppe ? (english ? `Group ${gruppe}` : `Gruppe ${gruppe}`) : '',
     english ? `Time: ${m.minutes} minutes` : `Bearbeitungszeit: ${m.minutes} Minuten`,
     english ? `${points} points` : `${points} Punkte`,
     // Die geprüfte Form wird genannt: Ein Test soll nicht raten lassen, worum es geht
-    topics.length ? (english ? `Focus: ${topics.map((t) => t.term || t.label).join(', ')}` : `Schwerpunkt: ${topics.map((t) => t.label).join(', ')}`) : '',
+    verben
+      ? english
+        ? `Focus: ${verben}`
+        : `Schwerpunkt: ${verben}`
+      : topics.length
+        ? english
+          ? `Focus: ${topics.map((t) => t.term || t.label).join(', ')}`
+          : `Schwerpunkt: ${topics.map((t) => t.label).join(', ')}`
+        : '',
     m.gradeScaleOnSheet && points > 0
       ? `${english ? 'Marks' : 'Notenschlüssel'}: ${((r) => (r ? punkteZeile(points, r.schwellen) : gradeScaleLine(points, m.gradeScaleThresholds)))(notenpunkteFuer(m))}`
       : ''
   ].filter(Boolean)
   return {
-    id: 'test-head',
+    id: gruppe && gruppe !== 'A' ? `test-head-${gruppe.toLowerCase()}` : 'test-head',
     type: 'infoBox',
     variant: 'wissen',
     title: m.title || (english ? 'Grammar test' : 'Grammatiktest'),
@@ -101,17 +113,26 @@ export function testToWorksheet(test: GrammarTest): Worksheet {
   return platziereKopfUndSchluss(testToWorksheetOhneIllustration(test))
 }
 
+/** Die Fassungen des Tests: eine, oder Gruppe A und B (30.09.2026, unregelmäßige Verben) */
+export const fassungenVon = (test: GrammarTest): WsBlock[][] => (test.blocksB?.length ? [test.blocks, test.blocksB] : [test.blocks])
+
+/** Kennung des Blattes einer Fassung – A heißt wie bisher „test" */
+export const blattIdVon = (index: number): string => (index === 0 ? 'test' : `test-${String.fromCharCode(97 + index)}`)
+
 function testToWorksheetOhneIllustration(test: GrammarTest): Worksheet {
-  const head = testHeadBlock(test)
-  const blocks: WsBlock[] = head ? [head, ...test.blocks] : [...test.blocks]
-  const sheet: Sheet = { id: 'test', label: 'Grammatiktest', blocks }
+  const fassungen = fassungenVon(test)
+  const sheets: Sheet[] = fassungen.map((bloecke, i) => {
+    const gruppe = fassungen.length > 1 ? String.fromCharCode(65 + i) : ''
+    const head = testHeadBlock(test, gruppe)
+    return { id: blattIdVon(i), label: gruppe ? `Gruppe ${gruppe}` : 'Grammatiktest', blocks: head ? [head, ...bloecke] : [...bloecke] }
+  })
   return {
     version: 1,
     meta: worksheetMetaForTest(test),
     // Auf einem Test tragen die Lernenden Name, Klasse und Datum ein
     design: { ...test.design, header: { ...test.design.header, fields: { name: true, class: true, date: true } } },
     outline: null,
-    sheets: [sheet],
+    sheets,
     sources: [],
     createdAt: test.createdAt
   }

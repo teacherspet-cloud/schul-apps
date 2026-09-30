@@ -17,6 +17,7 @@
 import { GRAMMAR_FORMATS, chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf } from '../../arbeitsblatt/didactics/grammar'
 import type { GrammarTopic } from '../../arbeitsblatt/didactics/grammar'
 import type { GrammarTestMeta } from './types'
+import { formatVon } from '../../../shared/verben/formate'
 
 export interface TestingRule {
   /** Was gilt – in einem Satz für die Lehrkraft */
@@ -36,6 +37,30 @@ export function testingRules(meta: GrammarTestMeta): TestingRule[] {
   const out: TestingRule[] = []
   const foreign = meta.subjectId !== 'deutsch' && meta.subjectId !== 'daz'
   const year = learningYear(meta.grade, sequenceOf(meta), meta.stateId)
+
+  /*
+   * Unregelmäßige Verben (30.09.2026): Der Schalter „einbetten" gilt hier nicht – im Zusammenhang
+   * prüfen die Formate „Lückensätze" und „Text in die Vergangenheit setzen". Belege der Recherche
+   * (recherche/unregelmaessige-verben-2026-09-30.md): NI schließt die isolierte Formenabfrage als
+   * Leistung aus, NRW erlaubt sie bis Stufe I.
+   */
+  if (meta.modus === 'verben' && meta.verben) {
+    const isoliert = meta.verben.formate.some((f) => !formatVon(f).ki)
+    if (meta.stateId === 'NI' && foreign && meta.subjectId !== 'latein' && isoliert) {
+      out.push({
+        severity: 'wichtig',
+        text: 'In Niedersachsen ist eine reine Formenabfrage (Tabelle, Ankreuzen) nicht als Leistungsnachweis vorgesehen – als Übung oder Diagnose ist sie geeignet.',
+        suggestion: 'Für eine Bewertung die Formate „Lückensätze im Zusammenhang" oder „Text in die Vergangenheit setzen" wählen.'
+      })
+    }
+    if (meta.stateId === 'NW' && foreign && year > 4 && isoliert) {
+      out.push({
+        severity: 'hinweis',
+        text: `Nordrhein-Westfalen, ${year}. Lernjahr: Eine isolierte Formenabfrage darf eine kommunikative Teilkompetenz nur noch ergänzen.`
+      })
+    }
+    return out
+  }
 
   if (meta.stateId === 'NI' && foreign) {
     out.push({

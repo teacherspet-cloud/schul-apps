@@ -1,5 +1,5 @@
 import { Alert, Badge, Box, Button, Card, Chip, Collapse, Group, Stack, Text, Title, UnstyledButton } from '@mantine/core'
-import { IconCheck, IconChevronRight, IconDeviceFloppy } from '@tabler/icons-react'
+import { IconCheck, IconChevronRight, IconDeviceFloppy, IconListDetails } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { useUndoKeys } from '../../../shared/useUndoKeys'
@@ -12,6 +12,8 @@ import { useVerzoegertesSichern } from '../../../shared/useAutosave'
 import { newId } from '../../vokabeltest/model/random'
 import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
 import type { VocabRow } from './VocabRow'
+import { istVerbSprache } from '@shared/verben'
+import VerbListeDialog from '../../../shared/verben/VerbListeDialog'
 
 /** Zeile in einen Lehrwerks-Eintrag überführen: getrimmt und ohne leere Felder. */
 function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
@@ -44,6 +46,8 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
   const [saving, setSaving] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [angabenOffen, setAngabenOffen] = useState(false)
+  // Liste unregelmäßiger Verben dieses Bandes (30.09.2026) – eigene Ablage neben dem Buch
+  const [verbenOffen, setVerbenOffen] = useState(false)
   // Alle Lehrwerke – Vorschlagslisten für Reihe, Verlag, Landesausgabe, Ausgabe
   const [alle, setAlle] = useState<TextbookMeta[]>([])
   useEffect(() => {
@@ -178,6 +182,11 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
           <Button variant="default" onClick={() => void wechsle(onBack)}>
             Zurück zur Übersicht
           </Button>
+          {istVerbSprache(book.language) && (
+            <Button variant="light" leftSection={<IconListDetails size={16} />} onClick={() => setVerbenOffen(true)} data-buch-verben>
+              Unregelmäßige Verben
+            </Button>
+          )}
           {!book.builtIn && (
             <Button variant="subtle" color="red" onClick={() => setConfirmReset(true)}>
               Änderungen verwerfen
@@ -224,6 +233,10 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
             </Group>
           </Group>
         </Alert>
+      )}
+
+      {istVerbSprache(book.language) && (
+        <VerbListeDialog opened={verbenOffen} onClose={() => setVerbenOffen(false)} sprache={book.language} lehrwerkId={book.id} />
       )}
 
       <Card withBorder>

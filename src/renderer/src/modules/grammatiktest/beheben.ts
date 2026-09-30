@@ -39,7 +39,8 @@ export function testBausteinNachWunsch(test: GrammarTest, docId: string, blockId
       const anrede = anredeFuerMeta(meta)
       return bausteinNachWunsch(
         {
-          bloecke: t.blocks,
+          // Beide Gruppen (30.09.2026): Der Baustein kann auch in Gruppe B stehen
+          bloecke: [...t.blocks, ...(t.blocksB ?? [])],
           blockId,
           art,
           wunsch,
@@ -56,7 +57,12 @@ export function testBausteinNachWunsch(test: GrammarTest, docId: string, blockId
       )
     },
     abschluss: () => (art === 'neu' ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
-    ablegen: (neu, t) => legeTestAb(docId, t, (aktuell) => ({ ...aktuell, blocks: aktuell.blocks.map((b) => (b.id === blockId ? neu : b)) }))
+    ablegen: (neu, t) =>
+      legeTestAb(docId, t, (aktuell) => ({
+        ...aktuell,
+        blocks: aktuell.blocks.map((b) => (b.id === blockId ? neu : b)),
+        ...(aktuell.blocksB ? { blocksB: aktuell.blocksB.map((b) => (b.id === blockId ? neu : b)) } : {})
+      }))
   })
 }
 

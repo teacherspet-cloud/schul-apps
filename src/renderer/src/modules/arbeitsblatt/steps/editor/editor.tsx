@@ -70,6 +70,7 @@ import { KiMenue, VersionSwitcher } from '../BlockRevision'
 import { wunschKontextFuer } from '../../generation/wunsch'
 import type { WunschArt } from '../../../../shared/kiWunsch'
 import { EinfuegenUntermenue } from '../EinfuegenMenue'
+import { VerbEinfuegenDialog, verbenMoeglich } from '../VerbAufgabeKarte'
 import { AudioPanel } from '../AudioPanel'
 import { BoardPanel } from '../BoardPanel'
 import { addVersion, switchVersion } from '../../model/versions'
@@ -145,6 +146,8 @@ export function EditorStep(): React.JSX.Element {
   }, [])
   // Maskottchen an einen Baustein heften (26.09.2026)
   const [illuBlockId, setIlluBlockId] = useState<string | null>(null)
+  // Unregelmäßige Verben einfügen (30.09.2026): neben welchem Baustein, darüber (0) oder darunter (1)
+  const [verbStelle, setVerbStelle] = useState<{ nebenId: string; versatz: 0 | 1 } | null>(null)
 
   const sheet = ws?.sheets.find((s) => s.id === activeSheetId) ?? ws?.sheets[0]
   const profile = useMemo(() => (ws ? profileFromMeta(ws.meta) : null), [ws])
@@ -533,8 +536,16 @@ export function EditorStep(): React.JSX.Element {
               {block.illustration ? 'Maskottchen ändern …' : 'Maskottchen anheften …'}
             </Menu.Item>
           )}
-          <EinfuegenUntermenue titel="Darüber einfügen" onWaehlen={(typ) => einfuegen(block.id, 0, typ)} />
-          <EinfuegenUntermenue titel="Darunter einfügen" onWaehlen={(typ) => einfuegen(block.id, 1, typ)} />
+          <EinfuegenUntermenue
+            titel="Darüber einfügen"
+            onWaehlen={(typ) => einfuegen(block.id, 0, typ)}
+            onVerben={verbenMoeglich(ws.meta) ? () => setVerbStelle({ nebenId: block.id, versatz: 0 }) : undefined}
+          />
+          <EinfuegenUntermenue
+            titel="Darunter einfügen"
+            onWaehlen={(typ) => einfuegen(block.id, 1, typ)}
+            onVerben={verbenMoeglich(ws.meta) ? () => setVerbStelle({ nebenId: block.id, versatz: 1 }) : undefined}
+          />
           {block.type === 'task' && block.example && (
             <Menu.Item leftSection={<IconNumber0Small size={16} />} onClick={() => updateBlock(sheet.id, block.id, (d) => delete (d as TaskBlock).example)}>
               Beispiellösung aus Aufgabe entfernen
@@ -585,6 +596,22 @@ export function EditorStep(): React.JSX.Element {
         wert={illuBlock?.illustration}
         onChange={(neu) => illuBlock && updateBlock(sheet.id, illuBlock.id, (d) => (neu ? (d.illustration = neu) : delete d.illustration))}
       />
+      {verbenMoeglich(ws.meta) && (
+        <VerbEinfuegenDialog
+          opened={Boolean(verbStelle)}
+          meta={ws.meta}
+          onClose={() => setVerbStelle(null)}
+          onEinfuegen={(neu) =>
+            verbStelle &&
+            update((d) => {
+              const blocks = d.sheets.find((s) => s.id === sheet.id)?.blocks
+              if (!blocks) return
+              const i = blocks.findIndex((b) => b.id === verbStelle.nebenId)
+              blocks.splice(i < 0 ? blocks.length : i + verbStelle.versatz, 0, ...neu)
+            })
+          }
+        />
+      )}
       <EditorLeiste
         zurueck={{ label: 'Gliederung', onClick: () => setStep(1) }}
         undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}

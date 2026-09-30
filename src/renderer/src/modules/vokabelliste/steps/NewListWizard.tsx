@@ -13,6 +13,8 @@ import type { VocabEntry } from '../../vokabeltest/model/types'
 import { alsListenEintrag } from '../../vokabeltest/model/vocab'
 import { aiCall } from '../../vokabeltest/store'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
+import type { VerbListeMeta } from '@shared/verben'
+import { vokabelnAusVerbliste } from '../../../shared/verben/quellen'
 
 /** Vorgaben, die der Wizard mitnimmt (Land, Schulform, Fach kommen aus der Übersicht) */
 export interface WizardDefaults {
@@ -45,6 +47,8 @@ export default function NewListWizard({
   const [grade, setGrade] = useState<number | ''>('')
   const [table, setTable] = useState<CefrTable>({ version: 1, states: [] })
   const [saving, setSaving] = useState(false)
+  // Verblisten der Lehrwerke (30.09.2026): „aus Lehrwerk: unregelmäßige Verben Green Line 3"
+  const [verblisten, setVerblisten] = useState<VerbListeMeta[]>([])
 
   useEffect(() => {
     if (!opened) return
@@ -56,6 +60,10 @@ export default function NewListWizard({
     setSchoolTypeId(defaults.schoolTypeId)
     setGrade('')
     window.api.cefr.get().then(setTable).catch(notifyError)
+    window.api.verbLists
+      .list()
+      .then(setVerblisten)
+      .catch(() => setVerblisten([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opened])
 
@@ -112,6 +120,25 @@ export default function NewListWizard({
           minHeight={140}
         />
         {progress && progress.total > 1 && <Progress value={(progress.done / progress.total) * 100} size="sm" />}
+        {verblisten.some((l) => l.sprache === language) && (
+          <Select
+            label="Oder: unregelmäßige Verben eines Lehrwerks übernehmen"
+            placeholder="Band wählen"
+            data={verblisten.filter((l) => l.sprache === language).map((l) => ({ value: l.id, label: `${l.name} (${l.anzahl} Verben)` }))}
+            value={null}
+            onChange={(id) => {
+              if (!id) return
+              window.api.verbLists
+                .get(id)
+                .then((liste) => {
+                  setEntries(vokabelnAusVerbliste(liste).map((v) => ({ id: newId(), ...v })))
+                  setName((n) => n || `Unregelmäßige Verben – ${liste.name}`)
+                })
+                .catch(notifyError)
+            }}
+            data-wizard-verbliste
+          />
+        )}
 
         {/* Name und Fach auch ohne Datei: Eine leere Liste lässt sich von Hand füllen (Paket 7) */}
         <Group grow align="flex-start">

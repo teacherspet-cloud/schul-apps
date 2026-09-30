@@ -32,7 +32,11 @@ import { distributeEvenly, requestedCount } from '../generation/distribute'
 import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
 import { istLatein, passtZurSprache } from '../didactics/latein'
-import { formHinweis, formVorwissen, formZuSchwer } from '../didactics/formVorwissen'
+import { formHinweis, formVorwissen, formZuSchwer, lernjahrVon } from '../didactics/formVorwissen'
+import VerbAufgabeWahl from '../../../shared/verben/VerbAufgabeWahl'
+import { istVerbSprache } from '@shared/verben'
+import { neueVerbAufgabe } from '../../../shared/verben/quellen'
+import { verbAufgabeFuer, vorwissenHinweis } from '../generation/verbAufgabe'
 import { planeZusammensetzung, suggestLevelFromVocab, STANDARD_UMFANG } from '../generation/autoPlan'
 import { gradeOptions, languageTracks, levelAtLeast, suggestLevel } from '../model/cefr'
 import { randomSeed } from '../model/random'
@@ -500,7 +504,47 @@ export default function SettingsStep(): React.JSX.Element {
                             {formText}
                           </Text>
                         )}
-                        {sel && (
+                        {/*
+                          Unregelmäßige Verben (30.09.2026): statt der Vokabelzahl die Auswahl aus der
+                          Verbliste des Lehrwerks – nur Formate ohne KI, je Form ein Punkt.
+                        */}
+                        {sel && def.id === 'irregularVerbs' && istVerbSprache(settings.targetLanguage) && (
+                          <Stack mt="xs" gap="xs">
+                            {((h) =>
+                              h ? (
+                                <Text size="xs" c="orange" data-verb-vorwissen>
+                                  {h}
+                                </Text>
+                              ) : null)(
+                              vorwissenHinweis(
+                                settings.verbAufgabe ?? neueVerbAufgabe(settings.targetLanguage, lernjahrVon(settings)),
+                                settings,
+                                listContext?.known
+                              )
+                            )}
+                            <VerbAufgabeWahl
+                              wert={
+                                settings.verbAufgabe?.sprache === settings.targetLanguage
+                                  ? settings.verbAufgabe
+                                  : (verbAufgabeFuer(settings, usable, 1) ?? neueVerbAufgabe(settings.targetLanguage, lernjahrVon(settings)))
+                              }
+                              onChange={(verbAufgabe) => patch({ verbAufgabe })}
+                              nurOhneKi
+                              vokabeln={usable}
+                              lehrwerkName={listContext?.bookName}
+                            />
+                            <NumberInput
+                              size="xs"
+                              label="Punkte je Form"
+                              min={0}
+                              step={0.5}
+                              decimalScale={1}
+                              value={sel.pointsPerItem}
+                              onChange={(v) => patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, pointsPerItem: Number(v) || 0 } : t)) })}
+                            />
+                          </Stack>
+                        )}
+                        {sel && def.id !== 'irregularVerbs' && (
                           <Group mt="xs" grow>
                             <NumberInput
                               size="xs"

@@ -69,6 +69,8 @@ export type TaskTypeId =
   | 'latinLoanWords'
   | 'latinWordFormation'
   | 'latinContext'
+  // Unregelmäßige Verben aus der Verbliste des Lehrwerks (30.09.2026, shared/verben)
+  | 'irregularVerbs'
 
 // ---------- Blöcke (eine Aufgabe im Test) ----------
 
@@ -295,6 +297,17 @@ export interface FreeTextBlock extends BlockBase {
   lines: number
 }
 
+/**
+ * Unregelmäßige Verben als Tabelle (30.09.2026): die Spalten der Verbliste (Englisch: infinitive |
+ * simple past | past participle | German), vorgegebene Zellen stehen da, leere werden ergänzt.
+ * Erzeugt ohne KI aus der Liste (shared/verben/erzeugen.ts) – je Lücke ein Punkt.
+ */
+export interface VerbTableBlock extends BlockBase {
+  kind: 'verbTable'
+  headers: string[]
+  rows: { id: string; cells: string[]; solution: string[] }[]
+}
+
 export type Block =
   | GapBlock
   | GapTextBlock
@@ -310,6 +323,7 @@ export type Block =
   | CrosswordBlock
   | FreeTextBlock
   | LatinFormsBlock
+  | VerbTableBlock
 
 export type BlockKind = Block['kind']
 
@@ -381,6 +395,8 @@ export interface TestSettings {
   seed: number
   /** Vorgabe zur Seitenzahl je Testvariante (Schülerblatt) */
   pageLimit?: PageLimit
+  /** Aufgabe „Unregelmäßige Verben": Quelle, Verben und Form (30.09.2026, shared/verben) */
+  verbAufgabe?: import('../../../shared/verben/formate').VerbAufgabe
 }
 
 export interface PageLimit {

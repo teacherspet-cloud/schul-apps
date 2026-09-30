@@ -45,6 +45,8 @@ import type { ListeningScript } from './listening'
 import { listeningCount } from '../didactics/listeningFormats'
 import { expandObserverGroups } from '../render/observerGroups'
 import { linkVideoTasks, sortViewingTasks } from './video'
+// Unregelmäßige Verben (30.09.2026): die App hängt die Aufgaben aus der Verbliste an
+import { mitVerbAufgabe } from './verbAufgabe'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 export type Progress = (message: string, done: number, total: number) => void
@@ -669,7 +671,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       }),
       3
     )
-    return { ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }
+    return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }, opts.ai)
   }
 
   const sheets = await runLimited(
@@ -721,7 +723,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     3
   )
 
-  return { ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }
+  return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }, opts.ai)
 }
 
 /**

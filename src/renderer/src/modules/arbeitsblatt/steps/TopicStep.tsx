@@ -46,6 +46,7 @@ import { comprehensionFormatById, comprehensionFormatsFor, defaultComprehensionF
 import { istDeutschZuhoeren, ZUHOEREN_MODES, type ZuhoerenMode } from '../didactics/zuhoeren'
 import { hasGrammar } from '../didactics/grammar'
 import GrammarPicker from './GrammarPicker'
+import { VerbAufgabeKarte } from './VerbAufgabeKarte'
 import { LANGUAGE_MODES, LanguageMode } from '../didactics/language'
 import { CourseLevel, courseLevelOptions, gradeRange } from '../didactics/schoolProfiles'
 import SchulortFelder from '../../../shared/components/SchulortFelder'
@@ -515,6 +516,8 @@ export default function TopicStep(): React.JSX.Element {
                       />
                     )}
                     {meta.skillFocus === 'grammar' && <GrammarPicker meta={meta} onChange={patch} />}
+                    {/* Unregelmäßige Verben (30.09.2026): Aufgaben aus der Verbliste, von der App angehängt */}
+                    {meta.skillFocus === 'grammar' && <VerbAufgabeKarte meta={meta} onChange={patch} />}
                     {/* Beim Schwerpunkt „Vokabeln" ist der Wortschatz das Thema selbst – dort
                       steht die ausführliche Auswahl weiter unten, nicht dieses Pop-up. */}
                     {subject.foreignLanguage && meta.skillFocus !== 'vocabulary' && vocabAvailable && (
