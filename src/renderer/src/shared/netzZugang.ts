@@ -17,6 +17,7 @@
  *    gearbeitet wird; ein Dateidialog auf dem entfernten Rechner wäre sinnlos.
  */
 import { buildApi } from '@shared/apiShape'
+import { netzVerbindung } from './netzVerbindung'
 
 /**
  * Läuft die Oberfläche im Browser statt in der App?
@@ -32,204 +33,32 @@ export const imNetz = (): boolean => imBrowserGestartet
 
 const SCHLUESSEL = 'schulapps-netz-token'
 
-const token = (): string => {
-  try {
-    return localStorage.getItem(SCHLUESSEL) ?? ''
-  } catch {
-    return ''
+/** Die Verbindung zum PC – Adresse ist die eigene Herkunft, die Anmeldung liegt im localStorage */
+const verbindung = netzVerbindung({
+  basis: '',
+  speicher: {
+    lies: () => {
+      try {
+        return localStorage.getItem(SCHLUESSEL) ?? ''
+      } catch {
+        return ''
+      }
+    },
+    schreibe: (t) => localStorage.setItem(SCHLUESSEL, t),
+    loesche: () => localStorage.removeItem(SCHLUESSEL)
   }
-}
+})
 
 /** Meldet das Gerät mit der PIN an; der Server gibt eine Kennung zurück. */
-export async function anmelden(pin: string): Promise<void> {
-  const res = await fetch('/anmelden', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin }) })
-  const daten = (await res.json()) as { token?: string; fehler?: string; verbleibend?: number }
-  if (!res.ok || !daten.token) {
-    throw new Error(daten.fehler + (typeof daten.verbleibend === 'number' ? ` Noch ${daten.verbleibend} Versuche.` : ''))
-  }
-  localStorage.setItem(SCHLUESSEL, daten.token)
-  // Ein offener Strom gehört zur alten Anmeldung – Ereignisse der neuen kämen dort nie an
-  stromSteuerung?.abort()
-}
+export const anmelden = (pin: string): Promise<void> => verbindung.anmelden(pin)
 
-export const abgemeldet = (): boolean => !token()
+export const abgemeldet = (): boolean => verbindung.abgemeldet()
 
-/** Binärdaten kommen als Base64 – über HTTP gibt es keine Uint8Array. */
-function auspacken(wert: unknown): unknown {
-  if (wert && typeof wert === 'object' && '__bytes' in (wert as Record<string, unknown>)) {
-    const b64 = String((wert as { __bytes: string }).__bytes)
-    const roh = atob(b64)
-    const bytes = new Uint8Array(roh.length)
-    for (let i = 0; i < roh.length; i++) bytes[i] = roh.charCodeAt(i)
-    return bytes
-  }
-  if (Array.isArray(wert)) return wert.map(auspacken)
-  if (wert && typeof wert === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(wert as Record<string, unknown>)) out[k] = auspacken(v)
-    return out
-  }
-  return wert
-}
-
-function packen(wert: unknown): unknown {
-  if (wert instanceof Uint8Array) {
-    let s = ''
-    for (const b of wert) s += String.fromCharCode(b)
-    return { __bytes: btoa(s) }
-  }
-  if (Array.isArray(wert)) return wert.map(packen)
-  if (wert && typeof wert === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(wert as Record<string, unknown>)) out[k] = packen(v)
-    return out
-  }
-  return wert
-}
-
-/*
- * ---------- Ereignisse vom Rechner (Fortschritt, Warteplatz, Modellhinweise) ----------
- *
- * Am Rechner kommen sie über die Electron-Brücke. Im Browser liest diese Datei einen Strom
- * vom Server (GET /ereignisse, Server-Sent Events). Warum dieser Weg und nicht Abfragen im
- * Takt oder EventSource, steht in main/services/lanServer.ts. Der Server schickt nur, was zu
- * Anfragen DIESES Geräts gehört oder alle angeht.
- */
-
-/** Ein Ereignis aus dem Strom */
-export interface StromEreignis {
-  nr: string
-  kanal: string
-  wert: unknown
-}
-
-/**
- * Zerlegt gelesenen Text in Ereignisse; ein unvollständiger Rest bleibt für das nächste Stück.
- *
- * Ein Ereignis endet mit einer Leerzeile. Zeilen mit „:" am Anfang sind Herzschlag bzw.
- * Kommentar und tragen nichts. Der Text kann an JEDER Stelle abreißen – mitten in einer Zeile
- * oder zwischen „\n" und „\n" –, deshalb wird nur vollständig Abgeschlossenes ausgewertet.
- */
-export function zerlegeStrom(text: string): { ereignisse: StromEreignis[]; rest: string } {
-  const ereignisse: StromEreignis[] = []
-  const bloecke = text.replace(/\r\n?/g, '\n').split('\n\n')
-  const rest = bloecke.pop() ?? ''
-  for (const block of bloecke) {
-    let nr = ''
-    const daten: string[] = []
-    for (const zeile of block.split('\n')) {
-      if (zeile.startsWith('id:')) nr = zeile.slice(3).trim()
-      else if (zeile.startsWith('data:')) daten.push(zeile.slice(5).replace(/^ /, ''))
-    }
-    if (!daten.length) continue
-    try {
-      const { kanal, wert } = JSON.parse(daten.join('\n')) as { kanal?: string; wert?: unknown }
-      if (typeof kanal === 'string') ereignisse.push({ nr, kanal, wert })
-    } catch {
-      // ein kaputtes Ereignis überspringen, der Strom geht weiter
-    }
-  }
-  return { ereignisse, rest }
-}
-
-/** Kommt so lange gar nichts – auch kein Herzschlag (alle 15 s) –, gilt die Verbindung als tot. */
-const STILLE_MS = 45_000
-
-const hoerer = new Map<string, Set<(wert: unknown) => void>>()
-let stromLaeuft = false
-/** Der gerade offene Strom – nach einer neuen Anmeldung wird er mit dem neuen Token neu geöffnet */
-let stromSteuerung: AbortController | null = null
-
-const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
-
-/**
- * Hält den Strom offen – solange die Seite lebt.
- *
- * Reißt er ab (WLAN weg, Tablet im Ruhezustand, Rechner neu gestartet), wird er mit
- * wachsender Pause (1 s bis 15 s) neu aufgebaut. Dabei nennt der Browser das zuletzt
- * erhaltene Ereignis (`last-event-id`); der Server liefert nach, was dazwischen kam – vor
- * allem „Platz frei", sonst stünde ein Auftrag für immer auf „wartet".
- * Ohne Anmeldung wird nichts geöffnet; der Server würde ohnehin ablehnen.
- */
-async function halteStrom(): Promise<void> {
-  let letzte = ''
-  let letzterToken = ''
-  let warte = 1000
-  for (;;) {
-    const t = token()
-    if (!t) {
-      await pause(2000)
-      continue
-    }
-    // Neue Anmeldung = neue Sitzung am Server mit eigener Zählung
-    if (t !== letzterToken) letzte = ''
-    letzterToken = t
-    const steuerung = new AbortController()
-    stromSteuerung = steuerung
-    let wache: ReturnType<typeof setTimeout> | undefined
-    const lebt = (): void => {
-      clearTimeout(wache)
-      wache = setTimeout(() => steuerung.abort(), STILLE_MS)
-    }
-    try {
-      lebt()
-      const res = await fetch('/ereignisse', {
-        headers: { 'x-schulapps-token': t, ...(letzte ? { 'last-event-id': letzte } : {}) },
-        cache: 'no-store',
-        signal: steuerung.signal
-      })
-      if (res.ok && res.body) {
-        warte = 1000
-        const leser = res.body.getReader()
-        // `stream: true`: Ein Umlaut kann auf zwei Stücke verteilt ankommen
-        const decoder = new TextDecoder()
-        let puffer = ''
-        for (;;) {
-          const { done, value } = await leser.read()
-          if (done) break
-          lebt()
-          puffer += decoder.decode(value, { stream: true })
-          const { ereignisse, rest } = zerlegeStrom(puffer)
-          puffer = rest
-          for (const e of ereignisse) {
-            if (e.nr) letzte = e.nr
-            for (const cb of hoerer.get(e.kanal) ?? []) {
-              try {
-                cb(e.wert)
-              } catch {
-                // ein fehlerhafter Hörer hält die übrigen nicht auf
-              }
-            }
-          }
-        }
-      } else if (res.status === 401) {
-        // Abgemeldet (z. B. Zugang am Rechner neu eingeschaltet): kein neuer Strom, bis wieder eine PIN eingegeben ist
-        letzte = ''
-        await pause(5000)
-      }
-    } catch {
-      // abgerissen oder zu lange still – unten neu verbinden
-    } finally {
-      clearTimeout(wache)
-      steuerung.abort()
-    }
-    await pause(warte)
-    warte = Math.min(15_000, warte * 2)
-  }
-}
+// Aufgeteilt am 30.09.2026: Anmeldung, Aufrufe und Ereignisstrom stehen in netzVerbindung.ts (auch für die iPad-App)
+export { zerlegeStrom, type StromEreignis } from './netzVerbindung'
 
 /** Hörer für ein Ereignis anmelden; der Strom startet mit dem ersten Hörer. */
-export function horche(kanal: string, cb: (wert: unknown) => void): () => void {
-  if (!hoerer.has(kanal)) hoerer.set(kanal, new Set())
-  hoerer.get(kanal)!.add(cb)
-  if (!stromLaeuft && typeof fetch === 'function') {
-    stromLaeuft = true
-    void halteStrom()
-  }
-  return () => {
-    hoerer.get(kanal)?.delete(cb)
-  }
-}
+export const horche = (kanal: string, cb: (wert: unknown) => void): (() => void) => verbindung.horche(kanal, cb)
 
 /*
  * ---------- Drucken im Browser ----------
@@ -296,21 +125,7 @@ export async function vereinePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
 export function netzZugangEinrichten(): void {
   if (!imBrowserGestartet) return
 
-  const call = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
-    const res = await fetch('/api', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-schulapps-token': token() },
-      body: JSON.stringify({ channel, args: args.map(packen) })
-    })
-    const daten = (await res.json()) as { ok?: boolean; value?: unknown; error?: string; fehler?: string }
-    if (res.status === 401) {
-      localStorage.removeItem(SCHLUESSEL)
-      throw new Error('Die Anmeldung ist abgelaufen. Bitte die PIN erneut eingeben.')
-    }
-    if (daten.fehler) throw new Error(daten.fehler)
-    if (daten.ok === false) throw new Error(daten.error)
-    return auspacken(daten.value) as T
-  }
+  const call = <T>(channel: string, ...args: unknown[]): Promise<T> => verbindung.aufruf<T>(channel, args)
 
   const api = buildApi(call, {
     // Im Browser gibt es keinen Pfad auf dem Rechner – die Datei kommt als Inhalt an

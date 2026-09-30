@@ -36,6 +36,24 @@ setzen NSPhotoLibraryAddUsageDescription string "Schul-Apps speichert erzeugte B
 setzen UIFileSharingEnabled bool true
 setzen LSSupportsOpeningDocumentsInPlace bool true
 
+# „Abo über den PC" (30.09.2026): Die App spricht Schul-Apps am PC über HTTP an (Netzzugang mit PIN).
+# App Transport Security bleibt an (NSAllowsArbitraryLoads = false). Erlaubt wird nur:
+#  - NSAllowsLocalNetworking: IP-Adressen, Namen ohne Punkt und .local – das WLAN zu Hause oder in
+#    der Schule (192.168.x, 10.x, 172.16–31.x) und nach Apples Beschreibung auch rohe IP-Adressen
+#    wie die von Tailscale (100.64.0.0/10)
+#  - ts.net: MagicDNS-Namen von Tailscale (pc-name.tailnet-xyz.ts.net) – für unterwegs; der Name
+#    ist ein Domainname, fällt also NICHT unter „lokal"
+# Die Verbindung zum PC über Tailscale ist durch WireGuard verschlüsselt, im WLAN wie beim
+# Browser-Zugang unverschlüsselt (PIN schützt vor fremden Geräten).
+neu NSAppTransportSecurity dict
+add NSAppTransportSecurity:NSAllowsArbitraryLoads bool false
+add NSAppTransportSecurity:NSAllowsLocalNetworking bool true
+add NSAppTransportSecurity:NSExceptionDomains dict
+add NSAppTransportSecurity:NSExceptionDomains:ts.net dict
+add NSAppTransportSecurity:NSExceptionDomains:ts.net:NSIncludesSubdomains bool true
+add NSAppTransportSecurity:NSExceptionDomains:ts.net:NSExceptionAllowsInsecureHTTPLoads bool true
+setzen NSLocalNetworkUsageDescription string "Schul-Apps verbindet sich mit Schul-Apps auf dem PC im selben WLAN, um den KI-Zugang des PCs zu nutzen."
+
 # Multitasking (Split View / Slide Over) erlauben
 setzen UIRequiresFullScreen bool false
 

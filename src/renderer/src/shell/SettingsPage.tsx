@@ -71,6 +71,7 @@ import VerbrauchCard from './VerbrauchCard'
 import { imNetz } from '../shared/netzZugang'
 import { amPc, aufIos } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
+import { PcKiVerbindung, PcKiWahl } from './PcKiZugang'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
 import HaeufigSelect from '../shared/components/HaeufigSelect'
@@ -268,26 +269,7 @@ export default function SettingsPage(): React.JSX.Element {
                 </Text>
               </Card>
 
-              <Card withBorder padding="lg">
-                <Title order={4} mb="md">
-                  Hörtexte
-                </Title>
-                <SecretField
-                  name="elevenlabs"
-                  label="ElevenLabs-API-Schlüssel (optional)"
-                  placeholder="sk_… (elevenlabs.io → Profil → API Keys)"
-                  keyUrl="elevenlabs.io/app/settings/api-keys"
-                />
-                <Text size="xs" c="dimmed" mt="xs">
-                  Nötig, um Hörverstehens-Aufgaben zu vertonen: Die KI schreibt das Skript, gesprochene Sprache erzeugt keiner der KI-Zugänge. Ohne Schlüssel
-                  bleibt das Skript als Lesetext für die Lehrkraft erhalten.
-                </Text>
-                {/* Der häufigste Einrichtungsfehler – die Seite zeigt beides untereinander an */}
-                <Text size="xs" c="dimmed" mt={4}>
-                  Achtung: Der Schlüssel beginnt mit <b>sk_</b> und wird nur <b>einmal</b> angezeigt – beim Anlegen oder Erneuern. Die lange Zeichenfolge, die
-                  in der Übersicht steht, ist nur die Kennung des Schlüssels und funktioniert nicht.
-                </Text>
-              </Card>
+              <HoertextCard settings={settings} update={update} />
             </Stack>
           </Tabs.Panel>
 
@@ -489,8 +471,13 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
   const { ai } = settings
   const textInfo = AI_PROVIDERS.find((p) => p.id === ai.textProvider)!
   const [reloadKey, setReloadKey] = useState(0)
-  // Den Abo-Zugang gibt es auf dem iPad nicht (kein Programm des Anbieters) – dort immer API-Schlüssel
+  /*
+   * Den Abo-Zugang gibt es auf dem iPad nicht direkt (kein Programm des Anbieters). Dort heißt
+   * die Wahl „API-Schlüssel" oder „Abo über den PC": Die App am PC erzeugt mit IHREM Zugang
+   * (30.09.2026, mobil/pcKi.ts).
+   */
   const ios = aufIos()
+  const ueberPc = ios && Boolean(settings.pcKi?.texte)
   const zugang: AiAccess = ios ? 'api' : ai.access[ai.textProvider]
 
   return (
@@ -500,7 +487,7 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
       </Title>
       <Text size="sm" c="dimmed" mb="md">
         {ios
-          ? 'Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang über einen API-Schlüssel (nutzungsabhängig bezahlt); er liegt verschlüsselt im Schlüsselbund dieses Geräts. Den Abo-Zugang gibt es nur in der App am PC.'
+          ? 'Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang entweder über einen API-Schlüssel (nutzungsabhängig bezahlt; er liegt verschlüsselt im Schlüsselbund dieses Geräts) oder über Schul-Apps am PC: Dann erzeugt der PC mit seinem Abo oder Schlüssel, das iPad schickt nur den Auftrag.'
           : 'Die KI erstellt Aufgaben und liest Vokabellisten aus Fotos. Zugang entweder über einen API-Schlüssel (schnell, nutzungsabhängig bezahlt; Schlüssel werden verschlüsselt auf diesem PC gespeichert) oder über ein privates Abo mithilfe des offiziellen Programms des Anbieters (langsamer, mit Nutzungsgrenzen des Abos).'}{' '}
         Die KI für Bilder steht im Reiter{' '}
         <Anchor component="button" size="sm" onClick={() => openSettings('dienste')}>
@@ -510,13 +497,17 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
       </Text>
 
       <Stack gap="md">
-        <Select
-          label="KI für Aufgaben und Texterkennung"
-          data={AI_PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
-          value={ai.textProvider}
-          onChange={(v) => v && update({ ai: { textProvider: v as AiProviderId } })}
-          allowDeselect={false}
-        />
+        {ios && <PcKiWahl settings={settings} update={update} gruppe="texte" />}
+        {/* Über den PC wählt der PC Anbieter und Modell */}
+        {!ueberPc && (
+          <Select
+            label="KI für Aufgaben und Texterkennung"
+            data={AI_PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+            value={ai.textProvider}
+            onChange={(v) => v && update({ ai: { textProvider: v as AiProviderId } })}
+            allowDeselect={false}
+          />
+        )}
         {!ios && (
           <SegmentedControl
             value={ai.access[ai.textProvider]}
@@ -530,7 +521,9 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
             ]}
           />
         )}
-        {zugang === 'subscription' ? (
+        {ueberPc ? (
+          <PcKiVerbindung settings={settings} update={update} />
+        ) : zugang === 'subscription' ? (
           <SubscriptionSetup key={`sub-${ai.textProvider}`} provider={ai.textProvider} settings={settings} update={update} />
         ) : (
           <>
@@ -562,27 +555,32 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
           </>
         )}
 
-        <Select
-          label="Sparmodus"
-          data={[
-            { value: 'auto', label: 'Automatisch – beim Abo an' },
-            { value: 'on', label: 'Immer an' },
-            { value: 'off', label: 'Aus – größte Sorgfalt (mehr Anfragen)' }
-          ]}
-          value={ai.economy}
-          onChange={(v) => v && update({ ai: { economy: v as AppSettings['ai']['economy'] } })}
-          allowDeselect={false}
-          description="Im Sparmodus entstehen alle Aufgaben einer Testvariante in einer einzigen KI-Anfrage, die zusätzliche Prüfrunde entfällt. Das spart beim Abo einen Großteil des Kontingents (etwa 5- bis 10-mal weniger Anfragen). Kleinere Modelle sparen zusätzlich."
-        />
+        {/* Über den PC gelten Sparmodus und Modellwahl des PCs */}
+        {!ueberPc && (
+          <>
+            <Select
+              label="Sparmodus"
+              data={[
+                { value: 'auto', label: 'Automatisch – beim Abo an' },
+                { value: 'on', label: 'Immer an' },
+                { value: 'off', label: 'Aus – größte Sorgfalt (mehr Anfragen)' }
+              ]}
+              value={ai.economy}
+              onChange={(v) => v && update({ ai: { economy: v as AppSettings['ai']['economy'] } })}
+              allowDeselect={false}
+              description="Im Sparmodus entstehen alle Aufgaben einer Testvariante in einer einzigen KI-Anfrage, die zusätzliche Prüfrunde entfällt. Das spart beim Abo einen Großteil des Kontingents (etwa 5- bis 10-mal weniger Anfragen). Kleinere Modelle sparen zusätzlich."
+            />
 
-        <Divider />
+            <Divider />
 
-        <Checkbox
-          checked={ai.autoLatest}
-          onChange={(e) => update({ ai: { autoLatest: e.currentTarget.checked } })}
-          label="Modelle automatisch aktuell halten"
-          description="Die Modellliste wird beim Start und alle 12 Stunden direkt beim Anbieter abgefragt. Ist diese Option aktiv, wird immer das empfohlene neueste Modell genutzt. Abgekündigte Modelle werden in jedem Fall automatisch ersetzt."
-        />
+            <Checkbox
+              checked={ai.autoLatest}
+              onChange={(e) => update({ ai: { autoLatest: e.currentTarget.checked } })}
+              label="Modelle automatisch aktuell halten"
+              description="Die Modellliste wird beim Start und alle 12 Stunden direkt beim Anbieter abgefragt. Ist diese Option aktiv, wird immer das empfohlene neueste Modell genutzt. Abgekündigte Modelle werden in jedem Fall automatisch ersetzt."
+            />
+          </>
+        )}
       </Stack>
     </Card>
   )
@@ -595,8 +593,9 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
 export function ImageAiCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
   const { ai } = settings
   const imageProvider = ai.imageProvider === 'none' ? null : ai.imageProvider
-  // iPad: nur API-Schlüssel (siehe AiCard)
+  // iPad: API-Schlüssel oder über den PC (siehe AiCard)
   const ios = aufIos()
+  const ueberPc = ios && Boolean(settings.pcKi?.bilder)
   const imageAccess = imageProvider && !ios ? ai.imageAccess[imageProvider] : 'api'
   const textZugang: AiAccess = ios ? 'api' : ai.access[ai.textProvider]
   const [reloadKey, setReloadKey] = useState(0)
@@ -610,6 +609,9 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
         Erzeugt auf Wunsch Bilder für Arbeitsblätter und gestaltet Piktogramme neu. Der Zugang lässt sich getrennt von der KI für Texte wählen.
       </Text>
       <Stack gap="md">
+        {ios && <PcKiWahl settings={settings} update={update} gruppe="bilder" />}
+        {ueberPc && <PcKiVerbindung settings={settings} update={update} />}
+        {!ueberPc && (
         <Select
           label="KI für Bilder"
           data={[
@@ -626,7 +628,8 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
           allowDeselect={false}
           description="Claude erzeugt keine Fotos, zeichnet aber einfache Vektorgrafiken (gut für Piktogramme)."
         />
-        {imageProvider && (
+        )}
+        {imageProvider && !ueberPc && (
           <>
             {!ios && (
               <SegmentedControl
@@ -691,6 +694,51 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
               </>
             )}
           </>
+        )}
+      </Stack>
+    </Card>
+  )
+}
+
+/**
+ * Hörtexte vertonen – eigene Karte (30.09.2026 herausgelöst), damit Einstellungsseite und
+ * Einrichtungsassistent DIESELBE Karte zeigen.
+ *
+ * Vertont wird über ElevenLabs oder einen OpenAI-API-Schlüssel (services/audio). In der
+ * iPad-App geht es auch über den PC: Dann vertont Schul-Apps am PC mit seinen Schlüsseln, und
+ * die fertige Hördatei landet auf dem iPad.
+ */
+export function HoertextCard({ settings, update }: { settings: AppSettings; update: Update }): React.JSX.Element {
+  const ios = aufIos()
+  const ueberPc = ios && Boolean(settings.pcKi?.hoertexte)
+  return (
+    <Card withBorder padding="lg">
+      <Title order={4} mb="md">
+        Hörtexte
+      </Title>
+      <Stack gap="sm">
+        {ios && <PcKiWahl settings={settings} update={update} gruppe="hoertexte" lokal="Eigener Schlüssel" />}
+        {ueberPc ? (
+          <PcKiVerbindung settings={settings} update={update} />
+        ) : (
+          <div>
+            <SecretField
+              name="elevenlabs"
+              label="ElevenLabs-API-Schlüssel (optional)"
+              placeholder="sk_… (elevenlabs.io → Profil → API Keys)"
+              keyUrl="elevenlabs.io/app/settings/api-keys"
+            />
+            <Text size="xs" c="dimmed" mt="xs">
+              Nötig, um Hörverstehens-Aufgaben zu vertonen: Die KI schreibt das Skript, gesprochene Sprache erzeugt keiner der Abo-Zugänge. Ein
+              OpenAI-API-Schlüssel (Reiter „KI-Zugang“) vertont ebenfalls – mit den OpenAI-Stimmen. Ohne Schlüssel bleibt das Skript als Lesetext für die
+              Lehrkraft erhalten.
+            </Text>
+            {/* Der häufigste Einrichtungsfehler – die Seite zeigt beides untereinander an */}
+            <Text size="xs" c="dimmed" mt={4}>
+              Achtung: Der Schlüssel beginnt mit <b>sk_</b> und wird nur <b>einmal</b> angezeigt – beim Anlegen oder Erneuern. Die lange Zeichenfolge, die in
+              der Übersicht steht, ist nur die Kennung des Schlüssels und funktioniert nicht.
+            </Text>
+          </div>
         )}
       </Stack>
     </Card>

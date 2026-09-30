@@ -62,7 +62,8 @@ import type {
   SavedKurztest,
   SavedKurztestInput,
   SavedKurztestMeta,
-  SavedGrammarTestMeta
+  SavedGrammarTestMeta,
+  PcKiTest
 } from '@shared/types'
 
 export interface PrinterInfo {
@@ -136,6 +137,13 @@ export function buildApi(call: Call, extras: ApiExtras) {
       status: () => call<LanStatus>('lan:status'),
       start: () => call<LanStatus>('lan:start'),
       stop: () => call<LanStatus>('lan:stop')
+    },
+    /**
+     * Nur iPad-App: KI über die App am PC („Abo über den PC", mobil/pcKi.ts). Meldet sich mit
+     * der PIN am Netzzugang des PCs an und liest dessen KI-Zugang. Am PC: Meldung „nur iPad".
+     */
+    pcKi: {
+      testen: (adresse: string, pin: string) => call<PcKiTest>('pcki:testen', adresse, pin)
     },
     settings: {
       get: () => call<AppSettings>('settings:get'),

@@ -10,7 +10,8 @@
  *  1. Node-Ersatz (Buffer, process) – die Dienste greifen schon beim Laden darauf zu
  *  2. Dateisystem laden (Einstellungen, Materialien, Schlüssel aus dem Schlüsselbund)
  *  3. Abrufe fremder Seiten über die native HTTP-Schicht, keine Namensauflösung
- *  4. window.api aufbauen, Plattform „ios" melden
+ *  4. window.api aufbauen, Plattform „ios" melden; KI-Aufrufe auf Wunsch an die App am PC
+ *     weiterreichen („Abo über den PC", mobil/pcKi.ts)
  *  5. Sicherung, Modelllisten und Sichern beim Wechsel in den Hintergrund
  *  6. Die Oberfläche selbst – dieselbe wie am PC
  */
@@ -25,7 +26,11 @@ import { setzeAbrufer } from '../main/services/images/politeFetch'
 import { setzeAufloeser } from '../main/services/netz/zieladresse'
 import { getSettings, setSettings } from '../main/services/storage/settings'
 import { protokolliere } from '../main/services/protokoll'
+import { writeFileSync } from 'fs'
+import { pruefeAudioName } from '../main/services/audio/elevenlabs'
+import { ausBase64 } from './base64'
 import { bus } from './bus'
+import { erstellePcKi } from './pcKi'
 import { capHttpFetch } from './netz/capHttpFetch'
 import { starteAutoSicherung } from './sicherung/autoSicherung'
 import { mobilUmgebung } from './umgebung'
@@ -94,7 +99,23 @@ async function starten(): Promise<void> {
   kiAttrappe()
 
   const aufrufe = new Map<string, (...args: unknown[]) => unknown>()
-  registriereKanaele((kanal, fn) => aufrufe.set(kanal, fn as (...args: unknown[]) => unknown), mobilUmgebung())
+  const lokal = async (kanal: string, args: unknown[]): Promise<unknown> => {
+    const fn = aufrufe.get(kanal)
+    if (!fn) throw new Error(`Unbekannter Aufruf „${kanal}".`)
+    return fn(...args)
+  }
+  // „Abo über den PC": KI-Aufrufe an Schul-Apps am PC, wenn in den Einstellungen gewählt
+  const pcKi = erstellePcKi({
+    einstellungen: () => getSettings().pcKi,
+    lokal,
+    emit: (kanal, wert) => bus.emit(kanal, wert),
+    // Die am PC vertonte Datei hier ablegen – audio:read findet sie dann wie eine eigene Vertonung
+    hoerdateiAblegen: ({ fileName, dataUrl }) => {
+      const b64 = String(dataUrl ?? '').split(',')[1]
+      if (b64) writeFileSync(pruefeAudioName(fileName), ausBase64(b64))
+    }
+  })
+  registriereKanaele((kanal, fn) => aufrufe.set(kanal, fn as (...args: unknown[]) => unknown), mobilUmgebung(pcKi))
 
   const call = async <T>(kanal: string, ...args: unknown[]): Promise<T> => {
     const fn = aufrufe.get(kanal)
@@ -102,7 +123,8 @@ async function starten(): Promise<void> {
     // Nur wo nötig warten: Ein Aufruf ohne Umweg bleibt Folge des Klicks (Dateiauswahl, Teilen)
     if (MIT_RESSOURCEN.test(kanal)) await vorbereiten(kanal, args)
     try {
-      return kopie((await fn(...kopie(args))) as T)
+      const weiter = pcKi.weiterleiten(kanal, kopie(args))
+      return kopie((await (weiter ?? fn(...kopie(args)))) as T)
     } catch (err) {
       const meldung = err instanceof Error ? err.message : String(err)
       if (!/abgebrochen|aborted/i.test(meldung)) {

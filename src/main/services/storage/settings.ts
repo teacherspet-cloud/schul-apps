@@ -47,6 +47,8 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
       economy: (ai.economy as AppSettings['ai']['economy']) ?? base.ai.economy
     },
     appearance: { ...base.appearance, ...stored.appearance },
+    // iPad: Adresse, PIN und Auswahl getrennt änderbar (30.09.2026)
+    ...(base.pcKi || stored.pcKi ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } } : {}),
     sicherung: { ...base.sicherung, ...(stored.sicherung as object) },
     datenschutz: { ...base.datenschutz, ...(stored.datenschutz as object) },
     briefkopf: { ...base.briefkopf, ...(stored.briefkopf as object) },

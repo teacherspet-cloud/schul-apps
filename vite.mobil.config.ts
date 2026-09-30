@@ -77,10 +77,15 @@ function einstieg(): Plugin {
          * CSP für iOS: Die KI-Anbieter, Bildarchive und Quellen werden direkt angesprochen (https:),
          * Bilder aus dem Dateisystem kommen über capacitor:. Beim Entwickeln ohne CSP (Vite braucht
          * Inline-Skripte und ws: für das Neuladen).
+         *
+         * connect-src http: (30.09.2026): „Abo über den PC" spricht den Netzzugang von Schul-Apps am
+         * PC an (mobil/pcKi.ts) – der läuft über HTTP, im WLAN (192.168.x, 10.x …) oder über Tailscale
+         * (100.x, *.ts.net). Eine Liste einzelner Bereiche ist in CSP nicht möglich; was iOS über
+         * HTTP überhaupt zulässt, regelt die Info.plist (scripts/ios-plist.sh, App Transport Security).
          */
         const csp = dev
           ? ''
-          : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: capacitor:; media-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; frame-src 'self' about: blob: data:; connect-src 'self' https: data: blob: capacitor:"
+          : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: capacitor:; media-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; frame-src 'self' about: blob: data:; connect-src 'self' https: http: data: blob: capacitor:"
         out = out.replace(
           /<meta\s+http-equiv="Content-Security-Policy"[\s\S]*?\/>/,
           csp ? `<meta http-equiv="Content-Security-Policy" content="${csp}" />` : ''

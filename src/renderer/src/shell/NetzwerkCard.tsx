@@ -123,6 +123,39 @@ export default function NetzwerkCard({
               </div>
             </Group>
             {/*
+             * Weitere Adressen dieses PCs (30.09.2026) – vor allem Tailscale: Damit erreicht die
+             * iPad-App („Abo über den PC") den PC auch aus einem fremden WLAN oder über Mobilfunk,
+             * ohne dass der Zugang ins Internet gestellt wird.
+             */}
+            {(status.weitere ?? []).length > 0 && (
+              <Stack gap={4}>
+                <Text size="sm" fw={500}>
+                  Weitere Adressen dieses PCs
+                </Text>
+                {(status.weitere ?? []).map((w) => (
+                  <Group key={w.adresse} gap="xs" wrap="wrap">
+                    <Code style={{ fontSize: 14 }}>{w.adresse}</Code>
+                    <Badge size="xs" variant="light" color={w.art === 'tailscale' ? 'grape' : 'gray'}>
+                      {w.art === 'tailscale' ? 'Tailscale' : w.schnittstelle}
+                    </Badge>
+                    <CopyButton value={w.adresse}>
+                      {({ copied, copy }) => (
+                        <Button size="compact-xs" variant="subtle" leftSection={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} onClick={copy}>
+                          {copied ? 'Kopiert' : 'Kopieren'}
+                        </Button>
+                      )}
+                    </CopyButton>
+                  </Group>
+                ))}
+                {(status.weitere ?? []).some((w) => w.art === 'tailscale') && (
+                  <Text size="xs" c="dimmed">
+                    Von unterwegs: mit Tailscale auf PC und iPad erreichbar. Die Tailscale-Adresse (am besten der Name auf „.ts.net“) gehört dann in der iPad-App
+                    unter „Abo über den PC“ in das Feld „Adresse des PCs“.
+                  </Text>
+                )}
+              </Stack>
+            )}
+            {/*
              * Der Wunschport war belegt. Das passiert vor allem, wenn Schul-Apps noch ein
              * zweites Mal läuft – dann hört die ältere Fassung weiter auf 8420, und das
              * Tablet landet unbemerkt bei ihr. Deshalb steht es hier deutlich.
@@ -186,6 +219,16 @@ export default function NetzwerkCard({
         <List spacing="xs" size="sm" icon={<IconDeviceTablet size={16} />}>
           <List.Item>
             <b>Nur im selben Netz, nur während dieses Programm läuft.</b> Von außerhalb ist nichts erreichbar; es gibt keinen Cloud-Dienst.
+          </List.Item>
+          <List.Item>
+            <b>iPad-App: KI über diesen PC.</b> In der iPad-App lässt sich unter „KI-Zugang“ die Option „Abo über den PC (WLAN)“ wählen – dann erzeugt dieser
+            PC mit seinem Abo oder API-Schlüssel. Dafür muss Schul-Apps hier laufen und der Zugang eingeschaltet sein; auf dem iPad stehen die Adresse von oben
+            und die PIN.
+          </List.Item>
+          <List.Item>
+            <b>Von unterwegs nur über ein privates VPN.</b> Mit Tailscale (kostenlos, verschlüsselt) auf PC und iPad erreicht die iPad-App diesen PC auch aus
+            einem fremden WLAN oder über Mobilfunk. Der Zugang wird dafür nicht ins Internet gestellt; eine Weiterleitung am Router ist weder nötig noch
+            ratsam.
           </List.Item>
           <List.Item>
             <b>Es ist dasselbe Programm.</b> Eine gemeinsame Bibliothek, ein KI-Kontingent – das dieses Rechners. Wer vom Tablet aus erstellt, verbraucht

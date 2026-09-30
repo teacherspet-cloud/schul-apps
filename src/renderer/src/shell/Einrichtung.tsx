@@ -1,9 +1,10 @@
 import { Button, Group, Modal, Stack, Stepper, Text, Title } from '@mantine/core'
-import { IconPalette, IconSchool, IconSparkles } from '@tabler/icons-react'
+import { IconHeadphones, IconPalette, IconPhoto, IconSchool, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
 import { imNetz } from '../shared/netzZugang'
-import { AiCard, AppearanceCard, SchoolCard } from './SettingsPage'
+import { aufIos } from '../shared/plattform'
+import { AiCard, AppearanceCard, HoertextCard, ImageAiCard, SchoolCard } from './SettingsPage'
 import SicherungEinlesen from './SicherungEinlesen'
 
 /**
@@ -16,6 +17,9 @@ import SicherungEinlesen from './SicherungEinlesen'
  * Drei Entscheidungen aus der Rücksprache:
  *
  * - Drei Schritte: Schule und Lerngruppe (mit Logo), KI-Zugang, Aussehen der Oberfläche.
+ *   Seit 30.09.2026 fünf: dazu Bilder-KI und Hörtexte („Der Einrichtungsassistent umfasst außerdem
+ *   noch nicht Bilder-KI und Hörtext-KI."). In der iPad-App bieten die KI-Schritte zusätzlich
+ *   „Abo über den PC" an (mobil/pcKi.ts).
  * - JEDER Schritt ist überspringbar. Wer den Schlüssel gerade nicht zur Hand hat, soll nicht
  *   festsitzen – die Programme sagen später ohnehin, was fehlt.
  * - Eine Sicherung lässt sich hier direkt einlesen – nach dem Zurücksetzen der naheliegende Weg
@@ -39,7 +43,8 @@ export default function Einrichtung(): React.JSX.Element | null {
   useEffect(() => {
     /*
      * Im Netzbetrieb nicht: Der Assistent richtet Dinge auf dem RECHNER ein (Anmeldung beim
-     * KI-Anbieter, Logo-Datei). Vom Tablet aus liefe er ins Leere.
+     * KI-Anbieter, Logo-Datei). Vom Tablet aus liefe er ins Leere. In der iPad-App dagegen
+     * schon – sie ist ein eigenes Programm mit eigenen Einstellungen (imNetz() ist dort false).
      */
     if (imNetz() || geprueft) return
     let abgebrochen = false
@@ -57,6 +62,7 @@ export default function Einrichtung(): React.JSX.Element | null {
   }, [settings.schoolName, geprueft])
 
   if (!offen) return null
+  const ios = aufIos()
 
   const schritte = [
     {
@@ -71,9 +77,26 @@ export default function Einrichtung(): React.JSX.Element | null {
       label: 'KI-Zugang',
       beschreibung: 'Womit soll erzeugt werden?',
       icon: <IconSparkles size={18} />,
-      hinweis:
-        'Ohne Zugang erzeugt die App kein Material – das ist der Schritt, an dem es sonst hängenbleibt. Der Schlüssel wird verschlüsselt auf diesem Rechner abgelegt und verlässt ihn nicht.',
+      hinweis: ios
+        ? 'Ohne Zugang erzeugt die App kein Material – das ist der Schritt, an dem es sonst hängenbleibt. Entweder ein eigener API-Schlüssel (liegt verschlüsselt im Schlüsselbund dieses Geräts) oder das Abo über den PC: Dann erzeugt Schul-Apps am PC mit dem dort eingerichteten Zugang.'
+        : 'Ohne Zugang erzeugt die App kein Material – das ist der Schritt, an dem es sonst hängenbleibt. Der Schlüssel wird verschlüsselt auf diesem Rechner abgelegt und verlässt ihn nicht.',
       inhalt: <AiCard settings={settings} update={update} />
+    },
+    {
+      label: 'Bilder-KI',
+      beschreibung: 'Bilder und Piktogramme',
+      icon: <IconPhoto size={18} />,
+      hinweis:
+        'Optional: Die KI zeichnet auf Wunsch Bilder für Arbeitsblätter und gestaltet Piktogramme neu. Ohne Bild-KI bleiben die Bildsuche im Netz und die mitgelieferten Symbole.',
+      inhalt: <ImageAiCard settings={settings} update={update} />
+    },
+    {
+      label: 'Hörtexte',
+      beschreibung: 'Hörtexte vertonen',
+      icon: <IconHeadphones size={18} />,
+      hinweis:
+        'Optional: Für Hörverstehen spricht eine Stimme das Skript ein. Ohne Stimme bleibt das Skript als Lesetext für die Lehrkraft erhalten.',
+      inhalt: <HoertextCard settings={settings} update={update} />
     },
     {
       label: 'Aussehen',
@@ -98,7 +121,7 @@ export default function Einrichtung(): React.JSX.Element | null {
       <Stack gap="lg">
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="sm" c="dimmed">
-            Drei kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen nachholen.
+            Fünf kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen nachholen.
           </Text>
           {/* Nach einem Zurücksetzen der naheliegende Weg zurück (Wunsch vom 25.09.2026) */}
           <SicherungEinlesen variant="subtle" />

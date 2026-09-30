@@ -289,6 +289,39 @@ export interface AppSettings {
     /** Sechsstellige PIN, die ein Geraet einmal eingeben muss */
     pin: string
   }
+  /**
+   * Nur iPad-App: KI über die App am PC („Abo über den PC", 30.09.2026, mobil/pcKi.ts).
+   *
+   * Den Abo-Zugang gibt es nur über die offiziellen Programme der Anbieter am PC. Die iPad-App
+   * reicht ihre KI-Aufrufe deshalb auf Wunsch an Schul-Apps am PC weiter (Netzzugang mit PIN) –
+   * im selben WLAN oder von unterwegs über ein privates VPN wie Tailscale.
+   */
+  pcKi?: PcKiEinstellungen
+}
+
+/** iPad: was über den PC läuft und wie er erreichbar ist */
+export interface PcKiEinstellungen {
+  /** Adresse wie in den Netz-Einstellungen am PC, z. B. 192.168.1.24:8420 oder pc.tailnet.ts.net:8420 */
+  adresse: string
+  /** PIN des Netzzugangs am PC */
+  pin: string
+  /** Texte und Texterkennung (ai:structured, ai:websuche) */
+  texte: boolean
+  /** Bilder (ai:image) */
+  bilder: boolean
+  /** Hörtexte vertonen (audio:voices, audio:speak, audio:preview) */
+  hoertexte: boolean
+}
+
+/** Ergebnis von „Verbindung testen" (iPad) */
+export interface PcKiTest {
+  /** Die Adresse, wie sie benutzt wurde (mit http://) */
+  adresse: string
+  /** Fassung von Schul-Apps am PC */
+  fassung: string
+  status: AiStatus
+  /** Anmeldestand des Abo-Programms am PC, falls dort der Abo-Zugang gewählt ist */
+  abo: SubscriptionStatus | null
 }
 
 /** Eine bei ElevenLabs verfügbare Stimme */

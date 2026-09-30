@@ -140,6 +140,8 @@ export function electronUmgebung(o: ElectronUmgebungOptionen): Umgebung {
         stopLan()
         return lanStatus()
       }
-    }
+    },
+    // „Abo über den PC" gibt es nur in der iPad-App – der PC IST der PC
+    pcKi: null
   }
 }

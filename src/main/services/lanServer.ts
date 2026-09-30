@@ -23,6 +23,7 @@ import type { AddressInfo } from 'node:net'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { networkInterfaces } from 'node:os'
 import { createReadStream, existsSync, statSync } from 'node:fs'
+import { execFile } from 'node:child_process'
 import { extname, join, normalize, sep } from 'node:path'
 
 /**
@@ -38,6 +39,11 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'secrets:has',
   'ai:status',
   'ai:models',
+  /*
+   * Nur lesend: Ist das Abo-Programm am PC angemeldet? Die iPad-App mit „Abo über den PC"
+   * zeigt das an (30.09.2026). Einrichten, Anmelden und Testen bleiben am PC.
+   */
+  'ai:subscription-status',
   'cefr:get',
   'designs:list',
   'branding:get-logo',
@@ -272,6 +278,15 @@ const PUFFER = 100
 const MAX_STROEME = 8
 const HERZSCHLAG_MS = 15_000
 
+/** Eine weitere Adresse, unter der der PC erreichbar ist (z. B. über Tailscale von unterwegs) */
+export interface LanWeitereAdresse {
+  /** Vollständige Adresse, z. B. http://100.101.102.103:8420 */
+  adresse: string
+  art: 'tailscale' | 'lan'
+  /** Name der Netzwerkverbindung laut Windows, z. B. „Tailscale" */
+  schnittstelle: string
+}
+
 export interface LanStatus {
   laeuft: boolean
   /** Der gewünschte Port – weicht er vom laufenden ab, war er belegt */
@@ -283,6 +298,8 @@ export interface LanStatus {
   angemeldet: number
   /** Gesperrt nach zu vielen Fehlversuchen */
   gesperrt: boolean
+  /** Weitere Adressen dieses PCs – vor allem die von Tailscale (Zugriff von unterwegs, 30.09.2026) */
+  weitere?: LanWeitereAdresse[]
 }
 
 type Aufruf = (channel: string, args: unknown[]) => Promise<unknown>
@@ -298,14 +315,78 @@ let herzschlag: ReturnType<typeof setInterval> | null = null
 let fehlversuche = 0
 const MAX_FEHLVERSUCHE = 10
 
-/** Die Adresse dieses Rechners im lokalen Netz (die erste, die nicht die Rückschleife ist). */
-export function lanAdresse(): string {
-  for (const liste of Object.values(networkInterfaces())) {
+/*
+ * ---------- Adressen dieses PCs ----------
+ *
+ * Bis 30.09.2026 galt die erste Adresse, die nicht die Rückschleife ist. Mit Tailscale (privates
+ * VPN, damit die iPad-App den KI-Zugang des PCs auch von unterwegs nutzen kann) konnte das die
+ * Tailscale-Adresse sein – im WLAN der Schule die falsche. Jetzt: zuerst die privaten Bereiche
+ * des lokalen Netzes, Tailscale getrennt daneben.
+ */
+
+/** Tailscale vergibt Adressen aus 100.64.0.0/10 (Carrier-Grade NAT) */
+export const istTailscaleAdresse = (ip: string): boolean => {
+  const [a, b] = ip.split('.').map(Number)
+  return a === 100 && b >= 64 && b <= 127
+}
+
+const istPrivat = (ip: string): boolean => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)
+
+type EigeneAdresse = { ip: string; art: 'tailscale' | 'lan'; schnittstelle: string }
+
+/** Alle IPv4-Adressen außer der Rückschleife, mit Art und Name der Verbindung */
+export function lanAdressen(): EigeneAdresse[] {
+  const out: EigeneAdresse[] = []
+  for (const [name, liste] of Object.entries(networkInterfaces())) {
     for (const netz of liste ?? []) {
-      if (netz.family === 'IPv4' && !netz.internal) return netz.address
+      if (netz.family !== 'IPv4' || netz.internal) continue
+      const tailscale = istTailscaleAdresse(netz.address) || /tailscale/i.test(name)
+      out.push({ ip: netz.address, art: tailscale ? 'tailscale' : 'lan', schnittstelle: name })
     }
   }
-  return '127.0.0.1'
+  return out
+}
+
+/** Die Adresse dieses Rechners im lokalen Netz – bevorzugt eine private (WLAN/LAN), nie die von Tailscale. */
+export function lanAdresse(): string {
+  const alle = lanAdressen()
+  const lan = alle.filter((a) => a.art === 'lan')
+  return (lan.find((a) => istPrivat(a.ip)) ?? lan[0] ?? alle[0])?.ip ?? '127.0.0.1'
+}
+
+/**
+ * Der MagicDNS-Name dieses PCs bei Tailscale (z. B. pc-name.tailnet-xyz.ts.net), falls
+ * Tailscale installiert ist. Die iPad-App erreicht den PC darüber auch dann, wenn iOS reine
+ * IP-Adressen außerhalb des lokalen Netzes nicht über HTTP zulässt (Info.plist: Ausnahme für ts.net).
+ * Nur gelesen („tailscale status"), nie etwas umgestellt.
+ */
+let magicDns = ''
+function frageMagicDns(): void {
+  if (!lanAdressen().some((a) => a.art === 'tailscale')) return
+  const kandidaten = process.platform === 'win32' ? ['tailscale', 'C:\\Program Files\\Tailscale\\tailscale.exe'] : ['tailscale']
+  const versuch = (i: number): void => {
+    if (i >= kandidaten.length) return
+    execFile(kandidaten[i], ['status', '--json'], { timeout: 3000, windowsHide: true }, (fehler, ausgabe) => {
+      if (fehler) return versuch(i + 1)
+      try {
+        const name = String((JSON.parse(String(ausgabe)) as { Self?: { DNSName?: string } }).Self?.DNSName ?? '').replace(/\.$/, '')
+        if (/^[a-z0-9.-]+\.ts\.net$/i.test(name)) magicDns = name
+      } catch {
+        // ohne Namen bleibt die IP-Adresse
+      }
+    })
+  }
+  versuch(0)
+}
+
+function weitereAdressen(port: number): LanWeitereAdresse[] {
+  const haupt = lanAdresse()
+  const alle = lanAdressen()
+  const out: LanWeitereAdresse[] = []
+  const tailscale = alle.filter((a) => a.art === 'tailscale')
+  if (magicDns && tailscale.length) out.push({ adresse: `http://${magicDns}:${port}`, art: 'tailscale', schnittstelle: tailscale[0].schnittstelle })
+  for (const a of alle) if (a.ip !== haupt) out.push({ adresse: `http://${a.ip}:${port}`, art: a.art, schnittstelle: a.schnittstelle })
+  return out
 }
 
 /** Die Fassung des laufenden Programms – steht in jeder Ablehnung, siehe dort. */
@@ -318,8 +399,41 @@ export function lanStatus(): LanStatus {
     port: aktuellerPort,
     wunschPort: gewuenschterPort,
     angemeldet: tokens.size,
-    gesperrt: fehlversuche >= MAX_FEHLVERSUCHE
+    gesperrt: fehlversuche >= MAX_FEHLVERSUCHE,
+    weitere: server ? weitereAdressen(aktuellerPort) : []
   }
+}
+
+/*
+ * ---------- Aufrufe aus der iPad-App (30.09.2026) ----------
+ *
+ * Die iPad-App kann ihre KI-Aufrufe an diesen PC weiterreichen („Abo über den PC",
+ * mobil/pcKi.ts). Ihre Seite kommt aber nicht von hier, sondern von capacitor://localhost –
+ * für den Browser eine fremde Herkunft. Ohne CORS-Freigabe verwirft der WKWebView jede
+ * Antwort. Freigegeben werden NUR die Herkünfte der App (und localhost für die Prüfungen);
+ * eine beliebige Webseite im Netz bekommt keine Freigabe. Die Anmeldung per PIN mit Sperre
+ * nach zehn Fehlversuchen gilt unverändert – CORS ersetzt sie nicht.
+ */
+export const erlaubteHerkunft = (herkunft: string): boolean =>
+  /^(capacitor|ionic):\/\/localhost$/.test(herkunft) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(herkunft)
+
+/**
+ * Lebenszeichen während einer langen Anfrage.
+ *
+ * Eine KI-Anfrage dauert Minuten. Solange keine Antwort kommt, fließt kein einziges Byte – und
+ * Mobilfunk, Router und iOS kappen stille Verbindungen (iOS nach 60 s ohne Daten). Deshalb
+ * geht während des Wartens alle 15 s ein Leerzeichen hinaus: vor JSON erlaubt und bedeutungslos.
+ */
+export const PULS_MS = 15_000
+
+/** Die Kennung einer Anfrage (nach `kennzeichne`) – zum Abbrechen, wenn das Gerät die Verbindung verliert */
+function kennungDerAnfrage(kanal: string, args: unknown[]): string | null {
+  if (kanal === 'ai:structured') {
+    const id = (args[0] as { progressId?: unknown } | undefined)?.progressId
+    return typeof id === 'string' ? id : null
+  }
+  if (kanal === 'ai:image' || kanal === 'ai:websuche') return typeof args[1] === 'string' ? args[1] : null
+  return null
 }
 
 /** Vergleich ohne Zeitunterschied – sonst ließe sich die PIN Ziffer für Ziffer erraten. */
@@ -500,6 +614,25 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
         const url = new URL(req.url ?? '/', 'http://x')
         const token = req.headers['x-schulapps-token']
 
+        // Die iPad-App (siehe oben): Freigabe nur für ihre Herkunft
+        const herkunft = String(req.headers.origin ?? '')
+        const fremdErlaubt = Boolean(herkunft) && erlaubteHerkunft(herkunft)
+        if (fremdErlaubt) {
+          res.setHeader('access-control-allow-origin', herkunft)
+          res.setHeader('vary', 'origin')
+        }
+        if (req.method === 'OPTIONS') {
+          if (!fremdErlaubt) return void res.writeHead(403).end()
+          res.writeHead(204, {
+            'access-control-allow-methods': 'GET, POST',
+            'access-control-allow-headers': 'content-type, x-schulapps-token, last-event-id',
+            'access-control-max-age': '600',
+            // Chromium fragt vor Zugriffen ins private Netz eigens nach
+            ...(req.headers['access-control-request-private-network'] ? { 'access-control-allow-private-network': 'true' } : {})
+          })
+          return void res.end()
+        }
+
         if (req.method === 'POST' && url.pathname === '/anmelden') {
           if (fehlversuche >= MAX_FEHLVERSUCHE)
             return json(res, 429, { fehler: 'Zu viele Fehlversuche. Der Zugang muss am Rechner in den Einstellungen neu eingeschaltet werden.' })
@@ -539,13 +672,26 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
             })
           }
           if (!aufrufen) return json(res, 500, { fehler: 'Der Zugang ist nicht bereit.' })
+          const ausfuehren = aufrufen
+          const args = kennzeichne(kanal, beschneide(kanal, (koerper.args ?? []).map(auspacken)), sitzung.kennung)
+          // Ab hier steht die Antwort fest auf 200 (Fehler stecken im JSON) – so können Lebenszeichen vorausgehen
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          const puls = setInterval(() => res.write(' '), PULS_MS)
+          // Verbindung verloren (WLAN weg, iPad im Ruhezustand): die KI-Anfrage abbrechen, statt das Kontingent für niemanden zu verbrauchen
+          const kennung = kennungDerAnfrage(kanal, args)
+          res.on('close', () => {
+            clearInterval(puls)
+            if (!res.writableFinished && kennung) void ausfuehren('ai:cancel', [kennung]).catch(() => undefined)
+          })
           try {
-            const roh = (koerper.args ?? []).map(auspacken)
-            const wert = await aufrufen(kanal, kennzeichne(kanal, beschneide(kanal, roh), sitzung.kennung))
-            return json(res, 200, { ok: true, value: packen(wert) })
+            const wert = await ausfuehren(kanal, args)
+            res.end(JSON.stringify({ ok: true, value: packen(wert) }))
           } catch (e) {
-            return json(res, 200, { ok: false, error: e instanceof Error ? e.message : String(e) })
+            res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) }))
+          } finally {
+            clearInterval(puls)
           }
+          return
         }
 
         if (req.method === 'GET' && url.pathname === '/gesundheit') return json(res, 200, { name: 'Schul-Apps', laeuft: true, fassung: fassung() })
@@ -573,6 +719,7 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
           for (const sitzung of tokens.values()) for (const res of sitzung.stroeme) res.write(': puls\n\n')
         }, HERZSCHLAG_MS)
         herzschlag.unref?.()
+        frageMagicDns()
         ok(lanStatus())
       })
     }

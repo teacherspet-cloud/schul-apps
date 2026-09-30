@@ -1,7 +1,8 @@
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { describe, expect, it } from 'vitest'
-import { beschneide, ERLAUBTE_KANAELE } from '../src/main/services/lanServer'
+import { beschneide, erlaubteHerkunft, ERLAUBTE_KANAELE, istTailscaleAdresse } from '../src/main/services/lanServer'
+import { gruppeVon, KANAELE_BILDER, KANAELE_HOERTEXTE, KANAELE_TEXTE } from '../src/mobil/pcKi'
 
 /*
  * Der Zugriff aus dem Netz arbeitet mit einer ERLAUBNISLISTE: Was dort nicht steht, wird
@@ -39,7 +40,8 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
       { muster: /:delete$/, warum: 'löscht gespeichertes Material' },
       { muster: /^export:print$/, warum: 'öffnet den Druckdialog dieses Rechners' },
       { muster: /^designs:delete$/, warum: 'löscht Designvorlagen' },
-      { muster: /^ai:(install|login|subscription|test)/, warum: 'richtet KI-Zugänge ein' }
+      // ai:subscription-status liest nur (Anzeige in der iPad-App, 30.09.2026) – alles andere am Abo richtet ein
+      { muster: /^ai:(install|login|subscription-(?!status$)|test)/, warum: 'richtet KI-Zugänge ein' }
     ]
     for (const kanal of ERLAUBTE_KANAELE) {
       for (const v of verboten) {
@@ -125,6 +127,43 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
     const args = [{ schoolName: 'Musterschule' }]
     expect(beschneide('settings:set', args)[0]).toEqual({ schoolName: 'Musterschule' })
     expect(beschneide('sheets:save', args)).toBe(args)
+  })
+
+  it('gibt alles frei, was die iPad-App mit „Abo über den PC" weiterreicht', () => {
+    /*
+     * Die iPad-App (mobil/pcKi.ts) schickt diese Aufrufe an den PC. Fehlte einer in der
+     * Erlaubnisliste, scheiterte er auf dem iPad mit „nicht freigegeben" – etwa der Abbruch
+     * eines Auftrags oder die Websuche mitten im Planen.
+     */
+    const weitergereicht = [...KANAELE_TEXTE, ...KANAELE_BILDER, ...KANAELE_HOERTEXTE, 'ai:cancel', 'ai:status', 'ai:subscription-status']
+    for (const k of weitergereicht) expect(ERLAUBTE_KANAELE, `${k} fehlt – die iPad-App könnte ihn nicht an den PC weiterreichen`).toContain(k)
+    // Einrichten bleibt am PC
+    for (const k of ['ai:subscription-test', 'ai:subscription-image-test', 'ai:subscription-models', 'ai:login-start', 'ai:install', 'ai:test']) {
+      expect(ERLAUBTE_KANAELE).not.toContain(k)
+    }
+    // Hörtexte über den PC: vertonen ja, den Explorer des PCs öffnen nie
+    expect(gruppeVon('audio:speak')).toBe('hoertexte')
+    expect(gruppeVon('audio:show')).toBeNull()
+    expect(gruppeVon('audio:read')).toBeNull()
+    expect(gruppeVon('secrets:set')).toBeNull()
+  })
+
+  it('erlaubt fremde Herkunft nur der iPad-App (CORS)', () => {
+    for (const h of ['capacitor://localhost', 'ionic://localhost', 'http://localhost', 'http://127.0.0.1:5188', 'https://localhost:3000']) {
+      expect(erlaubteHerkunft(h), h).toBe(true)
+    }
+    for (const h of ['http://192.168.1.50', 'https://boese.example', 'http://localhost.boese.example', 'capacitor://localhost.example', 'null', '']) {
+      expect(erlaubteHerkunft(h), h).toBe(false)
+    }
+  })
+
+  it('erkennt Tailscale-Adressen (100.64.0.0/10)', () => {
+    expect(istTailscaleAdresse('100.64.0.1')).toBe(true)
+    expect(istTailscaleAdresse('100.101.102.103')).toBe(true)
+    expect(istTailscaleAdresse('100.127.255.254')).toBe(true)
+    expect(istTailscaleAdresse('100.128.0.1')).toBe(false)
+    expect(istTailscaleAdresse('100.63.0.1')).toBe(false)
+    expect(istTailscaleAdresse('192.168.1.24')).toBe(false)
   })
 
   it('lässt die Bibliotheken lesen', () => {

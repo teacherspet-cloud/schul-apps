@@ -9,7 +9,8 @@
  *    danach alle Dateien darin
  *  - Im Ordner zeigen → teilen
  *  - Drucken → AirPrint (mobil/export/druckmaschine.ts)
- * Netzzugang und Abo-Zugang gibt es nicht (lan: null; stubs/cli.ts).
+ * Netzzugang und Abo-Zugang gibt es nicht (lan: null; stubs/cli.ts) – wohl aber „Abo über den PC":
+ * KI-Aufrufe an die App am PC weiterreichen (mobil/pcKi.ts, hier nur der Verbindungstest).
  */
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
@@ -19,6 +20,7 @@ import type { FileFilter } from '@shared/types'
 import type { Umgebung } from '../main/kanaele'
 import { bus } from './bus'
 import { druckmaschine } from './export/druckmaschine'
+import type { PcKi } from './pcKi'
 import { ladeSicherung, listeSicherungen, sichereJetzt } from './sicherung/autoSicherung'
 import { DOKUMENTE, USERDATA } from './vfs/mounts'
 import { normiere, vfs } from './vfs/speicher'
@@ -125,7 +127,7 @@ function waehleDatei(filters: FileFilter[]): Promise<string | null> {
   })
 }
 
-export function mobilUmgebung(): Umgebung {
+export function mobilUmgebung(pcKi?: PcKi): Umgebung {
   const aus = (): void => undefined
   return {
     sende: (kanal, wert) => bus.emit(kanal, wert),
@@ -175,6 +177,12 @@ export function mobilUmgebung(): Umgebung {
       // Eine Kopie in einen zweiten Ordner gibt es nicht – die Sicherungen liegen schon in der Dateien-App
       ordnerWaehlen: async () => null
     },
-    lan: null
+    lan: null,
+    pcKi: {
+      testen: async (adresse, pin) => {
+        if (!pcKi) throw new Error('Die Verbindung zum PC ist noch nicht bereit.')
+        return pcKi.testen(adresse, pin)
+      }
+    }
   }
 }

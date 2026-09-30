@@ -34,7 +34,8 @@ import {
   Textbook,
   TtsRequest,
   SavedGrammarTestInput,
-  SavedKurztestInput
+  SavedKurztestInput,
+  PcKiTest
 } from '@shared/types'
 import type { PrinterInfo, PrintOptions } from '@shared/apiShape'
 import { createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
@@ -153,6 +154,8 @@ export interface Umgebung {
   }
   /** Zugang aus dem lokalen Netz – nur am PC */
   lan: { status(): LanStatus; start(): Promise<LanStatus>; stop(): LanStatus } | null
+  /** KI über die App am PC („Abo über den PC") – nur in der iPad-App (mobil/pcKi.ts) */
+  pcKi: { testen(adresse: string, pin: string): Promise<PcKiTest> } | null
 }
 
 /** Meldung, wenn eine Funktion nur am PC existiert */
@@ -192,6 +195,11 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('lan:stop', () => {
     if (!lan) throw new Error(NUR_AM_PC)
     return lan.stop()
+  })
+  // Umgekehrt nur auf dem iPad: die Verbindung zur App am PC prüfen
+  handle('pcki:testen', (adresse: string, pin: string) => {
+    if (!u.pcKi) throw new Error('Die KI über den PC gibt es nur in der iPad-App – am PC läuft die KI direkt.')
+    return u.pcKi.testen(adresse, pin)
   })
 
   // Die Oberfläche hat vor dem Schließen alles gesichert (siehe main/index.ts, createWindow)

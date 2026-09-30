@@ -11,7 +11,9 @@
 //     schreibt über @capacitor/filesystem und lädt beim Start wieder.
 //  3. Ein API-Schlüssel landet im „Schlüsselbund" (Web-Ersatz) und nicht im Dateisystem.
 //  4. Ein Vokabeltest entsteht mit der KI-Attrappe von Anfang bis Ende und liegt danach in der Bibliothek.
-//  5. Die Oberfläche des iPads: kein Netzwerk-Reiter, KI nur über API-Schlüssel.
+//  5. Die Oberfläche des iPads: kein Netzwerk-Reiter, kein direktes Abo – aber „Abo über den PC".
+//  6. (30.09.2026) Ohne KI und Schulname erscheint der Einrichtungsassistent mit fünf Schritten
+//     (Schule, KI-Zugang, Bilder-KI, Hörtexte, Aussehen); die KI-Schritte bieten „Abo über den PC".
 import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -125,6 +127,7 @@ async function lauf(name, browserTyp, startOpt) {
       await kiReiter.click()
       await page.waitForTimeout(500)
       pruefe((await page.getByText(/^Abo \(/).count()) === 0, `${name}: keine Abo-Wahl beim KI-Zugang`)
+      pruefe((await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: Wahl „Abo über den PC" beim KI-Zugang`)
       pruefe((await page.getByText(/API-Schlüssel für/).count()) > 0, `${name}: Feld für den API-Schlüssel da`)
     } else pruefe(false, `${name}: Reiter „KI-Zugang" fehlt`)
     await page.screenshot({ path: join(out, `${name}-2-einstellungen.png`) })
@@ -191,13 +194,66 @@ async function lauf(name, browserTyp, startOpt) {
   }
 }
 
+/** Frisches iPad ohne KI-Attrappe: Der Einrichtungsassistent kommt – mit den neuen Schritten */
+async function assistent(name, browserTyp, startOpt) {
+  console.log(`\n=== ${name}: Einrichtungsassistent ===`)
+  const browser = await browserTyp.launch(startOpt)
+  const kontext = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 1 })
+  const page = await kontext.newPage()
+  const fehler = []
+  page.on('pageerror', (e) => fehler.push(`Fehler im Fenster: ${e.message}`))
+  try {
+    await page.goto(adresse)
+    await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
+    const titel = page.getByText('Willkommen bei Schul-Apps')
+    const da = await titel.waitFor({ state: 'visible', timeout: 10000 }).then(
+      () => true,
+      () => false
+    )
+    pruefe(da, `${name}: Einrichtungsassistent erscheint auf dem iPad`)
+    if (!da) return
+    pruefe(await page.getByText('Fünf kurze Schritte').isVisible(), `${name}: Einleitung nennt fünf Schritte`)
+    for (const s of ['Schule', 'KI-Zugang', 'Bilder-KI', 'Hörtexte', 'Aussehen']) {
+      pruefe((await page.locator('.mantine-Stepper-stepLabel', { hasText: s }).count()) > 0, `${name}: Schritt „${s}"`)
+    }
+    const weiter = page.getByRole('button', { name: 'Weiter', exact: true })
+    await weiter.click()
+    await page.waitForTimeout(400)
+    pruefe((await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: KI-Schritt bietet „Abo über den PC"`)
+    // Die Wahl zeigt Adresse, PIN und „Verbindung testen"
+    await page.getByText('Abo über den PC (WLAN)').first().click()
+    await page.waitForTimeout(400)
+    pruefe(await page.getByLabel('Adresse des PCs').first().isVisible(), `${name}: Feld „Adresse des PCs"`)
+    pruefe(await page.getByRole('button', { name: 'Verbindung testen' }).first().isVisible(), `${name}: Knopf „Verbindung testen"`)
+    await page.screenshot({ path: join(out, `${name}-0-assistent-ki.png`) })
+    await weiter.click()
+    await page.waitForTimeout(400)
+    pruefe((await page.getByText('KI für Bilder').count()) + (await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: Schritt Bilder-KI zeigt die Bild-Karte`)
+    await page.screenshot({ path: join(out, `${name}-0-assistent-bilder.png`) })
+    await weiter.click()
+    await page.waitForTimeout(400)
+    pruefe((await page.getByText('ElevenLabs-API-Schlüssel (optional)').count()) + (await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: Schritt Hörtexte zeigt die Hörtext-Karte`)
+    await page.screenshot({ path: join(out, `${name}-0-assistent-hoertexte.png`) })
+    await page.getByRole('button', { name: 'Später einrichten' }).click()
+  } catch (e) {
+    problems.push(`${name}: Assistent – ${e.message.split('\n')[0]}`)
+    await page.screenshot({ path: join(out, `${name}-assistent-fehler.png`) }).catch(() => undefined)
+  } finally {
+    for (const f of fehler) console.log(`   (${f})`)
+    pruefe(fehler.length === 0, `${name}: keine Fehler im Fenster beim Assistenten (${fehler.length})`)
+    await browser.close()
+  }
+}
+
 try {
   if (welche !== 'webkit') {
     // Chromium: das auf Windows vorhandene Edge
+    await assistent('chromium', chromium, { channel: 'msedge' })
     await lauf('chromium', chromium, { channel: 'msedge' })
   }
   if (welche !== 'chromium') {
     try {
+      await assistent('webkit', webkit, {})
       await lauf('webkit', webkit, {})
     } catch (e) {
       console.log(`WebKit nicht verfügbar: ${e.message.split('\n')[0]} (npx playwright-core install webkit)`)
