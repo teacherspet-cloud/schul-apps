@@ -16,7 +16,7 @@
  * die Variable nie.
  */
 import { appendFileSync, readFileSync } from 'fs'
-import type { StructuredRequest } from '@shared/types'
+import type { OnlineImageHit, StructuredRequest } from '@shared/types'
 import { AbbruchFehler } from '@shared/abbruch'
 import type { AiProvider, ChunkListener, Netzfund, RawModel } from './provider'
 
@@ -40,6 +40,16 @@ interface AttrappenDatei {
    * hineingezogenes Material im Auftrag steht.
    */
   protokoll?: string
+  /**
+   * Bild der Bild-KI (data:-URL, 01.10.2026). Fehlt es, gilt die Bild-KI als nicht eingerichtet und
+   * `generateImage` scheitert wie bisher. Jeder Bildauftrag landet als `schemaName: "bild"` im Protokoll.
+   */
+  bild?: string
+  /**
+   * Treffer der Online-Bildsuche (statt Wikimedia/Openverse) – Vorschau und Bild als data:-URLs,
+   * damit die Tests ohne Netz laufen. `[]` = die Suche findet nichts.
+   */
+  bildsuche?: OnlineImageHit[]
 }
 
 /** Wie oft je Auftragsart schon geantwortet wurde – für `folge` */
@@ -53,6 +63,26 @@ function lies(): AttrappenDatei {
   } catch {
     return {}
   }
+}
+
+/** Bild der Attrappe (falls hinterlegt) – dann gilt die Bild-KI als eingerichtet */
+export const attrappeBild = (): string | undefined => (attrappeAktiv() ? lies().bild : undefined)
+
+/** Treffer der Bildsuche aus der Attrappe (undefined = echte Suche) */
+export const attrappeBildsuche = (): OnlineImageHit[] | undefined => (attrappeAktiv() ? lies().bildsuche : undefined)
+
+/** Bildauftrag der Attrappe: protokollieren, hinterlegtes Bild liefern */
+export function attrappeBildErzeugen(prompt: string): string {
+  const datei = lies()
+  if (datei.protokoll) {
+    try {
+      appendFileSync(datei.protokoll, `${JSON.stringify({ schemaName: 'bild', system: '', user: prompt, bilder: 0 })}\n`)
+    } catch {
+      // Nur für Tests
+    }
+  }
+  if (!datei.bild) throw new Error('Attrappe: keine Bilder.')
+  return datei.bild
 }
 
 /** Wartet `ms`, meldet dabei Zeichen und endet beim Abbruch sofort. */
@@ -102,8 +132,8 @@ export class AttrappeProvider implements AiProvider {
     return structuredClone(antwort) as T
   }
 
-  async generateImage(): Promise<string> {
-    throw new Error('Attrappe: keine Bilder.')
+  async generateImage(prompt: string): Promise<string> {
+    return attrappeBildErzeugen(prompt)
   }
 
   async websuche(): Promise<Netzfund[]> {

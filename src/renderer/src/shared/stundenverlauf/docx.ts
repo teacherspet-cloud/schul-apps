@@ -4,7 +4,8 @@
  */
 import { AlignmentType, Document, Packer, PageOrientation, Paragraph, ShadingType, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from 'docx'
 import { kiWordEigenschaften, type KiHerkunft } from '@shared/kiKennzeichnung'
-import { A4_HEIGHT, A4_WIDTH, ALL_BORDERS, MM } from '../export/docxKit'
+import { A4_HEIGHT, A4_WIDTH, ALL_BORDERS, imageRun, MM } from '../export/docxKit'
+import { bildKennzeichnung, IMPULS_ARTEN, lizenzHinweis, type Einstiegsimpuls } from './einstiegsimpuls'
 import type { Stundenverlauf } from './stundenverlauf'
 
 const RAND = Math.round(14 * MM)
@@ -51,10 +52,48 @@ export async function verlaufDocx(v: Stundenverlauf, titel: string, untertitel: 
                   children: [new TextRun({ text: 'Hinweise: ', bold: true }), new TextRun(v.hinweise)]
                 })
               ]
-            : [])
+            : []),
+          ...v.phasen.flatMap((p) => (p.impuls ? impulsAbsaetze(p.impuls, p.phase, breite) : []))
         ]
       }
     ]
   })
   return new Uint8Array(await Packer.toArrayBuffer(doc))
+}
+
+/**
+ * Der Einstiegsimpuls unter der Tabelle: Bild (höchstens 9 cm hoch) mit Kennzeichnung bzw.
+ * Quellenangabe, dann Leitfrage, Moderation, erwartete Beiträge und Überleitung.
+ */
+function impulsAbsaetze(i: Einstiegsimpuls, phase: string, breite: number): Paragraph[] {
+  const fett = (label: string, text: string): Paragraph =>
+    new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: `${label} `, bold: true }), new TextRun(text)] })
+  const punkte = (xs: string[]): Paragraph[] => xs.map((x) => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(x)] }))
+  const aus: Paragraph[] = [
+    new Paragraph({
+      spacing: { before: 280, after: 100 },
+      children: [new TextRun({ text: `${phase}: ${IMPULS_ARTEN[i.art]?.label ?? 'Impuls'} – ${i.titel}`, bold: true, size: 24 })]
+    })
+  ]
+  // Nur Rasterbilder (PNG/JPEG/GIF) – Word kann SVG nicht ohne Ersatzbild
+  if (i.image?.dataUrl && /^data:image\/(png|jpe?g|gif);/.test(i.image.dataUrl)) {
+    const format = i.bildFormat && i.bildFormat > 0 ? i.bildFormat : 4 / 3
+    // 96 dpi: 9 cm Höhe ≈ 340 Punkte, Breite höchstens Satzspiegel (Twips → Punkte: /15)
+    const hoehe = Math.min(340, breite / 15 / format)
+    aus.push(new Paragraph({ children: [imageRun(i.image.dataUrl, hoehe * format, hoehe)] }))
+    aus.push(
+      new Paragraph({
+        spacing: { after: 120 },
+        children: [new TextRun({ text: [bildKennzeichnung(i.image), lizenzHinweis(i.image)].filter(Boolean).join(' · '), size: 16, color: '444444' })]
+      })
+    )
+  }
+  if (i.zitat) aus.push(fett('Zitat:', `„${i.zitat.text}" – ${i.zitat.quelle || 'Quelle fehlt'}`))
+  if (i.beschreibung) aus.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun(i.beschreibung)] }))
+  if (i.bezug) aus.push(fett('Bezug zum Stundenziel:', i.bezug))
+  if (i.leitfrage) aus.push(fett('Leitfrage:', i.leitfrage))
+  if (i.moderation.length) aus.push(fett('Moderation:', ''), ...punkte(i.moderation))
+  if (i.erwartungen.length) aus.push(fett('Erwartete Beiträge:', ''), ...punkte(i.erwartungen))
+  if (i.ueberleitung) aus.push(fett('Überleitung:', i.ueberleitung))
+  return aus
 }

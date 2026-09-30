@@ -36,6 +36,8 @@ import { describeSheet } from '../generation/describe'
 import { systemPrompt } from '../generation/prompts'
 import type { Worksheet } from '../model/types'
 import { aiCall, useArbeitsblatt } from '../store'
+import { brauchtBild } from '../../../shared/stundenverlauf/einstiegsimpuls'
+import { EinstiegsimpulsKarte, impulsBildHolen } from './EinstiegsimpulsKarte'
 
 /**
  * Reiter „Stundenverlauf" im Editor des Arbeitsblatts (Großprogramm 0.4, F4): mit KI aus dem
@@ -44,6 +46,8 @@ import { aiCall, useArbeitsblatt } from '../store'
 export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: LearnerProfile }): React.JSX.Element {
   const update = useArbeitsblatt((s) => s.update)
   const [busy, setBusy] = useState(false)
+  // Phase, deren Impulsbild gerade automatisch beschafft wird
+  const [bildPhase, setBildPhase] = useState<string | null>(null)
   const [wunsch, setWunsch] = useState('')
   const [dauer, setDauer] = useState<number>(ws.stundenverlauf?.dauer ?? (ws.meta.minutes > 50 ? 90 : 45))
   const v = ws.stundenverlauf
@@ -59,9 +63,26 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
     setBusy(true)
     try {
       const material = ws.sheets.map((s) => `${ws.sheets.length > 1 ? `[${s.label}]\n` : ''}${describeSheet(s)}`).join('\n\n')
-      const antwort = await aiCall<unknown>(verlaufsAnfrage(systemPrompt(ws.meta, profile), material, dauer, wunsch.trim()))
+      const lerngruppe = {
+        subjectId: ws.meta.subjectId,
+        subjectLabel: ws.meta.subjectLabel,
+        grade: ws.meta.grade,
+        topic: ws.meta.topic,
+        learningGoals: ws.meta.learningGoals
+      }
+      const antwort = await aiCall<unknown>(verlaufsAnfrage(systemPrompt(ws.meta, profile), material, dauer, wunsch.trim(), lerngruppe))
       const neu = verlaufAus(antwort, dauer)
       update((w) => (w.stundenverlauf = neu))
+      // Bildimpuls geplant: gleich ein konkretes Bild beschaffen (Suche mit KI-Prüfung, sonst KI-Entwurf)
+      const mitBild = neu.phasen.find((p) => brauchtBild(p.impuls))
+      if (mitBild && ws.meta.imageSource !== 'placeholder') {
+        setBildPhase(mitBild.id)
+        const aktuell = useArbeitsblatt.getState().worksheet
+        if (aktuell)
+          void impulsBildHolen(mitBild.id, aktuell, 'auto')
+            .catch((e: unknown) => notifyError(e, 'Das Bild für den Einstieg konnte nicht beschafft werden'))
+            .finally(() => setBildPhase(null))
+      }
     } catch (e) {
       notifyError(e, 'Der Stundenverlauf konnte nicht erstellt werden')
     } finally {
@@ -321,6 +342,11 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
             Summe: {summe} von {v.dauer} Minuten
           </Text>
         </Group>
+        {v.phasen
+          .filter((p) => p.impuls)
+          .map((p) => (
+            <EinstiegsimpulsKarte key={`impuls-${p.id}`} phase={p} ws={ws} dauer={v.dauer} laedt={bildPhase === p.id} />
+          ))}
         <Textarea
           size="xs"
           label="Hinweise"

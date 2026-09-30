@@ -42,7 +42,7 @@ import type { PrinterInfo, PrintOptions } from '@shared/apiShape'
 import { createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
 import { generateSvgImage } from './services/ai/svg'
 import { KiPlaetze } from './services/ai/kiPlaetze'
-import { attrappeAktiv } from './services/ai/attrappe'
+import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche } from './services/ai/attrappe'
 import { istAbbruch } from '@shared/abbruch'
 import { freierDateiname } from '@shared/dateiname'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
@@ -461,8 +461,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
 
   handle('images:openmoji-search', (q: string) => searchOpenMoji(q))
   handle('images:openmoji-svg', (hex: string) => getOpenMojiSvg(hex))
-  handle('images:online-search', (q: string, source: OnlineImageSource) => searchOnline(q, source, getSecret('pixabay')))
-  handle('images:fetch', (url: string) => fetchAsDataUrl(url))
+  // In den Oberflächentests mit Attrappe (nie im Betrieb) kommen die Treffer ohne Netz aus der Attrappe
+  handle('images:online-search', (q: string, source: OnlineImageSource) => attrappeBildsuche() ?? searchOnline(q, source, getSecret('pixabay')))
+  handle('images:fetch', (url: string) => (attrappeAktiv() && url.startsWith('data:image/') ? url : fetchAsDataUrl(url)))
   handle('sources:check-quote', (url: string, quote: string) => checkQuote(url, quote))
   // Ton-/Filmquellen: erreichbar, und handelt die Seite von dem, was die KI behauptet?
   handle('sources:check-media', (url: string, expect: string[]) => checkMediaSource(url, expect))
@@ -629,7 +630,7 @@ function aiStatus(): AiStatus {
     imageProvider: ai.imageProvider,
     imageModel,
     imageAccess,
-    hasImageKey: img !== 'none' && (imageAccess === 'subscription' ? ai.subscriptionAccepted[img] : Boolean(getSecret(img))),
+    hasImageKey: attrappeBild() ? true : img !== 'none' && (imageAccess === 'subscription' ? ai.subscriptionAccepted[img] : Boolean(getSecret(img))),
     economy: economyActive(ai),
     // Hörtexte über ElevenLabs oder – seit Großprogramm 0.4 (F6) – über einen OpenAI-API-Schlüssel
     hasTts: Boolean(getSecret('elevenlabs') || getSecret('openai')),
@@ -650,6 +651,8 @@ function textOptions(ai: AppSettings['ai']): AiStatus['textOptions'] {
 
 /** Bild erzeugen – über API-Schlüssel oder Abo; Claude zeichnet in beiden Fällen eine Vektorgrafik. */
 async function generateImage(prompt: string, signal?: AbortSignal): Promise<string> {
+  // Oberflächentests mit Attrappe: hinterlegtes Bild statt Bild-KI (nie im Betrieb)
+  if (attrappeBild()) return attrappeBildErzeugen(prompt)
   const { ai } = getSettings()
   const img = ai.imageProvider
   if (img === 'none') throw new Error('Es ist keine KI für Bilder ausgewählt (Einstellungen).')

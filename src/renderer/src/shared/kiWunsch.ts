@@ -98,6 +98,12 @@ export function regelVorschlaege(k: WunschKontext): string[] {
       v.push('Anderes Motiv', 'Schlichtere Darstellung')
       if (GESELLSCHAFT.test(fach)) v.push('Historische Bildquelle statt Zeichnung')
       break
+    // Bild eines Einstiegsimpulses im Stundenverlauf (01.10.2026): Impulswirkung statt Illustration
+    case 'einstiegsbild':
+      v.push('Mehrdeutigeres Motiv, das Fragen auslöst', 'Näher an der Leitfrage', 'Foto statt Zeichnung', 'Weniger Details, ein klares Hauptmotiv')
+      if (GESELLSCHAFT.test(fach)) v.push('Historische Bildquelle statt Zeichnung', 'Als Karikatur')
+      if (istFremdsprache(fach)) v.push('Szene mit viel Anlass zum Beschreiben')
+      break
     case 'table':
       v.push('Weniger Spalten', 'Beispielzeile vorgegeben')
       break

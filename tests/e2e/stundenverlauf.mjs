@@ -28,7 +28,20 @@ writeFileSync(
           { phase: 'Erarbeitung', minuten: 30, geschehen: 'Q1 lesen · Aufgabe 1', sozialform: 'EA', medien: 'Q1, Aufgabe 1' },
           { phase: 'Sicherung', minuten: 15, geschehen: 'Ergebnisse vergleichen', sozialform: 'UG', medien: 'Tafel' }
         ],
-        hinweise: 'Schwächere Lernende lesen nur den ersten Absatz.'
+        hinweise: 'Schwächere Lernende lesen nur den ersten Absatz.',
+        // Pflichtfeld seit den Einstiegsimpulsen (01.10.2026) – ohne Bild, damit diese Wache nichts sucht
+        einstieg: {
+          art: 'wortimpuls',
+          titel: 'Tafelimpuls: „Krise"',
+          beschreibung: 'Das Wort „Krise" steht an der Tafel.',
+          bezug: 'Vorwissen zu Krisen führt zur Frage nach den Ursachen.',
+          leitfrage: 'Wie konnte es zur Krise kommen?',
+          erwartungen: ['Geldmangel → festhalten'],
+          ueberleitung: 'Q1 zeigt, wie Zeitgenossen die Lage sahen.',
+          moderation: ['Wort anschreiben, schweigen'],
+          bild: { motiv: '', suche: '', original: false, werk: '', stil: 'foto', entwurf: '' },
+          zitat: { text: '', quelle: '' }
+        }
       }
     }
   })

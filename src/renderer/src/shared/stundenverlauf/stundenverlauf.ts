@@ -13,6 +13,17 @@ import type { StructuredRequest } from '@shared/types'
 import { distribute } from '../../modules/klassenarbeit/model/types'
 import { arr, int, obj, str } from '../aiSchema'
 import { kiMetaTag, type KiHerkunft } from '@shared/kiKennzeichnung'
+import {
+  bildKennzeichnung,
+  EINSTIEG_SCHEMA,
+  IMPULS_ARTEN,
+  impulsAus,
+  impulsKurz,
+  impulsRegeln,
+  lizenzHinweis,
+  type Einstiegsimpuls,
+  type ImpulsMeta
+} from './einstiegsimpuls'
 
 export const SOZIALFORMEN = ['EA', 'PA', 'GA', 'UG', 'LV', 'SV', 'Plenum'] as const
 
@@ -26,6 +37,8 @@ export interface VerlaufsPhase {
   sozialform: string
   /** Medien und Material, mit Bezug auf das Blatt (M1, Aufgabe 2) */
   medien: string
+  /** Geplanter Impuls dieser Phase (Einstieg: Bild, Karikatur, Zitat …) samt beschafftem Bild */
+  impuls?: Einstiegsimpuls
 }
 
 export interface Stundenverlauf {
@@ -88,14 +101,18 @@ const SCHEMA = obj({
       medien: str('Medien und Material mit Bezug auf das Blatt (z. B. „M1, Aufgabe 1–2, Tafel")')
     })
   ),
-  hinweise: str('Kurzer didaktischer Kommentar: Differenzierung, mögliche Schwierigkeiten, Alternativen – höchstens drei Sätze')
+  hinweise: str('Kurzer didaktischer Kommentar: Differenzierung, mögliche Schwierigkeiten, Alternativen – höchstens drei Sätze'),
+  einstieg: EINSTIEG_SCHEMA
 })
+
+/** Ohne Angaben zur Lerngruppe: allgemeine Regeln für den Einstieg */
+const OHNE_META: ImpulsMeta = { subjectId: '', subjectLabel: '', grade: 7, topic: '' }
 
 /**
  * Anfrage an die KI. `material` ist die Beschreibung des Materials (Aufgaben, Texte), `system`
  * das Lerngruppen-Profil des Programms.
  */
-export function verlaufsAnfrage(system: string, material: string, dauer: number, wunsch = ''): StructuredRequest {
+export function verlaufsAnfrage(system: string, material: string, dauer: number, wunsch = '', lerngruppe: ImpulsMeta = OHNE_META): StructuredRequest {
   return {
     system,
     user: [
@@ -108,6 +125,8 @@ export function verlaufsAnfrage(system: string, material: string, dauer: number,
       '- Sozialformen abwechseln, wo es der Sache dient; keine Methode um ihrer selbst willen.',
       // Praxislauf 28.09.2026: Die KI schrieb ganze Aufgabentexte samt AFB-Begründung in die Spalte
       '- „geschehen" ist eine Planungsnotiz, kein Abschrieb: höchstens vier Stichpunkte je Phase, jeder unter 20 Wörtern. Aufgaben nur mit Nummer und Operator nennen („Aufgabe 2: Untersuchen"), NICHT ihren Wortlaut, keine AFB-Begründungen und keine Erwartungshorizonte abschreiben.',
+      // Einstiegsimpulse nach den recherchierten Regeln (recherche/einstiegsimpulse-2026-10-01.md)
+      impulsRegeln(lerngruppe, dauer),
       wunsch ? `WÜNSCHE DER LEHRKRAFT (umsetzen): ${wunsch}` : '',
       'MATERIAL:',
       material
@@ -121,19 +140,28 @@ export function verlaufsAnfrage(system: string, material: string, dauer: number,
 
 /** Antwort der KI → Verlauf mit genau passender Summe */
 export function verlaufAus(daten: unknown, dauer: number): Stundenverlauf {
-  const d = (daten ?? {}) as { ziel?: unknown; phasen?: unknown; hinweise?: unknown }
+  const d = (daten ?? {}) as { ziel?: unknown; phasen?: unknown; hinweise?: unknown; einstieg?: unknown }
   const phasen = (Array.isArray(d.phasen) ? d.phasen : [])
     .map((p) => (p ?? {}) as Record<string, unknown>)
     .filter((p) => String(p.phase ?? '').trim())
-    .map((p) => ({
-      id: neueId(),
-      phase: String(p.phase).trim(),
-      minuten: Math.max(1, Math.round(Number(p.minuten) || 1)),
-      geschehen: String(p.geschehen ?? '').trim(),
-      sozialform: String(p.sozialform ?? '').trim(),
-      medien: String(p.medien ?? '').trim()
-    }))
+    .map(
+      (p): VerlaufsPhase => ({
+        id: neueId(),
+        phase: String(p.phase).trim(),
+        minuten: Math.max(1, Math.round(Number(p.minuten) || 1)),
+        geschehen: String(p.geschehen ?? '').trim(),
+        sozialform: String(p.sozialform ?? '').trim(),
+        medien: String(p.medien ?? '').trim()
+      })
+    )
   if (!phasen.length) throw new Error('Die KI hat keinen Verlauf geliefert.')
+  // Der Impuls gehört zur Einstiegsphase (sonst zur ersten Phase)
+  const impuls = impulsAus(d.einstieg)
+  if (impuls) {
+    const ziel = phasen.find((p) => /einstieg|motivation|hinführung|problematisierung/i.test(p.phase)) ?? phasen[0]
+    Object.assign(ziel, { impuls })
+    if (!ziel.geschehen) ziel.geschehen = impulsKurz(impuls)
+  }
   return minutenAngleichen({
     dauer,
     ziel: String(d.ziel ?? '').trim(),
@@ -148,17 +176,41 @@ export function verlaufHtml(v: Stundenverlauf, titel: string, untertitel: string
   const zeilen = v.phasen
     .map(
       (p) =>
-        `<tr><td><b>${esc(p.phase)}</b></td><td class="z">${p.minuten}′</td><td>${esc(p.geschehen).replace(/ · /g, '<br>')}</td><td>${esc(p.sozialform)}</td><td>${esc(p.medien)}</td></tr>`
+        `<tr><td><b>${esc(p.phase)}</b></td><td class="z">${p.minuten}′</td><td>${esc(p.geschehen).replace(/ · /g, '<br>')}</td><td>${esc(
+          p.sozialform
+        )}</td><td>${esc(p.medien)}</td></tr>`
     )
     .join('')
+  const impulse = v.phasen.filter((p) => p.impuls).map((p) => impulsHtml(p.impuls!, p.phase, esc))
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Stundenverlauf – ${esc(titel)}</title>${kiMetaTag(ki)}<style>
 @page { size: A4 landscape; margin: 14mm; }
 body { font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; font-size: 10.5pt; color: #000; margin: 0; }
 h1 { font-size: 15pt; margin: 0 0 1mm; } .u { color: #555; margin: 0 0 4mm; }
 table { width: 100%; border-collapse: collapse; } th, td { border: 0.3mm solid #888; padding: 1.5mm 2mm; vertical-align: top; text-align: left; }
 th { background: #eee; } td.z { white-space: nowrap; } .h { margin-top: 4mm; }
+.impuls { margin-top: 5mm; page-break-inside: avoid; border: 0.3mm solid #888; padding: 3mm 4mm; } .impuls h2 { font-size: 12pt; margin: 0 0 2mm; }
+.impuls figure { margin: 0 0 2mm; } .impuls img { max-width: 100%; max-height: 95mm; display: block; } .impuls figcaption { font-size: 8.5pt; color: #444; margin-top: 1mm; }
+.impuls ul, .impuls ol { margin: 1mm 0 2mm 5mm; padding-left: 4mm; } .impuls p { margin: 1mm 0; }
 </style></head><body><h1>Stundenverlauf – ${esc(titel)}</h1><p class="u">${esc(untertitel)} · ${v.dauer} Minuten</p>
 ${v.ziel ? `<p><b>Stundenziel:</b> ${esc(v.ziel)}</p>` : ''}
 <table><thead><tr><th style="width:14%">Phase</th><th style="width:6%">Zeit</th><th>Geplantes Geschehen</th><th style="width:9%">Sozialform</th><th style="width:18%">Medien / Material</th></tr></thead><tbody>${zeilen}</tbody></table>
-${v.hinweise ? `<p class="h"><b>Hinweise:</b> ${esc(v.hinweise)}</p>` : ''}</body></html>`
+${v.hinweise ? `<p class="h"><b>Hinweise:</b> ${esc(v.hinweise)}</p>` : ''}${impulse.join('')}</body></html>`
+}
+
+/** Der Impuls als Kasten in der Druckfassung: Bild mit Kennzeichnung, Leitfrage, Moderation, Erwartungen */
+function impulsHtml(i: Einstiegsimpuls, phase: string, esc: (s: string) => string): string {
+  const liste = (xs: string[], tag = 'ul'): string => (xs.length ? `<${tag}>${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</${tag}>` : '')
+  const kennung = bildKennzeichnung(i.image)
+  const bild = i.image?.dataUrl
+    ? `<figure><img src="${i.image.dataUrl}" alt="${esc(i.bild?.motiv ?? i.titel).replace(/"/g, '&quot;')}"><figcaption>${esc(kennung)}${
+        lizenzHinweis(i.image) ? ` · ${esc(lizenzHinweis(i.image))}` : ''
+      }</figcaption></figure>`
+    : ''
+  return `<section class="impuls"><h2>${esc(phase)}: ${esc(IMPULS_ARTEN[i.art]?.label ?? 'Impuls')} – ${esc(i.titel)}</h2>${bild}
+${i.zitat ? `<p><i>„${esc(i.zitat.text)}"</i>${i.zitat.quelle ? ` – ${esc(i.zitat.quelle)}` : ' – <b>Quelle fehlt</b>'}</p>` : ''}
+${i.beschreibung ? `<p>${esc(i.beschreibung)}</p>` : ''}${i.bezug ? `<p><b>Bezug zum Stundenziel:</b> ${esc(i.bezug)}</p>` : ''}
+${i.leitfrage ? `<p><b>Leitfrage:</b> ${esc(i.leitfrage)}</p>` : ''}
+${i.moderation.length ? `<p><b>Moderation:</b></p>${liste(i.moderation, 'ol')}` : ''}
+${i.erwartungen.length ? `<p><b>Erwartete Beiträge:</b></p>${liste(i.erwartungen)}` : ''}
+${i.ueberleitung ? `<p><b>Überleitung:</b> ${esc(i.ueberleitung)}</p>` : ''}</section>`
 }
