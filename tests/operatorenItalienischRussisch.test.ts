@@ -106,7 +106,7 @@ describe('Italienisch und Russisch', () => {
 
   it('Klausur-Anlage der Klassenarbeit: zielsprachige Landesliste', () => {
     expect(anlageFuer('HH', 'russisch')!.sprache).toBe('ru')
-    const meta = { ...defaultExamMeta('HE', 'gymnasium', 'Gymnasium', 12), subjectId: 'italienisch' }
+    const meta = { ...defaultExamMeta('HE', 'gymnasium', 'Gymnasium', 12), subjectId: 'italienisch' as const }
     const liste = amtlicheListe('HE', 'italienisch', anlageWunsch(meta))!
     expect(liste.sprache).toBe('it')
     expect(liste.quelle).toMatch(/Italienisch/)
