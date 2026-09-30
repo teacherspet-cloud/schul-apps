@@ -437,6 +437,26 @@ export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding
         })
       }
     }
+    /*
+     * Zu klein gedruckt (Rückmeldung „kann man nicht erkennen", 30.09.2026): Ein gezeichneter
+     * Schaltplan misst 1 Einheit = 1 mm. Wird er verkleinert – schmale Bildbreite oder als Bild
+     * neben einer Aufgabe (38 %) –, schrumpfen die Schaltzeichen unter die Lesbarkeit.
+     */
+    const gezeichnet = img.schaltplan && (img.schaltplan as { version?: number }).version === 2 ? imageSizeFromDataUrl(img.image?.dataUrl) : null
+    if (gezeichnet && gezeichnet.width > 0) {
+      const neben = img.side === 'left' || img.side === 'right'
+      const spalten = img.labels?.some((l) => !l.inline) ? 2 * 26 : 0
+      const flaeche = (neben ? CONTENT_WIDTH_MM * 0.38 : (CONTENT_WIDTH_MM * img.widthPercent) / 100) - spalten
+      const massstab = flaeche / gezeichnet.width
+      if (massstab < 0.85) {
+        const noetig = Math.min(100, Math.ceil(((gezeichnet.width * 0.85 + spalten) / CONTENT_WIDTH_MM) * 100))
+        out.push({
+          blockId: img.id,
+          message: `Der Schaltplan wird auf ${Math.round(massstab * 100)} % verkleinert gedruckt – die Schaltzeichen sind dann nur etwa ${Math.max(1, Math.round(massstab * 10))} mm groß und schlecht erkennbar (gut lesbar ab etwa 8 mm). Abhilfe: Bildbreite mindestens ${noetig} %${neben ? ', Bild nicht neben der Aufgabe, sondern darüber' : ''}.`,
+          severity: 'mittel'
+        })
+      }
+    }
     if (img.labels?.some((l) => l.blank) && beschriftungsAufgaben([img], sheet.blocks).length) {
       out.push({
         blockId: img.id,

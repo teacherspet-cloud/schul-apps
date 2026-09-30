@@ -28,6 +28,9 @@ import { qrSvg } from '../../render/qr'
 import { justifyText } from '../../render/SheetPages'
 import { stripMaterialNo } from '../../render/BlockView'
 import { spaltenBreiten } from '../../render/tabelleMasse'
+import { svgAusDataUrl } from '../../render/schaltplanSvg'
+import { beschriftetesBildSvg } from '../../render/beschriftungSvg'
+import { imageSizeFromDataUrl } from '../../../../shared/imageSize'
 import { trueFalseLabels } from '../../../../shared/trueFalseLabels'
 import { subjectById } from '../../model/subjects'
 import { anredeFuerMeta } from '../../didactics/anrede'
@@ -238,22 +241,32 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
         const dim = await ctx.deps.sizer(block.image.dataUrl)
         const maxW = (ctx.contentWidth / 1440) * 96 * (block.widthPercent / 100)
         const maxH = 110 * (96 / 25.4)
-        const scale = Math.min(maxW / dim.width, maxH / dim.height)
-        // Gezeichnete Schaltpläne sind SVG – Word braucht ein Rasterbild
-        const src = block.schaltplan && block.image.dataUrl.startsWith('data:image/svg')
-          ? await ctx.deps.raster(new TextDecoder().decode(Uint8Array.from(atob(block.image.dataUrl.split(',')[1]), (c) => c.charCodeAt(0))), dim.width * scale * 3, dim.height * scale * 3)
-          : block.image.dataUrl
-        out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [imageRun(src, dim.width * scale, dim.height * scale)] }))
+        /*
+         * Beschriftungen (30.09.2026): Word hat keine Ebene über dem Bild. Statt einer Liste unter
+         * dem Bild kommen Randspalten, Linien, Punkte und Schilder mit ins Bild – in derselben
+         * Setzung wie im PDF, auch mit von Hand verschobenen Punkten. Gerastert mit etwa 380 dpi.
+         */
+        if (block.labels?.length) {
+          const breiteMm = (ctx.contentWidth / 1440) * 25.4 * (block.widthPercent / 100)
+          const groesse = imageSizeFromDataUrl(block.image.dataUrl) ?? dim
+          const b = beschriftetesBildSvg({ dataUrl: block.image.dataUrl, groesse, labels: block.labels, mitLoesung: key, breiteMm })
+          const w = (b.breiteMm * 96) / 25.4
+          const h = (b.hoeheMm * 96) / 25.4
+          const s = Math.min(1, maxW / w, maxH / h)
+          const png = await ctx.deps.raster(b.svg, w * s * 4, h * s * 4)
+          out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [imageRun(png, w * s, h * s)] }))
+        } else {
+          const scale = Math.min(maxW / dim.width, maxH / dim.height)
+          // Gezeichnete Schaltpläne sind SVG – Word braucht ein Rasterbild
+          const svg = block.schaltplan ? svgAusDataUrl(block.image.dataUrl) : null
+          const src = svg ? await ctx.deps.raster(svg, dim.width * scale * 4, dim.height * scale * 4) : block.image.dataUrl
+          out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [imageRun(src, dim.width * scale, dim.height * scale)] }))
+        }
       } else {
         out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(`[Bild: ${block.description}]`, { color: '777777' })] }))
       }
-      /*
-       * Beschriftungen: Im Druck und im PDF sitzen sie mit Linie am gemeinten Bildteil – das
-       * ist die wirksamste Form. Word kann das nicht nachbilden, deshalb stehen sie hier als
-       * Liste unter dem Bild. Das ist messbar schwächer, aber die Beschriftungen gehen nicht
-       * verloren; die Einschränkung ist im README festgehalten.
-       */
-      if (block.labels?.length) {
+      // Ohne Bild bleiben die Beschriftungen wenigstens als Liste erhalten
+      if (!block.image && block.labels?.length) {
         for (const label of block.labels) {
           out.push(
             new Paragraph({

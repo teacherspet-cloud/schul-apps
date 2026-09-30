@@ -74,6 +74,20 @@ export interface ImageLabel {
    * Wird der Punkt verschoben, gilt der Weg nicht mehr und die Linie läuft wieder waagerecht.
    */
   route?: { x: number; y: number }[]
+  /**
+   * Beschriftung steht IM Bild direkt am Bauteil (gezeichnete Schaltpläne, seit 30.09.2026 2. Fassung):
+   * Das Schild sitzt über, unter, links bzw. rechts vom Punkt – ohne Linie und ohne Randspalte.
+   * Der Platz dafür ist in der Zeichnung reserviert.
+   */
+  inline?: 'oben' | 'unten' | 'links' | 'rechts'
+  /**
+   * Von Hand gesetzte Lage des Schildes (Prozent des Bildes, 30.09.2026): In der Randspalte zählt
+   * nur `y` (Schildmitte), am Bauteil (`inline`) ist es der Punkt, an dem das Schild ansetzt.
+   * Gesetzt, wird es von keiner automatischen Setzung mehr verschoben.
+   */
+  schild?: { x: number; y: number }
+  /** Automatische Lage des Punktes vor dem ersten Verschieben – für „Automatische Lage" */
+  ursprung?: { x: number; y: number }
 }
 
 interface BaseBlock {

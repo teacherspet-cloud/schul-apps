@@ -60,6 +60,53 @@ export function leitweg(label: ImageLabel): { x: number; y: number }[] {
   return [{ x: label.x, y: label.y }]
 }
 
+/** Punkt in Prozent des Bildes */
+export type Prozentpunkt = { x: number; y: number }
+
+/**
+ * Linie vom Punkt zum Schild in der Randspalte (Prozent): erst der Leitweg, dann rechtwinklig –
+ * waagerecht bis kurz vor den Bildrand, senkrecht auf die Höhe des Schildes, waagerecht hinaus.
+ * Liegt das Schild auf der Höhe, auf der die Linie das Bild verlässt, bleibt sie gerade.
+ * Gemeinsam für Bildschirm, Druck und Word (beschriftungSvg.ts).
+ */
+export function spaltenLinie(label: ImageLabel, platz: { side: 'left' | 'right'; top: number }): Prozentpunkt[] {
+  const links = platz.side === 'left'
+  const weg = leitweg(label)
+  const aus = weg[weg.length - 1]
+  const rand = links ? 0 : 100
+  if (Math.abs(aus.y - platz.top) < 0.05) return [...weg, { x: rand, y: aus.y }]
+  const knick = links ? Math.min(aus.x, 4) : Math.max(aus.x, 96)
+  return [...weg, { x: knick, y: aus.y }, { x: knick, y: platz.top }, { x: rand, y: platz.top }]
+}
+
+/** Ansatzpunkt eines Schildes am Bauteil: von Hand gesetzt oder am Punkt selbst */
+export const schildAnker = (label: ImageLabel): Prozentpunkt => label.schild ?? { x: label.x, y: label.y }
+
+/**
+ * Linie eines Schildes am Bauteil, wenn Punkt und Schild getrennt verschoben wurden – sonst null
+ * (das Schild steht dann direkt am Punkt). Rechtwinklig: bei Schildern über/unter dem Punkt erst
+ * senkrecht, bei Schildern daneben erst waagerecht.
+ */
+export function bauteilLinie(label: ImageLabel): Prozentpunkt[] | null {
+  const s = label.schild
+  if (!s || Math.hypot(s.x - label.x, s.y - label.y) < 0.3) return null
+  const p = { x: label.x, y: label.y }
+  const senkrecht = label.inline === 'oben' || label.inline === 'unten'
+  if (Math.abs(senkrecht ? s.x - p.x : s.y - p.y) < 0.05) return [p, s]
+  return senkrecht ? [p, { x: p.x, y: s.y }, s] : [p, { x: s.x, y: p.y }, s]
+}
+
+/** „Linie begradigen": Schild so verschieben, dass die Linie gerade verläuft */
+export function begradigt(label: ImageLabel): NonNullable<ImageLabel['schild']> {
+  if (label.inline) {
+    const s = schildAnker(label)
+    return label.inline === 'oben' || label.inline === 'unten' ? { x: label.x, y: s.y } : { x: s.x, y: label.y }
+  }
+  const weg = leitweg(label)
+  const aus = weg[weg.length - 1]
+  return { x: labelSide(label) === 'left' ? 0 : 100, y: aus.y }
+}
+
 /**
  * Zeilen, die ein Text in einer Spalte belegt – gieriger Umbruch an Leerzeichen; ein Wort,
  * das länger ist als die Zeile, läuft über (bricht nicht) und zählt eine Zeile.
@@ -118,7 +165,14 @@ export function layoutImageLabels(labels: ImageLabel[], opts: LabelLayoutOptions
   const lineMm = fontPt * PT_MM * 1.15
   const prozent = (mm: number): number => (mm / imageHeightMm) * 100
 
-  const eintraege = labels.map((l) => {
+  // Von Hand gesetzte Schilder bleiben, wo sie sind – gesetzt werden nur die übrigen
+  const out = new Map<string, PlacedLabel>()
+  const hand = labels.filter((l) => l.schild && !l.inline)
+  for (const l of hand) {
+    const lines = l.blank ? 1 : estimateLines(l.text, chars)
+    out.set(l.id, { id: l.id, side: labelSide(l), top: Math.min(100, Math.max(0, l.schild!.y)), heightPct: prozent(lines * lineMm + 0.6 + 0.8), lines })
+  }
+  const eintraege = labels.filter((l) => !l.inline && !l.schild).map((l) => {
     const lines = l.blank ? 1 : estimateLines(l.text, chars)
     // Zeilen + Innenabstand (0,6 mm) + Sicherheitszuschlag (0,8 mm)
     const h = prozent(lines * lineMm + 0.6 + 0.8)
@@ -145,7 +199,6 @@ export function layoutImageLabels(labels: ImageLabel[], opts: LabelLayoutOptions
     kandidat.side = andere
   }
 
-  const out = new Map<string, PlacedLabel>()
   for (const s of ['left', 'right'] as const) {
     const eigene = seite(s)
     const mitten = stapeln(eigene, gap)

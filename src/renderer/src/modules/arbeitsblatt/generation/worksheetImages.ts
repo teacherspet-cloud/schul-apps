@@ -165,10 +165,11 @@ async function completeTargets(
     await Promise.all(
       schaltplaene.map(async (rep) => {
         const gruppe = groups.get(`${rep.original ? 'Q' : ''}|${(rep.search || rep.description).toLowerCase()}`)!
-        const ok = await zeichneSchaltplan(gruppe, blocks, meta, deps.ai).catch(() => false)
-        if (!ok) return
+        // Kein Rückfall auf die Bildsuche: Ein fremder Schaltplan zeigt fast nie die beschriebenen Bauteile
+        const ergebnis = await zeichneSchaltplan(gruppe, blocks, meta, deps.ai).catch(() => 'abgelehnt' as const)
         pending.delete(rep)
-        stats.gezeichnet++
+        if (ergebnis === 'gezeichnet') stats.gezeichnet++
+        else stats.missing++
       })
     )
   }

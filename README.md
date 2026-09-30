@@ -413,7 +413,7 @@ Art. 50 Abs. 4 der KI-Verordnung gilt seit dem 2. August 2026. Erzeugte Bilder t
 
 Für Dokumente, Diagramme, Karten und Statistiken erzeugt die App weiterhin **kein** Bild, weil es Inhalte erfinden würde; bei allen übrigen erzeugten Bildern steht der Hinweis, die fachliche Richtigkeit zu prüfen. Das bleibt die Entscheidung der Lehrkraft – eine falsch beschriftete Zelle oder eine unmögliche Versuchsanordnung erkennt nur sie.
 
-> **Einschränkung des Word-Exports:** Word kann die Beschriftungen nicht am Bildteil platzieren. Dort stehen sie als Liste unter dem Bild – messbar schwächer, aber vollständig. Für die wirksame Form bitte Drucken oder PDF nutzen.
+> **Word-Export:** Word kennt keine Ebene über einem Bild. Deshalb kommen Randspalten, Linien, Punkte und Schilder mit ins gerasterte Bild (etwa 380 dpi) – in derselben Setzung wie im PDF, auch mit von Hand verschobenen Punkten. Im Editor lassen sich Punkt und Schild frei ziehen (Maus, Finger, Pfeiltasten; ein Zug = ein Rückgängig-Schritt), dazu „Linie begradigen", „Automatische Lage" und bei Schaltplänen „An Bauteil einrasten".
 
 ### Hilfsblatt mit nützlichen Ausdrücken
 

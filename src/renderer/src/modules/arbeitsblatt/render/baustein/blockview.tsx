@@ -2,6 +2,8 @@ import { RichText } from '../../../../shared/richtext/RichText'
 import type { WsBlock } from '../../model/types'
 import { gapRenderText } from '../Answers'
 import { ImageLabelLayer } from '../ImageLabels'
+import { schaltplanEinrasten } from '../schaltplanSvg'
+import { imageSizeFromDataUrl } from '../../../../shared/imageSize'
 import { gridDataUrl, gridDrawing } from '../gridSvg'
 import { diagramDrawing } from '../diagramSvg'
 import { qrDataUrl } from '../qr'
@@ -272,18 +274,17 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               // Für den Setzer der Schilder (26.09.2026): Blockbreite in mm und das Bild (Seitenverhältnis)
               widthMm={((ctx.contentWidthMm ?? 170) * block.widthPercent) / 100}
               imageDataUrl={block.image?.dataUrl}
-              onMove={
+              // Punkt und Schild frei nachjustieren – in jedem Editor, der Bausteine bearbeiten lässt (ein Zug = ein Rückgängig-Schritt)
+              onChange={
                 edit && ctx.update
-                  ? (id, x, y) =>
+                  ? (id, aendern) =>
                       ctx.update?.(block.id, (d) => {
                         const label = (d as typeof block).labels?.find((l) => l.id === id)
-                        if (label) {
-                          label.x = x
-                          label.y = y
-                        }
+                        if (label) aendern(label)
                       })
                   : undefined
               }
+              einrasten={block.schaltplan ? (p) => schaltplanEinrasten(block.schaltplan!, imageSizeFromDataUrl(block.image?.dataUrl), p) : undefined}
             >
               {picture}
             </ImageLabelLayer>
