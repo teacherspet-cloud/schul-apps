@@ -39,6 +39,9 @@ import {
   type Integration
 } from './rahmen'
 
+/** Alte Sprachen: keine Sprech-/Hör-Methoden der modernen Fremdsprachen */
+const ALTE_SPRACHEN = new Set(['latein', 'griechisch'])
+
 export type VorwissenArt = 'fach' | 'begriff' | 'methode' | 'fehlvorstellung' | 'nochNicht' | 'stoff'
 
 export interface VorwissenVorschlag {
@@ -417,7 +420,7 @@ function sprachVorschlaege(a: VorwissenAnfrage): VorwissenVorschlag[] {
   const ausBuch = lehrwerkVorschlaege(a)
   out.push(...ausBuch)
   if (a.lehrwerk && !ausBuch.length) out.push({ art: 'fach', text: `Wortschatz und Themen aus ${a.lehrwerk}`, quelle: 'gewähltes Lehrwerk', sicher: true })
-  for (const m of SPRACH_METHODEN.filter((m) => a.subjectId !== 'latein' && m.ab <= lj && (!m.nurEnglisch || a.subjectId === 'englisch')))
+  for (const m of SPRACH_METHODEN.filter((m) => !ALTE_SPRACHEN.has(a.subjectId) && m.ab <= lj && (!m.nurEnglisch || a.subjectId === 'englisch')))
     out.push({ art: m.art, text: m.text, quelle: m.quelle, sicher: false })
 
   /*
@@ -448,6 +451,8 @@ function sprachVorschlaege(a: VorwissenAnfrage): VorwissenVorschlag[] {
     if (lj <= 3) out.push({ art: 'nochNicht', text: LATEIN_KULTUR.lektuere, quelle: LATEIN_KULTUR.quelle, sicher: false })
     return out
   }
+  // Griechisch (30.09.2026): wie Latein ohne Methoden der modernen Fremdsprachen und ohne Transfer aus Englisch
+  if (a.subjectId === 'griechisch') return out
 
   // 2./3. Fremdsprache: Methoden und Textsorten aus Englisch sind da
   if (a.subjectId !== 'englisch' && seq !== 'fs1')
