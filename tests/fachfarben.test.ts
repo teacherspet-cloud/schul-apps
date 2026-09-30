@@ -22,6 +22,7 @@ import {
   wirksameFarbe
 } from '../src/renderer/src/shared/fachfarben'
 import { SUBJECTS } from '../src/renderer/src/modules/arbeitsblatt/model/subjects'
+import { FAECHER } from '../src/shared/faecher'
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
 import type { Worksheet } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 import { pageInfoFor } from '../src/renderer/src/modules/arbeitsblatt/render/SheetPages'
@@ -39,12 +40,15 @@ import type { TestDocument } from '../src/renderer/src/modules/vokabeltest/model
 
 const PNG_1PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 const GRUEN = FACH_VORSCHLAG.biologie
+/** Fächer mit eigener Palettenfarbe – ohne die Muster-Fächer (Farbe + Muster, 30.09.2026) */
+const ohneMuster = (): typeof SUBJECTS => SUBJECTS.filter((s) => !FAECHER.find((f) => f.id === s.id)?.muster)
 
 afterEach(() => merkeFachfarben({}))
 
 describe('Druckfeste Palette', () => {
   it('hat mindestens so viele Farben wie Fächer, jede fürs Auge klar von jeder anderen verschieden', () => {
-    expect(FACH_PALETTE.length).toBeGreaterThanOrEqual(SUBJECTS.length + WEITERE_FAECHER.length)
+    // Fächer mit Muster (30.09.2026) teilen die Farbe ihres Farbzwillings – nur die übrigen brauchen eine eigene
+    expect(FACH_PALETTE.length).toBeGreaterThanOrEqual(ohneMuster().length + WEITERE_FAECHER.length)
     for (let i = 0; i < FACH_PALETTE.length; i++)
       for (let j = i + 1; j < FACH_PALETTE.length; j++) {
         const a = FACH_PALETTE[i]
@@ -60,8 +64,9 @@ describe('Druckfeste Palette', () => {
   it('gibt jedem Fach einen eigenen Vorschlag aus der Palette – auch Niederländisch und Russisch', () => {
     // Wunsch der Lehrkraft (26.09.2026): keine geteilten Vorschläge mehr
     const palette = new Set(FACH_PALETTE.map((f) => f.hex))
-    const faecher = [...SUBJECTS, ...WEITERE_FAECHER]
-    for (const s of faecher) expect(palette.has(FACH_VORSCHLAG[s.id]), s.id).toBe(true)
+    for (const s of [...SUBJECTS, ...WEITERE_FAECHER]) expect(palette.has(FACH_VORSCHLAG[s.id]), s.id).toBe(true)
+    // Eigene Farbe: alle Fächer ohne Muster (Muster-Fächer: tests/fachMuster.test.ts)
+    const faecher = [...ohneMuster(), ...WEITERE_FAECHER]
     expect(new Set(faecher.map((s) => FACH_VORSCHLAG[s.id])).size).toBe(faecher.length)
     // Je zwei Vorschläge mindestens ΔE₀₀ = 12 auseinander (folgt aus der Palette, hier ausdrücklich)
     for (const a of faecher)
@@ -117,7 +122,7 @@ describe('Vorrang Fachfarbe › Vorlage', () => {
     expect(wirksameFarbe(vorlage, 'biologie', false, { biologie: '' })).toBe(GRUEN)
     expect(wirksameFarbe(vorlage, 'biologie', true, { biologie: '#123456' })).toBe(vorlage)
     // Unbekanntes Fach (etwa eine Sprache, die der Vokabeltest nicht kennt): Vorlage
-    expect(wirksameFarbe(vorlage, 'ja', false, {})).toBe(vorlage)
+    expect(wirksameFarbe(vorlage, 'xx', false, {})).toBe(vorlage)
     // Portugiesisch ist seit 30.09.2026 ein Fach mit eigener Farbe
     expect(wirksameFarbe(vorlage, 'pt', false, {})).toBe(FACH_VORSCHLAG.portugiesisch)
     // Niederländisch hat seit 26.09.2026 eine eigene Farbe
@@ -227,6 +232,6 @@ describe('Wirkung in allen Programmen', () => {
     expect(vokabeltestFarbe(doc('fr'))).toBe(FACH_VORSCHLAG.franzoesisch)
     expect(vokabeltestFarbe(doc('fr', true))).toBeNull()
     expect(vokabeltestFarbe(doc('nl'))).toBe(FACH_VORSCHLAG.niederlaendisch)
-    expect(vokabeltestFarbe(doc('ja'))).toBeNull()
+    expect(vokabeltestFarbe(doc('xx'))).toBeNull()
   })
 })

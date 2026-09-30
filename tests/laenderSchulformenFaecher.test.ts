@@ -183,7 +183,10 @@ describe('Fächer', () => {
     expect(SUBJECTS.map((s) => s.id)).toEqual(FAECHER.map((f) => f.id))
     const palette = new Map(FACH_PALETTE.map((p) => [p.name, p.hex]))
     for (const f of FAECHER) expect(FACH_VORSCHLAG[f.id], f.id).toBe(palette.get(f.farbe))
-    expect(new Set(FAECHER.map((f) => f.farbe)).size).toBe(FAECHER.length)
+    // Eigene Farbe je Fach ohne Muster; Muster-Fächer (30.09.2026) sind über Farbe + Muster eindeutig
+    const ohne = FAECHER.filter((f) => !f.muster)
+    expect(new Set(ohne.map((f) => f.farbe)).size).toBe(ohne.length)
+    expect(new Set(FAECHER.map((f) => `${f.farbe}|${f.muster ?? ''}`)).size).toBe(FAECHER.length)
   })
 
   it('Fremdsprachen tragen ihre Zielsprache, alte Sprachen ihre Übersetzungssprache', () => {

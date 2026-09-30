@@ -17,10 +17,11 @@
  * Neue Fächer (30.09.2026): Niederländisch (vorher nur Vokabeltest), Polnisch, Tschechisch,
  * Portugiesisch, Türkisch, Chinesisch – Fremdsprachen mit Lehrplänen in mehreren Ländern –,
  * Gesellschaftslehre, Naturwissenschaften, Arbeitslehre (Integrationsfächer der Gesamt-, Ober-
- * und Sekundarschulen), Darstellendes Spiel und Pädagogik. Weitere Fächer (Japanisch,
- * Neugriechisch, Dänisch, Arabisch, Psychologie, Hauswirtschaft) scheitern an der Farbpalette:
- * Mehr druckfeste Farben mit ΔE₀₀ ≥ 12 gibt es nicht (Suche vom 30.09.2026) – sie laufen unter
- * „Anderes Fach". Siehe recherche/audit-laender-schulformen-faecher-2026-09-30.md.
+ * und Sekundarschulen), Darstellendes Spiel und Pädagogik. Mehr druckfeste Farben mit ΔE₀₀ ≥ 12
+ * gibt es nicht (Suche vom 30.09.2026). Japanisch, Arabisch, Dänisch, Neugriechisch, Psychologie
+ * und Hauswirtschaft kamen deshalb mit „Farbe + Muster" dazu (Entscheidung der Lehrkraft,
+ * 30.09.2026): Farbe eines verwandten Fachs plus Muster und Kürzel im Farbfeld (`muster`).
+ * Siehe recherche/audit-laender-schulformen-faecher-2026-09-30.md.
  */
 
 export type FachArt =
@@ -52,7 +53,18 @@ export interface Fach {
   farbe: string
   /** Andere Bezeichnungen in den Ländern */
   auch?: string[]
+  /**
+   * Muster zur Farbe (30.09.2026, Entscheidung der Lehrkraft „Farbe + Muster"): Der druckfeste
+   * Farbraum ist ausgeschöpft. Fächer mit Muster teilen die Grundfarbe eines verwandten Fachs
+   * (ihres „Farbzwillings") und unterscheiden sich durch Muster und Kürzel im Farbfeld –
+   * dargestellt überall über renderer/src/shared/fachfarben.ts (`musterHintergrund`) und
+   * die Komponenten in shared/components/FachFarbe.tsx.
+   */
+  muster?: FachMuster
 }
+
+/** Muster eines Fachs mit geteilter Grundfarbe: diagonale Streifen, Punkte, Gitter (Karo) */
+export type FachMuster = 'streifen' | 'punkte' | 'karo'
 
 export const FAECHER: Fach[] = [
   { id: 'deutsch', label: 'Deutsch', kuerzel: 'D', art: 'deutsch', farbe: 'Rot' },
@@ -70,6 +82,24 @@ export const FAECHER: Fach[] = [
   { id: 'portugiesisch', label: 'Portugiesisch', kuerzel: 'Pt', art: 'fremdsprache', sprache: 'pt', farbe: 'Dunkeloliv' },
   { id: 'tuerkisch', label: 'Türkisch', kuerzel: 'Tü', art: 'fremdsprache', sprache: 'tr', farbe: 'Heide' },
   { id: 'chinesisch', label: 'Chinesisch', kuerzel: 'Chin', art: 'fremdsprache', sprache: 'zh', farbe: 'Brombeere' },
+  /*
+   * 30.09.2026 (Entscheidung der Lehrkraft): weitere Sprachen mit „Farbe + Muster" – je die Farbe
+   * eines verwandten Fachs, dazu ein eigenes Muster. Neugriechisch ('el') ist nicht Griechisch
+   * (Altgriechisch, 'grc').
+   */
+  { id: 'japanisch', label: 'Japanisch', kuerzel: 'Jap', art: 'fremdsprache', sprache: 'ja', farbe: 'Brombeere', muster: 'punkte' },
+  { id: 'arabisch', label: 'Arabisch', kuerzel: 'Ar', art: 'fremdsprache', sprache: 'ar', farbe: 'Heide', muster: 'streifen' },
+  { id: 'daenisch', label: 'Dänisch', kuerzel: 'Dä', art: 'fremdsprache', sprache: 'da', farbe: 'Rostrot', muster: 'karo' },
+  {
+    id: 'neugriechisch',
+    label: 'Neugriechisch',
+    kuerzel: 'Ngr',
+    art: 'fremdsprache',
+    sprache: 'el',
+    farbe: 'Kastanie',
+    muster: 'streifen',
+    auch: ['Griechisch (modern)', 'Modernes Griechisch']
+  },
   { id: 'mathematik', label: 'Mathematik', kuerzel: 'M', art: 'mathematik', formeln: true, farbe: 'Blau' },
   { id: 'biologie', label: 'Biologie', kuerzel: 'Bio', art: 'naturwissenschaft', formeln: true, farbe: 'Grün' },
   { id: 'chemie', label: 'Chemie', kuerzel: 'Ch', art: 'naturwissenschaft', formeln: true, farbe: 'Türkis' },
@@ -127,6 +157,25 @@ export const FAECHER: Fach[] = [
     farbe: 'Mokka',
     auch: ['Arbeitslehre', 'Wirtschaft-Arbeit-Technik', 'WAT', 'Arbeit-Wirtschaft-Technik', 'AWT', 'Wirtschaft-Technik-Haushalt', 'WTH']
   },
+  // 30.09.2026: Farbe der Arbeitslehre mit Gittermuster
+  {
+    id: 'hauswirtschaft',
+    label: 'Hauswirtschaft / Ernährung',
+    kuerzel: 'HW',
+    art: 'gesellschaft',
+    farbe: 'Mokka',
+    muster: 'karo',
+    auch: [
+      'Hauswirtschaft',
+      'Alltagskultur, Ernährung, Soziales',
+      'AES',
+      'Ernährung und Gestaltung',
+      'Ernährung und Soziales',
+      'Ernährung und Verbraucherbildung',
+      'Verbraucherbildung',
+      'Hauswirtschaft und Soziales'
+    ]
+  },
   {
     id: 'religion',
     label: 'Religion / Ethik',
@@ -146,6 +195,8 @@ export const FAECHER: Fach[] = [
   },
   { id: 'philosophie', label: 'Philosophie', kuerzel: 'Phil', art: 'gesellschaft', farbe: 'Aubergine' },
   { id: 'paedagogik', label: 'Pädagogik', kuerzel: 'Päd', art: 'gesellschaft', farbe: 'Taupe', auch: ['Erziehungswissenschaft', 'Pädagogik/Psychologie'] },
+  // 30.09.2026: Farbe der Pädagogik mit Streifen
+  { id: 'psychologie', label: 'Psychologie', kuerzel: 'Psy', art: 'gesellschaft', farbe: 'Taupe', muster: 'streifen' },
   { id: 'kunst', label: 'Kunst', kuerzel: 'Ku', art: 'musisch', farbe: 'Orchidee', auch: ['Bildende Kunst'] },
   { id: 'musik', label: 'Musik', kuerzel: 'Mu', art: 'musisch', farbe: 'Pflaume' },
   {
