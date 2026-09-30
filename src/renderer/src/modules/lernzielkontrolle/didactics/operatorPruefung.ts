@@ -266,7 +266,9 @@ export function operatorRegeln(profil: Laenderprofil | undefined): string {
     return [
       ...zeilen,
       `- Verwende Operatoren aus diesem Bestand: ${(profil ? namenAus(profil) : KERN_OPERATOREN).join(', ')}.`,
-      '- Für dieses Bundesland und diese Stufe liegt keine amtliche Operatorenliste vor. Verwende die Operatoren in ihrer üblichen fachlichen Bedeutung und erfinde keine Definition.'
+      profil?.herkunft === 'kmk' || profil?.herkunft === 'oberstufe'
+        ? `- Für dieses Bundesland, dieses Fach und diese Stufe liegt keine Landesliste vor; der Bestand stammt aus ${profil.quelle}. Verwende die Operatoren in ihrer üblichen fachlichen Bedeutung und erfinde keine Definition.`
+        : '- Für dieses Bundesland und diese Stufe liegt keine amtliche Operatorenliste vor. Verwende die Operatoren in ihrer üblichen fachlichen Bedeutung und erfinde keine Definition.'
     ].join('\n')
   }
   const mitDefinition = profil.operatoren.filter((o) => o.definition)

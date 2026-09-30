@@ -13,8 +13,9 @@ import type { Exam, ExamPart } from '../src/renderer/src/modules/klassenarbeit/m
  * Listen aus Dokumenten des Landes selbst („Immer nur die amtlichen Listen des Landes").
  */
 describe('Bestand', () => {
-  it('enthält alle Länder außer Niedersachsen (von Hand erfasst) und den KMK-Grundstock', () => {
-    expect(laenderImBestand()).toEqual(['BB', 'BE', 'BW', 'BY', 'HB', 'HE', 'HH', 'MV', 'NW', 'RP', 'SH', 'SL', 'SN', 'ST', 'TH'])
+  it('enthält alle 16 Länder und den KMK-Grundstock', () => {
+    // Niedersachsen seit 30.09.2026 auch im Bestand (alle Abiturlisten und Kerncurricula)
+    expect(laenderImBestand()).toEqual(['BB', 'BE', 'BW', 'BY', 'HB', 'HE', 'HH', 'MV', 'NI', 'NW', 'RP', 'SH', 'SL', 'SN', 'ST', 'TH'])
     expect(BESTAND.KMK).toBeDefined()
   })
 

@@ -1,6 +1,6 @@
 {
  "stateId": "SL",
- "stand": "2026-09-28",
+ "stand": "2026-09-30",
  "listen": [
   {
    "quelle": "Lehrplan Englisch – Fortgeführte Fremdsprache, Gymnasiale Oberstufe, Hauptphase, Leistungskurs und Grundkurs (2023), Abschnitt 4.3 Operatoren, Ministerium für Bildung und Kultur des Saarlandes, 2023",
@@ -661,6 +661,3831 @@
      "formen": [
       "Diskutieren"
      ]
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Deutsch (APA Deutsch), Gymnasiale Oberstufe Saar, MBK 08/2024, Anlage 1: Grundstock von Operatoren (nach IQB, Aufgabensammlung_D_Grundstock_von_Operatoren), S. 17–19, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Deutsch/APA_deutsch_2024.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "deutsch"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "einen Text als Ganzes oder aspektorientiert unter Wahrung des funktionalen Zusammenhangs von Inhalt, Form und Sprache erschließen und das Ergebnis der Erschließung darlegen",
+     "afb": "I–III",
+     "beispiele": [
+      "Analysieren Sie den vorliegenden Essay.",
+      "Analysieren Sie den Text im Hinblick auf die Wirkung der sprachlichen Mittel."
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte, Situationen, Vorgänge, Merkmale von Personen bzw. Figuren sachlich darlegen",
+     "afb": "I–II",
+     "beispiele": [
+      "Beschreiben Sie die äußere Situation des Protagonisten."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "einen Sachverhalt, eine Aussage, eine Figur auf Basis von Kriterien bzw. begründeten Wertmaßstäben einschätzen",
+     "afb": "II–III",
+     "beispiele": [
+      "Beurteilen Sie auf der Grundlage der vorliegenden Texte die Entwicklungstendenzen der deutschen Gegenwartssprache."
+     ]
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "die jeweilige Eigenart von Figuren/Sachverhalten herausarbeiten",
+     "afb": "II–III",
+     "beispiele": [
+      "Charakterisieren Sie den Protagonisten im vorliegenden Textauszug."
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Inhalte, Probleme, Sachverhalte und deren Zusammenhänge aufzeigen",
+     "afb": "I–II",
+     "beispiele": [
+      "Stellen Sie die wesentlichen Elemente des vorliegenden Kommunikationsmodells dar."
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "eine Aussage, einen Text, einen Sachverhalt unter Verwendung von Kontextwissen begründet in einen vorgegebenen Zusammenhang stellen",
+     "afb": "I–II",
+     "beispiele": [
+      "Ordnen Sie den folgenden Szenenausschnitt in den Handlungsverlauf des Dramas ein."
+     ]
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Materialien, Sachverhalte, Zusammenhänge, Thesen in einen Begründungszusammenhang stellen und mit zusätzlichen Informationen und Beispielen veranschaulichen",
+     "afb": "II–III",
+     "beispiele": [
+      "Erläutern Sie anhand der Textvorlage die wesentlichen Elemente der aristotelischen Dramentheorie."
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "auf der Grundlage einer Materialanalyse oder -auswertung eine These oder Problemstellung unter Abwägung von Argumenten hinterfragen und zu einem Urteil gelangen",
+     "afb": "I–III",
+     "beispiele": [
+      "Erörtern Sie die Position der Autorin."
+     ]
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "Zusammenhänge unter vorgegebenen oder selbst gewählten Gesichtspunkten begründet herstellen",
+     "afb": "II–III",
+     "beispiele": [
+      "Setzen Sie die Position des Autors in Beziehung zum Frauenbild des vorliegenden Textauszugs."
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "auf der Grundlage einer Analyse im Ganzen oder aspektorientiert Sinnzusammenhänge erschließen und unter Einbeziehung der Wechselwirkung zwischen Inhalt, Form und Sprache zu einer schlüssigen (Gesamt-)Deutung gelangen",
+     "afb": "I–III",
+     "beispiele": [
+      "Interpretieren Sie das vorliegende Gedicht.",
+      "Interpretieren Sie das Gedicht unter besonderer Berücksichtigung der Identitätsproblematik."
+     ]
+    },
+    {
+     "operator": "sich auseinandersetzen mit",
+     "definition": "eine Aussage, eine Problemstellung argumentativ und urteilend abwägen",
+     "afb": "II–III",
+     "beispiele": [
+      "Setzen Sie sich mit der Auffassung des Autors auseinander."
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Aussagen/Behauptungen kritisch hinterfragen und ihre Gültigkeit kriterienorientiert und begründet einschätzen",
+     "afb": "II–III",
+     "beispiele": [
+      "Überprüfen Sie, inwieweit die These zutrifft, die Kunstauffassung der Autorin spiegle sich im vorliegenden Text wider."
+     ]
+    },
+    {
+     "operator": "verfassen",
+     "definition": "auf der Grundlage einer Auswertung von Materialien wesentliche Aspekte eines Sachverhaltes in informierender oder argumentierender Form adressatenbezogen und zielorientiert darlegen",
+     "afb": "I–III",
+     "beispiele": [
+      "Verfassen Sie auf der Grundlage der Materialien einen Kommentar für eine Tageszeitung."
+     ]
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede herausarbeiten und gegeneinander abwägen",
+     "afb": "II–III",
+     "beispiele": [
+      "Vergleichen Sie die Naturschilderungen in den beiden Gedichten."
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "Inhalte oder Aussagen komprimiert wiedergeben",
+     "afb": "I–II",
+     "beispiele": [
+      "Fassen Sie die Handlung der vorliegenden Szene zusammen."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Mathematik (APA Mathematik), Gymnasiale Oberstufe Saar, Juli 2019, 3.3 Operatoren, S. 12–13, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Mathematik/APA_Mathematik_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "mathematik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "Elemente, Sachverhalte, Begriffe, Daten ohne Erläuterungen und ohne Begründung aufzählen",
+     "formen": [
+      "nennen",
+      "angeben"
+     ]
+    },
+    {
+     "operator": "angeben",
+     "definition": "Elemente, Sachverhalte, Begriffe, Daten ohne Erläuterungen und ohne Begründung aufzählen",
+     "formen": [
+      "nennen",
+      "angeben"
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte, Verfahren, Methoden oder Zusammenhänge sprachlich angemessen, strukturiert und unter korrekter Verwendung der Fachsprache ohne Begründung wiedergeben",
+     "formen": [
+      "beschreiben",
+      "darstellen",
+      "darlegen"
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte, Verfahren, Methoden oder Zusammenhänge sprachlich angemessen, strukturiert und unter korrekter Verwendung der Fachsprache ohne Begründung wiedergeben",
+     "formen": [
+      "beschreiben",
+      "darstellen",
+      "darlegen"
+     ]
+    },
+    {
+     "operator": "darlegen",
+     "definition": "Sachverhalte, Verfahren, Methoden oder Zusammenhänge sprachlich angemessen, strukturiert und unter korrekter Verwendung der Fachsprache ohne Begründung wiedergeben",
+     "formen": [
+      "beschreiben",
+      "darstellen",
+      "darlegen"
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "ein bekanntes Verfahren an einem vorgegebenem Beispiel durchführen"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "ein Ergebnis ausgehend von einem Ansatz durch Rechnung gewinnen und den Rechenweg unter Angabe von Zwischenschritten darstellen"
+    },
+    {
+     "operator": "bestimmen",
+     "definition": "ein Ergebnis ausgehend von einem Ansatz oder aus einem Diagramm bei freier Wahl des Verfahrens gewinnen und den Lösungsweg unter Angabe von Zwischenschritten darstellen",
+     "formen": [
+      "bestimmen",
+      "ermitteln"
+     ]
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "ein Ergebnis ausgehend von einem Ansatz oder aus einem Diagramm bei freier Wahl des Verfahrens gewinnen und den Lösungsweg unter Angabe von Zwischenschritten darstellen",
+     "formen": [
+      "bestimmen",
+      "ermitteln"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte, auf das im betrachteten Sachzusammenhang Wesentliche reduziert, übersichtlich grafisch oder verbal darstellen"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "einen Sachverhalt maßstäblich darstellen und gegebenenfalls konstruktive Elemente nutzen",
+     "formen": [
+      "zeichnen",
+      "grafisch darstellen"
+     ]
+    },
+    {
+     "operator": "grafisch darstellen",
+     "definition": "einen Sachverhalt maßstäblich darstellen und gegebenenfalls konstruktive Elemente nutzen",
+     "formen": [
+      "zeichnen",
+      "grafisch darstellen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Eigenschaften von Objekten oder Beziehungen zwischen Objekten unter Darstellung des Vorgehens herausfinden bzw. nachweisen"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Sachverhalte oder Aussagen an Fakten, Schlüssigkeit oder innerer Logik messen und eventuelle Widersprüche aufdecken"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich zum Ausdruck bringen"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt (z. B. das Zustandekommen einer grafischen Darstellung oder ein mathematisches Vorgehen) durch zusätzliche Informationen verständlich machen"
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten, Einzelergebnisse oder andere Elemente in einen Zusammenhang stellen, gegebenenfalls zu einer Gesamtaussage zusammenführen und Schlussfolgerungen ziehen"
+    },
+    {
+     "operator": "entscheiden",
+     "definition": "sich bei verschiedenen Möglichkeiten eindeutig und ohne Begründung festlegen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer These dafür und dagegen sprechende Argumente einander gegenüberstellen und abwägen"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "kausale Zusammenhänge (z. B. zwischen einem vorgegebenen Sachverhalt und einer grafischen Darstellung, einem Term oder einem Rechenergebnis) untersuchen und abwägend darstellen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "deuten",
+     "definition": "kausale Zusammenhänge (z. B. zwischen einem vorgegebenen Sachverhalt und einer grafischen Darstellung, einem Term oder einem Rechenergebnis) untersuchen und abwägend darstellen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien begründet formulieren",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien begründet formulieren",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien begründet formulieren",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "verallgemeinern",
+     "definition": "aus einem erkannten Sachverhalt eine erweiterte Aussage formulieren"
+    },
+    {
+     "operator": "belegen",
+     "definition": "die Gültigkeit einer Aussage oder eine Eigenschaft anhand eines Beispiels verifizieren"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Sachverhalte verbal oder formal unter Darlegung des Vorgehens auf bekannte Sätze, Regeln oder Eigenschaften zurückführen"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "eine Aussage unter Darlegung gültiger Schlussregeln logisch verifizieren",
+     "formen": [
+      "nachweisen",
+      "zeigen"
+     ]
+    },
+    {
+     "operator": "zeigen",
+     "definition": "eine Aussage unter Darlegung gültiger Schlussregeln logisch verifizieren",
+     "formen": [
+      "nachweisen",
+      "zeigen"
+     ]
+    },
+    {
+     "operator": "beweisen",
+     "definition": "eine Aussage nach gültigen Schlussregeln logisch verifizieren und mit einem erhöhten Formalisierungsgrad darlegen"
+    },
+    {
+     "operator": "herleiten",
+     "definition": "vorgegebene oder beschriebene Sachverhalte aus anderen bekannten Sachverhalten folgern"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Biologie (APA) 2023 – ab Abitur 2025 ff. (redaktionell geändert 2024), Anhang „Grundstock von Operatoren (gemäß IQB-Richtlinien)“, S. 13–14, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Biologie/APA_BI_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "biologie"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "ableiten",
+     "definition": "auf der Grundlage von Erkenntnissen oder Daten sachgerechte Schlüsse ziehen"
+    },
+    {
+     "operator": "abschätzen",
+     "definition": "durch begründete Überlegungen Größenwerte angeben"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "wichtige Bestandteile, Eigenschaften oder Zusammenhänge auf eine bestimmte Fragestellung hin herausarbeiten"
+    },
+    {
+     "operator": "aufstellen",
+     "definition": "chemische Formeln, Gleichungen, Reaktionsgleichungen (Wort- oder Formelgleichungen) oder Reaktionsmechanismen entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "formulieren",
+     "definition": "chemische Formeln, Gleichungen, Reaktionsgleichungen (Wort- oder Formelgleichungen) oder Reaktionsmechanismen entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "Hypothesen aufstellen",
+     "definition": "eine Vermutung über einen unbekannten Sachverhalt formulieren, die fachlich fundiert begründet wird"
+    },
+    {
+     "operator": "angeben",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Beobachtungen, Daten, Einzelergebnisse oder Informationen in einen Zusammenhang stellen und daraus Schlussfolgerungen ziehen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Gründe oder Argumente für eine Vorgehensweise oder einen Sachverhalt nachvollziehbar darstellen"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Die Berechnung ist ausgehend von einem Ansatz darzustellen."
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Beobachtungen, Strukturen, Sachverhalte, Methoden, Verfahren oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Das zu fällende Sachurteil ist mithilfe fachlicher Kriterien zu begründen."
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Das zu fällende Werturteil ist unter Berücksichtigung gesellschaftlicher Werte und Normen zu begründen."
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Strukturen, Sachverhalte oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren, auch mithilfe von Zeichnungen und Tabellen"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Argumente zu einer Aussage oder These einander gegenüberstellen und abwägen"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich machen, indem man ihn auf Regeln und Gesetzmäßigkeiten zurückführt"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt veranschaulichend darstellen und durch zusätzliche Informationen verständlich machen"
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "ein Ergebnis oder einen Zusammenhang rechnerisch, grafisch oder experimentell bestimmen"
+    },
+    {
+     "operator": "herleiten",
+     "definition": "mithilfe bekannter Gesetzmäßigkeiten einen Zusammenhang zwischen chemischen bzw. physikalischen Größen herstellen"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "deuten",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Begriffe oder Gegenstände auf der Grundlage bestimmter Merkmale systematisch einteilen"
+    },
+    {
+     "operator": "planen",
+     "definition": "zu einem vorgegebenen Problem (auch experimentelle) Lösungswege entwickeln und dokumentieren"
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte, Prozesse, Strukturen oder Ergebnisse übersichtlich grafisch darstellen und beschriften"
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Sachverhalte oder Phänomene mithilfe fachspezifischer Arbeitsweisen erschließen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede kriteriengeleitet herausarbeiten"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "Objekte grafisch exakt darstellen"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Chemie (APA), Juli 2023, Anhang „Grundstock von Operatoren (gemäß IQB-Richtlinien)“, S. 14–15, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Chemie/APA_CH_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "chemie"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "ableiten",
+     "definition": "auf der Grundlage von Erkenntnissen oder Daten sachgerechte Schlüsse ziehen"
+    },
+    {
+     "operator": "abschätzen",
+     "definition": "durch begründete Überlegungen Größenwerte angeben"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "wichtige Bestandteile, Eigenschaften oder Zusammenhänge auf eine bestimmte Fragestellung hin herausarbeiten Chemie zusätzlich: einen Sachverhalt experimentell prüfen"
+    },
+    {
+     "operator": "aufstellen",
+     "definition": "chemische Formeln, Gleichungen, Reaktionsgleichungen (Wort- oder Formelgleichungen) oder Reaktionsmechanismen entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "formulieren",
+     "definition": "chemische Formeln, Gleichungen, Reaktionsgleichungen (Wort- oder Formelgleichungen) oder Reaktionsmechanismen entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "Hypothesen aufstellen",
+     "definition": "eine Vermutung über einen unbekannten Sachverhalt formulieren, die fachlich fundiert begründet wird"
+    },
+    {
+     "operator": "angeben",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Beobachtungen, Daten, Einzelergebnisse oder Informationen in einen Zusammenhang stellen und daraus Schlussfolgerungen ziehen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Gründe oder Argumente für eine Vorgehensweise oder einen Sachverhalt nachvollziehbar darstellen"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Die Berechnung ist ausgehend von einem Ansatz darzustellen."
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Beobachtungen, Strukturen, Sachverhalte, Methoden, Verfahren oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Das zu fällende Sachurteil ist mithilfe fachlicher Kriterien zu begründen."
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Das zu fällende Werturteil ist unter Berücksichtigung gesellschaftlicher Werte und Normen zu begründen."
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Strukturen, Sachverhalte oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren, auch mithilfe von Zeichnungen und Tabellen"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Argumente zu einer Aussage oder These einander gegenüberstellen und abwägen"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich machen, indem man ihn auf Regeln und Gesetzmäßigkeiten zurückführt"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt veranschaulichend darstellen und durch zusätzliche Informationen verständlich machen"
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "ein Ergebnis oder einen Zusammenhang rechnerisch, grafisch oder experimentell bestimmen"
+    },
+    {
+     "operator": "herleiten",
+     "definition": "mithilfe bekannter Gesetzmäßigkeiten einen Zusammenhang zwischen chemischen bzw. physikalischen Größen herstellen"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "deuten",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Begriffe oder Gegenstände auf der Grundlage bestimmter Merkmale systematisch einteilen"
+    },
+    {
+     "operator": "planen",
+     "definition": "zu einem vorgegebenen Problem (auch experimentelle) Lösungswege entwickeln und dokumentieren"
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte, Prozesse, Strukturen oder Ergebnisse übersichtlich grafisch darstellen und beschriften"
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Sachverhalte oder Phänomene mithilfe fachspezifischer Arbeitsweisen erschließen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede kriteriengeleitet herausarbeiten"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "Objekte grafisch exakt darstellen"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Physik (APA Physik), Juli 2023 – Stand: 01.08.2024, Operatoren, S. 11–12, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Physik/APA_Physik_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "physik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "ableiten",
+     "definition": "auf der Grundlage von Erkenntnissen oder Daten sachgerechte Schlüsse ziehen"
+    },
+    {
+     "operator": "abschätzen",
+     "definition": "durch begründete Überlegungen Größenwerte angeben"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "wichtige Bestandteile, Eigenschaften oder Zusammenhänge auf eine bestimmte Fragestellung hin herausarbeiten"
+    },
+    {
+     "operator": "aufstellen",
+     "definition": "Gleichungen (Wort- oder Formelgleichungen) entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "formulieren",
+     "definition": "Gleichungen (Wort- oder Formelgleichungen) entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "Hypothesen aufstellen",
+     "definition": "eine Vermutung über einen unbekannten Sachverhalt formulieren, die fachlich fundiert begründet wird"
+    },
+    {
+     "operator": "angeben",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Beobachtungen, Daten, Einzelergebnisse oder Informationen in einen Zusammenhang stellen und daraus Schlussfolgerungen ziehen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Gründe oder Argumente für eine Vorgehensweise oder einen Sachverhalt nachvollziehbar darstellen"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Die Berechnung ist ausgehend von einem Ansatz darzustellen."
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Beobachtungen, Strukturen, Sachverhalte, Methoden, Verfahren oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Das zu fällende Sachurteil ist mithilfe fachlicher Kriterien zu begründen."
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Das zu fällende Werturteil ist unter Berücksichtigung gesellschaftlicher Werte und Normen zu begründen."
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Strukturen, Sachverhalte oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren, auch mithilfe von Zeichnungen und Tabellen"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Argumente zu einer Aussage oder These einander gegenüberstellen und abwägen"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich machen, indem man ihn auf Regeln und Gesetzmäßigkeiten zurückführt"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt veranschaulichend darstellen und durch zusätzliche Informationen verständlich machen"
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "ein Ergebnis oder einen Zusammenhang rechnerisch, grafisch oder experimentell bestimmen"
+    },
+    {
+     "operator": "herleiten",
+     "definition": "mithilfe bekannter Gesetzmäßigkeiten einen Zusammenhang zwischen physikalischen Größen herstellen"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "deuten",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Begriffe oder Gegenstände auf der Grundlage bestimmter Merkmale systematisch einteilen"
+    },
+    {
+     "operator": "planen",
+     "definition": "zu einem vorgegebenen Problem (auch experimentelle) Lösungswege entwickeln und dokumentieren"
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte, Prozesse, Strukturen oder Ergebnisse übersichtlich grafisch darstellen"
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Sachverhalte oder Phänomene mithilfe fachspezifischer Arbeitsweisen erschließen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede kriteriengeleitet herausarbeiten"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "Objekte grafisch exakt darstellen"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Informatik (APA Informatik), Gymnasiale Oberstufe Saar, Juli 2019, 2.4 Operatoren, S. 8–9 (in Anlehnung an die EPA-Operatoren), Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Informatik/APA_Informatik_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "informatik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "abschätzen",
+     "definition": "durch begründete Überlegungen Größenordnungen angeben"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "eine konkrete Materialgrundlage untersuchen, einzelne Elemente identifizieren und Beziehungen zwischen den Elementen erfassen"
+    },
+    {
+     "operator": "anwenden",
+     "definition": "ein bekanntes Verfahren an einem vorgegebenem Beispiel durchführen"
+    },
+    {
+     "operator": "angeben",
+     "definition": "ein Ergebnis numerisch oder verbal formulieren, ohne Darstellung des Lösungsweges und ohne Begründung",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "ein Ergebnis numerisch oder verbal formulieren, ohne Darstellung des Lösungsweges und ohne Begründung",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten, Einzelergebnisse oder andere Elemente in einen Zusammenhang stellen, gegebenenfalls zu einer Gesamtaussage zusammenführen und Schlussfolgerungen ziehen"
+    },
+    {
+     "operator": "bestätigen",
+     "definition": "die Gültigkeit einer Aussage oder eine Eigenschaft an einem Beispiel nachweisen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "einen Sachverhalt verbal oder formal auf bekannte Sätze, Regeln oder Eigenschaften zurückführen"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "ein Ergebnis ausgehend von einem Ansatz oder aus einem Diagramm gewinnen, den Lösungsweg unter Angabe von Zwischenschritten darstellen und das Ergebnis formulieren",
+     "formen": [
+      "berechnen",
+      "bestimmen",
+      "ermitteln"
+     ]
+    },
+    {
+     "operator": "bestimmen",
+     "definition": "ein Ergebnis ausgehend von einem Ansatz oder aus einem Diagramm gewinnen, den Lösungsweg unter Angabe von Zwischenschritten darstellen und das Ergebnis formulieren",
+     "formen": [
+      "berechnen",
+      "bestimmen",
+      "ermitteln"
+     ]
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "ein Ergebnis ausgehend von einem Ansatz oder aus einem Diagramm gewinnen, den Lösungsweg unter Angabe von Zwischenschritten darstellen und das Ergebnis formulieren",
+     "formen": [
+      "berechnen",
+      "bestimmen",
+      "ermitteln"
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte, Verfahren oder Zusammenhänge strukturiert unter Verwendung der Fachsprache strukturiert und verständlich wiedergeben"
+    },
+    {
+     "operator": "bestätigen",
+     "definition": "die Gültigkeit einer Aussage oder eine Eigenschaft durch ein Beispiel nachweisen"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien formulieren",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien formulieren",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien formulieren",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "beweisen",
+     "definition": "eine Aussage nach gültigen Schlussregeln logisch verifizieren",
+     "formen": [
+      "beweisen",
+      "zeigen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "zeigen",
+     "definition": "eine Aussage nach gültigen Schlussregeln logisch verifizieren",
+     "formen": [
+      "beweisen",
+      "zeigen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "eine Aussage nach gültigen Schlussregeln logisch verifizieren",
+     "formen": [
+      "beweisen",
+      "zeigen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte, Zusammenhänge, Methoden und Verfahren in fachtypischer Weise strukturiert wiedergeben"
+    },
+    {
+     "operator": "entscheiden",
+     "definition": "sich bei verschiedenen Möglichkeiten begründet und eindeutig festlegen"
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "Sachverhalte und Methoden zielgerecht miteinander verknüpfen; eine Hypothese, eine Idee, oder ein Modell schrittweise weiterführen und ausbauen",
+     "formen": [
+      "entwerfen",
+      "entwickeln"
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Sachverhalte und Methoden zielgerecht miteinander verknüpfen; eine Hypothese, eine Idee, oder ein Modell schrittweise weiterführen und ausbauen",
+     "formen": [
+      "entwerfen",
+      "entwickeln"
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich zum Ausdruck bringen"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt durch zusätzliche Informationen verständlich machen"
+    },
+    {
+     "operator": "herleiten",
+     "definition": "die Entstehung oder Ableitung eines gegebenen oder beschriebenen Sachverhaltes aus anderen oder aus allgemeinen Sachverhalten darstellen",
+     "formen": [
+      "herleiten",
+      "ableiten"
+     ]
+    },
+    {
+     "operator": "ableiten",
+     "definition": "die Entstehung oder Ableitung eines gegebenen oder beschriebenen Sachverhaltes aus anderen oder aus allgemeinen Sachverhalten darstellen",
+     "formen": [
+      "herleiten",
+      "ableiten"
+     ]
+    },
+    {
+     "operator": "implementieren",
+     "definition": "Algorithmen und Datenstrukturen in einer Programmiersprache aufschreiben"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "kausale Zusammenhänge untersuchen und abwägend darstellen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "deuten",
+     "definition": "kausale Zusammenhänge untersuchen und abwägend darstellen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "klassifizieren",
+     "definition": "eine Menge von Objekten nach vorgegebener oder sinnvoll selbstständig zu wählenden Kriterien in Klassen einteilen"
+    },
+    {
+     "operator": "modellieren",
+     "definition": "zu einen Ausschnitt der Realität ein informatisches Modell anfertigen"
+    },
+    {
+     "operator": "nennen",
+     "definition": "Elemente, Sachverhalte, Begriffe, Daten ohne Erläuterungen aufzählen",
+     "formen": [
+      "nennen",
+      "angeben"
+     ]
+    },
+    {
+     "operator": "angeben",
+     "definition": "Elemente, Sachverhalte, Begriffe, Daten ohne Erläuterungen aufzählen",
+     "formen": [
+      "nennen",
+      "angeben"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "einen Sachverhalt auf das Wesentliche reduzieren und diesen grafisch oder sprachlich darstellen"
+    },
+    {
+     "operator": "strukturieren",
+     "definition": "Objekte oder Sachverhalte kategorisieren und hierarchisieren",
+     "formen": [
+      "strukturieren",
+      "ordnen"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Objekte oder Sachverhalte kategorisieren und hierarchisieren",
+     "formen": [
+      "strukturieren",
+      "ordnen"
+     ]
+    },
+    {
+     "operator": "übertragen",
+     "definition": "eine Darstellung in eine andere Darstellungsform bringen",
+     "formen": [
+      "übertragen",
+      "überführen"
+     ]
+    },
+    {
+     "operator": "überführen",
+     "definition": "eine Darstellung in eine andere Darstellungsform bringen",
+     "formen": [
+      "übertragen",
+      "überführen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Eigenschaften von Objekten oder Beziehungen zwischen Objekten herausfinden bzw. nachweisen"
+    },
+    {
+     "operator": "verallgemeinern",
+     "definition": "aus einem erkannten Sachverhalt eine erweiterte Aussage formulieren"
+    },
+    {
+     "operator": "verfeinern",
+     "definition": "eine vorhandene Struktur präzisieren, ergänzen, erweitern"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "eine grafische Darstellung beobachtbarer oder gegebener Strukturen anfertigen"
+    },
+    {
+     "operator": "zeigen",
+     "definition": "eine Aussage, einen Sachverhalt nach Berechnungen, Herleitungen oder logischen Begründungen bestätigen"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Französisch (APA Französisch), Gymnasiale Oberstufe Saar, Juli 2019, Anlage: Operatoren gemäß IQB zu den Kompetenzbereichen Schreiben und Sprechen, S. 40–41, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Franzoesisch/APA_Franzoesisch_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "franzoesisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "fr",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analyser",
+     "definition": "relever et expliquer certains aspects particuliers du texte",
+     "formen": [
+      "analyser",
+      "étudier",
+      "examiner"
+     ],
+     "beispiele": [
+      "Analysez l’attitude du personnage envers ses supérieurs."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "étudier",
+     "definition": "relever et expliquer certains aspects particuliers du texte",
+     "formen": [
+      "analyser",
+      "étudier",
+      "examiner"
+     ],
+     "beispiele": [
+      "Analysez l’attitude du personnage envers ses supérieurs."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "examiner",
+     "definition": "relever et expliquer certains aspects particuliers du texte",
+     "formen": [
+      "analyser",
+      "étudier",
+      "examiner"
+     ],
+     "beispiele": [
+      "Analysez l’attitude du personnage envers ses supérieurs."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "caractériser",
+     "definition": "décrire et analyser un personnage, un objet",
+     "formen": [
+      "caractériser",
+      "faire le portrait"
+     ],
+     "beispiele": [
+      "Caractérisez le personnage principal."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "faire le portrait",
+     "definition": "décrire et analyser un personnage, un objet",
+     "formen": [
+      "caractériser",
+      "faire le portrait"
+     ],
+     "beispiele": [
+      "Caractérisez le personnage principal."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "commenter",
+     "definition": "exprimer son propre point de vue en avançant des arguments logiques",
+     "beispiele": [
+      "Commentez le jugement que porte l’auteur sur le tourisme de masse."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "comparer",
+     "definition": "montrer les points communs et les différences",
+     "formen": [
+      "comparer",
+      "mettre en rapport"
+     ],
+     "beispiele": [
+      "Comparez l’attitude des deux personnages envers la guerre."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "mettre en rapport",
+     "definition": "montrer les points communs et les différences",
+     "formen": [
+      "comparer",
+      "mettre en rapport"
+     ],
+     "beispiele": [
+      "Comparez l’attitude des deux personnages envers la guerre."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "décrire",
+     "definition": "montrer les différents aspects d’un personnage / d’une situation / d’un problème",
+     "beispiele": [
+      "Décrivez les rapports familiaux tels qu’ils sont présentés dans le texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "dégager",
+     "definition": "faire ressortir, mettre en évidence certains éléments ou structures du texte",
+     "formen": [
+      "dégager",
+      "exposer",
+      "présenter",
+      "préciser"
+     ],
+     "beispiele": [
+      "Dégagez l’opinion de l’auteur. Exposez brièvement le problème dont il est question dans le texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "exposer",
+     "definition": "faire ressortir, mettre en évidence certains éléments ou structures du texte",
+     "formen": [
+      "dégager",
+      "exposer",
+      "présenter",
+      "préciser"
+     ],
+     "beispiele": [
+      "Dégagez l’opinion de l’auteur. Exposez brièvement le problème dont il est question dans le texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "présenter",
+     "definition": "faire ressortir, mettre en évidence certains éléments ou structures du texte",
+     "formen": [
+      "dégager",
+      "exposer",
+      "présenter",
+      "préciser"
+     ],
+     "beispiele": [
+      "Dégagez l’opinion de l’auteur. Exposez brièvement le problème dont il est question dans le texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "préciser",
+     "definition": "faire ressortir, mettre en évidence certains éléments ou structures du texte",
+     "formen": [
+      "dégager",
+      "exposer",
+      "présenter",
+      "préciser"
+     ],
+     "beispiele": [
+      "Dégagez l’opinion de l’auteur. Exposez brièvement le problème dont il est question dans le texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "évaluer",
+     "definition": "faire le bilan",
+     "beispiele": [
+      "Evaluez la situation des immigrés Roms en banlieue lyonnaise à partir du texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "expliquer",
+     "definition": "rendre qc compréhensible",
+     "beispiele": [
+      "Expliquez la décision de la narratrice de porter le foulard."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "prendre position et justifier",
+     "definition": "exprimer son opinion personnelle en avançant des arguments logiques",
+     "beispiele": [
+      "« L’argent fait-il le bonheur ? » Prenez position et justifiez votre point de vue."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "peser le pour et le contre",
+     "definition": "montrer les avantages et les inconvénients d’un point de vue /d’une attitude et en tirer les conséquences",
+     "beispiele": [
+      "Pesez le pour et le contre du droit de vote à 16 ans."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "rédiger",
+     "definition": "écrire un texte selon des critères donnés",
+     "beispiele": [
+      "Rédigez une lettre / un passage pour votre journal intime / la suite de la scène."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "résumer",
+     "definition": "donner les idées principales",
+     "beispiele": [
+      "Résumez les idées principales du texte."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "analyser",
+     "definition": "relever et expliquer certains aspects particuliers d’un document",
+     "beispiele": [
+      "Analysez la statistique."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "commenter",
+     "definition": "exprimer son propre point de vue en avançant des arguments logiques",
+     "beispiele": [
+      "Commentez la citation."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "comparer",
+     "definition": "montrer les points communs et les différences",
+     "formen": [
+      "comparer",
+      "mettre en rapport"
+     ],
+     "beispiele": [
+      "Comparez les points de vue présentés dans les documents."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "mettre en rapport",
+     "definition": "montrer les points communs et les différences",
+     "formen": [
+      "comparer",
+      "mettre en rapport"
+     ],
+     "beispiele": [
+      "Comparez les points de vue présentés dans les documents."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "discuter de",
+     "definition": "opposer des opinions différentes sur un sujet concret",
+     "beispiele": [
+      "Discutez avec votre partenaire des mesures pour lutter contre … / pour …"
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "prendre position et justifier",
+     "definition": "donner des raisons",
+     "beispiele": [
+      "Prenez position et justifiez votre point de vue."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "se mettre d’accord",
+     "definition": "trouver un compromis",
+     "beispiele": [
+      "Dans votre école, certains désirent introduire l’uniforme scolaire. Discutez de ce sujet avec votre partenaire et mettez-vous d’accord."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "présenter",
+     "definition": "montrer par exemple une situation, un comportement",
+     "beispiele": [
+      "Présentez les résultats du sondage."
+     ],
+     "kompetenzbereich": "Sprechen"
+    },
+    {
+     "operator": "résumer",
+     "definition": "rendre les idées principales",
+     "beispiele": [
+      "Résumez les idées centrales du discours."
+     ],
+     "kompetenzbereich": "Sprechen"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Spanisch (APA Spanisch), Gymnasiale Oberstufe Saar, Juli 2020, 3. Operatoren zur Initiierung von Schülerleistungen, S. 16–18 (Tabellen nach Anforderungsbereichen I–III), Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Spanisch/APA_Spanisch_Juli_2020.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "spanisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "es",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "describir",
+     "definition": "referir de manera ordenada y lógica aspectos determinados de algo o alguien",
+     "afb": "I",
+     "beispiele": [
+      "Describa el cuadro detalladamente. Describa la situación en la que se encuentran Rosa y Nacha."
+     ]
+    },
+    {
+     "operator": "presentar",
+     "definition": "mostrar o dar a conocer algo o a alguien",
+     "afb": "I",
+     "formen": [
+      "presentar",
+      "exponer"
+     ],
+     "beispiele": [
+      "Presente con la ayuda de la pizarra de conferencias los argumentos de las distintas personas."
+     ]
+    },
+    {
+     "operator": "exponer",
+     "definition": "mostrar o dar a conocer algo o a alguien",
+     "afb": "I",
+     "formen": [
+      "presentar",
+      "exponer"
+     ],
+     "beispiele": [
+      "Presente con la ayuda de la pizarra de conferencias los argumentos de las distintas personas."
+     ]
+    },
+    {
+     "operator": "resumir",
+     "definition": "exponer brevemente y con palabras propias las ideas esenciales del texto sin entrar en detalles",
+     "afb": "I",
+     "beispiele": [
+      "Resuma brevemente lo que pasa en esta escena clave."
+     ]
+    },
+    {
+     "operator": "contar",
+     "definition": "reproducir el contenido con palabras propias",
+     "afb": "I",
+     "beispiele": [
+      "Cuente lo que pasa mientras el hombre está esperando."
+     ]
+    },
+    {
+     "operator": "esbozar",
+     "definition": "exponer los rasgos principales sin dar todas las ideas ni demasiados detalles",
+     "afb": "I",
+     "beispiele": [
+      "Esboce las relaciones familiares entre los personajes en esta escena."
+     ]
+    },
+    {
+     "operator": "ordenar",
+     "definition": "presentar los diferentes elementos poniéndolos en un orden lógico",
+     "afb": "I",
+     "beispiele": [
+      "Ordene cronológicamente los hechos mencionados en el texto."
+     ]
+    },
+    {
+     "operator": "exponer",
+     "definition": "presentar algo",
+     "afb": "I",
+     "beispiele": [
+      "Exponga la situación actual de los jóvenes en el mercado laboral."
+     ]
+    },
+    {
+     "operator": "analizar",
+     "definition": "examinar y explicar ciertos aspectos particulares de un texto teniendo en cuenta su mensaje",
+     "afb": "II",
+     "beispiele": [
+      "Analice el comportamiento del protagonista en el capítulo III."
+     ]
+    },
+    {
+     "operator": "caracterizar",
+     "definition": "resaltar los rasgos característicos de un personaje, una cosa, una situación etc. generalizando los puntos particulares o los detalles mencionados en el texto",
+     "afb": "II",
+     "formen": [
+      "caracterizar",
+      "retratar"
+     ],
+     "beispiele": [
+      "Caracterice al protagonista del texto."
+     ]
+    },
+    {
+     "operator": "retratar",
+     "definition": "resaltar los rasgos característicos de un personaje, una cosa, una situación etc. generalizando los puntos particulares o los detalles mencionados en el texto",
+     "afb": "II",
+     "formen": [
+      "caracterizar",
+      "retratar"
+     ],
+     "beispiele": [
+      "Caracterice al protagonista del texto."
+     ]
+    },
+    {
+     "operator": "clasificar",
+     "definition": "ordenar en grupos elementos con características comunes",
+     "afb": "II",
+     "beispiele": [
+      "Clasifique las distintas formas de contaminación mencionadas en el artículo."
+     ]
+    },
+    {
+     "operator": "comparar",
+     "definition": "examinar dos o más cosas, situaciones, personajes,puntos de vista etc. para descubrir y presentar su relación, sus semejanzas, sus diferencias según unos criterios dados",
+     "afb": "II",
+     "beispiele": [
+      "Compare la manera en que el texto literario presenta a Chencha con la presentación del mismo personaje en la versión cinematográfica."
+     ]
+    },
+    {
+     "operator": "confeccionar/realizar un esquema/un gráfico/una estadística etc.",
+     "definition": "visualizar y reorganizar elementos de un texto",
+     "afb": "II",
+     "beispiele": [
+      "Confeccione un esquema que haga visible la relación entre los dos protagonistas del cuento."
+     ]
+    },
+    {
+     "operator": "examinar",
+     "definition": "estudiar a fondo un problema, un comportamiento, una situación, un fenómeno",
+     "afb": "II",
+     "beispiele": [
+      "Examine la función de la última frase para el mensaje del texto."
+     ]
+    },
+    {
+     "operator": "explicar",
+     "definition": "hacer entender de manera clara una idea, un sentimiento o la función de un objeto, refiriéndose al contexto/a los motivos/a las causas",
+     "afb": "II",
+     "beispiele": [
+      "Explique los motivos de los emigrantes."
+     ]
+    },
+    {
+     "operator": "interpretar",
+     "definition": "analizar un contenido o un gráfico, una estadística etc.",
+     "afb": "II",
+     "beispiele": [
+      "Interprete el monólogo de Sigismundo."
+     ]
+    },
+    {
+     "operator": "buscar soluciones",
+     "definition": "proponer medidas para solucionar un problema",
+     "afb": "III",
+     "beispiele": [
+      "Busque soluciones a la situación de los jóvenes desempleados."
+     ]
+    },
+    {
+     "operator": "comentar",
+     "definition": "expresar opiniones u observaciones acerca de una cita, un problema o un comportamiento y dar argumentos lógicos. basándose en el contexto, los conocimientos de la materia y/o las propias experiencias",
+     "afb": "III",
+     "beispiele": [
+      "Comente la decisión del protagonista en la escena presentada."
+     ]
+    },
+    {
+     "operator": "comparar",
+     "definition": "examinar dos o más cosas, situaciones, personajes, puntos de vista etc. para descubrir y presentar su relación, sus semejanzas, sus diferencias según unos criterios dados",
+     "afb": "III",
+     "beispiele": [
+      "Compare las experiencias del protagonista con las tuyas."
+     ]
+    },
+    {
+     "operator": "convencer",
+     "definition": "conseguir que una persona piense de una determinada manera o que haga una cosa",
+     "afb": "III",
+     "beispiele": [
+      "Convenza a tus compañeros de que el viaje que tú has elegido es la mejor opción."
+     ]
+    },
+    {
+     "operator": "discutir",
+     "definition": "analizar un asunto desde distintos puntos de vista para explicarlo o solucionarlo, examinar y valorar los pros y los contras, referirse a un punto de vista, poner objecciones y manifestar una opinión contraria",
+     "afb": "III",
+     "beispiele": [
+      "Después de escuchar la presentación de su compañero/ compañera, discuta con él/ella la plausibilidad de los argumentos y la finalidad de la ecotasa."
+     ]
+    },
+    {
+     "operator": "evaluar",
+     "definition": "determinar el valor o el estado de una cosa",
+     "afb": "III",
+     "formen": [
+      "evaluar",
+      "valorar"
+     ],
+     "beispiele": [
+      "Evalúe el éxito de las medidas adoptadas para mantener limpias las playas de la Costa Brava."
+     ]
+    },
+    {
+     "operator": "valorar",
+     "definition": "determinar el valor o el estado de una cosa",
+     "afb": "III",
+     "formen": [
+      "evaluar",
+      "valorar"
+     ],
+     "beispiele": [
+      "Evalúe el éxito de las medidas adoptadas para mantener limpias las playas de la Costa Brava."
+     ]
+    },
+    {
+     "operator": "imaginar(se)",
+     "definition": "inventar algo basándose en elementos dados",
+     "afb": "III",
+     "beispiele": [
+      "Imagínate cómo puede continuar la película y escribe el guión la próxima escena."
+     ]
+    },
+    {
+     "operator": "interpretar",
+     "definition": "explicar un contenido o un gráfico, una estadística de un modo personal",
+     "afb": "III",
+     "beispiele": [
+      "Interprete el cuadro ‘Guérnica’ de Picasso."
+     ]
+    },
+    {
+     "operator": "justificar",
+     "definition": "aportar argumentos a favor de algo; defender con pruebas/razones",
+     "afb": "III",
+     "beispiele": [
+      "¿Compraría un coche eléctrico? Justifique su opinión."
+     ]
+    },
+    {
+     "operator": "juzgar",
+     "definition": "valorar las acciones o condiciones de un personaje, emitir juicio favorable o desfavorable sobre una cosa",
+     "afb": "III",
+     "beispiele": [
+      "Juzgue el bloqueo norteamericano."
+     ]
+    },
+    {
+     "operator": "opinar",
+     "definition": "expresar la propia opinión en cuanto a un comportamiento, una actitud, un punto de vista, un acontecimiento etc.",
+     "afb": "III",
+     "beispiele": [
+      "¿Qué opinas de la introducción de la ecotasa?"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Latein (APA) 2023, Anhang VI.1 Operatoren: „Operatoren und Anforderungsbereiche zum Erstellen von Prüfungsaufgaben“, S. 16–17, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Latein/APA_LA_2023.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "latein"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "mehrfach",
+   "operatoren": [
+    {
+     "operator": "angeben",
+     "definition": "Inhalte zu vorgegebenen Sachverhalten aufführen",
+     "afb": "I"
+    },
+    {
+     "operator": "nennen",
+     "definition": "definierte Begriffe (er)kennen; sie knapp und präzise wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "zuweisen",
+     "definition": "Sachverhalte / Aussagen einer vorgegebenen Kategorie zuordnen",
+     "afb": "I"
+    },
+    {
+     "operator": "benennen",
+     "definition": "Sachverhalte / Inhalte mit einem Begriff versehen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "bestimmen",
+     "definition": "lateinische Wortformen fachsystematisch klassifizieren",
+     "afb": "I–II"
+    },
+    {
+     "operator": "zusammenstellen",
+     "definition": "Begriffe / Elemente nach vorgegebenenen oder selbst erarbeiteten Aspekten sammeln",
+     "afb": "I–II"
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Begriffe / Elemente nach vorgegebenen oder selbst erarbeiteten übergeordneten Aspekten systematisieren",
+     "afb": "I–II"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte / Zusammenhänge in eigenen Worten darlegen",
+     "afb": "I–II",
+     "formen": [
+      "beschreiben",
+      "skizzieren"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte / Zusammenhänge in eigenen Worten darlegen",
+     "afb": "I–II",
+     "formen": [
+      "beschreiben",
+      "skizzieren"
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte / Zusammenhänge strukturiert wiedergeben",
+     "afb": "I–II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Sachverhalte / Aussagen mit erläuternden Hinweisen in einen Zusammenhang einfügen",
+     "afb": "I–II"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "wesentliche Aussagen komprimiert und strukturiert wiedergeben",
+     "afb": "I–II"
+    },
+    {
+     "operator": "belegen",
+     "definition": "(vorgegebene oder selbst aufgestellte) Thesen / Aussagen durch Textstellen nachweisen",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte in einem Zusammenhang (z.B. Regel, Modell, Kontext) einordnen und die bestehenden inneren Bezüge darlegen / begründen",
+     "afb": "II"
+    },
+    {
+     "operator": "gliedern",
+     "definition": "Texte (evt. mit sprachlicher / formaler / inhaltlicher Begründung) in Sinnabschnitte einteilen und diesen Abschnitten jeweils eine zusammenfassende Überschrift geben",
+     "afb": "II"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "in den Aussagen von Texten bestimmte Sachverhalte erkennen und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte und Personen in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Aspekt zusammenführen",
+     "afb": "II"
+    },
+    {
+     "operator": "paraphrasieren",
+     "definition": "mit eigenen Worten den Textinhalt unter Wahrung der Informationsreihenfolge wiedergeben",
+     "afb": "II"
+    },
+    {
+     "operator": "metrisch analysieren",
+     "definition": "Verse nach Längen, Kürzen und Einschnitten analysieren",
+     "afb": "II",
+     "formen": [
+      "metrisch analysieren",
+      "metrische Analyse anfertigen"
+     ]
+    },
+    {
+     "operator": "metrische Analyse anfertigen",
+     "definition": "Verse nach Längen, Kürzen und Einschnitten analysieren",
+     "afb": "II",
+     "formen": [
+      "metrisch analysieren",
+      "metrische Analyse anfertigen"
+     ]
+    },
+    {
+     "operator": "gestalten",
+     "definition": "Aufgaben auf der Grundlage von Textkenntnis und Sachwissen gestaltend interpretieren",
+     "afb": "II–III",
+     "formen": [
+      "gestalten",
+      "entwerfen"
+     ]
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "Aufgaben auf der Grundlage von Textkenntnis und Sachwissen gestaltend interpretieren",
+     "afb": "II–III",
+     "formen": [
+      "gestalten",
+      "entwerfen"
+     ]
+    },
+    {
+     "operator": "definieren",
+     "definition": "Begriffsinhalte so knapp und präzise wie möglich erklären",
+     "afb": "II–III"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "über das Erklären hinaus durch zusätzliche Informationen (z.B. Beispiele, Belege, Begründungen) nachvollziehbar verdeutlichen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Sachverhalte / Aussagen mit nachvollziehbaren Argumenten stützen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "deuten",
+     "definition": "Textaussagen durch Verknüpfen von Textpassagen mit außertextlichem Bezugsmaterial verständlich machen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Sachverhalte / Aussagen durch eigene Untersuchungen am Text bestätigen",
+     "afb": "II–III",
+     "formen": [
+      "nachweisen",
+      "zeigen"
+     ]
+    },
+    {
+     "operator": "zeigen",
+     "definition": "Sachverhalte / Aussagen durch eigene Untersuchungen am Text bestätigen",
+     "afb": "II–III",
+     "formen": [
+      "nachweisen",
+      "zeigen"
+     ]
+    },
+    {
+     "operator": "erschließen",
+     "definition": "unter gezielten Fragestellungen sprachliche, inhaltliche und / oder strukturelle Merkmale / Sachverhalte eines Textes herausarbeiten und im Zusammenhang darstellen",
+     "afb": "II–III",
+     "formen": [
+      "erschließen",
+      "untersuchen",
+      "analysieren"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "unter gezielten Fragestellungen sprachliche, inhaltliche und / oder strukturelle Merkmale / Sachverhalte eines Textes herausarbeiten und im Zusammenhang darstellen",
+     "afb": "II–III",
+     "formen": [
+      "erschließen",
+      "untersuchen",
+      "analysieren"
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "unter gezielten Fragestellungen sprachliche, inhaltliche und / oder strukturelle Merkmale / Sachverhalte eines Textes herausarbeiten und im Zusammenhang darstellen",
+     "afb": "II–III",
+     "formen": [
+      "erschließen",
+      "untersuchen",
+      "analysieren"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "eine Aussage auf ihre sachliche Richtigkeit vor dem Hintergrund vorhandener Kenntnisse untersuchen",
+     "afb": "II–III"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Aspekten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen; Übersetzungen vergleichen (\"Übersetzungsvergleich\")",
+     "afb": "III",
+     "formen": [
+      "vergleichen",
+      "unterscheiden",
+      "differenzieren"
+     ]
+    },
+    {
+     "operator": "unterscheiden",
+     "definition": "nach vorgegebenen oder selbst gewählten Aspekten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen; Übersetzungen vergleichen (\"Übersetzungsvergleich\")",
+     "afb": "III",
+     "formen": [
+      "vergleichen",
+      "unterscheiden",
+      "differenzieren"
+     ]
+    },
+    {
+     "operator": "differenzieren",
+     "definition": "nach vorgegebenen oder selbst gewählten Aspekten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen; Übersetzungen vergleichen (\"Übersetzungsvergleich\")",
+     "afb": "III",
+     "formen": [
+      "vergleichen",
+      "unterscheiden",
+      "differenzieren"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Thesen / Problemstellungen in Form einer Gegenüberstellung von Argumenten und Gegenargumenten untersuchen und mit einer begründeten Stellungnahme bewerten",
+     "afb": "III"
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "unter Heranziehung von Kenntnissen (über Autor, Sachverhalt, Kontext) eine eigene begründete Position vertreten",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen",
+      "bewerten",
+      "beurteilen"
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "unter Heranziehung von Kenntnissen (über Autor, Sachverhalt, Kontext) eine eigene begründete Position vertreten",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen",
+      "bewerten",
+      "beurteilen"
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "unter Heranziehung von Kenntnissen (über Autor, Sachverhalt, Kontext) eine eigene begründete Position vertreten",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen",
+      "bewerten",
+      "beurteilen"
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "auf der Basis methodisch reflektierten und sachangemessenen Interpretierens von textimmanenten und ggf. textexternen Elementen und Strukturen die Gesamtdeutung eines Textes bzw. von Textteilen selbstständig erarbeiten und ein komplexes Textverständnis nachvollziehbar darbieten",
+     "afb": "III"
+    },
+    {
+     "operator": "übersetzen",
+     "definition": "einen Text vollständig, zielsprachenorientiert und unter Berücksichtigung des historischen Hintergrundes sowie der Intention des Autors im Deutschen wiedergeben",
+     "afb": "III"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Allgemeine Ethik (APA Allgemeine Ethik), Gymnasiale Oberstufe Saar, Juli 2019, 1.2/1.3 Operatoren zu den Anforderungsbereichen, S. 5–6, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/AllgemeineEthik/APA_Allgemeine_Ethik_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "ethik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "(be-)nennen",
+     "definition": "Elemente ohne weitere Ausführungen angeben",
+     "afb": "I",
+     "beispiele": [
+      "Nennen Sie die drei „Pfeiler“ des Utilitarismus laut Bernward Gesang."
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "etwas mit eigenen Worten sachlich wiedergeben",
+     "afb": "I",
+     "beispiele": [
+      "Beschreiben Sie die wesentlichen Elemente der Karikatur."
+     ]
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "wesentliche Aspekte von etwas in eigenen Worten strukturiert und komprimiert wiedergeben",
+     "afb": "I",
+     "beispiele": [
+      "Fassen Sie Epikurs Ausführungen zum falschen Denken zusammen."
+     ]
+    },
+    {
+     "operator": "analysieren",
+     "definition": "unter bestimmten Fragestellungen Elemente und Zusammenhänge systematisch erschließen und darstellen",
+     "afb": "II",
+     "beispiele": [
+      "Analysieren Sie das Menschenbild in Nietzsches Ausführungen zum „Übermenschen“."
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "etwas Bekanntes auf etwas Neues beziehen",
+     "afb": "II",
+     "beispiele": [
+      "Wenden Sie den Utilitarismus auf dieses Beispiel an."
+     ]
+    },
+    {
+     "operator": "belegen",
+     "definition": "etwas in oder an etwas nachweisen",
+     "afb": "II",
+     "beispiele": [
+      "Belegen Sie die Diagnose Fromms an Beispielen aus dem Alltag."
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "etwas in seinem Zusammenhang strukturiert und sachlich wiedergeben",
+     "afb": "II",
+     "beispiele": [
+      "Stellen Sie die utilitaristische Position Mills dar."
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "etwas erklärend in einen bekannten Sinnzusammenhang einfügen",
+     "afb": "II",
+     "beispiele": [
+      "Ordnen Sie Kants Position in ihren philosophiegeschichtlichen Hintergrund ein."
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "etwas nachvollziehbar und verständlich machen",
+     "afb": "II",
+     "beispiele": [
+      "Erklären Sie Freuds Bedenken gegenüber der Kultur."
+     ]
+    },
+    {
+     "operator": "in einen Zusammenhang stellen",
+     "definition": "etwas erklärend in Beziehung zu etwas anderem setzen",
+     "afb": "II",
+     "beispiele": [
+      "Stellen Sie die Forderung nach Nachhaltigkeit in Zusammenhang mit Jonas’ Verantwortungsethik."
+     ]
+    },
+    {
+     "operator": "problematisieren",
+     "definition": "durch gezieltes Hinterfragen das Bedenkenswerte im vorgeblich Selbstverständlichen herausarbeiten",
+     "afb": "II",
+     "beispiele": [
+      "Problematisieren Sie die Institution des Haustieres."
+     ]
+    },
+    {
+     "operator": "prüfen",
+     "definition": "etwas auf eine relevante Qualität hin untersuchen",
+     "afb": "II",
+     "beispiele": [
+      "Prüfen Sie die These Fromms vom Verfall der Liebe in der modernen Gesellschaft auf ihre argumentative Plausibilität."
+     ]
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Aspekten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede herausstellen",
+     "afb": "II",
+     "beispiele": [
+      "Vergleichen Sie die moralphilosophischen Modelle Mills und Kants."
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "etwas durch Argumente stützen",
+     "afb": "III",
+     "beispiele": [
+      "Begründen Sie Ihre Position."
+     ]
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "etwas unter Verwendung von Fachwissen und Fachmethoden aufgrund expliziter Kriterien begründet bewerten",
+     "afb": "III",
+     "beispiele": [
+      "Beurteilen Sie den Ansatz Fromms."
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Analyseergebnisse synthetisieren und darstellen",
+     "afb": "III",
+     "beispiele": [
+      "Entwickeln Sie ausgehend von Ihren Analyseergebnissen ein Konzept für einen verantwortlichen Umgang mit einem Schwangerschaftsabbruch."
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "ein Beurteilungsproblem darstellen, Positionen und Argumente gegenüberstellend abwägen und eine Schlussfolgerung erarbeiten",
+     "afb": "III",
+     "beispiele": [
+      "Erörtern Sie die Praxistauglichkeit des Kategorischen Imperativs."
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "etwas Neues oder Nicht- Explizites aus etwas Bekanntem herleiten",
+     "afb": "III",
+     "beispiele": [
+      "Arbeiten Sie aus Freuds Aussagen zum Unbehagen in der Kultur sein Menschenbild heraus."
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "auf der Grundlage einer Analyse im Ganzen oder aspektorientiert Sinnzusammenhänge herstellen und zu einer schlüssigen Deutung kommen",
+     "afb": "III",
+     "beispiele": [
+      "Interpretieren Sie die Darstellung des Sisyphos-Mythos bei Camus [im Hinblick auf sein Menschenbild]."
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "sich zu etwas begründet positionieren",
+     "afb": "III",
+     "beispiele": [
+      "Nehmen Sie Stellung zu der These Fromms, dass die Liebe eine Kunst sei."
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Philosophie (APA), Gymnasiale Oberstufe, 2024, 1.3 Operatoren zu den Anforderungsbereichen, S. 4–6, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/Philosophie/APA_Philosophie_2024.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "philosophie"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "(be-)nennen",
+     "definition": "Elemente ohne weitere Ausführungen angeben",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte mit eigenen Worten in ihrem Zusammenhang geordnet, detailliert und sachlich darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "den (gedanklichen) Zusammenhang eines Textes/einer Position in eigenen Worten geordnet und sachlich darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "wesentliche Aspekte in eigenen Worten strukturiert und komprimiert wiedergeben",
+     "afb": "I"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Elemente und Zusammenhänge aspektorientiert und systematisch erschließen und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "anwenden",
+     "definition": "erworbenes Wissen oder methodische Kenntnisse auf neue Kontexte übertragen",
+     "afb": "II"
+    },
+    {
+     "operator": "belegen",
+     "definition": "absichern einer Behauptung durch Zitat oder Verweis auf eine Fundstelle (z. B. Titel, Seite, Zeilenangabe)",
+     "afb": "II"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "den Zusammenhang von Sachverhalten strukturiert, genau und sachlich entfalten",
+     "afb": "II"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Sachverhalte mit erläuternden Hinweisen und Begründungen in einen bekannten Sinnzusammenhang einfügen",
+     "afb": "II"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte nachvollziehbar und verständlich machen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte nachvollziehbar und verständlich machen und mit zusätzlichen Informationen/ Beispielen veranschaulichen",
+     "afb": "II"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "etwas Neues oder nicht explizit Formuliertes durch Schlussfolgerungen aus etwas Bekanntem herleiten",
+     "afb": "II",
+     "formen": [
+      "erschließen",
+      "herausarbeiten"
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "etwas Neues oder nicht explizit Formuliertes durch Schlussfolgerungen aus etwas Bekanntem herleiten",
+     "afb": "II",
+     "formen": [
+      "erschließen",
+      "herausarbeiten"
+     ]
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "Zusammenhänge unter vorgegebenen oder selbst gewählten Gesichtspunkten begründet herstellen",
+     "afb": "II",
+     "formen": [
+      "in Beziehung setzen",
+      "in einen Zusammenhang stellen"
+     ]
+    },
+    {
+     "operator": "in einen Zusammenhang stellen",
+     "definition": "Zusammenhänge unter vorgegebenen oder selbst gewählten Gesichtspunkten begründet herstellen",
+     "afb": "II",
+     "formen": [
+      "in Beziehung setzen",
+      "in einen Zusammenhang stellen"
+     ]
+    },
+    {
+     "operator": "problematisieren",
+     "definition": "durch gezieltes Hinterfragen das Bedenkenswerte im vorgeblich Selbstverständlichen herausarbeiten",
+     "afb": "II"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Aspekten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen durch Argumente stützen",
+     "afb": "III"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "ein selbstständiges Urteil unter Verwendung von Fachwissen und Fachmethoden auf der Basis ausgewiesener Kriterien formulieren",
+     "afb": "III"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "ein philosophisches Problem darstellen, unterschiedliche Positionen sowie Pro- und Kontra-Argumente abwägen und zu einem abschließenden, eigenen Urteil gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "ein Konzept in seinen wesentlichen Grundzügen erarbeiten und darstellen",
+     "afb": "III"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "ein philosophisches Problem darstellen und eine Argumentation entwickeln, die zu einer begründeten eigenen Beurteilung/Stellungnahme führt",
+     "afb": "III"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "auf der Grundlage einer Analyse im Ganzen oder aspektorientiert Sinnzusammenhänge herstellen und zu einer schlüssigen Deutung kommen",
+     "afb": "III"
+    },
+    {
+     "operator": "(über-)prüfen",
+     "definition": "Aussagen bzw. Behauptungen kritisch hinterfragen und ihre Gültigkeit kriterienorientiert und begründet einschätzen",
+     "afb": "III"
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "sich zu einer Aussage bzw. eine Problemstellung begründet positionieren",
+     "afb": "III"
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Evangelische Religion (APA Evangelische Religion), Gymnasiale Oberstufe Saar, Juli 2019, 2.4 Operatoren, S. 5–6 (evangelisch), Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/EvangelischeReligion/APA_Evangelische_Religion_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "religion"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "ausgewählte Elemente, Aspekte, Merkmale, Begriffe, Personen etc. unkommentiert angeben",
+     "afb": "I",
+     "formen": [
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "benennen",
+     "definition": "ausgewählte Elemente, Aspekte, Merkmale, Begriffe, Personen etc. unkommentiert angeben",
+     "afb": "I",
+     "formen": [
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "einen bekannten oder erkannten Sachverhalt oder Gedankengang in seinen Grundzügen ausdrücken",
+     "afb": "I"
+    },
+    {
+     "operator": "formulieren",
+     "definition": "den Gedankengang oder die Hauptaussage eines Textes, eines Sachverhalts oder einer Position mit eigenen Worten darlegen",
+     "afb": "I",
+     "formen": [
+      "formulieren",
+      "darstellen",
+      "aufzeigen"
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "den Gedankengang oder die Hauptaussage eines Textes, eines Sachverhalts oder einer Position mit eigenen Worten darlegen",
+     "afb": "I",
+     "formen": [
+      "formulieren",
+      "darstellen",
+      "aufzeigen"
+     ]
+    },
+    {
+     "operator": "aufzeigen",
+     "definition": "den Gedankengang oder die Hauptaussage eines Textes, eines Sachverhalts oder einer Position mit eigenen Worten darlegen",
+     "afb": "I",
+     "formen": [
+      "formulieren",
+      "darstellen",
+      "aufzeigen"
+     ]
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "einen bekannten oder erkannten Sachverhalt oder den Inhalt eines Textes unter Verwendung der Fachsprache mit eigenen Worten ausdrücken",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "die Merkmale eines Materials oder Sachverhalts mit Worten in Einzelheiten schildern",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "die Kernaussagen eines Textes komprimiert und strukturiert darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen bekannten oder erkannten Sachverhalt in einen neuen oder anderen Zusammenhang stellen oder die Position eines Verfassers bezüglich einer bestimmten Religion, Konfession, Denkrichtung etc. unter Verweis auf Textstellen und in Verbindung mit Vorwissen bestimmen",
+     "afb": "II",
+     "formen": [
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "einen bekannten oder erkannten Sachverhalt in einen neuen oder anderen Zusammenhang stellen oder die Position eines Verfassers bezüglich einer bestimmten Religion, Konfession, Denkrichtung etc. unter Verweis auf Textstellen und in Verbindung mit Vorwissen bestimmen",
+     "afb": "II",
+     "formen": [
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "einen bekannten Sachverhalt oder eine bekannte Methode auf etwas Neues beziehen",
+     "afb": "II"
+    },
+    {
+     "operator": "belegen",
+     "definition": "Aussagen durch Textstellen oder bekannte Sachverhalte stützen",
+     "afb": "II",
+     "formen": [
+      "belegen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Aussagen durch Textstellen oder bekannte Sachverhalte stützen",
+     "afb": "II",
+     "formen": [
+      "belegen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen durch Argumente stützen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt, eine These etc. ggf. mit zusätzlichen Informationen und Beispielen nachvollziehbar veranschaulichen",
+     "afb": "II",
+     "formen": [
+      "erläutern",
+      "erklären",
+      "entfalten"
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt, eine These etc. ggf. mit zusätzlichen Informationen und Beispielen nachvollziehbar veranschaulichen",
+     "afb": "II",
+     "formen": [
+      "erläutern",
+      "erklären",
+      "entfalten"
+     ]
+    },
+    {
+     "operator": "entfalten",
+     "definition": "einen Sachverhalt, eine These etc. ggf. mit zusätzlichen Informationen und Beispielen nachvollziehbar veranschaulichen",
+     "afb": "II",
+     "formen": [
+      "erläutern",
+      "erklären",
+      "entfalten"
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Aussagen eines Materials einen Sachverhalt oder eine Position erkennen und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "unter gezielter Fragestellung Elemente, Strukturmerkmale und Zusammenhänge systematisch erschließen und darstellen",
+     "afb": "II",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "unter gezielter Fragestellung Elemente, Strukturmerkmale und Zusammenhänge systematisch erschließen und darstellen",
+     "afb": "II",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "Zusammenhänge unter vorgegebenen oder selbst gewählten Gesichtspunkten begründet darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "sich auseinandersetzen mit",
+     "definition": "Eine Fragestellung oder eine Position auf ihre Bedeutung oder Plausibilität untersuchen und die Ergebnisse dieser Prüfung darlegen",
+     "afb": "III"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "einen begründeten Standpunkt einnehmen",
+     "definition": "Sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "die Vielschichtigkeit eines Beurteilungsproblems erkennen und darstellen, dazu Thesen erfassen bzw. aufstellen, Argumente formulieren, nachvollziehbare Zusammenhänge herstellen und dabei eine begründete Schlussfolgerung erarbeiten",
+     "afb": "III"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "eine Meinung, Aussage, These, Argumentation nachvollziehen, kritisch befragen und auf der Grundlage erworbener Fachkenntnisse begründet beurteilen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "eine Meinung, Aussage, These, Argumentation nachvollziehen, kritisch befragen und auf der Grundlage erworbener Fachkenntnisse begründet beurteilen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "einen Text oder ein anderes Material (Bild, Karikatur, Tondokument, Film etc.) sachgemäß analysieren und auf der Basis methodisch reflektierten Deutens zu einer schlüssigen Gesamtauslegung gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "gestalten",
+     "definition": "sich textbezogen kreativ mit einer Fragestellung auseinander setzen",
+     "afb": "III",
+     "formen": [
+      "gestalten",
+      "entwerfen"
+     ]
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "sich textbezogen kreativ mit einer Fragestellung auseinander setzen",
+     "afb": "III",
+     "formen": [
+      "gestalten",
+      "entwerfen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen aus der Sicht von",
+     "definition": "eine unbekannte Position, Argumentation oder Theorie aus der Perspektive einer bekannten Position beleuchten oder in Frage stellen und ein begründetes Urteil abgeben",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen aus der Sicht von",
+      "eine Erwiderung formulieren aus der Sicht von"
+     ]
+    },
+    {
+     "operator": "eine Erwiderung formulieren aus der Sicht von",
+     "definition": "eine unbekannte Position, Argumentation oder Theorie aus der Perspektive einer bekannten Position beleuchten oder in Frage stellen und ein begründetes Urteil abgeben",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen aus der Sicht von",
+      "eine Erwiderung formulieren aus der Sicht von"
+     ]
+    },
+    {
+     "operator": "Konsequenzen aufzeigen",
+     "definition": "Schlussfolgerungen ziehen; Perspektiven, Modelle, Handlungsmöglichkeiten, Konzepte u.a. entfalten",
+     "afb": "III",
+     "formen": [
+      "Konsequenzen aufzeigen",
+      "Perspektiven entwickeln"
+     ]
+    },
+    {
+     "operator": "Perspektiven entwickeln",
+     "definition": "Schlussfolgerungen ziehen; Perspektiven, Modelle, Handlungsmöglichkeiten, Konzepte u.a. entfalten",
+     "afb": "III",
+     "formen": [
+      "Konsequenzen aufzeigen",
+      "Perspektiven entwickeln"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Allgemeine Prüfungsanforderungen für das Abitur im Fach Katholische Religion (APA Katholische Religion), Gymnasiale Oberstufe Saar, Juli 2019, 2.1 Operatoren, S. 5–7 (katholisch), Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_GOS_ab_2019_2020/KatholischeReligion/APA_Katholische_Religion_2019.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "religion"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "schwerpunkt",
+   "operatoren": [
+    {
+     "operator": "nennen",
+     "definition": "ausgewählte Elemente, Aspekte, Merkmale, Begriffe, Personen etc. unkommentiert angeben",
+     "afb": "I",
+     "formen": [
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "benennen",
+     "definition": "ausgewählte Elemente, Aspekte, Merkmale, Begriffe, Personen etc. unkommentiert angeben",
+     "afb": "I",
+     "formen": [
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "einen bekannten oder erkannten Sachverhalt oder Gedankengang in seinen Grundzügen ausdrücken",
+     "afb": "I"
+    },
+    {
+     "operator": "formulieren",
+     "definition": "den Gedankengang oder die Hauptaussage eines Textes oder einer Position mit eigenen Worten darlegen",
+     "afb": "I",
+     "formen": [
+      "formulieren",
+      "darstellen",
+      "aufzeigen"
+     ]
+    },
+    {
+     "operator": "darstellen",
+     "definition": "den Gedankengang oder die Hauptaussage eines Textes oder einer Position mit eigenen Worten darlegen",
+     "afb": "I",
+     "formen": [
+      "formulieren",
+      "darstellen",
+      "aufzeigen"
+     ]
+    },
+    {
+     "operator": "aufzeigen",
+     "definition": "den Gedankengang oder die Hauptaussage eines Textes oder einer Position mit eigenen Worten darlegen",
+     "afb": "I",
+     "formen": [
+      "formulieren",
+      "darstellen",
+      "aufzeigen"
+     ]
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "einen bekannten oder erkannten Sachverhalt oder den Inhalt eines Textes unter Verwendung der Fachsprache mit eigenen Worten ausdrücken",
+     "afb": "I"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "die Merkmale eines Bildes oder eines anderen Materials mit Worten in Einzelheiten darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "die Kernaussagen eines Textes komprimiert und strukturiert darlegen",
+     "afb": "I"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "einen bekannten oder erkannten Sachverhalt in einen neuen oder anderen Zusammenhang stellen oder die Position eines Verfassers bezüglich einer bestimmten Religion, Konfession, Denkrichtung etc. unter Verweis auf Textstellen und in Verbindung mit Vorwissen bestimmen",
+     "afb": "II",
+     "formen": [
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "einen bekannten oder erkannten Sachverhalt in einen neuen oder anderen Zusammenhang stellen oder die Position eines Verfassers bezüglich einer bestimmten Religion, Konfession, Denkrichtung etc. unter Verweis auf Textstellen und in Verbindung mit Vorwissen bestimmen",
+     "afb": "II",
+     "formen": [
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "einen bekannten Sachverhalt oder eine bekannte Methode auf etwas Neues beziehen",
+     "afb": "II"
+    },
+    {
+     "operator": "belegen",
+     "definition": "Aussagen durch Textstellen oder bekannte Sachverhalte stützen",
+     "afb": "II",
+     "formen": [
+      "belegen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "Aussagen durch Textstellen oder bekannte Sachverhalte stützen",
+     "afb": "II",
+     "formen": [
+      "belegen",
+      "nachweisen"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen durch Argumente stützen",
+     "afb": "II"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt, eine These etc. gegebenenfalls mit zusätzlichen Informationen und Beispielen nachvollziehbar veranschaulichen",
+     "afb": "II",
+     "formen": [
+      "erläutern",
+      "erklären",
+      "entfalten"
+     ]
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt, eine These etc. gegebenenfalls mit zusätzlichen Informationen und Beispielen nachvollziehbar veranschaulichen",
+     "afb": "II",
+     "formen": [
+      "erläutern",
+      "erklären",
+      "entfalten"
+     ]
+    },
+    {
+     "operator": "entfalten",
+     "definition": "einen Sachverhalt, eine These etc. gegebenenfalls mit zusätzlichen Informationen und Beispielen nachvollziehbar veranschaulichen",
+     "afb": "II",
+     "formen": [
+      "erläutern",
+      "erklären",
+      "entfalten"
+     ]
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "von einem Material ausgehend einen Sachverhalt oder eine Position erkennen und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten Gesichtspunkten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "unter gezielter Fragestellung Elemente, Strukturmerkmale und Zusammenhänge systematisch erschließen und darstellen",
+     "afb": "II",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "unter gezielter Fragestellung Elemente, Strukturmerkmale und Zusammenhänge systematisch erschließen und darstellen",
+     "afb": "II",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "Zusammenhänge unter vorgegebenen oder selbst gewählten Gesichtspunkten begründet herstellen",
+     "afb": "II"
+    },
+    {
+     "operator": "sich auseinandersetzen mit",
+     "definition": "ein begründetes eigenes Urteil zu einer Fragestellung, Position oder einem dargestellten Sachverhalt entwickeln",
+     "afb": "III"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "einen Text oder ein anderes Material (Bild, Karikatur, etc.) sachgemäß analysieren und auf der Basis methodisch reflektierten Deutens zu einer schlüssigen Gesamtauslegung gelangen",
+     "afb": "III"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "bewerten",
+     "definition": "sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "einen begründeten Standpunkt einnehmen",
+     "definition": "sich zu einem Sachverhalt unter Verwendung von Fachwissen und Fachmethoden begründet positionieren (Sach- bzw. Werturteil)",
+     "afb": "III",
+     "formen": [
+      "beurteilen",
+      "bewerten",
+      "Stellung nehmen",
+      "einen begründeten Standpunkt einnehmen"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "die Vielschichtigkeit eines Beurteilungsproblems erkennen und darstellen, dazu Thesen erfassen bzw. aufstellen, Argumente formulieren, nachvollziehbare Zusammenhänge herstellen und dabei eine begründete Schlussfolgerung erarbeiten (dialektische Erörterung)",
+     "afb": "III"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "eine Meinung, Aussage, These, Argumentation nachvollziehen, kritisch befragen und auf der Grundlage erworbener Fachkenntnisse begründet beurteilen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "eine Meinung, Aussage, These, Argumentation nachvollziehen, kritisch befragen und auf der Grundlage erworbener Fachkenntnisse begründet beurteilen",
+     "afb": "III",
+     "formen": [
+      "prüfen",
+      "überprüfen"
+     ]
+    },
+    {
+     "operator": "Stellung nehmen aus der Sicht von",
+     "definition": "eine unbekannte Position, Argumentation oder Theorie aus der Perspektive einer bekannten Position beleuchten oder in Frage stellen und ein begründetes Urteil abgeben",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen aus der Sicht von",
+      "eine Erwiderung formulieren aus der Sicht von"
+     ]
+    },
+    {
+     "operator": "eine Erwiderung formulieren aus der Sicht von",
+     "definition": "eine unbekannte Position, Argumentation oder Theorie aus der Perspektive einer bekannten Position beleuchten oder in Frage stellen und ein begründetes Urteil abgeben",
+     "afb": "III",
+     "formen": [
+      "Stellung nehmen aus der Sicht von",
+      "eine Erwiderung formulieren aus der Sicht von"
+     ]
+    },
+    {
+     "operator": "Konsequenzen aufzeigen",
+     "definition": "Schlussfolgerungen ziehen; Perspektiven, Modelle, Handlungsmöglichkeiten, Konzepte u. a. entfalten",
+     "afb": "III",
+     "formen": [
+      "Konsequenzen aufzeigen",
+      "Perspektiven entwickeln"
+     ]
+    },
+    {
+     "operator": "Perspektiven entwickeln",
+     "definition": "Schlussfolgerungen ziehen; Perspektiven, Modelle, Handlungsmöglichkeiten, Konzepte u. a. entfalten",
+     "afb": "III",
+     "formen": [
+      "Konsequenzen aufzeigen",
+      "Perspektiven entwickeln"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Allgemeine Ethik Gymnasium, Anhang – Erprobungsphase – (Juli 2018), Operatorenliste Ethik, S. 124–125; wortgleich im Lehrplan Allgemeine Ethik Gemeinschaftsschule, Anhang (2018), Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_Gymnasium/allg_Ethik/allgemeine_Ethik_Anhang_Gym_2018.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "ethik"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Texte: die sprachliche Gestaltung und die Argumentationsstruktur eines Textes bzw. die Gestaltungsmittel und deren Komposition in einem Material untersuchen und interpretierend darstellen. Die expliziten und impliziten Prämissen, Denkvoraussetzungen und Thesen erfassen und formulieren, Begründungszusammenhänge und intendierte Folgerungen klären Fallbeispiele/Situationen: wesentliche ethisch-problembezogene Aspekte untersuchen und die Struktur ihrer Zusammenhänge herausarbeiten"
+    },
+    {
+     "operator": "benennen",
+     "definition": "zielgerichtet Informationen (Merkmale, Begriffe, Aspekte) zusammentragen, ohne diese zu kommentieren",
+     "formen": [
+      "benennen",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen (Merkmale, Begriffe, Aspekte) zusammentragen, ohne diese zu kommentieren",
+     "formen": [
+      "benennen",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "begründen",
+     "definition": "hinsichtlich der Ursachen und Folgerungen schlüssige Zusammenhänge ausführlich und differenziert darlegen"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte in eigenen Worten in ihrem Zusammenhang darlegen (in der Regel mit Bezug zu Materialien)"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "ein selbstständiges Urteil unter Verwendung von Fachwissen und Fachmethoden auf der Basis ausgewiesener Kriterien formulieren"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte in ihren Eigenarten beschreiben"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "einen Zusammenhang strukturiert und sachlich formulieren"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Pro- und Kontra-Argumente zu einem Beurteilungsproblem abwägen"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "mit eigenständigen Erläuterungen in einen bekannten Kontext einfügen"
+    },
+    {
+     "operator": "entwerfen",
+     "definition": "ein Konzept/eine Idee in seinen/ihren wesentlichen Grundzügen erarbeiten",
+     "formen": [
+      "entwerfen",
+      "entwickeln"
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "ein Konzept/eine Idee in seinen/ihren wesentlichen Grundzügen erarbeiten",
+     "formen": [
+      "entwerfen",
+      "entwickeln"
+     ]
+    },
+    {
+     "operator": "erläutern",
+     "definition": "nachvollziehbar und verständlich erklären"
+    },
+    {
+     "operator": "erörtern",
+     "definition": "ein Beurteilungsproblem erkennen und darstellen, unterschiedliche Positionen sowie Pro- und Kontra-Argumente abwägen und eine Schlussfolgerung erarbeiten"
+    },
+    {
+     "operator": "erschließen",
+     "definition": "etwas Neues oder nicht explizit Formuliertes durch Schlussfolgerungen aus etwas Bekanntem herleiten"
+    },
+    {
+     "operator": "identifizieren",
+     "definition": "etwas Gegebenes in einem Zusammenhang finden"
+    },
+    {
+     "operator": "in Beziehung setzen",
+     "definition": "Zusammenhänge unter vorgegebenen oder selbst gewählten Gesichtspunkten begründet herstellen"
+    },
+    {
+     "operator": "kategorisieren",
+     "definition": "nach vorgegebenen oder selbst gewählten Kriterien in eine Ordnung bringen"
+    },
+    {
+     "operator": "problematisieren",
+     "definition": "durch gezieltes Hinterfragen das Bedenkenswerte im vorgeblich Selbstverständlichen herausarbeiten"
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Aussagen und Beschreibungen auf ihre ethische Relevanz oder Übereinstimmung mit Fakten oder anderen Aussagen - und Wertungen auf ihre argumentative Plausibilität hin untersuchen",
+     "formen": [
+      "prüfen",
+      "kritisch hinterfragen"
+     ]
+    },
+    {
+     "operator": "kritisch hinterfragen",
+     "definition": "Aussagen und Beschreibungen auf ihre ethische Relevanz oder Übereinstimmung mit Fakten oder anderen Aussagen - und Wertungen auf ihre argumentative Plausibilität hin untersuchen",
+     "formen": [
+      "prüfen",
+      "kritisch hinterfragen"
+     ]
+    },
+    {
+     "operator": "recherchieren",
+     "definition": "gezieltes Ermitteln von Informationen mithilfe von Quellen oder Personen"
+    },
+    {
+     "operator": "übertragen",
+     "definition": "Inhalte aus einer Ausdrucksform in eine andere übersetzen bzw. Inhalte aus einem inhaltlichen Zusammenhang in einen anderen setzen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach vorgegebenen oder selbst gewählten philosophischen Aspekten Unterschiede, Ähnlichkeiten und Gemeinsamkeiten ermitteln und darstellen"
+    },
+    {
+     "operator": "wiedergeben",
+     "definition": "einen (gedanklichen) Zusammenhang in eigenen Worten nachvollziehen"
+    },
+    {
+     "operator": "zusammenfassen",
+     "definition": "wesentliche Aspekte in eigenen Worten strukturiert und komprimiert wiedergeben"
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Biologie Gymnasium, Anhang (Mai 2014), Operatorenliste, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_Gymnasium/Biologie/Biologie_Anhang_Gym_2014.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "biologie"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "schulformen": [
+    "gymnasium"
+   ],
+   "operatoren": [
+    {
+     "operator": "angeben",
+     "definition": "Elemente, Sachverhalte, Komponenten, Begriffe, Daten ohne nähere Erläuterungen aufzählen",
+     "formen": [
+      "angeben",
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "Elemente, Sachverhalte, Komponenten, Begriffe, Daten ohne nähere Erläuterungen aufzählen",
+     "formen": [
+      "angeben",
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "benennen",
+     "definition": "Elemente, Sachverhalte, Komponenten, Begriffe, Daten ohne nähere Erläuterungen aufzählen",
+     "formen": [
+      "angeben",
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten, Einzelergebnisse oder sonstige Sachverhalte in einen Zusammenhang stellen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Sachverhalte auf Regeln, Gesetzmäßigkeiten bzw. kausale Zusammenhänge zurückführen"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Strukturen, Sachverhalte oder Zusammenhänge strukturiert und fachsprachlich richtig mit eigenen Worten wiedergeben"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung unter Verwendung von Fachwissen und Fachmethoden begründet formulieren"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "einen Gegenstand oder einen Sachverhalt an erkennbaren Wertkategorien oder an bekannten Beurteilungskriterien messen"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte, Zusammenhänge, Methoden und Verfahren in fachtypischer Weise strukturiert wiedergeben"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "in Zusammenhang mit Sachverhalten, Aussagen oder Thesen unterschiedliche Positionen bzw. Pro- und Contra-Argumente einander gegenüberstellen und abwägen"
+    },
+    {
+     "operator": "durchführen (Experimente)",
+     "definition": "an einer Experimentieranordnung zielgerichtete Handlungen, Messungen und Änderungen vornehmen und diese protokollieren"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt auf Regeln und Gesetzmäßigkeiten zurückführen sowie ihn nachvollziehbar und verständlich machen"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt durch zusätzliche Informationen veranschaulichen und verständlich machen"
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "einen Zusammenhang oder eine Lösung finden und das Ergebnis formulieren"
+    },
+    {
+     "operator": "ordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte kategorisieren / hierarchisieren",
+     "formen": [
+      "ordnen",
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte kategorisieren / hierarchisieren",
+     "formen": [
+      "ordnen",
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte kategorisieren / hierarchisieren",
+     "formen": [
+      "ordnen",
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "planen",
+     "definition": "zu einem vorgegebenen Problem eine Experimentieranordnung finden bzw. eine Experimentieranleitung erstellen"
+    },
+    {
+     "operator": "protokollieren",
+     "definition": "Fragestellung, Aufbau, Ablauf und Beobachtung von Experimenten detailgenau zeichnerisch einwandfrei bzw. fachsprachlich richtig wiedergeben und auswerten"
+    },
+    {
+     "operator": "recherchieren",
+     "definition": "gezieltes Ermitteln von Informationen mit Hilfe von Quellen"
+    },
+    {
+     "operator": "schließen auf",
+     "definition": "Aus bekannten / vorgegebenen Fakten eine logisch begründete Folgerung ableiten"
+    },
+    {
+     "operator": "unterscheiden",
+     "definition": "diskriminieren von Sachverhalten oder Objekten anhand von Kriterien, die bei beiden nicht übereinstimmen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "eine möglichst exakte grafische Darstellung beobachtbarer oder gegebener Strukturen anfertigen"
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Chemie Gymnasium, Klassenstufen 8 und 9, Naturwissenschaftlicher Zweig (Schuljahr 2012/13, Erprobungsphase), „Liste verwendeten Operatoren“, S. 43–44 (gleiche Liste im Plan für den sprachlichen Zweig), Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_Gymnasium/Chemie/Chemie_8_und_9_nw_Zweig.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "chemie"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "schulformen": [
+    "gymnasium"
+   ],
+   "operatoren": [
+    {
+     "operator": "ableiten",
+     "definition": "von gegebenen oder selbst ermittelten experimentellen Daten auf eine zwingende Konsequenz schlussfolgern",
+     "formen": [
+      "ableiten",
+      "herleiten"
+     ]
+    },
+    {
+     "operator": "herleiten",
+     "definition": "von gegebenen oder selbst ermittelten experimentellen Daten auf eine zwingende Konsequenz schlussfolgern",
+     "formen": [
+      "ableiten",
+      "herleiten"
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "einen bekannten Zusammenhang oder eine bekannte Methode auf einen anderen Sachverhalt beziehen",
+     "formen": [
+      "anwenden",
+      "übertragen"
+     ]
+    },
+    {
+     "operator": "übertragen",
+     "definition": "einen bekannten Zusammenhang oder eine bekannte Methode auf einen anderen Sachverhalt beziehen",
+     "formen": [
+      "anwenden",
+      "übertragen"
+     ]
+    },
+    {
+     "operator": "auf etwas schließen",
+     "definition": "aus einer Reihe von Aussagen und Beobachtungen einen Sachverhalt ableiten"
+    },
+    {
+     "operator": "beachten",
+     "definition": "Verhaltensregeln und Sicherheitsrichtlinien im Labor anwenden"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "ein Ergebnis, ausgehend von einem Ansatz oder einem Diagramm gewinnen, den Lösungsweg unter Angabe von Zwischenschritten darstellen und das Ergebnis formulieren",
+     "formen": [
+      "berechnen",
+      "bestimmen"
+     ]
+    },
+    {
+     "operator": "bestimmen",
+     "definition": "ein Ergebnis, ausgehend von einem Ansatz oder einem Diagramm gewinnen, den Lösungsweg unter Angabe von Zwischenschritten darstellen und das Ergebnis formulieren",
+     "formen": [
+      "berechnen",
+      "bestimmen"
+     ]
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte, Verfahren oder Zusammenhänge strukturiert unter Verwendung der Fachsprache wiedergeben"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "zu einem Sachverhalt eine selbstständige Einschätzung nach fachwissenschaftlichen und fachmethodischen Kriterien formulieren"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "eine eigene Position zu einem Sachverhalt nach ausgewiesenen Kriterien vertreten bzw. mit Beurteilungskriterien begründen"
+    },
+    {
+     "operator": "deuten",
+     "definition": "kausale Zusammenhänge im Hinblick auf Erklärungsmöglichkeiten untersuchen und abwägend heraus stellen",
+     "formen": [
+      "deuten",
+      "interpretieren"
+     ]
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "kausale Zusammenhänge im Hinblick auf Erklärungsmöglichkeiten untersuchen und abwägend heraus stellen",
+     "formen": [
+      "deuten",
+      "interpretieren"
+     ]
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Im Zusammenhang mit Sachverhalten, Aussagen und Thesen Pro- und Kontra-Argumente einander gegenüber stellen und abwägen"
+    },
+    {
+     "operator": "durchführen",
+     "definition": "einen Sachverhalt in einem geplanten Experiment selbstständig überprüfen"
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Sachverhalte und Methoden zielgerichtet miteinander verknüpfen, eine Hypothese, eine Skizze, ein Experiment oder eine Theorie schrittweise weiterführen und ausbauen",
+     "formen": [
+      "entwickeln",
+      "aufstellen"
+     ]
+    },
+    {
+     "operator": "aufstellen",
+     "definition": "Sachverhalte und Methoden zielgerichtet miteinander verknüpfen, eine Hypothese, eine Skizze, ein Experiment oder eine Theorie schrittweise weiterführen und ausbauen",
+     "formen": [
+      "entwickeln",
+      "aufstellen"
+     ]
+    },
+    {
+     "operator": "erkennen",
+     "definition": "aus einer Beobachtung auf einen Sachverhalt schließen"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich zum Ausdruck bringen"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt durch zusätzliche Informationen (gegebenenfalls mit Formeln und Gleichungen) veranschaulichen und verständlich machen"
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "einen Zusammenhang oder eine Lösung finden und das Ergebnis formulieren"
+    },
+    {
+     "operator": "erweitern",
+     "definition": "den Umfang einer Aussage, eines Begriffes oder eines Modells vergrößern und verallgemeinern"
+    },
+    {
+     "operator": "herstellen",
+     "definition": "aus Ausgangsstoffen neue Produkte gewinnen oder erzeugen"
+    },
+    {
+     "operator": "nachweisen",
+     "definition": "einen Stoff durch eine bestimmte chemische Reaktion identifizieren"
+    },
+    {
+     "operator": "nennen",
+     "definition": "Elemente, Sachverhalte, Begriffe, Daten ohne nähere Erläuterungen aufzählen",
+     "formen": [
+      "nennen",
+      "angeben"
+     ]
+    },
+    {
+     "operator": "angeben",
+     "definition": "Elemente, Sachverhalte, Begriffe, Daten ohne nähere Erläuterungen aufzählen",
+     "formen": [
+      "nennen",
+      "angeben"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte anhand bestimmter Kriterien kategorisieren oder hierarchisieren",
+     "formen": [
+      "ordnen",
+      "zuordnen",
+      "einteilen"
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte anhand bestimmter Kriterien kategorisieren oder hierarchisieren",
+     "formen": [
+      "ordnen",
+      "zuordnen",
+      "einteilen"
+     ]
+    },
+    {
+     "operator": "einteilen",
+     "definition": "vorliegende Objekte oder Sachverhalte anhand bestimmter Kriterien kategorisieren oder hierarchisieren",
+     "formen": [
+      "ordnen",
+      "zuordnen",
+      "einteilen"
+     ]
+    },
+    {
+     "operator": "planen",
+     "definition": "zu einem vorgegebenen Problem eine Experimentieranordnung und eine Experimentieranleitung finden"
+    },
+    {
+     "operator": "protokollieren",
+     "definition": "Beobachtungen oder die Durchführung von Experimenten detailgenau und in fachtypischer Weise schriftlich wiedergeben"
+    },
+    {
+     "operator": "recherchieren",
+     "definition": "ermitteln von Informationen mit Hilfe von Quellen",
+     "formen": [
+      "recherchieren",
+      "sich informieren"
+     ]
+    },
+    {
+     "operator": "sich informieren",
+     "definition": "ermitteln von Informationen mit Hilfe von Quellen",
+     "formen": [
+      "recherchieren",
+      "sich informieren"
+     ]
+    },
+    {
+     "operator": "Überblick geben",
+     "definition": "einen Sachverhalt in einer sachlogischen und sinnvollen Reihenfolge ordnen und erklären"
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Sachverhalte oder Aussagen an Fakten oder innerer Logik messen und eventuelle Widersprüche aufdecken"
+    },
+    {
+     "operator": "umschreiben",
+     "definition": "einen Sachverhalt unter Verwendung der Fachsprache sachgerecht wiedergeben",
+     "formen": [
+      "umschreiben",
+      "definieren"
+     ]
+    },
+    {
+     "operator": "definieren",
+     "definition": "einen Sachverhalt unter Verwendung der Fachsprache sachgerecht wiedergeben",
+     "formen": [
+      "umschreiben",
+      "definieren"
+     ]
+    },
+    {
+     "operator": "unterscheiden",
+     "definition": "zwischen zwei oder mehreren Sachen an Hand von Merkmalen trennen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "eine möglichst exakte graphische Darstellung beobachtbarer oder gegebener Strukturen anfertigen"
+    },
+    {
+     "operator": "zerlegen",
+     "definition": "wichtige Bestandteile oder Eigenschaften auf eine bestimmte Fragestellung hin herausarbeiten",
+     "formen": [
+      "zerlegen",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "wichtige Bestandteile oder Eigenschaften auf eine bestimmte Fragestellung hin herausarbeiten",
+     "formen": [
+      "zerlegen",
+      "untersuchen"
+     ]
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Naturwissenschaften Gemeinschaftsschule, Anhang – Erprobungsphase – (Juli 2014), „Liste der Operatoren für die Kompetenzbereiche Fachwissen, Erkenntnisgewinnung, Kommunikation und Bewertung“, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_Gemeinschaftsschulen/Naturwissenschaften/LP_NW_GemS_Anhang_2014.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "biologie",
+    "chemie",
+    "physik"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "schulformen": [
+    "gemeinschaftsschule"
+   ],
+   "operatoren": [
+    {
+     "operator": "abschätzen",
+     "definition": "Durch begründete Überlegungen Größenordnungen naturwissenschaftlicher Größen angeben."
+    },
+    {
+     "operator": "angeben",
+     "definition": "Elemente, Sachverhalte, Komponenten, Begriffe, Daten ohne nähere Erläuterungen aufzählen.",
+     "formen": [
+      "angeben",
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "Elemente, Sachverhalte, Komponenten, Begriffe, Daten ohne nähere Erläuterungen aufzählen.",
+     "formen": [
+      "angeben",
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "benennen",
+     "definition": "Elemente, Sachverhalte, Komponenten, Begriffe, Daten ohne nähere Erläuterungen aufzählen.",
+     "formen": [
+      "angeben",
+      "nennen",
+      "benennen"
+     ]
+    },
+    {
+     "operator": "anwenden",
+     "definition": "Einen bekannten Sachverhalt oder eine bekannte Methode auf etwas Neues beziehen."
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten, Einzelergebnisse oder sonstige Sachverhalte in einen Zusammenhang stellen und gegebenenfalls zu einer abschließenden Gesamtaussage zusammenführen."
+    },
+    {
+     "operator": "aufstellen einer Hypothese (Vermutung)",
+     "definition": "Begründete Vermutung auf der Grundlage von Beobachtungen, Untersuchungen, Experimenten oder Aussagen formulieren."
+    },
+    {
+     "operator": "begründen",
+     "definition": "Sachverhalte auf Regeln, Gesetzmäßigkeiten bzw. kausale Zusammenhänge zurückführen."
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Strukturen, Sachverhalte oder Zusammenhänge strukturiert und fachsprachlich richtig mit eigenen Worten wiedergeben."
+    },
+    {
+     "operator": "bestimmen",
+     "definition": "Einen Lösungsweg darstellen und das Ergebnis formulieren."
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Zu einem Sachverhalt eine selbstständige Einschätzung unter Verwendung von Fachwissen und Fachmethoden begründet formulieren."
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Einen Gegenstand oder einen Sachverhalt an erkennbaren Wertkategorien oder an bekannten Beurteilungskriterien messen."
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Sachverhalte, Zusammenhänge, Methoden und Verfahren in fachtypischer Weise strukturiert wiedergeben."
+    },
+    {
+     "operator": "deuten",
+     "definition": "Sachverhalte in einen Erklärungszusammenhang bringen."
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "In Zusammenhang mit Sachverhalten, Aussagen oder Thesen unterschiedliche Positionen bzw. Pro- und Contra-Argumente einander gegenüberstellen und abwägen."
+    },
+    {
+     "operator": "dokumentieren",
+     "definition": "Alle notwendigen Erklärungen, Herleitungen und Skizzen darstellen."
+    },
+    {
+     "operator": "durchführen (Experimente)",
+     "definition": "An einer Experimentieranordnung zielgerichtete Handlungen, Messungen und Änderungen vornehmen."
+    },
+    {
+     "operator": "erklären",
+     "definition": "Einen Sachverhalt auf Regeln und Gesetzmäßigkeiten zurückführen sowie ihn nachvollziehbar und verständlich machen."
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Einen Sachverhalt durch zusätzliche Informationen veranschaulichen und verständlich machen.",
+     "formen": [
+      "erläutern",
+      "erörtern"
+     ]
+    },
+    {
+     "operator": "erörtern",
+     "definition": "Einen Sachverhalt durch zusätzliche Informationen veranschaulichen und verständlich machen.",
+     "formen": [
+      "erläutern",
+      "erörtern"
+     ]
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "Einen Zusammenhang oder eine Lösung finden und das Ergebnis formulieren."
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Vorliegende Objekte oder Sachverhalte kategorisieren / hierarchisieren.",
+     "formen": [
+      "ordnen",
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "einordnen",
+     "definition": "Vorliegende Objekte oder Sachverhalte kategorisieren / hierarchisieren.",
+     "formen": [
+      "ordnen",
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "Vorliegende Objekte oder Sachverhalte kategorisieren / hierarchisieren.",
+     "formen": [
+      "ordnen",
+      "einordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "planen",
+     "definition": "Zu einem vorgegebenen Problem eine Experimentieranordnung finden sowie eine Experimentieranleitung erstellen."
+    },
+    {
+     "operator": "protokollieren",
+     "definition": "Beobachtungen oder die Durchführung von Experimenten detailgenau zeichnerisch einwandfrei bzw. fachsprachlich richtig wiedergeben."
+    },
+    {
+     "operator": "recherchieren",
+     "definition": "Gezieltes Ermitteln von Informationen mit Hilfe von Quellen"
+    },
+    {
+     "operator": "schließen auf",
+     "definition": "Aus bekannten/vorgegebenen Fakten eine logisch begründete Folgerung ableiten."
+    },
+    {
+     "operator": "Stellung nehmen",
+     "definition": "Zu einem Gegenstand, der an sich eindeutig ist, nach kritischer Prüfung und sorgfältiger Abwägung ein begründetes Urteil abgeben."
+    },
+    {
+     "operator": "überprüfen",
+     "definition": "Sachverhalte oder Aussagen an Fakten oder innerer Logik messen und eventuelle Widersprüche darstellen",
+     "formen": [
+      "überprüfen",
+      "prüfen"
+     ]
+    },
+    {
+     "operator": "prüfen",
+     "definition": "Sachverhalte oder Aussagen an Fakten oder innerer Logik messen und eventuelle Widersprüche darstellen",
+     "formen": [
+      "überprüfen",
+      "prüfen"
+     ]
+    },
+    {
+     "operator": "unterscheiden",
+     "definition": "Diskriminieren von Sachverhalten oder Objekten anhand von Kriterien, die bei beiden nicht übereinstimmen."
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln."
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "Eine möglichst exakte graphische Darstellung beobachtbarer oder gegebener Strukturen anfertigen."
+    }
+   ]
+  },
+  {
+   "quelle": "Lehrplan Gesellschaftswissenschaften Gemeinschaftsschule, Anhang (Mai 2014), „Liste der verwendeten Operatoren“, S. 98, Ministerium für Bildung und Kultur des Saarlandes",
+   "url": "https://www.saarland.de/SharedDocs/Downloads/DE/mbk/Lehrplaene/Lehrplaene_Gemeinschaftsschulen/Gesellschaftswissenschaften/LP_GW_GemS_Anhang_Mai_2014.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "erdkunde",
+    "geschichte",
+    "politik"
+   ],
+   "stufe": "sek1",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "schulformen": [
+    "gemeinschaftsschule"
+   ],
+   "operatoren": [
+    {
+     "operator": "analysieren",
+     "definition": "Materialien oder Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Materialien oder Sachverhalte kriterienorientiert bzw. aspektgeleitet erschließen",
+     "formen": [
+      "analysieren",
+      "untersuchen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Daten oder Einzelergebnisse zu einer abschließenden Gesamtaussage zusammenführen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Aussagen durch Argumente oder Belege stützen"
+    },
+    {
+     "operator": "benennen",
+     "definition": "zielgerichtet Informationen (Merkmale, Begriffe, Aspekte) zusammentragen, ohne diese zu kommentieren",
+     "formen": [
+      "benennen",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "nennen",
+     "definition": "zielgerichtet Informationen (Merkmale, Begriffe, Aspekte) zusammentragen, ohne diese zu kommentieren",
+     "formen": [
+      "benennen",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Aufgaben anhand vorgegebener Sachverhalte und Daten lösen"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Sachverhalte in ihren typischen Merkmalen mit eigenen Worten wiedergeben"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "den Stellenwert von Sachverhalten in einem Zusammenhang bestimmen, um ohne persönlichen Wertbezug zu einem begründeten Sachurteil zu gelangen"
+    },
+    {
+     "operator": "bewerten",
+     "definition": "wie beurteilen, aber zusätzlich mit Offenlegung und Begründen eigener Wertmaßstäbe, die Pluralität einschließen und zu einem Werturteil führen, das auf den Wertvorstellungen des Grundgesetzes basiert"
+    },
+    {
+     "operator": "charakterisieren",
+     "definition": "Sachverhalte in ihren Eigenarten beschreiben und diese dann unter einem bestimmten Gesichtspunkt zusammenfassen"
+    },
+    {
+     "operator": "darstellen",
+     "definition": "wesentliche Aspekte eines Sachverhaltes unter Verwendung der Fachsprache wiedergeben"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "zu einer Problemstellung oder These eine Argumentation entwickeln, anwenden und zu einer begründeten Bewertung gelangen"
+    },
+    {
+     "operator": "einordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte in einen Zusammenhang stellen, kategorisieren bzw. hierarchisieren",
+     "formen": [
+      "einordnen",
+      "ordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte in einen Zusammenhang stellen, kategorisieren bzw. hierarchisieren",
+     "formen": [
+      "einordnen",
+      "ordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "zuordnen",
+     "definition": "vorliegende Objekte oder Sachverhalte in einen Zusammenhang stellen, kategorisieren bzw. hierarchisieren",
+     "formen": [
+      "einordnen",
+      "ordnen",
+      "zuordnen"
+     ]
+    },
+    {
+     "operator": "entwickeln",
+     "definition": "Analyseergebnisse zusammentragen und bewerten"
+    },
+    {
+     "operator": "erklären",
+     "definition": "Sachverhalte durch Wissen und Einsichten in einen Zusammenhang einordnen und begründen"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Sachverhalte im kausalgenetischen Zusammenhang differenziert und ausführlich darstellen und gegebenenfalls mit zusätzlichen Informationen veranschaulichen"
+    },
+    {
+     "operator": "erstellen",
+     "definition": "Aufgabenstellungen kreativ und produktorientiert bearbeiten"
+    },
+    {
+     "operator": "gliedern",
+     "definition": "Informationen in eine logische Ordnung bringen"
+    },
+    {
+     "operator": "herausarbeiten",
+     "definition": "aus Materialien bestimmte Sachverhalte herausfinden, die nicht explizit genannt werden, und Zusammenhänge zwischen ihnen herstellen"
+    },
+    {
+     "operator": "interpretieren",
+     "definition": "Materialien analysieren, Einzelaussagen erschließen, deren Beziehungen erläutern und in einer schlüssigen Gesamtdarstellung zusammenfassen und bewerten"
+    },
+    {
+     "operator": "recherchieren",
+     "definition": "gezieltes Ermitteln von Informationen mit Hilfe von Quellen / Personen",
+     "formen": [
+      "recherchieren",
+      "befragen"
+     ]
+    },
+    {
+     "operator": "befragen",
+     "definition": "gezieltes Ermitteln von Informationen mit Hilfe von Quellen / Personen",
+     "formen": [
+      "recherchieren",
+      "befragen"
+     ]
+    },
+    {
+     "operator": "schildern",
+     "definition": "Sachverhalte, Probleme oder Aussagen erkennen und zusammenhängend wiedergeben"
+    },
+    {
+     "operator": "unterscheiden",
+     "definition": "nach bestimmten Gesichtspunkten Unterschiede ermitteln und darstellen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "nach bestimmten Gesichtspunkten Gemeinsamkeiten, Ähnlichkeiten und Unterschiede ermitteln und darstellen"
     }
    ]
   }

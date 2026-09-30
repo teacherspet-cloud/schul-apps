@@ -51,7 +51,7 @@ import {
   type SchluesselId
 } from '../didactics/bewertung'
 import { formateFuer, KURZTEST_FORMATE, standardMinuten, zeitWarnung } from '../didactics/formate'
-import { istBelegt, namenAus, profilFuer } from '../didactics/operatoren'
+import { keineListeText, kennzeichnung, namenAus, profilFuer } from '../didactics/operatoren'
 import { themenAusZeile, themenFuer, themenHinweis, themenZeile, zweigeFuer } from '../didactics/themen'
 import { generateKurztest } from '../generation/generateKurztest'
 import { emptyKurztest, stufeFuerJahrgang } from '../model/defaults'
@@ -476,8 +476,9 @@ export default function SetupStep(): React.JSX.Element {
                             Entwurf
                           </Badge>
                         )}
-                        <Badge size="sm" variant="light" color={istBelegt(profil) ? 'teal' : 'yellow'}>
-                          {istBelegt(profil) ? 'amtliche Liste' : 'ohne Landesliste'}
+                        {/* Herkunft der Liste: Land, Verweis des Landes, KMK/IQB des Fachs, Oberstufenliste oder fachüblich */}
+                        <Badge size="sm" variant="light" color={kennzeichnung(profil).farbe}>
+                          {kennzeichnung(profil).text}
                         </Badge>
                       </Group>
                     )}
@@ -541,7 +542,7 @@ export default function SetupStep(): React.JSX.Element {
                     </Stack>
                   ) : (
                     <Text size="sm" c="dimmed">
-                      Keine Grundlage gefunden.
+                      {keineListeText(m.stateId, m.subjectId)}
                     </Text>
                   )}
                 </Card>

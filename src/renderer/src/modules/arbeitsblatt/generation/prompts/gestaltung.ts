@@ -1,6 +1,7 @@
 import type { WorksheetMeta } from '../../model/types'
 import { bilingualAktiv, operatorenFuer } from '../../didactics/bilingual'
 import { subjectOperators } from '../../didactics/subjectOperators'
+import { operatorenAuswahl } from '@shared/operatoren/zugriff'
 import { imageDesignRules } from '../../didactics/imageDesign'
 import { wantedTasks } from './grundregeln'
 
@@ -113,12 +114,22 @@ export function operatorRules(meta: WorksheetMeta, foreignLanguage?: string): st
     : ops.targetLanguage || byAfb.offen.length
       ? [`- Zulässige Operatoren: ${byAfb.offen.join(', ')}.`]
       : (['I', 'II', 'III'] as const).map((a) => `- Anforderungsbereich ${a}: ${byAfb[a].join(', ')}.`)
+  /*
+   * Amtliche Liste des Landes (30.09.2026) – über dieselbe Auswahlfunktion wie Lernzielkontrolle
+   * und Klassenarbeit. Nur eine Liste des Landes für genau diese Stufe; bilingual gilt die
+   * zielsprachliche Liste oben.
+   */
+  const land = bilingual
+    ? null
+    : operatorenAuswahl({ stateId: meta.stateId, fach: meta.subjectId, stufe: meta.grade >= 11 ? 'sek2' : 'sek1', schulform: meta.schoolTypeId, nurLand: true })
+  const landNamen = land && !land.stufeAbweichend ? [...new Set(land.operatoren.map((o) => o.operator))] : []
   return [
     `OPERATOREN (${meta.subjectLabel}):`,
     ...lines,
+    landNamen.length ? `- Amtliche Operatorenliste des Landes (${land!.quelle}): ${landNamen.join(', ')}. Operatoren aus dieser Liste haben Vorrang.` : '',
     ops.note ? `- ${ops.note}` : '',
     bilingual && meta.bilingual!.pruefsprache === 'gemischt' ? '- Aufgaben auf Deutsch verwenden die deutsche Entsprechung in Klammern.' : '',
-    '- Jede Aufgabe beginnt mit genau einem Operator aus dieser Liste; keine Umschreibungen wie „Beschäftige dich mit".',
+    `- Jede Aufgabe beginnt mit genau einem Operator aus ${landNamen.length ? 'diesen Listen' : 'dieser Liste'}; keine Umschreibungen wie „Beschäftige dich mit".`,
     '- Jede Aufgabe nennt das Material ausdrücklich (z. B. „anhand von M1", „mithilfe der Tabelle").',
     '- MATERIALNUMMERN VERGIBT DIE APP: Sie nummeriert Texte, Bilder, Tabellen und Raster in der Reihenfolge der Bausteine als M1, M2, M3 … Schreibe selbst KEINE Nummer in den Titel.',
     '- VERWEISE NUR ÜBER KENNUNGEN: Jeder Materialbaustein bekommt in „ref" eine Kurzkennung (z. B. "zeitleiste", "karte", "tabelle"); Aufgaben, Hilfen und Tabellenköpfe verweisen mit M{zeitleiste}, M{karte} – NIE mit einer selbst gezählten Nummer wie „M2". Die App ersetzt M{…} durch die richtige Nummer. Ein von der App eingesetzter Ausgangstext heißt M{quelle}.',

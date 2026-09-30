@@ -1,6 +1,6 @@
 {
  "stateId": "SN",
- "stand": "2026-09-28",
+ "stand": "2026-09-30",
  "listen": [
   {
    "quelle": "Verwaltungsvorschrift des SMK zur Vorbereitung auf die Abiturprüfung und die Ergänzungsprüfungen 2027 an allgemeinbildenden Gymnasien, Abendgymnasien und Kollegs (VwV Abiturprüfung 2027) vom 6. Mai 2025 (MBl. SMK S. 46), Sächsisches Staatsministerium für Kultus (SMK), 2025",
@@ -1437,6 +1437,338 @@
      "zusatz": {
       "Operatoren im Aufgabentext": "Ordnen Sie ... ein"
      }
+    }
+   ]
+  },
+  {
+   "quelle": "IQB – Gemeinsame Abituraufgabenpools der Länder: Aufgaben für das Fach Mathematik – Grundstock von Operatoren, Stand 28.02.2019; in Sachsen per VwV Abiturprüfung 2028 vom 10. Juni 2026 (MBl. SMK S. 86), Sächsisches Staatsministerium für Kultus, Teil III (inhaltsgleich VwV Abiturprüfung 2027 vom 6. Mai 2025, MBl. SMK S. 46), Leistungs- und Grundkursfach Mathematik: „Die Verwendung der Operatoren orientiert sich an dem vom IQB … veröffentlichten ‚Grundstock von Operatoren‘ für das Fach Mathematik.“",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/M_Grundstock_von_Operatoren.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "mathematik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "angeben, nennen",
+     "definition": "Für die Angabe bzw. Nennung ist keine Begründung notwendig.",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "entscheiden",
+     "definition": "Für die Entscheidung ist keine Begründung notwendig."
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Das zu fällende Urteil ist zu begründen."
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Bei einer Beschreibung kommt einer sprachlich angemessenen Formulierung und ggf. einer korrekten Verwendung der Fachsprache besondere Bedeutung zu. Eine Begründung für die Beschreibung ist nicht notwendig."
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Die Erläuterung liefert Informationen, mithilfe derer sich z. B. das Zustandekommen einer grafischen Darstellung oder ein mathematisches Vorgehen nachvollziehen lassen."
+    },
+    {
+     "operator": "deuten, interpretieren",
+     "definition": "Die Deutung bzw. Interpretation stellt einen Zusammenhang her z. B. zwischen einer grafischen Darstellung, einem Term oder dem Ergebnis einer Rechnung und einem vorgegebenen Sachzusammenhang.",
+     "formen": [
+      "deuten",
+      "interpretieren"
+     ]
+    },
+    {
+     "operator": "begründen, nachweisen, zeigen",
+     "definition": "Aussagen oder Sachverhalte sind durch logisches Schließen zu bestätigen. Die Art des Vorgehens kann – sofern nicht durch einen Zusatz anders angegeben – frei gewählt werden (z. B. Anwenden rechnerischer oder grafischer Verfahren). Das Vorgehen ist darzustellen.",
+     "formen": [
+      "begründen",
+      "nachweisen",
+      "zeigen"
+     ]
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Die Berechnung ist ausgehend von einem Ansatz darzustellen."
+    },
+    {
+     "operator": "bestimmen, ermitteln",
+     "definition": "Die Art des Vorgehens kann – sofern nicht durch einen Zusatz anders angegeben – frei gewählt werden (z. B. Anwenden rechnerischer oder grafischer Verfahren). Das Vorgehen ist darzustellen.",
+     "formen": [
+      "bestimmen",
+      "ermitteln"
+     ]
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Die Art des Vorgehens kann – sofern nicht durch einen Zusatz anders angegeben – frei gewählt werden (z. B. Anwenden rechnerischer oder grafischer Verfahren). Das Vorgehen ist darzustellen."
+    },
+    {
+     "operator": "grafisch darstellen, zeichnen",
+     "definition": "Die grafische Darstellung bzw. Zeichnung ist möglichst genau anzufertigen.",
+     "formen": [
+      "grafisch darstellen",
+      "zeichnen"
+     ]
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Die Skizze ist so anzufertigen, dass sie das im betrachteten Zusammenhang Wesentliche grafisch beschreibt."
+    }
+   ]
+  },
+  {
+   "quelle": "IQB – Gemeinsame Abituraufgabenpools der Länder: Aufgaben für die Fächer Biologie, Chemie und Physik – Grundstock von Operatoren (Stand 31.03.2022); in Sachsen per VwV Abiturprüfung 2028 vom 10. Juni 2026 (MBl. SMK S. 86), Sächsisches Staatsministerium für Kultus, Teil III (inhaltsgleich VwV Abiturprüfung 2027 vom 6. Mai 2025, MBl. SMK S. 46), Leistungs- und Grundkursfächer Biologie, Chemie, Physik: „Die Verwendung der Operatoren orientiert sich an dem vom IQB … veröffentlichten ‚Grundstock von Operatoren‘ für die Fächer Biologie, Chemie und Physik.“",
+   "url": "https://www.iqb.hu-berlin.de/media/documents/N_Grundstock_von_Operatoren.pdf",
+   "belegt": "abgeleitet",
+   "faecher": [
+    "biologie",
+    "chemie",
+    "physik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "ableiten",
+     "definition": "auf der Grundlage von Erkenntnissen oder Daten sachgerechte Schlüsse ziehen"
+    },
+    {
+     "operator": "abschätzen",
+     "definition": "durch begründete Überlegungen Größenwerte angeben"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "wichtige Bestandteile, Eigenschaften oder Zusammenhänge auf eine bestimmte Fragestellung hin herausarbeiten Chemie zusätzlich: einen Sachverhalt experimentell prüfen"
+    },
+    {
+     "operator": "aufstellen, formulieren",
+     "definition": "chemische Formeln, Gleichungen, Reaktionsgleichungen (Wort- oder Formelgleichungen) oder Reaktionsmechanismen entwickeln",
+     "formen": [
+      "aufstellen",
+      "formulieren"
+     ]
+    },
+    {
+     "operator": "Hypothesen aufstellen",
+     "definition": "eine Vermutung über einen unbekannten Sachverhalt formulieren, die fachlich fundiert begründet wird"
+    },
+    {
+     "operator": "angeben, nennen",
+     "definition": "Formeln, Regeln, Sachverhalte, Begriffe oder Daten ohne Erläuterung aufzählen bzw. wiedergeben",
+     "formen": [
+      "angeben",
+      "nennen"
+     ]
+    },
+    {
+     "operator": "auswerten",
+     "definition": "Beobachtungen, Daten, Einzelergebnisse oder Informationen in einen Zusammenhang stellen und daraus Schlussfolgerungen ziehen"
+    },
+    {
+     "operator": "begründen",
+     "definition": "Gründe oder Argumente für eine Vorgehensweise oder einen Sachverhalt nachvollziehbar darstellen"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Die Berechnung ist ausgehend von einem Ansatz darzustellen."
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Beobachtungen, Strukturen, Sachverhalte, Methoden, Verfahren oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Das zu fällende Sachurteil ist mithilfe fachlicher Kriterien zu begründen."
+    },
+    {
+     "operator": "bewerten",
+     "definition": "Das zu fällende Werturteil ist unter Berücksichtigung gesellschaftlicher Werte und Normen zu begründen."
+    },
+    {
+     "operator": "darstellen",
+     "definition": "Strukturen, Sachverhalte oder Zusammenhänge strukturiert und unter Verwendung der Fachsprache formulieren, auch mithilfe von Zeichnungen und Tabellen"
+    },
+    {
+     "operator": "diskutieren",
+     "definition": "Argumente zu einer Aussage oder These einander gegenüberstellen und abwägen"
+    },
+    {
+     "operator": "erklären",
+     "definition": "einen Sachverhalt nachvollziehbar und verständlich machen, indem man ihn auf Regeln und Gesetzmäßigkeiten zurückführt"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "einen Sachverhalt veranschaulichend darstellen und durch zusätzliche Informationen verständlich machen"
+    },
+    {
+     "operator": "ermitteln",
+     "definition": "ein Ergebnis oder einen Zusammenhang rechnerisch, grafisch oder experimentell bestimmen"
+    },
+    {
+     "operator": "herleiten",
+     "definition": "mithilfe bekannter Gesetzmäßigkeiten einen Zusammenhang zwischen chemischen bzw. physikalischen Größen herstellen"
+    },
+    {
+     "operator": "interpretieren, deuten",
+     "definition": "naturwissenschaftliche Ergebnisse, Beschreibungen und Annahmen vor dem Hintergrund einer Fragestellung oder Hypothese in einen nachvollziehbaren Zusammenhang bringen",
+     "formen": [
+      "interpretieren",
+      "deuten"
+     ]
+    },
+    {
+     "operator": "ordnen",
+     "definition": "Begriffe oder Gegenstände auf der Grundlage bestimmter Merkmale systematisch einteilen"
+    },
+    {
+     "operator": "planen",
+     "definition": "zu einem vorgegebenen Problem (auch experimentelle) Lösungswege entwickeln und dokumentieren"
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Sachverhalte, Prozesse, Strukturen oder Ergebnisse übersichtlich grafisch darstellen"
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Sachverhalte oder Phänomene mithilfe fachspezifischer Arbeitsweisen erschließen"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Gemeinsamkeiten und Unterschiede kriteriengeleitet herausarbeiten"
+    },
+    {
+     "operator": "zeichnen",
+     "definition": "Objekte grafisch exakt darstellen"
+    }
+   ]
+  },
+  {
+   "quelle": "Fachspezifische Operatoren für das Fach Informatik, Sachsen (schule.sachsen.de, Abiturseite Gymnasium „gymnasium-4701“); Bezug: VwV Abiturprüfung 2028 vom 10. Juni 2026 (MBl. SMK S. 86), Sächsisches Staatsministerium für Kultus, Teil III (inhaltsgleich VwV Abiturprüfung 2027 vom 6. Mai 2025, MBl. SMK S. 46), Leistungskursfach Informatik: „Die Verwendung der Operatoren orientiert sich an den vom IQB veröffentlichten ‚Grundstock für Operatoren‘ für die Fächer Mathematik, Naturwissenschaften und Deutsch, ergänzt durch fachspezifische Operatoren“",
+   "url": "https://www.schule.sachsen.de/ppdf/FachspezifischeOperatorenInformatik.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "informatik"
+   ],
+   "stufe": "sek2",
+   "sprache": "de",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "angeben, nennen",
+     "definition": "Für die Angabe bzw. Nennung ist keine Begründung notwendig",
+     "formen": [
+      "angeben",
+      "nennen"
+     ],
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "entscheiden",
+     "definition": "Für die Entscheidung ist keine Begründung notwendig.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "beurteilen",
+     "definition": "Das zu fällende Urteil ist zu begründen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "beschreiben",
+     "definition": "Bei einer Beschreibung kommt einer sprachlich angemessenen Formulierung und ggf. einer korrekten Verwendung der Fachsprache besondere Bedeutung zu. Eine Begründung für die Beschreibung ist nicht notwendig.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "erläutern",
+     "definition": "Die Erläuterung liefert Informationen, mithilfe derer sich z. B. das Zustandekommen einer grafischen Darstellung oder ein informatisches Vorgehen nachvollziehen lassen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "deuten, interpretieren",
+     "definition": "Die Deutung bzw. Interpretation stellt einen Zusammenhang her z. B. zwischen einer grafischen Darstellung und einem vorgegebenen Sachzusammenhang.",
+     "formen": [
+      "deuten",
+      "interpretieren"
+     ],
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "begründen, nachweisen, zeigen",
+     "definition": "Aussagen oder Sachverhalte sind durch logisches Schließen zu bestätigen. Die Art des Vorgehens kann – sofern nicht durch einen Zusatz anders angegeben – frei gewählt werden. Das Vorgehen ist darzustellen.",
+     "formen": [
+      "begründen",
+      "nachweisen",
+      "zeigen"
+     ],
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "berechnen",
+     "definition": "Die Berechnung ist ausgehend von einem Ansatz darzustellen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "bestimmen, ermitteln",
+     "definition": "Die Art des Vorgehens kann – sofern nicht durch einen Zusatz anders angegeben – frei gewählt werden. Das Vorgehen ist darzustellen.",
+     "formen": [
+      "bestimmen",
+      "ermitteln"
+     ],
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "untersuchen",
+     "definition": "Sachverhalte mit Hilfe fachspezifischer Arbeitsweisen erschließen. Die Art des Vorgehens kann – sofern nicht durch einen Zusatz anders angegeben – frei gewählt werden. Das Vorgehen ist darzustellen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "grafisch darstellen, zeichnen",
+     "definition": "Die grafische Darstellung bzw. Zeichnung ist möglichst genau anzufertigen.",
+     "formen": [
+      "grafisch darstellen",
+      "zeichnen"
+     ],
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "skizzieren",
+     "definition": "Die Skizze ist so anzufertigen, dass sie das im betrachteten Zusammenhang Wesentliche grafisch beschreibt.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "analysieren",
+     "definition": "Eine Materialgrundlage untersuchen, Elemente identifizieren, deren Merkmale und Beziehungen erfassen und das Ergebnis darstellen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "vergleichen",
+     "definition": "Nach vorgegebenen oder selbst gewählten Gesichtspunkten Gemeinsamkeiten, Ähnlichkeiten bzw. Unterschiede einander gegenüberstellen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch"
+    },
+    {
+     "operator": "Sich auseinandersetzen mit/Stellung nehmen",
+     "definition": "Die eigene Meinung zu einem Problem argumentativ entwickeln und darlegen.",
+     "kompetenzbereich": "vgl. IQB-Operatoren Mathe, Naturwissenschaften und Deutsch",
+     "formen": [
+      "sich auseinandersetzen mit",
+      "Stellung nehmen"
+     ]
+    },
+    {
+     "operator": "implementieren",
+     "definition": "Ein informatisches Modell auf einem oder für ein Informatiksystem umsetzen.",
+     "kompetenzbereich": "Weitere fachspezifische Operatoren"
+    },
+    {
+     "operator": "überführen",
+     "definition": "Das Vorgegebene in eine andere Darstellungsform bringen.",
+     "kompetenzbereich": "Weitere fachspezifische Operatoren"
     }
    ]
   }

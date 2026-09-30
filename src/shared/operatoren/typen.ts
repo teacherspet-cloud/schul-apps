@@ -48,6 +48,10 @@ export interface BestandsListe {
   stufe: 'sek1' | 'sek2'
   sprache: Listensprache
   afbLogik: 'keine' | 'mehrfach' | 'genauEiner' | 'schwerpunkt'
+  /** Nur für diese Schulformen (Kennungen aus levels.json); fehlt die Angabe, gilt die Liste für alle */
+  schulformen?: string[]
+  /** Fassung/Stand des Dokuments, wenn die Quelle einen nennt */
+  stand?: string
   operatoren: OperatorDefinition[]
 }
 

@@ -66,15 +66,20 @@ describe('Drei Schichten statt einer Liste', () => {
 
   it('kennzeichnet abgeleitete Profile als solche', () => {
     /*
-     * Der Kern der Ehrlichkeit: Für neun Länder wurde keine amtliche Liste gefunden. Sie
-     * bekommen den gemeinsamen Bestand, aber KEINE Definitionen – und die Oberfläche sagt
-     * das auch.
+     * Der Kern der Ehrlichkeit: Ist die Liste keine des Landes (bzw. kein ausdrücklicher Verweis
+     * des Landes), bekommt die Lehrkraft die Namen – aber KEINE Definitionen, und die
+     * Oberfläche sagt das auch. Seit 30.09.2026 verweisen die meisten dieser neun Länder
+     * nachweislich auf den IQB-Grundstock Mathematik; das zählt als Landesvorgabe.
      */
     for (const id of OHNE_AMTLICHE_LISTE) {
       const p = profilFuer(id, 'mathematik', 'sek2')!
-      expect(istBelegt(p), id).toBe(false)
+      expect(p.fach, id).toBe('mathematik')
+      if (istBelegt(p)) {
+        expect(['land', 'land-verweis'], id).toContain(p.herkunft ?? 'land')
+        continue
+      }
       expect(p.amtlich, id).toBe(false)
-      expect(p.hinweis, id).toMatch(/keine amtliche Operatorenliste gefunden/)
+      expect(p.hinweis, id).toMatch(/keine Landesliste gefunden|keine eigene Operatorenliste gefunden|weder eine Liste des Landes/)
       expect(
         p.operatoren.every((o) => o.definition === ''),
         id
@@ -403,8 +408,9 @@ describe('Nachgetragene Fachprofile', () => {
   })
 
   it('bleibt bei Fächern ohne Profil beim abgeleiteten Bestand', () => {
-    // Kunst ist in keiner der gelesenen Listen eigens geführt
-    expect(istBelegt(profilFuer('NW', 'kunst', 'sek2'))).toBe(false)
+    // Technik ist in keiner der gelesenen Listen eigens geführt; Kunst seit 30.09.2026 aus der NRW-Übersicht Kunst
+    expect(istBelegt(profilFuer('NW', 'technik', 'sek2'))).toBe(false)
+    expect(istBelegt(profilFuer('NW', 'kunst', 'sek2'))).toBe(true)
     // Erdkunde seit der Recherche vom 28.09.2026 aus der NRW-Operatorenübersicht Geographie
     expect(istBelegt(profilFuer('NW', 'erdkunde', 'sek2'))).toBe(true)
   })
@@ -459,9 +465,17 @@ describe('Niedersächsische Sek-I-Listen', () => {
      * gemeinsamen Bestand zurück und sagt das auch; ein stilles Ziehen der Abiturliste wäre
      * genau der Fehler, der wie ein KI-Problem aussähe.
      */
-    const p = profilFuer('NI', 'mathematik', 'sek1')!
+    // Gymnasium: kein Kerncurriculum mit Operatorenliste (Haupt-, Real-, Oberschule und IGS führen seit 2020/21 eigene)
+    const p = profilFuer('NI', 'mathematik', 'sek1', 'gymnasium')!
     expect(istBelegt(p)).toBe(false)
-    expect(p.hinweis).toMatch(/keine amtliche Operatorenliste gefunden/)
+    expect(p.hinweis).toMatch(/keine eigene Operatorenliste gefunden/)
+    // Die Namen der Mathematikliste, keine Definitionen – und nie die Liste eines anderen Fachs
+    expect(p.fach).toBe('mathematik')
+    expect(p.operatoren.every((o) => o.definition === '')).toBe(true)
+    // Die Oberschule hat ihre eigene Liste aus dem Kerncurriculum
+    const obs = profilFuer('NI', 'mathematik', 'sek1', 'oberschule')!
+    expect(istBelegt(obs)).toBe(true)
+    expect(obs.quelle).toMatch(/Kerncurricula Mathematik/)
   })
 
   it('nutzt für Deutsch das Kerncurriculum Sek I, nicht die Abiturliste', () => {

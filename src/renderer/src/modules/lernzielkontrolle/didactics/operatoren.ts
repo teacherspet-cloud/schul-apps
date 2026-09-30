@@ -43,8 +43,10 @@
  * Feld „AFB" würde für NRW-Mathematik eine Genauigkeit vortäuschen, die es dort nicht gibt.
  */
 
-import { BESTAND } from '@shared/operatoren/zugriff'
+import { istModerneFremdsprache, operatorenAuswahl, type OperatorenAuswahl } from '@shared/operatoren/zugriff'
 import { STATES } from '../../arbeitsblatt/didactics/states'
+import { subjectOperators } from '../../arbeitsblatt/didactics/subjectOperators'
+import { SUBJECTS } from '../../arbeitsblatt/model/subjects'
 
 export type Stufe = 'sek1' | 'sek2'
 export type Afb = 'I' | 'II' | 'III'
@@ -114,6 +116,12 @@ export interface Laenderprofil {
    */
   schulformen?: string[]
   belegt?: 'volltext' | 'abgeleitet'
+  /**
+   * Woher die Liste stammt (fehlt = Landesdokument): Verweis des Landes auf KMK/IQB,
+   * fachspezifischer KMK-/IQB-Bestand, Oberstufenliste als Orientierung für die Sek I oder
+   * fachübliche Operatoren. Nur „land" und „land-verweis" sind belegt.
+   */
+  herkunft?: 'land' | 'land-verweis' | 'kmk' | 'oberstufe' | 'fach'
   /** true = die AFB-Zuordnungen stammen aus der Quelle und wurden übernommen */
   afbUebernommen?: boolean
 }
@@ -375,6 +383,8 @@ const BELEGTE_PROFILE: Laenderprofil[] = [
     stateId: 'BY',
     fach: 'mathematik',
     stufe: 'sek1',
+    // Mittelschul-Dokument: Gymnasium und Realschule bekommen die eigenen LehrplanPLUS-Listen aus dem Bestand
+    schulformen: ['mittelschule'],
     quelle: 'ISB Bayern, Ergänzende Materialien zum LehrplanPLUS, Mittelschule Mathematik – Operatoren',
     url: 'https://www.isb.bayern.de/fileadmin/user_upload/Mittelschule/MSA/Mathematik/LPP-MS_Mathematik_Operatoren.pdf',
     stand: 'Juli 2022',
@@ -1856,47 +1866,15 @@ const BELEGTE_PROFILE: Laenderprofil[] = [
 ]
 
 /**
- * Länder, für die keine amtliche Operatorenliste ermittelt werden konnte.
+ * Länder, für die die erste Recherche (23.09.2026) keine amtliche Mathematikliste fand.
  *
- * Sie bekommen ein ABGELEITETES Profil: die Namen des gemeinsamen Kerns, keine
- * Definitionen. Das ist keine Landesvorgabe, sondern eine Arbeitsgrundlage, und die
- * Oberfläche sagt das auch so. Eine erfundene Definition wäre schlimmer als keine, weil
- * sie unbemerkt einen anderen Erwartungshorizont erzeugt.
+ * Seit der Auswahl über den gemeinsamen Bestand (30.09.2026) ist das keine Rückfallregel
+ * mehr: Jedes Land bekommt die Liste SEINES Fachs – aus einem Landesdokument, über den
+ * Verweis des Landes auf KMK/IQB oder aus dem fachspezifischen KMK-/IQB-Bestand. Die Liste
+ * bleibt als Rechercheprotokoll stehen.
  */
 export const OHNE_AMTLICHE_LISTE = ['BE', 'BB', 'RP', 'MV', 'HB', 'SL', 'ST', 'TH', 'BW']
 
-/**
- * Erzeugt für ein Land ohne Liste ein abgeleitetes Profil.
- *
- * Bestand: der gemeinsame Kern plus die vier Operatoren, die in sieben von acht gelesenen
- * Listen stehen. Das ist der Teil, bei dem der BESTAND belegt ist – die BEDEUTUNG ist es
- * nicht, deshalb bleibt jede Definition leer.
- */
-function abgeleitetesProfil(stateId: string, stufe: Stufe): Laenderprofil {
-  return {
-    stateId,
-    fach: 'alle',
-    stufe,
-    quelle: 'Kein Landesdokument ermittelt – gemeinsamer Bestand aus den acht gelesenen Länderlisten',
-    url: 'https://www.isb.bayern.de/fileadmin/user_upload/Gymnasium/Faecher/Physik/N_Grundstock_von_Operatoren.pdf',
-    stand: 'Recherchestand 23.09.2026',
-    amtlich: false,
-    belegt: 'abgeleitet',
-    afbLogik: 'keine',
-    oeffnungsklausel: true,
-    anrede: stufe === 'sek1' ? 'du' : 'sie',
-    operatoren: [...KERN_OPERATOREN, ...FAST_KERN].map((name) => ({ name, definition: '' })),
-    hinweis:
-      'Für dieses Bundesland wurde keine amtliche Operatorenliste gefunden. Verwendet wird der Bestand, der in allen acht gelesenen Länderlisten vorkommt; er geht auf den „Grundstock von Operatoren" der gemeinsamen Abituraufgabenpools beim IQB zurück (KMK-Beschluss v. 15.10.2020). Die App gibt dazu KEINE Definitionen aus – die Bedeutung weicht zwischen den Ländern nachweislich ab. Bitte die schulinterne oder landeseigene Liste gegenprüfen.'
-  }
-}
-
-/**
- * Alle Profile: die im Volltext gelesenen zuerst, danach die abgeleiteten.
- *
- * Die Reihenfolge ist wichtig, weil `profilFuer` den ersten Treffer nimmt – ein belegtes
- * Profil soll ein abgeleitetes immer schlagen.
- */
 /**
  * Listen, die laut ihrer eigenen Überschrift für MEHRERE Fächer gelten.
  *
@@ -1912,99 +1890,26 @@ const MEHRFACHGELTUNG: { stateId: string; von: string; fuer: string[]; stufe?: S
   { stateId: 'NI', von: 'biologie', stufe: 'sek1', fuer: ['chemie', 'physik'] }
 ]
 
-const mehrfachProfile = (): Laenderprofil[] =>
-  MEHRFACHGELTUNG.flatMap(({ stateId, von, fuer, stufe }) => {
+const STUFENGELTUNG: { stateId: string; fach: string }[] = [{ stateId: 'SH', fach: 'mathematik' }]
+
+const mehrfachProfile = (): Laenderprofil[] => [
+  ...MEHRFACHGELTUNG.flatMap(({ stateId, von, fuer, stufe }) => {
     const quelle = BELEGTE_PROFILE.find((p) => p.stateId === stateId && p.fach === von && (!stufe || p.stufe === stufe))
     return quelle ? fuer.map((fach) => ({ ...quelle, fach })) : []
+  }),
+  // Listen, die laut Titel für BEIDE Stufen gelten: Schleswig-Holstein, „Fachanforderungen Mathematik, Sekundarstufe I und Sekundarstufe II"
+  ...STUFENGELTUNG.flatMap(({ stateId, fach }) => {
+    const quelle = BELEGTE_PROFILE.find((p) => p.stateId === stateId && p.fach === fach && p.stufe === 'sek1')
+    return quelle ? [{ ...quelle, stufe: 'sek2' as Stufe, anrede: 'sie' as const }] : []
   })
-
-/*
- * Profile aus dem gemeinsamen Operatoren-Bestand (Großprogramm 0.4, D3; Recherche 28.09.2026).
- * Nur Listen aus Dokumenten des Landes selbst, nur wo kein von Hand erfasstes Profil für Land,
- * Fach und Stufe besteht. Fremdsprachen bekommen die Liste in der Zielsprache, alle anderen
- * Fächer die deutsche. Mehrere Tabellen eines Landes (je Kompetenzbereich) werden zu einem
- * Profil zusammengeführt. Ob die Quelle ungelistete Operatoren erlaubt, wurde nicht erfasst –
- * deshalb keine Warnung „nicht in der Landesliste" (Öffnungsklausel angenommen). Ergänzungstabellen
- * mit weniger als sechs Einträgen und Listen ohne auffindbare Online-Adresse werden kein Profil.
- */
-const ZIELSPRACHE: Record<string, string> = { englisch: 'en', franzoesisch: 'fr', spanisch: 'es' }
-const AFB_AUS: Record<string, Afb[]> = { I: ['I'], II: ['II'], III: ['III'], 'I–II': ['I', 'II'], 'II–III': ['II', 'III'], 'I–III': ['I', 'II', 'III'] }
-
-function bestandsProfile(): Laenderprofil[] {
-  const out: Laenderprofil[] = []
-  const vorhanden = new Set([...BELEGTE_PROFILE, ...mehrfachProfile()].map((p) => `${p.stateId}|${p.fach}|${p.stufe}`))
-  for (const land of Object.values(BESTAND)) {
-    if (land.stateId === 'KMK') continue
-    const gruppen = new Map<string, typeof land.listen>()
-    for (const l of land.listen) {
-      if (l.belegt !== 'volltext') continue
-      for (const fach of l.faecher) {
-        if (l.sprache !== (ZIELSPRACHE[fach] ?? 'de')) continue
-        const k = `${land.stateId}|${fach}|${l.stufe}`
-        if (vorhanden.has(k)) continue
-        gruppen.set(k, [...(gruppen.get(k) ?? []), l])
-      }
-    }
-    for (const [k, listen] of gruppen) {
-      const [, fach, stufe] = k.split('|')
-      const operatoren: OperatorDefinition[] = []
-      const gesehen = new Set<string>()
-      for (const l of listen)
-        for (const o of l.operatoren) {
-          const schluessel = `${o.operator.toLowerCase()}|${o.kompetenzbereich ?? ''}`
-          if (gesehen.has(schluessel)) continue
-          gesehen.add(schluessel)
-          operatoren.push({
-            name: o.operator,
-            ...(o.formen?.length ? { synonyme: o.formen } : {}),
-            definition: o.definition,
-            ...(o.afb ? { afb: AFB_AUS[o.afb] } : {}),
-            ...(o.kompetenzbereich ? { teilkompetenz: o.kompetenzbereich } : {})
-          })
-        }
-      // Ergänzungstabellen mit zwei, drei Einträgen (BB Englisch Sek II) sind kein Profil; ohne Fundstellen-Adresse auch nicht
-      const url = listen.find((l) => l.url)?.url ?? ''
-      if (operatoren.length < 6 || !url) continue
-      // Die AFB-Logik der Tabelle, die tatsächlich Zuordnungen trägt – gemischte Tabellen ohne Spalte zählen nicht
-      const mitAfb = operatoren.some((o) => o.afb?.length)
-      const logik = mitAfb ? (listen.find((l) => l.afbLogik !== 'keine')?.afbLogik ?? 'mehrfach') : 'keine'
-      out.push({
-        stateId: land.stateId,
-        fach,
-        stufe: stufe as Stufe,
-        quelle: [...new Set(listen.map((l) => l.quelle))].join('; '),
-        url,
-        stand: `Recherchestand ${land.stand}`,
-        amtlich: true,
-        belegt: 'volltext',
-        afbLogik: logik,
-        afbUebernommen: logik !== 'keine',
-        oeffnungsklausel: true,
-        anrede: stufe === 'sek1' ? 'du' : 'sie',
-        operatoren
-      })
-    }
-  }
-  return out
-}
-
-export const LAENDERPROFILE: Laenderprofil[] = [
-  ...BELEGTE_PROFILE,
-  ...mehrfachProfile(),
-  ...bestandsProfile(),
-  /*
-   * Für JEDES Land und JEDE Stufe eine Rückfallebene – ausnahmslos.
-   *
-   * Eine Bedingung „nur wo noch gar nichts steht" sah sparsamer aus und war falsch: Sobald
-   * Niedersachsen eine Sek-I-Liste für die Naturwissenschaften bekam, entfiel dadurch die
-   * Rückfallebene für alle ÜBRIGEN Fächer derselben Stufe – eine Lernzielkontrolle in
-   * Mathematik, Klasse 8, stand plötzlich ohne jede Grundlage da.
-   *
-   * Die abgeleiteten Profile stehen am Ende der Liste und tragen das Fach „alle";
-   * `profilFuer` sucht zuerst nach dem Fach und greift erst danach auf sie zurück.
-   */
-  ...STATES.flatMap((st) => (['sek1', 'sek2'] as Stufe[]).map((stufe) => abgeleitetesProfil(st.id, stufe)))
 ]
+
+/**
+ * Die von Hand erfassten Profile (Wortlaut geprüft). Alles Weitere liefert der gemeinsame
+ * Bestand zur Laufzeit über `operatorenAuswahl` – dieselbe Funktion, die auch die
+ * Klassenarbeit für ihre Anlage nutzt.
+ */
+export const LAENDERPROFILE: Laenderprofil[] = [...BELEGTE_PROFILE, ...mehrfachProfile()]
 
 /**
  * Jeder Operator, der irgendwo in den gelesenen Listen vorkommt.
@@ -2023,47 +1928,210 @@ export const ALLE_OPERATOREN: string[] = [
   ])
 ]
 
-/** Ist das Profil im Volltext belegt oder nur abgeleitet? */
+/**
+ * Belegt = die Liste gilt für dieses Land, dieses Fach und diese Stufe (Landesdokument oder
+ * ausdrücklicher Verweis des Landes). Nur dann gibt die App Definitionen an die KI weiter.
+ */
 export const istBelegt = (p?: Laenderprofil): boolean => Boolean(p) && (p!.belegt ?? 'volltext') === 'volltext'
 
 /**
- * Baden-Württemberg hat eine Sonderstellung und bekommt deshalb kein Profil.
- *
- * Es gibt keine Definitionsliste, sondern nur eine Hinweisliste im Leitfaden zur
- * schriftlichen Abiturprüfung, und die sagt selbst: „Die Bedeutung der bei Arbeitsaufträgen
- * verwendeten Operatoren entspricht in den meisten Fällen … dem allgemein üblichen
- * Sprachgebrauch." Hinzu kommt ein Vorbehalt aus der Recherche: Beim Auslesen des PDF ging
- * die Spaltenausrichtung verloren, sodass die Zuordnung Operator→Hinweis eine Rekonstruktion
- * wäre. Diese Zuordnung wird deshalb NICHT übernommen.
+ * Baden-Württemberg: Der Leitfaden zur schriftlichen Abiturprüfung sagt selbst, die Bedeutung
+ * der Operatoren entspreche „in den meisten Fällen … dem allgemein üblichen Sprachgebrauch".
+ * Fachlisten führt BW in den Bildungsplänen 2016 (Englisch, Geschichte, Gemeinschaftskunde,
+ * Geographie …); sie kommen über den gemeinsamen Bestand.
  */
 export const BW_HINWEIS =
-  'Baden-Württemberg führt keine Operatoren-Definitionsliste. Der Leitfaden zur schriftlichen Abiturprüfung enthält nur Hinweise und sagt, die Bedeutung entspreche „in den meisten Fällen … dem allgemein üblichen Sprachgebrauch". Die App gibt deshalb keine BW-Definitionen aus.'
+  'Baden-Württemberg führt keine allgemeine Operatoren-Definitionsliste für das Abitur. Der Leitfaden zur schriftlichen Abiturprüfung sagt, die Bedeutung entspreche „in den meisten Fällen … dem allgemein üblichen Sprachgebrauch". Fachlisten stehen in den Bildungsplänen 2016.'
+
+/* ---------- Auswahl: Land, Fach, Stufe, Schulform → Profil (30.09.2026) ---------- */
+
+/** Woher die angezeigte Liste stammt */
+export type ProfilHerkunft = 'land' | 'land-verweis' | 'kmk' | 'oberstufe' | 'fach'
+
+export const herkunftVon = (p: Laenderprofil): ProfilHerkunft => p.herkunft ?? 'land'
+
+const fachName = (fach: string): string => SUBJECTS.find((s) => s.id === fach)?.label ?? fach
+const landName = (stateId: string): string => STATES.find((s) => s.id === stateId)?.name ?? stateId
+
+const ZIELSPRACHE_KURZ: Record<string, string> = { englisch: 'en', franzoesisch: 'fr', spanisch: 'es', italienisch: 'it' }
+
+/** Die Operatoren ohne Definitionen und Anforderungsbereiche – für Listen, die hier nur Orientierung sind */
+const nurNamen = (ops: OperatorDefinition[]): OperatorDefinition[] =>
+  ops.map((o) => ({ name: o.name, ...(o.synonyme?.length ? { synonyme: o.synonyme } : {}), definition: '', ...(o.teilkompetenz ? { teilkompetenz: o.teilkompetenz } : {}) }))
+
+function ausBestand(ops: OperatorenAuswahl['operatoren']): OperatorDefinition[] {
+  const out: OperatorDefinition[] = []
+  const gesehen = new Set<string>()
+  for (const o of ops) {
+    const k = `${o.operator.toLowerCase()}|${o.kompetenzbereich ?? ''}`
+    if (gesehen.has(k)) continue
+    gesehen.add(k)
+    out.push({
+      name: o.operator,
+      ...(o.formen?.length ? { synonyme: o.formen } : {}),
+      definition: o.definition,
+      ...(o.afb ? { afb: AFB_AUS[o.afb] } : {}),
+      ...(o.kompetenzbereich ? { teilkompetenz: o.kompetenzbereich } : {})
+    })
+  }
+  return out
+}
+
+const AFB_AUS: Record<string, Afb[]> = { I: ['I'], II: ['II'], III: ['III'], 'I–II': ['I', 'II'], 'II–III': ['II', 'III'], 'I–III': ['I', 'II', 'III'] }
+
+/** Hinweistext je Herkunft – fachbezogen, ohne Anrede */
+function herkunftsHinweis(herkunft: ProfilHerkunft, stateId: string, fach: string, stufe: Stufe, wovon?: string): string | undefined {
+  const land = landName(stateId)
+  const f = fachName(fach)
+  const stufeText = stufe === 'sek1' ? 'die Sekundarstufe I' : 'die Oberstufe'
+  switch (herkunft) {
+    case 'land-verweis':
+      return `${land} führt für ${f} keine eigene Liste, sondern verweist auf den länderübergreifenden Bestand (KMK/IQB). Angezeigt ist diese Liste.`
+    case 'kmk':
+      return `Für ${f} in ${land} wurde für ${stufeText} keine Landesliste gefunden. Angezeigt ist der länderübergreifende Bestand DESSELBEN Fachs (KMK/IQB) – ohne Definitionen, weil die Bedeutung zwischen den Ländern abweichen kann. Maßgeblich bleibt die landeseigene oder schulinterne Liste.`
+    case 'oberstufe':
+      return `Für ${f} in ${land} wurde für die Sekundarstufe I keine eigene Operatorenliste gefunden. Angezeigt sind die Operatoren der Oberstufenliste (${wovon}) als Orientierung – ohne Definitionen, weil die Bedeutung in der Sek I abweichen kann.`
+    case 'fach':
+      return `Für ${f} wurde weder eine Liste des Landes ${land} noch ein länderübergreifender Bestand (KMK/IQB) gefunden. Angezeigt sind fachübliche Operatoren ohne Definitionen – eine Arbeitsgrundlage, keine Landesvorgabe.`
+    default:
+      return undefined
+  }
+}
+
+function profilAusAuswahl(a: OperatorenAuswahl, stateId: string, fach: string, stufe: Stufe): Laenderprofil {
+  const oberstufe = a.stufeAbweichend
+  const herkunft: ProfilHerkunft = oberstufe ? 'oberstufe' : a.herkunft
+  const belegt = herkunft === 'land' || herkunft === 'land-verweis'
+  const ops = ausBestand(a.operatoren)
+  const wovon = a.herkunft === 'kmk' ? 'KMK/IQB' : a.herkunft === 'land-verweis' ? `Verweis des Landes auf KMK/IQB` : landName(stateId)
+  return {
+    stateId,
+    fach,
+    stufe,
+    quelle: a.quelle,
+    url: a.url,
+    stand: a.stand,
+    amtlich: belegt,
+    belegt: belegt ? 'volltext' : 'abgeleitet',
+    herkunft,
+    afbLogik: belegt && ops.some((o) => o.afb?.length) ? a.afbLogik : 'keine',
+    afbUebernommen: belegt && ops.some((o) => o.afb?.length),
+    // Ob die Quelle ungelistete Operatoren erlaubt, ist im Bestand nicht erfasst – deshalb keine Warnung „nicht in der Landesliste"
+    oeffnungsklausel: true,
+    anrede: stufe === 'sek1' ? 'du' : 'sie',
+    operatoren: belegt ? ops : nurNamen(ops),
+    hinweis: herkunftsHinweis(herkunft, stateId, fach, stufe, wovon)
+  }
+}
 
 /**
- * Das passende Profil.
+ * Fächer ohne eigene fachübliche Liste nehmen die des nächstverwandten Fachs: Ethik und
+ * Philosophie die von Werte und Normen (Niedersachsens Ersatzfach), Wirtschaft die der
+ * Politik, Griechisch die des Lateinischen.
+ */
+const FACH_VERWANDT: Record<string, string> = { ethik: 'werte-und-normen', philosophie: 'werte-und-normen', wirtschaft: 'politik', griechisch: 'latein' }
+
+/** Letzte Ebene: fachübliche Operatoren (Operatorenlisten des Arbeitsblatts), nur Namen */
+function fachProfil(stateId: string, fach: string, stufe: Stufe): Laenderprofil | undefined {
+  // Russisch u. a. ohne zielsprachigen Bestand: lieber nichts als eine Liste in fremder Sprache
+  const sprache = ZIELSPRACHE_KURZ[fach]
+  if (istModerneFremdsprache(fach) && !sprache) return undefined
+  const so = subjectOperators(FACH_VERWANDT[fach] ?? fach, sprache)
+  if (!so) return undefined
+  const namen = so.zeigen ?? Object.keys(so.afb)
+  if (!namen.length) return undefined
+  return {
+    stateId,
+    fach,
+    stufe,
+    quelle: `Fachübliche Operatoren ${fachName(fach)} – keine Landesliste und kein KMK-/IQB-Bestand gefunden`,
+    url: '',
+    stand: 'Recherchestand 30.09.2026',
+    amtlich: false,
+    belegt: 'abgeleitet',
+    herkunft: 'fach',
+    afbLogik: 'keine',
+    oeffnungsklausel: true,
+    anrede: stufe === 'sek1' ? 'du' : 'sie',
+    operatoren: namen.map((name) => ({ name, definition: '' })),
+    hinweis: herkunftsHinweis('fach', stateId, fach, stufe)
+  }
+}
+
+/**
+ * Das passende Profil – DIE Auswahlfunktion der Lernzielkontrolle.
  *
- * Die Stufe geht dem Land vor: Für eine Lernzielkontrolle in Klasse 7 ist eine Sek-I-Liste
- * aus einem anderen Land die bessere Referenz als die Abiturliste des eigenen Landes.
- * Gibt es für das eigene Land keine Liste der richtigen Stufe, liefert die Funktion nichts –
- * dann greift der Kern ohne Definitionen.
+ * Rangfolge (die Stufe geht dem Land vor, das Fach geht allem vor):
+ *   1. von Hand erfasstes Profil für Land, Fach und Stufe (Schulform vor „ohne Einschränkung")
+ *   2. Landesliste oder Verweis des Landes aus dem gemeinsamen Bestand, gleiche Stufe
+ *   3. fächerübergreifende Landesliste der Stufe (Sachsen, Mittelschule) – nicht für
+ *      Fremdsprachen: Deren Operatoren stehen in der Zielsprache
+ *   4. fachspezifischer KMK-/IQB-Bestand der gleichen Stufe (nur Namen)
+ *   5. Sek I ohne eigene Liste: Oberstufenliste des Landes bzw. KMK/IQB – nur Namen, damit
+ *      keine Abiturdefinition still in eine Kontrolle für Klasse 7 wandert
+ *   6. fachübliche Operatoren des Fachs (nur Namen)
+ * NIE die Liste eines anderen Fachs.
  */
 export function profilFuer(stateId: string, fach: string, stufe: Stufe, schoolTypeId?: string): Laenderprofil | undefined {
-  const passend = LAENDERPROFILE.filter((p) => p.stateId === stateId && p.stufe === stufe)
-  const fuerSchulform = (p: Laenderprofil): boolean => Boolean(schoolTypeId) && Boolean(p.schulformen?.includes(schoolTypeId!))
-  const ohneEinschraenkung = (p: Laenderprofil): boolean => !p.schulformen?.length
-  /*
-   * Die Reihenfolge ist die Rangfolge, und sie ist wichtig:
-   * Ein Profil für GENAU DIESE Schulform schlägt eines ohne Einschränkung, und beides
-   * schlägt die Fächer-übergreifende Liste. Sonst bekäme eine Hauptschule in Geschichte die
-   * Gymnasialliste – mit anderen Anforderungsbereichen für dieselben Operatoren.
-   */
-  return (
-    passend.find((p) => p.fach === fach && fuerSchulform(p)) ??
-    passend.find((p) => p.fach === fach && ohneEinschraenkung(p)) ??
-    passend.find((p) => p.fach === 'alle' && fuerSchulform(p)) ??
-    passend.find((p) => p.fach === 'alle' && ohneEinschraenkung(p))
-  )
+  const hand = (s: Stufe, f: string): Laenderprofil | undefined => {
+    const passend = LAENDERPROFILE.filter((p) => p.stateId === stateId && p.stufe === s && p.fach === f)
+    const fuerSchulform = (p: Laenderprofil): boolean => Boolean(schoolTypeId) && Boolean(p.schulformen?.includes(schoolTypeId!))
+    // Ein Profil für GENAU DIESE Schulform schlägt eines ohne Einschränkung – sonst bekäme die Hauptschule die Gymnasialliste
+    // Ohne Schulformangabe gilt auch ein eingeschränktes Profil (das erste erfasste)
+    return passend.find(fuerSchulform) ?? passend.find((p) => !p.schulformen?.length) ?? (schoolTypeId ? undefined : passend[0])
+  }
+  const eigenes = hand(stufe, fach)
+  const auswahl = operatorenAuswahl({ stateId, fach, stufe, schulform: schoolTypeId })
+  // Eine Landesliste GENAU für diese Schulform schlägt ein Handprofil ohne Schulformangabe (NI Naturwissenschaften: Gymnasium vs. Haupt-/Realschule)
+  const auswahlFuerSchulform =
+    Boolean(schoolTypeId) && auswahl?.herkunft === 'land' && !auswahl.stufeAbweichend && auswahl.listen.every((l) => l.schulformen?.includes(schoolTypeId!))
+  if (eigenes && !(auswahlFuerSchulform && !eigenes.schulformen?.includes(schoolTypeId!))) return eigenes
+  if (auswahl && !auswahl.stufeAbweichend && auswahl.herkunft !== 'kmk') return profilAusAuswahl(auswahl, stateId, fach, stufe)
+
+  const alle = istModerneFremdsprache(fach) ? undefined : hand(stufe, 'alle')
+  if (alle) return alle
+
+  if (auswahl && !auswahl.stufeAbweichend) return profilAusAuswahl(auswahl, stateId, fach, stufe)
+
+  // Sek I ohne eigene Liste: das von Hand erfasste Oberstufenprofil des Landes, nur als Orientierung
+  const abi = stufe === 'sek1' ? hand('sek2', fach) : undefined
+  if (abi)
+    return {
+      ...abi,
+      stufe,
+      belegt: 'abgeleitet',
+      herkunft: 'oberstufe',
+      amtlich: false,
+      afbLogik: 'keine',
+      afbUebernommen: false,
+      oeffnungsklausel: true,
+      anrede: 'du',
+      operatoren: nurNamen(abi.operatoren),
+      hinweis: herkunftsHinweis('oberstufe', stateId, fach, stufe, landName(stateId))
+    }
+  if (auswahl) return profilAusAuswahl(auswahl, stateId, fach, stufe)
+  return fachProfil(stateId, fach, stufe)
 }
+
+/** Kennzeichnung der Liste in der Oberfläche */
+export function kennzeichnung(p: Laenderprofil): { text: string; farbe: 'teal' | 'blue' | 'yellow' } {
+  switch (herkunftVon(p)) {
+    case 'land':
+      return { text: 'amtliche Liste', farbe: 'teal' }
+    case 'land-verweis':
+      return { text: 'Landesverweis KMK/IQB', farbe: 'teal' }
+    case 'kmk':
+      return { text: 'KMK/IQB-Fachliste', farbe: 'blue' }
+    case 'oberstufe':
+      return { text: 'Oberstufenliste', farbe: 'yellow' }
+    default:
+      return { text: 'ohne amtliche Liste', farbe: 'yellow' }
+  }
+}
+
+/** Text, wenn für ein Fach gar nichts vorliegt – fachbezogen */
+export const keineListeText = (stateId: string, fach: string): string =>
+  `Für ${fachName(fach)} liegt weder eine Operatorenliste des Landes ${landName(stateId)} noch ein länderübergreifender Bestand (KMK/IQB) vor.`
 
 /** Alle Operatornamen eines Profils, Synonyme eingeschlossen. */
 export function namenAus(profil: Laenderprofil): string[] {

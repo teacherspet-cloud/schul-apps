@@ -14,7 +14,7 @@
 import { fachDerArbeit, formatArt } from '../model/faecher'
 import type { InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/types'
 import type { AnlageWunsch } from '@shared/operatoren/zugriff'
-import { anlageFuer } from '@shared/operatoren/zugriff'
+import { anlageFuer, operatorenAuswahl } from '@shared/operatoren/zugriff'
 import type { OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
 import { upperSecondary } from '../generation/generateExam'
 import { alleFassungen } from '../model/fassungen'
@@ -60,7 +60,13 @@ export const operatorenlisteAktiv = (exam: Exam): boolean => exam.meta.operatore
  * Dokumenten des Landes selbst.
  */
 export function amtlicheListe(stateId: string, subjectId: string, wunsch: AnlageWunsch = {}): Operatorenliste | null {
-  return OPERATORENLISTEN[stateId]?.[subjectId] ?? anlageFuer(stateId, subjectId, wunsch)
+  const hand = OPERATORENLISTEN[stateId]?.[subjectId]
+  // Die von Hand erfassten Listen sind Abiturlisten – für die Sek I hat eine Sek-I-Liste des Landes Vorrang
+  if (hand && wunsch.stufe === 'sek1') {
+    const sek1 = operatorenAuswahl({ stateId, fach: subjectId, stufe: 'sek1', sprache: wunsch.sprache, schulform: wunsch.schulform, nurLand: true })
+    if (sek1 && !sek1.stufeAbweichend) return { sprache: sek1.sprache, quelle: sek1.quelle, operatoren: sek1.operatoren }
+  }
+  return hand ?? anlageFuer(stateId, subjectId, wunsch)
 }
 
 /** Sprache und Stufe der Arbeit für die Wahl der Liste */
@@ -68,7 +74,7 @@ export function anlageWunsch(meta: Exam['meta']): AnlageWunsch {
   const zielsprache = meta.bilingual ? 'en' : fachDerArbeit(meta.subjectId).sprache
   // Amtliche Operatorenlisten gibt es in Deutsch, Englisch, Französisch und Spanisch – Italienisch und Russisch ohne Liste
   const sprache = zielsprache === 'it' || zielsprache === 'ru' ? undefined : zielsprache
-  return { sprache, stufe: upperSecondary(meta) ? 'sek2' : 'sek1' }
+  return { sprache, stufe: upperSecondary(meta) ? 'sek2' : 'sek1', schulform: meta.schoolTypeId }
 }
 
 const normal = (s: string): string => s.toLocaleLowerCase('de').replace(/[*_]/g, '').replace(/\s+/g, ' ').trim()
