@@ -9,7 +9,8 @@ import {
   wischRichtung,
   zeichnetZeiger,
   zoomBegrenzen,
-  zoomSchritt
+  zoomSchritt,
+  zoomTaste
 } from '../src/renderer/src/shared/touch/gestenLogik'
 
 // Rechenkern der Fingergesten (30.09.2026, shared/touch) – Schwellen nach Apple/WCAG
@@ -47,6 +48,21 @@ describe('Fingergesten', () => {
     expect(zoomSchritt(1, -1)).toBe(0.9)
     expect(zoomSchritt(3, 1)).toBe(3)
     expect(zoomSchritt(1.1, -1)).toBe(1)
+  })
+
+  it('Zoom-Tasten: Strg + Plus/Minus, Strg + Umschalt + 0; Strg + 0 bleibt der Startseite, AltGr zoomt nie', () => {
+    const t = (key: string, code: string, m: { shift?: boolean; alt?: boolean; ctrl?: boolean; meta?: boolean } = {}) =>
+      zoomTaste({ key, code, ctrlKey: m.ctrl ?? !m.meta, metaKey: m.meta ?? false, altKey: m.alt ?? false, shiftKey: m.shift ?? false })
+    expect(t('+', 'BracketRight')).toBe('plus')
+    expect(t('=', 'Equal')).toBe('plus')
+    expect(t('+', 'NumpadAdd')).toBe('plus')
+    expect(t('-', 'Slash')).toBe('minus')
+    expect(t('-', 'NumpadSubtract')).toBe('minus')
+    expect(t('=', 'Digit0', { shift: true })).toBe('einpassen')
+    expect(t('+', 'BracketRight', { meta: true })).toBe('plus')
+    expect(t('0', 'Digit0')).toBeNull()
+    expect(t('}', 'Digit0', { alt: true })).toBeNull()
+    expect(t('+', 'BracketRight', { ctrl: false })).toBeNull()
   })
 
   it('Hinweis beim langen Druck nur, wenn er mehr sagt als die Aufschrift', () => {

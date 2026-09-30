@@ -752,7 +752,7 @@ export function EditorStep(): React.JSX.Element {
                 onZeichnen={() => maskottchenZeichnen(ws, docId)}
                 onSeitenwahl={() => setSeitenwahl({ tausch: null })}
               />
-              <FitToWidth className="ws-editor-pages">
+              <FitToWidth className="ws-editor-pages" doppelseite="breite">
                 <CoverPage
                   ws={ws}
                   vorschau={deckblatt}

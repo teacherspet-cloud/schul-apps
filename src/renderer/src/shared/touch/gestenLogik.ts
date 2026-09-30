@@ -69,6 +69,22 @@ export function zoomSchritt(z: number, richtung: 1 | -1, min = ZOOM_MIN, max = Z
   return [...stufen].reverse().find((s) => s < z - 0.001) ?? min
 }
 
+export type ZoomAktion = 'plus' | 'minus' | 'einpassen'
+
+/**
+ * Tastenkürzel des Blattzooms (zoom.tsx): Strg/⌘ + Plus/Minus, Strg/⌘ + Umschalt + 0 = Breite
+ * einpassen. Strg + 0 allein bleibt die Startseite (App.tsx). Mit Alt (AltGr) nie – sonst
+ * zoomte AltGr + 0 („}") beim Schreiben.
+ */
+export function zoomTaste(e: { key: string; code: string; ctrlKey: boolean; metaKey?: boolean; altKey: boolean; shiftKey: boolean }): ZoomAktion | null {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return null
+  if (e.shiftKey && (e.code === 'Digit0' || e.code === 'Numpad0')) return 'einpassen'
+  // Deutsche Tastatur: eigene „+"-Taste; englische: „=" (mit Umschalt „+")
+  if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') return 'plus'
+  if ((e.key === '-' && !e.shiftKey) || e.code === 'NumpadSubtract') return 'minus'
+  return null
+}
+
 const normal = (s: string): string => s.replace(/\s+/g, ' ').trim().toLowerCase()
 
 /**

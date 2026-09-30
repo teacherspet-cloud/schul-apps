@@ -301,7 +301,40 @@ html[data-touch] .einfuege-stelle .mantine-ActionIcon-root {
   }
 }
 
-/* ---------- Zoom der Blätter (ZoomFlaeche) */
+/* ---------- Zoom der Blätter (FitToWidth, ZoomFlaeche – shared/touch/zoom.tsx) */
+
+/* Das Blatt steht mittig in der freien Fläche; ist es breiter, beginnt es links und die Fläche rollt */
+.blatt-inhalt {
+  width: fit-content;
+  margin-inline: auto;
+}
+/* Doppelseite: je zwei Seiten nebeneinander, wie ein aufgeschlagenes Heft (eine einzelne Seite bleibt mittig) */
+.blatt-doppelseite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10mm;
+  max-width: calc(420mm + 10mm);
+}
+.blatt-doppelseite > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+/* Vokabeltest: Die Seiten stehen eine Ebene tiefer (.editor-sheet), darunter „Aufgabe hinzufügen" */
+.blatt-doppelseite .editor-sheet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10mm;
+  width: fit-content;
+  max-width: calc(420mm + 10mm);
+}
+.blatt-doppelseite .editor-sheet > .vt-page {
+  margin-top: 0 !important;
+}
+.blatt-doppelseite .editor-sheet > :not(.vt-page) {
+  flex-basis: 100%;
+}
 
 html[data-touch] .fit-to-width {
   /* Der Zwei-Finger-Zoom gehört dem Blatt, nicht der ganzen Seite */

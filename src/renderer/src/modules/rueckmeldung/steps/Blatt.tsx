@@ -2,6 +2,7 @@ import { ActionIcon, Button, Menu, Tooltip } from '@mantine/core'
 import { IconCheck, IconPlus, IconTrash, IconX } from '@tabler/icons-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
+import { useBlattAnsicht } from '../../../shared/touch/zoom'
 import type { Korrekturzeichen } from '../../../shared/korrekturzeichen'
 import { newId } from '../../vokabeltest/model/random'
 import { einstufungVon, gesamtAusTabelle, gesamtEinstufen, skalenWerte, wertText, type SkalenKontext } from '../art'
@@ -162,7 +163,7 @@ export default function Blatt({
   }
 
   // ---------- Seiten ----------
-  const { buehne, blatt, lineal, zoom, plan, weiterMessen, vonVorn } = useSeitenPlan(blattInhalt(r, a, zeichen.length))
+  const { buehne, gezoomt, blatt, lineal, zoom, breiter, knoepfe, plan, weiterMessen, vonVorn } = useSeitenPlan(blattInhalt(r, a, zeichen.length))
   const bloecke = blattBloecke(r, a, md, plan.schnitte, true)
   const anfang = new Map(plan.seiten.map((s) => [s.start, s.rest]))
   const seiten = 1 + plan.seiten.filter((s) => bloecke.some((b) => b.key === s.start)).length
@@ -225,8 +226,15 @@ export default function Blatt({
     <BlattKontext.Provider value={c}>
       <style>{BLATT_CSS}</style>
       {(Object.keys(plan.notizen).length > 0 || Object.keys(plan.kappen).length > 0) && <style>{planCss(plan, bereich)}</style>}
-      <div className={`rm-buehne${verschiebt ? ' rm-verschiebt' : ''}`} ref={buehne} data-rm-blatt data-rm-seiten={seiten}>
-        <div style={{ zoom }}>
+      <div
+        className={`rm-buehne${verschiebt ? ' rm-verschiebt' : ''}`}
+        ref={buehne}
+        data-rm-blatt
+        data-rm-seiten={seiten}
+        data-blatt-zoom={zoom}
+        style={breiter ? { overflowX: 'auto' } : undefined}
+      >
+        <div ref={gezoomt} style={{ zoom }}>
           <div className="rm-seiten" style={{ height: hoehe }}>
             {Array.from({ length: seiten }, (_, k) => (
               <div key={k} className="rm-seite" style={{ top: `calc(${k} * (${BLATT_MASSE.hoehe}mm + ${SEITEN_ABSTAND}mm))` }}>
@@ -253,6 +261,8 @@ export default function Blatt({
           </div>
         </div>
       </div>
+      {/* Zoom wie in allen Programmen: Knöpfe, Strg + Mausrad, zwei Finger (shared/touch/zoom.tsx) */}
+      {knoepfe}
       {verschiebt && (
         <div className="rm-auswahl" style={{ left: '50%', top: 70, transform: 'translateX(-50%)' }}>
           Neue Textstelle für die Notiz im Schülertext markieren …
@@ -294,9 +304,12 @@ const planLeer = (p: SeitenPlan): boolean => !Object.keys(p.schnitte).length && 
  */
 function useSeitenPlan(inhalt: string): {
   buehne: React.RefObject<HTMLDivElement | null>
+  gezoomt: React.RefObject<HTMLDivElement | null>
   blatt: React.RefObject<HTMLElement | null>
   lineal: React.RefObject<HTMLDivElement | null>
   zoom: number
+  breiter: boolean
+  knoepfe: React.JSX.Element
   plan: SeitenPlan
   weiterMessen: () => void
   vonVorn: () => void
@@ -304,8 +317,13 @@ function useSeitenPlan(inhalt: string): {
   const buehne = useRef<HTMLDivElement>(null)
   const blatt = useRef<HTMLElement>(null)
   const lineal = useRef<HTMLDivElement>(null)
+  const gezoomt = useRef<HTMLDivElement>(null)
   const [plan, setPlan] = useState<SeitenPlan>(leererPlan)
-  const [zoom, setZoom] = useState(1)
+  /*
+   * Zoom wie in allen Programmen (30.09.2026): „Breite einpassen" bis 150 %, eigener Zoom je
+   * Programm gemerkt. Vorher: nur verkleinern, nie über 100 %.
+   */
+  const { zoom, breiter, knoepfe } = useBlattAnsicht({ flaeche: buehne, inhalt: gezoomt, breitePx: BLATT_MASSE.breite * MM_PX, minEinpassen: 0.35 })
   // Schriften geladen, Bild geladen: von vorn messen; verlassenes Textfeld: weiter messen
   const [stand, setStand] = useState(0)
   const [, setTakt] = useState(0)
@@ -340,24 +358,19 @@ function useSeitenPlan(inhalt: string): {
     else zustand.current.runden = 0
   })
 
-  // Fensterbreite → Zoom; Schriften geladen → neu messen
+  // Schriften geladen → neu messen
   useEffect(() => {
-    const el = buehne.current
-    if (!el) return
-    const beobachter = new ResizeObserver(() => {
-      const breite = el.clientWidth
-      if (breite) setZoom(Math.round(Math.min(1, Math.max(0.35, (breite - 24) / (BLATT_MASSE.breite * MM_PX))) * 1000) / 1000)
-    })
-    beobachter.observe(el)
     void document.fonts?.ready.then(() => setStand((s) => s + 1))
-    return () => beobachter.disconnect()
   }, [])
 
   return {
     buehne,
+    gezoomt,
     blatt,
     lineal,
     zoom,
+    breiter,
+    knoepfe,
     plan,
     // Nach dem Bearbeiten (Fokus weg): weiter messen – ein geänderter Inhalt beginnt dann von vorn
     weiterMessen: () => setTakt((t) => t + 1),

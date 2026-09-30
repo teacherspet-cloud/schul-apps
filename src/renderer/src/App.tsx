@@ -18,6 +18,7 @@ import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
 import { druckeAktives, openModule, useNavigation } from './shared/navigation'
 import { useTelefon, useTouch } from './shared/touch/touchModus'
+import { ZoomProgramm } from './shared/touch/zoom'
 import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
@@ -241,7 +242,10 @@ export default function App(): React.JSX.Element {
         {modules.map((m) => (
           // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
           <div key={m.id} hidden={m.id !== current?.id} className="module-container">
-            <m.component active={m.id === current?.id} />
+            {/* Zoom der Blätter je Programm (shared/touch/zoom.tsx) */}
+            <ZoomProgramm.Provider value={m.id}>
+              <m.component active={m.id === current?.id} />
+            </ZoomProgramm.Provider>
           </div>
         ))}
       </AppShell.Main>

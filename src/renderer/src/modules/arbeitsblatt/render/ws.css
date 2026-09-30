@@ -77,9 +77,15 @@
  * Er liegt über dem Fluss und schiebt nichts weiter – das ist der Sinn von „frei" und
  * zugleich sein Preis. Deshalb gilt es immer nur für den einen gezogenen Baustein.
  */
+/*
+ * z-index über dem überfahrenen Baustein im Fluss (editor.css: z-index 5): Seine Werkzeugleiste
+ * reicht über den Baustein hinaus. Lag sie über den Schreiblinien der Aufgabe darunter, fing
+ * deren Baustein den Zeiger ab – „Wieder einreihen" ließ sich nicht mehr anklicken (fiel auf,
+ * seit das Blatt auf die Breite eingepasst größer steht, 30.09.2026).
+ */
 .ws-free {
   position: absolute;
-  z-index: 1;
+  z-index: 6;
 }
 
 /* ---------- Kopf ---------- */
