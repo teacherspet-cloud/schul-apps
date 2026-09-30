@@ -1,4 +1,4 @@
-import { Container, Stack, Box, ScrollArea } from '@mantine/core'
+import { Button, Container, Stack, Box, ScrollArea } from '@mantine/core'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
@@ -15,7 +15,9 @@ import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbe
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
-import { testToWorksheet } from '../render/testWorksheet'
+import { testHeadBlock, testToWorksheet } from '../render/testWorksheet'
+import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
 import { testPoints, testTaskCount } from '../model/types'
 import { useGrammatiktest } from '../store'
 import { GRAMMATIKTEST_FILTER, serializeGrammarTest } from '../project'
@@ -30,7 +32,7 @@ import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
-import { testHinweiseBeheben } from '../beheben'
+import { testBausteinNachWunsch, testHinweiseBeheben } from '../beheben'
 
 /**
  * Schritt 2: Test ansehen, bearbeiten und ausgeben.
@@ -120,10 +122,42 @@ export default function TestEditorStep(): React.JSX.Element {
           ;[d.blocks[i], d.blocks[j]] = [d.blocks[j], d.blocks[i]]
         })
       }
+      extras={
+        // Zauberstab und Kreis mit Änderungswunsch (30.09.2026) – nicht am errechneten Kopfkasten
+        test.blocks.some((b) => b.id === block.id) ? (
+          <KiWunschKnoepfe
+            blockId={block.id}
+            kontext={() => wunschKontextFuer(block, ws.meta, 'Grammatiktest')}
+            busy={laufend.has(block.id)}
+            onAusfuehren={(art, wunsch) => testBausteinNachWunsch(test, docId, block.id, art, wunsch)}
+          />
+        ) : undefined
+      }
     >
       {content}
     </BausteinRahmen>
   )
+
+  /*
+   * Den Kopfkasten (ⓘ) von Hand ändern (30.09.2026, Vorbild Klassenarbeit): Er wird aus den
+   * Angaben errechnet und gehört keinem Baustein des Tests – eine Eingabe verpuffte bisher. Jetzt
+   * schreibt sie Titel und Wortlaut in den Test zurück (meta.title, meta.kopfText).
+   */
+  const aendere = (blockId: string, fn: (b: WsBlock) => void): void =>
+    update((d) => {
+      if (blockId === 'test-head') {
+        const kopf = testHeadBlock(d)
+        if (!kopf || kopf.type !== 'infoBox') return
+        const entwurf = structuredClone(kopf)
+        fn(entwurf)
+        if (entwurf.type !== 'infoBox') return
+        d.meta.title = entwurf.title.trim()
+        d.meta.kopfText = entwurf.body
+        return
+      }
+      const block = d.blocks.find((b) => b.id === blockId)
+      if (block) fn(block)
+    })
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -152,6 +186,13 @@ export default function TestEditorStep(): React.JSX.Element {
             fach={test.meta.subjectId}
             vorlagenfarbe={{ checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) }}
             ueberthema={{ werte: test.meta, bereich: bereich ?? '', onChange: (patch) => update((d) => Object.assign(d.meta, patch), 'ueberthema') }}
+            vorKiTest={
+              test.meta.kopfText?.trim() ? (
+                <Button size="compact-xs" variant="subtle" onClick={() => update((d) => (d.meta.kopfText = undefined))}>
+                  Kopfkasten wieder berechnen
+                </Button>
+              ) : null
+            }
             kiTest={{
               an: Boolean(test.meta.aiCanary),
               woerter: test.meta.aiCanaryWords,
@@ -213,13 +254,7 @@ export default function TestEditorStep(): React.JSX.Element {
                 sheet={sheet}
                 plans={layouts.get(`${sheet.id}:${key ? 'key' : 'print'}`) ?? []}
                 info={pageInfoFor(ws, sheet, logo, settings.schoolName, key, settings.citationStyle)}
-                context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', {
-                  update: (blockId, fn) =>
-                    update((d) => {
-                      const block = d.blocks.find((b) => b.id === blockId)
-                      if (block) fn(block)
-                    })
-                })}
+                context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', { update: aendere })}
                 wrapBlock={wrapBlock}
               />
             </FitToWidth>

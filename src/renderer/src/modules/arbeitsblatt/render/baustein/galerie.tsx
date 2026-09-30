@@ -1,5 +1,5 @@
 import type { ImageBlock, ImageRole } from '../../model/types'
-import { useWs } from '../WsContext'
+import { isEditMode, useWs } from '../WsContext'
 import { Feld, useSetter } from './hilfen'
 
 /** „M3 Die Schultaschen" → „Die Schultaschen" (die Nummer setzt die App selbst davor) */
@@ -21,6 +21,8 @@ export function galleryColumns(count: number, role: ImageRole = 'illustration'):
 export function GalleryView({ block }: { block: ImageBlock }): React.JSX.Element {
   const { mode, actions } = useWs()
   const edit = mode === 'edit'
+  // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026) – Anzeige und Platzhalter folgen weiter `edit`
+  const schreiben = isEditMode(mode)
   const set = useSetter(block)
   const items = block.items ?? []
   return (
@@ -40,7 +42,7 @@ export function GalleryView({ block }: { block: ImageBlock }): React.JSX.Element
               <div className="ws-gallery-caption">
                 <Feld
                   value={it.caption}
-                  editable={edit}
+                  editable={schreiben}
                   placeholder="Unterschrift"
                   onChange={set((d, v) => {
                     const item = (d as ImageBlock).items?.[k]
@@ -54,7 +56,7 @@ export function GalleryView({ block }: { block: ImageBlock }): React.JSX.Element
       </div>
       {(block.caption || edit) && (
         <figcaption>
-          <Feld value={block.caption} editable={edit} onChange={set((d, v) => ((d as ImageBlock).caption = v))} placeholder="Bildunterschrift" />
+          <Feld value={block.caption} editable={schreiben} onChange={set((d, v) => ((d as ImageBlock).caption = v))} placeholder="Bildunterschrift" />
         </figcaption>
       )}
     </figure>

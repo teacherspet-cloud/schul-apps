@@ -173,7 +173,8 @@ const ohneNamen = await page.evaluate(() =>
 pruefe(ohneNamen.length === 0, `Jeder Knopf in Leiste und Bausteinleiste hat einen Namen (${ohneNamen.length} ohne: ${ohneNamen.join(' ')})`)
 const zahl = await page.evaluate(() => document.querySelector('.ws-editor-pages .editor-block-toolbar')?.querySelectorAll('button').length ?? 0)
 console.log(`Knöpfe am ersten Baustein: ${zahl}`)
-pruefe(zahl <= 7, `Die Bausteinleiste ist ausgedünnt (${zahl} Knöpfe)`)
+// Seit 30.09.2026 stehen Zauberstab „Überarbeiten" und Kreis „Neu erzeugen" wieder sichtbar da (Wunsch der Lehrkraft) – daher 8
+pruefe(zahl <= 8, `Die Bausteinleiste ist ausgedünnt (${zahl} Knöpfe)`)
 
 // ---------- Blattoptionen ----------
 await page.getByRole('button', { name: 'Blattoptionen' }).click()

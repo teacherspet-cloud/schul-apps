@@ -209,6 +209,13 @@ export function baseForm(word: string): string {
  */
 export function blockHelp(block: Block, lang: string): string[] {
   if (block.showHelp === false) return []
+  // Von Hand geänderte Zeile hat Vorrang (30.09.2026); leer = keine Hinweiszeile
+  if (block.helpText !== undefined) return block.helpText.trim() ? [block.helpText.trim()] : []
+  return errechneteHilfe(block, lang)
+}
+
+/** Der errechnete Hinweis ohne Änderung von Hand – Ausgangstext beim Bearbeiten. */
+export function errechneteHilfe(block: Block, lang: string): string[] {
   const out: (HelpKey | { notNeeded: number })[] = []
   const unneeded = unneededWordCount(block)
   switch (block.kind) {

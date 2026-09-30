@@ -17,6 +17,58 @@ import { kurztestPrompt } from './generation/generateKurztest'
 import { kurztestOffen, legeKurztestAb } from './library'
 import type { Kurztest } from './model/types'
 import { worksheetMetaForKurztest } from './render/kurztestWorksheet'
+import { bausteinNachWunsch } from '../arbeitsblatt/generation/wunsch'
+import type { WunschArt } from '../../shared/kiWunsch'
+
+/**
+ * Zauberstab „Überarbeiten" bzw. Kreis „Neu erzeugen" an einem Baustein (30.09.2026) – mit dem
+ * Systemauftrag der Lernzielkontrolle. Das Ergebnis ersetzt nur diesen Baustein in dieser
+ * Fassung (ein Rückgängig-Schritt); Punkte bleiben.
+ */
+export function bausteinNachWunschAuftrag(test: Kurztest, docId: string, variante: number, blockId: string, art: WunschArt, wunsch: string): void {
+  if (!test.varianten[variante]) return
+  void starteAuftrag({
+    moduleId: 'lernzielkontrolle',
+    docId,
+    titel: test.meta.title.trim() || test.meta.thema.trim() || 'Lernzielkontrolle',
+    art: art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten',
+    eingabe: test,
+    istOffen: () => kurztestOffen(docId),
+    sperrt: false,
+    schluessel: blockId,
+    fehlerTitel: 'Der Baustein ließ sich nicht überarbeiten',
+    arbeit: async (t, k) => {
+      k.melde(art === 'neu' ? 'Die KI erzeugt den Baustein neu …' : 'Die KI überarbeitet den Baustein …')
+      const v = t.varianten[variante]
+      const meta = worksheetMetaForKurztest(t)
+      const anrede = anredeFuerMeta(meta)
+      return bausteinNachWunsch(
+        {
+          bloecke: v.blocks,
+          blockId,
+          art,
+          wunsch,
+          system: kurztestPrompt(t, v.label),
+          zusammenhang: [
+            `Material: Lernzielkontrolle${t.varianten.length > 1 ? `, Fassung ${v.label}` : ''}.`,
+            `Lerngruppe: ${lerngruppeSatz({ fach: t.meta.subjectLabel, jahrgang: t.meta.grade, schulform: t.meta.schoolTypeName })}.`,
+            t.meta.thema ? `Thema und Lernziel: ${t.meta.thema}.` : '',
+            anredeRegel(anrede)
+          ],
+          anrede,
+          punkteBehalten: true
+        },
+        k.ai
+      )
+    },
+    abschluss: () => (art === 'neu' ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
+    ablegen: (neu, t) =>
+      legeKurztestAb(docId, t, (aktuell) => ({
+        ...aktuell,
+        varianten: aktuell.varianten.map((v, i) => (i === variante ? { ...v, blocks: v.blocks.map((b) => (b.id === blockId ? neu : b)) } : v))
+      }))
+  })
+}
 
 /**
  * Welche Befunde eine Änderung am Test beheben kann. Nicht: Bedeutungsunterschiede zwischen

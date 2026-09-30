@@ -53,6 +53,8 @@ import { useDruck } from '../../../shared/navigation'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import { KiMenue, VersionSwitcher } from '../../arbeitsblatt/steps/BlockRevision'
+import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
+import type { WunschArt } from '../../../shared/kiWunsch'
 import { BlockSettings } from '../../arbeitsblatt/steps/BlockSettings'
 import { EinfuegenUntermenue } from '../../arbeitsblatt/steps/EinfuegenMenue'
 import WarningButton from '../../../shared/components/WarningButton'
@@ -391,24 +393,25 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    * ein kleiner Auftrag mit der Arbeit von jetzt; das Ergebnis ersetzt nur diesen Baustein in
    * dieser Fassung, der bisherige Stand bleibt als Fassung abrufbar.
    */
-  const bausteinUeberarbeiten = (block: WsBlock, instruction = ''): void => {
+  const bausteinUeberarbeiten = (block: WsBlock, instruction = '', wie: WunschArt = 'ueberarbeiten'): void => {
     const f = fassung
+    const neu = wie === 'neu'
     void starteAuftrag({
       moduleId: 'klassenarbeit',
       docId,
       titel,
-      art: instruction ? 'Baustein überarbeiten' : 'Baustein neu erzeugen',
+      art: neu ? 'Baustein neu erzeugen' : 'Baustein überarbeiten',
       eingabe: exam,
       istOffen: () => arbeitOffen(docId),
       sperrt: false,
       schluessel: `block-${block.id}`,
       fehlerTitel: 'Der Baustein konnte nicht überarbeitet werden',
       arbeit: async (e, k) => {
-        k.melde(instruction ? 'Die KI überarbeitet den Baustein …' : 'Die KI erzeugt den Baustein neu …')
+        k.melde(neu ? 'Die KI erzeugt den Baustein neu …' : 'Die KI überarbeitet den Baustein …')
         const ws = examToWorksheet(e, f)
-        return regenerateBlock(ws, ws.sheets[0], block.id, profileFromMeta(ws.meta), k.ai, '', instruction)
+        return regenerateBlock(ws, ws.sheets[0], block.id, profileFromMeta(ws.meta), k.ai, '', instruction, wie)
       },
-      abschluss: () => (instruction ? 'Der Baustein wurde überarbeitet.' : 'Der Baustein wurde neu erzeugt.'),
+      abschluss: () => (neu ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
       ablegen: (fresh, e) =>
         legeArbeitAb(docId, e, (aktuell) => ({
           ...aktuell,
@@ -505,8 +508,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             <KiMenue
               block={block}
               busy={laeuft}
-              onRevise={(instruction) => bausteinUeberarbeiten(block, instruction)}
-              onRegenerate={() => bausteinUeberarbeiten(block)}
+              kontext={() => wunschKontextFuer(block, worksheet.meta, 'Klassenarbeit')}
+              onWunsch={(wie, wunsch) => bausteinUeberarbeiten(block, wunsch, wie)}
             >
               {block.type === 'task' && (
                 <Menu.Item onClick={() => rasterErstellen(block)} data-raster-erstellen>

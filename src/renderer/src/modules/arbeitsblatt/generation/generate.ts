@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { wunschAuftrag, type WunschArt } from '../../../shared/kiWunsch'
 import { setzeVersuchEin } from '../didactics/protokoll'
 import type { StructuredRequest } from '@shared/types'
 import { runLimited } from '../../../shared/async'
@@ -405,6 +406,8 @@ function mitAnredePruefung(block: WsBlock, sheet: Sheet, meta: WorksheetMeta): W
 /**
  * Erzeugt einen einzelnen Baustein neu (mit dem übrigen Blatt als Zusammenhang).
  * `instruction`: eigener Auftrag der Lehrkraft (z. B. „einfacher formulieren“); `feedback`: zu behebende Probleme.
+ * `art`: „ueberarbeiten" (Zauberstab – der Baustein bleibt erkennbar) oder „neu" (Kreis – ein
+ * ganz neuer Entwurf, 30.09.2026); beide nehmen den Änderungswunsch mit (shared/kiWunsch.ts).
  */
 export async function regenerateBlock(
   ws: Worksheet,
@@ -413,7 +416,8 @@ export async function regenerateBlock(
   profile: LearnerProfile,
   ai: AiCall,
   feedback = '',
-  instruction = ''
+  instruction = '',
+  art: WunschArt = 'ueberarbeiten'
 ): Promise<WsBlock> {
   const index = sheet.blocks.findIndex((b) => b.id === blockId)
   const old = sheet.blocks[index]
@@ -422,17 +426,14 @@ export async function regenerateBlock(
   const data = await ai<any>({
     system: systemPrompt(ws.meta, profile),
     user: [
-      `Überarbeite Baustein (${index + 1}) des folgenden Arbeitsblatts. Behalte Typ${old.type === 'task' ? ', Anforderungsbereich' : ''} und Zweck bei und passe ihn in den Zusammenhang ein.`,
-      instruction
-        ? `Auftrag der Lehrkraft für diesen Baustein (genau umsetzen, alles andere möglichst beibehalten): ${instruction}`
-        : feedback
-          ? `Zu behebende Probleme: ${feedback}`
-          : 'Formuliere ihn neu und verbessere ihn didaktisch.',
+      feedback && !instruction
+        ? `Überarbeite Baustein (${index + 1}) des folgenden Arbeitsblatts. Behalte Typ${old.type === 'task' ? ', Anforderungsbereich' : ''} und Zweck bei und passe ihn in den Zusammenhang ein.\nZu behebende Probleme: ${feedback}`
+        : `${wunschAuftrag(art, instruction, index + 1)}\nBehalte Typ${old.type === 'task' ? ', Anforderungsbereich' : ''} und Zweck bei und passe ihn in den Zusammenhang des folgenden Arbeitsblatts ein.`,
       levelInstruction(ws.meta, sheet.stars ?? null, profile),
       taskContext(ws.meta, profile),
       originalSourceRules(ws.meta, sheet.stars ?? null),
       `Gesamtes Arbeitsblatt:\n${describeSheet(sheet)}`,
-      `Zu überarbeitender Baustein:\n${describeBlock(old)}`,
+      art === 'neu' ? `Bisheriger Baustein (nur zur Orientierung, nicht übernehmen):\n${describeBlock(old)}` : `Zu überarbeitender Baustein:\n${describeBlock(old)}`,
       'Für nicht benötigte Felder leere Werte verwenden.',
       materialText(ws.sources)
     ]

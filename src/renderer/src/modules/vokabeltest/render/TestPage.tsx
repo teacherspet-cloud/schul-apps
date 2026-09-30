@@ -2,7 +2,7 @@ import type { PagePlan } from '../../../shared/render/paginate'
 import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
-import { blockHelp } from './helpTexts'
+import { blockHelp, errechneteHilfe } from './helpTexts'
 import { isEditable, showsAnswers, T, useRender } from './RenderContext'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
@@ -202,10 +202,29 @@ export function BlockView({ block, number, lang = 'en', range }: { block: Block;
           {(block.instruction || isEditable(mode)) && (
             <T className="vt-instruction" value={block.instruction} onChange={set('instruction')} block placeholder="Arbeitsanweisung" />
           )}
-          {help.length > 0 && (
+          {/*
+           * Hinweiszeile (ⓘ) – seit 30.09.2026 im Editor bearbeitbar wie die Arbeitsanweisung.
+           * Entspricht die Eingabe wieder dem errechneten Hinweis, gilt wieder dieser (er folgt
+           * dann Änderungen an der Aufgabe); leer = keine Hinweiszeile auf dem Blatt.
+           */}
+          {(help.length > 0 || (mode === 'edit' && block.showHelp !== false && block.helpText !== undefined)) && (
             <div className="vt-help">
               <span className="vt-help-icon">i</span>
-              {help.join(' ')}
+              <T
+                className="vt-help-text"
+                value={help.join(' ')}
+                placeholder="Hinweiszeile (leer = keine)"
+                onChange={
+                  updateBlock
+                    ? (v) =>
+                        updateBlock(block.id, (d) => {
+                          const neu = v.replace(/\s+/g, ' ').trim()
+                          if (neu === errechneteHilfe(d, lang).join(' ')) delete d.helpText
+                          else d.helpText = neu
+                        })
+                    : undefined
+                }
+              />
             </div>
           )}
         </>

@@ -22,7 +22,9 @@ import { LANGUAGES } from '../model/types'
 import { fragenAusVokabeln } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
-import { IconAdjustments, IconArrowDown, IconArrowUp, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react'
+import { IconAdjustments, IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react'
+import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import { vokabelWunschHinweis, vokabelWunschKontext } from '../wunsch'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
@@ -200,32 +202,33 @@ export default function EditorStep(): React.JSX.Element {
           </ActionIcon>
         </Tooltip>
         <BlockSettings block={block} doc={doc} variantId={variant.id} />
+        {/*
+         * Zauberstab „Überarbeiten" und Kreis „Neu erzeugen" mit Änderungswunsch (30.09.2026) –
+         * vorher nur der Kreis „Ganze Aufgabe neu generieren" ohne Wunsch. Ein Rückgängig-Schritt.
+         */}
         {TASK_TYPES[block.taskType].schema && (
-          <Tooltip label="Ganze Aufgabe neu generieren">
-            <ActionIcon
-              size="sm"
-              variant="default"
-              aria-label={`Aufgabe ${index + 1} ganz neu generieren`}
-              loading={busy.has(block.id)}
-              onClick={() =>
-                withBusy(block.id, async () => {
-                  const next = await regenerateBlock(
-                    doc,
-                    variant,
-                    block,
-                    aiCall,
-                    block.kind === 'picture' ? await pictureOptions(doc.settings.pictureSource) : {}
-                  )
-                  updateBlock(variant.id, block.id, (d) => {
-                    for (const k of Object.keys(d)) delete (d as unknown as Record<string, unknown>)[k]
-                    Object.assign(d, next)
-                  })
+          <KiWunschKnoepfe
+            blockId={block.id}
+            kontext={() => vokabelWunschKontext(block, doc)}
+            busy={busy.has(block.id)}
+            name={`Aufgabe ${index + 1}`}
+            onAusfuehren={(art, wunsch) =>
+              withBusy(block.id, async () => {
+                const next = await regenerateBlock(
+                  doc,
+                  variant,
+                  block,
+                  aiCall,
+                  block.kind === 'picture' ? await pictureOptions(doc.settings.pictureSource) : {},
+                  vokabelWunschHinweis(block, art, wunsch)
+                )
+                updateBlock(variant.id, block.id, (d) => {
+                  for (const k of Object.keys(d)) delete (d as unknown as Record<string, unknown>)[k]
+                  Object.assign(d, next)
                 })
-              }
-            >
-              <IconRefresh size={14} />
-            </ActionIcon>
-          </Tooltip>
+              })
+            }
+          />
         )}
         <Tooltip label="Aufgabe löschen">
           <ActionIcon

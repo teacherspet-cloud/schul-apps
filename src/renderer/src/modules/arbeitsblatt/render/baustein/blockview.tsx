@@ -27,6 +27,9 @@ import { RU_SLOVO, russischPlural } from '../../../../shared/russischPlural'
  * nur auf dem Schülerblatt; im Lösungsteil lenkt sie nur ab.
  */
 
+/** Die Angaben des Materialkopfs in der Reihenfolge von `headerLine` */
+const KOPF_ANGABEN = ['author', 'textType', 'date'] as const
+
 /** „Wörter" in der Sprache des Kopfes (Klassenarbeit Französisch/Spanisch/Englisch) */
 const WOERTER: Record<'de' | 'en' | 'fr' | 'es' | 'it' | 'ru', string> = { de: 'Wörter', en: 'words', fr: 'mots', es: 'palabras', it: 'parole', ru: 'слов' }
 /** Russisch nach der Zahl (29.09.2026): 341 слово, 342 слова, 345 слов */
@@ -57,6 +60,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
   const ctx = useWs()
   const { mode } = ctx
   const edit = mode === 'edit'
+  // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026) – Anzeige und Platzhalter folgen weiter `edit`
+  const schreiben = isEditMode(mode)
   const set = useSetter(block)
 
   // Lehrerbausteine fehlen auf dem Schülerblatt – auch beim Messen der Seiten
@@ -65,18 +70,18 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
   switch (block.type) {
     case 'illustration':
       if (isKeyMode(mode)) return null
-      return <IllustrationView block={block} editable={edit} onBubble={set((d, v) => ((d as typeof block).bubble = v))} />
+      return <IllustrationView block={block} editable={schreiben} onBubble={set((d, v) => ((d as typeof block).bubble = v))} />
     case 'learningGoals':
       if (isKeyMode(mode)) return null
       return (
         <div className="ws-block ws-goals">
           <div className="ws-goals-title">
-            <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+            <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
           </div>
           <ul>
             {block.goals.map((g, i) => (
               <li key={i}>
-                <RichText value={g} inline editable={edit} onChange={set((d, v) => ((d as typeof block).goals[i] = v))} />
+                <RichText value={g} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).goals[i] = v))} />
               </li>
             ))}
           </ul>
@@ -89,11 +94,11 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
         <div className={`ws-block ws-info ws-info-${block.variant}`}>
           <div className="ws-info-head">
             <span className="ws-info-symbol">{v.symbol}</span>
-            <Feld className="ws-info-title" value={block.title || v.label} editable={edit} onChange={set((d, val) => ((d as typeof block).title = val))} />
+            <Feld className="ws-info-title" value={block.title || v.label} editable={schreiben} onChange={set((d, val) => ((d as typeof block).title = val))} />
           </div>
           <RichText
             value={block.body}
-            editable={edit}
+            editable={schreiben}
             onChange={set((d, val) => ((d as typeof block).body = val))}
             placeholder="Inhalt des Kastens"
             // Ein Merkkasten darf Lücken tragen, die die Lernenden selbst füllen
@@ -135,7 +140,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             <div className="ws-text-title" data-head>
               {/* Die Nummer vergibt die App – so verweist keine Aufgabe auf ein Material, das es nicht gibt */}
               {materialNo && <span className="ws-material-no">{materialNo}</span>}
-              <Feld value={stripMaterialNo(block.title)} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+              <Feld value={stripMaterialNo(block.title)} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </div>
           )}
           {/*
@@ -146,7 +151,24 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
            * steht ÜBER dem Text, nicht unten bei der Fundstelle: Man muss wissen, wer
            * spricht, BEVOR man liest.
            */}
-          {showHead && headerLine(block.sourceHeader) && <div className="ws-source-header">{headerLine(block.sourceHeader)}</div>}
+          {/* Jede Angabe einzeln bearbeitbar (30.09.2026) – die Zeile setzt sich wie `headerLine` zusammen */}
+          {showHead && headerLine(block.sourceHeader) && (
+            <div className="ws-source-header">
+              {KOPF_ANGABEN.filter((k) => block.sourceHeader?.[k]?.trim()).map((k, i) => (
+                <span key={k}>
+                  {i > 0 && ' · '}
+                  <Feld
+                    value={block.sourceHeader![k]}
+                    editable={schreiben}
+                    onChange={set((d, v) => {
+                      const kopf = (d as typeof block).sourceHeader
+                      if (kopf) kopf[k] = v
+                    })}
+                  />
+                </span>
+              ))}
+            </div>
+          )}
           {/*
            * Hinweis ueber einer Erzaehlung: Sie ist eine Darstellung, keine Quelle.
            * Er steht bewusst im Seiteninhalt und nicht klein darunter - eine Ich-Erzaehlung
@@ -175,7 +197,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                 <div key={from + i} data-unit className="ws-paragraph">
                   <RichText
                     value={p}
-                    editable={edit}
+                    editable={schreiben}
                     onChange={set((d, v) => {
                       // Absatz ersetzen; eine Leerzeile im neuen Text erzeugt weitere Absätze
                       const all = splitParagraphs((d as typeof block).body)
@@ -190,7 +212,10 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               <div data-unit className="ws-glossary">
                 {block.glossary.map((g, i) => (
                   <div key={i}>
-                    <b>{g.term}</b>: {g.explanation}
+                    <b>
+                      <Feld value={g.term} editable={schreiben} onChange={set((d, v) => ((d as typeof block).glossary[i].term = v))} />
+                    </b>
+                    : <Feld value={g.explanation} editable={schreiben} onChange={set((d, v) => ((d as typeof block).glossary[i].explanation = v))} />
                   </div>
                 ))}
               </div>
@@ -211,7 +236,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           )}
           {block.source && to >= paragraphs.length && (
             <div className="ws-source" data-foot>
-              Quelle: <Feld value={block.source} editable={edit} onChange={set((d, v) => ((d as typeof block).source = v))} />
+              Quelle: <Feld value={block.source} editable={schreiben} onChange={set((d, v) => ((d as typeof block).source = v))} />
             </div>
           )}
         </div>
@@ -232,7 +257,11 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           )}
         </>
       ) : (
-        <div className="ws-image-placeholder">{isEditMode(mode) || mode === 'measure' ? `Bild wählen: ${block.description}` : block.description}</div>
+        <div className="ws-image-placeholder">
+          {isEditMode(mode) || mode === 'measure' ? 'Bild wählen: ' : ''}
+          {/* Die Beschreibung steht auf dem Blatt – also auch hier bearbeitbar (30.09.2026) */}
+          <Feld value={block.description} editable={schreiben} onChange={set((d, v) => ((d as typeof block).description = v))} />
+        </div>
       )
       return (
         <figure className="ws-block ws-image" style={{ width: `${block.widthPercent}%` }}>
@@ -266,7 +295,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               {/* Die Nummer steht am Bild wie am Text: Eine Aufgabe „mithilfe von M3" braucht ein sichtbares M3 (27.09.2026) */}
               {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
               {/* Der Bildnachweis steht auf der Schlussseite, nicht unter dem Bild */}
-              <Feld value={block.caption} editable={edit} onChange={set((d, v) => ((d as typeof block).caption = v))} placeholder="Bildunterschrift" />
+              <Feld value={block.caption} editable={schreiben} onChange={set((d, v) => ((d as typeof block).caption = v))} placeholder="Bildunterschrift" />
             </figcaption>
           )}
         </figure>
@@ -277,13 +306,13 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       return (
         <div className="ws-block ws-phrases">
           <div className="ws-phrases-head">
-            <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} placeholder="Useful phrases" />
+            <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} placeholder="Useful phrases" />
           </div>
           {(block.hint || edit) && (
             <div className="ws-phrases-hint">
               <Feld
                 value={block.hint}
-                editable={edit}
+                editable={schreiben}
                 onChange={set((d, v) => ((d as typeof block).hint = v))}
                 placeholder="Hinweis zur Nutzung (optional), z. B. „Für Aufgabe 2: …“"
               />
@@ -292,13 +321,22 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           <div className="ws-phrases-groups">
             {block.groups.map((group, gi) => (
               <div className="ws-phrases-group" key={gi}>
-                {group.label && <div className="ws-phrases-label">{group.label}</div>}
+                {group.label && (
+                  <div className="ws-phrases-label">
+                    <Feld value={group.label} editable={schreiben} onChange={set((d, v) => ((d as typeof block).groups[gi].label = v))} />
+                  </div>
+                )}
                 <ul>
                   {group.items.map((item, ii) => (
                     <li key={ii}>
-                      {/* **fett** wie überall auf dem Blatt – vorher standen die Sternchen im Druck */}
+                      {/* **fett** wie überall auf dem Blatt – vorher standen die Sternchen im Druck; seit 30.09.2026 bearbeitbar */}
                       <span className="ws-phrases-text">
-                        <RichText value={item.text} inline editable={false} />
+                        <RichText
+                          value={item.text}
+                          inline
+                          editable={schreiben}
+                          onChange={set((d, v) => ((d as typeof block).groups[gi].items[ii].text = v))}
+                        />
                       </span>
                       {/*
                         Die deutsche Entsprechung steht gedämpft daneben, nicht darunter –
@@ -308,7 +346,12 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                       {item.german && ctx.phraseGerman && (
                         <span className="ws-phrases-de">
                           {' – '}
-                          <RichText value={item.german} inline editable={false} />
+                          <RichText
+                            value={item.german}
+                            inline
+                            editable={schreiben}
+                            onChange={set((d, v) => ((d as typeof block).groups[gi].items[ii].german = v))}
+                          />
                         </span>
                       )}
                     </li>
@@ -328,13 +371,13 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       return (
         <div className={`ws-block ws-scaffold ws-scaffold-${block.variant}`}>
           <div className="ws-scaffold-title">
-            <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+            <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
           </div>
           {block.variant === 'wortspeicher' ? (
             <div className="ws-wordbank">
               {block.items.map((it, i) => (
                 <span key={i}>
-                  <RichText value={it} inline editable={edit} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
+                  <RichText value={it} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
                 </span>
               ))}
             </div>
@@ -343,7 +386,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               {block.items.map((it, i) => (
                 <div key={i} className="ws-helpcard">
                   <div className="ws-helpcard-num">Hilfe {i + 1}</div>
-                  <RichText value={it} editable={edit} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
+                  <RichText value={it} editable={schreiben} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
                 </div>
               ))}
             </div>
@@ -351,7 +394,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             <ul>
               {block.items.map((it, i) => (
                 <li key={i}>
-                  <RichText value={it} inline editable={edit} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
+                  <RichText value={it} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
                 </li>
               ))}
             </ul>
@@ -366,7 +409,11 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       if (isKeyMode(mode)) return null
       return (
         <div className="ws-block ws-workspace">
-          {block.label && <div className="ws-workspace-label">{block.label}</div>}
+          {block.label && (
+            <div className="ws-workspace-label">
+              <Feld value={block.label} editable={schreiben} onChange={set((d, v) => ((d as typeof block).label = v))} />
+            </div>
+          )}
           <div className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${block.heightMm}mm` }} />
         </div>
       )
@@ -381,7 +428,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           {(block.title || ctx.materialNumbers?.get(block.id)) && (
             <div className="ws-grid-title">
               {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
-              <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+              <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </div>
           )}
           <img
@@ -392,7 +439,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           />
           {block.caption && (
             <div className="ws-grid-caption">
-              <Feld value={block.caption} editable={edit} onChange={set((d, v) => ((d as typeof block).caption = v))} />
+              <Feld value={block.caption} editable={schreiben} onChange={set((d, v) => ((d as typeof block).caption = v))} />
             </div>
           )}
         </div>
@@ -413,7 +460,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             </span>
             <span className="ws-audio-title">
               {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
-              <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+              <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </span>
             <span className="ws-audio-meta">
               {/*
@@ -428,7 +475,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               {block.speakers.length > 1 && <div className="ws-audio-speakers">{block.speakers.map((s) => s.name).join(' · ')}</div>}
               {block.beforeListening && (
                 <div className="ws-audio-before">
-                  <RichText value={block.beforeListening} inline editable={edit} onChange={set((d, v) => ((d as typeof block).beforeListening = v))} />
+                  <RichText value={block.beforeListening} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).beforeListening = v))} />
                 </div>
               )}
             </div>
@@ -494,7 +541,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             </span>
             <span className="ws-video-title">
               {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
-              <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+              <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
             </span>
             <span className="ws-video-meta">{facts.join(' · ')}</span>
           </div>
@@ -502,18 +549,18 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             <div className="ws-video-texts">
               {block.sourceTitle && (
                 <div className="ws-video-source">
-                  <Feld value={block.sourceTitle} editable={edit} onChange={set((d, v) => ((d as typeof block).sourceTitle = v))} />
+                  <Feld value={block.sourceTitle} editable={schreiben} onChange={set((d, v) => ((d as typeof block).sourceTitle = v))} />
                   {block.platform ? ` · ${block.platform}` : ''}
                 </div>
               )}
               {block.summary && (
                 <div className="ws-video-summary">
-                  <RichText value={block.summary} inline editable={edit} onChange={set((d, v) => ((d as typeof block).summary = v))} />
+                  <RichText value={block.summary} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).summary = v))} />
                 </div>
               )}
               {block.beforeViewing && (
                 <div className="ws-video-before">
-                  <RichText value={block.beforeViewing} inline editable={edit} onChange={set((d, v) => ((d as typeof block).beforeViewing = v))} />
+                  <RichText value={block.beforeViewing} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).beforeViewing = v))} />
                 </div>
               )}
             </div>
@@ -594,7 +641,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             <thead>
               <tr>
                 <th>
-                  <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+                  <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
                 </th>
                 {block.format === 'kompetenzraster'
                   ? ['sicher', 'teilweise', 'noch nicht'].map((l) => <th key={l}>{l}</th>)
@@ -607,7 +654,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               {block.statements.map((s, i) => (
                 <tr key={i}>
                   <td>
-                    <RichText value={s} inline editable={edit} onChange={set((d, v) => ((d as typeof block).statements[i] = v))} />
+                    <RichText value={s} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).statements[i] = v))} />
                   </td>
                   <td className="ws-sc-cell" />
                   <td className="ws-sc-cell" />
@@ -622,7 +669,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
     case 'divider':
       return (
         <div className="ws-block ws-divider">
-          <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as typeof block).title = v))} />
+          <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
         </div>
       )
     case 'protocol':

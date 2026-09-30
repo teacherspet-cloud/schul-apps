@@ -14,6 +14,51 @@ import { testPrompt } from './generation/generateTest'
 import { legeTestAb, testOffen } from './library'
 import type { GrammarTest } from './model/types'
 import { worksheetMetaForTest } from './render/testWorksheet'
+import { bausteinNachWunsch } from '../arbeitsblatt/generation/wunsch'
+import type { WunschArt } from '../../shared/kiWunsch'
+
+/**
+ * Zauberstab „Überarbeiten" bzw. Kreis „Neu erzeugen" an einem Baustein (30.09.2026) – mit dem
+ * Systemauftrag des Grammatiktests (geprüfte Form, Niveau). Ersetzt nur diesen Baustein, ein
+ * Rückgängig-Schritt; Punkte bleiben.
+ */
+export function testBausteinNachWunsch(test: GrammarTest, docId: string, blockId: string, art: WunschArt, wunsch: string): void {
+  void starteAuftrag({
+    moduleId: 'grammatiktest',
+    docId,
+    titel: test.meta.title?.trim() || 'Grammatiktest',
+    art: art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten',
+    eingabe: test,
+    istOffen: () => testOffen(docId),
+    sperrt: false,
+    schluessel: blockId,
+    fehlerTitel: 'Der Baustein ließ sich nicht überarbeiten',
+    arbeit: async (t, k) => {
+      k.melde(art === 'neu' ? 'Die KI erzeugt den Baustein neu …' : 'Die KI überarbeitet den Baustein …')
+      const meta = worksheetMetaForTest(t)
+      const anrede = anredeFuerMeta(meta)
+      return bausteinNachWunsch(
+        {
+          bloecke: t.blocks,
+          blockId,
+          art,
+          wunsch,
+          system: testPrompt(t),
+          zusammenhang: [
+            'Material: Grammatiktest.',
+            `Lerngruppe: ${lerngruppeSatz({ fach: meta.subjectLabel, jahrgang: meta.grade, schulform: meta.schoolTypeName, niveau: meta.cefrLevel || undefined })}.`,
+            anredeRegel(anrede)
+          ],
+          anrede,
+          punkteBehalten: true
+        },
+        k.ai
+      )
+    },
+    abschluss: () => (art === 'neu' ? 'Der Baustein wurde neu erzeugt.' : 'Der Baustein wurde überarbeitet.'),
+    ablegen: (neu, t) => legeTestAb(docId, t, (aktuell) => ({ ...aktuell, blocks: aktuell.blocks.map((b) => (b.id === blockId ? neu : b)) }))
+  })
+}
 
 export function testHinweiseBeheben(test: GrammarTest, docId: string, hinweise: string[]): void {
   if (!hinweise.length) return

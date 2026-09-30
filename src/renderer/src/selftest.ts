@@ -1794,6 +1794,13 @@ const vtJetzt = (): TestDocument | null => useVokabeltest.getState().doc
 /** Jahrgang des offenen Vokabeltests umstellen (Wache Maskottchen: Kopf- und Schlussfigur) */
 const vtJahrgang = (grade: number): void => useVokabeltest.getState().updateDoc((d) => void (d.settings.grade = grade))
 
+/** Hinweiszeile (ⓘ) der ersten Aufgabe setzen – Wache „Texte bearbeitbar" (30.09.2026) */
+const vtHinweiszeile = (text: string): void =>
+  useVokabeltest.getState().updateDoc((d) => {
+    const b = d.variants[0]?.blocks[0]
+    if (b) b.helpText = text
+  })
+
 function vtLatein(): { zeilen: number } {
   const woerter: VocabEntry[] = [
     {
@@ -1995,6 +2002,7 @@ export function installSelftest(): void {
     vtMitHinweis,
     vtJetzt,
     vtJahrgang,
+    vtHinweiszeile,
     gtJetzt: () => useGrammatiktest.getState().test,
     kaJetzt: () => useKlassenarbeit.getState().exam,
     lzkJetzt: () => useLernzielkontrolle.getState().test,

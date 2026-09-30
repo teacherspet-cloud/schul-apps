@@ -2759,3 +2759,20 @@
   padding-left: 2mm;
   margin-top: 1mm;
 }
+
+/*
+ * Bearbeitbare Textstücke IM Satz (30.09.2026): Materialkopf, Worterklärungen, Nützliche
+ * Ausdrücke, AFB-Begründung und Bildbeschreibung stehen in einer Zeile mit anderem Text. Der
+ * Bearbeitungsrahmen ist ein div, und `div.vt-editable` setzt ihn auf `block` – hier muss er im
+ * Satz bleiben, sonst stünde „Begriff", „:" und „Erklärung" untereinander.
+ */
+.ws-source-header .rt-editable-inline,
+.ws-glossary .rt-editable-inline,
+.ws-phrases-label .rt-editable-inline,
+.ws-phrases-text .rt-editable-inline,
+.ws-phrases-de .rt-editable-inline,
+.ws-teacher-note .rt-editable-inline,
+.ws-image-placeholder .rt-editable-inline,
+.ws-workspace-label .rt-editable-inline {
+  display: inline;
+}

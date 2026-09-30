@@ -35,7 +35,9 @@ import { useThemenbereich } from '../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../shared/ueberthema'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { AlleBehebenKnopf, KiBehebenKnopf } from '../../../shared/components/KiBeheben'
-import { befundBehebbar, befundeBeheben } from '../beheben'
+import { befundBehebbar, befundeBeheben, bausteinNachWunschAuftrag } from '../beheben'
+import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
 
 /**
  * Schritt 2: ansehen, bearbeiten, ausgeben.
@@ -223,6 +225,17 @@ export default function EditorStep(): React.JSX.Element {
           if (i < 0 || j < 0 || j >= liste.length) return
           ;[liste[i], liste[j]] = [liste[j], liste[i]]
         })
+      }
+      extras={
+        // Zauberstab und Kreis mit Änderungswunsch (30.09.2026) – nur an Bausteinen der Kontrolle, nicht am errechneten Schlüssel
+        blocks.some((b) => b.id === block.id) ? (
+          <KiWunschKnoepfe
+            blockId={block.id}
+            kontext={() => wunschKontextFuer(block, ws.meta, 'Lernzielkontrolle')}
+            busy={laufend.has(block.id)}
+            onAusfuehren={(art, wunsch) => bausteinNachWunschAuftrag(test, docId, variante, block.id, art, wunsch)}
+          />
+        ) : undefined
       }
     >
       {content}

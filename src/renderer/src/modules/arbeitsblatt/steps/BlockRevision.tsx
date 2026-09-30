@@ -1,108 +1,69 @@
-import { ActionIcon, Button, Chip, Group, Menu, Popover, Stack, Text, Textarea, Tooltip } from '@mantine/core'
-import { IconChevronLeft, IconChevronRight, IconHistory, IconRefresh, IconSparkles } from '@tabler/icons-react'
-import { useState } from 'react'
+import { ActionIcon, Button, Group, Menu, Text, Tooltip } from '@mantine/core'
+import { IconChevronLeft, IconChevronRight, IconHistory, IconRefresh, IconWand } from '@tabler/icons-react'
 import type { WsBlock } from '../model/types'
 import { versionInfo } from '../model/versions'
-
-const SUGGESTIONS: Partial<Record<WsBlock['type'], string[]>> = {
-  text: ['einfacher formulieren', 'kürzer fassen', 'mehr Fachbegriffe erklären', 'Originalquelle verwenden', 'Beispiel aus dem Alltag ergänzen'],
-  task: ['Aufgabe offener stellen', 'kleinschrittiger mit Teilaufgaben', 'anspruchsvoller (AFB III)', 'Satzanfänge als Hilfe ergänzen'],
-  infoBox: ['kürzer fassen', 'Beispiel ergänzen', 'einfacher formulieren'],
-  image: ['anderes Motiv wählen', 'Bildquelle (historisch) statt Zeichnung'],
-  table: ['weniger Spalten', 'Beispielzeile ergänzen']
-}
+import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import type { WunschArt, WunschKontext } from '../../../shared/kiWunsch'
+import { istLeer } from '../model/factory'
 
 /**
- * Das KI-Menü eines Bausteins: überarbeiten (mit eigenem Auftrag), neu erzeugen und – je nach
- * Baustein – weitere KI-Aktionen.
+ * Die KI-Knöpfe eines Bausteins: Zauberstab „Überarbeiten", Kreis „Neu erzeugen" (beide mit
+ * demselben Wunschfeld, shared/components/KiWunschKnoepfe.tsx) und darunter das Menü „KI" mit
+ * den weiteren KI-Aktionen des Bausteins (Leveln, Bewertungsraster, Beispiel …).
  *
- * Bis Paket 6 standen hier zwei fast gleiche Symbole übereinander: Funken für „überarbeiten“
- * und ein Kreispfeil für „neu erzeugen“, dazu das gelöste Beispiel. Welches was tut, zeigte nur
- * der Tooltip (Befund der Lehrkraft, 25.09.2026). Jetzt gibt es EINEN beschrifteten Knopf „KI“
- * mit einem Menü, in dem jede Aktion ausgeschrieben steht. „Überarbeiten …“ öffnet wie bisher
- * das Feld für den Auftrag, am selben Knopf.
+ * Bis Paket 6 standen hier zwei fast gleiche Symbole übereinander, deren Unterschied nur der
+ * Tooltip verriet (Befund der Lehrkraft, 25.09.2026) – daraufhin kam alles in ein Menü. Seit
+ * 30.09.2026 wünscht die Lehrkraft den Kreis zum Neugenerieren zurück, MIT Änderungswunsch,
+ * und dazu den Zauberstab zum Überarbeiten. Beide öffnen dasselbe Feld, dort stehen beide
+ * Aktionen ausgeschrieben; das Menü bietet dieselben zwei Einträge (kein zweiter Weg).
  */
 export function KiMenue({
   block,
   busy,
-  onRevise,
-  onRegenerate,
+  kontext,
+  onWunsch,
   children
 }: {
   block: WsBlock
   busy: boolean
-  onRevise: (instruction: string) => void
-  onRegenerate: () => void
+  kontext: () => WunschKontext
+  onWunsch: (art: WunschArt, wunsch: string) => void
   /** Weitere KI-Einträge des Bausteins (Menu.Item), z. B. das gelöste Beispiel */
   children?: React.ReactNode
 }): React.JSX.Element {
-  const [opened, setOpened] = useState(false)
-  const [text, setText] = useState('')
-  const suggestions = SUGGESTIONS[block.type] ?? ['einfacher formulieren', 'kürzer fassen', 'ausführlicher']
-  const run = (): void => {
-    if (!text.trim()) return
-    onRevise(text.trim())
-    setOpened(false)
-    setText('')
-  }
   return (
-    <Popover opened={opened} onChange={setOpened} width={340} position="left-start" withArrow shadow="md" trapFocus>
-      <Popover.Target>
-        <div>
-          <Menu position="left-start" withArrow shadow="md">
-            <Menu.Target>
-              <Tooltip label="KI-Aktionen: überarbeiten, neu erzeugen" position="left" disabled={opened}>
-                <Button className="editor-ai-revise" size="compact-xs" px={4} variant="filled" loading={busy} aria-label="KI-Aktionen">
-                  KI
-                </Button>
-              </Tooltip>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Label>KI-Aktionen für diesen Baustein</Menu.Label>
-              <Menu.Item leftSection={<IconSparkles size={14} />} onClick={() => setOpened(true)}>
+    <KiWunschKnoepfe
+      blockId={block.id}
+      kontext={kontext}
+      busy={busy}
+      onAusfuehren={onWunsch}
+      // Ein leerer Baustein hat nichts zum Überarbeiten – dort füllt der eigene Zauberstab
+      ohneUeberarbeiten={istLeer(block)}
+      fassungen
+      menue={(oeffne) => (
+        <Menu position="left-start" withArrow shadow="md">
+          <Menu.Target>
+            <Tooltip label="Weitere KI-Aktionen" position="left">
+              <Button className="editor-ai-revise" size="compact-xs" px={4} variant="filled" loading={busy} aria-label="KI-Aktionen">
+                KI
+              </Button>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Label>KI-Aktionen für diesen Baustein</Menu.Label>
+            {!istLeer(block) && (
+              <Menu.Item leftSection={<IconWand size={14} />} onClick={() => oeffne('ueberarbeiten')}>
                 Mit KI überarbeiten …
               </Menu.Item>
-              <Menu.Item leftSection={<IconRefresh size={14} />} onClick={onRegenerate}>
-                Mit KI neu erzeugen
-              </Menu.Item>
-              {children}
-            </Menu.Dropdown>
-          </Menu>
-        </div>
-      </Popover.Target>
-      <Popover.Dropdown>
-        <Stack gap="xs">
-          <Text size="sm" fw={600}>
-            Diesen Baustein mit KI überarbeiten
-          </Text>
-          <Textarea
-            placeholder="Was soll geändert werden? z. B. „Den Text für schwächere Leser einfacher formulieren.“"
-            autosize
-            minRows={2}
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) run()
-            }}
-            data-autofocus
-          />
-          <Group gap={4}>
-            {suggestions.map((s) => (
-              <Chip key={s} size="xs" checked={false} onChange={() => setText((t) => (t ? `${t}, ${s}` : s))}>
-                {s}
-              </Chip>
-            ))}
-          </Group>
-          <Text size="xs" c="dimmed">
-            Der bisherige Stand bleibt erhalten: Über dem Baustein erscheint „Fassung 1 / 2“ – die Pfeile wechseln zwischen alter und
-            neuer Fassung. Andere Bausteine bleiben unverändert.
-          </Text>
-          <Button size="xs" leftSection={<IconSparkles size={14} />} disabled={!text.trim()} onClick={run}>
-            Überarbeiten
-          </Button>
-        </Stack>
-      </Popover.Dropdown>
-    </Popover>
+            )}
+            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => oeffne('neu')}>
+              Mit KI neu erzeugen …
+            </Menu.Item>
+            {children}
+          </Menu.Dropdown>
+        </Menu>
+      )}
+    />
   )
 }
 

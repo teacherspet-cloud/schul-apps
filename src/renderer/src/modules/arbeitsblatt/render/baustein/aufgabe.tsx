@@ -6,7 +6,7 @@ import { pictogramForInstruction, pictogramForSocialForm } from '../pictograms'
 import { SOCIAL_FORM_LABELS, SOCIAL_FORM_SVG } from '../icons'
 import type { PlacedItem } from '../paginate'
 import { plainText } from '../../../../shared/richtext/parse'
-import { isKeyMode, useWs } from '../WsContext'
+import { isEditMode, isKeyMode, useWs } from '../WsContext'
 import { VIEWING_PHASES } from '../../didactics/videoTasks'
 import { taskItems } from '../../model/items'
 import { exampleNote } from '../../../../shared/exampleNote'
@@ -33,6 +33,8 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     contentWidthMm
   } = useWs()
   const edit = mode === 'edit'
+  // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026) – Anzeige und Platzhalter folgen weiter `edit`
+  const schreiben = isEditMode(mode)
   const key = isKeyMode(mode)
   const keyEdit = mode === 'keyEdit'
   const set = useSetter(block)
@@ -57,13 +59,13 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     <div className="ws-example" data-unit key="example">
       <div className="ws-mc-question">
         <span className="ws-mc-num">0.</span>
-        <RichText value={block.example.instruction} editable={edit} onChange={set((d, v) => ((d as TaskBlock).example!.instruction = v))} />
+        <RichText value={block.example.instruction} editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).example!.instruction = v))} />
       </div>
       {block.example.answer.kind === 'multipleChoice' ? (
         <McOptions answer={block.example.answer} showSolution />
       ) : (
         <div className="ws-example-solution">
-          <RichText value={block.example.solution} editable={edit} onChange={set((d, v) => ((d as TaskBlock).example!.solution = v))} />
+          <RichText value={block.example.solution} editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).example!.solution = v))} />
         </div>
       )}
     </div>
@@ -92,7 +94,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
                       <span className="ws-mc-num">{eintrag.i + 1}.</span>
                       <RichText
                         value={ohneOperator(eintrag.part.instruction, block.operator)}
-                        editable={edit}
+                        editable={schreiben}
                         onChange={set((d, v) => ((d as TaskBlock).parts[eintrag.i].instruction = v))}
                       />
                     </div>
@@ -264,7 +266,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
           mitzählt – auf Seite 2 lief der Inhalt dadurch über den Rand hinaus.
         */}
         <span className="ws-part-letter">{String.fromCharCode(97 + i)})</span>
-        <RichText value={part.instruction} editable={edit} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
+        <RichText value={part.instruction} editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
         {/* In der Lösungsansicht tritt die Musterlösung an die Stelle von Kästchen und Fläche */}
         {part.answer.kind !== 'lines' &&
           !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space' || part.answer.kind === 'diagram')) && (
@@ -354,23 +356,30 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     // Schwierigkeitsstufe (29.09.2026): nur hier im Lösungsteil, nie auf dem Schülerblatt
     const stufe = stufenZeile(block)
     if (block.afb || block.operator || taskItems(block) > 1 || stufe) {
+      const angaben = [
+        block.afb ? `AFB ${block.afb}` : '',
+        stufe,
+        block.operator ? `Operator: ${block.operator}` : '',
+        /* Zahl der einzeln bewerteten Einheiten – sonst muss die Lehrkraft beim
+           Korrigieren nachzählen, ob die Punkte zur Aufgabe passen. Erst ab zwei:
+           Bei einer offenen Aufgabe wäre „1 Item" nur Rauschen. */
+        taskItems(block) > 1 ? `${taskItems(block)} Items` : '',
+        block.points ? `${block.points} Punkte` : '',
+        block.minutes ? `ca. ${block.minutes} Min.` : ''
+      ]
+        .filter(Boolean)
+        .join(' · ')
       abschnitte.push({
         node: (
           <div className="ws-teacher-note" data-unit key="hinweis">
-            {[
-              block.afb ? `AFB ${block.afb}` : '',
-              stufe,
-              block.operator ? `Operator: ${block.operator}` : '',
-              /* Zahl der einzeln bewerteten Einheiten – sonst muss die Lehrkraft beim
-                 Korrigieren nachzählen, ob die Punkte zur Aufgabe passen. Erst ab zwei:
-                 Bei einer offenen Aufgabe wäre „1 Item" nur Rauschen. */
-              taskItems(block) > 1 ? `${taskItems(block)} Items` : '',
-              block.points ? `${block.points} Punkte` : '',
-              block.minutes ? `ca. ${block.minutes} Min.` : '',
-              block.afbReason
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            {angaben}
+            {/* Die Begründung des Anforderungsbereichs ist Text der Lehrkraft – bearbeitbar (30.09.2026) */}
+            {block.afbReason && (
+              <>
+                {angaben ? ' · ' : ''}
+                <RichText value={block.afbReason} inline editable={keyEdit} onChange={set((d, v) => ((d as TaskBlock).afbReason = v))} />
+              </>
+            )}
           </div>
         )
       })
@@ -434,12 +443,12 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
             */}
             {block.brief?.situation && (
               <span className="ws-task-situation">
-                <RichText value={block.brief.situation} inline editable={edit} onChange={set((d, v) => ((d as TaskBlock).brief!.situation = v))} />{' '}
+                <RichText value={block.brief.situation} inline editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).brief!.situation = v))} />{' '}
               </span>
             )}
             <RichText
               value={block.instruction}
-              editable={edit}
+              editable={schreiben}
               onChange={set((d, v) => ((d as TaskBlock).instruction = v))}
               // Ohne Sternchen: Der Platzhalter laeuft jetzt durch RichText und wuerde sie sonst woertlich zeigen
               placeholder="Arbeitsanweisung – Operator fett hervorheben"

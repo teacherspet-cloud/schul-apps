@@ -81,6 +81,8 @@ export interface GrammarTestMeta {
   answerKey: boolean
   /** Kopfkasten mit Zeit und Punkten */
   infoBox: boolean
+  /** Von Hand geänderter Wortlaut des Kopfkastens (30.09.2026); leer = aus den Angaben berechnet */
+  kopfText?: string
   /** Arbeitsanweisungen auf Deutsch statt in der Zielsprache */
   instructionsInGerman: boolean
 

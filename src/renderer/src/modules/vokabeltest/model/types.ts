@@ -82,6 +82,12 @@ interface BlockBase {
   warnings?: string[]
   /** Automatische Hinweiszeile für Schüler anzeigen (Standard: ja) */
   showHelp?: boolean
+  /**
+   * Von Hand geänderte Hinweiszeile (ⓘ) – Wunsch der Lehrkraft (30.09.2026): Die Zeile stand auf
+   * dem Blatt, ließ sich aber nicht bearbeiten. Fehlt der Wert, gilt der errechnete Hinweis;
+   * leer = keine Hinweiszeile.
+   */
+  helpText?: string
 }
 
 /** Satz mit Lücke: before ___ after. Mehrere Sätze pro Item für „ein Wort passt in beide Sätze". */

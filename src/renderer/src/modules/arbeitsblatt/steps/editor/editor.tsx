@@ -67,6 +67,8 @@ import '../../../vokabeltest/steps/editor.css'
 import { BlockSettings } from '../BlockSettings'
 import WarningButton from '../../../../shared/components/WarningButton'
 import { KiMenue, VersionSwitcher } from '../BlockRevision'
+import { wunschKontextFuer } from '../../generation/wunsch'
+import type { WunschArt } from '../../../../shared/kiWunsch'
 import { EinfuegenUntermenue } from '../EinfuegenMenue'
 import { AudioPanel } from '../AudioPanel'
 import { BoardPanel } from '../BoardPanel'
@@ -241,10 +243,10 @@ export function EditorStep(): React.JSX.Element {
   }
 
   /** Ersetzt den Baustein durch einen neuen Entwurf; der bisherige Stand bleibt abrufbar. */
-  const reviseBlock = (block: WsBlock, instruction = ''): void =>
-    bausteinAuftrag(ws, docId, 'Baustein neu erzeugen', block.id, block.id, async (w, k) => {
+  const reviseBlock = (block: WsBlock, instruction = '', art: WunschArt = 'ueberarbeiten'): void =>
+    bausteinAuftrag(ws, docId, art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten', block.id, block.id, async (w, k) => {
       const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
-      const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction)
+      const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction, art)
       await completeOriginalSources([fresh], browserSourceServices())
       // Neuer Bild-Entwurf: passendes Bild suchen (auch bei „selbst wählen“, weil die Lehrkraft den Entwurf ausdrücklich anfordert)
       if (fresh.type === 'image')
@@ -467,15 +469,14 @@ export function EditorStep(): React.JSX.Element {
             </Tooltip>
           )}
           {/*
-           * KI-Aktionen in EINEM beschrifteten Menü, seltene Aktionen im „⋯“-Menü (Paket 6).
-           * Vorher standen bis zu zehn Symbole übereinander am Rand; „überarbeiten“ (Funken)
-           * und „neu erzeugen“ (Kreispfeil) waren nur am Tooltip zu unterscheiden.
+           * Zauberstab „Überarbeiten" und Kreis „Neu erzeugen" mit demselben Wunschfeld (30.09.2026),
+           * darunter die weiteren KI-Aktionen in EINEM beschrifteten Menü (Paket 6).
            */}
           <KiMenue
             block={block}
             busy={busy.has(block.id) || busy.has(`beispiel-${block.id}`) || busy.has(`loesung-${block.id}`)}
-            onRevise={(instruction) => reviseBlock(block, instruction)}
-            onRegenerate={() => reviseBlock(block)}
+            kontext={() => wunschKontextFuer(block, ws.meta, 'Arbeitsblatt')}
+            onWunsch={(art, wunsch) => reviseBlock(block, wunsch, art)}
           >
             {/* Leveln (Großprogramm 0.4, F1): leichter, anspruchsvoller, Einfache/Leichte Sprache, GER-Stufe, DaZ-Worterklärungen */}
             <LevelnMenue block={block} meta={ws.meta} onRevise={(instruction) => reviseBlock(block, instruction)} />

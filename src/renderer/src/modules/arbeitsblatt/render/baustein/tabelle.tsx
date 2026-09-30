@@ -3,7 +3,7 @@ import { RichText } from '../../../../shared/richtext/RichText'
 import type { TableBlock } from '../../model/types'
 import type { PlacedItem } from '../paginate'
 import { spaltenBreiten, spalteVerschieben, tabellenBreite, zeilenHoehe, zeilenHoehen } from '../tabelleMasse'
-import { useWs } from '../WsContext'
+import { isEditMode, useWs } from '../WsContext'
 import { Feld, useSetter } from './hilfen'
 
 /**
@@ -18,6 +18,8 @@ import { Feld, useSetter } from './hilfen'
 export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: PlacedItem }): React.JSX.Element {
   const ctx = useWs()
   const edit = ctx.mode === 'edit'
+  // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026)
+  const schreiben = isEditMode(ctx.mode)
   const set = useSetter(block)
   const tableRef = useRef<HTMLTableElement>(null)
   const [vorschau, setVorschau] = useState<{ colWidths: number[]; rowHeightsMm: number[]; headerHeightMm: number; widthPercent: number } | null>(null)
@@ -84,7 +86,7 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
       {from === 0 && (block.title || ctx.materialNumbers?.get(block.id)) && (
         <div className="ws-table-title" data-head>
           {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}
-          <Feld value={block.title} editable={edit} onChange={set((d, v) => (d.title = v))} />
+          <Feld value={block.title} editable={schreiben} onChange={set((d, v) => (d.title = v))} />
         </div>
       )}
       <table
@@ -103,7 +105,7 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
           <tr style={kopfHoehe ? { height: `${kopfHoehe}mm` } : undefined}>
             {block.headers.map((h, c) => (
               <th key={c}>
-                <Feld value={h} editable={edit} onChange={set((d, v) => (d.headers[c] = v))} />
+                <Feld value={h} editable={schreiben} onChange={set((d, v) => (d.headers[c] = v))} />
                 {edit && (
                   <>
                     <span
@@ -123,7 +125,7 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
             <tr key={from + r} data-unit style={hoehen[from + r] ? { height: `${hoehen[from + r]}mm` } : undefined}>
               {row.map((cell, c) => (
                 <td key={c}>
-                  <RichText value={cell} inline editable={edit} onChange={set((d, v) => (d.rows[from + r][c] = v))} />
+                  <RichText value={cell} inline editable={schreiben} onChange={set((d, v) => (d.rows[from + r][c] = v))} />
                   {edit && <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'zeile', from + r)} />}
                 </td>
               ))}

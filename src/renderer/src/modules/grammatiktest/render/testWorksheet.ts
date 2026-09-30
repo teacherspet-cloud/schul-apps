@@ -37,7 +37,8 @@ export function testHeadBlock(test: GrammarTest): WsBlock | null {
     type: 'infoBox',
     variant: 'wissen',
     title: m.title || (english ? 'Grammar test' : 'Grammatiktest'),
-    body: lines.map((l) => `- ${l}`).join('\n')
+    // Von Hand geänderter Wortlaut hat Vorrang (30.09.2026); leer = aus den Angaben berechnet
+    body: m.kopfText?.trim() ? m.kopfText : lines.map((l) => `- ${l}`).join('\n')
   }
 }
 
