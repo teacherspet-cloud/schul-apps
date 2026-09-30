@@ -87,7 +87,7 @@ const UNIQUE_RULE = `Students must be able to see without doubt which word is as
 
 const GAP_RULES = `Rules for gaps:
 - "before" + [gap] + "after" together form one natural sentence; the gap replaces exactly the tested word/phrase.
-- "answer" is the exact form that fits the gap (inflect if grammar requires, e.g. plural, past tense, 3rd person -s).
+- "answer" is the exact form that fits the gap. Inflect only with forms the class already knows (see VORWISSEN DER KLASSE); otherwise build the sentence so that the base form fits.
 - The context must make the tested word the ONLY sensible solution among all words of the list. Add clues (collocations, typical situations) to remove ambiguity.
 - The answer must never appear in "before" or "after".
 ${UNIQUE_RULE}`

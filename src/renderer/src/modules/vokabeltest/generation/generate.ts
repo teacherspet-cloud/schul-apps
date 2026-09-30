@@ -14,6 +14,7 @@ import type { PictureFinder } from './pictures'
 import { istLatein, lateinRegeln } from '../didactics/latein'
 import { anredeMeldung, anredeRegel, falscheAnrede } from '../../../shared/anrede'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
+import { formBefunde, formVorwissen, vorwissenRegel } from '../didactics/formVorwissen'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 export type ImageFinder = (item: PictureItem, settings: TestSettings) => Promise<ImageRef | undefined>
@@ -57,6 +58,8 @@ export function systemPrompt(settings: TestSettings, variantLabel?: string, know
     settings.topic ? `- Where it fits naturally, set the sentences in this context/topic: ${settings.topic}.` : '',
     variantLabel ? `- This is test version ${variantLabel}. Write sentences that differ from other versions.` : '',
     ...knownVocabRules(known).map((r) => `- ${r}`),
+    // Vorwissen bei Wortformen (30.09.2026): simple past & Co. erst, wenn eingeführt
+    vorwissenRegel(formVorwissen(settings, known)),
     /*
      * Latein arbeitet anders. Die Regeln stehen auf Deutsch, weil sie deutsche Fachbegriffe
      * tragen (Nennform, Stammformen, Monosemieren) und weil bei Latein alles Schülermaterial
@@ -126,14 +129,14 @@ export async function generateBlock(
 
   let block = await produce(hinweis)
   let issues = checkBlock(block, vocab).filter((i) => block.kind !== 'picture' || !i.message.startsWith('Kein Bild'))
-  if (aiReview) issues = [...issues, ...(await reviewBlock(block, ctx.settings, opts.ai, words))]
+  if (aiReview) issues = [...issues, ...(await reviewBlock(block, ctx.settings, opts.ai, words, ctx.known))]
 
   if (issues.length > 0 && def.schema) {
     block = await produce(issues.map(formatIssue).join('\n'))
     issues = checkBlock(block, vocab)
     if (aiReview) {
       // Zweite Prüfung: Was dann noch mehrdeutig ist, bekommt den Anfangsbuchstaben als Hilfe
-      const remaining = await reviewBlock(block, ctx.settings, opts.ai, words)
+      const remaining = await reviewBlock(block, ctx.settings, opts.ai, words, ctx.known)
       issues = [
         ...issues,
         ...remaining.map((i) => (addFirstLetterHint(block, i.item) ? { ...i, message: `${i.message} → Anfangsbuchstabe als Hilfe ergänzt.` } : i))
@@ -177,7 +180,7 @@ async function finishBlock(
     }
     issues = checkBlock(block, vocab)
   }
-  block.warnings = [...issues.map(formatIssue), ...anredeHinweise(block, ctx.settings)]
+  block.warnings = [...issues.map(formatIssue), ...anredeHinweise(block, ctx.settings), ...formHinweise(block, vocab, ctx)]
   return block
 }
 
@@ -190,6 +193,11 @@ export function anredeHinweise(block: Block, settings: TestSettings): string[] {
   const soll = anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId)
   const fund = falscheAnrede(block.instruction ?? '', soll)
   return fund ? [anredeMeldung('Arbeitsanweisung', fund, soll)] : []
+}
+
+/** Lücken, die eine noch nicht eingeführte Wortform verlangen (örtliche Prüfung, 30.09.2026) */
+export function formHinweise(block: Block, vocab: VocabEntry[], ctx: Pick<GenContext, 'settings' | 'known'>): string[] {
+  return formBefunde(block, vocab, formVorwissen(ctx.settings, ctx.known)).map(formatIssue)
 }
 
 const localIssues = (block: Block, vocab: VocabEntry[]): Issue[] =>
@@ -253,7 +261,7 @@ export async function generateVariantCombined(
   // Wer die Prüfung abwählt, bekommt sie auch hier nicht.
   if (!opts.review) return blocks
   try {
-    const problems = await reviewVariant(blocks, ctx.settings, opts.ai)
+    const problems = await reviewVariant(blocks, ctx.settings, opts.ai, ctx.known)
     for (const p of problems) {
       const block = blocks[p.taskNumber - 1]
       if (block) block.warnings = [...(block.warnings ?? []), `[Prüfung] ${p.problem}`]
@@ -268,10 +276,10 @@ export async function generateVariantCombined(
  * Prüft alle Aufgaben eines Tests in einer einzigen Anfrage.
  * Gedacht für den Sparmodus, in dem die Einzelprüfung je Aufgabe entfällt.
  */
-export async function reviewVariant(blocks: Block[], settings: TestSettings, ai: AiCall): Promise<{ taskNumber: number; problem: string }[]> {
+export async function reviewVariant(blocks: Block[], settings: TestSettings, ai: AiCall, known?: KnownVocab): Promise<{ taskNumber: number; problem: string }[]> {
   if (!blocks.length) return []
   const res = await ai<{ problems: { taskNumber: number; problem: string }[] }>({
-    system: systemPrompt(settings),
+    system: systemPrompt(settings, undefined, known),
     user: [
       'Check this finished vocabulary test like a strict colleague. Report ONLY real problems:',
       '- an item has no clear solution, or another word of the same task would fit as well',
@@ -279,6 +287,7 @@ export async function reviewVariant(blocks: Block[], settings: TestSettings, ai:
       '- a given answer is wrong or has the wrong form, or there are language errors',
       '- an instruction does not make clear what students have to do',
       `- language clearly above level ${settings.level}`,
+      FORM_PRUEFUNG,
       '- a task refers to material or a word list that is not part of the test',
       'taskNumber is the number of the task (starting at 1). Return an empty list if everything is fine.',
       '',
@@ -318,10 +327,14 @@ export function addFirstLetterHint(block: Block, itemNumber?: number): boolean {
   return false
 }
 
+/** Prüfpunkt Wortformen: Befund, wenn eine Aufgabe eine noch nicht eingeführte Form verlangt (VORWISSEN DER KLASSE) */
+export const FORM_PRUEFUNG =
+  '- an item requires a word form the class has not learned yet (see VORWISSEN DER KLASSE, e.g. a past tense or a derived word in early learning years) – name the form and suggest the base form or a form given in brackets'
+
 /** Zweiter KI-Durchgang: prüft Eindeutigkeit, Niveau und Korrektheit. */
-export async function reviewBlock(block: Block, settings: TestSettings, ai: AiCall, words: string[] = []): Promise<Issue[]> {
+export async function reviewBlock(block: Block, settings: TestSettings, ai: AiCall, words: string[] = [], known?: KnownVocab): Promise<Issue[]> {
   const res = await ai<{ problems: { itemNumber: number; problem: string }[] }>({
-    system: systemPrompt(settings),
+    system: systemPrompt(settings, undefined, known),
     user:
       'Check this vocabulary test task carefully like a strict colleague. The students must be able to tell without doubt which word is asked for in each item. Report ONLY real problems:\n' +
       '- AMBIGUITY: for every item, try each of the other words of this task (list below, in any grammatical form): if another word would also be acceptable, report it and name that word\n' +
@@ -330,6 +343,7 @@ export async function reviewBlock(block: Block, settings: TestSettings, ai: AiCa
       '- the given answer is wrong, has the wrong form, or there are language errors\n' +
       '- the instruction does not make clear what students have to do\n' +
       `- language clearly above level ${settings.level}\n` +
+      `${FORM_PRUEFUNG}\n` +
       'Use itemNumber 0 for problems concerning the whole task. Return an empty list if everything is fine.\n\n' +
       (words.length ? `Words tested in this task: ${words.join(', ')}\n\n` : '') +
       describeBlock(block),

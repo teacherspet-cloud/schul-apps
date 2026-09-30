@@ -6,6 +6,7 @@ import type { TaskSelection, TaskTypeId, TestSettings, VocabEntry } from '../mod
 import { distributeEvenly } from './distribute'
 import { AiCall, systemPrompt } from './generate'
 import { TASK_TYPE_LIST, TASK_TYPES } from './taskTypes'
+import { formVorwissen, formZuSchwer, planHinweis, type FormSettings } from '../didactics/formVorwissen'
 
 /** Formate, die für einen automatisch erstellten Test in Frage kommen (ohne Kreuzworträtsel/Freitext). */
 const AUTO_CANDIDATES: TaskTypeId[] = [
@@ -31,8 +32,22 @@ const AUTO_CANDIDATES: TaskTypeId[] = [
   'trueFalse'
 ]
 
-export function availableAutoTypes(settings: Pick<TestSettings, 'level'>): TaskTypeId[] {
-  return AUTO_CANDIDATES.filter((id) => TASK_TYPES[id] && levelAtLeast(settings.level, TASK_TYPES[id].minLevel))
+/** Einstellungen der Auswahl; Sprache, Jahrgang und Fremdsprachenfolge sind nötig für das Vorwissen bei Wortformen */
+export type AutoSettings = Pick<TestSettings, 'level'> & Partial<Omit<FormSettings, 'level'>>
+
+/**
+ * Vorwissen der Klasse bei Wortformen (30.09.2026): Formate, die Wortbildung verlangen, fallen
+ * weg, solange sie nicht eingeführt ist. Ohne Sprache oder Jahrgang bleibt alles wie bisher.
+ */
+function formFilter(settings: AutoSettings): (id: TaskTypeId) => boolean {
+  if (!settings.targetLanguage || !settings.grade) return () => true
+  const v = formVorwissen({ targetLanguage: settings.targetLanguage, grade: settings.grade, languageOrder: settings.languageOrder ?? 1, stateId: settings.stateId ?? '', level: settings.level })
+  return (id) => !formZuSchwer(id, v)
+}
+
+export function availableAutoTypes(settings: AutoSettings): TaskTypeId[] {
+  const passt = formFilter(settings)
+  return AUTO_CANDIDATES.filter((id) => TASK_TYPES[id] && levelAtLeast(settings.level, TASK_TYPES[id].minLevel) && passt(id))
 }
 
 /** Wie viele Vokabeln abgefragt werden: bei wenig Punkten nur so viele wie Punkte (1 Punkt je Vokabel). */
@@ -133,7 +148,7 @@ const taskCountFor = (count: number): number => (count < 6 ? 2 : count < 12 ? 3 
  * erreicht würde, bleiben außen vor; „Bilder beschriften" braucht abbildbare Nomen und wird
  * nur von der KI-Planung vorgeschlagen.
  */
-export function fallbackTypes(settings: Pick<TestSettings, 'level'>, count: number, rnd: () => number = Math.random): TaskTypeId[] {
+export function fallbackTypes(settings: AutoSettings, count: number, rnd: () => number = Math.random): TaskTypeId[] {
   const wanted = taskCountFor(count)
   const perTask = Math.floor(count / wanted)
   const allowed = new Set(availableAutoTypes(settings).filter((t) => t !== 'pictureLabel' && (TASK_TYPES[t].minItems ?? 1) <= perTask))
@@ -225,6 +240,7 @@ async function kiPlan(vocab: VocabEntry[], settings: TestSettings, ziel: { min: 
           : `Choose 2 to 5 varied, suitable, context-based task formats and decide how many words each task tests. The counts must add up to a number between ${ziel.min} and ${ziel.max}.`,
         'Consider parts of speech and the kind of expressions (single words, phrases, verbs, adjectives), the CEFR level and variety for students.',
         schwierigkeitNachKlasse(settings),
+        planHinweis(formVorwissen(settings)),
         suggested.length
           ? `Start from this mix, which was drawn for variety so that not every test looks the same: ${suggested.join(', ')}. Keep a format only if the words really suit it; otherwise replace it with another suitable format of a similar kind (recognition / use in context / own production).`
           : '',

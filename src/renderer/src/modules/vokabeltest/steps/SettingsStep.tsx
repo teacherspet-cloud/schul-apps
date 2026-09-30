@@ -32,6 +32,7 @@ import { distributeEvenly, requestedCount } from '../generation/distribute'
 import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
 import { istLatein, passtZurSprache } from '../didactics/latein'
+import { formHinweis, formVorwissen, formZuSchwer } from '../didactics/formVorwissen'
 import { planeZusammensetzung, suggestLevelFromVocab, STANDARD_UMFANG } from '../generation/autoPlan'
 import { gradeOptions, languageTracks, levelAtLeast, suggestLevel } from '../model/cefr'
 import { randomSeed } from '../model/random'
@@ -67,6 +68,12 @@ export default function SettingsStep(): React.JSX.Element {
   const [hasKey, setHasKey] = useState(true)
   // Nur die Vokabeln, die in der Liste auf „abfragen“ stehen
   const usable = includedVocab(vocab)
+  // Vorwissen bei Wortformen (30.09.2026): Hinweis an Aufgaben, die Formänderungen verlangen
+  const formStand = useMemo(
+    () => (settings ? formVorwissen(settings, listContext?.known) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings?.targetLanguage, settings?.grade, settings?.languageOrder, settings?.stateId, settings?.level, listContext?.known]
+  )
   /*
    * KI-Vorschlag der Zusammensetzung (29.09.2026, Wunsch der Lehrkraft): beim ersten Öffnen
    * stellt die KI aus den gewählten Vokabeln die Aufgabentypen zusammen (14–18 Vokabeln). Die
@@ -468,6 +475,7 @@ export default function SettingsStep(): React.JSX.Element {
                   {TASK_TYPE_LIST.filter((d) => d.id !== 'freeText' && passtZurSprache(d.id, settings.targetLanguage)).map((def) => {
                     const sel = settings.tasks.find((t) => t.type === def.id)
                     const tooEasyLevel = !levelAtLeast(settings.level, def.minLevel)
+                    const formText = formStand ? formHinweis(def.id, formStand) : undefined
                     return (
                       <Card key={def.id} withBorder padding="sm" className={sel ? 'task-card-selected' : undefined}>
                         <Group justify="space-between" wrap="nowrap" align="start">
@@ -487,6 +495,11 @@ export default function SettingsStep(): React.JSX.Element {
                             </Badge>
                           </Tooltip>
                         </Group>
+                        {formText && (
+                          <Text size="xs" mt={4} c={formStand && formZuSchwer(def.id, formStand) ? 'orange' : 'dimmed'} data-formhinweis>
+                            {formText}
+                          </Text>
+                        )}
                         {sel && (
                           <Group mt="xs" grow>
                             <NumberInput
