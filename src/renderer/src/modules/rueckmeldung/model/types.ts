@@ -22,6 +22,7 @@
  */
 import type { KiHerkunft, KiVermerk } from '@shared/kiKennzeichnung'
 import type { Zuordnung } from '@shared/pseudonymisierung'
+import type { BilingualVorgaben } from '../../arbeitsblatt/model/types'
 
 /** Formen der Rückmeldung – mehrere wählbar */
 export type FormArt = 'schriftlich' | 'tipps' | 'tabelle' | 'rand' | 'scan' | 'ueberarbeitung'
@@ -225,6 +226,11 @@ export interface RueckmeldungMeta {
   schoolTypeName: string
   /** Anrede auf dem Bogen */
   anrede: 'du' | 'sie'
+  /**
+   * Bilingualer Sachfachunterricht (30.09.2026): Arbeitssprache und Form wie im Arbeitsblatt.
+   * Wirkt auf die Sprache der Rückmeldung und die Bewertungsregel des Landes (auftrag.ts).
+   */
+  bilingual?: BilingualVorgaben
   /** Worauf die Lehrkraft achten will (Kriterien, Schwerpunkt) */
   schwerpunkt: string
   /** Aus hineingezogenem Material erkannte Lerngruppe (29.09.2026) – Hinweis neben den Feldern */

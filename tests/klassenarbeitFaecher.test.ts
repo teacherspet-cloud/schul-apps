@@ -25,7 +25,7 @@ import { examHeadBlock, examToWorksheet } from '../src/renderer/src/modules/klas
  * Phase G). Die Fächer sagen über ihr Profil, was sie sind; die Programmteile fragen danach.
  */
 // Seit 29.09.2026 alle Fächer (Wunsch der Lehrkraft: Klassenarbeiten in allen Fächern)
-const FAECHER: ExamSubjectId[] = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst']
+const FAECHER: ExamSubjectId[] = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst', 'gesellschaftslehre', 'naturwissenschaften', 'arbeitslehre', 'paedagogik']
 
 const arbeit = (subjectId: ExamSubjectId, over: Partial<Exam['meta']> = {}, parts: ExamPart[] = []): Exam =>
   ({

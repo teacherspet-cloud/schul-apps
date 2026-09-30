@@ -110,7 +110,7 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
   // In Berlin/Brandenburg gehören Kl. 5–6 zur Grundschule: dort Grundschulformate beibehalten
   const bandGrade = input.schoolTypeId === 'grundschule' && input.grade > 4 ? 4 : input.grade
   const ageBand = ageBandForGrade(bandGrade)
-  const schoolProfile = schoolProfileFor(input.schoolTypeId)
+  const schoolProfile = schoolProfileFor(input.schoolTypeId, input.stateId)
   const courseProfileId = schoolProfile.id === 'integriert' || input.schoolTypeId === 'realschule' ? profileForCourseLevel(input.courseLevel) : null
   const effectiveProfile = courseProfileId ? SCHOOL_PROFILES[courseProfileId] : schoolProfile
   const foerder = schoolProfile.id === 'foerderLernen'

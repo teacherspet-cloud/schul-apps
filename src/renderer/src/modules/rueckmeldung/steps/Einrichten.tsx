@@ -56,6 +56,22 @@ import AntwortSpracheZeile from './AntwortSpracheZeile'
 import MaterialWahl from '../../../shared/components/MaterialWahl'
 import { naechstesKuerzel, type Abgabe, type Nachteilsausgleich } from '../model/types'
 import { useRueckmeldung } from '../store'
+import SchulortFelder from '../../../shared/components/SchulortFelder'
+import BilingualSchalter from '../../arbeitsblatt/steps/BilingualSchalter'
+import { mitLerngruppe } from '../../../shared/lerngruppe'
+import { gradeRange } from '../../arbeitsblatt/didactics/schoolProfiles'
+import type { CefrTable } from '@shared/types'
+
+/** Schulformen und Jahrgänge kommen aus dem gemeinsamen Katalog – die GER-Tabelle braucht die Rückmeldung nicht */
+const LEERE_TABELLE: CefrTable = { version: 1, states: [] }
+
+/** Jahrgänge der Schulform; ein gespeicherter Jahrgang außerhalb bleibt wählbar (ältere Rückmeldungen) */
+function jahrgangsListe(stateId: string, schoolTypeId: string, aktuell: number): { value: string; label: string }[] {
+  const { min, max } = gradeRange(LEERE_TABELLE, stateId, schoolTypeId)
+  const jahrgaenge = Array.from({ length: max - min + 1 }, (_, i) => min + i)
+  if (!jahrgaenge.includes(aktuell)) jahrgaenge.push(aktuell)
+  return jahrgaenge.sort((a, b) => a - b).map((g) => ({ value: String(g), label: `Klasse ${g}` }))
+}
 
 /**
  * Schritt 1 der Rückmeldung (Großprogramm 0.4, F3): Lerngruppe, Grundlage (gespeichertes
@@ -313,6 +329,22 @@ export default function Einrichten(): React.JSX.Element | null {
                 <Title order={4} mb="sm">
                   Lerngruppe
                 </Title>
+                {/* Bundesland und Schulform (30.09.2026): steuern Länderregeln, Notenpunkte und Gewichtung – vorher nur aus den Einstellungen */}
+                <Stack gap="xs" mb="xs">
+                  <SchulortFelder
+                    table={LEERE_TABELLE}
+                    stateId={r.meta.stateId}
+                    schoolTypeId={r.meta.schoolTypeId}
+                    schoolTypeName={r.meta.schoolTypeName}
+                    onChange={(p) =>
+                      update((d) => {
+                        Object.assign(d.meta, mitLerngruppe(LEERE_TABELLE, d.meta, p))
+                        delete d.meta.erkannt
+                      })
+                    }
+                    searchable
+                  />
+                </Stack>
                 <Group grow align="flex-start">
                   <HaeufigSelect
                     art="fach"
@@ -325,7 +357,7 @@ export default function Einrichten(): React.JSX.Element | null {
                   />
                   <Select
                     label="Jahrgang"
-                    data={Array.from({ length: 13 }, (_, i) => ({ value: String(i + 1), label: `Klasse ${i + 1}` }))}
+                    data={jahrgangsListe(r.meta.stateId, r.meta.schoolTypeId, r.meta.grade)}
                     value={String(r.meta.grade)}
                     onChange={(v) => v && update((d) => ((d.meta.grade = Number(v)), delete d.meta.erkannt))}
                     allowDeselect={false}
@@ -338,6 +370,18 @@ export default function Einrichten(): React.JSX.Element | null {
                     allowDeselect={false}
                   />
                 </Group>
+                {/* Bilingualer Sachfachunterricht – nur bei Sachfächern, wie im Arbeitsblatt (30.09.2026) */}
+                <Stack mt="xs">
+                  <BilingualSchalter
+                    meta={r.meta}
+                    onChange={(bilingual) =>
+                      update((d) => {
+                        if (bilingual) d.meta.bilingual = bilingual
+                        else delete d.meta.bilingual
+                      })
+                    }
+                  />
+                </Stack>
                 {r.meta.erkannt && (
                   <Text size="xs" c="teal" mt={6} data-rm-erkannt>
                     {r.meta.erkannt}

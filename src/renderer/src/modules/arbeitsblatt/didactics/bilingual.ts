@@ -30,16 +30,17 @@ import { subjectById } from '../model/subjects'
 import { plainText } from '../../../shared/richtext/parse'
 import { istUebungsklausur } from '../generation/abiturPrompt'
 import { ersterOperator, type ErkennungsSprache } from '@shared/operatoren/erkennung'
+import { bilingualFaehig } from '@shared/faecher'
 
 /** Ist das Blatt bilingual? Nur in Sachfächern – Deutsch und die Fremdsprachen sind keine. */
 export function bilingualAktiv(meta: Pick<WorksheetMeta, 'bilingual' | 'subjectId'>): boolean {
   if (!meta.bilingual?.an || !meta.bilingual.sprache) return false
-  const fach = subjectById(meta.subjectId)
   /*
    * Berlin, AV 2020, Nr. 2 Abs. 3: „Sachfächer im Sinne der Regelung sind alle
-   * Unterrichtsfächer mit Ausnahme von Deutsch und den Fremdsprachen."
+   * Unterrichtsfächer mit Ausnahme von Deutsch und den Fremdsprachen." Die Regel steht seit
+   * 30.09.2026 einmal im Fächerkatalog (@shared/faecher, `bilingualFaehig`) für alle Programme.
    */
-  return !fach.foreignLanguage && !fach.uebersetzungssprache && !['deutsch', 'daz'].includes(fach.id)
+  return bilingualFaehig(subjectById(meta.subjectId).id)
 }
 
 export const FORM_LABEL: Record<BilingualForm, string> = {

@@ -27,6 +27,7 @@
  * übrigen Fächer des Landes.
  */
 import { istFremdsprache, istKlassenarbeitsFach } from './faecher'
+import { datenSchulform, schulformVon } from '@shared/schulformen'
 
 export interface NachweisAnfrage {
   stateId: string
@@ -1147,6 +1148,24 @@ const LAENDER: Record<string, (k: Kontext) => Nachweis> = {
  * (bei `keineKlassenarbeit` als Warnung). Die Lehrkraft kann die Bezeichnung ändern.
  */
 export function nachweisFuer(anfrage: NachweisAnfrage): Nachweis {
+  /*
+   * Schulformen ohne eigene Regeln im Bericht (Kooperative Gesamtschule, berufliches Gymnasium,
+   * Wirtschaftsschule, FOS/BOS, Förderschule …, 30.09.2026): Regeln der Bezugsform aus
+   * @shared/schulformen – ausdrücklich als nicht gesichert gekennzeichnet.
+   */
+  const form = schulformVon(anfrage.stateId, anfrage.schoolTypeId)
+  const bezug = form?.bezug ? datenSchulform(anfrage.stateId, anfrage.schoolTypeId) : null
+  if (form && bezug && bezug !== anfrage.schoolTypeId) {
+    const r = nachweisFuer({ ...anfrage, schoolTypeId: bezug })
+    const bezugName = schulformVon(anfrage.stateId, bezug)?.name ?? bezug
+    return {
+      ...r,
+      nichtGesichert: true,
+      hinweis: [r.hinweis, `Für die Schulform „${form.name}" nicht eigens belegt – Regeln der Schulform „${bezugName}" übernommen (nicht gesichert).`]
+        .filter(Boolean)
+        .join(' ')
+    }
+  }
   const k: Kontext = {
     ...anfrage,
     gruppe: fachgruppe(anfrage.subjectId),

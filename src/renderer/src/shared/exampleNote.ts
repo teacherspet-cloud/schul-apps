@@ -20,6 +20,12 @@ const NOTES: Record<string, string> = {
   it: "C'è un esempio.",
   nl: 'Er is één voorbeeld.',
   ru: 'Дан один пример.',
+  // Schulfremdsprachen seit 30.09.2026 (@shared/faecher)
+  pl: 'Podano jeden przykład.',
+  cs: 'Jeden příklad je uveden.',
+  pt: 'Há um exemplo.',
+  tr: 'Bir örnek verilmiştir.',
+  zh: '已给出一个例子。',
   la: 'Exemplum unum datum est.'
 }
 

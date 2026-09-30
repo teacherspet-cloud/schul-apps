@@ -7,6 +7,7 @@
  * bei denen das Land nur auf KMK/IQB/EPA verweist, und der KMK-Grundstock bleiben außen vor.
  */
 import type { BestandsListe, LandesBestand, Listensprache, OperatorDefinition, Operatorenliste } from './typen'
+import { datenSchulform } from '../schulformen'
 
 const dateien = import.meta.glob<LandesBestand>('./daten/*.json', { eager: true, import: 'default' })
 
@@ -123,7 +124,18 @@ function sprachePasst(l: BestandsListe, fach: string, sprache: Listensprache): b
   return l.sprache === 'de'
 }
 
-function stufenListen(stateId: string, a: OperatorenAnfrage, stufe: 'sek1' | 'sek2', belegt: BestandsListe['belegt']): BestandsListe[] {
+/**
+ * Schulform ohne eigene Listen im Land (Kooperative Gesamtschule, berufliches Gymnasium, FOS …):
+ * die Listen ihrer Bezugsform aus @shared/schulformen (30.09.2026, Audit Länder/Schulformen/Fächer).
+ */
+function listenSchulform(stateId: string, schulform: string | undefined): string | undefined {
+  if (!schulform) return schulform
+  const genannt = (x: string): boolean => (BESTAND[stateId]?.listen ?? []).some((l) => l.schulformen?.includes(x))
+  return genannt(schulform) ? schulform : datenSchulform(stateId, schulform, genannt)
+}
+
+function stufenListen(stateId: string, anfrage: OperatorenAnfrage, stufe: 'sek1' | 'sek2', belegt: BestandsListe['belegt']): BestandsListe[] {
+  const a = { ...anfrage, schulform: listenSchulform(stateId, anfrage.schulform) }
   const sprache = a.sprache ?? ZIELSPRACHE_DES_FACHS[a.fach] ?? 'de'
   const heute = a.heute ?? new Date()
   const alle = (BESTAND[stateId]?.listen ?? []).filter(

@@ -1,4 +1,5 @@
 import type { CefrTable } from '@shared/types'
+import { FOERDERSCHULE_ID, profilVon, schulformenDes, schulformVon } from '@shared/schulformen'
 import type { AfbMix } from './ageBands'
 import { stateInfo } from './states'
 
@@ -7,7 +8,7 @@ export type SchoolProfileId = 'grundschule' | 'hauptschule' | 'realschule' | 'in
 /** Kursniveau: G/M/E (BW), G/E (Kurse), E–H (Berlin/Brandenburg) oder gemischte Lerngruppe */
 export type CourseLevel = 'mixed' | 'G' | 'M' | 'E' | 'BB-E' | 'BB-F' | 'BB-G' | 'BB-H'
 
-export const FOERDERSCHULE_ID = 'foerderschule-lernen'
+export { FOERDERSCHULE_ID }
 
 export interface SchoolProfile {
   id: SchoolProfileId
@@ -80,6 +81,10 @@ export const SCHOOL_PROFILES: Record<SchoolProfileId, SchoolProfile> = {
   }
 }
 
+/*
+ * Profil und Kurse kommen seit 30.09.2026 aus dem gemeinsamen Katalog (@shared/schulformen).
+ * Die Listen hier bleiben als Rückfall für Kennungen, die der Katalog nicht kennt (alte Dateien).
+ */
 const PROFILE_BY_SCHOOL_TYPE: Record<string, SchoolProfileId> = {
   grundschule: 'grundschule',
   hauptschule: 'hauptschule',
@@ -104,34 +109,28 @@ const COURSE_SCHOOL_TYPES = new Set([
   'regelschule'
 ])
 
-export function schoolProfileFor(schoolTypeId: string): SchoolProfile {
-  const id = PROFILE_BY_SCHOOL_TYPE[schoolTypeId] ?? (COURSE_SCHOOL_TYPES.has(schoolTypeId) ? 'integriert' : 'realschule')
+export function schoolProfileFor(schoolTypeId: string, stateId?: string): SchoolProfile {
+  const id = profilVon(schoolTypeId, stateId) ?? PROFILE_BY_SCHOOL_TYPE[schoolTypeId] ?? (COURSE_SCHOOL_TYPES.has(schoolTypeId) ? 'integriert' : 'realschule')
   return SCHOOL_PROFILES[id]
 }
 
-/** Schulformen eines Landes für die Auswahl (aus der GER-Tabelle) plus Förderschule. */
-export function schoolTypesForState(table: CefrTable, stateId: string): { value: string; label: string }[] {
-  const state = table.states.find((s) => s.id === stateId)
-  const types = (state?.schoolTypes ?? []).map((t) => ({ value: t.id, label: t.name }))
-  return [...types, { value: FOERDERSCHULE_ID, label: 'Förderschule (Förderschwerpunkt Lernen)' }]
+/** Schulformen eines Landes für die Auswahl – aus dem gemeinsamen Katalog, Förderschule zuletzt. */
+export function schoolTypesForState(_table: CefrTable, stateId: string): { value: string; label: string }[] {
+  return schulformenDes(stateId).map((t) => ({ value: t.id, label: t.name }))
 }
 
-/** Gültiger Jahrgangsbereich je Schulform und Land. */
-export function gradeRange(table: CefrTable, stateId: string, schoolTypeId: string): { min: number; max: number; note?: string } {
+/** Gültiger Jahrgangsbereich je Schulform und Land (Katalog; Grundschule nach Land 4 oder 6 Jahre). */
+export function gradeRange(_table: CefrTable, stateId: string, schoolTypeId: string): { min: number; max: number; note?: string } {
+  const sf = schulformVon(stateId, schoolTypeId)
+  if (sf) return { min: sf.von, max: sf.bis, ...(sf.hinweis && sf.id !== 'grundschule' ? { note: sf.hinweis } : {}) }
   const info = stateInfo(stateId)
-  if (schoolTypeId === FOERDERSCHULE_ID) return { min: 1, max: 10 }
   if (schoolTypeId === 'grundschule') return { min: 1, max: info.primaryYears }
-  const type = table.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)
-  const grades = type?.languages.flatMap((l) => Object.keys(l.grades).map(Number)) ?? []
-  const max = grades.length ? Math.max(...grades) : schoolTypeId === 'gymnasium' ? (info.gymnasium === 'G8' ? 12 : 13) : 10
-  if (info.primaryYears === 6) {
-    if (schoolTypeId === 'gymnasium') return { min: 5, max, note: 'Klasse 5–6 nur an grundständigen Gymnasien' }
-    return { min: 7, max }
-  }
-  return { min: 5, max }
+  return { min: info.primaryYears === 6 ? 7 : 5, max: schoolTypeId === 'gymnasium' ? (info.gymnasium === 'G8' ? 12 : 13) : 10 }
 }
 
 export function hasCourseLevels(schoolTypeId: string, stateId: string): boolean {
+  const sf = schulformVon(stateId, schoolTypeId)
+  if (sf) return Boolean(sf.kurse)
   if (COURSE_SCHOOL_TYPES.has(schoolTypeId)) return true
   // In Baden-Württemberg arbeitet auch die Realschule auf den Niveaus G und M
   return schoolTypeId === 'realschule' && stateId === 'BW'

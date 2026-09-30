@@ -23,11 +23,19 @@
  * Zuordnung von hier, die Tests (tests/programmSichtbarkeit.test.ts) prüfen sie ohne Oberfläche.
  */
 
-/** Fächer, in denen Vokabeln und Grammatik geprüft werden (Kennungen aus arbeitsblatt/model/subjects.ts) */
-export const SPRACH_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'latein', 'daz'] as const
+/**
+ * Fächer, in denen Vokabeln geprüft werden – die Sprachen des Vokabeltests (vokabeltest/model/types.ts,
+ * LANGUAGES) und DaZ. Bis 30.09.2026 fehlten Russisch und Niederländisch: Wer nur Russisch
+ * unterrichtete, sah den Vokabeltest nicht, obwohl er Russisch kann (Audit Länder/Schulformen/Fächer).
+ * tests/programmSichtbarkeit.test.ts prüft den Abgleich mit LANGUAGES.
+ */
+export const SPRACH_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'niederlaendisch', 'russisch', 'latein', 'daz'] as const
+
+/** Fächer des Grammatiktests (arbeitsblatt/didactics/grammar.ts, GRAMMAR_SUBJECTS) – mit Griechisch und Deutsch */
+export const GRAMMATIK_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch', 'latein', 'griechisch', 'deutsch', 'daz'] as const
 
 /** Fächer, die die Klassenarbeit kann (klassenarbeit/model/types.ts, `ExamSubjectId`) */
-export const KLASSENARBEIT_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst'] as const
+export const KLASSENARBEIT_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst', 'gesellschaftslehre', 'naturwissenschaften', 'arbeitslehre', 'paedagogik'] as const
 
 /** 'alle' = jedes Fach; sonst die Fachkennungen, für die das Programm gedacht ist */
 export type ProgrammFaecher = 'alle' | readonly string[]
@@ -41,7 +49,7 @@ export type ProgrammFaecher = 'alle' | readonly string[]
 export const PROGRAMM_FAECHER: Record<string, ProgrammFaecher> = {
   arbeitsblatt: 'alle',
   vokabeltest: SPRACH_FAECHER,
-  grammatiktest: SPRACH_FAECHER,
+  grammatiktest: GRAMMATIK_FAECHER,
   lernzielkontrolle: 'alle',
   klassenarbeit: KLASSENARBEIT_FAECHER,
   rueckmeldung: 'alle',

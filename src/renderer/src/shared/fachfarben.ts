@@ -17,6 +17,7 @@
  */
 import type { DesignTemplate } from '@shared/design'
 import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
+import { FAECHER, FACH_ZU_SPRACHE as KATALOG_SPRACHE, fachAusName } from '@shared/faecher'
 
 export interface PalettenFarbe {
   hex: string
@@ -76,7 +77,26 @@ export const FACH_PALETTE: PalettenFarbe[] = [
   { hex: '#480088', name: 'Indigo' },
   { hex: '#581840', name: 'Aubergine' },
   { hex: '#582000', name: 'Kastanie' },
-  { hex: '#907050', name: 'Nougat' }
+  { hex: '#907050', name: 'Nougat' },
+  /*
+   * 30.09.2026 für zehn neue Fächer (Niederländisch hatte schon eine Farbe): Polnisch, Tschechisch,
+   * Portugiesisch, Türkisch, Chinesisch, Gesellschaftslehre, Naturwissenschaften, Arbeitslehre,
+   * Darstellendes Spiel, Pädagogik. Gesucht wie oben, aber ohne Untergrenze der Buntheit: Mit
+   * Chroma ≥ 35 findet sich neben den 29 Farben nur noch EINE mit ΔE₀₀ ≥ 12. Deshalb Schritt für
+   * Schritt unter allen druckfesten Kandidaten mit ΔE₀₀ ≥ 12,2 zu allen übrigen die buntesten –
+   * gedeckte, dunkle Töne. Kleinster Abstand der ganzen Palette danach ΔE₀₀ = 12,2. Der Farbraum
+   * ist damit ausgeschöpft: Weitere Fächer brauchen eine niedrigere Schwelle oder teilen Farben.
+   */
+  { hex: '#283060', name: 'Nachtblau' },
+  { hex: '#283808', name: 'Dunkeloliv' },
+  { hex: '#906088', name: 'Malve' },
+  { hex: '#403010', name: 'Mokka' },
+  { hex: '#502828', name: 'Ochsenblut' },
+  { hex: '#586848', name: 'Salbei' },
+  { hex: '#704858', name: 'Heide' },
+  { hex: '#886868', name: 'Taupe' },
+  { hex: '#403040', name: 'Brombeere' },
+  { hex: '#605040', name: 'Walnuss' }
 ]
 
 const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name)!.hex
@@ -90,58 +110,16 @@ const farbe = (name: string): string => FACH_PALETTE.find((f) => f.name === name
  * jetzt Bordeaux, Latein Braun.
  * Eine in den Einstellungen gewählte Farbe bleibt unverändert – nur die Vorschläge sind neu.
  */
-export const FACH_VORSCHLAG: Record<string, string> = {
-  deutsch: farbe('Rot'),
-  englisch: farbe('Dunkelblau'),
-  franzoesisch: farbe('Violett'),
-  spanisch: farbe('Orange'),
-  italienisch: farbe('Tannengrün'),
-  // Getauscht mit Geschichte (Wunsch der Lehrkraft vom 26.09.2026, siehe oben)
-  latein: farbe('Braun'),
-  mathematik: farbe('Blau'),
-  biologie: farbe('Grün'),
-  chemie: farbe('Türkis'),
-  physik: farbe('Petrol'),
-  informatik: farbe('Schiefergrau'),
-  geschichte: farbe('Bordeaux'),
-  erdkunde: farbe('Olivgrün'),
-  politik: farbe('Ocker'),
-  religion: farbe('Magenta'),
-  anderes: farbe('Anthrazit'),
-  'werte-und-normen': farbe('Lavendel'),
-  kunst: farbe('Orchidee'),
-  musik: farbe('Pflaume'),
-  sport: farbe('Terrakotta'),
-  sachunterricht: farbe('Moosgrün'),
-  daz: farbe('Altrosa'),
-  niederlaendisch: farbe('Rostrot'),
-  russisch: farbe('Khaki'),
-  technik: farbe('Tiefseeblau'),
-  griechisch: farbe('Kastanie'),
-  wirtschaft: farbe('Nougat'),
-  ethik: farbe('Indigo'),
-  philosophie: farbe('Aubergine')
-}
+export const FACH_VORSCHLAG: Record<string, string> = Object.fromEntries(FAECHER.map((f) => [f.id, farbe(f.farbe)]))
 
 /**
- * Fächer, die es nur im Vokabeltest gibt (Sprachen ohne eigenes Fach in der Fächerliste der
- * übrigen Programme) – damit auch sie eine Farbe haben und in den Einstellungen stehen.
+ * Fächer außerhalb der Fächerliste – seit 30.09.2026 leer: Niederländisch (bis dahin nur im
+ * Vokabeltest) steht jetzt im gemeinsamen Katalog. Bleibt für Aufrufer und Tests bestehen.
  */
-export const WEITERE_FAECHER: { id: string; label: string }[] = [
-  // Russisch ist seit 29.09.2026 ein Fach der Fächerliste
-  { id: 'niederlaendisch', label: 'Niederländisch' }
-]
+export const WEITERE_FAECHER: { id: string; label: string }[] = []
 
-/** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) */
-export const FACH_ZU_SPRACHE: Record<string, string> = {
-  en: 'englisch',
-  fr: 'franzoesisch',
-  es: 'spanisch',
-  it: 'italienisch',
-  la: 'latein',
-  nl: 'niederlaendisch',
-  ru: 'russisch'
-}
+/** Sprachcode eines Vokabeltests → Fach (Vokabeltests kennen nur die Sprache) – aus dem Katalog */
+export const FACH_ZU_SPRACHE: Record<string, string> = KATALOG_SPRACHE
 
 // ---------- Farbrechnung (sRGB, WCAG 2.1, CIELAB) ----------
 
@@ -297,7 +275,8 @@ export function fachIdVon(wert?: string): string | null {
   if (FACH_VORSCHLAG[w]) return w
   if (FACH_ZU_SPRACHE[w]) return FACH_ZU_SPRACHE[w]
   const klein = w.toLocaleLowerCase('de')
-  return [...SUBJECTS, ...WEITERE_FAECHER].find((s) => s.label.toLocaleLowerCase('de') === klein)?.id ?? null
+  // Auch Landesnamen wie „Gemeinschaftskunde“ oder „WAT“ (Katalog, Feld auch)
+  return [...SUBJECTS, ...WEITERE_FAECHER].find((s) => s.label.toLocaleLowerCase('de') === klein)?.id ?? fachAusName(w)?.id ?? null
 }
 
 /** Farbe eines Fachs nach den Einstellungen (fehlt dort eine, gilt der Vorschlag); null = unbekanntes Fach */

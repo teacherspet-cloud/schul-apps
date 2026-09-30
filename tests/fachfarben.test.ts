@@ -117,7 +117,9 @@ describe('Vorrang Fachfarbe › Vorlage', () => {
     expect(wirksameFarbe(vorlage, 'biologie', false, { biologie: '' })).toBe(GRUEN)
     expect(wirksameFarbe(vorlage, 'biologie', true, { biologie: '#123456' })).toBe(vorlage)
     // Unbekanntes Fach (etwa eine Sprache, die der Vokabeltest nicht kennt): Vorlage
-    expect(wirksameFarbe(vorlage, 'pt', false, {})).toBe(vorlage)
+    expect(wirksameFarbe(vorlage, 'ja', false, {})).toBe(vorlage)
+    // Portugiesisch ist seit 30.09.2026 ein Fach mit eigener Farbe
+    expect(wirksameFarbe(vorlage, 'pt', false, {})).toBe(FACH_VORSCHLAG.portugiesisch)
     // Niederländisch hat seit 26.09.2026 eine eigene Farbe
     expect(wirksameFarbe(vorlage, 'nl', false, {})).toBe(FACH_VORSCHLAG.niederlaendisch)
   })
@@ -225,6 +227,6 @@ describe('Wirkung in allen Programmen', () => {
     expect(vokabeltestFarbe(doc('fr'))).toBe(FACH_VORSCHLAG.franzoesisch)
     expect(vokabeltestFarbe(doc('fr', true))).toBeNull()
     expect(vokabeltestFarbe(doc('nl'))).toBe(FACH_VORSCHLAG.niederlaendisch)
-    expect(vokabeltestFarbe(doc('pt'))).toBeNull()
+    expect(vokabeltestFarbe(doc('ja'))).toBeNull()
   })
 })

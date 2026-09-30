@@ -1,4 +1,5 @@
 import { CEFR_SCALE, CefrLevel, CefrTable, cefrIndex } from '@shared/types'
+import { vollstaendigeGerTabelle } from '@shared/schulformen'
 
 /** Sprachliche Vorgaben je GER-Niveau, die in jeden KI-Auftrag einfließen. */
 export const CEFR_DESCRIPTORS: Record<CefrLevel, string> = {
@@ -27,8 +28,21 @@ export interface GradeOption {
   basis: string
 }
 
+const vollstaendig = new WeakMap<CefrTable, CefrTable>()
+
+/**
+ * Sprachfolgen einer Schulform. Fehlt die Schulform in der Tabelle (Kooperative Gesamtschule,
+ * berufliches Gymnasium …), gelten die Niveaus ihrer Bezugsform aus @shared/schulformen –
+ * gekennzeichnet als übernommen. Der Hauptprozess liefert die Tabelle schon vervollständigt;
+ * hier nur der Rückfall für rohe Tabellen (Tests, ältere Stände).
+ */
 export function languageTracks(table: CefrTable, stateId: string, schoolTypeId: string) {
-  return table.states.find((s) => s.id === stateId)?.schoolTypes.find((t) => t.id === schoolTypeId)?.languages ?? []
+  const finde = (t: CefrTable) => t.states.find((s) => s.id === stateId)?.schoolTypes.find((x) => x.id === schoolTypeId)?.languages
+  const direkt = finde(table)
+  if (direkt || !table.states.length) return direkt ?? []
+  let voll = vollstaendig.get(table)
+  if (!voll) vollstaendig.set(table, (voll = vollstaendigeGerTabelle(table)))
+  return finde(voll) ?? []
 }
 
 export function gradeOptions(table: CefrTable, stateId: string, schoolTypeId: string, order: number): GradeOption[] {

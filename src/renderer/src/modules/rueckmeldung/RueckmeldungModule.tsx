@@ -5,6 +5,7 @@ import EinfacheBibliothek from '../../shared/testmodul/EinfacheBibliothek'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { notifyError } from '../../shared/util'
 import { subjectById } from '../arbeitsblatt/model/subjects'
+import { schulformVon } from '@shared/schulformen'
 import { ladeGrundlage } from './generation'
 import { hatInhalt, standardName, type Rueckmeldung } from './model/types'
 import Boegen from './steps/Boegen'
@@ -24,7 +25,7 @@ export function leereRueckmeldung(): Rueckmeldung {
       grade: 7,
       stateId: defaults.stateId,
       schoolTypeId: defaults.schoolTypeId,
-      schoolTypeName: '',
+      schoolTypeName: schulformVon(defaults.stateId, defaults.schoolTypeId)?.name ?? '',
       anrede: STANDARD_ANREDE,
       schwerpunkt: ''
     },

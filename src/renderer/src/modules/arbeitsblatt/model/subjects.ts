@@ -1,3 +1,5 @@
+import { FAECHER, SPRACHNAMEN } from '@shared/faecher'
+
 export interface Subject {
   id: string
   label: string
@@ -16,58 +18,21 @@ export interface Subject {
   formulas?: boolean
 }
 
-export const SUBJECTS: Subject[] = [
-  { id: 'deutsch', label: 'Deutsch' },
-  { id: 'englisch', label: 'Englisch', foreignLanguage: 'en' },
-  { id: 'franzoesisch', label: 'Französisch', foreignLanguage: 'fr' },
-  { id: 'spanisch', label: 'Spanisch', foreignLanguage: 'es' },
-  { id: 'italienisch', label: 'Italienisch', foreignLanguage: 'it' },
-  { id: 'latein', label: 'Latein', uebersetzungssprache: 'la' },
-  /*
-   * 29.09.2026 (Wunsch der Lehrkraft: Klassenarbeiten in allen Fächern): Russisch als
-   * Schulfach (bisher nur als Vokabeltest-Sprache), Griechisch wie Latein als Übersetzungsfach,
-   * Wirtschaft, Ethik und Philosophie als eigene Fächer (eigene Kerncurricula und Operatoren).
-   */
-  { id: 'russisch', label: 'Russisch', foreignLanguage: 'ru' },
-  { id: 'griechisch', label: 'Griechisch', uebersetzungssprache: 'grc' },
-  { id: 'mathematik', label: 'Mathematik', formulas: true },
-  { id: 'biologie', label: 'Biologie', formulas: true },
-  { id: 'chemie', label: 'Chemie', formulas: true },
-  { id: 'physik', label: 'Physik', formulas: true },
-  { id: 'informatik', label: 'Informatik', formulas: true },
-  { id: 'geschichte', label: 'Geschichte' },
-  { id: 'erdkunde', label: 'Erdkunde / Geographie' },
-  { id: 'politik', label: 'Politik / Wirtschaft / Sozialkunde' },
-  { id: 'wirtschaft', label: 'Wirtschaft' },
-  { id: 'religion', label: 'Religion / Ethik' },
-  /*
-   * Werte und Normen ist ein eigenes Fach, kein Religionsersatz mit anderem Namen: In
-   * Niedersachsen hat es ein eigenes Kerncurriculum mit eigener Operatorenliste, die von
-   * der des Religionsunterrichts abweicht. Bis September 2026 lief es hier unter
-   * „Religion / Ethik / Werte und Normen" mit – damit war es weder auswählbar noch
-   * unterscheidbar.
-   */
-  { id: 'werte-und-normen', label: 'Werte und Normen' },
-  { id: 'ethik', label: 'Ethik' },
-  { id: 'philosophie', label: 'Philosophie' },
-  { id: 'kunst', label: 'Kunst' },
-  { id: 'musik', label: 'Musik' },
-  { id: 'sport', label: 'Sport' },
-  // Technik (29.09.2026, Wunsch der Lehrkraft) – u. a. für Test- und Konstruktionsprotokolle
-  { id: 'technik', label: 'Technik' },
-  { id: 'sachunterricht', label: 'Sachunterricht' },
-  { id: 'daz', label: 'Deutsch als Zweitsprache (DaZ)' },
-  { id: 'anderes', label: 'Anderes Fach …' }
-]
+/**
+ * Die Fächer der Programme – seit 30.09.2026 aus dem gemeinsamen Katalog @shared/faecher (Kennung,
+ * Name, Zielsprache, Formeln). Neue Fächer werden dort eingetragen, nicht hier.
+ */
+export const SUBJECTS: Subject[] = FAECHER.map((f) => ({
+  id: f.id,
+  label: f.label,
+  ...(f.sprache ? { foreignLanguage: f.sprache } : {}),
+  ...(f.uebersetzungssprache ? { uebersetzungssprache: f.uebersetzungssprache } : {}),
+  ...(f.formeln ? { formulas: true } : {})
+}))
 
 export function subjectById(id: string): Subject {
   return SUBJECTS.find((s) => s.id === id) ?? SUBJECTS[0]
 }
 
-export const LANGUAGE_NAMES: Record<string, string> = {
-  de: 'Deutsch',
-  en: 'Englisch',
-  fr: 'Französisch',
-  es: 'Spanisch',
-  it: 'Italienisch'
-}
+/** Deutscher Name einer Sprache nach Code – aus dem Katalog, damit neue Schulfremdsprachen mitkommen */
+export const LANGUAGE_NAMES: Record<string, string> = SPRACHNAMEN

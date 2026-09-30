@@ -266,6 +266,8 @@ export const BIOLOGIE = naturwissenschaft('biologie', 'bio')
 export const CHEMIE = naturwissenschaft('chemie', 'ch')
 export const PHYSIK = naturwissenschaft('physik', 'ph')
 export const TECHNIK = naturwissenschaft('technik', 'te')
+// 30.09.2026: Integriertes Fach Naturwissenschaften (NaWi) – Formate wie in den Einzelfächern (abgeleitet)
+export const NATURWISSENSCHAFTEN = naturwissenschaft('naturwissenschaften', 'nawi')
 
 export const INFORMATIK: ExamFormat[] = [
   {
@@ -482,6 +484,25 @@ export const RELIGION = werteFach('religion', 're', 'biblischer, religiöser ode
 export const ETHIK = werteFach('ethik', 'eth', 'philosophischer oder Sachtext')
 export const PHILOSOPHIE = werteFach('philosophie', 'phil', 'philosophischer Text')
 export const WERTE_UND_NORMEN = werteFach('werte-und-normen', 'wun', 'philosophischer, religiöser oder Sachtext')
+// 30.09.2026: Pädagogik/Erziehungswissenschaft – Text, Fall, Erörterung wie in den Wertefächern (abgeleitet)
+export const PAEDAGOGIK = werteFach('paedagogik', 'paed', 'pädagogischer oder psychologischer Fachtext')
+
+/**
+ * Formate eines verwandten Fachs unter neuer Kennung übernehmen (30.09.2026): Arbeitslehre/WAT
+ * arbeitet mit denselben Formaten wie Wirtschaft (Fall, Daten, Urteil), Gesellschaftslehre mit
+ * denen aus Geschichte, Erdkunde und Politik (formats.ts). Abgeleitet, nicht eigens belegt –
+ * so im Hinweis des Formats.
+ */
+export function uebertrageFormate(liste: ExamFormat[], subject: ExamSubjectId, praefix: string, herkunft: string): ExamFormat[] {
+  return liste.map((f) => ({
+    ...f,
+    id: `${praefix}-${f.id.slice(f.id.indexOf('-') + 1)}`,
+    subject,
+    note: [f.note, `Format aus ${herkunft} übernommen – für dieses Fach nicht eigens belegt.`].filter(Boolean).join(' ')
+  }))
+}
+
+export const ARBEITSLEHRE = uebertrageFormate(WIRTSCHAFT, 'arbeitslehre', 'al', 'Wirtschaft')
 
 export const MUSIK: ExamFormat[] = [
   {
@@ -638,7 +659,10 @@ export const FORMATE_NEU: ExamFormat[] = [
   ...PHILOSOPHIE,
   ...WERTE_UND_NORMEN,
   ...MUSIK,
-  ...KUNST
+  ...KUNST,
+  ...NATURWISSENSCHAFTEN,
+  ...PAEDAGOGIK,
+  ...ARBEITSLEHRE
 ]
 
 /** Üblicher Aufbau je neuem Fach (Recherche 13.x) */
@@ -657,5 +681,9 @@ export const VORSCHLAG_NEU: Partial<Record<ExamSubjectId, (grade: number) => str
   philosophie: (g) => (g <= 10 ? ['phil-wissen', 'phil-text', 'phil-eroerterung'] : ['phil-text', 'phil-eroerterung']),
   'werte-und-normen': (g) => (g <= 7 ? ['wun-wissen', 'wun-text', 'wun-fall'] : ['wun-text', 'wun-fall', 'wun-eroerterung']),
   musik: (g) => (g <= 7 ? ['mu-hoeren', 'mu-theorie'] : ['mu-hoeren', 'mu-analyse', 'mu-text']),
-  kunst: (g) => (g <= 7 ? ['ku-bild', 'ku-gestalten'] : ['ku-bild', 'ku-vergleich'])
+  kunst: (g) => (g <= 7 ? ['ku-bild', 'ku-gestalten'] : ['ku-bild', 'ku-vergleich']),
+  // 30.09.2026
+  naturwissenschaften: (g) => (g <= 7 ? ['nawi-wissen', 'nawi-experiment', 'nawi-daten'] : ['nawi-material', 'nawi-experiment', 'nawi-bewertung']),
+  paedagogik: (g) => (g <= 10 ? ['paed-wissen', 'paed-text', 'paed-fall'] : ['paed-text', 'paed-fall', 'paed-eroerterung']),
+  arbeitslehre: (g) => (g <= 8 ? ['al-daten', 'al-fall', 'al-urteil'] : ['al-text', 'al-modell', 'al-urteil'])
 }

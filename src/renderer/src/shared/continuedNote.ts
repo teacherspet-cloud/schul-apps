@@ -16,6 +16,12 @@ const HINWEISE: Record<string, (nummer: number) => string> = {
   it: (n) => `Esercizio ${n} (continua)`,
   nl: (n) => `Opdracht ${n} (vervolg)`,
   ru: (n) => `Задание ${n} (продолжение)`,
+  // Schulfremdsprachen seit 30.09.2026 (@shared/faecher)
+  pl: (n) => `Zadanie ${n} (ciąg dalszy)`,
+  cs: (n) => `Úloha ${n} (pokračování)`,
+  pt: (n) => `Tarefa ${n} (continuação)`,
+  tr: (n) => `Görev ${n} (devamı)`,
+  zh: (n) => `练习 ${n}（续）`,
   // Latein: Die Arbeitsanweisungen stehen deutsch, der Hinweis deshalb auch
   la: (n) => `Aufgabe ${n} (Fortsetzung)`
 }

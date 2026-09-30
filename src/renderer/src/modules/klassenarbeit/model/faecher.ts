@@ -37,6 +37,11 @@ export type ExamSubjectId =
   | 'werte-und-normen'
   | 'musik'
   | 'kunst'
+  // 30.09.2026: Integrationsfächer und Pädagogik (@shared/faecher, Audit Länder/Schulformen/Fächer)
+  | 'gesellschaftslehre'
+  | 'naturwissenschaften'
+  | 'arbeitslehre'
+  | 'paedagogik'
 
 /**
  * Art des Fachs – die Programmteile fragen danach statt nach dem Namen.
@@ -326,6 +331,47 @@ export const KLASSENARBEIT_FAECHER: KlassenarbeitFach[] = [
     hauptfach: false,
     beispiel: 'z. B. Der Expressionismus',
     kopf: DEUTSCHER_KOPF('Kunst')
+  },
+  // ---------- 30.09.2026: Integrationsfächer der Gesamt-, Ober- und Sekundarschulen, Pädagogik ----------
+  {
+    id: 'gesellschaftslehre',
+    label: 'Gesellschaftslehre',
+    art: 'gesellschaft',
+    sprache: 'de',
+    praefix: 'gl',
+    hauptfach: false,
+    beispiel: 'z. B. Leben im Mittelalter',
+    kopf: DEUTSCHER_KOPF('Gesellschaftslehre')
+  },
+  {
+    id: 'naturwissenschaften',
+    label: 'Naturwissenschaften',
+    art: 'naturwissenschaft',
+    sprache: 'de',
+    praefix: 'nawi',
+    hauptfach: false,
+    beispiel: 'z. B. Stoffe und ihre Eigenschaften',
+    kopf: DEUTSCHER_KOPF('Naturwissenschaften')
+  },
+  {
+    id: 'arbeitslehre',
+    label: 'Arbeitslehre / WAT',
+    art: 'gesellschaft',
+    sprache: 'de',
+    praefix: 'al',
+    hauptfach: false,
+    beispiel: 'z. B. Berufsorientierung und Betriebspraktikum',
+    kopf: DEUTSCHER_KOPF('Arbeitslehre')
+  },
+  {
+    id: 'paedagogik',
+    label: 'Pädagogik',
+    art: 'gesellschaft',
+    sprache: 'de',
+    praefix: 'paed',
+    hauptfach: false,
+    beispiel: 'z. B. Erziehungsstile',
+    kopf: DEUTSCHER_KOPF('Pädagogik')
   }
 ]
 

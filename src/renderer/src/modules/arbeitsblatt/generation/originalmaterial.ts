@@ -17,7 +17,7 @@ import type { GeladeneQuelle, Materialanfrage, Quellentreffer, StructuredRequest
 import { arr, int, obj, str } from '../../../shared/aiSchema'
 import { wantsSourceHeader } from '../didactics/sourceHeader'
 import { istUebungsklausur } from './abiturPrompt'
-import { subjectById } from '../model/subjects'
+import { LANGUAGE_NAMES, subjectById } from '../model/subjects'
 
 /** Moderne Fremdsprache (nicht Latein) – nur dort unterscheiden sich Ausgangs- und Zielsprache */
 const fremdsprache = (subjectId: string): boolean => Boolean(subjectById(subjectId).foreignLanguage)
@@ -613,7 +613,9 @@ export function netzAuftrag(wunsch: MaterialWunsch, begriffe: string[]): string 
     fr: 'Französisch',
     es: 'Spanisch',
     it: 'Italienisch',
-    la: 'Latein'
+    la: 'Latein',
+    // Weitere Schulfremdsprachen (30.09.2026, @shared/faecher)
+    ...LANGUAGE_NAMES
   }
   return [
     `Fach: ${wunsch.fach}. Thema: ${wunsch.thema}. Jahrgang: ${wunsch.jahrgang}.`,

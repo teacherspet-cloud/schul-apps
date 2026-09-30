@@ -12,6 +12,12 @@ const LABELS: Record<string, { yes: string; no: string }> = {
   it: { yes: 'vero', no: 'falso' },
   nl: { yes: 'waar', no: 'niet waar' },
   ru: { yes: 'верно', no: 'неверно' },
+  // Schulfremdsprachen seit 30.09.2026 (@shared/faecher)
+  pl: { yes: 'prawda', no: 'fałsz' },
+  cs: { yes: 'pravda', no: 'nepravda' },
+  pt: { yes: 'verdadeiro', no: 'falso' },
+  tr: { yes: 'doğru', no: 'yanlış' },
+  zh: { yes: '正确', no: '错误' },
   la: { yes: 'verum', no: 'falsum' }
 }
 

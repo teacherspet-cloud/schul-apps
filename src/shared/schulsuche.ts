@@ -64,13 +64,22 @@ export const SCHULFORM_KUERZEL: Record<string, SchulformKuerzel[]> = {
   'integrierte-gesamtschule': ['igs'],
   'integrierte-sekundarschule': ['igs'],
   stadtteilschule: ['igs'],
-  gymnasium: ['gym']
+  gymnasium: ['gym'],
+  // 30.09.2026: alle Schulformen des gemeinsamen Katalogs (@shared/schulformen)
+  'kooperative-gesamtschule': ['igs'],
+  mittelstufenschule: ['hs', 'rs'],
+  // Wirtschaftsschule, FOS und BOS: im Verzeichnis nicht von Berufsschulen zu unterscheiden – keine Zuordnung
+  'berufliches-gymnasium': ['bbs'],
+  'berufliches-oberstufengymnasium': ['bbs'],
+  fachgymnasium: ['bbs'],
+  berufskolleg: ['bbs'],
+  'foerderschule-lernen': ['fs']
 }
 
 /**
  * Die Schulform der App, die zu einem Treffer passt – aus den Schulformen, die es im Land des
  * Treffers gibt. Die beste Deckung gewinnt („hs, rs" in NI → Oberschule, nicht Hauptschule);
- * null, wenn keine passt (Förderschule, berufsbildende Schule – die kennt die App nicht).
+ * null, wenn keine passt. Berufsbildende Schulen („bbs“) gelten als berufliches Gymnasium, Förderschulen („fs“) als Förderschule Lernen.
  */
 export function appSchulform(kuerzel: string[], schulformenDesLandes: string[]): string | null {
   let beste: string | null = null

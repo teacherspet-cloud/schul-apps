@@ -11,7 +11,7 @@
  * Quelleninterpretation, Erörterung von Deutungen und historische Darstellung.
  */
 import { formatIdFuer, inhaltsanteil, istAlteSprache, istFremdsprache, type ExamSubjectId } from './faecher'
-import { FORMATE_NEU, FREMDSPRACHEN_NEU, VORSCHLAG_NEU } from './formateNeu'
+import { FORMATE_NEU, FREMDSPRACHEN_NEU, uebertrageFormate, VORSCHLAG_NEU } from './formateNeu'
 
 export interface ExamFormat {
   id: string
@@ -702,7 +702,33 @@ const ERDKUNDE: ExamFormat[] = [
   }
 ]
 
-export const EXAM_FORMATS: ExamFormat[] = [...ENGLISCH, ...ABGELEITET, ...DEUTSCH, ...SACHFAECHER, ...POLITIK, ...ERDKUNDE, ...FORMATE_NEU]
+/**
+ * Gesellschaftslehre (30.09.2026): das Integrationsfach aus Geschichte, Erdkunde und Politik –
+ * je Format das aus dem Fach, das es prägt (Quelle aus Geschichte, Karte aus Erdkunde, Konflikt
+ * aus Politik). Abgeleitet, nicht eigens belegt.
+ */
+const GESELLSCHAFTSLEHRE: ExamFormat[] = [
+  ...uebertrageFormate(
+    SACHFAECHER.filter((f) => ['ge-knowledge', 'ge-source', 'ge-image', 'ge-data', 'ge-judgement', 'ge-action'].includes(f.id)),
+    'gesellschaftslehre',
+    'gl',
+    'Geschichte'
+  ),
+  ...uebertrageFormate(
+    ERDKUNDE.filter((f) => ['geo-map', 'geo-sketch'].includes(f.id)),
+    'gesellschaftslehre',
+    'gl',
+    'Erdkunde'
+  ),
+  ...uebertrageFormate(
+    POLITIK.filter((f) => ['pol-conflict', 'pol-cartoon'].includes(f.id)),
+    'gesellschaftslehre',
+    'gl',
+    'Politik'
+  )
+]
+
+export const EXAM_FORMATS: ExamFormat[] = [...ENGLISCH, ...ABGELEITET, ...DEUTSCH, ...SACHFAECHER, ...POLITIK, ...ERDKUNDE, ...GESELLSCHAFTSLEHRE, ...FORMATE_NEU]
 
 /**
  * Formate eines Fachs für den Jahrgang. Befund F2 (29.09.2026): In Niedersachsen ist eine
@@ -789,6 +815,7 @@ const VORSCHLAG: Partial<Record<ExamSubjectId, (grade: number) => string[]>> = {
   geschichte: (g) => (g <= 7 ? ['ge-knowledge', 'ge-source', 'ge-judgement'] : ['ge-source', 'ge-comparison', 'ge-judgement']),
   politik: (g) => (g <= 7 ? ['pol-knowledge', 'pol-data', 'pol-judgement'] : ['pol-text', 'pol-conflict', 'pol-judgement']),
   erdkunde: (g) => (g <= 7 ? ['geo-knowledge', 'geo-map', 'geo-climate'] : ['geo-map', 'geo-text', 'geo-judgement']),
+  gesellschaftslehre: (g) => (g <= 7 ? ['gl-knowledge', 'gl-map', 'gl-judgement'] : ['gl-source', 'gl-conflict', 'gl-judgement']),
   // Deutsch: eine Schreibaufgabe als Hauptteil, in der Sek I mit einem Teil „Sprache untersuchen"
   deutsch: (g) => (g <= 6 ? ['de-erzaehlen'] : g <= 10 ? ['de-textanalyse', 'de-sprache'] : ['de-textanalyse']),
   // Die Fächer vom 29.09.2026 (formateNeu.ts)
