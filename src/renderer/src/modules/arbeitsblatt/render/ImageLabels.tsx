@@ -1,6 +1,6 @@
 import type { ImageLabel } from '../model/types'
 import { imageSizeFromDataUrl } from '../../../shared/imageSize'
-import { imageHeightMmFor, layoutImageLabels } from './imageLabelLayout'
+import { imageHeightMmFor, layoutImageLabels, leitweg } from './imageLabelLayout'
 
 /**
  * Beschriftungen direkt an den Elementen eines Bildes.
@@ -84,13 +84,17 @@ export function ImageLabelLayer({
    * Die Linie vom Punkt zum Schild: waagerecht bis kurz vor den Bildrand, dann – falls das
    * Schild verschoben wurde – schräg zur Schildmitte am Rand. Als SVG in Prozentkoordinaten
    * über dem Bild; die Strichstärke skaliert nicht mit (vector-effect in ws.css).
+   * Gezeichnete Schaltpläne bringen einen rechtwinkligen Leitweg mit (`route`): vom Bauteil
+   * in einen freien Streifen, erst dort waagerecht – so läuft keine Linie durch ein Symbol.
    */
   const linie = (label: ImageLabel): string => {
     const p = platz(label)
     const links = p.side === 'left'
-    const knick = links ? Math.min(label.x, 4) : Math.max(label.x, 96)
+    const weg = leitweg(label)
+    const aus = weg[weg.length - 1]
+    const knick = links ? Math.min(aus.x, 4) : Math.max(aus.x, 96)
     const rand = links ? 0 : 100
-    return `${label.x},${label.y} ${knick},${label.y} ${rand},${p.top}`
+    return [...weg.map((q) => `${q.x},${q.y}`), `${knick},${aus.y}`, `${rand},${p.top}`].join(' ')
   }
 
   return (

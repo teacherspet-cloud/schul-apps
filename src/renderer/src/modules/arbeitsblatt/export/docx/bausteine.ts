@@ -239,7 +239,11 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
         const maxW = (ctx.contentWidth / 1440) * 96 * (block.widthPercent / 100)
         const maxH = 110 * (96 / 25.4)
         const scale = Math.min(maxW / dim.width, maxH / dim.height)
-        out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [imageRun(block.image.dataUrl, dim.width * scale, dim.height * scale)] }))
+        // Gezeichnete Schaltpläne sind SVG – Word braucht ein Rasterbild
+        const src = block.schaltplan && block.image.dataUrl.startsWith('data:image/svg')
+          ? await ctx.deps.raster(new TextDecoder().decode(Uint8Array.from(atob(block.image.dataUrl.split(',')[1]), (c) => c.charCodeAt(0))), dim.width * scale * 3, dim.height * scale * 3)
+          : block.image.dataUrl
+        out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [imageRun(src, dim.width * scale, dim.height * scale)] }))
       } else {
         out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(`[Bild: ${block.description}]`, { color: '777777' })] }))
       }

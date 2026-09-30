@@ -6,6 +6,7 @@ import { GREEN_SCREEN_PROMPT } from '../../../shared/images'
 import type { ImageBlock, ImageItem, WorksheetMeta, WsBlock } from '../model/types'
 import { findReusable, type ReusableImage } from '../../../shared/imageReuse'
 import { istZeitleiste, zeitleisteAusBeschreibung } from './zeitleiste'
+import { beschriftungsAufgaben, istSchaltplan, zeichneSchaltplan } from './schaltplan'
 
 export interface WorksheetImageDeps {
   ai: AiCall
@@ -117,7 +118,7 @@ export async function completeWorksheetImages(
       targets.push(b)
     }
   }
-  const stats = await completeTargets(targets, meta, deps, onProgress)
+  const stats = await completeTargets(targets, meta, deps, onProgress, blocks)
   for (const { proxy, block, item } of proxies) {
     if (proxy.image) item.image = proxy.image
     if (proxy.autoPicked) block.autoPicked = true
@@ -133,7 +134,8 @@ async function completeTargets(
   images: ImageBlock[],
   meta: WorksheetMeta,
   deps: WorksheetImageDeps,
-  onProgress?: (message: string, done: number, total: number) => void
+  onProgress?: (message: string, done: number, total: number) => void,
+  blocks: WsBlock[] = images
 ): Promise<{ web: number; ai: number; missing: number; reused: number; gezeichnet: number }> {
   const mode = meta.imageSource ?? 'auto'
   const stats = { web: 0, ai: 0, missing: 0, reused: 0, gezeichnet: 0 }
@@ -151,6 +153,44 @@ async function completeTargets(
     groups.get(`${rep.original ? 'Q' : ''}|${(rep.search || rep.description).toLowerCase()}`)!.forEach(fn)
   const pending = new Set(reps)
   const reasons = new Map<ImageBlock, string>()
+
+  /*
+   * Schaltpläne zeichnet die App (30.09.2026, generation/schaltplan.ts) – VOR Vorrat und Archiv:
+   * Ein fremder Schaltplan zeigt fast nie genau die beschriebenen Bauteile, und Beschriftungspunkte
+   * lassen sich nur an einer eigenen Zeichnung sicher an die Bauteile setzen.
+   */
+  const schaltplaene = [...pending].filter((r) => !r.original && istSchaltplan(r))
+  if (schaltplaene.length) {
+    onProgress?.('Schaltpläne werden gezeichnet …', 0, reps.length)
+    await Promise.all(
+      schaltplaene.map(async (rep) => {
+        const gruppe = groups.get(`${rep.original ? 'Q' : ''}|${(rep.search || rep.description).toLowerCase()}`)!
+        const ok = await zeichneSchaltplan(gruppe, blocks, meta, deps.ai).catch(() => false)
+        if (!ok) return
+        pending.delete(rep)
+        stats.gezeichnet++
+      })
+    )
+  }
+
+  /*
+   * Beschriftungspunkte der Text-KI entstehen, BEVOR es ein Bild gibt – auf einem gefundenen oder
+   * erzeugten Bild treffen sie nur zufällig (Befund „Wann leuchtet die Lampe?", 30.09.2026).
+   * Lässt eine Aufgabe dieselben Teile schon über Schreiblinien benennen, fallen die Punkte weg
+   * (ein Beschriftungsweg); sonst bleiben sie mit der Bitte, ihre Lage zu prüfen.
+   */
+  const blindeBeschriftung = (b: ImageBlock): void => {
+    if (!b.labels?.length || b.schaltplan) return
+    if (beschriftungsAufgaben([b], blocks).length) {
+      delete b.labels
+      warn(b, `${(b.warnings ?? []).find((w) => w.startsWith('Bild:')) ?? 'Bild: automatisch gewählt.'} Die geschätzten Beschriftungspunkte wurden entfernt – die Aufgabe bietet die Schreiblinien.`)
+      return
+    }
+    warn(
+      b,
+      `${(b.warnings ?? []).find((w) => w.startsWith('Bild:')) ?? 'Bild: automatisch gewählt.'} Die Beschriftungspunkte wurden vor der Bildwahl geschätzt – bitte prüfen, ob jeder Punkt am gemeinten Bildteil sitzt, und ggf. verschieben.`
+    )
+  }
 
   // Zuerst der Vorrat: Ein Motiv, das die Lerngruppe vom Übungsblatt kennt, ist einem neuen
   // vorzuziehen – es wirkt in der Abfrage als Abrufhilfe.
@@ -313,6 +353,7 @@ async function completeTargets(
     }),
     2
   )
+  for (const b of images) if (b.image && b.autoPicked) blindeBeschriftung(b)
   return stats
 }
 

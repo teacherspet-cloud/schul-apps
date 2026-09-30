@@ -60,6 +60,9 @@ import { loeseMaterialverweise, type IntegrityFinding } from './integrity'
 import type { ImageBlock, ImageRole, Sheet, WorksheetMeta, WsBlock } from '../model/types'
 import { bildmasse, bildzugriff, mindestbreite } from './bildarbeit'
 import { seitenBereich, seitenText, seitenVorgabe } from './seiten'
+import { verwaisteBeschriftungen } from '../render/schaltplanSvg'
+import { imageSizeFromDataUrl } from '../../../shared/imageSize'
+import { beschriftungsAufgaben } from '../generation/schaltplan'
 
 /**
  * Breite des Satzspiegels in Millimetern.
@@ -245,6 +248,8 @@ export function imageDesignRules(meta: WorksheetMeta): string {
     '- Sollen Teile eines Bildes benannt werden, liefere imageLabels: je Beschriftung der Text und die Position im Bild in Prozent (x, y von links oben). Die App zeichnet Linie und Schild – schreibe NIE Text in das Bild selbst.',
     '- Setze KEINE Ziffern oder Buchstaben ins Bild, deren Bedeutung darunter in einer Liste steht. Diese Form ist die am schwersten verständliche; die Beschriftung gehört direkt an das gemeinte Element.',
     '- Sollen die Lernenden selbst beschriften, setze blank=true bei den betreffenden Beschriftungen: Auf dem Schülerblatt steht dann eine leere Linie am richtigen Ort, im Lösungsteil der Text.',
+    '- EIN Beschriftungsweg: Lässt eine Aufgabe Bildteile benennen, dann ENTWEDER leere Beschriftungen im Bild (blank=true) ODER nummerierte Schreiblinien in der Aufgabe – nie beides.',
+    '- Schaltpläne (Stromkreise) zeichnet die App selbst nach DIN: Nenne in der Bildbeschreibung Quelle, Bauteile, Schalterstellung und Anordnung (Reihe/parallel, ggf. zwei Schaltungen nebeneinander). Die Beschriftungen setzt die App an die Bauteile – dafür genügen die Texte.',
     '',
     `REALITÄTSGRAD: ${realismAdvice(meta)}`,
     '',
@@ -413,6 +418,33 @@ export function checkImages(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding
       message: `${images.length} Bilder sind für Klasse ${meta.grade} viel. Vorgesehen sind etwa ${budget.perPage} je Seite; mehrere gleichzeitig sichtbare Bilder ohne eindeutigen Verweis senken die Behaltensleistung.`,
       severity: 'mittel'
     })
+  }
+
+  /*
+   * Beschriftungspunkte, die ins Leere zeigen (Befund „Wann leuchtet die Lampe?", 30.09.2026):
+   * An einem gezeichneten Schaltplan muss jeder Punkt an einem Bauteil sitzen. Und es gibt nur
+   * EINEN Beschriftungsweg – leere Linien im Bild UND nummerierte Linien in der Aufgabe
+   * verlangen dieselben Namen zweimal und lassen offen, wohin sie gehören.
+   */
+  for (const img of sheet.blocks.filter((b): b is ImageBlock => b.type === 'image')) {
+    if (img.schaltplan && img.labels?.length) {
+      const verwaist = verwaisteBeschriftungen(img.schaltplan, img.labels, imageSizeFromDataUrl(img.image?.dataUrl))
+      if (verwaist.length) {
+        out.push({
+          blockId: img.id,
+          message: `Im Schaltplan zeigt ${verwaist.length === 1 ? 'ein Beschriftungspunkt' : `${verwaist.length} Beschriftungspunkte`} auf kein Bauteil (${verwaist.map((l) => `„${l.text || 'leere Linie'}"`).join(', ')}). Punkt auf das gemeinte Bauteil ziehen oder die Beschriftung entfernen.`,
+          severity: 'mittel'
+        })
+      }
+    }
+    if (img.labels?.some((l) => l.blank) && beschriftungsAufgaben([img], sheet.blocks).length) {
+      out.push({
+        blockId: img.id,
+        message:
+          'Doppelter Beschriftungsweg: Das Bild hat leere Beschriftungslinien, und die Aufgabe dazu bietet zusätzlich nummerierte Schreiblinien. Besser nur einen Weg – die Linien direkt am Bild.',
+        severity: 'mittel'
+      })
+    }
   }
 
   // Die nummerierte Beschriftungsliste unter dem Bild ist das schwerste Format

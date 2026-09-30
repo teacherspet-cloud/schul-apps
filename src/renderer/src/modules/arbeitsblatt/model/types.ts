@@ -14,6 +14,7 @@ import type { SubtitleMode, VideoKind, ViewingDuring, ViewingPhase } from '../di
 import type { SourceHeader } from '../didactics/sourceHeader'
 import type { ZuhoerenMode } from '../didactics/zuhoeren'
 import type { Narration } from '../didactics/narration'
+import type { SchaltplanSpec } from '../render/schaltplanSvg'
 import type { DeckblattKarte, DeckblattKopf, DeckblattLayout, DeckblattMaskottchen, DeckblattTier } from '../render/deckblatt'
 
 export type { Afb, Stars }
@@ -67,6 +68,12 @@ export interface ImageLabel {
   side?: 'left' | 'right'
   /** true = auf dem Schülerblatt eine leere Linie, im Lösungsteil der Text */
   blank?: boolean
+  /**
+   * Rechtwinkliger Leitweg vom Punkt bis in einen freien Streifen (Prozent), erster Eintrag =
+   * der Punkt selbst. Von der App berechnet (gezeichnete Schaltpläne), nie von der KI geschätzt.
+   * Wird der Punkt verschoben, gilt der Weg nicht mehr und die Linie läuft wieder waagerecht.
+   */
+  route?: { x: number; y: number }[]
 }
 
 interface BaseBlock {
@@ -215,6 +222,11 @@ export interface ImageBlock extends BaseBlock {
   image?: ImageRef
   /** Beschriftungen, die direkt an Elementen im Bild sitzen */
   labels?: ImageLabel[]
+  /**
+   * Von der App gezeichneter Schaltplan (render/schaltplanSvg.ts): die Daten, aus denen Bild und
+   * Beschriftungsanker entstanden sind – damit lässt sich prüfen, ob jeder Punkt an einem Bauteil sitzt.
+   */
+  schaltplan?: SchaltplanSpec
   /** Bildbeschreibung (Alternativtext und Suchgrundlage) */
   description: string
   caption: string

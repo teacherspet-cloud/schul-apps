@@ -50,6 +50,17 @@ const PT_MM = 0.3528
 export const labelSide = (label: ImageLabel): 'left' | 'right' => label.side ?? (label.x < 50 ? 'left' : 'right')
 
 /**
+ * Der rechtwinklige Leitweg einer Beschriftung (Schaltpläne, 30.09.2026): vom Punkt bis in den
+ * freien Streifen, aus dem die Linie waagerecht zum Rand läuft. Gilt nur, solange er am Punkt
+ * beginnt – hat die Lehrkraft den Punkt verschoben, bleibt nur der Punkt selbst.
+ */
+export function leitweg(label: ImageLabel): { x: number; y: number }[] {
+  const r = label.route
+  if (r && r.length > 1 && Math.abs(r[0].x - label.x) < 0.6 && Math.abs(r[0].y - label.y) < 0.6) return r
+  return [{ x: label.x, y: label.y }]
+}
+
+/**
  * Zeilen, die ein Text in einer Spalte belegt – gieriger Umbruch an Leerzeichen; ein Wort,
  * das länger ist als die Zeile, läuft über (bricht nicht) und zählt eine Zeile.
  */
@@ -111,7 +122,10 @@ export function layoutImageLabels(labels: ImageLabel[], opts: LabelLayoutOptions
     const lines = l.blank ? 1 : estimateLines(l.text, chars)
     // Zeilen + Innenabstand (0,6 mm) + Sicherheitszuschlag (0,8 mm)
     const h = prozent(lines * lineMm + 0.6 + 0.8)
-    return { id: l.id, anchor: Math.min(100, Math.max(0, l.y)), x: l.x, side: labelSide(l), fest: Boolean(l.side), h, lines }
+    // Mit Leitweg sitzt das Schild auf der Höhe, auf der die Linie das Bild verlässt
+    const weg = leitweg(l)
+    const aus = weg[weg.length - 1]
+    return { id: l.id, anchor: Math.min(100, Math.max(0, aus.y)), x: aus.x, side: labelSide(l), fest: Boolean(l.side), h, lines }
   })
   const gap = prozent(gapMm)
 
