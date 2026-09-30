@@ -164,12 +164,12 @@ export function passeEin(e: TbElement, format: FormatId, schrift: TbTafel['schri
   const start = Math.max(e.schrift ?? f.schrift.text, f.schrift.notfall)
   let g = Math.min(start, f.schrift.text * (e.typ === 'text' && !e.titel ? 1.4 : 1))
   let s = kastenSatz(kastenInhalt(e), e.w * W, g * H, schrift)
-  // Erst größer, solange es passt (bis zur ursprünglichen Schrift), dann kleiner bis zur Notfallschrift
+  // Kleiner bis zur Notfallschrift; reicht das nicht, wächst der Kasten (höchstens bis zum Rand)
   while (s.hoehe > e.h * H && g > f.schrift.notfall) {
     g = Math.max(f.schrift.notfall, g * 0.94)
     s = kastenSatz(kastenInhalt(e), e.w * W, g * H, schrift)
   }
-  return { ...e, schrift: g, h: Math.max(e.h, s.hoehe / H) }
+  return { ...e, schrift: g, h: Math.min(Math.max(e.h, s.hoehe / H), Math.max(e.h, 1 - e.y)) }
 }
 
 /** Zauberstab/Kreis an einem Element; der Text gilt in allen Formaten, die denselben Knoten zeigen */

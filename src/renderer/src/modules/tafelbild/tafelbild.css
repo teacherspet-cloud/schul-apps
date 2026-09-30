@@ -203,3 +203,8 @@
     stroke-width: 3;
   }
 }
+
+/* Zauberstab und Kreis für das ganze Tafelbild nebeneinander in der Leiste */
+.tb-leiste .ki-wunsch-knoepfe {
+  flex-direction: row !important;
+}

@@ -60,15 +60,23 @@ export function pruefeTafel(t: TbTafel, k: PruefKontext): Befund[] {
 
   // Schrift
   const minimum = f.schrift.min
+  const klein: string[] = []
   for (const e of texte) {
     const s = e.schrift ?? f.schrift.text
     if (s < Math.min(minimum, HARTES_MINIMUM) * 0.98 && t.format !== 'heft')
       auf({ element: e.id, art: 'schrift', text: `„${(e.titel || e.text).slice(0, 30)}": Schrift unter dem harten Minimum – aus der letzten Reihe nicht lesbar.`, schwer: true })
-    else if (s < minimum * 0.98) auf({ element: e.id, art: 'schrift', text: `„${(e.titel || e.text).slice(0, 30)}": Schrift kleiner als empfohlen für ${f.kurz}.` })
+    else if (s < minimum * 0.98) klein.push(e.id)
     // Passt der Text in seinen Kasten?
     const satz = kastenSatz(kastenInhalt(e), e.w * W, s * H, t.schrift)
     if (satz.hoehe > e.h * H * 1.04 + 2) auf({ element: e.id, art: 'text', text: `„${(e.titel || e.text).slice(0, 30)}": Der Text passt nicht in den Kasten.`, schwer: satz.hoehe > e.h * H * 1.3 })
   }
+  // Zu kleine Schrift als EIN Befund – meist ist schlicht zu viel Text auf der Fläche
+  if (klein.length)
+    auf({
+      element: klein[0],
+      art: 'schrift',
+      text: `${klein.length === 1 ? 'Ein Element hat' : `${klein.length} Elemente haben`} eine kleinere Schrift als für ${f.kurz} empfohlen – Text kürzen oder Elemente entfernen.`
+    })
   const grade = new Set(texte.map((e) => Math.round((e.schrift ?? 0) * 1000)))
   if (grade.size > 4) auf({ art: 'schrift', text: `${grade.size} verschiedene Schriftgrößen – höchstens drei wirken ruhig (R9).` })
 
