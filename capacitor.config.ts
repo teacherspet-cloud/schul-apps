@@ -15,7 +15,9 @@ const config: CapacitorConfig = {
   },
   plugins: {
     CapacitorHttp: { enabled: false },
-    Keyboard: { resize: 'native' }
+    Keyboard: { resize: 'native' },
+    // Eigener Startbildschirm (App-Symbol auf Blau) bis die App geladen ist – src/mobil/start.ts blendet ihn aus
+    SplashScreen: { launchAutoHide: false, backgroundColor: '#12325e', showSpinner: false }
   }
 }
 
