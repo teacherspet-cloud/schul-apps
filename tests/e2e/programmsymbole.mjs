@@ -23,10 +23,11 @@ import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/programmsymbole')
 mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-symbole-'))
-const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung', 'Elternbriefe']
+const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung', 'Tafelbilder', 'Elternbriefe']
 /*
  * Programme ohne eigene Illustration zeigen ihr gezeichnetes Symbol. Seit dem 28.09.2026 haben
- * alle acht eine (Rückmeldung und Elternbriefe über den ChatGPT-Zugang der App erzeugt).
+ * alle acht eine (Rückmeldung und Elternbriefe über den ChatGPT-Zugang der App erzeugt), seit dem
+ * 30.09.2026 auch Tafelbilder als neuntes (von Hand gezeichnet: scripts/programmbilder/tafelbild.svg).
  */
 const OHNE_BILD = []
 
@@ -134,6 +135,9 @@ try {
   )
   await page.locator('.home-tile').first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: join(out, 'paket9-start.png') })
+  // Das neunte Programm (Tafelbilder, 30.09.2026) neben den übrigen Kacheln
+  await page.locator('.home-tile', { hasText: 'Tafelbilder' }).first().scrollIntoViewIfNeeded()
+  await page.screenshot({ path: join(out, 'paket9-start-tafelbilder.png') })
 } finally {
   await app.close()
   rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 })

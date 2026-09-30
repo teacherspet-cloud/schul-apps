@@ -5,8 +5,12 @@
 //
 // Im Quellordner liegen die gewählten Bilder als <id>.png, also vokabeltest.png,
 // vokabelliste.png, arbeitsblatt.png, lernzielkontrolle.png, grammatiktest.png,
-// klassenarbeit.png, rueckmeldung.png, elternbrief.png. Fehlende werden übersprungen – die Kachel zeigt dann weiter das
+// klassenarbeit.png, rueckmeldung.png, elternbrief.png, tafelbild.png. Fehlende werden übersprungen – die Kachel zeigt dann weiter das
 // Vektorsymbol (modules/registry.ts findet die Bilder von selbst).
+//
+// Tafelbilder (30.09.2026): ohne Schlüssel für die Bild-KI von Hand als SVG gezeichnet, im Stil der
+// übrigen (Kachel mit Glanz und Dicke, Tafel mit Kreidebild, Ablage mit Kreide, Lineal):
+// scripts/programmbilder/tafelbild.svg – als 1024-px-PNG in den Quellordner legen.
 //
 // Was passiert (Paket 9, 26.09.2026):
 // - Einfarbiger Hintergrund um die Kachel wird durchsichtig (von den Rändern her gefüllt),
@@ -22,7 +26,7 @@ import { app, BrowserWindow } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 
-const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit', 'rueckmeldung', 'elternbrief']
+const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit', 'rueckmeldung', 'elternbrief', 'tafelbild']
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320
 const KANTE_LEISTE = 96
