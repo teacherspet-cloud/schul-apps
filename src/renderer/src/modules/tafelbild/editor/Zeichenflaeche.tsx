@@ -26,6 +26,12 @@ interface Props {
   markiert: string[]
   /** Nach dem Loslassen: z. B. Schrift an die neue Größe anpassen */
   nachGeste?: (id: string) => void
+  /**
+   * Tasten (Pfeile verschieben, Entf/Rücktaste löschen) nur, solange nichts darüber liegt – in der
+   * Präsentation blättern Pfeile und Rücktaste; vorher verschoben bzw. LÖSCHTEN sie dabei das
+   * gewählte Element im Hintergrund (30.09.2026).
+   */
+  tastatur?: boolean
 }
 
 type Griff = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'start' | 'ende'
@@ -116,6 +122,16 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     return { x, y, hx, hy }
   }
 
+  // Zeiger festhalten; ein Zeiger, den der Browser schon wieder vergessen hat (Stift/Finger, der beim
+  // Antippen abhebt), wirft sonst mitten in der Geste einen Fehler
+  const fange = (pointerId: number): void => {
+    try {
+      overlay.current?.setPointerCapture(pointerId)
+    } catch {
+      /* ohne Festhalten geht es auch – die Fläche bekommt die Bewegung trotzdem */
+    }
+  }
+
   const beginne = (ev: React.PointerEvent, id: string, modus: Zug['modus']): void => {
     ev.stopPropagation()
     const e = nachId.get(id)
@@ -159,7 +175,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     }
     letzterTipp.current = { id, t: jetzt }
     p.setAuswahl(id)
-    overlay.current?.setPointerCapture(ev.pointerId)
+    fange(ev.pointerId)
     zug.current = { id, modus, start: punkt(ev), orig: structuredClone(e), gruppe: `tb-zug-${id}-${jetzt}`, bewegt: false }
   }
 
@@ -278,12 +294,12 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   const leerGedrueckt = (ev: React.PointerEvent): void => {
     const pt = punkt(ev)
     if (p.werkzeug === 'zeichnen') {
-      overlay.current?.setPointerCapture(ev.pointerId)
+      fange(ev.pointerId)
       setStriche([pt])
       return
     }
     if (p.werkzeug === 'pfeil') {
-      overlay.current?.setPointerCapture(ev.pointerId)
+      fange(ev.pointerId)
       setPfeilNeu({ a: pt, b: pt })
       return
     }
@@ -295,7 +311,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   useEffect(() => {
     const taste = (ev: KeyboardEvent): void => {
       const ziel = ev.target as HTMLElement | null
-      if (!p.auswahl || textId || (ziel && (ziel.tagName === 'INPUT' || ziel.tagName === 'TEXTAREA' || ziel.isContentEditable))) return
+      if (p.tastatur === false || !p.auswahl || textId || (ziel && (ziel.tagName === 'INPUT' || ziel.tagName === 'TEXTAREA' || ziel.isContentEditable))) return
       const id = p.auswahl
       if (ev.key === 'Delete' || ev.key === 'Backspace') {
         ev.preventDefault()

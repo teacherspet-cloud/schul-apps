@@ -30,8 +30,9 @@ export default function Praesentation({ tafel, inhalt, schliessen, mitLuecke }: 
       else return
       e.preventDefault()
     }
-    window.addEventListener('keydown', taste)
-    return () => window.removeEventListener('keydown', taste)
+    // In der Einfangphase: sonst schluckt ein offener Tooltip (nach dem Tippen auf „Weiter") das erste Esc
+    window.addEventListener('keydown', taste, true)
+    return () => window.removeEventListener('keydown', taste, true)
   })
 
   const plan = inhalt?.schritte.find((x) => x.nr === schritt)

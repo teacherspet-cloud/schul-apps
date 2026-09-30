@@ -5,14 +5,17 @@ import { pdfHtml, seitenFuer, standardPdfWahl } from '../src/renderer/src/module
 import { setzeLayout } from '../src/renderer/src/modules/tafelbild/layout'
 import { boardPlanAus, inhaltAusBoardPlan, insArbeitsblatt, texteAus } from '../src/renderer/src/modules/tafelbild/material'
 import { leeresTafelbild, type Tafelbild } from '../src/renderer/src/modules/tafelbild/model'
+import type { FormatId } from '../src/renderer/src/modules/tafelbild/formate'
 import { pptxDatei } from '../src/renderer/src/modules/tafelbild/pptx'
+import { pptxFolien } from '../src/renderer/src/modules/tafelbild/pptxFolien'
 import { inhaltAus } from '../src/renderer/src/modules/tafelbild/prompt'
 import type { Worksheet } from '../src/renderer/src/modules/arbeitsblatt/model/types'
-import { NETZ, FLUSS } from './tafelbildBeispiele'
+import { FLUSS, NETZ, TABELLE } from './tafelbildBeispiele'
 
 /*
- * Tafelbilder (30.09.2026): Ausgaben erzeugen gültige Dateien (PDF-HTML, PowerPoint), das
- * Arbeitsblatt nimmt Tafelbilder auf und gibt seine eigenen her, Material aus der App wird Text.
+ * Tafelbilder (30.09.2026): Ausgaben erzeugen gültige Dateien (PDF-HTML, PowerPoint mit bearbeitbaren
+ * Formen und Sprechernotizen), das Arbeitsblatt nimmt Tafelbilder auf und gibt seine eigenen her,
+ * Material aus der App wird Text.
  */
 function tafelbild(): Tafelbild {
   const t = leeresTafelbild()
@@ -48,40 +51,99 @@ describe('PDF', () => {
 })
 
 describe('PowerPoint', () => {
-  it('ist ein gültiges Paket: alle Teile vorhanden, jede XML wohlgeformt, Folien und Bilder verknüpft', () => {
-    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])
-    const datei = pptxDatei(
-      [
-        { png, breite: 1920, hoehe: 480, hintergrund: '#23402f', titel: 'Schritt 1 & <2>', beschreibung: 'Tafel "A"' },
-        { png, breite: 1920, hoehe: 1080, hintergrund: '#ffffff', titel: 'Schritt 2', beschreibung: 'B' }
-      ],
-      'Weimar'
-    )
-    const z = unzipSync(datei)
+  // Bilder ohne DOM: ein winziges PNG genügt für den Aufbau des Pakets
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])
+  const folienVon = async (roh: unknown, formate: FormatId[] = ['klapptafel', 'heft']): Promise<{ t: Tafelbild; z: Record<string, Uint8Array> }> => {
+    const t = leeresTafelbild()
+    t.meta.formate = formate
+    t.meta.varianten = { luecke: true, schritte: true, niveaus: false, merksatz: true }
+    t.inhalt = inhaltAus(roh, t.meta)
+    t.tafeln = formate.map((f) => setzeLayout(t.inhalt!, f, { regler: t.meta.regler, varianten: t.meta.varianten }).tafel)
+    const folien = await pptxFolien(t, formate, true, async () => png)
+    return { t, z: unzipSync(pptxDatei(folien, 'Weimar & <Test>')) }
+  }
+  const text = (z: Record<string, Uint8Array>, name: string): string => strFromU8(z[name])
+
+  it('ist ein gültiges Paket: alle Teile vorhanden, jede XML wohlgeformt, jede Beziehung zeigt auf einen vorhandenen Teil', async () => {
+    const { z } = await folienVon(NETZ)
     expect(Object.keys(z)[0]).toBe('[Content_Types].xml')
     for (const teil of [
       '_rels/.rels',
       'ppt/presentation.xml',
-      'ppt/_rels/presentation.xml.rels',
       'ppt/slideMasters/slideMaster1.xml',
-      'ppt/slideLayouts/slideLayout1.xml',
-      'ppt/theme/theme1.xml',
+      'ppt/notesMasters/notesMaster1.xml',
+      'ppt/theme/theme2.xml',
       'ppt/slides/slide1.xml',
-      'ppt/slides/slide2.xml',
-      'ppt/slides/_rels/slide2.xml.rels',
-      'ppt/media/bild2.png',
+      'ppt/notesSlides/notesSlide1.xml',
       'docProps/core.xml'
     ])
       expect(z[teil], teil).toBeDefined()
     for (const [name, inhalt] of Object.entries(z)) if (name.endsWith('.xml') || name.endsWith('.rels')) expect(xmlFehler(strFromU8(inhalt)), name).toEqual([])
-    const typen = strFromU8(z['[Content_Types].xml'])
-    expect(typen).toContain('/ppt/slides/slide2.xml')
-    const folie = strFromU8(z['ppt/slides/slide1.xml'])
-    expect(folie).toContain('r:embed="rId2"')
-    expect(folie).toContain('23402F')
-    // Breites Bild: volle Folienbreite, mittig
-    expect(folie).toContain('cx="12192000"')
-    expect(strFromU8(z['ppt/presentation.xml'])).toContain('<p:sldId id="257" r:id="rId3"/>')
+    // Beziehungen: jedes Ziel existiert, jeder Folien-/Notizteil steht im Inhaltsverzeichnis
+    const typen = text(z, '[Content_Types].xml')
+    for (const name of Object.keys(z).filter((n) => n.endsWith('.rels'))) {
+      const basis = name.replace(/_rels\/[^/]*\.rels$/, '')
+      for (const [, ziel] of text(z, name).matchAll(/Target="([^"]+)"/g)) {
+        const pfad: string[] = []
+        for (const x of `${basis}${ziel}`.split('/')) x === '..' ? pfad.pop() : x && pfad.push(x)
+        expect(z[pfad.join('/')], `${name} → ${ziel}`).toBeDefined()
+      }
+    }
+    for (const name of Object.keys(z).filter((n) => /^ppt\/(slides|notesSlides)\/[^/]+\.xml$/.test(n))) expect(typen).toContain(`/${name}`)
+    expect(text(z, 'docProps/core.xml')).toContain('Weimar &amp; &lt;Test&gt;')
+  })
+
+  it('Folien sind bearbeitbar: Kästen als Textfelder mit Rahmen, Verbinder angeschlossen, Titel als Folientitel, Tafel als Hintergrund', async () => {
+    const { z } = await folienVon(NETZ)
+    const n = Object.keys(z).filter((x) => /^ppt\/slides\/slide\d+\.xml$/.test(x)).length
+    const letzte = text(z, 'ppt/slides/slide5.xml')
+    // Aufbau: 5 Schritte + Lückenfassung je Format
+    expect(n).toBe(12)
+    expect(letzte).toContain('<a:t>Politik</a:t>')
+    expect(letzte).toContain('<a:t>Versailler Vertrag</a:t>')
+    expect(letzte).toContain('<a:buChar char="•"/>')
+    expect(letzte).toContain('prst="roundRect"')
+    expect(letzte).toContain('cmpd="dbl"')
+    expect(letzte).toMatch(/<p:cxnSp>.*<a:stCxn id="\d+" idx="\d"\/><a:endCxn id="\d+" idx="\d"\/>/)
+    expect(letzte).toContain('<p:ph type="title"/>')
+    expect(letzte).toContain('<a:t>Warum scheiterte die Weimarer Republik?</a:t>')
+    expect(letzte).toContain('typeface="Segoe Print"')
+    expect(letzte).toMatch(/<p:bg><p:bgPr><a:blipFill/)
+    // Bilder nur für Zeichnungen, jedes mit Alternativtext
+    const bilder = [...letzte.matchAll(/<p:pic><p:nvPicPr><p:cNvPr id="\d+" name="[^"]*"( descr="([^"]*)")?/g)]
+    expect(bilder.length).toBeGreaterThan(0)
+    for (const b of bilder) expect((b[2] ?? '').length, b[0]).toBeGreaterThan(3)
+    // Schritt 1 zeigt weniger als der letzte Schritt
+    expect(text(z, 'ppt/slides/slide1.xml')).not.toContain('<a:t>Gesellschaft</a:t>')
+    // Hefteintrag: Gelb auf Weiß als Textmarker
+    expect(text(z, 'ppt/slides/slide11.xml')).toContain('<a:highlight><a:srgbClr val="FFF27A"/></a:highlight>')
+    // Lückenfassung mit Lücken und Wortspeicher
+    const luecke = text(z, 'ppt/slides/slide6.xml')
+    expect(luecke).toContain('__________')
+    expect(luecke).toContain('Wortspeicher:')
+    // Hintergrund der Tafel nur einmal je Format abgelegt
+    expect(Object.keys(z).filter((x) => x.startsWith('ppt/media/')).length).toBeLessThan(n)
+  })
+
+  it('Sprechernotizen: Schritt, Phase, Impulsfrage, Merksatz, Lösungen der Lücken', async () => {
+    const { z } = await folienVon(NETZ)
+    const eins = text(z, 'ppt/notesSlides/notesSlide1.xml')
+    expect(eins).toContain('Schritt 1 von 5')
+    expect(eins).toContain('Phase: Einstieg')
+    expect(eins).toContain('Impulsfrage: Leitfrage')
+    expect(eins).toContain('Merksatz: Die Weimarer Republik scheiterte')
+    expect(eins).toContain('Lösungen der Lücken:')
+    expect(eins).toContain('Dolchstoßlegende')
+    expect(text(z, 'ppt/notesSlides/notesSlide6.xml')).toContain('Lückenfassung')
+  })
+
+  it('Tabelle als echte Tabelle ohne Tabellenformat', async () => {
+    const { z } = await folienVon(TABELLE, ['whiteboard'])
+    const folie = text(z, 'ppt/slides/slide3.xml')
+    expect(folie).toContain('<a:tbl>')
+    expect(folie).toContain('{2D5ABB26-0587-4C30-8999-92F81FD0307C}')
+    expect(folie).toContain('<a:t>Chloroplasten</a:t>')
+    expect((folie.match(/<a:gridCol /g) ?? []).length).toBe(3)
   })
 })
 

@@ -24,7 +24,8 @@ import {
 } from './formate'
 import { kastenInhalt, kastenSatz } from './kasten'
 import { schneidet } from './layout'
-import { elementText, istLinie, istTextElement, worte, type Befund, type Regler, type TbInhalt, type TbTafel } from './model'
+import { elementText, istLinie, istTextElement, worte, type Befund, type Regler, type TbElement, type TbInhalt, type TbTafel } from './model'
+import { zusammenfassPaar } from './vorschlaege'
 
 export interface PruefKontext {
   grade: number
@@ -63,19 +64,24 @@ export function pruefeTafel(t: TbTafel, k: PruefKontext): Befund[] {
   const klein: string[] = []
   for (const e of texte) {
     const s = e.schrift ?? f.schrift.text
-    if (s < Math.min(minimum, HARTES_MINIMUM) * 0.98 && t.format !== 'heft')
+    if (s < Math.min(minimum, HARTES_MINIMUM) * 0.98 && t.format !== 'heft') {
       auf({ element: e.id, art: 'schrift', text: `„${(e.titel || e.text).slice(0, 30)}": Schrift unter dem harten Minimum – aus der letzten Reihe nicht lesbar.`, schwer: true })
+      klein.push(e.id)
+    }
     else if (s < minimum * 0.98) klein.push(e.id)
     // Passt der Text in seinen Kasten?
     const satz = kastenSatz(kastenInhalt(e), e.w * W, s * H, t.schrift)
     if (satz.hoehe > e.h * H * 1.04 + 2) auf({ element: e.id, art: 'text', text: `„${(e.titel || e.text).slice(0, 30)}": Der Text passt nicht in den Kasten.`, schwer: satz.hoehe > e.h * H * 1.3 })
   }
-  // Zu kleine Schrift als EIN Befund – meist ist schlicht zu viel Text auf der Fläche
+  // Zu kleine Schrift als EIN Befund – meist ist schlicht zu viel Text auf der Fläche. Dazu die
+  // Vorschläge der App: KI kürzt die Kästen; wo es der Aufbau erlaubt, fasst die App zwei Kästen zusammen
   if (klein.length)
     auf({
       element: klein[0],
+      elemente: klein,
       art: 'schrift',
-      text: `${klein.length === 1 ? 'Ein Element hat' : `${klein.length} Elemente haben`} eine kleinere Schrift als für ${f.kurz} empfohlen – Text kürzen oder Elemente entfernen.`
+      text: `${klein.length === 1 ? 'Ein Element hat' : `${klein.length} Elemente haben`} eine kleinere Schrift als für ${f.kurz} empfohlen – Text kürzen oder Elemente zusammenfassen.`,
+      vorschlaege: ['kiKuerzen', ...(k.inhalt && zusammenfassPaar(k.inhalt) ? (['zusammenfassen'] as const) : [])]
     })
   const grade = new Set(texte.map((e) => Math.round((e.schrift ?? 0) * 1000)))
   if (grade.size > 4) auf({ art: 'schrift', text: `${grade.size} verschiedene Schriftgrößen – höchstens drei wirken ruhig (R9).` })
@@ -143,6 +149,12 @@ export function pruefeAlle(tafeln: TbTafel[], k: PruefKontext, zusatz: Befund[] 
     gesehen.add(s)
     return true
   })
+}
+
+/** Text-Elemente mit kleinerer Schrift als empfohlen (Auslöser der automatischen Kürzung) */
+export function kleineSchrift(t: TbTafel): TbElement[] {
+  const min = formatInfo(t.format).schrift.min
+  return t.elemente.filter((e) => istTextElement(e) && (e.schrift ?? min) < min * 0.98)
 }
 
 /** Knoten, deren Text die Grenzen sprengt – für die automatische Kürzung */

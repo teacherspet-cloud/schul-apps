@@ -26,18 +26,19 @@ import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { useKiZugang } from '../../../shared/useKiZugang'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl, safeFileName } from '../../../shared/util'
-import { elementBearbeiten, ganzesTafelbild, neuSetzen, passeEin } from '../auftrag'
+import { elementBearbeiten, ganzesTafelbild, knotenVon, neuSetzen, passeEin, textKuerzen } from '../auftrag'
 import Eigenschaften, { kopie } from '../editor/Eigenschaften'
 import Praesentation from '../editor/Praesentation'
 import TafelPanel from '../editor/TafelPanel'
 import Zeichenflaeche, { type Werkzeug } from '../editor/Zeichenflaeche'
 import { formatInfo, type FormatId } from '../formate'
-import { neueId, schrittZahl, standardName, type Diagramm, type ElementTyp, type TbElement, type TbTafel } from '../model'
+import { neueId, schrittZahl, standardName, type Befund, type Diagramm, type ElementTyp, type TbElement, type TbTafel, type TbVorschlag } from '../model'
 import { bildStil } from '../prompt'
 import { pruefeAlle } from '../pruefung'
 import { bibliothek, projektDatei, useTafelbild } from '../store'
 import type { SvgOptionen } from '../svg'
 import '../tafelbild.css'
+import { zusammenfassen } from '../vorschlaege'
 import ArbeitsblattDialog from './ArbeitsblattDialog'
 import AusgabeDialog from './AusgabeDialog'
 
@@ -131,6 +132,28 @@ export default function Bearbeiten(): React.JSX.Element | null {
   if (!t || !tafel) return null
   const format = tafel.format
   const gewaehlt = auswahl ? tafel.elemente.find((e) => e.id === auswahl) : undefined
+
+  /**
+   * Vorschläge der App zum Befund (Schrift kleiner als empfohlen): erst zusammenfassen (ohne KI,
+   * sofort, ein Schritt mit Strg+Z), dann auf Wunsch kürzen lassen – als Hintergrund-Auftrag auf
+   * dem zusammengefassten Stand.
+   */
+  const vorschlagUmsetzen = (v: TbVorschlag[], b: Befund): void => {
+    const knoten = knotenVon(t, b.elemente ?? (b.element ? [b.element] : []))
+    const kuerzen = (stand: typeof t): void => {
+      if (v.includes('kiKuerzen')) textKuerzen(stand, docId, knoten)
+    }
+    const neu = v.includes('zusammenfassen') && t.inhalt ? zusammenfassen(t.inhalt) : null
+    if (!neu) return kuerzen(t)
+    void neuSetzen({ ...t, inhalt: neu })
+      .then((n) => {
+        setDok(n)
+        setAuswahl(null)
+        notifySuccess('Zwei Kästen zusammengefasst – Strg+Z nimmt es zurück.')
+        kuerzen(n)
+      })
+      .catch(notifyError)
+  }
 
   const aendernTafel = (fn: (x: TbTafel) => void, gruppe?: string): void =>
     update((d) => {
@@ -378,6 +401,7 @@ export default function Bearbeiten(): React.JSX.Element | null {
             setWerkzeug={setWerkzeug}
             markiert={markiert}
             nachGeste={nachGeste}
+            tastatur={!praesentation && !ausgabe && !insBlatt}
           />
         </div>
         <div className="tb-seite">
@@ -426,6 +450,8 @@ export default function Bearbeiten(): React.JSX.Element | null {
                   .then((n) => setDok(n))
                   .catch(notifyError)
               }
+              kiDa={kiDa}
+              vorschlag={(v, b) => vorschlagUmsetzen(v, b)}
             />
           )}
         </div>

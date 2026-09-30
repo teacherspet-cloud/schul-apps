@@ -24,6 +24,11 @@ export interface SvgOptionen extends Ansicht {
   editor?: boolean
   /** Elemente mit Befund rot umrandet */
   markiert?: string[]
+  /**
+   * Ohne Kreidekörnung über der Schrift (PDF): der Druck rechnet jede Musterfüllung in ein
+   * seitengroßes Rasterbild um – im PDF brächte sie nur Dateigröße, keine sichtbare Körnung.
+   */
+  ohneKorn?: boolean
   /** Nur die Fläche, ohne Rahmen/Hintergrund (für Einbettungen) */
   ohneHintergrund?: boolean
 }
@@ -31,7 +36,7 @@ export interface SvgOptionen extends Ansicht {
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const r2 = (v: number): string => String(Math.round(v * 10) / 10)
 
-interface Kontext {
+export interface Kontext {
   W: number
   H: number
   medium: Medium
@@ -128,7 +133,7 @@ function randPunkt(r: { x: number; y: number; w: number; h: number }, zx: number
 
 function pfeilSvg(k: Kontext, a: { x: number; y: number }, b: { x: number; y: number }, e: TbElement, g: number): string {
   const c = k.farbe(e.farbe === 'gelb' && k.hell ? 'grund' : e.farbe)
-  const sw = Math.max(2, k.H * (k.medium === 'papier' ? 0.0022 : 0.0045))
+  const sw = pfeilStaerke(k)
   const art = e.pfeilArt ?? 'pfeil'
   const spitze = sw * 4.2
   const winkel = Math.atan2(b.y - a.y, b.x - a.x)
@@ -140,21 +145,35 @@ function pfeilSvg(k: Kontext, a: { x: number; y: number }, b: { x: number; y: nu
   const teile = [`<path d="M${r2(a.x)} ${r2(a.y)}L${r2(b.x)} ${r2(b.y)}" stroke="${c}" stroke-width="${r2(sw)}" stroke-linecap="round" fill="none"/>`]
   if (art !== 'linie') teile.push(kopf(b, winkel))
   if (art === 'doppelpfeil') teile.push(kopf(a, winkel + Math.PI))
-  const label = e.text.trim()
-  if (label) {
-    // Beschriftung so schmal wie die Linie (sie soll die Kästen nicht überdecken), notfalls zweizeilig
-    const laenge = Math.hypot(b.x - a.x, b.y - a.y)
-    const gg = Math.max(g * 0.7, Math.min(g * 0.85, (e.schrift ?? 0) * k.H || g * 0.8))
-    const laengstes = Math.max(...label.split(/\s+/).map((w) => textBreite(w, gg, k.schrift)))
-    const zl = umbrechen(label, Math.max(laengstes, gg * 4, laenge * 0.85), gg, k.schrift)
-    const breite = Math.max(...zl.map((z) => textBreite(z, gg, k.schrift)))
-    const hoehe = zl.length * gg * ZEILENHOEHE
-    const mx = (a.x + b.x) / 2
-    const my = (a.y + b.y) / 2
-    teile.push(`<rect x="${r2(mx - breite / 2 - gg * 0.2)}" y="${r2(my - hoehe / 2)}" width="${r2(breite + gg * 0.4)}" height="${r2(hoehe)}" rx="${r2(gg * 0.2)}" fill="${k.tafel}"/>`)
-    teile.push(zeilen(k, zl, mx, my - hoehe / 2, gg, e.farbe === 'grund' ? 'blau' : e.farbe, { mitte: true }))
+  const l = pfeilBeschriftung(k, a, b, e, g)
+  if (l) {
+    const x0 = l.mx - l.breite / 2 - l.gg * 0.2
+    teile.push(`<rect x="${r2(x0)}" y="${r2(l.my - l.hoehe / 2)}" width="${r2(l.breite + l.gg * 0.4)}" height="${r2(l.hoehe)}" rx="${r2(l.gg * 0.2)}" fill="${k.tafel}"/>`)
+    teile.push(zeilen(k, l.zeilen, l.mx, l.my - l.hoehe / 2, l.gg, l.farbe, { mitte: true }))
   }
   return teile.join('')
+}
+
+/** Strichstärke der Pfeile und Verbinder (Einheiten) */
+export const pfeilStaerke = (k: Pick<Kontext, 'H' | 'medium'>): number => Math.max(2, k.H * (k.medium === 'papier' ? 0.0022 : 0.0045))
+
+/** Beschriftung auf einer Linie: Lage (Mitte), Maße und Zeilen – für SVG und PowerPoint gleich */
+export function pfeilBeschriftung(
+  k: Kontext,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  e: TbElement,
+  g: number
+): { mx: number; my: number; breite: number; hoehe: number; gg: number; zeilen: string[]; farbe: Farbe } | null {
+  const label = e.text.trim()
+  if (!label) return null
+  // Beschriftung so schmal wie die Linie (sie soll die Kästen nicht überdecken), notfalls zweizeilig
+  const laenge = Math.hypot(b.x - a.x, b.y - a.y)
+  const gg = Math.max(g * 0.7, Math.min(g * 0.85, (e.schrift ?? 0) * k.H || g * 0.8))
+  const laengstes = Math.max(...label.split(/\s+/).map((w) => textBreite(w, gg, k.schrift)))
+  const zl = umbrechen(label, Math.max(laengstes, gg * 4, laenge * 0.85), gg, k.schrift)
+  const breite = Math.max(...zl.map((z) => textBreite(z, gg, k.schrift)))
+  return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, breite, hoehe: zl.length * gg * ZEILENHOEHE, gg, zeilen: zl, farbe: e.farbe === 'grund' ? 'blau' : e.farbe }
 }
 
 function beschriftungUnten(k: Kontext, e: TbElement, x: number, y: number, w: number, h: number): { h: number; svg: string } {
@@ -442,6 +461,55 @@ function formelSvg(k: Kontext, e: TbElement, x: number, y: number, w: number, h:
   return eingebettet(m.svg, x + (w - fw) / 2, y + (unten.h - fh) / 2, fw, fh, farbe) + unten.svg
 }
 
+/** Seite eines Rechtecks, an der ein Punkt liegt (Anschlussstelle eines Verbinders in PowerPoint) */
+export type Kante = 'oben' | 'links' | 'unten' | 'rechts'
+
+function kanteVon(r: { x: number; y: number; w: number; h: number }, p: { x: number; y: number }): Kante {
+  const d: [Kante, number][] = [
+    ['oben', Math.abs(p.y - r.y)],
+    ['unten', Math.abs(p.y - (r.y + r.h))],
+    ['links', Math.abs(p.x - r.x)],
+    ['rechts', Math.abs(p.x - (r.x + r.w))]
+  ]
+  return d.sort((x, y) => x[1] - y[1])[0][0]
+}
+
+/** Anfang und Ende eines Pfeils bzw. Verbinders (Einheiten) – für SVG und PowerPoint gleich */
+export function linienPunkte(
+  k: Kontext,
+  e: TbElement,
+  alle: Map<string, TbElement>
+): { a: { x: number; y: number }; b: { x: number; y: number }; vonKante?: Kante; nachKante?: Kante } | null {
+  const x = e.x * k.W
+  const y = e.y * k.H
+  if (e.typ === 'pfeil') return { a: { x, y }, b: { x: x + e.w * k.W, y: y + e.h * k.H } }
+  const g = (e.schrift ?? 0.045) * k.H
+  const von = e.von ? alle.get(e.von) : undefined
+  const nach = e.nach ? alle.get(e.nach) : undefined
+  if (!von) return null
+  const rv = { x: von.x * k.W, y: von.y * k.H, w: von.w * k.W, h: von.h * k.H }
+  const ziel = nach ? { x: (nach.x + nach.w / 2) * k.W, y: (nach.y + nach.h / 2) * k.H } : e.zielPunkt ? { x: e.zielPunkt.x * k.W, y: e.zielPunkt.y * k.H } : null
+  if (!ziel) return null
+  const luft = g * 0.25
+  // Zu einem Punkt (Marke der Zeitleiste): vom nächsten Rand aus, möglichst waagerecht bzw. senkrecht –
+  // aus der Mitte heraus liefe die Linie bei gleichen Jahren quer über den Nachbarkasten
+  const kante = (v: number, a0: number, a1: number): number => Math.min(a1 - g * 0.3, Math.max(a0 + g * 0.3, v))
+  const a = nach
+    ? randPunkt(rv, ziel.x, ziel.y, luft)
+    : ziel.x < rv.x
+      ? { x: rv.x - luft, y: kante(ziel.y, rv.y, rv.y + rv.h) }
+      : ziel.x > rv.x + rv.w
+        ? { x: rv.x + rv.w + luft, y: kante(ziel.y, rv.y, rv.y + rv.h) }
+        : ziel.y > rv.y + rv.h
+          ? { x: kante(ziel.x, rv.x, rv.x + rv.w), y: rv.y + rv.h + luft }
+          : ziel.y < rv.y
+            ? { x: kante(ziel.x, rv.x, rv.x + rv.w), y: rv.y - luft }
+            : randPunkt(rv, ziel.x, ziel.y, luft)
+  const rn = nach ? { x: nach.x * k.W, y: nach.y * k.H, w: nach.w * k.W, h: nach.h * k.H } : null
+  const b = rn ? randPunkt(rn, rv.x + rv.w / 2, rv.y + rv.h / 2, luft) : ziel
+  return { a, b, vonKante: kanteVon(rv, a), ...(rn ? { nachKante: kanteVon(rn, b) } : {}) }
+}
+
 function elementSvg(k: Kontext, e: TbElement, alle: Map<string, TbElement>): string {
   const x = e.x * k.W
   const y = e.y * k.H
@@ -454,18 +522,9 @@ function elementSvg(k: Kontext, e: TbElement, alle: Map<string, TbElement>): str
     case 'text':
       return kastenSvg(k, e, x, y, w, h)
     case 'pfeil':
-      return pfeilSvg(k, { x, y }, { x: x + w, y: y + h }, e, g)
     case 'verbinder': {
-      const von = e.von ? alle.get(e.von) : undefined
-      const nach = e.nach ? alle.get(e.nach) : undefined
-      if (!von) return ''
-      const rv = { x: von.x * k.W, y: von.y * k.H, w: von.w * k.W, h: von.h * k.H }
-      const ziel = nach ? { x: (nach.x + nach.w / 2) * k.W, y: (nach.y + nach.h / 2) * k.H } : e.zielPunkt ? { x: e.zielPunkt.x * k.W, y: e.zielPunkt.y * k.H } : null
-      if (!ziel) return ''
-      const luft = g * 0.25
-      const a = randPunkt(rv, ziel.x, ziel.y, luft)
-      const b = nach ? randPunkt({ x: nach.x * k.W, y: nach.y * k.H, w: nach.w * k.W, h: nach.h * k.H }, rv.x + rv.w / 2, rv.y + rv.h / 2, luft) : ziel
-      return pfeilSvg(k, a, b, e, g)
+      const l = linienPunkte(k, e, alle)
+      return l ? pfeilSvg(k, l.a, l.b, e, g) : ''
     }
     case 'symbol': {
       const unten = beschriftungUnten(k, e, x, y, w, h)
@@ -487,7 +546,7 @@ function elementSvg(k: Kontext, e: TbElement, alle: Map<string, TbElement>): str
   return ''
 }
 
-function hintergrund(k: Kontext, t: TbTafel, id: string, textur: boolean): string {
+function hintergrund(k: Kontext, t: TbTafel, textur: boolean): string {
   const { W, H } = k
   const p = PALETTEN[k.medium]
   const teile: string[] = []
@@ -501,7 +560,7 @@ function hintergrund(k: Kontext, t: TbTafel, id: string, textur: boolean): strin
       [0.4, 0.15, 0.25, 0.2]
     ]
     for (const [sx, sy, rx, ry] of spuren) teile.push(`<ellipse cx="${r2(sx * W)}" cy="${r2(sy * H)}" rx="${r2(rx * W)}" ry="${r2(ry * H)}" fill="#ffffff" opacity="0.035"/>`)
-    if (textur) teile.push(`<rect width="${W}" height="${H}" filter="url(#${id}-staub)" opacity="0.5"/>`)
+    if (textur) teile.push(staubSvg(W, H))
     if (t.format === 'klapptafel') {
       // Fugen zwischen Mittelteil und Flügeln, Holzrahmen, Ablage
       for (const f of [0.25, 0.75]) {
@@ -522,10 +581,11 @@ function hintergrund(k: Kontext, t: TbTafel, id: string, textur: boolean): strin
     // Hefteintrag: kariertes Papier (5 mm), sehr zart, mit Rand
     teile.push(`<rect width="${W}" height="${H}" fill="#ffffff"/>`)
     const kaestchen = W / 42
-    teile.push(
-      `<defs><pattern id="${id}-karo" width="${r2(kaestchen)}" height="${r2(kaestchen)}" patternUnits="userSpaceOnUse"><path d="M${r2(kaestchen)} 0H0V${r2(kaestchen)}" fill="none" stroke="#dbe7f3" stroke-width="1"/></pattern></defs>`
-    )
-    teile.push(`<rect width="${W}" height="${H}" fill="url(#${id}-karo)"/>`)
+    // Als EIN Linienpfad statt Muster: der PDF-Druck rechnete das Muster in ein seitengroßes Bild um
+    const linien: string[] = []
+    for (let x = kaestchen; x < W; x += kaestchen) linien.push(`M${r2(x)} 0V${H}`)
+    for (let y = kaestchen; y < H; y += kaestchen) linien.push(`M0 ${r2(y)}H${W}`)
+    teile.push(`<path d="${linien.join('')}" fill="none" stroke="#dbe7f3" stroke-width="1"/>`)
     teile.push(`<rect x="1" y="1" width="${W - 2}" height="${H - 2}" fill="none" stroke="#c9d3dd" stroke-width="2"/>`)
   }
   return teile.join('')
@@ -533,11 +593,75 @@ function hintergrund(k: Kontext, t: TbTafel, id: string, textur: boolean): strin
 
 let lauf = 0
 
-/** Die Tafel als vollständiges SVG */
-export function tafelSvg(t: TbTafel, o: SvgOptionen = {}): string {
+/** Fester Zufall (gleiche Textur in jeder Ausgabe) */
+function wuerfel(start: number): () => number {
+  let s = start
+  return () => {
+    s = (s * 16807) % 2147483647
+    return (s - 1) / 2147483646
+  }
+}
+
+/**
+ * Kreidetextur als kleine, gekachelte Muster statt SVG-Filter (Nachbesserung 30.09.2026): Filter
+ * rechnet der PDF-Druck in ein großes Bild um (2,3 MB je Datei); eine Musterkachel bleibt klein
+ * und wird im PDF nur wiederholt.
+ * - Körnung: winzige Flecken in der Tafelfarbe ÜBER der Schrift – auf dem Grund unsichtbar, in
+ *   den Kreidestrichen wirken sie wie die raue Kreidespur.
+ * - Staub: blasse, waagerecht gezogene Wischspuren und Staubkörner UNTER der Schrift.
+ */
+function kreideMuster(id: string, grund: string): string {
+  const z = wuerfel(97)
+  const korn: string[] = []
+  const K = 40
+  for (let i = 0; i < 150; i++) {
+    const r = 0.35 + z() * 0.9
+    korn.push(`<circle cx="${r2(z() * K)}" cy="${r2(z() * K)}" r="${r2(r)}" fill-opacity="${(0.3 + z() * 0.5).toFixed(2)}"/>`)
+  }
+  return `<pattern id="${id}-korn" width="${K}" height="${K}" patternUnits="userSpaceOnUse"><g fill="${grund}">${korn.join('')}</g></pattern>`
+}
+
+/**
+ * Staub und Wischspuren direkt als Vektorformen: je Deckkraftstufe EIN Pfad (im PDF nur wenige
+ * Kilobyte – einzelne Formen mit eigener Deckkraft blähten den Seiteninhalt auf).
+ */
+function staubSvg(W: number, H: number): string {
+  const z = wuerfel(211)
+  const flaeche = (W * H) / (900 * 420)
+  // Ellipse aus vier Bézierbögen (Bogenbefehle zerlegt der PDF-Druck in Hunderte kleiner Stücke)
+  const oval = (cx: number, cy: number, rx: number, ry: number): string => {
+    const kx = rx * 0.5523
+    const ky = ry * 0.5523
+    const punkte = [
+      [cx - rx, cy],
+      [cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry],
+      [cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy],
+      [cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry],
+      [cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy]
+    ]
+    return `M${punkte[0].map(r2).join(' ')}${punkte
+      .slice(1)
+      .map((c) => `C${c.map(r2).join(' ')}`)
+      .join('')}Z`
+  }
+  const spuren: string[][] = [[], [], []]
+  const koerner: string[][] = [[], [], []]
+  for (let i = 0; i < Math.round(14 * flaeche); i++) spuren[i % 3].push(oval(z() * W, z() * H, 60 + z() * 180, 4 + z() * 12))
+  for (let i = 0; i < Math.round(60 * flaeche); i++) {
+    const r = 0.8 + z() * 1.8
+    koerner[i % 3].push(oval(z() * W, z() * H, r, r))
+  }
+  const pfad = (d: string[], deck: number): string => (d.length ? `<path d="${d.join('')}" fill-opacity="${deck}"/>` : '')
+  return `<g fill="#ffffff">${spuren.map((d, i) => pfad(d, [0.02, 0.03, 0.045][i])).join('')}${koerner
+    .map((d, i) => pfad(d, [0.05, 0.08, 0.11][i]))
+    .join('')}</g>`
+}
+
+/** Zeichenumgebung einer Tafel (Maße, Farben, Schrift) */
+export function kontextFuer(t: TbTafel): Kontext {
   const f = formatInfo(t.format)
   const p = PALETTEN[f.medium]
-  const k: Kontext = {
+  return {
     W: f.breite,
     H: f.hoehe,
     medium: f.medium,
@@ -548,6 +672,42 @@ export function tafelSvg(t: TbTafel, o: SvgOptionen = {}): string {
     marker: p.marker,
     tafel: p.tafel
   }
+}
+
+/**
+ * EIN Element allein als SVG (durchsichtig, ohne Tafel) – für die Bilder in PowerPoint (Symbol,
+ * Skizze, Diagramm, Formel). `rand` in Einheiten ringsum, damit Beschriftungen am Rand nicht fehlen.
+ */
+export function elementBildSvg(t: TbTafel, e: TbElement, o: SvgOptionen = {}, rand = 0): { svg: string; x: number; y: number; w: number; h: number } {
+  const k = kontextFuer(t)
+  const alle = new Map(t.elemente.map((x) => [x.id, x]))
+  const x = e.x * k.W - rand
+  const y = e.y * k.H - rand
+  const w = e.w * k.W + 2 * rand
+  const h = e.h * k.H + 2 * rand
+  const innen = elementSvg(k, inAnsicht(e, o), alle)
+  // viewBox ab 0 0 (svgZuPng/svgMasse lesen die Maße daraus), das Element dorthin verschoben
+  const kopf = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${r2(w)} ${r2(h)}" width="${r2(w)}" height="${r2(h)}"`
+  return { svg: `${kopf} font-family="${esc(k.familie)}"><g transform="translate(${r2(-x)} ${r2(-y)})">${innen}</g></svg>`, x, y, w, h }
+}
+
+/**
+ * Hintergrund einer Folie (PowerPoint): Tafelfläche mit Rahmen, Fugen, Staub bzw. Karos an ihrer
+ * Stelle, ringsum `randFarbe`. Maße in Tafeleinheiten; die Schrift liegt als Text darüber.
+ */
+export function folienHintergrundSvg(t: TbTafel, folie: { w: number; h: number }, tafel: { x: number; y: number }, randFarbe: string): string {
+  const k = kontextFuer(t)
+  const fw = r2(folie.w)
+  const fh = r2(folie.h)
+  const flaeche = `<svg x="${r2(tafel.x)}" y="${r2(tafel.y)}" width="${k.W}" height="${k.H}" viewBox="0 0 ${k.W} ${k.H}">${hintergrund(k, t, k.medium === 'kreide')}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fw} ${fh}" width="${fw}" height="${fh}"><rect width="${fw}" height="${fh}" fill="${randFarbe}"/>${flaeche}</svg>`
+}
+
+/** Die Tafel als vollständiges SVG */
+export function tafelSvg(t: TbTafel, o: SvgOptionen = {}): string {
+  const f = formatInfo(t.format)
+  const p = PALETTEN[f.medium]
+  const k = kontextFuer(t)
   const id = `tb${(lauf++).toString(36)}`
   const textur = f.medium === 'kreide' && !o.ohneTextur
   const sichtbar = sichtbareElemente(t, o)
@@ -577,13 +737,17 @@ export function tafelSvg(t: TbTafel, o: SvgOptionen = {}): string {
     hoehe = k.H + bh
   }
 
-  const defs = textur
-    ? `<defs><filter id="${id}-kreide" x="0" y="0" width="1" height="1"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.55" result="m"/><feComposite in="SourceGraphic" in2="m" operator="in"/></filter><filter id="${id}-staub" x="0" y="0" width="1" height="1"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.05" numOctaves="3" seed="8" result="w"/><feColorMatrix in="w" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.16 -0.04"/></filter></defs>`
+  const mitKorn = textur && !o.ohneKorn
+  const defs = mitKorn ? `<defs>${kreideMuster(id, p.hintergrund)}</defs>` : ''
+  const grund = o.ohneHintergrund ? '' : hintergrund(k, t, textur)
+  // Körnung über der Schrift (nur auf der Tafelfläche, nicht über dem Wortspeicher)
+  const rb = k.H * (t.format === 'klapptafel' ? 0.022 : 0.016)
+  const korn = mitKorn
+    ? `<rect x="${r2(rb)}" y="${r2(rb)}" width="${r2(k.W - 2 * rb)}" height="${r2(k.H - 2 * rb)}" fill="url(#${id}-korn)" pointer-events="none"/>`
     : ''
-  const grund = o.ohneHintergrund ? '' : hintergrund(k, t, id, textur)
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${k.W} ${r2(hoehe)}" width="${k.W}" height="${r2(hoehe)}" font-family="${esc(
     k.familie
-  )}">${defs}${grund}<g${textur ? ` filter="url(#${id}-kreide)"` : ''}>${inhalt}</g>${band}</svg>`
+  )}">${defs}${grund}<g>${inhalt}</g>${korn}${band}</svg>`
 }
 
 /** Seitenverhältnis des SVG (mit Wortspeicher etwas höher) */

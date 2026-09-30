@@ -253,12 +253,21 @@ export interface TafelbildMeta {
   kiVermerk?: KiVermerk
 }
 
+/**
+ * Vorschläge, die die App zu einem Befund mit einem Klick umsetzt („Vorschlag der App umsetzen",
+ * wie im Arbeitsblatt): KI kürzt die betroffenen Kästen bzw. die App fasst zwei Kästen zusammen.
+ */
+export type TbVorschlag = 'kiKuerzen' | 'zusammenfassen'
+
 export interface Befund {
   format?: FormatId
   element?: string
+  /** Alle betroffenen Elemente (z. B. alle mit zu kleiner Schrift) */
+  elemente?: string[]
   art: 'text' | 'schrift' | 'farbe' | 'ueberlappung' | 'rand' | 'kontrast' | 'aufbau' | 'bild'
   text: string
   schwer?: boolean
+  vorschlaege?: TbVorschlag[]
 }
 
 export interface Tafelbild {

@@ -16,6 +16,9 @@
 //     (Schule, KI-Zugang, Bilder-KI, Hörtexte, Ablage, Aussehen); die KI-Schritte bieten „Abo über den PC".
 //  7. (30.09.2026) Ausgaben mit Ablageziel landen unter /documents/Schulmaterial/<Fach>/<Themenbereich>,
 //     ohne Überschreiben (auch nach dem Neuladen); die Meldung nennt den Ort und bietet „Teilen".
+//  8. (30.09.2026) Tafelbilder: App öffnen, Beispiel mit der KI-Attrappe erzeugen, ein Element mit
+//     dem FINGER verschieben (Chromium: echte Touch-Ereignisse über CDP; WebKit: Zeigerereignisse
+//     der Art „touch"), Präsentation öffnen und Schritt für Schritt aufdecken.
 import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -24,7 +27,8 @@ import { extname, join, resolve } from 'path'
 const out = resolve(process.argv[2] ?? 'test-results/mobil')
 const welche = process.argv[3] ?? 'beide'
 mkdirSync(out, { recursive: true })
-const wurzel = resolve('out/mobil')
+// SCHULAPPS_MOBIL_OUT: eine Kopie des Prüf-Builds (baut nebenher jemand neu, wechseln die Dateinamen in out/mobil)
+const wurzel = resolve(process.env.SCHULAPPS_MOBIL_OUT ?? 'out/mobil')
 if (!existsSync(join(wurzel, 'index.html'))) throw new Error('out/mobil fehlt – vorher: SCHULAPPS_MOBIL_TEST=1 npm run build:mobil')
 
 // ---------- Ein schlichter Server für out/mobil (wie capacitor://localhost)
@@ -50,6 +54,68 @@ const server = createServer((req, res) => {
 await new Promise((ok) => server.listen(0, '127.0.0.1', ok))
 const adresse = `http://127.0.0.1:${server.address().port}/`
 
+/** Antwort der Attrappe für „tafelbild_inhalt" – alle Felder, leere Felder leer */
+function tafelInhalt() {
+  const lage = { x: -1, y: -1, w: -1, h: -1 }
+  const k = (id, titel, punkte, o = {}) => ({ id, titel, punkte, rolle: 'aspekt', farbe: 'grund', symbol: '', zeit: '', niveau: 1, schritt: 2, lueckenWoerter: [], lage, ...o })
+  return {
+    titel: 'Warum scheiterte die Weimarer Republik?',
+    struktur: 'netz',
+    strukturGrund: 'Mehrere Ursachen um einen Begriff',
+    impuls: 'Erläutere die Ursachen mithilfe von M1.',
+    knoten: [
+      k('k1', 'Scheitern der Republik', [], { rolle: 'zentrum', farbe: 'gelb', schritt: 1 }),
+      k('k2', 'Politik', ['Versailler Vertrag', 'Dolchstoßlegende'], { farbe: 'rot', symbol: 'blitz', lueckenWoerter: ['Dolchstoßlegende'] }),
+      k('k3', 'Wirtschaft', ['Inflation 1923', 'Weltwirtschaftskrise'], { farbe: 'rot', symbol: 'geld', schritt: 3 }),
+      k('k4', 'Verfassung', ['Artikel 48'], { farbe: 'blau', schritt: 3 })
+    ],
+    beziehungen: [],
+    aspekte: [],
+    merksatz: { titel: 'Merke!', text: 'Die Republik scheiterte an mehreren Ursachen zugleich.', lueckenWoerter: ['Ursachen'] },
+    hausaufgabe: 'Beurteile, welche Ursache am schwersten wog.',
+    zeichnungen: [],
+    farbLegende: [
+      { farbe: 'gelb', bedeutung: 'Fachbegriff' },
+      { farbe: 'rot', bedeutung: 'Problem' },
+      { farbe: 'blau', bedeutung: 'Struktur' }
+    ],
+    schritte: [
+      { nr: 1, phase: 'Einstieg', impuls: 'Leitfrage stellen' },
+      { nr: 2, phase: 'Erarbeitung', impuls: 'Ursachen sammeln' }
+    ]
+  }
+}
+
+/**
+ * Mit dem Finger ziehen: in Chromium echte Touch-Ereignisse über CDP (der Browser macht daraus
+ * Zeigerereignisse der Art „touch", wie auf dem iPad); WebKit hat kein CDP – dort dieselben
+ * Zeigerereignisse von Hand.
+ */
+async function fingerZiehen(page, browserName, x, y, dx, dy) {
+  if (browserName === 'chromium') {
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+    const punkt = (px, py) => [{ x: px, y: py, id: 1, radiusX: 6, radiusY: 6, force: 1 }]
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: punkt(x, y) })
+    for (let i = 1; i <= 10; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: punkt(x + (dx * i) / 10, y + (dy * i) / 10) })
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false })
+    await cdp.detach()
+    return
+  }
+  await page.evaluate(
+    ([x, y, dx, dy]) => {
+      const ziel = document.elementFromPoint(x, y)
+      const basis = { pointerId: 7, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true, composed: true }
+      ziel.dispatchEvent(new PointerEvent('pointerdown', { ...basis, clientX: x, clientY: y, buttons: 1 }))
+      const flaeche = ziel.closest('svg') ?? ziel
+      for (let i = 1; i <= 10; i++) flaeche.dispatchEvent(new PointerEvent('pointermove', { ...basis, clientX: x + (dx * i) / 10, clientY: y + (dy * i) / 10, buttons: 1 }))
+      flaeche.dispatchEvent(new PointerEvent('pointerup', { ...basis, clientX: x + dx, clientY: y + dy, buttons: 0 }))
+    },
+    [x, y, dx, dy]
+  )
+}
+
 // ---------- Die Attrappe: feste Antworten je Auftragsart (services/ai/attrappe.ts)
 const attrappe = {
   verzoegerungMs: 800,
@@ -58,6 +124,9 @@ const attrappe = {
     review: { problems: [] },
     vocab_analysis: { entries: [] },
     testplan: { tasks: [] },
+    // Tafelbilder: ein kleines Begriffsnetz (wie tests/e2e/tafelbilder.mjs)
+    tafelbild_inhalt: tafelInhalt(),
+    tafelbild_kuerzen: { knoten: [] },
     // Einzelne Aufgaben (Wiederholung je Aufgabentyp): leer – die Attrappe kennt die Kennungen der Vokabeln nicht
     ...Object.fromEntries(
       'gapSentences gapText dialogue matchDefinitions writeDefinitions pictureLabel multipleChoice synonymsAntonyms collocations wordFormation wordFamily mindmap oddOneOut categorize writeSentences mediation crossword scrambled wrongWord twoSentences trueFalse freeText'
@@ -215,6 +284,46 @@ async function lauf(name, browserTyp, startOpt) {
     await page.waitForTimeout(800)
     const p5 = await sichern('Probe.txt', englisch)
     pruefe(p5 === '/documents/Schulmaterial/Englisch/Unit 1/Probe (3).txt', `${name}: auch nach dem Neuladen kein Überschreiben (${p5})`)
+
+    // ---------- 8. Tafelbilder: erzeugen, mit dem Finger verschieben, präsentieren
+    await sichtbar(page.locator('[aria-label="Tafelbilder"]')).click()
+    await sichtbar(page.getByText('Thema & Einstellungen', { exact: true })).waitFor({ timeout: 15000 })
+    await sichtbar(page.locator('[data-tb-thema]')).fill('Scheitern der Weimarer Republik')
+    await sichtbar(page.locator('[data-tb-erstellen]')).click()
+    const flaeche = page.locator('[data-tb-flaeche]').filter({ visible: true }).first()
+    const erzeugt = await flaeche.waitFor({ timeout: 60000 }).then(
+      () => true,
+      () => false
+    )
+    pruefe(erzeugt, `${name}: Tafelbild mit der Attrappe erzeugt`)
+    await page.waitForTimeout(800)
+    await page.screenshot({ path: join(out, `${name}-6-tafelbild.png`) })
+    // Einen Kasten mit dem Finger verschieben
+    const kasten = flaeche.locator('rect.tb-treffer[data-element^="k"]').first()
+    const id = await kasten.getAttribute('data-element')
+    const xVorher = Number(await kasten.getAttribute('x'))
+    const box = await kasten.boundingBox()
+    await fingerZiehen(page, name, box.x + box.width / 2, box.y + box.height / 2, 60, 24)
+    await page.waitForTimeout(500)
+    const xNachher = Number(await flaeche.locator(`rect.tb-treffer[data-element="${id}"]`).getAttribute('x'))
+    pruefe(xNachher > xVorher + 1, `${name}: Kasten mit dem Finger verschoben (x ${xVorher.toFixed(0)} → ${xNachher.toFixed(0)})`)
+    await page.screenshot({ path: join(out, `${name}-7-tafelbild-verschoben.png`) })
+    // Präsentation: beginnt bei Schritt 1, Pfeil rechts deckt auf, Esc schließt
+    await sichtbar(page.locator('[data-tb-praesentieren]')).click()
+    const praes = page.locator('[data-tb-praesentation]')
+    await praes.waitFor({ timeout: 10000 })
+    pruefe((await praes.getAttribute('data-schritt')) === '1', `${name}: Präsentation beginnt bei Schritt 1`)
+    await page.keyboard.press('ArrowRight')
+    await page.waitForTimeout(300)
+    pruefe((await praes.getAttribute('data-schritt')) === '2', `${name}: Präsentation deckt Schritt 2 auf`)
+    // Auf dem iPad ohne Tastatur: „Weiter" antippen
+    await page.locator('[data-tb-weiter]').click()
+    await page.waitForTimeout(300)
+    pruefe((await praes.getAttribute('data-schritt')) === '3', `${name}: „Weiter" deckt Schritt 3 auf`)
+    await page.screenshot({ path: join(out, `${name}-8-praesentation.png`) })
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+    pruefe((await praes.count()) === 0, `${name}: Esc schließt die Präsentation`)
   } catch (e) {
     problems.push(`${name}: Abbruch – ${e.message.split('\n')[0]}`)
     await page.screenshot({ path: join(out, `${name}-fehler.png`) }).catch(() => undefined)

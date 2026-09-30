@@ -4,7 +4,11 @@
 // Erstellen ohne Material (alle vier Formate), Element verschieben, Text ändern, Zauberstab,
 // Lückenfassung, Präsentation mit schrittweisem Aufdecken, PDF/PNG/PowerPoint erzeugt,
 // Erstellen mit hineingezogenem Material. Alles im WEGWERF-Profil.
+// Nachbesserung (30.09.2026): automatische Kürzung bei zu kleiner Schrift, „Vorschlag der App
+// umsetzen" (Elemente zusammenfassen, Text kürzen), PDF klein trotz Kreidetextur, PowerPoint mit
+// bearbeitbarem Text und Sprechernotizen.
 import { _electron as electron } from 'playwright-core'
+import { strFromU8, unzipSync } from 'fflate'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
@@ -140,6 +144,9 @@ try {
   pruefe(a.length === 1 && a[0].user.includes('Scheitern der Weimarer Republik') && /höchstens etwa \d+ Wörter/.test(a[0].user), 'Auftrag nennt Thema und Textmenge')
   await page.locator('[data-tb-flaeche]').first().waitFor({ timeout: 10000 })
   await page.waitForTimeout(600)
+  // Schrift unter der Empfehlung (Whiteboard, Flipchart): die KI kürzt beim Erzeugen einmal von selbst
+  const kurz = anfragen().filter((z) => z.schemaName === 'tafelbild_kuerzen')
+  pruefe(kurz.length === 1, `Automatische Kürzung beim Erzeugen (${kurz.length} Anfrage)`)
   const ueberlappt = (t?.pruefung ?? []).filter((b) => b.art === 'ueberlappung')
   pruefe(ueberlappt.length === 0, `Keine Überlappung nach dem Layout (${ueberlappt.map((b) => b.text).join(' | ')})`)
   for (const [i, f] of ['klapptafel', 'whiteboard', 'flipchart', 'heft'].entries()) {
@@ -231,8 +238,19 @@ try {
   const lies = (endung) => dateien.filter((d) => d.endsWith(endung)).map((d) => readFileSync(join(ablage, d)))
   const pdf = lies('.pdf')
   pruefe(pdf.length === 1 && pdf[0].subarray(0, 4).toString() === '%PDF' && pdf[0].length > 20000, `PDF erzeugt (${pdf[0]?.length ?? 0} Bytes)`)
+  // Kreidetextur als Muster statt Filter: vorher 2,3 MB
+  pruefe(pdf.length === 1 && pdf[0].length < 900000, `PDF mit Kreidetafel bleibt klein (${Math.round((pdf[0]?.length ?? 0) / 1024)} KB)`)
   const pptx = lies('.pptx')
   pruefe(pptx.length === 1 && pptx[0][0] === 0x50 && pptx[0][1] === 0x4b && pptx[0].includes(Buffer.from('ppt/slides/slide3.xml')), 'PowerPoint erzeugt, mehrere Folien')
+  if (pptx.length === 1) {
+    const z = unzipSync(new Uint8Array(pptx[0]))
+    const folien = Object.keys(z).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    const letzte = folien.map((n) => strFromU8(z[n])).find((x) => x.includes('<a:t>Merke!</a:t>')) ?? ''
+    pruefe(letzte.includes('<p:txBody>') && letzte.includes('<a:t>Politik</a:t>') && letzte.includes('<p:cxnSp>'), 'PowerPoint: Text bearbeitbar (Textfelder, Linien statt Bild)')
+    const notiz = strFromU8(z['ppt/notesSlides/notesSlide1.xml'] ?? new Uint8Array())
+    pruefe(/Schritt 1 von \d/.test(notiz) && notiz.includes('Merksatz:'), 'PowerPoint: Sprechernotizen mit Schritt und Merksatz')
+    writeFileSync(join(out, '10-tafelbild.pptx'), pptx[0])
+  }
   const png = lies('.png')
   pruefe(png.length >= 4 && png.every((b) => b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47), `PNG erzeugt (${png.length} Bilder)`)
   // Ein PNG zum Ansehen ablegen
@@ -241,6 +259,46 @@ try {
   const whiteb = dateien.find((d) => d.endsWith('.png') && d.includes('Whiteboard') && !d.includes('Lücken'))
   if (whiteb) writeFileSync(join(out, '08-export-whiteboard.png'), readFileSync(join(ablage, whiteb)))
   await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+
+  // ---------- Vorschlag der App umsetzen: Schrift unter der Empfehlung (Whiteboard)
+  await page.locator('[data-tb-formate] label').nth(1).click()
+  await page.waitForTimeout(400)
+  await page.locator('[data-tb-flaeche] .tb-overlay').first().click({ position: { x: 5, y: 5 } })
+  const vorschlag = sichtbar(page.getByTestId('tb-vorschlag-umsetzen'))
+  const daVorschlag = await vorschlag.waitFor({ timeout: 5000 }).then(
+    () => true,
+    () => false
+  )
+  pruefe(daVorschlag && (await vorschlag.innerText()).includes('zur Wahl'), `Befund „Schrift" bietet „Vorschlag der App umsetzen" (${daVorschlag ? await vorschlag.innerText() : 'fehlt'})`)
+  if (daVorschlag) {
+    const knotenVorher = (await jetzt()).inhalt.knoten.length
+    await vorschlag.click()
+    await page.locator('[data-kreismenue-umsetzen]').waitFor({ timeout: 3000 })
+    const eintraege = await page.getByRole('menuitemcheckbox').allInnerTexts()
+    pruefe(eintraege.some((e) => /Text kürzen/.test(e)) && eintraege.some((e) => /zusammenfassen/.test(e)), `Kreismenü: ${eintraege.join(' | ')}`)
+    await page.getByRole('menuitemcheckbox', { name: 'Elemente zusammenfassen' }).click()
+    await page.screenshot({ path: join(out, '09-vorschlag-kreismenue.png') })
+    await page.locator('[data-kreismenue-umsetzen]').click()
+    t = await warte((x) => x?.inhalt?.knoten?.length === knotenVorher - 1)
+    pruefe(t.inhalt.knoten.length === knotenVorher - 1 && t.inhalt.knoten.some((k) => k.titel.includes(' / ')), `Zwei Kästen zusammengefasst (${knotenVorher} → ${t.inhalt.knoten.length} Knoten)`)
+    await page.waitForTimeout(400)
+    await page.screenshot({ path: join(out, '09-vorschlag-zusammengefasst.png') })
+    await page.keyboard.press('Control+z')
+    t = await warte((x) => x?.inhalt?.knoten?.length === knotenVorher)
+    pruefe(t.inhalt.knoten.length === knotenVorher, 'Strg+Z nimmt das Zusammenfassen zurück')
+    // Text kürzen (KI): ein Hintergrund-Auftrag mit der Kürzungs-Anfrage
+    const vorherKurz = anfragen().filter((z) => z.schemaName === 'tafelbild_kuerzen').length
+    await page.locator('[data-tb-flaeche] .tb-overlay').first().click({ position: { x: 5, y: 5 } })
+    await sichtbar(page.getByTestId('tb-vorschlag-umsetzen')).click()
+    await page.locator('[data-kreismenue-umsetzen]').waitFor({ timeout: 3000 })
+    await page.getByRole('menuitemcheckbox', { name: 'Text kürzen (KI)' }).click()
+    await page.locator('[data-kreismenue-umsetzen]').click()
+    const ende = Date.now() + 10000
+    while (Date.now() < ende && anfragen().filter((z) => z.schemaName === 'tafelbild_kuerzen').length === vorherKurz) await page.waitForTimeout(250)
+    pruefe(anfragen().filter((z) => z.schemaName === 'tafelbild_kuerzen').length === vorherKurz + 1, 'Text kürzen (KI): Auftrag an die KI')
+    await page.waitForTimeout(1200)
+  }
 
   // ---------- Erstellen MIT Material
   await sichtbar(page.getByRole('button', { name: 'Neues Tafelbild' })).click()
@@ -250,7 +308,13 @@ try {
   // Nur die Ablagefläche des sichtbaren Programms (die übrigen Programme bleiben im Hintergrund geladen)
   await sichtbar(page.locator('.mantine-Dropzone-root')).locator('input[type="file"]').setInputFiles(material)
   const ok = page.locator('[data-datenschutz-ok]')
-  if (await ok.isVisible({ timeout: 4000 }).catch(() => false)) await ok.click()
+  if (
+    await ok.waitFor({ state: 'visible', timeout: 6000 }).then(
+      () => true,
+      () => false
+    )
+  )
+    await ok.click()
   await sichtbar(page.getByText('Quelle Inflation.txt')).waitFor({ timeout: 10000 })
   await sichtbar(page.locator('[data-tb-erstellen]')).click()
   t = await warte((x) => x?.tafeln?.length >= 1)

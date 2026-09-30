@@ -428,6 +428,24 @@ function zeitleiste(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean): 
     const achsR = { x: z.x, y: z.y, w: aw, h: z.h }
     achse.eintraege = achse.eintraege.map((e) => ({ ...e, y: e.x, x: undefined }))
     const r = raster(u, ordnung.map((o) => posten(o.k, u)), { x: z.x + aw + u.text * 1.5, y: z.y, w: z.w - aw - u.text * 1.5, h: z.h }, [1], { x: 0, y: u.text * 0.5 })
+    // Achse nur so lang wie die Kästen – sonst laufen die Verbinder quer über die Fläche
+    if (r.rects.length) {
+      const oben = Math.min(...r.rects.map((x) => x.y))
+      const unten = Math.max(...r.rects.map((x) => x.y + x.h))
+      achsR.y = oben
+      achsR.h = Math.max(u.text * 3, unten - oben)
+      // Kästen möglichst auf Höhe ihrer Marke (Maßstab bleibt), ohne sich zu überdecken
+      const gs = Math.min(r.g, aw / 4)
+      const marke = (t: number): number => achsR.y + gs * 0.4 + t * (achsR.h - gs * 1.8)
+      const luft = u.text * 0.5
+      const ys = r.rects.map((q, i) => marke(achse.eintraege[i]?.y ?? 0) - q.h / 2)
+      ys[0] = Math.max(ys[0], oben)
+      for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + r.rects[i - 1].h + luft)
+      const last = ys.length - 1
+      ys[last] = Math.min(ys[last], unten - r.rects[last].h)
+      for (let i = last - 1; i >= 0; i--) ys[i] = Math.min(ys[i], ys[i + 1] - r.rects[i].h - luft)
+      r.rects.forEach((q, i) => (q.y = Math.max(oben, ys[i])))
+    }
     aus.push(diagrammElement(achse, achsR, u, Math.min(...knoten.map((k) => k.schritt)), r.g))
     ordnung.forEach((o, i) => aus.push(kasten(posten(o.k, u), r.rects[i], r.g, u)))
     if (!r.passt) u.ueberlauf.push('Die Zeitleiste passt bei Mindestschrift nicht ganz in das Hauptfeld.')
@@ -437,44 +455,77 @@ function zeitleiste(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean): 
   aus.slice(1, n + 1).forEach((e) => {
     const t = achse.eintraege[Math.max(0, ordnung.findIndex((o) => o.k.id === e.knoten))]
     const ax = quer ? achsEl.x + (t.x ?? 0) * achsEl.w : achsEl.x + achsEl.w * 0.5
-    const ay = quer ? achsEl.y + achsEl.h * 0.5 : achsEl.y + (t.y ?? 0) * achsEl.h
+    // Hochkant wie im Zeitstrahl gezeichnet (svg.ts: Einzug oben g · 0,4, unten g · 1,4)
+    const gs = Math.min((achsEl.schrift ?? 0) * u.H, (achsEl.w * u.W) / 4)
+    const ay = quer ? achsEl.y + achsEl.h * 0.5 : achsEl.y + (gs * 0.4 + (t.y ?? 0) * (achsEl.h * u.H - gs * 1.8)) / u.H
     aus.push({ ...verbinder(e, e, '', 'linie'), nach: '', zielPunkt: { x: ax, y: ay } })
   })
   return aus
 }
 
+/**
+ * Kreislauf als Ring aus zwei Linien (30.09.2026, Nachbesserung): Quer oben links → rechts, unten
+ * zurück von rechts nach links; hochkant (ab fünf Stationen) rechts hinunter und links wieder
+ * hinauf. Die frühere Anordnung auf einer Ellipse ließ die Ecken der Fläche leer und zwang die
+ * Schrift klein – im Raster nutzen die Stationen die ganze Breite. Ein Zentrum steht in der Mitte.
+ */
 function kreislauf(u: Umgebung, inhalt: TbInhalt, z: Rechteck): TbElement[] {
   const zentrum = inhalt.knoten.find((k) => k.rolle === 'zentrum')
   const stationen = inhalt.knoten.filter((k) => k !== zentrum)
   const n = stationen.length
   if (n < 3) return fluss(u, inhalt, z, z.w > z.h)
-  let bw = Math.min(z.w * 0.32, z.w / (n > 5 ? 3 : 2.4))
+  const spalten = z.w < z.h * 1.1 && n >= 5
+  // Linie A und B in Leserichtung ihrer Lage (oben/rechts bzw. unten/links, jeweils von oben bzw. links)
+  const k = Math.ceil(n / 2)
+  const idx = stationen.map((_, i) => i)
+  const linieA = spalten ? idx.slice(1, k + 1) : idx.slice(0, k)
+  const linieB = spalten ? [0, ...idx.slice(k + 1).reverse()] : idx.slice(k).reverse()
+  const beschriftet = inhalt.beziehungen.some((b) => b.beschriftung.trim())
   let g = u.text
-  let rects: Rechteck[] = []
+  let lage: Rechteck[] = []
+  let zr: Rechteck | null = null
+  let passt = false
   for (let versuch = 0; versuch < 40; versuch++) {
-    const bh = Math.max(...stationen.map((k) => hoeheBei(u, k.titel, knotenText(k, u.stil), bw, g, Boolean(k.symbol))))
-    const rx = (z.w - bw) / 2
-    const ry = (z.h - bh) / 2
-    const cx = z.x + z.w / 2
-    const cy = z.y + z.h / 2
-    rects = stationen.map((_, i) => {
-      const a = -Math.PI / 2 + (i * 2 * Math.PI) / n
-      return { x: cx + rx * Math.cos(a) - bw / 2, y: cy + ry * Math.sin(a) - bh / 2, w: bw, h: bh }
-    })
-    const frei = rects.every((a, i) => rects.every((b, j) => i === j || !schneidet(a, b, u.text * 0.3))) && ry >= 0
-    if (frei) break
-    if (g > u.min) g = Math.max(u.min, g * 0.94)
-    else bw *= 0.93
-    if (versuch === 39) u.ueberlauf.push('Der Kreislauf ist sehr eng – Stationen kürzen.')
+    const pfeil = g * (beschriftet ? 2.4 : 1.8)
+    // Platz für das Zentrum zwischen den Linien
+    const zw = zentrum ? (spalten ? z.w * 0.3 : Math.min(z.w * 0.4, textBreite(zentrum.titel, g * 1.12, u.schrift) + g * 1.6)) : 0
+    const zh = zentrum ? hoeheBei(u, zentrum.titel, knotenText(zentrum, u.stil), zw, g, Boolean(zentrum.symbol)) : 0
+    const quer = spalten ? Math.max(pfeil, zw + g * 1.2) : pfeil
+    const zwischen = spalten ? pfeil : Math.max(pfeil, zh + g * 1.2)
+    const proLinie = Math.max(linieA.length, linieB.length)
+    const bw = spalten ? (z.w - quer) / 2 : (z.w - pfeil * (proLinie - 1)) / proLinie
+    const bh = Math.max(...stationen.map((s) => hoeheBei(u, s.titel, knotenText(s, u.stil), bw, g, Boolean(s.symbol))))
+    const gesamt = spalten ? linieA.length * bh + (linieA.length - 1) * zwischen : 2 * bh + zwischen
+    passt = gesamt <= z.h && bw > 0
+    if (passt || g <= u.min || versuch === 39) {
+      // Freien Platz als Abstand verteilen (höchstens eine Zeile mehr), dann mittig bzw. oben
+      const frei = Math.max(0, z.h - gesamt)
+      const plus = Math.min(frei, g * 1.5)
+      const hoehe = gesamt + plus
+      const y0 = z.y + (u.oben ? 0 : (z.h - hoehe) / 2)
+      lage = stationen.map(() => ({ x: 0, y: 0, w: bw, h: bh }))
+      const verteile = (liste: number[], von: number, bis: number, setze: (r: Rechteck, v: number) => void): void => {
+        liste.forEach((s, i) => setze(lage[s], liste.length > 1 ? von + (i * (bis - von)) / (liste.length - 1) : (von + bis) / 2))
+      }
+      if (spalten) {
+        const schritt = linieA.length > 1 ? (hoehe - bh) / (linieA.length - 1) : 0
+        linieA.forEach((s, i) => Object.assign(lage[s], { x: z.x + z.w - bw, y: y0 + i * schritt }))
+        verteile(linieB, y0, y0 + hoehe - bh, (r, v) => Object.assign(r, { x: z.x, y: v }))
+      } else {
+        verteile(linieA, z.x, z.x + z.w - bw, (r, v) => Object.assign(r, { x: v, y: y0 }))
+        verteile(linieB, z.x, z.x + z.w - bw, (r, v) => Object.assign(r, { x: v, y: y0 + hoehe - bh }))
+        // Nur eine Station unten: unter die Mitte
+        if (linieB.length === 1) lage[linieB[0]].x = z.x + (z.w - bw) / 2
+      }
+      zr = zentrum ? { x: z.x + (z.w - zw) / 2, y: y0 + (hoehe - zh) / 2, w: zw, h: zh } : null
+      break
+    }
+    g = Math.max(u.min, g * 0.94)
   }
-  const el = stationen.map((k, i) => kasten(posten(k, u), rects[i], g, u))
+  if (!passt) u.ueberlauf.push('Der Kreislauf passt bei Mindestschrift nicht ganz in das Hauptfeld – Stationen kürzen.')
+  const el = stationen.map((s, i) => kasten(posten(s, u), lage[i], g, u))
   const aus = [...el]
-  if (zentrum) {
-    const w = bw * 0.9
-    const h = hoeheBei(u, zentrum.titel, knotenText(zentrum, u.stil), w, g, Boolean(zentrum.symbol))
-    const r = { x: z.x + z.w / 2 - w / 2, y: z.y + z.h / 2 - h / 2, w, h }
-    if (!rects.some((x) => schneidet(x, r, 0))) aus.push({ ...kasten(posten(zentrum, u), r, g, u), rahmen: 'keiner' })
-  }
+  if (zentrum && zr && !lage.some((x) => schneidet(x, zr!, 0))) aus.push({ ...kasten(posten(zentrum, u), zr, g, u), rahmen: 'keiner' })
   el.forEach((e, i) => aus.push(verbinder(e, el[(i + 1) % n], inhalt.beziehungen.find((b) => b.von === e.knoten)?.beschriftung ?? '', 'pfeil')))
   return aus
 }
@@ -558,7 +609,8 @@ function zeichnungenSetzen(liste: TbZeichnung[], z: Rechteck, u: Umgebung): TbEl
     let h = w / v + unter
     if (h > zelle.h) {
       h = zelle.h
-      w = Math.min(zelle.w, (h - unter) * v)
+      // Ein Zeitstrahl darf sich strecken (die Achse wird länger, die Schrift bleibt)
+      w = zz.diagramm?.art === 'zeitstrahl' ? zelle.w : Math.min(zelle.w, (h - unter) * v)
     }
     const x0 = quer ? z.x + i * (zelle.w + luft) : z.x
     const y0 = quer ? z.y : z.y + i * (zelle.h + luft)
@@ -709,7 +761,9 @@ function setzeEinmal(inhalt: TbInhalt, format: FormatId, o: LayoutOptionen, fakt
 
   // Andere Formate: Zeichnungen unten bzw. rechts im Hauptfeld
   if (freieZeichnungen.length && !zeichenFlaeche) {
-    if (format === 'whiteboard') {
+    // Breite Zeichnungen (Zeitstrahl, Formel) als Streifen unter der Struktur – rechts daneben ließen sie viel Weiß
+    const breit = freieZeichnungen.every((z) => wunschVerhaeltnis(z) >= 3.5)
+    if (format === 'whiteboard' && !breit) {
       const b = haupt.w * 0.3
       zeichenFlaeche = { x: haupt.x + haupt.w - b, y: haupt.y, w: b, h: haupt.h }
       haupt = { ...haupt, w: haupt.w - b - u.text }
@@ -830,8 +884,24 @@ function setzeEinmal(inhalt: TbInhalt, format: FormatId, o: LayoutOptionen, fakt
   if (!o.varianten.schritte) for (const e of el) e.schritt = 1
   else nummeriereSchritte(el)
   entzerre(el, u)
+  if (format === 'heft') sicherungHeranruecken(el, u)
   if (el.some((e) => e.typ !== 'verbinder' && (e.y + e.h > 1.002 || e.x + e.w > 1.002))) u.ueberlauf.push('Nicht alles passt auf die Fläche.')
   return { tafel: { format, elemente: el, schrift }, ueberlauf: u.ueberlauf }
+}
+
+/**
+ * Hefteintrag (Nachbesserung 30.09.2026): Merksatz und Hausaufgabe rücken direkt unter den Inhalt.
+ * Unten verankert blieb über ihnen eine große leere Fläche mitten im Heft; so wird der Eintrag
+ * von oben nach unten abgeschrieben, und der freie Rest der Seite liegt am Ende.
+ */
+function sicherungHeranruecken(el: TbElement[], u: Umgebung): void {
+  const sicherung = el.filter((e) => e.typ === 'merksatz' || (e.typ === 'text' && e.titel === 'Hausaufgabe'))
+  const rest = el.filter((e) => e.typ !== 'verbinder' && e.typ !== 'pfeil' && !sicherung.includes(e))
+  if (!sicherung.length || !rest.length) return
+  const inhaltUnten = Math.max(...rest.map((e) => e.y + e.h))
+  const oben = Math.min(...sicherung.map((e) => e.y))
+  const luecke = oben - (inhaltUnten + (u.text * 1.4) / u.H)
+  if (luecke > 0) for (const e of sicherung) e.y -= luecke
 }
 
 /** Schritte lückenlos 1 … n; Verbinder erscheinen mit dem späteren ihrer Enden */

@@ -7,7 +7,7 @@
  * 2. KI liefert Inhalt + Layoutvorschlag (prompt.ts)
  * 3. Zeichnungen auflösen: OpenMoji-Piktogramme suchen, KI-Bilder im Tafelstil erzeugen
  * 4. Layout je Format (layout.ts), Qualitätsprüfung (pruefung.ts)
- * 5. Zu viel Text? Einmal kürzen lassen und neu setzen
+ * 5. Zu viel Text oder Schrift unter der Empfehlung? Einmal kürzen lassen und neu setzen
  */
 import type { StructuredRequest } from '@shared/types'
 import { registriereFortsetzung, starteAuftrag, type AuftragsKontext } from '../../shared/auftraege'
@@ -18,7 +18,7 @@ import { knotenText, setzeLayout } from './layout'
 import { kastenInhalt, kastenSatz } from './kasten'
 import { elementText, type Befund, type Tafelbild, type TafelbildMeta, type TbElement, type TbInhalt, type TbTafel } from './model'
 import { bildStil, elementAnfrage, elementAus, ganzesAnfrage, inhaltAnfrage, inhaltAus, kuerzenAnfrage, kuerzenAus, type MaterialText } from './prompt'
-import { pruefeAlle, zuLangeKnoten } from './pruefung'
+import { kleineSchrift, pruefeAlle, zuLangeKnoten } from './pruefung'
 import { bibliothek } from './store'
 
 type Melder = Pick<AuftragsKontext, 'melde' | 'ai' | 'bild'>
@@ -73,7 +73,15 @@ export interface Ergebnis {
   pruefung: Befund[]
 }
 
-/** Alle Formate setzen und prüfen; bei zu viel Text einmal kürzen lassen */
+/** Knoten der Elemente mit zu kleiner Schrift (alle Formate) */
+const knotenMitKleinerSchrift = (tafeln: TbTafel[]): string[] =>
+  [...new Set(tafeln.flatMap((t) => kleineSchrift(t).map((e) => e.knoten ?? '')))].filter(Boolean)
+
+/**
+ * Alle Formate setzen und prüfen; bei zu viel Text – oder wenn die Schrift unter die Empfehlung
+ * fiele (Nachbesserung 30.09.2026) – einmal kürzen lassen: zuerst die zu langen Kästen, sonst die
+ * mit zu kleiner Schrift, sonst alle.
+ */
 export async function setzeUndPruefe(inhalt: TbInhalt, m: TafelbildMeta, k: Melder | null, befunde: Befund[] = [], alteTafeln: TbTafel[] = []): Promise<Ergebnis> {
   const setzen = (i: TbInhalt): { tafeln: TbTafel[]; ueber: Befund[] } => {
     const ueber: Befund[] = []
@@ -88,8 +96,9 @@ export async function setzeUndPruefe(inhalt: TbInhalt, m: TafelbildMeta, k: Meld
   let aktuell = inhalt
   let r = setzen(aktuell)
   const lang = zuLangeKnoten(aktuell, m.grade, m.regler.stil)
-  if (k && (r.ueber.length || lang.length)) {
-    const ids = lang.length ? lang : aktuell.knoten.map((x) => x.id)
+  const klein = knotenMitKleinerSchrift(r.tafeln)
+  if (k && (r.ueber.length || lang.length || klein.length)) {
+    const ids = lang.length ? lang : klein.length ? klein : aktuell.knoten.map((x) => x.id)
     k.melde('Zu viel Text für die Tafel – die KI kürzt …')
     try {
       aktuell = kuerzenAus(await k.ai<unknown>(kuerzenAnfrage(m, aktuell, ids, worteJeElement(m.grade, m.regler.stil === 'ausformuliert'))), aktuell)
@@ -233,6 +242,45 @@ export function elementBearbeiten(t: Tafelbild, docId: string, format: FormatId,
         neu.pruefung = pruefeAlle(neu.tafeln, { grade: neu.meta.grade, regler: neu.meta.regler, inhalt: neu.inhalt })
         return neu
       })
+  })
+}
+
+/** Knoten, aus denen die Elemente entstanden (alle Formate) */
+export const knotenVon = (t: Tafelbild, elementIds: string[]): string[] =>
+  [...new Set(t.tafeln.flatMap((x) => x.elemente.filter((e) => elementIds.includes(e.id)).map((e) => e.knoten ?? '')))].filter(Boolean)
+
+/**
+ * „Text kürzen (KI)" – Vorschlag der App zum Befund „Schrift kleiner als empfohlen": die Kästen der
+ * betroffenen Knoten kürzen lassen (ohne Zuordnung: alle), dann alle Formate neu setzen. Als
+ * Hintergrund-Auftrag, ein Rückgängig-Schritt.
+ */
+export function textKuerzen(t: Tafelbild, docId: string, knotenIds: string[]): void {
+  const inhalt = t.inhalt
+  if (!inhalt) return
+  const bekannt = knotenIds.filter((id) => inhalt.knoten.some((k) => k.id === id))
+  const ids = bekannt.length ? bekannt : inhalt.knoten.map((x) => x.id)
+  void starteAuftrag({
+    moduleId: 'tafelbild',
+    docId,
+    titel: titel(t),
+    art: 'Text kürzen',
+    eingabe: t,
+    istOffen: () => bibliothek.istOffen(docId),
+    sperrt: false,
+    schluessel: `tafelbild-${docId}`,
+    fehlerTitel: 'Der Text konnte nicht gekürzt werden',
+    arbeit: async (tb, k) => {
+      k.melde('Die KI kürzt die Kästen …')
+      const gekuerzt = kuerzenAus(
+        await k.ai<unknown>(kuerzenAnfrage(tb.meta, inhalt, ids, worteJeElement(tb.meta.grade, tb.meta.regler.stil === 'ausformuliert'))),
+        inhalt
+      )
+      k.melde('Layout und Prüfung …')
+      return setzeUndPruefe(gekuerzt, tb.meta, null, [], tb.tafeln)
+    },
+    abschluss: (e) =>
+      `Gekürzt${e.pruefung.some((b) => b.art === 'schrift') ? ' – die Schrift ist noch klein.' : ' – die Schrift hat wieder die empfohlene Größe.'}`,
+    ablegen: (e, tb) => bibliothek.legeAb(docId, tb, (aktuell) => ({ ...aktuell, inhalt: e.inhalt, tafeln: e.tafeln, pruefung: e.pruefung }))
   })
 }
 

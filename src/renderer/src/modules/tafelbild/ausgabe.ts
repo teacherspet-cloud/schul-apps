@@ -3,14 +3,15 @@
  * - PDF zum Drucken: je Format eine Seite, dazu Lückenfassung, ★/★★-Fassungen und die
  *   Planungshilfe (Aufbau in Schritten, Farbbedeutung, Lösungen der Lücken)
  * - PNG in hoher Auflösung für Beamer und Smartboard
- * - PowerPoint: Folien, die das Tafelbild Schritt für Schritt aufbauen
+ * - PowerPoint: bearbeitbare Folien, die das Tafelbild Schritt für Schritt aufbauen (pptxFolien.ts)
  */
-import { FARB_NAMEN, farbwert, formatInfo, PALETTEN, type FormatId } from './formate'
+import { FARB_NAMEN, farbwert, formatInfo, type FormatId } from './formate'
 import { elementText, schrittZahl, type Niveau, type Tafelbild, type TbTafel } from './model'
-import { pptxDatei, type Folie } from './pptx'
+import { pptxDatei } from './pptx'
+import { pptxFolien } from './pptxFolien'
 import { STRUKTUR_NAMEN } from './model'
 import { svgMasse, tafelSvg, type SvgOptionen } from './svg'
-import { loesungen, NIVEAU_NAMEN, sichtbareElemente, wortspeicher } from './varianten'
+import { loesungen, NIVEAU_NAMEN } from './varianten'
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -85,7 +86,8 @@ export function pdfHtml(t: Tafelbild, w: PdfWahl, schule = ''): string {
   const seiten = seitenFuer(t, w)
     .map((s) => {
       const f = formatInfo(s.tafel.format)
-      const svg = tafelSvg(s.tafel, s.o)
+      // Ohne Körnung: im PDF würde sie als seitengroßes Rasterbild gedruckt (2,3 MB statt weniger Hundert KB)
+      const svg = tafelSvg(s.tafel, { ...s.o, ohneKorn: true })
       const m = svgMasse(svg)
       // Querformat: Breite füllt die Seite; hochkant: Höhe begrenzt
       const stil = f.seite === 'quer' ? `width:100%;max-height:${m.hoehe / m.breite > 0.62 ? '165mm' : 'none'}` : 'height:250mm;max-width:100%'
@@ -146,25 +148,9 @@ export const pngDataUrl = async (tafel: TbTafel, o: SvgOptionen = {}, breite = 1
 
 // ---------- PowerPoint ----------
 
-/** Folien: je Format der schrittweise Aufbau, am Ende auf Wunsch die Lückenfassung */
+/** Folien mit bearbeitbaren Formen: je Format der schrittweise Aufbau, am Ende auf Wunsch die Lückenfassung */
 export async function pptxFuer(t: Tafelbild, formate: FormatId[], mitLuecke: boolean): Promise<Uint8Array> {
-  const folien: Folie[] = []
-  for (const tafel of t.tafeln.filter((x) => formate.includes(x.format))) {
-    const f = formatInfo(tafel.format)
-    const n = t.meta.varianten.schritte ? schrittZahl(tafel) : 1
-    const hintergrund = PALETTEN[f.medium].hintergrund
-    for (let s = 1; s <= n; s++) {
-      const o: SvgOptionen = s < n ? { schritt: s } : {}
-      const { png, breite, hoehe } = await svgZuPng(tafelSvg(tafel, o), 1920)
-      const texte = sichtbareElemente(tafel, o).map(elementText).filter(Boolean)
-      folien.push({ png, breite, hoehe, hintergrund, titel: n > 1 ? `${f.kurz} – Schritt ${s} von ${n}` : f.kurz, beschreibung: `Tafelbild: ${texte.join(' | ')}`.slice(0, 1500) })
-    }
-    if (mitLuecke && tafel.elemente.some((e) => e.lueckenWoerter?.length || e.luecke)) {
-      const o: SvgOptionen = { luecke: true, wortspeicher: true }
-      const { png, breite, hoehe } = await svgZuPng(tafelSvg(tafel, o), 1920)
-      folien.push({ png, breite, hoehe, hintergrund, titel: `${f.kurz} – Lückenfassung`, beschreibung: `Lückenfassung. Wortspeicher: ${wortspeicher(tafel, o).join(', ')}` })
-    }
-  }
+  const folien = await pptxFolien(t, formate, mitLuecke, async (svg, breite) => (await svgZuPng(svg, breite)).png)
   if (!folien.length) throw new Error('Kein Tafelbild zum Ausgeben.')
   return pptxDatei(folien, t.inhalt?.titel || t.meta.title || 'Tafelbild')
 }
