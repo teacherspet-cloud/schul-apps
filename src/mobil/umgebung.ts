@@ -203,6 +203,8 @@ export function mobilUmgebung(pcKi?: PcKi): Umgebung {
       ordnerWaehlen: async () => null
     },
     lan: null,
+    // Die Windows-Firewall gibt es nur am Windows-PC (Kanal meldet „nur am Windows-PC")
+    windowsFreigabe: null,
     pcKi: {
       testen: async (adresse, pin) => {
         if (!pcKi) throw new Error('Die Verbindung zum PC ist noch nicht bereit.')

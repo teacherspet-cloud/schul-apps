@@ -186,6 +186,19 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
     expect(ERLAUBTE_KANAELE).toContain('ai:cancel')
   })
 
+  it('lässt die Windows-Firewall-Freigabe nie über das Netz auslösen (30.09.2026)', () => {
+    /*
+     * Die Freigabe startet eine Adminabfrage und legt Firewall-Regeln an – das gehört an den
+     * Rechner selbst. Beide Aufrufe existieren (Brücke), stehen aber in keiner Freigabeliste.
+     */
+    for (const k of ['lan:freigabe-status', 'lan:freigabe-einrichten']) {
+      expect(vorhandene, `${k} fehlt in main/kanaele.ts`).toContain(k)
+      expect(ERLAUBTE_KANAELE, `${k} darf aus dem Netz nicht erreichbar sein`).not.toContain(k)
+      expect(AUFTRAGS_KANAELE).not.toContain(k)
+      expect(gruppeVon(k)).toBeNull()
+    }
+  })
+
   it('lässt die Bibliotheken lesen', () => {
     for (const k of ['sheets:list', 'exams:list', 'tests:list', 'kurztests:list', 'grammarTests:list']) {
       expect(ERLAUBTE_KANAELE, `${k} fehlt – die Bibliothek bliebe im Browser leer`).toContain(k)

@@ -14,6 +14,7 @@ import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './service
 import { ladeSicherung, listeSicherungen, sichereJetzt } from './services/storage/autoSicherung'
 import { getSettings, setSettings } from './services/storage/settings'
 import { paketAusArgumenten } from './services/paket/wege'
+import { langerExePfad, windowsFreigabe } from './services/netz/windowsFreigabe'
 
 export interface ElectronUmgebungOptionen {
   /** Das Hauptfenster (kann fehlen, solange es noch nicht offen ist) */
@@ -148,6 +149,17 @@ export function electronUmgebung(o: ElectronUmgebungOptionen): Umgebung {
         return lanStatus()
       }
     },
+    /*
+     * Windows-Firewall-Freigabe (30.09.2026): Port = der laufende Port des Netzzugangs, sonst der
+     * eingestellte; Programm = der LANGE Pfad der laufenden exe (portabel: %TEMP%\Schul-Apps).
+     */
+    windowsFreigabe: windowsFreigabe({
+      port: () => {
+        const s = lanStatus()
+        return s.laeuft && s.port ? s.port : getSettings().lan?.port || 8420
+      },
+      exe: () => langerExePfad()
+    }),
     // „Abo über den PC" gibt es nur in der iPad-App – der PC IST der PC
     pcKi: null
   }

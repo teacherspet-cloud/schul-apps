@@ -17,6 +17,7 @@ import type { SchulQuelle, SchulTreffer, SuchOptionen } from './schulsuche'
 import type { DesignTemplate } from '@shared/design'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
 import type { LanStatus } from '../main/services/lanServer'
+import type { WindowsFreigabeErgebnis, WindowsFreigabeStatus } from '../main/services/netz/windowsFreigabe'
 import type { Netzfund } from '../main/services/ai/provider'
 import type {
   AiProviderId,
@@ -138,7 +139,10 @@ export function buildApi(call: Call, extras: ApiExtras) {
     lan: {
       status: () => call<LanStatus>('lan:status'),
       start: () => call<LanStatus>('lan:start'),
-      stop: () => call<LanStatus>('lan:stop')
+      stop: () => call<LanStatus>('lan:stop'),
+      /** Windows-Firewall: Status lesen (ohne Adminrechte) bzw. mit EINER UAC-Abfrage einrichten */
+      freigabeStatus: () => call<WindowsFreigabeStatus>('lan:freigabe-status'),
+      freigabeEinrichten: () => call<WindowsFreigabeErgebnis>('lan:freigabe-einrichten')
     },
     /**
      * Nur iPad-App: KI über die App am PC („Abo über den PC", mobil/pcKi.ts). Meldet sich mit

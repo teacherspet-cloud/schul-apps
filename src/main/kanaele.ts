@@ -94,6 +94,7 @@ import { leseProtokoll, protokolliere } from './services/protokoll'
 import { mitWiederholung } from './services/ai/wiederholung'
 import { leseVerbrauch, merkeVerbrauch } from './services/ai/verbrauch'
 import type { LanStatus } from './services/lanServer'
+import type { WindowsFreigabe, WindowsFreigabeStatus } from './services/netz/windowsFreigabe'
 import type { SicherungsEintrag } from './services/storage/autoSicherung'
 
 /** Registriert einen Aufruf; Fehler kommen als lesbare Meldung in der Oberfläche an (Sache der Umgebung). */
@@ -158,6 +159,8 @@ export interface Umgebung {
   }
   /** Zugang aus dem lokalen Netz – nur am PC */
   lan: { status(): LanStatus; start(): Promise<LanStatus>; stop(): LanStatus } | null
+  /** Windows-Firewall-Freigabe des Netzzugangs (eine UAC-Abfrage) – nur am Windows-PC; iPad: null */
+  windowsFreigabe: WindowsFreigabe | null
   /** KI über die App am PC („Abo über den PC") – nur in der iPad-App (mobil/pcKi.ts) */
   pcKi: { testen(adresse: string, pin: string): Promise<PcKiTest> } | null
 }
@@ -199,6 +202,20 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('lan:stop', () => {
     if (!lan) throw new Error(NUR_AM_PC)
     return lan.stop()
+  })
+  /*
+   * Windows-Firewall-Freigabe (30.09.2026, ausdrückliche Zustimmung der Lehrkraft): nur lokal
+   * über die Brücke – im Netzzugang gesperrt wie alles unter „lan:" (tests/lanFreigaben.test.ts).
+   */
+  const nurWindows = 'Die Windows-Freigabe gibt es nur in der App am Windows-PC.'
+  handle('lan:freigabe-status', (): Promise<WindowsFreigabeStatus> | WindowsFreigabeStatus =>
+    u.windowsFreigabe
+      ? u.windowsFreigabe.status()
+      : { zustand: 'nichtWindows', port: 0, exe: '', portRegel: false, programmRegel: false, blockierregeln: 0, meldung: nurWindows }
+  )
+  handle('lan:freigabe-einrichten', () => {
+    if (!u.windowsFreigabe) throw new Error(nurWindows)
+    return u.windowsFreigabe.einrichten()
   })
   // Umgekehrt nur auf dem iPad: die Verbindung zur App am PC prüfen
   handle('pcki:testen', (adresse: string, pin: string) => {

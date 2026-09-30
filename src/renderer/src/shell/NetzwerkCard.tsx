@@ -1,8 +1,10 @@
 import { Alert, Badge, Button, Card, Code, CopyButton, Group, List, NumberInput, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
-import { IconAlertTriangle, IconCheck, IconCopy, IconDeviceTablet, IconRefresh } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconCopy, IconDeviceTablet, IconRefresh, IconShieldCheck } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
 import type { LanStatus } from '../../../main/services/lanServer'
+import type { WindowsFreigabeStatus } from '../../../main/services/netz/windowsFreigabe'
+import { amPc } from '../shared/plattform'
 import { qrDataUrl } from '../modules/arbeitsblatt/render/qr'
 import { useAppSettings } from '../shared/settingsStore'
 import { notifyError } from '../shared/util'
@@ -239,6 +241,8 @@ export default function NetzwerkCard({
         />
       </Card>
 
+      {amPc() && <WindowsFreigabeKarte port={laeuft && status?.port ? status.port : port} />}
+
       <Card withBorder padding="lg">
         <Title order={4} mb="sm">
           Gut zu wissen
@@ -249,14 +253,13 @@ export default function NetzwerkCard({
             automatisch einschalten“ ist der Zugang nach jedem Programmstart wieder da.
           </List.Item>
           <List.Item>
-            <b>iPad-App: KI über diesen PC.</b> In der iPad-App lässt sich unter „KI-Zugang“ die Option „Abo über den PC (WLAN)“ wählen – dann erzeugt dieser
-            PC mit seinem Abo oder API-Schlüssel. Dafür muss Schul-Apps hier laufen und der Zugang eingeschaltet sein; auf dem iPad stehen die Adresse von oben
-            und die PIN.
+            <b>iPad-App: KI über diesen PC.</b> In der iPad-App lässt sich unter „KI-Zugang“ die Option „Abo über den PC (WLAN)“ wählen – dann erzeugt dieser PC
+            mit seinem Abo oder API-Schlüssel. Dafür muss Schul-Apps hier laufen und der Zugang eingeschaltet sein; auf dem iPad stehen die Adresse von oben und
+            die PIN.
           </List.Item>
           <List.Item>
             <b>Von unterwegs nur über ein privates VPN.</b> Mit Tailscale (kostenlos, verschlüsselt) auf PC und iPad erreicht die iPad-App diesen PC auch aus
-            einem fremden WLAN oder über Mobilfunk. Der Zugang wird dafür nicht ins Internet gestellt; eine Weiterleitung am Router ist weder nötig noch
-            ratsam.
+            einem fremden WLAN oder über Mobilfunk. Der Zugang wird dafür nicht ins Internet gestellt; eine Weiterleitung am Router ist weder nötig noch ratsam.
           </List.Item>
           <List.Item>
             <b>Es ist dasselbe Programm.</b> Eine gemeinsame Bibliothek, ein KI-Kontingent – das dieses Rechners. Wer vom Tablet aus erstellt, verbraucht
@@ -271,7 +274,8 @@ export default function NetzwerkCard({
             nicht erreichbar, obwohl hier alles richtig eingestellt ist. Zu Hause funktioniert es in der Regel.
           </List.Item>
           <List.Item>
-            <b>Windows fragt beim ersten Einschalten</b> nach einer Freigabe durch die Firewall. Ohne „Zulassen" kommt keine Verbindung zustande.
+            <b>Windows fragt beim ersten Einschalten</b> nach einer Freigabe durch die Firewall. Ohne „Zulassen" kommt keine Verbindung zustande. Dauerhaft
+            einrichten lässt sie sich oben unter „Windows-Firewall“.
           </List.Item>
           <List.Item>
             <b>Die Verbindung ist unverschlüsselt.</b> Im lokalen Netz ist das üblich; ein eigenes Zertifikat würde in jedem Browser eine Warnung erzeugen. Wer
@@ -339,5 +343,98 @@ function TailscaleAdresse({ ts }: { ts: NonNullable<LanStatus['tailscale']> }): 
         Nur für den Browser eines Geräts: <Code>{ts.ip}</Code> – die iPad-App erreicht Tailscale-IP-Adressen nicht.
       </Text>
     </Stack>
+  )
+}
+
+/**
+ * Windows-Firewall-Freigabe (30.09.2026, ausdrückliche Zustimmung der Lehrkraft).
+ *
+ * Die portable exe entpackt sich bei jedem Start neu; wurde die Frage von Windows einmal
+ * abgebrochen, blockiert eine still angelegte Regel das Tablet dauerhaft. Der Knopf richtet mit
+ * EINER Adminabfrage die Regeln für das private Netz ein (main/services/netz/windowsFreigabe.ts).
+ * Nur am Windows-PC – auf anderen Systemen meldet der Status „nichtWindows", die Karte bleibt weg.
+ */
+function WindowsFreigabeKarte({ port }: { port: number }): React.JSX.Element | null {
+  const [stand, setStand] = useState<WindowsFreigabeStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [meldung, setMeldung] = useState<{ text: string; ok: boolean } | null>(null)
+
+  const lesen = async (): Promise<void> => {
+    try {
+      setStand(await window.api.lan.freigabeStatus())
+    } catch {
+      setStand(null)
+    }
+  }
+
+  // Beim Öffnen und wenn sich der Port ändert (die Portregel hängt am Port)
+  useEffect(() => {
+    void lesen()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [port])
+
+  if (!stand || stand.zustand === 'nichtWindows') return null
+
+  const einrichten = async (): Promise<void> => {
+    setBusy(true)
+    setMeldung(null)
+    try {
+      const r = await window.api.lan.freigabeEinrichten()
+      setStand(r.status)
+      setMeldung({ text: r.meldung, ok: r.ergebnis === 'eingerichtet' })
+    } catch (e) {
+      notifyError(e, 'Die Freigabe ließ sich nicht einrichten')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card withBorder padding="lg" data-windows-freigabe>
+      <Group justify="space-between" mb={4}>
+        <Title order={4}>Windows-Firewall</Title>
+        {stand.zustand === 'eingerichtet' && (
+          <Badge color="green" variant="light">
+            Freigabe dauerhaft eingerichtet
+          </Badge>
+        )}
+        {stand.zustand === 'fehlt' && (
+          <Badge color="gray" variant="light">
+            nicht eingerichtet
+          </Badge>
+        )}
+      </Group>
+      <Text size="sm" c="dimmed" mb="md">
+        Die Freigabe erlaubt der iPad-App und dem Browser eines Tablets den Zugriff auf diesen PC im privaten Netz – auch über Tailscale. Betroffen sind nur
+        private Netze; in öffentlichen Netzen bleibt der Zugang gesperrt. Windows fragt dafür einmal nach Administratorrechten. Angelegt werden nur zwei Regeln
+        für Schul-Apps (Port {port} und das Programm selbst); Blockierregeln, die Windows nach „Abbrechen“ für Schul-Apps angelegt hat, werden entfernt.
+      </Text>
+      {stand.zustand === 'blockiert' && (
+        <Alert color="orange" icon={<IconAlertTriangle size={16} />} mb="md">
+          Windows blockiert Schul-Apps – Blockierregel entfernen. Die Einrichtung unten entfernt{' '}
+          {stand.blockierregeln === 1 ? 'sie' : `alle ${stand.blockierregeln}`} und legt die Freigabe an.
+        </Alert>
+      )}
+      {stand.zustand === 'unbekannt' && (
+        <Text size="sm" c="dimmed" mb="md">
+          {stand.meldung ?? 'Der Stand der Firewall ließ sich nicht lesen.'}
+        </Text>
+      )}
+      <Group gap="sm">
+        {stand.zustand !== 'eingerichtet' && (
+          <Button leftSection={<IconShieldCheck size={16} />} loading={busy} onClick={() => void einrichten()}>
+            Windows-Freigabe dauerhaft einrichten
+          </Button>
+        )}
+        <Button variant="subtle" leftSection={<IconRefresh size={14} />} disabled={busy} onClick={() => void lesen()}>
+          Erneut prüfen
+        </Button>
+      </Group>
+      {meldung && (
+        <Text size="sm" mt="sm" c={meldung.ok ? 'green' : 'orange'}>
+          {meldung.text}
+        </Text>
+      )}
+    </Card>
   )
 }

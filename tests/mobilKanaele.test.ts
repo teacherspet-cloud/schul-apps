@@ -82,6 +82,9 @@ describe('Kanäle am PC und auf dem iPad', () => {
     // Den Netzzugang gibt es nur am PC
     expect(umgebungen.pc.lan).not.toBeNull()
     expect(umgebungen.ios.lan).toBeNull()
+    // Die Windows-Firewall-Freigabe ebenso (30.09.2026)
+    expect(umgebungen.pc.windowsFreigabe).not.toBeNull()
+    expect(umgebungen.ios.windowsFreigabe).toBeNull()
   })
 
   it('meldet auf dem iPad klar, was es nur am PC gibt', async () => {
@@ -91,5 +94,7 @@ describe('Kanäle am PC und auf dem iPad', () => {
     expect(await aufrufe.get('lan:status')!()).toMatchObject({ laeuft: false })
     expect(await aufrufe.get('export:printers')!()).toEqual([])
     expect(await aufrufe.get('files:launch-file')!()).toBeNull()
+    await expect(Promise.resolve().then(() => aufrufe.get('lan:freigabe-einrichten')!())).rejects.toThrow(/nur in der App am Windows-PC/)
+    expect(await aufrufe.get('lan:freigabe-status')!()).toMatchObject({ zustand: 'nichtWindows' })
   })
 })

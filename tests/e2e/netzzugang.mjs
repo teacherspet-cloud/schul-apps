@@ -50,6 +50,31 @@ pruefe(pinFeld.da, 'Das PIN-Feld steht in den Einstellungen, auch wenn der Zugan
 pruefe(/^\d{6}$/.test(pinFeld.wert), `Es steht eine sechsstellige PIN darin (war: „${pinFeld.wert}")`)
 pruefe(pinFeld.aenderbar, 'Die PIN lässt sich ändern')
 
+/*
+ * Windows-Firewall-Freigabe (30.09.2026): Die Karte steht am Windows-PC da – mit Status und,
+ * solange nicht eingerichtet, dem Knopf. NUR ansehen, nie klicken: Der Knopf startet eine
+ * UAC-Abfrage und legt Firewall-Regeln an.
+ */
+if (process.platform === 'win32') {
+  const karte = await page
+    .waitForSelector('[data-windows-freigabe]', { timeout: 30000 })
+    .then(() => true)
+    .catch(() => false)
+  pruefe(karte, 'Die Karte „Windows-Firewall" steht in den Einstellungen')
+  const freigabe = await page.evaluate(() => {
+    const k = document.querySelector('[data-windows-freigabe]')
+    const text = k?.textContent ?? ''
+    return {
+      knopf: [...(k?.querySelectorAll('button') ?? [])].some((b) => b.textContent?.includes('Windows-Freigabe dauerhaft einrichten')),
+      eingerichtet: text.includes('Freigabe dauerhaft eingerichtet'),
+      hilfe: text.includes('privaten Netz') && text.includes('Tailscale')
+    }
+  })
+  console.log(`Windows-Freigabe: ${freigabe.eingerichtet ? 'eingerichtet' : 'nicht eingerichtet'} · Knopf sichtbar: ${freigabe.knopf}`)
+  pruefe(freigabe.knopf || freigabe.eingerichtet, 'Der Knopf „Windows-Freigabe dauerhaft einrichten" ist sichtbar (oder die Freigabe steht schon)')
+  pruefe(freigabe.hilfe, 'Der Hilfetext nennt privates Netz und Tailscale')
+}
+
 // Eine eigene PIN eintragen und nachsehen, ob sie ankommt
 await page.evaluate(() => {
   const label = [...document.querySelectorAll('label')].find((l) => l.textContent?.includes('PIN für die Anmeldung'))
