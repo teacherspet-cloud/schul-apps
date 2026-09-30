@@ -40,7 +40,13 @@ const PRAEFIX: Record<string, string> = {
   russisch: 'ru.',
   griechisch: 'gr.',
   latein: 'la.',
-  deutsch: 'de.'
+  deutsch: 'de.',
+  niederlaendisch: 'nl.',
+  polnisch: 'pl.',
+  tschechisch: 'cs.',
+  portugiesisch: 'pt.',
+  tuerkisch: 'tr.',
+  chinesisch: 'zh.'
 }
 
 describe('Datenformat der ergänzten Themen', () => {
@@ -64,7 +70,7 @@ describe('Datenformat der ergänzten Themen', () => {
       expect(t.examples?.length, t.id).toBeGreaterThan(0)
       expect(t.source?.trim(), t.id).toBeTruthy()
       // Fremdsprachen mit GER tragen ein lesbares Niveau
-      if (['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch'].includes(t.subject)) expect(einfuehrungsNiveau(t.level), t.id).not.toBeNull()
+      if (!['latein', 'griechisch', 'deutsch'].includes(t.subject)) expect(einfuehrungsNiveau(t.level), t.id).not.toBeNull()
       if (t.subject === 'deutsch') expect(t.scale).toBe('jahrgang')
       else expect(t.scale).toBe('lernjahr')
     }

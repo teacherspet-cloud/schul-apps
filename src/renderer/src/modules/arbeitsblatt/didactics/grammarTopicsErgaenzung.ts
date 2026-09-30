@@ -24,6 +24,7 @@
  * - Deutsch läuft nach Jahrgang.
  */
 import type { GrammarScale, GrammarTopic } from './grammarTopics'
+import { NEUE_SPRACHEN_GRAMMATIK } from './grammarTopicsNeueSprachen'
 
 type Eingabe = Omit<GrammarTopic, 'subject' | 'scale' | 'stage' | 'formatsText'> & {
   scale?: GrammarScale
@@ -2406,5 +2407,7 @@ export const ERGAENZTE_GRAMMATIKTHEMEN: GrammarTopic[] = [
   ...RUSSISCH,
   ...GRIECHISCH,
   ...LATEIN,
-  ...DEUTSCH
+  ...DEUTSCH,
+  // Niederländisch, Polnisch, Tschechisch, Portugiesisch, Türkisch, Chinesisch (30.09.2026)
+  ...NEUE_SPRACHEN_GRAMMATIK
 ]

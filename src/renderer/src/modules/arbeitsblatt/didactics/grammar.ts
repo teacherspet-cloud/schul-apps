@@ -56,7 +56,8 @@ const LATE_FS2_STATES = ['NW', 'NRW']
  */
 export function defaultSequence(subjectId: string, grade: number): LanguageSequence {
   if (subjectId === 'englisch') return 'fs1'
-  if (subjectId === 'spanisch' || subjectId === 'italienisch') {
+  // Chinesisch und Portugiesisch werden wie Spanisch und Italienisch oft als 3. oder spät beginnende Fremdsprache gelernt (Faustregel)
+  if (['spanisch', 'italienisch', 'chinesisch', 'portugiesisch'].includes(subjectId)) {
     if (grade >= 11) return 'spaet'
     return grade >= 8 ? 'fs3' : 'fs2'
   }
@@ -75,14 +76,30 @@ export function learningYear(grade: number, sequence: LanguageSequence, stateId 
   return Math.max(1, grade - start + 1)
 }
 
-/** Fächer, für die ein Grammatik-Schwerpunkt angeboten wird */
-export const GRAMMAR_SUBJECTS = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch', 'latein', 'griechisch', 'deutsch', 'daz']
+/**
+ * Fächer, für die ein Grammatik-Schwerpunkt angeboten wird. Seit 30.09.2026 auch die neuen
+ * Schulfremdsprachen (Themen in grammarTopicsNeueSprachen.ts).
+ */
+export const NEUE_SCHULSPRACHEN = ['niederlaendisch', 'polnisch', 'tschechisch', 'portugiesisch', 'tuerkisch', 'chinesisch']
+
+export const GRAMMAR_SUBJECTS = [
+  'englisch',
+  'franzoesisch',
+  'spanisch',
+  'italienisch',
+  'russisch',
+  'latein',
+  'griechisch',
+  'deutsch',
+  'daz',
+  ...NEUE_SCHULSPRACHEN
+]
 
 export const hasGrammar = (subjectId: string): boolean => GRAMMAR_SUBJECTS.includes(subjectId)
 
 /** Fächer, bei denen die Fremdsprachenfolge über das Lernjahr entscheidet */
 export const needsSequence = (subjectId: string): boolean =>
-  ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch', 'latein', 'griechisch'].includes(subjectId)
+  ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch', 'latein', 'griechisch', ...NEUE_SCHULSPRACHEN].includes(subjectId)
 
 /** Übungsformate, die die Recherche je Thema empfiehlt. */
 export const GRAMMAR_FORMATS: { id: string; label: string; open: boolean }[] = [

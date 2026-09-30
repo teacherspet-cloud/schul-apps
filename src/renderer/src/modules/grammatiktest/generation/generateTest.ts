@@ -25,6 +25,30 @@ import type { GrammarTest } from '../model/types'
 import { brauchtKi, erzeugeVerbBloecke } from '../../../shared/verben/aufgaben'
 import { VERB_SPALTEN } from '@shared/verben'
 
+/**
+ * Schrift und Varietät der neuen Schulfremdsprachen (30.09.2026): Was die KI sonst uneinheitlich
+ * macht – Pinyin, Diakritika, Vokalharmonie, europäisches oder brasilianisches Portugiesisch.
+ */
+export const SPRACHREGELN: Record<string, string[]> = {
+  chinesisch: [
+    '- Chinesisch in Kurzzeichen (vereinfachte Schriftzeichen), keine Langzeichen.',
+    '- Hinter jedem Satz bzw. jeder Wortgruppe Pinyin mit Tonzeichen in Klammern (z. B. 我是学生。(Wǒ shì xuésheng.)) – im 1. und 2. Lernjahr immer, später nur bei neuen Zeichen.',
+    '- Lösungen in Schriftzeichen; wo die Klasse ein Zeichen noch nicht schreibt, ist Pinyin mit Tonzeichen als Lösung zulässig – nenne dann beides.',
+    '- Stehen die Arbeitsanweisungen auf Chinesisch, dann sehr kurz und mit Pinyin.'
+  ],
+  tuerkisch: [
+    '- Türkische Buchstaben vollständig (ç, ğ, ı, İ, ö, ş, ü); ı und i sind verschiedene Buchstaben.',
+    '- Jede Endung folgt der Vokalharmonie und dem Konsonantenwechsel; die Fragepartikel mi/mı/mu/mü steht getrennt.'
+  ],
+  polnisch: ['- Polnische Diakritika vollständig (ą, ć, ę, ł, ń, ó, ś, ź, ż); in der Lösung stehen die Formen mit allen Zeichen.'],
+  tschechisch: ['- Tschechische Diakritika vollständig (á, č, ď, é, ě, í, ň, ó, ř, š, ť, ú, ů, ý, ž); in der Lösung stehen die Formen mit allen Zeichen.'],
+  portugiesisch: [
+    '- Einheitlich europäisches Portugiesisch (tu, estar a + Infinitiv, Enklise), außer der Test nennt ausdrücklich Brasilien.',
+    '- Wo die brasilianische Form ebenfalls richtig ist, nennt die Lösung beide.'
+  ],
+  niederlaendisch: ['- Standardniederländisch; wo in Belgien eine andere Form üblich und korrekt ist, nennt die Lösung beide.']
+}
+
 /** Auftrag an die KI. */
 export function testPrompt(test: GrammarTest): string {
   const m = test.meta
@@ -37,7 +61,12 @@ export function testPrompt(test: GrammarTest): string {
       `Spalten der Liste: ${spalten.map((s) => s.label).join(' | ')}.`,
       `Verben: ${m.verben.verben
         .slice(0, 60)
-        .map((e) => spalten.map((s) => e.formen[s.id]).filter(Boolean).join(' – '))
+        .map((e) =>
+          spalten
+            .map((s) => e.formen[s.id])
+            .filter(Boolean)
+            .join(' – ')
+        )
         .join('; ')}.`,
       '- Geprüft wird, nicht erarbeitet: keine Merkkästen, keine Hilfekarten.',
       '- Je Form ein Punkt; die Arbeitsanweisung nennt die Punktzahl nicht.'
@@ -68,6 +97,7 @@ export function testPrompt(test: GrammarTest): string {
       : '- Einzelsätze sind zulässig, aber jeder Satz muss für sich verständlich sein und eine Mitteilung enthalten – keine sinnlosen Übungssätze.',
     '- Keine unbekannte Lexik: Der Test prüft die Form, nicht den Wortschatz. Wer ein Wort nicht kennt, scheitert sonst aus dem falschen Grund.',
     german ? '' : `- Die Aufgabentexte stehen auf ${target}.`,
+    ...(SPRACHREGELN[m.subjectId] ?? []),
     m.instructionsInGerman ? '- Die Arbeitsanweisungen stehen auf Deutsch.' : '',
     // Anrede der Lernenden (Paket 8b): nur wo die Anweisungen deutsch sind – Sek I du, Sek II Sie
     german || m.instructionsInGerman ? anredeRegel(anredeFuer(m.grade, m.schoolTypeId, m.stateId)) : '',
