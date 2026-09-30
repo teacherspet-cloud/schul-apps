@@ -2,6 +2,8 @@ import { Badge, Button, Card, Checkbox, Group, Stack, Table, Text, Title } from 
 import { IconFileSpreadsheet, IconFileTypePdf, IconNotebook } from '@tabler/icons-react'
 import { useState } from 'react'
 import { speichereAusgabe } from '../../../shared/export/ausgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
+import { useRueckmeldung } from '../store'
 import { setzeFachVorgabe, setzeThemaVorgabe } from '../../../shared/fachVorgabe'
 import { neuAnlegen } from '../../../shared/navigation'
 import { notifyError, safeFileName } from '../../../shared/util'
@@ -14,6 +16,8 @@ import type { Rueckmeldung } from '../model/types'
  * aller Abgaben mit „Übungsblatt dazu erstellen" (öffnet ein neues Arbeitsblatt mit Thema).
  */
 export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Element {
+  // iPad: Ablage unter Schulmaterial/<Fach>/<Themenbereich> (shared/export/ablageZiel.ts)
+  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('rueckmeldung', useRueckmeldung.getState().docId, r.meta.subjectId)
   const zeilen = uebersichtZeilen(r)
   const profil = fehlerprofil(r)
   const [gewaehlt, setGewaehlt] = useState<string[]>([])
@@ -48,7 +52,7 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
               size="xs"
               variant="light"
               leftSection={<IconFileTypePdf size={14} />}
-              onClick={() => void speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.').catch(notifyError)}
+              onClick={() => void speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.', ablage()).catch(notifyError)}
             >
               PDF
             </Button>
@@ -59,7 +63,8 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
               onClick={() =>
                 void speichereAusgabe(
                   [{ name: `${basis}.csv`, filter: [{ name: 'CSV für Excel', extensions: ['csv'] }], daten: uebersichtCsv(r) }],
-                  'Notenübersicht gespeichert.'
+                  'Notenübersicht gespeichert.',
+                  ablage()
                 ).catch(notifyError)
               }
               data-rm-csv

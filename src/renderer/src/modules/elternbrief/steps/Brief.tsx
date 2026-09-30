@@ -24,6 +24,7 @@ import {
 import { IconAlertTriangle, IconFileTypeDocx, IconFileTypePdf, IconHistory, IconLanguage, IconRefresh, IconTrash, IconWand } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { FAMILIENSPRACHEN, spracheNach } from '../../../shared/familiensprachen'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, safeFileName } from '../../../shared/util'
@@ -137,7 +138,8 @@ export default function Brief(): React.JSX.Element | null {
             }
           ]
         : [{ name: `${name}.docx`, filter: WORD_FILTER, daten: () => briefDocx(b, kopf) }],
-      `Elternbrief${anzahl ? ` mit ${anzahl} Übersetzung${anzahl === 1 ? '' : 'en'}` : ''} gespeichert${pw ? ' und digital signiert' : ''}.`
+      `Elternbrief${anzahl ? ` mit ${anzahl} Übersetzung${anzahl === 1 ? '' : 'en'}` : ''} gespeichert${pw ? ' und digital signiert' : ''}.`,
+      ablageZiel('elternbrief', docId)
     ).catch(notifyError)
   }
 

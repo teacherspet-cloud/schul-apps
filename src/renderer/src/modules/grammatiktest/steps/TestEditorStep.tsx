@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
+import { meldeAblage } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
@@ -22,7 +24,7 @@ import EditorLeiste from '../../../shared/components/EditorLeiste'
 import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
 import CanaryDialog from '../../../shared/components/CanaryDialog'
 import { canaryWordFor } from '../../../shared/aiCanary'
-import { notifyError, notifySuccess } from '../../../shared/util'
+import { notifyError } from '../../../shared/util'
 import type { DesignTemplate } from '@shared/design'
 import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
@@ -92,7 +94,8 @@ export default function TestEditorStep(): React.JSX.Element {
     name: ws.meta.title || 'Grammatiktest',
     logo,
     schoolName: settings.schoolName,
-    begriff: 'Lösungen'
+    begriff: 'Lösungen',
+    ziel: ablageZiel('grammatiktest', docId, ws.meta.subjectLabel || ws.meta.subjectId)
   }
 
   /*
@@ -165,8 +168,8 @@ export default function TestEditorStep(): React.JSX.Element {
           tooltip: 'Als Datei speichern … (.grammatiktest, z. B. zum Weitergeben)',
           onClick: async () => {
             try {
-              const path = await window.api.files.save(`${quelle.name}.grammatiktest`, GRAMMATIKTEST_FILTER, serializeGrammarTest(test))
-              if (path) notifySuccess('Datei gespeichert.')
+              const path = await window.api.files.save(`${quelle.name}.grammatiktest`, GRAMMATIKTEST_FILTER, serializeGrammarTest(test), quelle.ziel)
+              if (path) meldeAblage(path, 'Datei gespeichert.')
             } catch (e) {
               notifyError(e)
             }
@@ -176,7 +179,7 @@ export default function TestEditorStep(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="grammatiktest" docId={docId} />
-            <LmsExport titel={test.meta.title || 'Grammatiktest'} bericht={() => fragenAusBlatt(testToWorksheet(test))} />
+            <LmsExport titel={test.meta.title || 'Grammatiktest'} bericht={() => fragenAusBlatt(testToWorksheet(test))} ziel={quelle.ziel} />
           </>
         }
       />

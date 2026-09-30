@@ -18,6 +18,7 @@ import {
 import { IconArrowDown, IconArrowUp, IconFileTypeDocx, IconFileTypePdf, IconListDetails, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { verlaufDocx } from '../../../shared/stundenverlauf/docx'
 import {
   leererVerlauf,
@@ -75,7 +76,8 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
       art === 'docx'
         ? [{ name: `${name}.docx`, filter: WORD_FILTER, daten: () => verlaufDocx(v, titel, untertitel, ws.meta.ki) }]
         : [{ name: `${name}.pdf`, html: verlaufHtml(v, titel, untertitel, ws.meta.ki) }],
-      'Stundenverlauf gespeichert.'
+      'Stundenverlauf gespeichert.',
+      ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
     ).catch(notifyError)
   }
 

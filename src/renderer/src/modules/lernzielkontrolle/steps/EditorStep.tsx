@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
+import { meldeAblage } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
@@ -26,7 +28,7 @@ import EditorLeiste from '../../../shared/components/EditorLeiste'
 import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
 import CanaryDialog from '../../../shared/components/CanaryDialog'
 import { canaryWordFor } from '../../../shared/aiCanary'
-import { notifyError, notifySuccess } from '../../../shared/util'
+import { notifyError } from '../../../shared/util'
 import type { DesignTemplate } from '@shared/design'
 import { useDruck } from '../../../shared/navigation'
 import { useThemenbereich } from '../../../shared/themenbereiche'
@@ -171,7 +173,16 @@ export default function EditorStep(): React.JSX.Element {
 
   const quelle = (alle: boolean): BlattQuelle => {
     const a = ausgabe(alle)
-    return { ws: a.ws, layouts, sheetIds: a.sheetIds, name: a.name, logo, schoolName: settings.schoolName, begriff: 'Lösungen' }
+    return {
+      ws: a.ws,
+      layouts,
+      sheetIds: a.sheetIds,
+      name: a.name,
+      logo,
+      schoolName: settings.schoolName,
+      begriff: 'Lösungen',
+      ziel: ablageZiel('lernzielkontrolle', docId, a.ws.meta.subjectLabel || a.ws.meta.subjectId)
+    }
   }
 
   /** Word, PDF oder Druckvorschau – mit der Wahl aus dem Ausgabe-Dialog */
@@ -270,8 +281,8 @@ export default function EditorStep(): React.JSX.Element {
           tooltip: 'Als Datei speichern … (.lernzielkontrolle, z. B. zum Weitergeben)',
           onClick: async () => {
             try {
-              const path = await window.api.files.save(`${quelle(false).name}.lernzielkontrolle`, KURZTEST_FILTER, serializeKurztest(test))
-              if (path) notifySuccess('Datei gespeichert.')
+              const path = await window.api.files.save(`${quelle(false).name}.lernzielkontrolle`, KURZTEST_FILTER, serializeKurztest(test), quelle(false).ziel)
+              if (path) meldeAblage(path, 'Datei gespeichert.')
             } catch (e) {
               notifyError(e)
             }
@@ -281,7 +292,11 @@ export default function EditorStep(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="lernzielkontrolle" docId={docId} />
-            <LmsExport titel={test.meta.title || test.meta.thema} bericht={() => fragenAusBlatt(kurztestToWorksheet(test, variante))} />
+            <LmsExport
+              titel={test.meta.title || test.meta.thema}
+              bericht={() => fragenAusBlatt(kurztestToWorksheet(test, variante))}
+              ziel={quelle(false).ziel}
+            />
           </>
         }
       />

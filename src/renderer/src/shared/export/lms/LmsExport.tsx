@@ -4,6 +4,7 @@ import { strToU8, zipSync } from 'fflate'
 import { useMemo, useState } from 'react'
 import { notifyError, safeFileName } from '../../util'
 import { speichereAusgabe } from '../ausgabe'
+import type { AblageZiel } from '@shared/types'
 import type { LmsBericht } from './fragen'
 import { giftText, h5pInhalt, moodleXml } from './formate'
 
@@ -25,7 +26,7 @@ export function h5pPaket(bericht: LmsBericht, titel: string): { daten: Uint8Arra
  * „Lernplattform …" (Großprogramm 0.4, F5): die Aufgaben als Fragen für Moodle, ILIAS oder H5P.
  * Der Dialog sagt vor dem Speichern, was übernommen wird und was nicht – mit Grund.
  */
-export default function LmsExport({ bericht, titel }: { bericht: () => LmsBericht; titel: string }): React.JSX.Element {
+export default function LmsExport({ bericht, titel, ziel }: { bericht: () => LmsBericht; titel: string; ziel?: AblageZiel }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
   const [format, setFormat] = useState<Format>('moodle')
   const b = useMemo(() => (offen ? bericht() : null), [offen, bericht])
@@ -40,7 +41,7 @@ export default function LmsExport({ bericht, titel }: { bericht: () => LmsBerich
         : format === 'gift'
           ? { name: `${name}.gift.txt`, filter: [{ name: 'GIFT', extensions: ['txt', 'gift'] }], daten: giftText(b.fragen, titel) }
           : { name: `${name}.h5p`, filter: [{ name: 'H5P', extensions: ['h5p'] }], daten: h5pPaket(b, titel).daten }
-    void speichereAusgabe([datei], 'Fragen für die Lernplattform gespeichert.')
+    void speichereAusgabe([datei], 'Fragen für die Lernplattform gespeichert.', ziel)
       .then((n) => n && setOffen(false))
       .catch(notifyError)
   }

@@ -18,7 +18,9 @@
 import './shims/global'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
+import { Directory, Filesystem } from '@capacitor/filesystem'
 import { SplashScreen } from '@capacitor/splash-screen'
+import { SCHULMATERIAL } from '@shared/schulmaterial'
 import { buildApi } from '@shared/apiShape'
 import type { AiProviderId } from '@shared/types'
 import { aktualisiereModelle, registriereKanaele } from '../main/kanaele'
@@ -66,6 +68,20 @@ function aboAufSchluessel(): void {
   if (Object.keys(access).length || Object.keys(imageAccess).length) setSettings({ ai: { access, imageAccess } })
 }
 
+/**
+ * Den Ordner Schulmaterial gleich anlegen (30.09.2026): „Auf meinem iPad › Schul-Apps" zeigt die
+ * Dateien-App erst, wenn die App dort etwas abgelegt hat. So findet die Lehrkraft den Ort schon
+ * vor dem ersten Speichern. Nur mit eingeschalteter Ablage (Einstellung schulmaterialAblage).
+ */
+async function schulmaterialAnlegen(): Promise<void> {
+  if (getSettings().schulmaterialAblage === false) return
+  try {
+    await Filesystem.stat({ path: SCHULMATERIAL, directory: Directory.Documents })
+  } catch {
+    await Filesystem.mkdir({ path: SCHULMATERIAL, directory: Directory.Documents, recursive: true }).catch(() => undefined)
+  }
+}
+
 /** Prüf-Build: KI-Attrappe aus dem Browserspeicher (services/ai/attrappe.ts), nie im Betrieb */
 function kiAttrappe(): void {
   if (!__KI_ATTRAPPE_ERLAUBT__) return
@@ -97,6 +113,7 @@ async function starten(): Promise<void> {
     console.error(e)
   }
   kiAttrappe()
+  void schulmaterialAnlegen()
 
   const aufrufe = new Map<string, (...args: unknown[]) => unknown>()
   const lokal = async (kanal: string, args: unknown[]): Promise<unknown> => {

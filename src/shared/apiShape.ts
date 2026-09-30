@@ -63,7 +63,8 @@ import type {
   SavedKurztestInput,
   SavedKurztestMeta,
   SavedGrammarTestMeta,
-  PcKiTest
+  PcKiTest,
+  AblageZiel
 } from '@shared/types'
 
 export interface PrinterInfo {
@@ -386,10 +387,13 @@ export function buildApi(call: Call, extras: ApiExtras) {
     },
     files: {
       docxToHtml: (data: Uint8Array) => call<string>('files:docx-html', data),
-      save: (defaultName: string, filters: FileFilter[], data: Uint8Array | string) => call<string | null>('files:save', defaultName, filters, data),
+      /** `ziel`: wohin die Datei gehört – die iPad-App legt danach unter Schulmaterial ab, der PC ignoriert es */
+      save: (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) =>
+        call<string | null>('files:save', defaultName, filters, data, ziel),
       open: (filters: FileFilter[]) => call<OpenedFile | null>('files:open', filters),
       launchFile: () => call<OpenedFile | null>('files:launch-file'),
-      showInFolder: (path: string) => call<void>('files:show', path),
+      /** Mehrere Pfade: auf dem iPad gemeinsam teilen; am PC zeigt der Explorer den ersten */
+      showInFolder: (path: string | string[]) => call<void>('files:show', path),
       /** Ordner wählen, in den mehrere Dateien auf einmal gehen; null bei Abbruch */
       chooseFolder: (title?: string) => call<string | null>('files:choose-folder', title),
       /** Datei in den gewählten Ordner legen – vorhandene werden nicht überschrieben („… (2)"); liefert den Pfad */
@@ -405,8 +409,10 @@ export function buildApi(call: Call, extras: ApiExtras) {
           fillable?: boolean
           audio?: { id: string; fileName: string; title: string; base64: string }[]
           signatur?: { passwort: string; grund?: string; name?: string }
-        }
-      ) => call<string | null>('export:pdf', html, defaultName, opts),
+        },
+        /** Wohin die Datei gehört (iPad: Schulmaterial; der PC ignoriert es) */
+        ziel?: AblageZiel
+      ) => call<string | null>('export:pdf', html, defaultName, opts, ziel),
       /** Wie `pdf`, aber ohne Dialog in einen schon gewählten Ordner (siehe files.chooseFolder) */
       pdfInFolder: (
         folder: string,

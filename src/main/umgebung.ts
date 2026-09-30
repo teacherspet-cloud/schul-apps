@@ -80,7 +80,8 @@ export function electronUmgebung(o: ElectronUmgebungOptionen): Umgebung {
       const fehler = await shell.openPath(ordner)
       if (fehler) throw new Error(fehler)
     },
-    imOrdnerZeigen: async (pfad) => shell.showItemInFolder(pfad),
+    // Mehrere Dateien (iPad: gemeinsam teilen) – der Explorer zeigt die erste
+    imOrdnerZeigen: async (pfad) => shell.showItemInFolder(Array.isArray(pfad) ? pfad[0] : pfad),
     startDatei: () => process.argv.slice(1).find((a) => a.toLowerCase().endsWith('.vokabeltest')) ?? null,
     startPaket: () => {
       if (startPaket === undefined) startPaket = paketAusArgumenten(process.argv)

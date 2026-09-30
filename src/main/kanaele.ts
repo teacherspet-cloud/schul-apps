@@ -35,7 +35,8 @@ import {
   TtsRequest,
   SavedGrammarTestInput,
   SavedKurztestInput,
-  PcKiTest
+  PcKiTest,
+  AblageZiel
 } from '@shared/types'
 import type { PrinterInfo, PrintOptions } from '@shared/apiShape'
 import { createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
@@ -126,17 +127,18 @@ export interface Umgebung {
   fenster: { gesichert(): void; rueckfrage(): void; bleiben(): void }
   /**
    * Eine Datei ausgeben: am PC mit Speichern-Dialog, auf dem iPad nach Dokumente/Ausgaben und
-   * über das Teilen-Menü. Liefert den Pfad oder null (abgebrochen).
+   * über das Teilen-Menü – oder, mit `ziel` (30.09.2026), geordnet nach Dokumente/Schulmaterial/
+   * <Fach>/<Themenbereich> ohne Teilen-Menü. Liefert den Pfad oder null (abgebrochen).
    */
-  dateiAusgeben(name: string, filters: FileFilter[], daten: AusgabeDaten): Promise<string | null>
+  dateiAusgeben(name: string, filters: FileFilter[], daten: AusgabeDaten, ziel?: AblageZiel): Promise<string | null>
   /** Eine Datei wählen; liefert einen lesbaren Pfad (iPad: Kopie unter /tmp) oder null */
   dateiWaehlen(filters: FileFilter[], titel?: string): Promise<string | null>
   /** Ordner für mehrere Dateien; iPad: ein neuer Ordner unter Dokumente/Ausgaben */
   ordnerWaehlen(titel?: string): Promise<string | null>
   /** Den Ordner zeigen (PC: Explorer) bzw. seine Dateien teilen (iPad) */
   ordnerZeigen(ordner: string): Promise<void>
-  /** Eine Datei im Ordner zeigen (PC) bzw. teilen (iPad) */
-  imOrdnerZeigen(pfad: string): Promise<void>
+  /** Eine Datei im Ordner zeigen (PC; bei mehreren die erste) bzw. teilen (iPad; mehrere gemeinsam) */
+  imOrdnerZeigen(pfad: string | string[]): Promise<void>
   /** Datei, mit der die App gestartet wurde (Doppelklick auf .vokabeltest), sonst null */
   startDatei(): string | null
   /** Beim Start übergebenes Schulpaket (einmal abholbar), sonst null */
@@ -462,7 +464,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('audio:show', (fileName: string) => u.imOrdnerZeigen(audioPath(fileName)))
 
   handle('files:docx-html', (data: Uint8Array) => docxToHtml(data))
-  handle('files:save', (defaultName: string, filters: FileFilter[], data: Uint8Array | string) => u.dateiAusgeben(defaultName, filters, data))
+  handle('files:save', (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) =>
+    u.dateiAusgeben(defaultName, filters, data, ziel)
+  )
   handle('files:open', async (filters: FileFilter[]) => {
     const path = await u.dateiWaehlen(filters)
     if (!path) return null
@@ -473,7 +477,7 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
     if (!path) return null
     return { name: basename(path), data: new Uint8Array(readFileSync(path)) }
   })
-  handle('files:show', (path: string) => u.imOrdnerZeigen(path))
+  handle('files:show', (path: string | string[]) => u.imOrdnerZeigen(path))
   // Schulpaket (Großprogramm 0.4, F8): Material als Datei weitergeben und einlesen
   handle('paket:erstellen', (titel: string, auswahl: { art: PaketArt; id: string }[]) => {
     const daten = erstellePaket(String(titel ?? '').trim() || 'Schulpaket', auswahl)
@@ -549,8 +553,8 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    * PDF speichern. `fillable` erzeugt statt des reinen Abbilds ein Formular: Auf den
    * Schreiblinien lässt sich tippen, Kästchen lassen sich ankreuzen.
    */
-  handle('export:pdf', (html: string, defaultName: string, opts?: PdfExtras) =>
-    u.dateiAusgeben(defaultName, [{ name: 'PDF', extensions: ['pdf'] }], () => pdfBytes(html, opts))
+  handle('export:pdf', (html: string, defaultName: string, opts?: PdfExtras, ziel?: AblageZiel) =>
+    u.dateiAusgeben(defaultName, [{ name: 'PDF', extensions: ['pdf'] }], () => pdfBytes(html, opts), ziel)
   )
   /** Dasselbe PDF ohne Dialog in einen schon gewählten Ordner (siehe `files:choose-folder`) */
   handle('export:pdf-in-folder', async (ordner: string, html: string, name: string, opts?: PdfExtras) =>

@@ -297,6 +297,24 @@ export interface AppSettings {
    * im selben WLAN oder von unterwegs über ein privates VPN wie Tailscale.
    */
   pcKi?: PcKiEinstellungen
+  /**
+   * Nur iPad-App: Ausgegebene Dateien geordnet auf dem Gerät ablegen – Dokumente/Schulmaterial/
+   * <Fach>/<Themenbereich> (30.09.2026, shared/schulmaterial.ts). Fehlt = an.
+   */
+  schulmaterialAblage?: boolean
+}
+
+/**
+ * Wohin eine ausgegebene Datei gehört – die Programme geben es beim Speichern mit.
+ * Das iPad legt danach unter Schulmaterial ab; der PC fragt wie gewohnt mit dem Dialog.
+ */
+export interface AblageZiel {
+  /** Programm (Kennung wie in der Bibliothek, z. B. 'vokabeltest') */
+  programm: string
+  /** Anzeigename des Fachs, z. B. „Englisch" */
+  fach?: string
+  /** Themenbereich von oben nach unten (mit Unterbereichen) */
+  themenbereich?: string[]
 }
 
 /** iPad: was über den PC läuft und wie er erreichbar ist */

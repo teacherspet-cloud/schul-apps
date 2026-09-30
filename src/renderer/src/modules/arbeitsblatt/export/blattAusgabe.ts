@@ -4,6 +4,7 @@ import { buildWorksheetHtml } from '../render/printHtml'
 import { buildWorksheetDocx } from './docx'
 import { browserDocxDeps } from './browserDeps'
 import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import type { AblageZiel } from '@shared/types'
 import type { LoesungsModus } from '../../../shared/components/LoesungsWahl'
 
 /**
@@ -24,6 +25,8 @@ export interface BlattQuelle {
   schoolName: string
   /** „Lösungen" oder – bei der Klassenarbeit – „Erwartungshorizont" */
   begriff: string
+  /** Wohin das Material gehört (iPad: Schulmaterial/<Fach>/<Themenbereich>, export/ablageZiel.ts) */
+  ziel?: AblageZiel
 }
 
 const html = (q: BlattQuelle, teil: 'blatt' | 'loesung', anhaengen: boolean): string =>
@@ -62,5 +65,5 @@ export function speichereBlatt(q: BlattQuelle, art: 'docx' | 'pdf', loesung: Loe
           )
       })
   }
-  return speichereAusgabe(dateien, art === 'pdf' ? 'PDF gespeichert.' : 'Word-Dokument gespeichert.')
+  return speichereAusgabe(dateien, art === 'pdf' ? 'PDF gespeichert.' : 'Word-Dokument gespeichert.', q.ziel)
 }

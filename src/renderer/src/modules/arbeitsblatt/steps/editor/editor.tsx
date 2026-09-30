@@ -25,7 +25,8 @@ import type { DesignTemplate } from '@shared/design'
 import ImagePicker from '../../../../shared/components/ImagePicker'
 import PrintPreview from '../../../../shared/components/PrintPreview'
 import { loesungsVorgabe } from '../../../../shared/components/LoesungsWahl'
-import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../../shared/export/ausgabe'
+import { meldeAblage, speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../../shared/export/ausgabe'
+import { ablageZiel } from '../../../../shared/export/ablageZiel'
 import FitToWidth from '../../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../../shared/settingsStore'
 import { notifyError, notifySuccess, safeFileName } from '../../../../shared/util'
@@ -190,6 +191,8 @@ export function EditorStep(): React.JSX.Element {
   const abweichung = seitenAbweichung(ws.meta, sheet, gezaehlteSeiten)
   const abweichungsSchluessel = `${sheet.id}:${gezaehlteSeiten}`
   const baseName = safeFileName(`${ws.meta.subjectLabel} - ${ws.meta.title || ws.meta.topic}`)
+  // iPad: Ablage unter Schulmaterial/<Fach>/<Themenbereich> (shared/export/ablageZiel.ts)
+  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
   // Seiten für das Deckblatt – dieselben, die Druck und Word nehmen (render/deckblattVorschau.tsx)
   const deckblatt = ws.meta.coverPage ? deckblattVorschau(ws, layouts, logo, schoolName, citationStyle) : null
 
@@ -641,8 +644,8 @@ export function EditorStep(): React.JSX.Element {
           tooltip: 'Als Datei speichern …',
           onClick: async () => {
             try {
-              const path = await window.api.files.save(`${baseName}.arbeitsblatt`, WORKSHEET_FILTER, serializeWorksheet(ws))
-              if (path) notifySuccess('Arbeitsblatt gespeichert.')
+              const path = await window.api.files.save(`${baseName}.arbeitsblatt`, WORKSHEET_FILTER, serializeWorksheet(ws), ablage())
+              if (path) meldeAblage(path, 'Arbeitsblatt gespeichert.')
             } catch (e) {
               notifyError(e)
             }
@@ -675,7 +678,7 @@ export function EditorStep(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="arbeitsblatt" docId={docId} />
-            <LmsExport titel={ws.meta.title || ws.meta.topic} bericht={() => fragenAusBlatt(ws)} />
+            <LmsExport titel={ws.meta.title || ws.meta.topic} bericht={() => fragenAusBlatt(ws)} ziel={ablage()} />
           </>
         }
       />
@@ -930,7 +933,8 @@ export function EditorStep(): React.JSX.Element {
               ? [fillable ? 'Ausfüllbares PDF gespeichert.' : 'PDF gespeichert.', hoertextImPdf ? 'Hörtexte sind im PDF enthalten.' : '']
                   .filter(Boolean)
                   .join(' ')
-              : 'Word-Dokument gespeichert.'
+              : 'Word-Dokument gespeichert.',
+            ablage()
           )
         }}
         sheets={ws.sheets.map((s) => ({ id: s.id, label: s.label }))}

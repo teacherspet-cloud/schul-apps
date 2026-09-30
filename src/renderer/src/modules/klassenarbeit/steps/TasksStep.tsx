@@ -42,9 +42,11 @@ import {
   IconPlaylistAdd
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
-import { notifyError, notifySuccess } from '../../../shared/util'
+import { notifyError } from '../../../shared/util'
 import { comprehensionFormatById } from '../../arbeitsblatt/didactics/comprehensionFormats'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
+import { meldeAblage } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { useDruck } from '../../../shared/navigation'
@@ -326,7 +328,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     name: gesamt > 1 ? (alle ? `${name} (alle Fassungen)` : `${name} ${label}`) : name,
     logo,
     schoolName: settings.schoolName,
-    begriff: 'Erwartungshorizont'
+    begriff: 'Erwartungshorizont',
+    ziel: ablageZiel('klassenarbeit', useKlassenarbeit.getState().docId, meta.subjectLabel || meta.subjectId)
   })
   const starte = (was: AusgabeModus): void => {
     setAlleAusgeben(true)
@@ -346,10 +349,11 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           ? await window.api.files.save(
               mod.transcriptFileName(title),
               [{ name: 'Word-Dokument', extensions: ['docx'] }],
-              await mod.buildTranscriptDocx(audioBlocks, info)
+              await mod.buildTranscriptDocx(audioBlocks, info),
+              quelle(false).ziel
             )
-          : await window.api.exporter.pdf(mod.buildTranscriptHtml(audioBlocks, info), mod.transcriptPdfName(title))
-      if (path) notifySuccess('Transkript gespeichert.')
+          : await window.api.exporter.pdf(mod.buildTranscriptHtml(audioBlocks, info), mod.transcriptPdfName(title), undefined, quelle(false).ziel)
+      if (path) meldeAblage(path, 'Transkript gespeichert.')
     } catch (e) {
       notifyError(e, 'Das Transkript konnte nicht gespeichert werden')
     }
@@ -625,7 +629,9 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               </Button>
             </Tooltip>
             {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
-            {hasContent && <LmsExport titel={exam.meta.title || exam.meta.topic} bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))} />}
+            {hasContent && (
+              <LmsExport titel={exam.meta.title || exam.meta.topic} bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))} ziel={quelle(false).ziel} />
+            )}
             {audioBlocks.length > 0 && (
               <Menu position="bottom-end" withinPortal>
                 <Menu.Target>
@@ -651,8 +657,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           tooltip: 'Als Datei speichern … (.klassenarbeit, z. B. zum Weitergeben)',
           onClick: async () => {
             try {
-              const path = await window.api.files.save(`${quelle(false).name}.klassenarbeit`, EXAM_FILTER, serializeExam(exam))
-              if (path) notifySuccess('Klassenarbeit gespeichert.')
+              const path = await window.api.files.save(`${quelle(false).name}.klassenarbeit`, EXAM_FILTER, serializeExam(exam), quelle(false).ziel)
+              if (path) meldeAblage(path, 'Klassenarbeit gespeichert.')
             } catch (e) {
               notifyError(e)
             }
@@ -842,6 +848,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               <AudioPanel
                 ws={audioSicht}
                 onUpdate={updateAudio}
+                ablage={quelle(false).ziel}
                 // Die erste Aufgabe zum Hörtext (verknüpft oder direkt dahinter) bekommt die neuen Fragen
                 onZusatzfragen={(audioId) => {
                   for (const p of exam.parts) {

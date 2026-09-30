@@ -12,8 +12,10 @@
 //  3. Ein API-Schlüssel landet im „Schlüsselbund" (Web-Ersatz) und nicht im Dateisystem.
 //  4. Ein Vokabeltest entsteht mit der KI-Attrappe von Anfang bis Ende und liegt danach in der Bibliothek.
 //  5. Die Oberfläche des iPads: kein Netzwerk-Reiter, kein direktes Abo – aber „Abo über den PC".
-//  6. (30.09.2026) Ohne KI und Schulname erscheint der Einrichtungsassistent mit fünf Schritten
-//     (Schule, KI-Zugang, Bilder-KI, Hörtexte, Aussehen); die KI-Schritte bieten „Abo über den PC".
+//  6. (30.09.2026) Ohne KI und Schulname erscheint der Einrichtungsassistent mit sechs Schritten
+//     (Schule, KI-Zugang, Bilder-KI, Hörtexte, Ablage, Aussehen); die KI-Schritte bieten „Abo über den PC".
+//  7. (30.09.2026) Ausgaben mit Ablageziel landen unter /documents/Schulmaterial/<Fach>/<Themenbereich>,
+//     ohne Überschreiben (auch nach dem Neuladen); die Meldung nennt den Ort und bietet „Teilen".
 import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -183,6 +185,36 @@ async function lauf(name, browserTyp, startOpt) {
     await page.waitForTimeout(2500)
     const tests = await page.evaluate(() => window.api.tests.list())
     pruefe(tests.length > 0, `${name}: Test in der Bibliothek (${tests.length})`)
+
+    // ---------- 7. Ablage unter Schulmaterial
+    const sichern = (name, ziel) => page.evaluate(([n, z]) => window.api.files.save(n, [], 'Inhalt', z), [name, ziel])
+    const englisch = { programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] }
+    const p1 = await sichern('Probe.txt', englisch)
+    pruefe(p1 === '/documents/Schulmaterial/Englisch/Unit 1/Probe.txt', `${name}: Ablage nach Fach und Themenbereich (${p1})`)
+    const p2 = await sichern('Probe.txt', englisch)
+    pruefe(p2 === '/documents/Schulmaterial/Englisch/Unit 1/Probe (2).txt', `${name}: kein Überschreiben (${p2})`)
+    const p3 = await sichern('Brief: 7/8.txt', { programm: 'elternbrief' })
+    pruefe(p3 === '/documents/Schulmaterial/Allgemein/Elternbriefe/Brief- 7-8.txt', `${name}: ohne Fach unter Allgemein, Name bereinigt (${p3})`)
+    const p4 = await sichern('Blatt.txt', { programm: 'arbeitsblatt', fach: 'Biologie' })
+    pruefe(p4 === '/documents/Schulmaterial/Biologie/Blatt.txt', `${name}: ohne Themenbereich im Fachordner (${p4})`)
+    // Über die Oberfläche: Word-Ausgabe des Vokabeltests
+    await sichtbar(page.getByRole('button', { name: 'Word', exact: true })).click()
+    await sichtbar(page.getByRole('button', { name: 'Speichern …' })).click()
+    const ort = page.locator('[data-schulmaterial-ort]').first()
+    const gemeldet = await ort.waitFor({ timeout: 60000 }).then(
+      () => true,
+      () => false
+    )
+    const ortText = gemeldet ? await ort.innerText() : ''
+    await page.screenshot({ path: join(out, `${name}-5-ablage.png`) })
+    pruefe(/Auf meinem iPad › Schul-Apps › Schulmaterial › Englisch/.test(ortText), `${name}: Meldung nennt den Ort (${ortText.replace(/\s+/g, ' ').slice(0, 110)})`)
+    pruefe(gemeldet && (await ort.getByRole('button', { name: 'Teilen' }).isVisible()), `${name}: Meldung bietet „Teilen"`)
+    // Nach dem Neuladen liegt die Datei auf dem Gerät – der nächste gleiche Name bekommt „(3)"
+    await page.reload()
+    await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
+    await page.waitForTimeout(800)
+    const p5 = await sichern('Probe.txt', englisch)
+    pruefe(p5 === '/documents/Schulmaterial/Englisch/Unit 1/Probe (3).txt', `${name}: auch nach dem Neuladen kein Überschreiben (${p5})`)
   } catch (e) {
     problems.push(`${name}: Abbruch – ${e.message.split('\n')[0]}`)
     await page.screenshot({ path: join(out, `${name}-fehler.png`) }).catch(() => undefined)
@@ -212,8 +244,8 @@ async function assistent(name, browserTyp, startOpt) {
     )
     pruefe(da, `${name}: Einrichtungsassistent erscheint auf dem iPad`)
     if (!da) return
-    pruefe(await page.getByText('Fünf kurze Schritte').isVisible(), `${name}: Einleitung nennt fünf Schritte`)
-    for (const s of ['Schule', 'KI-Zugang', 'Bilder-KI', 'Hörtexte', 'Aussehen']) {
+    pruefe(await page.getByText('Sechs kurze Schritte').isVisible(), `${name}: Einleitung nennt sechs Schritte`)
+    for (const s of ['Schule', 'KI-Zugang', 'Bilder-KI', 'Hörtexte', 'Ablage', 'Aussehen']) {
       pruefe((await page.locator('.mantine-Stepper-stepLabel', { hasText: s }).count()) > 0, `${name}: Schritt „${s}"`)
     }
     const weiter = page.getByRole('button', { name: 'Weiter', exact: true })
@@ -234,6 +266,11 @@ async function assistent(name, browserTyp, startOpt) {
     await page.waitForTimeout(400)
     pruefe((await page.getByText('ElevenLabs-API-Schlüssel (optional)').count()) + (await page.getByText('Abo über den PC (WLAN)').count()) > 0, `${name}: Schritt Hörtexte zeigt die Hörtext-Karte`)
     await page.screenshot({ path: join(out, `${name}-0-assistent-hoertexte.png`) })
+    await weiter.click()
+    await page.waitForTimeout(400)
+    pruefe(await page.getByText('Erstellte Materialien auf dem iPad ablegen').first().isVisible(), `${name}: Schritt Ablage mit Schalter (Standard: an)`)
+    pruefe(await page.getByRole('switch', { name: 'Erstellte Materialien auf dem iPad ablegen' }).isChecked(), `${name}: Ablage ist voreingestellt an`)
+    await page.screenshot({ path: join(out, `${name}-0-assistent-ablage.png`) })
     await page.getByRole('button', { name: 'Später einrichten' }).click()
   } catch (e) {
     problems.push(`${name}: Assistent – ${e.message.split('\n')[0]}`)

@@ -40,6 +40,7 @@ import {
 import { useEffect, useState } from 'react'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { FAMILIENSPRACHEN, spracheNach } from '../../../shared/familiensprachen'
 import { thresholdsForSubject } from '../../../shared/gradeScale'
 import { zeichenFuer, type Korrekturzeichen } from '../../../shared/korrekturzeichen'
@@ -127,6 +128,8 @@ export default function Boegen(): React.JSX.Element | null {
   const m = r.meta
   const fertige = r.abgaben.filter((a) => a.bogen)
   const zeichen = zeichenFuer(m.subjectId, settings)
+  // iPad: Ablage unter Schulmaterial/<Fach>/<Themenbereich> (shared/export/ablageZiel.ts)
+  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('rueckmeldung', docId, m.subjectId)
   const skala: SkalenKontext = { meta: m, schwellen: thresholdsForSubject(settings.gradeScale, m.subjectId) }
   const sichtbar = r.abgaben.filter((a) => passtZurSuche(a, suche))
   const umschalten = (id: string): void => setOffen((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]))
@@ -156,7 +159,7 @@ export default function Boegen(): React.JSX.Element | null {
           dateiart === 'pdf'
             ? { name: `${basis}.pdf`, html: await boegenDruckHtml(d, liste, { zeichen }) }
             : { name: `${basis}.docx`, filter: WORD_FILTER, daten: async () => boegenDocx(d, liste, { zeichen, scanBilder: await scanBilderFuer(liste) }) }
-        await speichereAusgabe([datei], liste.length === 1 ? 'Rückmeldung gespeichert.' : `${liste.length} Rückmeldungen gespeichert.`)
+        await speichereAusgabe([datei], liste.length === 1 ? 'Rückmeldung gespeichert.' : `${liste.length} Rückmeldungen gespeichert.`, ablage())
       })().catch(notifyError)
     })
 
@@ -177,7 +180,8 @@ export default function Boegen(): React.JSX.Element | null {
       dateiart === 'pdf'
         ? [{ name: `${basis}.pdf`, html: elternHtml(r, liste) }]
         : [{ name: `${basis}.docx`, filter: WORD_FILTER, daten: () => elternDocx(r, liste) }],
-      'Elternfassung gespeichert.'
+      'Elternfassung gespeichert.',
+      ablage()
     ).catch(notifyError)
   }
 
@@ -207,7 +211,8 @@ export default function Boegen(): React.JSX.Element | null {
         .then((daten) =>
           speichereAusgabe(
             [{ name: `${safeFileName(`Rückmeldung ${x.name.trim() || x.kuerzel}`)}.mp3`, filter: [{ name: 'MP3-Audio', extensions: ['mp3'] }], daten }],
-            'Audiodatei gespeichert.'
+            'Audiodatei gespeichert.',
+            ablage()
           )
         )
         .catch(notifyError)

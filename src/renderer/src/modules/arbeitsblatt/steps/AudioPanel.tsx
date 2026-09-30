@@ -21,6 +21,10 @@ import { aufIos } from '../../../shared/plattform'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { estimateSeconds } from '../generation/convert'
 import { subjectById } from '../model/subjects'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
+import { meldeAblage } from '../../../shared/export/ausgabe'
+import type { AblageZiel } from '@shared/types'
+import { anzeigeOrt } from '@shared/schulmaterial'
 import type { AudioBlock, Sheet, Worksheet } from '../model/types'
 import { useArbeitsblatt } from '../store'
 import { audioLength } from '../render/BlockView'
@@ -62,14 +66,18 @@ export function speakerNames(block: AudioBlock): string[] {
 export function AudioPanel({
   ws,
   onUpdate,
-  onZusatzfragen
+  onZusatzfragen,
+  ablage
 }: {
   ws: Worksheet
   onUpdate?: (fn: (ws: Worksheet) => void, gruppe?: string) => void
+  /** Wohin MP3 und Transkript gehören (iPad); Vorgabe: das offene Arbeitsblatt */
+  ablage?: AblageZiel
   /** Klassenarbeit (29.09.2026): „Weitere Fragen im gleichen Format" zum Hörtext mit dieser id */
   onZusatzfragen?: (audioId: string) => void
 }): React.JSX.Element {
   const updateSheet = useArbeitsblatt((s) => s.update)
+  const ziel = (): AblageZiel => ablage ?? ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
   const update = onUpdate ?? updateSheet
   const settings = useAppSettings((s) => s.settings)
   const [voices, setVoices] = useState<TtsVoice[]>([])
@@ -194,8 +202,9 @@ export function AudioPanel({
       const bytes = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0))
       // Zeichen, die Windows in Dateinamen nicht zulässt
       const name = `${(block.title || 'Hoertext').replace(/[\\/:*?"<>|]/g, '')}.mp3`
-      const path = await window.api.files.save(name, [{ name: 'MP3', extensions: ['mp3'] }], bytes)
-      if (path) notifySuccess(`Gespeichert: ${path}`)
+      const path = await window.api.files.save(name, [{ name: 'MP3', extensions: ['mp3'] }], bytes, ziel())
+      // Unter Schulmaterial (iPad) nennt die Meldung den Ort selbst; am PC wie bisher der ganze Pfad
+      if (path) meldeAblage(path, anzeigeOrt(path) ? 'MP3 gespeichert.' : `Gespeichert: ${path}`)
     } catch (e) {
       notifyError(e, 'Die MP3 konnte nicht gespeichert werden')
     }
@@ -358,10 +367,11 @@ export function AudioPanel({
           ? await window.api.files.save(
               mod.transcriptFileName(title),
               [{ name: 'Word-Dokument', extensions: ['docx'] }],
-              await mod.buildTranscriptDocx(audio, info)
+              await mod.buildTranscriptDocx(audio, info),
+              ziel()
             )
-          : await window.api.exporter.pdf(mod.buildTranscriptHtml(audio, info), mod.transcriptPdfName(title))
-      if (path) notifySuccess('Transkript gespeichert.')
+          : await window.api.exporter.pdf(mod.buildTranscriptHtml(audio, info), mod.transcriptPdfName(title), undefined, ziel())
+      if (path) meldeAblage(path, 'Transkript gespeichert.')
     } catch (e) {
       notifyError(e, 'Das Transkript konnte nicht gespeichert werden')
     }

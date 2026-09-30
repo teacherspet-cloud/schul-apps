@@ -1,10 +1,11 @@
 import { Button, Group, Modal, Stack, Stepper, Text, Title } from '@mantine/core'
-import { IconHeadphones, IconPalette, IconPhoto, IconSchool, IconSparkles } from '@tabler/icons-react'
+import { IconFolder, IconHeadphones, IconPalette, IconPhoto, IconSchool, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
 import { imNetz } from '../shared/netzZugang'
 import { aufIos } from '../shared/plattform'
 import { AiCard, AppearanceCard, HoertextCard, ImageAiCard, SchoolCard } from './SettingsPage'
+import AblageCard from './AblageCard'
 import SicherungEinlesen from './SicherungEinlesen'
 
 /**
@@ -19,7 +20,8 @@ import SicherungEinlesen from './SicherungEinlesen'
  * - Drei Schritte: Schule und Lerngruppe (mit Logo), KI-Zugang, Aussehen der Oberfläche.
  *   Seit 30.09.2026 fünf: dazu Bilder-KI und Hörtexte („Der Einrichtungsassistent umfasst außerdem
  *   noch nicht Bilder-KI und Hörtext-KI."). In der iPad-App bieten die KI-Schritte zusätzlich
- *   „Abo über den PC" an (mobil/pcKi.ts).
+ *   „Abo über den PC" an (mobil/pcKi.ts) und als eigenen Schritt die Ablage der erstellten
+ *   Dateien unter Schulmaterial (AblageCard).
  * - JEDER Schritt ist überspringbar. Wer den Schlüssel gerade nicht zur Hand hat, soll nicht
  *   festsitzen – die Programme sagen später ohnehin, was fehlt.
  * - Eine Sicherung lässt sich hier direkt einlesen – nach dem Zurücksetzen der naheliegende Weg
@@ -33,6 +35,8 @@ import SicherungEinlesen from './SicherungEinlesen'
  * Nachbau würde über kurz oder lang von ihr abweichen – und dann richtet der Assistent etwas
  * anderes ein, als die Einstellungen zeigen.
  */
+const ZAHLWORT: Record<number, string> = { 3: 'Drei', 4: 'Vier', 5: 'Fünf', 6: 'Sechs', 7: 'Sieben' }
+
 export default function Einrichtung(): React.JSX.Element | null {
   const settings = useAppSettings((s) => s.settings)
   const update = useAppSettings((s) => s.update)
@@ -98,6 +102,19 @@ export default function Einrichtung(): React.JSX.Element | null {
         'Optional: Für Hörverstehen spricht eine Stimme das Skript ein. Ohne Stimme bleibt das Skript als Lesetext für die Lehrkraft erhalten.',
       inhalt: <HoertextCard settings={settings} update={update} />
     },
+    // Nur iPad: wohin erstellte Dateien kommen
+    ...(ios
+      ? [
+          {
+            label: 'Ablage',
+            beschreibung: 'Wohin erstellte Dateien kommen',
+            icon: <IconFolder size={18} />,
+            hinweis:
+              'Eingeschaltet liegt jedes erstellte Material geordnet nach Fach und Themenbereich in der Dateien-App – auch ohne Netz jederzeit wieder da.',
+            inhalt: <AblageCard settings={settings} update={update} />
+          }
+        ]
+      : []),
     {
       label: 'Aussehen',
       beschreibung: 'Farben der Oberfläche',
@@ -121,7 +138,8 @@ export default function Einrichtung(): React.JSX.Element | null {
       <Stack gap="lg">
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="sm" c="dimmed">
-            Fünf kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen nachholen.
+            {ZAHLWORT[schritte.length] ?? schritte.length} kurze Schritte, danach geht es los. Jeder lässt sich überspringen und später in den Einstellungen
+            nachholen.
           </Text>
           {/* Nach einem Zurücksetzen der naheliegende Weg zurück (Wunsch vom 25.09.2026) */}
           <SicherungEinlesen variant="subtle" />

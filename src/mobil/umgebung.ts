@@ -3,7 +3,9 @@
  *
  * Was am PC ein Dialog ist, ist hier:
  *  - Datei speichern → Dokumente/Ausgaben (sichtbar in der Dateien-App) und das Teilen-Menü
- *    (AirDrop, Mail, „In Dateien sichern", Drucken …)
+ *    (AirDrop, Mail, „In Dateien sichern", Drucken …); Material mit Ablageziel seit 30.09.2026
+ *    geordnet nach Dokumente/Schulmaterial/<Fach>/<Themenbereich>, ohne Teilen-Menü – die
+ *    Oberfläche meldet den Ort und bietet „Teilen" an (shared/schulmaterial.ts)
  *  - Datei öffnen → die Dateiauswahl von iOS (<input type=file>)
  *  - Ordner wählen → ein neuer Ordner Dokumente/Ausgaben/<Datum Uhrzeit>; „Ordner öffnen" teilt
  *    danach alle Dateien darin
@@ -16,7 +18,9 @@ import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { freierDateiname } from '@shared/dateiname'
-import type { FileFilter } from '@shared/types'
+import { schulmaterialOrdner } from '@shared/schulmaterial'
+import type { AblageZiel, FileFilter } from '@shared/types'
+import { getSettings } from '../main/services/storage/settings'
 import type { Umgebung } from '../main/kanaele'
 import { bus } from './bus'
 import { druckmaschine } from './export/druckmaschine'
@@ -127,6 +131,16 @@ function waehleDatei(filters: FileFilter[]): Promise<string | null> {
   })
 }
 
+/** Schulmaterial-Ablage: nur mit Ziel und eingeschalteter Einstellung (Standard: an) */
+function schulmaterialAn(ziel: AblageZiel | undefined): AblageZiel | null {
+  if (!ziel || typeof ziel !== 'object' || typeof ziel.programm !== 'string') return null
+  try {
+    return getSettings().schulmaterialAblage === false ? null : ziel
+  } catch {
+    return ziel
+  }
+}
+
 export function mobilUmgebung(pcKi?: PcKi): Umgebung {
   const aus = (): void => undefined
   return {
@@ -134,11 +148,19 @@ export function mobilUmgebung(pcKi?: PcKi): Umgebung {
     rundruf: (kanal, wert) => bus.emit(kanal, wert),
     anOberflaeche: (kanal, wert) => bus.emit(kanal, wert),
     fenster: { gesichert: aus, rueckfrage: aus, bleiben: aus },
-    dateiAusgeben: async (name, _filters, daten) => {
-      vfs.ordnerAnlegen(AUSGABEN, true)
+    dateiAusgeben: async (name, _filters, daten, ablage) => {
+      const geordnet = schulmaterialAn(ablage)
+      const ordner = geordnet ? schulmaterialOrdner(DOKUMENTE, geordnet) : AUSGABEN
+      vfs.ordnerAnlegen(ordner, true)
       const inhalt = typeof daten === 'function' ? await daten() : daten
-      const ziel = await freierPfad(AUSGABEN, name)
+      // Nie überschreiben – auch nicht, was aus einer früheren Sitzung auf dem Gerät liegt
+      const ziel = await freierPfad(ordner, name)
       vfs.schreibe(ziel, typeof inhalt === 'string' ? new TextEncoder().encode(inhalt) : new Uint8Array(inhalt))
+      if (geordnet) {
+        // Die Oberfläche meldet den Ort und bietet „Teilen" an; erst schreiben, damit die Dateien-App sie gleich zeigt
+        await vfs.sichereAlles()
+        return ziel
+      }
       await teilen([ziel], name)
       return ziel
     },
@@ -156,7 +178,10 @@ export function mobilUmgebung(pcKi?: PcKi): Umgebung {
         ordner.split('/').pop()
       )
     },
-    imOrdnerZeigen: (pfad) => teilen([pfad], pfad.split('/').pop()),
+    imOrdnerZeigen: (pfad) => {
+      const liste = Array.isArray(pfad) ? pfad : [pfad]
+      return teilen(liste, liste.length === 1 ? liste[0].split('/').pop() : 'Schul-Apps')
+    },
     startDatei: () => null,
     startPaket: () => null,
     druck: druckmaschine,

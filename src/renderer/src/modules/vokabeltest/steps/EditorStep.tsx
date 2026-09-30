@@ -27,9 +27,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import ImagePicker from '../../../shared/components/ImagePicker'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { LoesungsWahl, loesungsVorgabe, merkeLoesungsWahl, type LoesungsModus } from '../../../shared/components/LoesungsWahl'
-import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import { meldeAblage, speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { imageSize } from '../../../shared/images'
-import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
+import { notifyError, safeFileName } from '../../../shared/util'
 import { buildDocx } from '../export/docx'
 import { standardMaskottchen, useMaskottchen } from '../../../shared/maskottchenStore'
 import { vokabeltestFigurVorschlag } from '../render/maskottchen'
@@ -280,8 +281,13 @@ export default function EditorStep(): React.JSX.Element {
           tooltip: 'Als Datei speichern … (.vokabeltest, z. B. zum Weitergeben)',
           onClick: async () => {
             try {
-              const path = await window.api.files.save(`${baseName}.vokabeltest`, PROJECT_FILTER, serializeProject(doc))
-              if (path) notifySuccess('Datei gespeichert.')
+              const path = await window.api.files.save(
+                `${baseName}.vokabeltest`,
+                PROJECT_FILTER,
+                serializeProject(doc),
+                ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage)
+              )
+              if (path) meldeAblage(path, 'Datei gespeichert.')
             } catch (e) {
               notifyError(e)
             }
@@ -293,6 +299,7 @@ export default function EditorStep(): React.JSX.Element {
             <LmsExport
               titel={doc.header.title}
               bericht={() => fragenAusVokabeln(doc.vocab, LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? 'Zielsprache')}
+              ziel={ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage)}
             />
             <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
           </>
@@ -720,7 +727,7 @@ function ExportModal({
         const dateien: AusgabeDatei[] = [{ name: `${baseName}${suffix}.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts) }]
         if (key === 'separate')
           dateien.push({ name: `${baseName}${suffix} - Lösungen.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts) })
-        await speichereAusgabe(dateien, 'PDF gespeichert.')
+        await speichereAusgabe(dateien, 'PDF gespeichert.', ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage))
       } else {
         const dateien: AusgabeDatei[] = [
           {
@@ -735,7 +742,7 @@ function ExportModal({
             filter: WORD_FILTER,
             daten: () => buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts }, imageSize)
           })
-        await speichereAusgabe(dateien, 'Word-Dokument gespeichert.')
+        await speichereAusgabe(dateien, 'Word-Dokument gespeichert.', ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage))
       }
       onClose()
     } catch (e) {
