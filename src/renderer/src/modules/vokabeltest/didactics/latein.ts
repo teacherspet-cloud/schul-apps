@@ -1,5 +1,8 @@
 import { istVerbSprache } from '@shared/verben'
-import type { LatinWordClass, TaskTypeId, VocabEntry } from '../model/types'
+import type { LatinWordClass, TaskTypeId } from '../model/types'
+import type { VocabEntry } from '../model/types'
+import { GRIECHISCH_NENNFORM_LABEL, griechischRegeln, istGriechisch } from './griechisch'
+import { sprachAufgabePasst } from './sprachAufgaben'
 
 /**
  * Vokabeltests im Fach Latein.
@@ -29,6 +32,19 @@ export const LATEIN = 'la'
 export const istLatein = (targetLanguage: string): boolean => targetLanguage === 'la'
 
 /**
+ * Alte Sprache (Latein, Altgriechisch, 30.09.2026): deutsches Schülermaterial, nur Übersetzen ins
+ * Deutsche, Nennformen – der Sonderweg dieser Datei gilt für beide (didactics/griechisch.ts).
+ */
+export const istAlteSprache = (targetLanguage: string): boolean => istLatein(targetLanguage) || istGriechisch(targetLanguage)
+
+/** „lateinisch" bzw. „griechisch" für KI-Aufträge und Beschreibungen */
+export const alteSpracheAdjektiv = (targetLanguage: string): string => (istGriechisch(targetLanguage) ? 'altgriechisch' : 'lateinisch')
+
+/** Anzeigename einer Aufgabenart: „(Latein)" wird im Griechischen zu „(Griechisch)" */
+export const aufgabenLabel = (def: { label: string }, targetLanguage: string): string =>
+  istGriechisch(targetLanguage) ? def.label.replace('(Latein)', '(Griechisch)') : def.label
+
+/**
  * Welche Nennform bei welcher Wortart verlangt wird – Wortlaut wie im Mustertest.
  *
  * Ohne diese Ansage wäre bei „servus" unklar, ob Genitiv oder Akkusativ gemeint ist: Beides
@@ -48,7 +64,8 @@ export const NENNFORM_LABEL: Record<LatinWordClass, string> = {
 /** Wortarten ohne eigene Nennform – dort bleibt die Formspalte leer, wie im Mustertest. */
 export const OHNE_NENNFORM: LatinWordClass[] = ['adverb', 'sonstiges']
 
-export const nennformLabel = (v: VocabEntry): string => NENNFORM_LABEL[v.wordClass ?? 'sonstiges']
+export const nennformLabel = (v: VocabEntry, targetLanguage = 'la'): string =>
+  (istGriechisch(targetLanguage) ? GRIECHISCH_NENNFORM_LABEL : NENNFORM_LABEL)[v.wordClass ?? 'sonstiges']
 
 /**
  * Aufgabenarten, die es im Lateinischen NICHT gibt.
@@ -66,7 +83,10 @@ export const NUR_LATEIN: TaskTypeId[] = ['latinForms', 'latinLoanWords', 'latinW
 export function passtZurSprache(id: TaskTypeId, targetLanguage: string): boolean {
   // Unregelmäßige Verben (30.09.2026): nur in Sprachen mit Verbliste (nicht Niederländisch)
   if (id === 'irregularVerbs') return istVerbSprache(targetLanguage)
-  if (istLatein(targetLanguage)) return !NICHT_IN_LATEIN.includes(id)
+  // Sprachbesondere Aufgaben (Aspektpaare, Lesung, Wurzel …) und Schriftgrenzen (30.09.2026)
+  const besonders = sprachAufgabePasst(id, targetLanguage)
+  if (besonders !== undefined) return besonders
+  if (istAlteSprache(targetLanguage)) return !NICHT_IN_LATEIN.includes(id)
   return !NUR_LATEIN.includes(id)
 }
 
@@ -85,7 +105,8 @@ export const NENNFORM_PUNKTE = { form: 1, bedeutung: 1 }
  * Sie stehen zusätzlich zu den allgemeinen Vorgaben und schneiden ab, was im
  * Lateinunterricht nicht vorkommt.
  */
-export function lateinRegeln(): string {
+export function lateinRegeln(targetLanguage = 'la'): string {
+  if (istGriechisch(targetLanguage)) return griechischRegeln()
   return [
     'LATEIN – dieses Fach arbeitet anders als die modernen Fremdsprachen:',
     '- Abgefragt wird ausschließlich Lateinisch → Deutsch. Keine Aufgabe verlangt, etwas auf Latein zu formulieren, zu sprechen oder zu schreiben.',

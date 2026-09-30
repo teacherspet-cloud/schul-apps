@@ -30,6 +30,12 @@ export interface VocabEntry {
    */
   wordClass?: LatinWordClass
   nennform?: string
+  /**
+   * CHINESISCH/JAPANISCH: Lesung des Wortes – Pinyin mit Tonzeichen bzw. Hiragana (30.09.2026).
+   * Lehrwerke drucken sie in einer eigenen Spalte (Hanzi | Pinyin | Deutsch); beim Einlesen steht
+   * sie in der dritten Spalte (`pos`) oder in Klammern hinter dem Wort. Siehe `didactics/schrift.ts`.
+   */
+  lesung?: string
 }
 
 /** Wortarten, für die es im Lateinischen eine eigene Nennform gibt. */
@@ -69,6 +75,12 @@ export type TaskTypeId =
   | 'latinLoanWords'
   | 'latinWordFormation'
   | 'latinContext'
+  // Sprachbesondere Aufgaben (30.09.2026, didactics/sprachAufgaben.ts)
+  | 'readingForms'
+  | 'readingMatch'
+  | 'aspectPairs'
+  | 'caseForms'
+  | 'arabicRoots'
   // Unregelmäßige Verben aus der Verbliste des Lehrwerks (30.09.2026, shared/verben)
   | 'irregularVerbs'
 
@@ -186,6 +198,8 @@ export interface LatinFormItem {
   formLabel: string
   form: string
   meanings: string
+  /** Umschrift des Wortes (Altgriechisch, optional in den Einstellungen) – klein hinter dem Wort */
+  transliteration?: string
 }
 
 export interface LatinFormsBlock extends BlockBase {
@@ -395,6 +409,11 @@ export interface TestSettings {
   seed: number
   /** Vorgabe zur Seitenzahl je Testvariante (Schülerblatt) */
   pageLimit?: PageLimit
+  /**
+   * Umschrift anzeigen (Altgriechisch: λόγος → logos), 30.09.2026. Fehlt = aus – im Unterricht
+   * lesen die Lernenden die griechische Schrift; die Umschrift ist eine Hilfe für Anfänger.
+   */
+  umschrift?: boolean
   /** Aufgabe „Unregelmäßige Verben": Quelle, Verben und Form (30.09.2026, shared/verben) */
   verbAufgabe?: import('../../../shared/verben/formate').VerbAufgabe
 }
@@ -432,10 +451,22 @@ export const LANGUAGES: { value: string; label: string; english: string }[] = [
   { value: 'it', label: 'Italienisch', english: 'Italian' },
   { value: 'nl', label: 'Niederländisch', english: 'Dutch' },
   { value: 'ru', label: 'Russisch', english: 'Russian' },
+  // Schulfremdsprachen seit 30.09.2026 (@shared/faecher) – Hinweise und Anweisungen in der Zielsprache
+  { value: 'pl', label: 'Polnisch', english: 'Polish' },
+  { value: 'cs', label: 'Tschechisch', english: 'Czech' },
+  { value: 'pt', label: 'Portugiesisch', english: 'Portuguese (European norm)' },
+  { value: 'tr', label: 'Türkisch', english: 'Turkish' },
+  { value: 'zh', label: 'Chinesisch', english: 'Chinese (Mandarin, simplified characters)' },
+  { value: 'ja', label: 'Japanisch', english: 'Japanese' },
+  { value: 'ar', label: 'Arabisch', english: 'Arabic (Modern Standard Arabic)' },
+  { value: 'da', label: 'Dänisch', english: 'Danish' },
+  { value: 'el', label: 'Neugriechisch', english: 'Modern Greek' },
   /*
    * Latein arbeitet anders als die modernen Fremdsprachen: nur Lateinisch → Deutsch, keine
    * Sprech- und Schreibformate, dafür Nennformen, Wortbildung und Sprachvergleich.
    * Siehe `didactics/latein.ts`.
    */
-  { value: 'la', label: 'Latein', english: 'Latin' }
+  { value: 'la', label: 'Latein', english: 'Latin' },
+  // Altgriechisch nach dem Latein-Sonderweg (30.09.2026, didactics/griechisch.ts)
+  { value: 'grc', label: 'Griechisch', english: 'Ancient Greek' }
 ]

@@ -6,8 +6,12 @@ import { buildCrossword, crosswordForm, isCrosswordWord, scrambleWord } from './
 import { arr, bool, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { KnownVocab } from '../../../shared/knownVocab'
 import { baseForm } from '../render/helpTexts'
-import { NENNFORM_PUNKTE, nennformLabel } from '../didactics/latein'
+import { alteSpracheAdjektiv, NENNFORM_PUNKTE, nennformLabel } from '../didactics/latein'
 import { mitNennform } from '../input/lateinNennform'
+import { istGriechisch, mitGriechischerNennform } from '../didactics/griechisch'
+import { ASPEKT_LABEL, LESUNG_LABEL, mitLesung, WURZEL_LABEL } from '../didactics/sprachAufgaben'
+import { griechischUmschrift } from '../../../shared/sonderzeichen'
+import { aufgabenText, FESTE_ANWEISUNG, zuordnungsKoepfe } from '../render/aufgabenTexte'
 import { baueVerbBlock } from './verbAufgabe'
 
 export interface GenContext {
@@ -40,6 +44,11 @@ export interface TaskTypeDef {
    */
   defaultInstructionSie?: string
   accepts?: (v: VocabEntry) => boolean
+  /**
+   * Braucht diese Aufgabe für DIESE Wörter die KI? Fehlt = ja, sobald es ein Schema gibt.
+   * (Lesung: nur, wenn in der Liste Pinyin/Hiragana fehlen – 30.09.2026)
+   */
+  needsAi?: (vocab: VocabEntry[], ctx: GenContext) => boolean
   /** JSON-Schema der KI-Antwort; ohne Schema kommt der Block ohne KI aus */
   schema?: Record<string, unknown>
   prompt?: (vocab: VocabEntry[], ctx: GenContext) => string
@@ -49,7 +58,12 @@ export interface TaskTypeDef {
 // ---------- Hilfen ----------
 
 const vocabLines = (vocab: VocabEntry[]): string =>
-  vocab.map((v) => `- id="${v.id}" | ${v.term} | German: ${v.translation}${v.pos ? ` | ${v.pos}` : ''}${v.note ? ` | note: ${v.note}` : ''}`).join('\n')
+  vocab
+    .map(
+      (v) =>
+        `- id="${v.id}" | ${v.term} | German: ${v.translation}${v.lesung ? ` | reading: ${v.lesung}` : ''}${v.pos ? ` | ${v.pos}` : ''}${v.note ? ` | note: ${v.note}` : ''}`
+    )
+    .join('\n')
 
 /** Ordnet eine KI-Antwort anhand der ID (oder notfalls des Wortes) einer Vokabel zu. */
 function findVocab(vocab: VocabEntry[], id: string, term?: string): VocabEntry | undefined {
@@ -59,14 +73,23 @@ function findVocab(vocab: VocabEntry[], id: string, term?: string): VocabEntry |
 const itemSchema = (props: Record<string, Record<string, unknown>>) =>
   obj({ instruction: str('Short task instruction for the students in the target language'), items: arr(obj(props)) })
 
+/**
+ * Grundgerüst eines Blocks. Überschrift und Anweisung in der Testsprache (render/aufgabenTexte.ts,
+ * 30.09.2026): In Sprachen mit festen, geprüften Anweisungen (Niederländisch, Russisch und die
+ * neuen Schulsprachen) hat der feste Text Vorrang vor der KI-Formulierung; sonst gilt die KI-
+ * Anweisung und der feste Text ist der Rückfall.
+ */
 function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction' | 'defaultInstructionSie'>, data: any, ctx: GenContext) {
   const points = ctx.settings.tasks.find((t) => t.type === def.id)?.pointsPerItem ?? 1
   const sie = def.defaultInstructionSie && anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId, ctx.settings.stateId) === 'sie'
+  const sprache = ctx.settings.targetLanguage
+  const fest = aufgabenText(def.id, sprache)
+  const ki = typeof data?.instruction === 'string' ? data.instruction.trim() : ''
   return {
     id: newId(ctx.rng),
     taskType: def.id,
-    title: def.defaultTitle,
-    instruction: (typeof data?.instruction === 'string' && data.instruction.trim()) || (sie ? def.defaultInstructionSie! : def.defaultInstruction),
+    title: fest?.title ?? def.defaultTitle,
+    instruction: (fest && FESTE_ANWEISUNG.has(sprache) ? fest.instruction : '') || ki || fest?.instruction || (sie ? def.defaultInstructionSie! : def.defaultInstruction),
     pointsPerItem: points
   }
 }
@@ -100,7 +123,17 @@ const FALLBACK_EXTRA_WORDS: Record<string, string[]> = {
   es: ['ventana', 'botella', 'jardín', 'lápiz', 'cocina', 'bicicleta', 'espejo', 'naranja'],
   it: ['finestra', 'bottiglia', 'giardino', 'matita', 'cucina', 'bicicletta', 'specchio', 'arancia'],
   nl: ['raam', 'fles', 'tuin', 'potlood', 'keuken', 'fiets', 'spiegel', 'sinaasappel'],
-  ru: ['окно', 'бутылка', 'сад', 'карандаш', 'кухня', 'велосипед', 'зеркало', 'апельсин']
+  ru: ['окно', 'бутылка', 'сад', 'карандаш', 'кухня', 'велосипед', 'зеркало', 'апельсин'],
+  // Schulsprachen seit 30.09.2026 – dieselben Alltagswörter
+  pl: ['okno', 'butelka', 'ogród', 'ołówek', 'kuchnia', 'rower', 'lustro', 'pomarańcza'],
+  cs: ['okno', 'láhev', 'zahrada', 'tužka', 'kuchyně', 'kolo', 'zrcadlo', 'pomeranč'],
+  pt: ['janela', 'garrafa', 'jardim', 'lápis', 'cozinha', 'bicicleta', 'espelho', 'laranja'],
+  tr: ['pencere', 'şişe', 'bahçe', 'kalem', 'mutfak', 'bisiklet', 'ayna', 'portakal'],
+  zh: ['窗户', '瓶子', '花园', '铅笔', '厨房', '自行车', '镜子', '橙子'],
+  ja: ['まど', 'びん', 'にわ', 'えんぴつ', 'だいどころ', 'じてんしゃ', 'かがみ', 'オレンジ'],
+  ar: ['نافذة', 'زجاجة', 'حديقة', 'قلم', 'مطبخ', 'دراجة', 'مرآة', 'برتقالة'],
+  da: ['vindue', 'flaske', 'have', 'blyant', 'køkken', 'cykel', 'spejl', 'appelsin'],
+  el: ['παράθυρο', 'μπουκάλι', 'κήπος', 'μολύβι', 'κουζίνα', 'ποδήλατο', 'καθρέφτης', 'πορτοκάλι']
 }
 
 /** Mindestens so viele überzählige Wörter stehen in jedem Wortkasten bzw. jeder Zuordnung */
@@ -276,8 +309,8 @@ const defs: TaskTypeDef[] = [
       return {
         ...base(this, data, ctx),
         kind: 'match',
-        leftLabel: 'Explanations',
-        rightLabel: 'Words',
+        leftLabel: zuordnungsKoepfe(ctx.settings.targetLanguage)[0],
+        rightLabel: zuordnungsKoepfe(ctx.settings.targetLanguage)[1],
         left,
         right: right.map(({ id, text }) => ({ id, text }))
       }
@@ -318,7 +351,8 @@ const defs: TaskTypeDef[] = [
     build(vocab, data, ctx) {
       return {
         ...base(this, data, ctx),
-        instruction: PICTURE_INSTRUCTIONS[ctx.settings.targetLanguage] ?? PICTURE_INSTRUCTIONS.en,
+        instruction:
+          aufgabenText('pictureLabel', ctx.settings.targetLanguage)?.instruction ?? PICTURE_INSTRUCTIONS[ctx.settings.targetLanguage] ?? PICTURE_INSTRUCTIONS.en,
         kind: 'picture',
         items: vocab.map((v) => ({ id: newId(ctx.rng), vocabId: v.id, answer: v.term, imageKeywords: v.imageKeywords ?? [v.term] })),
         // Wortkasten nur, wenn die Lehrkraft ihn will: Die Wörter wären sonst eine Hilfe,
@@ -818,19 +852,23 @@ ${vocabLines(vocab)}`,
        * `mitNennform` hier und nicht beim Einlesen: Die Zielsprache steht erst in den
        * Einstellungen fest, die Vokabelliste kommt aber schon vorher herein – über Einfügen,
        * Datei, Schulbuch oder Bibliothek. An dieser Stelle ist sicher, dass es Latein ist.
+       * Griechisch (30.09.2026): eigene Nennformen (Artikel statt Genus) und auf Wunsch die Umschrift.
        */
+      const sprache = ctx.settings.targetLanguage
+      const griechisch = istGriechisch(sprache)
       return {
         ...base(this, data, ctx),
         kind: 'latinForms',
         pointsForm: NENNFORM_PUNKTE.form,
         pointsMeaning: NENNFORM_PUNKTE.bedeutung,
-        items: vocab.map(mitNennform).map((v) => ({
+        items: vocab.map(griechisch ? mitGriechischerNennform : mitNennform).map((v) => ({
           id: newId(ctx.rng),
           vocabId: v.id,
           term: v.term,
-          formLabel: nennformLabel(v),
+          formLabel: nennformLabel(v, sprache),
           form: v.nennform ?? '',
-          meanings: v.translation
+          meanings: v.translation,
+          ...(griechisch && ctx.settings.umschrift ? { transliteration: griechischUmschrift(v.term) } : {})
         }))
       }
     }
@@ -838,7 +876,7 @@ ${vocabLines(vocab)}`,
   {
     id: 'latinLoanWords',
     label: 'Fremd- und Lehnwörter (Latein)',
-    description: 'Zu deutschen Fremdwörtern wird das lateinische Ursprungswort gesucht – und umgekehrt.',
+    description: 'Zu deutschen Fremdwörtern wird das lateinische bzw. griechische Ursprungswort gesucht – und umgekehrt.',
     kind: 'open',
     minLevel: 'Pre-A1',
     usesVocab: true,
@@ -848,11 +886,11 @@ ${vocabLines(vocab)}`,
     defaultInstructionSie: 'Nennen Sie zu jedem Wort ein deutsches Fremd- oder Lehnwort und erklären Sie den Zusammenhang.',
     schema: itemSchema({
       vocabId: str(),
-      prompt: str('Das lateinische Wort, wie es den Lernenden vorgelegt wird'),
+      prompt: str('Das lateinische bzw. griechische Wort, wie es den Lernenden vorgelegt wird'),
       modelAnswer: str('Deutsches Fremd- oder Lehnwort und in einem Satz der Bedeutungszusammenhang')
     }),
-    prompt: (vocab) =>
-      'Aufgabentyp: Zu jedem lateinischen Wort sollen die Lernenden ein deutsches Fremd- oder Lehnwort nennen und den Bedeutungszusammenhang erklären.\n' +
+    prompt: (vocab, ctx) =>
+      `Aufgabentyp: Zu jedem ${alteSpracheAdjektiv(ctx.settings.targetLanguage)}en Wort sollen die Lernenden ein deutsches Fremd- oder Lehnwort nennen und den Bedeutungszusammenhang erklären.\n` +
       'Nimm nur Wörter, zu denen es wirklich ein gebräuchliches deutsches Fremd- oder Lehnwort gibt; erfinde keine Verwandtschaft. Gibt es keines, lass das Wort weg.\n\n' +
       `Wörter:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
@@ -875,9 +913,11 @@ ${vocabLines(vocab)}`,
       prompt: str('Das zusammengesetzte oder abgeleitete Wort'),
       modelAnswer: str('Zerlegung in Präfix, Stamm und Endung mit den Bedeutungen der Teile')
     }),
-    prompt: (vocab) =>
+    prompt: (vocab, ctx) =>
       'Aufgabentyp: Wortbildung. Die Lernenden zerlegen Komposita und Ableitungen in Präfix, Stamm und Suffix und geben die Bedeutung der Teile an.\n' +
-      'Berücksichtige Assimilation (ad+ferre → afferre) und Vokalschwächung (per+facere → perficere), wenn sie vorkommen.\n' +
+      (istGriechisch(ctx.settings.targetLanguage)
+        ? 'Berücksichtige Assimilation und Augment (συν+λέγω → συλλέγω), wenn sie vorkommen.\n'
+        : 'Berücksichtige Assimilation (ad+ferre → afferre) und Vokalschwächung (per+facere → perficere), wenn sie vorkommen.\n') +
       'Nimm nur Wörter, die wirklich zusammengesetzt oder abgeleitet sind.\n\n' +
       `Wörter:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
@@ -887,7 +927,7 @@ ${vocabLines(vocab)}`,
   {
     id: 'latinContext',
     label: 'Bedeutung im Zusammenhang (Latein)',
-    description: 'Ein kurzer lateinischer Satz zeigt das Wort im Kontext; gewählt wird die dort passende Bedeutung.',
+    description: 'Ein kurzer lateinischer bzw. griechischer Satz zeigt das Wort im Kontext; gewählt wird die dort passende Bedeutung.',
     kind: 'choice',
     minLevel: 'Pre-A1',
     usesVocab: true,
@@ -897,12 +937,12 @@ ${vocabLines(vocab)}`,
     defaultInstructionSie: 'Kreuzen Sie die Bedeutung an, die im Satz passt.',
     schema: itemSchema({
       vocabId: str(),
-      sentence: str('Kurzer, einfacher lateinischer Satz, in dem das Wort vorkommt'),
+      sentence: str('Kurzer, einfacher Satz in der Zielsprache (Latein bzw. Altgriechisch), in dem das Wort vorkommt'),
       options: arr(str(), 'Drei deutsche Bedeutungen; nur eine passt im Satz'),
       correct: int('Index der passenden Bedeutung, beginnend bei 0')
     }),
-    prompt: (vocab) =>
-      'Aufgabentyp: Monosemieren. Zu jedem mehrdeutigen Wort ein kurzer lateinischer Satz und drei deutsche Bedeutungen, von denen nur eine im Satz passt.\n' +
+    prompt: (vocab, ctx) =>
+      `Aufgabentyp: Monosemieren. Zu jedem mehrdeutigen Wort ein kurzer ${alteSpracheAdjektiv(ctx.settings.targetLanguage)}er Satz und drei deutsche Bedeutungen, von denen nur eine im Satz passt.\n` +
       'Die falschen Bedeutungen sind ECHTE Bedeutungen des Wortes, die hier nur nicht passen – keine erfundenen.\n' +
       'Der Satz benutzt nur Formen und Vokabeln, die zum Lernstand passen.\n\n' +
       `Wörter:\n${vocabLines(vocab)}`,
@@ -923,6 +963,186 @@ ${vocabLines(vocab)}`,
               correct: Math.max(0, Math.min(options.length - 1, Number(it.correct) || 0))
             }
           ]
+        })
+      }
+    }
+  },
+  /*
+   * ---------- SPRACHBESONDERE AUFGABEN (30.09.2026, didactics/sprachAufgaben.ts) ----------
+   *
+   * Chinesisch/Japanisch: Zeichen – Lesung – Bedeutung; Russisch/Polnisch/Tschechisch: Aspektpaare;
+   * Kasus im Satz (auch Türkisch, Neugriechisch); Arabisch: Wurzel. Welche Sprache welche Aufgabe
+   * bekommt, regelt `passtZurSprache`.
+   */
+  {
+    id: 'readingForms',
+    label: 'Zeichen: Lesung und Bedeutung',
+    description: 'Das Wort steht in Schriftzeichen da; ergänzt werden die Lesung (Pinyin bzw. Hiragana) und die deutsche Bedeutung – wie die drei Spalten im Lehrwerk.',
+    kind: 'latinForms',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Reading and meaning',
+    defaultInstruction: 'Write the reading and the German meaning of each word.',
+    // Die Lesung steht meist in der Liste; die KI ergänzt nur fehlende (mit Hinweis zum Prüfen)
+    needsAi: (vocab, ctx) => vocab.some((v) => !mitLesung(v, ctx.settings.targetLanguage).lesung),
+    schema: obj({ items: arr(obj({ vocabId: str(), reading: str('Pinyin with tone marks (Chinese) or hiragana (Japanese)') })) }),
+    prompt: (vocab, ctx) =>
+      `Task type: give the standard reading of each word – ${
+        ctx.settings.targetLanguage === 'ja' ? 'in hiragana' : 'in Hanyu Pinyin with tone marks (not tone numbers), syllables of one word written together'
+      }. Only for these words (the others already have a reading):\n${vocabLines(vocab.filter((v) => !mitLesung(v, ctx.settings.targetLanguage).lesung))}`,
+    build(vocab, data, ctx) {
+      const sprache = ctx.settings.targetLanguage
+      const ki = new Map<string, string>((data.items ?? []).map((it: any) => [String(it.vocabId), String(it.reading ?? '').trim()]))
+      return {
+        ...base(this, data, ctx),
+        kind: 'latinForms',
+        pointsForm: 1,
+        pointsMeaning: 1,
+        items: vocab
+          .map((v) => mitLesung(v, sprache))
+          .map((v) => ({
+            id: newId(ctx.rng),
+            vocabId: v.id,
+            term: v.term,
+            formLabel: LESUNG_LABEL[sprache] ?? 'Reading:',
+            form: v.lesung ?? ki.get(v.id) ?? '',
+            meanings: v.translation
+          }))
+      }
+    }
+  },
+  {
+    id: 'readingMatch',
+    label: 'Zeichen, Lesung und Bedeutung zuordnen',
+    description: 'Schriftzeichen (1, 2 …) werden Lesung und Bedeutung (a, b …) zugeordnet.',
+    kind: 'match',
+    minLevel: 'Pre-A1',
+    usesVocab: true,
+    minItems: 3,
+    defaultPoints: 1,
+    defaultTitle: 'Characters, reading and meaning',
+    defaultInstruction: 'Match the characters (1–…) with the reading and the meaning (a–…).',
+    needsAi: (vocab, ctx) => vocab.some((v) => !mitLesung(v, ctx.settings.targetLanguage).lesung),
+    schema: obj({ items: arr(obj({ vocabId: str(), reading: str('Pinyin with tone marks (Chinese) or hiragana (Japanese)') })) }),
+    prompt: (vocab, ctx) =>
+      `Task type: give the standard reading of each word – ${
+        ctx.settings.targetLanguage === 'ja' ? 'in hiragana' : 'in Hanyu Pinyin with tone marks'
+      }. Only for these words:\n${vocabLines(vocab.filter((v) => !mitLesung(v, ctx.settings.targetLanguage).lesung))}`,
+    build(vocab, data, ctx) {
+      const sprache = ctx.settings.targetLanguage
+      const ki = new Map<string, string>((data.items ?? []).map((it: any) => [String(it.vocabId), String(it.reading ?? '').trim()]))
+      const rechts = (v: VocabEntry): string => [v.lesung ?? ki.get(v.id) ?? '', v.translation].filter(Boolean).join(' – ')
+      const woerter = vocab.map((v) => mitLesung(v, sprache))
+      // Überzählige Angaben nur aus nicht abgefragten Wörtern der Liste mit eigener Lesung – sie verraten nichts
+      const getestet = new Set((ctx.variantVocab ?? vocab).map((v) => v.id))
+      const extra = shuffle(
+        ctx.allVocab.map((v) => mitLesung(v, sprache)).filter((v) => !getestet.has(v.id) && v.lesung),
+        ctx.rng
+      ).slice(0, 2)
+      const right = shuffle(
+        [...woerter.map((v) => ({ id: newId(ctx.rng), text: rechts(v), vocabId: v.id as string | undefined })), ...extra.map((v) => ({ id: newId(ctx.rng), text: rechts(v), vocabId: undefined }))],
+        ctx.rng
+      )
+      const left = shuffle(woerter, ctx.rng).map((v) => ({ id: newId(ctx.rng), vocabId: v.id, text: v.term, answerId: right.find((r) => r.vocabId === v.id)!.id }))
+      return {
+        ...base(this, data, ctx),
+        kind: 'match',
+        leftLabel: sprache === 'ja' ? '漢字' : '汉字',
+        rightLabel: sprache === 'ja' ? 'よみ – いみ' : '拼音 – 意思',
+        left,
+        right: right.map(({ id, text }) => ({ id, text }))
+      }
+    }
+  },
+  {
+    id: 'aspectPairs',
+    label: 'Aspektpaare',
+    description: 'Zu jedem Verb wird der Aspektpartner ergänzt (делать – сделать, robić – zrobić, dělat – udělat), dazu die Bedeutung.',
+    kind: 'latinForms',
+    minLevel: 'A1+',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Aspect pairs',
+    defaultInstruction: 'Write the aspect partner of each verb.',
+    accepts: (v) => /verb|глаг|czasown|sloves|\bv\.?$/i.test(v.pos ?? '') || /(ть|ться|ти|чь|ć|ść|c|at|át|et|ět|it|ít|out|ovat|nout)$/u.test(v.term.trim()),
+    schema: itemSchema({
+      vocabId: str(),
+      partner: str('The other verb of the aspect pair (perfective for an imperfective verb and vice versa), infinitive, exactly as in standard dictionaries')
+    }),
+    prompt: (vocab) =>
+      'Task type: aspect pairs. For each verb give its aspect partner (imperfective ↔ perfective) as used in school textbooks (e.g. делать – сделать, говорить – сказать, robić – zrobić, dělat – udělat). Skip words that are not verbs or have no common aspect partner (biaspectual verbs, verbs of motion without a clear pair). Never invent forms.\n\n' +
+      `Verbs:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const sprache = ctx.settings.targetLanguage
+      return {
+        ...base(this, data, ctx),
+        kind: 'latinForms',
+        pointsForm: 1,
+        pointsMeaning: 1,
+        items: (data.items ?? []).flatMap((it: any) => {
+          const v = findVocab(vocab, it.vocabId)
+          const partner = String(it.partner ?? '').trim()
+          return v && partner ? [{ id: newId(ctx.rng), vocabId: v.id, term: v.term, formLabel: ASPEKT_LABEL[sprache] ?? 'Aspect partner:', form: partner, meanings: v.translation }] : []
+        })
+      }
+    }
+  },
+  {
+    id: 'caseForms',
+    label: 'Kasus im Satz',
+    description: 'Das Wort in Klammern wird in den Fall gesetzt, den der Satz verlangt (Russisch, Polnisch, Tschechisch, Türkisch mit Vokalharmonie, Neugriechisch).',
+    kind: 'gap',
+    minLevel: 'A1+',
+    usesVocab: true,
+    defaultPoints: 1,
+    defaultTitle: 'Cases',
+    defaultInstruction: 'Put the words in brackets into the correct case.',
+    accepts: (v) => !/verb|глаг|czasown|sloves|fiil|ρήμα|adv/i.test(v.pos ?? ''),
+    schema: itemSchema({
+      vocabId: str(),
+      before: str(),
+      base: str('Dictionary form of the tested word, shown in brackets'),
+      answer: str('The tested word in the case the sentence requires'),
+      after: str()
+    }),
+    prompt: (vocab, ctx) =>
+      'Task type: cases. For each noun (or adjective/pronoun) write one sentence with a gap. The gap needs the tested word in a case OTHER than the dictionary form, clearly required by a preposition, verb or construction in the sentence, so that exactly one form is correct. "base" is the dictionary form shown in brackets, "answer" the correct inflected form' +
+      (ctx.settings.targetLanguage === 'tr' ? ' (Turkish: case suffix with vowel harmony and consonant changes, e.g. ev → evde, kitap → kitabı; the suffix is written together with the word, after a proper name with an apostrophe)' : '') +
+      '. Use only cases the class already knows (see VORWISSEN DER KLASSE); in early learning years prefer the most frequent cases (e.g. prepositional/locative, accusative).\n' +
+      `${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
+        const v = findVocab(vocab, it.vocabId)
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, hint: it.base || v.term }] : []
+      })
+      return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
+    }
+  },
+  {
+    id: 'arabicRoots',
+    label: 'Wurzel und Bedeutung (Arabisch)',
+    description: 'Zu jedem Wort werden die Wurzelradikale (z. B. ك ت ب) und die Bedeutung angegeben – so wird im Wörterbuch gesucht.',
+    kind: 'latinForms',
+    minLevel: 'A1+',
+    usesVocab: true,
+    defaultPoints: 2,
+    defaultTitle: 'Root and meaning',
+    defaultInstruction: 'Write the root and the German meaning of each word.',
+    schema: itemSchema({ vocabId: str(), root: str('The three (or four) root consonants, separated by spaces, e.g. ك ت ب') }),
+    prompt: (vocab) =>
+      'Task type: roots. For each Arabic word give its root consonants (usually three, e.g. كِتاب → ك ت ب; مَدرَسة → د ر س). Skip loanwords, particles and words without a clear root. Never guess a root.\n\n' +
+      `Words:\n${vocabLines(vocab)}`,
+    build(vocab, data, ctx) {
+      return {
+        ...base(this, data, ctx),
+        kind: 'latinForms',
+        pointsForm: 1,
+        pointsMeaning: 1,
+        items: (data.items ?? []).flatMap((it: any) => {
+          const v = findVocab(vocab, it.vocabId)
+          const root = String(it.root ?? '').trim()
+          return v && root ? [{ id: newId(ctx.rng), vocabId: v.id, term: v.term, formLabel: WURZEL_LABEL, form: root, meanings: v.translation }] : []
         })
       }
     }

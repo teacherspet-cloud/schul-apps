@@ -2,6 +2,8 @@ import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, Tex
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { newId } from '../model/random'
+import SonderzeichenLeiste from '../../../shared/components/SonderzeichenLeiste'
+import { sprachAttribute } from '../../../shared/sprachSchrift'
 
 /**
  * EINE Vokabeltabelle für Vokabeltest (Schritt 1 und Prüffenster), eigene Listen und
@@ -43,13 +45,45 @@ export const ZUSATZ = 'Zusatzwortschatz (im Buch grau)'
 
 export const leereZeile = <T extends TabellenZeile>(): T => ({ id: newId(), term: '', translation: '' }) as T
 
+/**
+ * Sprache der Tabelle (30.09.2026): Schrift, Schreibrichtung und Sonderzeichen der Wortspalte,
+ * Beispiel im Platzhalter und die Überschrift der dritten Spalte – in Latein/Griechisch steht dort
+ * die Nennform, in Chinesisch/Japanisch die Lesung (so drucken es die Lehrwerke).
+ */
+const BEISPIEL: Record<string, string> = {
+  en: 'z. B. to explore',
+  fr: 'z. B. découvrir',
+  es: 'z. B. descubrir',
+  it: 'z. B. scoprire',
+  nl: 'z. B. ontdekken',
+  ru: 'z. B. открывать',
+  pl: 'z. B. odkrywać',
+  cs: 'z. B. objevovat',
+  pt: 'z. B. descobrir',
+  tr: 'z. B. keşfetmek',
+  zh: 'z. B. 发现',
+  ja: 'z. B. 発見する',
+  ar: 'z. B. اِكتَشَفَ',
+  da: 'z. B. at opdage',
+  el: 'z. B. ανακαλύπτω',
+  la: 'z. B. invenire',
+  grc: 'z. B. ὁ λόγος'
+}
+const DRITTE_SPALTE: Record<string, string> = {
+  la: 'Nennform / Wortart',
+  grc: 'Nennform / Wortart',
+  zh: 'Pinyin / Wortart',
+  ja: 'Lesung / Wortart'
+}
+
 export default function VokabelTabelle<T extends TabellenZeile>({
   zeilen,
   onChange,
   abfragen = false,
   mitBeispiel = false,
   mitVerlauf = false,
-  bereinige
+  bereinige,
+  sprache
 }: {
   zeilen: T[]
   /** Neue Zeilen; `gruppe` fasst fortlaufendes Tippen im selben Feld zu EINEM Verlaufsschritt */
@@ -62,6 +96,8 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   mitVerlauf?: boolean
   /** Zusätzliche Änderungen zu einer Änderung, z. B. veraltete Bild-Analyse verwerfen */
   bereinige?: (zeile: T, patch: Partial<T>) => Partial<T>
+  /** Sprachcode der Wörter (Schrift, Sonderzeichen, Spaltennamen) – fehlt = ohne Besonderheiten */
+  sprache?: string
 }): React.JSX.Element {
   // Stabile Rückrufe: Sonst zeichnet die Tabelle (oft weit über hundert Zeilen) bei jedem
   // Tastendruck ALLE Zeilen neu, und das Tippen wird spürbar zäh.
@@ -114,6 +150,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
 
   return (
     <>
+      <SonderzeichenLeiste sprache={sprache} />
       <Box style={{ overflowX: 'auto' }}>
         <Table verticalSpacing={4} striped highlightOnHover ref={tabelle} className="vokabel-tabelle">
           <Table.Thead>
@@ -136,7 +173,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
               <Table.Th w={36}>#</Table.Th>
               <Table.Th>Wort / Ausdruck</Table.Th>
               <Table.Th>Deutsch</Table.Th>
-              <Table.Th w={110}>Wortart</Table.Th>
+              <Table.Th w={sprache && DRITTE_SPALTE[sprache] ? 160 : 110}>{(sprache && DRITTE_SPALTE[sprache]) || 'Wortart'}</Table.Th>
               {mitBeispiel && (
                 <Table.Th>
                   <Tooltip label="Beispielsatz aus dem Schulbuch, darunter seine Übersetzung" withArrow>
@@ -162,6 +199,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
                 loeschen={loeschen}
                 weiter={weiter}
                 neueZeile={neueZeile}
+                sprache={sprache}
               />
             ))}
           </Table.Tbody>
@@ -185,6 +223,7 @@ interface ZeilenProps {
   loeschen: (id: string) => void
   weiter: (id: string, feld: Feld) => void
   neueZeile: (nach?: string) => void
+  sprache?: string
 }
 
 const Zeile = memo(function Zeile({
@@ -197,11 +236,16 @@ const Zeile = memo(function Zeile({
   aendern,
   loeschen,
   weiter,
-  neueZeile
+  neueZeile,
+  sprache
 }: ZeilenProps): React.JSX.Element {
   const name = v.term.trim() || `Zeile ${nr}`
   const abgefragt = v.include !== false
-  const feld = (f: Feld, label: string, placeholder?: string, letztesFeld = false): React.JSX.Element => (
+  // Wort, Beispiel und Nennform/Lesung in der Schrift der Sprache; Deutsch und Hinweis bleiben, wie sie sind
+  const zielsprachig = (f: Feld): boolean => f === 'term' || f === 'example' || f === 'pos'
+  const feld = (f: Feld, label: string, placeholder?: string, letztesFeld = false): React.JSX.Element => {
+    const attr = zielsprachig(f) ? sprachAttribute(sprache) : {}
+    return (
     <TextInput
       variant="unstyled"
       aria-label={`${label} in Zeile ${nr}`}
@@ -209,7 +253,14 @@ const Zeile = memo(function Zeile({
       value={(v[f] as string | undefined) ?? ''}
       data-zeile={v.id}
       data-feld={f}
-      styles={f === 'term' && v.grey ? { input: { color: 'var(--mantine-color-dimmed)' } } : undefined}
+      lang={attr.lang}
+      dir={attr.dir}
+      styles={{
+        input: {
+          ...(f === 'term' && v.grey ? { color: 'var(--mantine-color-dimmed)' } : {}),
+          ...(attr.style ?? {})
+        }
+      }}
       onChange={(e) => aendern(v.id, { [f]: e.currentTarget.value }, `zeile:${v.id}:${f}`)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
@@ -221,7 +272,8 @@ const Zeile = memo(function Zeile({
         }
       }}
     />
-  )
+    )
+  }
   return (
     <Table.Tr data-zusatz={v.grey ? '' : undefined} style={abfragen && !abgefragt ? { opacity: 0.6 } : undefined}>
       {abfragen && (
@@ -236,7 +288,7 @@ const Zeile = memo(function Zeile({
       </Table.Td>
       <Table.Td>
         <Group gap={4} wrap="nowrap">
-          <div style={{ flex: 1, minWidth: 0 }}>{feld('term', 'Wort', 'z. B. to explore')}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>{feld('term', 'Wort', BEISPIEL[sprache ?? 'en'] ?? BEISPIEL.en)}</div>
           {v.grey && (
             <Tooltip label={`${ZUSATZ} – muss nicht unbedingt gelernt werden`}>
               <Badge size="xs" variant="light" color="gray" tt="none" style={{ flexShrink: 0 }} data-testid="zusatz-kennzeichen">

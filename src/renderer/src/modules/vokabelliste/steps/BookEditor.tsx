@@ -333,6 +333,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
           zeilen={rows}
           mitBeispiel
           mitVerlauf
+          sprache={book.language}
           onChange={(r, gruppe) => {
             verlauf.setze(r, gruppe)
             geaendert()

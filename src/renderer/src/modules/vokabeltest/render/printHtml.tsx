@@ -61,7 +61,7 @@ export function buildPrintHtml(doc: TestDocument, sel: PrintSelection, layouts?:
   const withCredits = pages
 
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(doc.header.title)}</title>${kiMetaTag(doc.ki)}
+<html lang="${escapeHtml(doc.settings.targetLanguage || 'en')}"><head><meta charset="utf-8"><title>${escapeHtml(doc.header.title)}</title>${kiMetaTag(doc.ki)}
 <style>
 html, body { margin: 0; padding: 0; background: #fff; }
 .vt-page { page-break-after: always; break-after: page; min-height: auto; }

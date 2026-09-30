@@ -7,6 +7,7 @@ import { distributeEvenly } from './distribute'
 import { AiCall, systemPrompt } from './generate'
 import { TASK_TYPE_LIST, TASK_TYPES } from './taskTypes'
 import { formVorwissen, formZuSchwer, planHinweis, type FormSettings } from '../didactics/formVorwissen'
+import { passtZurSprache } from '../didactics/latein'
 
 /** Formate, die für einen automatisch erstellten Test in Frage kommen (ohne Kreuzworträtsel/Freitext). */
 const AUTO_CANDIDATES: TaskTypeId[] = [
@@ -29,7 +30,13 @@ const AUTO_CANDIDATES: TaskTypeId[] = [
   'scrambled',
   'wrongWord',
   'twoSentences',
-  'trueFalse'
+  'trueFalse',
+  // Sprachbesondere Aufgaben (30.09.2026) – nur in ihren Sprachen (didactics/sprachAufgaben.ts)
+  'readingForms',
+  'readingMatch',
+  'aspectPairs',
+  'caseForms',
+  'arabicRoots'
 ]
 
 /** Einstellungen der Auswahl; Sprache, Jahrgang und Fremdsprachenfolge sind nötig für das Vorwissen bei Wortformen */
@@ -47,7 +54,10 @@ function formFilter(settings: AutoSettings): (id: TaskTypeId) => boolean {
 
 export function availableAutoTypes(settings: AutoSettings): TaskTypeId[] {
   const passt = formFilter(settings)
-  return AUTO_CANDIDATES.filter((id) => TASK_TYPES[id] && levelAtLeast(settings.level, TASK_TYPES[id].minLevel) && passt(id))
+  const sprache = settings.targetLanguage
+  return AUTO_CANDIDATES.filter(
+    (id) => TASK_TYPES[id] && levelAtLeast(settings.level, TASK_TYPES[id].minLevel) && passt(id) && (!sprache || passtZurSprache(id, sprache))
+  )
 }
 
 /** Wie viele Vokabeln abgefragt werden: bei wenig Punkten nur so viele wie Punkte (1 Punkt je Vokabel). */

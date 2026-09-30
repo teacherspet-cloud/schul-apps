@@ -15,6 +15,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   Title,
@@ -31,7 +32,8 @@ import { notifyError } from '../../../shared/util'
 import { distributeEvenly, requestedCount } from '../generation/distribute'
 import { erstelleVokabeltest } from '../auftraege'
 import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
-import { istLatein, passtZurSprache } from '../didactics/latein'
+import { aufgabenLabel, istAlteSprache, passtZurSprache } from '../didactics/latein'
+import { aufgabenFuer } from '../model/grundeinstellungen'
 import { formHinweis, formVorwissen, formZuSchwer, lernjahrVon } from '../didactics/formVorwissen'
 import VerbAufgabeWahl from '../../../shared/verben/VerbAufgabeWahl'
 import { istVerbSprache } from '@shared/verben'
@@ -88,7 +90,7 @@ export default function SettingsStep(): React.JSX.Element {
   const [vorschlag, setVorschlag] = useState<{ laeuft: boolean; gruende: string[]; klasse?: string }>({ laeuft: false, gruende: [] })
   const angefasst = useRef(false)
   const schlageVor = async (basis: TestSettings, mitKlasse: boolean, table: CefrTable, kiDa: boolean): Promise<void> => {
-    if (istLatein(basis.targetLanguage) || usable.length < 2) return
+    if (istAlteSprache(basis.targetLanguage) || usable.length < 2) return
     angefasst.current = false
     setVorschlag({ laeuft: true, gruende: [] })
     let s = basis
@@ -268,9 +270,23 @@ export default function SettingsStep(): React.JSX.Element {
                       label="Zielsprache"
                       data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
                       value={settings.targetLanguage}
-                      onChange={(v) => v && patch({ targetLanguage: v })}
+                      onChange={(v) => {
+                        if (!v) return
+                        // Aufgaben, die es in der neuen Sprache nicht gibt, fallen weg (30.09.2026); bleibt keine, gelten die Standardaufgaben
+                        const bleiben = settings.tasks.filter((t) => passtZurSprache(t.type, v))
+                        patch({ targetLanguage: v, tasks: bleiben.length ? bleiben : aufgabenFuer(v, settings.vocabCount) })
+                      }}
                       allowDeselect={false}
                     />
+                    {settings.targetLanguage === 'grc' && (
+                      <Switch
+                        label="Umschrift hinter den griechischen Wörtern"
+                        description="z. B. λόγος [logos] – Hilfe für den Anfangsunterricht; Nennformen und Bedeutungen bleiben griechisch bzw. deutsch."
+                        checked={Boolean(settings.umschrift)}
+                        onChange={(e) => patch({ umschrift: e.currentTarget.checked })}
+                        data-umschrift
+                      />
+                    )}
                     {table.states.length > 0 ? (
                       <>
                         <SchulAngabe
@@ -431,7 +447,7 @@ export default function SettingsStep(): React.JSX.Element {
               <Card withBorder>
                 <Group justify="space-between" align="center" mb={4}>
                   <Title order={4}>Aufgabentypen</Title>
-                  {!istLatein(settings.targetLanguage) && (
+                  {!istAlteSprache(settings.targetLanguage) && (
                     <Button
                       size="xs"
                       variant="light"
@@ -488,7 +504,7 @@ export default function SettingsStep(): React.JSX.Element {
                             onChange={(e) => toggleTask(def.id, e.currentTarget.checked)}
                             label={
                               <Text fw={600} size="sm">
-                                {def.label}
+                                {aufgabenLabel(def, settings.targetLanguage)}
                               </Text>
                             }
                             description={def.description}

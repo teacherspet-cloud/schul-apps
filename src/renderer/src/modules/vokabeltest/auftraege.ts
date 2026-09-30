@@ -47,7 +47,7 @@ export function erstelleVokabeltest(lauf: VokabeltestLauf): void {
     fehlerTitel: 'Test konnte nicht erstellt werden',
     arbeit: async (e, k) => {
       const settings = lauf.vorbereiten ? await lauf.vorbereiten(e.settings, k) : e.settings
-      const header = e.header ?? defaultHeader((await window.api.settings.get()).schoolName)
+      const header = e.header ?? defaultHeader((await window.api.settings.get()).schoolName, settings.targetLanguage)
       return generateTest(e.usable, settings, header, {
         ai: k.ai,
         review: lauf.review,

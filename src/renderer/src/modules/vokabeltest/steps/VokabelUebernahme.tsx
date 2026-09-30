@@ -74,13 +74,16 @@ export function PruefFenster({
   onClose,
   onApply,
   abfragen = true,
-  titel
+  titel,
+  sprache
 }: {
   entries: VocabEntry[] | null
   onClose: () => void
   onApply: (entries: VocabEntry[], replace: boolean) => void
   abfragen?: boolean
   titel?: string
+  /** Sprache der Wörter – Schrift und Sonderzeichen in der Tabelle */
+  sprache?: string
 }): React.JSX.Element {
   const [draft, setDraft] = useState<VocabEntry[]>([])
 
@@ -110,7 +113,7 @@ export function PruefFenster({
       )}
       {abfragen && <AuswahlLeiste entries={draft} onChange={setDraft} />}
       <ScrollArea.Autosize mah="55vh">
-        <VokabelTabelle zeilen={draft} onChange={setDraft} abfragen={abfragen} />
+        <VokabelTabelle zeilen={draft} onChange={setDraft} abfragen={abfragen} sprache={sprache} />
       </ScrollArea.Autosize>
       <Group justify="flex-end" mt="md">
         <Button variant="default" onClick={onClose}>

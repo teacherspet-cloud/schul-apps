@@ -649,3 +649,19 @@
 .vt-verb-table td.vt-verb-blank {
   height: 8mm;
 }
+
+/* Umschrift hinter dem griechischen Wort (optional, 30.09.2026) – lateinische Schrift, klein und grau */
+.vt-umschrift {
+  font-weight: 400;
+  font-size: 0.85em;
+  color: #555;
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+}
+/* Arabisch: Rechts-nach-links-Seiten; die Formspalte beginnt dann rechts */
+.vt-page[dir='rtl'] .vt-latin-forms td {
+  padding: 1.2mm 0 1.2mm 2mm;
+}
+.vt-page[dir='rtl'] .vt-latin-label {
+  margin-right: 0;
+  margin-left: 1.5mm;
+}

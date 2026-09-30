@@ -236,11 +236,12 @@ export default function VocabStep(): React.JSX.Element {
             </Group>
 
             {filled.length > 0 && <AuswahlLeiste entries={vocab} onChange={(v) => setVocab(v)} />}
-            <VokabelTabelle zeilen={vocab} onChange={setVocab} abfragen mitVerlauf bereinige={bereinige} />
+            <VokabelTabelle zeilen={vocab} onChange={setVocab} abfragen mitVerlauf bereinige={bereinige} sprache={sprache || undefined} />
           </Card>
         </Container>
 
         <PruefFenster
+          sprache={sprache || undefined}
           entries={review?.entries ?? null}
           onClose={() => setReview(null)}
           onApply={(entries, replace) => {

@@ -10,6 +10,8 @@ import { fachPfad, ueberthemaVon } from '../../../shared/ueberthema'
 import { LANGUAGES } from '../model/types'
 import { MaskottchenBild } from '../../arbeitsblatt/render/Illustration'
 import { vokabeltestFigur } from './maskottchen'
+import { kopfTexte } from './aufgabenTexte'
+import { istRtl, schriftFamilie } from '../../../shared/sprachSchrift'
 
 /** Seitenaufteilung eines Tests (aus der Messung in useTestLayout). */
 export interface PageLayout {
@@ -69,11 +71,26 @@ export function TestPage({
   const akzent = vokabeltestFarbe(doc)
   // Schlussfigur (27.09.2026): jubelnd unten rechts im Seitenrand der letzten Seite – nie im Lösungsteil
   const figur = showsAnswers(mode) ? null : vokabeltestFigur(doc)
+  /*
+   * Schrift und Schreibrichtung der Testsprache (30.09.2026): Altgriechisch polyton (Palatino
+   * Linotype), Chinesisch/Japanisch mit Schriftzeichen-Schrift, Arabisch von rechts nach links.
+   * Deutsche Wörter in einem arabischen Test bleiben durch den Unicode-Bidi-Algorithmus lesbar.
+   */
+  const sprache = doc.settings.targetLanguage
+  const schrift = schriftFamilie(sprache)
+  const rtl = istRtl(sprache)
 
   return (
     <>
       {pages.map((plan, pi) => (
-        <div key={pi} className={pageClass} style={{ fontSize: `${fontSize}pt`, ...(akzent ? { ['--vt-accent' as string]: akzent } : {}) }} data-page={pi + 1}>
+        <div
+          key={pi}
+          className={pageClass}
+          lang={sprache || undefined}
+          dir={rtl ? 'rtl' : undefined}
+          style={{ fontSize: `${fontSize}pt`, ...(schrift ? { fontFamily: schrift } : {}), ...(akzent ? { ['--vt-accent' as string]: akzent } : {}) }}
+          data-page={pi + 1}
+        >
           {pi === 0 && <TestHeader doc={doc} variant={variant} />}
           {plan.items.map((placed) => {
             const index = variant.blocks.findIndex((b) => b.id === placed.id)
@@ -112,6 +129,8 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
   const pfad = vokabeltestPfad(doc)
   // Kopffigur (27.09.2026): winkend oben rechts; Kopfzeile und Titelzeile rücken ihr aus dem Weg
   const figur = key ? null : vokabeltestFigur(doc)
+  // Feste Kopftexte in der Testsprache (30.09.2026) – vorher immer englisch
+  const k = kopfTexte(doc.settings.targetLanguage)
   return (
     <header className={`vt-header${figur ? ' vt-header-illu' : ''}`}>
       {figur && <MaskottchenBild id={figur.maskottchenId} pose="winkend" className="vt-illu vt-illu-kopf" />}
@@ -128,28 +147,28 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
       <div className="vt-title-row">
         <h1 className="vt-title">
           {h.title}
-          {key && ' – answer key'}
+          {key && ` – ${k.loesung}`}
         </h1>
-        {h.showVariant && multi && <div className="vt-variant">Test {variant.label}</div>}
+        {h.showVariant && multi && <div className="vt-variant">{k.gruppe(variant.label)}</div>}
       </div>
       {h.subtitle && <div className="vt-subtitle">{h.subtitle}</div>}
       {!key && (h.showName || h.showClass || h.showDate) && (
         <div className="vt-fields">
           {h.showName && (
             <div className="vt-field vt-field-name">
-              <span>Name:</span>
+              <span>{k.name}</span>
               <span className="vt-field-line" />
             </div>
           )}
           {h.showClass && (
             <div className="vt-field vt-field-class">
-              <span>Class:</span>
+              <span>{k.klasse}</span>
               <span className="vt-field-line" />
             </div>
           )}
           {h.showDate && (
             <div className="vt-field vt-field-date">
-              <span>Date:</span>
+              <span>{k.datum}</span>
               <span className="vt-field-line" />
             </div>
           )}
@@ -159,12 +178,12 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
         <div className="vt-score">
           {h.showPoints && (
             <span>
-              Points: {key ? '' : <span className="vt-score-blank" />} / {formatPoints(total)}
+              {k.punkte} {key ? '' : <span className="vt-score-blank" />} / {formatPoints(total)}
             </span>
           )}
           {h.showGrade && !key && (
             <span>
-              Mark: <span className="vt-score-blank" />
+              {k.note} <span className="vt-score-blank" />
             </span>
           )}
         </div>
@@ -646,6 +665,8 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
                 <tr key={it.id}>
                   <td className="vt-latin-term">
                     <T value={it.term} onChange={set((d, v) => ((d as typeof block).items[idx].term = v))} />
+                    {/* Umschrift (Altgriechisch, optional) klein hinter dem Wort */}
+                    {it.transliteration && <span className="vt-umschrift"> [{it.transliteration}]</span>}
                   </td>
                   <td className="vt-latin-form">
                     {/*

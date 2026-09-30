@@ -55,7 +55,16 @@ const FACH: Record<string, string> = {
   es: 'spanisch',
   it: 'italienisch',
   ru: 'russisch',
-  la: 'latein'
+  la: 'latein',
+  // 30.09.2026: Altgriechisch (Formenlehre der Grammatiktabelle) und die Schulsprachen mit eigener Progression
+  // (grammarTopicsNeueSprachen.ts); Japanisch, Arabisch, Dänisch, Neugriechisch ohne Tabelle → Faustregel
+  grc: 'griechisch',
+  nl: 'niederlaendisch',
+  pl: 'polnisch',
+  cs: 'tschechisch',
+  pt: 'portugiesisch',
+  tr: 'tuerkisch',
+  zh: 'chinesisch'
 }
 
 /** Nur Bereiche, in denen sich das Wort selbst verändert – keine Satzbau-, Präpositions- oder Begleiterthemen */
@@ -69,7 +78,14 @@ const VERGANGENHEIT: Record<string, string[]> = {
   spanisch: ['es.verb.indefinido_reg'],
   italienisch: ['it.verb.passato_prossimo'],
   russisch: ['ru.verb.praeteritum'],
-  latein: ['la.form.perfekt']
+  latein: ['la.form.perfekt'],
+  griechisch: ['gr.form.futur_aorist'],
+  niederlaendisch: ['nl.verb.perfectum'],
+  polnisch: ['pl.verb.czas_przeszly'],
+  tschechisch: ['cs.verb.minuly_cas'],
+  portugiesisch: ['pt.verb.preterito_perfeito'],
+  tuerkisch: ['tr.verb.gecmis_di'],
+  chinesisch: ['zh.asp.le']
 }
 
 function sequenz(s: FormSettings, fach: string | undefined): LanguageSequence {
@@ -207,10 +223,10 @@ export function vorwissenRegel(v: FormVorwissen): string {
     v.lehrwerk?.danach.length ? `- Textbook – grammar of later units (NOT yet taught): ${kuerzen(v.lehrwerk.danach, 6, true)}.` : '',
     v.lehrwerk ? '- The textbook information is more precise than the general lists; follow it where they differ.' : '',
     'Rules for word forms:',
-    // Latein: nur Lesen und Übersetzen – es geht um die Formen in den lateinischen Sätzen
-    ...(v.fach === 'latein'
+    // Latein und Griechisch: nur Lesen und Übersetzen – es geht um die Formen in den Sätzen der Aufgaben
+    ...(v.fach === 'latein' || v.fach === 'griechisch'
       ? [
-          '- Latin sentences and phrases use only forms the class already knows; tested words appear in their dictionary form or in a known form.',
+          `- ${v.fach === 'latein' ? 'Latin' : 'Ancient Greek'} sentences and phrases use only forms the class already knows; tested words appear in their dictionary form or in a known form.`,
           '- Forms that are not yet taught do not occur; if one is unavoidable, explain it in brackets.'
         ]
       : [

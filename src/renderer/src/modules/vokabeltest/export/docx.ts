@@ -5,9 +5,9 @@ import {
   ImageRun,
   ISectionOptions,
   Packer,
-  Paragraph,
+  Paragraph as WordParagraph,
   ParagraphChild,
-  Table,
+  Table as WordTable,
   TableCell,
   TableLayoutType,
   TableRow,
@@ -16,6 +16,7 @@ import {
   VerticalAlign,
   WidthType
 } from 'docx'
+import type { IParagraphOptions, ITableOptions } from 'docx'
 import { kiVermerkText, kiWordEigenschaften, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
@@ -40,6 +41,25 @@ import { maskottchenBild } from '../../../shared/maskottchenStore'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { vokabeltestFigur } from '../render/maskottchen'
 import { vokabeltestPfad } from '../render/TestPage'
+import { kopfTexte } from '../render/aufgabenTexte'
+import { istRtl, wordSchrift } from '../../../shared/sprachSchrift'
+
+/*
+ * Arabisch (30.09.2026): Absätze und Tabellen von rechts nach links. Statt jede der vielen
+ * Absatzstellen einzeln anzufassen, setzen diese beiden Klassen die Richtung für die Dauer eines
+ * Exports (buildDocx setzt und löscht den Schalter).
+ */
+let rechtsNachLinks = false
+class Paragraph extends WordParagraph {
+  constructor(o: string | IParagraphOptions) {
+    super(rechtsNachLinks ? (typeof o === 'string' ? { text: o, bidirectional: true } : { bidirectional: true, ...o }) : o)
+  }
+}
+class Table extends WordTable {
+  constructor(o: ITableOptions) {
+    super(rechtsNachLinks ? { visuallyRightToLeft: true, ...o } : o)
+  }
+}
 
 const PX_MM = 96 / 25.4
 
@@ -60,6 +80,15 @@ export interface DocxOptions {
 }
 
 export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer): Promise<Uint8Array> {
+  rechtsNachLinks = istRtl(doc.settings.targetLanguage)
+  try {
+    return await baueDocx(doc, opts, sizer)
+  } finally {
+    rechtsNachLinks = false
+  }
+}
+
+async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer): Promise<Uint8Array> {
   const layoutFont = opts.layouts?.student.values().next().value?.fontSize
   const size = Math.round((layoutFont ?? doc.fontSize) * 2) // halbe Punkte
   // Dieselbe Farbe wie in Vorschau und Druck (vokabeltestFarbe in TestPage.tsx)
@@ -110,11 +139,24 @@ export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: Ima
     title: doc.header.title,
     // KI-Kennzeichnung, maschinenlesbar (Großprogramm 0.4)
     ...kiWordEigenschaften(doc.ki),
-    styles: { default: { document: { run: { font: 'Calibri', size } } } },
+    styles: { default: { document: { run: { font: grundschrift(doc.settings.targetLanguage), size, sizeComplexScript: size } } } },
     sections
   })
   const blob = await Packer.toArrayBuffer(document)
   return new Uint8Array(blob)
+}
+
+/**
+ * Grundschrift je Sprache (shared/sprachSchrift.ts): Altgriechisch ganz in Palatino Linotype (polyton),
+ * Chinesisch/Japanisch mit ostasiatischer Schrift für die Zeichen, Arabisch mit Arial für die
+ * komplexe Schrift – lateinische Buchstaben bleiben dort Calibri.
+ */
+function grundschrift(sprache: string): string | { ascii: string; hAnsi: string; eastAsia?: string; cs?: string } {
+  const s = wordSchrift(sprache)
+  if (!s) return 'Calibri'
+  if (s.wordArt === 'eastAsia') return { ascii: 'Calibri', hAnsi: 'Calibri', eastAsia: s.word }
+  if (s.wordArt === 'cs') return { ascii: 'Calibri', hAnsi: 'Calibri', cs: s.word }
+  return s.word
 }
 
 interface Ctx {
@@ -160,9 +202,11 @@ function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
   } else if (h.showSchool && h.schoolName) {
     out.push(new Paragraph({ children: [new TextRun({ text: h.schoolName, size: ctx.size - 4, color: '555555' })] }))
   }
-  const titleRuns: ParagraphChild[] = [new TextRun({ text: h.title + (mode === 'key' ? ' – answer key' : ''), bold: true, size: Math.round(ctx.size * 1.9) })]
+  // Feste Kopftexte in der Testsprache (30.09.2026)
+  const k = kopfTexte(ctx.doc.settings.targetLanguage)
+  const titleRuns: ParagraphChild[] = [new TextRun({ text: h.title + (mode === 'key' ? ` – ${k.loesung}` : ''), bold: true, size: Math.round(ctx.size * 1.9) })]
   if (h.showVariant && ctx.doc.variants.length > 1) {
-    titleRuns.push(new TextRun({ text: `\tTest ${v.label}`, bold: true, size: Math.round(ctx.size * 1.3), ...(ctx.akzent ? { color: ctx.akzent } : {}) }))
+    titleRuns.push(new TextRun({ text: `\t${k.gruppe(v.label)}`, bold: true, size: Math.round(ctx.size * 1.3), ...(ctx.akzent ? { color: ctx.akzent } : {}) }))
   }
   out.push(
     new Paragraph({
@@ -176,9 +220,9 @@ function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
 
   if (mode === 'print') {
     const fields: [string, number][] = []
-    if (h.showName) fields.push(['Name:', 5])
-    if (h.showClass) fields.push(['Class:', 2])
-    if (h.showDate) fields.push(['Date:', 2.5])
+    if (h.showName) fields.push([k.name, 5])
+    if (h.showClass) fields.push([k.klasse, 2])
+    if (h.showDate) fields.push([k.datum, 2.5])
     if (fields.length) {
       const totalWeight = fields.reduce((s, [, w]) => s + w, 0)
       const cells: TableCell[] = []
@@ -212,8 +256,8 @@ function header(ctx: Ctx, v: Variant, mode: Mode): (Paragraph | Table)[] {
     }
   }
   const scoreParts: string[] = []
-  if (h.showPoints) scoreParts.push(`Points: ${mode === 'key' ? '' : '______'} / ${formatPoints(variantPoints(v))}`)
-  if (h.showGrade && mode === 'print') scoreParts.push('Mark: ______')
+  if (h.showPoints) scoreParts.push(`${k.punkte} ${mode === 'key' ? '' : '______'} / ${formatPoints(variantPoints(v))}`)
+  if (h.showGrade && mode === 'print') scoreParts.push(`${k.note} ______`)
   if (scoreParts.length) {
     out.push(
       new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 160 }, children: [new TextRun({ text: scoreParts.join('      '), bold: true })] })
@@ -410,6 +454,7 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
         out.push(
           numbered(i + 1, [
             run(it.term, { bold: true }),
+            ...(it.transliteration ? [run(` [${it.transliteration}]`, { size: ctx.size - 2, color: '555555' })] : []),
             run('	'),
             run(it.formLabel === '—' ? '' : `${it.formLabel} `, { size: ctx.size - 2, color: '555555' }),
             mode === 'key' ? run(it.form, { color: RED }) : run(it.formLabel === '—' ? '' : leer),

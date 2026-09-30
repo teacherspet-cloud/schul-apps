@@ -29,7 +29,28 @@
  * unterrichtete, sah den Vokabeltest nicht, obwohl er Russisch kann (Audit Länder/Schulformen/Fächer).
  * tests/programmSichtbarkeit.test.ts prüft den Abgleich mit LANGUAGES.
  */
-export const SPRACH_FAECHER = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'niederlaendisch', 'russisch', 'latein', 'daz'] as const
+export const SPRACH_FAECHER = [
+  'englisch',
+  'franzoesisch',
+  'spanisch',
+  'italienisch',
+  'niederlaendisch',
+  'russisch',
+  // Schulsprachen seit 30.09.2026 (Hinweise und Anweisungen in der Zielsprache, Sonderzeichen-Eingabe)
+  'polnisch',
+  'tschechisch',
+  'portugiesisch',
+  'tuerkisch',
+  'chinesisch',
+  'japanisch',
+  'arabisch',
+  'daenisch',
+  'neugriechisch',
+  'latein',
+  // Altgriechisch nach dem Latein-Sonderweg (30.09.2026)
+  'griechisch',
+  'daz'
+] as const
 
 /** Fächer des Grammatiktests (arbeitsblatt/didactics/grammar.ts, GRAMMAR_SUBJECTS) – mit Griechisch und Deutsch */
 export const GRAMMATIK_FAECHER = [

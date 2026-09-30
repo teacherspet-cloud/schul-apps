@@ -2,7 +2,8 @@ import type { AppSettings, CefrTable } from '@shared/types'
 import { loadLastChoice } from '../../../shared/lastChoice'
 import { distributeEvenly } from '../generation/distribute'
 import { TASK_TYPES } from '../generation/taskTypes'
-import { istLatein } from '../didactics/latein'
+import { istAlteSprache } from '../didactics/latein'
+import { STANDARD_AUFGABEN } from '../didactics/sprachAufgaben'
 import { gradeOptions } from './cefr'
 import { randomSeed } from './random'
 import type { TaskTypeId, TestSettings } from './types'
@@ -13,6 +14,21 @@ const DEFAULT_TASKS: TaskTypeId[] = ['gapSentences', 'matchDefinitions', 'multip
  * Leitfaden Latein SH 2016, S. 25) – deshalb steht sie dort von vornherein bereit.
  */
 const DEFAULT_TASKS_LATEIN: TaskTypeId[] = ['latinForms', 'latinContext']
+
+/**
+ * Voreingestellte Aufgaben einer Sprache, gleichmäßig auf `count` Vokabeln verteilt: Latein und
+ * Griechisch der Nennform-Test, Chinesisch/Japanisch/Arabisch mit ihren Schriftaufgaben (30.09.2026).
+ */
+export function aufgabenFuer(sprache: string, count: number): TestSettings['tasks'] {
+  return distributeEvenly(
+    (istAlteSprache(sprache) ? DEFAULT_TASKS_LATEIN : (STANDARD_AUFGABEN[sprache] ?? DEFAULT_TASKS)).map((type) => ({
+      type,
+      count: 0,
+      pointsPerItem: TASK_TYPES[type].defaultPoints
+    })),
+    count
+  )
+}
 
 /** So viele Varianten entstehen ohne eigene Wahl – auf beiden Wegen gleich */
 export const STANDARD_VARIANTEN = 2
@@ -41,10 +57,7 @@ export function grundEinstellungen(app: Pick<AppSettings, 'defaults'>, table: Ce
   const sprache = herkunft?.language || last.targetLanguage || app.defaults.targetLanguage
   // Standardumfang 14–18 (29.09.2026); ohne KI-Vorschlag die Mitte
   const count = Math.min(16, vokabeln)
-  const tasks = distributeEvenly(
-    (istLatein(sprache) ? DEFAULT_TASKS_LATEIN : DEFAULT_TASKS).map((type) => ({ type, count: 0, pointsPerItem: TASK_TYPES[type].defaultPoints })),
-    count
-  )
+  const tasks = aufgabenFuer(sprache, count)
   const settings: TestSettings = {
     targetLanguage: sprache,
     stateId: herkunft?.stateId || last.stateId || app.defaults.stateId,

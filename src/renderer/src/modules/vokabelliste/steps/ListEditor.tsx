@@ -259,10 +259,11 @@ export default function ListEditor({
             onRedo={() => verlauf.redo() && geaendert()}
           />
         </Group>
-        <VokabelTabelle zeilen={rows} onChange={setRows} mitVerlauf />
+        <VokabelTabelle zeilen={rows} onChange={setRows} mitVerlauf sprache={language} />
       </Card>
 
       <PruefFenster
+        sprache={language}
         entries={review}
         abfragen={false}
         onClose={() => setReview(null)}

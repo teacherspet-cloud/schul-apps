@@ -70,10 +70,12 @@ describe('Lernjahr und Einordnung', () => {
   })
 
   it('Sprache ohne Grammatiktabelle: vorsichtige Faustregel', () => {
-    const v = formVorwissen(s({ targetLanguage: 'nl', languageOrder: 2, grade: 6 }))
+    // Niederländisch hat seit 30.09.2026 eine eigene Progression (grammarTopicsNeueSprachen.ts); Dänisch nicht
+    const v = formVorwissen(s({ targetLanguage: 'da', languageOrder: 2, grade: 6 }))
     expect(v.quelle).toBe('faustregel')
     expect(v.nochNicht).toContain('past tenses')
-    expect(formVorwissen(s({ targetLanguage: 'nl', languageOrder: 2, grade: 11 })).nochNicht).toEqual([])
+    expect(formVorwissen(s({ targetLanguage: 'da', languageOrder: 2, grade: 11 })).nochNicht).toEqual([])
+    expect(formVorwissen(s({ targetLanguage: 'nl', languageOrder: 2, grade: 6 })).quelle).toBe('tabelle')
   })
 
   it('nimmt die Grammatik des gewählten Lehrwerks dazu', () => {

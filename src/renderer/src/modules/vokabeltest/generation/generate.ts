@@ -11,7 +11,10 @@ import { knownVocabRules } from '../../../shared/knownVocab'
 import type { KnownVocab } from '../../../shared/knownVocab'
 import { GenContext, TASK_TYPES } from './taskTypes'
 import type { PictureFinder } from './pictures'
-import { istLatein, lateinRegeln } from '../didactics/latein'
+import { istAlteSprache, lateinRegeln } from '../didactics/latein'
+import { istGriechisch } from '../didactics/griechisch'
+import { mitLesung, SCHRIFT_REGELN } from '../didactics/sprachAufgaben'
+import { istStandardTitel, kopfTexte } from '../render/aufgabenTexte'
 import { anredeMeldung, anredeRegel, falscheAnrede } from '../../../shared/anrede'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { formBefunde, formVorwissen, vorwissenRegel } from '../didactics/formVorwissen'
@@ -43,10 +46,12 @@ export function languageName(code: string): string {
 export function systemPrompt(settings: TestSettings, variantLabel?: string, known?: KnownVocab): string {
   const lang = languageName(settings.targetLanguage)
   return [
-    istLatein(settings.targetLanguage)
-      ? 'Du bist eine erfahrene Lateinlehrkraft an einer deutschen Schule und entwirfst Vokabeltests.'
+    istAlteSprache(settings.targetLanguage)
+      ? `Du bist eine erfahrene ${istGriechisch(settings.targetLanguage) ? 'Griechischlehrkraft' : 'Lateinlehrkraft'} an einer deutschen Schule und entwirfst Vokabeltests.`
       : `You are an experienced teacher of ${lang} as a foreign language at German schools. You create vocabulary tests that check words in context, not by translation.`,
     `Target language: ${lang}${settings.targetLanguage === 'en' ? ' (British English spelling)' : ''}.`,
+    // Schrift und Rechtschreibung der Sprache (30.09.2026): Tonzeichen, Diakritika, Vokalisierung …
+    SCHRIFT_REGELN[settings.targetLanguage] ?? '',
     `Students: grade ${settings.grade}, learning ${lang} as their ${settings.languageOrder}. foreign language. CEFR level: ${settings.level}.`,
     `Language requirements for ${settings.level}: ${CEFR_DESCRIPTORS[settings.level]}`,
     'General rules:',
@@ -65,12 +70,12 @@ export function systemPrompt(settings: TestSettings, variantLabel?: string, know
      * tragen (Nennform, Stammformen, Monosemieren) und weil bei Latein alles Schülermaterial
      * außer den lateinischen Wörtern ohnehin deutsch ist.
      */
-    istLatein(settings.targetLanguage)
+    istAlteSprache(settings.targetLanguage)
       ? `
-${lateinRegeln()}`
+${lateinRegeln(settings.targetLanguage)}`
       : '',
     // Bei Latein stehen die Anweisungen auf Deutsch – dann gilt die Anrede nach Stufe (Paket 8b)
-    istLatein(settings.targetLanguage)
+    istAlteSprache(settings.targetLanguage)
       ? `
 ${anredeRegel(anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId))}`
       : ''
@@ -113,7 +118,7 @@ export async function generateBlock(
 
   const produce = async (feedback?: string): Promise<Block> => {
     let data: unknown = {}
-    if (def.schema && def.prompt && vocab.length > 0) {
+    if (def.schema && def.prompt && vocab.length > 0 && (def.needsAi?.(vocab, ctx) ?? true)) {
       data = await opts.ai({
         system,
         user: def.prompt(vocab, ctx) + (feedback ? `\n\nA previous attempt had these problems – avoid them:\n${feedback}` : ''),
@@ -124,7 +129,7 @@ export async function generateBlock(
     return def.build(vocab, data, ctx)
   }
 
-  const aiReview = opts.review && Boolean(def.schema) && vocab.length > 0
+  const aiReview = opts.review && Boolean(def.schema) && vocab.length > 0 && (def.needsAi?.(vocab, ctx) ?? true)
   const words = vocab.map((v) => v.term)
 
   let block = await produce(hinweis)
@@ -180,7 +185,7 @@ async function finishBlock(
     }
     issues = checkBlock(block, vocab)
   }
-  block.warnings = [...issues.map(formatIssue), ...anredeHinweise(block, ctx.settings), ...formHinweise(block, vocab, ctx)]
+  block.warnings = [...issues.map(formatIssue), ...anredeHinweise(block, ctx.settings), ...formHinweise(block, vocab, ctx), ...lesungHinweise(block, vocab, ctx.settings)]
   return block
 }
 
@@ -189,10 +194,20 @@ async function finishBlock(
  * Gemeldet am Block, nicht korrigiert. In den modernen Fremdsprachen gibt es nichts zu prüfen.
  */
 export function anredeHinweise(block: Block, settings: TestSettings): string[] {
-  if (!istLatein(settings.targetLanguage)) return []
+  if (!istAlteSprache(settings.targetLanguage)) return []
   const soll = anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId)
   const fund = falscheAnrede(block.instruction ?? '', soll)
   return fund ? [anredeMeldung('Arbeitsanweisung', fund, soll)] : []
+}
+
+/**
+ * Chinesisch/Japanisch (30.09.2026): Lesungen, die nicht aus der Liste stammen, hat die KI ergänzt –
+ * Pinyin mit falschem Ton fällt sonst erst beim Korrigieren auf.
+ */
+export function lesungHinweise(block: Block, vocab: VocabEntry[], settings: TestSettings): string[] {
+  if (block.taskType !== 'readingForms' && block.taskType !== 'readingMatch') return []
+  const ohne = vocab.filter((v) => !mitLesung(v, settings.targetLanguage).lesung).length
+  return ohne ? [`Lesung bei ${ohne} ${ohne === 1 ? 'Wort' : 'Wörtern'} nicht in der Liste – von der KI ergänzt, bitte prüfen.`] : []
 }
 
 /** Lücken, die eine noch nicht eingeführte Wortform verlangen (örtliche Prüfung, 30.09.2026) */
@@ -215,7 +230,7 @@ export async function generateVariantCombined(
 ): Promise<Block[]> {
   const system = systemPrompt(ctx.settings, variantLabel, ctx.known)
   const parts = assignments.map((a, i) => ({ ...a, def: TASK_TYPES[a.taskType], key: `task${i + 1}` }))
-  const aiParts = parts.filter((p) => p.def.schema && p.def.prompt && p.vocab.length > 0)
+  const aiParts = parts.filter((p) => p.def.schema && p.def.prompt && p.vocab.length > 0 && (p.def.needsAi?.(p.vocab, ctx) ?? true))
   let data: Record<string, unknown> = {}
   if (aiParts.length > 0) {
     data = await opts.ai<Record<string, unknown>>({
@@ -241,7 +256,7 @@ export async function generateVariantCombined(
     }
     let issues = block ? localIssues(block, p.vocab) : []
     // Nur fehlerhafte Aufgaben einzeln wiederholen (eine Anfrage, ohne weitere KI-Prüfung)
-    if ((!block || issues.length > 0) && p.def.schema && p.def.prompt && p.vocab.length > 0) {
+    if ((!block || issues.length > 0) && p.def.schema && p.def.prompt && p.vocab.length > 0 && (p.def.needsAi?.(p.vocab, ctx) ?? true)) {
       const retry = await opts.ai({
         system,
         user:
@@ -353,9 +368,10 @@ export async function reviewBlock(block: Block, settings: TestSettings, ai: AiCa
   return res.problems.map((p) => ({ item: p.itemNumber || undefined, message: p.problem }))
 }
 
-export function defaultHeader(schoolName: string): TestHeader {
+/** Kopf eines neuen Tests – Titel in der Testsprache (30.09.2026; ohne Sprache englisch wie bisher) */
+export function defaultHeader(schoolName: string, sprache?: string): TestHeader {
   return {
-    title: 'Vocabulary test',
+    title: kopfTexte(sprache).title,
     showName: true,
     showDate: true,
     showClass: true,
@@ -368,8 +384,10 @@ export function defaultHeader(schoolName: string): TestHeader {
   }
 }
 
-export async function generateTest(vocabInput: VocabEntry[], settings: TestSettings, header: TestHeader, opts: GenerateOptions): Promise<TestDocument> {
+export async function generateTest(vocabInput: VocabEntry[], settings: TestSettings, headerInput: TestHeader, opts: GenerateOptions): Promise<TestDocument> {
   const rng: Rng = createRng(settings.seed)
+  // Unveränderter Standardtitel („Vocabulary test", „Vokabeltest" …) folgt der Testsprache
+  const header = istStandardTitel(headerInput.title) ? { ...headerInput, title: kopfTexte(settings.targetLanguage).title } : headerInput
   let vocab = vocabInput
   const needsAnalysis = settings.tasks.some((t) => t.type === 'pictureLabel')
   const total0 = settings.variantCount * settings.tasks.length + (needsAnalysis ? 1 : 0)
