@@ -1,7 +1,7 @@
 {
  "stateId": "NW",
- "stand": "2026-09-28",
- "hinweis": "Quelle aller Dokumente: Kernlehrpläne (KLP) für die Sekundarstufe I in Nordrhein-Westfalen, veröffentlicht im Lehrplannavigator der QUA-LiS NRW (lehrplannavigator.nrw.de, vormals schulentwicklung.nrw.de). Themen = Inhaltsfelder mit ihren „inhaltlichen Schwerpunkten“ im Wortlaut; die Doppelpunkt-Aufzählungen des KLP bilden die dritte Ebene. Jahrgänge als Bänder des KLP („bis zum Ende der Erprobungsstufe“ = 5–6, „bis zum Ende der Sekundarstufe I“ = 7–10, bei Haupt-, Real- und Gesamtschule je nach KLP „bis zum Ende der Jahrgangsstufe 6/8/10“). Unterscheidet der KLP innerhalb eines Bandes Stufen ohne Jahrgangsangabe (erste/zweite Stufe), steht die Stufe im Feld „stufe“. Schulform „integriert“ = Gesamtschule/Sekundarschule. Umfang: Sekundarstufe I (Pflicht- und ausgewählte Wahlpflichtfächer); Grundschule und gymnasiale Oberstufe sind nicht erfasst. Praktische Philosophie steht unter fach „religion“ (variante „praktische-philosophie“). Feld „beispiel“: im KLP ausdrücklich als Beispiel („z. B.“) genannt, nicht verbindlich.",
+ "stand": "2026-09-30",
+ "hinweis": "Quelle aller Dokumente: Kernlehrpläne (KLP) für die Sekundarstufe I in Nordrhein-Westfalen, veröffentlicht im Lehrplannavigator der QUA-LiS NRW (lehrplannavigator.nrw.de, vormals schulentwicklung.nrw.de). Themen = Inhaltsfelder mit ihren „inhaltlichen Schwerpunkten“ im Wortlaut; die Doppelpunkt-Aufzählungen des KLP bilden die dritte Ebene. Jahrgänge als Bänder des KLP („bis zum Ende der Erprobungsstufe“ = 5–6, „bis zum Ende der Sekundarstufe I“ = 7–10, bei Haupt-, Real- und Gesamtschule je nach KLP „bis zum Ende der Jahrgangsstufe 6/8/10“). Unterscheidet der KLP innerhalb eines Bandes Stufen ohne Jahrgangsangabe (erste/zweite Stufe), steht die Stufe im Feld „stufe“. Schulform „integriert“ = Gesamtschule/Sekundarschule. Umfang: Sekundarstufe I (Pflicht- und ausgewählte Wahlpflichtfächer); Grundschule und gymnasiale Oberstufe sind nicht erfasst. Praktische Philosophie steht unter fach „religion“ (variante „praktische-philosophie“). Feld „beispiel“: im KLP ausdrücklich als Beispiel („z. B.“) genannt, nicht verbindlich. Nachtrag 30.09.2026: gymnasiale Oberstufe (Gymnasium/Gesamtschule) für Deutsch, Englisch, Mathematik, Biologie (KLP 2022/2023) und Geschichte (KLP 2014) – Inhaltsfelder/Themenfelder mit inhaltlichen Schwerpunkten, Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13, Grund- und Leistungskurs als getrennte Einträge (Feld „bereich“/„stufe“).",
  "quellen": [
   {
    "id": "nw-ge-deutsch",
@@ -1107,6 +1107,81 @@
    ],
    "fach": "religion",
    "hinweis": "Erlass vom 03.09.2024; in Kraft ab 01.08.2025 (ersetzt den KLP Praktische Philosophie von 2008); Ersatzfach für Schülerinnen und Schüler, die nicht am Religionsunterricht teilnehmen"
+  },
+  {
+   "id": "nw-gost-deutsch",
+   "titel": "Kernlehrplan für die Sekundarstufe II Gymnasium/Gesamtschule in Nordrhein-Westfalen – Deutsch",
+   "herausgeber": "Ministerium für Schule und Bildung des Landes Nordrhein-Westfalen",
+   "jahr": 2023,
+   "url": "https://lehrplannavigator.nrw.de/system/files/media/document/file/gost_klp_d_2023_06_07.pdf",
+   "detailseite": "https://lehrplannavigator.nrw.de/sekundarstufe-ii/kernlehrplaene-fuer-die-gymnasiale-oberstufe-ab-sj-20222023/deutsch-gymnasiale",
+   "abgerufen": "2026-09-30",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "fach": "deutsch",
+   "hinweis": "RdErl. v. 24.05.2023; in Kraft ab 01.08.2023, beginnend mit der Einführungsphase aufsteigend"
+  },
+  {
+   "id": "nw-gost-englisch",
+   "titel": "Kernlehrplan für die Sekundarstufe II Gymnasium/Gesamtschule in Nordrhein-Westfalen – Englisch",
+   "herausgeber": "Ministerium für Schule und Bildung des Landes Nordrhein-Westfalen",
+   "jahr": 2023,
+   "url": "https://lehrplannavigator.nrw.de/system/files/media/document/file/gost_klp_e_2023_06_07_0.pdf",
+   "detailseite": "https://lehrplannavigator.nrw.de/sekundarstufe-ii/kernlehrplaene-fuer-die-gymnasiale-oberstufe-ab-sj-20222023/englisch-gymnasiale",
+   "abgerufen": "2026-09-30",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "fach": "englisch",
+   "hinweis": "RdErl. v. 24.05.2023; in Kraft ab 01.08.2023, beginnend mit der Einführungsphase aufsteigend"
+  },
+  {
+   "id": "nw-gost-mathematik",
+   "titel": "Kernlehrplan für die Sekundarstufe II Gymnasium/Gesamtschule in Nordrhein-Westfalen – Mathematik",
+   "herausgeber": "Ministerium für Schule und Bildung des Landes Nordrhein-Westfalen",
+   "jahr": 2023,
+   "url": "https://lehrplannavigator.nrw.de/system/files/media/document/file/gost_klp_m_2023_06_07.pdf",
+   "detailseite": "https://lehrplannavigator.nrw.de/sekundarstufe-ii/kernlehrplaene-fuer-die-gymnasiale-oberstufe-ab-sj-20222023/mathematik-gymnasiale",
+   "abgerufen": "2026-09-30",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "fach": "mathematik",
+   "hinweis": "RdErl. v. 24.05.2023; in Kraft ab 01.08.2023, beginnend mit der Einführungsphase aufsteigend"
+  },
+  {
+   "id": "nw-gost-biologie",
+   "titel": "Kernlehrplan für die Sekundarstufe II Gymnasium/Gesamtschule in Nordrhein-Westfalen – Biologie",
+   "herausgeber": "Ministerium für Schule und Bildung des Landes Nordrhein-Westfalen",
+   "jahr": 2022,
+   "url": "https://lehrplannavigator.nrw.de/system/files/media/document/file/gost_klp_bi_2022_06_07_0.pdf",
+   "detailseite": "https://lehrplannavigator.nrw.de/sekundarstufe-ii/kernlehrplaene-fuer-die-gymnasiale-oberstufe-ab-sj-20222023/biologie-gymnasiale",
+   "abgerufen": "2026-09-30",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "fach": "biologie",
+   "hinweis": "Heft 4722; in Kraft ab 01.08.2022, beginnend mit der Einführungsphase aufsteigend"
+  },
+  {
+   "id": "nw-gost-geschichte",
+   "titel": "Kernlehrplan für die Sekundarstufe II Gymnasium/Gesamtschule in Nordrhein-Westfalen – Geschichte",
+   "herausgeber": "Ministerium für Schule und Weiterbildung des Landes Nordrhein-Westfalen",
+   "jahr": 2014,
+   "url": "https://lehrplannavigator.nrw.de/system/files/media/document/file/klp_gost_geschichte.pdf",
+   "detailseite": "https://lehrplannavigator.nrw.de/sekundarstufe-ii/kernlehrplaene-fuer-die-gymnasiale-oberstufe-ab-sj-2013/geschichte-gymnasiale",
+   "abgerufen": "2026-09-30",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "fach": "geschichte",
+   "hinweis": "Heft 4714; in Kraft ab 01.08.2014, beginnend mit der Einführungsphase aufsteigend; Nachfolge-KLP (2026) gilt ab Schuljahr 2027/2028"
   }
  ],
  "eintraege": [
@@ -50643,6 +50718,4171 @@
    "stufe": "bis zum Ende der Sekundarstufe I",
    "schulformName": "alle Schulformen der Sekundarstufe I",
    "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2) im Wortlaut; Aufzählungen nach Doppelpunkt als dritte Ebene. Die zugehörigen Kompetenzerwartungen sind nicht übernommen."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 16",
+   "thema": "Sprache",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Funktionen und Strukturmerkmale der Sprache",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "phonologische, morphologische, syntaktische, semantische und pragmatische Aspekte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Sprachvarietäten und ihre gesellschaftliche Bedeutung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "sprachliche Zuschreibungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Identifikation über Sprache",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Veränderungen der Gegenwartssprache",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Mündlichkeit und Schriftlichkeit",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 17",
+   "thema": "Texte",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Drama (Ganzschrift) im historischen Kontext",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dialoggestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Erzähltexte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "erzählerische und sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "lyrische Texte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Inhalt und Aufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "formale und sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "pragmatische Texte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Textsorte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Inhalt und gedanklicher Aufbau/Argumentationsgang",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Leserlenkung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "sprachliche Gestaltung und Intention",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "literarische und pragmatische Texte im Zusammenhang",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "thematische Bezüge",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 18",
+   "thema": "Kommunikation",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Kommunikationssituation und -verlauf",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Alltagskommunikation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "literarisch gestaltete Kommunikation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kommunikationsformen und -konventionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "monologische und dialogische Kommunikation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kommunikationsrollen und -funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Kommunikationsmodelle",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 19",
+   "thema": "Medien",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Information",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Darbietungsformen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Prüfung von Geltungsansprüchen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Dimensionen der Partizipation",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Generieren",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Teilen und Kommentieren",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "individuelle und gesellschaftliche Verantwortung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Multimodalität",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Nichtlinearität",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verhältnis von Bild, Ton und Text",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 21",
+   "thema": "Sprache",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Sprache, Denken und Wirklichkeit",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verhältnis von sprachlichem Zeichen, Vorstellung und Gegenstand",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Sprachvarietäten und ihre gesellschaftliche Bedeutung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Dialekte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Soziolekte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Sprachgeschichtlicher Wandel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Veränderungstendenzen der Gegenwartssprache",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "gesteuerte und ungesteuerte Formen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 22",
+   "thema": "Texte",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "strukturell unterschiedliche Dramen aus unterschiedlichen historischen Kontexten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dialoggestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "strukturell unterschiedliche Erzähltexte aus unterschiedlichen historischen Kontexten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "erzählerische und sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "lyrische Texte aus unterschiedlichen historischen Kontexten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Inhalt und Aufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sprechsituation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "formale und sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "pragmatische Texte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Textsorte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Inhalt und gedanklicher Aufbau/Argumentationsgang",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Leserlenkung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "sprachliche Gestaltung und Intention",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "literarische und pragmatische Texte im Zusammenhang",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "motivische und thematische, diachrone und synchrone Bezüge",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 23",
+   "thema": "Kommunikation",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Kommunikationssituation und -verlauf",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verhältnis von Öffentlichkeit und Privatheit",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "literarisch und rhetorisch gestaltete Kommunikation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kommunikationsformen und -konventionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "monologische und dialogische Kommunikation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kommunikationsrollen und -funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "symmetrische und asymmetrische Kommunikation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verständigung und Manipulation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 24",
+   "thema": "Medien",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Information",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Darbietungsformen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verbreitungsweisen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Prüfung von Geltungsansprüchen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Dimensionen der Partizipation",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "individuelle und gesellschaftliche Verantwortung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Möglichkeiten der Einflussnahme und Mitgestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Multimodales Erzählen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "erzählerische und ästhetische Gestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Umsetzung von Literatur",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "filmische Umsetzung einer Textvorlage",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bühneninszenierung eines dramatischen Textes",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 26",
+   "thema": "Sprache",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Sprache, Denken und Wirklichkeit",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verhältnis von sprachlichem Zeichen, Vorstellung und Gegenstand",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sprachskepsis",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Sprachvarietäten und ihre gesellschaftliche Bedeutung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Dialekte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Soziolekte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Sprachgeschichtlicher Wandel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Veränderungstendenzen der Gegenwartssprache",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "gesteuerte und ungesteuerte Formen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Theorien zum Spracherwerb",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Erstspracherwerb",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Mehrsprachigkeit",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 27",
+   "thema": "Texte",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "strukturell unterschiedliche Dramen aus unterschiedlichen historischen Kontexten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Dialoggestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "poetologische Konzepte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "strukturell unterschiedliche Erzähltexte aus unterschiedlichen historischen Kontexten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "erzählerische und sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "poetologische Konzepte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "lyrische Texte aus unterschiedlichen historischen Kontexten",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Inhalt und Aufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sprechsituation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "formale und sprachliche Gestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "poetologische Konzepte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "komplexe pragmatische Texte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Textsorte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Inhalt und gedanklicher Aufbau/Argumentationsgang",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Leserlenkung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "sprachliche Gestaltung und Intention",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "literarische und pragmatische Texte im Zusammenhang",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "motivische und thematische, diachrone und synchrone Bezüge",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 29",
+   "thema": "Kommunikation",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Kommunikationssituation und -verlauf",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verhältnis von Öffentlichkeit und Privatheit",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "literarisch und rhetorisch gestaltete Kommunikation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kommunikationsformen und -konventionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "monologische und dialogische Kommunikation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "vernetzte Kommunikation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kommunikationsrollen und -funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "symmetrische und asymmetrische Kommunikation",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verständigung und Manipulation",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Autor-Rezipienten-Kommunikation",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "deutsch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-deutsch",
+   "seite": "S. 30",
+   "thema": "Medien",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Information",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Darbietungsformen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verbreitungsweisen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Prüfung von Geltungsansprüchen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Dimensionen der Partizipation",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "individuelle und gesellschaftliche Verantwortung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Möglichkeiten der politischen Willensbildung, der gesellschaftlichen Einflussnahme und der Mitgestaltung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Multimodales Erzählen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Figurengestaltung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Handlungsaufbau",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "erzählerische und ästhetische Gestaltung in verschiedenen Erzählformaten",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Umsetzung von Literatur",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "filmische Umsetzung einer Textvorlage",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bühneninszenierung eines dramatischen Textes",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Medientheorie",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "mediale Umbrüche und ihre Wirkung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Kompetenzerwartungen (Rezeption/Produktion) nicht übernommen. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 22",
+   "thema": "Funktionen und Analysis",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Potenzfunktionen mit ganzzahligen Exponenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "ganzrationale Funktionen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Eigenschaften von Funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verlauf des Graphen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Definitionsbereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wertebereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Nullstellen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Symmetrie",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verhalten für x →±∞",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Transformationen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Spiegelung an den Koordinatenachsen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verschiebung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Streckung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Grundverständnis des Ableitungsbegriffs",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "mittlere und lokale Änderungsrate",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "graphisches Ableiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sekante und Tangente",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Differentialrechnung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Ableitungsregeln (Potenz-, Summen- und Faktorregel)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Monotonie",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Extrempunkte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "lokale und globale Extrema",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Krümmungsverhalten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wendepunkte",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 23",
+   "thema": "Analytische Geometrie und Lineare Algebra",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Koordinatisierungen des Raumes",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Punkte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ortsvektoren",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Vektoren",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Vektoroperationen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Addition",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Multiplikation mit einem Skalar",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Eigenschaften von Vektoren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Länge",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kollinearität",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Geraden und Strecken",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Parameterform",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Lagebeziehung von Geraden",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "identisch, parallel, windschief, sich schneidend",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Schnittpunkte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Geraden",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 24",
+   "thema": "Funktionen und Analysis",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "ganzrationale Funktionen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Exponentialfunktionen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Eigenschaften von Funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verlauf des Graphen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Definitionsbereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wertebereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Nullstellen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Symmetrie",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verhalten für x →±∞",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Fortführung der Differentialrechnung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Produktregel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Extremwertprobleme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rekonstruktion von Funktionstermen („Steckbriefaufgaben“)",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Integralrechnung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Produktsumme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "orientierte Fläche",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bestandsfunktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Integralfunktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stammfunktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bestimmtes Integral",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Hauptsatz der Differential- und Integralrechnung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 25",
+   "thema": "Analytische Geometrie und Lineare Algebra",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Vektoroperation",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Skalarprodukt",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Ebenen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Parameterform",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Koordinatenform",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Normalenvektor",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Schnittwinkel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Geraden",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Geraden und Ebenen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ebenen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Schnittpunkte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Geraden und Ebenen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Lineare Gleichungssysteme",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 26",
+   "thema": "Stochastik",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Mehrstufige Zufallsexperimente",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Urnenmodelle",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Baumdiagramme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Vierfeldertafeln",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bedingte Wahrscheinlichkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Pfadregeln",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kenngrößen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Erwartungswert",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Varianz",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Standardabweichung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Diskrete Zufallsgrößen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Wahrscheinlichkeitsverteilungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kenngrößen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Binomialverteilung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Kenngrößen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Histogramme",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 27",
+   "thema": "Funktionen und Analysis",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "ganzrationale Funktionen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Exponentialfunktionen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Sinusfunktionen mit Parametern a, b, c, d",
+       "herkunft": "zusammengefasst"
+      },
+      {
+       "thema": "entsprechende Kosinusfunktionen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Eigenschaften von Funktionen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verlauf des Graphen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Definitionsbereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Wertebereich",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Nullstellen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Symmetrie",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Verhalten für x →±∞",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Fortführung der Differentialrechnung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Produktregel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kettenregel",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Funktionsscharen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Extremwertprobleme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rekonstruktion von Funktionstermen („Steckbriefaufgaben“)",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Integralrechnung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Produktsumme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "orientierte Fläche",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Bestandsfunktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Integralfunktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stammfunktion",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bestimmtes Integral",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Hauptsatz der Differential- und Integralrechnung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 28",
+   "thema": "Analytische Geometrie und Lineare Algebra",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Vektoroperation",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Skalarprodukt",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Ebenen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Parameterform",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Koordinatenform",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Normalenform",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Schnittwinkel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Geraden",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Geraden und Ebenen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ebenen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Schnittpunkte",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Geraden und Ebenen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Lagebeziehungen und Abstände",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Punkte",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Geraden",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ebenen (alle Kombinationen)",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Lineare Gleichungssysteme",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "mathematik",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-mathematik",
+   "seite": "S. 29",
+   "thema": "Stochastik",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Mehrstufige Zufallsexperimente",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Urnenmodelle",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Baumdiagramme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Vierfeldertafeln",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "bedingte Wahrscheinlichkeiten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Pfadregeln",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Kenngrößen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Erwartungswert",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Varianz",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Standardabweichung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Diskrete Zufallsgrößen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Wahrscheinlichkeitsverteilungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kenngrößen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Binomialverteilung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Binomialkoeffizient",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Kenngrößen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Histogramme",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "σ-Regeln",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Beurteilende Statistik",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Prognoseintervall",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Konfidenzintervall",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stichprobenumfang",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Normalverteilung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Dichtefunktion („Gauß’sche Glockenkurve“)",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Parameter μ und σ",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Graph der Verteilungsfunktion",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut; Aufzählungen nach Doppelpunkt als nächste Ebene. Die Einführungsphase hat laut KLP nur die Inhaltsfelder Funktionen und Analysis sowie Analytische Geometrie und Lineare Algebra. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 27",
+   "thema": "Zellbiologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Aufbau der Zelle",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "prokaryotische Zelle",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "eukaryotische Zelle",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Zusammenwirken von Zellbestandteilen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Kompartimentierung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Endosymbiontentheorie",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Vielzeller",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Zelldifferenzierung und Arbeitsteilung",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Genetik der Zelle",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Mitose",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Chromosomen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Cytoskelett",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Zellzyklus",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Regulation",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Meiose",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Rekombination",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Karyogramm",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Genommutationen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Chromosomenmutationen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Biochemie der Zelle",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Stoffgruppen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Kohlenhydrate",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Lipide",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Proteine",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Biomembranen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Transport",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Prinzip der Signaltransduktion",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Zell-Zell-Erkennung",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Physiologie der Zelle",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Energieumwandlung",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "ATP-ADP-System",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Redoxreaktionen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Anabolismus und Katabolismus",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Enzyme",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Kinetik",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Regulation",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "physiologische Anpassungen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Homöostase",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Mikroskopie",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Analyse von Familienstammbäumen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Untersuchung von osmotischen Vorgängen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Untersuchung von Enzymaktivitäten",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 36",
+   "thema": "Neurobiologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Grundlagen der Informationsverarbeitung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Bau und Funktionen von Nervenzellen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Ruhepotenzial",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Aktionspotenzial",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Erregungsleitung",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Synapse",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Funktion der erregenden chemischen Synapse",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Stoffeinwirkung an Synapsen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "neuromuskuläre Synapse",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Potenzialmessungen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 37",
+   "thema": "Stoffwechselphysiologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Grundlegende Zusammenhänge bei Stoffwechselwegen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Zusammenhang von aufbauendem und abbauendem Stoffwechsel, Stoffwechselregulation auf Enzymebene",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stofftransport zwischen Kompartimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Chemiosmotische ATP-Bildung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Redoxreaktionen, Energieumwandlung, Energieentwertung, ATP-ADP-System",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Aufbauender Stoffwechsel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Funktionale Angepasstheiten",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Blattaufbau",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Feinbau Chloroplast",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Absorptionsspektrum von Chlorophyll",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Wirkungsspektrum",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Abhängigkeit der Fotosyntheserate von abiotischen Faktoren",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Calvin-Zyklus",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Fixierung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Reduktion",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Regeneration",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Zusammenhang von Primär- und Sekundärreaktionen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Abbauender Stoffwechsel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Feinbau Mitochondrium",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stoff- und Energiebilanz von Glykolyse, oxidative Decarboxylierung, Tricarbonsäurezyklus und Atmungskette",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Chromatografie",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 39",
+   "thema": "Ökologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Strukturen und Zusammenhänge in Ökosystemen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Biotop und Biozönose",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "biotische und abiotische Faktoren",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Einfluss ökologischer Faktoren auf Organismen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Toleranzkurven",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "ökologische Potenz",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Stoffkreislauf und Energiefluss in einem Ökosystem",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Kohlenstoffkreislauf",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Nahrungsnetz",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Intra- und interspezifische Beziehungen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Konkurrenz",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Parasitismus",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Symbiose",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Räuber-Beute-Beziehungen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Ökologische Nische",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Einfluss des Menschen auf Ökosysteme, Nachhaltigkeit, Biodiversität",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Folgen des anthropogen bedingten Treibhauseffekts",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ökosystemmanagement",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Ursache-Wirkungszusammenhänge",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Erhaltungs- und Renaturierungsmaßnahmen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "nachhaltige Nutzung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Bedeutung und Erhalt der Biodiversität",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Erfassung ökologischer Faktoren und qualitative Erfassung von Arten in einem Areal",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 41",
+   "thema": "Genetik und Evolution",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Molekulargenetische Grundlagen des Lebens",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Speicherung und Realisierung genetischer Information",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Bau der DNA",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "semikonservative Replikation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Transkription",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Translation",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Regulation der Genaktivität bei Eukaryoten",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Transkriptionsfaktoren",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Modifikationen des Epigenoms durch DNA-Methylierung",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Zusammenhänge zwischen genetischem Material, Genprodukten und Merkmal",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Genmutationen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Genetik menschlicher Erkrankungen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Familienstammbäume",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gentest und Beratung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gentherapie",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Entstehung und Entwicklung des Lebens",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Synthetische Evolutionstheorie",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Mutation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Rekombination",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Selektion",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Variation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gendrift",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "adaptiver Wert von Verhalten",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Kosten-Nutzen-Analyse",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "reproduktive Fitness",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Koevolution",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Abgrenzung von nicht-naturwissenschaftlichen Vorstellungen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Stammbäume und Verwandtschaft",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Artbildung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Biodiversität",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "populationsgenetischer Artbegriff",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Isolation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "molekularbiologische Homologien",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "ursprüngliche und abgeleitete Merkmale",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Grundkurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 43",
+   "thema": "Neurobiologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Grundlagen der Informationsverarbeitung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Bau und Funktionen von Nervenzellen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Ruhepotenzial",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Aktionspotenzial",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Erregungsleitung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "primäre und sekundäre Sinneszelle",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Rezeptorpotenzial",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Synapse",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Funktion der erregenden chemischen Synapse",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Stoffeinwirkung an Synapsen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "neuromuskuläre Synapse",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Hormone",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Hormonwirkung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Verschränkung hormoneller und neuronaler Steuerung",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Neuronale Plastizität",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Verrechnung",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Funktion einer hemmenden Synapse",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "räumliche und zeitliche Summation",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Zelluläre Prozesse des Lernens",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Störungen des neuronalen Systems",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Potenzialmessungen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Neurophysiologische Verfahren",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 46",
+   "thema": "Stoffwechselphysiologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Grundlegende Zusammenhänge bei Stoffwechselwegen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Zusammenhang von aufbauendem und abbauendem Stoffwechsel, Stoffwechselregulation auf Enzymebene",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stofftransport zwischen Kompartimenten",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Chemiosmotische ATP-Bildung",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Redoxreaktionen, Energieumwandlung, Energieentwertung, ATP-ADP-System",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Aufbauender Stoffwechsel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Funktionale Angepasstheiten",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Blattaufbau",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Feinbau Chloroplast",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Absorptionsspektrum von Chlorophyll",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Wirkungsspektrum",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Lichtsammelkomplex",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Energetisches Modell der Lichtreaktionen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Abhängigkeit der Fotosyntheserate von abiotischen Faktoren",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Calvin-Zyklus",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Fixierung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Reduktion",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Regeneration",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Zusammenhang von Primär- und Sekundärreaktionen",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "C4-Pflanzen",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Abbauender Stoffwechsel",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Feinbau Mitochondrium",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Stoff- und Energiebilanz von Glykolyse, oxidative Decarboxylierung, Tricarbonsäurezyklus und Atmungskette",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Energetisches Modell der Atmungskette",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Alkoholische Gärung und Milchsäuregärung",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Chromatografie",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Tracer-Methode",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 49",
+   "thema": "Ökologie",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Strukturen und Zusammenhänge in Ökosystemen",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Biotop und Biozönose",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "biotische und abiotische Faktoren",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Einfluss ökologischer Faktoren auf Organismen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Toleranzkurven",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "ökologische Potenz",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Stoffkreislauf und Energiefluss in einem Ökosystem",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Kohlenstoffkreislauf",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Stickstoffkreislauf",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Nahrungsnetz",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Intra- und interspezifische Beziehungen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Konkurrenz",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Parasitismus",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Symbiose",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Räuber-Beute-Beziehungen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Ökologische Nische",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Fortpflanzungsstrategien",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "r- und K-Strategien",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Idealisierte Populationsentwicklung",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "exponentielles und logistisches Wachstum",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Einfluss des Menschen auf Ökosysteme, Nachhaltigkeit, Biodiversität",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Folgen des anthropogen bedingten Treibhauseffekts",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ökosystemmanagement",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Ursache-Wirkungszusammenhänge",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Erhaltungs- und Renaturierungsmaßnahmen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "nachhaltige Nutzung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Bedeutung und Erhalt der Biodiversität",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Hormonartig wirkende Substanzen in der Umwelt",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Ökologischer Fußabdruck",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Erfassung ökologischer Faktoren und qualitative und quantitative Erfassung von Arten in einem Areal",
+       "herkunft": "wortlaut"
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "biologie",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-biologie",
+   "seite": "S. 51",
+   "thema": "Genetik und Evolution",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Molekulargenetische Grundlagen des Lebens",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Speicherung und Realisierung genetischer Information",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Bau der DNA",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "semikonservative Replikation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Transkription",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Translation",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Regulation der Genaktivität bei Eukaryoten",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Transkriptionsfaktoren",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Modifikationen des Epigenoms durch DNA-Methylierung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Histonmodifikation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "RNA-Interferenz",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Zusammenhänge zwischen genetischem Material, Genprodukten und Merkmal",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Genmutationen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Genetik menschlicher Erkrankungen",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Familienstammbäume",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gentest und Beratung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gentherapie",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Krebs",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Krebszellen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Onkogene und Anti-Onkogene",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "personalisierte Medizin",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Entstehung und Entwicklung des Lebens",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "Synthetische Evolutionstheorie",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Mutation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Rekombination",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Selektion",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Variation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gendrift",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "adaptiver Wert von Verhalten",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Kosten-Nutzen-Analyse",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "reproduktive Fitness",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Koevolution",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Abgrenzung von nicht-naturwissenschaftlichen Vorstellungen",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Stammbäume und Verwandtschaft",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Artbildung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Biodiversität",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "populationsgenetischer Artbegriff",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Isolation",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "molekularbiologische Homologien",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "ursprüngliche und abgeleitete Merkmale",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Sozialverhalten bei Primaten",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "exogene und endogene Ursachen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Fortpflanzungsverhalten",
+         "herkunft": "wortlaut"
+        }
+       ]
+      },
+      {
+       "thema": "Evolution des Menschen und kulturelle Evolution",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Ursprung",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Fossilgeschichte",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Stammbäume und Verbreitung des heutigen Menschen",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Werkzeuggebrauch",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Sprachentwicklung",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "thema": "Fachliche Verfahren",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "PCR",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Gelelektrophorese",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Gentechnik",
+       "herkunft": "wortlaut",
+       "unterthemen": [
+        {
+         "thema": "Veränderung und Einbau von DNA",
+         "herkunft": "wortlaut"
+        },
+        {
+         "thema": "Gentherapeutische Verfahren",
+         "herkunft": "wortlaut"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "bereich": "Leistungskurs",
+   "hinweis": "Inhaltsfelder mit ihren inhaltlichen Schwerpunkten (Kap. 2.3/2.4) im Wortlaut, gegliedert nach den Zwischenüberschriften des KLP; Aufzählungen nach Doppelpunkt als nächste Ebene. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 19",
+   "thema": "Das Individuum und die Gesellschaft im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Entwicklung einer eigenen Identität – Ambitionen und Hindernisse, Konformität vs. Individualismus, Werteorientierung",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Chancen und Herausforderungen Jugendlicher – ethnische, kulturelle, soziale, sexuelle und geschlechtliche Vielfalt",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 19",
+   "thema": "Medien und Literatur im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Möglichkeiten und Herausforderungen klassischer und multimodaler Literaturformate",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Identitätsbildung in und durch young adult fiction",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 19",
+   "thema": "Arbeit und Welt im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Lernen, Leben und Arbeiten im englischsprachigen Ausland",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "individuelle Möglichkeiten und Grenzen der Mitgestaltung sozialer und ökologischer Nachhaltigkeit",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu."
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 26",
+   "thema": "Das Vereinigte Königreich",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politik, Kultur, Gesellschaft – zwischen Wandel und Tradition",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Nationale Selbstkonzepte im Spiegel kolonialen Erbes und europäischer Verortung",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Grundkurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 26",
+   "thema": "Die Vereinigten Staaten von Amerika",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politik, Kultur, Gesellschaft – zwischen Wandel und Tradition",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Amerikanische Ideale und Realitäten – Freiheit, Gleichheit und das Streben nach Glück",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Grundkurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 26",
+   "thema": "Eine weitere englischsprachige Bezugskultur",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politik, Kultur, Gesellschaft – zwischen Wandel und Tradition",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Grundkurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 26",
+   "thema": "Das Individuum und die Gesellschaft im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Fragen der Identität – Ambitionen und Hindernisse, Konformität vs. Individualismus",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Chancen und Herausforderungen für die Gesellschaft – ethnische, kulturelle, soziale, sexuelle und geschlechtliche Vielfalt",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Grundkurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 26",
+   "thema": "Medien und Literatur im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Journalismus im Spannungsfeld von Information und Unterhaltung",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "soziale Medien und digitale Plattformen – Teilhabe und Manipulation",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Möglichkeiten und Herausforderungen klassischer und multimodaler Literaturformate",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Grundkurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 26",
+   "thema": "Welt im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Chancen und Herausforderungen der Globalisierung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "soziale, ökologische und wirtschaftliche Nachhaltigkeit",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Migration",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "der globale Arbeitsmarkt – Chancengleichheit, Wettbewerb und Kooperation",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "wissenschaftlicher und technischer Fortschritt als Chance und Herausforderung für die Gesellschaft",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Zukunftsvisionen – utopische und dystopische Narrative",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Grundkurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 34",
+   "thema": "Das Vereinigte Königreich",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politik, Kultur, Gesellschaft – zwischen Wandel und Tradition",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Nationale Selbstkonzepte im Spiegel kolonialen Erbes und europäischer Verortung",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Leistungskurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 34",
+   "thema": "Die Vereinigten Staaten von Amerika",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politik, Kultur, Gesellschaft – zwischen Wandel und Tradition",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Amerikanische Ideale und Realitäten – Freiheit, Gleichheit und das Streben nach Glück",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Leistungskurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 34",
+   "thema": "Eine weitere englischsprachige Bezugskultur",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politik, Kultur, Gesellschaft – zwischen Wandel und Tradition",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Das Erbe der britischen Herrschaft zwischen Aneignung und Abgrenzung",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Leistungskurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 34",
+   "thema": "Das Individuum und die Gesellschaft im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Fragen der Identität – Ambitionen und Hindernisse, Konformität vs. Individualismus",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Chancen und Herausforderungen für die Gesellschaft – ethnische, kulturelle, soziale, sexuelle und geschlechtliche Vielfalt",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Leistungskurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 34",
+   "thema": "Medien und Literatur im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Journalismus im Spannungsfeld von Information, Meinungsbildung und Unterhaltung",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "soziale Medien und digitale Plattformen – Teilhabe und Manipulation",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Möglichkeiten und Herausforderungen klassischer und multimodaler Literaturformate",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Leistungskurs"
+  },
+  {
+   "fach": "englisch",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-englisch",
+   "seite": "S. 34",
+   "thema": "Welt im Wandel",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Chancen und Herausforderungen der Globalisierung",
+     "herkunft": "wortlaut",
+     "unterthemen": [
+      {
+       "thema": "soziale, ökologische und wirtschaftliche Nachhaltigkeit",
+       "herkunft": "wortlaut"
+      },
+      {
+       "thema": "Migration",
+       "herkunft": "wortlaut"
+      }
+     ]
+    },
+    {
+     "thema": "der globale Arbeitsmarkt – Chancengleichheit, Wettbewerb und Kooperation",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "wissenschaftlicher und technischer Fortschritt als Chance und Herausforderung für die Gesellschaft",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Zukunftsvisionen: utopische und dystopische Narrative",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Der KLP beschreibt Kompetenzen; übernommen sind die Themenfelder des soziokulturellen Orientierungswissens („Fachliche Konkretisierungen“ der interkulturellen kommunikativen Kompetenz) im Wortlaut; die Globalisierungs-Zeile ist am Semikolon geteilt. Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Leistungskurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 23",
+   "thema": "Erfahrungen mit Fremdsein in weltgeschichtlicher Perspektive",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Die Darstellung der Germanen in römischer Perspektive",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Mittelalterliche Weltbilder in Asien und Europa",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Was Reisende erzählen – Selbst- und Fremdbild in der frühen Neuzeit",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Fremdsein, Vielfalt und Integration – Migration am Beispiel des Ruhrgebiets im 19. und 20. Jahrhundert",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 1 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 1"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 24",
+   "thema": "Islamische Welt – christliche Welt: Begegnung zweier Kulturen in Mittelalter und früher Neuzeit",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Religion und Staat",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Die Entwicklung von Wissenschaft und Kultur",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Die Kreuzzüge",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Das Osmanische Reich und „Europa“ in der Frühen Neuzeit",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 2 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 2"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    11
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 25",
+   "thema": "Menschenrechte in historischer Perspektive",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Ideengeschichtliche Wurzeln und Entwicklungsetappen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Durchsetzung der Menschenrechte am Beispiel der Französischen Revolution",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Geltungsbereiche der Menschenrechte in Vergangenheit und Gegenwart",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Einführungsphase",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 3 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 3"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 29",
+   "thema": "Die moderne Industriegesellschaft zwischen Fortschritt und Krise",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Die „Zweite Industrielle Revolution“ und die Entstehung der modernen Massengesellschaft",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Vom Hochimperialismus zum ersten „modernen“ Krieg der Industriegesellschaft",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Ursachen und Folgen der Weltwirtschaftskrise 1929",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 4 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 4 – Grundkurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 30",
+   "thema": "Die Zeit des Nationalsozialismus – Voraussetzungen, Herrschaftsstrukturen, Nachwirkungen und Deutungen",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politische und ideologische Voraussetzungen des Nationalsozialismus",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Die Herrschaft des Nationalsozialismus in Deutschland und Europa",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Vergangenheitspolitik und „Vergangenheitsbewältigung“",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 5 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 5 – Grundkurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 32",
+   "thema": "Nationalismus, Nationalstaat und deutsche Identität im 19. und 20. Jahrhundert",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Die „Deutsche Frage“ im 19. Jahrhundert",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "„Volk“ und „Nation“ im Kaiserreich und im Nationalsozialismus",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Nationale Identität unter den Bedingungen der Zweistaatlichkeit in Deutschland",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Die Überwindung der deutschen Teilung in der friedlichen Revolution von 1989",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 6 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 6 – Grundkurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 33",
+   "thema": "Friedensschlüsse und Ordnungen des Friedens in der Moderne",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Europäische Friedensordnung nach den Napoleonischen Kriegen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Internationale Friedensordnung nach dem Ersten Weltkrieg",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Konflikte und Frieden nach dem Zweiten Weltkrieg",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Grundkurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 7 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 7 – Grundkurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 37",
+   "thema": "Die moderne Industriegesellschaft zwischen Fortschritt und Krise",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Die „Zweite Industrielle Revolution“ und die Entstehung der modernen Massengesellschaft",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Vom Hochimperialismus zum ersten „modernen“ Krieg in der Industriegesellschaft",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Ursachen und Folgen der Weltwirtschaftskrise 1929",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 4 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 4 – Leistungskurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 38",
+   "thema": "Die Zeit des Nationalsozialismus – Voraussetzungen, Herrschaftsstruktur, Nachwirkungen und Deutungen",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Politische und ideologische Voraussetzungen des Nationalsozialismus",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Die Herrschaft des Nationalsozialismus in Deutschland und Europa",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Vergangenheitspolitik und „Vergangenheitsbewältigung“",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 5 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 5 – Leistungskurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 40",
+   "thema": "Nationalismus, Nationalstaat und deutsche Identität im 19. und 20. Jahrhundert",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Die „Deutsche Frage“ im 19. Jahrhundert",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "„Volk“ und „Nation“ im Kaiserreich und im Nationalsozialismus",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Nationale Identität unter den Bedingungen der Zweistaatlichkeit in Deutschland",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Die Überwindung der deutschen Teilung in der Revolution von 1989",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 6 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 6 – Leistungskurs"
+  },
+  {
+   "fach": "geschichte",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "jahrgaenge": [
+    12,
+    13
+   ],
+   "verbindlichkeit": "verbindlich",
+   "quelle": "nw-gost-geschichte",
+   "seite": "S. 42",
+   "thema": "Friedensschlüsse und Ordnungen des Friedens in der Moderne",
+   "herkunft": "wortlaut",
+   "unterthemen": [
+    {
+     "thema": "Multilateraler Interessenausgleich nach dem Dreißigjährigen Krieg",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Europäische Friedensordnung nach den Napoleonischen Kriegen",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Internationale Friedensordnung nach dem Ersten Weltkrieg",
+     "herkunft": "wortlaut"
+    },
+    {
+     "thema": "Konflikte und Frieden nach dem Zweiten Weltkrieg",
+     "herkunft": "wortlaut"
+    }
+   ],
+   "stufe": "Qualifikationsphase (Leistungskurs)",
+   "schulformName": "Gymnasiale Oberstufe",
+   "hinweis": "Inhaltsfeld 7 mit seinen inhaltlichen Schwerpunkten (Kap. 2.2/2.3) im Wortlaut; Kompetenzerwartungen nicht übernommen. KLP 2014 (gültig bis zum Nachfolge-KLP ab Schuljahr 2027/2028). Jahrgänge nach G9 (Einführungsphase = Jg. 11, Qualifikationsphase = Jg. 12–13; so auch an der Gesamtschule). Der KLP ordnet die Inhaltsfelder der Qualifikationsphase keinem Halbjahr zu.",
+   "bereich": "Inhaltsfeld 7 – Leistungskurs"
   }
  ],
  "luecken": [
@@ -50713,7 +54953,7 @@
    "schulformen": [
     "grundschule"
    ],
-   "grund": "Nicht Teil dieses Auftrags: erfasst ist nur die Sekundarstufe I (Kernlehrpläne Gymnasium G9, Gesamtschule/Sekundarschule, Realschule, Hauptschule); Lehrpläne der Grundschule und der gymnasialen Oberstufe fehlen."
+   "grund": "Nicht Teil dieses Auftrags: erfasst ist nur die Sekundarstufe I (Kernlehrpläne Gymnasium G9, Gesamtschule/Sekundarschule, Realschule, Hauptschule); Lehrpläne der Grundschule fehlen; von der gymnasialen Oberstufe nur Deutsch, Englisch, Mathematik, Biologie und Geschichte (Nachtrag 30.09.2026)."
   },
   {
    "fach": "sport",
@@ -50743,6 +54983,21 @@
     "nw-ge-englisch",
     "nw-rs-englisch",
     "nw-hs-englisch"
+   ]
+  },
+  {
+   "fach": "anderes",
+   "schulformen": [
+    "gymnasium",
+    "integriert"
+   ],
+   "grund": "Gymnasiale Oberstufe (Nachtrag 30.09.2026): erfasst sind nur Deutsch, Englisch, Mathematik, Biologie und Geschichte nach den derzeit geltenden KLP (Biologie 2022, Deutsch/Englisch/Mathematik 2023, Geschichte 2014). Die übrigen Fächer der Oberstufe fehlen. Die im Lehrplannavigator bereits veröffentlichten Nachfolge-KLP „ab SJ 2027/2028“ (z. B. Deutsch und Geschichte, Stand 24.08.2026) sind noch nicht in Kraft und nicht übernommen. Den Inhaltsfeldern der Qualifikationsphase ordnen die KLP keine Halbjahre zu (Jahrgänge 12–13).",
+   "quellen": [
+    "nw-gost-deutsch",
+    "nw-gost-englisch",
+    "nw-gost-mathematik",
+    "nw-gost-biologie",
+    "nw-gost-geschichte"
    ]
   }
  ]
