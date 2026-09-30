@@ -16,10 +16,12 @@
  * Die Vorschriften stehen je Land in `sources` (Vorschrift, Paragraph, Adresse). Was der Bericht
  * „nicht gesichert" nennt, steht in `nichtGesichert` und im Text selbst.
  * - NI: RdErl. „Schriftliche Arbeiten" 22.3.2012 (SVBl. S. 266, vorläufig weiter gültig);
- *   Gymnasium RdErl. 1.8.2025 (SVBl. S. 492) Nr. 6.4–6.7; HS/RS/OBS Erlasse vom 18.08.2026
+ *   Gymnasium RdErl. 1.8.2025 (SVBl. S. 492) Nr. 6.4–6.7; HS/RS/OBS Erlasse vom 18.08.2026;
+ *   KGS RdErl. vom 01.06.2023 Nr. 7.4–7.6 (30.09.2026)
  * - NW: APO-S I § 6 mit VV 6.1.1–6.1.3 (BASS 13-21 Nr. 1.1/1.2), BASS 12-63 Nr. 3
  * - BY: GSO §§ 16, 21–23, 25, 28 und Anlage 1 (Fassung ab 01.08.2026); RSO §§ 17–20; MSO §§ 12, 13
- *   (Kernfächer je Ausbildungsrichtung ergänzt am 29.09.2026, `recherche/bayern-schulaufgaben-2026-09-29.md`)
+ *   (Kernfächer je Ausbildungsrichtung ergänzt am 29.09.2026, `recherche/bayern-schulaufgaben-2026-09-29.md`);
+ *   Wirtschaftsschule WSO §§ 12, 13; FOS/BOS FOBOSO §§ 14, 15 und Anlage 3 (30.09.2026)
  * - BW: Notenbildungsverordnung §§ 7–9, 9a (zuletzt geändert 08.04.2026)
  * - HE: VOGSV §§ 28, 32–34 und Anlage 2 Nr. 4–7
  * - BE: Sek I-VO §§ 19, 20 und Anlage 4
@@ -109,7 +111,8 @@ export const EXAM_STATE_RULES: ExamStateRules[] = [
       'RdErl. „Schriftliche Arbeiten in den allgemein bildenden Schulen" vom 22.3.2012 (SVBl. S. 266), Nr. 4 und 8 – https://www.mk.niedersachsen.de/download/69741/',
       'RdErl. „Die Arbeit in den Schuljahrgängen 5 bis 10 des Gymnasiums" vom 1.8.2025 (SVBl. S. 492), Nr. 6.4–6.7',
       'Erlasse Hauptschule/Realschule/Oberschule vom 18.08.2026 (SVBl. S. 487/498/509)',
-      'IGS-Erlass (Fassung ab 01.08.2026), Nr. 7.4–7.6'
+      'IGS-Erlass (Fassung ab 01.08.2026), Nr. 7.4–7.6',
+      'RdErl. „Die Arbeit in den Schuljahrgängen 5 bis 10 der Kooperativen Gesamtschule (KGS)" vom 01.06.2023, Nr. 7.4–7.6 – https://www.mk.niedersachsen.de/download/79152/'
     ],
     nichtGesichert: [
       'Ein schriftlicher Mindestanteil von einem Drittel steht in keinem Erlass (vermutlich aus den Kerncurricula).',
@@ -193,6 +196,8 @@ export const EXAM_STATE_RULES: ExamStateRules[] = [
       'GSO Anlage 1 (Stundentafeln Jgst. 5–11) – https://www.gesetze-bayern.de/Content/Document/BayGSO-ANL_1',
       'RSO §§ 17–20 – https://www.gesetze-bayern.de/Content/Document/BayRSO-18',
       'MSO §§ 12, 13 – https://www.gesetze-bayern.de/Content/Document/BayMSO-12',
+      'WSO §§ 12, 13, 29 (Wirtschaftsschule, zuletzt geändert 01.07.2026) – https://www.gesetze-bayern.de/Content/Document/BayWSO-13',
+      'FOBOSO §§ 14, 15, 18 und Anlage 3 (Fach- und Berufsoberschule, zuletzt geändert 19.06.2026) – https://www.gesetze-bayern.de/Content/Document/BayFOBOSO',
       'KMS „Weiterentwicklung der Prüfungskultur an den bayerischen Gymnasien" vom 18.06.2026 (VI.3-BS5200.0/88/5) – https://www.isb.bayern.de/fileadmin/user_upload/Gymnasium/Leistungserhebungen/2026_06_KMS_Weiterentwicklung_Pruefungskultur_Gymnasium.pdf',
       'StMUK: Prüfungskultur am Gymnasium – https://www.km.bayern.de/unterrichten/unterrichtsalltag/pruefungskultur/gymnasium'
     ],

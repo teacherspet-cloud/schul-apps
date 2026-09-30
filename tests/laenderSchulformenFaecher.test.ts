@@ -153,8 +153,9 @@ describe('Schulformen je Land', () => {
 
 describe('Landesdaten mit Rückfall auf die Bezugsform', () => {
   it('Klassenarbeitsregeln: Kooperative Gesamtschule und berufliches Gymnasium – übernommen und „nicht gesichert"', () => {
-    const kgs = nachweisFuer({ stateId: 'NI', schoolTypeId: 'kooperative-gesamtschule', subjectId: 'englisch', grade: 7 })
-    const igs = nachweisFuer({ stateId: 'NI', schoolTypeId: 'integrierte-gesamtschule', subjectId: 'englisch', grade: 7 })
+    // NI/HE-KGS haben seit 30.09.2026 eigene Regeln (tests/nachweiseSchulformen.test.ts) – MV-KGS weiter über die Bezugsform
+    const kgs = nachweisFuer({ stateId: 'MV', schoolTypeId: 'kooperative-gesamtschule', subjectId: 'englisch', grade: 7 })
+    const igs = nachweisFuer({ stateId: 'MV', schoolTypeId: 'gesamtschule', subjectId: 'englisch', grade: 7 })
     expect(kgs.bezeichnung).toBe(igs.bezeichnung)
     expect(kgs.nichtGesichert).toBe(true)
     expect(kgs.hinweis).toContain('Kooperative Gesamtschule')

@@ -210,6 +210,14 @@ interface Kontext extends NachweisAnfrage {
   fach: string
 }
 
+const kontextVon = (anfrage: NachweisAnfrage): Kontext => ({
+  ...anfrage,
+  gruppe: fachgruppe(anfrage.subjectId),
+  kern: istKernfach(anfrage.subjectId),
+  gym: anfrage.schoolTypeId === 'gymnasium',
+  fach: fachName(anfrage.subjectId)
+})
+
 /** Ein Wert aus einer Tabelle je Jahrgang (ab `ab`), am Rand begrenzt */
 const jeJahrgang = <T,>(werte: T[], grade: number, ab = 5): T => werte[Math.max(0, Math.min(werte.length - 1, grade - ab))]
 
@@ -1122,6 +1130,161 @@ function thueringen(k: Kontext): Nachweis {
   }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Schulformen mit eigenen Regeln (30.09.2026, Audit Länder/Schulformen/Fächer)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Bayern, Wirtschaftsschule: WSO §§ 12, 13, 29 (Fassung zuletzt geändert durch VO vom 1.7.2026,
+ * GVBl. S. 425). Schulaufgaben nur in den Fächern der Abschlussprüfung (Deutsch, Englisch,
+ * Mathematik, Übungsunternehmen) und in Ökonomischer Bildung; Art und Zahl der übrigen
+ * Leistungsnachweise beschließt die Lehrerkonferenz. Dauer regelt die WSO nicht.
+ */
+function bayernWirtschaftsschule(k: Kontext): Nachweis {
+  const quelle = 'WSO §§ 12, 13, 29 (zuletzt geändert 01.07.2026)'
+  const takt = 'Ankündigung spätestens eine Woche vorher; höchstens eine Schulaufgabe oder Kurzarbeit am Tag, in der Woche sollen höchstens zwei Schulaufgaben gehalten werden.'
+  const pruefungsfach = k.gruppe === 'deutsch' || k.gruppe === 'mathematik' || k.subjectId === 'englisch'
+  // „wirtschaft" steht für Ökonomische Bildung bzw. Übungsunternehmen
+  const oekonomisch = k.subjectId === 'wirtschaft' || k.subjectId === 'wirtschaft-politik'
+  if (pruefungsfach || (oekonomisch && k.grade >= 7)) {
+    const hinweise = [takt]
+    if (pruefungsfach) hinweise.push('Als Fach der Abschlussprüfung sind Bearbeitungszeit, Inhalt und Form so zu wählen, dass die Schulaufgabe der Prüfungsvorbereitung dient; sie kann den gesamten bisher behandelten Stoff umfassen.')
+    if (oekonomisch) hinweise.push('Gilt für Ökonomische Bildung und das Prüfungsfach Übungsunternehmen.')
+    hinweise.push('Eine Schulaufgabe oder Kurzarbeit ist durch eine Schriftliche Hausarbeit ersetzbar (höchstens zwei im Schuljahr).')
+    return {
+      bezeichnung: 'Schulaufgabe',
+      anzahl: k.gruppe === 'mathematik' && k.grade === 9 ? 'mindestens 2 im Schuljahr (Jgst. 9 der drei- und vierstufigen Form)' : 'mindestens 3 im Schuljahr',
+      hinweis: hinweise.join(' '),
+      quelle
+    }
+  }
+  return {
+    bezeichnung: 'Kurzarbeit',
+    anzahl: 'nach Beschluss der Lehrerkonferenz (auf Vorschlag der Fachgruppe)',
+    hinweis: `Pflichtschulaufgaben gibt es an der Wirtschaftsschule nur in Deutsch, Englisch, Mathematik, Übungsunternehmen und Ökonomischer Bildung${
+      oekonomisch ? ' (in der Vorklasse ohne Schulaufgaben)' : ''
+    }. In ${k.fach} legt die Lehrerkonferenz Art und Zahl der Leistungsnachweise fest; Kurzarbeiten erstrecken sich auf höchstens sechs vorangegangene Stunden und werden eine Woche vorher angekündigt.`,
+    quelle
+  }
+}
+
+/** Profilfach 1 der Ausbildungsrichtungen (FOBOSO Anlage 1) – dort gibt es Schulaufgaben */
+const FOBOS_PROFILFACH1: Record<string, string> = {
+  physik: 'Technik',
+  biologie: 'Agrarwirtschaft, Bio- und Umwelttechnologie',
+  wirtschaft: 'Wirtschaft und Verwaltung (Betriebswirtschaftslehre)',
+  paedagogik: 'Sozialwesen (Pädagogik/Psychologie)',
+  kunst: 'Gestaltung (Gestaltung Praxis)'
+}
+
+/** Zweite Fremdsprache zum Erwerb der allgemeinen Hochschulreife (FOBOSO Anlage 1 Nr. 2) */
+const FOBOS_ZWEITE_FS = ['latein', 'franzoesisch', 'italienisch', 'spanisch', 'russisch']
+
+/**
+ * Bayern, Fachoberschule und Berufsoberschule: FOBOSO §§ 14, 15, 18 und Anlage 3 (zuletzt
+ * geändert durch VO vom 19.6.2026, GVBl. S. 335). Schulaufgaben je Schulhalbjahr: Deutsch,
+ * Englisch, Mathematik und Profilfach 1 je eine (Vorklasse: D/E/M je zwei), in Jgst. 12/13
+ * dazu die zweite Fremdsprache zur allgemeinen Hochschulreife.
+ */
+function bayernFosBos(k: Kontext): Nachweis {
+  const quelle = 'FOBOSO §§ 14, 15, 18 und Anlage 3 (zuletzt geändert 19.06.2026)'
+  const takt = 'Ankündigung spätestens eine Woche vorher; höchstens eine Schulaufgabe am Tag, in der Woche sollen höchstens zwei gehalten werden. Rückgabe binnen drei Wochen.'
+  const klein =
+    'Daneben je Halbjahr mindestens zwei (mit Kurzarbeiten) bzw. drei (mit Stegreifaufgaben) schriftliche und mündliche Leistungen; Kurzarbeit höchstens 30 min über höchstens zehn Stunden, Stegreifaufgabe höchstens 20 min über zwei Stunden.'
+  const form = k.schoolTypeId === 'bos' ? 'Berufsoberschule' : 'Fachoberschule'
+  if (k.gruppe === 'deutsch' || k.gruppe === 'mathematik' || k.subjectId === 'englisch') {
+    return {
+      bezeichnung: 'Schulaufgabe',
+      anzahl: '1 je Schulhalbjahr (Vorklasse 2)',
+      hinweis: `${takt} ${k.fach} ist Fach der Abschlussprüfung (Fachabitur/Abitur). ${klein}`,
+      quelle
+    }
+  }
+  if (FOBOS_ZWEITE_FS.includes(k.subjectId) && k.grade >= 12) {
+    return {
+      bezeichnung: 'Schulaufgabe',
+      anzahl: '1 je Schulhalbjahr',
+      hinweis: `${takt} Gilt für ${k.fach} als Wahlpflichtfach zweite Fremdsprache zum Erwerb der allgemeinen Hochschulreife (bzw. Profilfach 2 der Ausbildungsrichtung Internationale Wirtschaft).`,
+      quelle
+    }
+  }
+  const richtung = FOBOS_PROFILFACH1[k.subjectId]
+  if (richtung) {
+    return {
+      bezeichnung: 'Kurzarbeit',
+      anzahl: `als Profilfach 1 (Ausbildungsrichtung ${richtung}) 1 Schulaufgabe je Schulhalbjahr, sonst keine`,
+      dauer: 'Kurzarbeit höchstens 30 min',
+      hinweis: `An der ${form} hat ${k.fach} nur als Profilfach 1 der Ausbildungsrichtung ${richtung} Schulaufgaben; dort passt die Bezeichnung „Schulaufgabe". ${klein}`,
+      quelle
+    }
+  }
+  return {
+    bezeichnung: 'Kurzarbeit',
+    dauer: 'höchstens 30 min',
+    keineKlassenarbeit: true,
+    hinweis: `Schulaufgaben gibt es an der ${form} nur in Deutsch, Englisch, Mathematik, im Profilfach 1 der Ausbildungsrichtung und in Jgst. 12/13 in der zweiten Fremdsprache zur allgemeinen Hochschulreife. ${klein}`,
+    quelle
+  }
+}
+
+/**
+ * Niedersachsen, Kooperative Gesamtschule: RdErl. „Die Arbeit in den Schuljahrgängen 5 bis 10
+ * der Kooperativen Gesamtschule (KGS)" vom 01.06.2023, Nr. 7.4–7.6. Die Zahl richtet sich nach
+ * den Wochenstunden des Fachs, bewertet wird nach den Maßstäben des Schulzweigs.
+ */
+function niedersachsenKgs(k: Kontext): Nachweis {
+  const quelle = 'RdErl. „Die Arbeit in den Schuljahrgängen 5 bis 10 der Kooperativen Gesamtschule (KGS)" vom 01.06.2023, Nr. 7.4–7.6'
+  if (k.gruppe === 'sport' || k.subjectId === 'darstellendes-spiel' || k.subjectId === 'theater') {
+    return {
+      bezeichnung: 'Leistungsnachweis',
+      keineKlassenarbeit: true,
+      hinweis: `An der KGS werden in ${k.fach} keine bewerteten schriftlichen Lernkontrollen verlangt (ebenso Textiles Gestalten, Gestaltendes Werken).`,
+      quelle
+    }
+  }
+  const dauer = k.grade <= 6 ? 'höchstens eine Unterrichtsstunde' : k.gruppe === 'deutsch' && k.grade >= 8 ? 'höchstens drei Unterrichtsstunden' : 'höchstens zwei Unterrichtsstunden'
+  const hinweise = [
+    'Bewertet wird nach den Maßstäben des Schulzweigs (Haupt-, Real- oder Gymnasialzweig).',
+    'In mindestens dreistündigen Fächern sind zwei, in ein- und zweistündigen Fächern eine der Arbeiten durch alternative Lernkontrollen ersetzbar (Fachkonferenz).'
+  ]
+  if (k.gruppe === 'fremdsprache') hinweise.push('Die Überprüfung des Sprechens ersetzt eine schriftliche Lernkontrolle je Doppelschuljahrgang.')
+  if (k.subjectId === 'kunst') hinweise.push('Zwei fachpraktische Arbeiten mit Dokumentation des Werkstattprozesses können zwei schriftliche Lernkontrollen ersetzen.')
+  if (k.grade >= 9) hinweise.push('Im Abschlussjahrgang zählt die Abschlussarbeit als eine schriftliche Lernkontrolle.')
+  return {
+    bezeichnung: k.kern ? 'Klassenarbeit' : 'schriftliche Lernkontrolle',
+    anzahl: k.kern
+      ? 'vierstündig 4–6 (Regelfall 5), dreistündig 3–5 (Regelfall 4) im Schuljahr'
+      : 'als drei- oder vierstündiges Fach 3–5 bzw. 4–6, sonst 2 im Schuljahr',
+    dauer,
+    hinweis: hinweise.join(' '),
+    quelle
+  }
+}
+
+/**
+ * Hessen, Kooperative Gesamtschule, Mittelstufenschule, Förderstufe: Die VOGSV (Anlage 2 Nr. 7.1)
+ * nennt dieselben Zahlen für Haupt-, Realschule, IGS und Gymnasium (Jg. 5/6 je 5, danach 4) – sie
+ * gelten in jedem Bildungsgang dieser Schulformen.
+ */
+function hessenSchulformuebergreifend(k: Kontext): Nachweis {
+  const r = hessen(k)
+  return {
+    ...r,
+    hinweis: [r.hinweis, 'Die Zahlen der VOGSV gelten schulformübergreifend in jedem Bildungsgang (Haupt-, Realschul- und gymnasialer Bildungsgang).'].filter(Boolean).join(' ')
+  }
+}
+
+/** Schulformen, deren Regeln eigens belegt sind – sie gehen der Bezugsform vor */
+const EIGENE_SCHULFORMEN: Record<string, Record<string, (k: Kontext) => Nachweis>> = {
+  BY: { wirtschaftsschule: bayernWirtschaftsschule, fos: bayernFosBos, bos: bayernFosBos },
+  NI: { 'kooperative-gesamtschule': (k) => (istOberstufe(k) ? oberstufe(k) : niedersachsenKgs(k)) },
+  HE: {
+    'kooperative-gesamtschule': (k) => (istOberstufe(k) ? oberstufe(k) : hessenSchulformuebergreifend(k)),
+    mittelstufenschule: hessenSchulformuebergreifend,
+    foerderstufe: hessenSchulformuebergreifend
+  }
+}
+
 const LAENDER: Record<string, (k: Kontext) => Nachweis> = {
   NI: niedersachsen,
   NW: nordrheinWestfalen,
@@ -1148,9 +1311,12 @@ const LAENDER: Record<string, (k: Kontext) => Nachweis> = {
  * (bei `keineKlassenarbeit` als Warnung). Die Lehrkraft kann die Bezeichnung ändern.
  */
 export function nachweisFuer(anfrage: NachweisAnfrage): Nachweis {
+  // Eigens belegte Schulformen (BY Wirtschaftsschule, FOS/BOS; NI KGS; HE KGS, Mittelstufenschule, Förderstufe)
+  const eigene = EIGENE_SCHULFORMEN[anfrage.stateId]?.[anfrage.schoolTypeId]
+  if (eigene) return eigene(kontextVon(anfrage))
   /*
-   * Schulformen ohne eigene Regeln im Bericht (Kooperative Gesamtschule, berufliches Gymnasium,
-   * Wirtschaftsschule, FOS/BOS, Förderschule …, 30.09.2026): Regeln der Bezugsform aus
+   * Schulformen ohne eigene Regeln (berufliches Gymnasium, Förderschule, KGS in MV, Gemeinschafts-
+   * schule BE/SN …, 30.09.2026): Regeln der Bezugsform aus
    * @shared/schulformen – ausdrücklich als nicht gesichert gekennzeichnet.
    */
   const form = schulformVon(anfrage.stateId, anfrage.schoolTypeId)
@@ -1166,13 +1332,7 @@ export function nachweisFuer(anfrage: NachweisAnfrage): Nachweis {
         .join(' ')
     }
   }
-  const k: Kontext = {
-    ...anfrage,
-    gruppe: fachgruppe(anfrage.subjectId),
-    kern: istKernfach(anfrage.subjectId),
-    gym: anfrage.schoolTypeId === 'gymnasium',
-    fach: fachName(anfrage.subjectId)
-  }
+  const k = kontextVon(anfrage)
   if (istOberstufe(k)) return oberstufe(k)
   if (k.schoolTypeId === 'grundschule' || k.grade < 5) return { bezeichnung: 'Klassenarbeit' }
   const land = LAENDER[k.stateId]

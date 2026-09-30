@@ -163,7 +163,8 @@ export const SCHULFORMEN: Record<string, Schulform[]> = {
       profil: 'realschule',
       bezug: 'realschule',
       beruflich: true,
-      hinweis: 'Fünf-, vier-, drei- oder zweistufig (Jahrgangsstufen 6–10 bzw. 10–11); Abschluss: mittlerer Schulabschluss.'
+      hinweis:
+        'Vorklasse (Jgst. 6) zur vierstufigen Form (7–10), dreistufig (8–10), zweistufig (10–11, nach der Mittelschule); Abschluss: mittlerer Schulabschluss (WSO §§ 2, 4).'
     },
     {
       id: 'fos',
@@ -311,8 +312,7 @@ export const SCHULFORMEN: Record<string, Schulform[]> = {
       profil: 'integriert',
       kurse: true,
       bezug: 'oberschule',
-      nichtGesichert: true,
-      hinweis: 'Längeres gemeinsames Lernen (seit 2020 zulässig); Spanne je Standort verschieden.'
+      hinweis: 'Klassenstufen 1–10 und Jahrgangsstufen 11–12; auch ab Klassenstufe 5 mit kooperierender Grundschule (SächsSchulG § 7a).'
     },
     gymnasium(12),
     beruflichesGymnasium()
