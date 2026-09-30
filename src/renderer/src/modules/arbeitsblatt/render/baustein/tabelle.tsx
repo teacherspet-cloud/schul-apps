@@ -25,11 +25,18 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
   const [vorschau, setVorschau] = useState<{ colWidths: number[]; rowHeightsMm: number[]; headerHeightMm: number; widthPercent: number } | null>(null)
   const from = placed?.from ?? 0
   const to = placed?.to ?? block.rows.length
-  const breiten = vorschau?.colWidths ?? spaltenBreiten(block)
+  /*
+   * Stück einer geteilten Tabelle ohne eigene Maße: die beim Messen der GANZEN Tabelle
+   * ermittelten Spaltenbreiten (PlacedItem.spalten). Sonst setzt der Browser die Spalten nur
+   * nach den Zeilen dieses Stücks – sie brechen anders um, und die letzte Zeile ragt über den
+   * Seitenrand (Befund 30.09.2026).
+   */
+  const gemessen = !block.colWidths?.length && placed?.spalten?.length === spaltenBreiten(block).length ? placed.spalten : undefined
+  const breiten = vorschau?.colWidths ?? gemessen ?? spaltenBreiten(block)
   const hoehen = vorschau?.rowHeightsMm ?? zeilenHoehen(block)
   const kopfHoehe = vorschau?.headerHeightMm ?? block.headerHeightMm ?? 0
   const breite = vorschau?.widthPercent ?? block.widthPercent ?? 100
-  const mitMassen = Boolean(block.colWidths?.length || vorschau)
+  const mitMassen = Boolean(block.colWidths?.length || vorschau || gemessen)
 
   const ziehen = (e: React.PointerEvent, art: 'spalte' | 'tabelle' | 'zeile' | 'kopf', index: number): void => {
     const table = tableRef.current

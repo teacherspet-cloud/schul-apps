@@ -2811,3 +2811,12 @@
 .ws-workspace-label .rt-editable-inline {
   display: inline;
 }
+/*
+ * ALLGEMEIN für die Blattseiten (30.09.2026): Ein Feld, das im Druck im Satz steht, steht auch
+ * im Editor im Satz. Die Titel von Tabellen und Materialtexten fehlten in der Liste oben – neben
+ * der Materialnummer „M2" rutschte der Titel im Editor in eine eigene Zeile, jeder Titel war dort
+ * eine Zeile höher als gemessen, und die letzte Tabellenzeile ragte über den Seitenrand.
+ */
+.ws-page div.vt-editable.rt-editable-inline {
+  display: inline;
+}

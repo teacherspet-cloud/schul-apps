@@ -12,6 +12,8 @@ import PrintPreview from '../../../shared/components/PrintPreview'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
+import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
+import { useDruckFuerWachen } from '../../../shared/render/druckFuerWachen'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
@@ -77,6 +79,13 @@ export default function TestEditorStep(): React.JSX.Element {
   )?.name
   const ws = useMemo(() => (test ? mitThemenbereich(testToWorksheet(test), bereich) : null), [test, bereich])
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
+  // Seitenrand-Wache: Druck-HTML mit Lösungen, so wie der Export es baut
+  useDruckFuerWachen(ws ? () => buildWorksheetHtml(ws, layouts, { sheetIds: ws.sheets.map((s) => s.id), includeKey: true }, logo, settings.schoolName) : null, [
+    ws,
+    layouts,
+    logo,
+    settings.schoolName
+  ])
   // Anrede der Lernenden am angezeigten Test prüfen – auch nach Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (ws ? anredeBefunde(ws.meta, ws.sheets) : []), [ws])
   const docId = useGrammatiktest((s) => s.docId)

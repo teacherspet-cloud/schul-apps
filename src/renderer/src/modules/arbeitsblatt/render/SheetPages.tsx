@@ -21,6 +21,7 @@ import { druckDesign } from '../../../shared/fachfarben'
 import { boardList } from '../didactics/boardDesign'
 import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
 import { isMaterial, loeseMaterialverweise, materialNummern, verschluesseleBaustein } from '../didactics/integrity'
+import { ueberlaufUnten } from './seitenUeberlauf'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -638,7 +639,7 @@ const LINIEN_HOEHE = (8.5 * 96) / 25.4
  *
  * Bewusst NICHT angefasst: Seiten, auf denen noch etwas folgt, und alles ausser Schreiblinien.
  */
-function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Sheet, ersteHoehe: number, weitereHoehe: number): PagePlan[] {
+function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Sheet, ersteHoehe: number, weitereHoehe: number, abzug: readonly number[] = []): PagePlan[] {
   const hoehen = new Map(items.map((i) => [i.id, i]))
   const blockVon = new Map(sheet.blocks.map((b) => [b.id, b]))
   return plaene.map((plan, seite) => {
@@ -676,7 +677,7 @@ function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Shee
         (bis >= m.units.length ? (m.footHeight ?? 0) : 0)
       )
     }, 0)
-    const rest = (seite === 0 ? ersteHoehe : weitereHoehe) - genutzt
+    const rest = (seite === 0 ? ersteHoehe : weitereHoehe) - (abzug[seite] ?? 0) - genutzt
     // Ein Drittel Zeilenhöhe Reserve gegen Rundung – lieber eine Linie weniger als Überlauf
     const zusaetzlich = Math.floor((rest - LINIEN_HOEHE / 3) / LINIEN_HOEHE)
     if (zusaetzlich < 1) return plan
@@ -687,10 +688,69 @@ function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Shee
   })
 }
 
+const KEIN_ABZUG = new Map<string, number[]>()
+/** So oft wird nach der Prüfung höchstens neu umbrochen – danach bleibt es beim letzten Stand */
+const PRUEF_RUNDEN = 6
+
+/**
+ * Höhen der Einheiten eines teilbaren Bausteins – von OBERKANTE zu OBERKANTE (30.09.2026).
+ *
+ * Vorher zählte nur die Höhe jeder Einheit selbst. Der Abstand ZWISCHEN den Einheiten (Absätze,
+ * Tabellenzeilen, Abschnitte eines Protokolls) steckte damit im Kopf des Bausteins und kam nur
+ * dem ersten Stück zugute; auf jeder Folgeseite fehlte er in der Rechnung – bei einem langen Text
+ * je Absatz ein paar Punkte, zusammen genug, dass die letzte Zeile halb über den Rand ragte.
+ * Die letzte Einheit zählt bis zu ihrer Unterkante; was danach kommt, gehört zum Kopf.
+ * Liegen Einheiten ineinander oder nebeneinander (Oberkanten nicht aufsteigend), gilt wie
+ * früher die eigene Höhe.
+ */
+function einheitenHoehen(els: HTMLElement[]): number[] {
+  const r = els.map((u) => u.getBoundingClientRect())
+  const geordnet = r.every((x, i) => i === 0 || x.top >= r[i - 1].bottom - 0.5)
+  if (!geordnet) return r.map((x) => x.height)
+  return r.map((x, i) => (i < r.length - 1 ? r[i + 1].top - x.top : x.height))
+}
+
+/** Spaltenbreiten einer gemessenen Tabelle in Prozent ihrer Breite (aus der Kopfzeile, sonst der ersten Zeile) */
+function spaltenProzent(tabelle: HTMLTableElement): number[] {
+  const breite = tabelle.getBoundingClientRect().width
+  const zeile = tabelle.tHead?.rows[0] ?? tabelle.rows[0]
+  if (!zeile || breite <= 0) return []
+  return Array.from(zeile.cells).map((c) => (c.getBoundingClientRect().width / breite) * 100)
+}
+
+/** Geteilten Tabellen die Spaltenbreiten der ganzen Tabelle mitgeben (siehe `PlacedItem.spalten`) */
+function mitSpalten(plaene: PagePlan[], spaltenJe: Map<string, number[]>, items: MeasuredItem[]): PagePlan[] {
+  if (!spaltenJe.size) return plaene
+  const einheiten = new Map(items.map((i) => [i.id, i.units?.length ?? 0]))
+  return plaene.map((plan) => ({
+    ...plan,
+    items: plan.items.map((it) => {
+      const spalten = spaltenJe.get(it.id)
+      const geteilt = (it.from ?? 0) > 0 || (it.to !== undefined && it.to < (einheiten.get(it.id) ?? 0))
+      return spalten?.length && geteilt ? { ...it, spalten } : it
+    })
+  }))
+}
+
 export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoolName: string): { layouts: Map<string, PagePlan[]>; measure: React.ReactNode } {
   const ref = useRef<HTMLDivElement>(null)
   const [layouts, setLayouts] = useState<Map<string, PagePlan[]>>(new Map())
   const [tick, setTick] = useState(0)
+  /*
+   * PRÜFUNG NACH DEM SETZEN (30.09.2026, Befund „letzte Tabellenzeile nur halb sichtbar").
+   *
+   * Die berechneten Seiten werden im Messbereich noch einmal wirklich gesetzt und nachgemessen
+   * (`ueberlaufUnten`). Ragt auf einer Seite etwas über den Satzspiegel, bekommt genau diese
+   * Seite so viel weniger Platz, und es wird neu umbrochen – das Überstehende rutscht auf die
+   * Folgeseite, statt abgeschnitten zu werden. Die Abzüge gelten nur für dieses eine Blatt;
+   * jede Änderung beginnt wieder bei null. Höchstens PRUEF_RUNDEN Durchgänge.
+   */
+  const [pruefung, setPruefung] = useState<{ ws: Worksheet | null; abzug: Map<string, number[]>; runden: number }>(() => ({
+    ws: null,
+    abzug: new Map(),
+    runden: 0
+  }))
+  const abzug = pruefung.ws === ws ? pruefung.abzug : KEIN_ABZUG
 
   // Gemessen wird, was dargestellt wird – mit aufgelösten Verweisen („M3" ist kürzer als „M{zeitleiste}")
   const variants = useMemo(() => (ws ? ws.sheets.flatMap((s) => [false, true].map((key) => ({ sheet: zurAnzeige(s), key }))) : []), [ws])
@@ -720,11 +780,30 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       setTick((t) => t + 1)
     })
     beobachter.observe(root)
+    /*
+     * Auch jeder einzelne Baustein wird beobachtet: Wächst er NACH dem Messen (ein Bild lädt,
+     * eine Schrift kommt nach, eine Formel wird gesetzt), ändert sich an der Größe des
+     * Messbereichs nichts – die Seiten darin sind fest 297 mm hoch. Ohne diesen Beobachter
+     * blieb die alte, zu kleine Höhe in der Rechnung stehen.
+     */
+    const hoehen = new Map<Element, number>()
+    const bausteine = new ResizeObserver((eintraege) => {
+      let geaendert = false
+      for (const e of eintraege) {
+        const h = e.target.getBoundingClientRect().height
+        const alt = hoehen.get(e.target)
+        hoehen.set(e.target, h)
+        if (alt !== undefined && Math.abs(alt - h) > 0.5) geaendert = true
+      }
+      if (geaendert) setTick((t) => t + 1)
+    })
+    root.querySelectorAll('[data-measure-block]').forEach((el) => bausteine.observe(el))
     let aktiv = true
     document.fonts?.ready.then(() => aktiv && setTick((t) => t + 1)).catch(() => undefined)
     return () => {
       aktiv = false
       beobachter.disconnect()
+      bausteine.disconnect()
     }
   }, [ws])
 
@@ -752,16 +831,20 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
        * Aufgabe. Er gehört zu keiner Einheit – ohne diese Messung fehlte seine Höhe in der
        * Rechnung, und jede Folgeseite lief um genau so viel über den Rand.
        */
-      const fortsetzungKopf = el.querySelector<HTMLElement>('[data-continued-probe]')?.getBoundingClientRect().height ?? 0
+      const probe = el.querySelector<HTMLElement>('[data-continued-probe]')
+      // Mit dem Abstand darunter – der steht auf der Seite genauso
+      const fortsetzungKopf = probe ? probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(probe).marginBottom) || 0) : 0
       const items: MeasuredItem[] = []
+      const spaltenJe = new Map<string, number[]>()
       el.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((wrap) => {
         const id = wrap.dataset.measureBlock!
-        const height = wrap.getBoundingClientRect().height
+        const rahmen = wrap.getBoundingClientRect()
+        const height = rahmen.height
         const block = sheet.blocks.find((b) => b.id === id)
         const unitEls = Array.from(wrap.querySelectorAll<HTMLElement>('[data-unit]'))
         const splittable = (block?.type === 'text' || block?.type === 'table' || block?.type === 'task' || block?.type === 'protocol') && unitEls.length > 1
         if (splittable) {
-          const units = unitEls.map((u) => u.getBoundingClientRect().height)
+          const units = einheitenHoehen(unitEls)
           const unitSum = units.reduce((a, b) => a + b, 0)
           /*
            * Der FUSS (Wortzahl, Quellenangabe) steht nur unter dem letzten Teilstück. Bis zum
@@ -770,10 +853,23 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
            * rutschte auf die Folgeseite (PDF „Test": 5 px zu wenig für 269 px Absatz).
            */
           const footHeight = Array.from(wrap.querySelectorAll<HTMLElement>('[data-foot]')).reduce((a, f) => a + f.getBoundingClientRect().height, 0)
+          const headHeight = Math.max(0, height - unitSum - footHeight)
+          /*
+           * KOPF EINES FOLGESTÜCKS (30.09.2026). Was vor der ersten Einheit steht (Titel,
+           * Materialkopf, Arbeitsanweisung), steht auf dem Folgestück nicht – dafür steht dort,
+           * was sich wiederholt: bei Tabellen die Kopfzeile, bei Aufgaben der Hinweis
+           * „Aufgabe N (Fortsetzung)". Bis dahin zählte bei Tabellen NICHTS davon: Jedes
+           * Tabellenstück auf einer Folgeseite lief um die Höhe seiner Kopfzeile über den Rand.
+           * Der Rest des Kopfes (Abstand unter dem Baustein, Rahmen) gilt für jedes Stück.
+           */
+          const vorlauf = Math.max(0, unitEls[0].getBoundingClientRect().top - rahmen.top)
+          const tabelle = block?.type === 'table' ? unitEls[0].closest('table') : null
+          const wiederholt = tabelle ? Math.max(0, unitEls[0].getBoundingClientRect().top - tabelle.getBoundingClientRect().top) : block?.type === 'task' ? fortsetzungKopf : 0
+          if (tabelle) spaltenJe.set(id, spaltenProzent(tabelle))
           items.push({
             id,
             height,
-            headHeight: Math.max(0, height - unitSum - footHeight),
+            headHeight,
             footHeight,
             units,
             /*
@@ -785,15 +881,16 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
              */
             unitLines:
               block?.type === 'text' && block.lineNumbers
-                ? unitEls.map((u, k) => {
+                ? unitEls.map((u) => {
                     if (u.classList.contains('ws-glossary')) return 0
                     const zeile = parseFloat(getComputedStyle(u).lineHeight) || fontPx * 1.5
-                    return Math.max(1, Math.round(units[k] / zeile))
+                    // Die Höhe des Absatzes selbst – `units` enthält den Abstand zum nächsten mit
+                    return Math.max(1, Math.round(u.getBoundingClientRect().height / zeile))
                   })
                 : undefined,
             keepTogether: true,
             pageBreakBefore: block?.pageBreakBefore,
-            continuedHead: block?.type === 'task' ? fortsetzungKopf : 0
+            continuedHead: Math.max(0, headHeight - vorlauf) + wiederholt
           })
         } else {
           items.push({
@@ -804,10 +901,47 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
           })
         }
       })
-      next.set(layoutKey(sheet.id, key), linienAuffuellen(paginate(items, firstHeight, otherHeight), items, sheet, firstHeight, otherHeight))
+      const k = layoutKey(sheet.id, key)
+      const abzugHier = abzug.get(k) ?? []
+      const plaene = linienAuffuellen(paginate(items, firstHeight, otherHeight, abzugHier), items, sheet, firstHeight, otherHeight, abzugHier)
+      next.set(k, mitSpalten(plaene, spaltenJe, items))
     }
     setLayouts(next)
-  }, [ws, variants, logo, schoolName, tick])
+  }, [ws, variants, logo, schoolName, tick, abzug])
+
+  /*
+   * Die Prüfung selbst: die eben berechneten Seiten, im Messbereich gesetzt (`data-pruefung`),
+   * Seite für Seite nachmessen. Läuft als Layout-Effekt – ein nötiger zweiter Umbruch ist
+   * fertig, bevor der Bildschirm etwas zeigt. Seiten, auf denen ein einzelner Baustein schon
+   * größer ist als die ganze Seite (`overflow`), lassen sich durch Umbrechen nicht retten.
+   */
+  useLayoutEffect(() => {
+    const root = ref.current
+    if (!root || !ws || !layouts.size) return
+    const runden = pruefung.ws === ws ? pruefung.runden : 0
+    if (runden >= PRUEF_RUNDEN) return
+    const neu = new Map(abzug)
+    let geaendert = false
+    for (const [k, plaene] of layouts) {
+      const seiten = root.querySelectorAll<HTMLElement>(`[data-pruefung="${k}"] .ws-page`)
+      // Stimmt die Zahl nicht, gehört der Satz noch zum vorigen Stand – dann nicht urteilen
+      if (seiten.length < plaene.length) continue
+      plaene.forEach((plan, i) => {
+        if (plan.overflow) return
+        const body = seiten[i].querySelector<HTMLElement>('.ws-body')
+        if (!body || body.getBoundingClientRect().height < 50) return
+        const ueber = ueberlaufUnten(body)
+        if (ueber <= 0.5) return
+        const liste = [...(neu.get(k) ?? [])]
+        liste[i] = (liste[i] ?? 0) + Math.ceil(ueber) + 1
+        neu.set(k, liste)
+        geaendert = true
+      })
+    }
+    if (geaendert) setPruefung({ ws, abzug: neu, runden: runden + 1 })
+    // Nur nach einem neuen Umbruch prüfen – sonst misst jede Darstellung erneut
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layouts])
 
   const measure =
     ws && variants.length ? (
@@ -830,7 +964,12 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
                 <PageFrame info={info} page={2} pages={2}>
                   {/* Inhalt in voller Breite der Inhaltsfläche messen */}
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-                    {blockLayout(sheet.blocks, ws.meta.phraseSheet === 'blatt').map(({ block, side, sideAt }) => (
+                    {/*
+                      Dieselbe Regel wie beim Setzen (`phraseSheetModus`): Vorher galt hier nur die
+                      ausdrückliche Wahl – bei Übungsklausuren in Fremdsprachen stand das Hilfsblatt
+                      dann in der Messung, auf dem Blatt aber auf einer eigenen Seite.
+                    */}
+                    {blockLayout(sheet.blocks, phraseSheetModus(ws.meta) === 'blatt').map(({ block, side, sideAt }) => (
                       <div key={block.id} data-measure-block={block.id} style={{ display: 'flow-root' }}>
                         {side && (
                           <div className={`ws-side-image ${sideAt === 'left' ? 'ws-side-left' : ''}`}>
@@ -843,6 +982,12 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
                   </div>
                 </PageFrame>
               </WsContext.Provider>
+              {/* Die berechneten Seiten, wirklich gesetzt – Grundlage der Prüfung nach dem Setzen */}
+              {layouts.get(layoutKey(sheet.id, key)) && (
+                <div data-pruefung={layoutKey(sheet.id, key)}>
+                  <SheetPages ws={ws} sheet={sheet} plans={layouts.get(layoutKey(sheet.id, key))} info={info} context={ctx} />
+                </div>
+              )}
             </div>
           )
         })}

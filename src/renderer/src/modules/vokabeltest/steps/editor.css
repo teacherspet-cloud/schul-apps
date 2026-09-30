@@ -22,17 +22,25 @@
   outline: 3px solid #ffcdd2;
 }
 
+/*
+ * Der Rahmen darf NICHTS zur Höhe beitragen (30.09.2026): Der Seitenumbruch misst die Bausteine
+ * ohne ihn. Mit 1 mm Innenabstand unten und 1 px Rand oben und unten war jeder Baustein im
+ * Editor rund 1,5 mm höher als gemessen – bei zehn Bausteinen auf einer Seite ragte die letzte
+ * Zeile um 15 mm über den Satzspiegel und war nur halb zu sehen (Befund der Lehrkraft). Der
+ * gestrichelte Rahmen ist deshalb eine `outline`, und oben/unten gibt es keinen Innenabstand.
+ */
 .editor-block {
   position: relative;
   margin: 0 -4mm;
-  padding: 0 4mm 1mm;
+  padding: 0 4mm;
   border-radius: 6px;
-  border: 1px dashed transparent;
+  outline: 1px dashed transparent;
+  outline-offset: 0;
 }
 
 .editor-block:hover,
 .editor-block:focus-within {
-  border-color: #adb5bd;
+  outline-color: #adb5bd;
 }
 
 /*
@@ -175,8 +183,8 @@
 
 /* Frei platziert: dauerhaft erkennbar, sonst sucht man später, warum nichts mitwandert */
 .editor-block-frei {
-  border-color: var(--mantine-primary-color-filled);
-  border-style: solid;
+  outline-color: var(--mantine-primary-color-filled);
+  outline-style: solid;
   background: rgba(255, 255, 255, 0.85);
 }
 .editor-block-frei .editor-block-toolbar {

@@ -51,6 +51,8 @@ import PrintPreview from '../../../shared/components/PrintPreview'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { useDruck } from '../../../shared/navigation'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
+import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
+import { useDruckFuerWachen } from '../../../shared/render/druckFuerWachen'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import { KiMenue, VersionSwitcher } from '../../arbeitsblatt/steps/BlockRevision'
 import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
@@ -198,6 +200,11 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     const w = window as unknown as { __selftest?: Record<string, unknown> }
     if (w.__selftest) w.__selftest.layouts = layouts
   }, [layouts])
+  // Seitenrand-Wache: Druck-HTML mit Erwartungshorizont, so wie der Export es baut
+  useDruckFuerWachen(
+    hasContent ? () => buildWorksheetHtml(worksheet, layouts, { sheetIds: worksheet.sheets.map((s) => s.id), includeKey: true }, logo, settings.schoolName) : null,
+    [hasContent, worksheet, layouts, logo, settings.schoolName]
+  )
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken" – sobald es etwas zu drucken gibt
   useDruck('klassenarbeit', hasContent ? () => starte('print') : null)
   const sheet = worksheet.sheets[fassung] ?? worksheet.sheets[0]

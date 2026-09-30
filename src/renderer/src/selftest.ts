@@ -52,6 +52,7 @@ import { aiCall as lzkAi } from './modules/lernzielkontrolle/store'
 import { pruefeKurztest } from './modules/lernzielkontrolle/didactics/pruefungen'
 import { profilFuer } from './modules/lernzielkontrolle/didactics/operatoren'
 import { themenFuer, themenHinweis } from './modules/lernzielkontrolle/didactics/themen'
+import { seitenrandBlatt, vtSeitenrand, type SeitenrandArt } from './selftestSeitenrand'
 
 /**
  * Ein einzelner stiller MP3-Frame (MPEG-1 Layer III, 44,1 kHz).
@@ -1969,6 +1970,10 @@ export function installSelftest(): void {
     lzkMetaSetzen,
     logo,
     setWorksheet,
+    // Seitenrand-Wache (30.09.2026): Stress-Blätter ohne KI
+    seitenrandBlatt: (art: SeitenrandArt, seed?: number, design?: number, idPraefix?: string) => seitenrandBlatt(art, seed, design, idPraefix),
+    wsSeitenrand: (art: SeitenrandArt, seed?: number, design?: number) => setWorksheet(seitenrandBlatt(art, seed, design)),
+    vtSeitenrand,
     worksheetJetzt,
     docIdVon,
     inBereich,

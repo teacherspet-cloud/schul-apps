@@ -43,6 +43,7 @@ import { blockPoints, formatPoints, variantPoints } from '../model/blocks'
 import type { Block, TaskTypeId, TestDocument } from '../model/types'
 import { buildPrintHtml, imageCredits } from '../render/printHtml'
 import FitToWidth from '../../../shared/render/FitToWidth'
+import { useDruckFuerWachen } from '../../../shared/render/druckFuerWachen'
 import WarningButton from '../../../shared/components/WarningButton'
 import { RenderContext, RenderContextValue } from '../render/RenderContext'
 import '../render/test.css'
@@ -107,6 +108,8 @@ export default function EditorStep(): React.JSX.Element {
   const variant = doc?.variants.find((v) => v.id === activeVariantId) ?? doc?.variants[0]
   // Echte A4-Seiten: Aufteilung wird unsichtbar gemessen (auch für Druck, PDF und Word)
   const { layouts, measure } = useTestLayout(doc)
+  // Seitenrand-Wache: Druck-HTML aller Fassungen mit Lösungen, so wie der Export es baut
+  useDruckFuerWachen(doc ? () => buildPrintHtml(doc, { variantIds: doc.variants.map((v) => v.id), includeKey: true }, layouts) : null, [doc, layouts])
 
   // Strg+Z / Strg+Y hängen am Programm (VokabeltestModule), damit sie nur gelten, solange es vorn liegt
 

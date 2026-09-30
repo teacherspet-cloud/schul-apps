@@ -47,6 +47,7 @@ import { serializeWorksheet, WORKSHEET_FILTER } from '../../project'
 import { BausteinRahmen } from '../../render/BausteinRahmen'
 import type { PlacedItem } from '../../render/paginate'
 import { buildWorksheetHtml } from '../../render/printHtml'
+import { useDruckFuerWachen } from '../../../../shared/render/druckFuerWachen'
 import { tafelbildZiel } from '../../export/tafelbildZiel'
 import { contextFor, layoutKey, pageInfoFor, profileFromMeta, SheetPages, useSheetLayouts } from '../../render/SheetPages'
 import { deckblattVorschau } from '../../render/deckblattVorschau'
@@ -140,6 +141,8 @@ export function EditorStep(): React.JSX.Element {
     const w = window as unknown as { __selftest?: Record<string, unknown> }
     if (w.__selftest) w.__selftest.layouts = layouts
   }, [layouts])
+  // Seitenrand-Wache: Druck-HTML mit Lösungen, so wie der Export es baut
+  useDruckFuerWachen(ws ? () => buildWorksheetHtml(ws, layouts, { sheetIds: ws.sheets.map((s) => s.id), includeKey: true }, logo, schoolName) : null, [ws, layouts, logo, schoolName])
 
   useEffect(() => {
     window.api.designs.list().then(setDesigns).catch(notifyError)

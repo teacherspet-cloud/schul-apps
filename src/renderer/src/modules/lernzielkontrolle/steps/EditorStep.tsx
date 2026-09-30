@@ -12,6 +12,8 @@ import { meldeAblage } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
+import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
+import { useDruckFuerWachen } from '../../../shared/render/druckFuerWachen'
 import { BausteinRahmen } from '../../arbeitsblatt/render/BausteinRahmen'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
 import type { WsBlock } from '../../arbeitsblatt/model/types'
@@ -147,6 +149,13 @@ export default function EditorStep(): React.JSX.Element {
   const docId = useLernzielkontrolle((s) => s.docId)
   const laufend = useLaufendeSchluessel(docId)
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
+  // Seitenrand-Wache: Druck-HTML der gezeigten Fassung mit Lösungen, so wie der Export es baut
+  useDruckFuerWachen(ws ? () => buildWorksheetHtml(ws, layouts, { sheetIds: ws.sheets.map((s) => s.id), includeKey: true }, logo, settings.schoolName) : null, [
+    ws,
+    layouts,
+    logo,
+    settings.schoolName
+  ])
   // Strg+P druckt wie der Knopf „Drucken" (mit Rückfrage bei mehreren Fassungen); vor dem frühen return, weil es ein Hook ist
   const drucken = useRef<() => void>(() => undefined)
   useDruck('lernzielkontrolle', test && ws ? () => drucken.current() : null)

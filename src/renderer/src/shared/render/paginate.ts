@@ -62,6 +62,16 @@ export interface PlacedItem {
    * gleich aus. Berechnet wird die Zahl dort, wo die gemessenen Hoehen vorliegen.
    */
   fillLines?: number
+  /**
+   * Spaltenbreiten in Prozent für das Stück einer GETEILTEN Tabelle (30.09.2026).
+   *
+   * Ohne von Hand gezogene Maße setzt der Browser die Spalten nach dem Inhalt. Ein Tabellenstück
+   * enthält aber nur einen Teil der Zeilen – seine Spalten wurden anders breit, die Zellen
+   * brachen anders um, und die Zeilen wurden höher als gemessen: Die letzte Zeile ragte halb
+   * über den Seitenrand (Befund der Lehrkraft). Jedes Stück bekommt deshalb die Breiten, die die
+   * GANZE Tabelle beim Messen hatte.
+   */
+  spalten?: number[]
 }
 
 export interface PagePlan {
@@ -89,13 +99,19 @@ const KEEP_TOGETHER_MAX_GAP = 0.5
  */
 const MIN_EINHEITEN = 2
 
-export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPageHeight: number): PagePlan[] {
+/**
+ * `abzug`: je Seite (0-basiert) so viele px weniger Platz. Die Prüfung nach dem Setzen
+ * (SheetPages, `seitenUeberlauf`) trägt hier ein, um wie viel eine Seite tatsächlich über den
+ * Satzspiegel lief – beim nächsten Durchgang wandert dann das Überstehende auf die Folgeseite,
+ * statt abgeschnitten zu werden (30.09.2026).
+ */
+export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPageHeight: number, abzug: readonly number[] = []): PagePlan[] {
   const pages: PagePlan[] = [{ items: [], overflow: false }]
-  let remaining = firstPageHeight
+  let remaining = firstPageHeight - (abzug[0] ?? 0)
   const page = (): PagePlan => pages[pages.length - 1]
   const newPage = (): void => {
     pages.push({ items: [], overflow: false })
-    remaining = otherPageHeight
+    remaining = otherPageHeight - (abzug[pages.length - 1] ?? 0)
   }
   const minHeight = (it: MeasuredItem): number => (it.units?.length ? (it.headHeight ?? 0) + it.units[0] : it.height)
 
@@ -126,7 +142,9 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
     }
 
     // Zusammengehöriges Material passt auf eine neue Seite und würde erst in der unteren Seitenhälfte beginnen → nicht teilen
-    if (item.keepTogether && page().items.length > 0 && item.height <= otherPageHeight + EPS && remaining < otherPageHeight * KEEP_TOGETHER_MAX_GAP) {
+    // Maßgeblich ist der Platz der NÄCHSTEN Seite – mit ihrem Abzug aus der Prüfung
+    const naechste = otherPageHeight - (abzug[pages.length] ?? 0)
+    if (item.keepTogether && page().items.length > 0 && item.height <= naechste + EPS && remaining < otherPageHeight * KEEP_TOGETHER_MAX_GAP) {
       newPage()
       page().items.push(
         item.units
