@@ -44,6 +44,7 @@
  */
 
 import { istModerneFremdsprache, operatorenAuswahl, type OperatorenAuswahl } from '@shared/operatoren/zugriff'
+import { operatorenFuer } from '../../arbeitsblatt/didactics/bilingual'
 import { STATES } from '../../arbeitsblatt/didactics/states'
 import { subjectOperators } from '../../arbeitsblatt/didactics/subjectOperators'
 import { SUBJECTS } from '../../arbeitsblatt/model/subjects'
@@ -76,6 +77,8 @@ export interface OperatorDefinition {
    * Hörverstehen und hat in einer Schreibaufgabe nichts zu suchen.
    */
   teilkompetenz?: string
+  /** Bilingual: die deutsche Entsprechung des zielsprachigen Operators */
+  deutsch?: string
 }
 
 export interface Laenderprofil {
@@ -121,9 +124,11 @@ export interface Laenderprofil {
    * fachspezifischer KMK-/IQB-Bestand, Oberstufenliste als Orientierung für die Sek I oder
    * fachübliche Operatoren. Nur „land" und „land-verweis" sind belegt.
    */
-  herkunft?: 'land' | 'land-verweis' | 'kmk' | 'oberstufe' | 'fach'
+  herkunft?: ProfilHerkunft
   /** true = die AFB-Zuordnungen stammen aus der Quelle und wurden übernommen */
   afbUebernommen?: boolean
+  /** Sprache der Operatoren, wenn sie nicht aus dem Fach folgt (bilingualer Sachfachunterricht) */
+  sprache?: 'de' | 'en' | 'fr' | 'es' | 'it'
 }
 
 /**
@@ -1945,8 +1950,8 @@ export const BW_HINWEIS =
 
 /* ---------- Auswahl: Land, Fach, Stufe, Schulform → Profil (30.09.2026) ---------- */
 
-/** Woher die angezeigte Liste stammt */
-export type ProfilHerkunft = 'land' | 'land-verweis' | 'kmk' | 'oberstufe' | 'fach'
+/** Woher die angezeigte Liste stammt; „entsprechung" = zielsprachige Entsprechungen für den bilingualen Unterricht (HE/NI) */
+export type ProfilHerkunft = 'land' | 'land-verweis' | 'kmk' | 'oberstufe' | 'fach' | 'entsprechung'
 
 export const herkunftVon = (p: Laenderprofil): ProfilHerkunft => p.herkunft ?? 'land'
 
@@ -2085,7 +2090,14 @@ export function profilFuer(stateId: string, fach: string, stufe: Stufe, schoolTy
   // Eine Landesliste GENAU für diese Schulform schlägt ein Handprofil ohne Schulformangabe (NI Naturwissenschaften: Gymnasium vs. Haupt-/Realschule)
   const auswahlFuerSchulform =
     Boolean(schoolTypeId) && auswahl?.herkunft === 'land' && !auswahl.stufeAbweichend && auswahl.listen.every((l) => l.schulformen?.includes(schoolTypeId!))
-  if (eigenes && !(auswahlFuerSchulform && !eigenes.schulformen?.includes(schoolTypeId!))) return eigenes
+  /*
+   * Ein Handprofil ohne Definitionen und ohne Anforderungsbereiche (nur Namen) ist schwächer als
+   * die Landesliste desselben Landes im Bestand, die beides im Wortlaut führt (NI Geschichte,
+   * 30.09.2026) – dann gilt die Landesliste.
+   */
+  const handOhneInhalt = Boolean(eigenes) && eigenes!.operatoren.every((o) => !o.definition && !o.afb?.length)
+  const bestandBesser = handOhneInhalt && auswahl?.herkunft === 'land' && !auswahl.stufeAbweichend && auswahl.operatoren.some((o) => o.definition || o.afb)
+  if (eigenes && !bestandBesser && !(auswahlFuerSchulform && !eigenes.schulformen?.includes(schoolTypeId!))) return eigenes
   if (auswahl && !auswahl.stufeAbweichend && auswahl.herkunft !== 'kmk') return profilAusAuswahl(auswahl, stateId, fach, stufe)
 
   const alle = istModerneFremdsprache(fach) ? undefined : hand(stufe, 'alle')
@@ -2113,6 +2125,89 @@ export function profilFuer(stateId: string, fach: string, stufe: Stufe, schoolTy
   return fachProfil(stateId, fach, stufe)
 }
 
+/* ---------- Bilingualer Sachfachunterricht (30.09.2026) ---------- */
+
+/** Arbeitssprachen, für die es zielsprachige Operatoren gibt */
+export const BILINGUALE_SPRACHEN: { value: 'en' | 'fr'; label: string }[] = [
+  { value: 'en', label: 'Englisch' },
+  { value: 'fr', label: 'Französisch' }
+]
+
+/** Bilingual nur in Sachfächern – Deutsch und die Sprachen sind keine (Berlin, AV bilingualer Unterricht 2020, Nr. 2 Abs. 3) */
+export function bilingualMoeglich(fach: string): boolean {
+  const f = SUBJECTS.find((s) => s.id === fach)
+  return Boolean(f) && !f!.foreignLanguage && !f!.uebersetzungssprache && !['deutsch', 'daz'].includes(fach)
+}
+
+/**
+ * Die Operatoren für den bilingualen Sachfachunterricht – GETRENNT von der deutschen Liste des
+ * Fachs (Rückmeldung der Lehrkraft, 30.09.2026: „ungetrennt zwischen bilingual und normalem
+ * Fachunterricht").
+ *
+ * Rangfolge:
+ *   1. zielsprachige Liste des Landes für genau dieses Fach (NRW Geschichte/Sozialwissenschaften/
+ *      Geographie bilingual, Bremen Geschichte bilingual, Rheinland-Pfalz Sek I Erdkunde/
+ *      Geschichte/Sozialkunde) – über `operatorenAuswahl` mit der Arbeitssprache
+ *   2. sonst die Entsprechungen der deutschen Fachoperatoren aus den Listen von Hessen
+ *      (Geschichte/PoWi bilingual) und Niedersachsen (Handreichung 2014) – ausdrücklich als
+ *      Entsprechungen gekennzeichnet, mit der deutschen Form daneben
+ */
+export function bilingualProfil(stateId: string, fach: string, stufe: Stufe, sprache: 'en' | 'fr', schoolTypeId?: string): Laenderprofil | undefined {
+  if (!bilingualMoeglich(fach)) return undefined
+  const a = operatorenAuswahl({
+    stateId,
+    fach,
+    stufe,
+    schulform: schoolTypeId,
+    sprache
+  })
+  if (a && a.sprache === sprache) return { ...profilAusAuswahl(a, stateId, fach, stufe), sprache }
+  const ops = operatorenFuer(sprache)
+  if (!ops) return undefined
+  return {
+    stateId,
+    fach,
+    stufe,
+    sprache,
+    quelle:
+      'Entsprechungen der deutschen Fachoperatoren für den bilingualen Unterricht – Hessisches Kultusministerium, Operatoren Geschichte/Politik und Wirtschaft bilingual (Stand 01.08.2010); Niedersächsisches Kultusministerium, Handreichung bilingualer Unterricht (2014)',
+    url: '',
+    stand: '2010/2014',
+    amtlich: false,
+    belegt: 'abgeleitet',
+    herkunft: 'entsprechung',
+    afbLogik: 'genauEiner',
+    afbUebernommen: true,
+    oeffnungsklausel: true,
+    anrede: stufe === 'sek1' ? 'du' : 'sie',
+    operatoren: ops.map((o) => {
+      const [name, ...weitere] = o.ziel.split(/\s*[/,]\s*/)
+      return {
+        name,
+        ...(weitere.length ? { synonyme: weitere } : {}),
+        definition: '',
+        afb: [o.afb as Afb],
+        deutsch: o.de
+      }
+    }),
+    hinweis: `Für ${fachName(fach)} in ${landName(stateId)} liegt keine zielsprachige Liste des Landes vor. Angezeigt sind die ${
+      sprache === 'fr' ? 'französischen' : 'englischen'
+    } Entsprechungen der deutschen Fachoperatoren aus den Listen von Hessen und Niedersachsen; die Anforderungsbereiche bleiben dieselben.`
+  }
+}
+
+/** Das Profil einer Lernzielkontrolle: bilingual die zielsprachige Liste, sonst die deutsche des Fachs */
+export function profilFuerKurztest(m: {
+  stateId: string
+  subjectId: string
+  stufe: Stufe
+  schoolTypeId?: string
+  bilingual?: { an: boolean; sprache: 'en' | 'fr' }
+}): Laenderprofil | undefined {
+  if (m.bilingual?.an && bilingualMoeglich(m.subjectId)) return bilingualProfil(m.stateId, m.subjectId, m.stufe, m.bilingual.sprache, m.schoolTypeId)
+  return profilFuer(m.stateId, m.subjectId, m.stufe, m.schoolTypeId)
+}
+
 /** Kennzeichnung der Liste in der Oberfläche */
 export function kennzeichnung(p: Laenderprofil): { text: string; farbe: 'teal' | 'blue' | 'yellow' } {
   switch (herkunftVon(p)) {
@@ -2124,6 +2219,8 @@ export function kennzeichnung(p: Laenderprofil): { text: string; farbe: 'teal' |
       return { text: 'KMK/IQB-Fachliste', farbe: 'blue' }
     case 'oberstufe':
       return { text: 'Oberstufenliste', farbe: 'yellow' }
+    case 'entsprechung':
+      return { text: 'bilinguale Entsprechungen', farbe: 'blue' }
     default:
       return { text: 'ohne amtliche Liste', farbe: 'yellow' }
   }

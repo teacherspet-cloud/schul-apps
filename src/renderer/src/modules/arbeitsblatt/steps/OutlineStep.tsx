@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Autocomplete,
   Badge,
   Button,
   Card,
@@ -33,6 +34,71 @@ import { formuliereAus, planeNeu } from '../auftraege'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
 import { EinfuegeStelle } from './EinfuegenMenue'
 import { KiHinweise } from './KiHinweise'
+import { operatorenAuswahl, ZIELSPRACHE_DES_FACHS } from '@shared/operatoren/zugriff'
+import { bilingualAktiv, operatorenFuer } from '../didactics/bilingual'
+import { subjectOperators } from '../didactics/subjectOperators'
+import { subjectById } from '../model/subjects'
+import type { WorksheetMeta } from '../model/types'
+import { wahlEintraege, wahlGruppen, type WahlQuelle } from '../../../shared/operatorenWahl'
+
+/**
+ * Operatoren für das Feld „Operator" der Gliederung (30.09.2026): dieselbe Aufbereitung wie
+ * in der Lernzielkontrolle – nach Anforderungsbereich gruppiert, alphabetisch. Bilingual die
+ * zielsprachige Liste, sonst die Liste des Landes für diese Stufe, sonst die fachübliche.
+ */
+function operatorGruppenFuer(meta: WorksheetMeta): {
+  gruppen: { group: string; items: string[] }[]
+  afb: Record<string, 'I' | 'II' | 'III'>
+} {
+  const fremd = subjectById(meta.subjectId).foreignLanguage
+  let quelle: WahlQuelle[] = []
+  let sprache = fremd ?? 'de'
+  const bilingual = bilingualAktiv(meta) && meta.bilingual!.pruefsprache !== 'deutsch' ? operatorenFuer(meta.bilingual!.sprache) : null
+  if (bilingual) {
+    sprache = meta.bilingual!.sprache
+    quelle = bilingual.map((o) => {
+      const [name, ...synonyme] = o.ziel.split(/\s*[/,]\s*/)
+      return { name, synonyme, afb: o.afb, deutsch: o.de }
+    })
+  } else {
+    const zielsprache = ZIELSPRACHE_DES_FACHS[meta.subjectId]
+    const land = operatorenAuswahl({
+      stateId: meta.stateId,
+      fach: meta.subjectId,
+      stufe: meta.grade >= 11 ? 'sek2' : 'sek1',
+      schulform: meta.schoolTypeId,
+      nurLand: true,
+      ...(zielsprache ? { sprache: zielsprache } : {})
+    })
+    if (land && !land.stufeAbweichend) {
+      sprache = land.sprache
+      quelle = land.operatoren.map((o) => ({
+        name: o.operator,
+        synonyme: o.formen,
+        afb: o.afb,
+        definition: o.definition,
+        teilkompetenz: o.kompetenzbereich
+      }))
+    } else {
+      const so = subjectOperators(meta.subjectId, fremd)
+      if (so)
+        quelle = (so.zeigen ?? Object.keys(so.afb)).map((name) => ({
+          name,
+          afb: so.afb[name] ?? undefined
+        }))
+    }
+  }
+  const eintraege = wahlEintraege(quelle, sprache)
+  const gesehen = new Set<string>()
+  const gruppen = wahlGruppen(eintraege)
+    .map((g) => ({
+      group: g.titel,
+      items: g.eintraege.map((e) => e.name).filter((n) => !gesehen.has(n) && Boolean(gesehen.add(n)))
+    }))
+    .filter((g) => g.items.length)
+  const afb = Object.fromEntries(eintraege.filter((e) => ['I', 'II', 'III'].includes(e.afb)).map((e) => [e.name, e.afb as 'I' | 'II' | 'III']))
+  return { gruppen, afb }
+}
 
 const ANSWER_LABELS: Record<AnswerKind, string> = {
   lines: 'Schreiblinien',
@@ -67,6 +133,7 @@ export default function OutlineStep(): React.JSX.Element {
   const [wunschFuer, setWunschFuer] = useState<string | null>(null)
   const [wunschText, setWunschText] = useState('')
   const profile = useMemo(() => (worksheet ? profileFromMeta(worksheet.meta) : null), [worksheet])
+  const operatorWahl = useMemo(() => (worksheet ? operatorGruppenFuer(worksheet.meta) : { gruppen: [], afb: {} }), [worksheet?.meta])
 
   if (!worksheet?.outline || !profile) return <Container py="xl">Noch keine Gliederung.</Container>
   const outline = worksheet.outline
@@ -215,13 +282,28 @@ export default function OutlineStep(): React.JSX.Element {
                             placeholder="AFB"
                             onChange={(v) => patchItem(i, { afb: (v as OutlineItem['afb']) ?? undefined })}
                           />
-                          <TextInput
+                          {/* Auswahl aus der Liste (nach AFB gruppiert) oder frei eingeben; ohne AFB übernimmt die Wahl den der Liste */}
+                          <Autocomplete
                             size="xs"
-                            w={130}
+                            w={150}
                             placeholder="Operator"
                             aria-label="Operator"
+                            data={operatorWahl.gruppen}
                             value={it.operator}
-                            onChange={(e) => patchItem(i, { operator: e.currentTarget.value })}
+                            maxDropdownHeight={300}
+                            comboboxProps={{
+                              width: 240,
+                              position: 'bottom-start'
+                            }}
+                            onChange={(v) => patchItem(i, { operator: v })}
+                            onOptionSubmit={(v) =>
+                              !it.afb &&
+                              operatorWahl.afb[v] &&
+                              patchItem(i, {
+                                operator: v,
+                                afb: operatorWahl.afb[v]
+                              })
+                            }
                           />
                           <Select
                             size="xs"

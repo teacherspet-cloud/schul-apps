@@ -126,6 +126,84 @@ else {
   }
 
   /*
+   * Operatorenauswahl (30.09.2026): nach Anforderungsbereich gruppiert, Suche, bilingual
+   * getrennt. Nordrhein-Westfalen, Geschichte, Oberstufe – dort gibt es beide Listen.
+   */
+  await page.evaluate(() => window.__selftest.lzkEinstellung('NW', 'geschichte', 'sek2'))
+  await page.waitForTimeout(800)
+  const operatorKarte = async () =>
+    page.evaluate(() => {
+      const karte = [...document.querySelectorAll('.mantine-Card-root')].find(
+        (c) => c.querySelector('h4')?.textContent?.trim() === 'Operatoren' && c.offsetParent
+      )
+      if (!karte) return null
+      karte.scrollIntoView({ block: 'start' })
+      const chips = [...karte.querySelectorAll('[role="checkbox"]')].map((b) => (b.textContent ?? '').trim())
+      const texte = [...karte.querySelectorAll('p')].map((p) => (p.textContent ?? '').trim())
+      return {
+        chips,
+        gruppen: texte.filter((t) => /^AFB /.test(t)),
+        suche: Boolean(karte.querySelector('input[aria-label="Operator suchen"]')),
+        text: karte.textContent ?? ''
+      }
+    })
+  const klickeInKarte = (label) =>
+    page.evaluate((label) => {
+      const karte = [...document.querySelectorAll('.mantine-Card-root')].find(
+        (c) => c.querySelector('h4')?.textContent?.trim() === 'Operatoren' && c.offsetParent
+      )
+      const el = [...(karte?.querySelectorAll('label') ?? [])].find((l) => l.textContent?.trim() === label)
+      el?.click()
+      return Boolean(el)
+    }, label)
+  const fach = await operatorKarte()
+  console.log('Operatoren NW Geschichte:', fach ? `${fach.chips.length} Operatoren, Gruppen ${fach.gruppen.join(' | ')}` : 'Karte fehlt')
+  await page.screenshot({
+    path: join(out, '1d-operatoren-gruppiert.png'),
+    fullPage: false
+  })
+  if (!fach) problems.push('Die Karte „Operatoren" fehlt')
+  else {
+    if (!fach.gruppen.length) problems.push('Die Operatoren sind nicht nach Anforderungsbereich gruppiert')
+    if (!fach.chips.includes('erläutern') || !fach.chips.includes('herausarbeiten')) problems.push('„erläutern"/„herausarbeiten" fehlen in der Geschichtsliste')
+    if (fach.chips.some((c) => ['assess', 'explain', 'analyse'].includes(c))) problems.push('Im Fachunterricht stehen englische Operatoren in der Liste')
+    if (!fach.suche) problems.push('Das Suchfeld für Operatoren fehlt')
+    // Suche filtert
+    const feld = page.locator('input[aria-label="Operator suchen"]:visible').first()
+    await feld.fill('heraus')
+    await page.waitForTimeout(300)
+    const gefiltert = await operatorKarte()
+    console.log('Suche „heraus":', gefiltert?.chips.join(', '))
+    if (!gefiltert || gefiltert.chips.length !== 1 || gefiltert.chips[0] !== 'herausarbeiten')
+      problems.push(`Die Suche filtert nicht (${gefiltert?.chips.join(', ')})`)
+    await page.screenshot({
+      path: join(out, '1d2-operatoren-suche.png'),
+      fullPage: false
+    })
+    await feld.fill('')
+    await page.waitForTimeout(300)
+    // Bilingual umschalten
+    if (!(await klickeInKarte('bilingual'))) problems.push('Die Umschaltung Fachunterricht/bilingual fehlt')
+    else {
+      await page.waitForTimeout(600)
+      const bil = await operatorKarte()
+      console.log('Bilingual:', bil ? `${bil.chips.length} Operatoren – ${bil.chips.slice(0, 8).join(', ')}` : 'Karte fehlt')
+      await page.screenshot({
+        path: join(out, '1e-operatoren-bilingual.png'),
+        fullPage: false
+      })
+      if (!bil || !bil.chips.includes('assess')) problems.push('Bilingual fehlen die englischen Operatoren (assess)')
+      if (bil?.chips.includes('erläutern')) problems.push('Bilingual stehen deutsche Operatoren in der Liste')
+      if (!bil?.text.includes('bilingual (Englisch)')) problems.push('Die bilinguale Quelle wird nicht genannt')
+      // Zurück zum Fachunterricht
+      await klickeInKarte('Fachunterricht')
+      await page.waitForTimeout(400)
+      const zurueck = await operatorKarte()
+      if (!zurueck?.chips.includes('erläutern')) problems.push('Nach dem Zurückschalten fehlt die deutsche Liste')
+    }
+  }
+
+  /*
    * Themenvorschläge aus den Lehrplänen.
    *
    * Zwei Fälle, weil die Länder ihre Themen unterschiedlich fest zuordnen:

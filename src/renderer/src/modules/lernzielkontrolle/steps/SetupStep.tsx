@@ -51,7 +51,10 @@ import {
   type SchluesselId
 } from '../didactics/bewertung'
 import { formateFuer, KURZTEST_FORMATE, standardMinuten, zeitWarnung } from '../didactics/formate'
-import { keineListeText, kennzeichnung, namenAus, profilFuer } from '../didactics/operatoren'
+import { BILINGUALE_SPRACHEN, bilingualMoeglich, keineListeText, kennzeichnung, profilFuerKurztest } from '../didactics/operatoren'
+import { spracheDesProfils } from '../didactics/operatorPruefung'
+import OperatorenWahl from '../../../shared/components/OperatorenWahl'
+import { wahlEintraege } from '../../../shared/operatorenWahl'
 import { themenAusZeile, themenFuer, themenHinweis, themenZeile, zweigeFuer } from '../didactics/themen'
 import { generateKurztest } from '../generation/generateKurztest'
 import { emptyKurztest, stufeFuerJahrgang } from '../model/defaults'
@@ -140,7 +143,10 @@ export default function SetupStep(): React.JSX.Element {
   const grades = Array.from({ length: range.max - range.min + 1 }, (_, i) => range.min + i)
   const formate = formateFuer(m.stateId)
   const format = KURZTEST_FORMATE.find((f) => f.id === m.formatId)
-  const profil = profilFuer(m.stateId, m.subjectId, m.stufe, m.schoolTypeId)
+  const profil = profilFuerKurztest(m)
+  const bilingualAn = Boolean(m.bilingual?.an) && bilingualMoeglich(m.subjectId)
+  // Kein Hook: steht hinter der Rückkehr „Wird geladen" – die Aufbereitung ist billig
+  const wahl = profil ? wahlEintraege(profil.operatoren, spracheDesProfils(profil)) : []
   const zeit = zeitWarnung(m.minutes, format)
   const zweige = zweigeFuer(m.stateId, m.subjectId, m.grade, m.schoolTypeId)
   // Fällt der gewählte Zweig weg (anderes Fach, anderer Jahrgang), gilt wieder „alle"
@@ -485,54 +491,39 @@ export default function SetupStep(): React.JSX.Element {
                   </Group>
                   {profil ? (
                     <Stack gap={6}>
-                      <Text size="xs" c="dimmed">
-                        {profil.quelle}
-                        {profil.stand ? ` · Stand ${profil.stand}` : ''}
-                      </Text>
                       {/*
                        * Anklickbar: Die Lehrkraft wählt die Operatoren aus, die sie in diesem Test
                        * sehen möchte. Die Auswahl ist ein VORSCHLAG an die KI, kein Zwang – manche
                        * Antwortformen verlangen einen bestimmten Operator, und ein erzwungener
                        * erzeugte genau den Fehler, den die App sonst meldet.
+                       * Gemeinsame Auswahl aller Programme (30.09.2026): nach AFB gruppiert, bilingual getrennt.
                        */}
-                      <Group gap={4}>
-                        {namenAus(profil).map((n) => {
-                          const gewaehlt = (m.bevorzugteOperatoren ?? []).includes(n)
-                          return (
-                            <Badge
-                              key={n}
-                              size="xs"
-                              variant={gewaehlt ? 'filled' : 'outline'}
-                              color={gewaehlt ? 'grape' : 'gray'}
-                              tt="none"
-                              style={{ cursor: 'pointer' }}
-                              role="checkbox"
-                              aria-checked={gewaehlt}
-                              onClick={() =>
-                                patch({
-                                  bevorzugteOperatoren: gewaehlt
-                                    ? (m.bevorzugteOperatoren ?? []).filter((x) => x !== n)
-                                    : [...(m.bevorzugteOperatoren ?? []), n]
-                                })
+                      <OperatorenWahl
+                        eintraege={wahl}
+                        gewaehlt={m.bevorzugteOperatoren ?? []}
+                        onChange={(bevorzugteOperatoren) => patch({ bevorzugteOperatoren })}
+                        quelle={profil.quelle}
+                        stand={profil.stand}
+                        auswahlText={(n) => (n ? `${n} bevorzugt – als Vorschlag, nicht als Zwang` : 'Anklicken, um Operatoren für diesen Test vorzuschlagen')}
+                        bilingual={
+                          bilingualMoeglich(m.subjectId)
+                            ? {
+                                an: bilingualAn,
+                                sprache: m.bilingual?.sprache ?? 'en',
+                                sprachen: BILINGUALE_SPRACHEN,
+                                // Die Auswahl gilt nur für die Liste, aus der sie stammt
+                                onChange: (an, sprache) =>
+                                  patch({
+                                    bilingual: {
+                                      an,
+                                      sprache: sprache as 'en' | 'fr'
+                                    },
+                                    bevorzugteOperatoren: []
+                                  })
                               }
-                            >
-                              {n}
-                            </Badge>
-                          )
-                        })}
-                      </Group>
-                      <Group gap="xs" justify="space-between">
-                        <Text size="xs" c="dimmed">
-                          {(m.bevorzugteOperatoren ?? []).length
-                            ? `${(m.bevorzugteOperatoren ?? []).length} bevorzugt – als Vorschlag, nicht als Zwang`
-                            : 'Anklicken, um Operatoren für diesen Test vorzuschlagen'}
-                        </Text>
-                        {(m.bevorzugteOperatoren ?? []).length > 0 && (
-                          <Button size="compact-xs" variant="subtle" color="gray" onClick={() => patch({ bevorzugteOperatoren: [] })}>
-                            Auswahl aufheben
-                          </Button>
-                        )}
-                      </Group>
+                            : undefined
+                        }
+                      />
                       {!profil.oeffnungsklausel && (
                         <Text size="xs" c="orange.8">
                           Diese Liste hat keine Öffnungsklausel – nur die genannten Operatoren sind zulässig.

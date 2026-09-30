@@ -245,6 +245,25 @@ await page.keyboard.press('Control+z')
 await page.waitForTimeout(600)
 pruefe((await punkte()).join() === gStart.join(), 'Gliederung: Zweimal Strg+Z stellt den Anfang wieder her')
 
+// Operator der Gliederung (30.09.2026): Auswahl aus der Liste, nach Anforderungsbereich gruppiert
+const opFeld = page.locator('input[aria-label="Operator"]:visible').first()
+await opFeld.click()
+await opFeld.fill('')
+await page.waitForTimeout(500)
+const opGruppen = await page.evaluate(() =>
+  [...document.querySelectorAll('.mantine-Autocomplete-groupLabel')].filter((e) => e.offsetParent).map((e) => (e.textContent ?? '').trim())
+)
+const opEintraege = await page.evaluate(() =>
+  [...document.querySelectorAll('.mantine-Autocomplete-option')]
+    .filter((e) => e.offsetParent)
+    .map((e) => (e.textContent ?? '').trim())
+    .slice(0, 12)
+)
+console.log('Operator-Auswahl der Gliederung:', opGruppen.join(' | '), '–', opEintraege.join(', '))
+await page.screenshot({ path: join(out, 'gliederung-operatoren.png') })
+pruefe(opGruppen.some((g) => /^AFB /.test(g)) && opEintraege.length > 0, 'Gliederung: Die Operator-Auswahl bietet gruppierte Operatoren an')
+await page.keyboard.press('Escape')
+
 await app.close()
 rmSync(userData, { recursive: true, force: true })
 

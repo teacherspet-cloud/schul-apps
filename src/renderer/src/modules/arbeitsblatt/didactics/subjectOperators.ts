@@ -5,6 +5,8 @@
  * zu AFB III, in Erdkunde, Kunst und Religion zu AFB II. In Mathematik und in den modernen Fremdsprachen
  * ist der Anforderungsbereich ausdrücklich NICHT am Operator festgemacht (dort steht null).
  */
+import { ersterOperator, pruefeAnweisung, type ErkennungsSprache } from '@shared/operatoren/erkennung'
+import { operatorenAuswahl } from '@shared/operatoren/zugriff'
 import type { Afb } from '../model/types'
 
 export interface SubjectOperators {
@@ -471,16 +473,59 @@ function matchStem(operator: string, known: string[]): string | undefined {
   return s.length >= 4 ? known.find((k) => stem(k) === s) : undefined
 }
 
-/** Passt der Operator zum Fach? Liefert den erwarteten Anforderungsbereich, falls das Fach ihn festlegt. */
-export function checkSubjectOperator(
-  instruction: string,
-  subjectId: string,
-  foreignLanguage?: string
-): { operator: string; listed: string | null; known: boolean; afb: Afb | null } | null {
+export interface OperatorKontext {
+  stateId: string
+  stufe: 'sek1' | 'sek2'
+  schulform?: string
+}
+
+export interface OperatorPruefung {
+  /** Das erste Wort der Anweisung (für Meldungen) */
+  operator: string
+  /** Der erkannte Listeneintrag */
+  listed: string | null
+  known: boolean
+  afb: Afb | null
+  /** Nächstliegender Operator der Liste, wenn der verwendete dort nicht steht */
+  vorschlag?: string | null
+  /** Fundstelle, wenn gegen die Landesliste geprüft wurde */
+  landesliste?: string
+}
+
+/**
+ * Passt der Operator zum Fach? Liefert den erwarteten Anforderungsbereich, falls die Liste ihn festlegt.
+ *
+ * Seit 30.09.2026 über die gemeinsame Erkennung (`@shared/operatoren/erkennung`): Sie-Form,
+ * ihr-Form und trennbare Verben („Arbeiten Sie … heraus") zählen. Mit `kontext` wird gegen die
+ * Liste DES LANDES für genau diese Stufe geprüft – ein Verb ist dann nur Operator, wenn es dort
+ * steht; ohne Landesliste gegen die fachübliche Liste.
+ */
+export function checkSubjectOperator(instruction: string, subjectId: string, foreignLanguage?: string, kontext?: OperatorKontext): OperatorPruefung | null {
   const ops = subjectOperators(subjectId, foreignLanguage)
-  if (!ops) return null
+  const sprache = (foreignLanguage ?? 'de') as ErkennungsSprache
+  const auswahl = kontext
+    ? operatorenAuswahl({ stateId: kontext.stateId, fach: subjectId, stufe: kontext.stufe, schulform: kontext.schulform, nurLand: true, ...(sprache === 'it' ? {} : { sprache }) })
+    : null
+  const land = auswahl && !auswahl.stufeAbweichend && auswahl.sprache === sprache ? auswahl : null
+  if (!ops && !land) return null
   const operator = leadingOperator(instruction)
   if (!operator) return null
-  const match = operator in ops.afb ? operator : matchStem(operator, Object.keys(ops.afb))
-  return { operator, listed: match ?? null, known: Boolean(match), afb: match ? ops.afb[match] : null }
+  if (land) {
+    const b = pruefeAnweisung(instruction, land.operatoren, { sprache })
+    if (b.art === 'operator') {
+      const def = land.operatoren[b.treffer[0].index]
+      // Nur ein eindeutiger Anforderungsbereich der Landesliste wird geprüft
+      const afb = def?.afb === 'I' || def?.afb === 'II' || def?.afb === 'III' ? def.afb : null
+      return { operator, listed: b.treffer[0].operator, known: true, afb, landesliste: land.quelle }
+    }
+    return { operator, listed: null, known: false, afb: null, vorschlag: b.art === 'fremd' ? b.vorschlag : null, landesliste: land.quelle }
+  }
+  const namen = Object.keys(ops!.afb)
+  const treffer = ersterOperator(instruction, namen, { sprache })
+  if (treffer) return { operator, listed: treffer.operator, known: true, afb: ops!.afb[treffer.operator] }
+  // Rückfall: das erste Wort über den Stamm (bisheriges Verhalten)
+  const match = operator in ops!.afb ? operator : matchStem(operator, namen)
+  if (match) return { operator, listed: match, known: true, afb: ops!.afb[match] }
+  const b = pruefeAnweisung(instruction, namen, { sprache })
+  return { operator, listed: null, known: false, afb: null, vorschlag: b.art === 'fremd' ? b.vorschlag : null }
 }

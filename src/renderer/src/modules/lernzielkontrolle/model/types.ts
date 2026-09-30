@@ -109,6 +109,12 @@ export interface KurztestMeta {
    */
   bevorzugteOperatoren: string[]
 
+  /**
+   * Bilingualer Sachfachunterricht (30.09.2026): Aufgaben in der Arbeitssprache, Operatoren aus
+   * der zielsprachigen Liste – getrennt von der deutschen Liste des Fachs. Fehlt = Fachunterricht.
+   */
+  bilingual?: { an: boolean; sprache: 'en' | 'fr' }
+
   /** 1 = eine Fassung, 2 = A/B, 3 = A/B/C */
   varianten: number
 

@@ -26,7 +26,7 @@ import { formatById, geschaetzteMinuten } from '../didactics/formate'
 import { operatorRegeln } from '../didactics/operatorPruefung'
 import { anredeRegel } from '../../../shared/anrede'
 import { anredeFuerKurztest } from '../model/defaults'
-import { profilFuer } from '../didactics/operatoren'
+import { BILINGUALE_SPRACHEN, bilingualMoeglich, profilFuerKurztest } from '../didactics/operatoren'
 import { stateInfo } from '../../arbeitsblatt/didactics/states'
 import type { Kurztest } from '../model/types'
 import { interkulturellRegeln } from '../../arbeitsblatt/didactics/interkulturell'
@@ -121,11 +121,28 @@ function bevorzugteTeil(operatoren: string[]): string[] {
   ]
 }
 
+/**
+ * Bilingualer Sachfachunterricht (30.09.2026): Aufgaben in der Arbeitssprache, Operatoren aus
+ * der zielsprachigen Liste. Bewertet wird das Sachfach (KMK-Bericht 2013).
+ */
+function bilingualTeil(m: Kurztest['meta']): string[] {
+  if (!m.bilingual?.an || !bilingualMoeglich(m.subjectId)) return []
+  const sprache = BILINGUALE_SPRACHEN.find((s) => s.value === m.bilingual!.sprache)?.label ?? 'Englisch'
+  return [
+    '',
+    `BILINGUALER SACHFACHUNTERRICHT (Arbeitssprache ${sprache}):`,
+    `- Arbeitsanweisungen, Teilaufgaben und Material stehen auf ${sprache}. Jede Aufgabe beginnt mit einem Operator aus der Liste unter OPERATOREN, in ${sprache} und im Imperativ.`,
+    '- Zentrale Fachbegriffe stehen beim ersten Vorkommen zusätzlich auf Deutsch in Klammern.',
+    '- Bewertet wird die fachliche Leistung; keine Aufgabe verlangt eine Sprachleistung, die über das Sachfach hinausgeht.',
+    `- Die erwartete Lösung steht ebenfalls auf ${sprache}.`
+  ]
+}
+
 /** Der Systemauftrag. */
 export function kurztestPrompt(test: Kurztest, variante: string): string {
   const m = test.meta
   const format = formatById(m.formatId)
-  const profil = profilFuer(m.stateId, m.subjectId, m.stufe, m.schoolTypeId)
+  const profil = profilFuerKurztest(m)
   const land = stateInfo(m.stateId)
   const fach = subjectById(m.subjectId)
 
@@ -153,6 +170,7 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
     // Anrede nach der gewählten Stufe – nicht nach der Anrede der Landesliste (Paket 8b);
     // Klasse 10 im G8 (Einführungsphase) immer Sie
     anredeRegel(anredeFuerKurztest(m)),
+    ...bilingualTeil(m),
     ...bevorzugteTeil(m.bevorzugteOperatoren ?? []),
     /*
      * Orte und interkulturelle Aspekte – dieselbe Regel wie im Arbeitsblatt. Ein Kurztest in

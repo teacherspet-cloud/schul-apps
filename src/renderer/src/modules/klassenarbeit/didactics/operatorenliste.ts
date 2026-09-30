@@ -15,7 +15,8 @@ import { fachDerArbeit, formatArt } from '../model/faecher'
 import type { InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/types'
 import type { AnlageWunsch } from '@shared/operatoren/zugriff'
 import { anlageFuer, operatorenAuswahl } from '@shared/operatoren/zugriff'
-import type { OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
+import type { Listensprache, OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
+import { enthaeltOperatorForm } from '@shared/operatoren/erkennung'
 import { upperSecondary } from '../generation/generateExam'
 import { alleFassungen } from '../model/fassungen'
 import type { Exam } from '../model/types'
@@ -153,7 +154,8 @@ export function operatorenBefund(exam: Exam): OperatorenBefund {
     const bereich = kompetenzbereichFuer(formatId)
     // Zuerst im Kompetenzbereich des Teils, sonst irgendwo in der Liste
     const treffer =
-      gueltig.find((d) => passt(op, d) && (!bereich || !d.kompetenzbereich || d.kompetenzbereich === bereich)) ?? gueltig.find((d) => passt(op, d))
+      gueltig.find((d) => passt(op, d, liste.sprache) && (!bereich || !d.kompetenzbereich || d.kompetenzbereich === bereich)) ??
+      gueltig.find((d) => passt(op, d, liste.sprache))
     if (!treffer) {
       if (!fehlend.includes(op)) fehlend.push(op)
     } else if ((treffer.definition || treffer.beispiele?.length) && !gefunden.includes(treffer)) gefunden.push(treffer)
@@ -169,15 +171,18 @@ const stamm = (w: string): string => w.replace(/(issez|ez|er|ir|ad|ar|id|en|n|e|
 
 /**
  * Passt der Operator der Aufgabe zum Eintrag? Gleicher Wortlaut, eine hinterlegte Form
- * („Nimm Stellung") oder derselbe Wortstamm bei einem einzelnen Verb („Erläutere" ↔ „erläutern").
+ * („Nimm Stellung"), derselbe Wortstamm bei einem einzelnen Verb („Erläutere" ↔ „erläutern") –
+ * und seit 30.09.2026 alles, was die gemeinsame Erkennung kennt: Sie- und ihr-Form
+ * („Erläutern Sie"), trennbare Verben („Arbeiten Sie … heraus"), Wendungen.
  */
-export function passt(op: string, d: OperatorDefinition): boolean {
+export function passt(op: string, d: OperatorDefinition, sprache: Listensprache = 'de'): boolean {
   const n = normal(d.operator)
   if (n === op) return true
   if ((d.formen ?? []).some((f) => normal(f) === op)) return true
   const w1 = op.split(' ')
   const w2 = n.split(' ')
-  return w1.length === 1 && w2.length === 1 && stamm(w1[0]) === stamm(w2[0]) && stamm(w1[0]).length >= 4
+  if (w1.length === 1 && w2.length === 1 && stamm(w1[0]) === stamm(w2[0]) && stamm(w1[0]).length >= 4) return true
+  return enthaeltOperatorForm(op, d, { sprache })
 }
 
 /**

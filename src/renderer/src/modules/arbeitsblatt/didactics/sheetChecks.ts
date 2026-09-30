@@ -38,11 +38,19 @@ function taskFormat(b: TaskBlock): 'geschlossen' | 'halboffen' | 'offen' {
 
 export function checkSubjectOperators(sheet: Sheet, meta: WorksheetMeta, foreignLanguage?: string): DidacticWarning[] {
   const out: DidacticWarning[] = []
+  // Geprüft wird gegen die Liste des Landes für genau diese Stufe, sonst gegen die fachübliche (30.09.2026)
+  const kontext = meta.stateId ? { stateId: meta.stateId, stufe: meta.grade >= 11 ? ('sek2' as const) : ('sek1' as const), schulform: meta.schoolTypeId } : undefined
   tasks(sheet).forEach((t, i) => {
-    const res = checkSubjectOperator(plainText(t.instruction), meta.subjectId, foreignLanguage)
+    const res = checkSubjectOperator(plainText(t.instruction), meta.subjectId, foreignLanguage, kontext)
     if (!res || !res.operator) return
     if (!res.known) {
-      out.push({ kind: 'operator', message: `Aufgabe ${i + 1}: „${res.operator}“ steht nicht in der Operatorenliste für ${meta.subjectLabel}.` })
+      const vorschlag = res.vorschlag ? ` Nächstliegender Operator der Liste: „${res.vorschlag}“.` : ''
+      out.push({
+        kind: 'operator',
+        message: res.landesliste
+          ? `Aufgabe ${i + 1}: „${res.operator}“ ist kein Operator der Landesliste (${res.landesliste}).${vorschlag}`
+          : `Aufgabe ${i + 1}: „${res.operator}“ steht nicht in der Operatorenliste für ${meta.subjectLabel}.${vorschlag}`
+      })
       return
     }
     // Nur prüfen, wo das Fach den Anforderungsbereich am Operator festmacht

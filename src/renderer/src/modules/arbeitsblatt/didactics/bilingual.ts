@@ -29,6 +29,7 @@ import type { DidacticWarning } from './checks'
 import { subjectById } from '../model/subjects'
 import { plainText } from '../../../shared/richtext/parse'
 import { istUebungsklausur } from '../generation/abiturPrompt'
+import { ersterOperator, type ErkennungsSprache } from '@shared/operatoren/erkennung'
 
 /** Ist das Blatt bilingual? Nur in Sachfächern – Deutsch und die Fremdsprachen sind keine. */
 export function bilingualAktiv(meta: Pick<WorksheetMeta, 'bilingual' | 'subjectId'>): boolean {
@@ -287,26 +288,24 @@ export function checkBilingualOperatoren(sheet: Sheet, meta: WorksheetMeta): Did
   if (!ops || meta.bilingual?.pruefsprache === 'deutsch') return []
   // Im Mischformat sind auch die deutschen Entsprechungen richtig
   const gemischt = meta.bilingual?.pruefsprache === 'gemischt'
-  const varianten = ops
-    .flatMap((o) => [
-      ...o.ziel.split(/\s*[/,]\s*/).map((v) => ({ wort: v.replace(/[()]/g, '').toLowerCase().trim(), afb: o.afb })),
-      // Deutsch steht im Imperativ („Beschreibe“), die Liste im Infinitiv – verglichen wird der Stamm
-      ...(gemischt ? o.de.split(/\s*,\s*/).map((v) => ({ wort: v.toLowerCase().trim().replace(/e?n$/, ''), afb: o.afb, stamm: true })) : [])
-    ])
-    .filter((v) => v.wort)
-    .sort((a, b) => b.wort.length - a.wort.length)
+  // Gemeinsame Erkennung (30.09.2026): „Put … into context", im Mischformat auch „Arbeite … heraus", „Erläutern Sie"
+  const ziel = ops.flatMap((o) => o.ziel.split(/\s*[/,]\s*/).map((v) => ({ operator: v.trim(), afb: o.afb })))
+  const deutsch = gemischt ? ops.flatMap((o) => o.de.split(/\s*,\s*/).map((v) => ({ operator: v.trim(), afb: o.afb }))) : []
+  const sprache = meta.bilingual!.sprache as ErkennungsSprache
   const out: DidacticWarning[] = []
   let nr = 0
   for (const block of sheet.blocks) {
     if (block.type !== 'task') continue
     nr++
-    const text = plainText(block.instruction)
+    const roh = plainText(block.instruction)
       .replace(/\*\*/g, '')
       .replace(/^[\s\d.)]+/, '')
       .trim()
-      .toLowerCase()
+    const text = roh.toLowerCase()
     if (!text) continue
-    const treffer = varianten.find((v) => text.startsWith(v.wort) && ('stamm' in v || !/\p{L}/u.test(text.charAt(v.wort.length))))
+    const imZiel = ersterOperator(roh, ziel, { sprache })
+    const imDeutschen = !imZiel && deutsch.length ? ersterOperator(roh, deutsch, { sprache: 'de' }) : null
+    const treffer = imZiel ? { wort: imZiel.operator, afb: ziel[imZiel.index].afb } : imDeutschen ? { wort: imDeutschen.operator, afb: deutsch[imDeutschen.index].afb } : null
     const erstes = text.split(/\s+/)[0].replace(/[.,;:!?]/g, '')
     if (!treffer) {
       out.push({ kind: 'operator', message: `Aufgabe ${nr}: „${erstes}“ steht nicht in der bilingualen Operatorenliste (${meta.bilingual!.spracheLabel}).` })

@@ -15,8 +15,8 @@ import type { WsBlock } from '../../arbeitsblatt/model/types'
 import { pruefeBausteine, pruefeMaterialtexte } from './bausteine'
 import { pruefeBewertung } from './bewertung'
 import { formatById, zeitWarnung } from './formate'
-import { bedeutungsHinweise, operatorenIn, pruefeOperatoren, type AufgabeZurPruefung } from './operatorPruefung'
-import { KERN_OPERATOREN, namenAus, PRAXIS_OPERATOREN, profilFuer, ZU_AUFWENDIG, type Laenderprofil } from './operatoren'
+import { bedeutungsHinweise, operatorenIn, pruefeOperatoren, spracheDesProfils, type AufgabeZurPruefung } from './operatorPruefung'
+import { KERN_OPERATOREN, namenAus, PRAXIS_OPERATOREN, profilFuerKurztest, ZU_AUFWENDIG, type Laenderprofil } from './operatoren'
 import type { Kurztest } from '../model/types'
 import { anredeBefundeBaustein } from '../../arbeitsblatt/didactics/anrede'
 import { checkIntegrity } from '../../arbeitsblatt/didactics/integrity'
@@ -54,7 +54,7 @@ function alsAufgaben(blocks: WsBlock[], profil?: Laenderprofil): AufgabeZurPruef
       out.push({ id: b.id, instruction: b.instruction, answerKind: b.answer.kind, hatMaterial })
       continue
     }
-    const obenErkannt = operatorenIn(b.instruction, [...bekannt, ...PRAXIS_OPERATOREN, ...ZU_AUFWENDIG]).length > 0
+    const obenErkannt = operatorenIn(b.instruction, [...bekannt, ...PRAXIS_OPERATOREN, ...ZU_AUFWENDIG], spracheDesProfils(profil)).length > 0
     for (const [i, p] of b.parts.entries()) {
       out.push({
         id: `${b.id}:${i}`,
@@ -77,7 +77,7 @@ export function pruefeKurztest(test: Kurztest, varianteIndex = 0): Befund[] {
   const blocks = test.varianten[varianteIndex]?.blocks ?? []
   const m = test.meta
   const format = formatById(m.formatId)
-  const profil = profilFuer(m.stateId, m.subjectId, m.stufe, m.schoolTypeId)
+  const profil = profilFuerKurztest(m)
   const out: Befund[] = []
 
   // Zeit gegen die Landesgrenze
@@ -135,8 +135,8 @@ export function pruefeKurztest(test: Kurztest, varianteIndex = 0): Befund[] {
 
   // Operatoren
   for (const w of pruefeOperatoren(alsAufgaben(blocks, profil), profil)) {
-    // „zu aufwendig" ist ein Hinweis, kein Fehler – kein Land verbietet AFB III im Kurztest
-    out.push({ bereich: 'Operatoren', schwere: w.art === 'aufwendig' ? 'hinweis' : 'warnung', message: w.message, blockId: w.blockId.split(':')[0] })
+    // „zu aufwendig" und „kein Operator der Landesliste" (bei Öffnungsklausel) sind Hinweise, keine Fehler
+    out.push({ bereich: 'Operatoren', schwere: w.art === 'aufwendig' || w.art === 'fremd' ? 'hinweis' : 'warnung', message: w.message, blockId: w.blockId.split(':')[0] })
   }
 
   /*
