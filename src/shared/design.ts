@@ -115,15 +115,28 @@ const base: Omit<DesignTemplate, 'id' | 'name' | 'isDefault'> = {
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
+/**
+ * Standardvorlage für neue Materialien und neue Installationen (Wunsch der Lehrkraft, 30.09.2026):
+ * „Farbband". Eine bewusst gewählte eigene Voreinstellung bleibt davon unberührt (storage/designs.ts).
+ */
+export const STANDARD_DESIGN_ID = 'preset-farbband'
+
+/** Die mitgelieferte Standardvorlage – Rückfall, wenn keine Liste der Vorlagen vorliegt */
+export function standardDesign(): DesignTemplate {
+  const alle = presetDesigns()
+  return alle.find((d) => d.id === STANDARD_DESIGN_ID) ?? alle[0]
+}
+
 /** Mitgelieferte Vorlagen (werden beim ersten Start angelegt). */
 export function presetDesigns(): DesignTemplate[] {
   return [
-    { ...clone(base), id: 'preset-klassisch', name: 'Klassisch', isDefault: true },
+    { ...clone(base), id: 'preset-klassisch', name: 'Klassisch', isDefault: false },
     {
       ...clone(base),
       id: 'preset-farbband',
       name: 'Farbband',
-      isDefault: false,
+      // Standardvorlage seit 30.09.2026 (Wunsch der Lehrkraft; vorher „Klassisch")
+      isDefault: true,
       page: { ...base.page, accentColor: '#0b7285' },
       header: { ...clone(base.header), layout: 'colorBand' },
       tasks: { ...base.tasks, numberStyle: 'square' }

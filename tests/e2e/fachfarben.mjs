@@ -127,8 +127,8 @@ try {
   await page.waitForTimeout(600)
   await page.evaluate(() => window.__selftest.lzkSheet('BY', 1))
   await page.waitForTimeout(2000)
-  // Die Wache legt die LZK mit der ersten Vorlage („Klassisch") an
-  const lzkVorlage = '#2b6cb0'
+  // Die LZK beginnt mit der Standardvorlage („Farbband", seit 30.09.2026; vorher „Klassisch")
+  const lzkVorlage = '#0b7285'
   const lzk = await akzent()
   pruefe(lzk === BRAUN, `LZK-Kopf übernimmt die Fachfarbe Mathematik (${lzk})`)
   const kopf = await page.evaluate(() => {

@@ -780,9 +780,19 @@ export interface SeitenVorschlag {
   /**
    * Was zu tun ist – bestimmt, ob die App es mit einem Klick umsetzen kann:
    * hilfenAufKarten (lokal), materialKuerzen/zusammenlegen (Baustein überarbeiten),
-   * vertiefung/sicherung/transfer (Aufgabe anfügen und von der KI schreiben lassen), sonstiges (nur Text).
+   * vertiefung/sicherung/transfer (Aufgabe anfügen und von der KI schreiben lassen), sonstiges (nur Text),
+   * schreibraumKnapper/bilderKleiner (lokal, 30.09.2026: Schreibraum bzw. Bilder um eine Stufe verringern).
    */
-  art: 'hilfenAufKarten' | 'zusammenlegen' | 'materialKuerzen' | 'vertiefung' | 'sicherung' | 'transfer' | 'sonstiges'
+  art:
+    | 'hilfenAufKarten'
+    | 'zusammenlegen'
+    | 'materialKuerzen'
+    | 'vertiefung'
+    | 'sicherung'
+    | 'transfer'
+    | 'schreibraumKnapper'
+    | 'bilderKleiner'
+    | 'sonstiges'
   text: string
   /** Betroffener Baustein (Kennung) – bei Kürzen und Zusammenlegen */
   blockId?: string

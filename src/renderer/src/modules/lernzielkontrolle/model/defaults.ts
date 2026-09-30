@@ -6,7 +6,7 @@
  * übrigen belegten Grenzen; der Notenschlüssel ist aus, weil die echten Vorlagen keinen
  * tragen und er nirgends vorgeschrieben ist.
  */
-import { presetDesigns } from '@shared/design'
+import { standardDesign } from '@shared/design'
 import { OHNE_AUSGLEICH } from '../didactics/bausteine'
 import { STANDARD_BEWERTUNG } from '../didactics/bewertung'
 import { standardFormat, standardMinuten } from '../didactics/formate'
@@ -65,7 +65,7 @@ export function emptyKurztest(stateId: string, schoolTypeId: string, schoolTypeN
   return {
     version: 1,
     meta: defaultKurztestMeta(stateId, schoolTypeId, schoolTypeName),
-    design: presetDesigns()[0],
+    design: standardDesign(),
     varianten: [{ id: 'v1', label: '', blocks: [] }],
     createdAt: new Date().toISOString()
   }

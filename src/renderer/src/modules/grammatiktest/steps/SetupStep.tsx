@@ -26,6 +26,7 @@ import { defaultTestName, legeTestAb, testOffen } from '../library'
 import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
+import KreismenueKnopf from '../../../shared/components/Kreismenue'
 import WeitereOptionen from '../../../shared/components/WeitereOptionen'
 import VorlagenfarbeSchalter from '../../../shared/components/VorlagenfarbeSchalter'
 import { useKiZugang } from '../../../shared/useKiZugang'
@@ -281,9 +282,13 @@ export default function SetupStep(): React.JSX.Element {
                     <Alert key={i} color="orange" icon={<IconAlertTriangle size={16} />} p="xs">
                       <Text size="sm">{rule.text}</Text>
                       {rule.suggestion && <MehrText text={rule.suggestion} mt={4} />}
+                      {rule.aktion && <RegelUmsetzen onUmsetzen={() => patch({ embedded: true })} />}
                     </Alert>
                   ) : (
-                    <MehrText key={i} text={[rule.text, rule.suggestion].filter(Boolean).join(' ')} size="sm" />
+                    <Box key={i}>
+                      <MehrText text={[rule.text, rule.suggestion].filter(Boolean).join(' ')} size="sm" />
+                      {rule.aktion && <RegelUmsetzen onUmsetzen={() => patch({ embedded: true })} />}
+                    </Box>
                   )
                 )}
 
@@ -405,3 +410,22 @@ export function geaenderteOptionen(test: GrammarTest, designs: DesignTemplate[],
 
 /** Für den Test wiederverwendet: der Test als Arbeitsblatt (Anzeige und Export). */
 export type { GrammarTest }
+
+/**
+ * „Vorschlag der App umsetzen" an einem Regelhinweis (30.09.2026): Ein Klick setzt den Schalter
+ * „In einen Zusammenhang einbetten" – Strg+Z nimmt es zurück, der Hinweis verschwindet danach.
+ */
+function RegelUmsetzen({ onUmsetzen }: { onUmsetzen: () => void }): React.JSX.Element {
+  return (
+    <Box mt={6}>
+      <KreismenueKnopf
+        knopf={{ size: 'compact-xs', leftSection: <IconSparkles size={12} /> }}
+        eintraege={[{ id: 'einbetten', label: 'In einen Zusammenhang einbetten' }]}
+        onUmsetzen={onUmsetzen}
+        testId="regel-umsetzen"
+      >
+        Vorschlag der App umsetzen
+      </KreismenueKnopf>
+    </Box>
+  )
+}

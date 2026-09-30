@@ -20,7 +20,7 @@ import {
   IconWand,
   IconTable
 } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
 import ImagePicker from '../../../../shared/components/ImagePicker'
 import PrintPreview from '../../../../shared/components/PrintPreview'
@@ -71,7 +71,8 @@ import { EinfuegenUntermenue } from '../EinfuegenMenue'
 import { AudioPanel } from '../AudioPanel'
 import { BoardPanel } from '../BoardPanel'
 import { addVersion, switchVersion } from '../../model/versions'
-import { seitenAbweichung } from '../../didactics/seiten'
+import { seitenAbweichung, seitenVorgabe } from '../../didactics/seiten'
+import { bildBausteine, lokaleVorschlaegeAnwenden, lokalUmsetzbar, schreibraumBausteine, vorschlagKurz } from '../../didactics/seitenAktionen'
 import SeitenHinweis from '../SeitenHinweis'
 import { browserSourceServices, completeOriginalSources } from '../../generation/originalSources'
 import { browserWorksheetImageDeps } from '../../generation/browserImages'
@@ -164,6 +165,19 @@ export function EditorStep(): React.JSX.Element {
           : []
       )
 
+  // Nach „Vorschlag der App umsetzen": die neu gemessene Seitenzahl melden (die Messung läuft nach dem Zeichnen)
+  const neuMessung = useRef<number | null>(null)
+  const gemesseneSeiten = sheet ? (layouts.get(layoutKey(sheet.id, false)) ?? []).length : 0
+  const seitenMeta = ws?.meta
+  useEffect(() => {
+    const vorher = neuMessung.current
+    if (vorher === null || !gemesseneSeiten || gemesseneSeiten === vorher || !seitenMeta) return
+    neuMessung.current = null
+    const ziel = seitenVorgabe(seitenMeta)
+    const passt = ziel && gemesseneSeiten >= ziel.min && gemesseneSeiten <= ziel.max
+    notifySuccess(`Neu gemessen: ${gemesseneSeiten} statt ${vorher} Seiten${passt ? ' – die Seitenvorgabe ist eingehalten.' : '.'}`)
+  }, [gemesseneSeiten, seitenMeta])
+
   if (!ws || !sheet || !profile) return <Box p="xl">Noch kein Arbeitsblatt.</Box>
 
   const plans = layouts.get(layoutKey(sheet.id, key))
@@ -245,44 +259,56 @@ export function EditorStep(): React.JSX.Element {
       return (current) => addVersion(current, fresh)
     })
   /**
-   * Vorschlag aus dem Hinweis zur Seitenzahl umsetzen (Paket 7) – nur über vorhandene Wege:
-   * Hilfen auf die Hilfekarten legen (lokal, Strg+Z), einen Baustein überarbeiten lassen oder
-   * eine Aufgabe anfügen, die die KI nach dem Vorschlag schreibt (beides Hintergrund-Aufträge,
-   * der vorige Stand bleibt als Entwurf abrufbar).
+   * Vorschläge aus dem Hinweis zur Seitenzahl umsetzen (Paket 7; „Vorschlag der App umsetzen",
+   * 30.09.2026). Lokale Vorschläge – Hilfen auf die Hilfekarten, Schreibraum und Bilder eine Stufe
+   * kleiner – wirken zusammen als EIN Schritt (Strg+Z). Inhaltliche laufen über die vorhandenen
+   * Wege: einen Baustein überarbeiten lassen oder eine Aufgabe anfügen, die die KI nach dem
+   * Vorschlag schreibt (Hintergrund-Aufträge, der vorige Stand bleibt als Entwurf abrufbar).
+   * Danach misst die App neu; der Hinweis passt sich an und eine Meldung nennt die neue Seitenzahl.
    */
   const seitenUmsetzbar = (v: SeitenVorschlag): boolean =>
     v.art === 'hilfenAufKarten'
       ? sheet.blocks.some((b) => b.type === 'scaffold' && b.variant !== 'hilfekarten')
-      : v.art === 'vertiefung' || v.art === 'sicherung' || v.art === 'transfer'
-        ? true
-        : Boolean(v.blockId && sheet.blocks.some((b) => b.id === v.blockId))
-  const seitenUebernehmen = (v: SeitenVorschlag): void => {
-    if (v.art === 'hilfenAufKarten') {
+      : v.art === 'schreibraumKnapper'
+        ? schreibraumBausteine(sheet.blocks).length > 0
+        : v.art === 'bilderKleiner'
+          ? bildBausteine(sheet.blocks).length > 0
+          : v.art === 'vertiefung' || v.art === 'sicherung' || v.art === 'transfer'
+            ? true
+            : Boolean(v.blockId && sheet.blocks.some((b) => b.id === v.blockId))
+  const seitenUmsetzen = (liste: SeitenVorschlag[]): void => {
+    const lokal = liste.filter(lokalUmsetzbar)
+    if (lokal.length) {
+      let ergebnis: ReturnType<typeof lokaleVorschlaegeAnwenden> = []
       update((d) => {
-        for (const b of d.sheets.find((x) => x.id === sheet.id)!.blocks) if (b.type === 'scaffold' && b.variant !== 'hilfekarten') b.variant = 'hilfekarten'
+        ergebnis = lokaleVorschlaegeAnwenden(d.sheets.find((x) => x.id === sheet.id)!.blocks, lokal)
       })
-      notifySuccess('Die Hilfen stehen jetzt auf den Hilfekarten. Strg+Z nimmt es zurück.')
-      return
+      const gemacht = ergebnis.filter((e) => e.geaendert > 0)
+      if (gemacht.length) {
+        neuMessung.current = gezaehlteSeiten
+        notifySuccess(`Umgesetzt: ${gemacht.map((e) => vorschlagKurz(lokal.find((v) => v.art === e.art)!)).join(', ')}. Strg+Z nimmt es zurück.`)
+      }
     }
-    const ziel = v.blockId ? sheet.blocks.find((b) => b.id === v.blockId) : undefined
-    if (ziel) {
-      reviseBlock(ziel, v.text)
-      return
+    for (const v of liste.filter((x) => !lokalUmsetzbar(x))) {
+      const ziel = v.blockId ? sheet.blocks.find((b) => b.id === v.blockId) : undefined
+      if (ziel) {
+        reviseBlock(ziel, v.text)
+        continue
+      }
+      // Ergänzen: eine leere Aufgabe ans Ende, dann schreibt die KI sie nach dem Vorschlag
+      const neu = newBlock('task')
+      update((d) => {
+        d.sheets.find((x) => x.id === sheet.id)!.blocks.push(neu)
+      })
+      const mitNeu = useArbeitsblatt.getState().worksheet
+      if (!mitNeu) continue
+      bausteinAuftrag(mitNeu, docId, 'Aufgabe ergänzen', neu.id, neu.id, async (w, k) => {
+        const blatt = w.sheets.find((x) => x.id === sheet.id) ?? sheet
+        const fresh = await regenerateBlock(w, blatt, neu.id, profile, k.ai, '', v.text)
+        return (current) => addVersion(current, fresh)
+      })
     }
-    // Ergänzen: eine leere Aufgabe ans Ende, dann schreibt die KI sie nach dem Vorschlag
-    const neu = newBlock('task')
-    update((d) => {
-      d.sheets.find((x) => x.id === sheet.id)!.blocks.push(neu)
-    })
-    const mitNeu = useArbeitsblatt.getState().worksheet
-    if (!mitNeu) return
-    bausteinAuftrag(mitNeu, docId, 'Aufgabe ergänzen', neu.id, neu.id, async (w, k) => {
-      const blatt = w.sheets.find((x) => x.id === sheet.id) ?? sheet
-      const fresh = await regenerateBlock(w, blatt, neu.id, profile, k.ai, '', v.text)
-      return (current) => addVersion(current, fresh)
-    })
   }
-
   /**
    * Füllt einen noch leeren Baustein mit KI-Inhalt.
    *
@@ -712,7 +738,7 @@ export function EditorStep(): React.JSX.Element {
             <SeitenHinweis
               abweichung={abweichung}
               umsetzbar={seitenUmsetzbar}
-              onUebernehmen={seitenUebernehmen}
+              onUmsetzen={seitenUmsetzen}
               onAusblenden={() => setSeitenAus((a) => [...a, abweichungsSchluessel])}
             />
           )}

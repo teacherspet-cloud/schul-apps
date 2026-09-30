@@ -8,7 +8,7 @@
  * - Duplizieren: neue Kennung, ohne frühere Entwürfe und ohne freie Lage.
  */
 import { describe, expect, it } from 'vitest'
-import { presetDesigns } from '@shared/design'
+import { presetDesigns, standardDesign } from '@shared/design'
 import { ersterSatz } from '../src/renderer/src/shared/ersterSatz'
 import { geaenderteOptionen as abOptionen } from '../src/renderer/src/modules/arbeitsblatt/steps/TopicStep'
 import { geaenderteOptionen as lzkOptionen } from '../src/renderer/src/modules/lernzielkontrolle/steps/SetupStep'
@@ -40,7 +40,7 @@ describe('Erster Satz für „Mehr“', () => {
 describe('„Weitere Optionen“: was vom Standard abweicht', () => {
   const designs = presetDesigns()
   it('Arbeitsblatt: ein frisches Blatt hat nichts geändert', () => {
-    expect(abOptionen(defaultMeta('NI', 'gymnasium', 'Gymnasium'), designs[0], designs)).toEqual([])
+    expect(abOptionen(defaultMeta('NI', 'gymnasium', 'Gymnasium'), standardDesign(), designs)).toEqual([])
   })
   it('Arbeitsblatt: nennt nur Eingeklapptes – Differenzierung und Lösungsblatt stehen seit Paket 7 oben', () => {
     const m = {
@@ -51,7 +51,7 @@ describe('„Weitere Optionen“: was vom Standard abweicht', () => {
       imageAmount: 'keine' as const,
       overrides: { fontPt: 14 }
     }
-    expect(abOptionen(m, designs[0], designs)).toEqual(['Lerngruppen-Anpassung', 'Piktogramme'])
+    expect(abOptionen(m, standardDesign(), designs)).toEqual(['Lerngruppen-Anpassung', 'Piktogramme'])
   })
   it('LZK: eine frische Kontrolle hat nichts geändert; Punkte, Lösungsblatt und Hilfen stehen oben und zählen nicht', () => {
     const t = emptyKurztest('NI', 'gymnasium', 'Gymnasium')

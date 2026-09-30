@@ -1,4 +1,5 @@
 import { ageBandForGrade } from './ageBands'
+import { bildBausteine, schreibraumBausteine } from './seitenAktionen'
 import type { SeitenPlan, SeitenVorschlag, Sheet, WorksheetMeta } from '../model/types'
 
 /**
@@ -133,7 +134,9 @@ export function seitenAbweichung(meta: SeitenMeta, sheet: Sheet, gezaehlt: numbe
   const richtung = gezaehlt > vorgabe.max ? 'weniger' : 'mehr'
   const plan = sheet.seitenPlan
   const vonKi = (plan?.vorschlaege ?? []).filter((v) => v.richtung === richtung && (!v.blockId || sheet.blocks.some((b) => b.id === v.blockId)))
-  return { gezaehlt, vorgabe, richtung, grund: plan?.grund ?? '', vorschlaege: vonKi.length ? vonKi : lokaleVorschlaege(richtung, sheet) }
+  // Die Vorschläge der KI betreffen den Inhalt; die Stellschrauben der App (Schreibraum, Bilder) kommen immer dazu
+  const vorschlaege = vonKi.length ? [...vonKi, ...(richtung === 'weniger' ? platzVorschlaege(sheet) : [])] : lokaleVorschlaege(richtung, sheet)
+  return { gezaehlt, vorgabe, richtung, grund: plan?.grund ?? '', vorschlaege }
 }
 
 /** Wörter eines Textes – grob, nur für die Faustregel „langes Material" */
@@ -185,7 +188,10 @@ export function lokaleVorschlaege(richtung: 'weniger' | 'mehr', sheet: Sheet): S
         blockId: aufgaben[aufgaben.length - 1].id,
         text: 'Zwei gleichartige Übungsaufgaben zu einer zusammenlegen, die denselben Denkschritt verlangt.'
       })
-    if (!out.length) out.push({ richtung, art: 'sonstiges', lokal: true, text: 'Schreibraum (Linien, Kästchen) knapper bemessen oder ein Bild verkleinern.' })
+    const platz = platzVorschlaege(sheet)
+    if (!out.length && !platz.length)
+      out.push({ richtung, art: 'sonstiges', lokal: true, text: 'Schreibraum (Linien, Kästchen) knapper bemessen oder ein Bild verkleinern.' })
+    return [...out.slice(0, 3), ...platz]
   } else {
     out.push(
       { richtung, art: 'vertiefung', lokal: true, text: 'Eine Vertiefungsaufgabe zum Lernziel ergänzen (Anforderungsbereich III).' },
@@ -194,4 +200,30 @@ export function lokaleVorschlaege(richtung: 'weniger' | 'mehr', sheet: Sheet): S
     )
   }
   return out.slice(0, 3)
+}
+
+/**
+ * Stellschrauben der App, wenn das Blatt zu lang ist (30.09.2026): Schreibraum und Bilder um eine
+ * Stufe verringern. Beide setzt die App selbst um (didactics/seitenAktionen.ts) – nur angeboten,
+ * wenn es auf dem Blatt noch etwas zu verringern gibt.
+ */
+export function platzVorschlaege(sheet: Sheet): SeitenVorschlag[] {
+  const out: SeitenVorschlag[] = []
+  const schreib = schreibraumBausteine(sheet.blocks).length
+  if (schreib)
+    out.push({
+      richtung: 'weniger',
+      art: 'schreibraumKnapper',
+      lokal: true,
+      text: `Schreibraum (Linien, Kästchen, freie Flächen) ${schreib === 1 ? 'an einer Stelle' : `an ${schreib} Stellen`} um eine Stufe knapper bemessen.`
+    })
+  const bilder = bildBausteine(sheet.blocks).length
+  if (bilder)
+    out.push({
+      richtung: 'weniger',
+      art: 'bilderKleiner',
+      lokal: true,
+      text: `${bilder === 1 ? 'Das Bild' : `Die ${bilder} Bilder`} um ein Fünftel verkleinern.`
+    })
+  return out
 }

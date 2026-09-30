@@ -23,6 +23,8 @@ export interface TestingRule {
   text: string
   /** Vorschlag, wie sich das Blatt daran anpassen lässt */
   suggestion?: string
+  /** Den Vorschlag setzt die App mit einem Klick um („Vorschlag der App umsetzen", 30.09.2026) */
+  aktion?: 'einbetten'
   severity: 'hinweis' | 'wichtig'
 }
 
@@ -41,7 +43,8 @@ export function testingRules(meta: GrammarTestMeta): TestingRule[] {
       text: 'In Niedersachsen wird das Verfügen über sprachliche Mittel nicht isoliert bewertet; das Kerncurriculum weist Grammatik funktional aus.',
       suggestion: meta.embedded
         ? undefined
-        : 'Abhilfe: den Schalter „In einen Zusammenhang einbetten" setzen. Der Test prüft die Form dann in einem zusammenhängenden Text statt in Einzelsätzen und lässt sich einer Teilkompetenz zurechnen.'
+        : 'Abhilfe: den Schalter „In einen Zusammenhang einbetten" setzen. Der Test prüft die Form dann in einem zusammenhängenden Text statt in Einzelsätzen und lässt sich einer Teilkompetenz zurechnen.',
+      ...(meta.embedded ? {} : { aktion: 'einbetten' as const })
     })
   }
 
@@ -64,7 +67,8 @@ export function testingRules(meta: GrammarTestMeta): TestingRule[] {
     out.push({
       severity: 'hinweis',
       text: 'Ein benoteter Test aus unverbundenen Einzelsätzen misst die Formbeherrschung, nicht den Gebrauch.',
-      suggestion: 'Eingebettet in einen Text ist die Aufgabe näher am Sprachgebrauch – und in mehr Ländern als Leistung verwendbar.'
+      suggestion: 'Eingebettet in einen Text ist die Aufgabe näher am Sprachgebrauch – und in mehr Ländern als Leistung verwendbar.',
+      aktion: 'einbetten'
     })
   }
 

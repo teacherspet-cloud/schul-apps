@@ -1,0 +1,97 @@
+/* Kreismenü (Kreismenue.tsx): Einträge im Kreis um den Knopf, „Umsetzen" in der Mitte */
+.kreismenue-schleier {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0, 0, 0, 0.12);
+}
+.kreismenue {
+  position: fixed;
+  z-index: 401;
+  width: 0;
+  height: 0;
+}
+.kreismenue-ring {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.kreismenue-offen .kreismenue-ring {
+  opacity: 1;
+}
+.kreismenue-ring circle {
+  fill: var(--mantine-color-body);
+  fill-opacity: 0.92;
+  stroke: var(--mantine-color-default-border);
+  stroke-width: 1;
+}
+.kreismenue-eintrag,
+.kreismenue-mitte {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+  cursor: pointer;
+  border-radius: 999px;
+}
+.kreismenue-eintrag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  text-align: left;
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-default);
+  border: 1px solid var(--mantine-color-default-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition:
+    transform 180ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+.kreismenue-eintrag:hover,
+.kreismenue-eintrag:focus-visible {
+  border-color: var(--mantine-primary-color-filled);
+  outline: none;
+}
+.kreismenue-an {
+  background: var(--mantine-primary-color-light);
+  border-color: var(--mantine-primary-color-filled);
+}
+.kreismenue-haken {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+  color: var(--mantine-primary-color-filled);
+}
+.kreismenue-mitte {
+  width: 86px;
+  height: 86px;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+  color: var(--mantine-primary-color-contrast);
+  background: var(--mantine-primary-color-filled);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.kreismenue-mitte:disabled {
+  cursor: default;
+  color: var(--mantine-color-dimmed);
+  background: var(--mantine-color-default);
+  border: 1px solid var(--mantine-color-default-border);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kreismenue-eintrag,
+  .kreismenue-ring {
+    transition: none;
+  }
+}

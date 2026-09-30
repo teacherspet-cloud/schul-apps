@@ -1,10 +1,12 @@
-import { Alert, Badge, Button, CloseButton, Group, List, Text } from '@mantine/core'
-import { IconFileAlert } from '@tabler/icons-react'
+import { Alert, Badge, CloseButton, Group, List, Text } from '@mantine/core'
+import { IconFileAlert, IconWand } from '@tabler/icons-react'
+import KreismenueKnopf from '../../../shared/components/Kreismenue'
 import type { SeitenAbweichung } from '../didactics/seiten'
+import { vorschlagKurz } from '../didactics/seitenAktionen'
 import type { SeitenVorschlag } from '../model/types'
 
-/** Was sich mit einem Klick umsetzen lässt – und womit */
-export type SeitenAktion = (v: SeitenVorschlag) => void
+/** Setzt die gewählten Vorschläge um (lokale in EINEM Rückgängig-Schritt, KI-Vorschläge als Aufträge) */
+export type SeitenAktion = (v: SeitenVorschlag[]) => void
 
 /**
  * Hinweis im Editor, wenn das Blatt von der Seitenvorgabe abweicht (Paket 7, Wunsch der
@@ -12,24 +14,29 @@ export type SeitenAktion = (v: SeitenVorschlag) => void
  *
  * Vorher stand eine Abweichung höchstens im Lehrkraft-Hinweis auf dem Blatt – und nur, wenn
  * die KI sie selbst erwähnte. Jetzt zählt die App die Seiten selbst (nur Aufgaben und
- * Material, didactics/seiten.ts). Umsetzbare Vorschläge haben „Übernehmen" und laufen über
- * die vorhandenen Wege (Baustein überarbeiten, Aufgabe ergänzen – als Hintergrund-Auftrag,
- * Hilfen auf Hilfekarten – lokal, mit Strg+Z). Die übrigen bleiben erkennbar Vorschläge.
+ * Material, didactics/seiten.ts).
+ *
+ * „Vorschlag der App umsetzen" (Wunsch der Lehrkraft, 30.09.2026): EIN Knopf unter der Liste.
+ * Mit einem umsetzbaren Vorschlag setzt ein Klick ihn um; mit mehreren öffnet derselbe Knopf ein
+ * Kreismenü zur Auswahl. Lokale Vorschläge (Hilfekarten, Schreibraum, Bilder) wirken sofort als
+ * ein Schritt mit Strg+Z, inhaltliche laufen als Hintergrund-Auftrag der KI. Danach misst die App
+ * neu und der Hinweis passt sich an (oder verschwindet). Nicht Umsetzbares bleibt reiner Text.
  */
 export default function SeitenHinweis({
   abweichung: a,
   umsetzbar,
-  onUebernehmen,
+  onUmsetzen,
   onAusblenden
 }: {
   abweichung: SeitenAbweichung
   /** Lässt sich dieser Vorschlag mit einem Klick umsetzen? */
   umsetzbar: (v: SeitenVorschlag) => boolean
-  onUebernehmen: SeitenAktion
+  onUmsetzen: SeitenAktion
   onAusblenden: () => void
 }): React.JSX.Element {
   const ziel = a.vorgabe.max > a.vorgabe.min ? `${a.vorgabe.min}–${a.vorgabe.max}` : String(a.vorgabe.min)
   const titel = `${a.gezaehlt} statt ${ziel} ${a.vorgabe.max === 1 ? 'Seite' : 'Seiten'}`
+  const machbar = a.vorschlaege.map((v, i) => ({ v, id: String(i) })).filter(({ v }) => umsetzbar(v))
   return (
     <Alert
       color="yellow"
@@ -55,24 +62,34 @@ export default function SeitenHinweis({
       <List size="sm" spacing={4} mt={4}>
         {a.vorschlaege.map((v, i) => (
           <List.Item key={i}>
-            <Group gap="xs" wrap="nowrap" align="center">
-              <Text size="sm" style={{ flex: 1 }}>
-                {v.text}{' '}
-                {v.lokal && (
-                  <Badge size="xs" variant="light" color="gray" tt="none" title="Faustregel der App – die KI hat keinen passenden Vorschlag geliefert">
-                    Vorschlag der App
-                  </Badge>
-                )}
-              </Text>
-              {umsetzbar(v) && (
-                <Button size="compact-xs" variant="light" onClick={() => onUebernehmen(v)}>
-                  Übernehmen
-                </Button>
+            <Text size="sm">
+              {v.text}{' '}
+              {v.lokal && (
+                <Badge size="xs" variant="light" color="gray" tt="none" title="Faustregel der App – nicht von der KI">
+                  Faustregel der App
+                </Badge>
               )}
-            </Group>
+            </Text>
           </List.Item>
         ))}
       </List>
+      {machbar.length > 0 && (
+        <Group mt="sm" gap="xs">
+          <KreismenueKnopf
+            testId="vorschlag-umsetzen"
+            knopf={{ leftSection: <IconWand size={14} /> }}
+            eintraege={machbar.map(({ v, id }) => ({ id, label: vorschlagKurz(v), titel: v.text }))}
+            onUmsetzen={(ids) => onUmsetzen(machbar.filter((m) => ids.includes(m.id)).map((m) => m.v))}
+          >
+            {machbar.length === 1 ? 'Vorschlag der App umsetzen' : `Vorschlag der App umsetzen (${machbar.length} zur Wahl)`}
+          </KreismenueKnopf>
+          {machbar.length === 1 && (
+            <Text size="xs" c="dimmed">
+              {vorschlagKurz(machbar[0].v)}
+            </Text>
+          )}
+        </Group>
+      )}
     </Alert>
   )
 }

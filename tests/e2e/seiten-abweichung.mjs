@@ -4,7 +4,8 @@
 // Wünsche der Lehrkraft (25.09.2026):
 //  - Die Seitenzahl ist standardmäßig automatisch; „genau“ und „von–bis“ gelten als Richtwert.
 //  - Weicht das fertige Blatt davon ab, steht im Editor sichtbar „2 statt 1 Seite – Grund: …“
-//    mit Vorschlägen, die dem Lernziel dienen; umsetzbare mit „Übernehmen“ (Hintergrund-Auftrag).
+//    mit Vorschlägen, die dem Lernziel dienen; umsetzbare über „Vorschlag der App umsetzen“
+//    (30.09.2026: ein Knopf, bei mehreren Vorschlägen ein Kreismenü mit Mehrfachauswahl).
 //  - Gezählt werden nur Aufgaben- und Materialseiten (nicht die Hilfekarten-Schlussseite).
 //
 // Die Attrappe liefert ein Blatt, das sicher über eine Seite hinausgeht, und dazu im SELBEN
@@ -57,7 +58,8 @@ const aufgabe = (i, op) =>
     operator: op.toLowerCase(),
     afb: 'I',
     solution: 'Käfer, Würmer',
-    answer: { ...leer, kind: 'lines', lines: 12 }
+    // Das Schema nennt die Zahl der Linien `count` (`lines` ist ein Altname)
+    answer: { ...leer, kind: 'lines', lines: 12, count: 12 }
   })
 const protokoll = join(userData, 'ki-protokoll.jsonl')
 const attrappe = join(userData, 'ki-attrappe.json')
@@ -167,15 +169,56 @@ try {
   pruefe(Boolean(blatt?.user?.includes('ohne Hilfekarten')), 'Der Auftrag sagt, dass Hilfekarten nicht mitzählen')
   pruefe(!anfragen.some((a) => /seiten/i.test(a.schemaName) && a.schemaName !== 'worksheet'), 'Kein zusätzlicher KI-Aufruf für Grund und Vorschläge')
 
-  // Übernehmen: der Baustein wird als Hintergrund-Auftrag überarbeitet
-  await hinweis.getByRole('button', { name: 'Übernehmen' }).click()
+  // „Vorschlag der App umsetzen" (30.09.2026): mehrere umsetzbare Vorschläge → Kreismenü
+  const seitenJetzt = async () => {
+    const titel = await hinweis.innerText().catch(() => '')
+    const m = /(\d+) statt 1 Seite/.exec(titel)
+    return m ? Number(m[1]) : 1
+  }
+  const knopf = hinweis.getByTestId('vorschlag-umsetzen')
+  pruefe((await knopf.innerText()).includes('Vorschlag der App umsetzen'), `Knopf „Vorschlag der App umsetzen" (${await knopf.innerText()})`)
+  const kreisWahl = async (namen) => {
+    // Mit nur EINEM umsetzbaren Vorschlag setzt der Knopf ihn sofort um – hier stehen immer mehrere zur Wahl
+    if (!(await hinweis.getByTestId('vorschlag-umsetzen').innerText()).includes('zur Wahl')) throw new Error('Nur ein Vorschlag übrig')
+    await hinweis.getByTestId('vorschlag-umsetzen').click()
+    await page.locator('[data-kreismenue-umsetzen]').waitFor({ timeout: 3000 })
+    for (const n of namen) await page.getByRole('menuitemcheckbox', { name: n }).click()
+  }
+  await kreisWahl(['Schreibraum knapper'])
+  await page.waitForTimeout(250)
+  await page.screenshot({ path: join(shots, 'vorschlag-kreismenue.png') })
+  const eintraege = await page.getByRole('menuitemcheckbox').allInnerTexts()
+  pruefe(eintraege.length >= 2, `Kreismenü zeigt ${eintraege.length} Vorschläge (${eintraege.join(' | ')})`)
+  // Schreibraum: lokal, ein Klick – so oft, bis eine Seite weniger gesetzt wird (höchstens dreimal)
+  const vorher = await seitenJetzt()
+  await page.locator('[data-kreismenue-umsetzen]').click()
+  let nachher = vorher
+  for (let runde = 0; runde < 3; runde++) {
+    const ende = Date.now() + 4000
+    while (Date.now() < ende && (nachher = await seitenJetzt()) >= vorher) await page.waitForTimeout(250)
+    if (nachher < vorher) break
+    await kreisWahl(['Schreibraum knapper'])
+    await page.locator('[data-kreismenue-umsetzen]').click()
+  }
+  pruefe(nachher < vorher, `Schreibraum knapper → weniger Seiten (${vorher} → ${nachher})`)
+  await page.screenshot({ path: join(shots, 'vorschlag-umgesetzt.png') })
+  // Strg+Z nimmt den Schritt zurück
+  await page.keyboard.press('Control+z')
+  const endeZ = Date.now() + 4000
+  let zurueck = nachher
+  while (Date.now() < endeZ && (zurueck = await seitenJetzt()) <= nachher) await page.waitForTimeout(250)
+  pruefe(zurueck > nachher, `Strg+Z stellt den Schreibraum wieder her (${nachher} → ${zurueck})`)
+
+  // Inhaltlicher Vorschlag der KI: der Baustein wird als Hintergrund-Auftrag überarbeitet
+  await kreisWahl(['Material kürzen (KI)'])
+  await page.locator('[data-kreismenue-umsetzen]').click()
   await page.locator('.auftrags-pille, .auftrags-liste').first().waitFor({ timeout: 5000 })
-  pruefe(true, '„Übernehmen“ startet einen Auftrag (Baustein überarbeiten)')
+  pruefe(true, '„Material kürzen (KI)" startet einen Auftrag (Baustein überarbeiten)')
   // Die Attrappe liefert einen kurzen Text: „Abschnitt 5“ verschwindet vom Blatt
   const lang = () => page.locator('.ws-page').filter({ visible: true }).filter({ hasText: 'Abschnitt 5.' }).count()
   const ende = Date.now() + 20000
   while (Date.now() < ende && (await lang()) > 0) await page.waitForTimeout(500)
-  pruefe((await lang()) === 0, 'Der gekürzte Sachtext steht im Blatt (Übernehmen hat gewirkt)')
+  pruefe((await lang()) === 0, 'Der gekürzte Sachtext steht im Blatt (Umsetzen hat gewirkt)')
   // Ausblenden
   await hinweis
     .getByRole('button', { name: 'Hinweis zur Seitenzahl ausblenden' })

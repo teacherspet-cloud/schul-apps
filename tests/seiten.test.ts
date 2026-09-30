@@ -168,7 +168,8 @@ describe('Abweichung von der Seitenvorgabe: Hinweis mit Grund und Vorschlägen',
     })
     const a = seitenAbweichung(meta({ pages: 2 }), s, 3)!
     expect(a).toMatchObject({ gezaehlt: 3, richtung: 'weniger', grund: 'Der Originalauszug lässt sich nicht kürzen.' })
-    expect(a.vorschlaege.map((v) => v.art)).toEqual(['materialKuerzen'])
+    // Die Vorschläge der KI zuerst, dazu die Stellschrauben der App (Schreibraum der Aufgabe)
+    expect(a.vorschlaege.map((v) => v.art)).toEqual(['materialKuerzen', 'schreibraumKnapper'])
   })
 
   it('verschweigt die KI die Abweichung, meldet die App sie trotzdem – mit eigenen Vorschlägen (Faustregeln)', () => {
@@ -176,7 +177,7 @@ describe('Abweichung von der Seitenvorgabe: Hinweis mit Grund und Vorschlägen',
     const a = seitenAbweichung(meta({ pages: 1 }), s, 2)!
     expect(a.grund).toBe('')
     expect(a.vorschlaege.every((v) => v.lokal)).toBe(true)
-    expect(a.vorschlaege.map((v) => v.art)).toEqual(['hilfenAufKarten', 'zusammenlegen'])
+    expect(a.vorschlaege.map((v) => v.art)).toEqual(['hilfenAufKarten', 'zusammenlegen', 'schreibraumKnapper'])
     const zuWenig = seitenAbweichung(meta({ pages: 3 }), s, 2)!
     expect(zuWenig.richtung).toBe('mehr')
     expect(zuWenig.vorschlaege.map((v) => v.art)).toEqual(['vertiefung', 'sicherung', 'transfer'])
