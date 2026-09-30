@@ -124,21 +124,27 @@ export function electronUmgebung(o: ElectronUmgebungOptionen): Umgebung {
     /*
      * Der Zugang aus dem lokalen Netz.
      *
-     * Er läuft NUR, solange er eingeschaltet ist, und ist beim Start des Programms immer aus.
-     * Beim Beenden wird er mitgenommen – ein Server, der nach dem Schließen des Fensters
-     * weiterliefe, wäre genau die Art offener Tür, die niemand bemerkt.
+     * Er läuft NUR, solange das Programm läuft; beim Beenden wird er mitgenommen – ein Server,
+     * der nach dem Schließen des Fensters weiterliefe, wäre genau die Art offener Tür, die
+     * niemand bemerkt. Seit 30.09.2026 schaltet er sich beim Start wieder ein, wenn er einmal
+     * eingerichtet wurde (Wunsch der Lehrkraft, abschaltbar: lanServer.ts, `lanBeimStart`).
+     * PIN und Port bleiben dabei gleich, die Sperre nach zehn Fehlversuchen gilt weiter.
      */
     lan: {
       status: () => lanStatus(),
-      start: () => {
+      start: async () => {
         const s = getSettings()
         const port = s.lan?.port || 8420
         const pin = s.lan?.pin || String(Math.floor(100000 + Math.random() * 900000))
-        if (pin !== s.lan?.pin) setSettings({ lan: { port, pin } })
-        return startLan({ port, pin, wurzel: o.oberflaeche, aufruf: o.aufruf })
+        const stand = await startLan({ port, pin, wurzel: o.oberflaeche, aufruf: o.aufruf })
+        // Gemerkt wird erst, wenn der Zugang wirklich läuft
+        setSettings({ lan: { port, pin, eingerichtet: true, zuletztAn: true } })
+        return stand
       },
       stop: () => {
         stopLan()
+        const lan = getSettings().lan
+        if (lan) setSettings({ lan: { ...lan, zuletztAn: false } })
         return lanStatus()
       }
     },

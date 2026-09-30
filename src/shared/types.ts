@@ -278,16 +278,23 @@ export interface AppSettings {
   /** Automatische Sicherung (27.09.2026): an/aus (fehlt = an), zusätzlicher Ordner, Zahl der Stände */
   sicherung?: { automatisch?: boolean; ordner?: string; behalten?: number }
   /**
-   * Zugriff aus dem lokalen Netz (Browser auf Tablet, Handy, zweitem Rechner).
+   * Zugriff aus dem lokalen Netz (Browser auf Tablet, Handy, zweitem Rechner, iPad-App).
    *
-   * Hier steht nur, WOMIT der Zugang liefe – Port und PIN. Ob er laeuft, steht bewusst
-   * NICHT in den Einstellungen: Der Zugang startet nie von selbst, sondern immer nur auf
-   * ausdruecklichen Knopfdruck, und ist nach dem Beenden des Programms wieder aus.
+   * Port und PIN bleiben über Neustarts gleich – ein angemeldetes Gerät muss nichts neu eingeben.
+   * Bis 30.09.2026 war der Zugang nach jedem Start aus. Entscheidung der Lehrkraft („nach jedem
+   * Neustart aus"): Er schaltet sich beim Start wieder ein, sobald er einmal eingerichtet
+   * wurde – abschaltbar über `autoStart` (services/lanServer.ts, `lanBeimStart`).
    */
   lan?: {
     port: number
     /** Sechsstellige PIN, die ein Geraet einmal eingeben muss */
     pin: string
+    /** Beim Programmstart automatisch einschalten; ohne Angabe: an, sobald der Zugang eingerichtet ist */
+    autoStart?: boolean
+    /** Der Zugang lief schon einmal (einmal eingeschaltet = eingerichtet) */
+    eingerichtet?: boolean
+    /** Lief der Zugang beim letzten Beenden bzw. zuletzt? */
+    zuletztAn?: boolean
   }
   /**
    * Nur iPad-App: KI über die App am PC („Abo über den PC", 30.09.2026, mobil/pcKi.ts).

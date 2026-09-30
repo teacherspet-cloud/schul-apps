@@ -15,8 +15,8 @@ import { istAbbruch } from '@shared/abbruch'
  */
 vi.mock('electron', () => ({ app: { getVersion: () => '9.9.9-test' } }))
 
-const { startLan, stopLan, lanEreignis } = await import('../src/main/services/lanServer')
-const { erstellePcKi, pcAdresse, NICHT_ERREICHBAR } = await import('../src/mobil/pcKi')
+const { startLan, stopLan, lanEreignis, lanStatus } = await import('../src/main/services/lanServer')
+const { erstellePcKi, pcAdresse, NICHT_ERREICHBAR, GLEICHZEITIG } = await import('../src/mobil/pcKi')
 
 const PIN = '135790'
 let port = 0
@@ -38,6 +38,8 @@ const STATUS_PC: AiStatus = {
 }
 
 const warte = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+/** Wie viele Textanfragen der PC gerade gleichzeitig bearbeitet – und höchstens bearbeitet hat */
+const zugleich = { jetzt: 0, hoechstens: 0 }
 
 /** Der „Hauptprozess" am PC */
 async function aufruf(kanal: string, args: unknown[]): Promise<unknown> {
@@ -56,7 +58,13 @@ async function aufruf(kanal: string, args: unknown[]): Promise<unknown> {
     }
     // Wie u.sende am PC: Fortschritt mit der gekennzeichneten Kennung
     if (req.progressId) lanEreignis('ai:progress', { id: req.progressId, chars: 42 })
-    await warte(60)
+    zugleich.jetzt++
+    zugleich.hoechstens = Math.max(zugleich.hoechstens, zugleich.jetzt)
+    try {
+      await warte(req.schemaName === 'lang' ? 250 : 60)
+    } finally {
+      zugleich.jetzt--
+    }
     return { antwort: `PC: ${req.user}` }
   }
   if (kanal === 'ai:image') return 'data:image/png;base64,AAAA'
@@ -181,6 +189,55 @@ describe('Weiterreichen an den PC', () => {
     const wert = await ki.weiterleiten('ai:structured', [{ user: 'zwei', schemaName: 'probe', schema: {}, system: '' }])
     expect(wert).toEqual({ antwort: 'PC: zwei' })
     ki.beenden()
+  })
+})
+
+describe('Tempo (Messung 30.09.2026)', () => {
+  it('schickt höchstens so viele KI-Anfragen zugleich, wie der PC rechnet – die übrigen warten sichtbar', async () => {
+    const { ki, ereignisse } = ipad({})
+    zugleich.hoechstens = 0
+    const auftraege = Array.from({ length: 7 }, (_, i) =>
+      ki.weiterleiten('ai:structured', [{ user: `n${i}`, schemaName: 'lang', schema: {}, system: '', progressId: `t${i}` }])
+    )
+    const werte = await Promise.all(auftraege)
+    expect(werte.map((w) => (w as { antwort: string }).antwort)).toEqual(Array.from({ length: 7 }, (_, i) => `PC: n${i}`))
+    expect(zugleich.hoechstens).toBe(GLEICHZEITIG)
+    const wartend = ereignisse.filter((e) => e.kanal === 'ai:platz' && (e.wert as { zustand: string }).zustand === 'wartend')
+    expect(wartend.length).toBe(7 - GLEICHZEITIG)
+    ki.beenden()
+  })
+
+  it('meldet sich bei parallelen Aufträgen nur einmal an', async () => {
+    const vorher = lanStatus().angemeldet
+    const { ki } = ipad({})
+    await Promise.all(Array.from({ length: 5 }, (_, i) => ki.weiterleiten('ai:structured', [{ user: `p${i}`, schemaName: 'probe', schema: {}, system: '' }])))
+    expect(lanStatus().angemeldet - vorher).toBe(1)
+    ki.beenden()
+  })
+
+  it('nimmt den gemerkten KI-Stand des PCs, solange der PC nicht antwortet – nicht den des iPads', async () => {
+    let gemerkt = null as { basis: string; wert: AiStatus } | null
+    const baue = (adresse: string) =>
+      erstellePcKi({
+        einstellungen: () => ({ adresse, pin: PIN, texte: true, bilder: false, hoertexte: false }),
+        // Das iPad selbst: API-Schlüssel, kein Sparmodus
+        lokal: async () => ({ ...STATUS_PC, textAccess: 'api', economy: false, hasTextKey: false }),
+        emit: () => undefined,
+        standSpeicher: { lies: () => gemerkt, schreibe: (s) => void (gemerkt = s) }
+      })
+    const erreichbar = baue(`127.0.0.1:${port}`)
+    expect(((await erreichbar.weiterleiten('ai:status', [])) as AiStatus).economy).toBe(true)
+    expect(gemerkt?.wert.textAccess).toBe('subscription')
+    erreichbar.beenden()
+    // Neustart der App, PC (noch) nicht erreichbar: der gemerkte Stand gilt – sofort, ohne Warten
+    gemerkt = { basis: 'http://127.0.0.1:1', wert: gemerkt!.wert }
+    const weg = baue('127.0.0.1:1')
+    const beginn = Date.now()
+    const s = (await weg.weiterleiten('ai:status', [])) as AiStatus
+    expect(Date.now() - beginn).toBeLessThan(500)
+    expect(s.economy).toBe(true)
+    expect(s.textAccess).toBe('subscription')
+    weg.beenden()
   })
 })
 

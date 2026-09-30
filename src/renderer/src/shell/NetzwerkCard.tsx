@@ -10,8 +10,10 @@ import { notifyError } from '../shared/util'
 /**
  * Zugriff aus dem lokalen Netz.
  *
- * Bewusst nüchtern gehalten: Der Schalter ist aus, bis man ihn einschaltet, und beim Beenden
- * des Programms wieder aus. Was unter „Gut zu wissen" steht, sind keine Warnhinweise
+ * Bewusst nüchtern gehalten: Der Schalter ist aus, bis man ihn einmal einschaltet. Danach
+ * schaltet sich der Zugang beim Programmstart wieder ein (30.09.2026, Wunsch der Lehrkraft –
+ * die iPad-App stand sonst nach jedem Neustart des PCs ohne KI da); abschaltbar mit
+ * „Beim Start automatisch einschalten". Was unter „Gut zu wissen" steht, sind keine Warnhinweise
  * zur Zierde – es sind die drei Dinge, an denen es in der Praxis scheitert, und die sonst wie
  * ein Fehler des Programms aussähen.
  */
@@ -27,6 +29,8 @@ export default function NetzwerkCard({
   const port = settings.lan?.port ?? 8420
   const pin = settings.lan?.pin ?? ''
   const laeuft = Boolean(status?.laeuft)
+  // Voreinstellung: an, sobald der Zugang einmal eingerichtet war (main/services/lanServer.ts, lanBeimStart)
+  const autoStart = settings.lan?.autoStart ?? Boolean(settings.lan?.eingerichtet || settings.lan?.zuletztAn)
 
   const wuerfeln = (): string => String(Math.floor(100000 + Math.random() * 900000))
 
@@ -90,10 +94,17 @@ export default function NetzwerkCard({
 
         <Switch
           label="Zugang einschalten"
-          description="Läuft nur, solange er eingeschaltet ist, und ist nach dem Beenden des Programms wieder aus."
+          description="Läuft nur, solange dieses Programm läuft. PIN und Port bleiben über Neustarts gleich."
           checked={laeuft}
           disabled={busy}
           onChange={(e) => void schalten(e.currentTarget.checked)}
+        />
+        <Switch
+          label="Beim Start automatisch einschalten"
+          description="Nach einem Neustart ist der Zugang wieder da – mit derselben PIN und demselben Port. Die iPad-App meldet sich damit von selbst wieder an."
+          checked={autoStart}
+          onChange={(e) => void update({ lan: { port, pin, autoStart: e.currentTarget.checked } })}
+          mt="sm"
         />
 
         {laeuft && status && (
@@ -218,7 +229,8 @@ export default function NetzwerkCard({
         </Title>
         <List spacing="xs" size="sm" icon={<IconDeviceTablet size={16} />}>
           <List.Item>
-            <b>Nur im selben Netz, nur während dieses Programm läuft.</b> Von außerhalb ist nichts erreichbar; es gibt keinen Cloud-Dienst.
+            <b>Nur im selben Netz, nur während dieses Programm läuft.</b> Von außerhalb ist nichts erreichbar; es gibt keinen Cloud-Dienst. Mit „Beim Start
+            automatisch einschalten“ ist der Zugang nach jedem Programmstart wieder da.
           </List.Item>
           <List.Item>
             <b>iPad-App: KI über diesen PC.</b> In der iPad-App lässt sich unter „KI-Zugang“ die Option „Abo über den PC (WLAN)“ wählen – dann erzeugt dieser

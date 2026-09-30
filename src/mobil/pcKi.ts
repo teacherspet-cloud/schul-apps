@@ -31,8 +31,21 @@ export const KANAELE_HOERTEXTE = ['audio:voices', 'audio:speak', 'audio:preview'
 const STANDARD_PORT = '8420'
 /** Anmeldung, Test und Statusabfrage: länger wartet niemand auf eine Antwort, bevor es „nicht erreichbar" heißt */
 const KURZ_MS = 8000
-/** Wie lange ein erfolgreicher Erreichbarkeitstest gilt */
+/** Wie lange ein erfolgreicher Erreichbarkeitstest (oder eine erfolgreiche Antwort) gilt */
 const ERREICHBAR_MS = 20_000
+/**
+ * Höchstens so viele KI-Anfragen zugleich schickt das iPad los – so viele rechnet der PC ohnehin
+ * (main/services/ai/kiPlaetze.ts). Grund (Messung 30.09.2026, tests/e2e/pc-ki-tempo.mjs): Jede
+ * weitere Anfrage hielte eine der wenigen Verbindungen des WebViews zum PC fest (je Rechner nur
+ * wenige, eine davon braucht der Ereignisstrom), während sie am PC nur wartet. Dahinter standen
+ * dann die kurzen Aufrufe – Erreichbarkeit, Anmeldung, KI-Stand – bis in ihr Zeitlimit und
+ * meldeten „PC nicht erreichbar", obwohl er rechnete; der KI-Stand fiel dabei auf die Werte des
+ * iPads zurück (ohne Sparmodus = deutlich mehr Anfragen). Wer hier wartet, erscheint wie am PC
+ * als „wartet auf freien Platz".
+ */
+export const GLEICHZEITIG = 3
+/** So lange gilt ein gelesener KI-Stand des PCs, ohne erneut zu fragen */
+const STAND_MS = 60_000
 
 /**
  * Die eingegebene Adresse in die Form http://host:port bringen.
@@ -122,6 +135,12 @@ export interface PcKiOptionen {
   hoerdateiAblegen?: (ergebnis: TtsResult) => void
   /** Anderes fetch (Tests) */
   abruf?: typeof fetch
+  /**
+   * Zuletzt gelesener KI-Stand des PCs, über Neustarts gemerkt (iPad: localStorage). Damit
+   * stimmen Sparmodus und Modell sofort – auch bevor der PC geantwortet hat oder wenn er
+   * gerade nicht erreichbar ist.
+   */
+  standSpeicher?: { lies(): { basis: string; wert: AiStatus } | null; schreibe(stand: { basis: string; wert: AiStatus }): void }
 }
 
 export interface PcKi {
@@ -131,6 +150,8 @@ export interface PcKi {
   testen(adresse: string, pin: string): Promise<PcKiTest>
   /** Verbindung schließen (Tests) */
   beenden(): void
+  /** Verbindung, Anmeldung und KI-Stand im Voraus herstellen (App-Start, Rückkehr in den Vordergrund) */
+  vorwaermen(): void
 }
 
 export function erstellePcKi(o: PcKiOptionen): PcKi {
@@ -147,6 +168,16 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
   let abgelehntePin = ''
   /** Laufende Anfragen am PC: Kennung → lokaler Abbruch */
   const laufend = new Map<string, AbortController>()
+  /** KI-Anfragen, die gerade beim PC sind, und die, die auf einen Platz warten */
+  let unterwegs = 0
+  const warteschlange: (() => void)[] = []
+  /** Zuletzt gelesener KI-Stand des PCs */
+  let stand: { basis: string; wert: AiStatus; zeit: number } | null = null
+  let standHolen: Promise<AiStatus | null> | null = null
+  /** HTTP-Anfragen, die gerade beim PC sind (auch kurze) */
+  let imFlug = 0
+  /** Eine laufende Anmeldung – parallele Aufträge teilen sie, statt je eine eigene Sitzung am PC zu eröffnen */
+  let anmeldung: Promise<void> | null = null
 
   /** Die Verbindung zur eingestellten Adresse – bei geänderter Adresse neu */
   function holeVerbindung(basis: string): NetzVerbindung {
@@ -183,7 +214,15 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     return { fassung: String(daten.fassung ?? '') }
   }
 
-  async function anmelden(v: NetzVerbindung, pin: string): Promise<void> {
+  function anmelden(v: NetzVerbindung, pin: string): Promise<void> {
+    if (anmeldung) return anmeldung
+    anmeldung = anmeldenEinmal(v, pin).finally(() => {
+      anmeldung = null
+    })
+    return anmeldung
+  }
+
+  async function anmeldenEinmal(v: NetzVerbindung, pin: string): Promise<void> {
     if (!/^\d{6}$/.test(pin)) throw new Error('Die PIN hat sechs Ziffern – sie steht am PC unter Einstellungen › Netzwerk.')
     if (pin === abgelehntePin) throw new Error('Der PC hat die PIN abgelehnt. Die aktuelle PIN steht am PC unter Einstellungen › Netzwerk; nach dem Eintragen „Verbindung testen" wählen.')
     const steuerung = new AbortController()
@@ -206,9 +245,18 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     const beginn = Date.now()
     try {
       const v = holeVerbindung(basis)
-      if (Date.now() > erreichbarBis) await pruefeErreichbar(basis)
+      // Solange andere Anfragen beim PC laufen, ist er erreichbar – kein Test, der sich hinter ihnen anstellen müsste
+      if (Date.now() > erreichbarBis && imFlug === 0) await pruefeErreichbar(basis)
       if (v.abgemeldet()) await anmelden(v, e.pin)
-      const einmal = (): Promise<T> => {
+      const einmal = async (): Promise<T> => {
+        imFlug++
+        try {
+          return await roh()
+        } finally {
+          imFlug--
+        }
+      }
+      const roh = (): Promise<T> => {
         if (!kurz) return v.aufruf<T>(kanal, args, signal)
         // Kurze Aufrufe (Status) mit Zeitlimit über ein eigenes Signal; das Ende der Frist heißt „nicht erreichbar", nicht „abgebrochen"
         const steuerung = new AbortController()
@@ -222,7 +270,9 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
       }
       const start = Date.now()
       try {
-        return await einmal()
+        const wert = await einmal()
+        erreichbarBis = Date.now() + ERREICHBAR_MS
+        return wert
       } catch (err) {
         if (err instanceof AnmeldungAbgelaufen) {
           // Der Netzzugang am PC wurde neu eingeschaltet – mit der gespeicherten PIN neu anmelden
@@ -252,18 +302,94 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     }
   }
 
+  /** Auf einen der Plätze warten (siehe GLEICHZEITIG); ein Abbruch nimmt die Anfrage aus der Schlange */
+  function platz(id: string | null, signal: AbortSignal): Promise<void> {
+    if (unterwegs < GLEICHZEITIG) {
+      unterwegs++
+      return Promise.resolve()
+    }
+    if (id) o.emit('ai:platz', { id, zustand: 'wartend', abgebrochen: 0, abgebrocheneBilder: 0 })
+    return new Promise((los, weg) => {
+      const dran = (): void => {
+        signal.removeEventListener('abort', ab)
+        unterwegs++
+        los()
+      }
+      const ab = (): void => {
+        const i = warteschlange.indexOf(dran)
+        if (i >= 0) warteschlange.splice(i, 1)
+        weg(new AbbruchFehler())
+      }
+      warteschlange.push(dran)
+      signal.addEventListener('abort', ab, { once: true })
+    })
+  }
+
+  function platzFrei(): void {
+    unterwegs = Math.max(0, unterwegs - 1)
+    warteschlange.shift()?.()
+  }
+
   /** Eine lange Anfrage (KI, Vertonung) – abbrechbar über ihre Kennung */
   async function anfrage(e: PcKiEinstellungen, kanal: string, args: unknown[]): Promise<unknown> {
     const id = kennungIn(kanal, args)
     const steuerung = new AbortController()
     if (id) laufend.set(id, steuerung)
+    // Nur KI-Anfragen belegen am PC einen Platz; Stimmen und Vertonung laufen nebenher
+    const begrenzt = kanal.startsWith('ai:')
     try {
-      const wert = await amPc<unknown>(e, kanal, args, steuerung.signal)
-      if (kanal === 'audio:speak' && wert && typeof wert === 'object') o.hoerdateiAblegen?.(wert as TtsResult)
-      return wert
+      if (begrenzt) await platz(id, steuerung.signal)
+      try {
+        const wert = await amPc<unknown>(e, kanal, args, steuerung.signal)
+        if (kanal === 'audio:speak' && wert && typeof wert === 'object') o.hoerdateiAblegen?.(wert as TtsResult)
+        return wert
+      } finally {
+        if (begrenzt) platzFrei()
+      }
+    } catch (err) {
+      if (steuerung.signal.aborted) throw new AbbruchFehler()
+      throw err
     } finally {
       if (id && laufend.get(id) === steuerung) laufend.delete(id)
     }
+  }
+
+  function merkeStand(basis: string, wert: AiStatus): void {
+    stand = { basis, wert, zeit: Date.now() }
+    try {
+      o.standSpeicher?.schreibe({ basis, wert })
+    } catch {
+      // Merken ist Komfort – ohne geht es auch
+    }
+  }
+
+  /** Den KI-Stand des PCs lesen und merken; null, wenn der PC gerade nicht antwortet */
+  function holeStand(e: PcKiEinstellungen): Promise<AiStatus | null> {
+    if (standHolen) return standHolen
+    standHolen = (async () => {
+      try {
+        const wert = await amPc<AiStatus>(e, 'ai:status', [], undefined, true)
+        merkeStand(pcAdresse(e.adresse), wert)
+        return wert
+      } catch {
+        return null
+      } finally {
+        standHolen = null
+      }
+    })()
+    return standHolen
+  }
+
+  /** Der zuletzt bekannte Stand für diese Adresse (im Speicher oder vom letzten Start) */
+  function bekannterStand(basis: string): { wert: AiStatus; frisch: boolean } | null {
+    if (stand?.basis === basis) return { wert: stand.wert, frisch: Date.now() - stand.zeit < STAND_MS }
+    try {
+      const gemerkt = o.standSpeicher?.lies()
+      if (gemerkt?.basis === basis && gemerkt.wert) return { wert: gemerkt.wert, frisch: false }
+    } catch {
+      // nichts gemerkt
+    }
+    return null
   }
 
   /** ai:status: was über den PC läuft, meldet der PC; der Rest bleibt vom iPad */
@@ -272,16 +398,30 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     const texte = ueberPc(e, 'texte')
     const bilder = ueberPc(e, 'bilder')
     const hoertexte = ueberPc(e, 'hoertexte')
-    let pc: AiStatus | null = null
+    let basis = ''
     try {
-      pc = await amPc<AiStatus>(e, 'ai:status', [], undefined, true)
+      basis = pcAdresse(e.adresse)
     } catch {
+      basis = ''
+    }
+    /*
+     * Ein frischer Stand gilt sofort. Ein älterer, gemerkter ebenfalls – er wird im Hintergrund
+     * erneuert. Am PC kommt der KI-Stand in einer Millisekunde; müsste das iPad jedes Mal erst
+     * über das Netz fragen, entschiede die Oberfläche womöglich vor der Antwort – mit den Werten
+     * des iPads (ohne Sparmodus: ein Vielfaches an Anfragen, Messung 30.09.2026).
+     */
+    const bekannt = basis ? bekannterStand(basis) : null
+    let pc: AiStatus | null
+    if (bekannt) {
+      pc = bekannt.wert
+      if (!bekannt.frisch) void holeStand(e)
+    } else {
       /*
-       * PC gerade nicht erreichbar: trotzdem als „eingerichtet" melden. Sonst schickte die
-       * Oberfläche die Lehrkraft in die Einstellungen, obwohl dort alles stimmt – die klare
-       * Meldung kommt beim ersten Auftrag.
+       * Nichts bekannt und PC gerade nicht erreichbar (null): trotzdem als „eingerichtet"
+       * melden. Sonst schickte die Oberfläche die Lehrkraft in die Einstellungen, obwohl dort
+       * alles stimmt – die klare Meldung kommt beim ersten Auftrag.
        */
-      pc = null
+      pc = await holeStand(e)
     }
     return {
       ...hier,
@@ -332,9 +472,11 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
         const v = holeVerbindung(basis)
         token = ''
         abgelehntePin = ''
-        await anmelden(v, String(pin ?? '').trim())
+        // Mit genau DIESER PIN – nicht mit einer gerade laufenden Anmeldung der gespeicherten
+        await anmeldenEinmal(v, String(pin ?? '').trim())
         const e: PcKiEinstellungen = { adresse: basis, pin: String(pin ?? '').trim(), texte: true, bilder: true, hoertexte: true }
         const status = await amPc<AiStatus>(e, 'ai:status', [], undefined, true)
+        merkeStand(basis, status)
         let abo: SubscriptionStatus | null = null
         if (status.textAccess === 'subscription') {
           // Ältere Fassungen am PC geben diesen Aufruf nicht frei – dann ohne Anmeldestand
@@ -346,6 +488,12 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
         throw verstaendlich(err, basis, Date.now() - beginn)
       }
     },
-    beenden: schliessen
+    beenden: schliessen,
+    vorwaermen() {
+      const e = o.einstellungen()
+      if (!(ueberPc(e, 'texte') || ueberPc(e, 'bilder') || ueberPc(e, 'hoertexte'))) return
+      // Erreichbarkeit, Anmeldung, Ereignisstrom und KI-Stand stehen danach; Fehler meldet erst ein echter Auftrag
+      void holeStand(e!)
+    }
   }
 }

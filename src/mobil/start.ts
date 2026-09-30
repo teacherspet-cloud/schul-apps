@@ -33,6 +33,8 @@ import { pruefeAudioName } from '../main/services/audio/elevenlabs'
 import { ausBase64 } from './base64'
 import { bus } from './bus'
 import { erstellePcKi } from './pcKi'
+// Statusleiste, Kamera-Aussparung und App-Wechsel-Balken freihalten – nur in der App (30.09.2026)
+import './sicherBereich.css'
 import { capHttpFetch } from './netz/capHttpFetch'
 import { starteAutoSicherung } from './sicherung/autoSicherung'
 import { mobilUmgebung } from './umgebung'
@@ -97,6 +99,9 @@ function kiAttrappe(): void {
   ;(globalThis as { __SCHULAPPS_KI_ATTRAPPE__?: string }).__SCHULAPPS_KI_ATTRAPPE__ = '/tmp/ki-attrappe.json'
 }
 
+/** Zuletzt gelesener KI-Stand des PCs („Abo über den PC", mobil/pcKi.ts) */
+const PC_STAND = 'schulapps.pcKi.stand'
+
 /** Kanäle, deren Ressourcen erst bei Bedarf geladen werden (vfs/mounts.ts) */
 const MIT_RESSOURCEN = /^(lehrplan:themen|schulen:|images:openmoji-)/
 
@@ -130,8 +135,27 @@ async function starten(): Promise<void> {
     hoerdateiAblegen: ({ fileName, dataUrl }) => {
       const b64 = String(dataUrl ?? '').split(',')[1]
       if (b64) writeFileSync(pruefeAudioName(fileName), ausBase64(b64))
+    },
+    // Den KI-Stand des PCs über Neustarts merken: Sparmodus und Modell stimmen dann sofort
+    standSpeicher: {
+      lies: () => {
+        try {
+          return JSON.parse(localStorage.getItem(PC_STAND) ?? 'null')
+        } catch {
+          return null
+        }
+      },
+      schreibe: (stand) => {
+        try {
+          localStorage.setItem(PC_STAND, JSON.stringify(stand))
+        } catch {
+          // ohne Speicher fragt die App den PC eben erneut
+        }
+      }
     }
   })
+  // Verbindung zum PC schon beim Start herstellen – der erste Auftrag wartet dann nicht darauf
+  setTimeout(() => pcKi.vorwaermen(), 1500)
   registriereKanaele((kanal, fn) => aufrufe.set(kanal, fn as (...args: unknown[]) => unknown), mobilUmgebung(pcKi))
 
   const call = async <T>(kanal: string, ...args: unknown[]): Promise<T> => {
@@ -168,6 +192,8 @@ async function starten(): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     void App.addListener('appStateChange', ({ isActive }) => {
       if (!isActive) sichern()
+      // Zurück im Vordergrund: Die Verbindung zum PC ist nach dem Ruhezustand meist weg
+      else pcKi.vorwaermen()
     })
     void App.addListener('pause', sichern)
   }

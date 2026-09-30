@@ -277,6 +277,8 @@ const PUFFER = 100
  */
 const MAX_STROEME = 8
 const HERZSCHLAG_MS = 15_000
+/** So oft wird der gewünschte Port erneut versucht (je 0,7 s), bevor ein anderer drankommt */
+const WUNSCHPORT_GEDULD = 4
 
 /** Eine weitere Adresse, unter der der PC erreichbar ist (z. B. über Tailscale von unterwegs) */
 export interface LanWeitereAdresse {
@@ -387,6 +389,21 @@ function weitereAdressen(port: number): LanWeitereAdresse[] {
   if (magicDns && tailscale.length) out.push({ adresse: `http://${magicDns}:${port}`, art: 'tailscale', schnittstelle: tailscale[0].schnittstelle })
   for (const a of alle) if (a.ip !== haupt) out.push({ adresse: `http://${a.ip}:${port}`, art: a.art, schnittstelle: a.schnittstelle })
   return out
+}
+
+/**
+ * Soll der Zugang beim Programmstart von selbst angehen? (30.09.2026)
+ *
+ * Wunsch der Lehrkraft: Der Zugang war nach jedem Neustart aus – die iPad-App („Abo über den
+ * PC") stand dann ohne KI da, bis jemand am PC den Schalter fand. Jetzt:
+ *  - `autoStart` ausdrücklich gesetzt: das gilt
+ *  - sonst (Voreinstellung): an, sobald der Zugang einmal eingerichtet war oder zuletzt lief
+ * Ein PC, an dem nie jemand den Zugang eingeschaltet hat, öffnet weiterhin keinen Port.
+ */
+export function lanBeimStart(lan: { pin?: string; autoStart?: boolean; eingerichtet?: boolean; zuletztAn?: boolean } | undefined): boolean {
+  if (!lan || !/^\d{6}$/.test(String(lan.pin ?? ''))) return false
+  if (typeof lan.autoStart === 'boolean') return lan.autoStart
+  return Boolean(lan.eingerichtet || lan.zuletztAn)
 }
 
 /** Die Fassung des laufenden Programms – steht in jeder Ablehnung, siehe dort. */
@@ -703,13 +720,25 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
       }
     })
     /*
-     * Ist der Port belegt, wird der nächste versucht – bis zu zehnmal.
+     * Lange Anfragen der iPad-App kommen oft mit Pausen: Hielte der Server eine ruhende
+     * Verbindung nur die üblichen 5 s offen, müsste jede Anfrage über Tailscale erst eine neue
+     * aufbauen – oder träfe auf eine, die der Server gerade schließt, und scheiterte sofort.
+     */
+    s.keepAliveTimeout = 65_000
+    s.headersTimeout = 70_000
+    /*
+     * Ist der Port belegt, wird er zuerst ein paar Mal erneut versucht, erst dann der nächste –
+     * bis zu zehn weitere.
      *
      * Belegt sein kann er leicht: ein anderes Programm, oder ein Rest des eigenen Servers,
-     * den Windows noch nicht freigegeben hat. Ohne diesen Ausweg bliebe nur eine
+     * den Windows noch nicht freigegeben hat (vor allem beim Neustart des Programms). Der Port
+     * soll dabei STABIL bleiben: Auf ihn zeigen die Adresse im iPad und die Freigabe in der
+     * Windows-Firewall. Ein anderer Port wird nur genommen, wenn es nicht anders geht – die
+     * Einstellungen sagen es dann deutlich (NetzwerkCard). Ohne diesen Ausweg bliebe nur eine
      * Fehlermeldung mit „EADDRINUSE", mit der niemand etwas anfangen kann.
      */
     let versuch = 0
+    let geduld = 0
     const binden = (port: number): void => {
       s.listen(port, '0.0.0.0', () => {
         server = s
@@ -724,6 +753,12 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
       })
     }
     s.on('error', (e: NodeJS.ErrnoException) => {
+      if (e.code === 'EADDRINUSE' && versuch === 0 && geduld < WUNSCHPORT_GEDULD && opts.port !== 0) {
+        geduld++
+        s.removeAllListeners('listening')
+        setTimeout(() => binden(opts.port), 700)
+        return
+      }
       if (e.code === 'EADDRINUSE' && versuch < 10) {
         versuch++
         s.removeAllListeners('listening')

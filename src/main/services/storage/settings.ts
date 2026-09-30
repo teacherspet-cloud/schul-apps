@@ -49,6 +49,8 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     appearance: { ...base.appearance, ...stored.appearance },
     // iPad: Adresse, PIN und Auswahl getrennt änderbar (30.09.2026)
     ...(base.pcKi || stored.pcKi ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } } : {}),
+    // Netzzugang: Einzelne Felder (Port, PIN, Autostart) ändern, ohne die übrigen zu verlieren (30.09.2026)
+    ...(base.lan || stored.lan ? { lan: { port: 8420, pin: '', ...base.lan, ...(stored.lan as object) } } : {}),
     sicherung: { ...base.sicherung, ...(stored.sicherung as object) },
     datenschutz: { ...base.datenschutz, ...(stored.datenschutz as object) },
     briefkopf: { ...base.briefkopf, ...(stored.briefkopf as object) },

@@ -1,0 +1,72 @@
+/*
+ * Sicherer Bereich des Bildschirms – nur in der iPad-/iPhone-App (30.09.2026).
+ *
+ * Rückmeldung der Lehrkraft: „Oben ist die Leiste mit Uhrzeit, Datum, Akkuladung etc. zu sehen
+ * und überlagert den oberen Bereich der App." Die Seite läuft mit viewport-fit=cover bis unter die
+ * Statusleiste (vite.mobil.config.ts); iOS meldet über env(safe-area-inset-*), wie viel davon
+ * verdeckt ist – oben die Statusleiste bzw. die Kamera-Aussparung des iPhones, unten der
+ * Balken zum Wechseln der Apps, seitlich die Aussparung im Querformat.
+ *
+ * Nur diese Datei rückt die App davon ab; sie wird nur im mobilen Build geladen (mobil/start.ts).
+ * Am PC und im Browser bleibt alles, wie es ist – dort sind die Werte ohnehin 0.
+ *
+ * Die Abstände stehen in eigenen Variablen, damit eine Prüfung sie ohne iPad setzen kann
+ * (document.documentElement.style.setProperty('--sicher-oben', '24px')).
+ *
+ * Alle Regeln tragen ein vorangestelltes html: Diese Datei lädt VOR den Stilen von Mantine
+ * (mobil/start.ts lädt die Oberfläche danach) – bei gleichem Gewicht gewänne sonst Mantine.
+ */
+html:root {
+  --sicher-oben: env(safe-area-inset-top, 0px);
+  --sicher-unten: env(safe-area-inset-bottom, 0px);
+  --sicher-links: env(safe-area-inset-left, 0px);
+  --sicher-rechts: env(safe-area-inset-right, 0px);
+  /*
+   * Mantine rückt Seitenleiste und Hauptbereich um eine (hier nicht vorhandene) Kopf- und
+   * Fußleiste ab. Genau diese Abstände übernehmen jetzt Statusleiste und App-Wechsel-Balken.
+   */
+  --app-shell-header-offset: var(--sicher-oben);
+  --app-shell-footer-offset: var(--sicher-unten);
+}
+
+/* Seitenleiste neben der Kamera-Aussparung (iPhone quer) */
+html .mantine-AppShell-navbar {
+  inset-inline-start: var(--sicher-links);
+}
+
+html .mantine-AppShell-main {
+  padding-inline-start: calc(var(--app-shell-navbar-offset, 0rem) + var(--app-shell-padding) + var(--sicher-links));
+  padding-inline-end: calc(var(--app-shell-aside-offset, 0rem) + var(--app-shell-padding) + var(--sicher-rechts));
+}
+
+/* Dialoge: nie unter der Statusleiste beginnen, nie hinter dem App-Wechsel-Balken enden */
+html .mantine-Modal-inner {
+  padding-top: calc(var(--modal-y-offset, 5dvh) + var(--sicher-oben));
+  padding-bottom: calc(var(--modal-y-offset, 5dvh) + var(--sicher-unten));
+}
+
+html .mantine-Modal-content:not([data-full-screen]) {
+  max-height: calc(100dvh - var(--modal-y-offset, 5dvh) * 2 - var(--sicher-oben) - var(--sicher-unten));
+}
+
+html .mantine-Modal-content[data-full-screen] {
+  padding-top: var(--sicher-oben);
+  padding-bottom: var(--sicher-unten);
+}
+
+html .mantine-Drawer-content {
+  padding-top: var(--sicher-oben);
+  padding-bottom: var(--sicher-unten);
+}
+
+/* Hinweise oben rechts: unter der Statusleiste */
+html .mantine-Notifications-root {
+  margin-top: var(--sicher-oben);
+  margin-inline-end: var(--sicher-rechts);
+}
+
+/* Auftragsleiste unten rechts (shell/AuftragsLayer.tsx): über dem App-Wechsel-Balken */
+html .auftrags-layer {
+  bottom: calc(16px + var(--sicher-unten));
+  right: calc(16px + var(--sicher-rechts));
+}
