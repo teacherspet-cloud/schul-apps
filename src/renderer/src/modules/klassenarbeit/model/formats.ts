@@ -319,16 +319,18 @@ const FREMDSPRACHEN: { fach: ExamSubjectId; praefix: string; labels: Record<stri
   }
 ]
 
-const ABGELEITET: ExamFormat[] = [...FREMDSPRACHEN, ...FREMDSPRACHEN_NEU].flatMap(({ fach, praefix, labels }) =>
-  ENGLISCH.map((f) => {
+const ABGELEITET: ExamFormat[] = [...FREMDSPRACHEN, ...FREMDSPRACHEN_NEU].flatMap(({ fach, praefix, labels, ohne, ab, hinweis }: (typeof FREMDSPRACHEN_NEU)[number]) =>
+  ENGLISCH.filter((f) => !ohne?.includes(f.id.slice(3))).map((f) => {
     const art = f.id.slice(3)
-    const beginn = art === 'mediation' ? 7 : 6
+    // DaZ (30.09.2026) auch in der Grundschule – dort gilt der eigene früheste Jahrgang
+    const beginn = ab ?? (art === 'mediation' ? 7 : 6)
     return {
       ...f,
       id: `${praefix}-${art}`,
       subject: fach,
       label: labels[art] ?? f.label,
-      grades: [Math.max(beginn, f.grades[0]), f.grades[1]] as [number, number]
+      grades: [ab ? beginn : Math.max(beginn, f.grades[0]), f.grades[1]] as [number, number],
+      ...(hinweis ? { note: [f.note, hinweis].filter(Boolean).join(' ') } : {})
     }
   })
 )
@@ -861,7 +863,8 @@ export function suggestParts(
     const other = 100 - writing
     // Befund F6: Niedersachsen Kl. 5 gewichtet Hörverstehen stärker; Französisch-Sprachmittlung dort erst ab Kl. 9 (F3)
     const zweiter = stateId === 'NI' && grade <= 5 ? 'listening' : grade <= 7 || (stateId === 'NI' && subject === 'franzoesisch' && grade < 9) ? 'reading' : 'mediation'
-    const otherFormat = formatIdFuer(subject, zweiter)
+    // DaZ kennt keine Sprachmittlung (30.09.2026) – dann das Leseverstehen
+    const otherFormat = formatById(formatIdFuer(subject, zweiter)) ? formatIdFuer(subject, zweiter) : formatIdFuer(subject, 'reading')
     const otherDef = formatById(otherFormat)
     const writingDef = formatById(formatIdFuer(subject, 'writing'))
     const otherMinutes = Math.round((minutes * other) / 100)

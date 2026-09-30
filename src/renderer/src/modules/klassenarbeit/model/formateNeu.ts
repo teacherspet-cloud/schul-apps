@@ -610,11 +610,23 @@ export const KUNST: ExamFormat[] = [
   }
 ]
 
-/** Italienisch und Russisch: dieselben Arten wie die übrigen modernen Fremdsprachen (formats.ts) */
+/**
+ * Italienisch und Russisch (29.09.2026), Niederländisch, Polnisch, Tschechisch, Portugiesisch,
+ * Türkisch, Chinesisch und DaZ (30.09.2026): dieselben Arten wie die übrigen modernen
+ * Fremdsprachen (formats.ts). Die KMK-Bildungsstandards gelten für alle modernen Fremdsprachen
+ * mit denselben Kompetenzbereichen; die Bezeichnungen stehen in der Zielsprache, wie sie die
+ * Prüfungen der Herkunftsländer verwenden (Quellen in recherche/sprachtexte-2026-09-30.md).
+ */
 export const FREMDSPRACHEN_NEU: {
   fach: ExamSubjectId
   praefix: string
   labels: Record<string, string>
+  /** Arten, die es im Fach nicht gibt (DaZ: keine Sprachmittlung) */
+  ohne?: string[]
+  /** Frühester Jahrgang, falls abweichend von Klasse 6 (DaZ auch in der Grundschule) */
+  ab?: number
+  /** Hinweis an jedem Format des Fachs */
+  hinweis?: string
 }[] = [
   {
     fach: 'italienisch',
@@ -641,6 +653,284 @@ export const FREMDSPRACHEN_NEU: {
       grammar: 'Grammatik im Kontext',
       speaking: 'Говорение (Ersatz für eine schriftliche Arbeit)'
     }
+  },
+  // ---------- 30.09.2026 ----------
+  {
+    fach: 'niederlaendisch',
+    praefix: 'nl',
+    // Vaardigheden wie im Centraal Examen und im ERK (Europees Referentiekader: „mediatie")
+    labels: {
+      listening: 'Luistervaardigheid',
+      reading: 'Leesvaardigheid',
+      mediation: 'Mediatie',
+      writing: 'Schrijfvaardigheid',
+      language: 'Grammatica en woordenschat',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Spreekvaardigheid (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'polnisch',
+    praefix: 'pl',
+    // Teile der polnischen Fremdsprachenprüfung (CKE): „Rozumienie ze słuchu", „Rozumienie tekstów pisanych",
+    // „Znajomość środków językowych", „Wypowiedź pisemna"; Sprachmittlung dort als „Przetwarzanie tekstu"
+    labels: {
+      listening: 'Rozumienie ze słuchu',
+      reading: 'Rozumienie tekstów pisanych',
+      mediation: 'Przetwarzanie tekstu',
+      writing: 'Wypowiedź pisemna',
+      language: 'Znajomość środków językowych',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Wypowiedź ustna (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'tschechisch',
+    praefix: 'cs',
+    // Teile der tschechischen Maturita (CERMAT): „Poslech s porozuměním", „Čtení s porozuměním", „Písemný projev"
+    labels: {
+      listening: 'Poslech s porozuměním',
+      reading: 'Čtení s porozuměním',
+      mediation: 'Mediace',
+      writing: 'Písemný projev',
+      language: 'Jazykové prostředky',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Ústní projev (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'portugiesisch',
+    praefix: 'pt',
+    labels: {
+      listening: 'Compreensão oral',
+      reading: 'Compreensão escrita',
+      mediation: 'Mediação',
+      writing: 'Produção escrita',
+      language: 'Gramática e vocabulário',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Produção oral (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'tuerkisch',
+    praefix: 'tr',
+    // Die vier Fertigkeiten des türkischen Lehrplans (MEB): Dinleme, Okuma, Konuşma, Yazma
+    labels: {
+      listening: 'Dinleme',
+      reading: 'Okuma',
+      mediation: 'Aracılık',
+      writing: 'Yazma',
+      language: 'Dil bilgisi ve sözcük bilgisi',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Konuşma (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'chinesisch',
+    praefix: 'zh',
+    // Wie im HSK und in chinesischen Schulprüfungen: 听力, 阅读, 写作; Kurzform ohne „理解" wäre ebenfalls üblich
+    labels: {
+      listening: '听力理解',
+      reading: '阅读理解',
+      mediation: '语言中介',
+      writing: '写作',
+      language: '词汇与语法',
+      grammar: 'Grammatik im Kontext',
+      speaking: '口语表达 (Ersatz für eine schriftliche Arbeit)'
+    }
+  },
+  {
+    fach: 'daz',
+    praefix: 'daz',
+    // Teile nach dem Deutschen Sprachdiplom I (ZfA): Leseverstehen, Hörverstehen, schriftliche und mündliche Kommunikation
+    labels: {
+      listening: 'Hörverstehen',
+      reading: 'Leseverstehen',
+      writing: 'Schriftliche Kommunikation',
+      language: 'Wortschatz und Grammatik im Kontext',
+      grammar: 'Grammatik im Kontext',
+      speaking: 'Mündliche Kommunikation (Ersatz für eine schriftliche Arbeit)'
+    },
+    ohne: ['mediation'],
+    ab: 3,
+    hinweis:
+      'Aufbau nach dem DSD I (Leseverstehen, Hörverstehen, schriftliche Kommunikation – je nach GER-Niveau); für DaZ-Klassenarbeiten nicht fachspezifisch belegt. Notenaussetzung und Nachteilsausgleich regeln die Länder (Anforderungen werden nicht abgesenkt).'
+  }
+]
+
+/**
+ * Sport (30.09.2026): nur Sporttheorie. Grundlage EPA Sport (KMK 1989): schriftlicher Teil als
+ * Erörterung mit oder ohne Material, Kenntnisbereiche Bewegungslehre, Trainingslehre,
+ * motorisches Lernen, Verletzungsprophylaxe, Sport und Gesellschaft; AFB III „Anwendung
+ * sporttheoretischer Kenntnisse auf Falldarstellungen". Für die Sek I gibt es keine eigenen
+ * Formatvorgaben (NI: keine schriftliche Lernkontrolle, NRW: keine Klassenarbeiten) – abgeleitet.
+ */
+const SEK1_SPORT = 'Für die Sekundarstufe I nicht fachspezifisch belegt (abgeleitet aus den EPA Sport).'
+
+export const SPORT: ExamFormat[] = [
+  {
+    id: 'sp-wissen',
+    subject: 'sport',
+    label: 'Sporttheorie: Grundwissen und Regeln',
+    competence: 'Sachkompetenz',
+    description: 'Fachbegriffe, Regeln, Grundlagen von Aufwärmen, Belastung und Gesundheit – kurze Antworten, Zuordnen, Beschriften.',
+    afb: ['I', 'II'],
+    share: 35,
+    grades: [5, 13],
+    material: 'none',
+    note: SEK1_SPORT
+  },
+  {
+    id: 'sp-bewegung',
+    subject: 'sport',
+    label: 'Bewegungsanalyse',
+    competence: 'Bewegungslehre',
+    description: 'Eine Bewegung an einer Bildreihe beschreiben, in Phasen gliedern und Fehlerbilder mit Korrekturhinweisen erläutern.',
+    afb: ['II'],
+    share: 30,
+    grades: [7, 13],
+    material: 'image',
+    note: SEK1_SPORT
+  },
+  {
+    id: 'sp-training',
+    subject: 'sport',
+    label: 'Trainingslehre: Fallanwendung',
+    competence: 'Anwendung auf Falldarstellungen',
+    description: 'Zu einem Fall (Sportlerin, Verein, Schulklasse) Belastungsnormative bestimmen, einen Trainingsplan entwerfen und begründen.',
+    afb: ['II', 'III'],
+    share: 35,
+    grades: [8, 13],
+    material: 'text',
+    note: 'EPA Sport: AFB III „Anwendung sporttheoretischer Kenntnisse auf Falldarstellungen".'
+  },
+  {
+    id: 'sp-eroerterung',
+    subject: 'sport',
+    label: 'Sport und Gesellschaft: Erörterung mit Material',
+    competence: 'Urteilskompetenz',
+    description: 'Zu einem Text, einer Grafik oder Statistik (Doping, Sport und Medien, Gesundheit) Stellung nehmen und urteilen.',
+    afb: ['II', 'III'],
+    share: 30,
+    grades: [10, 13],
+    material: 'data',
+    note: 'EPA Sport: schriftlicher Teil als Erörterung mit oder ohne Material; die Teilaufgaben unabhängig voneinander lösbar.'
+  }
+]
+
+/**
+ * Darstellendes Spiel / Theater (30.09.2026): Grundlage EPA Darstellendes Spiel (KMK 2006) –
+ * Gestalten, Reflektieren, Kennen von Theaterformen. Schriftliche Arbeiten in der Sek I sind
+ * nicht vorgesehen oder nicht geregelt; die Formate sind abgeleitet (so im Hinweis).
+ */
+const DS_HINWEIS = 'Aus den EPA Darstellendes Spiel abgeleitet; für die Sekundarstufe I nicht fachspezifisch belegt.'
+
+export const DARSTELLENDES_SPIEL: ExamFormat[] = [
+  {
+    id: 'ds-wissen',
+    subject: 'darstellendes-spiel',
+    label: 'Theaterformen und Fachbegriffe',
+    competence: 'Kennen und Verstehen',
+    description: 'Theaterformen, Gestaltungsmittel (Körper, Stimme, Raum, Zeit, Requisit) und Fachbegriffe erklären und an Beispielen zeigen.',
+    afb: ['I', 'II'],
+    share: 30,
+    grades: [5, 13],
+    material: 'none',
+    note: DS_HINWEIS
+  },
+  {
+    id: 'ds-analyse',
+    subject: 'darstellendes-spiel',
+    label: 'Inszenierungsanalyse',
+    competence: 'Wahrnehmen und Analysieren',
+    description: 'Eine Szene (Szenenfoto, Szenenbeschreibung oder Dramenauszug) beschreiben und die Wirkung der Gestaltungsmittel analysieren.',
+    afb: ['II'],
+    share: 35,
+    grades: [7, 13],
+    material: 'image',
+    note: DS_HINWEIS
+  },
+  {
+    id: 'ds-konzept',
+    subject: 'darstellendes-spiel',
+    label: 'Inszenierungskonzept',
+    competence: 'Gestalten',
+    description: 'Zu einer Textvorlage ein Inszenierungskonzept entwerfen (Raum, Figur, Licht, Ton) und die Entscheidungen begründen.',
+    afb: ['III'],
+    share: 35,
+    grades: [8, 13],
+    material: 'text',
+    note: DS_HINWEIS
+  },
+  {
+    id: 'ds-reflexion',
+    subject: 'darstellendes-spiel',
+    label: 'Reflexion einer eigenen Gestaltung',
+    competence: 'Reflektieren',
+    description: 'Eine eigene szenische Gestaltung aus dem Unterricht beschreiben, deuten und kriteriengeleitet beurteilen.',
+    afb: ['II', 'III'],
+    share: 30,
+    grades: [5, 13],
+    material: 'none',
+    note: DS_HINWEIS
+  }
+]
+
+/**
+ * Sachunterricht (30.09.2026): kurze schriftliche Lernkontrolle (Hessen Jg. 3 höchstens 15,
+ * Jg. 4 höchstens 30 Minuten; Bayern Probearbeiten in HSU). Kompetenzangabe nach den fünf
+ * Perspektiven des GDSU-Perspektivrahmens 2013. Eine amtliche Formatliste gibt es nicht.
+ */
+const SU_HINWEIS = 'Keine amtliche Formatliste – nicht fachspezifisch belegt. In Jahrgang 1/2 in der Regel ohne Note.'
+
+export const SACHUNTERRICHT: ExamFormat[] = [
+  {
+    id: 'su-wissen',
+    subject: 'sachunterricht',
+    label: 'Wissen und Verstehen',
+    competence: 'Perspektivenübergreifend',
+    description: 'Kurze Antworten, Ankreuzen und Lückensätze zu den Inhalten der Einheit.',
+    afb: ['I', 'II'],
+    share: 35,
+    grades: [1, 4],
+    material: 'none',
+    note: SU_HINWEIS
+  },
+  {
+    id: 'su-zuordnen',
+    subject: 'sachunterricht',
+    label: 'Zuordnen und Beschriften',
+    competence: 'Naturwissenschaftliche und geographische Perspektive',
+    description: 'Eine Abbildung beschriften (Pflanze, Körper, Karte) oder Bilder und Begriffe einander zuordnen.',
+    afb: ['I'],
+    share: 30,
+    grades: [1, 4],
+    material: 'image',
+    note: SU_HINWEIS
+  },
+  {
+    id: 'su-versuch',
+    subject: 'sachunterricht',
+    label: 'Versuch beschreiben',
+    competence: 'Naturwissenschaftliche und technische Perspektive',
+    description: 'Zu einem Versuch aus dem Unterricht Vermutung, Beobachtung und Erklärung aufschreiben.',
+    afb: ['II'],
+    share: 35,
+    grades: [2, 4],
+    material: 'image',
+    note: SU_HINWEIS
+  },
+  {
+    id: 'su-zeit',
+    subject: 'sachunterricht',
+    label: 'Früher und heute',
+    competence: 'Historische und sozialwissenschaftliche Perspektive',
+    description: 'Bilder oder kurze Texte vergleichen und Veränderungen beschreiben; eine eigene Meinung begründen.',
+    afb: ['II', 'III'],
+    share: 30,
+    grades: [3, 4],
+    material: 'image',
+    note: SU_HINWEIS
   }
 ]
 
@@ -662,7 +952,10 @@ export const FORMATE_NEU: ExamFormat[] = [
   ...KUNST,
   ...NATURWISSENSCHAFTEN,
   ...PAEDAGOGIK,
-  ...ARBEITSLEHRE
+  ...ARBEITSLEHRE,
+  ...SPORT,
+  ...DARSTELLENDES_SPIEL,
+  ...SACHUNTERRICHT
 ]
 
 /** Üblicher Aufbau je neuem Fach (Recherche 13.x) */
@@ -685,5 +978,8 @@ export const VORSCHLAG_NEU: Partial<Record<ExamSubjectId, (grade: number) => str
   // 30.09.2026
   naturwissenschaften: (g) => (g <= 7 ? ['nawi-wissen', 'nawi-experiment', 'nawi-daten'] : ['nawi-material', 'nawi-experiment', 'nawi-bewertung']),
   paedagogik: (g) => (g <= 10 ? ['paed-wissen', 'paed-text', 'paed-fall'] : ['paed-text', 'paed-fall', 'paed-eroerterung']),
-  arbeitslehre: (g) => (g <= 8 ? ['al-daten', 'al-fall', 'al-urteil'] : ['al-text', 'al-modell', 'al-urteil'])
+  arbeitslehre: (g) => (g <= 8 ? ['al-daten', 'al-fall', 'al-urteil'] : ['al-text', 'al-modell', 'al-urteil']),
+  sport: (g) => (g <= 7 ? ['sp-wissen', 'sp-bewegung'] : g <= 9 ? ['sp-wissen', 'sp-bewegung', 'sp-training'] : ['sp-bewegung', 'sp-training', 'sp-eroerterung']),
+  'darstellendes-spiel': (g) => (g <= 7 ? ['ds-wissen', 'ds-reflexion'] : ['ds-analyse', 'ds-konzept', 'ds-reflexion']),
+  sachunterricht: (g) => (g <= 2 ? ['su-wissen', 'su-zuordnen'] : ['su-wissen', 'su-zuordnen', 'su-versuch'])
 }

@@ -55,9 +55,8 @@ describe('Programme nach eigenen Fächern', () => {
     expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung', 'tafelbild', 'elternbrief'])
   })
 
-  it('Latein und DaZ zählen zu den Sprachfächern; Latein hat seit 29.09.2026 auch Klassenarbeiten', () => {
-    const sprache = ['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'rueckmeldung', 'tafelbild', 'elternbrief', 'vokabelliste']
-    expect(ids(sichtbareProgramme(PROGRAMME, ['daz'], {}))).toEqual(sprache)
+  it('Latein und DaZ zählen zu den Sprachfächern; Latein seit 29.09.2026, DaZ seit 30.09.2026 auch mit Klassenarbeiten', () => {
+    expect(ids(sichtbareProgramme(PROGRAMME, ['daz'], {}))).toEqual(PROGRAMM_REIHENFOLGE)
     expect(ids(sichtbareProgramme(PROGRAMME, ['latein'], {}))).toEqual(PROGRAMM_REIHENFOLGE)
   })
 

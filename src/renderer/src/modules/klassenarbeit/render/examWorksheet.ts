@@ -22,6 +22,97 @@ import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen
 import { operatorenBlock } from '../didactics/operatorenliste'
 import { examGrades, examPoints } from '../model/types'
 import { RU_BALL, RU_MINUTA, russischPlural } from '../../../shared/russischPlural'
+import { polnischPlural, tschechischPlural } from '../../../shared/kopfSprache'
+import type { Zielsprache } from '../model/faecher'
+
+/** Wortlaute des Kopfkastens in einer Sprache */
+interface KopfkastenTexte {
+  title: string
+  time: (min: number) => string
+  aids: (a: string) => string
+  points: (n: number) => string
+  split: (c: number, l: number) => string
+  counts: (w: number) => string
+  scale: (line: string) => string
+  total: string
+  labels: { writing: string; other: string }
+}
+
+/**
+ * Kopfkasten der neuen Schulfremdsprachen (30.09.2026). Wortlaute nach den Prüfungen der
+ * Herkunftsländer, soweit bekannt (CvTE/NL, CKE/PL, CERMAT/CZ, IAVE/PT, ÖSYM/TR, Gaokao/HSK/CN);
+ * Quellen und Prüfstand in recherche/sprachtexte-2026-09-30.md – nicht muttersprachlich geprüft.
+ * Numerus nach der Zahl: pl 1 punkt / 2 punkty / 5 punktów, cs 1 bod / 2 body / 5 bodů,
+ * Türkisch nach Zahlen immer Singular (45 dakika, 20 puan), Prozent vorangestellt (%40).
+ */
+const NEUE_SPRACHEN: Partial<Record<Zielsprache, KopfkastenTexte>> = {
+  nl: {
+    title: 'Proefwerk',
+    time: (min) => `Tijdsduur: ${min} ${min === 1 ? 'minuut' : 'minuten'}`,
+    aids: (a) => `Toegestane hulpmiddelen: ${a || 'geen'}`,
+    points: (n) => `${n} ${n === 1 ? 'punt' : 'punten'}`,
+    split: (c, l) => `${c} % inhoud, ${l} % taal`,
+    counts: (w) => `telt voor ${w} % mee`,
+    scale: (line) => `Normering: ${line}`,
+    total: 'Totaal',
+    labels: { writing: 'Schrijfvaardigheid', other: 'Overige vaardigheden' }
+  },
+  pl: {
+    title: 'Sprawdzian',
+    time: (min) => `Czas pracy: ${min} ${polnischPlural(min, ['minuta', 'minuty', 'minut'])}`,
+    aids: (a) => `Dozwolone materiały pomocnicze: ${a || 'brak'}`,
+    points: (n) => `${n} ${polnischPlural(n, ['punkt', 'punkty', 'punktów'])}`,
+    split: (c, l) => `treść ${c} %, środki językowe ${l} %`,
+    counts: (w) => `stanowi ${w} % oceny`,
+    scale: (line) => `Skala ocen: ${line}`,
+    total: 'Razem',
+    labels: { writing: 'Wypowiedź pisemna', other: 'Pozostałe umiejętności' }
+  },
+  cs: {
+    title: 'Písemná práce',
+    time: (min) => `Časový limit: ${min} ${tschechischPlural(min, ['minuta', 'minuty', 'minut'])}`,
+    aids: (a) => `Povolené pomůcky: ${a || 'žádné'}`,
+    points: (n) => `${n} ${tschechischPlural(n, ['bod', 'body', 'bodů'])}`,
+    split: (c, l) => `obsah ${c} %, jazykové prostředky ${l} %`,
+    counts: (w) => `tvoří ${w} % známky`,
+    scale: (line) => `Klasifikační stupnice: ${line}`,
+    total: 'Celkem',
+    labels: { writing: 'Písemný projev', other: 'Ostatní dovednosti' }
+  },
+  pt: {
+    title: 'Teste',
+    time: (min) => `Duração: ${min} ${min === 1 ? 'minuto' : 'minutos'}`,
+    aids: (a) => `Material permitido: ${a || 'nenhum'}`,
+    points: (n) => `${n} ${n === 1 ? 'ponto' : 'pontos'}`,
+    split: (c, l) => `${c} % conteúdo, ${l} % língua`,
+    counts: (w) => `vale ${w} %`,
+    scale: (line) => `Escala de classificação: ${line}`,
+    total: 'Total',
+    labels: { writing: 'Produção escrita', other: 'Outras competências' }
+  },
+  tr: {
+    title: 'Yazılı Sınav',
+    time: (min) => `Süre: ${min} dakika`,
+    aids: (a) => `İzin verilen araç gereçler: ${a || 'yok'}`,
+    points: (n) => `${n} puan`,
+    split: (c, l) => `içerik %${c}, dil %${l}`,
+    counts: (w) => `ağırlık: %${w}`,
+    scale: (line) => `Puan–not karşılığı: ${line}`,
+    total: 'Toplam',
+    labels: { writing: 'Yazma', other: 'Diğer beceriler' }
+  },
+  zh: {
+    title: '测验',
+    time: (min) => `考试时间：${min}分钟`,
+    aids: (a) => `允许使用：${a || '无'}`,
+    points: (n) => `${n}分`,
+    split: (c, l) => `内容${c}%，语言${l}%`,
+    counts: (w) => `占总成绩的${w}%`,
+    scale: (line) => `分数与等级对照：${line}`,
+    total: '总分',
+    labels: { writing: '写作', other: '其他能力' }
+  }
+}
 
 /**
  * Kopfkasten der Arbeit: Zeit, Hilfsmittel und Bewertung.
@@ -35,8 +126,9 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
   const fach = fachDerArbeit(m.subjectId)
   const english = fach.sprache === 'en'
   const grades = examGrades(exam)
-  const t =
-    fach.sprache === 'fr'
+  const t: KopfkastenTexte =
+    NEUE_SPRACHEN[fach.sprache] ??
+    (fach.sprache === 'fr'
       ? {
           title: 'Contrôle',
           time: (min: number) => `Durée : ${min} minutes`,
@@ -119,16 +211,18 @@ export function examHeadBlock(exam: Exam): WsBlock | null {
                     writing: eigeneTeilnoteLabel(m.subjectId),
                     other: istAlteSprache(m.subjectId) ? 'Begleitaufgaben' : 'Weitere Kompetenzen'
                   }
-                }
+                })
+  // Chinesisch: Doppelpunkt in voller Breite ohne Leerzeichen („总分：60分")
+  const doppelpunkt = fach.sprache === 'zh' ? '：' : ': '
   const lines = [
     t.time(m.minutes),
     t.aids(translateAids(m.aids, fach.sprache)),
     ...grades.map((g) => {
       const value = g.points > 0 ? t.points(g.points) : t.split(inhaltsanteil(m.subjectId), 100 - inhaltsanteil(m.subjectId))
       // Eine einzige Note (Deutsch, Sachfächer): „Gesamt: 60 Punkte" statt „Weitere Kompetenzen … zählt 100 %"
-      if (grades.length === 1) return `${t.total}: ${value}`
+      if (grades.length === 1) return `${t.total}${doppelpunkt}${value}`
       const label = g.group === 'writing' ? t.labels.writing : t.labels.other
-      return `${label}: ${value} – ${t.counts(g.weight)}`
+      return `${label}${doppelpunkt}${value} – ${t.counts(g.weight)}`
     }),
     // Nur bei einer einzigen Note sinnvoll
     // Nur auf ausdrücklichen Wunsch: Der Schlüssel steht sonst allein im Erwartungshorizont
@@ -162,7 +256,8 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   const gesamt = fassungsZahl(exam)
   const f = Math.min(Math.max(0, fassung), gesamt - 1)
   const label = fassungsLabel(f, gesamt)
-  const gruppe = label ? `${kopfText.gruppe} ${label}` : ''
+  // Türkisch „A Grubu", Chinesisch „A卷" – sonst „Gruppe A"
+  const gruppe = label ? (kopfText.gruppenName?.(label) ?? `${kopfText.gruppe} ${label}`) : ''
   const head = examHeadBlock(exam)
   const kopf: WsBlock[] = head ? [gruppe && head.type === 'infoBox' ? { ...head, title: `${head.title} – ${gruppe}` } : head] : []
   if (!head && gruppe) kopf.push({ id: 'exam-gruppe', type: 'divider', title: gruppe })
@@ -170,14 +265,17 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   teileDerFassung(exam, f).forEach((part, i) => {
     const format = formatById(part.formatId)
     // Überschrift der Teile in der Sprache des Faches
-    // Russisch: 1 балл / 2 балла / 5 баллов; Italienisch: 1 punto / 2 punti
+    // Russisch: 1 балл / 2 балла / 5 баллов; Italienisch: 1 punto / 2 punti; Polnisch, Tschechisch, Niederländisch,
+    // Portugiesisch über `punkteWort`; Chinesisch mit eigener Überschrift („第1部分：阅读理解（20分）")
     const sprache = fachDerArbeit(exam.meta.subjectId).sprache
-    const punkteWort = sprache === 'ru' ? russischPlural(part.points, RU_BALL) : sprache === 'it' && part.points === 1 ? 'punto' : kopfText.punkte
+    const punkteWort =
+      sprache === 'ru' ? russischPlural(part.points, RU_BALL) : sprache === 'it' && part.points === 1 ? 'punto' : (kopfText.punkteWort?.(part.points) ?? kopfText.punkte)
     const points = part.points > 0 ? ` (${part.points} ${punkteWort})` : ''
+    const formatName = format?.label ?? part.label
     blocks.push({
       id: `part-${part.id}`,
       type: 'divider',
-      title: `${kopfText.teil} ${i + 1}: ${format?.label ?? part.label}${points}`
+      title: kopfText.teilUeberschrift?.(i + 1, formatName, part.points) ?? `${kopfText.teil} ${i + 1}: ${formatName}${points}`
     })
     blocks.push(...part.blocks.map((b) => ({ ...b, id: b.id || newId() })))
   })

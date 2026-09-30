@@ -127,9 +127,108 @@ const RUSSISCH: Record<string, string> = {
   'eigene notizen': 'собственные записи'
 }
 
-const WOERTERBUECHER: Record<'en' | 'fr' | 'es' | 'it' | 'ru', Record<string, string>> = { en: ENGLISH, fr: FRANZOESISCH, es: SPANISCH, it: ITALIENISCH, ru: RUSSISCH }
+/*
+ * Neue Schulfremdsprachen (30.09.2026). Fachbegriffe für Wörterbücher: nl „eentalig/tweetalig
+ * woordenboek", pl „słownik jednojęzyczny/dwujęzyczny", cs „výkladový/překladový slovník",
+ * pt „dicionário monolingue/bilingue", tr „tek dilli/iki dilli sözlük", zh „单语/双语词典".
+ * Aufzählung ohne Artikel wie in den Kopfzeilen der Herkunftsländer; nicht muttersprachlich
+ * geprüft (recherche/sprachtexte-2026-09-30.md).
+ */
+const NIEDERLAENDISCH: Record<string, string> = {
+  'keine hilfsmittel': 'geen (geen woordenboek of andere hulpmiddelen)',
+  keine: 'geen',
+  'einsprachiges wörterbuch': 'eentalig woordenboek',
+  'zweisprachiges wörterbuch': 'tweetalig woordenboek',
+  'ein- und zweisprachiges wörterbuch': 'eentalig en tweetalig woordenboek',
+  wörterbuch: 'woordenboek',
+  'wörterbuch nur für den schreibteil': 'woordenboek (alleen bij schrijfvaardigheid)',
+  vokabelheft: 'eigen woordenlijst',
+  'eigene notizen (eine seite)': 'eigen aantekeningen (één pagina)',
+  'eigene notizen': 'eigen aantekeningen'
+}
 
-export function translateAids(aids: string, language: 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'): string {
+const POLNISCH: Record<string, string> = {
+  'keine hilfsmittel': 'brak (bez słownika i innych pomocy)',
+  keine: 'brak',
+  'einsprachiges wörterbuch': 'słownik jednojęzyczny',
+  'zweisprachiges wörterbuch': 'słownik dwujęzyczny',
+  'ein- und zweisprachiges wörterbuch': 'słownik jednojęzyczny i dwujęzyczny',
+  wörterbuch: 'słownik',
+  'wörterbuch nur für den schreibteil': 'słownik (tylko do wypowiedzi pisemnej)',
+  vokabelheft: 'własny zeszyt ze słówkami',
+  'eigene notizen (eine seite)': 'własne notatki (jedna strona)',
+  'eigene notizen': 'własne notatki'
+}
+
+const TSCHECHISCH: Record<string, string> = {
+  'keine hilfsmittel': 'žádné (bez slovníku a jiných pomůcek)',
+  keine: 'žádné',
+  'einsprachiges wörterbuch': 'výkladový slovník',
+  'zweisprachiges wörterbuch': 'překladový slovník',
+  'ein- und zweisprachiges wörterbuch': 'výkladový a překladový slovník',
+  wörterbuch: 'slovník',
+  'wörterbuch nur für den schreibteil': 'slovník (jen pro písemný projev)',
+  vokabelheft: 'vlastní slovníček',
+  'eigene notizen (eine seite)': 'vlastní poznámky (jedna strana)',
+  'eigene notizen': 'vlastní poznámky'
+}
+
+const PORTUGIESISCH: Record<string, string> = {
+  'keine hilfsmittel': 'nenhum (nem dicionário nem outro material)',
+  keine: 'nenhum',
+  'einsprachiges wörterbuch': 'dicionário monolingue',
+  'zweisprachiges wörterbuch': 'dicionário bilingue',
+  'ein- und zweisprachiges wörterbuch': 'dicionário monolingue e dicionário bilingue',
+  wörterbuch: 'dicionário',
+  'wörterbuch nur für den schreibteil': 'dicionário (só na produção escrita)',
+  vokabelheft: 'caderno de vocabulário',
+  'eigene notizen (eine seite)': 'apontamentos pessoais (uma página)',
+  'eigene notizen': 'apontamentos pessoais'
+}
+
+const TUERKISCH: Record<string, string> = {
+  'keine hilfsmittel': 'yok (sözlük ve başka araç gereç kullanılamaz)',
+  keine: 'yok',
+  'einsprachiges wörterbuch': 'tek dilli sözlük',
+  'zweisprachiges wörterbuch': 'iki dilli sözlük',
+  'ein- und zweisprachiges wörterbuch': 'tek dilli ve iki dilli sözlük',
+  wörterbuch: 'sözlük',
+  'wörterbuch nur für den schreibteil': 'sözlük (yalnızca yazma bölümünde)',
+  vokabelheft: 'kelime defteri',
+  'eigene notizen (eine seite)': 'kendi notların (bir sayfa)',
+  'eigene notizen': 'kendi notların'
+}
+
+const CHINESISCH: Record<string, string> = {
+  'keine hilfsmittel': '无（不得使用词典或其他工具）',
+  keine: '无',
+  'einsprachiges wörterbuch': '单语词典',
+  'zweisprachiges wörterbuch': '双语词典',
+  'ein- und zweisprachiges wörterbuch': '单语词典和双语词典',
+  wörterbuch: '词典',
+  'wörterbuch nur für den schreibteil': '词典（仅限写作部分）',
+  vokabelheft: '生词本',
+  'eigene notizen (eine seite)': '个人笔记（一页）',
+  'eigene notizen': '个人笔记'
+}
+
+type AidsSprache = 'en' | 'fr' | 'es' | 'it' | 'ru' | 'nl' | 'pl' | 'cs' | 'pt' | 'tr' | 'zh'
+
+const WOERTERBUECHER: Record<AidsSprache, Record<string, string>> = {
+  en: ENGLISH,
+  fr: FRANZOESISCH,
+  es: SPANISCH,
+  it: ITALIENISCH,
+  ru: RUSSISCH,
+  nl: NIEDERLAENDISCH,
+  pl: POLNISCH,
+  cs: TSCHECHISCH,
+  pt: PORTUGIESISCH,
+  tr: TUERKISCH,
+  zh: CHINESISCH
+}
+
+export function translateAids(aids: string, language: 'de' | AidsSprache): string {
   const text = (aids ?? '').trim()
   if (language === 'de' || !text) return text
   const woerter = WOERTERBUECHER[language]
@@ -140,5 +239,6 @@ export function translateAids(aids: string, language: 'de' | 'en' | 'fr' | 'es' 
       return woerter[item.toLowerCase()] ?? item
     })
     .filter(Boolean)
-    .join(', ')
+    // Chinesisch: Aufzählungskomma „、"
+    .join(language === 'zh' ? '、' : ', ')
 }

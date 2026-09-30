@@ -229,6 +229,11 @@ describe('Fächer', () => {
         FAECHER.some((x) => x.id === f.id),
         f.id
       ).toBe(true)
+      // Sachunterricht (30.09.2026) nur in der Grundschule
+      if (f.art === 'grundschule') {
+        expect(formatsFor(f.id, 3).length, `${f.id} Kl. 3`).toBeGreaterThan(0)
+        continue
+      }
       expect(formatsFor(f.id, 7).length, `${f.id} Kl. 7`).toBeGreaterThan(0)
       expect(formatsFor(f.id, 12).length, `${f.id} Kl. 12`).toBeGreaterThan(0)
     }

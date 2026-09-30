@@ -11,6 +11,8 @@
  * Formatkennungen der Fremdsprachen: `<sprache>-<art>` (en-writing, fr-writing, es-writing …),
  * damit jede Stelle, die eine Art meint („der Schreibteil"), sie für alle drei Sprachen findet.
  */
+import { polnischPlural, tschechischPlural } from '../../../shared/kopfSprache'
+
 export type ExamSubjectId =
   | 'englisch'
   | 'franzoesisch'
@@ -42,6 +44,17 @@ export type ExamSubjectId =
   | 'naturwissenschaften'
   | 'arbeitslehre'
   | 'paedagogik'
+  // 30.09.2026: weitere Schulfremdsprachen (Audit, Punkt 3) und die übrigen Fächer mit schriftlichen Nachweisen
+  | 'niederlaendisch'
+  | 'polnisch'
+  | 'tschechisch'
+  | 'portugiesisch'
+  | 'tuerkisch'
+  | 'chinesisch'
+  | 'sport'
+  | 'darstellendes-spiel'
+  | 'sachunterricht'
+  | 'daz'
 
 /**
  * Art des Fachs – die Programmteile fragen danach statt nach dem Namen.
@@ -51,10 +64,15 @@ export type ExamSubjectId =
  * - naturwissenschaft: Punkte, Versuch und Messwerte, Einheiten als fachliche Fehler
  * - informatik: wie Naturwissenschaft, Code auf Papier oder am Rechner
  * - gesellschaft: Material, Urteil, eine Note (auch Wirtschaft, Religion, Ethik, Philosophie, WuN)
- * - musisch: kurze Lernkontrollen mit Hör- bzw. Bildmaterial
+ * - musisch: kurze Lernkontrollen mit Hör- bzw. Bildmaterial (auch Darstellendes Spiel)
+ * - sport: nur Sporttheorie (EPA Sport 1989), eine Note
+ * - grundschule: Sachunterricht, kurze Lernkontrolle (15–30 Minuten), eine Note
+ *
+ * DaZ ist `fremdsprache` mit deutscher Zielsprache: Teile nach dem DSD I (Lesen, Hören,
+ * schriftliche Kommunikation), eigene Teilnote für das Schreiben, Kopf auf Deutsch.
  */
-export type FachArt = 'fremdsprache' | 'deutsch' | 'gesellschaft' | 'alte-sprache' | 'mathematik' | 'naturwissenschaft' | 'informatik' | 'musisch'
-export type Zielsprache = 'en' | 'fr' | 'es' | 'it' | 'ru' | 'de'
+export type FachArt = 'fremdsprache' | 'deutsch' | 'gesellschaft' | 'alte-sprache' | 'mathematik' | 'naturwissenschaft' | 'informatik' | 'musisch' | 'sport' | 'grundschule'
+export type Zielsprache = 'en' | 'fr' | 'es' | 'it' | 'ru' | 'nl' | 'pl' | 'cs' | 'pt' | 'tr' | 'zh' | 'de'
 
 /** Arten der Fremdsprachen-Teile */
 export type FormatArt = 'listening' | 'reading' | 'mediation' | 'writing' | 'language' | 'grammar' | 'speaking'
@@ -67,6 +85,15 @@ export interface KopfTexte {
   teil: string
   punkte: string
   gruppe: string
+  /**
+   * Sprachen mit anderer Wortstellung oder Beugung (30.09.2026): Wort für „Punkte" nach der Zahl
+   * (pl 1 punkt / 2 punkty / 5 punktów), Name der Fassung (tr „A Grubu", zh „A卷") und die
+   * ganze Teilüberschrift (zh „第1部分：阅读理解（20分）"). Fehlt der Wert, gilt das Muster
+   * „<teil> <nr>: <Format> (<n> <punkte>)" bzw. „<gruppe> <A>".
+   */
+  punkteWort?: (n: number) => string
+  gruppenName?: (buchstabe: string) => string
+  teilUeberschrift?: (nr: number, format: string, punkte: number) => string
 }
 
 export interface KlassenarbeitFach {
@@ -83,6 +110,9 @@ export interface KlassenarbeitFach {
   beispiel: string
   kopf: KopfTexte
 }
+
+const PL_PUNKT: [string, string, string] = ['punkt', 'punkty', 'punktów']
+const CS_BOD: [string, string, string] = ['bod', 'body', 'bodů']
 
 const DEUTSCHER_KOPF = (fach: string): KopfTexte => ({ titel: `Klassenarbeit ${fach}`, fach, teil: 'Teil', punkte: 'Punkte', gruppe: 'Gruppe' })
 
@@ -372,6 +402,123 @@ export const KLASSENARBEIT_FAECHER: KlassenarbeitFach[] = [
     hauptfach: false,
     beispiel: 'z. B. Erziehungsstile',
     kopf: DEUTSCHER_KOPF('Pädagogik')
+  },
+  // ---------- 30.09.2026: weitere Schulfremdsprachen (Kopf in der Zielsprache, recherche/sprachtexte-2026-09-30.md) ----------
+  {
+    id: 'niederlaendisch',
+    label: 'Niederländisch',
+    art: 'fremdsprache',
+    sprache: 'nl',
+    praefix: 'nl',
+    hauptfach: true,
+    beispiel: 'z. B. Op vakantie in Nederland',
+    // „Proefwerk" ist die übliche schriftliche Klassenarbeit in den Niederlanden; Fassungen „Versie A/B"
+    kopf: { titel: 'Proefwerk', fach: 'Nederlands', teil: 'Deel', punkte: 'punten', gruppe: 'Versie', punkteWort: (n) => (n === 1 ? 'punt' : 'punten') }
+  },
+  {
+    id: 'polnisch',
+    label: 'Polnisch',
+    art: 'fremdsprache',
+    sprache: 'pl',
+    praefix: 'pl',
+    hauptfach: true,
+    beispiel: 'z. B. Moja rodzina',
+    // „Sprawdzian" mit „Grupa A/B" wie in polnischen Schulen; Numerus nach der Zahl (polnischPlural)
+    kopf: { titel: 'Sprawdzian', fach: 'Język polski', teil: 'Część', punkte: 'punktów', gruppe: 'Grupa', punkteWort: (n) => polnischPlural(n, PL_PUNKT) }
+  },
+  {
+    id: 'tschechisch',
+    label: 'Tschechisch',
+    art: 'fremdsprache',
+    sprache: 'cs',
+    praefix: 'cs',
+    hauptfach: true,
+    beispiel: 'z. B. Moje rodina',
+    // „Písemná práce" mit „Skupina A/B"; nach Ziffern 1 bod / 2–4 body / sonst bodů (tschechischPlural)
+    kopf: { titel: 'Písemná práce', fach: 'Český jazyk', teil: 'Část', punkte: 'bodů', gruppe: 'Skupina', punkteWort: (n) => tschechischPlural(n, CS_BOD) }
+  },
+  {
+    id: 'portugiesisch',
+    label: 'Portugiesisch',
+    art: 'fremdsprache',
+    sprache: 'pt',
+    praefix: 'pt',
+    hauptfach: true,
+    beispiel: 'z. B. A minha cidade',
+    // Parallele Fassungen heißen in portugiesischen Prüfungen „Versão 1/2" (IAVE) – hier mit Buchstaben
+    kopf: { titel: 'Teste', fach: 'Português', teil: 'Parte', punkte: 'pontos', gruppe: 'Versão', punkteWort: (n) => (n === 1 ? 'ponto' : 'pontos') }
+  },
+  {
+    id: 'tuerkisch',
+    label: 'Türkisch',
+    art: 'fremdsprache',
+    sprache: 'tr',
+    praefix: 'tr',
+    hauptfach: true,
+    beispiel: 'z. B. Benim ailem',
+    // Nach Zahlen steht im Türkischen der Singular (20 puan); der Buchstabe steht vor dem Wort: „A Grubu"
+    kopf: { titel: 'Yazılı Sınav', fach: 'Türkçe', teil: 'Bölüm', punkte: 'puan', gruppe: 'Grubu', gruppenName: (b) => `${b} Grubu` }
+  },
+  {
+    id: 'chinesisch',
+    label: 'Chinesisch',
+    art: 'fremdsprache',
+    sprache: 'zh',
+    praefix: 'zh',
+    hauptfach: true,
+    beispiel: 'z. B. 我的家',
+    // Ordinalzahl mit 第 … 部分, Punkte als „分", Fassungen als „A卷/B卷"; Doppelpunkt und Klammern in voller Breite
+    kopf: {
+      titel: '测验',
+      fach: '汉语',
+      teil: '部分',
+      punkte: '分',
+      gruppe: '卷',
+      punkteWort: () => '分',
+      gruppenName: (b) => `${b}卷`,
+      teilUeberschrift: (nr, format, punkte) => `第${nr}部分：${format}${punkte > 0 ? `（${punkte}分）` : ''}`
+    }
+  },
+  // ---------- 30.09.2026: Sport (Theorie), Darstellendes Spiel, Sachunterricht, DaZ ----------
+  {
+    id: 'sport',
+    label: 'Sport (Theorie)',
+    art: 'sport',
+    sprache: 'de',
+    praefix: 'sp',
+    hauptfach: false,
+    beispiel: 'z. B. Grundlagen der Trainingslehre',
+    kopf: DEUTSCHER_KOPF('Sport')
+  },
+  {
+    id: 'darstellendes-spiel',
+    label: 'Darstellendes Spiel / Theater',
+    art: 'musisch',
+    sprache: 'de',
+    praefix: 'ds',
+    hauptfach: false,
+    beispiel: 'z. B. Figur und Raum',
+    kopf: DEUTSCHER_KOPF('Darstellendes Spiel')
+  },
+  {
+    id: 'sachunterricht',
+    label: 'Sachunterricht',
+    art: 'grundschule',
+    sprache: 'de',
+    praefix: 'su',
+    hauptfach: false,
+    beispiel: 'z. B. Der Wasserkreislauf',
+    kopf: DEUTSCHER_KOPF('Sachunterricht')
+  },
+  {
+    id: 'daz',
+    label: 'Deutsch als Zweitsprache (DaZ)',
+    art: 'fremdsprache',
+    sprache: 'de',
+    praefix: 'daz',
+    hauptfach: false,
+    beispiel: 'z. B. Mein Schulweg',
+    kopf: DEUTSCHER_KOPF('Deutsch als Zweitsprache')
   }
 ]
 

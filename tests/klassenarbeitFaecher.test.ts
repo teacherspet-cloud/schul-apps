@@ -25,7 +25,7 @@ import { examHeadBlock, examToWorksheet } from '../src/renderer/src/modules/klas
  * Phase G). Die Fächer sagen über ihr Profil, was sie sind; die Programmteile fragen danach.
  */
 // Seit 29.09.2026 alle Fächer (Wunsch der Lehrkraft: Klassenarbeiten in allen Fächern)
-const FAECHER: ExamSubjectId[] = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst', 'gesellschaftslehre', 'naturwissenschaften', 'arbeitslehre', 'paedagogik']
+const FAECHER: ExamSubjectId[] = ['englisch', 'franzoesisch', 'spanisch', 'deutsch', 'geschichte', 'politik', 'erdkunde', 'italienisch', 'russisch', 'latein', 'griechisch', 'mathematik', 'informatik', 'biologie', 'chemie', 'physik', 'technik', 'wirtschaft', 'religion', 'ethik', 'philosophie', 'werte-und-normen', 'musik', 'kunst', 'gesellschaftslehre', 'naturwissenschaften', 'arbeitslehre', 'paedagogik', 'niederlaendisch', 'polnisch', 'tschechisch', 'portugiesisch', 'tuerkisch', 'chinesisch', 'sport', 'darstellendes-spiel', 'sachunterricht', 'daz']
 
 const arbeit = (subjectId: ExamSubjectId, over: Partial<Exam['meta']> = {}, parts: ExamPart[] = []): Exam =>
   ({
@@ -67,10 +67,12 @@ describe('Fachprofil', () => {
 
 describe('Formate und Vorschlag', () => {
   it('jedes Fach hat in Klasse 8 und 12 Formate, alle Kennungen eindeutig', () => {
-    for (const f of FAECHER) {
+    // Sachunterricht nur in der Grundschule (30.09.2026)
+    for (const f of FAECHER.filter((x) => x !== 'sachunterricht')) {
       expect(formatsFor(f, 8).length, f).toBeGreaterThan(2)
       expect(formatsFor(f, 12).length, f).toBeGreaterThan(2)
     }
+    expect(formatsFor('sachunterricht', 3).length).toBeGreaterThan(2)
     const ids = EXAM_FORMATS.map((f) => f.id)
     expect(new Set(ids).size).toBe(ids.length)
   })

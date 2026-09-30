@@ -70,11 +70,14 @@ export function amtlicheListe(stateId: string, subjectId: string, wunsch: Anlage
   return hand ?? anlageFuer(stateId, subjectId, wunsch)
 }
 
+const LISTEN_SPRACHEN: string[] = ['de', 'en', 'fr', 'es', 'it', 'ru']
+
 /** Sprache und Stufe der Arbeit für die Wahl der Liste */
 export function anlageWunsch(meta: Exam['meta']): AnlageWunsch {
   const zielsprache = meta.bilingual ? 'en' : fachDerArbeit(meta.subjectId).sprache
-  // Amtliche Operatorenlisten gibt es in Deutsch, Englisch, Französisch und Spanisch – Italienisch und Russisch ohne Liste
-  const sprache = zielsprache === 'it' || zielsprache === 'ru' ? undefined : zielsprache
+  // Amtliche Operatorenlisten gibt es in Deutsch, Englisch, Französisch, Spanisch, Italienisch und Russisch –
+  // die übrigen Sprachen (Niederländisch, Polnisch, Tschechisch, Portugiesisch, Türkisch, Chinesisch) ohne Liste
+  const sprache = LISTEN_SPRACHEN.includes(zielsprache) ? (zielsprache as AnlageWunsch['sprache']) : undefined
   return { sprache, stufe: upperSecondary(meta) ? 'sek2' : 'sek1', schulform: meta.schoolTypeId }
 }
 

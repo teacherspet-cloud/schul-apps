@@ -47,7 +47,22 @@ export const MODI: { value: GrammatikModus; label: string; beschreibung: string 
   { value: 'bandbreite', label: 'Bandbreite', beschreibung: '„Use a variety of tenses and structures." – ab Lernjahr 5, Abschluss, Oberstufe' }
 ]
 
-const SPRACHE: Record<string, 'en' | 'fr' | 'es' | 'it' | 'ru'> = { englisch: 'en', franzoesisch: 'fr', spanisch: 'es', italienisch: 'it', russisch: 'ru' }
+type MusterSprache = 'en' | 'fr' | 'es' | 'it' | 'ru' | 'nl' | 'pl' | 'cs' | 'pt' | 'tr' | 'zh'
+
+const SPRACHE: Record<string, MusterSprache> = {
+  englisch: 'en',
+  franzoesisch: 'fr',
+  spanisch: 'es',
+  italienisch: 'it',
+  russisch: 'ru',
+  // 30.09.2026
+  niederlaendisch: 'nl',
+  polnisch: 'pl',
+  tschechisch: 'cs',
+  portugiesisch: 'pt',
+  tuerkisch: 'tr',
+  chinesisch: 'zh'
+}
 
 type Meta = Exam['meta']
 
@@ -137,7 +152,7 @@ export function hinweise(m: Meta, g: SchreibGrammatik): { text: string; warnung?
 }
 
 /** Muster für die Aufgabenstellung in der Zielsprache (Bericht 5.2) – die KI formuliert danach */
-const MUSTER: Record<'en' | 'fr' | 'es' | 'it' | 'ru', Record<GrammatikModus, string>> = {
+const MUSTER: Record<MusterSprache, Record<GrammatikModus, string>> = {
   en: {
     anzahl: 'Use the {form} at least {n} times.',
     erinnerung: 'Remember: think about the tenses you need (e.g. the {form}).',
@@ -167,6 +182,43 @@ const MUSTER: Record<'en' | 'fr' | 'es' | 'it' | 'ru', Record<GrammatikModus, st
     erinnerung: 'Обрати внимание на нужные времена глаголов.',
     inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
     bandbreite: 'Используй разные времена глаголов и средства логической связи (сначала, потом, потому что, однако …).'
+  },
+  // 30.09.2026 – Muster wie bei Italienisch/Russisch („diese Struktur"), nicht muttersprachlich geprüft
+  nl: {
+    anzahl: 'Gebruik minstens {n} keer deze structuur: {form}.',
+    erinnerung: 'Let op: denk aan de werkwoordstijden die je nodig hebt.',
+    inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
+    bandbreite: 'Gebruik verschillende werkwoordstijden en verbindingswoorden (eerst, daarna, omdat, maar …).'
+  },
+  pl: {
+    anzahl: 'Użyj co najmniej {n} razy tej konstrukcji: {form}.',
+    erinnerung: 'Pamiętaj o odpowiednich czasach.',
+    inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
+    bandbreite: 'Użyj różnych czasów i wyrażeń łączących (najpierw, potem, ponieważ, ale …).'
+  },
+  cs: {
+    anzahl: 'Použij alespoň {n}krát tuto konstrukci: {form}.',
+    erinnerung: 'Nezapomeň na správné časy.',
+    inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
+    bandbreite: 'Použij různé časy a spojovací výrazy (nejdříve, potom, protože, ale …).'
+  },
+  pt: {
+    anzahl: 'Usa pelo menos {n} vezes esta estrutura: {form}.',
+    erinnerung: 'Lembra-te: pensa nos tempos verbais de que precisas.',
+    inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
+    bandbreite: 'Usa tempos verbais variados e conectores (primeiro, depois, porque, mas …).'
+  },
+  tr: {
+    anzahl: 'Bu yapıyı en az {n} kez kullan: {form}.',
+    erinnerung: 'Unutma: gereken zamanları kullan.',
+    inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
+    bandbreite: 'Farklı zamanlar ve bağlaçlar kullan (önce, sonra, çünkü, ama …).'
+  },
+  zh: {
+    anzahl: '请至少使用{n}次以下结构：{form}。',
+    erinnerung: '注意：请使用合适的语法结构。',
+    inhaltspunkte: 'Formuliere Inhaltspunkte, die die Struktur hervorrufen.',
+    bandbreite: '请使用多种句型和关联词（首先、然后、因为、但是……）。'
   }
 }
 
