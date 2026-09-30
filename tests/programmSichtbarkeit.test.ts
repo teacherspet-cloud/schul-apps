@@ -10,7 +10,7 @@ const PROGRAMME = PROGRAMM_REIHENFOLGE.map((id) => ({ id, faecher: PROGRAMM_FAEC
 const ids = (l: { id: string }[]): string[] => l.map((p) => p.id)
 
 describe('Reihenfolge der Programme', () => {
-  it('Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten, Rückmeldung, Elternbriefe, Vokabellisten', () => {
+  it('Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten, Rückmeldung, Tafelbilder, Elternbriefe, Vokabellisten', () => {
     expect(PROGRAMM_REIHENFOLGE).toEqual([
       'arbeitsblatt',
       'vokabeltest',
@@ -18,6 +18,7 @@ describe('Reihenfolge der Programme', () => {
       'lernzielkontrolle',
       'klassenarbeit',
       'rueckmeldung',
+      'tafelbild',
       'elternbrief',
       'vokabelliste'
     ])
@@ -45,16 +46,17 @@ describe('Programme nach eigenen Fächern', () => {
       'lernzielkontrolle',
       'klassenarbeit',
       'rueckmeldung',
+      'tafelbild',
       'elternbrief'
     ])
   })
 
   it('Mathematik allein: mit Klassenarbeit (seit 29.09.2026 alle Fächer), ohne Vokabel- und Grammatikprogramme', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung', 'elternbrief'])
+    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung', 'tafelbild', 'elternbrief'])
   })
 
   it('Latein und DaZ zählen zu den Sprachfächern; Latein hat seit 29.09.2026 auch Klassenarbeiten', () => {
-    const sprache = ['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'rueckmeldung', 'elternbrief', 'vokabelliste']
+    const sprache = ['arbeitsblatt', 'vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'rueckmeldung', 'tafelbild', 'elternbrief', 'vokabelliste']
     expect(ids(sichtbareProgramme(PROGRAMME, ['daz'], {}))).toEqual(sprache)
     expect(ids(sichtbareProgramme(PROGRAMME, ['latein'], {}))).toEqual(PROGRAMM_REIHENFOLGE)
   })

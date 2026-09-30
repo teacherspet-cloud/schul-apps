@@ -1,0 +1,205 @@
+/* Programm „Tafelbilder" (30.09.2026) – Zeichenfläche, Eigenschaften, Präsentation */
+
+.tb-arbeitsflaeche {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.tb-mitte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--mantine-color-gray-1);
+}
+[data-mantine-color-scheme='dark'] .tb-mitte {
+  background: var(--mantine-color-dark-8);
+}
+
+.tb-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+}
+
+.tb-buehne {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.tb-flaeche {
+  position: relative;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tb-flaeche > .tb-svg,
+.tb-flaeche > .tb-svg > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.tb-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: default;
+}
+.tb-overlay .tb-treffer {
+  fill: transparent;
+  cursor: move;
+}
+.tb-overlay .tb-treffer-linie {
+  stroke: transparent;
+  cursor: pointer;
+  fill: none;
+}
+.tb-overlay.tb-zeichnen,
+.tb-overlay.tb-zeichnen .tb-treffer {
+  cursor: crosshair;
+}
+.tb-overlay .tb-auswahl {
+  fill: none;
+  stroke: #228be6;
+  stroke-dasharray: 10 6;
+  pointer-events: none;
+}
+.tb-overlay .tb-griff {
+  fill: #ffffff;
+  stroke: #228be6;
+  cursor: nwse-resize;
+}
+.tb-overlay .tb-griff[data-griff='n'],
+.tb-overlay .tb-griff[data-griff='s'] {
+  cursor: ns-resize;
+}
+.tb-overlay .tb-griff[data-griff='e'],
+.tb-overlay .tb-griff[data-griff='w'] {
+  cursor: ew-resize;
+}
+.tb-overlay .tb-griff[data-griff='ne'],
+.tb-overlay .tb-griff[data-griff='sw'] {
+  cursor: nesw-resize;
+}
+.tb-overlay .tb-hilfslinie {
+  stroke: #f03e3e;
+  stroke-dasharray: 8 6;
+  pointer-events: none;
+}
+.tb-overlay .tb-raster {
+  stroke: rgba(34, 139, 230, 0.22);
+  pointer-events: none;
+}
+.tb-overlay .tb-verbinder-start {
+  fill: none;
+  stroke: #fab005;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+.tb-textfeld {
+  position: absolute;
+  z-index: 3;
+  resize: none;
+  border: 2px solid #228be6;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1d1d1f;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  padding: 4px 6px;
+  outline: none;
+}
+
+.tb-seite {
+  width: 330px;
+  flex: 0 0 330px;
+  border-left: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+  min-height: 0;
+}
+
+.tb-farbe {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--mantine-color-default-border);
+  cursor: pointer;
+  padding: 0;
+}
+.tb-farbe[data-aktiv='true'] {
+  outline: 3px solid #228be6;
+  outline-offset: 1px;
+}
+
+/* Präsentation: Vollbild, Tafel so groß wie möglich */
+.tb-praesentation {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: #111;
+  display: flex;
+  flex-direction: column;
+  touch-action: pan-y;
+}
+.tb-praesentation .tb-p-buehne {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5vh 1.5vw;
+}
+.tb-praesentation .tb-p-buehne svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.tb-praesentation .tb-p-leiste {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+  color: #ddd;
+  background: rgba(0, 0, 0, 0.55);
+}
+.tb-praesentation .tb-p-notiz {
+  flex: 1;
+  font-size: 14px;
+  color: #cfd6dd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Schmale Bildschirme (iPad hochkant): Eigenschaften unter die Fläche */
+@media (max-width: 900px) {
+  .tb-arbeitsflaeche {
+    flex-direction: column;
+  }
+  .tb-seite {
+    width: auto;
+    flex: 0 0 auto;
+    max-height: 42vh;
+    border-left: none;
+    border-top: 1px solid var(--mantine-color-default-border);
+  }
+}
+@media (pointer: coarse) {
+  .tb-overlay .tb-griff {
+    stroke-width: 3;
+  }
+}

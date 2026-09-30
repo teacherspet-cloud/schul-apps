@@ -102,6 +102,8 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
       'nachteilsausgleiche:save',
       'rueckmeldungen:save',
       'sheets:save',
+      // Tafelbilder (30.09.2026)
+      'tafelbilder:save',
       'tests:save',
       'textbooks:save'
     ])

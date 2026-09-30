@@ -16,7 +16,7 @@ import { randomBytes } from 'crypto'
 import { existsSync, readFileSync } from 'fs'
 import { strFromU8, strToU8, unzipSync, zipSync, type Unzipped } from 'fflate'
 
-export const PAKET_ARTEN = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'rueckmeldung', 'elternbrief'] as const
+export const PAKET_ARTEN = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'rueckmeldung', 'elternbrief', 'tafelbild'] as const
 export type PaketArt = (typeof PAKET_ARTEN)[number]
 
 export interface Ablageweg {

@@ -80,6 +80,8 @@ export function erzeugeAblage(ordner: string, bezeichnung: string, wurzel: () =>
 export const ABLAGEN = {
   rueckmeldungen: erzeugeAblage('rueckmeldungen', 'Rückmeldung'),
   elternbriefe: erzeugeAblage('elternbriefe', 'Elternbrief'),
+  // Tafelbilder (30.09.2026)
+  tafelbilder: erzeugeAblage('tafelbilder', 'Tafelbild'),
   // Rückmeldung (29.09.2026): Vorlagen für Bewertungstabellen und die lokal gemerkten Nachteilsausgleiche
   bewertungstabellen: erzeugeAblage('bewertungstabellen', 'Bewertungstabelle'),
   nachteilsausgleiche: erzeugeAblage('nachteilsausgleiche', 'Nachteilsausgleich')

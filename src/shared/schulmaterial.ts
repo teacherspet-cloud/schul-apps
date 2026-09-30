@@ -23,7 +23,8 @@ export const PROGRAMM_ORDNER: Record<string, string> = {
   lernzielkontrolle: 'Lernzielkontrollen',
   klassenarbeit: 'Klassenarbeiten',
   rueckmeldung: 'Rückmeldungen',
-  elternbrief: 'Elternbriefe'
+  elternbrief: 'Elternbriefe',
+  tafelbild: 'Tafelbilder'
 }
 
 /** Höchstens so viele Ebenen Themenbereich (die Oberfläche ist für drei gebaut) */

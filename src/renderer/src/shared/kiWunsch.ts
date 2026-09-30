@@ -113,6 +113,13 @@ export function regelVorschlaege(k: WunschKontext): string[] {
     case 'selfCheck':
       v.push('Aussagen näher an den Aufgaben')
       break
+    // Tafelbilder (30.09.2026): ein Element bzw. das ganze Tafelbild
+    case 'tafelelement':
+      v.push('Kürzer (Stichpunkte)', 'Fachbegriff hervorheben', 'Mit Beispiel', 'Passendes Symbol')
+      break
+    case 'tafelbild':
+      v.push('Weniger Text', 'Mehr Symbole und Pfeile', 'Klarere Struktur', 'Merksatz prägnanter', 'Anderer Aufbau (Tabelle statt Netz)')
+      break
     case 'vokabel':
       v.push('Mehr Kontextsätze', 'Schwierigere Ablenker', 'Anfangsbuchstaben als Hilfe', 'Andere Satzbeispiele')
       break

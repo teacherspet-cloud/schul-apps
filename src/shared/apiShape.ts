@@ -99,7 +99,7 @@ export interface ApiExtras {
 }
 
 /** Eintrag einer Bibliothek der neuen Programme (Rückmeldung, Elternbrief) */
-export type PaketArt = 'arbeitsblatt' | 'vokabeltest' | 'klassenarbeit' | 'lernzielkontrolle' | 'grammatiktest' | 'rueckmeldung' | 'elternbrief'
+export type PaketArt = 'arbeitsblatt' | 'vokabeltest' | 'klassenarbeit' | 'lernzielkontrolle' | 'grammatiktest' | 'rueckmeldung' | 'elternbrief' | 'tafelbild'
 
 export interface PaketVorschau {
   titel: string
@@ -123,7 +123,7 @@ export interface SavedDokumentMeta {
 
 export function buildApi(call: Call, extras: ApiExtras) {
   /** Bibliothek eines neuen Programms (Großprogramm 0.4) – main/services/storage/dokumente.ts */
-  const dokumentAblage = (kanal: 'rueckmeldungen' | 'elternbriefe' | 'bewertungstabellen' | 'nachteilsausgleiche') => ({
+  const dokumentAblage = (kanal: 'rueckmeldungen' | 'elternbriefe' | 'tafelbilder' | 'bewertungstabellen' | 'nachteilsausgleiche') => ({
     list: () => call<SavedDokumentMeta[]>(`${kanal}:list`),
     get: (id: string) => call<SavedDokumentMeta & { payload: unknown }>(`${kanal}:get`, id),
     save: (input: { id: string; name: string; stats: Record<string, unknown>; payload: unknown }) => call<SavedDokumentMeta>(`${kanal}:save`, input),
@@ -286,6 +286,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Neue Programme (Großprogramm 0.4) – gemeinsame Ablage im Hauptprozess */
     rueckmeldungen: dokumentAblage('rueckmeldungen'),
     elternbriefe: dokumentAblage('elternbriefe'),
+    /** Tafelbilder (30.09.2026) */
+    tafelbilder: dokumentAblage('tafelbilder'),
     /** Rückmeldung (29.09.2026): Vorlagen für Bewertungstabellen, gemerkte Nachteilsausgleiche (nur auf diesem Rechner) */
     bewertungstabellen: dokumentAblage('bewertungstabellen'),
     nachteilsausgleiche: dokumentAblage('nachteilsausgleiche'),

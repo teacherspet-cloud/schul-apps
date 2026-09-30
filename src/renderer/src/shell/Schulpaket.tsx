@@ -13,7 +13,7 @@ import { ladeMaterialien } from './materialien'
  * nicht, deshalb auch keinen QR-Code.
  */
 
-const PAKET_ARTEN: PaketArt[] = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'rueckmeldung', 'elternbrief']
+const PAKET_ARTEN: PaketArt[] = ['arbeitsblatt', 'vokabeltest', 'klassenarbeit', 'lernzielkontrolle', 'grammatiktest', 'rueckmeldung', 'elternbrief', 'tafelbild']
 const programmName = (art: string): string => modules.find((m) => m.id === art)?.name ?? art
 
 interface Eintrag {

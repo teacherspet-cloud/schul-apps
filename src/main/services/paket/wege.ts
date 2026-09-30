@@ -28,7 +28,8 @@ export const WEGE: Record<PaketArt, Ablageweg> = {
   lernzielkontrolle: weg(getKurztest, saveKurztest),
   grammatiktest: weg(getGrammarTest, saveGrammarTest),
   rueckmeldung: weg(ABLAGEN.rueckmeldungen.get, ABLAGEN.rueckmeldungen.save),
-  elternbrief: weg(ABLAGEN.elternbriefe.get, ABLAGEN.elternbriefe.save)
+  elternbrief: weg(ABLAGEN.elternbriefe.get, ABLAGEN.elternbriefe.save),
+  tafelbild: weg(ABLAGEN.tafelbilder.get, ABLAGEN.tafelbilder.save)
 }
 
 const hoertextPfad = (name: string): string | null => {

@@ -53,6 +53,8 @@ export const PROGRAMM_FAECHER: Record<string, ProgrammFaecher> = {
   lernzielkontrolle: 'alle',
   klassenarbeit: KLASSENARBEIT_FAECHER,
   rueckmeldung: 'alle',
+  // Tafelbilder (30.09.2026): Unterrichtsmaterial für jedes Fach – vor den organisatorischen Programmen
+  tafelbild: 'alle',
   elternbrief: 'alle',
   // Die Listen als Werkzeug der Vokabeltests ganz am Ende (Wunsch der Lehrkraft, 29.09.2026)
   vokabelliste: SPRACH_FAECHER

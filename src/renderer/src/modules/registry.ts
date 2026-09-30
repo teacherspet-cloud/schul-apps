@@ -8,6 +8,7 @@ import VokabellisteModule from './vokabelliste/VokabellisteModule'
 import VokabeltestModule from './vokabeltest/VokabeltestModule'
 import RueckmeldungModule from './rueckmeldung/RueckmeldungModule'
 import ElternbriefModule from './elternbrief/ElternbriefModule'
+import TafelbildModule from './tafelbild/TafelbildModule'
 import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
 
 /**
@@ -15,10 +16,10 @@ import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtb
  * Neues Programm: Ordner unter modules/ anlegen und hier eintragen –
  * es erscheint dann automatisch als Kachel auf der Startseite und in der Leiste.
  *
- * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+8 – gezählt werden nur die
+ * Die Reihenfolge ist zugleich die der Tastenkürzel Strg+1 … Strg+9 – gezählt werden nur die
  * sichtbaren Programme. Seit Paket 12 (Wunsch der Lehrkraft, 26.09.2026) gilt überall:
  * Arbeitsblätter, Vokabeltest, Grammatiktest, Lernzielkontrollen, Klassenarbeiten,
- * Rückmeldung, Elternbriefe, Vokabellisten – die meistgenutzten zuerst, die Listen als Werkzeug der
+ * Rückmeldung, Tafelbilder (seit 30.09.2026), Elternbriefe, Vokabellisten – die meistgenutzten zuerst, die Listen als Werkzeug der
  * Vokabeltests zuletzt (seit 29.09.2026 auch hinter den Elternbriefen, Wunsch der Lehrkraft).
  * Dieselbe Folge steht in shared/programmSichtbarkeit.ts (`PROGRAMM_REIHENFOLGE`).
  *
@@ -128,6 +129,18 @@ export const modules: SchulModule[] = [
     leistenbild: leistenbild('rueckmeldung'),
     faecher: PROGRAMM_FAECHER.rueckmeldung,
     component: RueckmeldungModule
+  },
+  {
+    id: 'tafelbild',
+    name: 'Tafelbilder',
+    description:
+      'Übersichtliche Tafelbilder für Klapptafel, Whiteboard, Flipchart und Heft – mit oder ohne eigenes Material, frei bearbeitbar, als Lückenfassung, schrittweise präsentiert, als PDF, PNG oder PowerPoint.',
+    icon: programmSymbol('tafelbild', 'lime'),
+    color: 'lime',
+    illustration: illustration('tafelbild'),
+    leistenbild: leistenbild('tafelbild'),
+    faecher: PROGRAMM_FAECHER.tafelbild,
+    component: TafelbildModule
   },
   {
     id: 'elternbrief',

@@ -10,6 +10,7 @@
  * lässt (tests/materialien.test.ts).
  */
 import { lehrwerkAngaben } from '@shared/lehrwerkSprache'
+import type { SavedDokumentMeta } from '@shared/apiShape'
 import type { SavedExamMeta, SavedGrammarTestMeta, SavedKurztestMeta, SavedTestMeta, SavedVocabList, SavedWorksheetMeta } from '@shared/types'
 import { LANGUAGES } from '../modules/vokabeltest/model/types'
 import { SUBJECTS } from '../modules/arbeitsblatt/model/subjects'
@@ -49,6 +50,8 @@ export interface Listen {
   grammarTests: SavedGrammarTestMeta[]
   exams: SavedExamMeta[]
   vokabellisten: SavedVocabList[]
+  /** Tafelbilder (30.09.2026) – optional, ältere Aufrufe kennen sie nicht */
+  tafelbilder?: SavedDokumentMeta[]
 }
 
 const klasse = (g?: number): string => (g ? `Klasse ${g}` : '')
@@ -195,6 +198,21 @@ export function vereinige(l: Listen): Material[] {
         v.language,
         v.grade
       )
+    ),
+    ...(l.tafelbilder ?? []).map((t) =>
+      material(
+        'tafelbild',
+        t.id,
+        t.name,
+        t.updatedAt,
+        !t.hatTafel,
+        zeile(t.subjectLabel, klasse(t.grade), t.thema),
+        [String(t.formate ?? '')],
+        t.subjectId ? String(t.subjectId) : t.subjectLabel,
+        t.grade,
+        t.thema ?? '',
+        { stateId: t.stateId ? String(t.stateId) : undefined, schoolTypeId: t.schoolTypeId ? String(t.schoolTypeId) : undefined }
+      )
     )
   ]
 }
@@ -226,13 +244,14 @@ export function suche(liste: Material[], eingabe: string): Material[] {
 /** Holt die Listen aller Programme. Fällt eine aus, fehlen nur deren Einträge. */
 export async function ladeMaterialien(): Promise<Material[]> {
   const sicher = <T>(p: Promise<T[]>): Promise<T[]> => p.catch(() => [])
-  const [tests, sheets, kurztests, grammarTests, exams, vokabellisten] = await Promise.all([
+  const [tests, sheets, kurztests, grammarTests, exams, vokabellisten, tafelbilder] = await Promise.all([
     sicher(window.api.tests.list()),
     sicher(window.api.sheets.list()),
     sicher(window.api.kurztests.list()),
     sicher(window.api.grammarTests.list()),
     sicher(window.api.exams.list()),
-    sicher(window.api.library.list())
+    sicher(window.api.library.list()),
+    sicher(window.api.tafelbilder.list())
   ])
-  return vereinige({ tests, sheets, kurztests, grammarTests, exams, vokabellisten })
+  return vereinige({ tests, sheets, kurztests, grammarTests, exams, vokabellisten, tafelbilder })
 }
