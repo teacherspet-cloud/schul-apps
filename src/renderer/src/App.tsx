@@ -1,9 +1,9 @@
 import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
+import { IconChevronsLeft, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
 import { useMaskottchen } from './shared/maskottchenStore'
 import { modules } from './modules/registry'
@@ -17,12 +17,23 @@ import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
 import { druckeAktives, openModule, useNavigation } from './shared/navigation'
+import { useTelefon, useTouch } from './shared/touch/touchModus'
+import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
 
 /** Breite Leiste (Symbol und Name) oder schmale (nur Symbole) – gemerkt je Rechner */
 const LEISTE_KEY = 'schul-apps-leiste-breit'
 const leseLeiste = (): boolean => {
   try {
     return localStorage.getItem(LEISTE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+/** Mit dem Finger (iPad): Seitenleiste ganz ausgeblendet – gemerkt je Gerät */
+const LEISTE_AUS_KEY = 'schul-apps-leiste-aus'
+const leseLeisteAus = (): boolean => {
+  try {
+    return localStorage.getItem(LEISTE_AUS_KEY) === '1'
   } catch {
     return false
   }
@@ -62,6 +73,28 @@ export default function App(): React.JSX.Element {
       // ohne lokalen Speicher gilt die Wahl nur für diese Sitzung
     }
   }
+
+  /*
+   * Mit dem Finger (30.09.2026, shared/touch/MobilNavigation.tsx): Auf dem iPhone steht die
+   * Navigation unten, auf dem iPad lässt sich die Seitenleiste ausblenden. Beide Male öffnet
+   * „Programme" bzw. ein Wischen vom linken Rand die Programmliste. Am PC bleibt alles.
+   */
+  const touch = useTouch()
+  const telefon = useTelefon()
+  const [leisteAus, setLeisteAus] = useState(leseLeisteAus)
+  const [schublade, setSchublade] = useState(false)
+  const ohneLeiste = telefon || (touch && leisteAus)
+  const leisteAusblenden = (aus: boolean): void => {
+    setLeisteAus(aus)
+    try {
+      localStorage.setItem(LEISTE_AUS_KEY, aus ? '1' : '0')
+    } catch {
+      // ohne lokalen Speicher gilt die Wahl nur für diese Sitzung
+    }
+  }
+  const schubladeAuf = useCallback(() => setSchublade(true), [])
+  useRandWischen(ohneLeiste, schubladeAuf)
+  const navDaten: NavigationsDaten = { programme: sichtbar, active, laufpunkte, oeffnen: openModule }
 
   /*
    * Vor dem Schließen des Fensters alles sichern und dem Hauptprozess Bescheid geben – das
@@ -129,60 +162,77 @@ export default function App(): React.JSX.Element {
     )
 
   return (
-    <AppShell navbar={{ width: breit ? 232 : 76, breakpoint: 0 }} padding={0}>
-      <AppShell.Navbar p={10} className="app-leiste" data-breit={breit}>
-        <AppShell.Section>
-          <NavIcon label="Startseite" breit={breit} active={active === 'home' || active === 'themen'} onClick={() => openModule('home')}>
-            <IconHome size={22} />
-          </NavIcon>
-        </AppShell.Section>
-        {/*
+    <AppShell navbar={ohneLeiste ? undefined : { width: breit ? 232 : 76, breakpoint: 0 }} padding={0}>
+      {!ohneLeiste && (
+        <AppShell.Navbar p={10} className="app-leiste" data-breit={breit}>
+          <AppShell.Section>
+            <NavIcon label="Startseite" breit={breit} active={active === 'home' || active === 'themen'} onClick={() => openModule('home')}>
+              <IconHome size={22} />
+            </NavIcon>
+          </AppShell.Section>
+          {/*
           Die Programmliste rollt nur senkrecht und ohne eigenen Balken-Rahmen. Vorher lag sie in
           einer ScrollArea, deren waagerechter Balken unten als grauer Streifen über dem
           Einstellungs-Symbol stehen blieb.
         */}
-        <AppShell.Section grow className="leiste-liste" mt="md">
-          {sichtbar.map((m) => (
-            <NavIcon
-              key={m.id}
-              label={m.name}
-              breit={breit}
-              active={active === m.id}
-              badge={laufpunkte[m.id]}
-              bild={m.leistenbild}
-              onClick={() => openModule(m.id)}
-            >
-              <m.icon size={22} />
-            </NavIcon>
-          ))}
-        </AppShell.Section>
-        <AppShell.Section>
-          {!schmalerBildschirm && (
-            <Tooltip label={breit ? 'Leiste einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow>
+          <AppShell.Section grow className="leiste-liste" mt="md">
+            {sichtbar.map((m) => (
+              <NavIcon
+                key={m.id}
+                label={m.name}
+                breit={breit}
+                active={active === m.id}
+                badge={laufpunkte[m.id]}
+                bild={m.leistenbild}
+                onClick={() => openModule(m.id)}
+              >
+                <m.icon size={22} />
+              </NavIcon>
+            ))}
+          </AppShell.Section>
+          <AppShell.Section>
+            {!schmalerBildschirm && (
+              <Tooltip label={breit ? 'Leiste einklappen' : 'Leiste mit Namen ausklappen'} position="right" withArrow>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  className="leiste-umschalter"
+                  onClick={umschalten}
+                  aria-label={breit ? 'Leiste einklappen' : 'Leiste ausklappen'}
+                  aria-expanded={breit}
+                  size={36}
+                  mb={6}
+                >
+                  {breit ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {/* Mit dem Finger (iPad): die Leiste ganz ausblenden – dann mehr Platz für das Blatt */}
+            {touch && (
               <ActionIcon
                 variant="subtle"
                 color="gray"
                 className="leiste-umschalter"
-                onClick={umschalten}
-                aria-label={breit ? 'Leiste einklappen' : 'Leiste ausklappen'}
-                aria-expanded={breit}
-                size={36}
+                onClick={() => leisteAusblenden(true)}
+                aria-label="Seitenleiste ausblenden"
+                size={44}
                 mb={6}
+                data-leiste-ausblenden
               >
-                {breit ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
+                <IconChevronsLeft size={20} />
               </ActionIcon>
-            </Tooltip>
-          )}
-          <NavIcon label="Einstellungen" breit={breit} active={active === 'settings'} onClick={() => openModule('settings')}>
-            <IconSettings size={22} />
-          </NavIcon>
-        </AppShell.Section>
-      </AppShell.Navbar>
+            )}
+            <NavIcon label="Einstellungen" breit={breit} active={active === 'settings'} onClick={() => openModule('settings')}>
+              <IconSettings size={22} />
+            </NavIcon>
+          </AppShell.Section>
+        </AppShell.Navbar>
+      )}
 
       {/* Nach dem ersten Start und nach dem Zurücksetzen: die Einrichtung in drei Schritten */}
       <Einrichtung />
 
-      <AppShell.Main className="app-main">
+      <AppShell.Main className="app-main" data-mobil-tabs={telefon || undefined}>
         {/* Die Startseite wird bei jedem Zurückkommen neu aufgebaut – damit ist „Zuletzt bearbeitet" aktuell */}
         {active === 'home' && <Home />}
         {active === 'settings' && <SettingsPage />}
@@ -195,6 +245,18 @@ export default function App(): React.JSX.Element {
           </div>
         ))}
       </AppShell.Main>
+
+      {telefon && <MobilTabs daten={navDaten} onProgramme={schubladeAuf} />}
+      {!telefon && ohneLeiste && <LeistenGriff onClick={schubladeAuf} />}
+      {ohneLeiste && (
+        <ProgrammSchublade
+          offen={schublade}
+          onClose={() => setSchublade(false)}
+          position={telefon ? 'bottom' : 'left'}
+          daten={navDaten}
+          onLeisteEinblenden={telefon ? undefined : () => leisteAusblenden(false)}
+        />
+      )}
 
       {/* Laufende und fertige Hintergrund-Aufträge – unten rechts über allen Programmen */}
       <AuftragsLayer />

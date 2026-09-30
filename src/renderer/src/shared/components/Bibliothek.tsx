@@ -7,6 +7,7 @@ import { useMenueFokus } from '../menueFokus'
 import { imNetz } from '../netzZugang'
 import { useConfirmKeys } from '../useConfirmKeys'
 import { notifyError, notifySuccess, uid } from '../util'
+import WischZeile from '../touch/WischZeile'
 import { FachPunkt } from './FachFarbe'
 import { zuordnungKopieren, zuordnungVergessen } from '../themenbereiche'
 
@@ -190,7 +191,7 @@ export function BibliothekKopf({
           </Button>
         </div>
       )}
-      <Group justify="space-between" wrap="nowrap" align="flex-start">
+      <Group justify="space-between" wrap="nowrap" align="flex-start" className="bibliothek-kopf">
         <div style={{ minWidth: 0 }}>
           <Title order={2}>{titel}</Title>
           {untertitel && (
@@ -229,18 +230,24 @@ export function BibliothekLeer({ leer, text }: { leer: boolean; text: string }):
 export function EintragMenue<M extends BibliotheksEintrag>({
   bib,
   eintrag,
-  vorne
+  vorne,
+  offen,
+  onOffen
 }: {
   bib: Bibliothek<M>
   eintrag: M
   /** Zusätzliche Punkte des Programms vor den gemeinsamen */
   vorne?: React.ReactNode
+  /** Von außen geöffnet (langer Druck auf den Eintrag, shared/touch/WischZeile.tsx) */
+  offen?: boolean
+  onOffen?: (offen: boolean) => void
 }): React.JSX.Element {
   const verschieben = useContext(VerschiebenKontext)
   // Umbenennen und Löschen öffnen ein Feld bzw. eine Rückfrage mit Fokus – das Menü darf ihn nicht zurückholen
   const { menue, weiter } = useMenueFokus()
+  const gesteuert = offen !== undefined && onOffen ? { opened: offen, onChange: onOffen } : {}
   return (
-    <Menu position="bottom-end" withinPortal {...menue}>
+    <Menu position="bottom-end" withinPortal {...menue} {...gesteuert}>
       <Menu.Target>
         <ActionIcon variant="subtle" aria-label={`Weitere Aktionen für „${eintrag.name}“`}>
           <IconDots size={16} />
@@ -371,40 +378,51 @@ export function EintragZeile<M extends BibliotheksEintrag>({
   fach?: string
 }): React.JSX.Element {
   const neu = bib.neuId === eintrag.id
+  const [menueOffen, setMenueOffen] = useState(false)
+  /*
+   * Mit dem Finger (30.09.2026): nach links wischen = „Kopie" und „Löschen", langer Druck =
+   * das ⋯-Menü. Beides steht auch im ⋯-Menü; am PC gibt WischZeile nur die Karte aus.
+   */
+  const aktionen = [
+    { label: 'Kopie', icon: <IconCopy size={18} />, farbe: 'var(--mantine-color-blue-6)', onClick: () => void bib.kopieren(eintrag.id) },
+    ...(imNetz() ? [] : [{ label: 'Löschen', icon: <IconTrash size={18} />, farbe: 'var(--mantine-color-red-6)', onClick: () => bib.setLoeschen(eintrag) }])
+  ]
   return (
-    <Card withBorder padding="sm" data-bibliothek-eintrag={eintrag.name} style={neu ? { borderColor: 'var(--mantine-color-teal-5)' } : undefined}>
-      <Group justify="space-between" wrap="nowrap">
-        <Oeffnen name={eintrag.name} onOeffnen={onOeffnen}>
-          <Group gap="xs">
-            {fach && <FachPunkt fach={fach} />}
-            <Text fw={600} truncate>
-              {eintrag.name}
+    <WischZeile aktionen={aktionen} onLangerDruck={() => setMenueOffen(true)}>
+      <Card withBorder padding="sm" data-bibliothek-eintrag={eintrag.name} style={neu ? { borderColor: 'var(--mantine-color-teal-5)' } : undefined}>
+        <Group justify="space-between" wrap="nowrap">
+          <Oeffnen name={eintrag.name} onOeffnen={onOeffnen}>
+            <Group gap="xs">
+              {fach && <FachPunkt fach={fach} />}
+              <Text fw={600} truncate>
+                {eintrag.name}
+              </Text>
+              {offen && (
+                <Badge size="sm" variant="filled" color="gray">
+                  geöffnet
+                </Badge>
+              )}
+              {neu && (
+                <Badge size="sm" variant="light" color="teal">
+                  neu
+                </Badge>
+              )}
+              {kennzeichen}
+            </Group>
+            <Text size="xs" c="dimmed">
+              {info}
             </Text>
-            {offen && (
-              <Badge size="sm" variant="filled" color="gray">
-                geöffnet
-              </Badge>
-            )}
-            {neu && (
-              <Badge size="sm" variant="light" color="teal">
-                neu
-              </Badge>
-            )}
-            {kennzeichen}
+          </Oeffnen>
+          <Group gap={4} wrap="nowrap">
+            <Button size="xs" onClick={onOeffnen}>
+              Öffnen
+            </Button>
+            <EintragMenue bib={bib} eintrag={eintrag} offen={menueOffen} onOffen={setMenueOffen} />
           </Group>
-          <Text size="xs" c="dimmed">
-            {info}
-          </Text>
-        </Oeffnen>
-        <Group gap={4} wrap="nowrap">
-          <Button size="xs" onClick={onOeffnen}>
-            Öffnen
-          </Button>
-          <EintragMenue bib={bib} eintrag={eintrag} />
         </Group>
-      </Group>
-      <EintragRueckfragen bib={bib} eintrag={eintrag} />
-    </Card>
+        <EintragRueckfragen bib={bib} eintrag={eintrag} />
+      </Card>
+    </WischZeile>
   )
 }
 

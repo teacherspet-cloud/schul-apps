@@ -9,6 +9,14 @@ import { abgemeldet, imNetz, netzZugangEinrichten } from './shared/netzZugang'
 
 netzZugangEinrichten()
 
+// Bedienung mit dem Finger (iPad, iPhone, Tablet im Browser): Größen, Gesten, Tastatur – am PC mit Maus ohne Wirkung
+import './shared/touch/touch.css'
+import { touchModusEinrichten } from './shared/touch/touchModus'
+import { gestenEinrichten } from './shared/touch/gesten'
+
+touchModusEinrichten()
+gestenEinrichten()
+
 import { MantineProvider } from '@mantine/core'
 import { useColorScheme } from '@mantine/hooks'
 import { Notifications } from '@mantine/notifications'

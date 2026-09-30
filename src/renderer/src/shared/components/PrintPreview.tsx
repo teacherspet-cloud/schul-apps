@@ -8,6 +8,7 @@ import { parsePageRanges } from '../printRanges'
 import { druckeImBrowser, imNetz } from '../netzZugang'
 import { aufIos } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
+import { ZoomFlaeche } from '../touch/zoom'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -221,53 +222,56 @@ export default function PrintPreview({
               </Stack>
             </Center>
           ) : (
-            <Stack align="center" gap="lg" py="lg">
-              {pages.map((src, i) => (
-                <Box key={i} style={{ textAlign: 'center' }}>
-                  <img
-                    src={src}
-                    alt={`Seite ${i + 1}`}
-                    data-print-page={i + 1}
-                    style={{
-                      width: 'min(560px, 100%)',
-                      background: '#fff',
-                      boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
-                      filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
-                      opacity: selected.has(i + 1) ? 1 : 0.35
-                    }}
-                  />
-                  <Text size="xs" c="dimmed" mt={4}>
-                    Seite {i + 1} von {pages.length}
-                    {!selected.has(i + 1) && ' · wird nicht gedruckt'}
-                  </Text>
-                </Box>
-              ))}
-              {loesung && loesungPages && (
-                <Text size="sm" fw={600} c="dimmed" data-loesung-trenner>
-                  {loesung.titel} – eigener Druckauftrag{loesungExemplare === 0 ? ' (wird nicht gedruckt)' : ''}
-                </Text>
-              )}
-              {loesung &&
-                loesungPages?.map((src, i) => (
-                  <Box key={`l${i}`} style={{ textAlign: 'center' }}>
+            // Mit dem Finger: Zwei-Finger-Zoom und Zoom-Knöpfe (shared/touch/zoom.tsx); am PC unverändert
+            <ZoomFlaeche>
+              <Stack align="center" gap="lg" py="lg">
+                {pages.map((src, i) => (
+                  <Box key={i} style={{ textAlign: 'center' }}>
                     <img
                       src={src}
-                      alt={`${loesung.titel}, Seite ${i + 1}`}
-                      data-print-loesung={i + 1}
+                      alt={`Seite ${i + 1}`}
+                      data-print-page={i + 1}
                       style={{
                         width: 'min(560px, 100%)',
                         background: '#fff',
                         boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
                         filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
-                        opacity: loesungExemplare > 0 ? 1 : 0.35
+                        opacity: selected.has(i + 1) ? 1 : 0.35
                       }}
                     />
                     <Text size="xs" c="dimmed" mt={4}>
-                      {loesung.titel}, Seite {i + 1} von {loesungPages.length}
+                      Seite {i + 1} von {pages.length}
+                      {!selected.has(i + 1) && ' · wird nicht gedruckt'}
                     </Text>
                   </Box>
                 ))}
-            </Stack>
+                {loesung && loesungPages && (
+                  <Text size="sm" fw={600} c="dimmed" data-loesung-trenner>
+                    {loesung.titel} – eigener Druckauftrag{loesungExemplare === 0 ? ' (wird nicht gedruckt)' : ''}
+                  </Text>
+                )}
+                {loesung &&
+                  loesungPages?.map((src, i) => (
+                    <Box key={`l${i}`} style={{ textAlign: 'center' }}>
+                      <img
+                        src={src}
+                        alt={`${loesung.titel}, Seite ${i + 1}`}
+                        data-print-loesung={i + 1}
+                        style={{
+                          width: 'min(560px, 100%)',
+                          background: '#fff',
+                          boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
+                          filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
+                          opacity: loesungExemplare > 0 ? 1 : 0.35
+                        }}
+                      />
+                      <Text size="xs" c="dimmed" mt={4}>
+                        {loesung.titel}, Seite {i + 1} von {loesungPages.length}
+                      </Text>
+                    </Box>
+                  ))}
+              </Stack>
+            </ZoomFlaeche>
           )}
         </ScrollArea>
 

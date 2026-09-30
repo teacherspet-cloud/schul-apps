@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Button, Group, Loader, Stack, Text } from '@mantine/core'
 import { Dropzone } from '@mantine/dropzone'
 import { IconCamera, IconFileUpload, IconPhoto, IconScan, IconUpload, IconX } from '@tabler/icons-react'
+import { useTouch } from '../touch/touchModus'
 
 export const FILE_TYPES = {
   image: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp'],
@@ -94,14 +95,32 @@ function IosBildquellen({ onFiles, multiple, disabled }: { onFiles: (files: File
   const belegt = disabled || aktiv !== null
   return (
     <Stack gap={4}>
-      <Group gap="xs" grow wrap="wrap">
-        <Button variant="light" leftSection={<IconCamera size={18} />} loading={aktiv === 'kamera'} disabled={belegt && aktiv !== 'kamera'} onClick={() => void holen('kamera')}>
+      <Group gap="xs" grow wrap="wrap" className="ios-bildquellen">
+        <Button
+          variant="light"
+          leftSection={<IconCamera size={18} />}
+          loading={aktiv === 'kamera'}
+          disabled={belegt && aktiv !== 'kamera'}
+          onClick={() => void holen('kamera')}
+        >
           Foto aufnehmen
         </Button>
-        <Button variant="light" leftSection={<IconPhoto size={18} />} loading={aktiv === 'fotos'} disabled={belegt && aktiv !== 'fotos'} onClick={() => void holen('fotos')}>
+        <Button
+          variant="light"
+          leftSection={<IconPhoto size={18} />}
+          loading={aktiv === 'fotos'}
+          disabled={belegt && aktiv !== 'fotos'}
+          onClick={() => void holen('fotos')}
+        >
           Aus Fotos wählen
         </Button>
-        <Button variant="light" leftSection={<IconScan size={18} />} loading={aktiv === 'scan'} disabled={belegt && aktiv !== 'scan'} onClick={() => void holen('scan')}>
+        <Button
+          variant="light"
+          leftSection={<IconScan size={18} />}
+          loading={aktiv === 'scan'}
+          disabled={belegt && aktiv !== 'scan'}
+          onClick={() => void holen('scan')}
+        >
           Dokument scannen
         </Button>
       </Group>
@@ -116,6 +135,9 @@ function IosBildquellen({ onFiles, multiple, disabled }: { onFiles: (files: File
 
 /** Gemeinsame Drag-&-Drop-Fläche für alle Module. */
 export default function DropZone({ onFiles, accept, title, hint, loading, multiple = true, minHeight = 140 }: Props): React.JSX.Element {
+  // Mit dem Finger zieht niemand Dateien auf die Fläche – dort heißt es „… auswählen" (Antippen öffnet die Auswahl)
+  const touch = useTouch()
+  const titel = touch ? title.replace(/ hierher ziehen( oder klicken)?$/, ' auswählen') : title
   const flaeche = (
     <Dropzone
       onDrop={onFiles}
@@ -138,7 +160,7 @@ export default function DropZone({ onFiles, accept, title, hint, loading, multip
         </Dropzone.Idle>
         <Stack gap={2}>
           <Text size="lg" fw={600}>
-            {title}
+            {titel}
           </Text>
           {hint && (
             <Text size="sm" c="dimmed">

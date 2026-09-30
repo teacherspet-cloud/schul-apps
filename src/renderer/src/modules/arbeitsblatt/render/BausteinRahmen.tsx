@@ -235,6 +235,15 @@ export function BausteinRahmen({
    */
   const druckBeginn = (e: React.PointerEvent): void => {
     /*
+     * Ein ZWEITER Finger heißt Zoomen (shared/touch/zoom.tsx), nicht Verschieben: Der Zug des
+     * ersten Fingers wird abgebrochen. Vorher lief dessen Uhr weiter – der Baustein löste sich
+     * beim Aufziehen mit zwei Fingern aus dem Fluss (30.09.2026).
+     */
+    if (!e.isPrimary) {
+      abbrechen()
+      return
+    }
+    /*
      * ACHTUNG: `[contenteditable="true"]` reicht NICHT. Die bearbeitbaren Texte dieser App
      * stehen auf `contenteditable="plaintext-only"` – mit der engeren Abfrage hätte langes
      * Drücken mitten im Schreiben den Baustein weggezogen.
@@ -252,6 +261,7 @@ export function BausteinRahmen({
       ziel.closest('input, textarea, button, a, [role="textbox"], .rt-editable, .vt-editable')
     )
       return
+    abbrechen()
     const x = e.clientX
     const y = e.clientY
     start.current = { x, y }

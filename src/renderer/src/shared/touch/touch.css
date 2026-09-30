@@ -1,0 +1,606 @@
+/*
+ * Touch-Modus (30.09.2026) – Bedienung mit dem Finger auf iPad, iPhone und Tablet im Browser.
+ *
+ * Alle Regeln hängen an `html[data-touch]` (gesetzt von touchModus.ts). Am PC mit Maus gilt
+ * davon NICHTS – die Oberfläche bleibt dort, wie sie ist.
+ *
+ * Grundlage: recherche/mobile-bedienung-2026-09-30.md
+ *  - Ziele mindestens 44 × 44 Punkte (Apple HIG, WCAG 2.5.5), Abstand ≥ 8 Punkte
+ *  - Eingaben mit ≥ 16 px Schrift – sonst zoomt iOS beim Antippen in das Feld
+ *  - Nichts nur beim Überfahren: Werkzeuge erscheinen nach dem Antippen (data-angetippt, touchTipp.ts)
+ *  - Telefonbreite (≤ 700 px): Dialoge als Vollbild, Seitenpanels als Blatt von unten, eine Spalte
+ *
+ * Die Mantine-Größen stehen in CSS-Variablen je Größenstufe (--button-height-xs …). Die Stufe
+ * setzt Mantine inline (`--button-height: var(--button-height-xs)`), deshalb werden hier die
+ * Stufen selbst umgestellt – das trifft jeden Knopf, egal mit welcher Größe er gebaut ist.
+ */
+
+/* ---------- Grundlagen */
+
+html[data-touch] body {
+  /* Kein Doppeltipp-Zoom und damit keine Verzögerung beim Antippen */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Knöpfe: kein Textmarkieren und kein Systemmenü beim langen Druck (der zeigt die Beschreibung) */
+html[data-touch] button,
+html[data-touch] [role='button'],
+html[data-touch] [role='tab'],
+html[data-touch] .mantine-Stepper-step,
+html[data-touch] .nav-icon {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Die App läuft im Tablet-Browser nicht mehr unter die Adressleiste (100vh ist dort zu hoch) */
+html[data-touch] .app-main {
+  height: 100dvh;
+}
+
+/* Browser: Die Bildschirmtastatur überdeckt die Seite nur – die App rückt darüber (gesten.ts misst) */
+html[data-touch][data-tastatur] .app-main {
+  height: calc(100dvh - var(--tastatur-hoehe, 0px));
+  min-height: 0;
+}
+
+/* ---------- Zielgrößen (44 Punkte) */
+
+html[data-touch] .mantine-Button-root {
+  --button-height-xs: 44px;
+  --button-height-sm: 44px;
+  --button-height-md: 44px;
+  --button-height-compact-xs: 44px;
+  --button-height-compact-sm: 44px;
+  --button-height-compact-md: 44px;
+  --button-height-compact-lg: 44px;
+}
+
+html[data-touch] .mantine-ActionIcon-root {
+  --ai-size-xs: 44px;
+  --ai-size-sm: 44px;
+  --ai-size-md: 44px;
+  --ai-size-lg: 44px;
+  --ai-size-input-xs: 44px;
+  --ai-size-input-sm: 44px;
+  --ai-size-input-md: 44px;
+}
+
+/* Knöpfe in Eingabefeldern (Löschen-Kreuz, Augen-Symbol) füllen die Feldhöhe */
+html[data-touch] .mantine-Input-section .mantine-ActionIcon-root,
+html[data-touch] .mantine-Input-section .mantine-CloseButton-root {
+  --ai-size-xs: 36px;
+  --ai-size-sm: 36px;
+  --ai-size-md: 36px;
+  --cb-size-xs: 36px;
+  --cb-size-sm: 36px;
+  --cb-size-md: 36px;
+}
+
+html[data-touch] .mantine-CloseButton-root {
+  --cb-size-xs: 44px;
+  --cb-size-sm: 44px;
+  --cb-size-md: 44px;
+  --cb-size-lg: 44px;
+}
+
+html[data-touch] .mantine-Input-wrapper {
+  --input-height-xs: 44px;
+  --input-height-sm: 44px;
+  --input-height-md: 44px;
+}
+
+/* ≥ 16 px in allen Eingaben: iOS zoomt sonst beim Antippen hinein */
+html[data-touch] .mantine-Input-input,
+html[data-touch] .mantine-PillsInput-field,
+html[data-touch] .mantine-TagsInput-inputField {
+  font-size: max(16px, var(--_input-fz, var(--input-fz, var(--mantine-font-size-md))));
+}
+/* Auf dem Blatt stehen die Felder in Blattschrift – dort bleibt die Größe des Blattes */
+html[data-touch] :is(input:not([type='checkbox'], [type='radio'], [type='range']), textarea, select):not(:is(.ws-page, .vt-page, .rm-buehne) *) {
+  font-size: max(16px, 1em);
+}
+
+/* Zahlenfelder: statt winziger Pfeile (24 × 17) die Zifferntastatur */
+html[data-touch] .mantine-NumberInput-controls {
+  display: none;
+}
+
+html[data-touch] .mantine-SegmentedControl-root {
+  --sc-padding-xs: 11px 12px;
+  --sc-padding-sm: 11px 14px;
+  --sc-padding-md: 11px 16px;
+}
+
+html[data-touch] .mantine-Tabs-tab,
+html[data-touch] .mantine-Accordion-control,
+html[data-touch] .mantine-Menu-item,
+html[data-touch] .mantine-Combobox-option,
+html[data-touch] .mantine-NavLink-root {
+  min-height: 44px;
+}
+
+html[data-touch] .mantine-Stepper-step {
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+}
+
+html[data-touch] .mantine-Checkbox-body,
+html[data-touch] .mantine-Radio-body,
+html[data-touch] .mantine-Switch-body {
+  min-height: 44px;
+  align-items: center;
+}
+html[data-touch] .mantine-Checkbox-root,
+html[data-touch] .mantine-Radio-root {
+  --checkbox-size-xs: 22px;
+  --checkbox-size-sm: 24px;
+  --radio-size-xs: 22px;
+  --radio-size-sm: 24px;
+}
+/* Kästchen OHNE Beschriftung (Tabellenzeilen): die Fläche um das Kästchen zählt mit */
+html[data-touch] .mantine-Checkbox-root:not(:has(.mantine-Checkbox-label)) .mantine-Checkbox-body {
+  min-width: 44px;
+  justify-content: center;
+}
+
+html[data-touch] .mantine-Chip-root {
+  --chip-size-xs: 36px;
+  --chip-size-sm: 40px;
+  --chip-size-md: 44px;
+}
+
+/* Textverweise („ändern", „einrichten"): größere Trefferfläche, gleiche Zeile */
+html[data-touch] .mantine-Anchor-root {
+  display: inline-block;
+  padding: 14px 6px;
+  margin: -14px -6px;
+}
+
+html[data-touch] .mantine-Anchor-root {
+  min-width: 44px;
+  text-align: center;
+}
+
+/* Knöpfe mit eigener (kleinerer) Höhe im Code – etwa Vorschläge zum Übernehmen – und Klappköpfe */
+html[data-touch] .mantine-Button-root {
+  min-height: 44px !important;
+}
+html[data-touch] .mantine-UnstyledButton-root[aria-expanded] {
+  min-height: 44px;
+}
+html[data-touch] .app-leiste .leiste-umschalter {
+  --ai-size: 44px !important;
+}
+html[data-touch] :is(.mantine-PillsInput-field, .mantine-TagsInput-inputField, .mantine-MultiSelect-inputField) {
+  min-height: 32px;
+}
+
+/* Kennzeichen, die man antippt (Operatoren, Vorschläge zum Übernehmen) */
+html[data-touch] .mantine-Badge-root:is([role='checkbox'], [role='button'], [tabindex='0'], button) {
+  --badge-height-xs: 36px;
+  --badge-height-sm: 40px;
+  --badge-height-md: 44px;
+  min-height: 44px;
+  --badge-fz-xs: 12px;
+  --badge-fz-sm: 13px;
+}
+
+/* Abstand zwischen Knöpfen in Leisten ≥ 8 Punkte (sonst trifft der Finger den Nachbarn) */
+html[data-touch] .app-toolbar {
+  gap: 8px !important;
+}
+
+/* ---------- Werkzeugleisten */
+
+/*
+ * Die Leisten bleiben einzeilig und lassen sich seitwärts wischen (app.css) – ein Verlauf am
+ * rechten Rand zeigt, dass es weitergeht. Im Hochformat (iPad hochkant, iPhone) bricht die
+ * Leiste des PROGRAMMS um (Schritte, „Meine …", „Neu …" – nichts verschwindet rechts); die
+ * Editorleiste darunter rollt weiter, sonst nähmen beide zusammen ein Viertel der Höhe.
+ */
+html[data-touch] .app-toolbar {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  padding-inline-end: 28px !important;
+}
+html[data-touch] .app-toolbar::-webkit-scrollbar {
+  display: none;
+}
+@media (orientation: portrait) {
+  html[data-touch] .app-toolbar:not(.editor-leiste) {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    row-gap: 6px !important;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  html[data-touch] .app-toolbar:not(.editor-leiste) .mantine-Stepper-root {
+    flex: 1 1 auto !important;
+  }
+}
+
+/* ---------- Werkzeuge, die sonst nur beim Überfahren erscheinen */
+
+/* Blätter: Zauberstab und Werkzeuge sind nach dem Antippen des Bausteins da (data-angetippt) */
+html[data-touch] .editor-ai-revise-slot {
+  opacity: 1;
+}
+html[data-touch] [data-angetippt] > .editor-block-toolbar,
+html[data-touch] .editor-block[data-angetippt] .editor-block-toolbar {
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+}
+
+/*
+ * Auf dem verkleinerten Blatt (iPhone: 40 %) schrumpften die Werkzeuge mit – auf 18 Punkte.
+ * Sie bekommen den Zoom des Blattes zurück (FitToWidth setzt --blatt-zoom) und bleiben fingergroß.
+ */
+html[data-touch] .editor-block-toolbar,
+html[data-touch] .vt-item-controls {
+  zoom: calc(1 / var(--blatt-zoom, 1));
+}
+
+html[data-touch] .editor-block-toolbar :is(button, [role='button']) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* Vokabeltest: die Knöpfe an Einträgen (Tauschen, Löschen …) nach dem Antippen */
+html[data-touch] :is(.vt-item, .vt-gaptext-gap, .vt-picture, .vt-match tr)[data-angetippt] .vt-item-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+html[data-touch] .vt-item-controls button {
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+/* Rückmeldung: Werkzeuge an Notizen, Abschnitten und Zeilen nach dem Antippen */
+html[data-touch] .rm-notiz[data-angetippt] .rm-werkzeug,
+html[data-touch] .rm-zeile[data-angetippt] > .rm-zeilen-werkzeug {
+  display: inline-flex;
+}
+html[data-touch] .bl-k[data-angetippt] .rm-abschnitt-werkzeug {
+  opacity: 1;
+}
+
+/* Einfügestellen der Gliederung: immer sichtbar */
+html[data-touch] .einfuege-stelle {
+  height: 24px;
+}
+html[data-touch] .einfuege-stelle .mantine-ActionIcon-root {
+  opacity: 0.85;
+}
+
+/* Beschreibung eines Knopfes nach langem Druck (gesten.ts) */
+.touch-tipp {
+  position: fixed;
+  z-index: 10000;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(33, 37, 41, 0.94);
+  color: #fff;
+  font: 500 14px/1.35 system-ui, -apple-system, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  animation: touch-tipp-ein 120ms ease-out;
+}
+@keyframes touch-tipp-ein {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ---------- Zoom der Blätter (ZoomFlaeche) */
+
+html[data-touch] .fit-to-width {
+  /* Der Zwei-Finger-Zoom gehört dem Blatt, nicht der ganzen Seite */
+  touch-action: pan-x pan-y;
+}
+.zoom-knoepfe {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  width: fit-content;
+  margin: 8px 12px 8px auto;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--app-surface, var(--mantine-color-body));
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+.zoom-knoepfe:has(~ .zoom-knoepfe) {
+  /* Deckblatt und Seiten: EIN Satz Knöpfe (der Zoom gilt für alle Blätter) */
+  display: none;
+}
+.zoom-knoepfe .zoom-wert {
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+}
+.fit-to-width[data-gezoomt] {
+  overflow-x: auto;
+}
+
+/* ---------- Navigation (MobilNavigation.tsx) */
+
+.mobil-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 150;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  padding: 4px 8px calc(4px + env(safe-area-inset-bottom, 0px));
+  background: var(--app-nav-bg, var(--mantine-color-body));
+  border-top: 1px solid var(--app-border, var(--mantine-color-default-border));
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+}
+.mobil-tab {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 52px;
+  min-width: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--mantine-color-text);
+  font: 600 12px/1.1 system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+}
+.mobil-tab[data-aktiv='true'] {
+  color: var(--mantine-primary-color-filled);
+  background: var(--mantine-primary-color-light);
+}
+.mobil-tab img {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+:root[data-app-nav='filled'] .mobil-tab {
+  color: rgba(255, 255, 255, 0.92);
+}
+:root[data-app-nav='filled'] .mobil-tab[data-aktiv='true'] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+/* Platz für die Leiste unten */
+/* (Mantine gibt dem Hauptbereich min-height: 100dvh – das muss mit herunter) */
+html[data-touch] .app-main[data-mobil-tabs] {
+  height: calc(100dvh - 62px - env(safe-area-inset-bottom, 0px));
+  min-height: 0;
+}
+html[data-touch][data-tastatur] .app-main[data-mobil-tabs] {
+  height: calc(100dvh - var(--tastatur-hoehe, 0px));
+}
+html[data-tastatur] .mobil-tabs {
+  display: none;
+}
+
+/* Programmliste als Schublade */
+.mobil-programme {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.mobil-programm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--app-border, var(--mantine-color-default-border));
+  border-radius: 12px;
+  background: var(--app-surface, var(--mantine-color-body));
+  color: var(--mantine-color-text);
+  font: 600 14px/1.2 system-ui, -apple-system, sans-serif;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.mobil-programm[data-aktiv='true'] {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--mantine-primary-color-light);
+}
+.mobil-programm img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+}
+
+/* Griff am linken Rand bei ausgeblendeter Leiste (Tablet) */
+.leiste-griff {
+  position: fixed;
+  left: calc(6px + env(safe-area-inset-left, 0px));
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 150;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- Wischaktionen in Listen (WischZeile.tsx) */
+
+.wisch-zeile {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-default, 8px);
+}
+.wisch-zeile-aktionen {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+  align-items: stretch;
+}
+.wisch-zeile-aktionen button {
+  width: 88px;
+  border: 0;
+  color: #fff;
+  font: 600 13px/1.2 system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.wisch-zeile-inhalt {
+  position: relative;
+  z-index: 1;
+  transition: transform 180ms ease;
+  touch-action: pan-y;
+  background: var(--app-surface, var(--mantine-color-body));
+}
+.wisch-zeile-inhalt[data-zieht] {
+  transition: none;
+}
+
+/* ---------- Telefonbreite */
+
+@media (max-width: 700px) {
+  /*
+   * Die Werkzeugleiste des angetippten Bausteins steht unten über der Navigation – wie die
+   * Leisten in Pages oder Notability. Neben dem Blatt ist auf dem iPhone kein Platz.
+   */
+  html[data-touch] .editor-block-toolbar {
+    position: fixed !important;
+    top: auto !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 6px !important;
+    padding: 6px;
+    border-radius: 14px;
+    background: var(--app-surface, #fff);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+    z-index: 160;
+  }
+  html[data-touch] .editor-block:not([data-angetippt]):not(.editor-block-aktiv) .editor-block-toolbar {
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+  /* Gruppen darin (KI-Knöpfe) ebenfalls nebeneinander */
+  html[data-touch] .editor-block-toolbar :is(.mantine-Stack-root, .mantine-Group-root) {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+  }
+  /* Solange die Leiste unten steht, rücken die Zoom-Knöpfe darüber */
+  html[data-touch] .module-container:has(.editor-block[data-angetippt], .editor-block-aktiv) .zoom-knoepfe {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Dialoge als Vollbild – mit Abstand zu Statusleiste und App-Wechsel-Balken */
+  html[data-touch] .mantine-Modal-root .mantine-Modal-inner {
+    padding: 0 !important;
+    align-items: stretch !important;
+  }
+  html[data-touch] .mantine-Modal-root .mantine-Modal-content {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100dvh;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+  html[data-touch] .mantine-Modal-root .mantine-Modal-header {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+  html[data-touch] .mantine-Modal-root .mantine-Modal-body {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /*
+   * Seitenpanels (Blattoptionen, Einstellungen am Baustein) als Blatt von unten: ein Popover
+   * mit 360 Punkten Breite läge auf dem iPhone halb neben dem Bildschirm. Auswahllisten und
+   * Menüs bleiben, wo sie sind – sie sind klein und gehören zu ihrem Feld.
+   */
+  html[data-touch] .mantine-Popover-dropdown:not(.mantine-Combobox-dropdown):not(.mantine-Menu-dropdown) {
+    position: fixed !important;
+    top: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 75dvh;
+    overflow: auto;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.2);
+  }
+  html[data-touch] .mantine-Popover-dropdown:not(.mantine-Combobox-dropdown):not(.mantine-Menu-dropdown) .mantine-Popover-arrow {
+    display: none;
+  }
+  html[data-touch] :is(.mantine-Menu-dropdown, .mantine-Combobox-dropdown) {
+    max-width: calc(100vw - 16px);
+  }
+
+  /* In Dialogen und in der Fußleiste der Formulare darf eine Knopfzeile umbrechen, statt Knöpfe abzuschneiden */
+  html[data-touch] .formular-fuss .mantine-Group-root,
+  html[data-touch] .mantine-Modal-root .mantine-Group-root {
+    --group-wrap: wrap !important;
+  }
+
+  /* Kopf der Bibliotheken: Knöpfe unter den Titel statt darüber */
+  html[data-touch] .bibliothek-kopf {
+    --group-wrap: wrap !important;
+  }
+
+  /* Kamera, Fotos, Scan untereinander statt abgeschnitten nebeneinander */
+  html[data-touch] .ios-bildquellen > * {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Eine Spalte statt zwei */
+  html[data-touch] .mantine-SimpleGrid-root {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  html[data-touch] .mantine-Grid-col {
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Schritte kompakt: nur der aktuelle mit Namen */
+  html[data-touch] .mantine-Stepper-step:not([data-progress]) .mantine-Stepper-stepBody {
+    display: none;
+  }
+  html[data-touch] .mantine-Stepper-stepDescription {
+    display: none;
+  }
+  html[data-touch] .mantine-Stepper-separator {
+    margin-inline: 6px;
+    min-width: 12px;
+  }
+
+  /* Druckvorschau: Seiten und Einstellungen untereinander */
+  html[data-touch] .pv-raum {
+    flex-wrap: wrap;
+    height: auto;
+  }
+  html[data-touch] .pv-vorschau,
+  html[data-touch] .pv-seite {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
