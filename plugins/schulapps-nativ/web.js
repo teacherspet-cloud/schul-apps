@@ -42,3 +42,11 @@ export class ScannerWeb extends WebPlugin {
     return { seiten: [] }
   }
 }
+
+export class HintergrundWeb extends WebPlugin {
+  async beginnen() {
+    return { id: null }
+  }
+
+  async beenden() {}
+}

@@ -24,6 +24,7 @@ import {
   dokumentOffen,
   laeuft,
   laufendeAuftraege,
+  nimmUnterbrocheneAuf,
   setzeFehlerMeldung,
   useAuftraege,
   useSekundentakt,
@@ -76,6 +77,9 @@ export default function AuftragsLayer(): React.JSX.Element | null {
 
   // Fehler eines Auftrags erscheinen wie überall als roter Hinweis (ein Abbruch nicht)
   useEffect(() => setzeFehlerMeldung((e, titel) => notifyError(e, titel)), [])
+
+  // iPad-App: Aufträge, die beim letzten Beenden der App noch liefen, fortsetzen (shared/auftraege.ts)
+  useEffect(() => void nimmUnterbrocheneAuf(), [])
 
   // Neuer Auftrag: kurz pulsieren statt aufklappen – nicht aufdringlich
   useEffect(() => {
@@ -242,6 +246,14 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
           <Text size="xs" c={a.status === 'fehler' ? 'red' : undefined} lineClamp={3}>
             {a.status === 'wartend' ? (a.wartegrund ?? 'Wartet auf freien Platz …') : a.meldung}
           </Text>
+          {/* Verbindung zum PC weg (iPad-App, Browser, 30.09.2026): Der Auftrag ist nicht verloren – das soll hier stehen */}
+          {laeuft(a) && a.verbindung && (
+            <Text size="xs" c="orange" data-verbindung={a.verbindung}>
+              {a.verbindung === 'unterbrochen'
+                ? 'Verbindung unterbrochen – Auftrag läuft am PC weiter, wird fortgesetzt …'
+                : 'App war im Hintergrund – die Anfrage wird wiederholt …'}
+            </Text>
+          )}
           <Text size="xs" c="dimmed">
             {laeuft(a) ? `${dauerLabel(vergangen)}${rest ? ` · ${rest}` : ''}` : a.status === 'fertig' ? `nach ${dauerLabel(vergangen)}` : ''}
           </Text>

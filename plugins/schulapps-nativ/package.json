@@ -1,7 +1,7 @@
 {
   "name": "schulapps-nativ",
   "version": "0.1.0",
-  "description": "Native iOS-Bausteine der Schul-Apps: PDF-Erzeugung und AirPrint, Schluesselbund, Dokumentenscanner",
+  "description": "Native iOS-Bausteine der Schul-Apps: PDF-Erzeugung und AirPrint, Schluesselbund, Dokumentenscanner, Hintergrundzeit",
   "private": true,
   "type": "module",
   "main": "index.js",

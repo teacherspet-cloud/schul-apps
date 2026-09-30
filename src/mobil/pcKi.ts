@@ -18,17 +18,32 @@
  *  - Hörtexte:  audio:voices, audio:speak, audio:preview – die fertige Hördatei wird auf dem
  *               iPad abgelegt, damit audio:read sie wie eine eigene Vertonung findet
  * ai:status wird zusammengesetzt: Was über den PC läuft, meldet der PC.
+ *
+ * WIEDERANKNÜPFEN (30.09.2026, Wunsch der Lehrkraft): Lange Anfragen laufen über das
+ * Auftragsregister am PC (main/services/lanAuftraege.ts, renderer/src/shared/netzAuftrag.ts).
+ * Reißt die Verbindung ab – WLAN-Wechsel, Tailscale verbindet neu, App im Hintergrund (iOS hält
+ * die WebView dort an) –, läuft der Auftrag am PC weiter; das iPad fragt ihn nach der
+ * Unterbrechung über seine ID wieder ab, statt ihn neu zu senden. Offene IDs stehen im
+ * `auftragsSpeicher` (iPad: localStorage): Nach einem Neustart der App nimmt dieselbe Anfrage
+ * (gleicher Kanal, gleiche Eingaben) den laufenden oder fertigen Auftrag am PC wieder auf,
+ * statt ihn ein zweites Mal rechnen zu lassen (`beanspruche`).
+ *
+ * TAILSCALE (30.09.2026): iOS erlaubt unverschlüsseltes HTTP nur zu Namen auf „.ts.net"
+ * (scripts/ios-plist.sh), nicht zur rohen Tailscale-IP 100.x. Der PC nennt beim Anmelden seinen
+ * Namen; die App merkt ihn sich (`tailscaleGefunden`) und nimmt ihn statt einer 100.x-Adresse.
  */
 import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
 import type { AiStatus, PcKiEinstellungen, PcKiTest, SubscriptionStatus, TtsResult } from '@shared/types'
-import { AnmeldungAbgelaufen, netzVerbindung, type NetzVerbindung } from '../renderer/src/shared/netzVerbindung'
+import { AnmeldungAbgelaufen, netzVerbindung, OhneAuftragsregister, type NetzVerbindung } from '../renderer/src/shared/netzVerbindung'
+import { AuftragUnterbrochen, fuehreAuftragAus } from '../renderer/src/shared/netzAuftrag'
+import { zielAdresse } from '../renderer/src/shared/pcAdresse'
 
 export const KANAELE_TEXTE = ['ai:structured', 'ai:websuche'] as const
 export const KANAELE_BILDER = ['ai:image'] as const
 export const KANAELE_HOERTEXTE = ['audio:voices', 'audio:speak', 'audio:preview'] as const
+/** Lange Anfragen, die über das Auftragsregister am PC laufen (wie AUFTRAGS_KANAELE in main/services/lanAuftraege.ts) */
+export const UEBER_REGISTER: readonly string[] = ['ai:structured', 'ai:image', 'ai:websuche', 'audio:speak']
 
-/** Voreinstellung des Netzzugangs am PC (main/umgebung.ts) */
-const STANDARD_PORT = '8420'
 /** Anmeldung, Test und Statusabfrage: länger wartet niemand auf eine Antwort, bevor es „nicht erreichbar" heißt */
 const KURZ_MS = 8000
 /** Wie lange ein erfolgreicher Erreichbarkeitstest (oder eine erfolgreiche Antwort) gilt */
@@ -47,27 +62,62 @@ export const GLEICHZEITIG = 3
 /** So lange gilt ein gelesener KI-Stand des PCs, ohne erneut zu fragen */
 const STAND_MS = 60_000
 
-/**
- * Die eingegebene Adresse in die Form http://host:port bringen.
- *
- * Angenommen wird, was die Netz-Einstellungen am PC zeigen („http://192.168.1.24:8420"), aber
- * auch ohne http:// oder ohne Port. Jeder Rechnername und jede Adresse ist erlaubt – nicht nur
- * die üblichen Heimnetz-Bereiche: Tailscale vergibt 100.x-Adressen und Namen auf „.ts.net".
- */
-export function pcAdresse(eingabe: string): string {
-  let text = String(eingabe ?? '').trim()
-  if (!text) throw new Error('Es ist noch keine Adresse des PCs eingetragen.')
-  if (!/^[a-z]+:\/\//i.test(text)) text = `http://${text}`
-  let url: URL
-  try {
-    url = new URL(text)
-  } catch {
-    throw new Error(`„${eingabe}" ist keine gültige Adresse. Erwartet wird z. B. 192.168.1.24:8420.`)
+export { ersetzeTailscaleIp, istTailscaleIp, pcAdresse, zeigtAufTailscaleIp, zielAdresse } from '../renderer/src/shared/pcAdresse'
+
+/** Ein offener Auftrag am PC, den das iPad sich merkt (über Neustarts) */
+export interface OffenerPcAuftrag {
+  id: string
+  /** Fingerabdruck der Anfrage (Kanal + Eingaben ohne Kennungen) */
+  fp: string
+  kanal: string
+  /** Adresse des PCs, bei dem er läuft */
+  basis: string
+  seit: number
+}
+
+/** So lange merkt sich das iPad einen offenen Auftrag – so lange hält ihn auch der PC (lanAuftraege.ts) */
+export const OFFEN_TTL_MS = 2 * 60 * 60 * 1000
+
+/** Die Eingaben einer Anfrage ohne ihre Kennung (die ist je Lauf neu, der Inhalt nicht) */
+function ohneKennung(kanal: string, args: unknown[]): unknown[] {
+  if (kanal === 'ai:structured' && args[0] && typeof args[0] === 'object') {
+    const { progressId: _p, ...rest } = args[0] as Record<string, unknown>
+    return [rest, ...args.slice(1)]
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Die Adresse muss mit http:// beginnen.')
-  if (url.username || url.password) throw new Error('Die Adresse darf keine Zugangsdaten enthalten.')
-  if (!url.port) url.port = STANDARD_PORT
-  return `${url.protocol}//${url.host}`
+  if (kanal === 'ai:image' || kanal === 'ai:websuche') return [args[0], ...args.slice(2)]
+  return args
+}
+
+/** 53-Bit-Prüfsumme (cyrb53) – zweimal mit verschiedenem Startwert, als Hex */
+function pruefsumme(text: string, saat: number): string {
+  let h1 = 0xdeadbeef ^ saat
+  let h2 = 0x41c6ce57 ^ saat
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    h1 = Math.imul(h1 ^ c, 2654435761)
+    h2 = Math.imul(h2 ^ c, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16)
+}
+
+/** Fingerabdruck einer Anfrage: gleicher Kanal und gleiche Eingaben = gleicher Abdruck */
+export function fingerabdruck(kanal: string, args: unknown[]): string {
+  let text: string
+  try {
+    text = `${kanal}\u0000${JSON.stringify(ohneKennung(kanal, args))}`
+  } catch {
+    text = `${kanal}\u0000${Math.random()}`
+  }
+  return `${pruefsumme(text, 1)}${pruefsumme(text, 2)}`
+}
+
+/** Zufällige Kennung aus [a-z0-9] (Auftrags-IDs, Gerätekennung) */
+export function zufallsKennung(laenge = 24): string {
+  const bytes = new Uint8Array(laenge)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('')
 }
 
 /** Welche Gruppe ein Kanal gehört – oder null, wenn er nie weitergereicht wird */
@@ -141,6 +191,17 @@ export interface PcKiOptionen {
    * gerade nicht erreichbar ist.
    */
   standSpeicher?: { lies(): { basis: string; wert: AiStatus } | null; schreibe(stand: { basis: string; wert: AiStatus }): void }
+  /**
+   * Geheime Kennung dieses Geräts für das Auftragsregister am PC – bleibt über Neustarts gleich
+   * (iPad: localStorage). Ohne Angabe gilt eine zufällige für die Lebensdauer dieses Objekts.
+   */
+  geraet?: string
+  /** Offene Aufträge am PC über Neustarts merken (iPad: localStorage) */
+  auftragsSpeicher?: { lies(): OffenerPcAuftrag[]; schreibe(liste: OffenerPcAuftrag[]): void }
+  /** Der PC hat beim Anmelden seine Tailscale-Adresse genannt (http://name.ts.net:port) */
+  tailscaleGefunden?: (adresse: string) => void
+  /** Wie lange nach einer Unterbrechung weiter versucht wird (Tests) */
+  geduldMs?: number
 }
 
 export interface PcKi {
@@ -150,8 +211,14 @@ export interface PcKi {
   testen(adresse: string, pin: string): Promise<PcKiTest>
   /** Verbindung schließen (Tests) */
   beenden(): void
-  /** Verbindung, Anmeldung und KI-Stand im Voraus herstellen (App-Start, Rückkehr in den Vordergrund) */
+  /**
+   * Verbindung, Anmeldung und KI-Stand im Voraus herstellen (App-Start, Rückkehr in den
+   * Vordergrund, Netz wieder da). Weckt dabei jeden Auftrag, der nach einer Unterbrechung auf
+   * den nächsten Versuch wartet – er fragt sofort wieder beim PC nach.
+   */
   vorwaermen(): void
+  /** Die gemerkten offenen Aufträge am PC (Anzeige, Tests) */
+  offeneAuftraege(): OffenerPcAuftrag[]
 }
 
 export function erstellePcKi(o: PcKiOptionen): PcKi {
@@ -166,6 +233,8 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
    * hätte ihn sonst mit jeder Statusabfrage ein Stück weiter zugesperrt.
    */
   let abgelehntePin = ''
+  /** Zuletzt vom PC genannte Tailscale-Adresse */
+  let tailscaleBekannt = ''
   /** Laufende Anfragen am PC: Kennung → lokaler Abbruch */
   const laufend = new Map<string, AbortController>()
   /** KI-Anfragen, die gerade beim PC sind, und die, die auf einen Platz warten */
@@ -178,6 +247,87 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
   let imFlug = 0
   /** Eine laufende Anmeldung – parallele Aufträge teilen sie, statt je eine eigene Sitzung am PC zu eröffnen */
   let anmeldung: Promise<void> | null = null
+  const geraet = o.geraet ?? zufallsKennung(32)
+  /** Aufträge im Register, die gerade eine Anfrage dieser Sitzung bedienen: Auftrags-ID → Kennung der Anfrage */
+  const lokalVonAuftrag = new Map<string, string>()
+  const auftragVonLokal = new Map<string, string>()
+  const aktiv = new Set<string>()
+  /** PCs ohne Auftragsregister (ältere Fassung) – dort der gewöhnliche Aufruf */
+  const ohneRegister = new Set<string>()
+  /** Aufträge, die nach einer Unterbrechung auf den nächsten Versuch warten – `vorwaermen` weckt sie */
+  const schlaefer = new Set<() => void>()
+  let gemerkt: OffenerPcAuftrag[] = []
+
+  // ---------- Offene Aufträge merken (über Neustarts, siehe OffenerPcAuftrag)
+  function offene(): OffenerPcAuftrag[] {
+    try {
+      const liste = o.auftragsSpeicher ? o.auftragsSpeicher.lies() : gemerkt
+      const jetzt = Date.now()
+      return (Array.isArray(liste) ? liste : []).filter((a) => a && typeof a.id === 'string' && jetzt - a.seit < OFFEN_TTL_MS)
+    } catch {
+      return []
+    }
+  }
+  function merkeOffene(liste: OffenerPcAuftrag[]): void {
+    gemerkt = liste
+    try {
+      o.auftragsSpeicher?.schreibe(liste)
+    } catch {
+      // Merken ist Komfort – der Auftrag läuft trotzdem
+    }
+  }
+  const vergiss = (id: string): void => merkeOffene(offene().filter((a) => a.id !== id))
+
+  /**
+   * Die Auftrags-ID für eine Anfrage: Liegt am PC schon ein offener Auftrag mit genau diesem
+   * Inhalt, den gerade niemand bedient (die App wurde neu gestartet, oder die Verbindung riss vor
+   * der Antwort ab), wird er übernommen – sonst gibt es eine neue ID. Zwei gleiche Anfragen
+   * zugleich bekommen so verschiedene Aufträge. Die Adresse spielt dabei keine Rolle: Derselbe PC
+   * ist im WLAN unter seiner IP und unterwegs unter seinem Tailscale-Namen erreichbar. Kennt ein
+   * anderer PC die ID nicht, startet er den Auftrag einfach neu.
+   */
+  function beanspruche(fp: string, basis: string, kanal: string): string {
+    const liste = offene()
+    const frei = liste.find((a) => a.fp === fp && !aktiv.has(a.id))
+    if (frei) return frei.id
+    const id = `${Date.now().toString(36)}-${zufallsKennung(20)}`
+    merkeOffene([...liste, { id, fp, kanal, basis, seit: Date.now() }])
+    return id
+  }
+
+  /** Pause vor dem nächsten Versuch, die `vorwaermen` vorzeitig beendet */
+  function weckbarePause(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((ok, fehler) => {
+      if (signal.aborted) return fehler(new AbbruchFehler())
+      const fertig = (): void => {
+        clearTimeout(t)
+        schlaefer.delete(fertig)
+        signal.removeEventListener('abort', ab)
+        ok()
+      }
+      const ab = (): void => {
+        clearTimeout(t)
+        schlaefer.delete(fertig)
+        fehler(new AbbruchFehler())
+      }
+      const t = setTimeout(fertig, ms)
+      schlaefer.add(fertig)
+      signal.addEventListener('abort', ab, { once: true })
+    })
+  }
+
+  /** Ereignisse zu Aufträgen im Register tragen „auftrag:<ID>" – zurück auf die Kennung der Anfrage */
+  const weiterreichen =
+    (kanal: string) =>
+    (wert: unknown): void => {
+      const id = wert && typeof wert === 'object' ? (wert as { id?: unknown }).id : undefined
+      if (typeof id === 'string' && id.startsWith('auftrag:')) {
+        const lokal = lokalVonAuftrag.get(id.slice('auftrag:'.length))
+        if (lokal) o.emit(kanal, { ...(wert as object), id: lokal })
+        return
+      }
+      o.emit(kanal, wert)
+    }
 
   /** Die Verbindung zur eingestellten Adresse – bei geänderter Adresse neu */
   function holeVerbindung(basis: string): NetzVerbindung {
@@ -190,11 +340,12 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
       basis,
       // Nur im Speicher: Nach einem Neustart meldet sich die App mit der gespeicherten PIN neu an
       speicher: { lies: () => token, schreibe: (t) => void (token = t), loesche: () => void (token = '') },
-      abruf
+      abruf,
+      geraet
     })
     // Fortschritt und Warteplatz der eigenen Anfragen – der PC schickt sie mit der Kennung des iPads zurück
-    verbindung.horche('ai:progress', (wert) => o.emit('ai:progress', wert))
-    verbindung.horche('ai:platz', (wert) => o.emit('ai:platz', wert))
+    verbindung.horche('ai:progress', weiterreichen('ai:progress'))
+    verbindung.horche('ai:platz', weiterreichen('ai:platz'))
     return verbindung
   }
 
@@ -228,7 +379,15 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     const steuerung = new AbortController()
     const frist = setTimeout(() => steuerung.abort(), KURZ_MS)
     try {
-      await v.anmelden(pin, steuerung.signal)
+      const { tailscale } = (await v.anmelden(pin, steuerung.signal)) ?? {}
+      if (tailscale && tailscale !== tailscaleBekannt) {
+        tailscaleBekannt = tailscale
+        try {
+          o.tailscaleGefunden?.(tailscale)
+        } catch {
+          // Merken ist Komfort
+        }
+      }
     } catch (e) {
       if (steuerung.signal.aborted) throw new TypeError('Failed to fetch (Zeitlimit)')
       // Der PC hat geantwortet und abgelehnt – die Meldung des PCs („Falsche PIN. Noch 9 Versuche.") bleibt stehen
@@ -241,7 +400,7 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
 
   /** Ein Aufruf am PC: erreichbar? angemeldet? – und bei abgelaufener Anmeldung einmal neu anmelden */
   async function amPc<T>(e: PcKiEinstellungen, kanal: string, args: unknown[], signal?: AbortSignal, kurz = false): Promise<T> {
-    const basis = pcAdresse(e.adresse)
+    const basis = zielAdresse(e)
     const beginn = Date.now()
     try {
       const v = holeVerbindung(basis)
@@ -330,6 +489,74 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     warteschlange.shift()?.()
   }
 
+  /**
+   * Eine lange Anfrage über das Auftragsregister am PC (siehe Kopf der Datei, WIEDERANKNÜPFEN).
+   * Die Verbindung darf zwischendurch abreißen; der Oberfläche wird das als „ai:verbindung"
+   * gemeldet (Auftragsleiste: „Verbindung unterbrochen – Auftrag läuft am PC weiter …").
+   */
+  async function ueberRegister(e: PcKiEinstellungen, kanal: string, args: unknown[], lokal: string | null, signal: AbortSignal): Promise<unknown> {
+    const basis = zielAdresse(e)
+    if (ohneRegister.has(basis)) return amPc<unknown>(e, kanal, args, signal)
+    const beginn = Date.now()
+    const id = beanspruche(fingerabdruck(kanal, args), basis, kanal)
+    aktiv.add(id)
+    if (lokal) {
+      lokalVonAuftrag.set(id, lokal)
+      auftragVonLokal.set(lokal, id)
+    }
+    const v = holeVerbindung(basis)
+    try {
+      const wert = await fuehreAuftragAus<unknown>({
+        v,
+        id,
+        kanal,
+        args,
+        signal,
+        geduldMs: o.geduldMs,
+        pause: weckbarePause,
+        lebt: () => void (erreichbarBis = Date.now() + ERREICHBAR_MS),
+        bereit: async () => {
+          if (Date.now() > erreichbarBis) await pruefeErreichbar(basis)
+          if (v.abgemeldet()) await anmelden(v, e.pin)
+        },
+        zustand: (z) => {
+          if (lokal) o.emit('ai:verbindung', { id: lokal, zustand: z })
+        },
+        fortschritt: (f) => {
+          if (lokal) o.emit('ai:progress', { ...f, id: lokal })
+        }
+      })
+      vergiss(id)
+      return wert
+    } catch (err) {
+      if (err instanceof OhneAuftragsregister) {
+        // Ältere Fassung am PC: gewöhnlicher Aufruf wie bis 30.09.2026
+        ohneRegister.add(basis)
+        vergiss(id)
+        return amPc<unknown>(e, kanal, args, signal)
+      }
+      if (signal.aborted || istAbbruch(err)) {
+        // Ausdrücklicher Abbruch: am PC beenden (spart dort Kontingent) – ohne darauf zu warten
+        if (signal.aborted) void v.auftrag('abbrechen', { id }).catch(() => undefined)
+        vergiss(id)
+        throw new AbbruchFehler()
+      }
+      erreichbarBis = 0
+      // Unterbrochen: Die ID bleibt gemerkt – ein erneuter Versuch holt das Ergebnis am PC ab
+      if (err instanceof AuftragUnterbrochen) {
+        throw err.angenommen ? new Error(err.message) : verstaendlich(err.ursache, basis, Date.now() - beginn)
+      }
+      vergiss(id)
+      throw verstaendlich(err, basis, Date.now() - beginn)
+    } finally {
+      aktiv.delete(id)
+      if (lokal) {
+        lokalVonAuftrag.delete(id)
+        if (auftragVonLokal.get(lokal) === id) auftragVonLokal.delete(lokal)
+      }
+    }
+  }
+
   /** Eine lange Anfrage (KI, Vertonung) – abbrechbar über ihre Kennung */
   async function anfrage(e: PcKiEinstellungen, kanal: string, args: unknown[]): Promise<unknown> {
     const id = kennungIn(kanal, args)
@@ -340,7 +567,9 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     try {
       if (begrenzt) await platz(id, steuerung.signal)
       try {
-        const wert = await amPc<unknown>(e, kanal, args, steuerung.signal)
+        const wert = UEBER_REGISTER.includes(kanal)
+          ? await ueberRegister(e, kanal, args, id, steuerung.signal)
+          : await amPc<unknown>(e, kanal, args, steuerung.signal)
         if (kanal === 'audio:speak' && wert && typeof wert === 'object') o.hoerdateiAblegen?.(wert as TtsResult)
         return wert
       } finally {
@@ -369,7 +598,7 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     standHolen = (async () => {
       try {
         const wert = await amPc<AiStatus>(e, 'ai:status', [], undefined, true)
-        merkeStand(pcAdresse(e.adresse), wert)
+        merkeStand(zielAdresse(e), wert)
         return wert
       } catch {
         return null
@@ -400,7 +629,7 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
     const hoertexte = ueberPc(e, 'hoertexte')
     let basis = ''
     try {
-      basis = pcAdresse(e.adresse)
+      basis = zielAdresse(e)
     } catch {
       basis = ''
     }
@@ -442,8 +671,8 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
   return {
     weiterleiten(kanal, args) {
       const e = o.einstellungen()
-      const aktiv = ueberPc(e, 'texte') || ueberPc(e, 'bilder') || ueberPc(e, 'hoertexte')
-      if (!aktiv) {
+      const eingeschaltet = ueberPc(e, 'texte') || ueberPc(e, 'bilder') || ueberPc(e, 'hoertexte')
+      if (!eingeschaltet) {
         // Ausgeschaltet: keinen Strom zum PC offen halten
         if (verbindung) schliessen()
         return null
@@ -453,8 +682,9 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
         const id = typeof args[0] === 'string' ? args[0] : ''
         const steuerung = laufend.get(id)
         if (!steuerung) return null
-        // Am PC abbrechen (spart dort Kontingent) und hier sofort als abgebrochen melden
-        void amPc(e!, 'ai:cancel', [id], undefined, true).catch(() => undefined)
+        // Am PC abbrechen (spart dort Kontingent) und hier sofort als abgebrochen melden.
+        // Läuft die Anfrage im Auftragsregister, bricht der Abbruch des Signals sie dort ab (ueberRegister).
+        if (!auftragVonLokal.has(id)) void amPc(e!, 'ai:cancel', [id], undefined, true).catch(() => undefined)
         steuerung.abort()
         laufend.delete(id)
         return Promise.resolve(undefined)
@@ -464,7 +694,11 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
       return anfrage(e!, kanal, args)
     },
     async testen(adresse, pin) {
-      const basis = pcAdresse(adresse)
+      // Eine Tailscale-IP geht auf dem iPad nicht – mit gemerktem Namen wird der genommen
+      const basis = zielAdresse({
+        adresse,
+        tailscaleAdresse: o.einstellungen()?.tailscaleAdresse
+      })
       const beginn = Date.now()
       try {
         const { fassung } = await pruefeErreichbar(basis)
@@ -482,18 +716,46 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
           // Ältere Fassungen am PC geben diesen Aufruf nicht frei – dann ohne Anmeldestand
           abo = await amPc<SubscriptionStatus>(e, 'ai:subscription-status', [status.textProvider], undefined, true).catch(() => null)
         }
-        return { adresse: basis, fassung, status, abo }
+        return {
+          adresse: basis,
+          fassung,
+          status,
+          abo,
+          ...(tailscaleBekannt ? { tailscale: tailscaleBekannt } : {})
+        }
       } catch (err) {
         erreichbarBis = 0
         throw verstaendlich(err, basis, Date.now() - beginn)
       }
     },
-    beenden: schliessen,
+    beenden() {
+      for (const w of [...schlaefer]) w()
+      schliessen()
+    },
     vorwaermen() {
       const e = o.einstellungen()
       if (!(ueberPc(e, 'texte') || ueberPc(e, 'bilder') || ueberPc(e, 'hoertexte'))) return
+      // Nach Ruhezustand oder Netzwechsel: nicht auf den alten Erreichbarkeitstest verlassen, wartende Aufträge sofort weiterfragen lassen
+      erreichbarBis = 0
+      for (const w of [...schlaefer]) w()
       // Erreichbarkeit, Anmeldung, Ereignisstrom und KI-Stand stehen danach; Fehler meldet erst ein echter Auftrag
-      void holeStand(e!)
+      void holeStand(e!).then((ok) => (ok ? abgleichen(e!) : undefined))
+    },
+    offeneAuftraege: () => offene()
+  }
+
+  /**
+   * Gemerkte Aufträge, die der PC nicht mehr kennt (dort neu gestartet, abgelaufen), vergessen –
+   * sonst nähme ein späterer gleicher Auftrag eine ID, die ins Leere führt (harmlos, aber unnötig).
+   */
+  async function abgleichen(e: PcKiEinstellungen): Promise<void> {
+    const basis = zielAdresse(e)
+    if (ohneRegister.has(basis) || !offene().some((a) => a.basis === basis)) return
+    try {
+      const amPcBekannt = new Set((await holeVerbindung(basis).auftraege()).map((a) => a.id))
+      merkeOffene(offene().filter((a) => a.basis !== basis || aktiv.has(a.id) || amPcBekannt.has(a.id)))
+    } catch (err) {
+      if (err instanceof OhneAuftragsregister) ohneRegister.add(basis)
     }
   }
 }

@@ -2,7 +2,9 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { describe, expect, it } from 'vitest'
 import { beschneide, erlaubteHerkunft, ERLAUBTE_KANAELE, istTailscaleAdresse } from '../src/main/services/lanServer'
-import { gruppeVon, KANAELE_BILDER, KANAELE_HOERTEXTE, KANAELE_TEXTE } from '../src/mobil/pcKi'
+import { gruppeVon, KANAELE_BILDER, KANAELE_HOERTEXTE, KANAELE_TEXTE, UEBER_REGISTER } from '../src/mobil/pcKi'
+import { AUFTRAGS_KANAELE } from '../src/main/services/lanAuftraege'
+import { REGISTER_KANAELE } from '../src/renderer/src/shared/netzAuftrag'
 
 /*
  * Der Zugriff aus dem Netz arbeitet mit einer ERLAUBNISLISTE: Was dort nicht steht, wird
@@ -164,6 +166,20 @@ describe('Freigaben für den Zugriff aus dem Netz', () => {
     expect(istTailscaleAdresse('100.128.0.1')).toBe(false)
     expect(istTailscaleAdresse('100.63.0.1')).toBe(false)
     expect(istTailscaleAdresse('192.168.1.24')).toBe(false)
+  })
+
+  it('lässt über das Auftragsregister nur lange, freigegebene Aufrufe laufen (30.09.2026)', () => {
+    /*
+     * Die Endpunkte /auftrag/… (Wiederanknüpfen nach Verbindungsabbruch) sind KEIN Umweg um die
+     * Erlaubnisliste: Jeder dort startbare Kanal muss auch einzeln freigegeben sein – und iPad,
+     * Browser und PC müssen dieselbe Liste kennen, sonst liefe eine Anfrage am Register vorbei.
+     */
+    for (const k of AUFTRAGS_KANAELE) expect(ERLAUBTE_KANAELE, `${k} startet als Auftrag, ist aber nicht freigegeben`).toContain(k)
+    expect([...AUFTRAGS_KANAELE].sort()).toEqual(['ai:image', 'ai:structured', 'ai:websuche', 'audio:speak'])
+    expect([...UEBER_REGISTER].sort()).toEqual([...AUFTRAGS_KANAELE].sort())
+    expect([...REGISTER_KANAELE].sort()).toEqual([...AUFTRAGS_KANAELE].sort())
+    // Der Abbruch bleibt ausdrücklich: ai:cancel bleibt frei
+    expect(ERLAUBTE_KANAELE).toContain('ai:cancel')
   })
 
   it('lässt die Bibliotheken lesen', () => {

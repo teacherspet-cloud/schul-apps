@@ -56,3 +56,29 @@ export const PdfDruck = {
   erzeugen: (o: { html: string; messen?: string }) => pdfDruckNativ.erzeugen(o),
   drucken: (o: { pdf: string; name?: string }) => pdfDruckNativ.drucken(o)
 }
+
+interface HintergrundPlugin {
+  beginnen(): Promise<{ id?: string | null }>
+  beenden(o: { id: string }): Promise<void>
+}
+
+const hintergrundNativ = registerPlugin<HintergrundPlugin>('Hintergrund')
+
+/**
+ * Hintergrundzeit für laufende KI-Aufträge (30.09.2026, mobil/hintergrund.ts). Eine ältere
+ * App ohne diese Methode liefert einen Fehler – dann eben ohne Hintergrundzeit.
+ */
+export const Hintergrund = {
+  beginnen: async (): Promise<string | null> => {
+    if (!nativ()) return null
+    try {
+      return (await hintergrundNativ.beginnen()).id ?? null
+    } catch {
+      return null
+    }
+  },
+  beenden: async (id: string): Promise<void> => {
+    if (!nativ() || !id) return
+    await hintergrundNativ.beenden({ id }).catch(() => undefined)
+  }
+}

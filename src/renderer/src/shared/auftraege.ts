@@ -80,6 +80,14 @@ export interface Auftrag {
   restBis?: number
   /** Der Auftrag läuft länger als alle gemerkten Läufe seiner Art */
   restLage?: 'laenger'
+  /**
+   * Nur über das Netz (iPad-App, Browser; 30.09.2026): Die Verbindung zum PC ist gerade weg –
+   * der Auftrag läuft dort weiter – bzw. die Anfrage wird nach der Rückkehr aus dem Hintergrund
+   * wiederholt (API-Modus auf dem iPad).
+   */
+  verbindung?: 'unterbrochen' | 'wiederholt'
+  /** Nach einem Neustart der App wieder aufgenommen */
+  fortgesetzt?: boolean
 }
 
 interface AuftraegeState {
@@ -161,6 +169,17 @@ export interface AuftragsStart<I, E> {
   fehlerTitel?: string
   /** Abschließende Meldung in der Leiste (z. B. welche Aufgaben entstanden sind) */
   abschluss?: (ergebnis: E) => string
+  /**
+   * Nach einem Neustart der iPad-App fortsetzbar (siehe `registriereFortsetzung`): die Art und
+   * die Argumente, mit denen das Programm denselben Auftrag erneut startet.
+   */
+  fortsetzen?: Fortsetzung
+}
+
+/** Womit ein Programm einen Auftrag nach einem Neustart der App wieder anstößt */
+export interface Fortsetzung {
+  art: string
+  args: unknown[]
 }
 
 interface Laufzeit {
@@ -199,6 +218,144 @@ function horchePlatz(): void {
     else wartendeAnfragen.delete(id)
     for (const [auftragId, lz] of laufzeit) if (lz.anfragen.has(id)) aendere(auftragId, (a) => ({ ...a, ...lage(lz, a) }))
   })
+  // Verbindung zum PC unterbrochen bzw. wieder da (iPad-App, Browser) – die Leiste sagt es
+  window.api.ai.onVerbindung?.(({ id, zustand }) => {
+    for (const [auftragId, lz] of laufzeit) {
+      if (lz.anfragen.has(id))
+        aendere(auftragId, (a) => ({
+          ...a,
+          verbindung: zustand === 'verbunden' ? undefined : zustand
+        }))
+    }
+  })
+}
+
+/*
+ * ---------- Nach einem Neustart der iPad-App fortsetzen (30.09.2026) ----------
+ *
+ * Wunsch der Lehrkraft: Aufträge, die vom iPad aus aufgegeben wurden, sollen nach einer
+ * Unterbrechung abgerufen und im richtigen Dokument abgelegt werden – auch wenn iOS die App
+ * im Hintergrund beendet hat. Die KI-Anfragen selbst liegen dann noch im Auftragsregister am PC
+ * (mobil/pcKi.ts merkt ihre IDs). Was fehlt, ist der Auftrag in der Oberfläche: Er ist
+ * Programmcode (`arbeit`, `ablegen`) und überlebt keinen Neustart.
+ *
+ * Deshalb merkt sich die iPad-App jeden laufenden Auftrag (localStorage). Programme, die einen
+ * Auftrag aus seinen Argumenten erneut anstoßen können, melden das an (`registriereFortsetzung`)
+ * und geben beim Start `fortsetzen` mit. Nach dem Neustart startet `nimmUnterbrocheneAuf` sie
+ * mit denselben Eingaben neu; dieselben KI-Anfragen finden dabei ihre Aufträge am PC wieder –
+ * laufende laufen weiter, fertige kommen sofort, nichts wird doppelt berechnet. Das Ergebnis
+ * landet über `ablegen` wie immer im Dokument `docId`. Aufträge ohne Fortsetzung erscheinen in
+ * der Leiste als unterbrochen.
+ */
+const UNTERBROCHEN_KEY = 'schul-apps-auftraege-unterbrochen'
+/** Höchstens so oft wird derselbe Auftrag nach Neustarts fortgesetzt – ein Auftrag, der die App abstürzen lässt, soll sie nicht dauerhaft lahmlegen */
+const MAX_FORTSETZUNGEN = 2
+
+interface GemerkterAuftrag {
+  id: string
+  moduleId: string
+  docId: string
+  titel: string
+  art: string
+  start: number
+  fortsetzen?: Fortsetzung
+  versuche: number
+}
+
+const fortsetzer = new Map<string, (...args: never[]) => unknown>()
+/** Wie oft der gerade (wieder) startende Auftrag schon fortgesetzt wurde */
+let laufendeFortsetzung = 0
+
+/** Ein Programm kann Aufträge dieser Art aus ihren Argumenten erneut starten */
+export function registriereFortsetzung<A extends unknown[]>(art: string, fn: (...args: A) => unknown): void {
+  fortsetzer.set(art, fn as unknown as (...args: never[]) => unknown)
+}
+
+const merkenAn = (): boolean => typeof window !== 'undefined' && window.__plattform === 'ios'
+
+function leseGemerkte(): GemerkterAuftrag[] {
+  try {
+    const liste = JSON.parse(localStorage.getItem(UNTERBROCHEN_KEY) ?? '[]') as GemerkterAuftrag[]
+    return Array.isArray(liste) ? liste.filter((a) => a && typeof a.id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function schreibeGemerkte(liste: GemerkterAuftrag[]): void {
+  try {
+    localStorage.setItem(UNTERBROCHEN_KEY, JSON.stringify(liste))
+  } catch {
+    // Zu groß (Bilder in den Eingaben): ohne Argumente merken – dann erscheint er nach einem Neustart als unterbrochen
+    try {
+      localStorage.setItem(UNTERBROCHEN_KEY, JSON.stringify(liste.map(({ fortsetzen: _f, ...rest }) => rest)))
+    } catch {
+      // ohne Speicher gibt es kein Fortsetzen
+    }
+  }
+}
+
+function merkeLaufenden(a: GemerkterAuftrag): void {
+  if (!merkenAn()) return
+  schreibeGemerkte([...leseGemerkte().filter((x) => x.id !== a.id), a])
+}
+
+function vergissLaufenden(id: string): void {
+  if (!merkenAn()) return
+  const liste = leseGemerkte()
+  if (liste.some((a) => a.id === id)) schreibeGemerkte(liste.filter((a) => a.id !== id))
+}
+
+/**
+ * Beim Start der Oberfläche: Aufträge, die beim letzten Beenden der App noch liefen, fortsetzen
+ * oder als unterbrochen zeigen. Liefert die Zahl der fortgesetzten.
+ */
+let aufgenommen = false
+export function nimmUnterbrocheneAuf(): number {
+  // Nur einmal je Start – sonst fände ein zweiter Aufruf die eben fortgesetzten Aufträge und startete sie doppelt
+  if (!merkenAn() || aufgenommen) return 0
+  aufgenommen = true
+  const liste = leseGemerkte()
+  if (!liste.length) return 0
+  schreibeGemerkte([])
+  let fortgesetzt = 0
+  for (const g of liste) {
+    const fn = g.fortsetzen ? fortsetzer.get(g.fortsetzen.art) : undefined
+    if (fn && g.fortsetzen && (g.versuche ?? 0) < MAX_FORTSETZUNGEN) {
+      laufendeFortsetzung = (g.versuche ?? 0) + 1
+      try {
+        fn(...(g.fortsetzen.args as never[]))
+        fortgesetzt++
+        continue
+      } catch (e) {
+        console.error(e)
+      } finally {
+        laufendeFortsetzung = 0
+      }
+    }
+    useAuftraege.setState((s) => ({
+      neu: s.neu + 1,
+      auftraege: [
+        ...s.auftraege,
+        {
+          id: `u-${g.id}`,
+          moduleId: g.moduleId,
+          docId: g.docId,
+          titel: g.titel,
+          art: g.art,
+          status: 'fehler',
+          anteil: 0,
+          meldung: 'Durch Beenden der App unterbrochen',
+          fehler: 'Die App wurde beendet, während der Auftrag lief. Ein erneuter Start mit denselben Eingaben übernimmt, was der PC davon schon fertig hat.',
+          start: g.start,
+          ende: Date.now(),
+          sperrt: false,
+          kannErneut: false
+        }
+      ]
+    }))
+  }
+  return fortgesetzt
 }
 
 /** Wartet ein Auftrag nur noch auf Plätze, heißt er „wartend" – sonst „laufend". */
@@ -280,14 +437,26 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
         art: start.art,
         status: 'laufend',
         anteil: 0,
-        meldung: 'Start …',
+        meldung: laufendeFortsetzung ? 'Nach dem Neustart fortgesetzt …' : 'Start …',
         start: jetzt,
         sperrt: start.sperrt ?? true,
         schluessel: start.schluessel,
-        kannErneut: false
+        kannErneut: false,
+        ...(laufendeFortsetzung ? { fortgesetzt: true } : {})
       }
     ]
   }))
+  // iPad-App: für den Fall merken, dass iOS die App beendet, bevor der Auftrag fertig ist
+  merkeLaufenden({
+    id,
+    moduleId: start.moduleId,
+    docId: start.docId,
+    titel: start.titel,
+    art: start.art,
+    start: jetzt,
+    fortsetzen: start.fortsetzen,
+    versuche: laufendeFortsetzung
+  })
 
   // Fortschritt: erledigte Schritte plus Anteil der laufenden Antwort, nie rückwärts
   let stufe: { fertig: number; gesamt: number; abschnitt?: RunPhase } = { fertig: 0, gesamt: 1 }
@@ -441,6 +610,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       lz.beendet = true
       clearInterval(takt)
       tracker.dispose()
+      vergissLaufenden(id)
     }
   })()
 }

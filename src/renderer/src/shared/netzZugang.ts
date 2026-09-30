@@ -17,7 +17,9 @@
  *    gearbeitet wird; ein Dateidialog auf dem entfernten Rechner wäre sinnlos.
  */
 import { buildApi } from '@shared/apiShape'
-import { netzVerbindung } from './netzVerbindung'
+import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
+import { AuftragUnterbrochen, fuehreAuftragAus, kennungIn, REGISTER_KANAELE } from './netzAuftrag'
+import { AnmeldungAbgelaufen, netzVerbindung, OhneAuftragsregister } from './netzVerbindung'
 
 /**
  * Läuft die Oberfläche im Browser statt in der App?
@@ -46,19 +48,156 @@ const verbindung = netzVerbindung({
     },
     schreibe: (t) => localStorage.setItem(SCHLUESSEL, t),
     loesche: () => localStorage.removeItem(SCHLUESSEL)
-  }
+  },
+  geraet: imBrowserGestartet ? geraetKennung() : undefined
 })
 
+/** Eine zufällige Kennung dieses Browsers für das Auftragsregister am PC (bleibt im localStorage) */
+function geraetKennung(): string {
+  const neu = (): string => Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('')
+  try {
+    const da = localStorage.getItem('schulapps-netz-geraet')
+    if (da && /^[a-z0-9]{24}$/.test(da)) return da
+    const k = neu()
+    localStorage.setItem('schulapps-netz-geraet', k)
+    return k
+  } catch {
+    return neu()
+  }
+}
+
 /** Meldet das Gerät mit der PIN an; der Server gibt eine Kennung zurück. */
-export const anmelden = (pin: string): Promise<void> => verbindung.anmelden(pin)
+export const anmelden = async (pin: string): Promise<void> => void (await verbindung.anmelden(pin))
 
 export const abgemeldet = (): boolean => verbindung.abgemeldet()
 
 // Aufgeteilt am 30.09.2026: Anmeldung, Aufrufe und Ereignisstrom stehen in netzVerbindung.ts (auch für die iPad-App)
 export { zerlegeStrom, type StromEreignis } from './netzVerbindung'
 
+/*
+ * ---------- Lange Anfragen über das Auftragsregister (30.09.2026) ----------
+ *
+ * Wie in der iPad-App (mobil/pcKi.ts): KI und Vertonung laufen am Rechner als Auftrag mit ID
+ * (shared/netzAuftrag.ts). Reißt die Verbindung ab, läuft er dort weiter, und der Browser fragt
+ * nach, statt neu zu senden. Seitdem bricht der Rechner eine Anfrage nicht mehr ab, nur weil
+ * die Verbindung wegfällt – ohne diesen Weg wäre das Ergebnis dann verloren.
+ */
+/** Auftrags-ID → Kennung der Anfrage (Fortschritt kommt vom Server als „auftrag:<ID>") */
+const lokalVonAuftrag = new Map<string, string>()
+/** Kennung der Anfrage → Abbruch */
+const laufend = new Map<string, AbortController>()
+/** Nur hier erzeugte Ereignisse (Verbindung unterbrochen/wieder da) */
+const eigeneHoerer = new Map<string, Set<(wert: unknown) => void>>()
+let ohneRegister = false
+/** Wartende Aufträge nach einer Unterbrechung – „online" oder Rückkehr auf die Seite weckt sie */
+const schlaefer = new Set<() => void>()
+
+function eigenesEreignis(kanal: string, wert: unknown): void {
+  for (const cb of eigeneHoerer.get(kanal) ?? []) {
+    try {
+      cb(wert)
+    } catch {
+      // ein fehlerhafter Hörer hält die übrigen nicht auf
+    }
+  }
+}
+
+function weckbarePause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((ok, fehler) => {
+    if (signal.aborted) return fehler(new AbbruchFehler())
+    const fertig = (): void => {
+      clearTimeout(t)
+      schlaefer.delete(fertig)
+      ok()
+    }
+    const t = setTimeout(fertig, ms)
+    schlaefer.add(fertig)
+    signal.addEventListener('abort', () => {
+      clearTimeout(t)
+      schlaefer.delete(fertig)
+      fehler(new AbbruchFehler())
+    })
+  })
+}
+
+if (imBrowserGestartet) {
+  const wecken = (): void => {
+    for (const w of [...schlaefer]) w()
+  }
+  window.addEventListener('online', wecken)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') wecken()
+  })
+}
+
+async function langerAufruf<T>(channel: string, args: unknown[]): Promise<T> {
+  if (ohneRegister) return verbindung.aufruf<T>(channel, args)
+  const lokal = kennungIn(channel, args)
+  const steuerung = new AbortController()
+  const id = `${Date.now().toString(36)}-${Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => (b % 36).toString(36)).join('')}`
+  if (lokal) {
+    laufend.set(lokal, steuerung)
+    lokalVonAuftrag.set(id, lokal)
+  }
+  try {
+    return await fuehreAuftragAus<T>({
+      v: verbindung,
+      id,
+      kanal: channel,
+      args,
+      signal: steuerung.signal,
+      pause: weckbarePause,
+      // Ohne Anmeldung fragt die Oberfläche nach der PIN – das übernimmt der gewöhnliche Weg
+      bereit: async () => {
+        if (verbindung.abgemeldet()) throw new AnmeldungAbgelaufen()
+      },
+      zustand: (z) => {
+        if (lokal) eigenesEreignis('ai:verbindung', { id: lokal, zustand: z })
+      },
+      fortschritt: (f) => {
+        if (lokal) eigenesEreignis('ai:progress', { ...f, id: lokal })
+      }
+    })
+  } catch (e) {
+    if (e instanceof OhneAuftragsregister) {
+      ohneRegister = true
+      return verbindung.aufruf<T>(channel, args)
+    }
+    if (steuerung.signal.aborted || istAbbruch(e)) {
+      if (steuerung.signal.aborted) void verbindung.auftrag('abbrechen', { id }).catch(() => undefined)
+      throw new AbbruchFehler()
+    }
+    if (e instanceof AuftragUnterbrochen) {
+      throw new Error(e.angenommen ? e.message : 'Der Rechner ist nicht erreichbar. Läuft Schul-Apps dort noch mit eingeschaltetem Netzzugang?')
+    }
+    throw e
+  } finally {
+    if (lokal && laufend.get(lokal) === steuerung) laufend.delete(lokal)
+    lokalVonAuftrag.delete(id)
+  }
+}
+
 /** Hörer für ein Ereignis anmelden; der Strom startet mit dem ersten Hörer. */
-export const horche = (kanal: string, cb: (wert: unknown) => void): (() => void) => verbindung.horche(kanal, cb)
+export const horche = (kanal: string, cb: (wert: unknown) => void): (() => void) => {
+  if (!eigeneHoerer.has(kanal)) eigeneHoerer.set(kanal, new Set())
+  eigeneHoerer.get(kanal)!.add(cb)
+  const eigenesAb = (): void => void eigeneHoerer.get(kanal)?.delete(cb)
+  if (kanal === 'ai:verbindung') return eigenesAb
+  // Ereignisse zu Aufträgen tragen „auftrag:<ID>" – zurück auf die Kennung der Anfrage
+  const stromAb = verbindung.horche(kanal, (wert) => {
+    const id = wert && typeof wert === 'object' ? (wert as { id?: unknown }).id : undefined
+    if (typeof id === 'string' && id.startsWith('auftrag:')) {
+      const lokal = lokalVonAuftrag.get(id.slice('auftrag:'.length))
+      if (lokal) cb({ ...(wert as object), id: lokal })
+      return
+    }
+    cb(wert)
+  })
+  return () => {
+    eigenesAb()
+    stromAb()
+  }
+}
 
 /*
  * ---------- Drucken im Browser ----------
@@ -125,7 +264,15 @@ export async function vereinePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
 export function netzZugangEinrichten(): void {
   if (!imBrowserGestartet) return
 
-  const call = <T>(channel: string, ...args: unknown[]): Promise<T> => verbindung.aufruf<T>(channel, args)
+  const call = <T>(channel: string, ...args: unknown[]): Promise<T> => {
+    if (REGISTER_KANAELE.includes(channel)) return langerAufruf<T>(channel, args)
+    if (channel === 'ai:cancel' && typeof args[0] === 'string' && laufend.has(args[0])) {
+      // Läuft als Auftrag: der Abbruch des Signals beendet ihn auch am Rechner (langerAufruf)
+      laufend.get(args[0])!.abort()
+      return Promise.resolve(undefined as T)
+    }
+    return verbindung.aufruf<T>(channel, args)
+  }
 
   const api = buildApi(call, {
     // Im Browser gibt es keinen Pfad auf dem Rechner – die Datei kommt als Inhalt an

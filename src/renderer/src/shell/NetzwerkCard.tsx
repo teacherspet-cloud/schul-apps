@@ -49,6 +49,25 @@ export default function NetzwerkCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /*
+   * Nachlesen, solange der Name bei Tailscale fehlt (30.09.2026): Der PC fragt ihn im
+   * Hintergrund ab („tailscale status"); vorher stand hier dauerhaft nur die 100.x-Adresse,
+   * die die iPad-App nicht erreicht.
+   */
+  const nameFehlt = Boolean(status?.laeuft && status.tailscale && !status.tailscale.name)
+  useEffect(() => {
+    if (!nameFehlt) return
+    const t = setInterval(
+      () =>
+        void window.api.lan
+          .status()
+          .then(setStatus)
+          .catch(() => undefined),
+      3000
+    )
+    return () => clearInterval(t)
+  }, [nameFehlt])
+
   const schalten = async (an: boolean): Promise<void> => {
     setBusy(true)
     try {
@@ -138,32 +157,29 @@ export default function NetzwerkCard({
              * iPad-App („Abo über den PC") den PC auch aus einem fremden WLAN oder über Mobilfunk,
              * ohne dass der Zugang ins Internet gestellt wird.
              */}
-            {(status.weitere ?? []).length > 0 && (
+            {status.tailscale && <TailscaleAdresse ts={status.tailscale} />}
+            {(status.weitere ?? []).some((w) => w.art !== 'tailscale') && (
               <Stack gap={4}>
                 <Text size="sm" fw={500}>
                   Weitere Adressen dieses PCs
                 </Text>
-                {(status.weitere ?? []).map((w) => (
-                  <Group key={w.adresse} gap="xs" wrap="wrap">
-                    <Code style={{ fontSize: 14 }}>{w.adresse}</Code>
-                    <Badge size="xs" variant="light" color={w.art === 'tailscale' ? 'grape' : 'gray'}>
-                      {w.art === 'tailscale' ? 'Tailscale' : w.schnittstelle}
-                    </Badge>
-                    <CopyButton value={w.adresse}>
-                      {({ copied, copy }) => (
-                        <Button size="compact-xs" variant="subtle" leftSection={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} onClick={copy}>
-                          {copied ? 'Kopiert' : 'Kopieren'}
-                        </Button>
-                      )}
-                    </CopyButton>
-                  </Group>
-                ))}
-                {(status.weitere ?? []).some((w) => w.art === 'tailscale') && (
-                  <Text size="xs" c="dimmed">
-                    Von unterwegs: mit Tailscale auf PC und iPad erreichbar. Die Tailscale-Adresse (am besten der Name auf „.ts.net“) gehört dann in der iPad-App
-                    unter „Abo über den PC“ in das Feld „Adresse des PCs“.
-                  </Text>
-                )}
+                {(status.weitere ?? [])
+                  .filter((w) => w.art !== 'tailscale')
+                  .map((w) => (
+                    <Group key={w.adresse} gap="xs" wrap="wrap">
+                      <Code style={{ fontSize: 14 }}>{w.adresse}</Code>
+                      <Badge size="xs" variant="light" color="gray">
+                        {w.schnittstelle}
+                      </Badge>
+                      <CopyButton value={w.adresse}>
+                        {({ copied, copy }) => (
+                          <Button size="compact-xs" variant="subtle" leftSection={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} onClick={copy}>
+                            {copied ? 'Kopiert' : 'Kopieren'}
+                          </Button>
+                        )}
+                      </CopyButton>
+                    </Group>
+                  ))}
               </Stack>
             )}
             {/*
@@ -263,6 +279,65 @@ export default function NetzwerkCard({
           </List.Item>
         </List>
       </Card>
+    </Stack>
+  )
+}
+
+/**
+ * Die Adresse für unterwegs (Tailscale, 30.09.2026).
+ *
+ * Rückmeldung der Lehrkraft: „Bei Tailscale wird die IP-Adresse 100.101.181.79:8420 angezeigt.
+ * Diese ist vom iPad aus nicht erreichbar. Stattdessen muss die tailae2351-Adresse angegeben
+ * werden." iOS lässt unverschlüsseltes HTTP nur zu Namen auf „.ts.net" zu. Deshalb steht für
+ * die iPad-App NUR der Name da (mit QR-Code); die IP klein daneben – im Browser eines Geräts
+ * funktioniert sie, dort gilt die Ausnahme von iOS nicht.
+ */
+function TailscaleAdresse({ ts }: { ts: NonNullable<LanStatus['tailscale']> }): React.JSX.Element {
+  return (
+    <Stack gap={4}>
+      <Group gap="xs">
+        <Text size="sm" fw={500}>
+          Von unterwegs (Tailscale)
+        </Text>
+        <Badge size="xs" variant="light" color="grape">
+          Tailscale
+        </Badge>
+      </Group>
+      {ts.adresse ? (
+        <Group align="flex-start" wrap="nowrap" gap="lg">
+          <Stack gap={4}>
+            <Text size="xs" c="dimmed">
+              Für die iPad-App unter „Abo über den PC“ › „Adresse des PCs“:
+            </Text>
+            <Group gap="xs">
+              <Code style={{ fontSize: 15 }} data-tailscale-adresse>
+                {ts.adresse}
+              </Code>
+              <CopyButton value={ts.adresse}>
+                {({ copied, copy }) => (
+                  <Button size="compact-xs" variant="light" leftSection={copied ? <IconCheck size={13} /> : <IconCopy size={13} />} onClick={copy}>
+                    {copied ? 'Kopiert' : 'Kopieren'}
+                  </Button>
+                )}
+              </CopyButton>
+            </Group>
+          </Stack>
+          <div style={{ textAlign: 'center' }}>
+            <img src={qrDataUrl(ts.adresse, 35)} alt={`QR-Code für ${ts.adresse}`} width={112} height={112} />
+            <Text size="xs" c="dimmed">
+              scannen
+            </Text>
+          </div>
+        </Group>
+      ) : (
+        <Text size="xs" c="dimmed">
+          Der Name dieses PCs bei Tailscale (auf „.ts.net“) wird ermittelt … Erscheint er nicht, ist in Tailscale vermutlich „MagicDNS“ ausgeschaltet – die
+          iPad-App braucht diesen Namen.
+        </Text>
+      )}
+      <Text size="xs" c="dimmed">
+        Nur für den Browser eines Geräts: <Code>{ts.ip}</Code> – die iPad-App erreicht Tailscale-IP-Adressen nicht.
+      </Text>
     </Stack>
   )
 }

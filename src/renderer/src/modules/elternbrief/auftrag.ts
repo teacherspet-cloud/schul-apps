@@ -5,7 +5,7 @@
  * geänderten Teile nach; die vorige deutsche Fassung bleibt in `fassungen`.
  */
 import type { StructuredRequest } from '@shared/types'
-import { starteAuftrag } from '../../shared/auftraege'
+import { registriereFortsetzung, starteAuftrag } from '../../shared/auftraege'
 import { spracheNach } from '../../shared/familiensprachen'
 import { useAppSettings } from '../../shared/settingsStore'
 import {
@@ -41,6 +41,7 @@ export function briefSchreiben(b: Elternbrief, docId: string): void {
     titel: b.meta.title || b.meta.anlass,
     art: 'Elternbrief schreiben',
     eingabe: b,
+    fortsetzen: { art: 'elternbrief.schreiben', args: [b, docId] },
     istOffen: () => bibliothek.istOffen(docId),
     sperrt: false,
     schluessel: `brief-${docId}`,
@@ -70,6 +71,7 @@ export function briefUebersetzen(b: Elternbrief, docId: string, codes: string[])
     titel: b.meta.title || b.meta.anlass,
     art: codes.length === 1 ? `Übersetzen: ${spracheNach(codes[0])?.name ?? codes[0]}` : `In ${codes.length} Sprachen übersetzen`,
     eingabe: b,
+    fortsetzen: { art: 'elternbrief.uebersetzen', args: [b, docId, codes] },
     istOffen: () => bibliothek.istOffen(docId),
     sperrt: false,
     schluessel: `uebersetzung-${docId}`,
@@ -258,3 +260,7 @@ export function teileNachuebersetzen(b: Elternbrief, docId: string, schluessel: 
       }))
   })
 }
+
+// Nach einem Neustart der iPad-App fortsetzen (30.09.2026, shared/auftraege.ts)
+registriereFortsetzung('elternbrief.schreiben', briefSchreiben)
+registriereFortsetzung('elternbrief.uebersetzen', briefUebersetzen)

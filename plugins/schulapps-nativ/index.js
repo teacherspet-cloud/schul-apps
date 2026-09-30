@@ -14,3 +14,8 @@ export const Schluesselbund = registerPlugin('Schluesselbund', {
 export const Scanner = registerPlugin('Scanner', {
   web: () => import('./web.js').then((m) => new m.ScannerWeb())
 })
+
+/** Hintergrundzeit fuer laufende KI-Auftraege (UIApplication.beginBackgroundTask; im Browser: nichts). */
+export const Hintergrund = registerPlugin('Hintergrund', {
+  web: () => import('./web.js').then((m) => new m.HintergrundWeb())
+})

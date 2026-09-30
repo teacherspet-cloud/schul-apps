@@ -336,6 +336,11 @@ export interface PcKiEinstellungen {
   bilder: boolean
   /** Hörtexte vertonen (audio:voices, audio:speak, audio:preview) */
   hoertexte: boolean
+  /**
+   * Vom PC beim Anmelden genannte Tailscale-Adresse (http://name.tailnet.ts.net:8420). Die App
+   * nimmt sie statt einer rohen 100.x-Adresse – die lässt iOS nicht zu (30.09.2026).
+   */
+  tailscaleAdresse?: string
 }
 
 /** Ergebnis von „Verbindung testen" (iPad) */
@@ -347,6 +352,8 @@ export interface PcKiTest {
   status: AiStatus
   /** Anmeldestand des Abo-Programms am PC, falls dort der Abo-Zugang gewählt ist */
   abo: SubscriptionStatus | null
+  /** Tailscale-Adresse des PCs mit Namen auf „.ts.net", falls der PC sie kennt */
+  tailscale?: string
 }
 
 /** Eine bei ElevenLabs verfügbare Stimme */

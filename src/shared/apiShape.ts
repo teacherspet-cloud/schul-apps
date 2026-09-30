@@ -242,7 +242,14 @@ export function buildApi(call: Call, extras: ApiExtras) {
        * Beim Warten steht dabei, wie viele Plätze abgebrochene Anfragen noch halten (davon Bilder).
        */
       onPlatz: (cb: (platz: { id: string; zustand: 'wartend' | 'laufend'; abgebrochen?: number; abgebrocheneBilder?: number }) => void) =>
-        extras.subscribe('ai:platz', cb as (value: unknown) => void)
+        extras.subscribe('ai:platz', cb as (value: unknown) => void),
+      /**
+       * Nur über das Netz (iPad-App „Abo über den PC", Browser, 30.09.2026): Die Verbindung zum PC
+       * ist während einer Anfrage abgerissen bzw. wieder da; `wiederholt` = die App war im
+       * Hintergrund, die Anfrage wird nach der Rückkehr erneut gestellt (API-Modus auf dem iPad).
+       */
+      onVerbindung: (cb: (v: { id: string; zustand: 'unterbrochen' | 'verbunden' | 'wiederholt' }) => void) =>
+        extras.subscribe('ai:verbindung', cb as (value: unknown) => void)
     },
     cefr: {
       get: () => call<CefrTable>('cefr:get')

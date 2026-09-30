@@ -40,6 +40,13 @@ export interface ScannerPlugin extends Plugin {
   scannen(): Promise<{ seiten: string[] }>
 }
 
+export interface HintergrundPlugin extends Plugin {
+  /** Bittet iOS um Hintergrundzeit (meist rund 30 s); id null = nicht gewaehrt. */
+  beginnen(): Promise<{ id: string | null }>
+  beenden(optionen: { id: string }): Promise<void>
+}
+
 export declare const PdfDruck: PdfDruckPlugin
 export declare const Schluesselbund: SchluesselbundPlugin
 export declare const Scanner: ScannerPlugin
+export declare const Hintergrund: HintergrundPlugin

@@ -13,8 +13,16 @@
 //  3. eine Textanfrage läuft am PC (Attrappe antwortet), Fortschritt kommt auf dem iPad an
 //  4. ein Abbruch auf dem iPad beendet den Auftrag
 //  5. ein nicht erreichbarer PC ergibt eine verständliche Meldung
+// Wiederanknüpfen (30.09.2026) – zwischen iPad und PC steht ein Vermittler, dessen Leitung sich kappen lässt:
+//  6. Verbindung während eines Elternbriefs gekappt: Die Leiste meldet es, der PC rechnet weiter, nach der
+//     Rückkehr steht der Brief im Dokument – ohne zweite Anfrage an den PC
+//  7. App im „Hintergrund" (Seite verborgen, Netz weg): zurück im Vordergrund kommt das Ergebnis sofort
+//  8. App neu geladen, während ein Brief entsteht: Der Auftrag wird fortgesetzt, übernimmt den Auftrag am
+//     PC und legt im selben Dokument ab
+//  9. Tailscale: eine 100.x-Adresse wird durch den gemerkten Namen auf „.ts.net" ersetzt
 import { _electron as electron, chromium } from 'playwright-core'
 import { createServer } from 'http'
+import { createServer as tcpServer, connect as tcpVerbinden } from 'net'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { extname, join, resolve } from 'path'
@@ -57,10 +65,57 @@ const server = createServer((req, res) => {
 await new Promise((ok) => server.listen(0, '127.0.0.1', ok))
 const ipadAdresse = `http://127.0.0.1:${server.address().port}/`
 
+// ---------- Vermittler zwischen iPad und PC (wie WLAN bzw. Tailscale): kappen = jede Leitung reißt ab, neue werden abgewiesen
+const leitungen = new Set()
+let leitungOffen = true
+const vermittler = tcpServer((ein) => {
+  if (!leitungOffen) return void ein.destroy()
+  const aus = tcpVerbinden(lan.port, '127.0.0.1')
+  leitungen.add(ein)
+  leitungen.add(aus)
+  const weg = () => {
+    ein.destroy()
+    aus.destroy()
+    leitungen.delete(ein)
+    leitungen.delete(aus)
+  }
+  ein.on('error', weg).on('close', weg)
+  aus.on('error', weg).on('close', weg)
+  ein.pipe(aus)
+  aus.pipe(ein)
+})
+await new Promise((ok) => vermittler.listen(0, '127.0.0.1', ok))
+const vermittlerPort = vermittler.address().port
+const kappen = () => {
+  leitungOffen = false
+  for (const l of leitungen) l.destroy()
+}
+const oeffnen = () => void (leitungOffen = true)
+const protokoll = join(userData, 'ki-protokoll.jsonl')
+const briefAnfragen = () =>
+  existsSync(protokoll)
+    ? readFileSync(protokoll, 'utf-8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((z) => JSON.parse(z))
+        .filter((z) => z.schemaName === 'elternbrief_text')
+    : []
+const brief = (betreff) => ({
+  betreff,
+  anrede: 'Liebe Eltern der Klasse 7b,',
+  absaetze: ['am 12. Oktober wandern wir in den Wildpark.', 'Bitte geben Sie Ihrem Kind 5 € mit.'],
+  gruss: 'Mit freundlichen Grüßen',
+  ruecklaufTitel: 'Rückmeldung',
+  ruecklaufZeilen: ['Unterschrift: ______']
+})
+
 const browser = await chromium.launch({ channel: 'msedge' })
 const page = await (await browser.newContext({ viewport: { width: 1180, height: 820 } })).newPage()
 const fehler = []
 page.on('pageerror', (e) => fehler.push(`Fehler im Fenster: ${e.message}`))
+// Zur Fehlersuche: E2E_LOG=1 zeigt die Konsole der Seite
+if (process.env.E2E_LOG) page.on('console', (m) => console.log(`   [seite] ${m.text().slice(0, 300)}`))
 try {
   await page.goto(ipadAdresse)
   await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
@@ -125,6 +180,141 @@ try {
   })
   pruefe(/abgebrochen/i.test(abbruch), `Abbruch auf dem iPad beendet den Auftrag (${abbruch.slice(0, 60)})`)
 
+  // ---------- 6. Verbindung während eines Auftrags gekappt
+  writeFileSync(
+    attrappeDatei,
+    JSON.stringify({ verzoegerungMs: 4000, protokoll, antworten: { probe: { ok: true, von: 'pc' }, lang: { ok: true }, elternbrief_text: brief('Wandertag am 12. Oktober') } })
+  )
+  // Ab jetzt über den Vermittler
+  await page.evaluate((p) => window.api.settings.set({ pcKi: { adresse: `127.0.0.1:${p}` } }), vermittlerPort)
+  const sichtbar = (l) => l.filter({ visible: true }).first()
+  await page.keyboard.press('Control+7')
+  await sichtbar(page.locator('[data-eb-stichpunkte]')).waitFor({ timeout: 15000 })
+  await sichtbar(page.locator('[data-eb-stichpunkte]')).fill('Wandertag am 12.10., Treffpunkt 8:00 Schulhof, Wildpark, 5 €')
+  await page.waitForTimeout(600)
+  await sichtbar(page.locator('[data-eb-schreiben]')).click()
+  // Der Auftrag ist am PC angekommen – dann reißt die Leitung
+  const bisAnfragen = async (n, ms = 10000) => {
+    const ende = Date.now() + ms
+    while (briefAnfragen().length < n && Date.now() < ende) await page.waitForTimeout(100)
+    return briefAnfragen().length
+  }
+  await bisAnfragen(1)
+  // Die Auftragsleiste ausklappen – dort steht der Hinweis
+  const pille = page.locator('.auftrags-pille').first()
+  if (await pille.isVisible().catch(() => false)) await pille.click()
+  await page.waitForTimeout(400)
+  kappen()
+  const hinweis = await page
+    .locator('[data-verbindung="unterbrochen"]')
+    .first()
+    .waitFor({ timeout: 15000 })
+    .then(
+      () => true,
+      () => false
+    )
+  await page.screenshot({ path: join(out, 'pcki-6-unterbrochen.png') })
+  pruefe(hinweis, 'Die Auftragsleiste meldet: Verbindung unterbrochen – Auftrag läuft am PC weiter')
+  // Der PC rechnet währenddessen fertig; dann ist das Netz wieder da
+  await page.waitForTimeout(4500)
+  oeffnen()
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  const briefDa = await page
+    .getByText('Wandertag am 12. Oktober', { exact: true })
+    .first()
+    .waitFor({ timeout: 20000 })
+    .then(
+      () => true,
+      () => false
+    )
+  await page.screenshot({ path: join(out, 'pcki-6-wieder-da.png') })
+  pruefe(briefDa, 'Nach der Rückkehr der Verbindung steht der Brief im Dokument')
+  pruefe(briefAnfragen().length === 1, `Der PC hat den Brief nur einmal geschrieben (${briefAnfragen().length} Anfrage/n)`)
+
+  // ---------- 7. App im Hintergrund: Seite verborgen, Netz weg – zurück im Vordergrund kommt das Ergebnis
+  const hintergrund = page.evaluate(() =>
+    window.api.ai.structured({ system: 'x', user: 'hintergrund', schemaName: 'lang', schema: {}, progressId: 'e2e-hintergrund' }).then(
+      (w) => ({ ok: true, w }),
+      (e) => ({ ok: false, e: String(e) })
+    )
+  )
+  await page.waitForTimeout(800)
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  kappen()
+  await page.waitForTimeout(5000)
+  oeffnen()
+  const zurueck = Date.now()
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  const ausDemHintergrund = await hintergrund
+  pruefe(
+    ausDemHintergrund.ok && ausDemHintergrund.w?.ok === true,
+    `Nach der Rückkehr in den Vordergrund kommt das Ergebnis (${Date.now() - zurueck} ms, ${JSON.stringify(ausDemHintergrund).slice(0, 80)})`
+  )
+
+  // ---------- 8. App neu geladen, während ein Brief entsteht
+  writeFileSync(
+    attrappeDatei,
+    JSON.stringify({ verzoegerungMs: 5000, protokoll, antworten: { probe: { ok: true, von: 'pc' }, lang: { ok: true }, elternbrief_text: brief('Wandertag – neu geschrieben') } })
+  )
+  // Erledigtes aus der Leiste räumen (sie läge über dem Knopf), zurück zum ersten Schritt, andere Stichpunkte
+  const raeumen = page.getByRole('button', { name: 'Erledigte entfernen' }).first()
+  if (await raeumen.isVisible().catch(() => false)) await raeumen.click()
+  await sichtbar(page.locator('.mantine-Stepper-step')).click()
+  await sichtbar(page.locator('[data-eb-stichpunkte]')).waitFor({ timeout: 10000 })
+  await sichtbar(page.locator('[data-eb-stichpunkte]')).fill('Wandertag am 12.10., Treffpunkt 8:30 Bushaltestelle, Wildpark, 5 €')
+  await page.waitForTimeout(600)
+  await sichtbar(page.locator('[data-eb-schreiben]')).click()
+  await bisAnfragen(2)
+  const gemerkt = await page.evaluate(() => JSON.parse(localStorage.getItem('schul-apps-auftraege-unterbrochen') ?? '[]'))
+  const docId = gemerkt.find((a) => a.moduleId === 'elternbrief')?.docId
+  pruefe(Boolean(docId) && gemerkt.some((a) => a.fortsetzen?.art === 'elternbrief.schreiben'), `Der laufende Auftrag ist gemerkt (${docId})`)
+  const pcAuftraege = await page.evaluate(() => JSON.parse(localStorage.getItem('schulapps.pcKi.auftraege') ?? '[]'))
+  pruefe(pcAuftraege.length >= 1, `Die ID des Auftrags am PC ist gemerkt (${pcAuftraege.length})`)
+  // Wie auf dem iPad: erst in den Hintergrund (die App sichert), dann beendet iOS sie
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  await page.waitForTimeout(1500)
+  await page.reload()
+  await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
+  const ende = Date.now() + 30000
+  let abgelegt = ''
+  while (Date.now() < ende) {
+    abgelegt = await page
+      .evaluate(async (id) => {
+        const d = await window.api.elternbriefe.get(id).catch(() => null)
+        return d?.payload?.text?.betreff ?? ''
+      }, docId)
+      .catch(() => '')
+    if (abgelegt === 'Wandertag – neu geschrieben') break
+    await page.waitForTimeout(500)
+  }
+  await page.screenshot({ path: join(out, 'pcki-8-nach-neustart.png') })
+  pruefe(abgelegt === 'Wandertag – neu geschrieben', `Nach dem Neuladen liegt der neue Brief im selben Dokument (${abgelegt || 'nichts'})`)
+  pruefe(briefAnfragen().length === 2, `Der fortgesetzte Auftrag hat am PC keinen zweiten Brief bestellt (${briefAnfragen().length} Anfragen insgesamt)`)
+
+  // ---------- 9. Tailscale: 100.x wird durch den gemerkten Namen ersetzt
+  await page.evaluate(() => window.api.settings.set({ pcKi: { tailscaleAdresse: 'http://home-pc.tailae2351.ts.net:8420' } }))
+  await page.getByRole('button', { name: /Einstellungen/ }).filter({ visible: true }).first().click()
+  await page.getByRole('tab', { name: 'KI-Zugang' }).click()
+  const feld = page.getByLabel('Adresse des PCs').first()
+  await feld.fill('100.101.181.79:8420')
+  const warnung = await page.getByText(/Tailscale-IP-Adressen \(100\.x\) lässt iOS nicht zu/).first().isVisible().catch(() => false)
+  await feld.blur()
+  await page.waitForTimeout(500)
+  const ersetzt = await page.evaluate(async () => (await window.api.settings.get()).pcKi?.adresse)
+  await page.screenshot({ path: join(out, 'pcki-9-tailscale.png') })
+  pruefe(warnung, 'Eine 100.x-Adresse wird als für iOS ungeeignet markiert')
+  pruefe(ersetzt === 'http://home-pc.tailae2351.ts.net:8420', `…und durch den Namen auf „.ts.net" ersetzt (${ersetzt})`)
+  await page.keyboard.press('Escape')
+
   // ---------- 5. PC nicht erreichbar
   await page.evaluate(() => window.api.settings.set({ pcKi: { adresse: '127.0.0.1:1' } }))
   const weg = await page.evaluate(() =>
@@ -142,6 +332,8 @@ try {
   pruefe(fehler.length === 0, `keine Fehler im Fenster (${fehler.length})`)
   await browser.close()
   server.close()
+  kappen()
+  vermittler.close()
   await pc.evaluate(() => window.api.lan.stop()).catch(() => undefined)
   await app.close()
   rmSync(userData, { recursive: true, force: true })

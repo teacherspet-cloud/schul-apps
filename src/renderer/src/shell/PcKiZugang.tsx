@@ -3,6 +3,7 @@ import { IconAlertTriangle, IconCheck, IconDeviceDesktop, IconPlugConnected } fr
 import { useState } from 'react'
 import { AI_PROVIDERS, SUBSCRIPTIONS, type AppSettings, type DeepPartial, type PcKiEinstellungen, type PcKiTest } from '@shared/types'
 import { notifyError } from '../shared/util'
+import { ersetzeTailscaleIp, zeigtAufTailscaleIp } from '../shared/pcAdresse'
 
 /**
  * „Abo über den PC" in der iPad-App (30.09.2026).
@@ -55,16 +56,38 @@ export function PcKiVerbindung({ settings, update }: { settings: AppSettings; up
   const [pruefe, setPruefe] = useState(false)
   const [ergebnis, setErgebnis] = useState<PcKiTest | null>(null)
   const [fehler, setFehler] = useState('')
+  const [ersetzt, setErsetzt] = useState('')
+
+  /*
+   * Eine Tailscale-IP (100.x) erreicht die iPad-App nicht – iOS lässt unverschlüsseltes HTTP nur
+   * zu Namen auf „.ts.net" zu (30.09.2026). Ist der Name vom PC bekannt, wird die IP ersetzt;
+   * sonst steht unter dem Feld, wo der Name zu finden ist. Ersetzt wird erst beim Verlassen des
+   * Felds bzw. beim Testen, nicht mitten im Tippen.
+   */
+  const tailscaleErsetzen = async (adresse: string): Promise<string> => {
+    const neu = ersetzeTailscaleIp(adresse, e.tailscaleAdresse)
+    if (!neu) return adresse
+    setErsetzt(adresse)
+    await setzePcKi(update, { adresse: neu })
+    return neu
+  }
+  const tailscaleIp = zeigtAufTailscaleIp(e.adresse ?? '')
 
   const testen = async (): Promise<void> => {
     setPruefe(true)
     setFehler('')
     setErgebnis(null)
     try {
-      const res = await window.api.pcKi.testen(e.adresse ?? '', e.pin ?? '')
+      const adresse = await tailscaleErsetzen(e.adresse ?? '')
+      const res = await window.api.pcKi.testen(adresse, e.pin ?? '')
       setErgebnis(res)
-      // Die Adresse in der Form speichern, in der sie funktioniert hat
-      if (res.adresse !== e.adresse) await setzePcKi(update, { adresse: res.adresse })
+      // Die Adresse in der Form speichern, in der sie funktioniert hat – und den Tailscale-Namen, falls der PC ihn nennt
+      if (res.adresse !== adresse || (res.tailscale && res.tailscale !== e.tailscaleAdresse)) {
+        await setzePcKi(update, {
+          adresse: res.adresse,
+          ...(res.tailscale ? { tailscaleAdresse: res.tailscale } : {})
+        })
+      }
     } catch (err) {
       setFehler(err instanceof Error ? err.message : String(err))
     } finally {
@@ -81,7 +104,16 @@ export function PcKiVerbindung({ settings, update }: { settings: AppSettings; up
           description="Steht am PC unter Einstellungen › Netzwerk, z. B. 192.168.1.24:8420 – von unterwegs die Tailscale-Adresse (Name auf „.ts.net“)."
           placeholder="192.168.1.24:8420"
           value={e.adresse ?? ''}
-          onChange={(ev) => void setzePcKi(update, { adresse: ev.currentTarget.value.trim() })}
+          onChange={(ev) => {
+            setErsetzt('')
+            void setzePcKi(update, { adresse: ev.currentTarget.value.trim() })
+          }}
+          onBlur={(ev) => void tailscaleErsetzen(ev.currentTarget.value.trim()).catch(notifyError)}
+          error={
+            tailscaleIp
+              ? 'Tailscale-IP-Adressen (100.x) lässt iOS nicht zu. Gebraucht wird der Name auf „.ts.net“ – er steht am PC unter Einstellungen › Netzwerk.'
+              : undefined
+          }
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
@@ -107,6 +139,11 @@ export function PcKiVerbindung({ settings, update }: { settings: AppSettings; up
         </Button>
       </Group>
 
+      {ersetzt && (
+        <Text size="xs" c="dimmed">
+          Die Tailscale-IP {ersetzt} wurde durch den Namen des PCs ersetzt – nur diesen lässt iOS ohne Verschlüsselung zu.
+        </Text>
+      )}
       {ergebnis && <TestErgebnis ergebnis={ergebnis} />}
       {fehler && (
         <Alert color="red" icon={<IconAlertTriangle size={16} />} title="Keine Verbindung zum PC">

@@ -13,6 +13,6 @@ Pod::Spec.new do |s|
   s.source_files = 'ios/Sources/**/*.{swift,h,m}'
   s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
-  s.frameworks = 'WebKit', 'PDFKit', 'VisionKit', 'Security'
+  s.frameworks = 'UIKit', 'WebKit', 'PDFKit', 'VisionKit', 'Security'
   s.swift_version = '5.9'
 end

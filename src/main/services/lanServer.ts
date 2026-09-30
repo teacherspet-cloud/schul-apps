@@ -25,6 +25,16 @@ import { networkInterfaces } from 'node:os'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { extname, join, normalize, sep } from 'node:path'
+import {
+  AUFTRAG_VORSATZ,
+  AUFTRAGS_KANAELE,
+  AuftragsFehler,
+  AuftragsRegister,
+  gueltigeAuftragsId,
+  gueltigesGeraet,
+  kennungDesAuftrags,
+  MAX_WARTEN_MS
+} from './lanAuftraege'
 
 /**
  * Aufrufe, die aus dem Netz erlaubt sind.
@@ -263,6 +273,8 @@ interface Ereignis {
 
 interface Sitzung {
   kennung: string
+  /** Gerätekennungen, die über diese Anmeldung Aufträge führen (x-schulapps-geraet) – für deren Fortschritt */
+  geraete: Set<string>
   stroeme: Set<ServerResponse>
   /** Zuletzt gesendete Ereignisse – zum Nachliefern nach einer kurzen Unterbrechung */
   puffer: Ereignis[]
@@ -287,6 +299,11 @@ export interface LanWeitereAdresse {
   art: 'tailscale' | 'lan'
   /** Name der Netzwerkverbindung laut Windows, z. B. „Tailscale" */
   schnittstelle: string
+  /**
+   * Nur im Browser brauchbar: die rohe Tailscale-IP (100.x). Die iPad-App erreicht sie nicht –
+   * iOS lässt unverschlüsseltes HTTP dort nur für Namen auf „.ts.net" zu (Info.plist, 30.09.2026).
+   */
+  nurBrowser?: boolean
 }
 
 export interface LanStatus {
@@ -302,6 +319,11 @@ export interface LanStatus {
   gesperrt: boolean
   /** Weitere Adressen dieses PCs – vor allem die von Tailscale (Zugriff von unterwegs, 30.09.2026) */
   weitere?: LanWeitereAdresse[]
+  /**
+   * Tailscale (30.09.2026): `adresse` mit dem MagicDNS-Namen – die EINE Adresse für die iPad-App
+   * von unterwegs; `ip` nur für Browser. `name` ist leer, solange er (noch) nicht ermittelt ist.
+   */
+  tailscale?: { name: string; adresse: string; ip: string } | null
 }
 
 type Aufruf = (channel: string, args: unknown[]) => Promise<unknown>
@@ -363,22 +385,60 @@ export function lanAdresse(): string {
  * Nur gelesen („tailscale status"), nie etwas umgestellt.
  */
 let magicDns = ''
+/** Zeitpunkt der letzten Abfrage – ohne Namen wird höchstens alle 30 s erneut gefragt */
+let magicDnsGefragt = 0
+let magicDnsLaeuft = false
+
+/** Den MagicDNS-Namen aus der Ausgabe von „tailscale status --json" lesen ('' = keiner) */
+export function magicDnsAus(ausgabe: string): string {
+  try {
+    const name = String((JSON.parse(ausgabe) as { Self?: { DNSName?: string } }).Self?.DNSName ?? '').replace(/\.$/, '')
+    return /^[a-z0-9.-]+\.ts\.net$/i.test(name) ? name.toLowerCase() : ''
+  } catch {
+    return ''
+  }
+}
+
+/*
+ * Rückmeldung der Lehrkraft (30.09.2026): In den Einstellungen stand nur die Tailscale-IP, der
+ * Name fehlte. Gefragt wurde nur EINMAL beim Einschalten, ohne dass die Karte später nachlas;
+ * und eine vollständige Ausgabe wurde verworfen, sobald das Programm mit einem Fehlercode
+ * endete. Jetzt: die Ausgabe auch dann lesen, und solange kein Name da ist, bei jeder
+ * Statusabfrage (höchstens alle 30 s) erneut fragen. Nur gelesen – nie etwas umgestellt.
+ */
 function frageMagicDns(): void {
+  if (magicDnsLaeuft || Date.now() - magicDnsGefragt < 30_000) return
   if (!lanAdressen().some((a) => a.art === 'tailscale')) return
-  const kandidaten = process.platform === 'win32' ? ['tailscale', 'C:\\Program Files\\Tailscale\\tailscale.exe'] : ['tailscale']
+  magicDnsGefragt = Date.now()
+  magicDnsLaeuft = true
+  const programme = process.env.ProgramFiles ?? 'C:\\Program Files'
+  const kandidaten =
+    process.platform === 'win32' ? ['tailscale', join(programme, 'Tailscale', 'tailscale.exe'), 'C:\\Program Files\\Tailscale\\tailscale.exe'] : ['tailscale']
   const versuch = (i: number): void => {
-    if (i >= kandidaten.length) return
-    execFile(kandidaten[i], ['status', '--json'], { timeout: 3000, windowsHide: true }, (fehler, ausgabe) => {
-      if (fehler) return versuch(i + 1)
-      try {
-        const name = String((JSON.parse(String(ausgabe)) as { Self?: { DNSName?: string } }).Self?.DNSName ?? '').replace(/\.$/, '')
-        if (/^[a-z0-9.-]+\.ts\.net$/i.test(name)) magicDns = name
-      } catch {
-        // ohne Namen bleibt die IP-Adresse
-      }
+    if (i >= kandidaten.length) {
+      magicDnsLaeuft = false
+      return
+    }
+    execFile(kandidaten[i], ['status', '--json'], { timeout: 4000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (_fehler, ausgabe) => {
+      const name = magicDnsAus(String(ausgabe ?? ''))
+      if (!name) return versuch(i + 1)
+      magicDns = name
+      magicDnsLaeuft = false
     })
   }
   versuch(0)
+}
+
+/** Tailscale-Adressen dieses PCs: Name (für die iPad-App) und IP (nur Browser) */
+function tailscaleAdressen(port: number): LanStatus['tailscale'] {
+  const ts = lanAdressen().find((a) => a.art === 'tailscale')
+  if (!ts) return null
+  if (!magicDns) frageMagicDns()
+  return {
+    name: magicDns,
+    adresse: magicDns ? `http://${magicDns}:${port}` : '',
+    ip: `http://${ts.ip}:${port}`
+  }
 }
 
 function weitereAdressen(port: number): LanWeitereAdresse[] {
@@ -387,7 +447,9 @@ function weitereAdressen(port: number): LanWeitereAdresse[] {
   const out: LanWeitereAdresse[] = []
   const tailscale = alle.filter((a) => a.art === 'tailscale')
   if (magicDns && tailscale.length) out.push({ adresse: `http://${magicDns}:${port}`, art: 'tailscale', schnittstelle: tailscale[0].schnittstelle })
-  for (const a of alle) if (a.ip !== haupt) out.push({ adresse: `http://${a.ip}:${port}`, art: a.art, schnittstelle: a.schnittstelle })
+  for (const a of alle) {
+    if (a.ip !== haupt) out.push({ adresse: `http://${a.ip}:${port}`, art: a.art, schnittstelle: a.schnittstelle, ...(a.art === 'tailscale' ? { nurBrowser: true } : {}) })
+  }
   return out
 }
 
@@ -417,7 +479,8 @@ export function lanStatus(): LanStatus {
     wunschPort: gewuenschterPort,
     angemeldet: tokens.size,
     gesperrt: fehlversuche >= MAX_FEHLVERSUCHE,
-    weitere: server ? weitereAdressen(aktuellerPort) : []
+    weitere: server ? weitereAdressen(aktuellerPort) : [],
+    tailscale: server ? tailscaleAdressen(aktuellerPort) : null
   }
 }
 
@@ -443,14 +506,23 @@ export const erlaubteHerkunft = (herkunft: string): boolean =>
  */
 export const PULS_MS = 15_000
 
-/** Die Kennung einer Anfrage (nach `kennzeichne`) – zum Abbrechen, wenn das Gerät die Verbindung verliert */
-function kennungDerAnfrage(kanal: string, args: unknown[]): string | null {
+/*
+ * ---------- Aufträge der iPad-App (30.09.2026, services/lanAuftraege.ts) ----------
+ *
+ * Das Register lebt so lange wie das Programm – NICHT nur so lange wie der Netzzugang: Wird
+ * der Zugang aus- und wieder eingeschaltet, laufen die Aufträge im Hauptprozess ja weiter.
+ */
+export const auftragsRegister = new AuftragsRegister()
+
+/** Die Kennung eines Auftrags dort einsetzen, wo der Aufruf sie erwartet (Fortschritt, Warteplatz, Abbruch) */
+export function kennzeichneAuftrag(kanal: string, args: unknown[], id: string): unknown[] {
+  const kennung = kennungDesAuftrags(id)
   if (kanal === 'ai:structured') {
-    const id = (args[0] as { progressId?: unknown } | undefined)?.progressId
-    return typeof id === 'string' ? id : null
+    const req = args[0] as Record<string, unknown> | undefined
+    return req && typeof req === 'object' ? [{ ...req, progressId: kennung }, ...args.slice(1)] : args
   }
-  if (kanal === 'ai:image' || kanal === 'ai:websuche') return typeof args[1] === 'string' ? args[1] : null
-  return null
+  if (kanal === 'ai:image' || kanal === 'ai:websuche') return [args[0], kennung, ...args.slice(2)]
+  return args
 }
 
 /** Vergleich ohne Zeitunterschied – sonst ließe sich die PIN Ziffer für Ziffer erraten. */
@@ -482,6 +554,24 @@ function zustellen(sitzung: Sitzung, kanal: string, wert: unknown): void {
 export function lanEreignis(kanal: string, wert: unknown): boolean {
   const id = wert && typeof wert === 'object' ? (wert as { id?: unknown }).id : undefined
   if (typeof id !== 'string' || !id.startsWith(NETZ_VORSATZ)) return false
+  /*
+   * Ein Auftrag aus dem Register: Stand festhalten (das Gerät holt ihn nach einer Unterbrechung
+   * ab) und an jede Anmeldung desselben Geräts schicken – nach einem Neustart der App ist das
+   * eine andere als beim Start des Auftrags. Kennung dort: „auftrag:<ID>".
+   */
+  if (id.startsWith(AUFTRAG_VORSATZ)) {
+    const auftrag = id.slice(AUFTRAG_VORSATZ.length)
+    const geraet = auftragsRegister.ereignis(auftrag, kanal, wert)
+    if (geraet && NETZ_EREIGNISSE.includes(kanal)) {
+      for (const s of tokens.values())
+        if (s.geraete.has(geraet))
+          zustellen(s, kanal, {
+            ...(wert as object),
+            id: `auftrag:${auftrag}`
+          })
+    }
+    return true
+  }
   const rest = id.slice(NETZ_VORSATZ.length)
   const trenn = rest.indexOf('-')
   const kennung = rest.slice(0, Math.max(0, trenn))
@@ -608,6 +698,70 @@ function datei(res: ServerResponse, wurzel: string, pfad: string): void {
   createReadStream(gewaehlt).pipe(res)
 }
 
+interface AuftragsKoerper {
+  id?: unknown
+  channel?: unknown
+  args?: unknown
+  warteMs?: unknown
+}
+
+/**
+ * Die Endpunkte des Auftragsregisters (alle POST mit JSON, nur angemeldet und mit Gerätekennung):
+ *  - /auftrag/starten    { id, channel, args } → Stand (idempotent: dieselbe ID = derselbe Auftrag)
+ *  - /auftrag/abfragen   { id, warteMs }       → Stand nach höchstens 25 s (Long-Poll); fertig mit Ergebnis
+ *  - /auftrag/liste      {}                    → alle Aufträge dieses Geräts (ohne Ergebnisse)
+ *  - /auftrag/quittieren { id }                → Ergebnis abgeholt, Auftrag entfernt
+ *  - /auftrag/abbrechen  { id }                → ausdrücklicher Abbruch
+ * Ein unbekannter (oder fremder) Auftrag ergibt 404 – das Gerät startet ihn dann neu.
+ */
+async function auftragsEndpunkt(res: ServerResponse, aktion: string, geraet: string, koerper: AuftragsKoerper): Promise<void> {
+  const reg = auftragsRegister
+  if (aktion === 'liste') return json(res, 200, { auftraege: reg.liste(geraet) })
+  const id = koerper.id
+  if (!gueltigeAuftragsId(id)) return json(res, 400, { fehler: 'Ungültige Auftrags-ID.' })
+  const antwort = (bild: ReturnType<AuftragsRegister['abfragen']>): void => {
+    if (!bild) return json(res, 404, { fehler: 'Auftrag unbekannt.' })
+    json(res, 200, {
+      auftrag: 'wert' in bild ? { ...bild, wert: packen(bild.wert) } : bild
+    })
+  }
+
+  if (aktion === 'starten') {
+    const kanal = String(koerper.channel ?? '')
+    if (!AUFTRAGS_KANAELE.includes(kanal) || !ERLAUBTE_KANAELE.includes(kanal)) {
+      return json(res, 403, {
+        fehler: `„${kanal}" lässt sich über das Netz nicht als Auftrag starten (Schul-Apps ${fassung()}).`
+      })
+    }
+    if (!aufrufen) return json(res, 500, { fehler: 'Der Zugang ist nicht bereit.' })
+    const ausfuehren = aufrufen
+    const roh = Array.isArray(koerper.args) ? (koerper.args as unknown[]) : []
+    const args = kennzeichneAuftrag(kanal, beschneide(kanal, roh.map(auspacken)), id)
+    try {
+      return antwort(reg.starte(geraet, id, kanal, () => ausfuehren(kanal, args)).bild)
+    } catch (e) {
+      if (e instanceof AuftragsFehler) return e.code === 'voll' ? json(res, 429, { fehler: e.message }) : json(res, 404, { fehler: 'Auftrag unbekannt.' })
+      throw e
+    }
+  }
+  if (aktion === 'abfragen') {
+    // Geht die Verbindung weg, endet nur das Warten – der Auftrag selbst läuft weiter
+    const steuerung = new AbortController()
+    res.on('close', () => steuerung.abort())
+    const ms = Math.max(0, Math.min(MAX_WARTEN_MS, Number(koerper.warteMs) || 0))
+    const bild = await reg.warte(geraet, id, ms, steuerung.signal)
+    if (res.writableEnded || res.destroyed) return
+    return antwort(bild)
+  }
+  if (aktion === 'quittieren') return json(res, 200, { ok: reg.quittiere(geraet, id) })
+  if (aktion === 'abbrechen') {
+    const lief = reg.brichAb(geraet, id)
+    if (lief && aufrufen) void aufrufen('ai:cancel', [kennungDesAuftrags(id)]).catch(() => undefined)
+    return json(res, 200, { ok: lief })
+  }
+  return json(res, 404, { fehler: 'Unbekannter Aufruf.' })
+}
+
 export interface LanOptionen {
   port: number
   pin: string
@@ -642,7 +796,7 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
           if (!fremdErlaubt) return void res.writeHead(403).end()
           res.writeHead(204, {
             'access-control-allow-methods': 'GET, POST',
-            'access-control-allow-headers': 'content-type, x-schulapps-token, last-event-id',
+            'access-control-allow-headers': 'content-type, x-schulapps-token, x-schulapps-geraet, last-event-id',
             'access-control-max-age': '600',
             // Chromium fragt vor Zugriffen ins private Netz eigens nach
             ...(req.headers['access-control-request-private-network'] ? { 'access-control-allow-private-network': 'true' } : {})
@@ -661,16 +815,37 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
             return json(res, 401, { fehler: 'Falsche PIN.', verbleibend: MAX_FEHLVERSUCHE - fehlversuche })
           }
           const neu = randomBytes(24).toString('hex')
-          tokens.set(neu, { kennung: randomBytes(6).toString('hex'), stroeme: new Set(), puffer: [], nr: 0 })
+          tokens.set(neu, { kennung: randomBytes(6).toString('hex'), geraete: new Set(), stroeme: new Set(), puffer: [], nr: 0 })
           fehlversuche = 0
-          return json(res, 200, { token: neu })
+          // Die Adresse für unterwegs: Die iPad-App merkt sie sich (die Tailscale-IP erreicht sie nicht)
+          const ts = tailscaleAdressen(aktuellerPort)
+          return json(res, 200, {
+            token: neu,
+            ...(ts?.adresse ? { tailscale: ts.adresse } : {})
+          })
+        }
+
+        // Die Gerätekennung der iPad-App: Fortschritt ihrer Aufträge geht an jede ihrer Anmeldungen
+        const geraet = req.headers['x-schulapps-geraet']
+        const merkeGeraet = (s: Sitzung): void => {
+          if (gueltigesGeraet(geraet)) s.geraete.add(geraet)
         }
 
         if (req.method === 'GET' && url.pathname === '/ereignisse') {
           // Dieselbe Anmeldung wie für jeden Aufruf – ohne sie gibt es keinen Strom
           const sitzung = typeof token === 'string' ? tokens.get(token) : undefined
           if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' })
+          merkeGeraet(sitzung)
           return oeffneStrom(req, res, sitzung)
+        }
+
+        if (req.method === 'POST' && url.pathname.startsWith('/auftrag/')) {
+          const sitzung = typeof token === 'string' ? tokens.get(token) : undefined
+          if (!sitzung) return json(res, 401, { fehler: 'Nicht angemeldet.' })
+          if (!gueltigesGeraet(geraet)) return json(res, 400, { fehler: 'Gerätekennung fehlt.' })
+          merkeGeraet(sitzung)
+          const koerper = JSON.parse((await leseKoerper(req)) || '{}') as AuftragsKoerper
+          return await auftragsEndpunkt(res, url.pathname.slice('/auftrag/'.length), geraet, koerper)
         }
 
         if (req.method === 'POST' && url.pathname === '/api') {
@@ -694,12 +869,13 @@ export function startLan(opts: LanOptionen): Promise<LanStatus> {
           // Ab hier steht die Antwort fest auf 200 (Fehler stecken im JSON) – so können Lebenszeichen vorausgehen
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
           const puls = setInterval(() => res.write(' '), PULS_MS)
-          // Verbindung verloren (WLAN weg, iPad im Ruhezustand): die KI-Anfrage abbrechen, statt das Kontingent für niemanden zu verbrauchen
-          const kennung = kennungDerAnfrage(kanal, args)
-          res.on('close', () => {
-            clearInterval(puls)
-            if (!res.writableFinished && kennung) void ausfuehren('ai:cancel', [kennung]).catch(() => undefined)
-          })
+          /*
+           * Verbindung verloren (WLAN weg, iPad im Ruhezustand): Bis 30.09.2026 wurde die
+           * KI-Anfrage dann abgebrochen. Seitdem nicht mehr – nur ein ausdrücklicher Abbruch
+           * (ai:cancel) beendet sie. Die iPad-App holt Ergebnisse über das Auftragsregister ab
+           * (/auftrag/…, siehe auftragsEndpunkt), auch nach einer Unterbrechung.
+           */
+          res.on('close', () => clearInterval(puls))
           try {
             const wert = await ausfuehren(kanal, args)
             res.end(JSON.stringify({ ok: true, value: packen(wert) }))

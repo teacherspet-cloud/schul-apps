@@ -22,7 +22,7 @@ import { Directory, Filesystem } from '@capacitor/filesystem'
 import { SplashScreen } from '@capacitor/splash-screen'
 import { SCHULMATERIAL } from '@shared/schulmaterial'
 import { buildApi } from '@shared/apiShape'
-import type { AiProviderId } from '@shared/types'
+import type { AiProviderId, AppSettings, DeepPartial } from '@shared/types'
 import { aktualisiereModelle, registriereKanaele } from '../main/kanaele'
 import { setzeAbrufer } from '../main/services/images/politeFetch'
 import { setzeAufloeser } from '../main/services/netz/zieladresse'
@@ -32,7 +32,9 @@ import { writeFileSync } from 'fs'
 import { pruefeAudioName } from '../main/services/audio/elevenlabs'
 import { ausBase64 } from './base64'
 import { bus } from './bus'
-import { erstellePcKi } from './pcKi'
+import { erstellePcKi, zufallsKennung, type OffenerPcAuftrag } from './pcKi'
+import { erstelleHintergrundSchutz, GESCHUETZTE_KANAELE } from './hintergrund'
+import { Hintergrund } from './plugins'
 // Statusleiste, Kamera-Aussparung und App-Wechsel-Balken freihalten – nur in der App (30.09.2026)
 import './sicherBereich.css'
 import { capHttpFetch } from './netz/capHttpFetch'
@@ -101,6 +103,35 @@ function kiAttrappe(): void {
 
 /** Zuletzt gelesener KI-Stand des PCs („Abo über den PC", mobil/pcKi.ts) */
 const PC_STAND = 'schulapps.pcKi.stand'
+/** Offene Aufträge am PC und die geheime Gerätekennung dafür (Wiederanknüpfen, 30.09.2026) */
+const PC_AUFTRAEGE = 'schulapps.pcKi.auftraege'
+const PC_GERAET = 'schulapps.pcKi.geraet'
+
+function lies<T>(schluessel: string, ersatz: T): T {
+  try {
+    const roh = localStorage.getItem(schluessel)
+    return roh ? (JSON.parse(roh) as T) : ersatz
+  } catch {
+    return ersatz
+  }
+}
+
+function schreib(schluessel: string, wert: unknown): void {
+  try {
+    localStorage.setItem(schluessel, JSON.stringify(wert))
+  } catch {
+    // Merken ist Komfort – ohne geht es auch
+  }
+}
+
+/** Die Gerätekennung für das Auftragsregister am PC – einmal erzeugt, dann behalten */
+function geraetKennung(): string {
+  const da = lies<string>(PC_GERAET, '')
+  if (/^[a-z0-9]{32}$/.test(da)) return da
+  const neu = zufallsKennung(32)
+  schreib(PC_GERAET, neu)
+  return neu
+}
 
 /** Kanäle, deren Ressourcen erst bei Bedarf geladen werden (vfs/mounts.ts) */
 const MIT_RESSOURCEN = /^(lehrplan:themen|schulen:|images:openmoji-)/
@@ -138,21 +169,32 @@ async function starten(): Promise<void> {
     },
     // Den KI-Stand des PCs über Neustarts merken: Sparmodus und Modell stimmen dann sofort
     standSpeicher: {
-      lies: () => {
-        try {
-          return JSON.parse(localStorage.getItem(PC_STAND) ?? 'null')
-        } catch {
-          return null
-        }
-      },
-      schreibe: (stand) => {
-        try {
-          localStorage.setItem(PC_STAND, JSON.stringify(stand))
-        } catch {
-          // ohne Speicher fragt die App den PC eben erneut
-        }
+      lies: () => lies(PC_STAND, null),
+      schreibe: (stand) => schreib(PC_STAND, stand)
+    },
+    // Wiederanknüpfen: offene Aufträge am PC über Neustarts der App merken (30.09.2026)
+    geraet: geraetKennung(),
+    auftragsSpeicher: {
+      lies: () => lies<OffenerPcAuftrag[]>(PC_AUFTRAEGE, []),
+      schreibe: (liste) => schreib(PC_AUFTRAEGE, liste)
+    },
+    // Die Tailscale-Adresse des PCs merken – eine 100.x-Adresse erreicht die App nicht
+    tailscaleGefunden: (adresse) => {
+      try {
+        if (getSettings().pcKi?.tailscaleAdresse !== adresse)
+          setSettings({
+            pcKi: { tailscaleAdresse: adresse }
+          } as DeepPartial<AppSettings>)
+      } catch (e) {
+        console.error(e)
       }
     }
+  })
+  // API-Modus: laufende KI-Anfragen gegen das Anhalten im Hintergrund schützen (mobil/hintergrund.ts)
+  const schutz = erstelleHintergrundSchutz({
+    beginnen: Hintergrund.beginnen,
+    beenden: Hintergrund.beenden,
+    emit: (kanal, wert) => bus.emit(kanal, wert)
   })
   // Verbindung zum PC schon beim Start herstellen – der erste Auftrag wartet dann nicht darauf
   setTimeout(() => pcKi.vorwaermen(), 1500)
@@ -165,7 +207,10 @@ async function starten(): Promise<void> {
     if (MIT_RESSOURCEN.test(kanal)) await vorbereiten(kanal, args)
     try {
       const weiter = pcKi.weiterleiten(kanal, kopie(args))
-      return kopie((await (weiter ?? fn(...kopie(args)))) as T)
+      if (weiter) return kopie((await weiter) as T)
+      // Auf dem iPad selbst: lange Anfragen überstehen das Ausblenden der App (oder werden danach wiederholt)
+      const hier = GESCHUETZTE_KANAELE.includes(kanal) ? schutz.schuetze(kanal, args, async () => fn(...kopie(args))) : fn(...kopie(args))
+      return kopie((await hier) as T)
     } catch (err) {
       const meldung = err instanceof Error ? err.message : String(err)
       if (!/abgebrochen|aborted/i.test(meldung)) {
@@ -191,15 +236,22 @@ async function starten(): Promise<void> {
   const sichern = (): void => void vfs.sichereAlles()
   if (Capacitor.isNativePlatform()) {
     void App.addListener('appStateChange', ({ isActive }) => {
+      schutz.vordergrund(isActive)
       if (!isActive) sichern()
-      // Zurück im Vordergrund: Die Verbindung zum PC ist nach dem Ruhezustand meist weg
+      // Zurück im Vordergrund: Die Verbindung zum PC ist nach dem Ruhezustand meist weg – laufende Aufträge sofort abholen
       else pcKi.vorwaermen()
     })
     void App.addListener('pause', sichern)
   }
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') sichern()
+    const sichtbar = document.visibilityState === 'visible'
+    // Im Browser (Prüf-Build) gibt es kein appStateChange – die Sichtbarkeit der Seite tritt an seine Stelle
+    if (!Capacitor.isNativePlatform()) schutz.vordergrund(sichtbar)
+    if (!sichtbar) sichern()
+    else pcKi.vorwaermen()
   })
+  // Netz wieder da (WLAN-Wechsel, Tailscale verbunden): wartende Aufträge sofort weiterfragen lassen
+  window.addEventListener('online', () => pcKi.vorwaermen())
   window.addEventListener('pagehide', sichern)
 
   await import('../renderer/src/main')

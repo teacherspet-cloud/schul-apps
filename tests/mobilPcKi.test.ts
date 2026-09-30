@@ -22,6 +22,7 @@ const PIN = '135790'
 let port = 0
 const amPc: { kanal: string; args: unknown[] }[] = []
 const abbrechen = new Map<string, () => void>()
+const freigeben = new Map<string, () => void>()
 
 const STATUS_PC: AiStatus = {
   textProvider: 'openai',
@@ -55,6 +56,12 @@ async function aufruf(kanal: string, args: unknown[]): Promise<unknown> {
     if (req.schemaName === 'warten') {
       await new Promise<void>((r) => abbrechen.set(String(req.progressId), r))
       throw new Error('Der Auftrag wurde abgebrochen.')
+    }
+    // Wiederanknüpfen: rechnet, bis der Test ihn freigibt (nach Inhalt: user)
+    if (req.schemaName === 'haengt') {
+      if (req.progressId) lanEreignis('ai:progress', { id: req.progressId, chars: 7 })
+      await new Promise<void>((r) => freigeben.set(String(req.user), r))
+      return { antwort: `PC: ${req.user}` }
     }
     // Wie u.sende am PC: Fortschritt mit der gekennzeichneten Kennung
     if (req.progressId) lanEreignis('ai:progress', { id: req.progressId, chars: 42 })
@@ -133,9 +140,9 @@ describe('Weiterreichen an den PC', () => {
     await warte(300)
     const wert = await ki.weiterleiten('ai:structured', [{ system: '', user: 'Hallo', schemaName: 'probe', schema: {}, progressId: 'auftrag-7' }])
     expect(wert).toEqual({ antwort: 'PC: Hallo' })
-    // Am PC kam die Kennung mit dem Vorsatz der Sitzung an, zurück ohne
+    // Am PC lief die Anfrage als Auftrag im Register (Kennung „netz-auftrag-<ID>"), zurück kam die eigene Kennung
     const amPcKennung = (amPc.filter((a) => a.kanal === 'ai:structured').at(-1)!.args[0] as { progressId: string }).progressId
-    expect(amPcKennung).toMatch(/^netz-[0-9a-f]+-auftrag-7$/)
+    expect(amPcKennung).toMatch(/^netz-auftrag-[a-z0-9-]+$/)
     await warte(100)
     expect(ereignisse).toContainEqual({ kanal: 'ai:progress', wert: { id: 'auftrag-7', chars: 42 } })
     ki.beenden()
@@ -154,7 +161,7 @@ describe('Weiterreichen an den PC', () => {
     expect(istAbbruch(fehler)).toBe(true)
     await warte(200)
     const abbruch = amPc.slice(zuvor).find((a) => a.kanal === 'ai:cancel')
-    expect(String(abbruch?.args[0])).toMatch(/^netz-[0-9a-f]+-lang-1$/)
+    expect(String(abbruch?.args[0])).toMatch(/^netz-auftrag-[a-z0-9-]+$/)
     // Eine fremde Kennung bleibt auf dem iPad
     expect(ki.weiterleiten('ai:cancel', ['gibt-es-nicht'])).toBeNull()
     ki.beenden()
@@ -297,5 +304,314 @@ describe('CORS für die iPad-App', () => {
     })
     expect(falsch.status).toBe(401)
     expect(falsch.headers.get('access-control-allow-origin')).toBe('capacitor://localhost')
+  })
+})
+
+/*
+ * ---------- Wiederanknüpfen (30.09.2026) ----------
+ *
+ * Wunsch der Lehrkraft: Bei Verbindungsabbrüchen zwischen PC und iPad soll der Auftrag nahtlos
+ * weiterlaufen – auch über einen Neustart der App hinweg. Zwischen iPad und PC steht hier ein
+ * Vermittler, dessen Leitung sich kappen lässt (wie ein WLAN-Wechsel oder Tailscale, das neu
+ * verbindet): Jede offene Verbindung reißt ab, neue werden sofort wieder geschlossen.
+ */
+const { createServer: netzServer, connect: netzVerbinden } = await import('net')
+const { ersetzeTailscaleIp, zielAdresse, zeigtAufTailscaleIp, fingerabdruck } = await import('../src/mobil/pcKi')
+const { magicDnsAus } = await import('../src/main/services/lanServer')
+type OffenerPcAuftrag = import('../src/mobil/pcKi').OffenerPcAuftrag
+
+async function vermittler(ziel: number): Promise<{
+  port: number
+  kappen(): void
+  oeffnen(): void
+  schliessen(): void
+}> {
+  const leitungen = new Set<import('net').Socket>()
+  let offen = true
+  const s = netzServer((ein) => {
+    if (!offen) return void ein.destroy()
+    const aus = netzVerbinden(ziel, '127.0.0.1')
+    leitungen.add(ein)
+    leitungen.add(aus)
+    const weg = (): void => {
+      ein.destroy()
+      aus.destroy()
+      leitungen.delete(ein)
+      leitungen.delete(aus)
+    }
+    ein.on('error', weg).on('close', weg)
+    aus.on('error', weg).on('close', weg)
+    ein.pipe(aus)
+    aus.pipe(ein)
+  })
+  await new Promise<void>((ok) => s.listen(0, '127.0.0.1', ok))
+  return {
+    port: (s.address() as import('net').AddressInfo).port,
+    kappen: () => {
+      offen = false
+      for (const l of leitungen) l.destroy()
+    },
+    oeffnen: () => void (offen = true),
+    schliessen: () => {
+      offen = false
+      for (const l of leitungen) l.destroy()
+      s.close()
+    }
+  }
+}
+
+/** Ein iPad hinter dem Vermittler – mit fester Gerätekennung und gemerkten Aufträgen (wie localStorage) */
+function ipadHinter(p: number, geteilt: { liste: OffenerPcAuftrag[] }, geraet: string, geduldMs?: number) {
+  const ereignisse: { kanal: string; wert: unknown }[] = []
+  const ki = erstellePcKi({
+    einstellungen: () => ({
+      adresse: `127.0.0.1:${p}`,
+      pin: PIN,
+      texte: true,
+      bilder: false,
+      hoertexte: false
+    }),
+    lokal: async () => STATUS_PC,
+    emit: (kanal, wert) => ereignisse.push({ kanal, wert }),
+    geraet,
+    geduldMs,
+    auftragsSpeicher: {
+      lies: () => geteilt.liste,
+      schreibe: (l) => void (geteilt.liste = l)
+    }
+  })
+  return { ki, ereignisse }
+}
+
+const bisWahr = async (bedingung: () => boolean, ms = 5000): Promise<void> => {
+  const ende = Date.now() + ms
+  while (!bedingung()) {
+    if (Date.now() > ende) throw new Error('Zeit abgelaufen')
+    await warte(20)
+  }
+}
+const strukturierteAmPc = (): number => amPc.filter((a) => a.kanal === 'ai:structured').length
+
+describe('Wiederanknüpfen nach Verbindungsabbruch', () => {
+  it('Verbindung während des Auftrags gekappt: läuft am PC weiter, das Ergebnis kommt nach der Rückkehr an', async () => {
+    const v = await vermittler(port)
+    const geteilt = { liste: [] as OffenerPcAuftrag[] }
+    const { ki, ereignisse } = ipadHinter(v.port, geteilt, 'geraet-kappen-0123456789')
+    const vorher = strukturierteAmPc()
+    const lauf = ki.weiterleiten('ai:structured', [
+      {
+        system: '',
+        user: 'kappen-1',
+        schemaName: 'haengt',
+        schema: {},
+        progressId: 'k-1'
+      }
+    ])!
+    await bisWahr(() => freigeben.has('kappen-1'))
+    expect(geteilt.liste).toHaveLength(1)
+    await warte(150)
+
+    // WLAN weg, Tailscale verbindet neu …
+    v.kappen()
+    await bisWahr(() => ereignisse.some((e) => e.kanal === 'ai:verbindung' && (e.wert as { zustand: string }).zustand === 'unterbrochen'))
+    expect(ereignisse.find((e) => e.kanal === 'ai:verbindung')?.wert).toEqual({
+      id: 'k-1',
+      zustand: 'unterbrochen'
+    })
+    // … währenddessen rechnet der PC fertig
+    freigeben.get('kappen-1')!()
+    await warte(300)
+
+    // Netz wieder da, App zurück im Vordergrund
+    v.oeffnen()
+    ki.vorwaermen()
+    expect(await lauf).toEqual({ antwort: 'PC: kappen-1' })
+    // Nur EIN Auftrag am PC – nichts wurde neu gesendet
+    expect(strukturierteAmPc() - vorher).toBe(1)
+    expect(ereignisse).toContainEqual({
+      kanal: 'ai:verbindung',
+      wert: { id: 'k-1', zustand: 'verbunden' }
+    })
+    // Fortschritt kam unter der eigenen Kennung an
+    expect(ereignisse).toContainEqual({
+      kanal: 'ai:progress',
+      wert: { id: 'k-1', chars: 7 }
+    })
+    // Abgeholt und quittiert: nichts mehr gemerkt
+    expect(geteilt.liste).toHaveLength(0)
+    ki.beenden()
+    v.schliessen()
+  }, 20_000)
+
+  it('App-Neustart: dieselbe Anfrage übernimmt den laufenden Auftrag am PC, statt neu zu rechnen', async () => {
+    const v = await vermittler(port)
+    const geteilt = { liste: [] as OffenerPcAuftrag[] }
+    const geraet = 'geraet-neustart-0123456789'
+    const anfrage = {
+      system: 's',
+      user: 'neustart-1',
+      schemaName: 'haengt',
+      schema: {}
+    }
+    const vorher = strukturierteAmPc()
+
+    // Erste „Sitzung" der App: startet den Auftrag, dann bricht die Leitung weg, und sie gibt auf
+    const alt = ipadHinter(v.port, geteilt, geraet, 200)
+    const altLauf = alt.ki.weiterleiten('ai:structured', [{ ...anfrage, progressId: 'alt-1' }])!.catch((e: unknown) => e)
+    await bisWahr(() => freigeben.has('neustart-1'))
+    v.kappen()
+    const altFehler = await altLauf
+    expect(String(altFehler)).toMatch(/läuft am PC weiter/)
+    // Die ID bleibt gemerkt – der Auftrag ist ja nicht verloren
+    expect(geteilt.liste).toHaveLength(1)
+    alt.ki.beenden()
+
+    // Neustart: neue Anmeldung, neue Kennung der Anfrage, gleicher Inhalt
+    v.oeffnen()
+    const neu = ipadHinter(v.port, geteilt, geraet)
+    const neuLauf = neu.ki.weiterleiten('ai:structured', [{ ...anfrage, progressId: 'neu-1' }])!
+    await warte(400)
+    freigeben.get('neustart-1')!()
+    expect(await neuLauf).toEqual({ antwort: 'PC: neustart-1' })
+    expect(strukturierteAmPc() - vorher).toBe(1)
+    expect(geteilt.liste).toHaveLength(0)
+    neu.ki.beenden()
+    v.schliessen()
+  }, 20_000)
+
+  it('zwei gleiche Anfragen zugleich bekommen je einen eigenen Auftrag', async () => {
+    const geteilt = { liste: [] as OffenerPcAuftrag[] }
+    const { ki } = ipadHinter(port, geteilt, 'geraet-doppelt-0123456789')
+    const anfrage = {
+      system: 's',
+      user: 'doppelt-1',
+      schemaName: 'probe',
+      schema: {}
+    }
+    const vorher = strukturierteAmPc()
+    const [a, b] = await Promise.all([
+      ki.weiterleiten('ai:structured', [{ ...anfrage, progressId: 'd-1' }]),
+      ki.weiterleiten('ai:structured', [{ ...anfrage, progressId: 'd-2' }])
+    ])
+    expect(a).toEqual({ antwort: 'PC: doppelt-1' })
+    expect(b).toEqual({ antwort: 'PC: doppelt-1' })
+    expect(strukturierteAmPc() - vorher).toBe(2)
+    ki.beenden()
+  })
+
+  it('ein Abbruch auf dem iPad beendet den Auftrag auch am PC und vergisst ihn', async () => {
+    const geteilt = { liste: [] as OffenerPcAuftrag[] }
+    const { ki } = ipadHinter(port, geteilt, 'geraet-abbruch-0123456789')
+    const lauf = ki.weiterleiten('ai:structured', [
+      {
+        system: '',
+        user: 'ab-1',
+        schemaName: 'warten',
+        schema: {},
+        progressId: 'ab-1'
+      }
+    ])!
+    await warte(300)
+    await ki.weiterleiten('ai:cancel', ['ab-1'])
+    expect(istAbbruch(await lauf.catch((e: unknown) => e))).toBe(true)
+    await warte(200)
+    expect(geteilt.liste).toHaveLength(0)
+    expect(amPc.some((a) => a.kanal === 'ai:cancel' && String(a.args[0]).startsWith('netz-auftrag-'))).toBe(true)
+    ki.beenden()
+  })
+
+  it('nimmt bei einer älteren Fassung am PC (ohne Register) den gewöhnlichen Weg', async () => {
+    const ohne: typeof fetch = (input, init) => {
+      if (String(input).includes('/auftrag/')) return Promise.resolve(new Response('nicht erlaubt', { status: 405 }))
+      return fetch(input, init)
+    }
+    const ki = erstellePcKi({
+      einstellungen: () => ({
+        adresse: `127.0.0.1:${port}`,
+        pin: PIN,
+        texte: true,
+        bilder: false,
+        hoertexte: false
+      }),
+      lokal: async () => STATUS_PC,
+      emit: () => undefined,
+      abruf: ohne
+    })
+    expect(await ki.weiterleiten('ai:structured', [{ system: '', user: 'alt', schemaName: 'probe', schema: {} }])).toEqual({ antwort: 'PC: alt' })
+    ki.beenden()
+  })
+
+  it('der Fingerabdruck hängt am Inhalt, nicht an der Kennung', () => {
+    const a = fingerabdruck('ai:structured', [{ user: 'x', progressId: 'eins' }])
+    expect(fingerabdruck('ai:structured', [{ user: 'x', progressId: 'zwei' }])).toBe(a)
+    expect(fingerabdruck('ai:structured', [{ user: 'y', progressId: 'eins' }])).not.toBe(a)
+    expect(fingerabdruck('ai:image', ['Apfel', 'b1'])).toBe(fingerabdruck('ai:image', ['Apfel', 'b2']))
+  })
+})
+
+describe('Tailscale: Name statt IP (Rückmeldung 30.09.2026)', () => {
+  it('ersetzt eine 100.x-Adresse durch den gemerkten Namen auf „.ts.net"', () => {
+    const name = 'http://home-pc.tailae2351.ts.net:8420'
+    expect(zeigtAufTailscaleIp('100.101.181.79:8420')).toBe(true)
+    expect(zeigtAufTailscaleIp('192.168.1.24:8420')).toBe(false)
+    expect(zeigtAufTailscaleIp('home-pc.tailae2351.ts.net')).toBe(false)
+    expect(ersetzeTailscaleIp('100.101.181.79:8420', name)).toBe(name)
+    expect(ersetzeTailscaleIp('http://100.101.181.79', name)).toBe(name)
+    // Ein anderer Port in der Eingabe bleibt
+    expect(ersetzeTailscaleIp('100.101.181.79:8421', name)).toBe('http://home-pc.tailae2351.ts.net:8421')
+    // Ohne Namen oder ohne 100.x nichts zu ersetzen
+    expect(ersetzeTailscaleIp('100.101.181.79:8420', undefined)).toBeNull()
+    expect(ersetzeTailscaleIp('192.168.1.24:8420', name)).toBeNull()
+    expect(zielAdresse({ adresse: '100.101.181.79:8420', tailscaleAdresse: name })).toBe(name)
+    expect(zielAdresse({ adresse: '192.168.1.24', tailscaleAdresse: name })).toBe('http://192.168.1.24:8420')
+  })
+
+  it('liest den Namen aus „tailscale status --json"', () => {
+    expect(
+      magicDnsAus(
+        JSON.stringify({
+          Self: {
+            HostName: 'schul-apps-pc',
+            DNSName: 'Home-PC.tailae2351.ts.net.'
+          }
+        })
+      )
+    ).toBe('home-pc.tailae2351.ts.net')
+    expect(magicDnsAus(JSON.stringify({ Self: { DNSName: 'pc.example.com.' } }))).toBe('')
+    expect(magicDnsAus('kein json')).toBe('')
+  })
+
+  it('merkt sich den Namen, den der PC beim Anmelden nennt', async () => {
+    let gemerkt = ''
+    // Der PC im Test hat kein Tailscale – die Antwort der Anmeldung wird um den Namen ergänzt
+    const mitName: typeof fetch = async (input, init) => {
+      const res = await fetch(input, init)
+      if (!String(input).endsWith('/anmelden') || !res.ok) return res
+      const daten = (await res.json()) as Record<string, unknown>
+      return new Response(
+        JSON.stringify({
+          ...daten,
+          tailscale: 'http://home-pc.tailae2351.ts.net:8420'
+        }),
+        { status: 200 }
+      )
+    }
+    const ki = erstellePcKi({
+      einstellungen: () => ({
+        adresse: `127.0.0.1:${port}`,
+        pin: PIN,
+        texte: true,
+        bilder: false,
+        hoertexte: false
+      }),
+      lokal: async () => STATUS_PC,
+      emit: () => undefined,
+      abruf: mitName,
+      tailscaleGefunden: (a) => void (gemerkt = a)
+    })
+    const t = await ki.testen(`127.0.0.1:${port}`, PIN)
+    expect(t.tailscale).toBe('http://home-pc.tailae2351.ts.net:8420')
+    expect(gemerkt).toBe('http://home-pc.tailae2351.ts.net:8420')
+    ki.beenden()
   })
 })

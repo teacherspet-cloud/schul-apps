@@ -13,7 +13,7 @@
 import { versuchAnfrage, versuchAus } from './didactics/protokoll'
 import type { VersuchDaten } from './model/protokoll'
 import { istAbbruch } from '@shared/abbruch'
-import { starteAuftrag } from '../../shared/auftraege'
+import { registriereFortsetzung, starteAuftrag } from '../../shared/auftraege'
 import { notifyInfo } from '../../shared/util'
 import { blattOffen, legeArbeitsblattAb } from './library'
 import { browserWorksheetImageDeps } from './generation/browserImages'
@@ -102,6 +102,10 @@ export function planeGliederung(worksheet: Worksheet, docId: string): void {
     titel: titelVon(worksheet),
     art: 'Gliederung planen',
     eingabe: worksheet,
+    fortsetzen: {
+      art: 'arbeitsblatt.planeGliederung',
+      args: [worksheet, docId]
+    },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Gliederung konnte nicht erstellt werden',
     arbeit: async (ws, k) => {
@@ -152,6 +156,7 @@ export function planeNeu(worksheet: Worksheet, docId: string): void {
     titel: titelVon(worksheet),
     art: 'Gliederung neu planen',
     eingabe: worksheet,
+    fortsetzen: { art: 'arbeitsblatt.planeNeu', args: [worksheet, docId] },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Gliederung konnte nicht neu geplant werden',
     arbeit: (ws, k) => {
@@ -186,6 +191,10 @@ export function formuliereAus(worksheet: Worksheet, docId: string, optionen: { r
     titel: titelVon(worksheet),
     art: 'Arbeitsblatt ausformulieren',
     eingabe: worksheet,
+    fortsetzen: {
+      art: 'arbeitsblatt.formuliereAus',
+      args: [worksheet, docId, optionen]
+    },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Arbeitsblatt konnte nicht erstellt werden',
     arbeit: async (ws, k) => {
@@ -272,6 +281,7 @@ export function maskottchenZeichnen(worksheet: Worksheet, docId: string): void {
     titel: titelVon(worksheet),
     art: tier ? 'Deckblatt-Tier zeichnen' : 'Deckblatt-Fuchs zeichnen',
     eingabe: worksheet,
+    fortsetzen: { art: 'arbeitsblatt.maskottchen', args: [worksheet, docId] },
     istOffen: () => blattOffen(docId),
     sperrt: false,
     schluessel: 'deckblatt-maskottchen',
@@ -432,6 +442,7 @@ export function versuchAuftrag(worksheet: Worksheet, docId: string): void {
     titel: titelVon(worksheet),
     art: 'Versuch ausarbeiten',
     eingabe: worksheet,
+    fortsetzen: { art: 'arbeitsblatt.versuch', args: [worksheet, docId] },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Der Versuch konnte nicht ausgearbeitet werden',
     arbeit: (ws, k) => versuchAusarbeiten(ws.meta, k),
@@ -440,3 +451,13 @@ export function versuchAuftrag(worksheet: Worksheet, docId: string): void {
       legeArbeitsblattAb(docId, ws, (aktuell) => (aktuell.meta.versuch ? { ...aktuell, meta: { ...aktuell.meta, versuch: { ...aktuell.meta.versuch, daten } } } : aktuell))
   })
 }
+
+/*
+ * Nach einem Neustart der iPad-App fortsetzen (30.09.2026, shared/auftraege.ts): dieselben
+ * Eingaben, dieselben KI-Anfragen – was der PC schon gerechnet hat, kommt sofort zurück.
+ */
+registriereFortsetzung('arbeitsblatt.planeGliederung', planeGliederung)
+registriereFortsetzung('arbeitsblatt.planeNeu', planeNeu)
+registriereFortsetzung('arbeitsblatt.formuliereAus', formuliereAus)
+registriereFortsetzung('arbeitsblatt.maskottchen', maskottchenZeichnen)
+registriereFortsetzung('arbeitsblatt.versuch', versuchAuftrag)

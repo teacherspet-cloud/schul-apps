@@ -109,14 +109,47 @@ export interface NetzVerbindungOptionen {
   speicher: { lies(): string; schreibe(token: string): void; loesche(): void }
   /** Anderes fetch (Tests); Vorgabe: das globale */
   abruf?: typeof fetch
+  /**
+   * Geheime Kennung dieses Geräts für das Auftragsregister am PC (main/services/lanAuftraege.ts).
+   * Wer sie mitschickt, findet seine Aufträge auch nach einer neuen Anmeldung wieder.
+   */
+  geraet?: string
+}
+
+/** Der PC kennt kein Auftragsregister (ältere Fassung) – dann geht es über den gewöhnlichen Aufruf */
+export class OhneAuftragsregister extends Error {
+  constructor() {
+    super('Diese Fassung von Schul-Apps am PC kennt noch keine Aufträge mit Wiederanknüpfen.')
+    this.name = 'OhneAuftragsregister'
+  }
+}
+
+/** Stand eines Auftrags im Register am PC (siehe lanAuftraege.ts, AuftragsBild) */
+export interface NetzAuftrag {
+  id: string
+  kanal: string
+  zustand: 'laeuft' | 'fertig' | 'fehler' | 'abgebrochen'
+  seit: number
+  ende?: number
+  fortschritt?: Record<string, unknown>
+  platz?: Record<string, unknown>
+  fehler?: string
+  wert?: unknown
 }
 
 export interface NetzVerbindung {
-  /** Meldet das Gerät mit der PIN an; der Server gibt eine Kennung zurück. */
-  anmelden(pin: string, signal?: AbortSignal): Promise<void>
+  /** Meldet das Gerät mit der PIN an; der Server gibt eine Kennung zurück – und, falls bekannt, seine Tailscale-Adresse. */
+  anmelden(pin: string, signal?: AbortSignal): Promise<{ tailscale?: string }>
   abgemeldet(): boolean
   /** Ein Aufruf am PC; 401 wirft `AnmeldungAbgelaufen` */
   aufruf<T>(channel: string, args: unknown[], signal?: AbortSignal): Promise<T>
+  /**
+   * Auftragsregister am PC (braucht `geraet`): starten, abfragen, quittieren, abbrechen, liste.
+   * Liefert null, wenn der PC den Auftrag nicht kennt; 401 wirft `AnmeldungAbgelaufen`,
+   * ein PC ohne Register `OhneAuftragsregister`.
+   */
+  auftrag(aktion: 'starten' | 'abfragen' | 'quittieren' | 'abbrechen', koerper: Record<string, unknown>, signal?: AbortSignal): Promise<NetzAuftrag | null>
+  auftraege(signal?: AbortSignal): Promise<NetzAuftrag[]>
   /** Hörer für ein Ereignis anmelden; der Strom startet mit dem ersten Hörer. */
   horche(kanal: string, cb: (wert: unknown) => void): () => void
   /** Strom schließen und nicht wieder öffnen */
@@ -125,6 +158,7 @@ export interface NetzVerbindung {
 
 export function netzVerbindung(o: NetzVerbindungOptionen): NetzVerbindung {
   const abruf = (...a: Parameters<typeof fetch>): Promise<Response> => (o.abruf ?? fetch)(...a)
+  const geraetKopf: Record<string, string> = o.geraet ? { 'x-schulapps-geraet': o.geraet } : {}
   const hoerer = new Map<string, Set<(wert: unknown) => void>>()
   let stromLaeuft = false
   let beendet = false
@@ -173,7 +207,7 @@ export function netzVerbindung(o: NetzVerbindungOptionen): NetzVerbindung {
       try {
         lebt()
         const res = await abruf(`${o.basis}/ereignisse`, {
-          headers: { 'x-schulapps-token': t, ...(letzte ? { 'last-event-id': letzte } : {}) },
+          headers: { 'x-schulapps-token': t, ...geraetKopf, ...(letzte ? { 'last-event-id': letzte } : {}) },
           cache: 'no-store',
           signal: steuerung.signal
         })
@@ -227,7 +261,7 @@ export function netzVerbindung(o: NetzVerbindungOptionen): NetzVerbindung {
         body: JSON.stringify({ pin }),
         signal
       })
-      const daten = (await res.json()) as { token?: string; fehler?: string; verbleibend?: number }
+      const daten = (await res.json()) as { token?: string; fehler?: string; verbleibend?: number; tailscale?: string }
       if (!res.ok || !daten.token) {
         throw new Error((daten.fehler ?? 'Die Anmeldung ist fehlgeschlagen.') + (typeof daten.verbleibend === 'number' ? ` Noch ${daten.verbleibend} Versuche.` : ''))
       }
@@ -235,8 +269,61 @@ export function netzVerbindung(o: NetzVerbindungOptionen): NetzVerbindung {
       // Ein offener Strom gehört zur alten Anmeldung – Ereignisse der neuen kämen dort nie an
       stromSteuerung?.abort()
       wecken?.()
+      return typeof daten.tailscale === 'string' && daten.tailscale ? { tailscale: daten.tailscale } : {}
     },
     abgemeldet: () => !o.speicher.lies(),
+    async auftrag(aktion, koerper, signal) {
+      const res = await abruf(`${o.basis}/auftrag/${aktion}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-schulapps-token': o.speicher.lies(),
+          ...geraetKopf
+        },
+        body: JSON.stringify(aktion === 'starten' && Array.isArray(koerper.args) ? { ...koerper, args: (koerper.args as unknown[]).map(packen) } : koerper),
+        cache: 'no-store',
+        signal
+      })
+      if (res.status === 401) {
+        o.speicher.loesche()
+        throw new AnmeldungAbgelaufen()
+      }
+      // Ältere Fassung am PC: POST auf einen unbekannten Pfad ergibt 405
+      if (res.status === 405) throw new OhneAuftragsregister()
+      if (res.status === 404) return null
+      const daten = (await res.json()) as {
+        auftrag?: NetzAuftrag
+        ok?: boolean
+        fehler?: string
+      }
+      if (daten.fehler) throw new Error(daten.fehler)
+      if (!daten.auftrag) return null
+      return 'wert' in daten.auftrag ? { ...daten.auftrag, wert: auspacken(daten.auftrag.wert) } : daten.auftrag
+    },
+    async auftraege(signal) {
+      const res = await abruf(`${o.basis}/auftrag/liste`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-schulapps-token': o.speicher.lies(),
+          ...geraetKopf
+        },
+        body: '{}',
+        cache: 'no-store',
+        signal
+      })
+      if (res.status === 401) {
+        o.speicher.loesche()
+        throw new AnmeldungAbgelaufen()
+      }
+      if (res.status === 405) throw new OhneAuftragsregister()
+      const daten = (await res.json()) as {
+        auftraege?: NetzAuftrag[]
+        fehler?: string
+      }
+      if (daten.fehler) throw new Error(daten.fehler)
+      return daten.auftraege ?? []
+    },
     async aufruf<T>(channel: string, args: unknown[], signal?: AbortSignal): Promise<T> {
       const res = await abruf(`${o.basis}/api`, {
         method: 'POST',
