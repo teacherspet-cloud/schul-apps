@@ -2,6 +2,7 @@ import type { ProtokollInhalt, VersuchSetup } from './protokoll'
 import type { DesignTemplate } from '@shared/design'
 import type { AiProviderId, CefrLevel, TtsSettings } from '@shared/types'
 import type { SourceCitation } from '../../../shared/citation'
+import type { KopfSprache } from '../../../shared/kopfSprache'
 import type { BoardField, BoardFormat } from '../didactics/boardDesign'
 import type { ImageFunction } from '../didactics/imageDesign'
 import type { Afb, AfbMix } from '../didactics/ageBands'
@@ -1123,7 +1124,7 @@ export interface WorksheetMeta {
    * Fehlt = Deutsch. Englischarbeiten setzen hier 'en', damit auch PDF und Word
    * durchgehend englisch beschriftet sind.
    */
-  labelLanguage?: 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'
+  labelLanguage?: KopfSprache
   /**
    * Wort hinter dem Titel im Lösungsteil („– Lösungen"). Fehlt = „Lösungen". Die
    * Klassenarbeit setzt „Erwartungshorizont" – das ist dort der Fachbegriff, auch in

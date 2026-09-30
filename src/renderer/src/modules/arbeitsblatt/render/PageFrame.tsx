@@ -5,6 +5,7 @@ import type { CitationStyle } from '@shared/types'
 import { CANARY_STYLE } from '../../../shared/aiCanary'
 import { RichText } from '../../../shared/richtext/RichText'
 import { fachPfad, ueberthemaVon, type UeberthemaStil } from '../../../shared/ueberthema'
+import { KOPF_LABELS, SEITE, type KopfLabels, type KopfSprache } from '../../../shared/kopfSprache'
 
 export interface PageInfo {
   /** Titel in der Kopfzeile direkt im Blatt ändern (27.09.2026) – fehlt = nur lesen */
@@ -18,7 +19,7 @@ export interface PageInfo {
   lineHeight: number
   isKey: boolean
   /** Sprache der festen Beschriftungen (Name, Klasse, Datum) – bei Englischarbeiten englisch */
-  language?: 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'
+  language?: KopfSprache
   /** z. B. „★★" bei getrennten Niveau-Blättern */
   levelMark?: string
   /** Regelwerk für die Quellenangaben auf der Nachweisseite */
@@ -116,21 +117,13 @@ export function sidebarBox(design: DesignTemplate): { start: number } | null {
 }
 
 /** Feste Beschriftungen in der Sprache des Faches */
-const LABELS = {
-  de: { name: 'Name:', class: 'Klasse:', date: 'Datum:', grade: (g: number) => `Klasse ${g}` },
-  en: { name: 'Name:', class: 'Class:', date: 'Date:', grade: (g: number) => `Class ${g}` },
-  // Französisch- und Spanischarbeiten (Großprogramm 0.4, Phase G): Kopf einsprachig in der Zielsprache
-  fr: { name: 'Nom :', class: 'Classe :', date: 'Date :', grade: (g: number) => `Classe ${g}` },
-  es: { name: 'Nombre:', class: 'Clase:', date: 'Fecha:', grade: (g: number) => `Clase ${g}` },
-  // Italienisch- und Russischarbeiten (29.09.2026)
-  it: { name: 'Nome:', class: 'Classe:', date: 'Data:', grade: (g: number) => `Classe ${g}` },
-  ru: { name: 'Фамилия, имя:', class: 'Класс:', date: 'Дата:', grade: (g: number) => `${g} класс` }
-}
+/**
+ * Beschriftungen und „Seite" in der Sprache des Kopfes – seit 30.09.2026 für alle Schulfremdsprachen
+ * an einer Stelle (shared/kopfSprache.ts); SEITE bleibt hier für bestehende Importe erhalten.
+ */
+export { SEITE }
 
-/** „Seite" in der Sprache des Kopfes */
-export const SEITE: Record<'de' | 'en' | 'fr' | 'es' | 'it' | 'ru', string> = { de: 'Seite', en: 'Page', fr: 'Page', es: 'Página', it: 'Pagina', ru: 'Страница' }
-
-export const pageLabels = (info: PageInfo): (typeof LABELS)['de'] => LABELS[info.language ?? 'de']
+export const pageLabels = (info: PageInfo): KopfLabels => KOPF_LABELS[info.language ?? 'de']
 
 /** Steht nur das Datum an, passt es neben den Titel – das spart eine ganze Zeile. */
 export function dateInTitleRow(info: PageInfo): boolean {

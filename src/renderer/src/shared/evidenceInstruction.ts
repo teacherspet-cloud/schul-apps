@@ -69,7 +69,22 @@ const TEXTS: Record<string, EvidenceText> = {
     instruction: 'Отметь правильный ответ и обоснуй его короткой цитатой из текста.',
     column: 'Цитата из текста',
     sourced: false
-  }
+  },
+  /*
+   * Neue Schulfremdsprachen (30.09.2026): sinngemäß gebildet nach dem englischen Wortlaut, in
+   * keinem geprüften amtlichen Material belegt – daher alle sourced: false
+   * (recherche/sprachtexte-2026-09-30.md, nicht muttersprachlich geprüft).
+   */
+  nl: { instruction: 'Kruis het juiste antwoord aan en onderbouw het met een kort citaat uit de tekst.', column: 'Citaat uit de tekst', sourced: false },
+  pl: { instruction: 'Zaznacz właściwą odpowiedź i uzasadnij ją krótkim cytatem z tekstu.', column: 'Cytat z tekstu', sourced: false },
+  cs: { instruction: 'Označ správnou odpověď a zdůvodni ji krátkou citací z textu.', column: 'Citace z textu', sourced: false },
+  pt: { instruction: 'Assinala a resposta correta e justifica-a com uma citação curta do texto.', column: 'Citação do texto', sourced: false },
+  tr: { instruction: 'Doğru cevabı işaretle ve metinden kısa bir alıntıyla gerekçelendir.', column: 'Metinden alıntı', sourced: false },
+  zh: { instruction: '请选出正确答案，并引用课文中的一句短句作为依据。', column: '课文引文', sourced: false },
+  ja: { instruction: '正しい答えに印をつけ、本文から短く引用して根拠を示しなさい。', column: '本文からの引用', sourced: false },
+  ar: { instruction: 'ضع علامة على الإجابة الصحيحة وعلّلها باقتباس قصير من النص.', column: 'اقتباس من النص', sourced: false },
+  da: { instruction: 'Sæt kryds ved det rigtige svar, og begrund det med et kort citat fra teksten.', column: 'Citat fra teksten', sourced: false },
+  el: { instruction: 'Σημείωσε τη σωστή απάντηση και τεκμηρίωσέ την με ένα σύντομο απόσπασμα από το κείμενο.', column: 'Απόσπασμα από το κείμενο', sourced: false }
 }
 
 /**

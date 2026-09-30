@@ -18,6 +18,11 @@ const LABELS: Record<string, { yes: string; no: string }> = {
   pt: { yes: 'verdadeiro', no: 'falso' },
   tr: { yes: 'doğru', no: 'yanlış' },
   zh: { yes: '正确', no: '错误' },
+  // Japanisch, Arabisch, Dänisch, Neugriechisch (30.09.2026, Farbe + Muster)
+  ja: { yes: '正しい', no: '正しくない' },
+  ar: { yes: 'صحيح', no: 'خطأ' },
+  da: { yes: 'rigtigt', no: 'forkert' },
+  el: { yes: 'σωστό', no: 'λάθος' },
   la: { yes: 'verum', no: 'falsum' }
 }
 

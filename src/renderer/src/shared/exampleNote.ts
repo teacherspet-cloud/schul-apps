@@ -26,6 +26,10 @@ const NOTES: Record<string, string> = {
   pt: 'Há um exemplo.',
   tr: 'Bir örnek verilmiştir.',
   zh: '已给出一个例子。',
+  ja: '例が一つ示されています。',
+  ar: 'يوجد مثال واحد.',
+  da: 'Der er ét eksempel.',
+  el: 'Δίνεται ένα παράδειγμα.',
   la: 'Exemplum unum datum est.'
 }
 

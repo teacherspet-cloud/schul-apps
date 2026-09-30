@@ -22,7 +22,7 @@ import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
 import { ProtokollView } from './protokoll'
-import { RU_SLOVO, russischPlural } from '../../../../shared/russischPlural'
+import { wortzahlText, zaehleWoerter } from '../../../../shared/kopfSprache'
 
 /**
  * Jeder Baustein mit angehefteter Illustration bekommt die Figur an die Ecke (26.09.2026) –
@@ -32,10 +32,6 @@ import { RU_SLOVO, russischPlural } from '../../../../shared/russischPlural'
 /** Die Angaben des Materialkopfs in der Reihenfolge von `headerLine` */
 const KOPF_ANGABEN = ['author', 'textType', 'date'] as const
 
-/** „Wörter" in der Sprache des Kopfes (Klassenarbeit Französisch/Spanisch/Englisch) */
-const WOERTER: Record<'de' | 'en' | 'fr' | 'es' | 'it' | 'ru', string> = { de: 'Wörter', en: 'words', fr: 'mots', es: 'palabras', it: 'parole', ru: 'слов' }
-/** Russisch nach der Zahl (29.09.2026): 341 слово, 342 слова, 345 слов */
-const woerterWort = (n: number, sprache: keyof typeof WOERTER): string => (sprache === 'ru' ? russischPlural(n, RU_SLOVO) : WOERTER[sprache])
 export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
   const { mode } = useWs()
   const set = useSetter(block)
@@ -122,11 +118,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       // Blocksatz nur bei längeren Texten – kurze Absätze würden sonst zerrissen
       const justify = ctx.justify && plainText(block.body).length >= LONG_TEXT_CHARS
       // Auslassungszeichen sind Kennzeichnung, keine Woerter des Originals
-      const materialWoerter = (
-        plainText(block.body)
-          .replace(/\[\s*(?:…|\.\.\.)\s*\]/g, ' ')
-          .match(/[\p{L}\p{N}]+/gu) ?? []
-      ).length
+      // Chinesisch/Japanisch: Schriftzeichen statt Wörter (shared/kopfSprache.ts)
+      const materialWoerter = zaehleWoerter(plainText(block.body).replace(/\[\s*(?:…|\.\.\.)\s*\]/g, ' '), ctx.labelLanguage)
       return (
         <div
           /*
@@ -233,7 +226,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           */}
           {to >= paragraphs.length && materialWoerter > 0 && (
             <div className="ws-wortzahl" data-foot>
-              ({materialWoerter} {woerterWort(materialWoerter, ctx.labelLanguage ?? 'de')})
+              ({wortzahlText(materialWoerter, ctx.labelLanguage)})
             </div>
           )}
           {block.source && to >= paragraphs.length && (

@@ -22,6 +22,10 @@ const HINWEISE: Record<string, (nummer: number) => string> = {
   pt: (n) => `Tarefa ${n} (continuação)`,
   tr: (n) => `Görev ${n} (devamı)`,
   zh: (n) => `练习 ${n}（续）`,
+  ja: (n) => `問題 ${n}（続き）`,
+  ar: (n) => `التمرين ${n} (تابع)`,
+  da: (n) => `Opgave ${n} (fortsat)`,
+  el: (n) => `Άσκηση ${n} (συνέχεια)`,
   // Latein: Die Arbeitsanweisungen stehen deutsch, der Hinweis deshalb auch
   la: (n) => `Aufgabe ${n} (Fortsetzung)`
 }
