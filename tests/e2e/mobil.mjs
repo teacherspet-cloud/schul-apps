@@ -214,6 +214,8 @@ async function lauf(name, browserTyp, startOpt) {
     await page.getByRole('button', { name: 'alle' }).click()
     await page.getByRole('button', { name: /Vokabeln anzeigen und auswählen/ }).click()
     const ersetzen = page.getByRole('button', { name: 'Bisherige Liste ersetzen' })
+    // Der Prüfdialog braucht einen Moment (WebKit, große Fingerziele seit 30.09.2026) – nicht sofort weiterklicken
+    await ersetzen.waitFor({ state: 'visible', timeout: 5000 }).catch(() => undefined)
     if (await ersetzen.isVisible().catch(() => false)) await ersetzen.click()
     await page.getByRole('button', { name: /Weiter zu den Testeinstellungen/ }).click()
     await page.waitForSelector('text=Test einstellen', { timeout: 15000 })
