@@ -11,83 +11,103 @@
  * Die Vorgabe „Blau" stammt aus einem Deckblatt der Lehrkraft; die Farbwerte sind daraus
  * ausgelesen (dunkel #2F528F, mittel #B4C7E7, hell #DAE3F3).
  */
-import { aufhellen, geltendeFachfarbe } from '../../../shared/fachfarben'
+import {
+  aufhellen,
+  fachMuster,
+  geltendeFachfarbe,
+  musterEbene,
+  musterGroesse,
+  type FachMuster,
+} from "../../../shared/fachfarben";
 
 export interface CoverDesign {
-  id: string
-  label: string
+  id: string;
+  label: string;
   /** Kräftige Farbe für Kopfbereich und Schrift darauf */
-  dark: string
+  dark: string;
   /** Mittlerer Ton für Flächen und Rahmen */
-  mid: string
+  mid: string;
   /** Heller Grund der unteren Hälfte */
-  light: string
+  light: string;
   /** Schriftfarbe auf dunklem Grund */
-  onDark: string
-  description: string
+  onDark: string;
+  description: string;
+  /** Muster des Fachs über der kräftigen Farbe (Farbe + Muster, 30.09.2026) – nur bei der Fachfarbe */
+  muster?: FachMuster;
 }
+
+/** CSS-Variablen der Deckblattfarben – mit dem Muster des Fachs im Kopfbereich (CoverPage, Deckblattbilder) */
+export const deckblattVariablen = (d: CoverDesign): Record<string, string> => ({
+  "--cover-dark": d.dark,
+  "--cover-mid": d.mid,
+  "--cover-light": d.light,
+  "--cover-muster": musterEbene(d.muster, "mm"),
+  "--cover-muster-groesse": musterGroesse(d.muster, "mm"),
+});
 
 export const COVER_DESIGNS: CoverDesign[] = [
   {
-    id: 'blau',
-    label: 'Blau',
-    dark: '#2f528f',
-    mid: '#b4c7e7',
-    light: '#dae3f3',
-    onDark: '#ffffff',
-    description: 'Die Vorlage: kräftiges Blau oben, heller Verlauf darunter.'
+    id: "blau",
+    label: "Blau",
+    dark: "#2f528f",
+    mid: "#b4c7e7",
+    light: "#dae3f3",
+    onDark: "#ffffff",
+    description: "Die Vorlage: kräftiges Blau oben, heller Verlauf darunter.",
   },
   {
-    id: 'gruen',
-    label: 'Grün',
-    dark: '#375623',
-    mid: '#c5e0b4',
-    light: '#e2f0d9',
-    onDark: '#ffffff',
-    description: 'Ruhig und sachlich – passt zu Naturwissenschaften.'
+    id: "gruen",
+    label: "Grün",
+    dark: "#375623",
+    mid: "#c5e0b4",
+    light: "#e2f0d9",
+    onDark: "#ffffff",
+    description: "Ruhig und sachlich – passt zu Naturwissenschaften.",
   },
   {
-    id: 'rot',
-    label: 'Rot',
-    dark: '#843c0c',
-    mid: '#f8cbad',
-    light: '#fbe5d6',
-    onDark: '#ffffff',
-    description: 'Warm und auffällig – gut für Sprachen und Gesellschaftsfächer.'
+    id: "rot",
+    label: "Rot",
+    dark: "#843c0c",
+    mid: "#f8cbad",
+    light: "#fbe5d6",
+    onDark: "#ffffff",
+    description:
+      "Warm und auffällig – gut für Sprachen und Gesellschaftsfächer.",
   },
   {
-    id: 'violett',
-    label: 'Violett',
-    dark: '#4a2a6d',
-    mid: '#d6c7e8',
-    light: '#ece5f4',
-    onDark: '#ffffff',
-    description: 'Kräftig, aber nicht laut.'
+    id: "violett",
+    label: "Violett",
+    dark: "#4a2a6d",
+    mid: "#d6c7e8",
+    light: "#ece5f4",
+    onDark: "#ffffff",
+    description: "Kräftig, aber nicht laut.",
   },
   {
-    id: 'anthrazit',
-    label: 'Anthrazit',
-    dark: '#33383d',
-    mid: '#c9ced3',
-    light: '#e9ecef',
-    onDark: '#ffffff',
-    description: 'Zurückhaltend und sehr gut kopierbar.'
+    id: "anthrazit",
+    label: "Anthrazit",
+    dark: "#33383d",
+    mid: "#c9ced3",
+    light: "#e9ecef",
+    onDark: "#ffffff",
+    description: "Zurückhaltend und sehr gut kopierbar.",
   },
   {
-    id: 'sand',
-    label: 'Sand',
-    dark: '#7f6000',
-    mid: '#ffe699',
-    light: '#fff2cc',
-    onDark: '#ffffff',
-    description: 'Freundlich und hell – gut für die Unterstufe.'
-  }
-]
+    id: "sand",
+    label: "Sand",
+    dark: "#7f6000",
+    mid: "#ffe699",
+    light: "#fff2cc",
+    onDark: "#ffffff",
+    description: "Freundlich und hell – gut für die Unterstufe.",
+  },
+];
 
-export const coverDesign = (id?: string): CoverDesign => COVER_DESIGNS.find((d) => d.id === id) ?? COVER_DESIGNS[0]
+export const coverDesign = (id?: string): CoverDesign =>
+  COVER_DESIGNS.find((d) => d.id === id) ?? COVER_DESIGNS[0];
 
 /** Kennung der Deckblattfarbe, die der Fachfarbe folgt (Paket 10a) */
-export const FACH_COVER_ID = 'fach'
+export const FACH_COVER_ID = "fach";
 
 /**
  * Farben des Deckblatts für ein Blatt.
@@ -98,20 +118,28 @@ export const FACH_COVER_ID = 'fach'
  * verwenden" oder unbekanntem Fach bleibt es beim bisherigen Blau. Das neue Deckblatt aus
  * Paket 11 übernimmt diese Farbe.
  */
-export function deckblattFarben(meta: { coverDesign?: string; subjectId?: string; vorlagenfarbe?: boolean }): CoverDesign {
-  const eigene = meta.coverDesign && meta.coverDesign !== FACH_COVER_ID ? COVER_DESIGNS.find((d) => d.id === meta.coverDesign) : undefined
-  if (eigene) return eigene
-  const fach = geltendeFachfarbe(meta.subjectId, meta.vorlagenfarbe)
-  if (!fach) return COVER_DESIGNS[0]
+export function deckblattFarben(meta: {
+  coverDesign?: string;
+  subjectId?: string;
+  vorlagenfarbe?: boolean;
+}): CoverDesign {
+  const eigene =
+    meta.coverDesign && meta.coverDesign !== FACH_COVER_ID
+      ? COVER_DESIGNS.find((d) => d.id === meta.coverDesign)
+      : undefined;
+  if (eigene) return eigene;
+  const fach = geltendeFachfarbe(meta.subjectId, meta.vorlagenfarbe);
+  if (!fach) return COVER_DESIGNS[0];
   return {
     id: FACH_COVER_ID,
-    label: 'Fachfarbe',
+    label: "Fachfarbe",
     dark: fach,
     mid: aufhellen(fach, 0.65),
     light: aufhellen(fach, 0.85),
-    onDark: '#ffffff',
-    description: 'Folgt der Farbe des Fachs aus den Einstellungen.'
-  }
+    onDark: "#ffffff",
+    description: "Folgt der Farbe des Fachs aus den Einstellungen.",
+    muster: fachMuster(meta.subjectId) ?? undefined,
+  };
 }
 
 /**
@@ -129,8 +157,8 @@ export function foxPlaceholder(dark: string, mid: string): string {
   <circle cx="72" cy="60" r="4.5" fill="#1d2b3a"/>
   <path d="M60 76c-4 0-7 3-7 6s3 5 7 5 7-2 7-5-3-6-7-6z" fill="#1d2b3a"/>
   <path d="M60 87v7" stroke="#1d2b3a" stroke-width="2.5" stroke-linecap="round"/>
-</svg>`
-  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
+</svg>`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 }
 
 /**
@@ -141,11 +169,13 @@ export function foxPlaceholder(dark: string, mid: string): string {
 export function foxPrompt(subject: string, topic: string): string {
   return [
     `Eine freundliche, anthropomorphe Fuchsfigur als Maskottchen für ein Unterrichtsmaterial im Fach ${subject}.`,
-    topic ? `Thema des Materials: ${topic}. Kleidung und ein Gegenstand in der Hand dürfen dazu passen.` : '',
-    'Ganzfigur oder Brustbild, freundlich und ruhig, kindgerecht, ohne Text und ohne Schrift im Bild.',
-    'Klare Vektorgrafik-Anmutung mit wenigen Flächen, kräftigen Konturen und hellem, einfarbigem Hintergrund.',
-    'Keine realistische Fotografie, keine Gewalt, keine Marken, keine realen Personen.'
+    topic
+      ? `Thema des Materials: ${topic}. Kleidung und ein Gegenstand in der Hand dürfen dazu passen.`
+      : "",
+    "Ganzfigur oder Brustbild, freundlich und ruhig, kindgerecht, ohne Text und ohne Schrift im Bild.",
+    "Klare Vektorgrafik-Anmutung mit wenigen Flächen, kräftigen Konturen und hellem, einfarbigem Hintergrund.",
+    "Keine realistische Fotografie, keine Gewalt, keine Marken, keine realen Personen.",
   ]
     .filter(Boolean)
-    .join(' ')
+    .join(" ");
 }

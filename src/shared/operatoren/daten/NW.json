@@ -3838,6 +3838,290 @@
      "kompetenzbereich": "Schreiben"
     }
    ]
+  },
+  {
+   "quelle": "Operatoren für die Überprüfung des Hörverstehens im Fach Italienisch ab Abitur 2025, NRW (Klausurteil Hörverstehen, isoliert), Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, Zentralabitur GOSt)",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/operatoren_hv_italienisch.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "italienisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "it",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "abbinare",
+     "definition": "",
+     "formen": [
+      "associare"
+     ],
+     "beispiele": [
+      "Abbinate/Associate i dialoghi alle immagini corrispondenti."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "completare",
+     "definition": "",
+     "beispiele": [
+      "Completate la frase con le parole mancanti."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "elencare",
+     "definition": "",
+     "beispiele": [
+      "Elencate i Paesi in cui ha vissuto Omar."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "indicare",
+     "definition": "",
+     "beispiele": [
+      "Indicate i due temi del dibattito."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "inserire",
+     "definition": "",
+     "beispiele": [
+      "Inserite le informazioni che mancano nella scheda."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "mettere una crocetta su",
+     "definition": "",
+     "formen": [
+      "segnare con una crocetta"
+     ],
+     "beispiele": [
+      "Mettete una crocetta sulla risposta giusta.",
+      "Segnate con una crocetta la riposta giusta."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "rispondere",
+     "definition": "",
+     "beispiele": [
+      "Rispondete alle domande con le informazioni richieste."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Russisch – Übersicht über die Operatoren (gültig ab dem Abitur 2025): Schreiben/Leseverstehen (integriert), Sprachmittlung, Hörverstehen, Ministerium für Schule und Bildung NRW / QUA-LiS NRW (Standardsicherung NRW, Zentralabitur GOSt)",
+   "url": "https://www.standardsicherung.schulministerium.nrw.de/system/files/media/document/file/r_operatoren_ab_abitur2025_neu.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "russisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "ru",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "аргументировать",
+     "definition": "привести выводы за и против данной в тексте точки зрения, решения, ...",
+     "beispiele": [
+      "Аргументируйте свой вывод с помощью цитат из текста."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "выделить главное",
+     "definition": "кратко сформулировать главные аспекты",
+     "beispiele": [
+      "Выделите главную идею произведения."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "доказать",
+     "definition": "подтвердить фактами или примерами",
+     "beispiele": [
+      "Докажите на основе текста правильность выводов, сделанных автором."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "изложить",
+     "definition": "последовательно выразить что-нибудь словами, кратко пересказать содержание",
+     "beispiele": [
+      "Изложите содержание данного текста."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "написать (+ вид текста)",
+     "definition": "придумать (в письменной форме) текст указанного жанра)",
+     "beispiele": [
+      "Напишите окончание текста / письмо издателю / диалог и т.д."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "обосновать",
+     "definition": "подкрепить доказательствами",
+     "beispiele": [
+      "Обоснуйте свою точку зрения цитатами из текста."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "обсудить",
+     "definition": "внимательно рассмотреть данную проблему, чтобы прийти к объективному выводу, используя при этом аргументы, примеры и мнения",
+     "beispiele": [
+      "Обсудите мотивацию поведения главной героини в предложенном фрагменте повести."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "объяснить",
+     "definition": "сделать что-нибудь ясным, понятным",
+     "beispiele": [
+      "Объясните намерение автора статьи."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "описать",
+     "definition": "подробно изобразить кого-нибудь или что-нибудь словами, передать особенности и детали",
+     "beispiele": [
+      "Опишите героя рассказа.",
+      "Опишите отношения между ..."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "охарактеризовать",
+     "definition": "выделить и описать особенность, характерную черту кого-нибудь или чего-нибудь",
+     "beispiele": [
+      "Охарактеризуйте отношения между персонажами пьесы."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "оценить",
+     "definition": "высказать мнение о ценности или значении кого/чего-нибудь, используя конкретные факты, данные",
+     "beispiele": [
+      "Оцените поступок героя.",
+      "Оцените ситуацию, в которой находится героиня."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "проанализировать",
+     "definition": "внимательно рассмотреть составные части (факты), чтобы лучше объяснить смысл, структуру (произведения,ситуации)",
+     "beispiele": [
+      "Проанализируйте поведение героини.",
+      "Проанализируйте стилистические особенности стихотворения."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "проинтерпретировать",
+     "definition": "на основе анализа текста и личного опыта объяснить и раскрыть смысл чего-нибудь комплексно и творчески",
+     "beispiele": [
+      "Проинтерпретируйте стихотворение Д. Хармса."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "прокомментировать",
+     "definition": "делать обоснованные (критические) замечания к теме, проблеме и аргументировано высказывать свои мысли",
+     "beispiele": [
+      "Прокомментируйте поведение героя. Прокомментируйте мнение автора статьи."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "проследить",
+     "definition": "изучить шаг за шагом",
+     "beispiele": [
+      "Проследите, как развиваются отношения между ..."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "сравнить",
+     "definition": "сопоставить объекты, чтобы установить их сходство и/или различие",
+     "beispiele": [
+      "Сравните главных героев рассказа."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "написать (+ вид текста)",
+     "definition": "составить текст заданного жанра на основе немецкого текста.",
+     "beispiele": [
+      "Напишите другу электронное письмо на русском языке."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "передать",
+     "definition": "излагать на русском языке главную информацию прочитанного по-немецки текста, опираясь на знание межкультурных различий.",
+     "beispiele": [
+      "Передайте на русском языке основное содержание статьи. Передайте по электронной почте главную информацию текста с веб-страницы."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "изложить",
+     "definition": "излагать на русском языке главную информацию прочитанного по-немецки текста, опираясь на знание межкультурных различий.",
+     "beispiele": [
+      "Изложите главную информацию текста."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "выберите",
+     "definition": "",
+     "beispiele": [
+      "В процессе прослушивания выберите одно подходящее утверждение."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "заполните",
+     "definition": "",
+     "beispiele": [
+      "В процессе прослушивания заполните таблицу."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "назовите",
+     "definition": "",
+     "beispiele": [
+      "Назовите два аспекта."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "ответьте",
+     "definition": "",
+     "beispiele": [
+      "В процессе прослушивания кратко ответьте на вопросы."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "отметьте",
+     "definition": "",
+     "beispiele": [
+      "Во время прослушивания отметьте правильный ответ."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
   }
  ]
 }

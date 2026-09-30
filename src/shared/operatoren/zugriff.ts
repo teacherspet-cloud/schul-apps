@@ -61,8 +61,8 @@ export function anlageFuer(stateId: string, fach: string, wunsch: AnlageWunsch =
  * leer, gibt es kein Ergebnis; die Programme sagen das dann fachbezogen.
  */
 
-/** Zielsprache der modernen Fremdsprachen mit amtlichen Listen */
-export const ZIELSPRACHE_DES_FACHS: Record<string, Listensprache> = { englisch: 'en', franzoesisch: 'fr', spanisch: 'es' }
+/** Zielsprache der modernen Fremdsprachen mit amtlichen Listen (Italienisch/Russisch seit 30.09.2026: HE, HH, NW) */
+export const ZIELSPRACHE_DES_FACHS: Record<string, Listensprache> = { englisch: 'en', franzoesisch: 'fr', spanisch: 'es', italienisch: 'it', russisch: 'ru' }
 
 const MODERNE_FREMDSPRACHEN = ['englisch', 'franzoesisch', 'spanisch', 'italienisch', 'russisch']
 

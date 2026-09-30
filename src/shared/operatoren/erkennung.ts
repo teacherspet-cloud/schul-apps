@@ -26,7 +26,7 @@
 import { BESTAND } from './zugriff'
 import type { Listensprache } from './typen'
 
-export type ErkennungsSprache = Listensprache | 'it'
+export type ErkennungsSprache = Listensprache
 
 /** Ein Listeneintrag in einer der Formen, wie sie in den Programmen vorkommen */
 export type OperatorAngabe = string | { operator: string; formen?: string[] } | { name: string; synonyme?: string[] }
@@ -276,14 +276,30 @@ const ROMANISCHE_ENDUNGEN: Record<string, RegExp> = {
   it: /(?:ate|ete|ite|are|ere|ire|a|i|e)$/
 }
 
+/**
+ * Russisch (30.09.2026): Infinitiv der Liste („описать", „проанализировать", „дать оценку") ↔
+ * Imperativ der Aufgabe („Опишите", „Проанализируйте", „Дайте оценку", „Отметьте"). Ohne
+ * `ohneAkzent` – NFD zerlegt „й" und „ё". Konsonantenwechsel im Imperativ („написать" ↔
+ * „напишите", „доказать" ↔ „докажите") am Stammende ausgeglichen.
+ */
+function russischerStamm(w: string): string {
+  const s = w.toLowerCase().replace(/ё/g, 'е')
+  const r = s
+    .replace(/(?:ировать|уйте|ите|йте|ьте|ть)$/, '')
+    .replace(/ш$/, 'с')
+    .replace(/ж$/, 'з')
+  return r.length >= 2 ? r : s
+}
+
 function romanischerStamm(w: string, sprache: string): string {
+  if (sprache === 'ru') return russischerStamm(w)
   let s = ohneAkzent(w)
   if (sprache === 'es') s = s.replace(/z/g, 'c')
   const r = s.replace(ROMANISCHE_ENDUNGEN[sprache] ?? /$^/, '')
   return r.length >= 3 ? r : s
 }
 
-/** Gleiches Verb? „décris" ↔ „décrire" ↔ „décrivez", „analiza" ↔ „analizar" ↔ „analice" */
+/** Gleiches Verb? „décris" ↔ „décrire" ↔ „décrivez", „analiza" ↔ „analizar" ↔ „analice", „опишите" ↔ „описать" */
 function romanischGleich(a: string, b: string, sprache: string): boolean {
   if (ohneAkzent(a) === ohneAkzent(b)) return true
   const x = romanischerStamm(a, sprache)

@@ -504,7 +504,7 @@ export function checkSubjectOperator(instruction: string, subjectId: string, for
   const ops = subjectOperators(subjectId, foreignLanguage)
   const sprache = (foreignLanguage ?? 'de') as ErkennungsSprache
   const auswahl = kontext
-    ? operatorenAuswahl({ stateId: kontext.stateId, fach: subjectId, stufe: kontext.stufe, schulform: kontext.schulform, nurLand: true, ...(sprache === 'it' ? {} : { sprache }) })
+    ? operatorenAuswahl({ stateId: kontext.stateId, fach: subjectId, stufe: kontext.stufe, schulform: kontext.schulform, nurLand: true, sprache })
     : null
   const land = auswahl && !auswahl.stufeAbweichend && auswahl.sprache === sprache ? auswahl : null
   if (!ops && !land) return null

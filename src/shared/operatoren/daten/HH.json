@@ -3390,6 +3390,473 @@
      ]
     }
    ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Italienisch, Anhang „Liste der Operatoren“ (PDF-Seiten 34–35), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "italienisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "it",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "analizzare",
+     "definition": "descrivere e spiegare dettagliatamente",
+     "formen": [
+      "esaminare"
+     ],
+     "beispiele": [
+      "Analizza le figure presenti nel testo. Esamina l’evoluzione del rapporto tra i personaggi principali."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "caratterizzare",
+     "definition": "mettere in evidenza gli aspetti peculiari di qualcuno o qualcosa",
+     "beispiele": [
+      "Caratterizza i protagonisti del racconto."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "commentare",
+     "definition": "interpretare un testo o un avvenimento ed esprimere il proprio punto di vista a riguardo",
+     "beispiele": [
+      "Commenta l’opinione dell’autore."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "descrivere",
+     "definition": "illustrare in modo per lo più dettagliato fatti, cose o persone",
+     "beispiele": [
+      "Descrivi l’aspetto fisico del padre. Descrivi l’ambiente in cui si svolge la storia."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "discutere",
+     "definition": "esprimere il proprio punto di vista con argomenti a favore e contro ed arrivare ad una propria conclusione",
+     "beispiele": [
+      "Discuti i vantaggi e gli svantaggi proposti dall’autore."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "esporre",
+     "definition": "mostrare gli aspetti, le strutture o i principi generali di qualcosa",
+     "beispiele": [
+      "Esponi le condizioni di vita del protagonista."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "giustificare",
+     "definition": "mostrare ragioni adeguate per la decisione o conclusione",
+     "beispiele": [
+      "Tu sei il direttore di una scuola. Giustifica la tua decisione di non fare usare telefonini a scuola."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "interpretare",
+     "definition": "spiegare il senso o l’intenzione di qualcosa",
+     "beispiele": [
+      "Interpreta il messaggio della caricatura."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "paragonare",
+     "definition": "confrontare, comparare, contrapporre due personaggi o qualcosa",
+     "formen": [
+      "mettere a confronto",
+      "confrontare"
+     ],
+     "beispiele": [
+      "Paragona le figure retoriche presenti nel testo."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "presentare",
+     "definition": "mettere in evidenza alcuni elementi o strutture del testo",
+     "beispiele": [
+      "Presenta l’opinione dell’autore."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "produrre",
+     "definition": "elaborare un testo",
+     "formen": [
+      "comporre"
+     ],
+     "beispiele": [
+      "Scrivi una lettera ad un’amica. Componi un piccolo racconto."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "riassumere",
+     "definition": "esprimere in parole proprie e in modo sintetico i contenuti essenziali",
+     "beispiele": [
+      "Riassumi brevemente il testo."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "spiegare",
+     "definition": "sottoporre ad attenta osservazione tematica gli aspetti o le problematiche di qualcosa",
+     "beispiele": [
+      "Spiega il concetto di amicizia nel testo."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "valutare",
+     "definition": "esprimere una valutazione / un giudizio su qualcosa o qualcuno",
+     "formen": [
+      "giudicare"
+     ],
+     "beispiele": [
+      "Valuta / giudica il comportamento del padre."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "esporre",
+     "definition": "esprimere brevemente i punti o gli aspetti principali, tenendo eventualmente conto degli aspetti culturali",
+     "formen": [
+      "presentare",
+      "riassumere"
+     ],
+     "beispiele": [
+      "Presenta per un progetto universitario italiano le informazioni più importanti sull’immagine degli immigrati in Germania."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "produrre",
+     "definition": "produrre un testo con caratteristiche specifiche",
+     "formen": [
+      "comporre"
+     ],
+     "beispiele": [
+      "Utilizzando le informazioni del testo, scrivi una lettera per un tuo amico italiano che vuole ottenere una borsa di studio all’università di Amburgo."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "spiegare",
+     "definition": "sottoporre ad attenta osservazione tematica gli aspetti o le problematiche di qualcosa, tenendo eventualmente conto degli aspetti culurali",
+     "beispiele": [
+      "Spiega in base al testo la differenza della situazione giovanile in Germania e in Italia."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "collegare",
+     "definition": "",
+     "beispiele": [
+      "Collega le immagini con i termini adeguati. Un’immagine è in più."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "completare",
+     "definition": "",
+     "beispiele": [
+      "Completa le frasi seguenti utilizzando da 1 a 5 parole."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "nominare",
+     "definition": "",
+     "beispiele": [
+      "Nomina gli aspetti principali menzionati nella discussione."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "segnare una croce",
+     "definition": "",
+     "formen": [
+      "fare una croce"
+     ],
+     "beispiele": [
+      "Segna con una croce la risposta corretta."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "spiegare",
+     "definition": "",
+     "beispiele": [
+      "Spiega le idee supportate dal parlante A."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
+  },
+  {
+   "quelle": "Abitur 2027 – Regelungen für die zentralen schriftlichen Prüfungsaufgaben („A-Heft“), Russisch, Anhang „Liste der Operatoren“ (PDF-Seiten 51–52), Freie und Hansestadt Hamburg, Behörde für Schule und Berufsbildung (heute Behörde für Schule, Familie und Berufsbildung), 2025",
+   "url": "https://dokumente.hamburg.de/resource/blob/1074128/9a9b1afacd506b6058cb4c3379abaeb6/abitur-a-heft-2027-data.pdf",
+   "belegt": "volltext",
+   "faecher": [
+    "russisch"
+   ],
+   "stufe": "sek2",
+   "sprache": "ru",
+   "afbLogik": "keine",
+   "operatoren": [
+    {
+     "operator": "выделить",
+     "definition": "кратко и ясно представить главные аспекты чего-н.",
+     "formen": [
+      "констатировать"
+     ],
+     "beispiele": [
+      "Выделите идеи автора о…"
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "изложить",
+     "definition": "передать главные черты, структуру или общие принципы чего-н.",
+     "formen": [
+      "изобразить"
+     ],
+     "beispiele": [
+      "Изложите мнение автора о любви, браке и разводе."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "интерпретировать",
+     "definition": "объяснить смысл, значение или замысел чего-н.",
+     "formen": [
+      "составить интерпретацию"
+     ],
+     "beispiele": [
+      "Интерпретируйте смысл данной карикатуры."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "написать (+ жанр текста)",
+     "definition": "написать текст с определёнными жанровыми свойствами",
+     "beispiele": [
+      "Напишите концовку рассказа / письмо редактору / диалог и т. д."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "обосновать",
+     "definition": "подкреплять решения или выводы доказательствами, упорядоченной аргументацией",
+     "formen": [
+      "оправдать"
+     ],
+     "beispiele": [
+      "Вы – директор школы. Обоснуйте свои причины запретить как учителям так и ученикам курение на территории школы."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "обсудить",
+     "definition": "внимательно рассмотреть данную проблему с целью прийти к объективному выводу при взвешивании аргументов, приведении примеров",
+     "formen": [
+      "рассмотреть"
+     ],
+     "beispiele": [
+      "Обсудите значение социального положения для формирования убеждений человека."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "объяснить",
+     "definition": "описать и определить функции или связности, чтобы проследить за развертыванием, развитием или изменением и выяснить причины данного явления",
+     "beispiele": [
+      "Объясните одержимость деньгами главного героя."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "описать",
+     "definition": "дать детальный отсчёт качеств чего-н. / кого-н.",
+     "formen": [
+      "изобразить"
+     ],
+     "beispiele": [
+      "Опишите внешний вид и поведение персонажа. (I) Опишите способ, с помощью которого автор драмы создаёт напряжённую атмосферу. (II)"
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "охарактеризовать",
+     "definition": "представить чёткий анализ характера персонажа",
+     "formen": [
+      "составить характеристику"
+     ],
+     "beispiele": [
+      "Охарактеризуйте главного героя данного отрывка из романа."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "оценить",
+     "definition": "выразить убедительно обоснованное мнение о сущности или качестве чего-н. / кого-н.",
+     "formen": [
+      "дать оценку"
+     ],
+     "beispiele": [
+      "Оцените значение изучения иностранных языков для будущего человека."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "проанализировать",
+     "definition": "описать и объяснить детально",
+     "formen": [
+      "дать анализ",
+      "составить анализ"
+     ],
+     "beispiele": [
+      "Проанализируйте манеру письма данного текста. Составьте анализ противоположных взглядов на социальные условия, высказываемых героями рассказа."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "проиллюстрировать",
+     "definition": "наглядно продемонстрировать, используя примеры",
+     "formen": [
+      "пояснить"
+     ],
+     "beispiele": [
+      "Проиллюстрируйте, каким образом школьная жизнь в России отличается от школьной жизни в Германии."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "прокомментировать",
+     "definition": "сделать обоснованные, критические примечания к теме, проблеме, аргументированно высказать свои мысли",
+     "formen": [
+      "составить комментарий"
+     ],
+     "beispiele": [
+      "Прокомментируйте мнение автора о ролях полов."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "противопоставить",
+     "definition": "выделить разницу между двумя или больше предметами",
+     "beispiele": [
+      "Противопоставьте идею автора о человеческой агрессивности теориям агрессивности, знакомым вам."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "составить краткое содержание",
+     "definition": "кратко изложить главные факты или идеи текста в упорядоченной форме и временной последовательности",
+     "beispiele": [
+      "Составьте краткое содержание данного текста."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "сравнить",
+     "definition": "показать сходства и расхождения",
+     "formen": [
+      "сопоставить"
+     ],
+     "beispiele": [
+      "Сравните мнения об образовании, представляемые экспертами в данном тексте."
+     ],
+     "kompetenzbereich": "Schreiben"
+    },
+    {
+     "operator": "объяснить",
+     "definition": "описать и определить функции или связности и выяснить причины данного явления, учитывая, если нужно, культурные расхождения",
+     "beispiele": [
+      "Объясните на основе текста принципы сортировки мусора в Германии."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "изложить",
+     "definition": "составить кратко главные факты или идеи текста, учитывая, если нужно, культурные расхождения",
+     "formen": [
+      "представить",
+      "составить краткое содержание"
+     ],
+     "beispiele": [
+      "Представьте для международного школьного проекта в ЕС главную информацию об имидже мигрантов в немецких СМИ в виде официального электронного письма."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "написать (+ жанр текста)",
+     "definition": "написать текст с определёнными жанровыми свойствами",
+     "beispiele": [
+      "Используя информацию в данном тексте, напишите по-русски статью для веб-сайта проекта, в которой вы объясняете своим российским партнёрам, как можно получить стипендию в немецком университете."
+     ],
+     "kompetenzbereich": "Sprachmittlung"
+    },
+    {
+     "operator": "заполнить",
+     "definition": "",
+     "formen": [
+      "вставить"
+     ],
+     "beispiele": [
+      "Заполните / дополните ниже указанные предложения, используя максимально 5 слов. Вставьте нужную информацию, используя ок. 1 – 5 слов."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "перечислить",
+     "definition": "",
+     "formen": [
+      "назвать"
+     ],
+     "beispiele": [
+      "Перечислите самые главные аспекты, названные в дискуссии."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "сопоставить",
+     "definition": "",
+     "beispiele": [
+      "Сопоставьте по данным из текста каждого человека с одной из картин. Есть одна картина, которая вам не нужна."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "выделить",
+     "definition": "",
+     "formen": [
+      "констатировать"
+     ],
+     "beispiele": [
+      "Выделите идеи, поддерживаемые собеседником А."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    },
+    {
+     "operator": "отметить",
+     "definition": "",
+     "beispiele": [
+      "Отметьте правильный ответ."
+     ],
+     "kompetenzbereich": "Hör-/Hörsehverstehen"
+    }
+   ]
   }
  ]
 }

@@ -26,7 +26,8 @@ export interface OperatorDefinition {
   zusatz?: Record<string, string>
 }
 
-export type Listensprache = 'de' | 'en' | 'fr' | 'es'
+/** Sprache einer Liste; Italienisch und Russisch seit 30.09.2026 (Landesabitur HE, A-Heft HH, Standardsicherung NRW) */
+export type Listensprache = 'de' | 'en' | 'fr' | 'es' | 'it' | 'ru'
 
 /** Eine Liste, wie sie auf der Klausur als Anlage erscheint */
 export interface Operatorenliste {

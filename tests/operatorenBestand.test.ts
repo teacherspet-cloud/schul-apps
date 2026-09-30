@@ -26,7 +26,7 @@ describe('Bestand', () => {
         // Zwei Dokumente (HH Gesellschaftswissenschaften 2020, TH Festlegungen 2025) haben keine auffindbare Online-Adresse; die Fundstelle steht vollständig im Titel
         expect(l.url, `${land.stateId}: URL`).toMatch(/^(https?:\/\/|$)/)
         expect(['sek1', 'sek2']).toContain(l.stufe)
-        expect(['de', 'en', 'fr', 'es']).toContain(l.sprache)
+        expect(['de', 'en', 'fr', 'es', 'it', 'ru']).toContain(l.sprache)
         expect(l.operatoren.length).toBeGreaterThan(0)
         for (const o of l.operatoren) {
           expect(o.operator.trim(), `${land.stateId}: Operator ohne Wortlaut`).not.toBe('')
