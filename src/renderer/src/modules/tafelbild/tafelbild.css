@@ -27,14 +27,33 @@
   background: var(--mantine-color-body);
 }
 
+/*
+ * Zoom (30.09.2026): Die Bühne rollt, sobald die gezoomte Tafel größer ist; mittig über „margin: auto"
+ * (mit align/justify-content: center wäre der linke bzw. obere Teil beim Zoomen nicht erreichbar).
+ */
+.tb-flaechen-rahmen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .tb-buehne {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 12px;
-  overflow: hidden;
+  overflow: auto;
+}
+.tb-zoom {
+  margin: auto;
+  flex: none;
+}
+.tb-flaechen-rahmen > .zoom-knoepfe {
+  position: absolute;
+  right: 14px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
 }
 
 .tb-flaeche {
@@ -56,6 +75,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  /* Kein Rollen durch den Browser: Stift und Maus zeichnen; der Finger rollt über die Zeichenfläche selbst */
   touch-action: none;
   cursor: default;
 }
@@ -207,4 +227,21 @@
 /* Zauberstab und Kreis für das ganze Tafelbild nebeneinander in der Leiste */
 .tb-leiste .ki-wunsch-knoepfe {
   flex-direction: row !important;
+}
+
+/* Vorschläge für Lernziele (Einrichten) – antippen übernimmt bzw. entfernt */
+.tb-lernziel-vorschlag {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 8px;
+  background: var(--mantine-color-body);
+}
+.tb-lernziel-vorschlag:hover {
+  border-color: var(--mantine-color-blue-5);
+}
+.tb-lernziel-vorschlag[data-gewaehlt] {
+  border-color: var(--mantine-color-blue-6);
+  background: var(--mantine-color-blue-light);
 }

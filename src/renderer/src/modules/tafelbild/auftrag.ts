@@ -17,7 +17,20 @@ import { formatInfo, worteJeElement, type FormatId } from './formate'
 import { knotenText, setzeLayout } from './layout'
 import { kastenInhalt, kastenSatz } from './kasten'
 import { elementText, type Befund, type Tafelbild, type TafelbildMeta, type TbElement, type TbInhalt, type TbTafel } from './model'
-import { bildStil, elementAnfrage, elementAus, ganzesAnfrage, inhaltAnfrage, inhaltAus, kuerzenAnfrage, kuerzenAus, type MaterialText } from './prompt'
+import {
+  bildStil,
+  elementAnfrage,
+  elementAus,
+  ganzesAnfrage,
+  inhaltAnfrage,
+  inhaltAus,
+  inhaltsProbleme,
+  korrekturAnfrage,
+  korrekturAus,
+  kuerzenAnfrage,
+  kuerzenAus,
+  type MaterialText
+} from './prompt'
 import { kleineSchrift, pruefeAlle, zuLangeKnoten } from './pruefung'
 import { bibliothek } from './store'
 
@@ -87,7 +100,7 @@ export async function setzeUndPruefe(inhalt: TbInhalt, m: TafelbildMeta, k: Meld
     const ueber: Befund[] = []
     const tafeln = m.formate.map((f) => {
       const schrift = alteTafeln.find((t) => t.format === f)?.schrift
-      const r = setzeLayout(i, f, { regler: m.regler, varianten: m.varianten, ...(schrift ? { schrift } : {}) })
+      const r = setzeLayout(i, f, { regler: m.regler, varianten: m.varianten, zeitachse: m.zeitachse, ...(schrift ? { schrift } : {}) })
       for (const t of r.ueberlauf) ueber.push({ format: f, art: 'text', text: t })
       return r.tafel
     })
@@ -107,7 +120,7 @@ export async function setzeUndPruefe(inhalt: TbInhalt, m: TafelbildMeta, k: Meld
       if ((e as { name?: string })?.name === 'AbortError') throw e
     }
   }
-  return { inhalt: aktuell, tafeln: r.tafeln, pruefung: pruefeAlle(r.tafeln, { grade: m.grade, regler: m.regler, inhalt: aktuell }, [...befunde, ...r.ueber]) }
+  return { inhalt: aktuell, tafeln: r.tafeln, pruefung: pruefeAlle(r.tafeln, { grade: m.grade, regler: m.regler, inhalt: aktuell, lernziel: m.lernziel }, [...befunde, ...r.ueber]) }
 }
 
 async function erzeuge(t: Tafelbild, k: Melder, anfrage: (texte: MaterialText[], bilder: string[]) => StructuredRequest): Promise<Ergebnis> {
@@ -116,9 +129,29 @@ async function erzeuge(t: Tafelbild, k: Melder, anfrage: (texte: MaterialText[],
   const roh = await k.ai<unknown>(anfrage(texte, bilder))
   const befunde: Befund[] = []
   let inhalt = inhaltAus(roh, t.meta)
+  inhalt = await korrigieren(inhalt, t.meta, k)
   inhalt = await zeichnungenAufloesen(inhalt, t.meta, k, befunde)
   k.melde('Layout und Prüfung …')
   return setzeUndPruefe(inhalt, t.meta, k, befunde, t.tafeln)
+}
+
+/**
+ * Antwort der KI prüfen (Nachbesserung 30.09.2026): Fehlt einem Ereignis der Zeitleiste das Datum,
+ * passt es nicht zum Titel oder hat eine Tabellenspalte nicht genau einen Eintrag je Aspekt, geht
+ * EINE Korrekturanfrage mit genau diesen Fehlern an die KI. Was danach noch fehlt, meldet die Prüfung.
+ */
+async function korrigieren(inhalt: TbInhalt, m: TafelbildMeta, k: Melder): Promise<TbInhalt> {
+  const probleme = inhaltsProbleme(inhalt)
+  if (!probleme.length) return inhalt
+  k.melde(inhalt.struktur === 'zeitleiste' ? 'Die KI ergänzt fehlende Daten der Zeitleiste …' : 'Die KI ordnet die Einträge den Spalten zu …')
+  let neu = inhalt
+  try {
+    neu = korrekturAus(await k.ai<unknown>(korrekturAnfrage(m, inhalt, probleme)), inhalt)
+  } catch (e) {
+    if ((e as { name?: string })?.name === 'AbortError') throw e
+  }
+  // Was danach noch fehlt, meldet die Prüfung (pruefeAlle)
+  return neu
 }
 
 const titel = (t: Tafelbild): string => t.meta.title || t.meta.thema || t.inhalt?.titel || 'Tafelbild'
@@ -239,7 +272,7 @@ export function elementBearbeiten(t: Tafelbild, docId: string, format: FormatId,
         if (neu.inhalt && e.typ === 'merksatz' && neu.inhalt.merksatz && !('bild' in erg)) {
           neu.inhalt.merksatz = { ...neu.inhalt.merksatz, text: erg.antwort.text, lueckenWoerter: erg.antwort.lueckenWoerter }
         }
-        neu.pruefung = pruefeAlle(neu.tafeln, { grade: neu.meta.grade, regler: neu.meta.regler, inhalt: neu.inhalt })
+        neu.pruefung = pruefeAlle(neu.tafeln, { grade: neu.meta.grade, regler: neu.meta.regler, inhalt: neu.inhalt, lernziel: neu.meta.lernziel })
         return neu
       })
   })

@@ -23,9 +23,10 @@ import {
   type TbZeichnung,
   type ZeichnungArt
 } from './model'
+import { lernzielZeilen } from './lernziele'
 import { erlaubteZeichnungen, fachRegeln, inhaltsRegeln, strukturRegel, SYSTEM_GRUNDSAETZE } from './regeln'
-import { jahrAus } from './layout'
 import { skizzeFuer, symbolFuer } from './symbole'
+import { massstabPasst, ohneAspektPraefix, ordneEreignisse, ordneFluss, ordneKreislauf, pruefeTabelle, pruefeZeitleiste, zeitWert, type InhaltsProblem } from './zeitleiste'
 
 const num = (description?: string): Schema => ({ type: 'number', ...(description ? { description } : {}) })
 
@@ -55,7 +56,7 @@ const KNOTEN_SCHEMA = obj({
   rolle: enumOf(ROLLEN),
   farbe: enumOf(FARBEN),
   symbol: str('Symbolname aus dem Vorrat oder leer'),
-  zeit: str('Zeitangabe (nur Zeitleiste), sonst leer'),
+  zeit: str('Datum (Pflicht bei Zeitleiste, sonst leer): Jahr, Tagesdatum oder Epoche – z. B. „1918", „9. November 1918", „44 v. Chr.", „15. Jh.", „vor 66 Mio. Jahren"'),
   niveau: int('1, 2 oder 3'),
   schritt: int('Aufbauschritt ab 1'),
   lueckenWoerter: arr(str()),
@@ -114,6 +115,20 @@ export function systemAuftrag(m: TafelbildMeta): string {
   return [...SYSTEM_GRUNDSAETZE, '', ...fachRegeln(`${m.subjectId} ${m.subjectLabel}`)].join('\n')
 }
 
+/**
+ * Gewählte Lernziele steuern das Tafelbild (Wunsch 30.09.2026): Struktur, Merksatz und Sicherung
+ * halten genau das Ergebnis fest, das die Ziele verlangen; Impuls und Hausaufgabe nutzen ihre Operatoren.
+ */
+export function lernzielRegeln(lernziel: string): string[] {
+  const ziele = lernzielZeilen(lernziel)
+  if (!ziele.length) return []
+  return [
+    `LERNZIELE (verbindlich) – die Schülerinnen und Schüler …\n${ziele.map((z) => `- ${z}`).join('\n')}`,
+    '- Das Tafelbild sichert GENAU diese Ziele: Jedes Ziel findet sich in Knoten oder Merksatz wieder (dieselben Fachbegriffe); nichts, was zu keinem Ziel gehört.',
+    '- Der Merksatz hält das Ergebnis zum wichtigsten Lernziel fest (Ergebnissicherung); Impuls und Hausaufgabe nutzen den Operator eines Lernziels.'
+  ]
+}
+
 /** Erzeugen aus Thema, Lernziel und (optional) Material */
 export function inhaltAnfrage(m: TafelbildMeta, material: MaterialText[], bilder: string[], wunsch = ''): StructuredRequest {
   const formate = m.formate.map((f) => formatInfo(f).label).join(', ')
@@ -126,7 +141,7 @@ export function inhaltAnfrage(m: TafelbildMeta, material: MaterialText[], bilder
         : 'Entwirf ein Tafelbild.',
       `Lerngruppe: ${lerngruppe(m)}.`,
       m.thema.trim() ? `Thema: ${m.thema.trim()}.` : '',
-      m.lernziel.trim() ? `Lernziel: ${m.lernziel.trim()}.` : '',
+      ...lernzielRegeln(m.lernziel),
       `Tafelformate (die App setzt je Format ein eigenes Layout): ${formate}.`,
       foto ? 'STRUKTUR: wie auf dem Foto (struktur passend wählen).' : strukturRegel(m),
       ...inhaltsRegeln(m),
@@ -202,7 +217,7 @@ export function elementAnfrage(m: TafelbildMeta, e: TbElement, umgebung: TbEleme
     system: systemAuftrag(m),
     user: [
       wunschAuftrag(art, wunsch).replace(/den Baustein/g, `das Element (${name})`),
-      `Lerngruppe: ${lerngruppe(m)}. Thema: ${m.thema || '–'}.${m.lernziel ? ` Lernziel: ${m.lernziel}.` : ''}`,
+      `Lerngruppe: ${lerngruppe(m)}. Thema: ${m.thema || '–'}.${m.lernziel.trim() ? ` Lernziele: ${lernzielZeilen(m.lernziel).join('; ')}.` : ''}`,
       ...inhaltsRegeln(m).filter((z) => /TEXTMENGE|SPRACHE|STIL|LÜCKEN|Keine Lücken|OPERATOREN|BILINGUAL/.test(z)),
       `ELEMENT (${name}): ${JSON.stringify({ titel: e.titel ?? '', text: e.text, lueckenWoerter: e.lueckenWoerter ?? [], symbol: e.symbol ?? '', tex: e.tex ?? '', diagramm: e.diagramm ?? null })}`,
       nachbarn.length ? `ÜBRIGES TAFELBILD (nur zur Orientierung, nicht wiederholen):\n${nachbarn.join('\n')}` : '',
@@ -273,14 +288,22 @@ export function kuerzenAus(d: unknown, inhalt: TbInhalt): TbInhalt {
 
 // ---------- Antwort lesen ----------
 
-/** Zeitstrahl: Marken nach der Jahreszahl setzen – konstanter Maßstab (R29); ohne Jahre gleichmäßig */
+/**
+ * Zeitstrahl als Zeichnung: Marken chronologisch (stabil), maßstabsgerecht, wenn die Abstände es
+ * erlauben (R29), sonst gleichmäßig. Ohne lesbare Zeit bleibt die Reihenfolge der KI.
+ */
 export function zeitPositionen<T extends { wert?: string; x?: number }>(liste: T[]): T[] {
-  const jahre = liste.map((e) => jahrAus(e.wert))
-  const sortiert = liste.map((e, i) => ({ e, j: jahre[i] })).sort((a, b) => (a.j ?? 0) - (b.j ?? 0))
-  if (sortiert.every((x) => x.j !== null)) {
-    const min = sortiert[0].j!
-    const max = sortiert[sortiert.length - 1].j!
-    return sortiert.map((x) => ({ ...x.e, x: max > min ? (x.j! - min) / (max - min) : 0.5 }))
+  const werte = liste.map((e) => zeitWert(e.wert))
+  if (liste.length && werte.every((w) => w !== null)) {
+    const sortiert = liste.map((e, i) => ({ e, w: werte[i]!, i })).sort((a, b) => a.w - b.w || a.i - b.i)
+    const min = sortiert[0].w
+    const max = sortiert[sortiert.length - 1].w
+    const massstab = massstabPasst(sortiert.map((x) => x.w))
+    const stufen = [...new Set(sortiert.map((x) => x.w))]
+    return sortiert.map((x) => ({
+      ...x.e,
+      x: max <= min ? 0.5 : massstab ? (x.w - min) / (max - min) : stufen.indexOf(x.w) / Math.max(1, stufen.length - 1)
+    }))
   }
   return liste.map((e, i) => ({ ...e, x: liste.length > 1 ? i / (liste.length - 1) : 0.5 }))
 }
@@ -418,7 +441,7 @@ export function inhaltAus(daten: unknown, meta: Pick<TafelbildMeta, 'struktur' |
       return { nr: Math.max(1, Math.round(zahl(o.nr, 1))), phase: text(o.phase), impuls: text(o.impuls) }
     })
     .filter((s) => s.phase || s.impuls)
-  return {
+  return ordneInhalt({
     titel: text(d.titel) || 'Tafelbild',
     struktur,
     strukturGrund: text(d.strukturGrund),
@@ -440,7 +463,85 @@ export function inhaltAus(daten: unknown, meta: Pick<TafelbildMeta, 'struktur' |
     zeichnungen: gefiltert,
     farbLegende: legende.length ? legende : standardLegende(knoten),
     schritte
+  })
+}
+
+/**
+ * Reihenfolge des Inhalts deterministisch machen (Nachbesserung 30.09.2026) – die KI liefert
+ * Ereignisse, Stationen und Schritte oft ungeordnet:
+ * - Zeitleiste: Knoten chronologisch; der Aufbau (schritt) folgt der Zeit.
+ * - Kreislauf: Stationen in Pfeilrichtung; Flussdiagramm: Schritte in Pfeilrichtung.
+ * - Tabelle: wiederholte Aspektnamen am Anfang der Einträge fallen weg.
+ */
+export function ordneInhalt(inhalt: TbInhalt): TbInhalt {
+  const i = { ...inhalt }
+  if (i.struktur === 'zeitleiste') {
+    const geordnet = ordneEreignisse(i.knoten).map((e) => e.knoten)
+    const schritte = geordnet.map((k) => k.schritt).sort((a, b) => a - b)
+    i.knoten = geordnet.map((k, j) => ({ ...k, schritt: schritte[j] }))
+  } else if (i.struktur === 'kreislauf') {
+    const zentrum = i.knoten.filter((k) => k.rolle === 'zentrum')
+    i.knoten = [...zentrum, ...ordneKreislauf(i.knoten.filter((k) => k.rolle !== 'zentrum'), i.beziehungen)]
+  } else if (i.struktur === 'fluss') i.knoten = ordneFluss(i.knoten, i.beziehungen)
+  else if (i.struktur === 'tabelle' && i.aspekte?.length) {
+    const aspekte = i.aspekte
+    i.knoten = i.knoten.map((k) => (k.rolle === 'spalte' ? { ...k, punkte: k.punkte.map((p, j) => (aspekte[j] ? ohneAspektPraefix(p, aspekte[j]) : p)) } : k))
   }
+  return i
+}
+
+/** Fehler der KI-Antwort, die eine Korrekturanfrage auslösen (Datum fehlt, Spalten passen nicht) */
+export function inhaltsProbleme(inhalt: TbInhalt): InhaltsProblem[] {
+  if (inhalt.struktur === 'zeitleiste') return pruefeZeitleiste(inhalt)
+  if (inhalt.struktur === 'tabelle') return pruefeTabelle(inhalt)
+  return []
+}
+
+export const KORREKTUR_SCHEMA = obj({
+  knoten: arr(obj({ id: str(), titel: str('unverändert, außer der Titel war falsch'), zeit: str('Datum (Zeitleiste), sonst leer'), punkte: arr(str()) }))
+})
+
+/** Korrekturanfrage: nur die fehlerhaften Knoten, mit genauer Anweisung */
+export function korrekturAnfrage(m: TafelbildMeta, inhalt: TbInhalt, probleme: InhaltsProblem[]): StructuredRequest {
+  const betroffen = new Set(probleme.map((p) => p.knoten).filter(Boolean))
+  const knoten = inhalt.knoten.filter((k) => !betroffen.size || betroffen.has(k.id))
+  const aspekte = (inhalt.aspekte ?? []).filter(Boolean)
+  return {
+    system: systemAuftrag(m),
+    user: [
+      `Die Knoten eines Tafelbilds (${lerngruppe(m)}, Thema: ${m.thema || inhalt.titel}) haben Fehler. Korrigiere GENAU diese Fehler; alles andere bleibt wörtlich, die ids bleiben.`,
+      'FEHLER:',
+      ...probleme.map((p) => `- ${p.text}`),
+      inhalt.struktur === 'zeitleiste'
+        ? 'ZEITLEISTE: Gib für JEDEN Knoten im Feld „zeit" ein genaues, lesbares Datum an – das Jahr; wo es auf den Tag ankommt, Tag und Monat („9. November 1918"); vor Christus „44 v. Chr."; Jahrhunderte „15. Jh."; Erdgeschichte „vor 66 Mio. Jahren". Das Datum muss zum Titel und zu den Punkten passen (historisch korrekt). punkte leer lassen, wenn sie stimmen.'
+        : '',
+      inhalt.struktur === 'tabelle'
+        ? `TABELLE: Jede Spalte hat in „punkte" GENAU ${aspekte.length} Einträge – einen je Aspekt, in dieser Reihenfolge: ${aspekte.join(' | ')}. Ohne Aussage zu einem Aspekt: „–". Den Aspektnamen nicht wiederholen. zeit leer.`
+        : '',
+      `KNOTEN (JSON): ${JSON.stringify(knoten.map((k) => ({ id: k.id, titel: k.titel, punkte: k.punkte, zeit: k.zeit ?? '' })))}`
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    schemaName: 'tafelbild_korrektur',
+    schema: KORREKTUR_SCHEMA
+  }
+}
+
+/** Korrektur übernehmen (nur gelieferte, nicht leere Felder) und neu ordnen */
+export function korrekturAus(d: unknown, inhalt: TbInhalt): TbInhalt {
+  const liste = ((d as { knoten?: unknown })?.knoten ?? []) as { id?: unknown; titel?: unknown; zeit?: unknown; punkte?: unknown }[]
+  const neu = structuredClone(inhalt)
+  for (const x of Array.isArray(liste) ? liste : []) {
+    const k = neu.knoten.find((y) => y.id === text(x.id))
+    if (!k) continue
+    if (text(x.zeit)) k.zeit = text(x.zeit)
+    if (text(x.titel)) k.titel = text(x.titel)
+    const punkte = Array.isArray(x.punkte) ? x.punkte.map(text).filter(Boolean) : []
+    if (punkte.length) k.punkte = punkte
+    const alles = `${k.titel} ${k.punkte.join(' ')}`.toLowerCase()
+    k.lueckenWoerter = k.lueckenWoerter.filter((w) => alles.includes(w.toLowerCase()))
+  }
+  return ordneInhalt(neu)
 }
 
 /** Legende, wenn die KI keine liefert – aus den benutzten Farben (R21) */

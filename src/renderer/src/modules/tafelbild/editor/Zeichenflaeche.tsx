@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { zeichnetZeiger } from '../../../shared/touch/gestenLogik'
+import { useBlattAnsicht } from '../../../shared/touch/zoom'
 import { formatInfo } from '../formate'
 import { istLinie, istTextElement, neueId, type TbElement, type TbTafel } from '../model'
-import { tafelSvg, type SvgOptionen } from '../svg'
+import { kontextFuer, linienPunkte, tafelSvg, type SvgOptionen } from '../svg'
 import { sichtbareElemente } from '../varianten'
 
 /**
@@ -11,6 +13,17 @@ import { sichtbareElemente } from '../varianten'
  *
  * Bedient wird mit Zeigerereignissen – dieselben für Maus, Stift und Finger (iPad). Jede Geste ist
  * EIN Rückgängig-Schritt (Gruppe im Verlauf).
+ *
+ * Zoom (Wunsch der Lehrkraft, 30.09.2026: „Bei Tafelbildern fehlt eine Möglichkeit, heranzuzoomen"):
+ * dieselbe Bedienung wie bei allen Blättern (shared/touch/zoom.tsx) – Knöpfe −/%/+/„Einpassen",
+ * Strg/⌘ + Mausrad bzw. Aufziehen auf dem Trackpad, zwei Finger. 100 % = die Tafel passt ganz in
+ * die Fläche; darüber rollt die Fläche. Gezoomt wird per CSS-`zoom` um die Tafel; die Umrechnung
+ * der Zeiger misst das gezoomte Rechteck, und alles, was in Bildschirmpunkten gedacht ist (Griffe,
+ * Trefferbreite der Linien, Fangabstand), rechnet mit der gezoomten Größe.
+ *
+ * Stift oder Finger (gestenLogik.ts, zeichnetZeiger): Maus und Stift zeichnen und verschieben, der
+ * Finger rollt und zoomt – ein Antippen wählt aus, Doppeltippen ändert den Text. Mit „Mit dem Finger
+ * zeichnen" bearbeitet auch der Finger.
  */
 export type Werkzeug = 'auswahl' | 'zeichnen' | 'pfeil' | 'verbinder'
 
@@ -32,6 +45,8 @@ interface Props {
    * gewählte Element im Hintergrund (30.09.2026).
    */
   tastatur?: boolean
+  /** „Mit dem Finger zeichnen": der Finger zeichnet und verschiebt wie Stift und Maus */
+  fingerZeichnet?: boolean
 }
 
 type Griff = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'start' | 'ende'
@@ -53,6 +68,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   const W = f.breite
   const H = f.hoehe
   const buehne = useRef<HTMLDivElement>(null)
+  const gezoomt = useRef<HTMLDivElement>(null)
   const overlay = useRef<SVGSVGElement>(null)
   const zug = useRef<Zug | null>(null)
   const [groesse, setGroesse] = useState({ w: 800, h: 400 })
@@ -63,34 +79,54 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   const [textId, setTextId] = useState<string | null>(null)
   const [textWert, setTextWert] = useState('')
   const letzterTipp = useRef<{ id: string; t: number } | null>(null)
+  /** Finger, der die Fläche rollt (die Fläche selbst hat touch-action: none – der Stift soll zeichnen, nicht rollen) */
+  const rollen = useRef<{ id: number; x: number; y: number; links: number; oben: number } | null>(null)
+  const finger = useRef(new Set<number>())
 
-  // Fläche so groß wie möglich, im Seitenverhältnis des Formats
+  // Fläche so groß wie möglich, im Seitenverhältnis des Formats (= 100 %, „Einpassen")
   useEffect(() => {
     const el = buehne.current
     if (!el) return
     const beobachter = new ResizeObserver(() => {
       const r = el.getBoundingClientRect()
       const s = Math.min((r.width - 24) / W, (r.height - 24) / H)
-      setGroesse({ w: Math.max(200, W * s), h: Math.max(100, H * s) })
+      setGroesse((alt) => {
+        const neu = { w: Math.max(200, W * s), h: Math.max(100, H * s) }
+        // Rollbalken beim Zoomen verändern den Platz um wenige Punkte – dann bleibt die Größe
+        return Math.abs(neu.w - alt.w) < 2 && Math.abs(neu.h - alt.h) < 2 ? alt : neu
+      })
     })
     beobachter.observe(el)
     return () => beobachter.disconnect()
   }, [W, H])
+
+  // Zoom wie bei allen Blättern; „Einpassen" = die Tafel passt ganz hinein
+  const { zoom, knoepfe } = useBlattAnsicht({ flaeche: buehne, inhalt: gezoomt, breitePx: groesse.w, randPx: 0, minEinpassen: 1, obergrenze: 1 })
+  /** Bildschirmpunkte je Einheit der Tafel (mit Zoom) – für Griffe, Linienbreiten, Fangabstand */
+  const bildschirm = { w: groesse.w * zoom, h: groesse.h * zoom }
 
   const svg = useMemo(() => tafelSvg(p.tafel, { ...p.ansicht, ohneTextur: true, editor: true, markiert: p.markiert }), [p.tafel, p.ansicht, p.markiert])
   const sichtbar = useMemo(() => sichtbareElemente(p.tafel, p.ansicht), [p.tafel, p.ansicht])
   const nachId = useMemo(() => new Map(p.tafel.elemente.map((e) => [e.id, e])), [p.tafel.elemente])
   const gewaehlt = p.auswahl ? nachId.get(p.auswahl) : undefined
 
+  /**
+   * Zeiger → Lage auf der Tafel (0 … 1). Das Rechteck der Fläche ist das GEZOOMTE (CSS-`zoom`): Seine
+   * Breite ist die Tafelbreite × Zoom – so bleibt der Punkt unter dem Zeiger bei jedem Zoom richtig.
+   */
   const punkt = (ev: { clientX: number; clientY: number }): { x: number; y: number } => {
     const r = overlay.current!.getBoundingClientRect()
-    return { x: (ev.clientX - r.left) / r.width, y: (ev.clientY - r.top) / r.height }
+    const w = r.width || bildschirm.w
+    const h = r.height || bildschirm.h
+    return { x: (ev.clientX - r.left) / w, y: (ev.clientY - r.top) / h }
   }
+  /** Zeichnet bzw. verschiebt dieser Zeiger? Maus und Stift ja, der Finger nur mit „Mit dem Finger zeichnen" */
+  const bearbeitet = (ev: React.PointerEvent): boolean => zeichnetZeiger(ev.pointerType, Boolean(p.fingerZeichnet))
 
   // Raster: Quadrate von 1/24 der Höhe
   const rasterX = H / 24 / W
   const rasterY = 1 / 24
-  const schwelle = { x: 7 / groesse.w, y: 7 / groesse.h }
+  const schwelle = { x: 7 / bildschirm.w, y: 7 / bildschirm.h }
 
   /** Einrasten an Kanten/Mitten der übrigen Elemente, sonst am Raster */
   function einrasten(e: TbElement, x: number, y: number): { x: number; y: number; hx?: number; hy?: number } {
@@ -133,10 +169,12 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   }
 
   const beginne = (ev: React.PointerEvent, id: string, modus: Zug['modus']): void => {
-    ev.stopPropagation()
     const e = nachId.get(id)
     if (!e) return
-    if (p.werkzeug === 'verbinder' && modus === 'schieben' && !istLinie(e)) {
+    const zieht = bearbeitet(ev)
+    // Der Finger (ohne „Mit dem Finger zeichnen") rollt die Fläche – das Ereignis geht weiter an den Browser
+    if (zieht) ev.stopPropagation()
+    if (p.werkzeug === 'verbinder' && modus === 'schieben' && !istLinie(e) && zieht) {
       if (!verbinderVon) setVerbinderVon(id)
       else if (verbinderVon !== id) {
         const von = verbinderVon
@@ -175,11 +213,22 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     }
     letzterTipp.current = { id, t: jetzt }
     p.setAuswahl(id)
+    // Antippen mit dem Finger wählt nur aus; verschoben wird mit Stift oder Maus
+    if (!zieht) return
     fange(ev.pointerId)
     zug.current = { id, modus, start: punkt(ev), orig: structuredClone(e), gruppe: `tb-zug-${id}-${jetzt}`, bewegt: false }
   }
 
   const bewege = (ev: React.PointerEvent): void => {
+    const r = rollen.current
+    if (r && r.id === ev.pointerId) {
+      const b = buehne.current
+      if (b) {
+        b.scrollLeft = r.links - (ev.clientX - r.x)
+        b.scrollTop = r.oben - (ev.clientY - r.y)
+      }
+      return
+    }
     const pt = punkt(ev)
     if (striche) {
       setStriche([...striche, pt])
@@ -193,7 +242,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     if (!z) return
     const dx = pt.x - z.start.x
     const dy = pt.y - z.start.y
-    if (!z.bewegt && Math.abs(dx) < 2 / groesse.w && Math.abs(dy) < 2 / groesse.h) return
+    if (!z.bewegt && Math.abs(dx) < 2 / bildschirm.w && Math.abs(dy) < 2 / bildschirm.h) return
     z.bewegt = true
     const o = z.orig
     let neu: Partial<TbElement> = {}
@@ -235,6 +284,12 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   }
 
   const beende = (ev: React.PointerEvent): void => {
+    if (ev.pointerType === 'touch') finger.current.delete(ev.pointerId)
+    // Rollen endet mit dem Finger – oder wenn zwei Finger zoomen (zoom.tsx meldet pointercancel)
+    if (rollen.current && (rollen.current.id === ev.pointerId || ev.type === 'pointercancel')) {
+      rollen.current = null
+      return
+    }
     if (striche) {
       const pts = striche
       setStriche(null)
@@ -292,6 +347,16 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   }
 
   const leerGedrueckt = (ev: React.PointerEvent): void => {
+    // Der Finger rollt und zoomt (zwei Finger) – er zeichnet nicht und hebt die Auswahl nicht auf
+    if (!bearbeitet(ev)) {
+      if (ev.pointerType !== 'touch') return
+      finger.current.add(ev.pointerId)
+      const b = buehne.current
+      // Ein Finger rollt; kommt ein zweiter dazu, gehört die Geste dem Zoom
+      rollen.current = finger.current.size === 1 && b ? { id: ev.pointerId, x: ev.clientX, y: ev.clientY, links: b.scrollLeft, oben: b.scrollTop } : null
+      if (rollen.current) fange(ev.pointerId)
+      return
+    }
     const pt = punkt(ev)
     if (p.werkzeug === 'zeichnen') {
       fange(ev.pointerId)
@@ -350,7 +415,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
 
   // Griffe in Bildschirmgröße (auf dem iPad größer)
   const grob = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
-  const gr = ((grob ? 22 : 12) / groesse.w) * W
+  const gr = ((grob ? 22 : 12) / bildschirm.w) * W
   const griffe = (e: TbElement): React.JSX.Element[] => {
     if (e.typ === 'pfeil')
       return (['start', 'ende'] as Griff[]).map((g) => {
@@ -378,19 +443,12 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
     ))
   }
 
+  // Trefferlinien genau dort, wo die Linie gezeichnet ist (auch Verbinder zur Marke einer Zeitleiste)
+  const kontext = useMemo(() => kontextFuer(p.tafel), [p.tafel])
   const trefferLinie = (e: TbElement): React.JSX.Element | null => {
-    let a: { x: number; y: number }
-    let b: { x: number; y: number }
-    if (e.typ === 'pfeil') {
-      a = { x: e.x * W, y: e.y * H }
-      b = { x: (e.x + e.w) * W, y: (e.y + e.h) * H }
-    } else {
-      const von = e.von ? nachId.get(e.von) : undefined
-      const nach = e.nach ? nachId.get(e.nach) : undefined
-      if (!von) return null
-      a = { x: (von.x + von.w / 2) * W, y: (von.y + von.h / 2) * H }
-      b = nach ? { x: (nach.x + nach.w / 2) * W, y: (nach.y + nach.h / 2) * H } : e.zielPunkt ? { x: e.zielPunkt.x * W, y: e.zielPunkt.y * H } : a
-    }
+    const l = linienPunkte(kontext, e, nachId)
+    if (!l) return null
+    const { a, b } = l
     return (
       <line
         key={e.id}
@@ -400,7 +458,7 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
         y1={a.y}
         x2={b.x}
         y2={b.y}
-        strokeWidth={(grob ? 30 : 16) * (W / groesse.w)}
+        strokeWidth={(grob ? 30 : 16) * (W / bildschirm.w)}
         onPointerDown={(ev) => beginne(ev, e.id, 'schieben')}
       />
     )
@@ -410,78 +468,83 @@ export default function Zeichenflaeche(p: Props): React.JSX.Element {
   const zeichenModus = p.werkzeug === 'zeichnen' || p.werkzeug === 'pfeil'
 
   return (
-    <div className="tb-buehne" ref={buehne}>
-      <div className="tb-flaeche" style={{ width: groesse.w, height: groesse.h }} data-tb-flaeche={p.tafel.format}>
-        <div className="tb-svg" dangerouslySetInnerHTML={{ __html: svg }} />
-        <svg
-          ref={overlay}
-          className={`tb-overlay${zeichenModus ? ' tb-zeichnen' : ''}`}
-          viewBox={`0 0 ${W} ${H}`}
-          preserveAspectRatio="none"
-          onPointerDown={leerGedrueckt}
-          onPointerMove={bewege}
-          onPointerUp={beende}
-          onPointerCancel={beende}
-        >
-          {p.tafel.raster && (
-            <g>
-              {Array.from({ length: Math.floor(1 / rasterX) }, (_, i) => (
-                <line key={`x${i}`} className="tb-raster" x1={(i + 1) * rasterX * W} x2={(i + 1) * rasterX * W} y1={0} y2={H} strokeWidth={W / groesse.w} />
-              ))}
-              {Array.from({ length: 23 }, (_, i) => (
-                <line key={`y${i}`} className="tb-raster" y1={(i + 1) * rasterY * H} y2={(i + 1) * rasterY * H} x1={0} x2={W} strokeWidth={W / groesse.w} />
-              ))}
-            </g>
-          )}
-          {sichtbar.filter(istLinie).map(trefferLinie)}
-          {sichtbar
-            .filter((e) => !istLinie(e))
-            .map((e) => (
-              <rect key={e.id} className="tb-treffer" data-element={e.id} x={e.x * W} y={e.y * H} width={e.w * W} height={e.h * H} onPointerDown={(ev) => beginne(ev, e.id, 'schieben')} />
-            ))}
-          {verbinderVon && nachId.get(verbinderVon) && (
-            <rect
-              className="tb-verbinder-start"
-              x={nachId.get(verbinderVon)!.x * W - 6}
-              y={nachId.get(verbinderVon)!.y * H - 6}
-              width={nachId.get(verbinderVon)!.w * W + 12}
-              height={nachId.get(verbinderVon)!.h * H + 12}
-              strokeWidth={(3 * W) / groesse.w}
-            />
-          )}
-          {gewaehlt && !istLinie(gewaehlt) && (
-            <rect className="tb-auswahl" x={gewaehlt.x * W - 3} y={gewaehlt.y * H - 3} width={gewaehlt.w * W + 6} height={gewaehlt.h * H + 6} strokeWidth={(2 * W) / groesse.w} />
-          )}
-          {gewaehlt && p.werkzeug === 'auswahl' && griffe(gewaehlt)}
-          {hilfen.x !== undefined && <line className="tb-hilfslinie" x1={hilfen.x * W} x2={hilfen.x * W} y1={0} y2={H} strokeWidth={(1.5 * W) / groesse.w} />}
-          {hilfen.y !== undefined && <line className="tb-hilfslinie" y1={hilfen.y * H} y2={hilfen.y * H} x1={0} x2={W} strokeWidth={(1.5 * W) / groesse.w} />}
-          {striche && striche.length > 1 && (
-            <polyline points={striche.map((q) => `${q.x * W},${q.y * H}`).join(' ')} fill="none" stroke="#fab005" strokeWidth={(3 * W) / groesse.w} strokeLinecap="round" />
-          )}
-          {pfeilNeu && <line x1={pfeilNeu.a.x * W} y1={pfeilNeu.a.y * H} x2={pfeilNeu.b.x * W} y2={pfeilNeu.b.y * H} stroke="#fab005" strokeWidth={(3 * W) / groesse.w} />}
-        </svg>
-        {textEl && (
-          <textarea
-            className="tb-textfeld"
-            data-tb-textfeld
-            autoFocus
-            value={textWert}
-            onChange={(ev) => setTextWert(ev.currentTarget.value)}
-            onBlur={() => textFertig(true)}
-            onKeyDown={(ev) => {
-              if (ev.key === 'Escape') textFertig(false)
-              if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) textFertig(true)
-            }}
-            style={{
-              left: `${(istLinie(textEl) ? 0.35 : textEl.x) * 100}%`,
-              top: `${(istLinie(textEl) ? 0.4 : textEl.y) * 100}%`,
-              width: `${Math.max(istLinie(textEl) ? 0.3 : textEl.w, 0.18) * 100}%`,
-              height: `${Math.max(istLinie(textEl) ? 0.15 : textEl.h, 0.1) * 100}%`,
-              fontSize: Math.max(13, Math.min(22, (textEl.schrift ?? 0.05) * groesse.h * 0.8))
-            }}
-          />
-        )}
+    <div className="tb-flaechen-rahmen">
+      <div className="tb-buehne" ref={buehne} data-tb-zoom={zoom} data-gezoomt={zoom > 1.001 || undefined}>
+        <div className="tb-zoom" ref={gezoomt} style={zoom !== 1 ? { zoom } : undefined}>
+          <div className="tb-flaeche" style={{ width: groesse.w, height: groesse.h }} data-tb-flaeche={p.tafel.format}>
+            <div className="tb-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+            <svg
+              ref={overlay}
+              className={`tb-overlay${zeichenModus ? ' tb-zeichnen' : ''}${p.fingerZeichnet ? ' tb-finger' : ''}`}
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+              onPointerDown={leerGedrueckt}
+              onPointerMove={bewege}
+              onPointerUp={beende}
+              onPointerCancel={beende}
+            >
+              {p.tafel.raster && (
+                <g>
+                  {Array.from({ length: Math.floor(1 / rasterX) }, (_, i) => (
+                    <line key={`x${i}`} className="tb-raster" x1={(i + 1) * rasterX * W} x2={(i + 1) * rasterX * W} y1={0} y2={H} strokeWidth={W / bildschirm.w} />
+                  ))}
+                  {Array.from({ length: 23 }, (_, i) => (
+                    <line key={`y${i}`} className="tb-raster" y1={(i + 1) * rasterY * H} y2={(i + 1) * rasterY * H} x1={0} x2={W} strokeWidth={W / bildschirm.w} />
+                  ))}
+                </g>
+              )}
+              {sichtbar.filter(istLinie).map(trefferLinie)}
+              {sichtbar
+                .filter((e) => !istLinie(e))
+                .map((e) => (
+                  <rect key={e.id} className="tb-treffer" data-element={e.id} x={e.x * W} y={e.y * H} width={e.w * W} height={e.h * H} onPointerDown={(ev) => beginne(ev, e.id, 'schieben')} />
+                ))}
+              {verbinderVon && nachId.get(verbinderVon) && (
+                <rect
+                  className="tb-verbinder-start"
+                  x={nachId.get(verbinderVon)!.x * W - 6}
+                  y={nachId.get(verbinderVon)!.y * H - 6}
+                  width={nachId.get(verbinderVon)!.w * W + 12}
+                  height={nachId.get(verbinderVon)!.h * H + 12}
+                  strokeWidth={(3 * W) / bildschirm.w}
+                />
+              )}
+              {gewaehlt && !istLinie(gewaehlt) && (
+                <rect className="tb-auswahl" x={gewaehlt.x * W - 3} y={gewaehlt.y * H - 3} width={gewaehlt.w * W + 6} height={gewaehlt.h * H + 6} strokeWidth={(2 * W) / bildschirm.w} />
+              )}
+              {gewaehlt && p.werkzeug === 'auswahl' && griffe(gewaehlt)}
+              {hilfen.x !== undefined && <line className="tb-hilfslinie" x1={hilfen.x * W} x2={hilfen.x * W} y1={0} y2={H} strokeWidth={(1.5 * W) / bildschirm.w} />}
+              {hilfen.y !== undefined && <line className="tb-hilfslinie" y1={hilfen.y * H} y2={hilfen.y * H} x1={0} x2={W} strokeWidth={(1.5 * W) / bildschirm.w} />}
+              {striche && striche.length > 1 && (
+                <polyline points={striche.map((q) => `${q.x * W},${q.y * H}`).join(' ')} fill="none" stroke="#fab005" strokeWidth={(3 * W) / bildschirm.w} strokeLinecap="round" />
+              )}
+              {pfeilNeu && <line x1={pfeilNeu.a.x * W} y1={pfeilNeu.a.y * H} x2={pfeilNeu.b.x * W} y2={pfeilNeu.b.y * H} stroke="#fab005" strokeWidth={(3 * W) / bildschirm.w} />}
+            </svg>
+            {textEl && (
+              <textarea
+                className="tb-textfeld"
+                data-tb-textfeld
+                autoFocus
+                value={textWert}
+                onChange={(ev) => setTextWert(ev.currentTarget.value)}
+                onBlur={() => textFertig(true)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Escape') textFertig(false)
+                  if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) textFertig(true)
+                }}
+                style={{
+                  left: `${(istLinie(textEl) ? 0.35 : textEl.x) * 100}%`,
+                  top: `${(istLinie(textEl) ? 0.4 : textEl.y) * 100}%`,
+                  width: `${Math.max(istLinie(textEl) ? 0.3 : textEl.w, 0.18) * 100}%`,
+                  height: `${Math.max(istLinie(textEl) ? 0.15 : textEl.h, 0.1) * 100}%`,
+                  fontSize: Math.max(13, Math.min(22, (textEl.schrift ?? 0.05) * groesse.h * 0.8))
+                }}
+              />
+            )}
+          </div>
+        </div>
       </div>
+      {knoepfe}
     </div>
   )
 }

@@ -43,6 +43,9 @@ import { FORMAT_IDS, formatInfo, type FormatId } from '../formate'
 import { inhaltAusBoardPlan, ladeAppMaterial, tafelbilderDesBlatts, texteAus } from '../material'
 import { standardSprache, standardStil, STRUKTUREN, type Regler, type Sprachniveau, type StrukturWahl, type Tafelbild, type TafelbildMeta, type ZeichnungQuelle } from '../model'
 import { useTafelbild } from '../store'
+import { MASSSTAB_NAMEN, type ZeitMassstab } from '../zeitleiste'
+import '../tafelbild.css'
+import LernzielFeld from './LernzielFeld'
 
 const LEERE_TABELLE: CefrTable = { version: 1, states: [] }
 
@@ -235,14 +238,7 @@ export default function Einrichten(): React.JSX.Element | null {
                       onChange={(e) => patch({ thema: e.currentTarget.value }, 'tb-thema')}
                       data-tb-thema
                     />
-                    <Textarea
-                      label="Lernziel (optional)"
-                      placeholder="z. B. Die Schülerinnen und Schüler erläutern mehrere Ursachen und gewichten sie."
-                      autosize
-                      minRows={2}
-                      value={m.lernziel}
-                      onChange={(e) => patch({ lernziel: e.currentTarget.value }, 'tb-lernziel')}
-                    />
+                    <LernzielFeld meta={m} kiDa={kiDa} onChange={(lernziel) => patch({ lernziel }, 'tb-lernziel')} />
                     <Textarea
                       label="Weitere Wünsche (optional)"
                       placeholder="z. B. mit Bezug auf die Karikatur der letzten Stunde"
@@ -361,6 +357,28 @@ export default function Einrichten(): React.JSX.Element | null {
                     description={STRUKTUREN.find((s) => s.value === m.struktur)?.beschreibung}
                     data-tb-struktur
                   />
+                  {(m.struktur === 'zeitleiste' || m.struktur === 'auto') && (
+                    <div style={{ marginTop: 8 }}>
+                      <Text size="sm" fw={500} mb={4}>
+                        Abstände auf einer Zeitleiste
+                      </Text>
+                      <SegmentedControl
+                        fullWidth
+                        size="xs"
+                        value={m.zeitachse ?? 'auto'}
+                        onChange={(v) => patch({ zeitachse: v as ZeitMassstab })}
+                        data={(Object.keys(MASSSTAB_NAMEN) as ZeitMassstab[]).map((z) => ({ value: z, label: MASSSTAB_NAMEN[z] }))}
+                        data-tb-zeitachse
+                      />
+                      <Text size="xs" c="dimmed" mt={2}>
+                        {m.zeitachse === 'massstab'
+                          ? 'Marken im wahren Zeitabstand.'
+                          : m.zeitachse === 'gleich'
+                            ? 'Marken im gleichen Abstand – gut bei sehr ungleichen Zeiträumen.'
+                            : 'Maßstabsgerecht, wenn die Jahreszahlen dabei lesbar bleiben; sonst gleiche Abstände.'}
+                      </Text>
+                    </div>
+                  )}
                 </Card>
 
                 <Card withBorder>

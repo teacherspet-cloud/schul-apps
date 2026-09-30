@@ -12,10 +12,11 @@ import { farbwert, formatInfo, PALETTEN, SCHRIFTEN, ZEILENHOEHE, type Farbe, typ
 import { funktionsPunkte, parseFunktion } from './funktion'
 import { kastenInhalt, kastenSatz } from './kasten'
 import { tabellenSpalten } from './layout'
-import type { Diagramm, TbElement, TbTafel } from './model'
+import type { Diagramm, Kante, TbElement, TbTafel } from './model'
 import { SKIZZEN, SYMBOLE } from './symbole'
 import { textBreite, umbrechen } from './textsatz'
 import { inAnsicht, sichtbareElemente, wortspeicher, type Ansicht } from './varianten'
+import { achsenMass, markeAufAchse, markenPunkt } from './zeitleiste'
 
 export interface SvgOptionen extends Ansicht {
   /** Ohne Körnung (Editor) */
@@ -247,42 +248,52 @@ function tabelleSvg(k: Kontext, e: TbElement, d: Diagramm, x: number, y: number,
   return teile.join('')
 }
 
+/**
+ * Zeitstrahl (Nachbesserung 30.09.2026): Die Lage jeder Marke rechnet `achsenMass`/`markenPunkt`
+ * (zeitleiste.ts) – dieselbe Rechnung wie für die Verbinder der Kästen, die so genau auf ihrer
+ * Marke enden. Die Beschriftung steht auf der Seite `seite` (bei der Zeitleiste gegenüber dem
+ * Kasten, damit kein Verbinder durch sie läuft); ohne Angabe abwechselnd.
+ */
 function zeitstrahlSvg(k: Kontext, e: TbElement, d: Diagramm, x: number, y: number, w: number, h: number): string {
-  // Beschriftungen müssen in die Fläche passen: oben und unten je gut zwei Zeilen
-  const nurAchse = d.eintraege.every((t) => !t.label)
-  const g = Math.min((e.schrift ?? 0.045) * k.H, w >= h ? h / (nurAchse ? 3.4 : 5.6) : w / 4)
+  const m = achsenMass(d, x, y, w, h, (e.schrift ?? 0.045) * k.H, k.schrift)
+  const g = m.g
   const c = k.farbe('grund')
   const sw = Math.max(2, k.H * 0.005)
   const teile: string[] = []
-  const quer = w >= h
-  if (quer) {
-    const ay = y + h / 2
+  const gesehen = new Set<string>()
+  if (m.quer) {
+    const ay = m.linie
     teile.push(`<path d="M${r2(x)} ${r2(ay)}H${r2(x + w)}" stroke="${c}" stroke-width="${r2(sw)}"/>`)
     teile.push(`<path d="M${r2(x + w - g * 0.7)} ${r2(ay - g * 0.4)}L${r2(x + w)} ${r2(ay)}L${r2(x + w - g * 0.7)} ${r2(ay + g * 0.4)}" stroke="${c}" stroke-width="${r2(sw)}" fill="none"/>`)
-    // Einzug links und rechts, damit Jahreszahl und Beschriftung am Rand nicht abgeschnitten werden
-    const breiteste = Math.max(g * 1.2, ...d.eintraege.map((t) => Math.min(g * 7, Math.max((t.wert ?? '').length * 0.85, t.label.length * 0.8) * g * SCHRIFTEN[k.schrift].breite)))
-    const rand = breiteste / 2 + g * 0.2
-    const innen = w - g * 0.9 - 2 * rand
-    const gesehen = new Set<string>()
     d.eintraege.forEach((t, i) => {
       // Gleiche Marke (gleiches Jahr) nur einmal beschriften
       const schluessel = `${t.x}|${t.wert}`
       if (gesehen.has(schluessel) && !t.label) return
       gesehen.add(schluessel)
-      const px = x + rand + (t.x ?? i / Math.max(1, d.eintraege.length - 1)) * innen
-      teile.push(`<path d="M${r2(px)} ${r2(ay - g * 0.45)}V${r2(ay + g * 0.45)}" stroke="${k.farbe('gelb')}" stroke-width="${r2(sw * 1.3)}"/>`)
-      const oben = i % 2 === 1
-      if (t.wert) teile.push(zeilen(k, [t.wert], px, oben ? ay - g * 1.6 : ay + g * 0.55, g * 0.85, 'gelb', { mitte: true, fett: true }))
-      if (t.label) teile.push(zeilen(k, umbrechen(t.label, g * 7, g * 0.8, k.schrift).slice(0, 1), px, oben ? ay - g * 2.65 : ay + g * 1.6, g * 0.8, 'grund', { mitte: true }))
+      const p = markenPunkt(m, d, i)
+      teile.push(`<path d="M${r2(p.x)} ${r2(ay - g * 0.45)}V${r2(ay + g * 0.45)}" stroke="${k.farbe('gelb')}" stroke-width="${r2(sw * 1.3)}"/>`)
+      const oben = m.seiten[i] < 0
+      if (t.wert) teile.push(zeilen(k, [t.wert], p.x, oben ? ay - g * 0.55 - g * 0.85 * ZEILENHOEHE : ay + g * 0.5, g * 0.85, 'gelb', { mitte: true, fett: true }))
+      if (t.label) teile.push(zeilen(k, umbrechen(t.label, g * 7, g * 0.8, k.schrift).slice(0, 1), p.x, oben ? ay - g * 2.65 : ay + g * 1.6, g * 0.8, 'grund', { mitte: true }))
     })
   } else {
-    const ax = x + w * 0.5
+    const ax = m.linie
     teile.push(`<path d="M${r2(ax)} ${r2(y)}V${r2(y + h)}" stroke="${c}" stroke-width="${r2(sw)}"/>`)
     teile.push(`<path d="M${r2(ax - g * 0.4)} ${r2(y + h - g * 0.7)}L${r2(ax)} ${r2(y + h)}L${r2(ax + g * 0.4)} ${r2(y + h - g * 0.7)}" stroke="${c}" stroke-width="${r2(sw)}" fill="none"/>`)
     d.eintraege.forEach((t, i) => {
-      const py = y + g * 0.4 + (t.y ?? i / Math.max(1, d.eintraege.length - 1)) * (h - g * 1.8)
-      teile.push(`<path d="M${r2(ax - g * 0.45)} ${r2(py)}H${r2(ax + g * 0.45)}" stroke="${k.farbe('gelb')}" stroke-width="${r2(sw * 1.3)}"/>`)
-      if (t.wert) teile.push(zeilen(k, [t.wert], x, py - g * 0.55, Math.min(g * 0.8, (w * 0.45) / Math.max(2, t.wert.length * 0.6)), 'gelb', { fett: true }))
+      const schluessel = `${t.y ?? t.x}|${t.wert}`
+      if (gesehen.has(schluessel) && !t.label) return
+      gesehen.add(schluessel)
+      const p = markenPunkt(m, d, i)
+      teile.push(`<path d="M${r2(ax - g * 0.45)} ${r2(p.y)}H${r2(ax + g * 0.45)}" stroke="${k.farbe('gelb')}" stroke-width="${r2(sw * 1.3)}"/>`)
+      const text = [t.wert ?? '', t.label].filter(Boolean).join(' ')
+      if (!text) return
+      const links = m.seiten[i] < 0
+      const platz = links ? ax - g * 0.6 - x : x + w - ax - g * 0.6
+      // Schrift so, dass die Beschriftung in ihre Seite passt
+      const gl = Math.max(g * 0.5, Math.min(g * 0.85, (g * 0.85 * platz) / Math.max(1, textBreite(text, g * 0.85, k.schrift))))
+      const tb = Math.min(platz, textBreite(text, gl, k.schrift) * 1.06)
+      teile.push(zeilen(k, [text], links ? ax - g * 0.6 - tb : ax + g * 0.6, p.y - gl * 0.55, gl, t.wert ? 'gelb' : 'grund', { fett: Boolean(t.wert) }))
     })
   }
   return teile.join('')
@@ -462,7 +473,7 @@ function formelSvg(k: Kontext, e: TbElement, x: number, y: number, w: number, h:
 }
 
 /** Seite eines Rechtecks, an der ein Punkt liegt (Anschlussstelle eines Verbinders in PowerPoint) */
-export type Kante = 'oben' | 'links' | 'unten' | 'rechts'
+export type { Kante }
 
 function kanteVon(r: { x: number; y: number; w: number; h: number }, p: { x: number; y: number }): Kante {
   const d: [Kante, number][] = [
@@ -488,12 +499,30 @@ export function linienPunkte(
   const nach = e.nach ? alle.get(e.nach) : undefined
   if (!von) return null
   const rv = { x: von.x * k.W, y: von.y * k.H, w: von.w * k.W, h: von.h * k.H }
+  const luft = g * 0.25
+  const kante = (v: number, a0: number, a1: number): number => Math.min(a1 - g * 0.3, Math.max(a0 + g * 0.3, v))
+  // Zur Marke eines Zeitstrahls: von der Seite des Kastens, die der Achse zugewandt ist – so bleibt
+  // die Linie außerhalb der Reihe (quer) bzw. Spalte (hochkant) und kreuzt keinen Nachbarkasten
+  if (nach && e.marke !== undefined && nach.diagramm?.art === 'zeitstrahl') {
+    const ziel = markeAufAchse(k.W, k.H, k.schrift, nach, e.marke)
+    if (!ziel) return null
+    const quer = nach.w * k.W >= nach.h * k.H
+    const a = quer
+      ? { x: kante(ziel.x, rv.x, rv.x + rv.w), y: ziel.y > rv.y + rv.h / 2 ? rv.y + rv.h + luft : rv.y - luft }
+      : { x: ziel.x > rv.x + rv.w / 2 ? rv.x + rv.w + luft : rv.x - luft, y: kante(ziel.y, rv.y, rv.y + rv.h) }
+    return { a, b: ziel, vonKante: kanteVon(rv, a) }
+  }
   const ziel = nach ? { x: (nach.x + nach.w / 2) * k.W, y: (nach.y + nach.h / 2) * k.H } : e.zielPunkt ? { x: e.zielPunkt.x * k.W, y: e.zielPunkt.y * k.H } : null
   if (!ziel) return null
-  const luft = g * 0.25
-  // Zu einem Punkt (Marke der Zeitleiste): vom nächsten Rand aus, möglichst waagerecht bzw. senkrecht –
+  const rn = nach ? { x: nach.x * k.W, y: nach.y * k.H, w: nach.w * k.W, h: nach.h * k.H } : null
+  // Feste Anschlussseiten (Flussdiagramm: Umbruch in die nächste Zeile von unten nach oben)
+  if (rn && (e.kanten?.von || e.kanten?.nach)) {
+    const a = e.kanten.von ? kantenMitte(rv, e.kanten.von, luft) : randPunkt(rv, rn.x + rn.w / 2, rn.y + rn.h / 2, luft)
+    const b = e.kanten.nach ? kantenMitte(rn, e.kanten.nach, luft) : randPunkt(rn, rv.x + rv.w / 2, rv.y + rv.h / 2, luft)
+    return { a, b, vonKante: kanteVon(rv, a), nachKante: kanteVon(rn, b) }
+  }
+  // Zu einem Punkt (ältere Zeitleisten): vom nächsten Rand aus, möglichst waagerecht bzw. senkrecht –
   // aus der Mitte heraus liefe die Linie bei gleichen Jahren quer über den Nachbarkasten
-  const kante = (v: number, a0: number, a1: number): number => Math.min(a1 - g * 0.3, Math.max(a0 + g * 0.3, v))
   const a = nach
     ? randPunkt(rv, ziel.x, ziel.y, luft)
     : ziel.x < rv.x
@@ -505,9 +534,16 @@ export function linienPunkte(
           : ziel.y < rv.y
             ? { x: kante(ziel.x, rv.x, rv.x + rv.w), y: rv.y - luft }
             : randPunkt(rv, ziel.x, ziel.y, luft)
-  const rn = nach ? { x: nach.x * k.W, y: nach.y * k.H, w: nach.w * k.W, h: nach.h * k.H } : null
   const b = rn ? randPunkt(rn, rv.x + rv.w / 2, rv.y + rv.h / 2, luft) : ziel
   return { a, b, vonKante: kanteVon(rv, a), ...(rn ? { nachKante: kanteVon(rn, b) } : {}) }
+}
+
+/** Mitte einer Kante (mit Luft nach außen) */
+function kantenMitte(r: { x: number; y: number; w: number; h: number }, kante: Kante, luft: number): { x: number; y: number } {
+  if (kante === 'oben') return { x: r.x + r.w / 2, y: r.y - luft }
+  if (kante === 'unten') return { x: r.x + r.w / 2, y: r.y + r.h + luft }
+  if (kante === 'links') return { x: r.x - luft, y: r.y + r.h / 2 }
+  return { x: r.x + r.w + luft, y: r.y + r.h / 2 }
 }
 
 function elementSvg(k: Kontext, e: TbElement, alle: Map<string, TbElement>): string {

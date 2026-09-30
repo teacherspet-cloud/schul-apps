@@ -4,6 +4,7 @@ import KreismenueKnopf from '../../../shared/components/Kreismenue'
 import { FARB_NAMEN, farbwert, formatInfo, SCHRIFTEN, type Farbe, type Schriftart } from '../formate'
 import { STRUKTUR_NAMEN, type Befund, type Tafelbild, type TbTafel, type TbVorschlag } from '../model'
 import { VORSCHLAG_NAMEN } from '../vorschlaege'
+import { MASSSTAB_NAMEN, type ZeitMassstab } from '../zeitleiste'
 
 /**
  * Seitenleiste ohne gewähltes Element: Prüfbefunde (anklickbar), Bedeutung der Farben, Schrift,
@@ -23,7 +24,8 @@ export default function TafelPanel({
   setzeTafel,
   neuSetzen,
   vorschlag,
-  kiDa
+  kiDa,
+  zeitachse
 }: {
   t: Tafelbild
   tafel: TbTafel
@@ -34,6 +36,8 @@ export default function TafelPanel({
   neuSetzen: () => void
   vorschlag: (v: TbVorschlag[], b: Befund) => void
   kiDa: boolean
+  /** Zeitleiste: Abstände der Marken wählen (setzt alle Formate neu) */
+  zeitachse?: (wahl: ZeitMassstab) => void
 }): React.JSX.Element {
   const f = formatInfo(tafel.format)
   const benutzt = [...new Set(tafel.elemente.map((e) => e.farbe))].filter((c) => c !== 'grund')
@@ -123,6 +127,21 @@ export default function TafelPanel({
           data={(Object.keys(SCHRIFTEN) as Schriftart[]).map((s) => ({ value: s, label: SCHRIFTEN[s].label }))}
         />
         <Switch size="xs" label="Raster anzeigen und einrasten" checked={Boolean(tafel.raster)} onChange={(e) => setzeTafel((x) => (x.raster = e.currentTarget.checked))} />
+        {t.inhalt?.struktur === 'zeitleiste' && zeitachse && (
+          <div>
+            <Text size="xs" fw={500} mb={2}>
+              Abstände auf der Zeitleiste
+            </Text>
+            <SegmentedControl
+              size="xs"
+              fullWidth
+              value={t.meta.zeitachse ?? 'auto'}
+              onChange={(v) => zeitachse(v as ZeitMassstab)}
+              data={(Object.keys(MASSSTAB_NAMEN) as ZeitMassstab[]).map((m) => ({ value: m, label: MASSSTAB_NAMEN[m] }))}
+              data-tb-zeitachse
+            />
+          </div>
+        )}
         {t.inhalt && (
           <Button size="xs" variant="default" leftSection={<IconLayoutGrid size={14} />} onClick={neuSetzen} data-tb-neu-setzen>
             Layout neu setzen (alle Formate)

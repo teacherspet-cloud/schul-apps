@@ -14,6 +14,7 @@ import type { StoffQuelle } from '../../shared/files/stoffQuelle'
 import type { BilingualVorgaben } from '../arbeitsblatt/model/types'
 import type { SchaltplanSpec } from '../arbeitsblatt/render/schaltplanSvg'
 import { FORMAT_IDS, standardSchrift, type Farbe, type FormatId, type Schriftart } from './formate'
+import type { ZeitMassstab } from './zeitleiste'
 
 export type ElementTyp = 'text' | 'kasten' | 'pfeil' | 'verbinder' | 'symbol' | 'skizze' | 'bild' | 'diagramm' | 'formel' | 'merksatz'
 
@@ -30,6 +31,9 @@ export const ELEMENT_NAMEN: Record<ElementTyp, string> = {
   merksatz: 'Merksatz'
 }
 
+/** Seite eines Rechtecks (Anschlussstelle eines Verbinders) */
+export type Kante = 'oben' | 'links' | 'unten' | 'rechts'
+
 export type Rahmen = 'keiner' | 'linie' | 'doppelt' | 'gestrichelt' | 'wolke'
 export type PfeilArt = 'pfeil' | 'doppelpfeil' | 'linie'
 export type Niveau = 1 | 2 | 3
@@ -38,8 +42,11 @@ export type DiagrammArt = 'zeitstrahl' | 'koordinatensystem' | 'schaltplan' | 'k
 
 export interface Diagramm {
   art: DiagrammArt
-  /** Zeitstrahl: Ereignisse (wert = Jahr); Kreislauf: Stationen; Kartenskizze: Orte (x/y 0 … 1) */
-  eintraege: { label: string; wert?: string; x?: number; y?: number }[]
+  /**
+   * Zeitstrahl: Marken (wert = Zeitangabe, x bzw. y = Lage 0 … 1, seite = Seite der Beschriftung:
+   * -1 oben/links, 1 unten/rechts); Kreislauf: Stationen; Kartenskizze: Orte (x/y 0 … 1)
+   */
+  eintraege: { label: string; wert?: string; x?: number; y?: number; seite?: -1 | 1 }[]
   /** Koordinatensystem: Funktionsterme in x, z. B. „0.5*x^2 - 1" */
   funktionen?: string[]
   bereich?: { xMin: number; xMax: number; yMin: number; yMax: number }
@@ -82,8 +89,16 @@ export interface TbElement {
   von?: string
   nach?: string
   pfeilArt?: PfeilArt
-  /** Verbinder zu einem Punkt statt zu einem Element (Zeitleiste: Marke auf dem Strahl), relativ */
+  /** Verbinder zu einem Punkt statt zu einem Element (ältere Zeitleisten), relativ */
   zielPunkt?: { x: number; y: number }
+  /**
+   * Verbinder zur Marke Nr. `marke` des Zeitstrahls `nach` (Nachbesserung 30.09.2026): Das Ende
+   * wird beim Zeichnen aus der Lage der Marke berechnet – es sitzt immer genau auf SEINER Marke,
+   * auch wenn die Achse verschoben oder vergrößert wird.
+   */
+  marke?: number
+  /** Anschlussseiten eines Verbinders (Flussdiagramm: Zeilenumbruch von unten nach oben) */
+  kanten?: { von?: Kante; nach?: Kante }
   /** Beschriftung auf einem Pfeil oder Verbinder steht in `text` */
   /** Symbol aus dem eingebauten Vorrat (symbole.ts) */
   symbol?: string
@@ -238,6 +253,8 @@ export interface TafelbildMeta {
   lernziel: string
   operatoren: string[]
   struktur: StrukturWahl
+  /** Zeitleiste: Abstände der Marken – maßstabsgerecht, gleich oder automatisch */
+  zeitachse?: ZeitMassstab
   regler: Regler
   formate: FormatId[]
   quellen: ZeichnungQuelle[]

@@ -10,6 +10,7 @@ import {
   IconExclamationMark,
   IconFileText,
   IconGrid4x4,
+  IconHandFinger,
   IconLine,
   IconMathFunction,
   IconPhoto,
@@ -20,6 +21,7 @@ import {
   IconTypography
 } from '@tabler/icons-react'
 import { useMemo, useState } from 'react'
+import { useTouch } from '../../../shared/touch/touchModus'
 import { starteAuftrag } from '../../../shared/auftraege'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
 import UndoRedoButtons from '../../../shared/components/UndoRedoButtons'
@@ -111,6 +113,23 @@ const DIAGRAMM_VORLAGEN: { label: string; d: Diagramm }[] = [
   }
 ]
 
+/** „Mit dem Finger zeichnen" gilt je Gerät (Tablet mit oder ohne Stift) */
+const FINGER_SPEICHER = 'schul-apps-tafelbild-finger'
+function fingerGemerkt(): boolean {
+  try {
+    return localStorage.getItem(FINGER_SPEICHER) === '1'
+  } catch {
+    return false
+  }
+}
+function fingerMerken(an: boolean): void {
+  try {
+    localStorage.setItem(FINGER_SPEICHER, an ? '1' : '0')
+  } catch {
+    // ohne lokalen Speicher gilt die Wahl nur bis zum Schließen
+  }
+}
+
 /** Schritt 2: Zeichenfläche, Eigenschaften, Ausgabe, Präsentation */
 export default function Bearbeiten(): React.JSX.Element | null {
   const { dok: t, update, docId, docName, setDocName, savedAt, undo, redo, verlauf, setStep, endGroup, setDok } = useTafelbild()
@@ -121,11 +140,15 @@ export default function Bearbeiten(): React.JSX.Element | null {
   const [praesentation, setPraesentation] = useState(false)
   const [ausgabe, setAusgabe] = useState(false)
   const [insBlatt, setInsBlatt] = useState(false)
+  const [fingerZeichnet, setFingerZeichnet] = useState(fingerGemerkt)
   const kiDa = useKiZugang()
+  // Den Umschalter braucht nur, wer mit dem Finger bedient (Tablet, Touchscreen)
+  const touch = useTouch()
+  const mitFinger = touch || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0)
 
   const tafel: TbTafel | undefined = t?.tafeln.find((x) => x.format === formatWahl) ?? t?.tafeln[0]
   const befunde = useMemo(
-    () => (t ? pruefeAlle(t.tafeln, { grade: t.meta.grade, regler: t.meta.regler, inhalt: t.inhalt }, (t.pruefung ?? []).filter((b) => b.art === 'bild')) : []),
+    () => (t ? pruefeAlle(t.tafeln, { grade: t.meta.grade, regler: t.meta.regler, inhalt: t.inhalt, lernziel: t.meta.lernziel }, (t.pruefung ?? []).filter((b) => b.art === 'bild')) : []),
     [t]
   )
   const markiert = useMemo(() => befunde.filter((b) => b.format === tafel?.format && b.schwer && b.element).map((b) => b.element!), [befunde, tafel?.format])
@@ -379,6 +402,23 @@ export default function Bearbeiten(): React.JSX.Element | null {
                 <IconGrid4x4 size={18} />
               </ActionIcon>
             </Tooltip>
+            {mitFinger && (
+              <Tooltip label={fingerZeichnet ? 'Der Finger zeichnet und verschiebt – Rollen und Zoomen mit zwei Fingern' : 'Stift zeichnet, der Finger rollt und zoomt'}>
+                <ActionIcon
+                  variant={fingerZeichnet ? 'filled' : 'default'}
+                  size="lg"
+                  aria-label="Mit dem Finger zeichnen"
+                  aria-pressed={fingerZeichnet}
+                  onClick={() => {
+                    fingerMerken(!fingerZeichnet)
+                    setFingerZeichnet(!fingerZeichnet)
+                  }}
+                  data-tb-finger
+                >
+                  <IconHandFinger size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             {werkzeug === 'verbinder' && (
               <Text size="xs" c="dimmed" ml="xs" style={{ alignSelf: 'center' }}>
                 Erstes, dann zweites Element antippen
@@ -402,6 +442,7 @@ export default function Bearbeiten(): React.JSX.Element | null {
             markiert={markiert}
             nachGeste={nachGeste}
             tastatur={!praesentation && !ausgabe && !insBlatt}
+            fingerZeichnet={fingerZeichnet}
           />
         </div>
         <div className="tb-seite">
@@ -452,6 +493,11 @@ export default function Bearbeiten(): React.JSX.Element | null {
               }
               kiDa={kiDa}
               vorschlag={(v, b) => vorschlagUmsetzen(v, b)}
+              zeitachse={(wahl) =>
+                void neuSetzen({ ...t, meta: { ...t.meta, zeitachse: wahl } })
+                  .then((n) => setDok(n))
+                  .catch(notifyError)
+              }
             />
           )}
         </div>

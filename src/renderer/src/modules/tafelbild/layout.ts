@@ -11,6 +11,21 @@ import { formatInfo, standardSchrift, ZEILENHOEHE, zonen, type Farbe, type Forma
 import { kastenSatz } from './kasten'
 import { textBreite } from './textsatz'
 import {
+  achsenMass,
+  beschriftungFrei,
+  markenLage,
+  markenPunkt,
+  ohneAspektPraefix,
+  ordneEreignisse,
+  ordneFluss,
+  ordneKreislauf,
+  packe,
+  type AchsenMass,
+  type Ereignis,
+  type Marke,
+  type ZeitMassstab
+} from './zeitleiste'
+import {
   neueId,
   type Diagramm,
   type Regler,
@@ -298,9 +313,11 @@ function tabelle(u: Umgebung, inhalt: TbInhalt, z: Rechteck): TbElement[] {
   const spalten = inhalt.knoten.filter((k) => k.rolle === 'spalte')
   const knoten = spalten.length >= 2 ? spalten : inhalt.knoten
   const aspekte = (inhalt.aspekte ?? []).filter(Boolean)
-  if (aspekte.length && knoten.every((k) => k.punkte.length >= 1)) {
+  // Tabelle nur, wenn jede Spalte höchstens einen Eintrag je Aspekt hat – überzählige gingen sonst verloren
+  if (aspekte.length && knoten.every((k) => k.punkte.length >= 1 && k.punkte.length <= aspekte.length)) {
     const kopf = ['', ...knoten.map((k) => k.titel)]
-    const zeilen = aspekte.map((a, i) => [a, ...knoten.map((k) => k.punkte[i] ?? '')])
+    // Zeile i = Aspekt i; ein wiederholter Aspektname am Anfang des Eintrags („Wirtschaft: …") entfällt
+    const zeilen = aspekte.map((a, i) => [a, ...knoten.map((k) => ohneAspektPraefix(k.punkte[i] ?? '', a))])
     const diagramm: Diagramm = { art: 'tabelle', eintraege: [], spalten: kopf, zeilen }
     const g = tabellenGrad(u, diagramm, z.w, z.h)
     const h = Math.min(z.h, tabellenHoehe(u, diagramm, z.w, g))
@@ -355,7 +372,8 @@ function tabellenGrad(u: Umgebung, d: Diagramm, w: number, h: number): number {
 }
 
 function fluss(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean): TbElement[] {
-  const knoten = inhalt.knoten
+  // In Pfeilrichtung geordnet (zeitleiste.ts): kein Pfeil läuft gegen die Leserichtung zurück
+  const knoten = ordneFluss(inhalt.knoten, inhalt.beziehungen)
   const n = knoten.length
   // Leserichtung: links → rechts, dann nächste Zeile wieder links beginnend (R29); hochkant von oben nach unten
   const spalten = quer ? [n, Math.ceil(n / 2), Math.ceil(n / 3), 2] : [1, 2]
@@ -364,104 +382,233 @@ function fluss(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean): TbEle
   const el = knoten.map((k, i) => kasten(posten(k, u), r.rects[i], r.g, u))
   const aus = [...el]
   const gezogen = new Set<string>()
+  /*
+   * Anschlüsse ohne Kreuzung: In die nächste Zeile läuft der Pfeil von der Unterkante zur
+   * Oberkante – quer durch den Zwischenraum der Zeilen statt durch die Kästen der Zeile. Ein Pfeil,
+   * der in derselben Zeile Kästen überspringt, läuft über die Oberkanten.
+   */
+  const anschluss = (von: TbElement, nach: TbElement): TbElement['kanten'] | undefined => {
+    if (Math.abs(von.y - nach.y) > 1e-6) return nach.y > von.y ? { von: 'unten', nach: 'oben' } : { von: 'oben', nach: 'unten' }
+    const a = el.indexOf(von)
+    const b = el.indexOf(nach)
+    return Math.abs(a - b) > 1 ? { von: 'oben', nach: 'oben' } : undefined
+  }
+  const pfeil = (von: TbElement, nach: TbElement, text: string, art: TbElement['pfeilArt']): TbElement => {
+    const k = anschluss(von, nach)
+    return { ...verbinder(von, nach, text, art), ...(k ? { kanten: k } : {}) }
+  }
   for (const b of inhalt.beziehungen) {
     const von = el.find((e) => e.knoten === b.von)
     const nach = el.find((e) => e.knoten === b.nach)
     if (!von || !nach || von === nach) continue
     gezogen.add(`${von.id}>${nach.id}`)
-    aus.push(verbinder(von, nach, b.beschriftung, b.art))
+    aus.push(pfeil(von, nach, b.beschriftung, b.art))
   }
   // Ohne ausdrückliche Beziehungen: die Kette in Reihenfolge
-  if (!gezogen.size) for (let i = 0; i + 1 < el.length; i++) aus.push(verbinder(el[i], el[i + 1], '', 'pfeil'))
+  if (!gezogen.size) for (let i = 0; i + 1 < el.length; i++) aus.push(pfeil(el[i], el[i + 1], '', 'pfeil'))
   return aus
 }
 
-/** Erstes Jahr aus einer Zeitangabe („1914", „15. Jh.", „44 v. Chr.", „Juli 1914 – 1918") */
-export function jahrAus(zeit?: string): number | null {
-  if (!zeit) return null
-  const jh = /(\d{1,2})\.\s*(?:Jh|Jahrhundert)/i.exec(zeit)
-  const vChr = /v\.\s*Chr/i.test(zeit)
-  if (jh) return (Number(jh[1]) - 1) * 100 * (vChr ? -1 : 1) + (vChr ? -50 : 50)
-  const m = /-?\d{1,4}/.exec(zeit.replace(/(\d)\.(\d)/g, '$1$2'))
-  if (!m) return null
-  const n = Number(m[0])
-  return vChr ? -Math.abs(n) : n
-}
+export { jahrAus } from './zeitleiste'
 
-function zeitleiste(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean): TbElement[] {
-  const knoten = [...inhalt.knoten]
-  const jahre = knoten.map((k) => jahrAus(k.zeit))
-  const bekannt = jahre.every((j) => j !== null)
-  // Nach der Zeit ordnen, wenn alle Angaben lesbar sind
-  const ordnung = knoten.map((k, i) => ({ k, j: jahre[i] ?? i })).sort((a, b) => (bekannt ? a.j - b.j : 0))
-  const aus: TbElement[] = []
-  const min = Math.min(...ordnung.map((o) => o.j))
-  const max = Math.max(...ordnung.map((o) => o.j))
-  const spanne = max - min || 1
-  // Achse: konstanter Maßstab (die Marken sitzen an der wahren Zeitstelle)
-  const achse: Diagramm = {
-    art: 'zeitstrahl',
-    eintraege: ordnung.map((o) => ({ label: '', wert: o.k.zeit ?? '', x: bekannt ? (o.j - min) / spanne : ordnung.length > 1 ? ordnung.indexOf(o) / (ordnung.length - 1) : 0.5 }))
-  }
-  const n = ordnung.length
-  if (quer) {
-    const ah = u.text * 3
-    const ay = z.y + (z.h - ah) / 2
-    const achsR = { x: z.x, y: ay, w: z.w, h: ah }
-    const oben = ordnung.filter((_, i) => i % 2 === 0)
-    const unten = ordnung.filter((_, i) => i % 2 === 1)
-    const hoch = (z.h - ah) / 2 - u.text * 1.2
-    const ro = raster(u, oben.map((o) => posten(o.k, u)), { x: z.x, y: z.y, w: z.w, h: hoch }, [oben.length], { x: u.text * 0.8, y: 0 })
-    const ru = raster(u, unten.map((o) => posten(o.k, u)), { x: z.x, y: ay + ah + u.text * 1.2, w: z.w, h: hoch }, [Math.max(1, unten.length)], { x: u.text * 0.8, y: 0 })
-    const g = Math.min(ro.g, ru.g)
-    const achsEl = diagrammElement(achse, achsR, u, Math.min(...knoten.map((k) => k.schritt)), g)
-    aus.push(achsEl)
-    // Obere Reihe unten bündig an die Achse, untere oben bündig
-    oben.forEach((o, i) => {
-      const r = ro.rects[i]
-      aus.push(kasten(posten(o.k, u), { ...r, y: z.y + hoch - r.h }, g, u))
-    })
-    unten.forEach((o, i) => aus.push(kasten(posten(o.k, u), { ...ru.rects[i], y: ay + ah + u.text * 1.2 }, g, u)))
-    if (!ro.passt || !ru.passt) u.ueberlauf.push('Die Zeitleiste passt bei Mindestschrift nicht ganz in das Hauptfeld.')
-  } else {
-    const aw = u.text * 3.2
-    const achsR = { x: z.x, y: z.y, w: aw, h: z.h }
-    achse.eintraege = achse.eintraege.map((e) => ({ ...e, y: e.x, x: undefined }))
-    const r = raster(u, ordnung.map((o) => posten(o.k, u)), { x: z.x + aw + u.text * 1.5, y: z.y, w: z.w - aw - u.text * 1.5, h: z.h }, [1], { x: 0, y: u.text * 0.5 })
-    // Achse nur so lang wie die Kästen – sonst laufen die Verbinder quer über die Fläche
-    if (r.rects.length) {
-      const oben = Math.min(...r.rects.map((x) => x.y))
-      const unten = Math.max(...r.rects.map((x) => x.y + x.h))
-      achsR.y = oben
-      achsR.h = Math.max(u.text * 3, unten - oben)
-      // Kästen möglichst auf Höhe ihrer Marke (Maßstab bleibt), ohne sich zu überdecken
-      const gs = Math.min(r.g, aw / 4)
-      const marke = (t: number): number => achsR.y + gs * 0.4 + t * (achsR.h - gs * 1.8)
-      const luft = u.text * 0.5
-      const ys = r.rects.map((q, i) => marke(achse.eintraege[i]?.y ?? 0) - q.h / 2)
-      ys[0] = Math.max(ys[0], oben)
-      for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + r.rects[i - 1].h + luft)
-      const last = ys.length - 1
-      ys[last] = Math.min(ys[last], unten - r.rects[last].h)
-      for (let i = last - 1; i >= 0; i--) ys[i] = Math.min(ys[i], ys[i + 1] - r.rects[i].h - luft)
-      r.rects.forEach((q, i) => (q.y = Math.max(oben, ys[i])))
+/**
+ * Zeitleiste (Nachbesserung 30.09.2026): Ereignisse chronologisch (zeitleiste.ts), eine Marke je
+ * Zeitpunkt – maßstabsgerecht oder gleichabständig. Die Kästen wechseln je Marke die Seite (quer:
+ * oben/unten, hochkant: links/rechts bzw. alle rechts, wenn die Spalten sonst zu schmal würden),
+ * stehen möglichst genau über bzw. neben IHRER Marke und behalten die Reihenfolge – so kreuzt kein
+ * Verbinder einen anderen. Die Jahreszahl steht gegenüber dem Kasten an der Marke.
+ */
+function zeitleiste(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean, wahl: ZeitMassstab): TbElement[] {
+  const ereignisse = ordneEreignisse(inhalt.knoten)
+  const massstab = markenLage(ereignisse, 'massstab')
+  const gleich = markenLage(ereignisse, 'gleich')
+  const zuMarke = gleich.zuMarke
+  const bevorzugt = wahl === 'auto' ? markenLage(ereignisse, 'auto').art : wahl
+  const schritt = Math.min(...inhalt.knoten.map((k) => k.schritt))
+  // Kasten je Marke abwechselnd oben/links (-1) und unten/rechts (1); die Jahreszahl gegenüber
+  const seiteDerMarke = gleich.marken.map((_, i): -1 | 1 => (i % 2 === 0 ? -1 : 1))
+  /**
+   * Achse mit ihren Marken. Maßstabsgerecht, wenn gewünscht – bei „automatisch" nur, wenn die
+   * Jahreszahlen dabei frei bleiben (keine überdeckt eine andere oder liegt im Weg eines Verbinders).
+   */
+  const achse = (kastenSeite: (i: number) => -1 | 1, r: Rechteck, g: number): Achse => {
+    const bau = (marken: Marke[], gleichmaessig: boolean): Achse => {
+      const d: Diagramm = {
+        art: 'zeitstrahl',
+        eintraege: marken.map((m, i) => ({ label: '', wert: m.text, ...(quer ? { x: m.t } : { y: m.t }), seite: (-kastenSeite(i)) as -1 | 1 }))
+      }
+      return { el: diagrammElement(d, r, u, schritt, g), mass: achsenMass(d, r.x, r.y, r.w, r.h, g, u.schrift), d, gleichmaessig, bau: (m) => bau(m, gleichmaessig) }
     }
-    aus.push(diagrammElement(achse, achsR, u, Math.min(...knoten.map((k) => k.schritt)), r.g))
-    ordnung.forEach((o, i) => aus.push(kasten(posten(o.k, u), r.rects[i], r.g, u)))
-    if (!r.passt) u.ueberlauf.push('Die Zeitleiste passt bei Mindestschrift nicht ganz in das Hauptfeld.')
+    if (bevorzugt === 'massstab') {
+      const m = bau(massstab.marken, false)
+      if (wahl === 'massstab' || beschriftungFrei(m.d, m.mass, u.schrift)) return m
+    }
+    return bau(gleich.marken, true)
   }
-  // Jeder Kasten zeigt auf seine Marke
-  const achsEl = aus[0]
-  aus.slice(1, n + 1).forEach((e) => {
-    const t = achse.eintraege[Math.max(0, ordnung.findIndex((o) => o.k.id === e.knoten))]
-    const ax = quer ? achsEl.x + (t.x ?? 0) * achsEl.w : achsEl.x + achsEl.w * 0.5
-    // Hochkant wie im Zeitstrahl gezeichnet (svg.ts: Einzug oben g · 0,4, unten g · 1,4)
-    const gs = Math.min((achsEl.schrift ?? 0) * u.H, (achsEl.w * u.W) / 4)
-    const ay = quer ? achsEl.y + achsEl.h * 0.5 : achsEl.y + (gs * 0.4 + (t.y ?? 0) * (achsEl.h * u.H - gs * 1.8)) / u.H
-    aus.push({ ...verbinder(e, e, '', 'linie'), nach: '', zielPunkt: { x: ax, y: ay } })
+  /*
+   * Ohne Maßstab ist die Lage der Marken frei: Sie rücken an die Mitte IHRES Kastens – so laufen die
+   * Verbinder gerade (senkrecht bzw. waagerecht). Die Reihenfolge bleibt, die Jahreszahlen bleiben frei.
+   */
+  const anKaesten = (a: Achse, kaesten: TbElement[]): Achse => {
+    if (!a.gleichmaessig) return a
+    const laenge = a.mass.a1 - a.mass.a0
+    if (laenge <= 0) return a
+    // Mindestabstand benachbarter Marken: Platz für die Jahreszahl neben dem Verbinder der Nachbarmarke
+    const g = a.mass.g
+    const breiteste = Math.max(...gleich.marken.map((m) => textBreite(m.text, g * 0.85, u.schrift) * 1.06))
+    const mindest = (quer ? breiteste / 2 + g * 0.6 : g * 1.35) / laenge
+    const t: number[] = []
+    gleich.marken.forEach((_, i) => {
+      const e = kaesten[zuMarke.indexOf(i)]
+      const mitte = quer ? (e.x + e.w / 2) * u.W : (e.y + e.h / 2) * u.H
+      t.push(Math.max(i ? t[i - 1] + mindest : 0, Math.min(1, Math.max(0, (mitte - a.mass.a0) / laenge))))
+    })
+    // Reichen die Kästen über das Ende der Achse hinaus, rücken die letzten Marken zusammen
+    for (let i = t.length - 1; i >= 0; i--) t[i] = Math.min(t[i], 1 - (t.length - 1 - i) * mindest)
+    if (t[0] < -1e-9) return a
+    const neu = a.bau(gleich.marken.map((m, i) => ({ ...m, t: t[i] })))
+    return beschriftungFrei(neu.d, neu.mass, u.schrift) ? neu : a
+  }
+  const mitVerbindern = (kaesten: TbElement[], a0: Achse): TbElement[] => {
+    const a = anKaesten(a0, kaesten)
+    return [a.el, ...kaesten, ...kaesten.map((e, j) => ({ ...verbinder(e, a.el, '', 'linie'), marke: zuMarke[j] }))]
+  }
+
+  if (quer) {
+    const oben = ereignisse.map((_, j) => j).filter((j) => seiteDerMarke[zuMarke[j]] < 0)
+    const unten = ereignisse.map((_, j) => j).filter((j) => seiteDerMarke[zuMarke[j]] > 0)
+    const spalten = Math.max(1, oben.length, unten.length)
+    const luft = u.text * 0.8
+    /*
+     * Achse, Abstand und Reihen wachsen mit der Schrift: Wird sie kleiner, schrumpft auch der Streifen
+     * der Achse – der Platz geht an die Kästen (vorher blieb er fest und zwang alles klein).
+     */
+    let g = u.text
+    let ah = 0
+    let ay = 0
+    let abstand = 0
+    let ro: ReturnType<typeof raster> | null = null
+    let ru: ReturnType<typeof raster> | null = null
+    for (let i = 0; i < 30; i++) {
+      ah = g * 3.4
+      ay = z.y + (z.h - ah) / 2
+      abstand = g * 1.1
+      const band = Math.max(g * 2, (z.h - ah) / 2 - abstand)
+      const uu = { ...u, text: g }
+      const reihe = (liste: number[], y: number): ReturnType<typeof raster> =>
+        raster(uu, liste.map((j) => posten(ereignisse[j].knoten, u)), { x: z.x, y, w: z.w, h: band }, [spalten], { x: luft, y: 0 })
+      ro = reihe(oben, z.y)
+      ru = reihe(unten, ay + ah + abstand)
+      const gg = Math.min(ro.g, ru.g)
+      if ((ro.passt && ru.passt && gg >= g - 1e-9) || g <= u.min) {
+        if (gg < g - 1e-9) {
+          // Mindestschrift erreicht: beide Reihen im selben Grad
+          g = gg
+          ro = reihe(oben, z.y)
+          ru = reihe(unten, ay + ah + abstand)
+        }
+        break
+      }
+      g = Math.max(u.min, Math.min(gg, g * 0.94))
+    }
+    if (!ro || !ru) return []
+    const [rOben, rUnten] = [ro, ru]
+    if (!rOben.passt || !rUnten.passt) u.ueberlauf.push('Die Zeitleiste passt bei Mindestschrift nicht ganz in das Hauptfeld.')
+    const a = achse((i) => seiteDerMarke[i], { x: z.x, y: ay, w: z.w, h: ah }, g)
+    const kaesten: TbElement[] = new Array(ereignisse.length)
+    const setzeReihe = (liste: number[], r: ReturnType<typeof raster>, obenBuendig: boolean): void => {
+      if (!liste.length) return
+      const bw = r.rects[0].w
+      // Jeder Kasten möglichst mittig über bzw. unter seiner Marke, Reihenfolge bleibt
+      const x0 = packe(
+        liste.map((j) => markenPunkt(a.mass, a.d, zuMarke[j]).x),
+        liste.map(() => bw),
+        z.x,
+        z.x + z.w,
+        luft
+      )
+      liste.forEach((j, i) => {
+        const h = r.rects[i].h
+        kaesten[j] = kasten(posten(ereignisse[j].knoten, u), { x: x0[i], y: obenBuendig ? ay - abstand - h : ay + ah + abstand, w: bw, h }, g, u)
+      })
+    }
+    setzeReihe(oben, rOben, true)
+    setzeReihe(unten, rUnten, false)
+    return mitVerbindern(kaesten, a)
+  }
+
+  // Hochkant: beidseitig (abwechselnd links/rechts) oder einseitig (alle rechts) – was besser lesbar ist
+  const versuche = [true, false].map((beidseitig) => {
+    let g = u.text
+    let erg: ReturnType<typeof zeitleisteHoch> | null = null
+    for (let i = 0; i < 30; i++) {
+      erg = zeitleisteHoch(u, ereignisse, zuMarke, gleich.marken, z, g, beidseitig ? (i2) => seiteDerMarke[i2] : () => 1, achse)
+      if (erg.passt || g <= u.min) break
+      g = Math.max(u.min, g * 0.94)
+    }
+    return { ...erg!, beidseitig }
   })
-  return aus
+  const trennt = (v: (typeof versuche)[number]): boolean =>
+    v.kaesten.some((e) => trenntWoerter(u, [{ titel: e.titel ?? '', text: e.text, icon: Boolean(e.symbol) }], e.w * u.W, (e.schrift ?? 0) * u.H))
+  const guete = (v: (typeof versuche)[number]): number => (v.passt ? 2 : 0) + (trennt(v) ? 0 : 1)
+  const [bei, ein] = versuche
+  // Gleich gut: beidseitig (abwechselnd), solange die Schrift nicht deutlich kleiner wird
+  const best = guete(bei) !== guete(ein) ? (guete(bei) > guete(ein) ? bei : ein) : bei.g >= ein.g * 0.88 ? bei : ein
+  if (!best.passt) u.ueberlauf.push('Die Zeitleiste passt bei Mindestschrift nicht ganz in das Hauptfeld.')
+  return mitVerbindern(best.kaesten, best.achse)
 }
+
+interface Achse {
+  el: TbElement
+  mass: AchsenMass
+  d: Diagramm
+  /** Gleiche Abstände (kein Maßstab) – die Marken dürfen an die Kästen rücken */
+  gleichmaessig: boolean
+  /** Dieselbe Achse mit anderen Lagen der Marken */
+  bau: (marken: Marke[]) => Achse
+}
+
+/** Eine hochkant gesetzte Zeitleiste bei Schriftgrad g */
+function zeitleisteHoch(
+  u: Umgebung,
+  ereignisse: Ereignis[],
+  zuMarke: number[],
+  marken: Marke[],
+  z: Rechteck,
+  g: number,
+  kastenSeite: (i: number) => -1 | 1,
+  achse: (kastenSeite: (i: number) => -1 | 1, r: Rechteck, g: number) => Achse
+): { kaesten: TbElement[]; achse: Achse; passt: boolean; g: number } {
+  const beidseitig = marken.some((_, i) => kastenSeite(i) < 0)
+  // Breite der Achse: Linie und Jahreszahlen (auf einer oder beiden Seiten), mindestens 4 Schriftgrade
+  const beschriftung = Math.max(g, ...marken.map((m) => textBreite(m.text, g * 0.85, u.schrift) * 1.06))
+  const aw = Math.max(g * 4, beidseitig ? 2 * (beschriftung + g * 0.8) : beschriftung + g * 1.5)
+  const abstand = g * 1.1
+  const bw = beidseitig ? (z.w - aw - 2 * abstand) / 2 : z.w - aw - abstand
+  const ax = beidseitig ? z.x + bw + abstand : z.x
+  const a = achse(kastenSeite, { x: ax, y: z.y, w: aw, h: z.h }, g)
+  const hoehen = ereignisse.map((e) => hoeheBei(u, e.knoten.titel, knotenText(e.knoten, u.stil), bw, g, Boolean(e.knoten.symbol)))
+  const luft = g * 0.5
+  const kaesten: TbElement[] = new Array(ereignisse.length)
+  let passt = bw > g * 4
+  for (const seite of [-1, 1] as const) {
+    const liste = ereignisse.map((_, j) => j).filter((j) => kastenSeite(zuMarke[j]) === seite)
+    if (!liste.length) continue
+    if (liste.reduce((s, j) => s + hoehen[j], 0) + luft * (liste.length - 1) > z.h) passt = false
+    // Jeder Kasten möglichst auf Höhe seiner Marke, Reihenfolge bleibt
+    const y0 = packe(
+      liste.map((j) => markenPunkt(a.mass, a.d, zuMarke[j]).y),
+      liste.map((j) => hoehen[j]),
+      z.y,
+      z.y + z.h,
+      luft
+    )
+    const x = seite < 0 ? z.x : ax + aw + abstand
+    liste.forEach((j, i) => (kaesten[j] = kasten(posten(ereignisse[j].knoten, u), { x, y: y0[i], w: bw, h: hoehen[j] }, g, u)))
+  }
+  return { kaesten, achse: a, passt, g }
+}
+
 
 /**
  * Kreislauf als Ring aus zwei Linien (30.09.2026, Nachbesserung): Quer oben links → rechts, unten
@@ -471,7 +618,11 @@ function zeitleiste(u: Umgebung, inhalt: TbInhalt, z: Rechteck, quer: boolean): 
  */
 function kreislauf(u: Umgebung, inhalt: TbInhalt, z: Rechteck): TbElement[] {
   const zentrum = inhalt.knoten.find((k) => k.rolle === 'zentrum')
-  const stationen = inhalt.knoten.filter((k) => k !== zentrum)
+  // Reihenfolge der Pfeile, nicht der Liste (zeitleiste.ts)
+  const stationen = ordneKreislauf(
+    inhalt.knoten.filter((k) => k !== zentrum),
+    inhalt.beziehungen
+  )
   const n = stationen.length
   if (n < 3) return fluss(u, inhalt, z, z.w > z.h)
   const spalten = z.w < z.h * 1.1 && n >= 5
@@ -526,7 +677,11 @@ function kreislauf(u: Umgebung, inhalt: TbInhalt, z: Rechteck): TbElement[] {
   const el = stationen.map((s, i) => kasten(posten(s, u), lage[i], g, u))
   const aus = [...el]
   if (zentrum && zr && !lage.some((x) => schneidet(x, zr!, 0))) aus.push({ ...kasten(posten(zentrum, u), zr, g, u), rahmen: 'keiner' })
-  el.forEach((e, i) => aus.push(verbinder(e, el[(i + 1) % n], inhalt.beziehungen.find((b) => b.von === e.knoten)?.beschriftung ?? '', 'pfeil')))
+  el.forEach((e, i) => {
+    const naechster = el[(i + 1) % n]
+    const b = inhalt.beziehungen.find((x) => x.von === e.knoten && x.nach === naechster.knoten) ?? inhalt.beziehungen.find((x) => x.von === e.knoten)
+    aus.push(verbinder(e, naechster, b?.beschriftung ?? '', 'pfeil'))
+  })
   return aus
 }
 
@@ -625,6 +780,8 @@ export interface LayoutOptionen {
   regler: Pick<Regler, 'stil'>
   varianten: Varianten
   schrift?: Schriftart
+  /** Zeitleiste: Abstände der Marken */
+  zeitachse?: ZeitMassstab
 }
 
 export interface LayoutErgebnis {
@@ -798,7 +955,7 @@ function setzeEinmal(inhalt: TbInhalt, format: FormatId, o: LayoutOptionen, fakt
           : struktur === 'fluss'
             ? fluss(uu, inhalt, haupt, hauptQuer)
             : struktur === 'zeitleiste'
-              ? zeitleiste(uu, inhalt, haupt, hauptQuer)
+              ? zeitleiste(uu, inhalt, haupt, hauptQuer, o.zeitachse ?? 'auto')
               : struktur === 'kreislauf'
                 ? kreislauf(uu, inhalt, haupt)
                 : struktur === 'frei'

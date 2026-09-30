@@ -149,12 +149,12 @@ export function strukturRegel(meta: Pick<TafelbildMeta, 'struktur'>): string {
     case 'tabelle':
       return 'STRUKTUR: Tabelle/Gegenüberstellung – 2–4 Knoten mit rolle „spalte" (Überschrift = Spaltenkopf), in „aspekte" die Vergleichsaspekte als Zeilen; jede Spalte hat in „punkte" GENAU einen Eintrag je Aspekt in derselben Reihenfolge.'
     case 'fluss':
-      return 'STRUKTUR: Flussdiagramm/Ursache–Wirkung – Knoten in Reihenfolge (rolle „schritt"), Beziehungen als Pfeile mit kurzer Beschriftung („führt zu", „verstärkt").'
+      return 'STRUKTUR: Flussdiagramm/Ursache–Wirkung – Knoten in Reihenfolge von der Ursache zur Folge (rolle „schritt"), Beziehungen als Pfeile in diese Richtung mit kurzer Beschriftung („führt zu", „verstärkt"); möglichst eine Kette, wenige Verzweigungen.'
     case 'zeitleiste':
-      return 'STRUKTUR: Zeitleiste – Knoten mit rolle „ereignis" und Jahreszahl im Feld „zeit"; chronologisch.'
+      return 'STRUKTUR: Zeitleiste – jeder Knoten ein Ereignis (rolle „ereignis") mit genauem, historisch korrektem Datum im Feld „zeit" (Jahr, Tagesdatum wie „9. November 1918", „44 v. Chr.", „15. Jh." oder „vor 66 Mio. Jahren"); titel = Ereignis ohne Datum, punkte = Bedeutung. Knoten chronologisch, „schritt" in zeitlicher Folge.'
     case 'kreislauf':
-      return 'STRUKTUR: Kreislauf – 4–6 Stationen (rolle „schritt") in Umlaufrichtung; optional ein „zentrum" für die Mitte.'
+      return 'STRUKTUR: Kreislauf – 4–6 Stationen (rolle „schritt") in Umlaufrichtung; Beziehungen als Pfeile von jeder Station zur nächsten (die letzte zur ersten); optional ein „zentrum" für die Mitte.'
     default:
-      return 'STRUKTUR: Wähle, was zum Inhalt passt (netz, tabelle, fluss, zeitleiste, kreislauf oder gliederung) und begründe die Wahl in einem Satz (strukturGrund). Die Mindmap NUR bei Ober- und Unterbegriffen.'
+      return 'STRUKTUR: Wähle, was zum Inhalt passt (netz, tabelle, fluss, zeitleiste, kreislauf oder gliederung) und begründe die Wahl in einem Satz (strukturGrund). Die Mindmap NUR bei Ober- und Unterbegriffen. Bei einer Zeitleiste hat jeder Knoten ein genaues Datum im Feld „zeit"; bei einer Tabelle hat jede Spalte genau einen Eintrag je Aspekt.'
   }
 }

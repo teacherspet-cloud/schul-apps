@@ -18,7 +18,8 @@
 //     ohne Überschreiben (auch nach dem Neuladen); die Meldung nennt den Ort und bietet „Teilen".
 //  8. (30.09.2026) Tafelbilder: App öffnen, Beispiel mit der KI-Attrappe erzeugen, ein Element mit
 //     dem FINGER verschieben (Chromium: echte Touch-Ereignisse über CDP; WebKit: Zeigerereignisse
-//     der Art „touch"), Präsentation öffnen und Schritt für Schritt aufdecken.
+//     der Art „touch"), Präsentation öffnen und Schritt für Schritt aufdecken. Seit dem Zoom: Der
+//     Finger rollt und zoomt, verschoben wird erst mit „Mit dem Finger zeichnen" (sonst mit dem Stift).
 import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -300,15 +301,24 @@ async function lauf(name, browserTyp, startOpt) {
     pruefe(erzeugt, `${name}: Tafelbild mit der Attrappe erzeugt`)
     await page.waitForTimeout(800)
     await page.screenshot({ path: join(out, `${name}-6-tafelbild.png`) })
-    // Einen Kasten mit dem Finger verschieben
+    // Stift zeichnet, der Finger rollt und zoomt (30.09.2026): ohne „Mit dem Finger zeichnen" bleibt der Kasten stehen
     const kasten = flaeche.locator('rect.tb-treffer[data-element^="k"]').first()
     const id = await kasten.getAttribute('data-element')
     const xVorher = Number(await kasten.getAttribute('x'))
     const box = await kasten.boundingBox()
     await fingerZiehen(page, name, box.x + box.width / 2, box.y + box.height / 2, 60, 24)
     await page.waitForTimeout(500)
+    const xGerollt = Number(await flaeche.locator(`rect.tb-treffer[data-element="${id}"]`).getAttribute('x'))
+    pruefe(Math.abs(xGerollt - xVorher) < 0.5, `${name}: Der Finger verschiebt ohne „Mit dem Finger zeichnen" nichts (x ${xVorher.toFixed(0)} → ${xGerollt.toFixed(0)})`)
+    // Zoom-Knöpfe auch auf dem Tablet
+    pruefe((await page.locator('.tb-flaechen-rahmen [data-zoom-knoepfe]').filter({ visible: true }).count()) === 1, `${name}: Zoom-Knöpfe an der Zeichenfläche`)
+    // Einen Kasten mit dem Finger verschieben – nach „Mit dem Finger zeichnen"
+    await sichtbar(page.locator('[data-tb-finger]')).click()
+    const box2 = await flaeche.locator(`rect.tb-treffer[data-element="${id}"]`).boundingBox()
+    await fingerZiehen(page, name, box2.x + box2.width / 2, box2.y + box2.height / 2, 60, 24)
+    await page.waitForTimeout(500)
     const xNachher = Number(await flaeche.locator(`rect.tb-treffer[data-element="${id}"]`).getAttribute('x'))
-    pruefe(xNachher > xVorher + 1, `${name}: Kasten mit dem Finger verschoben (x ${xVorher.toFixed(0)} → ${xNachher.toFixed(0)})`)
+    pruefe(xNachher > xVorher + 1, `${name}: Kasten mit dem Finger verschoben, „Mit dem Finger zeichnen" an (x ${xVorher.toFixed(0)} → ${xNachher.toFixed(0)})`)
     await page.screenshot({ path: join(out, `${name}-7-tafelbild-verschoben.png`) })
     // Präsentation: beginnt bei Schritt 1, Pfeil rechts deckt auf, Esc schließt
     await sichtbar(page.locator('[data-tb-praesentieren]')).click()

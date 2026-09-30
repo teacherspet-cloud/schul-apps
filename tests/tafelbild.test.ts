@@ -161,10 +161,11 @@ describe('Layout', () => {
     const z = setzeLayout(inhalt(ALLE.zeitleiste), 'klapptafel', { regler: meta().regler, varianten: meta().varianten }).tafel
     const achse = z.elemente.find((e) => e.diagramm?.art === 'zeitstrahl')!
     const xs = achse.diagramm!.eintraege.map((e) => e.x!)
-    // 1789 → 0, 1799 → 1, 1791 → 0,2
+    // Eine Marke je Zeitpunkt (zweimal 1789 = eine Marke): 1789 → 0, 1799 → 1, 1791 → 0,2
+    expect(xs).toHaveLength(4)
     expect(xs[0]).toBe(0)
     expect(xs[xs.length - 1]).toBe(1)
-    expect(xs[2]).toBeCloseTo(0.2, 5)
+    expect(xs[1]).toBeCloseTo(0.2, 5)
     expect(jahrAus('44 v. Chr.')).toBe(-44)
     expect(jahrAus('15. Jh.')).toBe(1450)
   })
