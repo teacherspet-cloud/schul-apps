@@ -41,7 +41,7 @@ import { hoerenIstPruefgegenstand } from '../../didactics/audioRules'
 import { plainText } from '../../../../shared/richtext/parse'
 import { estimateSeconds } from '../../generation/convert'
 import { BLOCK_LABELS, dupliziereBaustein, istLeer, newBlock } from '../../model/factory'
-import { anredeFuerMeta } from '../../didactics/anrede'
+import { anredeFuerMeta, anweisungenDeutsch } from '../../didactics/anrede'
 import type { SeitenVorschlag, TaskBlock, Worksheet, WsBlock, WsBlockType } from '../../model/types'
 import { serializeWorksheet, WORKSHEET_FILTER } from '../../project'
 import { BausteinRahmen } from '../../render/BausteinRahmen'
@@ -78,6 +78,8 @@ import { addVersion, switchVersion } from '../../model/versions'
 import { seitenAbweichung, seitenVorgabe } from '../../didactics/seiten'
 import { bildBausteine, lokaleVorschlaegeAnwenden, lokalUmsetzbar, schreibraumBausteine, vorschlagKurz } from '../../didactics/seitenAktionen'
 import SeitenHinweis from '../SeitenHinweis'
+import OperatorformHinweis from '../../../../shared/components/OperatorformHinweis'
+import { operatorformBefunde, operatorformenUmsetzen } from '../../../../shared/operatorformen'
 import { browserSourceServices, completeOriginalSources } from '../../generation/originalSources'
 import { browserWorksheetImageDeps } from '../../generation/browserImages'
 import { completeWorksheetImages } from '../../generation/worksheetImages'
@@ -764,6 +766,17 @@ export function EditorStep(): React.JSX.Element {
                 />
               </FitToWidth>
             </>
+          )}
+          {/* Operatoren in falscher Satzstellung („Zusammenfassen Sie …“), 01.10.2026 – auch in älteren Blättern */}
+          {view === 'student' && !key && (
+            <OperatorformHinweis
+              befunde={operatorformBefunde(ws.sheets, anweisungenDeutsch(ws.meta))}
+              onUmsetzen={() =>
+                update((w) => {
+                  for (const s of w.sheets) operatorformenUmsetzen(s.blocks)
+                })
+              }
+            />
           )}
           {view === 'student' && abweichung && !seitenAus.includes(abweichungsSchluessel) && (
             <SeitenHinweis

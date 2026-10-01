@@ -25,6 +25,7 @@
  */
 import { BESTAND } from './zugriff'
 import type { Listensprache } from './typen'
+import { operatorFormfehler, type Formfehler } from './satzbau'
 
 export type ErkennungsSprache = Listensprache
 
@@ -41,6 +42,11 @@ export interface OperatorTreffer {
   /** Zeichenposition im bereinigten Text */
   position: number
   art: 'verb' | 'getrennt' | 'wendung' | 'nomen'
+  /**
+   * Der Operator steht da, aber sprachlich falsch gebildet („Zusammenfassen Sie …"): die
+   * richtige Form als Muster („Fassen Sie … zusammen"). Fehlt bei korrekten Formen.
+   */
+  falscheForm?: string
 }
 
 export const nameVon = (a: OperatorAngabe): string => (typeof a === 'string' ? a : 'operator' in a ? a.operator : a.name)
@@ -513,6 +519,14 @@ export function findeOperatoren(text: string, liste: OperatorAngabe[], opt: Erke
       art: k.art
     })
   }
+  // Falsch gebildete Formen („Zusammenfassen Sie") zählen als Fundstelle, sind aber nicht korrekt (01.10.2026, satzbau.ts)
+  if (out.length && sprache === 'de') {
+    const fehler = operatorFormfehler(bereinigterText(text))
+    for (const t of out) {
+      const f = fehler.find((x) => x.position === t.position)
+      if (f) t.falscheForm = f.richtig
+    }
+  }
   if (out.length || opt.nomen === false || sprache !== 'de') return out
   // Rückfall: Substantivierung („Verfasse eine Stellungnahme"), nur wenn kein Verb der Liste dasteht
   for (const x of woerter) {
@@ -669,30 +683,38 @@ export function naechsterOperator(operator: string, liste: OperatorAngabe[]): st
   return best?.name ?? null
 }
 
-export type AnweisungsBefund =
+export type AnweisungsBefund = (
   | { art: 'operator'; treffer: OperatorTreffer[] }
   | { art: 'fremd'; form: string; operator: string; vorschlag: string | null }
   | { art: 'keiner' }
+) & {
+  /** Sprachlich falsch gebildete Operatorformen mit Korrektur („Zusammenfassen Sie" → „Fassen Sie … zusammen") */
+  formfehler: Formfehler[]
+}
 
 /**
  * Prüft eine Aufgabenstellung gegen DIE Liste (Land, Fach, Stufe, Schulform):
  *   „operator" – mindestens ein Operator der Liste steht da
  *   „fremd"    – ein Operator anderer Listen steht da, aber keiner dieser Liste („kein Operator der Landesliste")
  *   „keiner"   – gar kein erkennbarer Operator
+ * Dazu in jedem Fall `formfehler`: sprachlich falsch gebildete Formen mit Korrektur – sie werden
+ * gemeldet, nicht als korrekt durchgelassen.
  */
 export function pruefeAnweisung(text: string, liste: OperatorAngabe[], opt: ErkennungsOptionen & { zusaetzlich?: string[] } = {}): AnweisungsBefund {
-  const treffer = findeOperatoren(text, liste, opt)
-  if (treffer.length) return { art: 'operator', treffer }
   const sprache = opt.sprache ?? 'de'
+  const formfehler = operatorFormfehler(text, sprache)
+  const treffer = findeOperatoren(text, liste, opt)
+  if (treffer.length) return { art: 'operator', treffer, formfehler }
   const anderswo = ersterOperator(text, [...alleBekanntenOperatoren(sprache), ...(opt.zusaetzlich ?? [])], { ...opt, nomen: false })
   if (anderswo)
     return {
       art: 'fremd',
       form: anderswo.form,
       operator: anderswo.operator,
-      vorschlag: naechsterOperator(anderswo.operator, liste)
+      vorschlag: naechsterOperator(anderswo.operator, liste),
+      formfehler
     }
-  return { art: 'keiner' }
+  return { art: 'keiner', formfehler }
 }
 
 /** Steht dieses Wort als Operator in einer deutschen Liste? (Deutsche Entsprechungen in Fremdsprachenlisten erkennen) */

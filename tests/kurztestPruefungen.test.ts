@@ -159,7 +159,8 @@ describe('Hineingezogene Unterlagen', () => {
   it('deckelt sehr lange Unterlagen', () => {
     // Ein ganzes Schulbuchkapitel würde den Auftrag sprengen und die Aufgabe verwässern
     const lang = quelle({ text: 'x'.repeat(20000), kind: 'pdf' })
-    expect(kurztestPrompt(mitQuellen([lang]), '').length).toBeLessThan(12000)
+    // Gemessen wird der Zuwachs durch die Unterlage – der übrige Auftrag darf wachsen (Satzbau-Regel 01.10.2026)
+    expect(kurztestPrompt(mitQuellen([lang]), '').length - kurztestPrompt(mitQuellen([]), '').length).toBeLessThan(7000)
   })
 })
 

@@ -5,6 +5,7 @@ import type { Stars } from '../didactics/differentiation'
 import { emptyAnswer } from '../model/factory'
 import { sanitizeDiagram } from '../model/diagram'
 import { anredeText, type Anrede } from '../../../shared/anrede'
+import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { defaultAxes, gridDefaults, sanitizeAxes } from '../model/grid'
 import type {
   Afb,
@@ -47,7 +48,7 @@ export function estimateSeconds(transcript: string): number {
 
 function convertBrief(b: any): TaskBrief {
   return {
-    situation: text(b?.situation),
+    situation: satzbau(text(b?.situation)),
     audience: text(b?.audience),
     textType: text(b?.textType),
     purpose: text(b?.purpose),
@@ -193,6 +194,13 @@ export function convertAnswer(a: any, rng: Rng): Answer {
  * „auto" und alles Unbekannte bleiben leer – dann entscheidet die App wie bisher nach der
  * Rolle des Bildes. Nur eine ausdrückliche Angabe wird übernommen.
  */
+/**
+ * Operatoren in korrekter Satzstellung (01.10.2026): KI-Ausgaben wie „Zusammenfassen Sie anhand
+ * von M1 …" werden zu „Fassen Sie anhand von M1 … zusammen" – nur die Stellung, nie der Inhalt.
+ * Gilt für jede Erzeugung, Überarbeitung und Reparatur, weil alle über convertBlock laufen.
+ */
+const satzbau = (t: string): string => korrigiereOperatorformen(t).text
+
 const seite = (v: unknown): 'left' | 'right' | 'none' | undefined => (v === 'left' || v === 'right' || v === 'none' ? v : undefined)
 
 export function convertBlock(
@@ -321,7 +329,7 @@ export function convertBlock(
       return {
         ...base,
         type,
-        instruction: text(b.instruction),
+        instruction: satzbau(text(b.instruction)),
         operator: text(b.operator),
         afb: afbOf(b.afb),
         afbReason: text(b.afbReason),
@@ -334,7 +342,7 @@ export function convertBlock(
           .filter((p: any) => text(p?.instruction))
           .map((p: any) => ({
             id: newId(rng),
-            instruction: text(p.instruction),
+            instruction: satzbau(text(p.instruction)),
             answer: convertAnswer(p.answer, rng),
             solution: text(p.solution),
             ...(stufeAus(p.stufe) ? { stufe: stufeAus(p.stufe) } : {}),

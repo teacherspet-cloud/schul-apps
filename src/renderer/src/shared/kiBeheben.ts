@@ -90,6 +90,8 @@ export function reparaturAuftrag(hinweise: string[], k: ReparaturKontext): strin
       '- Fehlt etwas (Material, Ausgangstext, Mustertext, Erwartungshorizont, Lösung, Hilfsblatt), baue es nach und füge es an der passenden Stelle ein oder ergänze den Baustein.',
       '- Stimmt ein Verweis oder eine Nummerierung nicht, passe die Aufgabe an das vorhandene Material an (die App nummeriert Material selbst als M1, M2 … in der Reihenfolge der Bausteine; schreibe keine Nummern in Titel).',
       '- Passt eine Formulierung nicht (Anrede, Operator, Sprache, Wortzahl), formuliere den Baustein um und behalte Inhalt, Anforderungsbereich und Antwortform bei.',
+      // 01.10.2026: Aus „‚fassen' steht nicht in der Liste – nächstliegend ‚zusammenfassen'" machte die KI „Zusammenfassen Sie …"
+      '- Ein Operator wird nie im Infinitiv vorangestellt, sondern als korrekt gebildeter Imperativ in den Satz eingebaut: trennbare Verben mit der Vorsilbe am Satzende („Fassen Sie … zusammen", „Arbeite … heraus", „Setzen Sie sich mit … auseinander", „Nehmen Sie … Stellung"); FALSCH ist „Zusammenfassen Sie …".',
       `- Ändere höchstens ${MAX_AENDERUNGEN} Bausteine. Alles, was der Hinweis nicht betrifft, bleibt wörtlich, wie es ist.`,
       '- art: "ersetzen" (Baustein mit dieser Nummer durch den neuen ersetzen), "davor"/"danach" (neuen Baustein vor/nach dieser Nummer einfügen), "entfernen" (Baustein streichen; block leer lassen).',
       '- Liefere jeden geänderten oder neuen Baustein VOLLSTÄNDIG, nicht nur die geänderte Stelle.',

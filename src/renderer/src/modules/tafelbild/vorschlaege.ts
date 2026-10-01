@@ -10,6 +10,7 @@
  *   Gliederung, übernommene Anordnung): Schritte eines Ablaufs, Stationen eines Kreislaufs,
  *   Ereignisse einer Zeitleiste und Spalten einer Gegenüberstellung bleiben getrennt.
  */
+import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { worte, type TbInhalt, type TbKnoten, type TbVorschlag } from './model'
 
 const ZUSAMMENFASSBAR: TbInhalt['struktur'][] = ['netz', 'gliederung', 'frei']
@@ -67,5 +68,32 @@ export function zusammenfassen(inhalt: TbInhalt): TbInhalt | null {
 /** Kurzer Name eines Vorschlags – für das Kreismenü */
 export const VORSCHLAG_NAMEN: Record<TbVorschlag, { label: string; titel: string }> = {
   kiKuerzen: { label: 'Text kürzen (KI)', titel: 'Die KI kürzt die Kästen mit zu kleiner Schrift; danach werden alle Formate neu gesetzt.' },
-  zusammenfassen: { label: 'Elemente zusammenfassen', titel: 'Die zwei kürzesten benachbarten Aspekte werden ein Kasten – ohne KI, mit Strg+Z rückgängig.' }
+  zusammenfassen: { label: 'Elemente zusammenfassen', titel: 'Die zwei kürzesten benachbarten Aspekte werden ein Kasten – ohne KI, mit Strg+Z rückgängig.' },
+  satzbau: { label: 'Satzstellung korrigieren', titel: 'Operatoren als korrekter Imperativ („Fassen Sie … zusammen") – ohne KI, mit Strg+Z rückgängig.' }
+}
+
+/**
+ * Operatoren in falscher Satzstellung (01.10.2026, „Zusammenfassen Sie …"): Texte der Tafeln und
+ * Arbeitsauftrag/Hausaufgabe des Inhalts korrigieren – an Ort und Stelle (Entwurf des Stores).
+ * Liefert die Zahl der geänderten Texte.
+ */
+export function satzbauKorrigieren(t: { tafeln: { elemente: { text: string; titel?: string }[] }[]; inhalt: TbInhalt | null }): number {
+  let n = 0
+  const korr = (s: string | undefined): string | undefined => {
+    if (!s) return s
+    const neu = korrigiereOperatorformen(s).text
+    if (neu !== s) n++
+    return neu
+  }
+  for (const x of t.tafeln)
+    for (const e of x.elemente) {
+      e.text = korr(e.text) ?? e.text
+      if (e.titel) e.titel = korr(e.titel)
+    }
+  if (t.inhalt) {
+    t.inhalt.impuls = korr(t.inhalt.impuls) ?? ''
+    t.inhalt.hausaufgabe = korr(t.inhalt.hausaufgabe) ?? ''
+    for (const s of t.inhalt.schritte) s.impuls = korr(s.impuls) ?? ''
+  }
+  return n
 }

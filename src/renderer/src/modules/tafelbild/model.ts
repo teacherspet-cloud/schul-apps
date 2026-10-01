@@ -274,7 +274,7 @@ export interface TafelbildMeta {
  * Vorschläge, die die App zu einem Befund mit einem Klick umsetzt („Vorschlag der App umsetzen",
  * wie im Arbeitsblatt): KI kürzt die betroffenen Kästen bzw. die App fasst zwei Kästen zusammen.
  */
-export type TbVorschlag = 'kiKuerzen' | 'zusammenfassen'
+export type TbVorschlag = 'kiKuerzen' | 'zusammenfassen' | 'satzbau'
 
 export interface Befund {
   format?: FormatId

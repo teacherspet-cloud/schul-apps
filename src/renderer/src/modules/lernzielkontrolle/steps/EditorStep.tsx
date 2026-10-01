@@ -38,6 +38,9 @@ import { mitThemenbereich } from '../../../shared/ueberthema'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { AlleBehebenKnopf, KiBehebenKnopf } from '../../../shared/components/KiBeheben'
 import { befundBehebbar, befundeBeheben, bausteinNachWunschAuftrag } from '../beheben'
+import OperatorformHinweis from '../../../shared/components/OperatorformHinweis'
+import { operatorformBefunde, operatorformenUmsetzen } from '../../../shared/operatorformen'
+import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
 import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
 
@@ -145,6 +148,8 @@ export default function EditorStep(): React.JSX.Element {
   )?.name
   const ws = useMemo(() => (test ? mitThemenbereich(kurztestToWorksheet(test, variante, schwellen), bereich) : null), [test, variante, schwellen, bereich])
   const befunde = useMemo(() => (test ? pruefeKurztest(test, variante) : []), [test, variante])
+  // Operatoren in falscher Satzstellung („Zusammenfassen Sie …“), 01.10.2026
+  const formen = useMemo(() => (ws && !loesung ? operatorformBefunde(ws.sheets, anweisungenDeutsch(ws.meta)) : []), [ws, loesung])
   // „Mit KI beheben" (Paket 12): laufende Reparaturen dieser Kontrolle
   const docId = useLernzielkontrolle((s) => s.docId)
   const laufend = useLaufendeSchluessel(docId)
@@ -408,6 +413,14 @@ export default function EditorStep(): React.JSX.Element {
             </Accordion>
           )}
 
+          <OperatorformHinweis
+            befunde={formen}
+            onUmsetzen={() =>
+              update((d) => {
+                for (const v of d.varianten) operatorformenUmsetzen(v.blocks)
+              })
+            }
+          />
           {loesung && schluesselHerkunft(test, schwellen) && (
             <Alert color="gray" icon={<IconInfoCircle size={15} />} mb="sm" p="xs">
               <Text size="xs">Notenschlüssel: {schluesselHerkunft(test, schwellen)}</Text>

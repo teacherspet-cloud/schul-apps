@@ -107,7 +107,7 @@ export function abiturRegeln(meta: WorksheetMeta): string {
     '',
     'AUFGABENSTELLUNG:',
     '- Wenige, aber komplexe Arbeitsanweisungen. Ein unzusammenhängendes Reihen von Einzelfragen ist nicht zulässig (EPA Geschichte).',
-    '- Jede Teilaufgabe beginnt mit dem Operator und nennt das Material, auf das sie sich bezieht.',
+    '- Jede Teilaufgabe beginnt mit dem Operator und nennt das Material, auf das sie sich bezieht. Der Operator steht als korrekt gebildeter Imperativ – trennbare Verben mit der Vorsilbe am Satzende („Fassen Sie … zusammen", „Arbeiten Sie … heraus", „Ordnen Sie … ein"), nie „Zusammenfassen Sie …".',
     '- Die Teilaufgaben ergeben ein zusammenhängendes Ganzes; erkennbar ist, welche den Schwerpunkt bildet.',
     '',
     'ERWARTUNGSHORIZONT:',

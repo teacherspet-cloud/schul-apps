@@ -13,6 +13,7 @@
  * startet stelleAuftrag.ts.
  */
 import type { StructuredRequest } from '@shared/types'
+import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { ersetzeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
 import { einstufungVon, hatForm, kriterienEinstufen, vorschlag, type SkalenKontext } from './art'
@@ -306,7 +307,7 @@ export function stelleAus(daten: unknown, r: Rueckmeldung, a: Abgabe, s: Stelle,
   if (s.art === 'schluss' || mit('schluss')) roh.schluss = text(d.schluss) || undefined
   if (s.art === 'ueberarbeitung' || mit('ueberarbeitung')) {
     const u = (d.ueberarbeitung ?? {}) as Record<string, unknown>
-    if (text(u.auftrag)) roh.ueberarbeitung = { zitat: text(u.zitat), auftrag: text(u.auftrag) }
+    if (text(u.auftrag)) roh.ueberarbeitung = { zitat: text(u.zitat), auftrag: korrigiereOperatorformen(text(u.auftrag)).text }
   }
   if (s.art === 'rand') {
     const k = (d.rand ?? {}) as Record<string, unknown>

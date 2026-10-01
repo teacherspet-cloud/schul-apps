@@ -17,6 +17,7 @@
  */
 
 import { DOPPELDEUTIG, duImperativFormen, NACH_NOMEN } from './anredeVerben'
+import { operatorSatzbauRegel } from '@shared/operatoren/satzbau'
 
 export type Anrede = 'du' | 'sie'
 
@@ -32,10 +33,18 @@ export const anredeFuerStufe = (stufe: 'primar' | 'sek1' | 'sek2'): Anrede => (s
  * Beispiel zweimal zu führen, sagt der Auftrag ausdrücklich, dass sie umzuformen sind.
  */
 export function anredeRegel(anrede: Anrede): string {
+  return [anredeRegelText(anrede), operatorSatzbauRegel(anrede)].join('\n')
+}
+
+/*
+ * Satzbau der Operatoren (01.10.2026): Beim Umformen in die Sie-Form entstand „Zusammenfassen Sie
+ * anhand von M1 …". Die Regel mit Beispielen trennbarer Verben steht deshalb immer bei der Anrede.
+ */
+function anredeRegelText(anrede: Anrede): string {
   return anrede === 'sie'
     ? [
         'ANREDE (verbindlich, Sekundarstufe II): Deutschsprachige Arbeitsanweisungen, Hilfen, Tipps und Hinweise für die Lernenden stehen in der Sie-Form – „Erläutern Sie …", „Lesen Sie M1 und …", „Begründen Sie Ihre Antwort."',
-        '- Beispiele in diesem Auftrag, die in der du-Form stehen („Erkläre …", „Kreuze an …"), überträgst du in die Sie-Form.',
+        '- Beispiele in diesem Auftrag, die in der du-Form stehen („Erkläre …", „Kreuze an …"), überträgst du in die Sie-Form',
         '- Wörtliche Zitate, Quellentexte, Rollentexte, Dialoge und Mustertexte behalten ihre eigene Anrede. Fremdsprachige Arbeitsanweisungen folgen den Gepflogenheiten ihrer Sprache.'
       ].join('\n')
     : [

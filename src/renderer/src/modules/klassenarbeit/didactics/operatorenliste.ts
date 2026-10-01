@@ -16,7 +16,7 @@ import type { InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/
 import type { AnlageWunsch } from '@shared/operatoren/zugriff'
 import { anlageFuer, operatorenAuswahl } from '@shared/operatoren/zugriff'
 import type { Listensprache, OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
-import { enthaeltOperatorForm } from '@shared/operatoren/erkennung'
+import { enthaeltOperatorForm, findeOperatoren } from '@shared/operatoren/erkennung'
 import { upperSecondary } from '../generation/generateExam'
 import { alleFassungen } from '../model/fassungen'
 import type { Exam } from '../model/types'
@@ -117,21 +117,24 @@ export function operatorenDerArbeit(exam: Exam): string[] {
 }
 
 /** Jeder Operator mit dem Teil, in dem er zuerst vorkommt (für den Kompetenzbereich) */
-export function operatorVorkommen(exam: Exam): { op: string; formatId: string }[] {
-  const out: { op: string; formatId: string }[] = []
+export function operatorVorkommen(exam: Exam): { op: string; formatId: string; text: string }[] {
+  const out: { op: string; formatId: string; text: string }[] = []
   const gesehen = new Set<string>()
   for (const part of exam.parts)
     for (const liste of alleFassungen(part))
       for (const b of liste) {
         if (b.type !== 'task') continue
         const t = b as TaskBlock
-        for (const roh of [operatorAusAnweisung(t.instruction) || t.operator, ...t.parts.map((x) => operatorAusAnweisung(x.instruction))]) {
+        for (const [roh, text] of [
+          [operatorAusAnweisung(t.instruction) || t.operator, t.instruction],
+          ...t.parts.map((x) => [operatorAusAnweisung(x.instruction), x.instruction])
+        ]) {
           const op = normal(roh ?? '')
           const bereich = kompetenzbereichFuer(part.formatId) ?? ''
           const k = `${op}|${bereich}`
           if (!op || gesehen.has(k)) continue
           gesehen.add(k)
-          out.push({ op, formatId: part.formatId })
+          out.push({ op, formatId: part.formatId, text: text ?? '' })
         }
       }
   return out
@@ -153,12 +156,18 @@ export function operatorenBefund(exam: Exam): OperatorenBefund {
   const gueltig = liste.operatoren.filter((d) => !d.nurFaecher?.length || d.nurFaecher.includes(fach))
   const gefunden: OperatorDefinition[] = []
   const fehlend: string[] = []
-  for (const { op, formatId } of operatorVorkommen(exam)) {
+  for (const { op, formatId, text } of operatorVorkommen(exam)) {
     const bereich = kompetenzbereichFuer(formatId)
     // Zuerst im Kompetenzbereich des Teils, sonst irgendwo in der Liste
     const treffer =
       gueltig.find((d) => passt(op, d, liste.sprache) && (!bereich || !d.kompetenzbereich || d.kompetenzbereich === bereich)) ??
-      gueltig.find((d) => passt(op, d, liste.sprache))
+      gueltig.find((d) => passt(op, d, liste.sprache)) ??
+      /*
+       * Nur ein Teil fett („**Fassen** Sie … zusammen" → „fassen"): der ganze Satz über die gemeinsame
+       * Erkennung (01.10.2026). Sonst stand „fassen" als fehlende Definition da – und eine Reparatur
+       * setzte „Zusammenfassen Sie" an den Satzanfang.
+       */
+      gueltig[findeOperatoren(text, gueltig, { sprache: liste.sprache, nomen: false })[0]?.index ?? -1]
     if (!treffer) {
       if (!fehlend.includes(op)) fehlend.push(op)
     } else if ((treffer.definition || treffer.beispiele?.length) && !gefunden.includes(treffer)) gefunden.push(treffer)

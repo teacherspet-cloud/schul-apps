@@ -10,6 +10,7 @@
  * Nur für die Lehrkraft: Der Verlauf erscheint nie auf den Blättern der Lernenden.
  */
 import type { StructuredRequest } from '@shared/types'
+import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { distribute } from '../../modules/klassenarbeit/model/types'
 import { arr, int, obj, str } from '../aiSchema'
 import { kiMetaTag, type KiHerkunft } from '@shared/kiKennzeichnung'
@@ -124,7 +125,7 @@ export function verlaufsAnfrage(system: string, material: string, dauer: number,
       `- Die Minuten aller Phasen ergeben zusammen GENAU ${dauer}.`,
       '- Sozialformen abwechseln, wo es der Sache dient; keine Methode um ihrer selbst willen.',
       // Praxislauf 28.09.2026: Die KI schrieb ganze Aufgabentexte samt AFB-Begründung in die Spalte
-      '- „geschehen" ist eine Planungsnotiz, kein Abschrieb: höchstens vier Stichpunkte je Phase, jeder unter 20 Wörtern. Aufgaben nur mit Nummer und Operator nennen („Aufgabe 2: Untersuchen"), NICHT ihren Wortlaut, keine AFB-Begründungen und keine Erwartungshorizonte abschreiben.',
+      '- „geschehen" ist eine Planungsnotiz, kein Abschrieb: höchstens vier Stichpunkte je Phase, jeder unter 20 Wörtern. Aufgaben nur mit Nummer und Operator nennen („Aufgabe 2: Untersuchen"; Arbeitsaufträge an die Klasse als korrekter Imperativ, trennbare Verben mit der Vorsilbe am Ende: „Fassen Sie … zusammen"), NICHT ihren Wortlaut, keine AFB-Begründungen und keine Erwartungshorizonte abschreiben.',
       // Einstiegsimpulse nach den recherchierten Regeln (recherche/einstiegsimpulse-2026-10-01.md)
       impulsRegeln(lerngruppe, dauer),
       wunsch ? `WÜNSCHE DER LEHRKRAFT (umsetzen): ${wunsch}` : '',
@@ -149,7 +150,8 @@ export function verlaufAus(daten: unknown, dauer: number): Stundenverlauf {
         id: neueId(),
         phase: String(p.phase).trim(),
         minuten: Math.max(1, Math.round(Number(p.minuten) || 1)),
-        geschehen: String(p.geschehen ?? '').trim(),
+        // Arbeitsaufträge in korrekter Satzstellung („Fassen Sie … zusammen", nie „Zusammenfassen Sie") – 01.10.2026
+        geschehen: korrigiereOperatorformen(String(p.geschehen ?? '').trim()).text,
         sozialform: String(p.sozialform ?? '').trim(),
         medien: String(p.medien ?? '').trim()
       })

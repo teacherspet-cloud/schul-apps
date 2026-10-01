@@ -10,6 +10,9 @@ import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { meldeAblage } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
+import OperatorformHinweis from '../../../shared/components/OperatorformHinweis'
+import { operatorformBefunde, operatorformenUmsetzen } from '../../../shared/operatorformen'
+import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from '../../arbeitsblatt/render/SheetPages'
 import { buildWorksheetHtml } from '../../arbeitsblatt/render/printHtml'
@@ -88,6 +91,8 @@ export default function TestEditorStep(): React.JSX.Element {
   ])
   // Anrede der Lernenden am angezeigten Test prüfen – auch nach Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (ws ? anredeBefunde(ws.meta, ws.sheets) : []), [ws])
+  // Operatoren in falscher Satzstellung („Zusammenfassen Sie …“), 01.10.2026
+  const formen = useMemo(() => (ws ? operatorformBefunde(ws.sheets, anweisungenDeutsch(ws.meta)) : []), [ws])
   const docId = useGrammatiktest((s) => s.docId)
   const laufend = useLaufendeSchluessel(docId)
   // Strg+P druckt wie der Knopf „Drucken"; vor dem frühen return, weil es ein Hook ist
@@ -265,6 +270,17 @@ export default function TestEditorStep(): React.JSX.Element {
                 // Paket 12: „Mit KI beheben" – ein kleiner Auftrag, Ergebnis als ein Rückgängig-Schritt
                 onBeheben={(liste) => testHinweiseBeheben(test, docId, liste)}
                 laeuft={laufend.has('beheben')}
+              />
+            )}
+            {!key && (
+              <OperatorformHinweis
+                befunde={formen}
+                onUmsetzen={() =>
+                  update((d) => {
+                    operatorformenUmsetzen(d.blocks)
+                    if (d.blocksB) operatorformenUmsetzen(d.blocksB)
+                  })
+                }
               />
             )}
             <FitToWidth className="ws-editor-pages">

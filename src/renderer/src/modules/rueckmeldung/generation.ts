@@ -6,6 +6,7 @@ import { antwortSpracheAus, type AntwortSprache } from './antwortSprache'
 import { fremdsprachlich, gesamtAusTeilen, getrennt, teileAusArbeit, teilZeile, wertungenAusKi, type BewertungsTeil, type TeilWertung } from './teilbewertung'
 import { deutschMoeglich, pruefeZielsprache, zielsprachHinweis } from './sprachErkennung'
 import type { StructuredRequest } from '@shared/types'
+import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { ersetzeNamen, findeNamen, type Zuordnung } from '@shared/pseudonymisierung'
 import { arr, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
 import { describeBlock, describeSheet } from '../arbeitsblatt/generation/describe'
@@ -405,7 +406,9 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       ? `- Korrekturrand (29.09.2026: Fehler zuverlässig markieren): JEDEN Rechtschreib-, Grammatik-, Zeichensetzungs- und Wortfehler einzeln markieren – art „fehler", Zitat = nur das fehlerhafte Wort bzw. die kurze Wortgruppe, Text = Korrekturzeichen-Bedeutung knapp und die VERBESSERUNG (z. B. „dargestellt"). Keinen Fehler auslassen, auch wenn es viele sind (bis zu 60 Kommentare); bei Wiederholung desselben Fehlers jede Stelle markieren. Zusätzlich 2–5 Kommentare mit Lob bzw. inhaltlichen Hinweisen. Reihenfolge wie im Text. Das Zitat steht WÖRTLICH so in der Arbeit (mit dem Fehler).${zeichenListe.length ? ` Korrekturzeichen NUR aus dieser Liste (bei Lob und Hinweisen leer): ${zeichenListe.join('; ')}.` : ''}`
       : '',
     scan ? '- Die Arbeit liegt auch als Bild bei: Gib für jeden Randkommentar Seite und ungefähre Lage (x, y in Prozent) der Stelle im Bild an.' : '',
-    hatForm(m, 'ueberarbeitung') ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag.' : '',
+    hatForm(m, 'ueberarbeitung')
+      ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag – als korrekt gebildeter Imperativ, trennbare Verben mit der Vorsilbe am Satzende („Formuliere den Satz um", „Fassen Sie den Absatz zusammen", nie „Zusammenfassen Sie").'
+      : '',
     '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.',
     ...sprachRegeln(r, a, art !== 'keine'),
     ...abgabeRegeln(r, a)
@@ -672,7 +675,8 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
     }
     if (hatForm(m, 'ueberarbeitung')) {
       const u = (d.ueberarbeitung ?? {}) as Record<string, unknown>
-      if (text(u.auftrag)) bogen.ueberarbeitung = { zitat: text(u.zitat), auftrag: text(u.auftrag) }
+      // Operatoren in korrekter Satzstellung („Fassen Sie … zusammen", nie „Zusammenfassen Sie") – 01.10.2026
+      if (text(u.auftrag)) bogen.ueberarbeitung = { zitat: text(u.zitat), auftrag: korrigiereOperatorformen(text(u.auftrag)).text }
     }
     if (m.elternfassung && text(d.eltern)) bogen.eltern = text(d.eltern)
     // Die Kappung steht auch bei den Hinweisen für die Lehrkraft (einmal, auch wenn Tabelle und Teile gedeckelt wurden)

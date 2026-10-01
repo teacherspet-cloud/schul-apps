@@ -60,7 +60,7 @@ export function contextRules(meta: WorksheetMeta): string {
      */
     'DIE SITUATION STEHT GENAU EINMAL. Teile dir die Arbeit so auf:',
     `- brief.situation: die Lage – wer du bist, was der Anlass ist, an wen der Text geht. Zwei bis drei Sätze auf ${target}. Das ist der Vorspann auf dem Blatt.`,
-    `- instruction: der AUFTRAG. Beginnt mit dem Operator, nennt die Textsorte und was inhaltlich zu leisten ist. EIN Satz, höchstens zwei.`,
+    `- instruction: der AUFTRAG. Beginnt mit dem Operator als korrekt gebildetem Imperativ der Sprache (trennbare deutsche Verben mit der Vorsilbe am Satzende: „Fasse … zusammen"), nennt die Textsorte und was inhaltlich zu leisten ist. EIN Satz, höchstens zwei.`,
     '- Die Arbeitsanweisung nennt das Material, auf das sie sich bezieht. Verweise über die Kennung des Materials („… based on M{text}", „… mit Hilfe von M{tabelle} und M{bild}"; jeder Materialbaustein trägt sie in „ref") – die App setzt daraus die Nummern M1, M2 …; verweise nur auf Material, das es gibt.',
     '- Die Arbeitsanweisung wiederholt die Situation NICHT. Sie greift sie höchstens mit einem Halbsatz auf („In your article, …"), nennt aber nicht noch einmal Rolle, Anlass und Adressat.',
     '- Muster für das Zusammenspiel: brief.situation = „You are a member of your school website’s editorial team. Your British partner school is preparing a Shakespeare festival and wants to learn how German theatre reinterprets Macbeth." · instruction = „Write an article for your school website presenting the Hohenbrück production, and consider what makes it relevant for young audiences."',

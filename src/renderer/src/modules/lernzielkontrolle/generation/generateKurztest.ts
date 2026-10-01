@@ -61,7 +61,7 @@ export const KURZTEST_SCHEMA = obj({
       body: str('text: der Materialtext; bei Aufgaben und Tabellen leer'),
       headers: arr(str(), 'table: Spaltenköpfe des Materials'),
       rows: arr(arr(str()), 'table: Zeilen des Materials'),
-      instruction: str('task: PFLICHT, nie leer. Arbeitsanweisung, beginnt mit GENAU EINEM Operator im Imperativ. Auch wenn es Teilaufgaben gibt.'),
+      instruction: str('task: PFLICHT, nie leer. Arbeitsanweisung, beginnt mit GENAU EINEM Operator als korrekt gebildetem Imperativ (trennbare Verben: „Fasse … zusammen", „Gib … an"). Auch wenn es Teilaufgaben gibt.'),
       operator: str('task: der verwendete Operator im Infinitiv, z. B. „berechnen"'),
       answer: ANSWER,
       parts: arr(obj({ instruction: str(), answer: ANSWER, solution: str() }), 'task: Teilaufgaben oder leer'),
@@ -131,7 +131,7 @@ function bilingualTeil(m: Kurztest['meta']): string[] {
   return [
     '',
     `BILINGUALER SACHFACHUNTERRICHT (Arbeitssprache ${sprache}):`,
-    `- Arbeitsanweisungen, Teilaufgaben und Material stehen auf ${sprache}. Jede Aufgabe beginnt mit einem Operator aus der Liste unter OPERATOREN, in ${sprache} und im Imperativ.`,
+    `- Arbeitsanweisungen, Teilaufgaben und Material stehen auf ${sprache}. Jede Aufgabe beginnt mit einem Operator aus der Liste unter OPERATOREN, in ${sprache} und als korrekt gebildeter Imperativ dieser Sprache (nicht im Infinitiv).`,
     '- Zentrale Fachbegriffe stehen beim ersten Vorkommen zusätzlich auf Deutsch in Klammern.',
     '- Bewertet wird die fachliche Leistung; keine Aufgabe verlangt eine Sprachleistung, die über das Sachfach hinausgeht.',
     `- Die erwartete Lösung steht ebenfalls auf ${sprache}.`

@@ -199,7 +199,7 @@ export const FLAT_BLOCK = obj({
     'image: Beschriftungen direkt an den Bildteilen (2–8) – die App zeichnet Schild und Linie. Sonst leere Liste.'
   ),
   imageIsSource: bool('image: true nur bei einer Originalquelle (historisches Bild, Kunstwerk, Karikatur, Plakat)'),
-  instruction: str('task: Arbeitsanweisung, beginnt mit **Operator**'),
+  instruction: str('task: Arbeitsanweisung, beginnt mit dem **Operator** als korrekt gebildetem Imperativ (trennbare Verben: „**Fassen** Sie … **zusammen**")'),
   operator: str(),
   afb: enumOf(AFBS),
   afbReason: str('task: kurze Begründung der AFB-Zuordnung'),

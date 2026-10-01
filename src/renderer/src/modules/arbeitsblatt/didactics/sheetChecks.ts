@@ -11,6 +11,7 @@ import { seitenBereich, seitenText } from './seiten'
 import type { LearnerProfile } from './profile'
 import { checkLanguageSkills } from './languageChecks'
 import { checkSubjectOperator } from './subjectOperators'
+import { formfehlerMeldung, operatorFormfehler } from '@shared/operatoren/satzbau'
 import { comprehensionFormatById } from './comprehensionFormats'
 import { checkClosedFormatsHistory, checkItemWording, checkTrueFalseEvidence } from './itemWording'
 import { checkSourceHeaders } from './sourceHeader'
@@ -41,6 +42,10 @@ export function checkSubjectOperators(sheet: Sheet, meta: WorksheetMeta, foreign
   // Geprüft wird gegen die Liste des Landes für genau diese Stufe, sonst gegen die fachübliche (30.09.2026)
   const kontext = meta.stateId ? { stateId: meta.stateId, stufe: meta.grade >= 11 ? ('sek2' as const) : ('sek1' as const), schulform: meta.schoolTypeId } : undefined
   tasks(sheet).forEach((t, i) => {
+    // Satzstellung (01.10.2026): „Zusammenfassen Sie …" ist ein Operator, aber falsch gebildet – melden, nicht durchlassen
+    if (!foreignLanguage || meta.instructionsInGerman)
+      for (const [ort, text] of [[`Aufgabe ${i + 1}`, t.instruction], ...t.parts.map((p, j) => [`Aufgabe ${i + 1} ${String.fromCharCode(97 + j)})`, p.instruction])])
+        for (const f of operatorFormfehler(plainText(text))) out.push({ kind: 'operator', message: formfehlerMeldung(ort, f) })
     const res = checkSubjectOperator(plainText(t.instruction), meta.subjectId, foreignLanguage, kontext)
     if (!res || !res.operator) return
     if (!res.known) {

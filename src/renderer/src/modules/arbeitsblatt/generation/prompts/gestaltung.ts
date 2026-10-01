@@ -130,6 +130,7 @@ export function operatorRules(meta: WorksheetMeta, foreignLanguage?: string): st
     ops.note ? `- ${ops.note}` : '',
     bilingual && meta.bilingual!.pruefsprache === 'gemischt' ? '- Aufgaben auf Deutsch verwenden die deutsche Entsprechung in Klammern.' : '',
     `- Jede Aufgabe beginnt mit genau einem Operator aus ${landNamen.length ? 'diesen Listen' : 'dieser Liste'}; keine Umschreibungen wie „Beschäftige dich mit".`,
+    '- Die Listen nennen die Operatoren im Infinitiv. In der Aufgabe steht der korrekt konjugierte Imperativ in der Satzstellung der Sprache: trennbare Verben mit der Vorsilbe am Satzende („Fassen Sie … zusammen", „Ordne … ein"), nie „Zusammenfassen Sie …"; in Fremdsprachen der Imperativ der Zielsprache („Summarise …", „Résumez …", „Resuma …", „Riassumete …", „Обобщите …").',
     '- Jede Aufgabe nennt das Material ausdrücklich (z. B. „anhand von M1", „mithilfe der Tabelle").',
     '- MATERIALNUMMERN VERGIBT DIE APP: Sie nummeriert Texte, Bilder, Tabellen und Raster in der Reihenfolge der Bausteine als M1, M2, M3 … Schreibe selbst KEINE Nummer in den Titel.',
     '- VERWEISE NUR ÜBER KENNUNGEN: Jeder Materialbaustein bekommt in „ref" eine Kurzkennung (z. B. "zeitleiste", "karte", "tabelle"); Aufgaben, Hilfen und Tabellenköpfe verweisen mit M{zeitleiste}, M{karte} – NIE mit einer selbst gezählten Nummer wie „M2". Die App ersetzt M{…} durch die richtige Nummer. Ein von der App eingesetzter Ausgangstext heißt M{quelle}.',

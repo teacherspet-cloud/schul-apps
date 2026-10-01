@@ -14,11 +14,12 @@
  */
 import { alleBekanntenOperatoren, enthaeltOperatorForm, findeOperatoren, naechsterOperator, type ErkennungsSprache } from '@shared/operatoren/erkennung'
 import { ZIELSPRACHE_DES_FACHS } from '@shared/operatoren/zugriff'
+import { formfehlerMeldung, operatorFormfehler } from '@shared/operatoren/satzbau'
 import { ALLE_OPERATOREN, istBelegt, konflikteFuer, KERN_OPERATOREN, namenAus, PRAXIS_OPERATOREN, ZU_AUFWENDIG, type Laenderprofil } from './operatoren'
 
 export interface OperatorWarnung {
   blockId: string
-  /** 'fehlt' | 'doppelt' | 'kontext' | 'kein-weg' | 'aufwendig' | 'unbekannt' | 'fremd' */
+  /** 'fehlt' | 'doppelt' | 'kontext' | 'kein-weg' | 'aufwendig' | 'unbekannt' | 'fremd' | 'form' */
   art: string
   message: string
 }
@@ -133,9 +134,18 @@ export function pruefeOperatoren(aufgaben: AufgabeZurPruefung[], profil: Laender
   }
   // „Landesliste" nur, wenn die Liste wirklich vom Land stammt
   const listenName = profil && istBelegt(profil) ? 'Landesliste' : 'hinterlegten Liste'
+  const formGemeldet = new Set<string>()
 
   for (const a of aufgaben) {
     const gefunden = operatorenIn(a.instruction, [...bekannt, ...(sprache === 'de' ? ZU_AUFWENDIG : [])], sprache)
+    // 0. Satzstellung (01.10.2026): „Zusammenfassen Sie …" ist erkannt, aber falsch gebildet – melden, nicht durchlassen
+    for (const f of operatorFormfehler(a.instruction.replace(/\*\*/g, ''), sprache)) {
+      // Teilaufgaben tragen die Anweisung der Aufgabe mit – dieselbe Stelle nur einmal melden
+      const schluessel = `${a.id.split(':')[0]}|${f.falsch}|${f.richtig}`
+      if (formGemeldet.has(schluessel)) continue
+      formGemeldet.add(schluessel)
+      out.push({ blockId: a.id, art: 'form', message: formfehlerMeldung('Aufgabenstellung', f) })
+    }
 
     if (!gefunden.length) {
       /*

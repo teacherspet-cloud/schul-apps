@@ -181,7 +181,7 @@ export function buildLearnerProfile(input: LearnerInput, overrides: ProfileOverr
     )
   } else {
     rules.push(
-      `Beginne jede (Teil-)Aufgabe mit einem Operator in **Fettschrift**. Geeignete Operatoren – AFB I: ${operators.I.join(', ')}; AFB II: ${operators.II.join(', ')}; AFB III: ${operators.III.join(', ')}. Ordne jeder Aufgabe ihren Anforderungsbereich begründet zu (die Zuordnung ist fachspezifisch).`
+      `Jede (Teil-)Aufgabe enthält einen Operator in **Fettschrift**, als korrekt gebildeter Imperativ an den Satzanfang gestellt; bei trennbaren Verben steht die Vorsilbe am Satzende und wird ebenfalls fett („**Fasse** … **zusammen**", „**Arbeiten** Sie … **heraus**") – nie den Infinitiv voranstellen („Zusammenfassen Sie" ist falsch). Geeignete Operatoren (Infinitiv) – AFB I: ${operators.I.join(', ')}; AFB II: ${operators.II.join(', ')}; AFB III: ${operators.III.join(', ')}. Ordne jeder Aufgabe ihren Anforderungsbereich begründet zu (die Zuordnung ist fachspezifisch).`
     )
   }
   rules.push(spracheRegel(language))

@@ -40,7 +40,7 @@ import { pruefeAlle } from '../pruefung'
 import { bibliothek, projektDatei, useTafelbild } from '../store'
 import type { SvgOptionen } from '../svg'
 import '../tafelbild.css'
-import { zusammenfassen } from '../vorschlaege'
+import { satzbauKorrigieren, zusammenfassen } from '../vorschlaege'
 import ArbeitsblattDialog from './ArbeitsblattDialog'
 import AusgabeDialog from './AusgabeDialog'
 
@@ -162,6 +162,15 @@ export default function Bearbeiten(): React.JSX.Element | null {
    * dem zusammengefassten Stand.
    */
   const vorschlagUmsetzen = (v: TbVorschlag[], b: Befund): void => {
+    // Satzstellung der Operatoren (01.10.2026): ohne KI, ein Schritt mit Strg+Z
+    if (v.includes('satzbau')) {
+      let n = 0
+      update((d) => {
+        n = satzbauKorrigieren(d)
+      })
+      if (n) notifySuccess(`Satzstellung in ${n === 1 ? 'einem Text' : `${n} Texten`} korrigiert – Strg+Z nimmt es zurück.`)
+      return
+    }
     const knoten = knotenVon(t, b.elemente ?? (b.element ? [b.element] : []))
     const kuerzen = (stand: typeof t): void => {
       if (v.includes('kiKuerzen')) textKuerzen(stand, docId, knoten)

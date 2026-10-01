@@ -518,7 +518,8 @@ export function checkSubjectOperator(instruction: string, subjectId: string, for
       const afb = def?.afb === 'I' || def?.afb === 'II' || def?.afb === 'III' ? def.afb : null
       return { operator, listed: b.treffer[0].operator, known: true, afb, landesliste: land.quelle }
     }
-    return { operator, listed: null, known: false, afb: null, vorschlag: b.art === 'fremd' ? b.vorschlag : null, landesliste: land.quelle }
+    // Gemeldet wird die Form im Text („Fassen … zusammen"), nicht nur das erste Wort („fassen") – 01.10.2026
+    return { operator: b.art === 'fremd' ? b.form : operator, listed: null, known: false, afb: null, vorschlag: b.art === 'fremd' ? b.vorschlag : null, landesliste: land.quelle }
   }
   const namen = Object.keys(ops!.afb)
   const treffer = ersterOperator(instruction, namen, { sprache })
@@ -527,5 +528,5 @@ export function checkSubjectOperator(instruction: string, subjectId: string, for
   const match = operator in ops!.afb ? operator : matchStem(operator, namen)
   if (match) return { operator, listed: match, known: true, afb: ops!.afb[match] }
   const b = pruefeAnweisung(instruction, namen, { sprache })
-  return { operator, listed: null, known: false, afb: null, vorschlag: b.art === 'fremd' ? b.vorschlag : null }
+  return { operator: b.art === 'fremd' ? b.form : operator, listed: null, known: false, afb: null, vorschlag: b.art === 'fremd' ? b.vorschlag : null }
 }

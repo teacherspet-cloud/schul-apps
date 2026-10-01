@@ -22,7 +22,7 @@ export const SYSTEM_GRUNDSAETZE = [
   `- Merksatz: genau einer, höchstens ${MAX_MERKSATZ_WORTE} Wörter, einprägsam formuliert (R17).`,
   '- Mindestens ein grafisches Element (Pfeile, Symbol, Skizze), wenn Zeichnungen gewünscht sind – ein Tafelbild nur aus Text verführt zum Auswendiglernen.',
   '- Die Mindmap nur für Ober- und Unterbegriffe; für Abläufe das Flussdiagramm, für Vergleiche die Tabelle, für Chronologie die Zeitleiste (konstanter Maßstab!), für wiederkehrende Abläufe den Kreislauf.',
-  '- Keine Anrede der Schülerinnen und Schüler im Tafeltext außer in Arbeitsaufträgen; Arbeitsaufträge beginnen mit einem Operator.'
+  '- Keine Anrede der Schülerinnen und Schüler im Tafeltext außer in Arbeitsaufträgen; Arbeitsaufträge beginnen mit einem Operator als korrekt gebildetem Imperativ – trennbare Verben mit der Vorsilbe am Satzende („Fasse … zusammen", „Fassen Sie … zusammen", nie „Zusammenfassen Sie").'
 ]
 
 /** Fachspezifische Hinweise (Recherche 3.11, R42–R45) */

@@ -4,6 +4,7 @@
  * neu erzeugen, zu lange Knoten kürzen. Ohne Oberfläche prüfbar (tests/tafelbild*.test.ts).
  */
 import type { StructuredRequest } from '@shared/types'
+import { korrigiereOperatorformen } from '@shared/operatoren/satzbau'
 import { arr, bool, enumOf, int, obj, str, type Schema } from '../../shared/aiSchema'
 import { wunschAuftrag, type WunschArt } from '../../shared/kiWunsch'
 import { leseSchaltplan } from '../arbeitsblatt/render/schaltplanSvg'
@@ -445,7 +446,8 @@ export function inhaltAus(daten: unknown, meta: Pick<TafelbildMeta, 'struktur' |
     titel: text(d.titel) || 'Tafelbild',
     struktur,
     strukturGrund: text(d.strukturGrund),
-    impuls: text(d.impuls),
+    // Arbeitsaufträge in korrekter Satzstellung („Fassen Sie … zusammen", nie „Zusammenfassen Sie") – 01.10.2026
+    impuls: korrigiereOperatorformen(text(d.impuls)).text,
     knoten,
     beziehungen,
     ...(Array.isArray(d.aspekte) && d.aspekte.length ? { aspekte: d.aspekte.map(text).filter(Boolean) } : {}),
@@ -459,7 +461,7 @@ export function inhaltAus(daten: unknown, meta: Pick<TafelbildMeta, 'struktur' |
               : []
           }
         : null,
-    hausaufgabe: text(d.hausaufgabe),
+    hausaufgabe: korrigiereOperatorformen(text(d.hausaufgabe)).text,
     zeichnungen: gefiltert,
     farbLegende: legende.length ? legende : standardLegende(knoten),
     schritte

@@ -9,6 +9,7 @@
  * - Kontrast jeder Farbe zum Grund (R25)
  * - genau eine Überschrift, Merksatz ≤ 25 Wörter (R17/R32), höchstens 8 Schritte, je Schritt ≤ 3 neue Elemente (R33)
  */
+import { operatorFormfehler } from '@shared/operatoren/satzbau'
 import {
   formatInfo,
   HARTES_MINIMUM,
@@ -227,13 +228,39 @@ export function pruefeTafel(t: TbTafel, k: PruefKontext): Befund[] {
   return b
 }
 
+/**
+ * Operatoren in falscher Satzstellung (01.10.2026): „Zusammenfassen Sie …" statt „Fassen Sie …
+ * zusammen" im Arbeitsauftrag, in der Hausaufgabe oder in einem Kasten. EIN Befund für alle
+ * Stellen; „Vorschlag der App umsetzen" korrigiert sie ohne KI (vorschlaege.ts).
+ */
+export function satzbauBefunde(tafeln: TbTafel[], inhalt?: TbInhalt | null): Befund[] {
+  const stellen: { element?: string; falsch: string; richtig: string }[] = []
+  for (const t of tafeln)
+    for (const e of t.elemente)
+      for (const s of [e.text, e.titel ?? '']) for (const f of operatorFormfehler(s)) stellen.push({ element: e.id, falsch: f.falsch, richtig: f.richtig })
+  for (const s of [inhalt?.impuls ?? '', inhalt?.hausaufgabe ?? '']) for (const f of operatorFormfehler(s)) stellen.push({ falsch: f.falsch, richtig: f.richtig })
+  const eindeutig = [...new Map(stellen.map((x) => [`${x.falsch}|${x.richtig}`, x])).values()]
+  if (!eindeutig.length) return []
+  return [
+    {
+      art: 'text',
+      element: eindeutig.find((x) => x.element)?.element,
+      text: `Satzstellung des Operators: ${eindeutig
+        .slice(0, 3)
+        .map((x) => `„${x.falsch}" → „${x.richtig}"`)
+        .join('; ')}${eindeutig.length > 3 ? ' …' : ''}.`,
+      vorschlaege: ['satzbau']
+    }
+  ]
+}
+
 /** Alle Tafeln prüfen, doppelte Befunde (gleicher Text) zusammenfassen */
 export function pruefeAlle(tafeln: TbTafel[], k: PruefKontext, zusatz: Befund[] = []): Befund[] {
   const ziele: Befund[] = lernzielBefunde(k.inhalt, k.lernziel ?? '').map((text) => ({ art: 'aufbau', text }))
   // Zeitleiste ohne lesbares Datum, Tabellenspalte ohne Eintrag je Aspekt (auch nach eigener Änderung)
   const i = k.inhalt
   const inhalt: Befund[] = (i?.struktur === 'zeitleiste' ? pruefeZeitleiste(i) : i?.struktur === 'tabelle' ? pruefeTabelle(i) : []).map((p) => ({ art: 'aufbau', text: p.text }))
-  const alle = [...zusatz, ...ziele, ...inhalt, ...tafeln.flatMap((t) => pruefeTafel(t, k))]
+  const alle = [...zusatz, ...ziele, ...inhalt, ...satzbauBefunde(tafeln, k.inhalt), ...tafeln.flatMap((t) => pruefeTafel(t, k))]
   const gesehen = new Set<string>()
   return alle.filter((x) => {
     const s = `${x.format}|${x.text}`
