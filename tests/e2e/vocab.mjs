@@ -26,8 +26,15 @@ await page.waitForSelector('text=Vokabelliste')
 const auto = page.getByRole('button', { name: 'Test automatisch erstellen' })
 if (await auto.isEnabled()) throw new Error('Ohne Vokabeln darf „Test automatisch erstellen" nicht anklickbar sein')
 
+// Wunsch der Lehrkraft (01.10.2026): Ohne Vorgeschichte ist „Schulbuch“ der vorgewählte Weg, nicht „Datei hineinziehen“
+const schulbuchReiter = page.getByRole('tab', { name: 'Schulbuch' })
+if ((await schulbuchReiter.getAttribute('aria-selected')) !== 'true') throw new Error('Beim Öffnen muss der Reiter „Schulbuch“ vorgewählt sein')
+if (!(await page.getByRole('combobox', { name: 'Lehrwerk' }).isVisible())) throw new Error('Die Lehrwerk-Auswahl muss beim Öffnen sichtbar sein')
+await page.screenshot({ path: join(out, '00-start-schulbuch.png') })
+console.log('Reiter „Schulbuch“ ist beim Öffnen vorgewählt')
+
 // Schulbuch wählen: Green Line 4 → Klasse 8 (Quellen stehen seit Paket 7 in Reitern)
-await page.getByRole('tab', { name: 'Schulbuch' }).click()
+await schulbuchReiter.click()
 await page.getByRole('combobox', { name: 'Lehrwerk' }).click()
 await page.getByRole('option', { name: 'Green Line 4', exact: true }).click()
 await page.getByRole('combobox', { name: 'Unit', exact: true }).click()

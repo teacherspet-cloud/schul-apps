@@ -23,13 +23,15 @@ import VokabelTabelle from './VokabelTabelle'
 import { AuswahlLeiste, EinfuegenFenster, PruefFenster } from './VokabelUebernahme'
 
 type Quelle = 'datei' | 'schulbuch' | 'tabelle' | 'listen'
-const QUELLE_KEY = 'vokabeltest-quelle'
+// Schlüssel mit „-2“: Seit dem Wunsch der Lehrkraft (01.10.2026) ist „Schulbuch“ der Standard –
+// eine alte Merkung aus der Zeit, als „Datei hineinziehen“ vorne stand, soll ihn nicht verdecken.
+const QUELLE_KEY = 'vokabeltest-quelle-2'
 const gemerkteQuelle = (): Quelle => {
   try {
     const q = localStorage.getItem(QUELLE_KEY)
-    return q === 'schulbuch' || q === 'tabelle' || q === 'listen' ? q : 'datei'
+    return q === 'datei' || q === 'tabelle' || q === 'listen' ? q : 'schulbuch'
   } catch {
-    return 'datei'
+    return 'schulbuch'
   }
 }
 
@@ -112,18 +114,18 @@ export default function VocabStep(): React.JSX.Element {
         <Container size="lg" py="lg">
           <Title order={2}>Vokabelliste</Title>
           <Text c="dimmed" size="sm" mb="md">
-            Vokabeln aus einer Datei, dem Schulbuch, einer Tabelle oder einer gespeicherten Liste übernehmen – oder direkt eintippen. Das Häkchen legt fest,
+            Vokabeln aus dem Schulbuch, einer Datei, einer Tabelle oder einer gespeicherten Liste übernehmen – oder direkt eintippen. Das Häkchen legt fest,
             welche Vokabeln abgefragt werden.
           </Text>
 
           <Card withBorder padding="md" mb="lg">
             <Tabs value={quelle} onChange={waehleQuelle} keepMounted>
               <Tabs.List mb="md">
-                <Tabs.Tab value="datei" leftSection={<IconFileUpload size={16} />}>
-                  Datei hineinziehen
-                </Tabs.Tab>
                 <Tabs.Tab value="schulbuch" leftSection={<IconBook2 size={16} />}>
                   Schulbuch
+                </Tabs.Tab>
+                <Tabs.Tab value="datei" leftSection={<IconFileUpload size={16} />}>
+                  Datei hineinziehen
                 </Tabs.Tab>
                 <Tabs.Tab value="tabelle" leftSection={<IconClipboard size={16} />}>
                   Tabelle einfügen
