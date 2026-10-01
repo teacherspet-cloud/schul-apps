@@ -16,7 +16,7 @@ import type { Answer, AnswerKind, Worksheet, WorksheetMeta, WsBlock } from './mo
 import { createRng } from './modules/vokabeltest/model/random'
 import { useVokabeltest } from './modules/vokabeltest/store'
 
-export type SeitenrandArt = 'tabellen' | 'knapp' | 'raender' | 'protokoll' | 'gemischt' | 'teilbar'
+export type SeitenrandArt = 'tabellen' | 'knapp' | 'raender' | 'protokoll' | 'gemischt' | 'teilbar' | 'fussnoten'
 
 const SATZ =
   'Der Wasserkreislauf beschreibt, wie Wasser verdunstet, als Wolke weiterzieht und als Niederschlag zurück auf die Erde fällt, wo es versickert oder in Flüsse abfließt. '
@@ -375,7 +375,77 @@ function bausteine(art: SeitenrandArt, seed: number): WsBlock[] {
     }
     case 'teilbar':
       return teilbareBausteine(seed)
+    case 'fussnoten':
+      return fussnotenBausteine(seed)
   }
+}
+
+/**
+ * Lange Materialtexte mit vielen Fußnoten und Worthilfen (01.10.2026, Blattoptionen „Fußnoten"):
+ * Die Anmerkungen stehen unten auf der Seite ihres Worts; der Umbruch muss ihren Platz freihalten,
+ * auch bei langen Erklärungen, einem Erklärbild und Zeilennummern.
+ */
+function fussnotenBausteine(seed: number): WsBlock[] {
+  const r = createRng(seed)
+  const aus: WsBlock[] = []
+  for (let m = 0; m < 3; m++) {
+    const fussnoten: NonNullable<Extract<WsBlock, { type: 'text' }>['fussnoten']> = []
+    const absaetze = Array.from({ length: 5 + Math.floor(r() * 4) }, (_, i) => {
+      let absatz = `${i + 1}. ${SATZ.repeat(1 + Math.floor(r() * 3))}`
+      if (r() < 0.75) {
+        const fid = `${praefix}fn${m}-${i}`
+        fussnoten.push({
+          id: fid,
+          wort: 'verdunsten',
+          text: 'vom flüssigen in den gasförmigen Zustand übergehen; geschieht vor allem bei Wärme. '.repeat(1 + Math.floor(r() * 3)).trim(),
+          ...(m === 1 && i === 1 ? { bild: { dataUrl: testbild(160, 120, '#3a7bd5'), source: 'ai' as const } } : {})
+        })
+        absatz = absatz.replace('verdunstet,', `verdunstet[^${fid}],`)
+      }
+      return absatz
+    })
+    aus.push(
+      text(0, 0, {
+        body: absaetze.join('\n\n'),
+        fussnoten,
+        lineNumbers: m === 0,
+        glossary: [
+          { term: 'Niederschlag', explanation: 'Wasser, das aus der Atmosphäre fällt: Regen, Schnee, Hagel' },
+          { term: 'Flüsse', explanation: 'fließende Gewässer' }
+        ]
+      })
+    )
+    aus.push(aufgabe('**Erkläre** den Wasserkreislauf mithilfe des Materials.', antwort('lines', { count: 4 + Math.floor(r() * 6) })))
+  }
+  return aus
+}
+
+/**
+ * Ein langes Material über zwei Seiten mit Anmerkungen auf BEIDEN Seiten (Wache fussnoten.mjs,
+ * 01.10.2026): Fußnote im ersten und im vorletzten Absatz, eine Worthilfe in der Mitte.
+ */
+export function fussnotenBlatt(art: 'fussnoten' | 'endnoten'): Worksheet {
+  const ws = seitenrandBlatt('knapp', 1, 0, '')
+  ws.meta.title = `Fußnoten: ${art}`
+  ws.meta.anmerkungen = art
+  const absaetze = Array.from({ length: 14 }, (_, i) => `${i + 1}. ${SATZ.repeat(2)}`)
+  absaetze[0] = absaetze[0].replace('verdunstet,', 'verdunstet[^fa],')
+  absaetze[12] = absaetze[12].replace('verdunstet,', 'verdunstet[^fb],')
+  absaetze[6] = absaetze[6].replace('Niederschlag', 'Hagelschauer')
+  ws.sheets[0].blocks = [
+    text(0, 0, {
+      id: 'fn-material',
+      lineNumbers: true,
+      body: absaetze.join('\n\n'),
+      fussnoten: [
+        { id: 'fa', wort: 'verdunsten', text: 'vom flüssigen in den gasförmigen Zustand übergehen' },
+        { id: 'fb', wort: 'verdunsten (2)', text: 'hier: über dem Meer, angetrieben von der Sonnenwärme' }
+      ],
+      glossary: [{ term: 'Hagelschauer', explanation: 'kurzer, heftiger Niederschlag aus Eiskörnern' }]
+    }),
+    aufgabe('**Erkläre** den Wasserkreislauf mithilfe von M1.', antwort('lines', { count: 6 }))
+  ]
+  return ws
 }
 
 /**
@@ -421,7 +491,8 @@ export function seitenrandBlatt(art: SeitenrandArt, seed = 1, design = 0, idPrae
     grade: 8,
     pages: 0,
     answerKey: true,
-    ...(art === 'raender' ? { notesMargin: true, correctionMargin: true, coverPage: true } : {})
+    ...(art === 'raender' ? { notesMargin: true, correctionMargin: true, coverPage: true } : {}),
+    ...(art === 'fussnoten' ? { anmerkungen: 'fussnoten' as const } : {})
   }
   const designs = presetDesigns()
   return {

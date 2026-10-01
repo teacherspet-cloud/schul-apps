@@ -41,6 +41,7 @@ export default function BlattoptionenFelder({
   korrekturrand,
   notizrand,
   blocksatz,
+  anmerkungen,
   fach,
   vorlagenfarbe,
   ueberthema,
@@ -57,6 +58,11 @@ export default function BlattoptionenFelder({
   korrekturrand?: Schalter
   notizrand?: Schalter
   blocksatz?: Schalter
+  /**
+   * Fußnoten oder Endnoten (01.10.2026) – nur übergeben, wenn ein Material Anmerkungen hat
+   * (didactics/anmerkungen.ts, `hatAnmerkungen`); sonst erscheint die Wahl nicht.
+   */
+  anmerkungen?: { wert: 'fussnoten' | 'endnoten'; onChange: (art: 'fussnoten' | 'endnoten') => void }
   fach: string | undefined
   vorlagenfarbe: Schalter
   ueberthema?: { werte: UeberthemaFelder; bereich: string; onChange: (patch: Pick<UeberthemaFelder, 'ueberthema' | 'ueberthemaAus'>) => void }
@@ -112,6 +118,21 @@ export default function BlattoptionenFelder({
           description="Längere Texte im Blocksatz setzen. Flattersatz gilt als besser lesbar (Ofqual 2021, DIN 1450); bei Einfacher und Leichter Sprache ist Blocksatz immer aus."
           checked={blocksatz.checked}
           onChange={(e) => blocksatz.onChange(e.currentTarget.checked)}
+        />
+      )}
+      {anmerkungen && (
+        <Select
+          size="sm"
+          label="Fußnoten und Worthilfen"
+          description="Fußnoten stehen unten auf der Seite des markierten Worts, Endnoten gesammelt am Ende des Materials. Die Zählung beginnt je Material bei ¹."
+          data={[
+            { value: 'endnoten', label: 'Endnoten (am Ende des Materials)' },
+            { value: 'fussnoten', label: 'Fußnoten (unten auf der Seite)' }
+          ]}
+          value={anmerkungen.wert}
+          onChange={(v) => v && anmerkungen.onChange(v as 'fussnoten' | 'endnoten')}
+          allowDeselect={false}
+          data-testid="blattoption-anmerkungen"
         />
       )}
       <VorlagenfarbeSchalter fach={fach} checked={vorlagenfarbe.checked} onChange={vorlagenfarbe.onChange} />

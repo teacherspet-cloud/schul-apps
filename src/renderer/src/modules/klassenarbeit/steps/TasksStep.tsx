@@ -93,6 +93,7 @@ import { useKlassenarbeit } from '../store'
 import { EXAM_FILTER, serializeExam } from '../project'
 import EditorLeiste from '../../../shared/components/EditorLeiste'
 import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
+import { anmerkungsArt, hatAnmerkungen } from '../../arbeitsblatt/didactics/anmerkungen'
 import CanaryDialog from '../../../shared/components/CanaryDialog'
 import { canaryWordFor } from '../../../shared/aiCanary'
 import type { DesignTemplate } from '@shared/design'
@@ -641,6 +642,11 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             schulangaben={{ checked: meta.showSchool !== false, onChange: (an) => updateExam((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(meta.correctionMargin), onChange: (an) => updateExam((d) => (d.meta.correctionMargin = an)) }}
             notizrand={{ checked: Boolean(meta.notesMargin), onChange: (an) => updateExam((d) => (d.meta.notesMargin = an)) }}
+            anmerkungen={
+              hatAnmerkungen(exam.parts.flatMap((p) => alleFassungen(p).flat()))
+                ? { wert: anmerkungsArt(meta), onChange: (art) => updateExam((d) => (d.meta.anmerkungen = art)) }
+                : undefined
+            }
             blocksatz={{ checked: exam.design.page.justifyText !== false, onChange: (an) => updateExam((d) => (d.design.page.justifyText = an)) }}
             fach={meta.subjectId}
             vorlagenfarbe={{ checked: Boolean(meta.vorlagenfarbe), onChange: (an) => updateExam((d) => (d.meta.vorlagenfarbe = an)) }}

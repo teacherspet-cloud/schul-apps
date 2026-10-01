@@ -39,13 +39,16 @@ import { zeigtUebersetzung } from '../../didactics/phraseRules'
 import { anredeFuerMeta } from '../../didactics/anrede'
 import { anredeText } from '../../../../shared/anrede'
 import type { DeckblattBilder, DeckblattText } from '../../render/deckblattBilder'
-import { WorksheetDocxDeps, WorksheetDocxOptions, Child, EMU_MM, PX_MM, Ctx } from './grundlagen'
+import { WorksheetDocxDeps, WorksheetDocxOptions, Child, EMU_MM, PX_MM, Ctx, type WordFussnoten } from './grundlagen'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { boardSection } from './tafel'
 import { headerFor, footerFor } from './kopf'
 import { blockContent, gridTable } from './bausteine'
 
 export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptions, deps: WorksheetDocxDeps): Promise<Uint8Array> {
   const sections: ISectionOptions[] = []
+  // Echte Word-Fußnoten der Materialtexte (Blattoptionen „Fußnoten", 01.10.2026)
+  const fussnoten: WordFussnoten = { naechste: 1, eintraege: {}, marken: new Map() }
   const sheets = ws.sheets.filter((s) => opts.sheetIds.includes(s.id))
   const add = async (key: boolean): Promise<void> => {
     // Verweise „M{karte}" → „M3", wie am Bildschirm
@@ -53,7 +56,7 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
       // Seitenauswahl: nur Blätter mit gewählten Seiten, und davon nur deren Inhalte
       const filter = opts.seiten ? opts.seiten.blaetter.get(seitenGruppe(sheet.id, key)) : undefined
       if (opts.seiten && !filter) continue
-      sections.push(...(await sheetSections(ws, zurAnzeige(sheet), key, deps, filter)))
+      sections.push(...(await sheetSections(ws, zurAnzeige(sheet), key, deps, filter, fussnoten)))
     }
   }
   // Das Deckblatt steht vor allem anderen – aber nicht vor einer reinen Lösungsdatei
@@ -74,9 +77,38 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
     // KI-Kennzeichnung, maschinenlesbar (Großprogramm 0.4)
     ...kiWordEigenschaften(ws.meta.ki),
     styles: { default: { document: { run: { font: wordFontName(ws.design.page.fontFamily), size: Math.round(info.fontPt * 2) } } } },
+    ...(fussnoten.marken.size ? { footnotes: fussnoten.eintraege } : {}),
     sections
   })
-  return new Uint8Array(await Packer.toArrayBuffer(doc))
+  return fussnotenZeichen(new Uint8Array(await Packer.toArrayBuffer(doc)), fussnoten.marken)
+}
+
+/**
+ * Eigene Fußnotenzeichen einsetzen (01.10.2026): Word nummeriert Fußnoten sonst durch das ganze
+ * Dokument (1 … 9), die App beginnt je Material bei 1. Am Verweis im Text steht dafür
+ * `w:customMarkFollows` mit dem Zeichen dahinter, in der Fußnote selbst das Zeichen statt des
+ * automatischen `w:footnoteRef` – beides Standard-WordprocessingML, Word und LibreOffice setzen es
+ * hochgestellt (Zeichenformat „FootnoteReference").
+ */
+export function fussnotenZeichen(datei: Uint8Array, marken: Map<number, string>): Uint8Array {
+  if (!marken.size) return datei
+  const dateien = unzipSync(datei)
+  const xml = (name: string): string | undefined => (dateien[name] ? strFromU8(dateien[name]) : undefined)
+  const dokument = xml('word/document.xml')
+  const noten = xml('word/footnotes.xml')
+  if (!dokument || !noten) return datei
+  const zeichen = (id: string): string | undefined => marken.get(Number(id))
+  dateien['word/document.xml'] = strToU8(
+    dokument.replace(/<w:footnoteReference w:id="(\d+)"\/>/g, (alt, id: string) =>
+      zeichen(id) ? `<w:footnoteReference w:customMarkFollows="1" w:id="${id}"/><w:t xml:space="preserve">${zeichen(id)}</w:t>` : alt
+    )
+  )
+  dateien['word/footnotes.xml'] = strToU8(
+    noten.replace(/(<w:footnote\b[^>]*\bw:id="(\d+)"[^>]*>)([\s\S]*?)(<\/w:footnote>)/g, (alt, auf: string, id: string, inhalt: string, zu: string) =>
+      zeichen(id) ? auf + inhalt.replace('<w:footnoteRef/>', `<w:t xml:space="preserve">${zeichen(id)}</w:t>`) + zu : alt
+    )
+  )
+  return zipSync(dateien)
 }
 
 /** Millimeter → Twips (Word-Maß für Rahmen und Zeilenabstand) */
@@ -225,7 +257,9 @@ export async function sheetSections(
   key: boolean,
   deps: WorksheetDocxDeps,
   /** Seitenauswahl: nur diese Bausteine und Schlussseiten (export/wordSeiten.ts) */
-  filter?: { bausteine: Set<string>; zusatz: Set<string> }
+  filter?: { bausteine: Set<string>; zusatz: Set<string> },
+  /** Sammelstelle der Word-Fußnoten des Dokuments (Blattoptionen „Fußnoten") */
+  fussnoten?: WordFussnoten
 ): Promise<ISectionOptions[]> {
   const zeigt = (block: WsBlock, side?: WsBlock): boolean => !filter || filter.bausteine.has(block.id) || Boolean(side && filter.bausteine.has(side.id))
   const zusatzGewaehlt = (art: string): boolean => !filter || filter.zusatz.has(art)
@@ -244,7 +278,8 @@ export async function sheetSections(
     key,
     sheetStars: sheet.stars,
     phraseGerman: zeigtUebersetzung(ws.meta, sheet.stars),
-    materialNumbers: materialNumbersFor(sheet)
+    materialNumbers: materialNumbersFor(sheet),
+    fussnoten
   }
 
   const headers = { first: await headerFor(ctx, true), default: await headerFor(ctx, false) }

@@ -65,19 +65,32 @@ const MESSUNG = `(function (seitenSel, flaecheSel) {
     }
     const tol = Math.max(1, mmPx * 0.3)
     const funde = []
+    // Fußnoten unten auf der Seite (01.10.2026): Der übrige Inhalt endet an ihrer Oberkante, sie selbst in der Fläche
+    const fn = flaecheSel ? [...wurzel.children].find((k) => k.hasAttribute('data-fussnoten-seite')) : null
+    const unterkante = fn ? fn.getBoundingClientRect().top : f.bottom
+    if (fn) {
+      const r = fn.getBoundingClientRect()
+      if (r.bottom > f.bottom + tol || r.top < f.top - tol)
+        funde.push({
+          el: 'Fußnotenbereich',
+          unten: Math.round(((r.bottom - f.bottom) / mmPx) * 10) / 10,
+          oben: Math.round(((f.top - r.top) / mmPx) * 10) / 10,
+          text: (fn.textContent || '').slice(0, 50)
+        })
+    }
     const lauf = (el, clipOben, clipUnten) => {
       for (const kind of el.children) {
-        if (kind.matches(AUSNAHMEN)) continue
+        if (kind === fn || kind.matches(AUSNAHMEN)) continue
         const st = getComputedStyle(kind)
         if (st.display === 'none' || st.visibility === 'hidden' || st.opacity === '0') continue
         const r = kind.getBoundingClientRect()
         const oben = Math.max(r.top, clipOben)
         const unten = Math.min(r.bottom, clipUnten)
         const sichtbar = r.width > 0.5 && r.height > 0.5 && unten > oben
-        if (sichtbar && (unten > f.bottom + tol || oben < f.top - tol)) {
+        if (sichtbar && (unten > unterkante + tol || oben < f.top - tol)) {
           const text = (kind.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 50)
           const klasse = typeof kind.className === 'string' ? kind.className : (kind.className && kind.className.baseVal) || ''
-          funde.push({ el: (kind.tagName + '.' + klasse.trim().replace(/\\s+/g, '.')).slice(0, 70), unten: Math.round(((unten - f.bottom) / mmPx) * 10) / 10, oben: Math.round(((f.top - oben) / mmPx) * 10) / 10, text })
+          funde.push({ el: (kind.tagName + '.' + klasse.trim().replace(/\\s+/g, '.')).slice(0, 70), unten: Math.round(((unten - unterkante) / mmPx) * 10) / 10, oben: Math.round(((f.top - oben) / mmPx) * 10) / 10, text })
         }
         // In SVG nicht hineinsehen: Pfade einer Formel sind kein eigener Baustein
         if (kind instanceof SVGElement) continue
@@ -220,7 +233,11 @@ try {
       ['gemischt', 11, 0],
       ['gemischt', 23, 1],
       ['gemischt', 37, 4],
-      ['gemischt', 51, 7]
+      ['gemischt', 51, 7],
+      // Fußnoten unten auf der Seite (01.10.2026): Platz für die Anmerkungen, nichts läuft hinein
+      ['fussnoten', 1, 0],
+      ['fussnoten', 7, 2],
+      ['fussnoten', 13, 5]
     ]
     for (const [art, seed, design] of ARTEN) {
       const name = `Arbeitsblatt ${art}${art === 'gemischt' ? ` ${seed}` : ''} (Design ${design})`
@@ -236,20 +253,22 @@ try {
     for (const [art, seed] of [
       ['tabellen', 1],
       ['teilbar', 2],
-      ['gemischt', 23]
+      ['gemischt', 23],
+      ['fussnoten', 3]
     ]) {
       const name = `Klassenarbeit ${art}${art === 'gemischt' ? ` ${seed}` : ''}`
       await page.evaluate(() => window.__selftest.exam())
       const teil1 = await stressBloecke(art, seed, 'k1-')
       const teil2 = await stressBloecke('knapp', 1, 'k2-')
       await page.evaluate(
-        ([b1, b2]) => {
+        ([b1, b2, fussnoten]) => {
           const e = structuredClone(window.__selftest.kaJetzt())
           e.parts[0].blocks = b1
           e.parts[1].blocks = b2
+          e.meta.anmerkungen = fussnoten ? 'fussnoten' : undefined
           window.__selftest.kaSetzen(e)
         },
-        [teil1, teil2]
+        [teil1, teil2, art === 'fussnoten']
       )
       await blattPruefen(name, false)
     }
@@ -262,16 +281,21 @@ try {
     for (const [art, seed] of [
       ['tabellen', 1],
       ['teilbar', 3],
-      ['gemischt', 37]
+      ['gemischt', 37],
+      ['fussnoten', 5]
     ]) {
       const name = `Lernzielkontrolle ${art}${art === 'gemischt' ? ` ${seed}` : ''}`
       await page.evaluate(() => window.__selftest.lzkSheet('BY', 3))
       const bloecke = await stressBloecke(art, seed, 'l-')
-      await page.evaluate((b) => {
-        const t = structuredClone(window.__selftest.lzkJetzt())
-        t.varianten[0].blocks = b
-        window.__selftest.lzkSetzen(t)
-      }, bloecke)
+      await page.evaluate(
+        ([b, fussnoten]) => {
+          const t = structuredClone(window.__selftest.lzkJetzt())
+          t.varianten[0].blocks = b
+          t.meta.anmerkungen = fussnoten ? 'fussnoten' : undefined
+          window.__selftest.lzkSetzen(t)
+        },
+        [bloecke, art === 'fussnoten']
+      )
       await blattPruefen(name, false)
     }
   }
@@ -282,17 +306,22 @@ try {
     await page.waitForTimeout(600)
     for (const [art, seed] of [
       ['knapp', 1],
-      ['gemischt', 51]
+      ['gemischt', 51],
+      ['fussnoten', 9]
     ]) {
       const name = `Grammatiktest ${art}${art === 'gemischt' ? ` ${seed}` : ''}`
       await page.evaluate(() => window.__selftest.grammarTestSheet())
       const bloecke = await stressBloecke(art, seed, 'g-')
-      await page.evaluate((b) => {
-        const t = structuredClone(window.__selftest.gtJetzt())
-        t.blocks = b
-        delete t.blocksB
-        window.__selftest.gtSetzen(t)
-      }, bloecke)
+      await page.evaluate(
+        ([b, fussnoten]) => {
+          const t = structuredClone(window.__selftest.gtJetzt())
+          t.blocks = b
+          delete t.blocksB
+          t.meta.anmerkungen = fussnoten ? 'fussnoten' : undefined
+          window.__selftest.gtSetzen(t)
+        },
+        [bloecke, art === 'fussnoten']
+      )
       await blattPruefen(name, false)
     }
   }

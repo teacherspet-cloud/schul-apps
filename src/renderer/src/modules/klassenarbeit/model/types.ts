@@ -260,6 +260,12 @@ export interface ExamMeta {
   correctionMargin?: boolean
   notesMargin?: boolean
   /**
+   * Fußnoten oder Endnoten (01.10.2026, Blattoptionen – nur angeboten, wenn ein Material
+   * Anmerkungen hat): `fussnoten` = unten auf der Seite des markierten Worts, sonst gesammelt
+   * am Ende des Materials (didactics/anmerkungen.ts).
+   */
+  anmerkungen?: 'fussnoten' | 'endnoten'
+  /**
    * Operatorenliste als Anlage (27.09.2026, didactics/operatorenliste.ts): die in den Aufgaben
    * verwendeten Operatoren mit der amtlichen Definition des Landes. Fehlt der Wert, entscheidet
    * die Stufe: Sek II ja, Sek I nein.

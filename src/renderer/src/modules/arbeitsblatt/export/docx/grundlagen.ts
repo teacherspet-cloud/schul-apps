@@ -68,6 +68,20 @@ export interface Ctx {
    * fehlten sie in Word ganz: Eine Aufgabe „mithilfe von M2" hatte dort kein M2.
    */
   materialNumbers: Map<string, string>
+  /** Echte Word-Fußnoten des ganzen Dokuments (Blattoptionen „Fußnoten", 01.10.2026) */
+  fussnoten?: WordFussnoten
+}
+
+/**
+ * Sammelstelle der Word-Fußnoten (01.10.2026). Word zählt Fußnoten durch das ganze Dokument;
+ * die App beginnt je Material bei ¹. Deshalb trägt jede Fußnote ein EIGENES Zeichen
+ * (`w:customMarkFollows`) – `marken` hält es je Fußnote fest, `fussnotenZeichen` (aufbau.ts)
+ * setzt es nach dem Packen in document.xml und footnotes.xml ein.
+ */
+export interface WordFussnoten {
+  naechste: number
+  eintraege: Record<number, { children: Paragraph[] }>
+  marken: Map<number, string>
 }
 
 /** „M2 " vor Titel oder Bildunterschrift – dieselbe Nummer wie am Bildschirm */

@@ -92,6 +92,7 @@ export function worksheetMetaForKurztest(test: Kurztest): WorksheetMeta {
     showSchool: m.showSchool,
     correctionMargin: m.correctionMargin,
     notesMargin: m.notesMargin,
+    anmerkungen: m.anmerkungen,
     aiCanary: m.aiCanary,
     aiCanaryWords: m.aiCanaryWords,
     // Die Lernhilfen des Arbeitsblatts gibt es hier nicht – siehe didactics/bausteine.ts

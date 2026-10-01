@@ -52,7 +52,10 @@ import { aiCall as lzkAi } from './modules/lernzielkontrolle/store'
 import { pruefeKurztest } from './modules/lernzielkontrolle/didactics/pruefungen'
 import { profilFuer } from './modules/lernzielkontrolle/didactics/operatoren'
 import { themenFuer, themenHinweis } from './modules/lernzielkontrolle/didactics/themen'
-import { seitenrandBlatt, vtSeitenrand, type SeitenrandArt } from './selftestSeitenrand'
+import { fussnotenBlatt, seitenrandBlatt, vtSeitenrand, type SeitenrandArt } from './selftestSeitenrand'
+import { buildWorksheetDocx } from './modules/arbeitsblatt/export/docx'
+import { browserDocxDeps } from './modules/arbeitsblatt/export/browserDeps'
+import { strFromU8, unzipSync } from 'fflate'
 
 /**
  * Ein einzelner stiller MP3-Frame (MPEG-1 Layer III, 44,1 kHz).
@@ -1973,6 +1976,19 @@ export function installSelftest(): void {
     // Seitenrand-Wache (30.09.2026): Stress-Blätter ohne KI
     seitenrandBlatt: (art: SeitenrandArt, seed?: number, design?: number, idPraefix?: string) => seitenrandBlatt(art, seed, design, idPraefix),
     wsSeitenrand: (art: SeitenrandArt, seed?: number, design?: number) => setWorksheet(seitenrandBlatt(art, seed, design)),
+    // Fußnoten oder Endnoten (01.10.2026, Wache fussnoten.mjs)
+    wsFussnoten: (art: 'fussnoten' | 'endnoten') => setWorksheet(fussnotenBlatt(art)),
+    fussnotenBlatt,
+    /** Word-Datei des offenen Arbeitsblatts: document.xml und footnotes.xml als Text */
+    wordXmlJetzt: async (): Promise<{ dokument: string; fussnoten: string }> => {
+      const ws = useArbeitsblatt.getState().worksheet
+      if (!ws) throw new Error('Kein Arbeitsblatt geladen.')
+      const datei = unzipSync(await buildWorksheetDocx(ws, { sheetIds: ws.sheets.map((s) => s.id), includeKey: false }, browserDocxDeps(null, '')))
+      return {
+        dokument: strFromU8(datei['word/document.xml']),
+        fussnoten: datei['word/footnotes.xml'] ? strFromU8(datei['word/footnotes.xml']) : ''
+      }
+    },
     vtSeitenrand,
     worksheetJetzt,
     docIdVon,

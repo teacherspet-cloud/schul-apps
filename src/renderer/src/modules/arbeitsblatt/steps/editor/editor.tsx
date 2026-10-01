@@ -56,6 +56,7 @@ import { deckblattBilder } from '../../render/deckblattBilder'
 import { DeckblattSeitenwahl, DeckblattWerkzeuge } from '../DeckblattWerkzeuge'
 import EditorLeiste from '../../../../shared/components/EditorLeiste'
 import BlattoptionenFelder from '../../../../shared/components/BlattoptionenFelder'
+import { anmerkungsArt, hatAnmerkungen } from '../../didactics/anmerkungen'
 import CanaryDialog from '../../../../shared/components/CanaryDialog'
 import IllustrationenOption from '../IllustrationenOption'
 import { useThemenbereich } from '../../../../shared/themenbereiche'
@@ -665,6 +666,11 @@ export function EditorStep(): React.JSX.Element {
             nachSchule={<IllustrationenOption ws={ws} update={update} />}
             korrekturrand={{ checked: Boolean(ws.meta.correctionMargin), onChange: (an) => update((w) => (w.meta.correctionMargin = an)) }}
             notizrand={{ checked: Boolean(ws.meta.notesMargin), onChange: (an) => update((w) => (w.meta.notesMargin = an)) }}
+            anmerkungen={
+              hatAnmerkungen(ws.sheets.flatMap((s) => s.blocks))
+                ? { wert: anmerkungsArt(ws.meta), onChange: (art) => update((w) => (w.meta.anmerkungen = art)) }
+                : undefined
+            }
             blocksatz={{ checked: ws.design.page.justifyText !== false, onChange: (an) => update((w) => (w.design.page.justifyText = an)) }}
             fach={ws.meta.subjectId}
             vorlagenfarbe={{ checked: Boolean(ws.meta.vorlagenfarbe), onChange: (an) => update((w) => (w.meta.vorlagenfarbe = an)) }}

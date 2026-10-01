@@ -88,6 +88,7 @@ export function worksheetMetaForTest(test: GrammarTest): WorksheetMeta {
     showSchool: m.showSchool,
     correctionMargin: m.correctionMargin,
     notesMargin: m.notesMargin,
+    anmerkungen: m.anmerkungen,
     aiCanary: m.aiCanary,
     aiCanaryWords: m.aiCanaryWords,
     helpCards: false,

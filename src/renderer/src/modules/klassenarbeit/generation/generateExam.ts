@@ -135,6 +135,7 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     // Korrektur- und Notizrand wie beim Arbeitsblatt
     correctionMargin: m.correctionMargin,
     notesMargin: m.notesMargin,
+    anmerkungen: m.anmerkungen,
     showSchool: m.showSchool,
     aiCanary: m.aiCanary,
     aiCanaryWords: m.aiCanaryWords,

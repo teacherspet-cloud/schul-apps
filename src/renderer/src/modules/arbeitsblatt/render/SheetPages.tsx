@@ -1,11 +1,11 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { needsLargeType } from '../didactics/language'
 import { buildLearnerProfile, LearnerProfile } from '../didactics/profile'
-import type { Sheet, Worksheet, WorksheetMeta, WsBlock } from '../model/types'
-import { BlockView } from './BlockView'
+import type { Sheet, TextBlock, Worksheet, WorksheetMeta, WsBlock } from '../model/types'
+import { BlockView, SeitenFussnoten } from './BlockView'
 import { subjectById } from '../model/subjects'
 import { contentInsets, PageFrame, PageInfo } from './PageFrame'
-import { MeasuredItem, PagePlan, paginate, PlacedItem } from './paginate'
+import { MeasuredItem, notenHoehe, PagePlan, paginate, PlacedItem } from './paginate'
 import { WsContext, WsContextValue, WsMode, isKeyMode } from './WsContext'
 import { DEFAULT_CITATION_STYLE, formatCitation } from '../../../shared/citation'
 import type { CitationStyle } from '@shared/types'
@@ -22,6 +22,7 @@ import { boardList } from '../didactics/boardDesign'
 import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
 import { isMaterial, loeseMaterialverweise, materialNummern, verschluesseleBaustein } from '../didactics/integrity'
 import { ueberlaufUnten } from './seitenUeberlauf'
+import { anmerkungenJeAbsatz, anmerkungenImStueck, anmerkungsArt, anmerkungenVon, type Anmerkung } from '../didactics/anmerkungen'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -159,6 +160,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     ohneSchreibhilfen: Boolean(ws.meta.ohneSchreibhilfen),
     ohneLernhilfen: ws.meta.lernhilfen === false,
     notesMargin: ws.meta.notesMargin,
+    anmerkungsArt: anmerkungsArt(ws.meta),
     phraseGerman: zeigtUebersetzung(ws.meta, sheet.stars),
     taskStyle: {
       numberStyle: ws.design.tasks.numberStyle,
@@ -388,6 +390,8 @@ export function SheetPages({
                   </div>
                 )
               })}
+              {/* Fußnoten dieser Seite (Blattoptionen „Fußnoten", 01.10.2026) – nur die Anmerkungen der Wörter auf ihr */}
+              {context.anmerkungsArt === 'fussnoten' && <SeitenFussnoten gruppen={fussnotenDerSeite(page, byId)} />}
             </PageFrame>
           )
       )}
@@ -528,6 +532,22 @@ export function SheetPages({
       )}
     </WsContext.Provider>
   )
+}
+
+/**
+ * Die Fußnoten einer Seite: je Material im Fluss die Anmerkungen, deren Wort im Stück auf dieser
+ * Seite steht (Anmerkungen ohne Stelle im Text beim letzten Stück). Frei gezogene Materialien
+ * behalten ihre Liste am Ende des Materials.
+ */
+export function fussnotenDerSeite(page: PagePlan, byId: Map<string, WsBlock>): { block: TextBlock; anmerkungen: Anmerkung[] }[] {
+  const aus: { block: TextBlock; anmerkungen: Anmerkung[] }[] = []
+  for (const placed of page.items) {
+    const block = byId.get(placed.id)
+    if (block?.type !== 'text' || block.free) continue
+    const anmerkungen = anmerkungenImStueck(block, placed.from ?? 0, placed.to ?? Infinity)
+    if (anmerkungen.length) aus.push({ block, anmerkungen })
+  }
+  return aus
 }
 
 export type ZusatzSeite = 'hilfsblatt' | 'hilfekarten' | 'lehrkraft' | 'nachweise'
@@ -691,7 +711,13 @@ function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Shee
         (bis >= m.units.length ? (m.footHeight ?? 0) : 0)
       )
     }, 0)
-    const rest = (seite === 0 ? ersteHoehe : weitereHoehe) - (abzug[seite] ?? 0) - genutzt
+    // Fußnoten unten auf dieser Seite (samt Linie) nehmen den Schreiblinien ebenfalls Platz
+    const noten = plan.items.reduce((summe, it) => {
+      const m = hoehen.get(it.id)
+      return m?.noteUnits ? summe + notenHoehe(m, it.from ?? 0, it.to ?? m.noteUnits.length) : summe
+    }, 0)
+    const linie = noten > 0 ? Math.max(0, ...plan.items.map((it) => hoehen.get(it.id)?.noteRule ?? 0)) : 0
+    const rest = (seite === 0 ? ersteHoehe : weitereHoehe) - (abzug[seite] ?? 0) - genutzt - noten - linie
     // Ein Drittel Zeilenhöhe Reserve gegen Rundung – lieber eine Linie weniger als Überlauf
     const zusaetzlich = Math.floor((rest - LINIEN_HOEHE / 3) / LINIEN_HOEHE)
     if (zusaetzlich < 1) return plan
@@ -859,6 +885,41 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       const fortsetzungKopf = probe ? probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(probe).marginBottom) || 0) : 0
       const items: MeasuredItem[] = []
       const spaltenJe = new Map<string, number[]>()
+      /*
+       * FUSSNOTEN (01.10.2026): Höhe jeder Anmerkung, gesetzt wie unten auf der Seite (gleiche Breite,
+       * gleiche Klassen) – von Oberkante zu Oberkante, die letzte bis zu ihrer Unterkante. Was über der
+       * ersten und unter der letzten steht (Linie, Abstände), ist einmal je Seite fällig (`noteRule`).
+       */
+      const notenJe = new Map<string, Map<number, number>>()
+      let noteRule = 0
+      const fnBox = el.querySelector<HTMLElement>('[data-fn-messung]')
+      if (fnBox) {
+        const zeilen = Array.from(fnBox.querySelectorAll<HTMLElement>('.ws-fussnote-zeile'))
+        const r = zeilen.map((z) => z.getBoundingClientRect())
+        const box = fnBox.getBoundingClientRect()
+        if (r.length) noteRule = Math.max(0, r[0].top - box.top) + Math.max(0, box.bottom - r[r.length - 1].bottom)
+        zeilen.forEach((z, i) => {
+          const a = z.querySelector<HTMLElement>('[data-fn-block]')
+          if (!a) return
+          const id = a.dataset.fnBlock!
+          const h = i < r.length - 1 ? r[i + 1].top - r[i].top : r[i].height
+          if (!notenJe.has(id)) notenJe.set(id, new Map())
+          notenJe.get(id)!.set(Number(a.dataset.fnNr), h)
+        })
+      }
+      /** Fußnotenhöhen je Einheit eines Materials – Absätze über `data-absatz`, Anmerkungen ohne Stelle bei der letzten */
+      const notenEinheiten = (block: WsBlock | undefined, unitEls: HTMLElement[], geteilt: boolean): number[] | undefined => {
+        const h = block && notenJe.get(block.id)
+        if (!h || block?.type !== 'text') return undefined
+        const je = anmerkungenJeAbsatz(block)
+        const summe = (nrn: number[]): number => nrn.reduce((a, nr) => a + (h.get(nr) ?? 0), 0)
+        if (!geteilt) return [summe(je.satz.anmerkungen.map((a) => a.nr))]
+        return unitEls.map((u, k) => {
+          const absatz = Number(u.dataset.absatz)
+          const hier = Number.isFinite(absatz) ? summe(je.absaetze[absatz] ?? []) : 0
+          return hier + (k === unitEls.length - 1 ? summe(je.rest) : 0)
+        })
+      }
       el.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((wrap) => {
         const id = wrap.dataset.measureBlock!
         const rahmen = wrap.getBoundingClientRect()
@@ -913,12 +974,14 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
             const kopf = u.closest('table')?.tHead
             return kopf ? kopf.getBoundingClientRect().height : 0
           })
+          const noteUnits = notenEinheiten(block, unitEls, true)
           items.push({
             id,
             height,
             headHeight,
             footHeight,
             units,
+            ...(noteUnits ? { noteUnits, noteRule } : {}),
             ...(unitGlue.some(Boolean) ? { unitGlue } : {}),
             ...(unitRepeat.some((x) => x > 0) ? { unitRepeat } : {}),
             /*
@@ -949,9 +1012,11 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
             continuedHead: Math.max(0, headHeight - vorlauf) + wiederholt
           })
         } else {
+          const noteUnits = notenEinheiten(block, unitEls, false)
           items.push({
             id,
             height,
+            ...(noteUnits ? { noteUnits, noteRule } : {}),
             keepWithNext: block?.type === 'divider',
             pageBreakBefore: block?.pageBreakBefore
           })
@@ -1035,6 +1100,16 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
                         <BlockView block={block} />
                       </div>
                     ))}
+                    {/* Fußnoten aller Materialien, gesetzt wie unten auf der Seite – nur zum Messen */}
+                    {ctx.anmerkungsArt === 'fussnoten' && (
+                      <SeitenFussnoten
+                        messung
+                        gruppen={blockLayout(sheet.blocks, phraseSheetModus(ws.meta) === 'blatt')
+                          .map((e) => e.block)
+                          .filter((b): b is TextBlock => b.type === 'text' && !b.free)
+                          .map((b) => ({ block: b, anmerkungen: anmerkungenVon(b).anmerkungen }))}
+                      />
+                    )}
                   </div>
                 </PageFrame>
               </WsContext.Provider>

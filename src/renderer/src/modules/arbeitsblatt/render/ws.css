@@ -2927,3 +2927,48 @@
   margin: 0;
   z-index: 1;
 }
+
+/*
+ * Fußnoten unten auf der Seite (01.10.2026, Blattoptionen „Fußnoten"): unten in der Inhaltsfläche,
+ * also über der Fußzeile, mit kurzer Linie wie im Buchsatz. Den Platz hält der Seitenumbruch frei;
+ * die Messung setzt denselben Bereich im Fluss (`ws-fussnoten-messung`), damit die Höhen stimmen.
+ */
+.ws-fussnoten-seite {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  font-size: 0.85em;
+  /* Abstand zum Text darüber; die Linie sitzt im unteren Teil davon */
+  padding-top: 4mm;
+}
+.ws-fussnoten-seite::before {
+  content: '';
+  position: absolute;
+  top: 2.6mm;
+  left: 0;
+  width: 35mm;
+  border-top: 0.2mm solid #999;
+}
+.ws-fussnoten-seite.ws-fussnoten-messung {
+  position: relative;
+}
+.ws-fussnote-zeile {
+  display: flex;
+  gap: 1.5mm;
+  align-items: baseline;
+}
+.ws-fussnote-zeile > .ws-anmerkung {
+  flex: 1;
+  min-width: 0;
+}
+.ws-fussnoten-material {
+  font-weight: 700;
+  font-size: 0.9em;
+}
+.ws-fussnoten-gruppe + .ws-fussnoten-gruppe {
+  margin-top: 0.6mm;
+}
+.ws-fussnoten-seite .rt-editable-inline {
+  display: inline;
+}

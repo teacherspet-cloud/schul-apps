@@ -34,6 +34,11 @@ export interface WsContextValue {
   /** Notizrand neben den Materialtexten */
   notesMargin?: boolean
   /**
+   * Anmerkungen der Materialtexte als Fußnoten unten auf der Seite (SheetPages setzt sie) oder als
+   * Endnoten am Ende des Materials (Vorgabe) – 01.10.2026, didactics/anmerkungen.ts
+   */
+  anmerkungsArt?: 'fussnoten' | 'endnoten'
+  /**
    * Stehen im Hilfsblatt deutsche Entsprechungen neben den Wendungen?
    *
    * Entschieden wird das einmal in `contextFor` aus Niveau und ★-Stufe (siehe

@@ -15,13 +15,20 @@
 
 const AUSNAHMEN = '.ws-free, .editor-block-toolbar, .editor-ai-revise-slot, .ws-zeilen-griff, .ws-spalten-griff, [data-seitenrand-ignorieren]'
 
-/** Wie weit (px, Bildschirmmaß) der Inhalt unten über die Inhaltsfläche `flaeche` hinausragt; 0 = nichts */
+/**
+ * Wie weit (px, Bildschirmmaß) der Inhalt unten über die Inhaltsfläche `flaeche` hinausragt; 0 = nichts.
+ *
+ * Fußnoten unten auf der Seite (01.10.2026): Steht ein Fußnotenbereich (`data-fussnoten-seite`)
+ * unten in der Fläche, endet der Satzspiegel für den übrigen Inhalt an dessen Oberkante – was in
+ * die Fußnoten hineinragt, zählt als Überlauf und wandert beim nächsten Umbruch weiter.
+ */
 export function ueberlaufUnten(flaeche: HTMLElement): number {
-  const unterkante = flaeche.getBoundingClientRect().bottom
+  const fussnoten = Array.from(flaeche.children).find((k) => k.hasAttribute('data-fussnoten-seite'))
+  const unterkante = fussnoten ? fussnoten.getBoundingClientRect().top : flaeche.getBoundingClientRect().bottom
   let tiefste = unterkante
   const lauf = (el: Element, clipUnten: number): void => {
     for (const kind of Array.from(el.children)) {
-      if (kind.matches(AUSNAHMEN)) continue
+      if (kind === fussnoten || kind.matches(AUSNAHMEN)) continue
       const st = getComputedStyle(kind)
       // Nicht nach `visibility` fragen: Der Messbereich der App ist als Ganzes unsichtbar
       if (st.display === 'none') continue

@@ -29,6 +29,7 @@ import { GRAMMATIKTEST_FILTER, serializeGrammarTest } from '../project'
 import { defaultTestName } from '../library'
 import EditorLeiste from '../../../shared/components/EditorLeiste'
 import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
+import { anmerkungsArt, hatAnmerkungen } from '../../arbeitsblatt/didactics/anmerkungen'
 import CanaryDialog from '../../../shared/components/CanaryDialog'
 import { canaryWordFor } from '../../../shared/aiCanary'
 import { notifyError } from '../../../shared/util'
@@ -206,6 +207,11 @@ export default function TestEditorStep(): React.JSX.Element {
             schulangaben={{ checked: test.meta.showSchool !== false, onChange: (an) => update((d) => (d.meta.showSchool = an)) }}
             korrekturrand={{ checked: Boolean(test.meta.correctionMargin), onChange: (an) => update((d) => (d.meta.correctionMargin = an)) }}
             notizrand={{ checked: Boolean(test.meta.notesMargin), onChange: (an) => update((d) => (d.meta.notesMargin = an)) }}
+            anmerkungen={
+              hatAnmerkungen([...test.blocks, ...(test.blocksB ?? [])])
+                ? { wert: anmerkungsArt(test.meta), onChange: (art) => update((d) => (d.meta.anmerkungen = art)) }
+                : undefined
+            }
             blocksatz={{ checked: test.design.page.justifyText !== false, onChange: (an) => update((d) => (d.design.page.justifyText = an)) }}
             fach={test.meta.subjectId}
             vorlagenfarbe={{ checked: Boolean(test.meta.vorlagenfarbe), onChange: (an) => update((d) => (d.meta.vorlagenfarbe = an)) }}

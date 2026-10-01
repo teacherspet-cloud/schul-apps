@@ -12,6 +12,12 @@ export interface RichDocxOptions {
   raster: MathRasterizer
   run?: RunOptions
   paragraph?: Partial<IParagraphOptions>
+  /**
+   * Hochgestelltes ersetzen (01.10.2026): Liefert der Haken einen Lauf, steht dieser statt des
+   * hochgestellten Texts – so werden die Ziffern der Materialtexte im Modus „Fußnoten" zu echten
+   * Word-Fußnotenzeichen (export/docx/bausteine.ts). `undefined` = gewöhnlich hochgestellt.
+   */
+  hochgestellt?: (text: string) => ParagraphChild | undefined
 }
 
 /** Pixel pro ex bei einer Schriftgröße (ca. 0,45 em). */
@@ -21,6 +27,11 @@ async function inlineRuns(inlines: Inline[], opts: RichDocxOptions): Promise<Par
   const out: ParagraphChild[] = []
   for (const i of inlines) {
     if (i.t === 'text') {
+      const ersatz = i.sup ? opts.hochgestellt?.(i.text) : undefined
+      if (ersatz) {
+        out.push(ersatz)
+        continue
+      }
       out.push(
         new TextRun({
           text: i.text,

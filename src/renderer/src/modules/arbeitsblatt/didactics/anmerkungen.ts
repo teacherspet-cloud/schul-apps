@@ -178,3 +178,55 @@ export function anmerkungenVon(block: Pick<TextBlock, 'body' | 'glossary' | 'fus
 
 /** Fußnotenmarken und Hochgestelltes entfernen – für Wortzahl, KI-Aufträge und Prüfungen */
 export const ohneFussnotenMarken = (text: string): string => text.replace(FUSSNOTE_MARKE, '').replace(/\^\{[^}]*\}/g, '')
+
+/*
+ * FUSSNOTEN ODER ENDNOTEN (01.10.2026, Wahl der Lehrkraft in den Blattoptionen).
+ *
+ * Endnoten (Vorgabe, bisheriges Verhalten): Die Anmerkungen stehen gesammelt am Ende des
+ * Materials, auch wenn es über zwei Seiten geteilt ist. Fußnoten: Jede Anmerkung steht unten
+ * auf DER Seite, auf der ihr Wort steht – über der Fußzeile, durch eine kurze Linie abgesetzt.
+ * Der Seitenumbruch hält dafür Platz frei (shared/render/paginate.ts, `noteUnits`). Die Zählung
+ * beginnt in beiden Fällen je Material bei ¹.
+ */
+export type AnmerkungsArt = 'fussnoten' | 'endnoten'
+
+/** Die gewählte Art; ohne Angabe Endnoten */
+export const anmerkungsArt = (meta: { anmerkungen?: AnmerkungsArt } | undefined): AnmerkungsArt =>
+  meta?.anmerkungen === 'fussnoten' ? 'fussnoten' : 'endnoten'
+
+/** Absätze wie in der Darstellung (render/baustein/hilfen.tsx, `splitParagraphs`) */
+const absaetze = (body: string): string[] =>
+  body
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+/**
+ * Welche Anmerkung gehört zu welchem Absatz? `absaetze[i]` = Nummern der Ziffern in Absatz i
+ * (in der Reihenfolge im Text); `rest` = Anmerkungen ohne Stelle im Text – sie stehen beim
+ * letzten Stück des Materials.
+ */
+export function anmerkungenJeAbsatz(block: Pick<TextBlock, 'body' | 'glossary' | 'fussnoten'>): { satz: AnmerkungsSatz; absaetze: number[][]; rest: number[] } {
+  const satz = anmerkungenVon(block)
+  const roh = absaetze(block.body ?? '')
+  const anzeige = absaetze(satz.anzeige)
+  // Teilt die Anzeige anders als der Rohtext (sehr selten), stehen alle Anmerkungen beim letzten Stück
+  const je = anzeige.length === roh.length ? anzeige.map((p) => [...p.matchAll(/\^\{(\d+)\}/g)].map((m) => Number(m[1]))) : roh.map(() => [])
+  const vergeben = new Set(je.flat())
+  return { satz, absaetze: je, rest: satz.anmerkungen.filter((a) => !vergeben.has(a.nr)).map((a) => a.nr) }
+}
+
+/**
+ * Die Anmerkungen eines Stücks [von, bis) – in Absätzen gezählt. Was keine Stelle im Text hat,
+ * gehört zum Stück, das das Material abschließt.
+ */
+export function anmerkungenImStueck(block: Pick<TextBlock, 'body' | 'glossary' | 'fussnoten'>, von = 0, bis = Infinity): Anmerkung[] {
+  const { satz, absaetze: je, rest } = anmerkungenJeAbsatz(block)
+  const nummern = new Set(je.slice(von, Math.min(bis, je.length)).flat())
+  if (bis >= je.length) for (const nr of rest) nummern.add(nr)
+  return satz.anmerkungen.filter((a) => nummern.has(a.nr))
+}
+
+/** Hat eines der Materialien Anmerkungen? Nur dann bieten die Blattoptionen die Wahl an */
+export const hatAnmerkungen = (bloecke: readonly { type: string }[]): boolean =>
+  bloecke.some((b) => b.type === 'text' && anmerkungenVon(b as TextBlock).anmerkungen.length > 0)

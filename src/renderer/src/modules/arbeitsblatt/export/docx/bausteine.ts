@@ -10,6 +10,7 @@ import {
   TableRow,
   TabStopType,
   TextRun,
+  FootnoteReferenceRun,
   VerticalAlign,
   WidthType
 } from 'docx'
@@ -24,7 +25,7 @@ import { audioLength, galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraph
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { headerLine } from '../../didactics/sourceHeader'
-import { anmerkungenVon } from '../../didactics/anmerkungen'
+import { anmerkungenVon, anmerkungsArt, type Anmerkung } from '../../didactics/anmerkungen'
 import { gridDrawing } from '../../render/gridSvg'
 import { qrSvg } from '../../render/qr'
 import { justifyText } from '../../render/SheetPages'
@@ -97,6 +98,25 @@ export async function illustrationDocx(
   ]
 }
 export const key = (ctx: Ctx): boolean => ctx.key
+
+/**
+ * Läufe einer Anmerkung: Ziffer (nur in der Liste unter dem Material – in einer Word-Fußnote setzt
+ * Word das Zeichen selbst davor), ggf. KI-Bild, Stichwort fett, Erklärung.
+ */
+function anmerkungLaeufe(ctx: Ctx, block: WsBlock, a: Anmerkung, mitZiffer: boolean): ParagraphChild[] {
+  const bild = a.art === 'fussnote' && block.type === 'text' ? block.fussnoten?.[a.index]?.bild : undefined
+  const masse = bild ? imageSizeFromDataUrl(bild.dataUrl) : null
+  const hoehe = 16 * PX_PER_MM
+  return [
+    ...(mitZiffer ? [new TextRun({ text: String(a.nr), superScript: true, bold: true, size: ctx.size - 3 })] : []),
+    run(' ', { size: ctx.size - 3 }),
+    ...(bild
+      ? [imageRun(bild.dataUrl, masse ? (hoehe * masse.width) / masse.height : hoehe, hoehe), run(' (KI-Bild) ', { size: ctx.size - 6, color: '555555' })]
+      : []),
+    run(a.text ? `${a.wort}: ` : a.wort, { bold: true, size: ctx.size - 3 }),
+    ...(a.text ? [run(a.text, { size: ctx.size - 3 })] : [])
+  ]
+}
 
 export async function blockContent(ctx: Ctx, block: WsBlock, numbers: Map<string, number>): Promise<Child[]> {
   // Nur im Lösungsteil (didactics/loesungsteil.ts): auf dem Schülerblatt fehlt der Baustein ganz
@@ -175,13 +195,33 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
        */
       const anm = anmerkungenVon(block)
       const luecken = (t: string): string => t.replace(/\[\[(.+?)\]\]/g, (_, w: string) => (ctx.key ? `**${w}**` : '__________'))
+      /*
+       * Blattoptionen „Fußnoten" (01.10.2026): Die Ziffer im Text wird eine ECHTE Word-Fußnote mit
+       * eigenem Zeichen (je Material ab 1), Word setzt sie unten auf die Seite des Worts. Frei
+       * gezogene Materialien und Anmerkungen ohne Stelle im Text bleiben in der Liste darunter.
+       */
+      const sammel = anmerkungsArt(ctx.ws.meta) === 'fussnoten' && !block.free ? ctx.fussnoten : undefined
+      const alsFussnote = new Set<number>()
+      const hochgestellt = sammel
+        ? (t: string) => {
+            const a = anm.anmerkungen.find((x) => x.imText && String(x.nr) === t.trim())
+            if (!a || alsFussnote.has(a.nr)) return undefined
+            alsFussnote.add(a.nr)
+            const id = sammel.naechste++
+            sammel.eintraege[id] = { children: [new Paragraph({ children: anmerkungLaeufe(ctx, block, a, false) })] }
+            sammel.marken.set(id, String(a.nr))
+            return new FootnoteReferenceRun(id)
+          }
+        : undefined
       for (const p of splitParagraphs(anm.anzeige))
         out.push(
           ...(await rich(ctx, luecken(p), {
-            paragraph: { spacing: { after: 0, line: 360 }, keepLines: true, keepNext: true, ...(justify ? { alignment: AlignmentType.JUSTIFIED } : {}) }
+            paragraph: { spacing: { after: 0, line: 360 }, keepLines: true, keepNext: true, ...(justify ? { alignment: AlignmentType.JUSTIFIED } : {}) },
+            hochgestellt
           }))
         )
-      if (anm.anmerkungen.length) {
+      const liste = anm.anmerkungen.filter((a) => !alsFussnote.has(a.nr))
+      if (liste.length) {
         out.push(
           new Paragraph({
             suppressLineNumbers: true,
@@ -190,28 +230,7 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
             children: []
           })
         )
-        for (const a of anm.anmerkungen) {
-          const bild = a.art === 'fussnote' ? block.fussnoten?.[a.index]?.bild : undefined
-          const masse = bild ? imageSizeFromDataUrl(bild.dataUrl) : null
-          const hoehe = 16 * PX_PER_MM
-          out.push(
-            new Paragraph({
-              suppressLineNumbers: true,
-              children: [
-                new TextRun({ text: String(a.nr), superScript: true, bold: true, size: ctx.size - 3 }),
-                run(' ', { size: ctx.size - 3 }),
-                ...(bild
-                  ? [
-                      imageRun(bild.dataUrl, masse ? (hoehe * masse.width) / masse.height : hoehe, hoehe),
-                      run(' (KI-Bild) ', { size: ctx.size - 6, color: '555555' })
-                    ]
-                  : []),
-                run(a.text ? `${a.wort}: ` : a.wort, { bold: true, size: ctx.size - 3 }),
-                ...(a.text ? [run(a.text, { size: ctx.size - 3 })] : [])
-              ]
-            })
-          )
-        }
+        for (const a of liste) out.push(new Paragraph({ suppressLineNumbers: true, children: anmerkungLaeufe(ctx, block, a, true) }))
       }
       if (block.source)
         out.push(new Paragraph({ suppressLineNumbers: true, children: [run(`Quelle: ${block.source}`, { size: ctx.size - 6, color: '555555' })] }))

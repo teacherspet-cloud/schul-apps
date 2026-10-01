@@ -1176,6 +1176,12 @@ export interface WorksheetMeta {
    */
   notesMargin?: boolean
   /**
+   * Fußnoten oder Endnoten (01.10.2026, Blattoptionen – nur angeboten, wenn ein Material
+   * Anmerkungen hat): `fussnoten` = unten auf der Seite des markierten Worts, sonst gesammelt
+   * am Ende des Materials (didactics/anmerkungen.ts).
+   */
+  anmerkungen?: 'fussnoten' | 'endnoten'
+  /**
    * Illustrationen (Maskottchen) auf diesem Blatt (26.09.2026): `an` ausdrücklich gewählt,
    * sonst nach dem Jahrgang (Einstellung „bis Klasse"); `maskottchenId` = Figur, sonst Standard.
    */

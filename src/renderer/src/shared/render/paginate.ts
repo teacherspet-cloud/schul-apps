@@ -39,6 +39,15 @@ export interface MeasuredItem {
   unitRepeat?: number[]
   /** Zeilen je Einheit (für fortlaufende Zeilennummern) */
   unitLines?: number[]
+  /**
+   * FUSSNOTEN unten auf der Seite (01.10.2026, Blattoptionen „Fußnoten"): Höhe der Anmerkungen,
+   * deren Wort in Einheit i steht – sie stehen auf derselben Seite wie die Einheit. Bei einem
+   * ungeteilten Baustein genau ein Eintrag (alle Anmerkungen). Passt eine Anmerkung nicht mehr
+   * auf die Seite, wandert die Einheit mit ihrem Wort auf die nächste – wie im Buchsatz.
+   */
+  noteUnits?: number[]
+  /** Linie und Abstand über dem Fußnotenbereich – einmal je Seite, sobald dort eine Fußnote steht */
+  noteRule?: number
   /** Nicht allein am Seitenende stehen lassen (z. B. Abschnittsüberschrift) */
   keepWithNext?: boolean
   /**
@@ -121,20 +130,34 @@ const KEEP_TOGETHER_MAX_GAP = 0.5
 export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPageHeight: number, abzug: readonly number[] = []): PagePlan[] {
   const pages: PagePlan[] = [{ items: [], overflow: false }]
   let remaining = firstPageHeight - (abzug[0] ?? 0)
+  /** Steht auf der laufenden Seite schon eine Fußnote? Dann ist ihre Linie schon bezahlt */
+  let notenAufSeite = false
   const page = (): PagePlan => pages[pages.length - 1]
   const newPage = (): void => {
     pages.push({ items: [], overflow: false })
     remaining = otherPageHeight - (abzug[pages.length - 1] ?? 0)
+    notenAufSeite = false
   }
+  /** Platz für die Fußnoten der Einheiten [von, bis) auf der laufenden Seite – samt Linie, wenn sie die ersten sind */
+  const noten = (it: MeasuredItem, von: number, bis: number): number => {
+    const h = notenHoehe(it, von, bis)
+    return h > 0 ? h + (notenAufSeite ? 0 : (it.noteRule ?? 0)) : 0
+  }
+  /** Ganzer Baustein samt seinen Fußnoten */
+  const gesamt = (it: MeasuredItem): number => it.height + noten(it, 0, it.noteUnits?.length ?? 0)
   /** Kleinstes erstes Stück: Kopf + erste Einheit samt allem, was an sie gebunden ist */
   const minHeight = (it: MeasuredItem): number => {
-    if (!it.units?.length) return it.height
+    if (!it.units?.length) return gesamt(it)
     let h = it.headHeight ?? 0
-    for (let k = 0; k < it.units.length; k++) {
+    let k = 0
+    for (; k < it.units.length; k++) {
       h += it.units[k]
       if (!it.unitGlue?.[k]) break
     }
-    return h
+    return h + noten(it, 0, k + 1)
+  }
+  const notenGesetzt = (it: MeasuredItem, von: number, bis: number): void => {
+    if (notenHoehe(it, von, bis) > 0) notenAufSeite = true
   }
 
   items.forEach((item, index) => {
@@ -143,11 +166,12 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
     if (item.pageBreakBefore && page().items.length > 0) newPage()
 
     // Überschriften nicht allein am Seitenende
-    if (item.keepWithNext && next && page().items.length > 0 && item.height + minHeight(next) > remaining + EPS) {
+    if (item.keepWithNext && next && page().items.length > 0 && gesamt(item) + minHeight(next) > remaining + EPS) {
       newPage()
     }
 
-    if (item.height <= remaining + EPS) {
+    if (gesamt(item) <= remaining + EPS) {
+      const h = gesamt(item)
       page().items.push(
         item.units
           ? {
@@ -159,15 +183,22 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
             }
           : { id: item.id }
       )
-      remaining -= item.height
+      remaining -= h
+      notenGesetzt(item, 0, item.noteUnits?.length ?? 0)
       return
     }
 
     // Zusammengehöriges Material passt auf eine neue Seite und würde erst in der unteren Seitenhälfte beginnen → nicht teilen
     // Maßgeblich ist der Platz der NÄCHSTEN Seite – mit ihrem Abzug aus der Prüfung
     const naechste = otherPageHeight - (abzug[pages.length] ?? 0)
-    if (item.keepTogether && page().items.length > 0 && item.height <= naechste + EPS && remaining < otherPageHeight * KEEP_TOGETHER_MAX_GAP) {
+    if (
+      item.keepTogether &&
+      page().items.length > 0 &&
+      item.height + notenHoehe(item, 0, item.noteUnits?.length ?? 0) + (item.noteRule ?? 0) <= naechste + EPS &&
+      remaining < otherPageHeight * KEEP_TOGETHER_MAX_GAP
+    ) {
       newPage()
+      const h = gesamt(item)
       page().items.push(
         item.units
           ? {
@@ -179,7 +210,8 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
             }
           : { id: item.id }
       )
-      remaining -= item.height
+      remaining -= h
+      notenGesetzt(item, 0, item.noteUnits?.length ?? 0)
       return
     }
 
@@ -193,12 +225,15 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
       while (from < n) {
         // Ein Folgestück wiederholt seinen Kopf (Fortsetzungshinweis, Tabellenkopf) – und ggf. den einer inneren Tabelle
         const head = from === 0 ? (item.headHeight ?? 0) : (item.continuedHead ?? 0) + (item.unitRepeat?.[from] ?? 0)
-        let used = head
-        let to = from
-        while (to < n && used + mitFuss(to) <= remaining + EPS) {
-          used += mitFuss(to)
-          to++
+        // Höhe des Stücks [from, bis) samt den Fußnoten seiner Einheiten auf dieser Seite
+        const stueck = (bis: number): number => {
+          let h = head
+          for (let k = from; k < bis; k++) h += mitFuss(k)
+          return h + noten(item, from, bis)
         }
+        let to = from
+        while (to < n && stueck(to + 1) <= remaining + EPS) to++
+        let used = stueck(to)
         /*
          * Gebundene Einheiten (Aufgabenstellung, Kopf einer Teilaufgabe …) nie als letzte eines
          * Stücks: so weit zurückgehen, bis nach einer freien Einheit umbrochen wird.
@@ -206,7 +241,7 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
         const gierig = to
         while (to > from && to < n && gebunden(to - 1)) {
           to--
-          used -= mitFuss(to)
+          used = stueck(to)
         }
         if (to === from) {
           // Nicht einmal Kopf + erste Einheit (samt Gebundenem) passen: ganzer Rest auf die nächste Seite
@@ -217,12 +252,11 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
           if (gierig > from) {
             // Oben auf einer leeren Seite und die Kette ist länger als die Seite: dann doch innerhalb der Kette teilen
             to = gierig
-            used = head
-            for (let k = from; k < to; k++) used += mitFuss(k)
+            used = stueck(to)
           } else {
             // Einheit größer als eine ganze Seite: trotzdem setzen
             to = from + 1
-            used = head + mitFuss(from)
+            used = stueck(to)
             page().overflow = true
           }
         }
@@ -237,6 +271,7 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
         })
         lineCursor += lineCount
         remaining -= used
+        notenGesetzt(item, from, to)
         from = to
         if (from < item.units.length) newPage()
       }
@@ -245,8 +280,10 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
 
     if (page().items.length > 0) newPage()
     page().items.push({ id: item.id })
-    if (item.height > remaining + EPS) page().overflow = true
-    remaining -= item.height
+    const h = gesamt(item)
+    if (h > remaining + EPS) page().overflow = true
+    remaining -= h
+    notenGesetzt(item, 0, item.noteUnits?.length ?? 0)
   })
 
   return pages
@@ -254,6 +291,11 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
 
 function sum(values: number[]): number {
   return values.reduce((a, b) => a + b, 0)
+}
+
+/** Höhe der Fußnoten der Einheiten [von, bis) – ohne Linie */
+export function notenHoehe(it: Pick<MeasuredItem, 'noteUnits'>, von: number, bis: number): number {
+  return sum((it.noteUnits ?? []).slice(von, bis))
 }
 
 /**

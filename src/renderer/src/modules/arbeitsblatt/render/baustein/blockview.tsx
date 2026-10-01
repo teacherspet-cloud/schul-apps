@@ -23,7 +23,7 @@ import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
 import { ProtokollView } from './protokoll'
 import { wortzahlText, zaehleWoerter } from '../../../../shared/kopfSprache'
-import { anmerkungenVon, ohneFussnotenMarken } from '../../didactics/anmerkungen'
+import { anmerkungenVon, ohneFussnotenMarken, type Anmerkung } from '../../didactics/anmerkungen'
 import { fassungWechseln } from '../../didactics/textauswahl'
 import { useTextAuswahl } from './textauswahl'
 
@@ -638,9 +638,15 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
   const anzeigeAbsaetze = splitParagraphs(anm.anzeige)
   const gleichGeteilt = anzeigeAbsaetze.length === paragraphs.length
   const from = placed?.from ?? 0
-  const to = placed?.to ?? paragraphs.length + (anm.anmerkungen.length ? 1 : 0)
+  /*
+   * Fußnoten (01.10.2026, Blattoptionen): Die Anmerkungen stehen unten auf der Seite ihres Worts –
+   * gesetzt von SheetPages (`SeitenFussnoten`), nicht hier. Frei gezogene Materialien stehen außerhalb
+   * des Seitenflusses und behalten ihre Liste am Ende.
+   */
+  const fussModus = ctx.anmerkungsArt === 'fussnoten' && !block.free
+  const to = placed?.to ?? paragraphs.length + (anm.anmerkungen.length && !fussModus ? 1 : 0)
   const showHead = from === 0
-  const showGlossary = anm.anmerkungen.length > 0 && to > paragraphs.length
+  const showGlossary = !fussModus && anm.anmerkungen.length > 0 && to > paragraphs.length
   const lineStart = placed?.lineStart ?? 0
   const lineCount = placed?.lineCount ?? 0
   // Blocksatz nur bei längeren Texten – kurze Absätze würden sonst zerrissen
@@ -764,58 +770,9 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
         {showGlossary && (
           <div data-unit className="ws-glossary">
             {/* Fußnoten und Worthilfen in EINER Zählung, jede mit ihrer hochgestellten Ziffer (01.10.2026) */}
-            {anm.anmerkungen.map((a) => {
-              const f = a.art === 'fussnote' ? block.fussnoten?.[a.index] : undefined
-              const feld = (welches: 'wort' | 'text') =>
-                set((d, v) => {
-                  const t = d as typeof block
-                  if (a.art === 'fussnote') {
-                    const fn = t.fussnoten?.[a.index]
-                    if (fn) fn[welches] = v
-                  } else if (t.glossary[a.index]) {
-                    if (welches === 'wort') t.glossary[a.index].term = v
-                    else t.glossary[a.index].explanation = v
-                  }
-                })
-              return (
-                <div key={`${a.art}-${a.index}`} className={`ws-anmerkung ${f?.bild ? 'ws-anmerkung-bild' : ''}`} data-anmerkung={a.art}>
-                  <sup className="ws-anmerkung-nr">{a.nr}</sup>{' '}
-                  {f?.bild && (
-                    <span className="ws-fussnote-bild">
-                      <img src={f.bild.dataUrl} alt={a.wort} />
-                      <span className="ws-ai-mark" title="Dieses Bild wurde von einer KI erzeugt.">
-                        KI
-                      </span>
-                    </span>
-                  )}
-                  <b>
-                    <Feld value={a.wort} editable={schreiben} onChange={feld('wort')} />
-                  </b>
-                  {(a.text || schreiben) && (
-                    <>
-                      : <Feld value={a.text} editable={schreiben} onChange={feld('text')} />
-                    </>
-                  )}
-                  {edit && a.art === 'fussnote' && (
-                    <button
-                      type="button"
-                      className="ws-anmerkung-weg"
-                      title="Fußnote entfernen"
-                      aria-label="Fußnote entfernen"
-                      onClick={() =>
-                        ctx.update?.(block.id, (d) => {
-                          if (d.type !== 'text' || !f) return
-                          d.body = d.body.split(`[^${f.id}]`).join('')
-                          d.fussnoten = (d.fussnoten ?? []).filter((x) => x.id !== f.id)
-                        })
-                      }
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              )
-            })}
+            {anm.anmerkungen.map((a) => (
+              <AnmerkungZeile key={`${a.art}-${a.index}`} block={block} a={a} />
+            ))}
           </div>
         )}
       </div>
@@ -838,6 +795,107 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
           Quelle: <Feld value={block.source} editable={schreiben} onChange={set((d, v) => ((d as typeof block).source = v))} />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Eine Anmerkung (Fußnote oder Worthilfe) mit ihrer hochgestellten Ziffer – am Ende des Materials
+ * (Endnoten) und unten auf der Seite (Fußnoten) dieselbe Zeile, in beiden Fällen bearbeitbar.
+ */
+function AnmerkungZeile({ block, a }: { block: TextBlock; a: Anmerkung }): React.JSX.Element {
+  const ctx = useWs()
+  const schreiben = isEditMode(ctx.mode)
+  const set = useSetter(block)
+  const f = a.art === 'fussnote' ? block.fussnoten?.[a.index] : undefined
+  const feld = (welches: 'wort' | 'text') =>
+    set((d, v) => {
+      const t = d as typeof block
+      if (a.art === 'fussnote') {
+        const fn = t.fussnoten?.[a.index]
+        if (fn) fn[welches] = v
+      } else if (t.glossary[a.index]) {
+        if (welches === 'wort') t.glossary[a.index].term = v
+        else t.glossary[a.index].explanation = v
+      }
+    })
+  return (
+    <div className={`ws-anmerkung ${f?.bild ? 'ws-anmerkung-bild' : ''}`} data-anmerkung={a.art} data-fn-block={block.id} data-fn-nr={a.nr}>
+      <sup className="ws-anmerkung-nr">{a.nr}</sup>{' '}
+      {f?.bild && (
+        <span className="ws-fussnote-bild">
+          <img src={f.bild.dataUrl} alt={a.wort} />
+          <span className="ws-ai-mark" title="Dieses Bild wurde von einer KI erzeugt.">
+            KI
+          </span>
+        </span>
+      )}
+      <b>
+        <Feld value={a.wort} editable={schreiben} onChange={feld('wort')} />
+      </b>
+      {(a.text || schreiben) && (
+        <>
+          : <Feld value={a.text} editable={schreiben} onChange={feld('text')} />
+        </>
+      )}
+      {ctx.mode === 'edit' && a.art === 'fussnote' && (
+        <button
+          type="button"
+          className="ws-anmerkung-weg"
+          title="Fußnote entfernen"
+          aria-label="Fußnote entfernen"
+          onClick={() =>
+            ctx.update?.(block.id, (d) => {
+              if (d.type !== 'text' || !f) return
+              d.body = d.body.split(`[^${f.id}]`).join('')
+              d.fussnoten = (d.fussnoten ?? []).filter((x) => x.id !== f.id)
+            })
+          }
+        >
+          ×
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * FUSSNOTEN UNTEN AUF DER SEITE (01.10.2026, Blattoptionen „Fußnoten").
+ *
+ * Steht unten in der Inhaltsfläche – über der Fußzeile, durch eine kurze Linie vom Text getrennt –
+ * und zeigt nur die Anmerkungen, deren Wort auf DIESER Seite steht. Den Platz hält der
+ * Seitenumbruch frei (`noteUnits` in shared/render/paginate.ts); die Prüfung nach dem Setzen
+ * (seitenUeberlauf.ts) misst bis zur Oberkante dieses Bereichs. Stehen Anmerkungen mehrerer
+ * Materialien auf einer Seite, trägt jede Gruppe vorn die Materialnummer – jede Zählung beginnt
+ * bei ¹. `messung`: im Fluss statt unten angeheftet, für die Höhenmessung in SheetPages.
+ */
+export function SeitenFussnoten({
+  gruppen,
+  messung
+}: {
+  gruppen: { block: TextBlock; anmerkungen: Anmerkung[] }[]
+  messung?: boolean
+}): React.JSX.Element | null {
+  const ctx = useWs()
+  const belegt = gruppen.filter((g) => g.anmerkungen.length > 0)
+  if (!belegt.length) return null
+  const mitNummer = !messung && belegt.length > 1
+  return (
+    <div
+      className={`ws-fussnoten-seite ${messung ? 'ws-fussnoten-messung' : ''}`}
+      data-fussnoten-seite={messung ? undefined : ''}
+      data-fn-messung={messung ? '' : undefined}
+    >
+      {belegt.map((g) => (
+        <div key={g.block.id} className="ws-fussnoten-gruppe" data-fn-gruppe={g.block.id}>
+          {g.anmerkungen.map((a, i) => (
+            <div key={`${a.art}-${a.index}`} className="ws-fussnote-zeile">
+              {mitNummer && i === 0 && <span className="ws-fussnoten-material">{ctx.materialNumbers?.get(g.block.id) ?? stripMaterialNo(g.block.title)}</span>}
+              <AnmerkungZeile block={g.block} a={a} />
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   )
 }

@@ -35,6 +35,12 @@ export interface GrammarTestMeta {
   showSchool?: boolean
   correctionMargin?: boolean
   notesMargin?: boolean
+  /**
+   * Fußnoten oder Endnoten (01.10.2026, Blattoptionen – nur angeboten, wenn ein Material
+   * Anmerkungen hat): `fussnoten` = unten auf der Seite des markierten Worts, sonst gesammelt
+   * am Ende des Materials (didactics/anmerkungen.ts).
+   */
+  anmerkungen?: 'fussnoten' | 'endnoten'
   aiCanary?: boolean
   aiCanaryWords?: string
   subjectId: string
