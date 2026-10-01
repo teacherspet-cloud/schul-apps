@@ -5,6 +5,7 @@ import type { Block, TestDocument, Variant } from '../model/types'
 import { blockHelp, errechneteHilfe } from './helpTexts'
 import { isEditable, showsAnswers, T, useRender } from './RenderContext'
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
+import { continuedNote } from '../../../shared/continuedNote'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
 import { fachPfad, ueberthemaVon } from '../../../shared/ueberthema'
 import { LANGUAGES } from '../model/types'
@@ -29,7 +30,8 @@ export interface BlockRange {
 }
 
 /** Aufgabenarten, deren Items auf mehrere Seiten verteilt werden dürfen */
-export const SPLITTABLE_KINDS = new Set<Block['kind']>(['gap', 'choice', 'open', 'trueFalse', 'oddOneOut', 'scramble'])
+// Zuordnung seit 01.10.2026 zwischen zwei Zeilen teilbar – wie im Arbeitsblatt (`teilbareAntwort`)
+export const SPLITTABLE_KINDS = new Set<Block['kind']>(['gap', 'choice', 'open', 'trueFalse', 'oddOneOut', 'scramble', 'match'])
 
 /**
  * „Englisch › Unit 3" – Sprache und Überthema für den Kopf (Paket 11); leer ohne Überthema.
@@ -207,6 +209,12 @@ export function BlockView({ block, number, lang = 'en', range }: { block: Block;
 
   return (
     <section className={`vt-block vt-kind-${block.kind} ${continued ? 'vt-block-continued' : ''}`}>
+      {/*
+       * Folgestück: „Aufgabe 3 (Fortsetzung)" in der Sprache des Tests – derselbe Wegweiser wie im
+       * Arbeitsblatt (01.10.2026, Wunsch der Lehrkraft: überall einheitlich). Die Höhe misst
+       * `useTestLayout` einmal und rechnet sie jedem Folgestück an.
+       */}
+      {continued && <div className="vt-continued">{continuedNote(lang, number)}</div>}
       {!continued && (
         <>
           <div className="vt-block-head">
@@ -552,12 +560,12 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
       return (
         <table className="vt-match">
           <tbody>
-            {Array.from({ length: Math.max(block.left.length, block.right.length) }, (_, row) => {
+            {Array.from({ length: Math.max(block.left.length, block.right.length) }, (_, row) => row).slice(range?.from ?? 0, range?.to).map((row) => {
               const l = block.left[row]
               const r = block.right[row]
               const answerIndex = l ? block.right.findIndex((x) => x.id === l.answerId) : -1
               return (
-                <tr key={row}>
+                <tr key={row} data-unit>
                   <td className="vt-match-box">{l && <span className="vt-box">{answers ? letter(answerIndex) : ''}</span>}</td>
                   <td className="vt-match-left">
                     {l && (
