@@ -577,6 +577,15 @@ export function AiCard({ settings, update }: { settings: AppSettings; update: Up
               description="Im Sparmodus entstehen alle Aufgaben einer Testvariante in einer einzigen KI-Anfrage, die zusätzliche Prüfrunde entfällt. Das spart beim Abo einen Großteil des Kontingents (etwa 5- bis 10-mal weniger Anfragen). Kleinere Modelle sparen zusätzlich."
             />
 
+            {/* Blindprobe (01.10.2026): Ankreuzfragen zu Texten dürfen ohne den Text nicht lösbar sein */}
+            <Checkbox
+              checked={ai.mcBlindprobe !== false}
+              onChange={(e) => update({ ai: { mcBlindprobe: e.currentTarget.checked } })}
+              label="Blindprobe für Ankreuzfragen zu Texten"
+              description="Nach dem Erzeugen beantwortet eine zweite KI-Anfrage die Ankreuzfragen zu Lese-, Hör- und Videotexten OHNE den Text. Was sie trotzdem lösen kann, wird neu gefasst (höchstens zweimal) oder als Hinweis markiert. Kostet je Aufgabe ein bis fünf zusätzliche Anfragen."
+              data-testid="einstellung-mc-blindprobe"
+            />
+
             <Divider />
 
             <Checkbox

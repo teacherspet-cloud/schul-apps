@@ -638,7 +638,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Produzione scritta',
       language: 'Uso della lingua',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Produzione orale (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Produzione orale'
     }
   },
   {
@@ -651,7 +651,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Письменная речь',
       language: 'Грамматика и лексика',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Говорение (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Говорение'
     }
   },
   // ---------- 30.09.2026 ----------
@@ -666,7 +666,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Schrijfvaardigheid',
       language: 'Grammatica en woordenschat',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Spreekvaardigheid (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Spreekvaardigheid'
     }
   },
   {
@@ -681,7 +681,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Wypowiedź pisemna',
       language: 'Znajomość środków językowych',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Wypowiedź ustna (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Wypowiedź ustna'
     }
   },
   {
@@ -695,7 +695,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Písemný projev',
       language: 'Jazykové prostředky',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Ústní projev (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Ústní projev'
     }
   },
   {
@@ -708,7 +708,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Produção escrita',
       language: 'Gramática e vocabulário',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Produção oral (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Produção oral'
     }
   },
   {
@@ -722,7 +722,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Yazma',
       language: 'Dil bilgisi ve sözcük bilgisi',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Konuşma (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Konuşma'
     }
   },
   {
@@ -736,7 +736,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: '写作',
       language: '词汇与语法',
       grammar: 'Grammatik im Kontext',
-      speaking: '口语表达 (Ersatz für eine schriftliche Arbeit)'
+      speaking: '口语表达'
     }
   },
   {
@@ -749,7 +749,7 @@ export const FREMDSPRACHEN_NEU: {
       writing: 'Schriftliche Kommunikation',
       language: 'Wortschatz und Grammatik im Kontext',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Mündliche Kommunikation (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Mündliche Kommunikation'
     },
     ohne: ['mediation'],
     ab: 3,

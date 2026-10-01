@@ -6,10 +6,12 @@ import { bilingualAktiv, glossarRegeln } from '../../didactics/bilingual'
 import { vocabWorkRules } from '../../didactics/vocabWork'
 import { chosenGrammarTopics, grammarFormatLabel } from '../../didactics/grammar'
 import { wantedTasks } from './grundregeln'
+import { istSprechblatt, sprechRegeln } from '../../didactics/sprechen'
+import { SPRECHEN_DIALOGISCH, SPRECHEN_MONOLOGISCH } from '../../../../shared/sprechen/kompetenzen'
 
 /** Kompetenzschwerpunkt eines Fremdsprachenblattes (Auswahl in Schritt 1). */
 export const SKILL_FOCUS: {
-  value: 'mixed' | 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary'
+  value: 'mixed' | 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary' | 'speaking' | 'interaction'
   label: string
   description: string
   prompt: string
@@ -41,6 +43,22 @@ export const SKILL_FOCUS: {
       'Sonst nichts: keine Lernziele, keine Textsortenübung, kein Mustertext, kein Wortspeicher als eigener Baustein, keine Selbsteinschätzung, keine zweite Aufgabe und keine Teilaufgaben.',
       'Situation, Adressat, Textsorte, Zweck, Umfang und die Inhaltspunkte stehen in brief, nicht als eigene Aufgaben.'
     ].join(' ')
+  },
+  /*
+   * Sprechen (01.10.2026, Wunsch der Lehrkraft): beide Teilkompetenzen der KMK-Bildungsstandards
+   * als eigene Schwerpunkte. Die Regeln entstehen je Blatt in didactics/sprechen.ts.
+   */
+  {
+    value: 'speaking',
+    label: SPRECHEN_MONOLOGISCH,
+    description: 'Vorbereitung auf die Sprechprüfung: Monologkarten mit Material, Redemittel, Beobachtungsbogen, Mustervortrag als Hörtext.',
+    prompt: ''
+  },
+  {
+    value: 'interaction',
+    label: SPRECHEN_DIALOGISCH,
+    description: 'Vorbereitung auf die Sprechprüfung: Rollenkarten für Paare oder Gruppen, Redemittel, Beobachtungsbogen, Mustergespräch als Hörtext.',
+    prompt: ''
   },
   {
     value: 'vocabulary',
@@ -113,6 +131,8 @@ export function skillFocusPrompt(meta: WorksheetMeta): string {
   if (!skillFocusOptions(meta.subjectId).some((f) => f.value === meta.skillFocus)) return ''
   // Beim Schwerpunkt Vokabeln stehen die ausführlichen Regeln in didactics/vocabWork.ts
   if (meta.skillFocus === 'vocabulary') return vocabWorkRules(meta)
+  // Sprechen: Teile nach Wahl der Lehrkraft (didactics/sprechen.ts)
+  if (istSprechblatt(meta)) return sprechRegeln(meta)
   const text = SKILL_FOCUS.find((f) => f.value === (meta.skillFocus ?? 'mixed'))?.prompt ?? ''
   const wanted = wantedTasks(meta)
   if (!wanted || !text) return text

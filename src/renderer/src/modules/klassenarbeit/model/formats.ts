@@ -131,9 +131,11 @@ const ENGLISCH: ExamFormat[] = [
   {
     id: 'en-speaking',
     subject: 'englisch',
-    label: 'Speaking (Ersatz für eine schriftliche Arbeit)',
-    competence: 'Sprechen',
-    description: 'Paar- oder Gruppenprüfung: Monolog (Bildimpuls, Kurzvortrag) und Dialog (Diskussion, Rollenspiel) mit Bewertungsraster.',
+    label: 'Speaking test',
+    // 01.10.2026: Sprechprüfung mit Karten, Prüferbogen und Raster (generation/sprechpruefung.ts)
+    competence: 'Sprechprüfung',
+    description:
+      'Paar- oder Dreierprüfung: Einstieg, zusammenhängendes Sprechen mit Material (Bild, Cartoon, Statistik, Kurztext, Zitat) und Gespräch mit Rollenkarten – mit Prüferbogen, Bewertungsraster je Prüfling und mehreren gleichwertigen Kartensätzen.',
     afb: ['II', 'III'],
     share: 100,
     grades: [5, 13],
@@ -301,7 +303,7 @@ const FREMDSPRACHEN: { fach: ExamSubjectId; praefix: string; labels: Record<stri
       writing: 'Production écrite',
       language: 'Maîtrise de la langue',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Production orale (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Production orale'
     }
   },
   {
@@ -314,7 +316,7 @@ const FREMDSPRACHEN: { fach: ExamSubjectId; praefix: string; labels: Record<stri
       writing: 'Expresión escrita',
       language: 'Uso de la lengua',
       grammar: 'Grammatik im Kontext',
-      speaking: 'Expresión oral (Ersatz für eine schriftliche Arbeit)'
+      speaking: 'Expresión oral'
     }
   }
 ]

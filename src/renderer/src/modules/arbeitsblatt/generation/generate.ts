@@ -48,6 +48,7 @@ import { expandObserverGroups } from '../render/observerGroups'
 import { linkVideoTasks, sortViewingTasks } from './video'
 // Unregelmäßige Verben (30.09.2026): die App hängt die Aufgaben aus der Verbliste an
 import { mitVerbAufgabe } from './verbAufgabe'
+import { blindprobeAktiv, blindprobeBloecke } from '../../../shared/verstehen/blindprobe'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 export type Progress = (message: string, done: number, total: number) => void
@@ -570,6 +571,16 @@ export function pruefeBlattNeu(sheet: Sheet, profile: LearnerProfile, meta: Work
 }
 
 /** Formuliert alle Niveaufassungen aus, prüft sie und korrigiert schwerwiegende Probleme gezielt. */
+/**
+ * Blindprobe der Ankreuzfragen zu Texten, Hörtexten und Videos (01.10.2026, shared/verstehen/blindprobe.ts):
+ * Was ohne den Text lösbar ist, wird neu gefasst oder markiert. Schalter in den Einstellungen, voreingestellt an.
+ */
+export async function mitBlindprobe(sheet: Sheet, ai: AiCall, melde?: (text: string) => void): Promise<Sheet> {
+  if (!blindprobeAktiv()) return sheet
+  const b = await blindprobeBloecke(sheet.blocks, ai, { melde }).catch(() => null)
+  return b?.geprueft ? { ...sheet, blocks: b.bloecke } : sheet
+}
+
 export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, opts: GenerateOptions): Promise<Worksheet> {
   const { meta } = ws
   const levels: (Stars | null)[] =
@@ -671,6 +682,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
         sheet = await repairSheet(ws, sheet, profil, opts.ai, () => undefined, label)
         // Sprache nachmessen und bei Abweichung umschreiben lassen (Entscheidung der Lehrkraft: automatisch)
         sheet = await lesbarkeitAngleichen(meta, sheet, profil, stufe, opts.ai)
+        // Ankreuzfragen zu Texten: Blindprobe ohne Text (01.10.2026) – auch im Sparmodus, sie ist eine Prüfung, keine Prüfrunde
+        sheet = await mitBlindprobe(sheet, opts.ai)
         finished++
         opts.onProgress?.(`${label} fertig (${finished} von ${levels.length})`, done + finished, total)
         return addSheetWarnings(sheet, profil, meta)
@@ -720,6 +733,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       sheet = await repairSheet(ws, sheet, profil, opts.ai, step, label)
       // Sprache nachmessen und bei Abweichung umschreiben lassen (Entscheidung der Lehrkraft: automatisch)
       sheet = await lesbarkeitAngleichen(meta, sheet, profil, stufe, opts.ai, (m) => step(`${label}: ${m}`))
+      // Ankreuzfragen zu Texten: Blindprobe ohne Text, Lösbares neu fassen (01.10.2026)
+      sheet = await mitBlindprobe(sheet, opts.ai, (m) => step(`${label}: ${m}`))
       const sheetWarnings = localChecks(sheet, profil, ws.meta)
       if (sheetWarnings.length && sheet.blocks[0]) {
         sheet.blocks[0].warnings = [...(sheet.blocks[0].warnings ?? []), ...sheetWarnings.map((w) => `[Blatt] ${w.message}`)]

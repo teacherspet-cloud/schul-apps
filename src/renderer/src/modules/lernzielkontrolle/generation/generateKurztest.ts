@@ -30,6 +30,7 @@ import { BILINGUALE_SPRACHEN, bilingualMoeglich, profilFuerKurztest } from '../d
 import { stateInfo } from '../../arbeitsblatt/didactics/states'
 import type { Kurztest } from '../model/types'
 import { interkulturellRegeln } from '../../arbeitsblatt/didactics/interkulturell'
+import { blindprobeAktiv, blindprobeBloecke, mcAusschlussRegeln } from '../../../shared/verstehen/blindprobe'
 
 // Dieselbe Signatur wie in den anderen Programmen – sonst passt der Fortschrittszähler nicht
 export type { AiCall } from '../../../shared/imageChoice'
@@ -180,6 +181,9 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
     // `stoff` ist hier das ausgewiesene Vorwissen: was unmittelbar vorher behandelt wurde
     interkulturellRegeln({ subjectId: m.subjectId, priorKnowledge: m.stoff, grade: m.grade }),
     '',
+    // Ankreuzfragen zu einem Materialtext: ohne den Text keine Möglichkeit ausschließbar (01.10.2026)
+    mcAusschlussRegeln(),
+    '',
     'AUFGABENSTELLUNG:',
     '- JEDE Aufgabe hat eine eigene Arbeitsanweisung im Feld „instruction". Sie darf NIE leer bleiben, auch dann nicht, wenn es Teilaufgaben gibt.',
     '- Gibt es Teilaufgaben, steht in der Anweisung der gemeinsame Auftrag („**Berechne.**"), und die Teilaufgaben enthalten nur noch die Rechnung oder Frage selbst – nicht noch einmal denselben Operator.',
@@ -243,6 +247,11 @@ export async function generateKurztest(test: Kurztest, variante: string, ai: AiC
   if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)
   // Ohne Punkte auf dem Blatt auch keine im Erwartungshorizont – die KI hält sich nicht immer an „0"
   else for (const a of aufgabenIn(blocks)) a.points = 0
+  // Ankreuzfragen zu Texten (01.10.2026): Blindprobe ohne Text, Lösbares neu fassen (shared/verstehen/blindprobe.ts)
+  if (blindprobeAktiv()) {
+    const probe = await blindprobeBloecke(blocks, ai, { melde: onStep }).catch(() => null)
+    if (probe?.geprueft) return probe.bloecke
+  }
   return blocks
 }
 

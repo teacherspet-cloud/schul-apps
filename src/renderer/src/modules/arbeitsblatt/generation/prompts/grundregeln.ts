@@ -20,6 +20,7 @@ import { demandRules } from '../../didactics/demand'
 import { interkulturellRegeln } from '../../didactics/interkulturell'
 import { helpCardRules, skillFocusPrompt, loesungsspracheRegel, phraseSheetRules, grammarRules } from './fertigkeiten'
 import { comprehensionRules, mcItemRules, itemWordingRules, singleTaskFocus } from './aufgaben'
+import { mcAusschlussRegeln } from '../../../../shared/verstehen/blindprobe'
 import { imageRules, learningDesignRules, scaffoldRules, operatorRules, subjectMethodRules, gridRules } from './gestaltung'
 import { umfangRegeln } from './schreiben'
 import { languageSkillRules, videoRules } from './sprache'
@@ -175,6 +176,9 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     '',
     // Der Operator gehört EINMAL in die Anweisung, nicht in jede einzelne Ankreuzfrage
     mcItemRules,
+    '',
+    // Ankreuzfragen zu Texten: ohne den Text keine Möglichkeit ausschließbar (01.10.2026, Blindprobe danach)
+    mcAusschlussRegeln(),
     '',
     languageSkillRules(meta),
     '',

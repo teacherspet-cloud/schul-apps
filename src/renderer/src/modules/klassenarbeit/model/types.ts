@@ -97,6 +97,10 @@ export interface ExamPart {
   studentTextType?: string
   /** Fremdsprachen, Schreibteil: ausdrücklich mitgeprüfte Grammatik (29.09.2026, didactics/schreibGrammatik.ts) */
   grammatik?: import('../didactics/schreibGrammatik').SchreibGrammatik
+  /** Sprechprüfung (01.10.2026, generation/sprechpruefung.ts): Gruppengröße, Kartensätze, Zeiten, Material */
+  sprechen?: import('../../../shared/sprechen/laender').SprechSetup
+  /** Sprechprüfung: die erzeugten Karten und Inhalte des Prüferbogens – daraus entstehen die Bausteine */
+  sprechDaten?: import('../generation/sprechpruefung').SprechDaten
   /** Material und Aufgaben des Teils – bei mehreren Fassungen die der Fassung A */
   blocks: WsBlock[]
   /**

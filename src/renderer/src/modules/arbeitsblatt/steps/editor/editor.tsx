@@ -62,7 +62,7 @@ import IllustrationenOption from '../IllustrationenOption'
 import { useThemenbereich } from '../../../../shared/themenbereiche'
 import { mitThemenbereich } from '../../../../shared/ueberthema'
 import '../../render/ws.css'
-import { useArbeitsblatt } from '../../store'
+import { aiCall, useArbeitsblatt } from '../../store'
 import { bausteinAuftrag, hinweiseBeheben, maskottchenZeichnen } from '../../auftraege'
 import { useLaufendeSchluessel } from '../../../../shared/auftraege'
 import { defaultWorksheetName, setPreviewLayouts } from '../../library'
@@ -75,11 +75,14 @@ import type { WunschArt } from '../../../../shared/kiWunsch'
 import { EinfuegenUntermenue } from '../EinfuegenMenue'
 import { VerbEinfuegenDialog, verbenMoeglich } from '../VerbAufgabeKarte'
 import { AudioPanel } from '../AudioPanel'
+import { hoertextWunschAuftrag } from '../../hoertextAuftrag'
 import { BoardPanel } from '../BoardPanel'
 import { addVersion, switchVersion } from '../../model/versions'
 import { seitenAbweichung, seitenVorgabe } from '../../didactics/seiten'
 import { bildBausteine, lokaleVorschlaegeAnwenden, lokalUmsetzbar, schreibraumBausteine, vorschlagKurz } from '../../didactics/seitenAktionen'
 import SeitenHinweis from '../SeitenHinweis'
+import McBlindHinweis from '../../../../shared/components/McBlindHinweis'
+import { uebernimmBlindprobe } from '../../../../shared/verstehen/blindprobe'
 import OperatorformHinweis from '../../../../shared/components/OperatorformHinweis'
 import { operatorformBefunde, operatorformenUmsetzen } from '../../../../shared/operatorformen'
 import { browserSourceServices, completeOriginalSources } from '../../generation/originalSources'
@@ -254,7 +257,10 @@ export function EditorStep(): React.JSX.Element {
 
   /** Ersetzt den Baustein durch einen neuen Entwurf; der bisherige Stand bleibt abrufbar. */
   const reviseBlock = (block: WsBlock, instruction = '', art: WunschArt = 'ueberarbeiten'): void =>
-    bausteinAuftrag(ws, docId, art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten', block.id, block.id, async (w, k) => {
+    // Hörtext (01.10.2026): Das Skript ändert sich, die Aufgaben dazu ziehen mit – ein Rückgängig-Schritt
+    block.type === 'audio'
+      ? hoertextWunschAuftrag(ws, docId, block.id, art, instruction, profile)
+      : bausteinAuftrag(ws, docId, art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten', block.id, block.id, async (w, k) => {
       const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
       const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction, art)
       await completeOriginalSources([fresh], browserSourceServices())
@@ -753,7 +759,15 @@ export function EditorStep(): React.JSX.Element {
         <Stack align="center" py="lg" gap="md">
           {view === 'board' && <BoardPanel ws={ws} profile={profile} />}
           {view === 'verlauf' && <StundenverlaufPanel ws={ws} profile={profile} />}
-          {view === 'audio' && <AudioPanel ws={ws} />}
+          {view === 'audio' && (
+            <AudioPanel
+              ws={ws}
+              // Änderungswunsch am Skript (01.10.2026): derselbe Weg wie am Baustein im Blatt
+              onWunsch={(audioId, art, wunsch) => hoertextWunschAuftrag(ws, docId, audioId, art, wunsch, profile)}
+              wunschKontext={(b) => wunschKontextFuer(b, ws.meta, 'Arbeitsblatt')}
+              wunschLaeuft={(audioId) => busy.has(audioId)}
+            />
+          )}
           {view === 'student' && ws.meta.coverPage && deckblatt && (
             <>
               {/* Werkzeuge ÜBER der Seite, nicht darauf – nichts davon gerät in den Druck (Paket 11) */}
@@ -781,6 +795,20 @@ export function EditorStep(): React.JSX.Element {
               onUmsetzen={() =>
                 update((w) => {
                   for (const s of w.sheets) operatorformenUmsetzen(s.blocks)
+                })
+              }
+            />
+          )}
+          {/* Ankreuzfragen zu Texten ohne Blindprobe (01.10.2026): auf Abruf prüfen und Lösbares neu fassen – je Blatt */}
+          {view === 'student' && !key && (
+            <McBlindHinweis
+              listen={ws.sheets.map((s) => s.blocks)}
+              ai={aiCall}
+              uebernehmen={(ergebnisse) =>
+                update((w) => {
+                  const vorher = ergebnisse.flatMap((e) => e.vorher)
+                  const nachher = ergebnisse.flatMap((e) => e.nachher)
+                  for (const s of w.sheets) s.blocks = uebernimmBlindprobe(s.blocks, vorher, nachher)
                 })
               }
             />

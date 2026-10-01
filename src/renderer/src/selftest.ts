@@ -1506,6 +1506,54 @@ function printHtmlNow(): string {
  * je drei Möglichkeiten. Genau daran hängt die zweispaltige, rahmenlose Darstellung – und
  * daran, dass der Operator nur noch EINMAL oben steht.
  */
+/**
+ * Blindprobe auf Abruf (01.10.2026): ein älteres Blatt mit Lesetext und zwei Ankreuzfragen ohne
+ * Blindprobe – die erste ist mit Weltwissen lösbar. Wache: tests/e2e/mc-blindprobe.mjs.
+ */
+function mcBlindSheet(): { aufgaben: number } {
+  const frage = (id: string, instruction: string, options: string[], richtig: number): TaskPart => ({
+    id,
+    instruction,
+    answer: { ...emptyAnswer('multipleChoice'), options, correct: [richtig] },
+    solution: options[richtig]
+  })
+  const text: WsBlock = {
+    id: 'text1',
+    type: 'text',
+    title: 'A day at the harbour',
+    body: 'Mia works at the harbour café every Saturday. She starts at seven, when the fishing boats come in. The first customers are the fishermen, who order tea with lemon and talk about the weather.\n\nAt noon the tourists arrive, and Mia sells fish sandwiches until the café closes at three.',
+    lineNumbers: true,
+    source: '',
+    glossary: []
+  }
+  const task: WsBlock = {
+    id: 'blind1',
+    type: 'task',
+    instruction: '**Tick** the correct answer.',
+    operator: 'tick',
+    afb: 'I',
+    afbReason: '',
+    socialForm: 'EA',
+    minutes: 5,
+    points: 0,
+    solution: '',
+    answer: emptyAnswer('none'),
+    skill: 'reading',
+    parts: [frage('b1', 'What is the capital of France?', ['Paris', 'a fish', 'Saturday'], 0), frage('b2', 'When does the café close?', ['at one', 'at three', 'at five'], 1)]
+  }
+  const ws: Worksheet = {
+    version: 1,
+    meta: { ...defaultMeta('NI', 'gymnasium', 'Gymnasium'), subjectId: 'englisch', subjectLabel: 'Englisch', topic: 'At the harbour', grade: 7, pages: 1 },
+    design: presetDesigns()[0],
+    outline: null,
+    sheets: [{ id: 's1', label: 'Arbeitsblatt', blocks: [text, task] }],
+    sources: [],
+    createdAt: new Date().toISOString()
+  }
+  useArbeitsblatt.getState().loadWorksheet(ws, 2)
+  return { aufgaben: 1 }
+}
+
 function mcSheet(): { fragen: number } {
   const state = useArbeitsblatt.getState()
   const frage = (id: string, text: string, optionen: string[]): TaskPart => ({
@@ -2009,6 +2057,7 @@ export function installSelftest(): void {
     grammarTestSheet,
     audioSheet,
     mcSheet,
+    mcBlindSheet,
     fillableSheet,
     mathSheet,
     lzkSheet,

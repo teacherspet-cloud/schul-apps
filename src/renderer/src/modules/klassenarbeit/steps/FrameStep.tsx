@@ -1,4 +1,6 @@
 import SchreibGrammatikFeld from './SchreibGrammatikFeld'
+import SprechpruefungKarte from './SprechpruefungKarte'
+import { sprechpruefungAlsArbeit } from '../generation/sprechpruefung'
 import { BY_GYM_ZWEIG_KERNFAECHER as BY_GYM_ZWEIGE, nachweisFuer, NACHWEIS_BEZEICHNUNGEN, type ByZweig } from '../model/nachweise'
 import FachKarte, { FehlerquoteFelder } from './FachKarte'
 import { istAlteSprache } from '../model/faecher'
@@ -673,6 +675,12 @@ export default function FrameStep(): React.JSX.Element {
                       <Button size="compact-sm" variant="light" onClick={fillParts}>
                         Vorschlag erzeugen
                       </Button>
+                      {/* Sprechprüfung statt schriftlicher Arbeit (01.10.2026) – nur, wo das Fach sie kennt */}
+                      {available.some((f) => formatArt(f.id) === 'speaking') && (
+                        <Button size="compact-sm" variant="light" onClick={() => update((d) => sprechpruefungAlsArbeit(d))}>
+                          Sprechprüfung
+                        </Button>
+                      )}
                     </Group>
                   </Group>
                   {exam.parts.length === 0 ? (
@@ -775,6 +783,9 @@ export default function FrameStep(): React.JSX.Element {
                                   defaultValue={part.notes ?? ''}
                                   onBlur={(e) => update((d) => (d.parts[i].notes = e.currentTarget.value))}
                                 />
+                                {formatArt(part.formatId) === 'speaking' && (
+                                  <SprechpruefungKarte exam={exam} part={part} setzen={(s) => update((d) => (d.parts[i].sprechen = s), `sprechen:${part.id}`)} />
+                                )}
                                 {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
                                   <MultiSelect
                                     mt="xs"

@@ -20,6 +20,7 @@ import type { AudioBlock, WorksheetMeta, WsBlock } from '../model/types'
 import { stufenMixHinweis } from '../../../shared/verstehen/regeln'
 import { listeningTextRules, systemPrompt } from './prompts'
 import { istDeutschZuhoeren } from '../didactics/zuhoeren'
+import { brauchtMusterdialog, musterdialogRegeln } from '../didactics/sprechen'
 import type { AiCall } from './generate'
 
 export interface ListeningScript {
@@ -45,6 +46,8 @@ const SCRIPT_SCHEMA = obj({
 
 /** Braucht dieses Blatt einen Hörtext, den die KI schreiben soll? */
 export function wantsListening(meta: WorksheetMeta): boolean {
+  // Sprechen (01.10.2026): Der Musterdialog entsteht als eigener Hörtext, auch ohne den Schalter
+  if (brauchtMusterdialog(meta) && subjectById(meta.subjectId).foreignLanguage) return true
   if (!meta.audioAi) return false
   // Deutsch hat einen eigenen Hoer-Kompetenzbereich (Verstehend zuhoeren, KMK 2022)
   return Boolean(subjectById(meta.subjectId).foreignLanguage) || istDeutschZuhoeren(meta)
@@ -70,7 +73,9 @@ export function scriptPrompt(meta: WorksheetMeta, index = 0, done: ListeningScri
     '',
     'Es geht NUR um den Hörtext – noch keine Aufgaben.',
     listeningTextRules(meta),
-    format && (!meta.audioFormat || meta.audioFormat === 'auto') ? `- Vorschlag für die Textsorte: ${format.label}. ${format.construction}` : '',
+    // Sprechen: Prüfungsmuster statt freier Textsorte (didactics/sprechen.ts)
+    musterdialogRegeln(meta),
+    format && !brauchtMusterdialog(meta) && (!meta.audioFormat || meta.audioFormat === 'auto') ? `- Vorschlag für die Textsorte: ${format.label}. ${format.construction}` : '',
     '',
     'Das Skript wird von einer Computerstimme vorgelesen. Deshalb:',
     '- Jede Sprecherzeile beginnt mit dem Namen und einem Doppelpunkt: „Anna: …".',

@@ -85,6 +85,7 @@ import {
   STUDENT_TEXT_TYPES,
   writingWords
 } from '../generation/prompts'
+import { istSprechblatt, SPRECH_TEILE, sprechTeile, type SprechTeil } from '../didactics/sprechen'
 import { defaultMeta } from '../model/defaults'
 import { subjectById, SUBJECTS } from '../model/subjects'
 import { loadLastChoice, saveLastChoice } from '../../../shared/lastChoice'
@@ -480,6 +481,16 @@ export default function TopicStep(): React.JSX.Element {
                         value={meta.skillFocus ?? 'mixed'}
                         onChange={(v) => v && patch({ skillFocus: v as LanguageSkill | 'mixed' })}
                         allowDeselect={false}
+                      />
+                    )}
+                    {/* Sprechen (01.10.2026): Teile des Vorbereitungsblatts, voreingestellt alle vier (didactics/sprechen.ts) */}
+                    {istSprechblatt(meta) && (
+                      <MultiSelect
+                        label="Teile des Blattes zur Sprechprüfung"
+                        description="Musterdialog: Der Hörtext entsteht vorab mit zwei Stimmen und lässt sich im Reiter „Hörtexte“ vertonen."
+                        data={SPRECH_TEILE}
+                        value={sprechTeile(meta)}
+                        onChange={(v) => patch({ sprechTeile: (v.length ? v : ['karten']) as SprechTeil[] })}
                       />
                     )}
                     {/*

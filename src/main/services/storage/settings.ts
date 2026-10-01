@@ -44,7 +44,9 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
       subscriptionModels: { ...base.ai.subscriptionModels, ...(ai.subscriptionModels as object) },
       subscriptionAccepted: { ...base.ai.subscriptionAccepted, ...(ai.subscriptionAccepted as object) },
       cliPaths: { ...base.ai.cliPaths, ...(ai.cliPaths as object) },
-      economy: (ai.economy as AppSettings['ai']['economy']) ?? base.ai.economy
+      economy: (ai.economy as AppSettings['ai']['economy']) ?? base.ai.economy,
+      // Blindprobe für Ankreuzfragen (01.10.2026): fehlt der Wert, ist sie an
+      ...((v) => (typeof v === 'boolean' ? { mcBlindprobe: v } : {}))(ai.mcBlindprobe ?? base.ai.mcBlindprobe)
     },
     appearance: { ...base.appearance, ...stored.appearance },
     // iPad: Adresse, PIN und Auswahl getrennt änderbar (30.09.2026)

@@ -26,7 +26,7 @@ import { rasterAlsTabelle, rasterAnfrage, rasterAus } from '../../../shared/bewe
 import { describeBlock } from '../../arbeitsblatt/generation/describe'
 import { systemPrompt } from '../../arbeitsblatt/generation/prompts'
 import LevelnMenue from '../../arbeitsblatt/steps/LevelnMenue'
-import { inhaltsanteil, zweiterTeil } from '../model/faecher'
+import { formatArt, inhaltsanteil, zweiterTeil } from '../model/faecher'
 import {
   IconCopy,
   IconFileTypeDocx,
@@ -89,7 +89,7 @@ import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
 import { arbeitHinweiseBeheben } from '../beheben'
 import { AudioPanel } from '../../arbeitsblatt/steps/AudioPanel'
 import type { Worksheet } from '../../arbeitsblatt/model/types'
-import { useKlassenarbeit } from '../store'
+import { aiCall, useKlassenarbeit } from '../store'
 import { EXAM_FILTER, serializeExam } from '../project'
 import EditorLeiste from '../../../shared/components/EditorLeiste'
 import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
@@ -107,6 +107,8 @@ import { useThemenbereich } from '../../../shared/themenbereiche'
 import VerlagsImportDialog from '../import/VerlagsImportDialog'
 import ZusatzfragenDialog from '../import/ZusatzfragenDialog'
 import { mitThemenbereich } from '../../../shared/ueberthema'
+import McBlindHinweis from '../../../shared/components/McBlindHinweis'
+import { uebernimmBlindprobe } from '../../../shared/verstehen/blindprobe'
 
 /** Einen Baustein in ALLEN Fassungen ändern – übernommenes Material steht dort mit derselben id. */
 function aendereBaustein(d: Exam, id: string, fn: (b: WsBlock) => void): void {
@@ -917,6 +919,23 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               })
             }
           />
+          {/* Ankreuzfragen zu Texten ohne Blindprobe (01.10.2026): auf Abruf prüfen und Lösbares neu fassen – je Teil und Fassung */}
+          {hasContent && (
+            <McBlindHinweis
+              listen={exam.parts.filter((p) => formatArt(p.formatId) !== 'speaking').flatMap((p) => alleFassungen(p))}
+              ai={aiCall}
+              uebernehmen={(ergebnisse) => {
+                const vorher = ergebnisse.flatMap((e) => e.vorher)
+                const nachher = ergebnisse.flatMap((e) => e.nachher)
+                updateExam((d) => {
+                  for (const t of d.parts) {
+                    t.blocks = uebernimmBlindprobe(t.blocks, vorher, nachher)
+                    if (t.weitereFassungen) t.weitereFassungen = t.weitereFassungen.map((f) => uebernimmBlindprobe(f, vorher, nachher))
+                  }
+                })
+              }}
+            />
+          )}
           <OperatorformHinweis
             befunde={formen}
             onUmsetzen={() =>

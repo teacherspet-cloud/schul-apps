@@ -3,6 +3,7 @@ import { AppSettings, DeepPartial, DEFAULT_SETTINGS } from '@shared/types'
 import { notifyError } from './util'
 import { merkeFachfarben } from './fachfarben'
 import { merkeBildungsgang } from '../modules/arbeitsblatt/didactics/bildungsgang'
+import { setzeBlindprobe } from './verstehen/blindprobe'
 
 export { THEMES, themeById } from './themes'
 export type { AppTheme } from './themes'
@@ -40,6 +41,8 @@ export const useAppSettings = create<SettingsState>((set, get) => ({
       ])
       merkeFachfarben(settings.fachfarben)
       merkeBildungsgang(settings.defaults)
+      // Blindprobe der Ankreuzfragen: die Erzeugung liest den Schalter außerhalb von React
+      setzeBlindprobe(settings.ai?.mcBlindprobe)
       set({ settings, logoDataUrl, pictograms, loaded: true })
     } catch (e) {
       set({ loaded: true })
@@ -82,11 +85,13 @@ export const useAppSettings = create<SettingsState>((set, get) => ({
     merkeFachfarben(sofort.fachfarben)
     // Ebenso der Bildungsgang der eigenen Schule (G8/G9) – die Anrede wird auch im Druck bestimmt
     merkeBildungsgang(sofort.defaults)
+    setzeBlindprobe(sofort.ai?.mcBlindprobe)
     set({ settings: sofort })
     try {
       const gespeichert = await window.api.settings.set(patch)
       merkeFachfarben(gespeichert.fachfarben)
       merkeBildungsgang(gespeichert.defaults)
+      setzeBlindprobe(gespeichert.ai?.mcBlindprobe)
       set({ settings: gespeichert })
     } catch (e) {
       notifyError(e)

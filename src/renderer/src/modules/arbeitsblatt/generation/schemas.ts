@@ -40,7 +40,7 @@ export const BLOCK_SIDES = ['auto', 'none', 'left', 'right']
 export const SOCIAL_FORMS = ['EA', 'PA', 'GA', 'Plenum', 'Rollenspiel']
 export const AFBS = ['', 'I', 'II', 'III']
 export const GRID_KIND_IDS = ['karo', 'mm', 'koordinaten', 'klima']
-export const LANGUAGE_SKILLS = ['mediation', 'writing', 'listening', 'reading', 'grammar']
+export const LANGUAGE_SKILLS = ['mediation', 'writing', 'listening', 'reading', 'grammar', 'speaking', 'interaction']
 
 export const OUTLINE_SCHEMA = obj({
   title: str('Kurzer, motivierender Titel des Arbeitsblatts'),

@@ -452,7 +452,8 @@ export interface TaskPart {
  * reading = Leseverstehen, grammar = Verfügung über sprachliche Mittel (Grammatik).
  * Für alle anderen Fächer bleibt das Feld leer.
  */
-export type LanguageSkill = 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary'
+// speaking = Sprechen: zusammenhängendes Sprechen, interaction = Sprechen: an Gesprächen teilnehmen (01.10.2026)
+export type LanguageSkill = 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary' | 'speaking' | 'interaction'
 
 /**
  * Eine Spalte der Notizentabelle einer Schreibaufgabe.
@@ -1015,6 +1016,8 @@ export interface WorksheetMeta {
   /**
    * Schwerpunkt Vokabeln: Wie die Wortschatzarbeit auf dem Blatt angelegt ist.
    * Ersetzt bei diesem Schwerpunkt die Frage nach Materialquellen.
+  /** Schwerpunkt Sprechen: gewählte Teile des Blattes (didactics/sprechen.ts); fehlt = alle vier */
+  sprechTeile?: import('../didactics/sprechen').SprechTeil[]
    */
   vocabWork?: VocabWorkMode
   /** Zielwörter, die das Blatt aufbaut (leer = die KI wählt sie zum Thema) */

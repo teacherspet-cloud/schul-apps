@@ -11,6 +11,8 @@ import { meldeAblage } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import OperatorformHinweis from '../../../shared/components/OperatorformHinweis'
+import McBlindHinweis from '../../../shared/components/McBlindHinweis'
+import { uebernimmBlindprobe } from '../../../shared/verstehen/blindprobe'
 import { operatorformBefunde, operatorformenUmsetzen } from '../../../shared/operatorformen'
 import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
 import { AusgabeDialog, type AusgabeModus } from '../../../shared/components/LoesungsWahl'
@@ -24,7 +26,7 @@ import { testHeadBlock, testToWorksheet } from '../render/testWorksheet'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
 import { wunschKontextFuer } from '../../arbeitsblatt/generation/wunsch'
 import { testPoints, testTaskCount } from '../model/types'
-import { useGrammatiktest } from '../store'
+import { aiCall, useGrammatiktest } from '../store'
 import { GRAMMATIKTEST_FILTER, serializeGrammarTest } from '../project'
 import { defaultTestName } from '../library'
 import EditorLeiste from '../../../shared/components/EditorLeiste'
@@ -289,6 +291,20 @@ export default function TestEditorStep(): React.JSX.Element {
                 }
               />
             )}
+            {/* Ankreuzfragen zu einem Lese- oder Hörtext ohne Blindprobe (01.10.2026) – nur ausgewiesene Verstehensaufgaben */}
+            <McBlindHinweis
+              listen={[test.blocks, ...(test.blocksB ? [test.blocksB] : [])]}
+              ai={aiCall}
+              streng
+              uebernehmen={(ergebnisse) =>
+                update((d) => {
+                  const vorher = ergebnisse.flatMap((e) => e.vorher)
+                  const nachher = ergebnisse.flatMap((e) => e.nachher)
+                  d.blocks = uebernimmBlindprobe(d.blocks, vorher, nachher)
+                  if (d.blocksB) d.blocksB = uebernimmBlindprobe(d.blocksB, vorher, nachher)
+                })
+              }
+            />
             <FitToWidth className="ws-editor-pages">
               <SheetPages
                 ws={ws}

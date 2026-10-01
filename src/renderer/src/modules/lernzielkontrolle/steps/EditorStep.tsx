@@ -23,7 +23,7 @@ import { thresholdsForSubject } from '../../../shared/gradeScale'
 import { pruefeKurztest, teilaufgaben, zaehleBefunde, type Befund } from '../didactics/pruefungen'
 import { dauerSchaetzung } from '../generation/generateKurztest'
 import { kurztestToWorksheet, kurztestToWorksheetAlle, schluesselHerkunft } from '../render/kurztestWorksheet'
-import { useLernzielkontrolle } from '../store'
+import { aiCall, useLernzielkontrolle } from '../store'
 import { KURZTEST_FILTER, serializeKurztest } from '../project'
 import { defaultKurztestName } from '../library'
 import EditorLeiste from '../../../shared/components/EditorLeiste'
@@ -40,6 +40,8 @@ import { useLaufendeSchluessel } from '../../../shared/auftraege'
 import { AlleBehebenKnopf, KiBehebenKnopf } from '../../../shared/components/KiBeheben'
 import { befundBehebbar, befundeBeheben, bausteinNachWunschAuftrag } from '../beheben'
 import OperatorformHinweis from '../../../shared/components/OperatorformHinweis'
+import McBlindHinweis from '../../../shared/components/McBlindHinweis'
+import { uebernimmBlindprobe } from '../../../shared/verstehen/blindprobe'
 import { operatorformBefunde, operatorformenUmsetzen } from '../../../shared/operatorformen'
 import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
@@ -424,6 +426,18 @@ export default function EditorStep(): React.JSX.Element {
             onUmsetzen={() =>
               update((d) => {
                 for (const v of d.varianten) operatorformenUmsetzen(v.blocks)
+              })
+            }
+          />
+          {/* Ankreuzfragen zu Materialtexten ohne Blindprobe (01.10.2026): auf Abruf prüfen – je Variante */}
+          <McBlindHinweis
+            listen={test.varianten.map((v) => v.blocks)}
+            ai={aiCall}
+            uebernehmen={(ergebnisse) =>
+              update((d) => {
+                const vorher = ergebnisse.flatMap((e) => e.vorher)
+                const nachher = ergebnisse.flatMap((e) => e.nachher)
+                for (const v of d.varianten) v.blocks = uebernimmBlindprobe(v.blocks, vorher, nachher)
               })
             }
           />

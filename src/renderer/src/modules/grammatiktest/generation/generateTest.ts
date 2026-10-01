@@ -24,6 +24,7 @@ import { errorTargets, testingRules } from '../model/testRules'
 import type { GrammarTest } from '../model/types'
 import { brauchtKi, erzeugeVerbBloecke } from '../../../shared/verben/aufgaben'
 import { VERB_SPALTEN } from '@shared/verben'
+import { blindprobeAktiv, blindprobeBloecke } from '../../../shared/verstehen/blindprobe'
 
 /**
  * Schrift und Varietät der neuen Schulfremdsprachen (30.09.2026): Was die KI sonst uneinheitlich
@@ -229,6 +230,11 @@ export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (messa
   // Nummern der KI werden zu Kennungen („M{text}"); die Nummern entstehen beim Darstellen aus der Reihenfolge
   blocks.splice(0, blocks.length, ...verschluesseleMaterialverweise(blocks))
   spreadPoints(blocks, test.meta.points)
+  // Ankreuzfragen zu einem Lese- oder Hörtext (01.10.2026): Blindprobe ohne Text – nur ausgewiesene Verstehensaufgaben, Grammatikfragen nie
+  if (blindprobeAktiv()) {
+    const probe = await blindprobeBloecke(blocks, ai, { melde: onStep, streng: true }).catch(() => null)
+    if (probe?.geprueft) return probe.bloecke
+  }
   return blocks
 }
 

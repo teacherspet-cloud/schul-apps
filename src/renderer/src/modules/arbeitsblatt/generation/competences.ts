@@ -11,13 +11,15 @@ import type { LearnerProfile } from '../didactics/profile'
 import { stateInfo } from '../didactics/states'
 import { subjectById } from '../model/subjects'
 import type { WorksheetMeta } from '../model/types'
+import { SPRECHEN_DIALOGISCH, SPRECHEN_MONOLOGISCH } from '../../../shared/sprechen/kompetenzen'
 
 /** Kompetenzbereiche je Fach – Orientierung für den Vorschlag. */
 const COMPETENCE_AREAS: Record<string, string[]> = {
   englisch: [
     'Hör-/Hörsehverstehen',
     'Leseverstehen',
-    'Sprechen',
+    SPRECHEN_MONOLOGISCH,
+    SPRECHEN_DIALOGISCH,
     'Schreiben',
     'Sprachmittlung',
     'Verfügung über sprachliche Mittel',
@@ -27,7 +29,8 @@ const COMPETENCE_AREAS: Record<string, string[]> = {
   franzoesisch: [
     'Hör-/Hörsehverstehen',
     'Leseverstehen',
-    'Sprechen',
+    SPRECHEN_MONOLOGISCH,
+    SPRECHEN_DIALOGISCH,
     'Schreiben',
     'Sprachmittlung',
     'Verfügung über sprachliche Mittel',
@@ -36,13 +39,14 @@ const COMPETENCE_AREAS: Record<string, string[]> = {
   spanisch: [
     'Hör-/Hörsehverstehen',
     'Leseverstehen',
-    'Sprechen',
+    SPRECHEN_MONOLOGISCH,
+    SPRECHEN_DIALOGISCH,
     'Schreiben',
     'Sprachmittlung',
     'Verfügung über sprachliche Mittel',
     'interkulturelle kommunikative Kompetenz'
   ],
-  italienisch: ['Hör-/Hörsehverstehen', 'Leseverstehen', 'Sprechen', 'Schreiben', 'Sprachmittlung', 'Verfügung über sprachliche Mittel'],
+  italienisch: ['Hör-/Hörsehverstehen', 'Leseverstehen', SPRECHEN_MONOLOGISCH, SPRECHEN_DIALOGISCH, 'Schreiben', 'Sprachmittlung', 'Verfügung über sprachliche Mittel'],
   deutsch: ['Sprechen und Zuhören', 'Schreiben', 'Lesen – mit Texten und Medien umgehen', 'Sprache und Sprachgebrauch untersuchen'],
   geschichte: ['Sachkompetenz', 'Methodenkompetenz', 'Urteilskompetenz', 'Orientierungskompetenz'],
   politik: ['Sachkompetenz', 'Methodenkompetenz', 'Urteilskompetenz', 'Handlungskompetenz'],
@@ -59,6 +63,12 @@ const COMPETENCE_AREAS: Record<string, string[]> = {
 }
 
 export function competenceAreas(subjectId: string): string[] {
+  /*
+   * Alle übrigen modernen Fremdsprachen (Russisch, Niederländisch, Polnisch …) haben dieselben
+   * Kompetenzbereiche der KMK-Bildungsstandards – bis 01.10.2026 fielen sie auf die Liste der
+   * Sachfächer zurück. Latein und Griechisch sind keine `foreignLanguage` und bleiben außen vor.
+   */
+  if (!COMPETENCE_AREAS[subjectId] && subjectById(subjectId).foreignLanguage && subjectById(subjectId).id === subjectId) return COMPETENCE_AREAS.italienisch
   return COMPETENCE_AREAS[subjectId] ?? ['Fachwissen', 'Erkenntnisgewinnung', 'Kommunikation', 'Bewertung']
 }
 
