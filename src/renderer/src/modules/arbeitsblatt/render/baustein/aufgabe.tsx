@@ -29,6 +29,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     answerLanguage,
     wordLimit,
     ohneSchreibhilfen,
+    ohneLernhilfen,
     correctionMargin,
     contentWidthMm
   } = useWs()
@@ -368,7 +369,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   const mustertextGezeigt = Boolean(key && block.answer.kind === 'lines' && !block.parts.length && block.brief?.model)
   const hauptZeilen = block.parts.length ? null : antwortZeilen(block.answer, onAnswer((d) => d.answer), 'antwort')
   const abschnitte: Abschnitt[] = []
-  for (const teil of briefAbschnitte({ block, edit, set, wordLimit, ohneHilfen: ohneSchreibhilfen })) abschnitte.push({ node: teil })
+  for (const teil of briefAbschnitte({ block, edit, set, wordLimit, ohneHilfen: ohneSchreibhilfen, ohneLernhilfen })) abschnitte.push({ node: teil })
   if (block.example) abschnitte.push({ node: beispielKnoten })
   if (mcListe) abschnitte.push(...mcZeilenAbschnitte())
   else if (block.parts.length > 0) block.parts.forEach((part, i) => abschnitte.push(...teilaufgabe(part, i)))
@@ -406,7 +407,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   if (key) {
     abschnitte.push({ node: loesungsKnoten(block.solution, set((d, v) => ((d as TaskBlock).solution = v)), 'Lösung / Erwartungshorizont', 'loesung', true, 'Lösung:')! })
     if (block.brief) {
-      for (const n of erwartungsAbschnitte({ block, edit: keyEdit, set, mitMustertext: !mustertextGezeigt })) abschnitte.push({ node: n })
+      for (const n of erwartungsAbschnitte({ block, edit: keyEdit, set, mitMustertext: !mustertextGezeigt, ohneLernhilfen })) abschnitte.push({ node: n })
     }
     // Schwierigkeitsstufe (29.09.2026): nur hier im Lösungsteil, nie auf dem Schülerblatt
     const stufe = stufenZeile(block)

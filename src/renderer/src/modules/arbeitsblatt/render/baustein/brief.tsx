@@ -20,7 +20,8 @@ export function briefAbschnitte({
   edit,
   set,
   wordLimit,
-  ohneHilfen
+  ohneHilfen,
+  ohneLernhilfen
 }: {
   block: TaskBlock
   edit: boolean
@@ -28,12 +29,17 @@ export function briefAbschnitte({
   wordLimit?: boolean
   /** Klausur der Oberstufe (27.09.2026): keine Formhinweise, keine Notizentabelle – das wären Hilfen in einer Leistungssituation */
   ohneHilfen?: boolean
+  /**
+   * Klassenarbeit ohne „Hilfen für Lernende" (01.10.2026): keine Rahmenzeile „Adressat · Textsorte ·
+   * Zweck", keine Teilpunkte, keine Notizentabelle, keine Formhinweise – sie stehen im Erwartungshorizont.
+   */
+  ohneLernhilfen?: boolean
 }): React.JSX.Element[] {
   const brief = block.brief
   if (!brief) return []
-  const rahmen = brief.frameHidden ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
-  const notizen = ohneHilfen ? [] : (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
-  const form = ohneHilfen ? [] : (brief.form ?? []).filter(Boolean)
+  const rahmen = brief.frameHidden || ohneLernhilfen ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
+  const notizen = ohneHilfen || ohneLernhilfen ? [] : (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
+  const form = ohneHilfen || ohneLernhilfen ? [] : (brief.form ?? []).filter(Boolean)
   const teile: React.JSX.Element[] = []
 
   /*
@@ -102,7 +108,7 @@ export function briefAbschnitte({
    * Punktes löscht, löscht den Punkt – sonst blieb ein nackter Aufzählungspunkt stehen, den man
    * nicht mehr loswurde. Bereits leere Punkte älterer Blätter werden nicht dargestellt.
    */
-  const punkte = brief.points.map((p, i) => ({ p, i })).filter(({ p }) => plainText(p).trim())
+  const punkte = ohneLernhilfen ? [] : brief.points.map((p, i) => ({ p, i })).filter(({ p }) => plainText(p).trim())
   if (punkte.length > 0)
     teile.push(
       <ul className="ws-brief-points" data-unit data-bindet key="points">
@@ -155,18 +161,24 @@ export function erwartungsAbschnitte({
   block,
   edit,
   set,
-  mitMustertext
+  mitMustertext,
+  ohneLernhilfen
 }: {
   block: TaskBlock
   edit: boolean
   set: (apply: (draft: TaskBlock, value: string) => void) => ((v: string) => void) | undefined
   /** false, wenn der Mustertext schon oben auf den Schreiblinien steht */
   mitMustertext: boolean
+  /** Rahmenzeile und Teilpunkte stehen nicht auf dem Schülerblatt – dann hier (01.10.2026) */
+  ohneLernhilfen?: boolean
 }): React.JSX.Element[] {
   const brief = block.brief
   const erwartet = brief?.expected ?? []
   const kriterien = (brief?.criteria ?? []).filter(Boolean)
-  if (!brief || (!erwartet.length && !kriterien.length && !(mitMustertext && brief.model))) return []
+  // Ohne Hilfen für Lernende: Adressat · Textsorte · Zweck und die Teilpunkte gehören in die Lehrerfassung
+  const rahmen = ohneLernhilfen && brief ? [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ') : ''
+  const teilpunkte = ohneLernhilfen && brief ? brief.points.map((p, i) => ({ p, i })).filter(({ p }) => plainText(p).trim()) : []
+  if (!brief || (!erwartet.length && !kriterien.length && !(mitMustertext && brief.model) && !rahmen && !teilpunkte.length)) return []
 
   /*
    * JEDE Zeile ist eine eigene Umbruch-Einheit.
@@ -181,6 +193,21 @@ export function erwartungsAbschnitte({
     </div>
   ]
   const weitere: (React.JSX.Element | null)[] = [
+    rahmen || teilpunkte.length ? (
+      <div className="ws-expectation ws-expectation-row" data-unit key="eh-situierung" data-testid="eh-situierung">
+        <div className="ws-expectation-head">Situierung und Teilpunkte (nicht auf dem Schülerblatt)</div>
+        {rahmen && <p>Adressat · Textsorte · Zweck: {rahmen}</p>}
+        {teilpunkte.length > 0 && (
+          <ul className="ws-expectation-examples">
+            {teilpunkte.map(({ p, i }) => (
+              <li key={i}>
+                <RichText value={p} inline editable={edit} onChange={set((d, v) => (d.brief!.points[i] = v))} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    ) : null,
     ...erwartet.map((e, i) => (
       <div key={i} className="ws-expectation ws-expectation-row" data-unit>
         <div className="ws-expectation-head">

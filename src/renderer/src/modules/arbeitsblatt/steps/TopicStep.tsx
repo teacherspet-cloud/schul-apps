@@ -599,6 +599,13 @@ export default function TopicStep(): React.JSX.Element {
                              * Aufgabe belegt, im Unterricht aber verbreitet. Beides ist
                              * vertretbar – also wird gefragt statt geraten.
                              */}
+                            {/* Hilfen für Lernende (01.10.2026): auf dem Arbeitsblatt wie bisher an, abschaltbar fürs Prüfungsformat */}
+                            <Switch
+                              label="Hilfen für Lernende"
+                              description="Kasten „Adressat · Textsorte · Zweck“, inhaltliche Teilpunkte, Notizentabelle und Formhinweise auf dem Blatt. Ohne Hilfen (Prüfungsformat) stehen sie nur im Lösungsblatt."
+                              checked={meta.lernhilfen !== false}
+                              onChange={(e) => patch({ lernhilfen: e.currentTarget.checked ? undefined : false })}
+                            />
                             <Checkbox
                               label="Notizentabelle zur Schreibaufgabe"
                               description="Zwei Spalten mit Stichpunkten und offenen Impulsen („Positives: …“), aus denen die Lernenden auswählen. Ohne Haken stehen die Inhaltspunkte als Liste – so wie in den Abschlussprüfungen."

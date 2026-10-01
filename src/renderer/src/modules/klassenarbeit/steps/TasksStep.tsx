@@ -82,6 +82,8 @@ import { alleFassungen, bloeckeDerFassung, fassungsLabel, fassungsZahl, mitBloec
 import { examHasContent, examToWorksheet, examToWorksheetAlle } from '../render/examWorksheet'
 import AnredeHinweise, { anredeBefunde } from '../../../shared/components/AnredeHinweise'
 import OperatorformHinweis from '../../../shared/components/OperatorformHinweis'
+import LernhilfenHinweis from './LernhilfenHinweis'
+import { hilfenBefunde, hilfenInsLehrermaterial } from '../model/lernhilfen'
 import { operatorformBefunde, operatorformenUmsetzen } from '../../../shared/operatorformen'
 import { anweisungenDeutsch } from '../../arbeitsblatt/didactics/anrede'
 import { arbeitHinweiseBeheben } from '../beheben'
@@ -204,6 +206,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   const anrede = useMemo(() => (hasContent ? anredeBefunde(worksheet.meta, worksheet.sheets) : []), [hasContent, worksheet])
   // Operatoren in falscher Satzstellung („Zusammenfassen Sie …“) in allen Fassungen, 01.10.2026
   const formen = useMemo(() => (hasContent ? operatorformBefunde(worksheet.sheets, anweisungenDeutsch(worksheet.meta)) : []), [hasContent, worksheet])
+  // Teilpunkte auf dem Schülerblatt, obwohl die Hilfen für Lernende aus sind (01.10.2026)
+  const hilfen = useMemo(() => (hasContent ? hilfenBefunde(exam) : []), [hasContent, exam])
   const { layouts, measure } = useSheetLayouts(hasContent ? worksheet : null, logo, settings.schoolName)
   // Selbsttest (wie beim Arbeitsblatt): die echte Seitenaufteilung für Wachen und Sichtprüfungen
   useEffect(() => {
@@ -876,6 +880,17 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
               })
             }}
             laeuft={[...busy].some((k) => k.startsWith('beheben-'))}
+          />
+          <LernhilfenHinweis
+            befunde={hilfen}
+            onUmsetzen={() =>
+              updateExam((d) => {
+                for (const t of d.parts) {
+                  t.blocks = hilfenInsLehrermaterial(t.blocks)
+                  if (t.weitereFassungen) t.weitereFassungen = t.weitereFassungen.map(hilfenInsLehrermaterial)
+                }
+              })
+            }
           />
           <OperatorformHinweis
             befunde={formen}

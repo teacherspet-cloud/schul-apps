@@ -31,7 +31,7 @@ export function describeBlock(b: WsBlock): string {
     case 'infoBox':
       return `Kasten (${b.variant}) „${b.title}“: ${plainText(b.body)}`
     case 'text':
-      return `Text „${b.title}“: ${plainText(b.body)}${b.glossary.length ? ` | Worterklärungen: ${b.glossary.map((g) => g.term).join(', ')}` : ''}`
+      return `Text „${b.title}“: ${b.intro ? `[Einleitung: ${plainText(b.intro)}] ` : ''}${plainText(b.body)}${b.glossary.length ? ` | Worterklärungen: ${b.glossary.map((g) => g.term).join(', ')}` : ''}`
     case 'phrases':
       return `Nützliche Ausdrücke „${b.title}“: ${b.groups.map((g) => `${g.label}: ${g.items.map((it) => it.text).join(', ')}`).join(' | ')}`
     case 'image':

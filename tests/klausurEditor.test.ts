@@ -64,7 +64,8 @@ describe('Oberstufe: keine Schreibhilfen', () => {
         criteria: []
       }
     }
-    const oberstufe = arbeit({}, [part('en-writing', [aufgabe])])
+    // Mit eingeschalteten Hilfen für Lernende – ohne sie stehen Rahmenzeile und Inhaltspunkte nur im Erwartungshorizont (01.10.2026)
+    const oberstufe = arbeit({ lernhilfen: true }, [part('en-writing', [aufgabe])])
     expect(worksheetMetaFor(oberstufe).ohneSchreibhilfen).toBe(true)
     expect(worksheetMetaFor(arbeit({ grade: 8, courseLevel: undefined })).ohneSchreibhilfen).toBe(false)
     const deps = { logo: null, schoolName: '', sizer: async () => ({ width: 10, height: 10 }), raster: async () => PNG, sidebar: async () => PNG }
@@ -77,16 +78,21 @@ describe('Oberstufe: keine Schreibhilfen', () => {
     expect(klausur).toContain('Outline how the film')
     expect(klausur).not.toContain('appropriate salutation')
     expect(klausur).not.toContain('dark visuals')
-    const sekI = await xml(arbeit({ grade: 8, courseLevel: undefined }, [part('en-writing', [aufgabe])]))
+    const sekI = await xml(arbeit({ grade: 8, courseLevel: undefined, lernhilfen: true }, [part('en-writing', [aufgabe])]))
     expect(sekI).toContain('appropriate salutation')
     // Rahmenzeile „Adressat · Textsorte · Zweck": bearbeitbar und abschaltbar (27.09.2026)
     expect(klausur).toContain('A British student · Email · To inform')
     // Leere Inhaltspunkte erzeugen keinen Aufzählungspunkt (27.09.2026)
-    const leer = await xml(arbeit({}, [part('en-writing', [{ ...aufgabe, brief: { ...aufgabe.brief!, points: ['', 'Explain how …', ' '] } }])]))
+    const leer = await xml(arbeit({ lernhilfen: true }, [part('en-writing', [{ ...aufgabe, brief: { ...aufgabe.brief!, points: ['', 'Explain how …', ' '] } }])]))
     expect((leer.match(/<w:numPr>/g) ?? []).length).toBe(1)
-    const ohneRahmen = await xml(arbeit({}, [part('en-writing', [{ ...aufgabe, brief: { ...aufgabe.brief!, frameHidden: true } }])]))
+    const ohneRahmen = await xml(arbeit({ lernhilfen: true }, [part('en-writing', [{ ...aufgabe, brief: { ...aufgabe.brief!, frameHidden: true } }])]))
     expect(ohneRahmen).not.toContain('A British student · Email')
     expect(ohneRahmen).toContain('Outline how the film')
+    // Voreinstellung der Klassenarbeit: keine Hilfen für Lernende auf dem Schülerblatt
+    const standard = await xml(arbeit({}, [part('en-writing', [aufgabe])]))
+    expect(standard).not.toContain('Outline how the film')
+    expect(standard).not.toContain('A British student · Email')
+    expect(standard).toContain('Write an email.')
   })
 })
 

@@ -255,6 +255,8 @@ export function convertBlock(
             }
           : {}),
         source: text(b.source),
+        // Einleitungssatz über dem Text (01.10.2026) – nur, wenn die KI einen geliefert hat
+        ...(text(b.intro) ? { intro: text(b.intro) } : {}),
         glossary: (Array.isArray(b.glossary) ? b.glossary : [])
           .filter((g: any) => text(g?.term))
           .map((g: any) => ({ term: text(g.term), explanation: text(g.explanation) }))

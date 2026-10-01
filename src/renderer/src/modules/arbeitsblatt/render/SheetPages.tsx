@@ -157,6 +157,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     sheetStars: sheet.stars,
     correctionMargin: ws.meta.correctionMargin,
     ohneSchreibhilfen: Boolean(ws.meta.ohneSchreibhilfen),
+    ohneLernhilfen: ws.meta.lernhilfen === false,
     notesMargin: ws.meta.notesMargin,
     phraseGerman: zeigtUebersetzung(ws.meta, sheet.stars),
     taskStyle: {

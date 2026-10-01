@@ -28,6 +28,8 @@ export interface WsContextValue {
   correctionMargin?: boolean
   /** Klausur der Oberstufe: Formhinweise und Notizentabellen der Schreibaufgaben nicht zeigen */
   ohneSchreibhilfen?: boolean
+  /** Ohne Hilfen für Lernende (Klassenarbeit, 01.10.2026): Rahmenzeile und Teilpunkte nur im Erwartungshorizont */
+  ohneLernhilfen?: boolean
   /** Notizrand neben den Materialtexten */
   notesMargin?: boolean
   /**

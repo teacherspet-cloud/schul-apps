@@ -1,6 +1,7 @@
 import { STUFEN_WERTE, stufenLabel } from '../../../shared/verstehen/stufen'
 import ProtokollEinstellungen from './ProtokollEinstellungen'
-import { Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
+import { Anchor, Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
+import { wortzahl } from '../generation/kuerzung'
 import { hatMasse } from '../render/tabelleMasse'
 import { useArbeitsblatt } from '../store'
 import { IconAdjustments } from '@tabler/icons-react'
@@ -747,6 +748,42 @@ export function BlockSettings({
           )}
           {block.type === 'text' && (
             <>
+              {/* Umfang des Materials (01.10.2026) – bei zugeschnittenen Originaltexten mit Zielbereich; „kürzer/länger/anderer Ausschnitt" am Zauberstab */}
+              <Text size="xs" data-testid="material-umfang">
+                Umfang: {wortzahl(block.body)} Wörter
+                {block.zuschnitt
+                  ? ` · Ziel ${block.zuschnitt.zielMin}–${block.zuschnitt.zielMax} (${block.zuschnitt.zielGrund}) · Ausschnitt aus ${wortzahl(block.zuschnitt.original)} Wörtern des Originals`
+                  : ''}
+              </Text>
+              {block.zuschnitt && (
+                <Text size="xs" c="dimmed">
+                  Kürzer, länger oder ein anderer Ausschnitt: über den Zauberstab – gewählt wird aus dem Original, umformuliert wird nichts.
+                </Text>
+              )}
+              {/* Fundstellen der recherchierten Angaben im Einleitungssatz – nur hier, nicht auf dem Blatt */}
+              {(block.introFundstellen?.length ?? 0) > 0 && (
+                <Stack gap={2} data-testid="einleitung-fundstellen">
+                  <Text size="xs" fw={600}>
+                    Einleitung – recherchierte Angaben
+                  </Text>
+                  {block.introFundstellen!.map((f, i) => (
+                    <Text key={i} size="xs">
+                      {f.angabe}:{' '}
+                      <Anchor href={f.url} target="_blank" size="xs">
+                        {f.url}
+                      </Anchor>
+                    </Text>
+                  ))}
+                </Stack>
+              )}
+              <Textarea
+                size="xs"
+                label="Einleitungssatz (kursiv über dem Text)"
+                autosize
+                minRows={1}
+                defaultValue={block.intro ?? ''}
+                onBlur={(e) => update((d) => d.type === 'text' && (d.intro = e.currentTarget.value.trim() || undefined))}
+              />
               <Switch
                 size="xs"
                 label="Zeilennummern"

@@ -176,7 +176,26 @@ export function writingBriefRules(meta: WorksheetMeta): string {
     '- points = Punkte für den Aspekt, zusammen etwa zwei Drittel der Aufgabenpunkte. Das restliche Drittel trägt die Sprache; die Gewichtung von Inhalt zu Sprache reicht in den Ländern von 23:77 (Bayern) bis 42:58 (Nordrhein-Westfalen).',
     '- brief.criteria: die sprachlichen Kriterien, getrennt nach Ausdrucksvermögen und Textaufbau einerseits, sprachlicher Korrektheit andererseits.',
     `- brief.words = ${writingWords(meta)}. Inhaltspunkte, Schreibraum und Mustertext richten sich nach diesem Umfang.`,
-    `- brief.model: ein ausformulierter Mustertext auf ${target}, der die Textsorte einhält und ungefähr ${writingWords(meta)} Wörter lang ist. Er zeigt der Lehrkraft, was sie erwartet – die Lernenden sehen ihn nicht.`
+    `- brief.model: ein ausformulierter Mustertext auf ${target}, der die Textsorte einhält und ungefähr ${writingWords(meta)} Wörter lang ist. Er zeigt der Lehrkraft, was sie erwartet – die Lernenden sehen ihn nicht.`,
+    pruefungsformatRegeln(meta)
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * Ohne Hilfen für Lernende (Klassenarbeit, 01.10.2026): Situation, Adressat und Auftrag stehen im
+ * Fließtext der Aufgabe – wie in den amtlichen Formaten (NI, NRW, IQB). Rahmenzeile und
+ * Inhaltspunkte füllt die KI trotzdem: Sie stehen im Erwartungshorizont.
+ */
+export function pruefungsformatRegeln(meta: Pick<WorksheetMeta, 'lernhilfen'>): string {
+  if (meta.lernhilfen !== false) return ''
+  return [
+    '',
+    'PRÜFUNGSFORMAT – KEINE HILFEN AUF DEM SCHÜLERBLATT (Schreiben und Sprachmittlung):',
+    '- Die Arbeitsanweisung (instruction) enthält Situation, Adressat, Textsorte und Auftrag im FLIESSTEXT, wie in den amtlichen Aufgaben (NI, NRW, IQB). Muster: „You are contributing to the website of your British partner school. … **Write** an article for the partner school’s website based on M{text}, presenting the expert’s view …"',
+    '- KEINE Unterpunkte in der Arbeitsanweisung („Outline why … / Explain why … / Present how …"), KEINE Teilaufgaben (parts bleibt leer), KEIN Kasten mit Adressat, Textsorte und Zweck, KEINE Formulierungshilfen.',
+    '- brief.audience, brief.textType, brief.purpose und brief.points füllst du TROTZDEM: Sie erscheinen nur im Erwartungshorizont der Lehrkraft. brief.points = die inhaltlichen Teilpunkte, die eine gute Lösung abdeckt.'
   ].join('\n')
 }
 

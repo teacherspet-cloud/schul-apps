@@ -43,6 +43,8 @@ export interface WunschKontext {
   antwortArt?: string
   /** Hat die Aufgabe Teilaufgaben? */
   teilaufgaben?: number
+  /** Text aus einem längeren Original zugeschnitten (01.10.2026) – Wünsche wählen den Ausschnitt neu */
+  zuschnitt?: { woerter: number; min: number; max: number }
 }
 
 const FREMDSPRACHE = /englisch|franz|spanisch|latein|italien|russisch|niederl|tuerk|türk|polnisch|chinesisch|griechisch|japan|portug|daz/i
@@ -88,6 +90,11 @@ export function regelVorschlaege(k: WunschKontext): string[] {
       if (!/material|m\d|text|quelle|abbildung|tabelle/.test(text)) v.push('Bezug auf das Material')
       break
     case 'text':
+      // Originaltext mit gespeichertem Original: nur Ausschnitt-Wünsche – umformuliert wird nicht (§ 62 UrhG)
+      if (k.zuschnitt) {
+        v.push('Kürzerer Ausschnitt', 'Längerer Ausschnitt', 'Anderen Ausschnitt wählen', 'Ausschnitt näher an der Aufgabe')
+        break
+      }
       v.push('Kürzerer Text', 'Fachbegriffe erklärt', 'Mehr Absätze und Zwischenüberschriften')
       if (GESELLSCHAFT.test(fach)) v.push('Originalquelle statt Darstellung')
       break

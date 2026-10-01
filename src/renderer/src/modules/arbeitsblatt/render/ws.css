@@ -2367,6 +2367,12 @@
   margin-bottom: 1mm;
 }
 
+/* Einleitungssatz über einem Materialtext (01.10.2026): kursiv, vor dem Wortlaut */
+.ws-text-intro {
+  font-style: italic;
+  margin-bottom: 1.5mm;
+}
+
 /*
  * Vorgaben einer Schreibaufgabe (Fremdsprachen).
  *

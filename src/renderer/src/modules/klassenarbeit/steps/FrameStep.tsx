@@ -1080,6 +1080,16 @@ export default function FrameStep(): React.JSX.Element {
                         onChange={(e) => patch({ writingScaffold: e.currentTarget.checked })}
                       />
                     )}
+                    {/* Hilfen für Lernende (01.10.2026): in Klassenarbeiten standardmäßig aus – Rahmenzeile und Teilpunkte stehen dann im Erwartungshorizont */}
+                    {exam.parts.some((p) => ['writing', 'mediation'].includes(formatArt(p.formatId) ?? '')) && (
+                      <Checkbox
+                        label="Hilfen für Lernende bei Schreiben und Sprachmittlung"
+                        description="Kasten „Adressat · Textsorte · Zweck“ und inhaltliche Teilpunkte auf dem Schülerblatt. In den amtlichen Aufgabenformaten (NI, NRW, IQB) stehen Situation, Adressat und Auftrag im Fließtext der Aufgabe; ohne Haken erscheinen Teilpunkte und Zweck nur im Erwartungshorizont."
+                        checked={Boolean(meta.lernhilfen)}
+                        onChange={(e) => patch({ lernhilfen: e.currentTarget.checked })}
+                        data-testid="lernhilfen-schalter"
+                      />
+                    )}
                   </Stack>
                 </Card>
 

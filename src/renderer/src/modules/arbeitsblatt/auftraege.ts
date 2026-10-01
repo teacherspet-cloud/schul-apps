@@ -22,6 +22,7 @@ import { generateOutline, generateWorksheet } from './generation/generate'
 import { alsAblage, beschaffeOriginalmaterial, materialSprache, type GepruefterTreffer } from './generation/originalmaterial'
 import { browserMaterialDienste, browserSourceServices } from './generation/originalSources'
 import { originalSourcesActive, sourceTextWords } from './generation/prompts'
+import { schneideZu } from './generation/zuschnitt'
 import { subjectById } from './model/subjects'
 import type { TableBlock, TaskBlock, Worksheet, WsBlock } from './model/types'
 import type { LearnerProfile } from './didactics/profile'
@@ -62,6 +63,34 @@ export interface QuellenFrage {
 async function materialBeschaffen(ws: Worksheet, k: AuftragsKontext) {
   const meta = ws.meta
   if (!originalSourcesActive(meta)) return null
+  /*
+   * Eigene Internetadresse der Lehrkraft (01.10.2026): Sie wird nicht gesucht, sondern auf den
+   * Umfang des Ausgangstextes zugeschnitten – wörtlich, mit Einleitungssatz und „(gekürzt)".
+   */
+  const eigene = ws.sources.find((q) => q.url && q.kind === 'web' && q.useAsBasis && q.text.trim())
+  if (eigene?.url) {
+    const woerter = sourceTextWords(meta)
+    const fach = subjectById(meta.subjectId)
+    const r = await schneideZu(
+      {
+        // Die Kopfzeilen „Webseite: …", „Adresse: …" sind Auskunft, kein Lesetext
+        text: eigene.text.replace(/^\s*(?:(?:Webseite|Adresse|Titel):[^\n]*\n?)+\s*/i, ''),
+        seitentitel: eigene.fileName,
+        url: eigene.url,
+        ziel: { min: Math.round(woerter * 0.85), max: Math.round(woerter * 1.25), grund: 'Umfang des Ausgangstextes aus Schritt 1 (Richtwert, bis ein Viertel mehr)' },
+        thema: meta.topic,
+        leitgedanke: meta.learningGoals,
+        sprache: materialSprache(fach, meta.skillFocus === 'mediation'),
+        ...(fach.foreignLanguage ? { zielsprache: fach.foreignLanguage } : {}),
+        fach: meta.subjectLabel,
+        jahrgang: meta.grade,
+        mediation: meta.skillFocus === 'mediation'
+      },
+      k.ai,
+      { netzsuche: browserMaterialDienste(k.websuche).netzsuche, fortschritt: (t) => k.melde(t) }
+    )
+    return r.ablage
+  }
   const ergebnis = await beschaffeOriginalmaterial({
     wunsch: {
       thema: meta.topic,

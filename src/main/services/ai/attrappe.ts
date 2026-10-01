@@ -18,6 +18,7 @@
 import { appendFileSync, readFileSync } from 'fs'
 import type { GeladeneQuelle, Materialanfrage, OnlineImageHit, Quellentreffer, StructuredRequest } from '@shared/types'
 import { AbbruchFehler } from '@shared/abbruch'
+import { fliesstext } from '../sources/fliesstext'
 import type { AiProvider, ChunkListener, Netzfund, RawModel } from './provider'
 
 interface AttrappenDatei {
@@ -55,7 +56,7 @@ interface AttrappenDatei {
    * zu einer Adresse liefert. So lässt sich die Quellenauswahl samt Aussortieren prüfen, ohne
    * Wikisource zu belasten.
    */
-  quellen?: { treffer: Quellentreffer[]; texte: Record<string, { titel: string; text: string }> }
+  quellen?: { treffer: Quellentreffer[]; texte: Record<string, { titel: string; text?: string; html?: string }> }
   /** Funde der Websuche des Anbieters (sonst keine) */
   websuche?: Netzfund[]
 }
@@ -92,7 +93,9 @@ export function attrappeQuelleLaden(url: string): GeladeneQuelle | undefined {
   if (!q) return undefined
   const t = q.texte[url]
   if (!t) return { url, titel: '', text: '', wortzahl: 0, fehler: 'Attrappe: Adresse unbekannt.' }
-  return { url, titel: t.titel, text: t.text, wortzahl: (t.text.match(/[\p{L}\p{N}]+/gu) ?? []).length }
+  // Eine hinterlegte HTML-Seite geht durch dieselbe Fließtext-Extraktion wie im Betrieb (01.10.2026)
+  const text = t.html ? fliesstext(t.html, 'de') : (t.text ?? '')
+  return { url, titel: t.titel, text, wortzahl: (text.match(/[\p{L}\p{N}]+/gu) ?? []).length }
 }
 
 /** Bildauftrag der Attrappe: protokollieren, hinterlegtes Bild liefern */

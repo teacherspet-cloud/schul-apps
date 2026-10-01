@@ -86,11 +86,13 @@ export async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): 
    */
   const brief = block.brief
   if (brief) {
-    const rahmen = brief.frameHidden ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
+    // Klassenarbeit ohne Hilfen für Lernende (01.10.2026): Rahmenzeile, Teilpunkte, Notizen und Formhinweise nicht auf dem Schülerblatt
+    const ohneLernhilfen = ctx.ws.meta.lernhilfen === false
+    const rahmen = brief.frameHidden || ohneLernhilfen ? '' : [brief.audience, brief.textType, brief.purpose].filter(Boolean).join(' · ')
     if (rahmen) out.push(new Paragraph({ indent: { left: indent }, spacing: { after: 60 }, children: [run(rahmen, { italics: true })] }))
 
     // Klausur der Oberstufe: keine Notizentabelle, keine Formhinweise (wie am Bildschirm)
-    const notizen = ctx.ws.meta.ohneSchreibhilfen ? [] : (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
+    const notizen = ctx.ws.meta.ohneSchreibhilfen || ohneLernhilfen ? [] : (brief.notes ?? []).filter((s) => s.title || s.items.length || s.prompts.length)
     if (notizen.length) {
       out.push(
         new Table({
@@ -122,12 +124,12 @@ export async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): 
     }
 
     // Leere Inhaltspunkte auch hier nicht (wie am Bildschirm)
-    for (const p of brief.points.filter((x) => plainText(x).trim()))
+    for (const p of ohneLernhilfen ? [] : brief.points.filter((x) => plainText(x).trim()))
       out.push(new Paragraph({ bullet: { level: 0 }, indent: { left: indent + 200 }, children: await richRun(ctx, p) }))
 
     // Die Wortzahl nur, wenn das Blatt sie nennen soll – dieselbe Regel wie am Bildschirm
     const zeigtWortzahl = Boolean(ctx.ws.meta.wordLimit) && brief.words > 0
-    const formZeile = [zeigtWortzahl ? `Umfang: etwa ${brief.words} Wörter` : '', ...(ctx.ws.meta.ohneSchreibhilfen ? [] : (brief.form ?? []).filter(Boolean))]
+    const formZeile = [zeigtWortzahl ? `Umfang: etwa ${brief.words} Wörter` : '', ...(ctx.ws.meta.ohneSchreibhilfen || ohneLernhilfen ? [] : (brief.form ?? []).filter(Boolean))]
       .filter(Boolean)
       .join(' · ')
     if (formZeile) out.push(new Paragraph({ indent: { left: indent }, spacing: { before: 60, after: 40 }, children: [run(formZeile, { bold: true })] }))

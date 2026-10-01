@@ -154,6 +154,16 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
             children: [run(headerLine(block.sourceHeader), { size: ctx.size - 3, color: '555555' })]
           })
         )
+      // Einleitungssatz (01.10.2026): kursiv über dem Text, nicht Teil des Zitats und nicht der Zeilenzählung
+      if (block.intro?.trim())
+        out.push(
+          new Paragraph({
+            keepNext: true,
+            suppressLineNumbers: true,
+            spacing: { after: 80 },
+            children: await richRun(ctx, block.intro.trim(), { italics: true })
+          })
+        )
       // Längere Texte im Blocksatz wie in der Vorschau
       const justify = justifyText(ctx.ws) && plainText(block.body).length >= LONG_TEXT_CHARS
       for (const p of splitParagraphs(block.body))

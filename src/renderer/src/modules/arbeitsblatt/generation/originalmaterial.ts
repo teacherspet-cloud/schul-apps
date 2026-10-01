@@ -26,6 +26,10 @@ const fremdsprache = (subjectId: string): boolean => Boolean(subjectById(subject
 import type { OriginalMaterialAblage, Sheet, TextBlock, WorksheetMeta, WsBlock } from '../model/types'
 import { kuerzungsHinweis, kuerzungsProtokoll, pruefeKuerzung, type KuerzungsPruefung } from './kuerzung'
 import { befundText, bewerte, type Bewertung } from './textQualitaet'
+import { bereinigeArtikeltext, type Artikel } from '@shared/artikelText'
+import { einleitungErstellen } from './zuschnitt'
+
+const wortzahlVon = (text: string): number => (text.match(/[\p{L}\p{N}]+/gu) ?? []).length
 
 export type AiRuf = <T>(req: StructuredRequest) => Promise<T>
 
@@ -94,6 +98,9 @@ export interface Originalmaterial {
   /** einordnende Sätze der Lehrkraft – ausdrücklich NICHT Teil des Zitats */
   vorbemerkung: string
   pruefung: KuerzungsPruefung
+  /** Einleitungssatz über dem Text und Fundstellen recherchierter Angaben (01.10.2026) */
+  einleitung?: string
+  einleitungFundstellen?: { angabe: string; url: string }[]
 }
 
 export type MaterialErgebnis =
@@ -485,6 +492,7 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
     bewertung: Bewertung
   }[] = []
   const verworfen: string[] = []
+  const artikelJeUrl = new Map<string, Artikel>()
   for (const t of mischeQuellen(treffer)) {
     lauf.fortschritt?.(`Quelle wird geprüft: ${t.titel} …`)
     const quelle = await dienste.laden(t.url).catch((e) => ({
@@ -498,6 +506,13 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
       verworfen.push(`${t.titel}: ${quelle.fehler}`)
       continue
     }
+    /*
+     * Seitenbeiwerk (Rubrik, Datum, Vorspann, Bildnachweis) wird VOR der Kürzung entfernt (01.10.2026) –
+     * aber erst NACH Messung und Relevanzprüfung: Gerade die kurzen Zeilen verraten dort ein Register
+     * oder eine Autorenseite.
+     */
+    const artikel = bereinigeArtikeltext(quelle.text, { seitentitel: quelle.titel })
+    if (artikel.entfernt.length) artikelJeUrl.set(t.url, artikel)
     const bewertung = bewerte(quelle.text, qualitaet)
     if (bewertung.ausschluss.length) {
       verworfen.push(`${t.titel}: ${bewertung.ausschluss.join(', ')}`)
@@ -539,6 +554,11 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
     })
   }
   passend.sort((a, b) => gesamtRang(b.bewertung.rang, b.relevanz) - gesamtRang(a.bewertung.rang, a.relevanz))
+  // Ab hier zählt der bereinigte Artikeltext: Auswahl, Wortzahl und Kürzung (01.10.2026)
+  passend = passend.map((g) => {
+    const a = artikelJeUrl.get(g.treffer.url)
+    return a?.text ? { ...g, quelle: { ...g.quelle, text: a.text, wortzahl: wortzahlVon(a.text) } } : g
+  })
 
   if (!passend.length) {
     const details = verworfen.length ? ` Geprüft und verworfen: ${verworfen.slice(0, 3).join('; ')}.` : ''
@@ -568,14 +588,31 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
   if (auftrag.nummer < 0 || !gewaehlt) return ergebnisOhneFund(wunsch, auftrag.begruendung || 'Keiner der gefundenen Texte passte zum Thema.', treffer)
 
   const pruefung = pruefeKuerzung(gewaehlt.quelle.text, auftrag.gekuerzt)
+  // Einleitungssatz über dem Text (01.10.2026) – aus den Angaben der Seite, fehlende Angaben recherchiert
+  const quellenangabe = quellenangabeMitAbruf(auftrag.quellenangabe, gewaehlt.treffer)
+  const einleitung = await einleitungErstellen(
+    {
+      artikel: artikelJeUrl.get(gewaehlt.treffer.url) ?? { text: gewaehlt.quelle.text, entfernt: [] },
+      text: auftrag.gekuerzt,
+      titel: gewaehlt.treffer.titel,
+      url: gewaehlt.treffer.url,
+      sprache: wunsch.sprache,
+      thema: wunsch.thema,
+      quellenangabe,
+      netzsuche: dienste.netzsuche
+    },
+    ai
+  ).catch(() => null)
   return {
     art: 'gefunden',
     kandidaten: treffer,
     material: {
       quelle: gewaehlt.treffer,
       text: auftrag.gekuerzt,
-      quellenangabe: quellenangabeMitAbruf(auftrag.quellenangabe, gewaehlt.treffer),
+      quellenangabe,
       hinweis: kuerzungsHinweis(pruefung),
+      ...(einleitung?.text ? { einleitung: einleitung.text } : {}),
+      ...(einleitung?.fundstellen.length ? { einleitungFundstellen: einleitung.fundstellen } : {}),
       vorbemerkung: (auftrag.vorbemerkung ?? '').trim(),
       protokoll: [
         ...(auftrag.vorbemerkung ? [`Vorbemerkung der Lehrkraft: „${auftrag.vorbemerkung}"`] : []),
@@ -629,7 +666,13 @@ export function materialBausteine(
     lineNumbers: true,
     // „Quelle:" schreibt die Darstellung davor – eine Angabe, die selbst so beginnt, stünde sonst doppelt („Quelle: Quelle: https://…", 27.09.2026)
     source: [material.quellenangabe.replace(/^\s*quelle\s*:\s*/i, ''), material.hinweis].filter(Boolean).join(' '),
-    glossary: [],
+    // Worthilfen nur, wenn sie geprüft im Text stehen (zuschnitt.ts, pruefeWorthilfen)
+    glossary: material.worthilfen ?? [],
+    // Einleitungssatz über dem Text (01.10.2026) – kursiv, nicht Teil des Zitats
+    ...(material.einleitung?.trim() ? { intro: material.einleitung.trim() } : {}),
+    ...(material.einleitungFundstellen?.length ? { introFundstellen: material.einleitungFundstellen } : {}),
+    // Original für „kürzer/länger/anderer Ausschnitt" am Zauberstab
+    ...(material.zuschnitt ? { zuschnitt: material.zuschnitt } : {}),
     /*
      * Sprache des Textes kennzeichnen (Paket 12): Die Prüfung der Sprachmittlung sucht den
      * DEUTSCHEN Ausgangstext über dieses Merkmal. Der eingesetzte Originaltext trug es nicht –
@@ -737,7 +780,9 @@ export function alsAblage(material: Originalmaterial): OriginalMaterialAblage {
     hinweis: material.hinweis,
     protokoll: material.protokoll,
     vorbemerkung: material.vorbemerkung.trim() || undefined,
-    wortlautGeprueft: material.pruefung.ok
+    wortlautGeprueft: material.pruefung.ok,
+    ...(material.einleitung ? { einleitung: material.einleitung } : {}),
+    ...(material.einleitungFundstellen?.length ? { einleitungFundstellen: material.einleitungFundstellen } : {})
   }
 }
 

@@ -20,6 +20,7 @@ import type { WorksheetMeta, WsBlock } from '../model/types'
 import { convertBlock } from './convert'
 import { describeBlock } from './describe'
 import { FLAT_BLOCK } from './schemas'
+import { wortzahl } from './kuerzung'
 
 type AiCall = <T>(req: StructuredRequest) => Promise<T>
 
@@ -47,6 +48,9 @@ export function wunschKontextFuer(
     thema: meta.topic,
     lernziel: meta.learningGoals,
     inhalt: describeBlock(block),
+    ...(block.type === 'text' && block.zuschnitt
+      ? { zuschnitt: { woerter: wortzahl(block.body), min: block.zuschnitt.zielMin, max: block.zuschnitt.zielMax } }
+      : {}),
     ...(block.type === 'task'
       ? {
           afb: block.afb ? AFB_ZAHL[block.afb] : undefined,

@@ -44,6 +44,9 @@ import {
   writingScaffoldRules
 } from '../../arbeitsblatt/generation/prompts'
 import { WORTZAHL_GRUND, wortzahlErlaubt } from '../model/examRules'
+import { erkenneSprache, schneideZu } from '../../arbeitsblatt/generation/zuschnitt'
+import { materialZiel } from '../model/textlaengen'
+import { hilfenInsLehrermaterial } from '../model/lernhilfen'
 import { defaultMeta } from '../../arbeitsblatt/model/defaults'
 import { subjectById } from '../../arbeitsblatt/model/subjects'
 import type { LanguageSkill, OriginalMaterialAblage, Sheet, WorksheetMeta, WsBlock } from '../../arbeitsblatt/model/types'
@@ -127,6 +130,8 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     originalSources: upperSecondary(m) ? 'on' : 'off',
     // Oberstufe: keine Formhinweise und Notizentabellen bei Schreibaufgaben (27.09.2026)
     ohneSchreibhilfen: upperSecondary(m),
+    // Hilfen für Lernende (Rahmenzeile, Teilpunkte) nur auf ausdrücklichen Wunsch – sonst im Erwartungshorizont (01.10.2026)
+    lernhilfen: m.lernhilfen === true,
     // Korrektur- und Notizrand wie beim Arbeitsblatt
     correctionMargin: m.correctionMargin,
     notesMargin: m.notesMargin,
@@ -404,6 +409,85 @@ export async function quellenangabenErmitteln(quellen: StoffQuelle[], ai: AiCall
   )
 }
 
+/**
+ * Das Material der Lehrkraft für EINEN Teil (01.10.2026) – nach der Sprache des Textes.
+ *
+ * Vorher bekam jeder textgebundene Teil das erste Material: Eine deutsche Seite für die
+ * Sprachmittlung stand dann auch als Lesetext im Leseverstehen. Jetzt gilt: Sprachmittlung nimmt
+ * einen deutschen Text, Leseverstehen einen in der Zielsprache. Lässt sich die Sprache nicht
+ * erkennen (kurzer Text), gilt das Material für jeden Teil wie bisher.
+ */
+export function arbeitsmaterialFuerTeil(exam: Exam, part: Pick<ExamPart, 'formatId'>): StoffQuelle | null {
+  const mitText = arbeitsmaterialQuellen(exam).filter((q) => q.text.trim())
+  if (!mitText.length) return null
+  const fach = subjectById(exam.meta.subjectId)
+  if (!fach.foreignLanguage) return mitText[0]
+  const gewuenscht = materialSprache(fach, formatArt(part.formatId) === 'mediation')
+  const kandidaten = [...new Set(['de', fach.foreignLanguage])]
+  const sprache = (q: StoffQuelle): string => erkenneSprache(ohneWebseitenKopf(q.text), kandidaten)
+  return mitText.find((q) => sprache(q) === gewuenscht) ?? mitText.find((q) => !sprache(q)) ?? null
+}
+
+/**
+ * Roter Faden (01.10.2026): Alle Teile einer Arbeit beziehen sich auf dasselbe Thema. Steht in
+ * jedem Teilauftrag und im Auftrag zum Zuschnitt des Materials.
+ */
+export function roterFaden(exam: Exam, part?: Pick<ExamPart, 'id'>): string {
+  if (exam.parts.length < 2) return ''
+  const material = arbeitsmaterialQuellen(exam).find((q) => q.text.trim())
+  return [
+    'ROTER FADEN – DIE ARBEIT HAT EIN DURCHGEHENDES THEMA:',
+    `- Alle Teile beziehen sich auf das Thema „${exam.meta.topic}“ und greifen verschiedene Seiten davon auf – Leseverstehen, Sprachmittlung und Schreiben bauen aufeinander auf, ohne sich zu wiederholen.`,
+    material ? `- Gemeinsamer Bezugspunkt ist das Material der Lehrkraft („${material.fileName}“). Die Sprachmittlung nutzt die für ihre Aufgabe relevanten Abschnitte; Lese- und Schreibteil bleiben beim selben Thema.` : '',
+    `- Teile der Arbeit: ${exam.parts.map((p, i) => `${i + 1}. ${p.label}${part && p.id === part.id ? ' (dieser Teil)' : ''}`).join('; ')}.`
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * Material der Lehrkraft von einer Internetadresse auf die Länge des Teils zuschneiden
+ * (01.10.2026): wörtlich, am Thema der ganzen Arbeit ausgerichtet, mit Einleitungssatz und
+ * Quellenangabe „(gekürzt)". Dateien der Lehrkraft (ohne Adresse) bleiben unverändert – sie hat
+ * sie selbst zusammengestellt.
+ */
+export async function materialFuerTeil(
+  exam: Exam,
+  part: ExamPart,
+  ai: AiCall,
+  opts: { netzsuche?: (auftrag: string) => Promise<{ titel: string; url: string; auszug: string }[]>; fortschritt?: (t: string) => void } = {}
+): Promise<OriginalMaterialAblage | null> {
+  const q = arbeitsmaterialFuerTeil(exam, part)
+  if (!q) return null
+  if (!q.url) return { ...arbeitsmaterialAblage({ ...exam, meta: { ...exam.meta, arbeitsmaterial: [q] } })! }
+  const fach = subjectById(exam.meta.subjectId)
+  const mediation = formatArt(part.formatId) === 'mediation'
+  const text = ohneWebseitenKopf(q.text)
+  const sprache = erkenneSprache(text, [...new Set(['de', fach.foreignLanguage ?? 'de'])]) || materialSprache(fach, mediation)
+  const format = formatById(part.formatId)
+  const r = await schneideZu(
+    {
+      text,
+      seitentitel: q.fileName,
+      url: q.url,
+      quellenangabe: q.quellenangabe,
+      ziel: materialZiel(exam, part),
+      thema: exam.meta.topic,
+      leitgedanke: [roterFaden(exam, part), exam.meta.content ? `Inhalte der Unterrichtseinheit: ${exam.meta.content}` : ''].filter(Boolean).join('\n'),
+      teil: part.label,
+      aufgabe: format?.description,
+      sprache,
+      ...(fach.foreignLanguage ? { zielsprache: fach.foreignLanguage } : {}),
+      fach: exam.meta.subjectLabel,
+      jahrgang: exam.meta.grade,
+      mediation
+    },
+    ai,
+    opts
+  )
+  return r.ablage
+}
+
 /** Textgebundene Teile: Dort steht das Material der Lehrkraft als Lesetext auf der Arbeit */
 /** Formate, deren Material eine echte, zu analysierende Quelle ist (Begründung bei `brauchtOriginaltext`) */
 const QUELLENFORMATE = ['ge-source', 'ge-comparison', 'pol-text', 'de-textanalyse', 'de-gedicht', 'de-sachtext']
@@ -463,6 +547,7 @@ export function partPrompt(exam: Exam, part: ExamPart, number: number, material?
   return [
     `Erstelle Teil ${number} einer Klassenarbeit im Fach ${m.subjectLabel}.`,
     `Thema der Arbeit: ${m.topic}`,
+    roterFaden(exam, part),
     m.content ? `Inhalte der Unterrichtseinheit, auf die sich die Arbeit bezieht: ${m.content}` : '',
     unterlagenTeil(exam),
     arbeitsmaterialTeil(exam, part),
@@ -748,10 +833,21 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
       onProgress(`Teil ${i + 1}: Quellenangabe des Materials wird ermittelt …`)
       exam = { ...exam, meta: { ...exam.meta, arbeitsmaterial: await quellenangabenErmitteln(exam.meta.arbeitsmaterial ?? [], ai) } }
     }
-    const eigenes = textgebunden(part) ? arbeitsmaterialAblage(exam) : null
+    /*
+     * Material von einer Internetadresse wird auf die Länge des Teils zugeschnitten (01.10.2026):
+     * wörtlich, am Thema der ganzen Arbeit ausgerichtet, Sprachmittlung mit deutschem Text.
+     */
+    const eigenes = textgebunden(part)
+      ? await materialFuerTeil(exam, part, ai, {
+          netzsuche: browserMaterialDienste(opts.websuche).netzsuche,
+          fortschritt: (t) => onProgress(`Teil ${i + 1}: ${t}`)
+        }).catch(() => arbeitsmaterialAblage(exam))
+      : null
     if (eigenes) {
       material = eigenes
-      materialNotizen.push(`Teil ${i + 1} (${part.label}): Material der Lehrkraft „${eigenes.titel}" als Lesetext eingesetzt.`)
+      materialNotizen.push(
+        `Teil ${i + 1} (${part.label}): Material der Lehrkraft „${eigenes.titel}" als Lesetext eingesetzt.${eigenes.protokoll.length ? ` ${eigenes.protokoll.join(' ')}` : ''}`
+      )
     } else if (brauchtOriginaltext(exam, part)) {
       const teilMeta = worksheetMetaFor(exam, part)
       const ergebnis = await beschaffeOriginalmaterial({
@@ -908,6 +1004,21 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
    * Fassungen gibt, für jede von ihnen: Fassung B hat ihre eigenen Höraufgaben.
    */
   for (const part of result.parts) for (const liste of alleFassungen(part)) linkListeningTasks(liste)
+
+  /*
+   * Ohne „Hilfen für Lernende" (Voreinstellung der Klassenarbeit, 01.10.2026): Teilpunkte, die die
+   * KI trotz Auftrag als Teilaufgaben oder Aufzählung geliefert hat, wandern in den Erwartungshorizont.
+   */
+  if (!exam.meta.lernhilfen) {
+    result = {
+      ...result,
+      parts: result.parts.map((p) => ({
+        ...p,
+        blocks: hilfenInsLehrermaterial(p.blocks),
+        ...(p.weitereFassungen ? { weitereFassungen: p.weitereFassungen.map(hilfenInsLehrermaterial) } : {})
+      }))
+    }
+  }
 
   if (notes.length) {
     result.meta = { ...result.meta, teacherNote: [result.meta.teacherNote, `Prüfung der Arbeit: ${notes.join(' | ')}`].filter(Boolean).join('\n') }

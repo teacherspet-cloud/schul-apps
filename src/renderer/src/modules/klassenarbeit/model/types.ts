@@ -197,6 +197,16 @@ export interface ExamMeta {
    */
   writingScaffold?: boolean
   /**
+   * Hilfen für Lernende bei Schreib- und Sprachmittlungsaufgaben (01.10.2026): Rahmenzeile
+   * „Adressat · Textsorte · Zweck" und inhaltliche Teilpunkte auf dem Schülerblatt.
+   *
+   * Standardmäßig AUS (Befund der Lehrkraft: „Bei Aufgabenstellungen in Klassenarbeiten werden
+   * für die Schüler Hilfestellungen zusätzlich zur Aufgabe gegeben"). In den amtlichen Formaten
+   * (NI, NRW, IQB) enthält die Aufgabe Situation, Adressat und Auftrag im Fließtext; Teilpunkte
+   * und Zweck stehen im Erwartungshorizont.
+   */
+  lernhilfen?: boolean
+  /**
    * Nennt die Arbeit den Lernenden eine Wortzahl?
    *
    * Standardmäßig AUS. In Niedersachsen dürfen in den Fremdsprachen bei Schreib- und

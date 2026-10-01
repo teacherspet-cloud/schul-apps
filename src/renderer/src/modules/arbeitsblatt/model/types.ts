@@ -206,6 +206,47 @@ export interface TextBlock extends BaseBlock {
    * fuer eine Quelle haelt, lernt beim Analysieren das Falsche.
    */
   narration?: Narration
+  /**
+   * Einleitungssatz über dem Text (01.10.2026), kursiv zwischen „M1 Titel" und dem Wortlaut:
+   * Verfasser mit Funktion, Entstehungszeit, Anlass und Medium, Thema – in der Sprache des
+   * Materials, mit Doppelpunkt am Ende („Am 10.03.2025 erklärt die LMU-Anglistin Claudia Olk im
+   * Magazin EINSICHTEN, warum Shakespeare aktuell bleibt:"). Nicht Teil des Zitats.
+   */
+  intro?: string
+  /** Fundstellen der für die Einleitung recherchierten Angaben – nur für die Lehrkraft */
+  introFundstellen?: { angabe: string; url: string }[]
+  /** Zuschnitt aus einem längeren Original (Internetadresse) – Grundlage für „kürzer/länger/anderer Ausschnitt" */
+  zuschnitt?: TextZuschnitt
+}
+
+/**
+ * Wie ein Materialtext aus einem längeren Original entstand (01.10.2026).
+ *
+ * Gespeichert, damit der Zauberstab („kürzer", „länger", „anderer Ausschnitt") den Ausschnitt
+ * aus dem ORIGINAL neu wählt, statt den Text umzuschreiben – das Original darf nur gekürzt
+ * werden (§ 62 UrhG, generation/kuerzung.ts).
+ */
+export interface TextZuschnitt {
+  /** der bereinigte Volltext des Originals (Seitenbeiwerk entfernt) */
+  original: string
+  url: string
+  /** Zielbereich in Wörtern und woher er stammt */
+  zielMin: number
+  zielMax: number
+  zielGrund: string
+  /** Thema bzw. Leitgedanke, an dem der Ausschnitt ausgerichtet ist (roter Faden) */
+  thema: string
+  leitgedanke?: string
+  /** Teil bzw. Aufgabe, für die der Text gebraucht wird (z. B. „Sprachmittlung") */
+  teil?: string
+  /** Sprache des Textes (zweibuchstabig) */
+  sprache: string
+  /** Zielsprache der Lernenden – für Worthilfen */
+  zielsprache?: string
+  fach?: string
+  jahrgang?: number
+  /** Quellenangabe ohne Kürzungshinweis – der Hinweis wird je Ausschnitt neu gesetzt */
+  quellenangabe: string
 }
 
 /** Einzelbild einer Bildreihe (z. B. vier Tiere, Instrumente, Vulkantypen) */
@@ -1089,6 +1130,17 @@ export interface WorksheetMeta {
    */
   ohneSchreibhilfen?: boolean
   /**
+   * Hilfen für Lernende bei Schreib- und Sprachmittlungsaufgaben (01.10.2026): die Rahmenzeile
+   * „Adressat · Textsorte · Zweck", die inhaltlichen Teilpunkte, Notizentabelle und Formhinweise.
+   *
+   * Fehlt der Wert, bleibt es beim bisherigen Verhalten (Arbeitsblatt: Hilfen sichtbar). `false`
+   * blendet sie auf dem Schülerblatt aus – sie stehen dann im Erwartungshorizont. Die
+   * Klassenarbeit setzt `false`, solange die Lehrkraft sie nicht ausdrücklich einschaltet:
+   * In den amtlichen Aufgabenformaten (NI, NRW, IQB) stehen Situation, Adressat und Auftrag im
+   * Fließtext der Aufgabe, ohne Kasten und ohne Unterpunkte.
+   */
+  lernhilfen?: boolean
+  /**
    * Notizrand neben den Materialtexten.
    *
    * Wunsch der Lehrkraft (24.09.2026): „fuege oben ausserdem eine option (wie beim
@@ -1350,6 +1402,13 @@ export interface OriginalMaterialAblage {
   vorbemerkung?: string
   /** false, wenn die Prüfung einen Eingriff am Wortlaut gefunden hat */
   wortlautGeprueft: boolean
+  /** Einleitungssatz über dem Text (siehe `TextBlock.intro`) */
+  einleitung?: string
+  einleitungFundstellen?: { angabe: string; url: string }[]
+  /** Zuschnitt aus dem Original – für den Zauberstab */
+  zuschnitt?: TextZuschnitt
+  /** Worthilfen, geprüft: Jeder Begriff steht im Text */
+  worthilfen?: { term: string; explanation: string }[]
 }
 
 export type BoardLayout = 'columns' | 'flow' | 'cluster'

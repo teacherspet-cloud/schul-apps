@@ -165,6 +165,9 @@ export const FLAT_BLOCK = obj({
   items: arr(str(), 'learningGoals: Lernziele; scaffold: Einträge; selfCheck: Ich-kann-Sätze'),
   lineNumbers: bool('text: Zeilennummern anzeigen (die App nummeriert selbst – nie Nummern in body schreiben)'),
   source: str('text: Quellenangabe oder leer'),
+  intro: str(
+    'text: Einleitungssatz über dem Text (kursiv), in der Sprache des Textes, endet mit Doppelpunkt – Verfasser mit Funktion, Entstehungszeit, Anlass bzw. Medium und Thema, soweit bekannt („Am 25.10.2012 äußert sich der Historiker Max Mustermann zum Historikerstreit:"). Nichts erfinden: Unbekanntes weglassen; bei einem selbst verfassten Text kein erfundener Verfasser. Sonst leer.'
+  ),
   glossary: arr(obj({ term: str(), explanation: str() }), 'text: Worterklärungen'),
   imageDescription: str('image: genaue Beschreibung des benötigten Bildes'),
   sourceImageIndex: int('image: Index eines übernehmbaren Materialbildes oder -1'),

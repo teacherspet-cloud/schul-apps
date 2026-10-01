@@ -210,6 +210,15 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
            * wird sonst fuer eine Quelle gehalten.
            */}
           {showHead && narrationNote(block.narration) && <div className="ws-narration-note">{narrationNote(block.narration)}</div>}
+          {/*
+           * Einleitungssatz (01.10.2026): kursiv zwischen „M1 Titel" und dem Wortlaut – wer spricht,
+           * wann, wo, worüber. Nicht Teil des Zitats und nicht der Zeilenzählung.
+           */}
+          {showHead && (block.intro?.trim() || (edit && block.zuschnitt)) && (
+            <div className="ws-text-intro" data-testid="material-einleitung">
+              <Feld value={block.intro ?? ''} editable={schreiben} onChange={set((d, v) => ((d as typeof block).intro = v))} />
+            </div>
+          )}
           <div className="ws-text-body">
             {block.lineNumbers && lineCount > 0 && (
               <div className="ws-line-numbers" aria-hidden>

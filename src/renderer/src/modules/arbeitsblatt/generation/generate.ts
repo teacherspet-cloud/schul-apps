@@ -26,6 +26,7 @@ import type { OriginalMaterialAblage, Outline, OutlineItem, Sheet, SourceMateria
 import { convertBlock, convertOutline } from './convert'
 import { describeBlock, describeSheet } from './describe'
 import { setzeMaterialEin } from './originalmaterial'
+import { neuZuschneiden } from './zuschnitt'
 import { istUebungsklausur } from './abiturPrompt'
 import { bilingualAktiv, glossarZweck } from '../didactics/bilingual'
 import {
@@ -423,6 +424,11 @@ export async function regenerateBlock(
 ): Promise<WsBlock> {
   const index = sheet.blocks.findIndex((b) => b.id === blockId)
   const old = sheet.blocks[index]
+  /*
+   * Zugeschnittener Originaltext (01.10.2026): „kürzer", „länger", „anderer Ausschnitt" wählen den
+   * Ausschnitt aus dem gespeicherten ORIGINAL neu – die KI darf ihn nicht umschreiben.
+   */
+  if (old?.type === 'text' && old.zuschnitt && !feedback) return neuZuschneiden(old, instruction, art, ai)
   const images = embeddableImages(ws.sources)
   profile = profilFuerStufe(profile, stufeFuer(ws.meta, sheet.stars ?? null))
   const data = await ai<any>({
