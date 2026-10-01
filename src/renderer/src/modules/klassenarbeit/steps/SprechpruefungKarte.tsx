@@ -1,4 +1,5 @@
-import { Alert, Group, MultiSelect, NumberInput, SegmentedControl, Stack, Switch, Text } from '@mantine/core'
+import { Alert, Group, MultiSelect, SegmentedControl, Stack, Switch, Text } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconMicrophone } from '@tabler/icons-react'
 import {
   MAX_KARTENSAETZE,
@@ -32,7 +33,7 @@ export default function SprechpruefungKarte({ exam, part, setzen }: { exam: Exam
   const landName = STATES.find((s) => s.id === m.stateId)?.name ?? m.stateId
   const neu = (p: Partial<SprechSetup>): void => setzen({ ...setup, ...p })
   const minuten = (label: string, wert: number, feld: keyof SprechSetup, max = 30): React.JSX.Element => (
-    <NumberInput
+    <ZahlFeld
       size="xs"
       w={120}
       label={label}
@@ -69,7 +70,7 @@ export default function SprechpruefungKarte({ exam, part, setzen }: { exam: Exam
             onChange={(v) => neu({ gruppe: v === '3' ? 3 : 2 })}
           />
         </div>
-        <NumberInput
+        <ZahlFeld
           size="xs"
           w={150}
           label="Kartensätze"
