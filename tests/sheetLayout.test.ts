@@ -4,6 +4,7 @@ import { galleryColumns } from '../src/renderer/src/modules/arbeitsblatt/render/
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { imageCredits, isHelpCard, materialNumbersFor } from '../src/renderer/src/modules/arbeitsblatt/render/SheetPages'
+import { linieGebunden } from '../src/renderer/src/modules/arbeitsblatt/render/baustein/hilfen'
 import { paginate } from '../src/renderer/src/shared/render/paginate'
 import { stripMaterialNo } from '../src/renderer/src/modules/arbeitsblatt/render/BlockView'
 import { checkIntegrity, sameOrder } from '../src/renderer/src/modules/arbeitsblatt/didactics/integrity'
@@ -392,6 +393,18 @@ describe('Teilen ohne Mindestzahl, aber nie die Aufgabenstellung allein', () => 
     const plan = paginate([{ id: 'a', height: 900, headHeight: 0, units: [300, 300, 300], unitGlue: [true, true, false] }], 600, 600)
     expect(plan[0].overflow).toBe(false)
     expect(plan[0].items[0]).toMatchObject({ from: 0, to: 2 })
+  })
+
+  it('Schreiblinien: jedes Stück hat mindestens zwei Linien (erste an zweite, vorletzte an letzte gebunden)', () => {
+    // Entscheidung der Lehrkraft (01.10.2026); Kopf 50, zehn Linien à 32
+    const n = 10
+    const unitGlue = Array.from({ length: n }, (_, k) => linieGebunden(k, n))
+    const schreiben = { id: 's', height: 50 + n * 32, headHeight: 50, continuedHead: 20, units: Array(n).fill(32), unitGlue }
+    for (let vorher = 300; vorher <= 600; vorher += 7) {
+      const plan = paginate([{ id: 'v', height: vorher }, schreiben], 650, 650)
+      const stuecke = plan.flatMap((p) => p.items.filter((i) => i.id === 's'))
+      for (const st of stuecke) expect(st.to! - st.from!, `Vorlauf ${vorher}`).toBeGreaterThanOrEqual(2)
+    }
   })
 
   it('ein Folgestück rechnet die wiederholte Kopfzeile einer inneren Tabelle mit (`unitRepeat`)', () => {

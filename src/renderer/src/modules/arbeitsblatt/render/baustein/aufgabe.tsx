@@ -13,7 +13,7 @@ import { exampleNote } from '../../../../shared/exampleNote'
 import { continuedNote } from '../../../../shared/continuedNote'
 import { bereinigeSkizze } from '../../generation/solution'
 import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
-import { stars, useSetter } from './hilfen'
+import { linieGebunden, stars, useSetter } from './hilfen'
 import { stufenZeile } from '../../../../shared/verstehen/anzeige'
 import { briefAbschnitte, erwartungsAbschnitte, Abschnitt, gruppiereAntworten, gruppiereTeilaufgaben } from './brief'
 
@@ -187,9 +187,20 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    */
   const LINIEN_PRO_EINHEIT = 1
 
+  /*
+   * MINDESTENS ZWEI LINIEN je Stück (Entscheidung der Lehrkraft, 01.10.2026): Eine einzelne Linie
+   * oben auf der Folgeseite unter „Aufgabe 3 (Fortsetzung)" – oder allein unten – wirkt verloren.
+   * Die erste Linie ist deshalb an die zweite gebunden und die vorletzte an die letzte
+   * (`data-bindet`); passt das nicht, wandert der Rest mit.
+   */
   const linienAbschnitte = (count: number): React.JSX.Element[] =>
     Array.from({ length: Math.ceil(count / LINIEN_PRO_EINHEIT) }, (_, k) => (
-      <div className={`ws-lines ${correctionMargin ? 'ws-lines-rand' : ''}`} data-unit key={`lines-${k}`}>
+      <div
+        className={`ws-lines ${correctionMargin ? 'ws-lines-rand' : ''}`}
+        data-unit
+        {...(linieGebunden(k, Math.ceil(count / LINIEN_PRO_EINHEIT)) ? { 'data-bindet': '' } : {})}
+        key={`lines-${k}`}
+      >
         {Array.from({ length: Math.min(LINIEN_PRO_EINHEIT, count - k * LINIEN_PRO_EINHEIT) }, (_, j) => (
           <div key={j} className="ws-line" />
         ))}

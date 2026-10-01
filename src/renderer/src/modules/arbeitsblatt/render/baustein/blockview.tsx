@@ -17,7 +17,7 @@ import { headerLine } from '../../didactics/sourceHeader'
 import { narrationNote } from '../../didactics/narration'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { Illustriert, IllustrationView } from '../Illustration'
-import { LONG_TEXT_CHARS, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, audioLength, shortLink, useSetter } from './hilfen'
+import { LONG_TEXT_CHARS, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, audioLength, linieGebunden, shortLink, useSetter } from './hilfen'
 import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
@@ -469,7 +469,14 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             <div className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${block.heightMm}mm` }} />
           ) : (
             Array.from({ length: bis - von }, (_, k) => (
-              <div key={von + k} data-unit className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${hoehe(von + k)}mm` }} />
+              <div
+                key={von + k}
+                data-unit
+                // Mindestens zwei Linien je Stück – siehe `linieGebunden`
+                {...(linieGebunden(von + k, linien) ? { 'data-bindet': '' } : {})}
+                className={`ws-workspace-area ws-workspace-${block.kind}`}
+                style={{ height: `${hoehe(von + k)}mm` }}
+              />
             ))
           )}
         </div>

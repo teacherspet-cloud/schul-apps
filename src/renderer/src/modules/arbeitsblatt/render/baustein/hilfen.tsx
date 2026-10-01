@@ -92,3 +92,10 @@ export function FortsetzungsHinweis({ bezeichnung }: { bezeichnung: string }): R
   const { answerLanguage } = useWs()
   return <div className="ws-task-continued">{continuedLabel(answerLanguage, plainText(bezeichnung ?? '').replace(/\s+/g, ' '))}</div>
 }
+
+/**
+ * Gebundene Linien eines Schreibbereichs mit `anzahl` Linien (01.10.2026, Entscheidung der
+ * Lehrkraft): Jedes Stück eines geteilten Schreibbereichs hat mindestens zwei Linien – die erste
+ * hängt an der zweiten, die vorletzte an der letzten.
+ */
+export const linieGebunden = (k: number, anzahl: number): boolean => anzahl >= 2 && (k === 0 || k === anzahl - 2)
