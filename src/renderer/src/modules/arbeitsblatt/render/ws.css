@@ -2505,6 +2505,13 @@
 .ws-info-absatz + .ws-info-absatz {
   padding-top: 0.35em;
 }
+/*
+ * Ganz kursive Zeile direkt unter einem Listenpunkt im selben Absatz eines Kastens: gehört zum
+ * Punkt und steht eingerückt darunter – das Aufgabenbeispiel der Operatorenliste (01.10.2026).
+ */
+.ws-info-absatz .rt-list + .rt-p:has(> span:only-child > em) {
+  padding-left: 1.4em;
+}
 
 /*
  * NOTIZRAND neben einem Materialtext.

@@ -216,6 +216,13 @@ export function passt(op: string, d: OperatorDefinition, sprache: Listensprache 
  * Jetzt: eine knappe Liste – Operator und Erläuterung in der Sprache der Liste, jeder Operator
  * einmal – als eigener Anhang am Ende der Arbeit. Vorbemerkungen bekommt nur die Lehrkraft
  * (`operatorenVorbemerkungen`, Hinweis im Aufgabenschritt).
+ *
+ * Korrektur der Lehrkraft (01.10.2026, später): Das Aufgabenbeispiel der amtlichen Liste gehört
+ * dazu – es steht wieder auf dem Blatt, kursiv direkt unter der Erläuterung, im Wortlaut und nur in
+ * der Sprache der Liste. Weiter nur für die Lehrkraft: Vorbemerkungen, AFB, deutsche Namen der
+ * Kompetenzbereiche und die weiteren Spalten (`zusatz`) – die sind in allen Ländern deutsche
+ * Fußnoten/Hinweise, Arbeitsschritte, AFB-Bandbreiten oder Schreibvarianten des Operators, keine
+ * Beispiele in der Zielsprache (Durchsicht aller Listen am 01.10.2026).
  */
 
 /** Ein Wort aus einer Liste: Deutsch erkennbar an seinen Stoppwörtern */
@@ -224,11 +231,18 @@ const DEUTSCH = new Set(STOPPWOERTER.de)
 /** Steht eine Erläuterung auf Deutsch, obwohl die Liste eine Fremdsprache ist? (HE/NW erläutern englische Operatoren deutsch) */
 export function erlaeuterungDeutsch(text: string, sprache: Listensprache): boolean {
   if (sprache === 'de') return false
-  const woerter = text.toLowerCase().match(/[\p{L}]+/gu) ?? []
+  // Zitate zählen nicht – ein französisches Beispiel darf einen deutschen Artikeltitel nennen
+  const original = text.replace(/«[^»]*»|„[^“”]*[“”]|“[^”]*”|"[^"]*"/g, ' ').match(/[\p{L}]+/gu) ?? []
+  const woerter = original.map((w) => w.toLowerCase())
   if (woerter.length < 4) return false
   const ziel = new Set(STOPPWOERTER[sprache] ?? [])
   const de = woerter.filter((w) => DEUTSCH.has(w) && !ziel.has(w)).length
-  return de / woerter.length >= 0.12 || /[äöüß]/.test(text)
+  /*
+   * Umlaute nur in kleingeschriebenen Wörtern und „ü" nicht nach „g" (01.10.2026, später): Die
+   * Aufgabenbeispiele nennen Orte („Düsseldorf", „München"), und Spanisch schreibt „lingüística".
+   */
+  const umlaut = original.some((w) => w === w.toLowerCase() && (/[äöß]/.test(w) || /(?<!g)ü/.test(w)))
+  return de / woerter.length >= 0.12 || umlaut
 }
 
 /**
@@ -244,27 +258,55 @@ export function schuelerErlaeuterung(d: OperatorDefinition, sprache: Listensprac
   return def
 }
 
-/** Die Einträge des Schülerblatts: je Operator EINMAL (der erste Fund), nur mit Erläuterung in der Sprache der Liste */
-export function schuelerEintraege(befund: OperatorenBefund): { operator: string; erlaeuterung: string }[] {
+/**
+ * Die Aufgabenbeispiele eines Operators für das Schülerblatt (01.10.2026, später): im Wortlaut der
+ * Liste, nur in der Sprache der Liste. Korrektur der Lehrkraft: „Die amtliche Liste enthält auch ein
+ * Beispiel für den Operator – dieses Beispiel muss mit rein." Deutsche Beispiele einer
+ * fremdsprachigen Liste bleiben weg (wie deutsche Erläuterungen).
+ */
+export function schuelerBeispiele(d: OperatorDefinition, sprache: Listensprache): string[] {
+  return (d.beispiele ?? []).map((b) => b.replace(/\s+/g, ' ').trim()).filter((b) => b && !erlaeuterungDeutsch(b, sprache))
+}
+
+export interface SchuelerEintrag {
+  operator: string
+  /** Leer, wenn die Liste keine Erläuterung in ihrer Sprache hat (dann trägt das Beispiel den Eintrag) */
+  erlaeuterung: string
+  beispiele: string[]
+}
+
+/**
+ * Die Einträge des Schülerblatts: je Operator EINMAL (der erste Fund) – mit Erläuterung und/oder
+ * Aufgabenbeispiel in der Sprache der Liste. Ohne beides bleibt der Operator weg.
+ */
+export function schuelerEintraege(befund: OperatorenBefund): SchuelerEintrag[] {
   if (!befund.liste) return []
-  const out: { operator: string; erlaeuterung: string }[] = []
+  const out: SchuelerEintrag[] = []
   const gesehen = new Set<string>()
   for (const d of befund.gefunden) {
     const k = normal(d.operator)
     if (gesehen.has(k)) continue
     const erlaeuterung = schuelerErlaeuterung(d, befund.liste.sprache)
-    if (!erlaeuterung) continue
+    const beispiele = schuelerBeispiele(d, befund.liste.sprache)
+    if (!erlaeuterung && !beispiele.length) continue
     gesehen.add(k)
-    out.push({ operator: d.operator, erlaeuterung })
+    out.push({ operator: d.operator, erlaeuterung, beispiele })
   }
   return out
 }
 
-/** Verwendete Operatoren, deren amtliche Erläuterung nicht aufs Schülerblatt kommt (fehlt oder steht nur auf Deutsch) – für den Hinweis an die Lehrkraft */
+/** Verwendete Operatoren, die gar nicht aufs Schülerblatt kommen (weder Erläuterung noch Beispiel in der Sprache der Liste) – für den Hinweis an die Lehrkraft */
 export function ohneSchuelerErlaeuterung(befund: OperatorenBefund): string[] {
   if (!befund.liste) return []
   const drauf = new Set(schuelerEintraege(befund).map((e) => normal(e.operator)))
   return [...new Set(befund.gefunden.filter((d) => !drauf.has(normal(d.operator))).map((d) => d.operator))]
+}
+
+/** Operatoren, die nur mit ihrem Aufgabenbeispiel im Anhang stehen (die Liste erläutert sie nicht in ihrer Sprache) – für den Hinweis an die Lehrkraft */
+export function nurMitBeispiel(befund: OperatorenBefund): string[] {
+  return schuelerEintraege(befund)
+    .filter((e) => !e.erlaeuterung)
+    .map((e) => e.operator)
 }
 
 /** Vorbemerkungen der Liste zu den Kompetenzbereichen der verwendeten Operatoren – nur für die Lehrkraft */
@@ -284,6 +326,31 @@ const TITEL: Record<Listensprache, string> = {
 }
 const QUELLE: Record<Listensprache, string> = { de: 'Quelle', en: 'Source', fr: 'Source', es: 'Fuente', it: 'Fonte', ru: 'Источник' }
 const ANHANG: Record<Listensprache, string> = { de: 'Anhang', en: 'Appendix', fr: 'Annexe', es: 'Anexo', it: 'Allegato', ru: 'Приложение' }
+const BEISPIEL: Record<Listensprache, [string, string]> = {
+  de: ['Beispiel', 'Beispiele'],
+  en: ['Example', 'Examples'],
+  fr: ['Exemple', 'Exemples'],
+  es: ['Ejemplo', 'Ejemplos'],
+  it: ['Esempio', 'Esempi'],
+  ru: ['Пример', 'Примеры']
+}
+/** Anführungszeichen der Sprache */
+const ZITAT: Record<Listensprache, [string, string]> = { de: ['„', '“'], en: ['“', '”'], fr: ['« ', ' »'], es: ['«', '»'], it: ['«', '»'], ru: ['«', '»'] }
+
+/**
+ * Ein Eintrag als eigener Absatz des Kastens: Operator mit Erläuterung als Listenpunkt, darunter
+ * kursiv das Aufgabenbeispiel. Jeder Eintrag ist ein Absatz – der Kasten darf nur ZWISCHEN zwei
+ * Operatoren auf die nächste Seite umbrechen, Operator und Beispiel bleiben zusammen.
+ */
+export function eintragText(e: SchuelerEintrag, sprache: Listensprache): string {
+  const kopf = `- **${e.operator}**${e.erlaeuterung ? `: ${e.erlaeuterung}` : ''}`
+  if (!e.beispiele.length) return kopf
+  const [auf, zu] = ZITAT[sprache] ?? ZITAT.en
+  const [eins, mehr] = BEISPIEL[sprache] ?? BEISPIEL.en
+  // * und $ würden im Fließtextformat als Hervorhebung bzw. Formel gelesen
+  const roh = (b: string): string => b.replace(/\*/g, '∗').replace(/\$/g, '\\$')
+  return `${kopf}\n*${e.beispiele.length > 1 ? mehr : eins}: ${e.beispiele.map((b) => `${auf}${roh(b)}${zu}`).join(' · ')}*`
+}
 
 /** Überschrift des Anhangs, unter dem die Liste steht – trennt sie sichtbar vom letzten Teil */
 export const OPERATOREN_ANHANG_ID = 'exam-operatoren-anhang'
@@ -291,7 +358,7 @@ export const operatorenAnhangTitel = (sprache: Listensprache): string => ANHANG[
 
 /**
  * Der Baustein für das Ende der Arbeit – ein Kasten ohne Materialnummer. Null, wenn die Liste
- * nicht vorgesehen ist oder kein verwendeter Operator eine Erläuterung für das Blatt hat.
+ * nicht vorgesehen ist oder kein verwendeter Operator eine Erläuterung oder ein Beispiel für das Blatt hat.
  */
 export function operatorenBlock(exam: Exam): InfoBoxBlock | null {
   if (!operatorenlisteAktiv(exam)) return null
@@ -306,7 +373,8 @@ export function operatorenBlock(exam: Exam): InfoBoxBlock | null {
     type: 'infoBox',
     variant: 'definition',
     title: TITEL[sprache] ?? TITEL.de,
-    body: [...eintraege.map((e) => `- **${e.operator}**: ${e.erlaeuterung}`), '', `${QUELLE[sprache] ?? QUELLE.de}: ${liste.quelle}`].join('\n')
+    // Jeder Operator ein Absatz (Umbruchstelle), die Quelle ein eigener
+    body: [...eintraege.map((e) => eintragText(e, sprache)), `${QUELLE[sprache] ?? QUELLE.de}: ${liste.quelle}`].join('\n\n')
   }
 }
 

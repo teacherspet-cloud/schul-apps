@@ -16,7 +16,7 @@ export interface OperatorDefinition {
   afb?: AfbAngabe
   /** Weitere Formen, wie sie in Arbeitsanweisungen stehen („Nimm Stellung", „Setze … in Beziehung") */
   formen?: string[]
-  /** Illustrierende Aufgabenbeispiele im Wortlaut der Liste – keine Definition, nie auf dem Schülerblatt (01.10.2026) */
+  /** Illustrierende Aufgabenbeispiele im Wortlaut der Liste – keine Definition; auf dem Schülerblatt kursiv unter der Erläuterung, wenn in der Sprache der Liste (01.10.2026) */
   beispiele?: string[]
   /** Kompetenzbereich, für den dieser Eintrag gilt (Schreiben, Sprachmittlung, Sprechen, Hör-/Hörsehverstehen, Leseverstehen) */
   kompetenzbereich?: string

@@ -109,13 +109,13 @@ describe('Klausur-Anlage außerhalb Niedersachsens', () => {
       createdAt: ''
     }) as unknown as Exam
 
-  it('NRW-Klausur Englisch erhält die NRW-Liste – ohne Aufgabenbeispiel', () => {
+  it('NRW-Klausur Englisch erhält die NRW-Liste – mit Aufgabenbeispiel unter der Erläuterung', () => {
     const e = arbeit('NW', [aufgabe('**Analyse** the way the atmosphere is created.')])
     expect(amtlicheListe('NW', 'englisch')).not.toBeNull()
     const b = operatorenBlock(e) as InfoBoxBlock
     expect(b.body).toMatch(/\*\*analyse\*\*: describe and explain in detail/)
-    // Aufgabenbeispiele sind keine Definitionen – nicht auf dem Schülerblatt (01.10.2026)
-    expect(b.body).not.toMatch(/Example/)
+    // Das Aufgabenbeispiel der Liste gehört dazu – kursiv direkt unter der Erläuterung (Korrektur der Lehrkraft, 01.10.2026)
+    expect(b.body).toMatch(/\*\*analyse\*\*: describe and explain in detail[^\n]*\n\*Examples?: “/)
     expect(b.body).toMatch(/Source: .*Englisch/)
   })
 

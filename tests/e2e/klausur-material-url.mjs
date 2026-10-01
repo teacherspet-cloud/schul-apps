@@ -17,8 +17,8 @@
 //  - Fixtur MIT Bewertungswidget (artikel-bewertung.json): Titel ist die Schlagzeile, kein Widget im Text,
 //  - der Text erreicht mindestens die Mitte des Zielbereichs (550 Wörter) – die KI-Attrappe liefert
 //    absichtlich nur rund 505 Wörter, also greift die auffüllende Absatzkürzung,
-//  - Operatorenliste (NI, an): eigener Anhang am Ende, knapp, ohne Vorbemerkung und Beispiel; die
-//    Vorbemerkung sieht nur die Lehrkraft.
+//  - Operatorenliste (NI, an): eigener Anhang am Ende, knapp, mit dem Aufgabenbeispiel der Liste
+//    kursiv unter der Erläuterung, ohne Vorbemerkung; die Vorbemerkung sieht nur die Lehrkraft.
 import { _electron as electron } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -230,8 +230,20 @@ try {
   // Operatorenliste: knapp, in der Zielsprache, als Anhang hinter dem Material – nicht unter der Aufgabe
   pruefe(blatt.includes('Operators used in this test'), 'Die Operatorenliste steht auf dem Blatt')
   pruefe(blatt.includes('produce a text with specific features'), 'Operator mit Erläuterung der Liste')
-  for (const m of ['situativen Rahmen', 'Es ist erforderlich', 'Example', 'Using the information in the input article', 'level III'])
-    pruefe(!blatt.includes(m), `Nichts aus Vorbemerkung/Beispiel auf dem Schülerblatt: „${m}"`)
+  // Korrektur der Lehrkraft (01.10.2026, später): das Aufgabenbeispiel der Liste gehört dazu, direkt unter der Erläuterung
+  const definitionAt = blatt.indexOf('produce a text with specific features')
+  const beispielAt = blatt.indexOf('Example: “Using the information in the input article')
+  pruefe(beispielAt > definitionAt && definitionAt >= 0, 'Aufgabenbeispiel der Liste steht direkt unter der Erläuterung')
+  const beispielZeile = page.locator('.ws-editor-pages .ws-info-absatz .rt-p', { hasText: 'Using the information in the input article' }).first()
+  if (await beispielZeile.count()) {
+    const stil = await beispielZeile.evaluate((el) => ({
+      einzug: parseFloat(getComputedStyle(el).paddingLeft),
+      kursiv: getComputedStyle(el.querySelector('em') ?? el).fontStyle
+    }))
+    pruefe(stil.einzug > 0 && stil.kursiv === 'italic', `Beispiel kursiv und eingerückt (${stil.einzug}px, ${stil.kursiv})`)
+  } else pruefe(false, 'Beispielzeile im Kasten gefunden')
+  for (const m of ['situativen Rahmen', 'Es ist erforderlich', 'Sprachmittlung', 'level III'])
+    pruefe(!blatt.includes(m), `Nichts aus Vorbemerkung/AFB/Kompetenzbereich auf dem Schülerblatt: „${m}"`)
   pruefe(blatt.indexOf('Operators used in this test') > blatt.lastIndexOf('(gekürzt)'), 'Die Liste steht hinter dem Material, nicht zwischen Aufgabe und M1')
   pruefe(blatt.includes('Appendix'), 'Eigene Überschrift „Appendix" über der Liste')
   const lehrkraft = page.getByTestId('operatoren-hinweis')

@@ -10,8 +10,10 @@ import {
   operatorenDerArbeit,
   operatorenlisteAktiv,
   operatorenVorbemerkungen,
+  nurMitBeispiel,
   ohneSchuelerErlaeuterung,
   OPERATOREN_BLOCK_ID,
+  schuelerBeispiele,
   schuelerErlaeuterung
 } from '../src/renderer/src/modules/klassenarbeit/didactics/operatorenliste'
 import { defaultExamMeta } from '../src/renderer/src/modules/klassenarbeit/model/defaults'
@@ -73,7 +75,7 @@ describe('Operatoren aus den Aufgaben', () => {
     expect(examToWorksheet(e).sheets[0].blocks.some((b) => b.id === OPERATOREN_BLOCK_ID)).toBe(false)
   })
 
-  it('Niedersachsen, Englisch: verwendete Operatoren mit amtlichem Wortlaut – knapp, ohne Aufgabenbeispiele', () => {
+  it('Niedersachsen, Englisch: verwendete Operatoren mit amtlichem Wortlaut und Aufgabenbeispiel', () => {
     const e = arbeit({}, [
       aufgabe('**Tick** the correct answer.'),
       aufgabe('**Outline** the review.', ['**Comment on** the ending.']),
@@ -87,9 +89,10 @@ describe('Operatoren aus den Aufgaben', () => {
     const body = block?.body ?? ''
     expect(body).toContain('- **outline**: give the main features')
     expect(body).toContain('Stand 1. Februar 2024')
-    // „tick" hat in der Liste nur ein Aufgabenbeispiel, keine Erläuterung – auf dem Blatt stünde nur das Wort
-    expect(body).not.toContain('**tick**')
-    expect(ohneSchuelerErlaeuterung(b)).toEqual(['tick'])
+    // „tick" hat in der Liste nur ein Aufgabenbeispiel, keine Erläuterung – es steht mit dem Beispiel da (01.10.2026, später)
+    expect(body).toMatch(/- \*\*tick\*\*\n\*Examples?: “Tick /)
+    expect(ohneSchuelerErlaeuterung(b)).toEqual([])
+    expect(nurMitBeispiel(b)).toEqual(['tick'])
     const ws = examToWorksheet(e)
     expect(ws.sheets[0].blocks[ws.sheets[0].blocks.length - 1].id).toBe(OPERATOREN_BLOCK_ID)
     // Unbekannter Operator: nicht auf dem Blatt, aber im Befund
@@ -113,21 +116,29 @@ describe('Operatoren aus den Aufgaben', () => {
    * Befund der Lehrkraft (01.10.2026): Unter einer Sprachmittlung stand die deutsche Vorbemerkung des
    * Ministeriums („Es ist erforderlich, … in einen situativen Rahmen … einzubetten.") und das
    * Aufgabenbeispiel der Liste. Seit 28.09.2026 setzte der Baustein ALLES aus der Liste aufs Blatt.
+   *
+   * Korrektur der Lehrkraft (01.10.2026, später): „Die amtliche Liste enthält auch ein Beispiel für den
+   * Operator – dieses Beispiel muss mit rein." Das Beispiel steht kursiv direkt unter der Erläuterung.
    */
-  it('Schülerblatt: Operator und Erläuterung in der Sprache der Liste – keine Vorbemerkung, kein Beispiel, keine weiteren Spalten (01.10.2026)', () => {
+  it('Schülerblatt: Operator, Erläuterung und Aufgabenbeispiel in der Sprache der Liste – keine Vorbemerkung, kein AFB, keine weiteren Spalten (01.10.2026)', () => {
     // Mediation: die Erläuterung aus dem Kompetenzbereich Sprachmittlung
     const mediation = { ...arbeit({}, [aufgabe('**Write** an email based on M1.')]) }
     mediation.parts[0].formatId = 'en-mediation'
     const body = operatorenBlock(mediation)?.body ?? ''
-    expect(body).toContain('- **write (+ text type)**: produce a text with specific features')
-    for (const verboten of ['situativen Rahmen', 'Es ist erforderlich', 'Example', 'Using the information in the input article', 'Sprachmittlung', 'level III'])
-      expect(body).not.toContain(verboten)
+    expect(body).toContain(
+      '- **write (+ text type)**: produce a text with specific features\n*Example: “Using the information in the input article write an article in English for your project website in which you inform your Polish partners how to get a sports scholarship at a German university.”*'
+    )
+    for (const verboten of ['situativen Rahmen', 'Es ist erforderlich', 'Sprachmittlung', 'level III', 'AFB']) expect(body).not.toContain(verboten)
+    // Operator samt Beispiel ist EIN Absatz (Umbruchstelle des Kastens nur zwischen den Operatoren), die Quelle ein eigener
+    const absaetze = body.split(/\n\s*\n/)
+    expect(absaetze).toHaveLength(2)
+    expect(absaetze[1]).toMatch(/^Source: /)
     // Die Vorbemerkung bekommt nur die Lehrkraft
     expect(operatorenVorbemerkungen(operatorenBefund(mediation))).toEqual([{ bereich: 'Sprachmittlung', text: expect.stringContaining('situativen Rahmen') }])
-    // Schreiben: ohne Anforderungsbereich und ohne Beispiele
+    // Schreiben: ohne Anforderungsbereich, mit den Beispielen der Liste
     const schreiben = operatorenBlock(arbeit({}, [aufgabe('**Analyse** the way the atmosphere is created.')]))?.body ?? ''
-    expect(schreiben).toContain('- **analyse, examine**: describe and explain in detail')
-    expect(schreiben).not.toMatch(/Examples?:|level II/)
+    expect(schreiben).toContain('- **analyse, examine**: describe and explain in detail\n*Example')
+    expect(schreiben).not.toMatch(/level II/)
     // Derselbe Operator in zwei Teilen (Schreiben und Sprachmittlung): einmal
     const zwei = arbeit({}, [aufgabe('**Write** a comment.')])
     zwei.parts.push({ ...zwei.parts[0], id: 'p2', formatId: 'en-mediation', blocks: [aufgabe('**Write** an email based on M1.')] })
@@ -159,6 +170,23 @@ describe('Operatorenliste: Erläuterungen nur in der Sprache der Liste (01.10.20
     expect(schuelerErlaeuterung({ operator: 'entwerfen', definition: `${entwerfen} Besonderer Hinweis: für Entwürfe von Algorithmen …` }, 'de')).toBe(entwerfen)
   })
 
+  it('Aufgabenbeispiele nur in der Sprache der Liste (01.10.2026, später)', () => {
+    const d = {
+      operator: 'discuss',
+      definition: 'weigh arguments',
+      beispiele: ['Discuss the advantages of school uniforms.', 'Erörtern Sie die Vor- und Nachteile der Schuluniform.']
+    }
+    expect(schuelerBeispiele(d, 'en')).toEqual(['Discuss the advantages of school uniforms.'])
+    expect(schuelerBeispiele({ ...d, beispiele: ['Erörtern Sie die Vor- und Nachteile der Schuluniform.'] }, 'de')).toHaveLength(1)
+    // Ortsnamen, spanisches „ü" und zitierte deutsche Titel machen ein Beispiel nicht deutsch
+    const es = 'Comente la opinión del autor sobre la política lingüística del gobierno catalán.'
+    const fr = 'Vous visitez Düsseldorf avec vos partenaires. Présentez la situation en vous référant à l’article « 25 % der Düsseldorfer leben in ständiger Angst! ».'
+    expect(schuelerBeispiele({ ...d, beispiele: [es] }, 'es')).toEqual([es])
+    expect(schuelerBeispiele({ ...d, beispiele: [fr] }, 'fr')).toEqual([fr])
+    // NI Spanisch: Sprachmittlungsbeispiele auf Deutsch bleiben weg
+    expect(schuelerBeispiele({ ...d, beispiele: ['Stellen Sie in einem Eintrag für den spanischen Blogbereich das Konzept dieser Schule vor.'] }, 'es')).toEqual([])
+  })
+
   it('Bestand: keine Erläuterung trägt eine Vorbemerkung oder ein Beispiel im Wortlaut', async () => {
     const { BESTAND } = await import('../src/shared/operatoren/zugriff')
     const { OPERATORENLISTEN } = await import('../src/renderer/src/modules/klassenarbeit/didactics/operatorenlistenDaten')
@@ -169,5 +197,9 @@ describe('Operatorenliste: Erläuterungen nur in der Sprache der Liste (01.10.20
     const muster = /(?:^|[\s(])(?:examples?|beispiele?|exemples?|ejemplos?|aufgabenbeispiel)\s*:|es ist erforderlich|(?:besonderer\s+)?hinweis\s*:|anmerkung\s*:/i
     const verdaechtig = alle.filter((o) => muster.test(o.definition ?? ''))
     expect(verdaechtig.map((o) => `${o.operator}: ${o.definition}`)).toEqual([])
+    // Die Beispiele kommen jetzt aufs Blatt: keines darf eine Vorbemerkung oder einen Hinweis der Liste tragen
+    const vermerk = /es ist erforderlich|(?:besonderer\s+)?hinweis\s*:|anmerkung\s*:|fußnote|aufgabenbeispiel/i
+    const beispiele = alle.flatMap((o) => (o.beispiele ?? []).filter((b) => vermerk.test(b)).map((b) => `${o.operator}: ${b}`))
+    expect(beispiele).toEqual([])
   })
 })

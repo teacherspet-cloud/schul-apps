@@ -67,7 +67,7 @@ import { addVersion, switchVersion } from '../../arbeitsblatt/model/versions'
 import { newBlock } from '../../arbeitsblatt/model/factory'
 import { newId } from '../../vokabeltest/model/random'
 import { examHeadBlock } from '../render/examWorksheet'
-import { ohneSchuelerErlaeuterung, operatorenBefund, operatorenlisteAktiv, operatorenVorbemerkungen } from '../didactics/operatorenliste'
+import { nurMitBeispiel, ohneSchuelerErlaeuterung, operatorenBefund, operatorenlisteAktiv, operatorenVorbemerkungen } from '../didactics/operatorenliste'
 import type { WsBlockType } from '../../arbeitsblatt/model/types'
 import { WsContext, type WsContextValue } from '../../arbeitsblatt/render/WsContext'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
@@ -202,9 +202,11 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     if (!b.liste) return `Für ${meta.stateId} und ${meta.subjectLabel} ist keine amtliche Operatorenliste hinterlegt – die Anlage „Operatoren" entfällt.`
     // Vorbemerkungen der Liste und Operatoren ohne Erläuterung in der Sprache der Liste: nur für die Lehrkraft, nie auf dem Blatt (01.10.2026)
     const ohne = ohneSchuelerErlaeuterung(b)
+    const nurBeispiel = nurMitBeispiel(b)
     return [
       b.fehlend.length ? `Ohne amtliche Definition in der Operatorenliste (${b.liste.quelle}): ${b.fehlend.join(', ')}.` : '',
-      ohne.length ? `Ohne Erläuterung in der Sprache der Liste, daher nicht im Anhang: ${ohne.join(', ')}.` : '',
+      ohne.length ? `Ohne Erläuterung und Beispiel in der Sprache der Liste, daher nicht im Anhang: ${ohne.join(', ')}.` : '',
+      nurBeispiel.length ? `Im Anhang nur mit dem Aufgabenbeispiel der Liste (keine Erläuterung in ihrer Sprache): ${nurBeispiel.join(', ')}.` : '',
       ...operatorenVorbemerkungen(b).map((v) => `Vorbemerkung der Liste${v.bereich ? ` (${v.bereich})` : ''}, nur für die Lehrkraft: ${v.text}`)
     ]
       .filter(Boolean)
