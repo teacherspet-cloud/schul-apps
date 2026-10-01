@@ -1016,6 +1016,8 @@ export interface WorksheetMeta {
   themenbereich?: string
   /** Fremdsprachen: Kompetenzschwerpunkt des Blattes ('mixed' = gemischt) */
   skillFocus?: LanguageSkill | 'mixed'
+  /** Schwerpunkt Sprechen: gewählte Teile des Blattes (didactics/sprechen.ts); fehlt = alle vier */
+  sprechTeile?: import('../didactics/sprechen').SprechTeil[]
   /**
    * Hörverstehen: Die KI schreibt den Hörtext mit; vertont wird er auf Knopfdruck im
    * Reiter „Hörtexte". Nur sinnvoll, wenn eine Stimme (ElevenLabs) eingerichtet ist.
@@ -1033,8 +1035,6 @@ export interface WorksheetMeta {
   /**
    * Schwerpunkt Vokabeln: Wie die Wortschatzarbeit auf dem Blatt angelegt ist.
    * Ersetzt bei diesem Schwerpunkt die Frage nach Materialquellen.
-  /** Schwerpunkt Sprechen: gewählte Teile des Blattes (didactics/sprechen.ts); fehlt = alle vier */
-  sprechTeile?: import('../didactics/sprechen').SprechTeil[]
    */
   vocabWork?: VocabWorkMode
   /** Zielwörter, die das Blatt aufbaut (leer = die KI wählt sie zum Thema) */

@@ -717,12 +717,12 @@ export async function generateExamPart(
  * („kürzer", „ohne Multiple Choice", „anderes Thema") sowie den bisherigen Stand.
  */
 export async function reviseExamPart(exam: Exam, part: ExamPart, number: number, instruction: string, ai: AiCall): Promise<WsBlock[]> {
-  const meta = worksheetMetaFor(exam, part)
   // Sprechprüfung: Karten und Prüferbogen neu, der Wunsch geht als Vorgabe der Lehrkraft mit
   if (formatArt(part.formatId) === 'speaking') {
     const teil = { ...part, notes: [part.notes, `Änderungswunsch (hat Vorrang): ${instruction}`].filter(Boolean).join('\n') }
     return sprechBausteine(exam, part, await generateSprechDaten(exam, teil, ai))
   }
+  const meta = worksheetMetaFor(exam, part)
   const profile = profileFor(meta)
   const current = part.blocks.map((b) => describeBlock(b)).join('\n\n')
   const res = await ai<{ blocks: unknown[] }>({
@@ -825,7 +825,6 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
   const notes: string[] = []
   for (let i = 0; i < exam.parts.length; i++) {
     const part = nurFassungA(exam.parts[i])
-    onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label}${anzahl > 1 ? ' (Fassung A)' : ''} …`)
     /*
      * Sprechprüfung (01.10.2026): eigener Weg – Karten, Prüferbogen und Raster aus EINER Anfrage
      * für alle Kartensätze. Die Kartensätze ersetzen die Fassungen; jede Fassung zeigt denselben Teil.
@@ -839,6 +838,7 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
       parts.push(fertig)
       continue
     }
+    onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label}${anzahl > 1 ? ' (Fassung A)' : ''} …`)
 
     /*
      * Oberstufe: Der Ausgangstext wird beschafft, BEVOR die Aufgaben entstehen.
@@ -1067,9 +1067,9 @@ async function pruefeFassung(
   const out = [...teile]
   for (let i = 0; i < out.length; i++) {
     const part = out[i]
-    // Hörverstehen: Erst die Aufgaben ihrem Hörtext zuordnen, dann prüfen – sonst liefe
     // Sprechprüfung: Karten und Prüferbogen sind keine Aufgaben mit Material – die Prüfkette passt nicht
     if (formatArt(part.formatId) === 'speaking') continue
+    // Hörverstehen: Erst die Aufgaben ihrem Hörtext zuordnen, dann prüfen – sonst liefe
     // die Lösungsprüfung gegen alle Skripte des Teils zugleich.
     linkListeningTasks(part.blocks)
     const sheet: Sheet = { id: part.id, label: part.label, blocks: part.blocks }
