@@ -202,7 +202,7 @@ try {
     await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click()
     await page.waitForTimeout(500)
     await page.getByRole('button', { name: 'Weiter zu den Aufgaben' }).click()
-    await page.getByRole('button', { name: 'Arbeit erzeugen' }).click()
+    await page.getByRole('button', { name: 'Arbeit erzeugen' }).first().click()
     // Fertig, wenn jeder Teil Bausteine hat und kein Auftrag mehr läuft
     const exam = await warte(
       () => {

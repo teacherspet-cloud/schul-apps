@@ -352,7 +352,7 @@ if (run('arbeit')) {
   await shot('3a-rahmen')
   await page.getByRole('button', { name: 'Weiter zu den Aufgaben' }).click()
   await page.waitForTimeout(1000)
-  await page.getByRole('button', { name: 'Arbeit erzeugen' }).click()
+  await page.getByRole('button', { name: 'Arbeit erzeugen' }).first().click()
   await page.waitForSelector('button:has-text("Neu erzeugen")', { timeout: 2 * WAIT_MS })
   await page.waitForTimeout(3000)
   await shot('3b-klassenarbeit')

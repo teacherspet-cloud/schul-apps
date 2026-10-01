@@ -74,7 +74,7 @@ const arbeit = async (fach, thema) => {
   await page.screenshot({ path: join(out, `${fach}-rahmen.png`) })
   const vorher = anfragen().length
   await page.getByRole('button', { name: 'Weiter zu den Aufgaben' }).click()
-  await page.getByRole('button', { name: 'Arbeit erzeugen' }).click()
+  await page.getByRole('button', { name: 'Arbeit erzeugen' }).first().click()
   await page.locator('.ws-editor-pages .ws-page').first().waitFor({ timeout: 30000 })
   await page.waitForTimeout(1000)
   await page.screenshot({ path: join(out, `${fach}-arbeit.png`) })

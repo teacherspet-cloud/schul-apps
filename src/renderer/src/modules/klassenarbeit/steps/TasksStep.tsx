@@ -39,7 +39,8 @@ import {
   IconChevronDown,
   IconChevronUp,
   IconFileImport,
-  IconPlaylistAdd
+  IconPlaylistAdd,
+  IconArrowLeft
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { notifyError } from '../../../shared/util'
@@ -90,7 +91,9 @@ import BlattoptionenFelder from '../../../shared/components/BlattoptionenFelder'
 import CanaryDialog from '../../../shared/components/CanaryDialog'
 import { canaryWordFor } from '../../../shared/aiCanary'
 import type { DesignTemplate } from '@shared/design'
-import { starteAuftrag, useLaufendeSchluessel } from '../../../shared/auftraege'
+import { starteAuftrag, useLaufendeSchluessel, useSperrenderAuftrag } from '../../../shared/auftraege'
+import ErzeugenStart from '../../../shared/components/ErzeugenStart'
+import Formularfuss from '../../../shared/components/Formularfuss'
 import { arbeitOffen, defaultExamName, legeArbeitAb } from '../library'
 import { QUELLENAUSWAHL, type QuellenFrage } from '../../arbeitsblatt/auftraege'
 import type { AudioBlock } from '../../arbeitsblatt/model/types'
@@ -153,6 +156,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   const logo = useAppSettings((s) => s.logoDataUrl)
   // Teile, an denen gerade ein Auftrag „überarbeiten" arbeitet (je Teil und Fassung)
   const busy = useLaufendeSchluessel(useKlassenarbeit((s) => s.docId))
+  // Läuft „Arbeit erzeugen“ schon, dreht der Hauptknopf der Startkarte
+  const erzeugtGerade = Boolean(useSperrenderAuftrag(useKlassenarbeit((s) => s.docId)))
   const [revise, setRevise] = useState<string | null>(null)
   /*
    * Word, PDF und Drucken fragen nach dem Erwartungshorizont (ohne / anhängen / eigene Datei)
@@ -298,6 +303,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     })
   }
 
+  const erzeugenLabel = meta.variants > 1 ? `Klassenarbeit erzeugen (${meta.variants} Fassungen)` : 'Klassenarbeit erzeugen'
   /** Die ganze Arbeit erzeugen – alle eingestellten Fassungen; sperrt sie bis dahin. */
   const run = (): void => {
     const n = Math.max(1, meta.variants)
@@ -629,15 +635,20 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
         }
         extras={
           <>
-            <Button size="xs" variant="light" leftSection={hasContent ? <IconRefresh size={14} /> : <IconSparkles size={14} />} onClick={run}>
-              {hasContent ? 'Neu erzeugen' : 'Arbeit erzeugen'}
-            </Button>
-            {/* Verlagsmaterial zerlegen und Aufgaben auswählen (29.09.2026) */}
-            <Tooltip label="Klassenarbeitsvorschlag, Testheft oder Lehrerband einlesen, in Aufgaben zerlegen und auswählen">
-              <Button size="xs" variant="light" leftSection={<IconFileImport size={14} />} onClick={() => setImportOffen(true)} data-testid="verlagsimport">
-                Aufgaben aus Material
+            {/* Vor dem ersten Entwurf stehen beide Wege groß in der Startkarte (01.10.2026); hier bleibt „Neu erzeugen“ für später */}
+            {hasContent && (
+              <Button size="xs" variant="light" leftSection={<IconRefresh size={14} />} onClick={run}>
+                Neu erzeugen
               </Button>
-            </Tooltip>
+            )}
+            {/* Verlagsmaterial zerlegen und Aufgaben auswählen (29.09.2026) */}
+            {hasContent && (
+              <Tooltip label="Klassenarbeitsvorschlag, Testheft oder Lehrerband einlesen, in Aufgaben zerlegen und auswählen">
+                <Button size="xs" variant="light" leftSection={<IconFileImport size={14} />} onClick={() => setImportOffen(true)} data-testid="verlagsimport">
+                  Aufgaben aus Material
+                </Button>
+              </Tooltip>
+            )}
             {hasContent && <RueckmeldungKnopf art="klassenarbeit" docId={docId} />}
             {hasContent && (
               <LmsExport titel={exam.meta.title || exam.meta.topic} bericht={() => fragenAusBlatt(examToWorksheet(exam, gewaehlt))} ziel={quelle(false).ziel} />
@@ -693,6 +704,34 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
       <ZusatzfragenDialog aufgabeId={zusatzFuer} onClose={() => setZusatzFuer(null)} exam={exam} fassung={fassung} docId={docId} />
       <ScrollArea style={{ flex: 1, minHeight: 0 }}>
         <Container size="xl" py="lg">
+          {/*
+           * Startkarte, solange nichts erzeugt ist (Befund der Lehrkraft 01.10.2026): Vorher stand
+           * nur „Arbeit erzeugen“ klein in der Leiste und ein Hinweis unter dem Aufbau – der nächste
+           * Schritt war nicht zu erkennen. Jetzt oben, groß, ohne Scrollen sichtbar.
+           */}
+          {!hasContent && (
+            <ErzeugenStart
+              titel="Rahmen steht – jetzt die Aufgaben erzeugen"
+              knopf={{ label: erzeugenLabel, onClick: run, laedt: erzeugtGerade }}
+              alternativen={
+                <>
+                  <Tooltip label="Klassenarbeitsvorschlag, Testheft oder Lehrerband einlesen, in Aufgaben zerlegen und auswählen">
+                    <Button variant="default" leftSection={<IconFileImport size={16} />} onClick={() => setImportOffen(true)} data-testid="verlagsimport">
+                      Aufgaben aus Material
+                    </Button>
+                  </Tooltip>
+                  <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
+                    Rahmen ändern
+                  </Button>
+                </>
+              }
+            >
+              Die KI schreibt für {exam.parts.length === 1 ? 'den geplanten Teil' : `alle ${exam.parts.length} geplanten Teile`} Material und Aufgaben
+              {meta.answerKey ? ' samt Erwartungshorizont' : ''}
+              {meta.variants > 1 ? `, und zwar in ${meta.variants} gleichwertigen Fassungen` : ''}. Jeder Teil wird einzeln erzeugt, das dauert je nach
+              KI-Zugang einen Moment. Danach lässt sich alles direkt im Blatt ändern, einzelne Teile lassen sich mit ✨ gezielt überarbeiten.
+            </ErzeugenStart>
+          )}
           {/*
            * Aufbau der Arbeit (Teile mit ✨, Noten) – seit 27.09.2026 EINKLAPPBAR unter der Leiste,
            * damit das Blatt oben steht wie beim Arbeitsblatt. Entscheidung der Lehrkraft: standardmäßig
@@ -822,16 +861,6 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             </div>
           </Collapse>
 
-          {!hasContent && (
-            <Alert color="blue" icon={<IconInfoCircle size={18} />} title="Noch keine Aufgaben erzeugt">
-              <Text size="sm">
-                „Arbeit erzeugen“ schreibt Material, Aufgaben und – wenn eingeschaltet – den Erwartungshorizont für jeden Teil
-                {meta.variants > 1 ? `, und zwar in ${meta.variants} gleichwertigen Fassungen` : ''}. Jeder Teil wird einzeln erzeugt, das dauert je nach
-                KI-Zugang einen Moment.
-              </Text>
-            </Alert>
-          )}
-
           <AnredeHinweise
             befunde={anrede}
             // Paket 12: „Mit KI beheben" – je Fassung ein Auftrag (bei mehreren steht „Fassung B, …" vor dem Hinweis)
@@ -931,6 +960,20 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           <PrintPreview html={druck?.html ?? null} loesung={druck?.loesung} title={`Drucken – ${quelle(false).name}`} onClose={() => setDruck(null)} />
         </Container>
       </ScrollArea>
+      {/* Wie in den Formularen: Der Hauptknopf steht vor dem ersten Entwurf auch fest unten */}
+      {!hasContent && (
+        <Formularfuss
+          links={
+            <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={() => setStep(0)}>
+              Zurück zum Rahmen
+            </Button>
+          }
+        >
+          <Button size="md" leftSection={<IconSparkles size={18} />} onClick={run} loading={erzeugtGerade} data-testid="erzeugen-fuss">
+            {erzeugenLabel}
+          </Button>
+        </Formularfuss>
+      )}
     </Box>
   )
 }
