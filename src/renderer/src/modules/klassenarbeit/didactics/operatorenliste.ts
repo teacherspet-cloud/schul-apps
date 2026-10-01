@@ -6,8 +6,8 @@
  * Operatoren auf, die in den Aufgaben der Arbeit vorkommen, und definiert sie – ausschließlich
  * nach der amtlichen Liste des Landes (Entscheidung der Lehrkraft: keine KI-Formulierungen).
  * Fehlt zu einem verwendeten Operator die amtliche Definition, bleibt er weg und die Lehrkraft
- * bekommt einen Hinweis. Entsteht bei Sek II von selbst, in der Sek I per Schalter; steht als
- * eigener Abschnitt am Ende der Arbeit.
+ * bekommt einen Hinweis. Entsteht bei Sek II von selbst, in der Sek I per Schalter; steht seit
+ * 01.10.2026 (später) auf der ersten Aufgabenseite (`operatorenStelle` in render/examWorksheet.ts).
  *
  * Die Listen selbst: `operatorenlistenDaten.ts` (Land → Fach → Operatoren mit Quelle).
  */
@@ -214,7 +214,7 @@ export function passt(op: string, d: OperatorDefinition, sprache: Listensprache 
  * Aufgabe und Material M1, als gehöre er zur Aufgabe.
  *
  * Jetzt: eine knappe Liste – Operator und Erläuterung in der Sprache der Liste, jeder Operator
- * einmal – als eigener Anhang am Ende der Arbeit. Vorbemerkungen bekommt nur die Lehrkraft
+ * einmal – zunächst als eigener Anhang am Ende der Arbeit, seit 01.10.2026 (später) auf der ersten Aufgabenseite. Vorbemerkungen bekommt nur die Lehrkraft
  * (`operatorenVorbemerkungen`, Hinweis im Aufgabenschritt).
  *
  * Korrektur der Lehrkraft (01.10.2026, später): Das Aufgabenbeispiel der amtlichen Liste gehört
@@ -302,7 +302,7 @@ export function ohneSchuelerErlaeuterung(befund: OperatorenBefund): string[] {
   return [...new Set(befund.gefunden.filter((d) => !drauf.has(normal(d.operator))).map((d) => d.operator))]
 }
 
-/** Operatoren, die nur mit ihrem Aufgabenbeispiel im Anhang stehen (die Liste erläutert sie nicht in ihrer Sprache) – für den Hinweis an die Lehrkraft */
+/** Operatoren, die nur mit ihrem Aufgabenbeispiel in der Liste stehen (die Liste erläutert sie nicht in ihrer Sprache) – für den Hinweis an die Lehrkraft */
 export function nurMitBeispiel(befund: OperatorenBefund): string[] {
   return schuelerEintraege(befund)
     .filter((e) => !e.erlaeuterung)
@@ -325,7 +325,6 @@ const TITEL: Record<Listensprache, string> = {
   ru: 'Операторы в этой работе'
 }
 const QUELLE: Record<Listensprache, string> = { de: 'Quelle', en: 'Source', fr: 'Source', es: 'Fuente', it: 'Fonte', ru: 'Источник' }
-const ANHANG: Record<Listensprache, string> = { de: 'Anhang', en: 'Appendix', fr: 'Annexe', es: 'Anexo', it: 'Allegato', ru: 'Приложение' }
 const BEISPIEL: Record<Listensprache, [string, string]> = {
   de: ['Beispiel', 'Beispiele'],
   en: ['Example', 'Examples'],
@@ -352,13 +351,10 @@ export function eintragText(e: SchuelerEintrag, sprache: Listensprache): string 
   return `${kopf}\n*${e.beispiele.length > 1 ? mehr : eins}: ${e.beispiele.map((b) => `${auf}${roh(b)}${zu}`).join(' · ')}*`
 }
 
-/** Überschrift des Anhangs, unter dem die Liste steht – trennt sie sichtbar vom letzten Teil */
-export const OPERATOREN_ANHANG_ID = 'exam-operatoren-anhang'
-export const operatorenAnhangTitel = (sprache: Listensprache): string => ANHANG[sprache] ?? ANHANG.de
-
 /**
- * Der Baustein für das Ende der Arbeit – ein Kasten ohne Materialnummer. Null, wenn die Liste
- * nicht vorgesehen ist oder kein verwendeter Operator eine Erläuterung oder ein Beispiel für das Blatt hat.
+ * Der Baustein für die erste Aufgabenseite (01.10.2026, später; vorher Anhang am Ende) – ein Kasten
+ * ohne Materialnummer, ab zwei Operatoren zweispaltig. Null, wenn die Liste nicht vorgesehen ist
+ * oder kein verwendeter Operator eine Erläuterung oder ein Beispiel für das Blatt hat.
  */
 export function operatorenBlock(exam: Exam): InfoBoxBlock | null {
   if (!operatorenlisteAktiv(exam)) return null
@@ -373,7 +369,8 @@ export function operatorenBlock(exam: Exam): InfoBoxBlock | null {
     type: 'infoBox',
     variant: 'definition',
     title: TITEL[sprache] ?? TITEL.de,
-    // Jeder Operator ein Absatz (Umbruchstelle), die Quelle ein eigener
+    ...(eintraege.length > 1 ? { spalten: 2 as const } : {}),
+    // Jeder Operator ein Absatz, je Zeile ein Paar (Umbruchstelle); die Quelle über die ganze Breite
     body: [...eintraege.map((e) => eintragText(e, sprache)), `${QUELLE[sprache] ?? QUELLE.de}: ${liste.quelle}`].join('\n\n')
   }
 }

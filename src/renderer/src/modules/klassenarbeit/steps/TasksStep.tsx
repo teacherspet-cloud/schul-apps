@@ -200,14 +200,14 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   // Operatorenliste (27.09.2026): nur amtliche Definitionen – was fehlt, erfährt die Lehrkraft hier
   const operatorenHinweis = useMemo(() => {
     const b = operatorenBefund(exam)
-    if (!b.liste) return `Für ${meta.stateId} und ${meta.subjectLabel} ist keine amtliche Operatorenliste hinterlegt – die Anlage „Operatoren" entfällt.`
+    if (!b.liste) return `Für ${meta.stateId} und ${meta.subjectLabel} ist keine amtliche Operatorenliste hinterlegt – sie entfällt.`
     // Vorbemerkungen der Liste und Operatoren ohne Erläuterung in der Sprache der Liste: nur für die Lehrkraft, nie auf dem Blatt (01.10.2026)
     const ohne = ohneSchuelerErlaeuterung(b)
     const nurBeispiel = nurMitBeispiel(b)
     return [
       b.fehlend.length ? `Ohne amtliche Definition in der Operatorenliste (${b.liste.quelle}): ${b.fehlend.join(', ')}.` : '',
-      ohne.length ? `Ohne Erläuterung und Beispiel in der Sprache der Liste, daher nicht im Anhang: ${ohne.join(', ')}.` : '',
-      nurBeispiel.length ? `Im Anhang nur mit dem Aufgabenbeispiel der Liste (keine Erläuterung in ihrer Sprache): ${nurBeispiel.join(', ')}.` : '',
+      ohne.length ? `Ohne Erläuterung und Beispiel in der Sprache der Liste, daher nicht in der Liste auf dem Blatt: ${ohne.join(', ')}.` : '',
+      nurBeispiel.length ? `In der Liste auf dem Blatt nur mit dem Aufgabenbeispiel der Liste (keine Erläuterung in ihrer Sprache): ${nurBeispiel.join(', ')}.` : '',
       ...operatorenVorbemerkungen(b).map((v) => `Vorbemerkung der Liste${v.bereich ? ` (${v.bereich})` : ''}, nur für die Lehrkraft: ${v.text}`)
     ]
       .filter(Boolean)

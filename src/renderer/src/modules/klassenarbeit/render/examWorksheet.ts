@@ -19,7 +19,7 @@ import { notenpunkteFuer } from '../../../shared/notenpunkte'
 import { formatById } from '../model/formats'
 import type { Exam } from '../model/types'
 import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
-import { amtlicheListe, anlageWunsch, OPERATOREN_ANHANG_ID, operatorenAnhangTitel, operatorenBlock } from '../didactics/operatorenliste'
+import { operatorenBlock } from '../didactics/operatorenliste'
 import { examGrades, examPoints } from '../model/types'
 import { RU_BALL, RU_MINUTA, russischPlural } from '../../../shared/russischPlural'
 import { polnischPlural, tschechischPlural } from '../../../shared/kopfSprache'
@@ -287,15 +287,12 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     ? blocks.map((b) => (b.type === 'task' && b.answer.kind === 'lines' ? { ...b, answer: { ...b.answer, kind: 'none' as const } } : b))
     : blocks
   /*
-   * Operatorenliste (27.09.2026) – seit 01.10.2026 als eigener Anhang am ENDE der Arbeit, mit
-   * Überschrift. Vorher stand sie direkt hinter der letzten Aufgabe; bei einer Sprachmittlung
-   * (Aufgabe, dann Material) also zwischen Aufgabe und M1 und wirkte wie eine Hilfe zur Aufgabe.
+   * Operatorenliste (27.09.2026) – seit 01.10.2026 (später) auf der ERSTEN AUFGABENSEITE statt als
+   * Anhang am Ende (Entscheidung der Lehrkraft); die ganze Liste, zweispaltig. Wo genau, regelt
+   * `operatorenStelle`: nie zwischen einer Aufgabe und ihrem Material.
    */
   const operatoren = operatorenBlock(exam)
-  if (operatoren) {
-    const liste = amtlicheListe(exam.meta.stateId, exam.meta.subjectId, anlageWunsch(exam.meta))
-    bloecke.push({ id: OPERATOREN_ANHANG_ID, type: 'divider', title: operatorenAnhangTitel(liste?.sprache ?? 'de') }, operatoren)
-  }
+  if (operatoren) bloecke.splice(operatorenStelle(bloecke), 0, operatoren)
   // Fassung A behält die bisherige Blattkennung – so bleibt alles gültig, was sich darauf bezieht
   const sheet: Sheet = {
     id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`,
@@ -340,6 +337,31 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
     sources: [],
     createdAt: exam.createdAt
   }
+}
+
+/**
+ * Stelle der Operatorenliste in den Bausteinen der Arbeit (01.10.2026): auf der Seite der ersten Aufgabe.
+ *
+ * - Folgt auf die Aufgaben des ersten Teils ein Seitenumbruch (Originalmaterial auf eigener Seite),
+ *   ein neuer Teil oder nichts mehr, steht die Liste direkt hinter den Aufgaben – unten auf der Aufgabenseite.
+ * - Steht vor der ersten Aufgabe schon Material (Text, dann Aufgaben), ebenso hinter den Aufgaben.
+ * - Folgt das Material der Aufgabe ohne Umbruch (Sprachmittlung: Aufgabe, dann M1), steht die Liste
+ *   VOR der Überschrift des Teils – zwischen Aufgabe und Material wirkte sie wie eine Hilfe zur Aufgabe.
+ * Ohne Aufgaben: am Ende.
+ */
+export function operatorenStelle(bloecke: WsBlock[]): number {
+  const erste = bloecke.findIndex((b) => b.type === 'task')
+  if (erste < 0) return bloecke.length
+  let ende = erste
+  while (ende < bloecke.length && bloecke[ende].type === 'task') ende++
+  const danach = bloecke[ende]
+  if (!danach || danach.type === 'divider' || danach.pageBreakBefore) return ende
+  // Beginn des Teils: seine Überschrift (oder der Anfang hinter dem Kopf)
+  let beginn = erste
+  while (beginn > 0 && bloecke[beginn - 1].type !== 'divider') beginn--
+  const materialDavor = bloecke.slice(beginn, erste).some((b) => b.type !== 'divider')
+  if (materialDavor) return ende
+  return beginn > 0 && bloecke[beginn - 1].id.startsWith('part-') ? beginn - 1 : beginn
 }
 
 /**

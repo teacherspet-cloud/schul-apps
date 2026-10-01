@@ -17,7 +17,7 @@ import { headerLine } from '../../didactics/sourceHeader'
 import { narrationNote } from '../../didactics/narration'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { Illustriert, IllustrationView } from '../Illustration'
-import { LONG_TEXT_CHARS, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, audioLength, linieGebunden, shortLink, useSetter } from './hilfen'
+import { LONG_TEXT_CHARS, kastenZeilen, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, audioLength, linieGebunden, shortLink, useSetter } from './hilfen'
 import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
@@ -107,9 +107,23 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
        * bleibt die gewohnte Darstellung und wird nie geteilt (mitten im Satz).
        */
       const absaetze = splitParagraphs(block.body ?? '')
-      const [von, bis] = stueck(placed, absaetze.length)
+      // Zweispaltig (Operatorenliste): ein Paar Listenpunkte je Zeile – die Umbruchstellen sind die Zeilen
+      const zeilen = kastenZeilen(absaetze, block.spalten)
+      const [von, bis] = stueck(placed, zeilen.length)
+      const absatzFeld = (i: number): React.JSX.Element => (
+        <RichText
+          value={absaetze[i]}
+          editable={schreiben}
+          onChange={set((d, val) => {
+            const alle = splitParagraphs((d as typeof block).body ?? '')
+            alle[i] = val
+            ;(d as typeof block).body = alle.filter((x) => x.trim()).join('\n\n')
+          })}
+          renderText={gapRenderText(isKeyMode(mode))}
+        />
+      )
       return (
-        <div className={`ws-block ws-info ws-info-${block.variant} ${placed?.continued ? 'ws-continued' : ''}`}>
+        <div className={`ws-block ws-info ws-info-${block.variant} ${block.spalten === 2 ? 'ws-info-spalten' : ''} ${placed?.continued ? 'ws-continued' : ''}`}>
           {von === 0 ? (
             <div className="ws-info-head">
               <span className="ws-info-symbol">{v.symbol}</span>
@@ -128,20 +142,21 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               renderText={gapRenderText(isKeyMode(mode))}
             />
           ) : (
-            absaetze.slice(von, bis).map((absatz, k) => (
-              <div key={von + k} data-unit className="ws-info-absatz">
-                <RichText
-                  value={absatz}
-                  editable={schreiben}
-                  onChange={set((d, val) => {
-                    const alle = splitParagraphs((d as typeof block).body ?? '')
-                    alle[von + k] = val
-                    ;(d as typeof block).body = alle.filter((x) => x.trim()).join('\n\n')
-                  })}
-                  renderText={gapRenderText(isKeyMode(mode))}
-                />
-              </div>
-            ))
+            zeilen.slice(von, bis).map((zeile, k) =>
+              zeile.length > 1 || block.spalten === 2 ? (
+                <div key={von + k} data-unit className={`ws-info-absatz ${zeile.length > 1 ? 'ws-info-paar' : ''}`}>
+                  {zeile.map((i) => (
+                    <div key={i} className="ws-info-spalte">
+                      {absatzFeld(i)}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div key={von + k} data-unit className="ws-info-absatz">
+                  {absatzFeld(zeile[0])}
+                </div>
+              )
+            )
           )}
         </div>
       )

@@ -1048,7 +1048,7 @@ export default function FrameStep(): React.JSX.Element {
                       label="Operatorenliste anhängen"
                       description={
                         amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))
-                          ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))!.quelle}) am Ende der Arbeit${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
+                          ? `Die in den Aufgaben verwendeten Operatoren mit der amtlichen Definition (${amtlicheListe(meta.stateId, meta.subjectId, anlageWunsch(meta))!.quelle}) auf der ersten Aufgabenseite${upperSecondary(meta) ? ' – in der Oberstufe vorgesehen' : ''}`
                           : 'Für dieses Land und Fach ist keine amtliche Operatorenliste hinterlegt – der Baustein bleibt leer'
                       }
                       checked={meta.operatorenliste ?? upperSecondary(meta)}

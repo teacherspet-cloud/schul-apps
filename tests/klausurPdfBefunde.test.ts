@@ -6,14 +6,15 @@ import type { TaskBlock, TextBlock } from '../src/renderer/src/modules/arbeitsbl
 import { suggestOutlineItem } from '../src/renderer/src/modules/arbeitsblatt/generation/generate'
 import { buildLearnerProfile } from '../src/renderer/src/modules/arbeitsblatt/didactics/profile'
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
-import { OPERATOREN_ANHANG_ID, OPERATOREN_BLOCK_ID } from '../src/renderer/src/modules/klassenarbeit/didactics/operatorenliste'
+import { OPERATOREN_BLOCK_ID } from '../src/renderer/src/modules/klassenarbeit/didactics/operatorenliste'
 import { arbeitsmaterialAblage, quellenangabenErmitteln } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
 import { defaultExamMeta } from '../src/renderer/src/modules/klassenarbeit/model/defaults'
 import type { Exam, ExamPart } from '../src/renderer/src/modules/klassenarbeit/model/types'
-import { examToWorksheet } from '../src/renderer/src/modules/klassenarbeit/render/examWorksheet'
+import { examToWorksheet, operatorenStelle } from '../src/renderer/src/modules/klassenarbeit/render/examWorksheet'
+import type { WsBlock } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 
 /*
- * Befunde der Lehrkraft zur PDF „Test" (27.09.2026): Operatorenliste direkt unter die Aufgabe (seit 01.10.2026 als Anhang am Ende),
+ * Befunde der Lehrkraft zur PDF „Test" (27.09.2026): Operatorenliste direkt unter die Aufgabe (01.10.2026 als Anhang am Ende, seit 01.10.2026 später auf der ersten Aufgabenseite),
  * keine Schreiblinien in der Sek II, vollständige Quellenangabe statt nackter Adresse, und der
  * Zauberstab der Gliederung nimmt einen Änderungswunsch an.
  */
@@ -57,16 +58,39 @@ const arbeit = (over: Partial<Exam['meta']>, blocks: (TaskBlock | TextBlock)[]):
 describe('Klausur: Operatoren unter der Aufgabe, keine Linien in der Sek II', () => {
   /*
    * 01.10.2026: Zwischen Sprachmittlungsaufgabe und M1 wirkte die Liste wie eine Hilfe zur Aufgabe
-   * (Befund der Lehrkraft). Jetzt steht sie als eigener Anhang mit Überschrift am Ende der Arbeit.
+   * (Befund der Lehrkraft), danach stand sie als Anhang am Ende. Entscheidung der Lehrkraft (später):
+   * die ganze Liste auf der ersten Aufgabenseite, kein Anhang mehr – aber nie zwischen Aufgabe und Material.
    */
-  it('die Operatorenliste steht als Anhang am Ende der Arbeit – nicht zwischen Aufgabe und Material', () => {
+  it('Sprachmittlung ohne Umbruch: die Liste steht vor dem Teil, nicht zwischen Aufgabe und M1 – kein Anhang', () => {
     const ws = examToWorksheet(arbeit({}, [aufgabe('**Write** an email based on M1.'), text()]))
     const bloecke = ws.sheets[0].blocks
     const ids = bloecke.map((b) => b.id)
-    expect(ids.slice(-2)).toEqual([OPERATOREN_ANHANG_ID, OPERATOREN_BLOCK_ID])
-    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBeGreaterThan(ids.indexOf('m1'))
-    const anhang = bloecke[bloecke.length - 2]
-    expect(anhang.type === 'divider' && anhang.title).toBe('Appendix')
+    expect(ids).toContain(OPERATOREN_BLOCK_ID)
+    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBeLessThan(ids.indexOf('part-p1'))
+    expect(ids).not.toContain('exam-operatoren-anhang')
+    expect(bloecke.some((b) => b.type === 'divider' && /Appendix|Anhang/.test(b.title))).toBe(false)
+  })
+
+  it('Material auf eigener Seite: die Liste steht unten auf der Aufgabenseite, vor dem Umbruch', () => {
+    const ws = examToWorksheet(arbeit({}, [aufgabe('**Write** an email based on M1.'), { ...text(), pageBreakBefore: true }]))
+    const ids = ws.sheets[0].blocks.map((b) => b.id)
+    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBe(ids.indexOf('m1') - 1)
+    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBeGreaterThan(ids.indexOf('t-31'))
+  })
+
+  it('operatorenStelle: Text vor den Aufgaben → hinter den Aufgaben; ohne Aufgaben → am Ende', () => {
+    const d = (id: string): WsBlock => ({ id, type: 'divider', title: id }) as WsBlock
+    const t = (id: string): WsBlock => ({ ...(newBlock('task') as TaskBlock), id })
+    const m = (id: string): WsBlock => ({ ...text(), id })
+    expect(operatorenStelle([d('part-1'), m('m1'), t('a'), t('b'), m('m2'), t('c')])).toBe(4)
+    expect(operatorenStelle([d('part-1'), t('a'), d('part-2'), m('m2')])).toBe(2)
+    expect(operatorenStelle([d('part-1'), m('m1')])).toBe(2)
+  })
+
+  it('ab zwei Operatoren zweispaltig, die Quelle über die ganze Breite', async () => {
+    const { kastenZeilen } = await import('../src/renderer/src/modules/arbeitsblatt/render/baustein/hilfen')
+    expect(kastenZeilen(['- **a**: x', '- **b**: y', '- **c**: z', 'Source: NI'], 2)).toEqual([[0, 1], [2], [3]])
+    expect(kastenZeilen(['- **a**: x', '- **b**: y'], undefined)).toEqual([[0], [1]])
   })
 
   it('Sek II: Schreibaufgaben bekommen keine Linien, Sek I behält sie', () => {

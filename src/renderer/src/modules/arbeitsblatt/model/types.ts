@@ -175,6 +175,12 @@ export interface InfoBoxBlock extends BaseBlock {
   variant: InfoVariant
   title: string
   body: string
+  /**
+   * Zwei Spalten (01.10.2026, Operatorenliste der Klausur): aufeinanderfolgende Listenpunkte
+   * („- …") stehen paarweise nebeneinander, jedes Paar ist eine Umbruchstelle; Absätze ohne
+   * Listenpunkt (Quelle) über die ganze Breite.
+   */
+  spalten?: 2
 }
 
 export interface TextBlock extends BaseBlock {

@@ -13,6 +13,23 @@ export const splitParagraphs = (body: string): string[] =>
     .map((p) => p.trim())
     .filter(Boolean)
 
+/**
+ * Zeilen eines Kastens (01.10.2026): je Zeile die Nummern ihrer Absätze. Einspaltig ist jeder
+ * Absatz eine Zeile; zweispaltig stehen aufeinanderfolgende Listenpunkte paarweise nebeneinander,
+ * Absätze ohne Listenpunkt (Quelle) allein über die ganze Breite. Jede Zeile ist eine Umbruchstelle.
+ */
+export function kastenZeilen(absaetze: string[], spalten?: number): number[][] {
+  if (spalten !== 2) return absaetze.map((_, i) => [i])
+  const punkt = (a: string): boolean => /^[-•]\s/.test(a)
+  const out: number[][] = []
+  absaetze.forEach((a, i) => {
+    const letzte = out[out.length - 1]
+    if (punkt(a) && letzte?.length === 1 && punkt(absaetze[letzte[0]])) letzte.push(i)
+    else out.push([i])
+  })
+  return out
+}
+
 export const stars = (n?: number): string => (n ? '★'.repeat(n) : '')
 
 /**

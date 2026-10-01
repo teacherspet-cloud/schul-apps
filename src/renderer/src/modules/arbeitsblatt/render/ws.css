@@ -2512,6 +2512,18 @@
 .ws-info-absatz .rt-list + .rt-p:has(> span:only-child > em) {
   padding-left: 1.4em;
 }
+/*
+ * Operatorenliste der Klausur (01.10.2026): zwei Spalten, je Zeile ein Paar Operatoren, kleiner
+ * gesetzt – sie steht auf der ersten Aufgabenseite und soll die Aufgaben nicht verdrängen.
+ */
+.ws-info-spalten {
+  font-size: 0.88em;
+}
+.ws-info-paar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 5mm;
+}
 
 /*
  * NOTIZRAND neben einem Materialtext.

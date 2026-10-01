@@ -17,8 +17,9 @@
 //  - Fixtur MIT Bewertungswidget (artikel-bewertung.json): Titel ist die Schlagzeile, kein Widget im Text,
 //  - der Text erreicht mindestens die Mitte des Zielbereichs (550 Wörter) – die KI-Attrappe liefert
 //    absichtlich nur rund 505 Wörter, also greift die auffüllende Absatzkürzung,
-//  - Operatorenliste (NI, an): eigener Anhang am Ende, knapp, mit dem Aufgabenbeispiel der Liste
-//    kursiv unter der Erläuterung, ohne Vorbemerkung; die Vorbemerkung sieht nur die Lehrkraft.
+//  - Operatorenliste (NI, an): auf der ersten Aufgabenseite (Entscheidung der Lehrkraft 01.10.2026,
+//    später; kein Anhang mehr), vor dem Material, knapp, mit dem Aufgabenbeispiel der Liste kursiv
+//    unter der Erläuterung, ohne Vorbemerkung; die Vorbemerkung sieht nur die Lehrkraft.
 import { _electron as electron } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -227,7 +228,7 @@ try {
   pruefe(blatt.includes('(gekürzt)'), 'Die Quellenzeile mit „(gekürzt)" steht auf dem Blatt')
   pruefe(!/M\d+\s*Bewertung/.test(blatt), 'Keine Materialüberschrift „M1 Bewertung …"')
 
-  // Operatorenliste: knapp, in der Zielsprache, als Anhang hinter dem Material – nicht unter der Aufgabe
+  // Operatorenliste: knapp, in der Zielsprache, auf der ersten Aufgabenseite – vor dem Material, kein Anhang
   pruefe(blatt.includes('Operators used in this test'), 'Die Operatorenliste steht auf dem Blatt')
   pruefe(blatt.includes('produce a text with specific features'), 'Operator mit Erläuterung der Liste')
   // Korrektur der Lehrkraft (01.10.2026, später): das Aufgabenbeispiel der Liste gehört dazu, direkt unter der Erläuterung
@@ -244,8 +245,18 @@ try {
   } else pruefe(false, 'Beispielzeile im Kasten gefunden')
   for (const m of ['situativen Rahmen', 'Es ist erforderlich', 'Sprachmittlung', 'level III'])
     pruefe(!blatt.includes(m), `Nichts aus Vorbemerkung/AFB/Kompetenzbereich auf dem Schülerblatt: „${m}"`)
-  pruefe(blatt.indexOf('Operators used in this test') > blatt.lastIndexOf('(gekürzt)'), 'Die Liste steht hinter dem Material, nicht zwischen Aufgabe und M1')
-  pruefe(blatt.includes('Appendix'), 'Eigene Überschrift „Appendix" über der Liste')
+  pruefe(blatt.indexOf('Operators used in this test') < blatt.indexOf('Am 10.03.2025 erklärt die LMU-Anglistin'), 'Die Liste steht vor dem Material, nicht dahinter')
+  pruefe(!blatt.includes('Appendix'), 'Kein Anhang „Appendix" mehr')
+  const seiten = await page.locator('.ws-editor-pages .ws-page').evaluateAll((els) => els.filter((el) => !el.closest('.ws-measure, [data-pruefung]')).map((el) => el.innerText))
+  const ersteAufgabenseite = seiten.findIndex((t) => t.includes('You are contributing to the website'))
+  pruefe(
+    ersteAufgabenseite >= 0 && seiten[ersteAufgabenseite].includes('Operators used in this test'),
+    `Die Liste steht auf der ersten Aufgabenseite (Seite ${ersteAufgabenseite + 1})`
+  )
+  pruefe(
+    seiten.findIndex((t) => t.includes('Operators used in this test')) === ersteAufgabenseite,
+    'Die Liste beginnt nicht vor der Aufgabenseite'
+  )
   const lehrkraft = page.getByTestId('operatoren-hinweis')
   const hinweisText = (await lehrkraft.count()) ? await lehrkraft.first().innerText() : ''
   pruefe(hinweisText.includes('situativen Rahmen') && hinweisText.includes('nur für die Lehrkraft'), 'Die Vorbemerkung der Liste sieht nur die Lehrkraft')
