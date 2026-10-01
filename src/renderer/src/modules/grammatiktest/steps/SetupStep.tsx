@@ -1,5 +1,6 @@
 import { nimmFachVorgabe } from '../../../shared/fachVorgabe'
-import { Alert, Box, Button, Card, Container, Grid, Group, NumberInput, ScrollArea, SegmentedControl, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Box, Button, Card, Container, Grid, Group, ScrollArea, SegmentedControl, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { DesignTemplate } from '@shared/design'
@@ -317,14 +318,14 @@ export default function SetupStep(): React.JSX.Element {
                       onChange={(e) => patch({ title: e.currentTarget.value })}
                     />
                     <Group grow>
-                      <NumberInput
+                      <ZahlFeld
                         label="Bearbeitungszeit (Minuten)"
                         min={5}
                         max={90}
                         value={meta.minutes}
                         onChange={(v) => patch({ minutes: Number(v) || 20 })}
                       />
-                      <NumberInput label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
+                      <ZahlFeld label="Punkte" min={4} max={120} value={meta.points} onChange={(v) => patch({ points: Number(v) || 20 })} />
                     </Group>
                     {/* Immer sichtbar (Paket 7, Nachtrag der Lehrkraft) – samt Notenschlüssel, der an der Benotung hängt */}
                     <Switch

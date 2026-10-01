@@ -464,6 +464,23 @@ img.home-illustration {
   border-bottom: none;
 }
 
+/* Der Auftrag selbst führt zu seinem Ort (01.10.2026, AuftragsLayer.tsx) */
+.auftrags-zeile-ziel {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.auftrags-zeile-ziel:hover {
+  background: var(--mantine-color-default-hover);
+}
+.auftrags-zeile-ziel:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
+
 .auftrags-pille {
   display: block;
   border-radius: 999px;

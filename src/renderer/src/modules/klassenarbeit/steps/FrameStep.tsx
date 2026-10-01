@@ -23,7 +23,6 @@ import {
   Grid,
   Group,
   MultiSelect,
-  NumberInput,
   ScrollArea,
   SegmentedControl,
   Select,
@@ -35,6 +34,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconArrowRight, IconTrash } from '@tabler/icons-react'
 import Formularfuss, { ersterGrund, FormularSeite } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
@@ -552,7 +552,7 @@ export default function FrameStep(): React.JSX.Element {
                   </Title>
                   <Stack gap="sm">
                     <Group grow>
-                      <NumberInput
+                      <ZahlFeld
                         label="Dauer (Minuten)"
                         min={20}
                         max={300}
@@ -561,7 +561,7 @@ export default function FrameStep(): React.JSX.Element {
                         onChange={(v) => patch({ minutes: Number(v) || 45 })}
                       />
                       {!istFremdsprache(meta.subjectId) && (
-                        <NumberInput
+                        <ZahlFeld
                           label="Gesamtpunkte"
                           min={10}
                           max={200}
@@ -721,7 +721,7 @@ export default function FrameStep(): React.JSX.Element {
                                 )}
                                 {typeof part.contentShare === 'number' && (
                                   <Group gap={6} align="flex-end" mt="xs">
-                                    <NumberInput
+                                    <ZahlFeld
                                       size="xs"
                                       w={110}
                                       label="Inhalt %"
@@ -805,7 +805,7 @@ export default function FrameStep(): React.JSX.Element {
                                   />
                                 )}
                                 {(formatArt(part.formatId) === 'listening' || formatArt(part.formatId) === 'reading') && (
-                                  <NumberInput
+                                  <ZahlFeld
                                     mt="xs"
                                     size="xs"
                                     w={220}
@@ -832,7 +832,7 @@ export default function FrameStep(): React.JSX.Element {
                                 )}
                               </div>
                               <Group gap={6} wrap="nowrap">
-                                <NumberInput
+                                <ZahlFeld
                                   size="xs"
                                   w={78}
                                   label="Anteil %"
@@ -854,7 +854,7 @@ export default function FrameStep(): React.JSX.Element {
                                   }}
                                 />
                                 {(!istFremdsprache(meta.subjectId) || part.points > 0) && (
-                                  <NumberInput
+                                  <ZahlFeld
                                     size="xs"
                                     w={78}
                                     label="Punkte"
@@ -865,7 +865,7 @@ export default function FrameStep(): React.JSX.Element {
                                     onChange={(v) => update((d) => (d.parts[i].points = Number(v) || 0))}
                                   />
                                 )}
-                                <NumberInput
+                                <ZahlFeld
                                   size="xs"
                                   w={70}
                                   label="Minuten"

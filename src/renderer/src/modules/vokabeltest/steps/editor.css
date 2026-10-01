@@ -49,7 +49,9 @@
  * über dem „⋯“, und der Klick traf den falschen Baustein.
  */
 .editor-block:hover,
-.editor-block:focus-within {
+.editor-block:focus-within,
+.editor-block-aktiv,
+.editor-block[data-angetippt] {
   z-index: 5;
 }
 
@@ -88,6 +90,13 @@
   color: #4a63a0;
 }
 
+/* Aus der Auftragsleiste aufgerufen (navigation.ts: geheZuDokument): kurz hervorheben */
+.editor-block[data-aufgerufen] {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+  transition: outline-color 600ms ease;
+}
+
 .editor-block-busy {
   opacity: 0.5;
   pointer-events: none;
@@ -110,9 +119,16 @@
  * bleiben; erst am Ende der Verzögerung wird sie unsichtbar UND unklickbar.
  */
 .editor-block-toolbar {
+  /* Abstand neben dem Baustein, solange die Leiste zu sehen ist (Tablet: fingerbreit, s. u.) */
+  --leiste-rechts: -40px;
   position: absolute;
   top: 6mm;
-  right: -40px;
+  /*
+   * Unsichtbar steht die Leiste IM Baustein (01.10.2026): Seit das Blatt im Editor seitlich
+   * nicht mehr abschneidet (ws.css), verbreiterten die versteckten Leisten am Blattrand sonst
+   * die Rollfläche – das Blatt ließ sich seitwärts rollen.
+   */
+  right: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -120,7 +136,8 @@
   visibility: hidden;
   transition:
     opacity 150ms ease 700ms,
-    visibility 0s linear 850ms;
+    visibility 0s linear 850ms,
+    right 0s linear 850ms;
 }
 
 /*
@@ -137,9 +154,11 @@
 .editor-block-toolbar:hover {
   opacity: 1;
   visibility: visible;
+  right: var(--leiste-rechts);
   transition:
     opacity 120ms ease,
-    visibility 0s;
+    visibility 0s,
+    right 0s;
 }
 
 /*
@@ -167,7 +186,7 @@
     height: 44px;
   }
   .editor-block-toolbar {
-    right: -52px;
+    --leiste-rechts: -52px;
   }
 }
 
@@ -190,6 +209,7 @@
 .editor-block-frei .editor-block-toolbar {
   opacity: 1;
   visibility: visible;
+  right: var(--leiste-rechts);
 }
 
 .editor-warning {

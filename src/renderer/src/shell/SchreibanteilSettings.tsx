@@ -1,4 +1,5 @@
-import { Card, Group, NumberInput, Stack, Text, Title } from '@mantine/core'
+import { Card, Group, Stack, Text, Title } from '@mantine/core'
+import ZahlFeld from '../shared/components/ZahlFeld'
 import type { AppSettings } from '@shared/types'
 
 const SPRACHEN: { id: string; label: string }[] = [
@@ -34,8 +35,8 @@ export default function SchreibanteilSettings({ settings, update }: { settings: 
             <Text size="sm" w={110}>
               {s.label}
             </Text>
-            <NumberInput size="xs" w={130} label="Klasse 5" suffix=" %" min={0} max={100} step={5} value={werte[s.id]?.k5 ?? 60} onChange={(v) => setze(s.id, 'k5', Number(v) || 0)} />
-            <NumberInput size="xs" w={130} label="ab Klasse 6" suffix=" %" min={0} max={100} step={5} value={werte[s.id]?.ab6 ?? 70} onChange={(v) => setze(s.id, 'ab6', Number(v) || 0)} />
+            <ZahlFeld size="xs" w={130} label="Klasse 5" suffix=" %" min={0} max={100} step={5} value={werte[s.id]?.k5 ?? 60} onChange={(v) => setze(s.id, 'k5', Number(v) || 0)} />
+            <ZahlFeld size="xs" w={130} label="ab Klasse 6" suffix=" %" min={0} max={100} step={5} value={werte[s.id]?.ab6 ?? 70} onChange={(v) => setze(s.id, 'ab6', Number(v) || 0)} />
           </Group>
         ))}
       </Stack>

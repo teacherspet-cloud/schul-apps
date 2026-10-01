@@ -1,4 +1,5 @@
-import { Alert, Badge, Button, Card, Code, CopyButton, Group, List, NumberInput, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Badge, Button, Card, Code, CopyButton, Group, List, Stack, Switch, Text, TextInput, Title } from '@mantine/core'
+import ZahlFeld from '../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconCheck, IconCopy, IconDeviceTablet, IconRefresh, IconShieldCheck } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
@@ -228,7 +229,7 @@ export default function NetzwerkCard({
           </Button>
         </Group>
 
-        <NumberInput
+        <ZahlFeld
           label="Port"
           description="Nur ändern, wenn ein anderes Programm diesen Port belegt."
           min={1024}

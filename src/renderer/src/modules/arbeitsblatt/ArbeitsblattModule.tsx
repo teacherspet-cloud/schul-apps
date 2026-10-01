@@ -20,7 +20,7 @@ import { useArbeitsblatt } from './store'
 import { sichereAlles } from '../../shared/autosave'
 import { useAppSettings } from '../../shared/settingsStore'
 import { useUndoKeys } from '../../shared/useUndoKeys'
-import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
+import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../../shared/navigation'
 import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import QuellenAuswahl from './steps/QuellenAuswahl'
@@ -49,6 +49,12 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
     await openSavedWorksheet(id)
     setArea('create')
     setLibrary(false)
+  })
+  // Aus der Auftragsleiste (navigation.ts: geheZuDokument): das Blatt zeigen, bei einem Baustein im Editor
+  useZielZeiger('arbeitsblatt', (ziel) => {
+    setArea('create')
+    setLibrary(false)
+    if (ziel.baustein && useArbeitsblatt.getState().worksheet?.sheets.length) setStep(2)
   })
 
   useEffect(() => {

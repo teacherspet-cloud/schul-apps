@@ -1,4 +1,5 @@
-import { ActionIcon, Anchor, Button, Checkbox, Group, MultiSelect, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
+import { ActionIcon, Anchor, Button, Checkbox, Group, MultiSelect, Select, Stack, Text, TextInput } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
 import {
   ALLE_ABSCHNITTE,
@@ -117,7 +118,7 @@ export default function ProtokollEinstellungen({
               <Text size="xs" style={{ flex: 1 }}>
                 {a.titel}
               </Text>
-              <NumberInput
+              <ZahlFeld
                 size="xs"
                 w={96}
                 min={0}

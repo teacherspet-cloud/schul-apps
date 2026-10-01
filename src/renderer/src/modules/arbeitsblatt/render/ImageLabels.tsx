@@ -137,8 +137,23 @@ export function ImageLabelLayer({
       // Bezug ist immer die Bildfläche – auch beim Schild in der Randspalte
       const area = e.currentTarget.closest('.ws-imglabel-grid')?.querySelector('.ws-imglabel-area') ?? e.currentTarget.closest('.ws-imglabel-area')
       if (!area) return
+      // Ein zweiter Finger gehört dem Zoom (shared/touch/zoom.tsx), nicht dem Griff
+      if (!e.isPrimary) return
       e.preventDefault()
       e.stopPropagation()
+      /*
+       * iPad (01.10.2026): „Die Linien lassen sich nicht verschieben – oft wird das Bild oder der
+       * Text markiert bzw. gezogen." Der Zeiger gehört ab jetzt dem Griff (Capture), und solange
+       * der Zug läuft, markiert der Browser nichts (ws.css: html[data-griff-zug]).
+       */
+      const zeiger = e.pointerId
+      try {
+        e.currentTarget.setPointerCapture(zeiger)
+      } catch {
+        // ohne Capture tragen die Horcher am Fenster den Zug weiter
+      }
+      window.getSelection()?.removeAllRanges()
+      document.documentElement.setAttribute('data-griff-zug', '')
       setAktiv(label.id)
       const rect = area.getBoundingClientRect()
       const startX = e.clientX
@@ -159,11 +174,16 @@ export function ImageLabelLayer({
         return l
       }
       const bewegen = (ev: PointerEvent): void => {
+        if (ev.pointerId !== zeiger) return
         if (!letzte && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 2) return
+        ev.preventDefault()
         letzte = neu(ev)
         setZug({ id: label.id, label: letzte })
       }
-      const ende = (): void => {
+      const ende = (ev: PointerEvent): void => {
+        // Der Zwei-Finger-Zoom meldet sein „Abbrechen" ohne Kennung des Fingers (zoom.tsx)
+        if (ev.pointerId !== zeiger && ev.isTrusted) return
+        document.documentElement.removeAttribute('data-griff-zug')
         window.removeEventListener('pointermove', bewegen)
         window.removeEventListener('pointerup', ende)
         window.removeEventListener('pointercancel', ende)
@@ -293,7 +313,7 @@ export function ImageLabelLayer({
     ) : null
 
   const flaeche = (
-    <div className="ws-imglabel-area">
+    <div className={`ws-imglabel-area${bearbeitbar ? ' ws-imglabel-bearbeitbar' : ''}`}>
       {children}
       {linien.length > 0 && (
         <svg className="ws-imglabel-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">

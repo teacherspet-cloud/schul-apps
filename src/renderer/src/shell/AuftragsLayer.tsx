@@ -32,7 +32,7 @@ import {
   type Auftrag
 } from '../shared/auftraege'
 import { sichereAlles } from '../shared/autosave'
-import { openDocument, openModule } from '../shared/navigation'
+import { geheZuDokument } from '../shared/navigation'
 import { notifyError } from '../shared/util'
 import { modules } from '../modules/registry'
 
@@ -218,11 +218,13 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
   const Symbol = modul?.icon
   const vergangen = (a.ende ?? jetzt) - a.start
   const rest = laeuft(a) ? restAnzeige(a, jetzt) : ''
-  // „Öffnen": Ist das Dokument im Programm schon offen, genügt der Wechsel dorthin
-  const oeffnen = (): void => {
-    if (dokumentOffen(a.id)) openModule(a.moduleId)
-    else void openDocument(a.moduleId, a.docId)
-  }
+  /*
+   * Zum Auftrag (01.10.2026, Wunsch der Lehrkraft): Ein Klick auf den Auftrag führt in sein
+   * Programm, sein Dokument und seinen Schritt – während er läuft (dort steht der Hinweis auf den
+   * laufenden Auftrag bzw. der Baustein, an dem er arbeitet) und danach zum fertigen Ergebnis.
+   * Ist das Dokument schon offen, genügt der Wechsel in das Programm.
+   */
+  const oeffnen = (): void => void geheZuDokument(a.moduleId, a.docId, dokumentOffen(a.id), { baustein: a.schluessel })
   const farbe = a.status === 'fertig' ? 'teal' : a.status === 'fehler' ? 'red' : a.status === 'abgebrochen' ? 'gray' : (modul?.color ?? 'blue')
   return (
     <div className="auftrags-zeile" data-status={a.status} data-auftrag={a.id} data-anteil={Math.round(a.anteil * 100)}>
@@ -231,32 +233,41 @@ function AuftragsZeile({ auftrag: a, jetzt }: { auftrag: Auftrag; jetzt: number 
           {Symbol ? <Symbol size={18} /> : null}
         </ThemeIcon>
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-          <Text size="sm" fw={600} truncate="end" title={a.titel}>
-            {a.titel}
-          </Text>
-          <Text size="xs" c="dimmed" truncate="end">
-            {modul?.name ?? a.moduleId} · {a.art}
-          </Text>
-          {laeuft(a) &&
-            (a.anteil > 0 || a.status === 'wartend' ? (
-              <Progress value={a.anteil * 100} size="sm" animated={a.status === 'laufend'} color={a.status === 'wartend' ? 'gray' : undefined} />
-            ) : (
-              <Loader size="xs" type="dots" />
-            ))}
-          <Text size="xs" c={a.status === 'fehler' ? 'red' : undefined} lineClamp={3}>
-            {a.status === 'wartend' ? (a.wartegrund ?? 'Wartet auf freien Platz …') : a.meldung}
-          </Text>
-          {/* Verbindung zum PC weg (iPad-App, Browser, 30.09.2026): Der Auftrag ist nicht verloren – das soll hier stehen */}
-          {laeuft(a) && a.verbindung && (
-            <Text size="xs" c="orange" data-verbindung={a.verbindung}>
-              {a.verbindung === 'unterbrochen'
-                ? 'Verbindung unterbrochen – Auftrag läuft am PC weiter, wird fortgesetzt …'
-                : 'App war im Hintergrund – die Anfrage wird wiederholt …'}
-            </Text>
-          )}
-          <Text size="xs" c="dimmed">
-            {laeuft(a) ? `${dauerLabel(vergangen)}${rest ? ` · ${rest}` : ''}` : a.status === 'fertig' ? `nach ${dauerLabel(vergangen)}` : ''}
-          </Text>
+          <UnstyledButton
+            className="auftrags-zeile-ziel"
+            onClick={oeffnen}
+            aria-label={`Zum Auftrag: ${a.titel} (${modul?.name ?? a.moduleId}, ${a.art})`}
+            data-auftrag-ziel={a.id}
+          >
+            <Stack gap={2}>
+              <Text size="sm" fw={600} truncate="end" title={a.titel}>
+                {a.titel}
+              </Text>
+              <Text size="xs" c="dimmed" truncate="end">
+                {modul?.name ?? a.moduleId} · {a.art}
+              </Text>
+              {laeuft(a) &&
+                (a.anteil > 0 || a.status === 'wartend' ? (
+                  <Progress value={a.anteil * 100} size="sm" animated={a.status === 'laufend'} color={a.status === 'wartend' ? 'gray' : undefined} />
+                ) : (
+                  <Loader size="xs" type="dots" />
+                ))}
+              <Text size="xs" c={a.status === 'fehler' ? 'red' : undefined} lineClamp={3}>
+                {a.status === 'wartend' ? (a.wartegrund ?? 'Wartet auf freien Platz …') : a.meldung}
+              </Text>
+              {/* Verbindung zum PC weg (iPad-App, Browser, 30.09.2026): Der Auftrag ist nicht verloren – das soll hier stehen */}
+              {laeuft(a) && a.verbindung && (
+                <Text size="xs" c="orange" data-verbindung={a.verbindung}>
+                  {a.verbindung === 'unterbrochen'
+                    ? 'Verbindung unterbrochen – Auftrag läuft am PC weiter, wird fortgesetzt …'
+                    : 'App war im Hintergrund – die Anfrage wird wiederholt …'}
+                </Text>
+              )}
+              <Text size="xs" c="dimmed">
+                {laeuft(a) ? `${dauerLabel(vergangen)}${rest ? ` · ${rest}` : ''}` : a.status === 'fertig' ? `nach ${dauerLabel(vergangen)}` : ''}
+              </Text>
+            </Stack>
+          </UnstyledButton>
           <Group gap={6} mt={2}>
             {a.rueckfrage && (
               <Button size="compact-xs" variant="filled" onClick={oeffnen}>

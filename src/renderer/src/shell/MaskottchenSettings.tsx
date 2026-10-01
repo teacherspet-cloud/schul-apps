@@ -7,7 +7,6 @@ import {
   Group,
   Image,
   Modal,
-  NumberInput,
   Select,
   SimpleGrid,
   Stack,
@@ -17,6 +16,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import ZahlFeld from '../shared/components/ZahlFeld'
 import { IconChevronLeft, IconChevronRight, IconPhoto, IconRefresh, IconSparkles, IconStar, IconStarFilled, IconTrash, IconUpload } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
@@ -198,7 +198,7 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
         Kopf und am Schluss. Jede Figur hat eine Vorlage und zwölf Posen (winkend, zeigend, denkend, schreibend, sprechend …).
       </Text>
       <Group align="flex-end" mb="md">
-        <NumberInput
+        <ZahlFeld
           label="Illustrationen bis Klasse"
           description="Darüber nur, wenn sie am Blatt eingeschaltet werden"
           min={4}

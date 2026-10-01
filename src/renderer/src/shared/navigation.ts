@@ -185,3 +185,68 @@ export function druckeAktives(): boolean {
   fn()
   return true
 }
+
+/*
+ * ---------- Zum Auftrag springen (01.10.2026) ----------
+ *
+ * Wunsch der Lehrkraft: Ein Klick auf einen Auftrag in der Auftragsleiste führt dorthin, wo er
+ * arbeitet – Programm, Dokument und Schritt –, auch während er läuft; danach zum fertigen
+ * Ergebnis. Programm und Dokument öffnet `openDocument`. Kleine Aufträge arbeiten an EINEM
+ * Baustein: Dafür meldet ein Programm an, wie es zu seinen Bausteinen kommt (den Schritt mit dem
+ * Blatt zeigen); danach rollt das Blatt zum Baustein (`data-baustein` am Bausteinrahmen).
+ */
+
+/** Wohin im Dokument: ein Baustein – seine Kennung oder ein Schlüssel, der sie enthält („raster-<id>") */
+export interface DokumentZiel {
+  baustein?: string
+}
+
+const zielZeiger = new Map<string, (ziel: DokumentZiel) => void>()
+
+/** Das Programm meldet an, wie es sein offenes Dokument zeigt – und zu einem Ziel darin kommt (z. B. den Schritt mit dem Blatt) */
+export function useZielZeiger(moduleId: string, zeigen: (ziel: DokumentZiel) => void): void {
+  const aktuell = useRef(zeigen)
+  aktuell.current = zeigen
+  useEffect(() => {
+    const fn = (ziel: DokumentZiel): void => aktuell.current(ziel)
+    zielZeiger.set(moduleId, fn)
+    return () => {
+      if (zielZeiger.get(moduleId) === fn) zielZeiger.delete(moduleId)
+    }
+  }, [moduleId])
+}
+
+/** Der Baustein, dessen Kennung im Schlüssel steckt – im gerade sichtbaren Programm */
+export function findeBaustein(schluessel: string, wurzel: ParentNode = document): HTMLElement | null {
+  let bester: HTMLElement | null = null
+  for (const el of wurzel.querySelectorAll<HTMLElement>('.module-container:not([hidden]) [data-baustein]')) {
+    const id = el.dataset.baustein ?? ''
+    if (!id || !schluessel.includes(id)) continue
+    if (!el.getBoundingClientRect().height) continue
+    if (!bester || id.length > (bester.dataset.baustein ?? '').length) bester = el
+  }
+  return bester
+}
+
+/**
+ * Zum Ort eines Auftrags: Programm und Dokument (ist es schon offen, nur das Programm), dann
+ * – wenn er an einem Baustein arbeitet – dessen Schritt und der Baustein selbst.
+ */
+export async function geheZuDokument(moduleId: string, docId: string, schonOffen: boolean, ziel?: DokumentZiel): Promise<void> {
+  if (schonOffen) useNavigation.getState().openModule(moduleId)
+  else await useNavigation.getState().openDocument(moduleId, docId)
+  // Das Programm zeigt das Dokument (nicht seine Bibliothek) und – bei einem Baustein – den Schritt mit dem Blatt
+  zielZeiger.get(moduleId)?.(ziel ?? {})
+  const baustein = ziel?.baustein
+  if (!baustein) return
+  // Das Blatt baut sich nach dem Schrittwechsel erst auf – einige Bilder lang danach suchen
+  for (let i = 0; i < 40; i++) {
+    await new Promise((weiter) => requestAnimationFrame(() => weiter(null)))
+    const el = findeBaustein(baustein)
+    if (!el) continue
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    el.setAttribute('data-aufgerufen', '')
+    window.setTimeout(() => el.removeAttribute('data-aufgerufen'), 1800)
+    return
+  }
+}

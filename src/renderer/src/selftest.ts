@@ -46,6 +46,8 @@ import { useLernzielkontrolle } from './modules/lernzielkontrolle/store'
 import { emptyKurztest } from './modules/lernzielkontrolle/model/defaults'
 import type { Kurztest } from './modules/lernzielkontrolle/model/types'
 import { openSavedKurztest, saveCurrentKurztest } from './modules/lernzielkontrolle/library'
+import { blattOffen } from './modules/arbeitsblatt/library'
+import { starteAuftrag } from './shared/auftraege'
 import { standardFormat as standardFormatFuer, standardMinuten } from './modules/lernzielkontrolle/didactics/formate'
 import { generateKurztest } from './modules/lernzielkontrolle/generation/generateKurztest'
 import { aiCall as lzkAi } from './modules/lernzielkontrolle/store'
@@ -2093,6 +2095,24 @@ export function installSelftest(): void {
     lzkBibliothek,
     lzkLoeschen,
     lzkEcht,
+    // Auftragsleiste (01.10.2026, Wache mobil-touch.mjs): ein Probe-Auftrag am offenen Blatt, der läuft, bis `fertig()` ihn beendet
+    auftragProbe: (titel: string, schluessel?: string): { fertig: () => void } => {
+      const docId = useArbeitsblatt.getState().docId
+      let fertig = (): void => undefined
+      void starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId,
+        titel,
+        art: 'Probe',
+        eingabe: {},
+        sperrt: false,
+        schluessel,
+        istOffen: () => blattOffen(docId),
+        arbeit: () => new Promise<void>((weiter) => (fertig = weiter)),
+        ablegen: async () => undefined
+      })
+      return { fertig: () => fertig() }
+    },
     printHtml: printHtmlNow,
     renderPdf,
     pdfFlaeche,

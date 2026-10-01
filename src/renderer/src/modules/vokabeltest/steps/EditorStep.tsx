@@ -8,7 +8,6 @@ import {
   Group,
   Menu,
   Modal,
-  NumberInput,
   Popover,
   ScrollArea,
   Select,
@@ -18,6 +17,7 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { LANGUAGES } from '../model/types'
 import { fragenAusVokabeln } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
@@ -436,7 +436,7 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
           <Text size="sm" fw={600}>
             {TASK_TYPES[block.taskType].label}
           </Text>
-          <NumberInput
+          <ZahlFeld
             size="xs"
             label={block.kind === 'freeText' ? 'Punkte' : 'Punkte je Item'}
             min={0}
@@ -484,7 +484,7 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
             onChange={(e) => apply((b) => (b.showHelp = e.currentTarget.checked))}
           />
           {block.kind === 'open' && (
-            <NumberInput
+            <ZahlFeld
               size="xs"
               label="Schreiblinien je Item"
               min={0}
@@ -494,7 +494,7 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
             />
           )}
           {block.kind === 'freeText' && (
-            <NumberInput
+            <ZahlFeld
               size="xs"
               label="Schreiblinien"
               min={0}
@@ -504,7 +504,7 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
             />
           )}
           {block.kind === 'picture' && (
-            <NumberInput
+            <ZahlFeld
               size="xs"
               label="Bilder pro Zeile"
               min={2}
@@ -643,7 +643,7 @@ function HeaderSettingsInhalt({
       />
       {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
       <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
-      <NumberInput
+      <ZahlFeld
         size="xs"
         label="Schriftgröße (pt)"
         min={9}

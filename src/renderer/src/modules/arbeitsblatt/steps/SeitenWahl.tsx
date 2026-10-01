@@ -1,4 +1,5 @@
-import { Group, NumberInput, SegmentedControl, Text } from '@mantine/core'
+import { Group, SegmentedControl, Text } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { seitenArt, seitenSchaetzung, seitenText, seitenVorgabe } from '../didactics/seiten'
 import type { WorksheetMeta } from '../model/types'
 
@@ -38,7 +39,7 @@ export default function SeitenWahl({ meta, patch }: { meta: WorksheetMeta; patch
         />
         {vorgabe && (
           <Group gap={6} align="center" wrap="nowrap">
-            <NumberInput
+            <ZahlFeld
               aria-label={art === 'spanne' ? 'Seiten von' : 'Seitenzahl'}
               w={70}
               min={1}
@@ -52,7 +53,7 @@ export default function SeitenWahl({ meta, patch }: { meta: WorksheetMeta; patch
             {art === 'spanne' && (
               <>
                 <Text size="sm">bis</Text>
-                <NumberInput
+                <ZahlFeld
                   aria-label="Seiten bis"
                   w={70}
                   min={2}

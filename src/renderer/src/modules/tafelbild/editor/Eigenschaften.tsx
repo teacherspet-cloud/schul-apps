@@ -1,4 +1,5 @@
-import { ActionIcon, Button, Divider, Group, NumberInput, ScrollArea, SegmentedControl, Select, Slider, Stack, Switch, TagsInput, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
+import { ActionIcon, Button, Divider, Group, ScrollArea, SegmentedControl, Select, Slider, Stack, Switch, TagsInput, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconArrowDown, IconArrowUp, IconCopy, IconSearch, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
@@ -100,7 +101,7 @@ function DiagrammFelder({ d, setze }: { d: Diagramm; setze: (fn: (d: Diagramm) =
         />
         <Group gap={4} grow>
           {(['xMin', 'xMax', 'yMin', 'yMax'] as const).map((k) => (
-            <NumberInput key={k} size="xs" label={k} value={b[k]} onChange={(v) => setze((x) => (x.bereich = { ...b, [k]: Number(v) || 0 }))} />
+            <ZahlFeld key={k} size="xs" label={k} value={b[k]} onChange={(v) => setze((x) => (x.bereich = { ...b, [k]: Number(v) || 0 }))} />
           ))}
         </Group>
       </Stack>
@@ -312,7 +313,7 @@ export default function Eigenschaften({ e, format, meta, inhalt, aendern, loesch
         )}
         <Divider label="Varianten" labelPosition="left" />
         <Group grow align="flex-end">
-          <NumberInput size="xs" label="Aufbauschritt" min={1} max={12} value={e.schritt} onChange={(v) => aendern((x) => (x.schritt = Math.max(1, Number(v) || 1)))} data-tb-schritt />
+          <ZahlFeld size="xs" label="Aufbauschritt" min={1} max={12} value={e.schritt} onChange={(v) => aendern((x) => (x.schritt = Math.max(1, Number(v) || 1)))} data-tb-schritt />
           <div>
             <Text size="xs" fw={500} mb={2}>
               Niveau

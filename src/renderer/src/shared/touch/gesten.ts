@@ -161,6 +161,12 @@ function langerDruckUndDoppeltipp(): void {
       }
       const ziel = e.target as HTMLElement | null
       if (!ziel?.closest) return
+      // Griffe zum Ziehen (Beschriftungspunkt, Schild, Anfassknopf): Halten beginnt dort einen Zug, es fragt nicht nach der Beschreibung
+      if (ziel.closest('[data-griff], .editor-block-griff')) {
+        abbrechen()
+        start = null
+        return
+      }
       start = { x: e.clientX, y: e.clientY, zeit: Date.now(), ziel, id: e.pointerId }
       abbrechen()
       uhr = window.setTimeout(ausloesen, LANGER_DRUCK_MS)

@@ -68,7 +68,21 @@
  */
 .ws-editor-pages .ws-body {
   overflow: visible;
-  clip-path: inset(0 -30mm);
+  clip-path: inset(0 -150mm);
+}
+/*
+ * Auch die Seite selbst schneidet im Editor nur oben und unten ab (01.10.2026). Mit
+ * `overflow: clip` endete die Leiste am Blattrand – über der leeren Fläche daneben war sie
+ * unsichtbar und auf dem iPad nicht anzutippen (shared/touch/leistenLage.ts). Wieder
+ * `clip-path` statt `overflow` – aus demselben Grund wie oben (Menüs der Leiste).
+ */
+.ws-editor-pages .ws-page {
+  overflow: visible;
+  clip-path: inset(0 -150mm);
+}
+/* Die Seite mit dem gewählten Baustein liegt oben – bei der Doppelseite reicht die Leiste über die Nachbarseite */
+.ws-editor-pages .ws-page:has(.editor-block-aktiv, .editor-block[data-angetippt], .editor-block:hover) {
+  z-index: 3;
 }
 
 /*
@@ -1902,6 +1916,50 @@
   width: 2.6mm;
   height: 2.6mm;
   margin: -1.3mm 0 0 -1.3mm;
+  overflow: visible;
+}
+
+/*
+ * Griffe der Beschriftung mit dem Finger (01.10.2026). Befund auf dem iPad: Punkt und Linie
+ * ließen sich nicht ziehen – stattdessen wurde das Bild oder Text markiert bzw. gezogen. Der
+ * Punkt war 2,6 mm groß (auf dem verkleinerten Blatt kaum 8 Punkte); der Finger traf das Bild.
+ *  - Trefferfläche um den Punkt: am PC 16, mit dem Finger 44 Punkte – unabhängig vom Blatt-Zoom
+ *  - Bild und Schilder im Editor: nicht markierbar, nicht als Bild herausziehbar, kein Systemmenü
+ *  - Während eines Zuges markiert die ganze Seite nichts (ImageLabels.tsx setzt data-griff-zug)
+ */
+.ws-imglabel-move::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+html[data-touch] .ws-imglabel-move::before {
+  width: calc(44px / var(--blatt-zoom, 1));
+  height: calc(44px / var(--blatt-zoom, 1));
+}
+html[data-touch] .ws-imglabel-box[data-griff]::before {
+  content: '';
+  position: absolute;
+  inset: calc(-12px / var(--blatt-zoom, 1)) 0;
+}
+.ws-imglabel-bearbeitbar,
+.ws-imglabel-bearbeitbar img,
+.ws-imglabel-box[data-griff],
+.ws-imglabel-inline[data-griff] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+html[data-griff-zug],
+html[data-griff-zug] * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  cursor: grabbing !important;
 }
 
 /* ---------- Piktogramme ---------- */

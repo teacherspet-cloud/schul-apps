@@ -1,4 +1,5 @@
-import { ActionIcon, Badge, Button, Card, Group, NumberInput, Select, Stack, Text } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, Select, Stack, Text } from '@mantine/core'
+import ZahlFeld from '../shared/components/ZahlFeld'
 import { IconPlus, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { AppSettings } from '@shared/types'
@@ -22,7 +23,7 @@ function SchwellenZeile({ werte, onChange }: { werte: number[]; onChange: (w: nu
   return (
     <Group gap="xs" wrap="nowrap">
       {NOTEN.map((note, i) => (
-        <NumberInput
+        <ZahlFeld
           key={note}
           size="xs"
           label={`Note ${note}`}

@@ -14,7 +14,6 @@ import {
   Grid,
   Group,
   MultiSelect,
-  NumberInput,
   Radio,
   ScrollArea,
   SegmentedControl,
@@ -28,6 +27,7 @@ import {
   TextInput,
   Title
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconDownload, IconAlertTriangle, IconBook2, IconListDetails, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import UrlQuelleEingabe from '../../../shared/components/UrlQuelleEingabe'
@@ -779,7 +779,7 @@ export default function TopicStep(): React.JSX.Element {
                     />
                     {/* Seitenzahl: automatisch, genau oder von–bis (Paket 7, didactics/seiten.ts) */}
                     <SeitenWahl meta={meta} patch={patch} />
-                    <NumberInput
+                    <ZahlFeld
                       label="Bearbeitungszeit (Min.)"
                       min={5}
                       max={180}
@@ -788,7 +788,7 @@ export default function TopicStep(): React.JSX.Element {
                       onChange={(v) => patch({ minutes: Number(v) || 45 })}
                     />
                     {/* Leer lassen heißt „Richtwert des Altersbands" – eine eingetragene Zahl gilt genau. */}
-                    <NumberInput
+                    <ZahlFeld
                       label="Zahl der Aufgaben"
                       description={
                         meta.taskCount
@@ -802,7 +802,7 @@ export default function TopicStep(): React.JSX.Element {
                       onChange={(v) => patch({ taskCount: Number(v) || 0 })}
                     />
                     {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
-                      <NumberInput
+                      <ZahlFeld
                         label={meta.skillFocus === 'listening' ? 'Fragen je Hörtext' : 'Fragen zum Text'}
                         description={
                           meta.itemCount
@@ -862,7 +862,7 @@ export default function TopicStep(): React.JSX.Element {
                                 onChange={(v) => v && patch({ audioCount: Number(v) })}
                                 allowDeselect={false}
                               />
-                              <NumberInput
+                              <ZahlFeld
                                 size="sm"
                                 label="Länge je Hörtext (Sek.)"
                                 description={meta.audioSeconds ? 'Eigene Vorgabe' : `Leer: nach Niveau ${meta.cefrLevel}`}
@@ -947,7 +947,7 @@ export default function TopicStep(): React.JSX.Element {
                             onChange={(e) => patch({ vocabMaxWords: e.currentTarget.checked ? recommendedWordCount(meta).max * 2 : 0 })}
                           />
                           {Boolean(meta.vocabMaxWords) && (
-                            <NumberInput
+                            <ZahlFeld
                               label="Höchstzahl"
                               w={120}
                               min={1}
@@ -1456,7 +1456,7 @@ function VideoCard({
             />
           </Group>
           <Group grow>
-            <NumberInput label="Laufzeit (Min.)" min={0} max={300} value={v.minutes} onChange={(value) => set({ minutes: Number(value) || 0 })} />
+            <ZahlFeld label="Laufzeit (Min.)" min={0} max={300} value={v.minutes} onChange={(value) => set({ minutes: Number(value) || 0 })} />
             <TextInput
               label="Gezeigter Abschnitt (optional)"
               placeholder="12:40–18:10"

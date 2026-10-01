@@ -1,4 +1,5 @@
-import { Card, Group, NumberInput, Stack, Text, Tooltip } from '@mantine/core'
+import { Card, Group, Stack, Text, Tooltip } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { gesamtEinstufen, vorschlag, type SkalenKontext } from '../art'
 import { teilTabelle } from '../blattLayout'
 import type { Bogen, EinstufungsArt, Rueckmeldung } from '../model/types'
@@ -150,7 +151,7 @@ export default function TeileWertung({
   }
 
   const zahl = (label: string, wert: number | undefined, onChange: (n: number) => void): React.JSX.Element => (
-    <NumberInput size="xs" label={label} min={0} max={100} suffix=" %" value={wert ?? 0} onChange={(x) => onChange(Math.max(0, Math.min(100, Number(x) || 0)))} w={100} />
+    <ZahlFeld size="xs" label={label} min={0} max={100} suffix=" %" value={wert ?? 0} onChange={(x) => onChange(Math.max(0, Math.min(100, Number(x) || 0)))} w={100} />
   )
 
   return (

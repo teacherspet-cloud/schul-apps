@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Group,
-  NumberInput,
   SegmentedControl,
   Select,
   Stack,
@@ -15,6 +14,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconArrowDown, IconArrowUp, IconFileTypeDocx, IconFileTypePdf, IconListDetails, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
@@ -190,7 +190,7 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
               setze((d) => (d.ziel = wert), 'verlauf-ziel')
             }}
           />
-          <NumberInput
+          <ZahlFeld
             w={130}
             size="xs"
             label="Dauer (Minuten)"
@@ -244,7 +244,7 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
                   />
                 </Table.Td>
                 <Table.Td>
-                  <NumberInput
+                  <ZahlFeld
                     size="xs"
                     variant="unstyled"
                     min={1}

@@ -102,6 +102,16 @@ html[data-touch] :is(input:not([type='checkbox'], [type='radio'], [type='range']
   font-size: max(16px, 1em);
 }
 
+/*
+ * Rollende Menüs und Pop-ups (dropdownHoehe.ts): Das Wischen bleibt in der Liste, statt am Ende
+ * die Seite dahinter zu bewegen; senkrechtes Wischen gehört dem Rollen.
+ */
+html[data-touch] :is(.mantine-Popover-dropdown, .mantine-Menu-dropdown, .mantine-Combobox-dropdown) {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+
 /* Zahlenfelder: statt winziger Pfeile (24 × 17) die Zifferntastatur */
 html[data-touch] .mantine-NumberInput-controls {
   display: none;
@@ -234,6 +244,18 @@ html[data-touch] [data-angetippt] > .editor-block-toolbar,
 html[data-touch] .editor-block[data-angetippt] .editor-block-toolbar {
   opacity: 1;
   visibility: visible;
+  right: var(--leiste-rechts);
+  transition: none;
+}
+/*
+ * Höchstens EINE Leiste (01.10.2026): iOS lässt `:hover` am zuletzt angetippten Element kleben,
+ * und der Nachlauf hielt die Leiste des vorigen Bausteins noch stehen. Beide Leisten lagen dann
+ * übereinander, und der Finger traf die falsche. Mit dem Finger zählt nur der angetippte Baustein.
+ */
+html[data-touch] .editor-block:not([data-angetippt], .editor-block-aktiv, .editor-block-frei, :has([aria-expanded='true'])) > .editor-block-toolbar {
+  opacity: 0;
+  visibility: hidden;
+  right: 0;
   transition: none;
 }
 
@@ -575,8 +597,9 @@ html[data-tastatur] .mobil-tabs {
     bottom: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    max-height: 75dvh;
-    overflow: auto;
+    /* !important: Die Höhe neben dem Auslöser (dropdownHoehe.ts) gilt hier nicht – das Blatt steht unten */
+    max-height: 75dvh !important;
+    overflow: auto !important;
     border-radius: 16px 16px 0 0;
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.2);

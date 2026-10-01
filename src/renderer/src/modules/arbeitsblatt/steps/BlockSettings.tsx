@@ -1,6 +1,7 @@
 import { STUFEN_WERTE, stufenLabel } from '../../../shared/verstehen/stufen'
 import ProtokollEinstellungen from './ProtokollEinstellungen'
-import { Anchor, Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
+import { Anchor, Button, Group, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { wortzahl } from '../generation/kuerzung'
 import { ohneFussnotenMarken } from '../didactics/anmerkungen'
 import { zielWortzahl } from '../generation/zuschnitt'
@@ -39,7 +40,7 @@ const ANSWER_OPTIONS: { value: AnswerKind; label: string }[] = [
 /** Einstellungen eines Gitternetzes: Art, Höhe und – beim Koordinatensystem – die Achsen. */
 function GridSettings({ block, update }: { block: GridBlock; update: (fn: (d: WsBlock) => void) => void }): React.JSX.Element {
   const axis = (key: keyof GridAxes, label: string, step = 1): React.JSX.Element => (
-    <NumberInput
+    <ZahlFeld
       size="xs"
       label={label}
       step={step}
@@ -69,7 +70,7 @@ function GridSettings({ block, update }: { block: GridBlock; update: (fn: (d: Ws
           }
           allowDeselect={false}
         />
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label="Höhe (mm)"
           min={20}
@@ -80,7 +81,7 @@ function GridSettings({ block, update }: { block: GridBlock; update: (fn: (d: Ws
         />
       </Group>
       {(block.kind === 'karo' || block.kind === 'mm') && (
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label="Kästchenweite (mm)"
           min={1}
@@ -243,7 +244,7 @@ function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: 
       fn(a.diagram)
     })
   const zahl = (label: string, wert: number, schreiben: (v: number) => void, step = 1): React.JSX.Element => (
-    <NumberInput size="xs" label={label} value={wert} step={step} onChange={(v) => set(() => schreiben(Number(v) || 0))} />
+    <ZahlFeld size="xs" label={label} value={wert} step={step} onChange={(v) => set(() => schreiben(Number(v) || 0))} />
   )
   const t = d.timeline
   const kartesisch = d.kind === 'koordinaten' || d.kind === 'mm' || d.kind === 'spannung' || d.kind === 'schraegbild'
@@ -471,7 +472,7 @@ function AnswerSettings({ answer, onChange }: { answer: Answer; onChange: (fn: (
         allowDeselect={false}
       />
       {(answer.kind === 'lines' || answer.kind === 'grid' || answer.kind === 'labels') && (
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label={answer.kind === 'grid' ? 'Kästchenzeilen' : 'Anzahl'}
           min={1}
@@ -482,7 +483,7 @@ function AnswerSettings({ answer, onChange }: { answer: Answer; onChange: (fn: (
       )}
       {answer.kind === 'diagram' && <DiagramSettings answer={answer} onChange={onChange} />}
       {answer.kind === 'space' && (
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label="Höhe (mm)"
           min={10}
@@ -704,7 +705,7 @@ export function BlockSettings({
                   defaultValue={block.operator}
                   onBlur={(e) => update((d) => d.type === 'task' && (d.operator = e.currentTarget.value))}
                 />
-                <NumberInput
+                <ZahlFeld
                   size="xs"
                   label="Min."
                   min={0}
@@ -973,7 +974,7 @@ export function BlockSettings({
                 onChange={(v) => v && update((d) => d.type === 'workspace' && (d.kind = v as 'lines'))}
                 allowDeselect={false}
               />
-              <NumberInput
+              <ZahlFeld
                 size="xs"
                 label="Höhe (mm)"
                 min={15}
@@ -995,7 +996,7 @@ export function BlockSettings({
                   defaultValue={block.textType}
                   onBlur={(e) => update((d) => d.type === 'audio' && (d.textType = e.currentTarget.value))}
                 />
-                <NumberInput
+                <ZahlFeld
                   size="xs"
                   label="Durchgänge"
                   min={1}
@@ -1039,7 +1040,7 @@ export function BlockSettings({
                   defaultValue={block.section}
                   onBlur={(e) => update((d) => d.type === 'video' && (d.section = e.currentTarget.value))}
                 />
-                <NumberInput
+                <ZahlFeld
                   size="xs"
                   label="Durchgänge"
                   min={1}

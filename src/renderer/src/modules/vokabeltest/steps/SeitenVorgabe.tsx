@@ -1,4 +1,5 @@
-import { Group, NumberInput, SegmentedControl, Text } from '@mantine/core'
+import { Group, SegmentedControl, Text } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import type { PageLimit } from '../model/types'
 import { pageLimitMin } from '../render/useTestLayout'
 
@@ -43,7 +44,7 @@ export default function SeitenVorgabe({
       />
       {limit.mode === 'range' ? (
         <Group gap={6} align="center" wrap="nowrap">
-          <NumberInput
+          <ZahlFeld
             size={size}
             aria-label="Seiten von"
             min={1}
@@ -56,7 +57,7 @@ export default function SeitenVorgabe({
             }}
           />
           <Text size={size}>bis</Text>
-          <NumberInput
+          <ZahlFeld
             size={size}
             aria-label="Seiten bis"
             min={2}
@@ -73,7 +74,7 @@ export default function SeitenVorgabe({
       ) : (
         limit.mode !== 'auto' && (
           <Group gap={6} align="center" wrap="nowrap">
-            <NumberInput
+            <ZahlFeld
               size={size}
               aria-label="Anzahl Seiten"
               min={1}

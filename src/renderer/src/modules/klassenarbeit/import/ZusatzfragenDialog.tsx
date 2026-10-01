@@ -1,4 +1,5 @@
-import { Alert, Button, Group, Modal, NumberInput, Stack, Text, Tooltip } from '@mantine/core'
+import { Alert, Button, Group, Modal, Stack, Text, Tooltip } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconPlaylistAdd } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { starteAuftrag } from '../../../shared/auftraege'
@@ -130,7 +131,7 @@ export default function ZusatzfragenDialog({
             {vorhanden.length === 1 ? 'Item' : 'Items'} (Format {formatDer(ort.block)}). Die KI nutzt nur den Text; im Unterricht läuft die Originalaufnahme.
           </Text>
           <Group align="flex-end" gap="sm">
-            <NumberInput
+            <ZahlFeld
               label="Zahl der neuen Fragen"
               min={1}
               max={12}
@@ -149,7 +150,7 @@ export default function ZusatzfragenDialog({
           <Group gap="xs" wrap="nowrap">
             {STUFEN_WERTE.map((s, i) => (
               <Tooltip key={s} label={STUFEN[s].merkmal} multiline w={280}>
-                <NumberInput
+                <ZahlFeld
                   label={`Stufe ${s}`}
                   description={STUFEN[s].name}
                   min={0}

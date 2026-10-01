@@ -1,4 +1,5 @@
-import { Button, Card, Group, NumberInput, Stack, Switch, Table, Text, Title } from '@mantine/core'
+import { Button, Card, Group, Stack, Switch, Table, Text, Title } from '@mantine/core'
+import ZahlFeld from '../shared/components/ZahlFeld'
 import { IconDeviceFloppy, IconFileText, IconFolder, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
@@ -65,7 +66,7 @@ export default function SicherungenCard(): React.JSX.Element {
             checked={sicherung?.automatisch !== false}
             onChange={(e) => void update({ sicherung: { ...sicherung, automatisch: e.currentTarget.checked } })}
           />
-          <NumberInput
+          <ZahlFeld
             label="Stände behalten"
             w={140}
             min={1}

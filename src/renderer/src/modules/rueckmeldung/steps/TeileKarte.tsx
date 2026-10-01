@@ -1,4 +1,5 @@
-import { ActionIcon, Badge, Button, Card, Group, NumberInput, SegmentedControl, Select, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, SegmentedControl, Select, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { einstufungVon } from '../art'
 import { teileErkennen } from '../auftrag'
@@ -108,7 +109,7 @@ export default function TeileKarte({
                 w={220}
               />
               {verrechnung === 'prozent' ? (
-                <NumberInput
+                <ZahlFeld
                   size="xs"
                   label={i === 0 ? 'Gewicht %' : undefined}
                   min={0}
@@ -118,7 +119,7 @@ export default function TeileKarte({
                   w={90}
                 />
               ) : (
-                <NumberInput size="xs" label={i === 0 ? 'Punkte' : undefined} min={0} value={t.punkte ?? 0} onChange={(v) => setzeTeil(i, { punkte: Number(v) || 0 })} w={90} />
+                <ZahlFeld size="xs" label={i === 0 ? 'Punkte' : undefined} min={0} value={t.punkte ?? 0} onChange={(v) => setzeTeil(i, { punkte: Number(v) || 0 })} w={90} />
               )}
               {t.art === 'sprachmittlung' && (
                 <Select
@@ -136,7 +137,7 @@ export default function TeileKarte({
                 />
               )}
               {getrennt(t) && (
-                <NumberInput
+                <ZahlFeld
                   size="xs"
                   label={i === 0 || !getrennt(teile[0]) ? 'Inhalt %' : undefined}
                   min={0}

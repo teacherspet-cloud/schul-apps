@@ -8,7 +8,6 @@ import {
   Grid,
   Group,
   Loader,
-  NumberInput,
   Radio,
   ScrollArea,
   SegmentedControl,
@@ -21,6 +20,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconArrowLeft, IconRefresh, IconSparkles } from '@tabler/icons-react'
 import Formularfuss, { ersterGrund, FormularSeite, KeinKiZugang } from '../../../shared/components/Formularfuss'
 import MehrText from '../../../shared/components/MehrText'
@@ -335,7 +335,7 @@ export default function SettingsStep(): React.JSX.Element {
                         </Group>
                       </>
                     ) : (
-                      <NumberInput label="Klasse" min={1} max={13} value={settings.grade} onChange={(v) => patch({ grade: Number(v) || 1 })} />
+                      <ZahlFeld label="Klasse" min={1} max={13} value={settings.grade} onChange={(v) => patch({ grade: Number(v) || 1 })} />
                     )}
                     <Select
                       label="GER-Niveau für die Aufgaben"
@@ -358,7 +358,7 @@ export default function SettingsStep(): React.JSX.Element {
                   </Title>
                   <Stack gap="sm">
                     <Group align="end">
-                      <NumberInput
+                      <ZahlFeld
                         label="Anzahl abzufragender Vokabeln"
                         description={`${usable.length} Vokabeln stehen in der Liste auf „abfragen“`}
                         min={1}
@@ -549,7 +549,7 @@ export default function SettingsStep(): React.JSX.Element {
                               vokabeln={usable}
                               lehrwerkName={listContext?.bookName}
                             />
-                            <NumberInput
+                            <ZahlFeld
                               size="xs"
                               label="Punkte je Form"
                               min={0}
@@ -562,7 +562,7 @@ export default function SettingsStep(): React.JSX.Element {
                         )}
                         {sel && def.id !== 'irregularVerbs' && (
                           <Group mt="xs" grow>
-                            <NumberInput
+                            <ZahlFeld
                               size="xs"
                               label="Vokabeln"
                               min={def.minItems ?? 1}
@@ -570,7 +570,7 @@ export default function SettingsStep(): React.JSX.Element {
                               value={sel.count}
                               onChange={(v) => patch({ tasks: settings.tasks.map((t) => (t.type === def.id ? { ...t, count: Number(v) || 1 } : t)) })}
                             />
-                            <NumberInput
+                            <ZahlFeld
                               size="xs"
                               label="Punkte je Vokabel"
                               min={0}

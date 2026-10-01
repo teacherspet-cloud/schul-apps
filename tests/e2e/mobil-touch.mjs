@@ -14,7 +14,10 @@
 //  7. Wischen: Eintrag nach links legt „Kopie"/„Löschen" frei; zwischen den Schritten eines Programms
 //  8. Bildschirmtastatur (nachgestellt: das Fenster schrumpft wie in der App): das Feld bleibt sichtbar
 //  9. Textauswahl-Menü: langer Druck auf ein Wort im Material öffnet das Kreismenü (01.10.2026)
-import { chromium } from 'playwright-core'
+// 10.–15. Befunde vom iPad (01.10.2026): Bausteinleiste antippen und neben dem Blatt, Beschriftung
+//     ziehen, lange Listen rollen, Zahlenfelder leeren, Auftragsleiste – dazu ein Lauf in WebKit
+//     (Safari-Engine) und einer am PC mit Maus
+import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
 import { extname, join, resolve } from 'path'
@@ -97,6 +100,240 @@ const messen = () => {
     eingaben,
     seitwaerts: document.documentElement.scrollWidth > vw + 1 || (main ? main.scrollWidth > main.clientWidth + 1 : false)
   }
+}
+
+/*
+ * ---------- Befunde vom iPad (01.10.2026) ----------
+ * 10. Knöpfe der Bausteinleiste lassen sich antippen (Zauberstab öffnet sein Feld)
+ * 11. Die Leiste ist auch neben dem Blatt ganz zu sehen und zu treffen (auch am PC, s. pcLauf)
+ * 12. Beschriftung: Punkt und Schild mit dem Finger ziehen – nicht Bild oder Text
+ * 13. Lange Liste (Baustein hinzufügen) mit dem Finger rollen
+ * 14. Zahlenfeld „Bearbeitungszeit": leeren, 45 tippen, leer verlassen = Standard
+ * 15. Auftragsleiste: Klick auf den Auftrag führt zu Programm, Dokument und Baustein
+ * Gemeinsam für Chromium (mit Fingerzügen über CDP) und WebKit (nur Antippen).
+ */
+
+/** Knöpfe der sichtbaren Leiste eines Bausteins: im Fenster? treffbar? neben dem Blatt? */
+const leistenBefund = (block) => {
+  const t = block.querySelector(':scope > .editor-block-toolbar')
+  if (!t || getComputedStyle(t).visibility !== 'visible') return { alle: 0, getroffen: 0, imFenster: 0, daneben: 0 }
+  const seite = block.closest('.ws-page').getBoundingClientRect()
+  const knoepfe = [...t.querySelectorAll('button')].filter((k) => k.getBoundingClientRect().width > 0)
+  const je = knoepfe.map((k) => {
+    const r = k.getBoundingClientRect()
+    const x = r.left + r.width / 2
+    const y = r.top + r.height / 2
+    const oben = document.elementFromPoint(x, y)
+    return { trifft: k.contains(oben), imFenster: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, daneben: r.right > seite.right + 4 }
+  })
+  return {
+    alle: je.length,
+    getroffen: je.filter((e) => e.trifft).length,
+    imFenster: je.filter((e) => e.imFenster).length,
+    daneben: je.filter((e) => e.daneben).length
+  }
+}
+
+const BILD_LABELS = [
+  { id: 'a', text: 'Zellkern', x: 30, y: 30 },
+  { id: 'b', text: 'Zellwand', x: 60, y: 55 }
+]
+/** Bildbaustein mit Beschriftungen ins offene Blatt (wie beschriftungZiehen.mjs) */
+const bildEinfuegen = (labels) => {
+  const ws = window.__selftest.worksheetJetzt()
+  const c = document.createElement('canvas')
+  c.width = 800
+  c.height = 600
+  const g = c.getContext('2d')
+  g.fillStyle = '#eef3ee'
+  g.fillRect(0, 0, 800, 600)
+  g.strokeStyle = '#686'
+  g.lineWidth = 6
+  g.strokeRect(60, 60, 680, 480)
+  ws.sheets[0].blocks.splice(1, 0, {
+    id: 'zelle',
+    type: 'image',
+    role: 'material',
+    side: 'none',
+    description: 'Pflanzenzelle',
+    caption: 'Pflanzenzelle',
+    widthPercent: 80,
+    image: { dataUrl: c.toDataURL('image/png'), source: 'own', credit: 'Prüfstand' },
+    labels
+  })
+  window.__selftest.setWorksheet(structuredClone(ws))
+}
+
+/**
+ * Die Prüfungen 10–15. `h`: page, name, telefon, bild, sichtbar, oeffne, offen und – nur Chromium –
+ * `zug(von, dx, dy)` für einen Fingerzug.
+ */
+async function befundeIpad(h) {
+  const { page, name, telefon, bild, sichtbar, oeffne } = h
+  const tippe = (p) => page.touchscreen.tap(p.x, p.y)
+  const mitte = async (loc) => {
+    const b = await loc.boundingBox()
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 }
+  }
+  const editor = '.module-container:not([hidden]) .ws-editor-pages'
+
+  // ---------- 10. Zauberstab antippen
+  await oeffne('Arbeitsblatt')
+  await page.evaluate(() => window.__selftest.mathSheet())
+  await page.waitForTimeout(1500)
+  const block = page.locator(`${editor} .editor-block`).filter({ visible: true }).nth(2)
+  const antippen = async () => {
+    await block.scrollIntoViewIfNeeded()
+    const bb = await block.boundingBox()
+    await page.touchscreen.tap(bb.x + 4, bb.y + Math.min(bb.height / 2, 16))
+    await page.waitForTimeout(500)
+  }
+  await antippen()
+  const stab = block.locator(':scope > .editor-block-toolbar [aria-label="Baustein überarbeiten"]')
+  const stabTrifft = await stab.evaluate((b) => {
+    const r = b.getBoundingClientRect()
+    return b.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2))
+  })
+  await tippe(await mitte(stab))
+  await page.waitForTimeout(700)
+  const feldDa = await page
+    .locator('[data-ki-wunsch]')
+    .isVisible()
+    .catch(() => false)
+  await bild('10-zauberstab')
+  pruefe(stabTrifft && feldDa, `${name}: Zauberstab der Bausteinleiste antippbar – öffnet sein Feld (trifft ${stabTrifft}, Feld ${feldDa})`)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+
+  // ---------- 11. Leiste neben dem Blatt (nicht auf dem Telefon: dort steht sie unten)
+  if (!telefon) {
+    for (let i = 0; i < 3; i++) {
+      await sichtbar('[aria-label="Verkleinern"]').tap()
+      await page.waitForTimeout(250)
+    }
+    await antippen()
+    const b = await block.evaluate(leistenBefund)
+    await bild('11-leiste-neben-blatt')
+    pruefe(
+      b.alle > 0 && b.getroffen === b.alle && b.imFenster === b.alle && b.daneben > 0,
+      `${name}: Leiste neben dem Blatt ganz sichtbar und treffbar (${b.getroffen}/${b.alle} getroffen, ${b.imFenster} im Fenster, ${b.daneben} neben dem Blatt)`
+    )
+    await sichtbar('[data-zoom-wert]').tap()
+    await page.waitForTimeout(400)
+  }
+  // Am Fensterrand (Blatt füllt die Breite): die Leiste rückt ins Bild
+  await antippen()
+  const rand = await block.evaluate(leistenBefund)
+  // Telefon: Die Leiste steht unten und rollt seitwärts – dort zählt, dass jeder sichtbare Knopf trifft
+  pruefe(
+    rand.alle > 0 && rand.getroffen === (telefon ? rand.imFenster : rand.alle) && (telefon || rand.imFenster === rand.alle),
+    `${name}: Leiste im Fenster und treffbar (${rand.getroffen} getroffen, ${rand.imFenster} von ${rand.alle} im Fenster)`
+  )
+
+  // ---------- 12. Beschriftung mit dem Finger ziehen (Fingerzüge nur über CDP)
+  if (h.zug) {
+    await page.evaluate(bildEinfuegen, BILD_LABELS)
+    await page.waitForTimeout(2000)
+    const fig = page.locator(`${editor} .ws-image:has([data-griff])`).first()
+    await fig.scrollIntoViewIfNeeded()
+    const label = (id) => page.evaluate((i) => window.__selftest.worksheetJetzt().sheets[0].blocks.find((b) => b.id === 'zelle').labels.find((l) => l.id === i), id)
+    const punkt = fig.locator('[data-griff="punkt"][data-label-id="a"]').first()
+    const pm = await mitte(punkt)
+    const vorher = await label('a')
+    // Bewusst neben den kleinen Punkt (9/7 Punkte daneben): die Fingerfläche zählt
+    await h.zug({ x: pm.x + 9, y: pm.y + 7 }, 50, 35)
+    const nachher = await label('a')
+    const zustand = await page.evaluate(() => ({
+      markiert: window.getSelection()?.toString() ?? '',
+      frei: Boolean(window.__selftest.worksheetJetzt().sheets[0].blocks.find((b) => b.id === 'zelle').free)
+    }))
+    await bild('12-beschriftung')
+    pruefe(
+      nachher.x > vorher.x + 2 && nachher.y > vorher.y + 2 && !zustand.frei && !zustand.markiert,
+      `${name}: Punkt der Beschriftung mit dem Finger gezogen (${vorher.x}/${vorher.y} → ${nachher.x}/${nachher.y}; Bild verschoben ${zustand.frei}, markiert „${zustand.markiert}")`
+    )
+    const schild = fig.locator('[data-griff="schild"][data-label-id="b"]').first()
+    const sVorher = (await label('b')).schild?.y
+    await h.zug(await mitte(schild), 0, 40)
+    const sNachher = (await label('b')).schild?.y
+    pruefe(sNachher !== undefined && sNachher !== sVorher, `${name}: Schild der Beschriftung mit dem Finger gezogen (${sVorher} → ${sNachher})`)
+  }
+
+  // ---------- 13. Lange Liste rollen
+  const hinzu = sichtbar('.module-container:not([hidden]) button:has-text("Baustein hinzufügen")')
+  await hinzu.scrollIntoViewIfNeeded()
+  await hinzu.tap()
+  await page.waitForTimeout(600)
+  const liste = sichtbar('.mantine-Menu-dropdown')
+  const roll = await liste.evaluate((d) => ({ hoehe: d.scrollHeight, sicht: d.clientHeight, unten: d.getBoundingClientRect().bottom <= innerHeight + 1 }))
+  if (h.zug) {
+    const lm = await mitte(liste)
+    await h.zug({ x: lm.x, y: lm.y + 80 }, 0, -220)
+    const oben = await liste.evaluate((d) => d.scrollTop)
+    await bild('13-liste-rollen')
+    pruefe(
+      roll.unten && (roll.hoehe <= roll.sicht + 1 || oben > 20),
+      `${name}: „Baustein hinzufügen" passt ins Fenster und rollt mit dem Finger (Inhalt ${roll.hoehe}, sichtbar ${roll.sicht}, gerollt ${Math.round(oben)})`
+    )
+  } else pruefe(roll.unten && (roll.hoehe <= roll.sicht + 1 || roll.sicht > 100), `${name}: „Baustein hinzufügen" passt ins Fenster (Inhalt ${roll.hoehe}, sichtbar ${roll.sicht})`)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(400)
+
+  // ---------- 14. Zahlenfeld leeren
+  await sichtbar('.module-container:not([hidden]) .mantine-Stepper-step').tap()
+  await page.waitForTimeout(800)
+  const zeit = page.locator('.module-container:not([hidden])').getByLabel('Bearbeitungszeit (Min.)').filter({ visible: true }).first()
+  await zeit.scrollIntoViewIfNeeded()
+  await zeit.tap()
+  await zeit.press('ControlOrMeta+a')
+  await zeit.press('Backspace')
+  const leer = await zeit.inputValue()
+  await zeit.pressSequentially('45')
+  const getippt = await zeit.inputValue()
+  await zeit.press('ControlOrMeta+a')
+  await zeit.press('Backspace')
+  await page.locator('.module-container:not([hidden]) h4, .module-container:not([hidden]) .mantine-Title-root').filter({ visible: true }).first().tap()
+  await page.waitForTimeout(300)
+  const danach = await zeit.inputValue()
+  const minuten = await page.evaluate(() => window.__selftest.worksheetJetzt().meta.minutes)
+  await bild('14-zeitfeld')
+  pruefe(leer === '', `${name}: Bearbeitungszeit lässt sich leeren („${leer}")`)
+  pruefe(getippt === '45', `${name}: danach „45" getippt ergibt 45 („${getippt}")`)
+  pruefe(danach === '45' && minuten === 45, `${name}: leer verlassen setzt den Standard 45 („${danach}", gespeichert ${minuten})`)
+
+  // ---------- 15. Auftragsleiste: zum Auftrag springen
+  await page.evaluate(() => window.__selftest.setWorksheet(window.__selftest.worksheetJetzt()))
+  await page.waitForTimeout(800)
+  const zielId = await page.evaluate(() => {
+    const bl = window.__selftest.worksheetJetzt().sheets[0].blocks
+    return bl[bl.length - 1].id
+  })
+  await page.evaluate((id) => (window.__probe = window.__selftest.auftragProbe('Probeauftrag Touch', `raster-${id}`)), zielId)
+  const zumAuftrag = async (wann) => {
+    await oeffne('Startseite')
+    await page.waitForTimeout(400)
+    if (!(await page.locator('.auftrags-liste').isVisible().catch(() => false))) await sichtbar('.auftrags-pille').tap()
+    await page.waitForTimeout(400)
+    await sichtbar('[data-auftrag-ziel]').tap()
+    await page.waitForTimeout(1500)
+    const lage = await page.evaluate((id) => {
+      const el = document.querySelector(`.module-container:not([hidden]) [data-baustein="${id}"]`)
+      if (!el) return 'fehlt'
+      const r = el.getBoundingClientRect()
+      return r.height > 0 && r.bottom > 0 && r.top < innerHeight ? 'im Bild' : 'außerhalb'
+    }, zielId)
+    await bild(`15-auftrag-${wann}`)
+    pruefe(lage === 'im Bild', `${name}: Klick auf den ${wann === 'laufend' ? 'laufenden' : 'fertigen'} Auftrag öffnet Blatt und Baustein (${lage})`)
+  }
+  await zumAuftrag('laufend')
+  await page.evaluate(() => window.__probe.fertig())
+  await page.waitForTimeout(600)
+  await zumAuftrag('fertig')
+  // Aufräumen: Erledigte entfernen – die Liste verdeckte sonst die Navigation unten
+  await oeffne('Startseite')
+  if (!(await page.locator('.auftrags-liste').isVisible().catch(() => false))) await sichtbar('.auftrags-pille').tap()
+  await sichtbar('.auftrags-liste button:has-text("Erledigte entfernen")').tap()
+  await page.waitForTimeout(400)
 }
 
 async function lauf(name, breite, hoehe) {
@@ -406,6 +643,9 @@ async function lauf(name, breite, hoehe) {
       await page.waitForTimeout(300)
     } else pruefe(false, `${name}: Materialtext für das Textauswahl-Menü nicht gefunden`)
 
+    // ---------- 10.–15. Befunde vom iPad (01.10.2026)
+    await befundeIpad({ page, name, telefon, bild, sichtbar, oeffne, zug: wischen })
+
     // ---------- 8. Bildschirmtastatur (nachgestellt wie in der App: das Fenster wird niedriger)
     await oeffne('Einstellungen')
     const feld = page.locator('.module-container:not([hidden]) input[type=text], .mantine-AppShell-main input[type=text]').filter({ visible: true }).last()
@@ -443,9 +683,112 @@ async function lauf(name, breite, hoehe) {
   }
 }
 
-await lauf('ipad-hoch', 1024, 1366)
-await lauf('ipad-quer', 1366, 1024)
-await lauf('iphone', 390, 844)
+/** Gemeinsame Helfer für die Läufe außerhalb von `lauf` (WebKit, PC) */
+function helfer(page, name) {
+  const sichtbar = (sel) => page.locator(sel).filter({ visible: true }).first()
+  const bild = (n) => page.screenshot({ path: join(out, `${name}-${n}.png`) })
+  const oeffne = async (label) => {
+    const direkt = page.locator(`.app-leiste [aria-label="${label}"], .mobil-tabs [aria-label="${label}"]`).filter({ visible: true })
+    if (await direkt.count()) await direkt.first().click({ timeout: 8000 })
+    await page.waitForTimeout(600)
+  }
+  return { sichtbar, bild, oeffne }
+}
+
+async function starten(page) {
+  await page.goto(adresse)
+  await page.waitForSelector('text=Schul-Apps', { timeout: 30000 })
+  const spaeter = page.getByRole('button', { name: 'Später einrichten' })
+  await spaeter.waitFor({ state: 'visible', timeout: 8000 }).catch(() => undefined)
+  if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await page.waitForTimeout(500)
+}
+
+/**
+ * WebKit (die Engine von Safari auf dem iPad): Antippen, Leiste, Zahlenfeld und Auftragsleiste.
+ * Fingerzüge gibt es hier nicht (kein CDP) – die prüft der Chromium-Lauf.
+ */
+async function webkitLauf(name, breite, hoehe) {
+  console.log(`\n=== ${name} (WebKit, ${breite}×${hoehe}) ===`)
+  let browser
+  try {
+    browser = await webkit.launch()
+  } catch (e) {
+    console.log(`       WebKit nicht verfügbar: ${e.message.split('\n')[0]} – übersprungen`)
+    return
+  }
+  const kontext = await browser.newContext({ viewport: { width: breite, height: hoehe }, hasTouch: true, deviceScaleFactor: 1 })
+  const page = await kontext.newPage()
+  const fehler = []
+  page.on('pageerror', (e) => fehler.push(e.message))
+  const h = helfer(page, name)
+  try {
+    await starten(page)
+    pruefe(await page.evaluate(() => document.documentElement.hasAttribute('data-touch')), `${name}: Touch-Modus an`)
+    await befundeIpad({ page, name, telefon: false, ...h })
+    pruefe(fehler.length === 0, `${name}: keine Fehler im Fenster${fehler.length ? ` – ${fehler.slice(0, 3).join(' | ')}` : ''}`)
+  } catch (e) {
+    await h.bild('abbruch').catch(() => undefined)
+    pruefe(false, `${name}: Abbruch – ${e.message.split('\n')[0]}`)
+  } finally {
+    await browser.close()
+  }
+}
+
+/** Am PC mit Maus: Die Leiste ist auch über der leeren Fläche neben dem Blatt ganz zu sehen und zu treffen */
+async function pcLauf() {
+  const name = 'pc'
+  console.log(`\n=== ${name} (Maus, 1600×1000) ===`)
+  const browser = await chromium.launch({ channel: 'msedge' })
+  const page = await (await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })).newPage()
+  const h = helfer(page, name)
+  try {
+    await starten(page)
+    // Die Web-Fassung ist für das iPad gebaut und schaltet den Touch-Modus immer ein – hier gilt die Darstellung für die Maus
+    await page.evaluate(() => document.documentElement.removeAttribute('data-touch'))
+    await h.oeffne('Arbeitsblatt')
+    await page.evaluate(() => window.__selftest.mathSheet())
+    // Schmaler Seitenrand (12 mm, das Mindestmaß der Designvorlagen): Die Leiste reicht über das Blatt hinaus
+    await page.evaluate(() => {
+      const ws = window.__selftest.worksheetJetzt()
+      ws.design.page.marginMm = 12
+      window.__selftest.setWorksheet(structuredClone(ws))
+    })
+    await page.waitForTimeout(1500)
+    for (let i = 0; i < 3; i++) {
+      await h.sichtbar('[aria-label="Verkleinern"]').click()
+      await page.waitForTimeout(250)
+    }
+    const block = page.locator('.module-container:not([hidden]) .ws-editor-pages .editor-block').filter({ visible: true }).nth(2)
+    await block.scrollIntoViewIfNeeded()
+    await block.hover({ position: { x: 10, y: 10 } })
+    await page.waitForTimeout(400)
+    const b = await block.evaluate(leistenBefund)
+    await h.bild('11-leiste-neben-blatt')
+    pruefe(
+      b.alle > 0 && b.getroffen === b.alle && b.imFenster === b.alle && b.daneben > 0,
+      `${name}: Leiste neben dem Blatt ganz sichtbar und treffbar (${b.getroffen}/${b.alle} getroffen, ${b.daneben} neben dem Blatt)`
+    )
+    // Den Knopf neben dem Blatt wirklich anklicken: „Weitere Aktionen" öffnet sein Menü
+    await block.locator(':scope > .editor-block-toolbar [aria-label="Weitere Aktionen"]').click()
+    await page.waitForTimeout(400)
+    pruefe(await h.sichtbar('.mantine-Menu-dropdown').isVisible().catch(() => false), `${name}: „Weitere Aktionen" neben dem Blatt öffnet das Menü`)
+    await h.sichtbar('[data-zoom-wert]').click()
+  } catch (e) {
+    await h.bild('abbruch').catch(() => undefined)
+    pruefe(false, `${name}: Abbruch – ${e.message.split('\n')[0]}`)
+  } finally {
+    await browser.close()
+  }
+}
+
+// MOBIL_TOUCH_NUR=pc|webkit|ipad-hoch|ipad-quer|iphone: nur dieser Lauf
+const nur = process.env.MOBIL_TOUCH_NUR
+if (!nur || nur === 'ipad-hoch') await lauf('ipad-hoch', 1024, 1366)
+if (!nur || nur === 'ipad-quer') await lauf('ipad-quer', 1366, 1024)
+if (!nur || nur === 'iphone') await lauf('iphone', 390, 844)
+if (!nur || nur === 'webkit') await webkitLauf('webkit-ipad', 1180, 820)
+if (!nur || nur === 'pc') await pcLauf()
 server.close()
 
 if (probleme.length) {

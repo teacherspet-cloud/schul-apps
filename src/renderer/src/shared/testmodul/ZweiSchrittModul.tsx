@@ -16,7 +16,7 @@ import { useSperrenderAuftrag } from '../auftraege'
 import { sichereAlles } from '../autosave'
 import AuftragsHinweis from '../components/AuftragsHinweis'
 import UndoRedoButtons from '../components/UndoRedoButtons'
-import { useDokumentOeffner, useNeuAnleger } from '../navigation'
+import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../navigation'
 import { useUndoKeys } from '../useUndoKeys'
 import { notifyError } from '../util'
 import type { Bibliothek } from './bibliothek'
@@ -110,6 +110,12 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
   const vonAussen = useDokumentOeffner(p.modulId, async (id) => {
     await p.bibliothek.oeffnen(id)
     setLibrary(false)
+  })
+  // Aus der Auftragsleiste (navigation.ts: geheZuDokument): das Dokument zeigen, bei einem Baustein im zweiten Schritt
+  useZielZeiger(p.modulId, (ziel) => {
+    setLibrary(false)
+    const s = p.useStore.getState()
+    if (ziel.baustein && p.hatInhalt(p.dokument(s))) s.setStep(1)
   })
 
   useEffect(() => {

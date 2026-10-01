@@ -1,4 +1,5 @@
-import { ActionIcon, Badge, Button, Card, Group, NumberInput, Select, Stack, Table, Text, TextInput, Title, Tooltip } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, Select, Stack, Table, Text, TextInput, Title, Tooltip } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconDeviceFloppy, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import DropZone from '../../../shared/components/DropZone'
@@ -152,7 +153,7 @@ export default function TabelleKarte(): React.JSX.Element | null {
                     />
                   </Table.Td>
                   <Table.Td>
-                    <NumberInput
+                    <ZahlFeld
                       size="xs"
                       variant="unstyled"
                       min={0}

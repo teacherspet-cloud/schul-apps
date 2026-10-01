@@ -12,7 +12,6 @@ import {
   Container,
   Grid,
   Group,
-  NumberInput,
   ScrollArea,
   SegmentedControl,
   Select,
@@ -25,6 +24,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconInfoCircle, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { starteAuftrag } from '../../../shared/auftraege'
@@ -428,7 +428,7 @@ export default function SetupStep(): React.JSX.Element {
                       erklaerung="Die KI bleibt innerhalb dessen, was hier steht – Schreibweise, Beispiele und Reihenfolge werden übernommen."
                     />
                     <Group grow align="flex-start">
-                      <NumberInput
+                      <ZahlFeld
                         label="Bearbeitungszeit (Minuten)"
                         min={5}
                         max={60}
@@ -562,14 +562,14 @@ export default function SetupStep(): React.JSX.Element {
                         />
                         {m.bewertung.bereich && (
                           <Group grow>
-                            <NumberInput
+                            <ZahlFeld
                               label="von"
                               min={1}
                               max={100}
                               value={m.bewertung.bereich.min}
                               onChange={(v) => patch({ bewertung: { ...m.bewertung, bereich: { ...m.bewertung.bereich!, min: Number(v) || 1 } } })}
                             />
-                            <NumberInput
+                            <ZahlFeld
                               label="bis"
                               min={1}
                               max={100}

@@ -1,4 +1,5 @@
 import { createTheme, CSSVariablesResolver, MantineColorShade, MantineColorsTuple, MantineRadius, MantineThemeOverride } from '@mantine/core'
+import { POPOVER_MIDDLEWARES, UNTERMENUE_MIDDLEWARES } from './dropdownHoehe'
 
 /** Farben einer Oberfläche (je Thema einmal hell, einmal dunkel). */
 export interface ThemePalette {
@@ -372,6 +373,11 @@ export function buildMantineTheme(t: AppTheme): MantineThemeOverride {
     defaultRadius: t.radius,
     fontFamily: t.fontFamily,
     headings: { fontFamily: t.headingFontFamily, fontWeight: t.headingWeight },
+    // Lange Menüs und Pop-ups rollen, statt unter den Bildschirmrand zu laufen (dropdownHoehe.ts)
+    components: {
+      Popover: { defaultProps: { middlewares: POPOVER_MIDDLEWARES } },
+      MenuSub: { defaultProps: { middlewares: UNTERMENUE_MIDDLEWARES } }
+    },
     other: { appTheme: t }
   })
 }

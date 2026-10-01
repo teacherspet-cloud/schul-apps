@@ -1,4 +1,5 @@
-import { Alert, Button, Group, Modal, NumberInput, Stack, Table, Text } from '@mantine/core'
+import { Alert, Button, Group, Modal, Stack, Table, Text } from '@mantine/core'
+import ZahlFeld from './ZahlFeld'
 import { useEffect, useState } from 'react'
 import { DEFAULT_THRESHOLDS, gradeBoundaries, GRADE_LABELS, normalizeThresholds } from '../gradeScale'
 
@@ -67,7 +68,7 @@ export default function GradeScaleModal({
                       0 % (fest)
                     </Text>
                   ) : (
-                    <NumberInput
+                    <ZahlFeld
                       size="xs"
                       min={0}
                       max={100}

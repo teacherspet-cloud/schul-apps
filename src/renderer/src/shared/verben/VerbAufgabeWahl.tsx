@@ -6,7 +6,8 @@
  * Lernjahr) → Verben ankreuzen → Formate, Spalten und Bewertung. Die Voreinstellung folgt dem
  * Lernjahr (formate.ts); alles bleibt änderbar.
  */
-import { Alert, Badge, Button, Checkbox, Group, NumberInput, ScrollArea, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, Tooltip } from '@mantine/core'
+import { Alert, Badge, Button, Checkbox, Group, ScrollArea, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, Tooltip } from '@mantine/core'
+import ZahlFeld from '../components/ZahlFeld'
 import { IconListDetails, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { grundformVon, verbSchluessel, VERB_SPALTEN, type VerbEintrag, type VerbListeMeta } from '@shared/verben'
@@ -211,7 +212,7 @@ export default function VerbAufgabeWahl({
                     data-verbformat={f.id}
                   />
                   {an && (
-                    <NumberInput
+                    <ZahlFeld
                       size="xs"
                       w={64}
                       hideControls

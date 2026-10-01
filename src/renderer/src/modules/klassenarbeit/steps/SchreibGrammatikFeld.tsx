@@ -1,4 +1,5 @@
-import { Alert, Checkbox, Group, MultiSelect, NumberInput, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Checkbox, Group, MultiSelect, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react'
 import { hinweise, MODI, strukturenFuer, vorschlag, type GrammatikModus, type SchreibGrammatik } from '../didactics/schreibGrammatik'
 import type { Exam, ExamPart } from '../model/types'
@@ -68,7 +69,7 @@ export default function SchreibGrammatikFeld({
           </Text>
           <Group gap="md" align="flex-end">
             {wert.modus === 'anzahl' && (
-              <NumberInput size="xs" w={120} label="Mindestanzahl" min={1} max={10} value={wert.anzahl ?? 2} onChange={(v) => set({ anzahl: Number(v) || 2 })} />
+              <ZahlFeld size="xs" w={120} label="Mindestanzahl" min={1} max={10} value={wert.anzahl ?? 2} onChange={(v) => set({ anzahl: Number(v) || 2 })} />
             )}
             {wert.modus === 'anzahl' && (
               <Checkbox size="xs" label="Formen unterstreichen lassen" checked={Boolean(wert.unterstreichen)} onChange={(e) => set({ unterstreichen: e.currentTarget.checked })} />

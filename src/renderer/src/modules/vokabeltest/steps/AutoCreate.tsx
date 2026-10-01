@@ -1,4 +1,5 @@
-import { Alert, Button, Checkbox, Group, Loader, Modal, NumberInput, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Loader, Modal, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconSparkles } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { CEFR_SCALE, CefrLevel, CefrTable } from '@shared/types'
@@ -185,7 +186,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
           Die KI wählt passende Aufgabenformate für die {usable.length} abgefragten Vokabeln und verteilt die Punkte. Der fertige Test lässt sich anschließend
           bearbeiten.
         </Text>
-        <NumberInput
+        <ZahlFeld
           label="Gesamtpunktzahl"
           min={2}
           max={200}
@@ -213,7 +214,7 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
                   allowDeselect={false}
                 />
               ) : (
-                <NumberInput label="Klassenstufe" min={1} max={13} value={base.grade} onChange={(v) => setGrade(Number(v) || 1)} />
+                <ZahlFeld label="Klassenstufe" min={1} max={13} value={base.grade} onChange={(v) => setGrade(Number(v) || 1)} />
               )}
               <Select
                 label="Schwierigkeit (GER-Niveau)"

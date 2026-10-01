@@ -1,4 +1,5 @@
-import { Card, Group, NumberInput, Stack, Switch, Text, Title } from '@mantine/core'
+import { Card, Group, Stack, Switch, Text, Title } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import VersuchKarte from '../../arbeitsblatt/steps/VersuchKarte'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { fachDerArbeit, hatVersuche } from '../model/faecher'
@@ -61,7 +62,7 @@ export function FehlerquoteFelder({ exam, patch }: { exam: Exam; patch: (p: Part
   return (
     <Stack gap={4} data-fehlerquote>
       <Group grow>
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label="Wörter im Übersetzungstext"
           min={20}
@@ -70,7 +71,7 @@ export function FehlerquoteFelder({ exam, patch }: { exam: Exam; patch: (p: Part
           value={q.woerter}
           onChange={(v) => patch({ uebersetzung: { ...q, woerter: Number(v) || q.woerter } })}
         />
-        <NumberInput
+        <ZahlFeld
           size="xs"
           label={"„ausreichend“ bis … Fehler je 100 Wörter"}
           min={5}

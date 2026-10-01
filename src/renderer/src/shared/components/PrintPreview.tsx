@@ -1,4 +1,5 @@
-import { Alert, Box, Button, Center, Group, Loader, Modal, NumberInput, ScrollArea, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, Modal, ScrollArea, SegmentedControl, Select, Stack, Text } from '@mantine/core'
+import ZahlFeld from './ZahlFeld'
 import { IconPrinter } from '@tabler/icons-react'
 import * as pdfjs from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -442,9 +443,9 @@ export default function PrintPreview({
                   searchable
                 />
               )}
-              {!ios && <NumberInput label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />}
+              {!ios && <ZahlFeld label="Exemplare" min={1} max={999} value={copies} onChange={(v) => setCopies(Math.max(1, Number(v) || 1))} />}
               {loesung && (
-                <NumberInput
+                <ZahlFeld
                   label={ios ? `${loesung.titel} drucken (1 = ja, 0 = nein)` : `Exemplare ${loesung.titel}`}
                   description="0 = nicht drucken"
                   min={0}

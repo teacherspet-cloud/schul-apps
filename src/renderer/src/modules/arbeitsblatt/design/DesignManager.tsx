@@ -8,7 +8,6 @@ import {
   ColorInput,
   Divider,
   Group,
-  NumberInput,
   ScrollArea,
   SegmentedControl,
   Select,
@@ -19,6 +18,7 @@ import {
   Title,
   UnstyledButton
 } from '@mantine/core'
+import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { anredeText } from '../../../shared/anrede'
 import { anredeFuerMeta } from '../didactics/anrede'
 import { IconCopy, IconDownload, IconPlus, IconStar, IconTrash, IconUpload } from '@tabler/icons-react'
@@ -310,7 +310,7 @@ export default function DesignManager(): React.JSX.Element {
               />
               <Group grow>
                 {!design.page.autoFontSize && (
-                  <NumberInput
+                  <ZahlFeld
                     label="Schriftgröße (pt)"
                     min={9}
                     max={20}
@@ -320,7 +320,7 @@ export default function DesignManager(): React.JSX.Element {
                     onChange={(v) => patch('page', { baseFontPt: Number(v) || 11 })}
                   />
                 )}
-                <NumberInput
+                <ZahlFeld
                   label="Seitenrand (mm)"
                   description="mind. 12 mm (Druckbereich)"
                   min={12}
@@ -352,7 +352,7 @@ export default function DesignManager(): React.JSX.Element {
               <Group grow>
                 <Switch label="Schullogo" checked={design.header.showLogo} onChange={(e) => patch('header', { showLogo: e.currentTarget.checked })} />
                 {design.header.showLogo && (
-                  <NumberInput
+                  <ZahlFeld
                     size="xs"
                     label="Logohöhe (mm)"
                     min={6}
@@ -500,7 +500,7 @@ export default function DesignManager(): React.JSX.Element {
                       onChange={(v) => v && patch('sidebar', { side: v as 'left' })}
                       allowDeselect={false}
                     />
-                    <NumberInput
+                    <ZahlFeld
                       size="xs"
                       label="Breite (mm)"
                       min={4}
