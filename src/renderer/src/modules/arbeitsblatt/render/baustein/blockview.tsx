@@ -1,5 +1,5 @@
 import { RichText } from '../../../../shared/richtext/RichText'
-import type { WsBlock } from '../../model/types'
+import type { TextBlock, WsBlock } from '../../model/types'
 import { gapRenderText } from '../Answers'
 import { ImageLabelLayer } from '../ImageLabels'
 import { schaltplanEinrasten } from '../schaltplanSvg'
@@ -23,6 +23,9 @@ import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
 import { ProtokollView } from './protokoll'
 import { wortzahlText, zaehleWoerter } from '../../../../shared/kopfSprache'
+import { anmerkungenVon, ohneFussnotenMarken } from '../../didactics/anmerkungen'
+import { fassungWechseln } from '../../didactics/textauswahl'
+import { useTextAuswahl } from './textauswahl'
 
 /**
  * Jeder Baustein mit angehefteter Illustration bekommt die Figur an die Ecke (26.09.2026) –
@@ -145,146 +148,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
     }
 
     case 'text': {
-      const materialNo = ctx.materialNumbers?.get(block.id)
-      const paragraphs = splitParagraphs(block.body)
-      const from = placed?.from ?? 0
-      const to = placed?.to ?? paragraphs.length + (block.glossary.length ? 1 : 0)
-      const showHead = from === 0
-      const showGlossary = block.glossary.length > 0 && to > paragraphs.length
-      const lineStart = placed?.lineStart ?? 0
-      const lineCount = placed?.lineCount ?? 0
-      // Blocksatz nur bei längeren Texten – kurze Absätze würden sonst zerrissen
-      const justify = ctx.justify && plainText(block.body).length >= LONG_TEXT_CHARS
-      // Auslassungszeichen sind Kennzeichnung, keine Woerter des Originals
-      // Chinesisch/Japanisch: Schriftzeichen statt Wörter (shared/kopfSprache.ts)
-      const materialWoerter = zaehleWoerter(plainText(block.body).replace(/\[\s*(?:…|\.\.\.)\s*\]/g, ' '), ctx.labelLanguage)
-      return (
-        <div
-          /*
-           * Notizrand: Er verschmaelert die Absaetze, der Text wird dadurch hoeher – und
-           * genau so wird er auch GEMESSEN, weil die Messung dieselbe Klasse traegt. Der
-           * Seitenumbruch verschiebt sich also von selbst mit.
-           */
-          className={`ws-block ws-text ${block.lineNumbers ? 'ws-text-numbered' : ''} ${placed?.continued ? 'ws-continued' : ''} ${justify ? 'ws-justify' : ''} ${
-            ctx.notesMargin ? 'ws-notizrand' : ''
-          }`}
-        >
-          {/* Folgestück: „M2 (Fortsetzung)" – derselbe Wegweiser wie bei Aufgaben (01.10.2026) */}
-          {!showHead && <FortsetzungsHinweis bezeichnung={materialNo ?? stripMaterialNo(block.title)} />}
-          {showHead && (block.title || materialNo) && (
-            <div className="ws-text-title" data-head>
-              {/* Die Nummer vergibt die App – so verweist keine Aufgabe auf ein Material, das es nicht gibt */}
-              {materialNo && <span className="ws-material-no">{materialNo}</span>}
-              <Feld value={stripMaterialNo(block.title)} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
-            </div>
-          )}
-          {/*
-           * Materialkopf einer Quelle: Verfasser · Textsorte · Datum.
-           *
-           * Ohne diese Angaben lässt sich die Standortgebundenheit nicht beurteilen – und
-           * genau darum geht es bei der Quellenanalyse (EPA Geschichte 3.2.2/3.3.3). Er
-           * steht ÜBER dem Text, nicht unten bei der Fundstelle: Man muss wissen, wer
-           * spricht, BEVOR man liest.
-           */}
-          {/* Jede Angabe einzeln bearbeitbar (30.09.2026) – die Zeile setzt sich wie `headerLine` zusammen */}
-          {showHead && headerLine(block.sourceHeader) && (
-            <div className="ws-source-header">
-              {KOPF_ANGABEN.filter((k) => block.sourceHeader?.[k]?.trim()).map((k, i) => (
-                <span key={k}>
-                  {i > 0 && ' · '}
-                  <Feld
-                    value={block.sourceHeader![k]}
-                    editable={schreiben}
-                    onChange={set((d, v) => {
-                      const kopf = (d as typeof block).sourceHeader
-                      if (kopf) kopf[k] = v
-                    })}
-                  />
-                </span>
-              ))}
-            </div>
-          )}
-          {/*
-           * Hinweis ueber einer Erzaehlung: Sie ist eine Darstellung, keine Quelle.
-           * Er steht bewusst im Seiteninhalt und nicht klein darunter - eine Ich-Erzaehlung
-           * wird sonst fuer eine Quelle gehalten.
-           */}
-          {showHead && narrationNote(block.narration) && <div className="ws-narration-note">{narrationNote(block.narration)}</div>}
-          {/*
-           * Einleitungssatz (01.10.2026): kursiv zwischen „M1 Titel" und dem Wortlaut – wer spricht,
-           * wann, wo, worüber. Nicht Teil des Zitats und nicht der Zeilenzählung.
-           */}
-          {showHead && (block.intro?.trim() || (edit && block.zuschnitt)) && (
-            <div className="ws-text-intro" data-testid="material-einleitung">
-              <Feld value={block.intro ?? ''} editable={schreiben} onChange={set((d, v) => ((d as typeof block).intro = v))} />
-            </div>
-          )}
-          <div className="ws-text-body">
-            {block.lineNumbers && lineCount > 0 && (
-              <div className="ws-line-numbers" aria-hidden>
-                {Array.from({ length: lineCount }, (_, i) => lineStart + i + 1)
-                  .filter((n) => n % 5 === 0)
-                  .map((n) => (
-                    // Position in Zeilenhöhen der Textschrift; die Zahl selbst ist kleiner gesetzt
-                    <span key={n} style={{ top: `${(n - lineStart - 1) * 1.5}em` }}>
-                      <small>{n}</small>
-                    </span>
-                  ))}
-              </div>
-            )}
-            {edit && paragraphs.length === 0 ? (
-              <div data-unit>
-                <RichText value="" editable onChange={set((d, v) => ((d as typeof block).body = v))} placeholder="Text (Absätze durch Leerzeile trennen)" />
-              </div>
-            ) : (
-              paragraphs.slice(from, Math.min(to, paragraphs.length)).map((p, i) => (
-                <div key={from + i} data-unit className="ws-paragraph">
-                  <RichText
-                    value={p}
-                    editable={schreiben}
-                    onChange={set((d, v) => {
-                      // Absatz ersetzen; eine Leerzeile im neuen Text erzeugt weitere Absätze
-                      const all = splitParagraphs((d as typeof block).body)
-                      all[from + i] = v
-                      ;(d as typeof block).body = all.filter((x) => x.trim()).join('\n\n')
-                    })}
-                  />
-                </div>
-              ))
-            )}
-            {showGlossary && (
-              <div data-unit className="ws-glossary">
-                {block.glossary.map((g, i) => (
-                  <div key={i}>
-                    <b>
-                      <Feld value={g.term} editable={schreiben} onChange={set((d, v) => ((d as typeof block).glossary[i].term = v))} />
-                    </b>
-                    : <Feld value={g.explanation} editable={schreiben} onChange={set((d, v) => ((d as typeof block).glossary[i].explanation = v))} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          {/*
-            WORTZAHL am Ende des Materials, rechtsbuendig.
-            Gewuenscht von der Lehrkraft (24.09.2026). In Pruefungsaufgaben steht sie dort,
-            weil sie den Aufwand einschaetzbar macht: Wer weiss, dass der Text 700 Woerter
-            hat, teilt sich die Lesezeit anders ein.
-            Gezaehlt wird der ganze Text, nicht nur das Stueck auf dieser Seite – und die
-            Auslassungszeichen zaehlen nicht mit.
-          */}
-          {to >= paragraphs.length && materialWoerter > 0 && (
-            <div className="ws-wortzahl" data-foot>
-              ({wortzahlText(materialWoerter, ctx.labelLanguage)})
-            </div>
-          )}
-          {block.source && to >= paragraphs.length && (
-            <div className="ws-source" data-foot>
-              Quelle: <Feld value={block.source} editable={schreiben} onChange={set((d, v) => ((d as typeof block).source = v))} />
-            </div>
-          )}
-        </div>
-      )
+      return <MaterialText block={block} placed={placed} />
     }
 
     case 'image': {
@@ -753,4 +617,227 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
     case 'protocol':
       return <ProtokollView block={block} placed={placed} />
   }
+}
+
+/**
+ * Materialtext (M1, M2 …) – eigene Komponente seit dem Textauswahl-Menü (01.10.2026): Rechtsklick
+ * bzw. langer Druck auf eine Markierung öffnet das Kreismenü (textauswahl.tsx). Fußnoten und
+ * Worthilfen tragen EINE Zählung mit hochgestellten Ziffern (didactics/anmerkungen.ts).
+ */
+function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem }): React.JSX.Element {
+  const ctx = useWs()
+  const { mode } = ctx
+  const edit = mode === 'edit'
+  const schreiben = isEditMode(mode)
+  const set = useSetter(block)
+  const auswahl = useTextAuswahl(block)
+  const materialNo = ctx.materialNumbers?.get(block.id)
+  const paragraphs = splitParagraphs(block.body)
+  // Anzeige mit hochgestellten Ziffern an Fußnoten- und Worthilfe-Stellen; Rohtext bleibt zum Bearbeiten
+  const anm = anmerkungenVon(block)
+  const anzeigeAbsaetze = splitParagraphs(anm.anzeige)
+  const gleichGeteilt = anzeigeAbsaetze.length === paragraphs.length
+  const from = placed?.from ?? 0
+  const to = placed?.to ?? paragraphs.length + (anm.anmerkungen.length ? 1 : 0)
+  const showHead = from === 0
+  const showGlossary = anm.anmerkungen.length > 0 && to > paragraphs.length
+  const lineStart = placed?.lineStart ?? 0
+  const lineCount = placed?.lineCount ?? 0
+  // Blocksatz nur bei längeren Texten – kurze Absätze würden sonst zerrissen
+  const justify = ctx.justify && plainText(block.body).length >= LONG_TEXT_CHARS
+  // Auslassungszeichen sind Kennzeichnung, keine Woerter des Originals
+  // Chinesisch/Japanisch: Schriftzeichen statt Wörter (shared/kopfSprache.ts)
+  const materialWoerter = zaehleWoerter(plainText(ohneFussnotenMarken(block.body)).replace(/\[\s*(?:…|\.\.\.)\s*\]/g, ' '), ctx.labelLanguage)
+  return (
+    <div
+      /*
+       * Notizrand: Er verschmaelert die Absaetze, der Text wird dadurch hoeher – und
+       * genau so wird er auch GEMESSEN, weil die Messung dieselbe Klasse traegt. Der
+       * Seitenumbruch verschiebt sich also von selbst mit.
+       */
+      className={`ws-block ws-text ${block.lineNumbers ? 'ws-text-numbered' : ''} ${placed?.continued ? 'ws-continued' : ''} ${justify ? 'ws-justify' : ''} ${
+        ctx.notesMargin ? 'ws-notizrand' : ''
+      }`}
+    >
+      {/* Folgestück: „M2 (Fortsetzung)" – derselbe Wegweiser wie bei Aufgaben (01.10.2026) */}
+      {!showHead && <FortsetzungsHinweis bezeichnung={materialNo ?? stripMaterialNo(block.title)} />}
+      {showHead && (block.title || materialNo) && (
+        <div className="ws-text-title" data-head>
+          {/* Die Nummer vergibt die App – so verweist keine Aufgabe auf ein Material, das es nicht gibt */}
+          {materialNo && <span className="ws-material-no">{materialNo}</span>}
+          <Feld value={stripMaterialNo(block.title)} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
+        </div>
+      )}
+      {/*
+       * Materialkopf einer Quelle: Verfasser · Textsorte · Datum.
+       *
+       * Ohne diese Angaben lässt sich die Standortgebundenheit nicht beurteilen – und
+       * genau darum geht es bei der Quellenanalyse (EPA Geschichte 3.2.2/3.3.3). Er
+       * steht ÜBER dem Text, nicht unten bei der Fundstelle: Man muss wissen, wer
+       * spricht, BEVOR man liest.
+       */}
+      {/* Jede Angabe einzeln bearbeitbar (30.09.2026) – die Zeile setzt sich wie `headerLine` zusammen */}
+      {showHead && headerLine(block.sourceHeader) && (
+        <div className="ws-source-header">
+          {KOPF_ANGABEN.filter((k) => block.sourceHeader?.[k]?.trim()).map((k, i) => (
+            <span key={k}>
+              {i > 0 && ' · '}
+              <Feld
+                value={block.sourceHeader![k]}
+                editable={schreiben}
+                onChange={set((d, v) => {
+                  const kopf = (d as typeof block).sourceHeader
+                  if (kopf) kopf[k] = v
+                })}
+              />
+            </span>
+          ))}
+        </div>
+      )}
+      {/*
+       * Hinweis ueber einer Erzaehlung: Sie ist eine Darstellung, keine Quelle.
+       * Er steht bewusst im Seiteninhalt und nicht klein darunter - eine Ich-Erzaehlung
+       * wird sonst fuer eine Quelle gehalten.
+       */}
+      {showHead && narrationNote(block.narration) && <div className="ws-narration-note">{narrationNote(block.narration)}</div>}
+      {/*
+       * Einleitungssatz (01.10.2026): kursiv zwischen „M1 Titel" und dem Wortlaut – wer spricht,
+       * wann, wo, worüber. Nicht Teil des Zitats und nicht der Zeilenzählung.
+       */}
+      {showHead && (block.intro?.trim() || (edit && block.zuschnitt)) && (
+        <div className="ws-text-intro" data-testid="material-einleitung">
+          <Feld value={block.intro ?? ''} editable={schreiben} onChange={set((d, v) => ((d as typeof block).intro = v))} />
+        </div>
+      )}
+      <div
+        className="ws-text-body"
+        ref={auswahl.ref}
+        onContextMenu={auswahl.onContextMenu}
+        data-zeile-start={lineStart}
+        // Langer Druck (iPad) öffnet das Textauswahl-Menü – shared/touch/gesten.ts
+        data-langdruck={auswahl.onContextMenu ? '' : undefined}
+      >
+        {/* Umschalter der Fassungen (Textauswahl „Einfacher formulieren") – nur im Editor, außerhalb des Flusses */}
+        {edit && showHead && block.andereFassung && (
+          <div className="ws-fassung" data-fassung={block.andereFassung.art === 'original' ? 'vereinfacht' : 'original'}>
+            {block.andereFassung.art === 'original' ? 'Vereinfachte Fassung' : 'Originalfassung'}
+            <button type="button" onClick={() => ctx.update?.(block.id, (d) => d.type === 'text' && fassungWechseln(d))}>
+              {block.andereFassung.art === 'original' ? 'Original zeigen' : 'Vereinfachte Fassung zeigen'}
+            </button>
+          </div>
+        )}
+        {block.lineNumbers && lineCount > 0 && (
+          <div className="ws-line-numbers" aria-hidden>
+            {Array.from({ length: lineCount }, (_, i) => lineStart + i + 1)
+              .filter((n) => n % 5 === 0)
+              .map((n) => (
+                // Position in Zeilenhöhen der Textschrift; die Zahl selbst ist kleiner gesetzt
+                <span key={n} style={{ top: `${(n - lineStart - 1) * 1.5}em` }}>
+                  <small>{n}</small>
+                </span>
+              ))}
+          </div>
+        )}
+        {edit && paragraphs.length === 0 ? (
+          <div data-unit>
+            <RichText value="" editable onChange={set((d, v) => ((d as typeof block).body = v))} placeholder="Text (Absätze durch Leerzeile trennen)" />
+          </div>
+        ) : (
+          paragraphs.slice(from, Math.min(to, paragraphs.length)).map((p, i) => (
+            <div key={from + i} data-unit className="ws-paragraph" data-absatz={from + i}>
+              <RichText
+                value={p}
+                anzeige={gleichGeteilt ? anzeigeAbsaetze[from + i] : undefined}
+                // Lücken aus dem Textauswahl-Menü: im Lösungsteil mit Lösung
+                renderText={gapRenderText(isKeyMode(mode))}
+                editable={schreiben}
+                onChange={set((d, v) => {
+                  // Absatz ersetzen; eine Leerzeile im neuen Text erzeugt weitere Absätze
+                  const all = splitParagraphs((d as typeof block).body)
+                  all[from + i] = v
+                  ;(d as typeof block).body = all.filter((x) => x.trim()).join('\n\n')
+                })}
+              />
+            </div>
+          ))
+        )}
+        {showGlossary && (
+          <div data-unit className="ws-glossary">
+            {/* Fußnoten und Worthilfen in EINER Zählung, jede mit ihrer hochgestellten Ziffer (01.10.2026) */}
+            {anm.anmerkungen.map((a) => {
+              const f = a.art === 'fussnote' ? block.fussnoten?.[a.index] : undefined
+              const feld = (welches: 'wort' | 'text') =>
+                set((d, v) => {
+                  const t = d as typeof block
+                  if (a.art === 'fussnote') {
+                    const fn = t.fussnoten?.[a.index]
+                    if (fn) fn[welches] = v
+                  } else if (t.glossary[a.index]) {
+                    if (welches === 'wort') t.glossary[a.index].term = v
+                    else t.glossary[a.index].explanation = v
+                  }
+                })
+              return (
+                <div key={`${a.art}-${a.index}`} className={`ws-anmerkung ${f?.bild ? 'ws-anmerkung-bild' : ''}`} data-anmerkung={a.art}>
+                  <sup className="ws-anmerkung-nr">{a.nr}</sup>{' '}
+                  {f?.bild && (
+                    <span className="ws-fussnote-bild">
+                      <img src={f.bild.dataUrl} alt={a.wort} />
+                      <span className="ws-ai-mark" title="Dieses Bild wurde von einer KI erzeugt.">
+                        KI
+                      </span>
+                    </span>
+                  )}
+                  <b>
+                    <Feld value={a.wort} editable={schreiben} onChange={feld('wort')} />
+                  </b>
+                  {(a.text || schreiben) && (
+                    <>
+                      : <Feld value={a.text} editable={schreiben} onChange={feld('text')} />
+                    </>
+                  )}
+                  {edit && a.art === 'fussnote' && (
+                    <button
+                      type="button"
+                      className="ws-anmerkung-weg"
+                      title="Fußnote entfernen"
+                      aria-label="Fußnote entfernen"
+                      onClick={() =>
+                        ctx.update?.(block.id, (d) => {
+                          if (d.type !== 'text' || !f) return
+                          d.body = d.body.split(`[^${f.id}]`).join('')
+                          d.fussnoten = (d.fussnoten ?? []).filter((x) => x.id !== f.id)
+                        })
+                      }
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      {auswahl.menue}
+      {/*
+            WORTZAHL am Ende des Materials, rechtsbuendig.
+            Gewuenscht von der Lehrkraft (24.09.2026). In Pruefungsaufgaben steht sie dort,
+            weil sie den Aufwand einschaetzbar macht: Wer weiss, dass der Text 700 Woerter
+            hat, teilt sich die Lesezeit anders ein.
+            Gezaehlt wird der ganze Text, nicht nur das Stueck auf dieser Seite – und die
+            Auslassungszeichen zaehlen nicht mit.
+          */}
+      {to >= paragraphs.length && materialWoerter > 0 && (
+        <div className="ws-wortzahl" data-foot>
+          ({wortzahlText(materialWoerter, ctx.labelLanguage)})
+        </div>
+      )}
+      {block.source && to >= paragraphs.length && (
+        <div className="ws-source" data-foot>
+          Quelle: <Feld value={block.source} editable={schreiben} onChange={set((d, v) => ((d as typeof block).source = v))} />
+        </div>
+      )}
+    </div>
+  )
 }

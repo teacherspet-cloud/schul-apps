@@ -15,7 +15,7 @@ import { punkteZeilen } from '../../../shared/notenpunkte'
 import { GRAMMAR_TOPICS } from '../didactics/grammar'
 import { phraseSheetModus } from '../generation/prompts'
 import { zeigtUebersetzung } from '../didactics/phraseRules'
-import { anredeFuerMeta } from '../didactics/anrede'
+import { anredeFuerMeta, anweisungenDeutsch } from '../didactics/anrede'
 import { anredeText } from '../../../shared/anrede'
 import { druckDesign } from '../../../shared/fachfarben'
 import { boardList } from '../didactics/boardDesign'
@@ -171,6 +171,19 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     subjectId: ws.meta.subjectId,
     labelLanguage: ws.meta.labelLanguage,
     anrede: anredeFuerMeta(ws.meta),
+    // Textauswahl-Menü (01.10.2026): nur Fach, Jahrgang, Schulform, Thema – keine Personendaten
+    lerngruppeText: {
+      fach: ws.meta.subjectLabel,
+      fachId: ws.meta.subjectId,
+      jahrgang: ws.meta.grade,
+      schulform: ws.meta.schoolTypeName,
+      thema: ws.meta.topic,
+      zielsprache: subjectById(ws.meta.subjectId).foreignLanguage,
+      cefr: ws.meta.cefrLevel,
+      anrede: anredeFuerMeta(ws.meta) === 'sie' ? 'sie' : 'du',
+      aufgabenSprache: anweisungenDeutsch(ws.meta) ? 'de' : (subjectById(ws.meta.subjectId).foreignLanguage ?? 'de')
+    },
+    blattBausteine: sheet.blocks,
     ...extra,
     // Getippte Nummern („M3") werden beim Speichern zur Kennung des Materials, das jetzt so heißt – so wandern sie beim Verschieben mit
     ...(update

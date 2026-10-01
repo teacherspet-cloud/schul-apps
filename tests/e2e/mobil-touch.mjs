@@ -13,6 +13,7 @@
 //  6. Langer Druck: Menü eines Bibliothekseintrags; auf einem Symbolknopf dessen Beschreibung
 //  7. Wischen: Eintrag nach links legt „Kopie"/„Löschen" frei; zwischen den Schritten eines Programms
 //  8. Bildschirmtastatur (nachgestellt: das Fenster schrumpft wie in der App): das Feld bleibt sichtbar
+//  9. Textauswahl-Menü: langer Druck auf ein Wort im Material öffnet das Kreismenü (01.10.2026)
 import { chromium } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -367,6 +368,43 @@ async function lauf(name, breite, hoehe) {
     const loeschen = page.locator('[data-wisch-zeile][data-offen] .wisch-zeile-aktionen button').filter({ visible: true })
     pruefe((await loeschen.count()) >= 1, `${name}: nach links wischen legt „Kopie"/„Löschen" frei (${await loeschen.allInnerTexts()})`)
     await bild('7-wischen')
+
+    // ---------- 9. Textauswahl-Menü (01.10.2026): langer Druck auf ein Wort im Material öffnet das Kreismenü
+    await oeffne('Arbeitsblatt')
+    await page.evaluate(() => window.__selftest.wsMaterialtext(3))
+    await page.waitForTimeout(1500)
+    const wortLage = await page.evaluate(() => {
+      const el = [...document.querySelectorAll('.module-container:not([hidden]) .ws-editor-pages .ws-paragraph[data-absatz="0"]')].find(
+        (e) => e.getBoundingClientRect().height > 0
+      )
+      if (!el) return null
+      el.scrollIntoView({ block: 'center' })
+      const gang = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let n = gang.nextNode(); n; n = gang.nextNode()) {
+        const i = n.data.indexOf('Versammlung')
+        if (i < 0) continue
+        const r = document.createRange()
+        r.setStart(n, i + 2)
+        r.setEnd(n, i + 3)
+        const b = r.getBoundingClientRect()
+        return { x: b.left + b.width / 2, y: b.top + b.height / 2 }
+      }
+      return null
+    })
+    if (wortLage) {
+      await langerDruck(wortLage)
+      await page.waitForTimeout(600)
+      const eintrag = page.locator('[data-textmenue] [data-textaktion="fussnote"]')
+      pruefe(await eintrag.isVisible().catch(() => false), `${name}: langer Druck auf ein Wort im Material öffnet das Textauswahl-Menü`)
+      const wort = await page
+        .locator('.textmenue-wort')
+        .innerText()
+        .catch(() => '')
+      pruefe(wort.includes('Versammlung'), `${name}: das Wort unter dem Finger ist markiert (${wort})`)
+      await bild('9-textauswahl')
+      await page.keyboard.press('Escape')
+      await page.waitForTimeout(300)
+    } else pruefe(false, `${name}: Materialtext für das Textauswahl-Menü nicht gefunden`)
 
     // ---------- 8. Bildschirmtastatur (nachgestellt wie in der App: das Fenster wird niedriger)
     await oeffne('Einstellungen')

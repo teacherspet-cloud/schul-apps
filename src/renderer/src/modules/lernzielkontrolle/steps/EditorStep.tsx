@@ -444,6 +444,13 @@ export default function EditorStep(): React.JSX.Element {
                     update((d) => {
                       const block = d.varianten[variante]?.blocks.find((b) => b.id === blockId)
                       if (block) fn(block)
+                    }),
+                  // Textauswahl-Menü (01.10.2026): neuer Baustein hinter dem Material
+                  einfuegenNach: (anker, neu) =>
+                    update((d) => {
+                      const liste = d.varianten[variante]?.blocks
+                      const i = liste?.findIndex((b) => b.id === anker) ?? -1
+                      if (liste && i >= 0) liste.splice(i + 1, 0, structuredClone(neu))
                     })
                 })}
                 wrapBlock={wrapBlock}

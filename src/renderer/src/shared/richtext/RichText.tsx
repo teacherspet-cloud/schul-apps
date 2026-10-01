@@ -14,6 +14,9 @@ function InlineView({ inlines, renderText }: { inlines: Inline[]; renderText?: T
           return <span key={k} className="rt-math" dangerouslySetInnerHTML={{ __html: texToSvg(i.tex).svg }} />
         }
         let node: React.ReactNode = renderText ? renderText(i.text) : i.text
+        if (i.sup) node = <sup>{node}</sup>
+        if (i.underline) node = <u>{node}</u>
+        if (i.mark) node = <mark className="rt-mark">{node}</mark>
         if (i.italic) node = <em>{node}</em>
         if (i.bold) node = <strong>{node}</strong>
         return <span key={k}>{node}</span>
@@ -98,7 +101,8 @@ export function RichText({
   className,
   placeholder,
   renderText,
-  inline
+  inline,
+  anzeige
 }: {
   value: string
   onChange?: (v: string) => void
@@ -107,10 +111,15 @@ export function RichText({
   placeholder?: string
   renderText?: TextRenderer
   inline?: boolean
+  /** Abweichende Anzeige (z. B. mit Fußnotenmarken an den Worthilfen); bearbeitet wird `value` */
+  anzeige?: string
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const ref = useRef<HTMLTextAreaElement>(null)
+  // Mit der Maus angeklickt: Bearbeiten erst beim Loslassen – so bleibt eine gezogene Markierung stehen (Textauswahl-Menü)
+  const zeiger = useRef(false)
+  const gezeigt = anzeige ?? value
 
   useEffect(() => setDraft(value), [value])
   useEffect(() => {
@@ -121,7 +130,7 @@ export function RichText({
     }
   }, [editing, draft])
 
-  if (!editable || !onChange) return <RichTextView value={value} className={className} renderText={renderText} inline={inline} />
+  if (!editable || !onChange) return <RichTextView value={gezeigt} className={className} renderText={renderText} inline={inline} />
 
   if (editing) {
     return (
@@ -154,11 +163,21 @@ export function RichText({
       tabIndex={0}
       title="Klicken zum Bearbeiten"
       data-placeholder={placeholder}
-      onClick={() => setEditing(true)}
-      onFocus={() => setEditing(true)}
+      onPointerDown={(e) => (zeiger.current = e.pointerType === 'mouse')}
+      onClick={(e) => {
+        zeiger.current = false
+        // Eine gezogene Markierung (z. B. für das Textauswahl-Menü) nicht durch das Bearbeiten verwerfen
+        const auswahl = window.getSelection()
+        if (auswahl && !auswahl.isCollapsed && e.currentTarget.contains(auswahl.anchorNode)) return
+        setEditing(true)
+      }}
+      onFocus={() => {
+        if (!zeiger.current) setEditing(true)
+      }}
+      onBlur={() => (zeiger.current = false)}
     >
       {value ? (
-        <RichTextView value={value} className={className} renderText={renderText} inline={inline} />
+        <RichTextView value={gezeigt} className={className} renderText={renderText} inline={inline} />
       ) : (
         <span className="rt-placeholder">{placeholder}</span>
       )}

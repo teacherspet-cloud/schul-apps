@@ -1,0 +1,553 @@
+{
+  "app": "schul-apps",
+  "type": "arbeitsblatt",
+  "version": 1,
+  "worksheet": {
+    "version": 1,
+    "meta": {
+      "title": "Wie Pflanzen Energie gewinnen",
+      "subjectId": "biologie",
+      "subjectLabel": "Biologie",
+      "topic": "Fotosynthese",
+      "learningGoals": "",
+      "priorKnowledge": "",
+      "stateId": "NI",
+      "schoolTypeId": "integrierte-gesamtschule",
+      "schoolTypeName": "Integrierte Gesamtschule",
+      "grade": 7,
+      "courseLevel": "mixed",
+      "languageMode": "standard",
+      "languageOrder": 1,
+      "cefrLevel": "A2",
+      "instructionsInGerman": false,
+      "sheetType": "erarbeitung",
+      "pages": 2,
+      "minutes": 45,
+      "socialForms": [],
+      "differentiation": {
+        "levels": 3,
+        "mode": "combined"
+      },
+      "answerKey": true,
+      "sheetNumber": "4",
+      "imageSource": "placeholder",
+      "overrides": {},
+      "teacherNote": ""
+    },
+    "design": {
+      "page": {
+        "marginMm": 14,
+        "fontFamily": "Calibri, Carlito, \"Segoe UI\", Arial, sans-serif",
+        "baseFontPt": 11.5,
+        "autoFontSize": true,
+        "accentColor": "#5f3dc4"
+      },
+      "header": {
+        "layout": "logoRight",
+        "showLogo": true,
+        "logoHeightMm": 14,
+        "showSchoolName": true,
+        "showSubject": true,
+        "showTitle": true,
+        "showSheetNumber": true,
+        "fields": {
+          "name": true,
+          "date": true,
+          "class": true
+        },
+        "customText": "",
+        "followingPages": "compact"
+      },
+      "footer": {
+        "show": true,
+        "left": "schoolName",
+        "center": "pageNumber",
+        "right": "subject",
+        "customText": "",
+        "showLogoSmall": false
+      },
+      "sidebar": {
+        "show": true,
+        "side": "left",
+        "widthMm": 10,
+        "color": "#5f3dc4",
+        "content": "subject",
+        "customText": ""
+      },
+      "tasks": {
+        "numberStyle": "circle",
+        "showSocialFormIcons": true,
+        "boldOperators": true
+      },
+      "id": "preset-seitenleiste",
+      "name": "Seitenleiste",
+      "isDefault": false
+    },
+    "outline": null,
+    "sources": [],
+    "createdAt": "2026-09-16",
+    "sheets": [
+      {
+        "id": "sheet-1",
+        "label": "Arbeitsblatt",
+        "blocks": [
+          {
+            "id": "b1",
+            "type": "learningGoals",
+            "title": "Das lernst du",
+            "goals": [
+              "Ich kann die Fotosynthese mit einer Wortgleichung beschreiben.",
+              "Ich kann erklären, warum Pflanzen Licht brauchen."
+            ]
+          },
+          {
+            "id": "b2",
+            "type": "text",
+            "title": "M1 Die Fotosynthese",
+            "body": "Absatz 1: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 2: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 3: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 4: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 5: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 6: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 7: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.\n\nAbsatz 8: Pflanzen nehmen über die Wurzeln Wasser auf und über die Spaltöffnungen der Blätter Kohlenstoffdioxid. Mit Hilfe des Sonnenlichts entsteht im Blattgrün daraus Traubenzucker. Dabei wird Sauerstoff frei, den Menschen und Tiere zum Atmen brauchen. Die Pflanze nutzt den Zucker als Energiequelle und als Baustoff.",
+            "lineNumbers": true,
+            "source": "eigener Text",
+            "glossary": [
+              {
+                "term": "Spaltöffnung",
+                "explanation": "kleine Öffnung an der Blattunterseite"
+              }
+            ]
+          },
+          {
+            "id": "b2alt",
+            "type": "text",
+            "title": "M2 A letter from the garden",
+            "body": "The gardener wants to preserve (1) the old trees. In spring the leaves[2] turn green again.\n\nThe soil¹ needs water, and the roots* grow deep.",
+            "lineNumbers": true,
+            "source": "Eigener Text",
+            "glossary": [
+              {
+                "term": "(1) preserve",
+                "explanation": "bewahren"
+              },
+              {
+                "term": "[2] leaves",
+                "explanation": "Blätter"
+              },
+              {
+                "term": "¹ soil",
+                "explanation": "Erde, Boden"
+              },
+              {
+                "term": "* roots",
+                "explanation": "Wurzeln"
+              }
+            ]
+          },
+          {
+            "id": "b3",
+            "type": "infoBox",
+            "variant": "merke",
+            "title": "Merke",
+            "body": "Fotosynthese als Gleichung:\n\n$$\\ce{6CO2 + 6H2O ->[Licht] C6H12O6 + 6O2}$$\n\nDie Energie des Lichts wird in **Traubenzucker** gespeichert."
+          },
+          {
+            "id": "b4",
+            "type": "task",
+            "instruction": "**Nenne** die Stoffe, die eine Pflanze für die Fotosynthese braucht.",
+            "operator": "nennen",
+            "afb": "I",
+            "afbReason": "Wiedergabe aus M1",
+            "socialForm": "EA",
+            "answer": {
+              "kind": "lines",
+              "count": 2,
+              "heightMm": 40,
+              "gapText": "",
+              "left": [],
+              "right": [],
+              "pairs": [],
+              "options": [],
+              "correct": [],
+              "statements": [],
+              "items": [],
+              "displayOrder": [],
+              "headers": [],
+              "rows": [],
+              "solutionRows": [],
+              "labels": []
+            },
+            "parts": [],
+            "solution": "Wasser, Kohlenstoffdioxid, Licht",
+            "points": 2,
+            "minutes": 5
+          },
+          {
+            "id": "b5",
+            "type": "task",
+            "instruction": "**Ergänze** den Lückentext.",
+            "operator": "ergänzen",
+            "afb": "I",
+            "afbReason": "",
+            "socialForm": "PA",
+            "answer": {
+              "kind": "gapText",
+              "count": 3,
+              "heightMm": 40,
+              "gapText": "Pflanzen nehmen [[Wasser]] über die Wurzeln auf. Aus Licht entsteht $x = \\frac{a}{b}$ und [[Traubenzucker]].",
+              "left": [],
+              "right": [],
+              "pairs": [],
+              "options": [],
+              "correct": [],
+              "statements": [],
+              "items": [],
+              "displayOrder": [],
+              "headers": [],
+              "rows": [],
+              "solutionRows": [],
+              "labels": []
+            },
+            "parts": [],
+            "solution": "",
+            "points": 2,
+            "minutes": 5
+          },
+          {
+            "id": "b6",
+            "type": "task",
+            "stars": 2,
+            "instruction": "**Ordne** zu und **kreuze an**.",
+            "operator": "zuordnen",
+            "afb": "II",
+            "afbReason": "",
+            "socialForm": "EA",
+            "answer": {
+              "kind": "none",
+              "count": 3,
+              "heightMm": 40,
+              "gapText": "",
+              "left": [],
+              "right": [],
+              "pairs": [],
+              "options": [],
+              "correct": [],
+              "statements": [],
+              "items": [],
+              "displayOrder": [],
+              "headers": [],
+              "rows": [],
+              "solutionRows": [],
+              "labels": []
+            },
+            "parts": [
+              {
+                "id": "p1",
+                "instruction": "Ordne die Begriffe zu.",
+                "answer": {
+                  "kind": "matching",
+                  "count": 3,
+                  "heightMm": 40,
+                  "gapText": "",
+                  "left": [
+                    "Chlorophyll",
+                    "Spaltöffnung"
+                  ],
+                  "right": [
+                    "Blattgrün",
+                    "Gasaustausch",
+                    "Wurzel"
+                  ],
+                  "pairs": [
+                    0,
+                    1
+                  ],
+                  "options": [],
+                  "correct": [],
+                  "statements": [],
+                  "items": [],
+                  "displayOrder": [],
+                  "headers": [],
+                  "rows": [],
+                  "solutionRows": [],
+                  "labels": []
+                },
+                "solution": ""
+              },
+              {
+                "id": "p2",
+                "instruction": "Was entsteht?",
+                "answer": {
+                  "kind": "multipleChoice",
+                  "count": 3,
+                  "heightMm": 40,
+                  "gapText": "",
+                  "left": [],
+                  "right": [],
+                  "pairs": [],
+                  "options": [
+                    "Sauerstoff",
+                    "Stickstoff",
+                    "Traubenzucker"
+                  ],
+                  "correct": [
+                    0,
+                    2
+                  ],
+                  "statements": [],
+                  "items": [],
+                  "displayOrder": [],
+                  "headers": [],
+                  "rows": [],
+                  "solutionRows": [],
+                  "labels": []
+                },
+                "solution": ""
+              },
+              {
+                "id": "p3",
+                "instruction": "Richtig oder falsch?",
+                "answer": {
+                  "kind": "trueFalse",
+                  "count": 3,
+                  "heightMm": 40,
+                  "gapText": "",
+                  "left": [],
+                  "right": [],
+                  "pairs": [],
+                  "options": [],
+                  "correct": [],
+                  "statements": [
+                    {
+                      "text": "Pflanzen brauchen Licht.",
+                      "isTrue": true
+                    },
+                    {
+                      "text": "Nachts bilden Pflanzen Zucker.",
+                      "isTrue": false
+                    }
+                  ],
+                  "items": [],
+                  "displayOrder": [],
+                  "headers": [],
+                  "rows": [],
+                  "solutionRows": [],
+                  "labels": []
+                },
+                "solution": ""
+              },
+              {
+                "id": "p4",
+                "instruction": "Bringe in die richtige Reihenfolge.",
+                "answer": {
+                  "kind": "ordering",
+                  "count": 3,
+                  "heightMm": 40,
+                  "gapText": "",
+                  "left": [],
+                  "right": [],
+                  "pairs": [],
+                  "options": [],
+                  "correct": [],
+                  "statements": [],
+                  "items": [
+                    "Licht trifft auf das Blatt",
+                    "Zucker entsteht",
+                    "Zucker wird gespeichert"
+                  ],
+                  "displayOrder": [
+                    2,
+                    0,
+                    1
+                  ],
+                  "headers": [],
+                  "rows": [],
+                  "solutionRows": [],
+                  "labels": []
+                },
+                "solution": ""
+              }
+            ],
+            "solution": "siehe Teilaufgaben",
+            "points": 6,
+            "minutes": 10
+          },
+          {
+            "id": "b7",
+            "type": "task",
+            "stars": 3,
+            "instruction": "**Beurteile**, ob Zimmerpflanzen die Luft im Klassenraum verbessern.",
+            "operator": "beurteilen",
+            "afb": "III",
+            "afbReason": "eigenes Urteil",
+            "socialForm": "GA",
+            "answer": {
+              "kind": "tableFill",
+              "count": 3,
+              "heightMm": 40,
+              "gapText": "",
+              "left": [],
+              "right": [],
+              "pairs": [],
+              "options": [],
+              "correct": [],
+              "statements": [],
+              "items": [],
+              "displayOrder": [],
+              "headers": [
+                "Argument",
+                "dafür/dagegen"
+              ],
+              "rows": [
+                [
+                  "Sauerstoff",
+                  ""
+                ],
+                [
+                  "",
+                  "dagegen"
+                ]
+              ],
+              "solutionRows": [
+                [
+                  "",
+                  "dafür"
+                ],
+                [
+                  "geringe Menge",
+                  ""
+                ]
+              ],
+              "labels": []
+            },
+            "parts": [],
+            "solution": "Nur geringe Wirkung.",
+            "points": 4,
+            "minutes": 15
+          },
+          {
+            "id": "b8",
+            "type": "scaffold",
+            "variant": "wortspeicher",
+            "title": "Wortspeicher",
+            "items": [
+              "das Blattgrün",
+              "der Traubenzucker",
+              "der Sauerstoff"
+            ]
+          },
+          {
+            "id": "b9",
+            "type": "scaffold",
+            "variant": "hilfekarten",
+            "title": "Hilfekarten zu Aufgabe 4",
+            "items": [
+              "Lies die Aufgabe noch einmal.",
+              "Denke an M1.",
+              "Sauerstoff entsteht.",
+              "Beispiel: Ich finde …"
+            ]
+          },
+          {
+            "id": "b10",
+            "type": "table",
+            "title": "Tabelle",
+            "headers": [
+              "Stoff",
+              "Herkunft"
+            ],
+            "rows": [
+              [
+                "Wasser",
+                "Boden"
+              ],
+              [
+                "CO$_2$",
+                "Luft"
+              ]
+            ]
+          },
+          {
+            "id": "b11",
+            "type": "image",
+            "description": "Blatt mit Pfeilen",
+            "caption": "Abb. 1",
+            "widthPercent": 40,
+            "image": {
+              "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+              "source": "own",
+              "credit": "eigene Zeichnung"
+            }
+          },
+          {
+            "id": "grid-demo",
+            "type": "grid",
+            "kind": "koordinaten",
+            "title": "Zeichne den Verlauf der Körpertemperatur.",
+            "caption": "1 Kästchen = 1 Stunde",
+            "heightMm": 80,
+            "cellMm": 5,
+            "axes": {
+              "xLabel": "Zeit t in h",
+              "yLabel": "Temperatur in °C",
+              "y2Label": "",
+              "xMin": 0,
+              "xMax": 12,
+              "xStep": 1,
+              "yMin": 35,
+              "yMax": 41,
+              "yStep": 1,
+              "y2Min": 0,
+              "y2Max": 0,
+              "y2Step": 0,
+              "showNumbers": true,
+              "months": false
+            }
+          },
+          {
+            "id": "audio-demo",
+            "type": "audio",
+            "title": "Im Labor",
+            "textType": "Gespräch",
+            "transcript": "Mia: Schau mal, das Thermometer zeigt 38 Grad.\nTom: Dann läuft der Versuch schon eine Stunde.\nMia: Wir notieren den Wert und messen gleich noch einmal.",
+            "speakers": [
+              {
+                "id": "s1",
+                "name": "Mia",
+                "voiceId": "",
+                "voiceName": ""
+              },
+              {
+                "id": "s2",
+                "name": "Tom",
+                "voiceId": "",
+                "voiceName": ""
+              }
+            ],
+            "plays": 2,
+            "beforeListening": "Achte darauf, welche Werte genannt werden.",
+            "seconds": 28,
+            "url": "https://example.org/hoertext.mp3"
+          },
+          {
+            "id": "b12",
+            "type": "workspace",
+            "kind": "grid",
+            "heightMm": 20,
+            "label": "Rechne hier:"
+          },
+          {
+            "id": "b13",
+            "type": "selfCheck",
+            "title": "Das kann ich jetzt",
+            "statements": [
+              "Ich kann die Wortgleichung aufschreiben."
+            ],
+            "format": "smileys"
+          },
+          {
+            "id": "b14",
+            "type": "divider",
+            "title": "Zusatz"
+          }
+        ]
+      }
+    ]
+  }
+}

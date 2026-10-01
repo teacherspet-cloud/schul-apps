@@ -799,6 +799,13 @@ export function EditorStep(): React.JSX.Element {
                 }}
                 context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', {
                   update: (id, fn) => updateBlock(sheet.id, id, fn),
+                  // Textauswahl-Menü (01.10.2026): neue Aufgabe bzw. Wortspeicher hinter dem Material
+                  einfuegenNach: (anker, neu) =>
+                    update((d) => {
+                      const blatt = d.sheets.find((s) => s.id === sheet.id)
+                      const i = blatt?.blocks.findIndex((b) => b.id === anker) ?? -1
+                      if (blatt) blatt.blocks.splice(i < 0 ? blatt.blocks.length : i + 1, 0, structuredClone(neu))
+                    }),
                   actions: {
                     pickImage: (blockId, itemId) => setPicker(itemId ? `${blockId}::${itemId}` : blockId)
                   }

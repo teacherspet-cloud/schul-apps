@@ -289,7 +289,17 @@ export default function TestEditorStep(): React.JSX.Element {
                 sheet={sheet}
                 plans={layouts.get(`${sheet.id}:${key ? 'key' : 'print'}`) ?? []}
                 info={pageInfoFor(ws, sheet, logo, settings.schoolName, key, settings.citationStyle)}
-                context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', { update: aendere })}
+                context={contextFor(ws, sheet, key ? 'keyEdit' : 'edit', {
+                  update: aendere,
+                  // Textauswahl-Menü (01.10.2026): neuer Baustein hinter dem Material – in jeder Fassung, die es enthält
+                  einfuegenNach: (anker, neu) =>
+                    update((d) => {
+                      for (const liste of [d.blocks, d.blocksB ?? []]) {
+                        const i = liste.findIndex((b) => b.id === anker)
+                        if (i >= 0) liste.splice(i + 1, 0, structuredClone(neu))
+                      }
+                    })
+                })}
                 wrapBlock={wrapBlock}
               />
             </FitToWidth>

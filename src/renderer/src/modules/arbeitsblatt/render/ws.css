@@ -2869,3 +2869,61 @@
 .ws-page div.vt-editable.rt-editable-inline {
   display: inline;
 }
+
+/*
+ * Textauswahl-Menü der Materialtexte (01.10.2026): hochgestellte Fußnotenziffern, Unterstreichen,
+ * farbiges Markieren. Die Ziffer darf die Zeilenhöhe nicht vergrößern – sonst laufen die
+ * Zeilennummern am Rand davon.
+ */
+.rt sup,
+.ws-anmerkung-nr {
+  font-size: 0.68em;
+  line-height: 0;
+  vertical-align: baseline;
+  position: relative;
+  top: -0.45em;
+  font-weight: 600;
+}
+.rt mark.rt-mark {
+  background: #fff176;
+  color: inherit;
+  padding: 0;
+}
+.ws-anmerkung {
+  position: relative;
+}
+.ws-anmerkung-weg {
+  display: none;
+  margin-left: 4px;
+  padding: 0 4px;
+  font: inherit;
+  line-height: 1.2;
+  border: 0.2mm solid #999;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+.ws-anmerkung:hover .ws-anmerkung-weg,
+[data-touch] .ws-anmerkung-weg {
+  display: inline-block;
+}
+.ws-fussnote-bild {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0.5mm 1.5mm 0.5mm 0;
+}
+.ws-fussnote-bild img {
+  display: block;
+  height: 16mm;
+  width: auto;
+  max-width: 30mm;
+  object-fit: contain;
+}
+.ws-text-body > .ws-fassung {
+  position: absolute;
+  right: 0;
+  top: -1.6em;
+  margin: 0;
+  z-index: 1;
+}

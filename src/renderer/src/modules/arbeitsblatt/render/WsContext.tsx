@@ -3,6 +3,7 @@ import type { WsBlock } from '../model/types'
 import type { Stars } from '../didactics/differentiation'
 import type { Anrede } from '../../../shared/anrede'
 import type { KopfSprache } from '../../../shared/kopfSprache'
+import type { LerngruppeText } from '../didactics/textauswahl'
 
 /** edit = Schülerblatt bearbeiten, keyEdit = Lösungen bearbeiten, print/key = Druckansichten */
 export type WsMode = 'edit' | 'print' | 'key' | 'keyEdit' | 'measure'
@@ -70,6 +71,12 @@ export interface WsContextValue {
    * Stelle als in der Arbeitsanweisung.
    */
   wordLimit?: boolean
+  /** Textauswahl-Menü der Materialtexte (01.10.2026): Lerngruppe für die KI-Aufträge – ohne Personendaten */
+  lerngruppeText?: LerngruppeText
+  /** Alle Bausteine des Blattes (Wortspeicher finden, Materialzahl) */
+  blattBausteine?: WsBlock[]
+  /** Einen neuen Baustein hinter einem anderen einfügen (Textauswahl: Aufgabe, Wortspeicher) – ein Rückgängig-Schritt */
+  einfuegenNach?: (ankerId: string, block: WsBlock) => void
 }
 
 export const WsContext = createContext<WsContextValue>({

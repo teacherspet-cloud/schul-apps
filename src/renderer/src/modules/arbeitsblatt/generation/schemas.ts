@@ -168,7 +168,11 @@ export const FLAT_BLOCK = obj({
   intro: str(
     'text: Einleitungssatz über dem Text (kursiv), in der Sprache des Textes, endet mit Doppelpunkt – Verfasser mit Funktion, Entstehungszeit, Anlass bzw. Medium und Thema, soweit bekannt („Am 25.10.2012 äußert sich der Historiker Max Mustermann zum Historikerstreit:"). Nichts erfinden: Unbekanntes weglassen; bei einem selbst verfassten Text kein erfundener Verfasser. Sonst leer.'
   ),
-  glossary: arr(obj({ term: str(), explanation: str() }), 'text: Worterklärungen'),
+  // Der Begriff steht wörtlich im Text: Dort setzt die App die hochgestellte Ziffer (didactics/anmerkungen.ts, 01.10.2026)
+  glossary: arr(
+    obj({ term: str('Ausdruck genau so, wie er im Text steht – ohne Nummer, Stern oder Klammer'), explanation: str() }),
+    'text: Worterklärungen (Annotationen); die App markiert jeden Begriff im Text mit einer hochgestellten Ziffer – im Text selbst KEINE Nummern, Sternchen oder Klammern setzen'
+  ),
   imageDescription: str('image: genaue Beschreibung des benötigten Bildes'),
   sourceImageIndex: int('image: Index eines übernehmbaren Materialbildes oder -1'),
   imageSearch: str(

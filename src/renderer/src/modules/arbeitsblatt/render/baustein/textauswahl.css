@@ -1,0 +1,80 @@
+/* Textauswahl-Menü der Materialtexte (textauswahl.tsx) – Kreis wie kreismenue.css, Mitte mit Wort und Sprache */
+.textmenue-eintrag {
+  justify-content: center;
+  text-align: center;
+}
+.textmenue-eintrag:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.textmenue-mitte {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  /* Der Kreis selbst hat keine Breite – ohne feste Breite stünde das Wort Buchstabe für Buchstabe untereinander */
+  width: 150px;
+  font-size: 12px;
+  text-align: center;
+}
+.textmenue-wort {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.textmenue-sprache {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--mantine-primary-color-contrast);
+  background: var(--mantine-primary-color-filled);
+  border: none;
+}
+/* Schmale Bildschirme (iPhone): Liste statt Kreis */
+.textmenue-liste {
+  left: 50%;
+  top: 50%;
+  width: min(320px, calc(100vw - 24px));
+  height: auto;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--mantine-color-body);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.textmenue-liste .kreismenue-eintrag {
+  position: static;
+  min-height: 44px;
+  font-size: 15px;
+}
+.textmenue-liste .textmenue-mitte {
+  position: static;
+  transform: none;
+  order: -1;
+  width: auto;
+}
+/* Fassungen (Original / vereinfacht) unter dem Material – nur im Editor */
+.ws-fassung {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.72em;
+  color: #555;
+  margin-top: 1mm;
+}
+.ws-fassung button {
+  font: inherit;
+  padding: 0 6px;
+  border: 0.2mm solid #999;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}

@@ -2,6 +2,7 @@ import { STUFEN_WERTE, stufenLabel } from '../../../shared/verstehen/stufen'
 import ProtokollEinstellungen from './ProtokollEinstellungen'
 import { Anchor, Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
 import { wortzahl } from '../generation/kuerzung'
+import { ohneFussnotenMarken } from '../didactics/anmerkungen'
 import { zielWortzahl } from '../generation/zuschnitt'
 import { hatMasse } from '../render/tabelleMasse'
 import { useArbeitsblatt } from '../store'
@@ -751,7 +752,7 @@ export function BlockSettings({
             <>
               {/* Umfang des Materials (01.10.2026) – bei zugeschnittenen Originaltexten mit Zielbereich; „kürzer/länger/anderer Ausschnitt" am Zauberstab */}
               <Text size="xs" data-testid="material-umfang">
-                Umfang: {wortzahl(block.body)} Wörter
+                Umfang: {wortzahl(ohneFussnotenMarken(block.body))} Wörter
                 {block.zuschnitt
                   ? ` · Ziel ${block.zuschnitt.zielMin}–${block.zuschnitt.zielMax}, angestrebt etwa ${zielWortzahl({ min: block.zuschnitt.zielMin, max: block.zuschnitt.zielMax })} (${block.zuschnitt.zielGrund}) · Ausschnitt aus ${wortzahl(block.zuschnitt.original)} Wörtern des Originals`
                   : ''}

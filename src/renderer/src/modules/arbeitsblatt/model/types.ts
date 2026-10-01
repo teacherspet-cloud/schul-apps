@@ -217,6 +217,30 @@ export interface TextBlock extends BaseBlock {
   introFundstellen?: { angabe: string; url: string }[]
   /** Zuschnitt aus einem längeren Original (Internetadresse) – Grundlage für „kürzer/länger/anderer Ausschnitt" */
   zuschnitt?: TextZuschnitt
+  /**
+   * Fußnoten aus dem Textauswahl-Menü (01.10.2026). Im Text steht die Marke `[^kennung]`; die
+   * Ziffer vergibt die App je Material in der Reihenfolge im Text – gemeinsam mit den Worthilfen
+   * (didactics/anmerkungen.ts). Eine Fußnote, deren Marke fehlt, erscheint nicht.
+   */
+  fussnoten?: Fussnote[]
+  /**
+   * Die andere Fassung des Textes (Textauswahl „Einfacher formulieren"): Beim ersten Vereinfachen
+   * wird das Original hier abgelegt; der Umschalter am Material tauscht beide Fassungen.
+   */
+  andereFassung?: { art: 'original' | 'vereinfacht'; body: string; source: string }
+}
+
+/** Eine Fußnote zu einer Stelle im Materialtext */
+export interface Fussnote {
+  id: string
+  /** Stichwort vor der Erklärung (Grundform, z. B. „to preserve") */
+  wort: string
+  /** Erklärung (z. B. „to keep sth. as it is") */
+  text: string
+  /** Sprache der Erklärung (de oder die Zielsprache) */
+  sprache?: string
+  /** Kleine Erklärgrafik (KI-Bild, gekennzeichnet) */
+  bild?: ImageRef
 }
 
 /**

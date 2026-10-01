@@ -9,6 +9,7 @@ import {
   TableLayoutType,
   TableRow,
   TabStopType,
+  TextRun,
   VerticalAlign,
   WidthType
 } from 'docx'
@@ -23,6 +24,7 @@ import { audioLength, galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraph
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { headerLine } from '../../didactics/sourceHeader'
+import { anmerkungenVon } from '../../didactics/anmerkungen'
 import { gridDrawing } from '../../render/gridSvg'
 import { qrSvg } from '../../render/qr'
 import { justifyText } from '../../render/SheetPages'
@@ -166,13 +168,20 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
         )
       // Längere Texte im Blocksatz wie in der Vorschau
       const justify = justifyText(ctx.ws) && plainText(block.body).length >= LONG_TEXT_CHARS
-      for (const p of splitParagraphs(block.body))
+      /*
+       * Fußnoten und Worthilfen (01.10.2026): EINE Zählung, im Text als hochgestellte Ziffer (echter
+       * hochgestellter Lauf über `^{n}`), dieselbe Ziffer vor der Anmerkung unter dem Material.
+       * Lücken aus dem Textauswahl-Menü: Linie bzw. im Lösungsteil die Lösung.
+       */
+      const anm = anmerkungenVon(block)
+      const luecken = (t: string): string => t.replace(/\[\[(.+?)\]\]/g, (_, w: string) => (ctx.key ? `**${w}**` : '__________'))
+      for (const p of splitParagraphs(anm.anzeige))
         out.push(
-          ...(await rich(ctx, p, {
+          ...(await rich(ctx, luecken(p), {
             paragraph: { spacing: { after: 0, line: 360 }, keepLines: true, keepNext: true, ...(justify ? { alignment: AlignmentType.JUSTIFIED } : {}) }
           }))
         )
-      if (block.glossary.length) {
+      if (anm.anmerkungen.length) {
         out.push(
           new Paragraph({
             suppressLineNumbers: true,
@@ -181,13 +190,28 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
             children: []
           })
         )
-        for (const g of block.glossary)
+        for (const a of anm.anmerkungen) {
+          const bild = a.art === 'fussnote' ? block.fussnoten?.[a.index]?.bild : undefined
+          const masse = bild ? imageSizeFromDataUrl(bild.dataUrl) : null
+          const hoehe = 16 * PX_PER_MM
           out.push(
             new Paragraph({
               suppressLineNumbers: true,
-              children: [run(`${g.term}: `, { bold: true, size: ctx.size - 3 }), run(g.explanation, { size: ctx.size - 3 })]
+              children: [
+                new TextRun({ text: String(a.nr), superScript: true, bold: true, size: ctx.size - 3 }),
+                run(' ', { size: ctx.size - 3 }),
+                ...(bild
+                  ? [
+                      imageRun(bild.dataUrl, masse ? (hoehe * masse.width) / masse.height : hoehe, hoehe),
+                      run(' (KI-Bild) ', { size: ctx.size - 6, color: '555555' })
+                    ]
+                  : []),
+                run(a.text ? `${a.wort}: ` : a.wort, { bold: true, size: ctx.size - 3 }),
+                ...(a.text ? [run(a.text, { size: ctx.size - 3 })] : [])
+              ]
             })
           )
+        }
       }
       if (block.source)
         out.push(new Paragraph({ suppressLineNumbers: true, children: [run(`Quelle: ${block.source}`, { size: ctx.size - 6, color: '555555' })] }))

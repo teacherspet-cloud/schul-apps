@@ -2,10 +2,13 @@
  * Leichtes Textformat für Arbeitsblätter:
  *   **fett**, *kursiv*, $Formel$, $$abgesetzte Formel$$ (eigene Zeile), \ce{H2O} in Formeln,
  *   Aufzählungen mit "- " und nummerierte Listen mit "1. ".
+ * Seit 01.10.2026 (Textauswahl-Menü der Materialtexte) außerdem ++unterstrichen++, ==markiert==
+ * und ^{hochgestellt} (Fußnotenziffern im Word-Export).
  * Dieselbe Struktur speist Editor, Druck und Word-Export.
  */
 
-export type Inline = { t: 'text'; text: string; bold?: boolean; italic?: boolean } | { t: 'math'; tex: string }
+export type Inline =
+  { t: 'text'; text: string; bold?: boolean; italic?: boolean; underline?: boolean; mark?: boolean; sup?: boolean } | { t: 'math'; tex: string }
 
 export type RichBlock =
   | { t: 'para'; inlines: Inline[] }
@@ -105,24 +108,99 @@ function findClosingDollar(text: string, from: number): number {
 }
 
 function parseEmphasis(text: string): Inline[] {
-  const out: Inline[] = []
+  return emphasisAbschnitte(text).map(({ von, bis, ...f }) => ({ t: 'text' as const, text: text.slice(von, bis), ...f }))
+}
+
+/**
+ * Sichtbare Abschnitte eines Textstücks (ohne Formeln) mit ihrer Auszeichnung – als Stellen im
+ * Rohtext. Grundlage der Anzeige UND des Textauswahl-Menüs (Formatieren einer Markierung).
+ */
+export function emphasisAbschnitte(text: string): ({ von: number; bis: number } & Auszeichnung)[] {
+  // Neue Marken (unterstrichen, markiert, hochgestellt) laufen über den Zähler mit Verschachtelung
+  if (NEUE_MARKEN.test(text)) return markenAbschnitte(text)
+  const out: ({ von: number; bis: number } & Auszeichnung)[] = []
   const re = /\*\*([^*]+?)\*\*|\*([^*\s][^*]*?)\*/g
   let last = 0
   for (let m = re.exec(text); m; m = re.exec(text)) {
-    if (m.index > last) out.push({ t: 'text', text: text.slice(last, m.index) })
-    if (m[1] !== undefined) out.push({ t: 'text', text: m[1], bold: true })
-    else out.push({ t: 'text', text: m[2], italic: true })
+    if (m.index > last) out.push({ von: last, bis: m.index })
+    if (m[1] !== undefined) out.push({ von: m.index + 2, bis: m.index + 2 + m[1].length, bold: true })
+    else out.push({ von: m.index + 1, bis: m.index + 1 + m[2].length, italic: true })
     last = m.index + m[0].length
   }
-  if (last < text.length) out.push({ t: 'text', text: text.slice(last) })
+  if (last < text.length) out.push({ von: last, bis: text.length })
+  return out.filter((a) => a.bis > a.von)
+}
+
+const NEUE_MARKEN = /==|\+\+|\^\{/
+
+export type Auszeichnung = { bold?: boolean; italic?: boolean; underline?: boolean; mark?: boolean; sup?: boolean }
+
+/**
+ * Sichtbare Abschnitte eines Textes mit Marken – als Stellen im ROHTEXT (von, bis).
+ *
+ * Paarweise Marken (`**`, `*`, `==`, `++`) gelten nur, wenn es ein Gegenstück gibt; `^{` endet an
+ * der nächsten `}`. So lassen sich Marken verschachteln („==**wichtig** und richtig=="). Die
+ * Stellen braucht das Textauswahl-Menü, um eine Markierung im Blatt dem Rohtext zuzuordnen.
+ */
+export function markenAbschnitte(text: string): ({ von: number; bis: number } & Auszeichnung)[] {
+  const re = /\*\*|\*|==|\+\+|\^\{|\}/g
+  const treffer: { art: string; i: number }[] = []
+  for (let m = re.exec(text); m; m = re.exec(text)) treffer.push({ art: m[0], i: m.index })
+  // Gegenstücke bestimmen: je Art abwechselnd öffnen/schließen; eine unpaarige letzte Marke bleibt Text
+  const gilt = new Set<number>()
+  const offen = new Map<string, number>()
+  let hochOffen = -1
+  for (let k = 0; k < treffer.length; k++) {
+    const { art } = treffer[k]
+    if (art === '^{') {
+      if (hochOffen < 0) hochOffen = k
+      continue
+    }
+    if (art === '}') {
+      if (hochOffen >= 0) {
+        gilt.add(hochOffen)
+        gilt.add(k)
+        hochOffen = -1
+      }
+      continue
+    }
+    const vorher = offen.get(art)
+    if (vorher === undefined) offen.set(art, k)
+    else {
+      gilt.add(vorher)
+      gilt.add(k)
+      offen.delete(art)
+    }
+  }
+  const SCHALTER: Record<string, keyof Auszeichnung> = { '**': 'bold', '*': 'italic', '==': 'mark', '++': 'underline', '^{': 'sup', '}': 'sup' }
+  const stand: Auszeichnung = {}
+  const out: ({ von: number; bis: number } & Auszeichnung)[] = []
+  let pos = 0
+  const abschnitt = (bis: number): void => {
+    if (bis <= pos) return
+    const f: Auszeichnung = {}
+    for (const [k, v] of Object.entries(stand)) if (v) f[k as keyof Auszeichnung] = true
+    out.push({ von: pos, bis, ...f })
+  }
+  treffer.forEach((t, k) => {
+    if (!gilt.has(k)) return
+    abschnitt(t.i)
+    const schalter = SCHALTER[t.art]
+    stand[schalter] = t.art === '^{' ? true : t.art === '}' ? false : !stand[schalter]
+    pos = t.i + t.art.length
+  })
+  abschnitt(text.length)
   return out
 }
+
+const gleicheAuszeichnung = (a: Auszeichnung, b: Auszeichnung): boolean =>
+  !!a.bold === !!b.bold && !!a.italic === !!b.italic && !!a.underline === !!b.underline && !!a.mark === !!b.mark && !!a.sup === !!b.sup
 
 function mergeText(items: Inline[]): Inline[] {
   const out: Inline[] = []
   for (const it of items) {
     const prev = out[out.length - 1]
-    if (it.t === 'text' && prev?.t === 'text' && !!prev.bold === !!it.bold && !!prev.italic === !!it.italic) {
+    if (it.t === 'text' && prev?.t === 'text' && gleicheAuszeichnung(prev, it)) {
       prev.text += it.text
     } else out.push({ ...it })
   }

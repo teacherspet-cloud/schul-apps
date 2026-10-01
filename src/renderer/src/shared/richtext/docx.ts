@@ -26,6 +26,10 @@ async function inlineRuns(inlines: Inline[], opts: RichDocxOptions): Promise<Par
           text: i.text,
           bold: i.bold || opts.run?.bold,
           italics: i.italic || opts.run?.italics,
+          // Textauswahl-Menü (01.10.2026): unterstrichen, gelb markiert, hochgestellte Fußnotenziffern
+          ...(i.underline ? { underline: {} } : {}),
+          ...(i.mark ? { highlight: 'yellow' as const } : {}),
+          ...(i.sup ? { superScript: true } : {}),
           color: opts.run?.color,
           size: opts.size,
           font: opts.run?.font

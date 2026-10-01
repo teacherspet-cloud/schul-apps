@@ -245,7 +245,16 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   const editContext = useMemo(
     () =>
       contextFor(worksheet, sheet, loesung ? 'keyEdit' : 'edit', {
-        update: (blockId, fn) => updateExam((d) => aendereBaustein(d, blockId, fn))
+        update: (blockId, fn) => updateExam((d) => aendereBaustein(d, blockId, fn)),
+        // Textauswahl-Menü (01.10.2026): neuer Baustein hinter dem Material – in jeder Fassung, die es enthält
+        einfuegenNach: (anker, neu) =>
+          updateExam((d) => {
+            for (const part of d.parts)
+              for (const liste of alleFassungen(part)) {
+                const i = liste.findIndex((b) => b.id === anker)
+                if (i >= 0) liste.splice(i + 1, 0, structuredClone(neu))
+              }
+          })
       }),
     [worksheet, sheet, loesung, updateExam]
   )
