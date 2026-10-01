@@ -78,6 +78,8 @@ export interface WsContextValue {
   wordLimit?: boolean
   /** Textauswahl-Menü der Materialtexte (01.10.2026): Lerngruppe für die KI-Aufträge – ohne Personendaten */
   lerngruppeText?: LerngruppeText
+  /** Ablauf des Hörteils (Einlesezeit, Pausen) – für Bearbeitungszeit und Zeitmarken im Lehrkraft-Teil (01.10.2026) */
+  hoerablauf?: import('../didactics/hoerablauf').Hoerablauf
   /** Alle Bausteine des Blattes (Wortspeicher finden, Materialzahl) */
   blattBausteine?: WsBlock[]
   /** Einen neuen Baustein hinter einem anderen einfügen (Textauswahl: Aufgabe, Wortspeicher) – ein Rückgängig-Schritt */

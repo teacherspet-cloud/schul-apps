@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { hoerablaufFuer, hoerStufe } from '../didactics/hoerablauf'
 import { needsLargeType } from '../didactics/language'
 import { buildLearnerProfile, LearnerProfile } from '../didactics/profile'
 import type { Sheet, TextBlock, Worksheet, WorksheetMeta, WsBlock } from '../model/types'
@@ -186,6 +187,8 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
       aufgabenSprache: anweisungenDeutsch(ws.meta) ? 'de' : (subjectById(ws.meta.subjectId).foreignLanguage ?? 'de')
     },
     blattBausteine: sheet.blocks,
+    // Ablauf des Hörteils nach Land und Stufe (01.10.2026) – Bearbeitungszeit im Lehrkraft-Teil
+    hoerablauf: hoerablaufFuer(ws.meta.stateId, hoerStufe(ws.meta.grade)),
     ...extra,
     // Getippte Nummern („M3") werden beim Speichern zur Kennung des Materials, das jetzt so heißt – so wandern sie beim Verschieben mit
     ...(update

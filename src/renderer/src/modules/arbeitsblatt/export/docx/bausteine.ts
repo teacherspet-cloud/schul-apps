@@ -14,6 +14,7 @@ import {
   VerticalAlign,
   WidthType
 } from 'docx'
+import { dauerAngabe, hoerzeit } from '../../../../shared/verstehen/hoerzeit'
 import { maskottchenBild } from '../../../../shared/maskottchenStore'
 import { diagramDrawing } from '../../render/diagramSvg'
 import { imageRun, MM, NO_BORDERS, RED, run, writingLines } from '../../../../shared/export/docxKit'
@@ -21,7 +22,7 @@ import { richTextRuns } from '../../../../shared/richtext/docx'
 import { plainText } from '../../../../shared/richtext/parse'
 import type { Answer, WsBlock } from '../../model/types'
 import { INFO_VARIANTS } from '../../render/icons'
-import { audioLength, galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraphs } from '../../render/BlockView'
+import { galleryColumns, LONG_TEXT_CHARS, shortLink, splitParagraphs } from '../../render/BlockView'
 import { COPYRIGHT_NOTE, QR_NOTE, videoKindById } from '../../didactics/videoTasks'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { headerLine } from '../../didactics/sourceHeader'
@@ -442,7 +443,7 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
       // Abspielzahl und Transkriptpflicht folgen dem Fach – siehe `didactics/audioRules.ts`
       const fach = ctx.ws.meta.subjectId
       const audioRegeln = audioRulesFor(fach)
-      const meta = [block.textType, block.seconds ? audioLength(block.seconds) : '', playsLabelFor(fach, block.plays, anredeFuerMeta(ctx.ws.meta))]
+      const meta = [block.textType, hoerzeit(block).sekunden ? dauerAngabe(hoerzeit(block)) : '', playsLabelFor(fach, block.plays, anredeFuerMeta(ctx.ws.meta))]
         .filter(Boolean)
         .join(' · ')
       const inner: Child[] = [

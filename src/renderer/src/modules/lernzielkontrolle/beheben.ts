@@ -19,6 +19,7 @@ import type { Kurztest } from './model/types'
 import { worksheetMetaForKurztest } from './render/kurztestWorksheet'
 import { bausteinNachWunsch } from '../arbeitsblatt/generation/wunsch'
 import type { WunschArt } from '../../shared/kiWunsch'
+import { hoertextWunschLzk } from './hoertext'
 
 /**
  * Zauberstab „Überarbeiten" bzw. Kreis „Neu erzeugen" an einem Baustein (30.09.2026) – mit dem
@@ -27,6 +28,8 @@ import type { WunschArt } from '../../shared/kiWunsch'
  */
 export function bausteinNachWunschAuftrag(test: Kurztest, docId: string, variante: number, blockId: string, art: WunschArt, wunsch: string): void {
   if (!test.varianten[variante]) return
+  // Hörtext (01.10.2026): Das Skript ändert sich, die Aufgaben dazu ziehen mit
+  if (test.varianten[variante].blocks.find((b) => b.id === blockId)?.type === 'audio') return hoertextWunschLzk(test, docId, blockId, art, wunsch)
   void starteAuftrag({
     moduleId: 'lernzielkontrolle',
     docId,

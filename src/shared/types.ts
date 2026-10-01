@@ -441,6 +441,11 @@ export interface TtsRequest {
   languageCode?: string
   /** Klangregler; ohne Angabe gelten die Voreinstellungen von ElevenLabs */
   settings?: TtsSettings
+  /**
+   * Bisherige Aufnahme (01.10.2026): Datei und Segmente. Unveränderte Zeilen werden daraus
+   * übernommen, nur geänderte neu vertont (`shared/vertonung.ts`).
+   */
+  vorher?: { fileName: string; segmente: import('./vertonung').TtsSegment[] }
 }
 
 export interface TtsResult {
@@ -458,6 +463,19 @@ export interface TtsResult {
   model: string
   /** Zahl der Aufträge an ElevenLabs (mehr als einer nur bei sehr langen Texten) */
   requests: number
+  /** Gemessene Spieldauer in Sekunden (01.10.2026) */
+  sekunden?: number
+  /** Beginn jeder Sprecherzeile in Sekunden – gemessen bzw. je Auftrag nach Zeichen verteilt */
+  zeitmarken?: number[]
+  /** Segmente der Datei für spätere Teil-Vertonungen */
+  segmente?: import('./vertonung').TtsSegment[]
+  /** 'teilweise' = nur geänderte Zeilen neu vertont, der Rest übernommen */
+  weg?: 'voll' | 'teilweise'
+  /** Neu vertonte und gesamte Zeilen */
+  neu?: number
+  zeilen?: number
+  /** Warum ganz neu vertont wurde, obwohl eine Aufnahme da war */
+  grund?: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

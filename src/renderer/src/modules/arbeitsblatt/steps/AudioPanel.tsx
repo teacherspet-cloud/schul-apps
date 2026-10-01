@@ -27,27 +27,18 @@ import type { AblageZiel } from '@shared/types'
 import { anzeigeOrt } from '@shared/schulmaterial'
 import type { AudioBlock, Sheet, Worksheet } from '../model/types'
 import { useArbeitsblatt } from '../store'
-import { audioLength } from '../render/BlockView'
 import { akzentName, akzentVon, HERKUNFT, herkunftVon, sichtbareStimmen, stimmenName, vorhandeneAkzente, vorhandeneHerkunft } from '../../../shared/voiceFilter'
 import type { Herkunft } from '../../../shared/voiceFilter'
 import { settingsFuerNiveau } from '@shared/voiceSettings'
 import { listeningRules } from '../didactics/listeningFormats'
 import { VoiceSettings } from './VoiceSettings'
 import EinstellungenLink from '../../../shared/components/EinstellungenLink'
+import KiWunschKnoepfe from '../../../shared/components/KiWunschKnoepfe'
+import type { WunschArt, WunschKontext } from '../../../shared/kiWunsch'
+import { dauerAngabe, ersetzeDauerangaben, hoertextZu, hoerzeit, minSek, scriptTurns, skriptFingerabdruck } from '../../../shared/verstehen/hoerzeit'
 
-/** Sprecherzeilen „Name: Text“ aus dem Skript lesen; ohne Namen gilt der erste Sprecher. */
-export function scriptTurns(block: AudioBlock): { name: string; text: string }[] {
-  const out: { name: string; text: string }[] = []
-  for (const line of block.transcript.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-    const m = /^([\p{Lu}][\p{L}\s.'-]{0,24}):\s*(.+)$/u.exec(trimmed)
-    if (m) out.push({ name: m[1].trim(), text: m[2].trim() })
-    else if (out.length) out[out.length - 1].text += ` ${trimmed}`
-    else out.push({ name: '', text: trimmed })
-  }
-  return out
-}
+// Sprecherzeilen lesen – seit 01.10.2026 in shared/verstehen/hoerzeit.ts (auch für die Zeitmarken)
+export { scriptTurns }
 
 /** Namen, die im Skript sprechen – Grundlage für die Stimmenauswahl. */
 export function speakerNames(block: AudioBlock): string[] {
@@ -67,7 +58,11 @@ export function AudioPanel({
   ws,
   onUpdate,
   onZusatzfragen,
-  ablage
+  ablage,
+  onWunsch,
+  wunschKontext,
+  wunschLaeuft,
+  onVertont
 }: {
   ws: Worksheet
   onUpdate?: (fn: (ws: Worksheet) => void, gruppe?: string) => void
@@ -75,6 +70,13 @@ export function AudioPanel({
   ablage?: AblageZiel
   /** Klassenarbeit (29.09.2026): „Weitere Fragen im gleichen Format" zum Hörtext mit dieser id */
   onZusatzfragen?: (audioId: string) => void
+  /** Änderungswunsch an das Skript (01.10.2026): Zauberstab/Kreis wie an den Bausteinen; die Aufgaben ziehen mit */
+  onWunsch?: (audioId: string, art: WunschArt, wunsch: string) => void
+  wunschKontext?: (block: AudioBlock) => WunschKontext
+  /** Läuft für diesen Hörtext gerade ein Änderungswunsch? */
+  wunschLaeuft?: (audioId: string) => boolean
+  /** Nach dem Vertonen: gemessene Spieldauer (Klassenarbeit passt die Bearbeitungszeit des Hörteils an) */
+  onVertont?: (audioId: string, sekunden: number) => void
 }): React.JSX.Element {
   const updateSheet = useArbeitsblatt((s) => s.update)
   const ziel = (): AblageZiel => ablage ?? ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
@@ -222,7 +224,7 @@ export function AudioPanel({
     try {
       const res = await importiereHoerdatei(block.id, file)
       setBlock(block.id, (b) => {
-        b.audio = { dataUrl: res.dataUrl, fileName: res.fileName }
+        b.audio = { dataUrl: res.dataUrl, fileName: res.fileName, ...(res.seconds > 0 ? { sekunden: res.seconds } : {}) }
         b.origin = 'archiv'
         if (res.seconds > 0) b.seconds = res.seconds
       })
@@ -308,16 +310,57 @@ export function AudioPanel({
         id: block.id,
         languageCode: language,
         turns: turns.map((t) => ({ voiceId: voiceFor(block, t.name), text: t.text })),
-        settings: block.voiceSettings ?? settingsFuerNiveau(listeningRules(ws.meta.cefrLevel).wpm, mehrereStimmen, undefined)
+        settings: block.voiceSettings ?? settingsFuerNiveau(listeningRules(ws.meta.cefrLevel).wpm, mehrereStimmen, undefined),
+        /*
+         * Bisherige eigene Vertonung (01.10.2026): Unveränderte Zeilen übernimmt der Hauptprozess
+         * Byte für Byte, nur Geändertes geht an den Dienst. Eine Originalaufnahme ist keine Vorlage.
+         */
+        ...(block.audio?.fileName && block.origin !== 'archiv' ? { vorher: { fileName: block.audio.fileName, segmente: block.audio.segmente ?? [] } } : {})
       })
-      setBlock(block.id, (b) => {
-        b.audio = { dataUrl: res.dataUrl, fileName: res.fileName }
-        b.seconds = estimateSeconds(b.transcript)
+      const vorher = hoerzeit(block)
+      let neueDauer = 0
+      update((d) => {
+        const alle = d.sheets.flatMap((s) => s.blocks)
+        const b = alle.find((x): x is AudioBlock => x.id === block.id && x.type === 'audio')
+        if (!b) return
+        b.audio = {
+          dataUrl: res.dataUrl,
+          fileName: res.fileName,
+          ...(res.sekunden ? { sekunden: res.sekunden } : {}),
+          ...(res.zeitmarken ? { zeitmarken: res.zeitmarken } : {}),
+          ...(res.segmente ? { segmente: res.segmente } : {}),
+          skript: skriptFingerabdruck(b.transcript)
+        }
         // Vertont von der Sprachsynthese: wieder als KI-Aufnahme kennzeichnen (29.09.2026)
         delete b.origin
+        const nach = hoerzeit(b)
+        b.seconds = Math.round(nach.sekunden)
+        neueDauer = nach.sekunden
+        /*
+         * Längenangaben zu diesem Hörtext (Hinweis vor dem Hören, Arbeitsanweisungen der Aufgaben dazu,
+         * Hinweise für die Lehrkraft) folgen der gemessenen Dauer – 01.10.2026.
+         */
+        b.beforeListening = ersetzeDauerangaben(b.beforeListening, vorher.sekunden, nach)
+        for (const t of alle) {
+          if (t.type !== 'task' || hoertextZu(t, alle)?.id !== b.id) continue
+          t.instruction = ersetzeDauerangaben(t.instruction, vorher.sekunden, nach)
+          for (const p of t.parts) p.instruction = ersetzeDauerangaben(p.instruction, vorher.sekunden, nach)
+        }
+        if (typeof d.meta.teacherNote === 'string') d.meta.teacherNote = ersetzeDauerangaben(d.meta.teacherNote, vorher.sekunden, nach)
       })
-      // Der Weg gehört in die Meldung: „Dialog" heißt, dass die Sprecher aufeinander eingehen
-      notifySuccess(`Hörtext vertont (${Math.round(res.bytes / 1024)} kB, ${res.mode === 'dialog' ? 'Dialog in einem Stück' : 'eine Stimme'}).`)
+      if (neueDauer) onVertont?.(block.id, neueDauer)
+      // Der Weg gehört in die Meldung: „Dialog" heißt, dass die Sprecher aufeinander eingehen; „nur Geändertes" spart Kontingent
+      const dauer = neueDauer ? ` – ${minSek(neueDauer)} min` : ''
+      if (res.weg === 'teilweise')
+        notifySuccess(
+          res.neu
+            ? `Nur die geänderten Stellen neu vertont (${res.neu} von ${res.zeilen} Zeilen), der Rest der Aufnahme ist unverändert übernommen${dauer}.`
+            : `Gestrichene Stellen aus der Aufnahme entfernt, nichts neu vertont${dauer}.`
+        )
+      else
+        notifySuccess(
+          `Hörtext vertont (${Math.round(res.bytes / 1024)} kB, ${res.mode === 'dialog' ? 'Dialog in einem Stück' : 'eine Stimme'}${dauer}).${res.grund ? ` Ganz neu vertont: ${res.grund}` : ''}`
+        )
     } catch (e) {
       notifyError(e, 'Vertonen fehlgeschlagen')
     } finally {
@@ -424,20 +467,42 @@ export function AudioPanel({
       )}
       {blocks.map(({ sheet, block }) => {
         const names = speakerNames(block)
-        const seconds = estimateSeconds(block.transcript)
+        // Dauer und Zeitmarken: gemessen, sobald eine passende Aufnahme da ist, sonst geschätzt (01.10.2026)
+        const zeit = hoerzeit(block)
+        const zeilen = scriptTurns(block)
         return (
-          <Card key={block.id} withBorder p="lg">
+          <Card key={block.id} withBorder p="lg" data-hoertext={block.id}>
             <Stack gap="sm">
-              <Group justify="space-between">
+              <Group justify="space-between" wrap="nowrap" align="flex-start">
                 <Group gap="xs">
                   <IconHeadphones size={20} />
                   <Title order={5}>{block.title}</Title>
                   <Badge variant="light">{block.textType}</Badge>
                   {ws.sheets.length > 1 && <Badge variant="outline">{sheet.label}</Badge>}
+                  {zeit.veraltet && (
+                    <Tooltip label="Das Skript wurde nach dem Vertonen geändert. Neu vertonen ersetzt nur die geänderten Stellen." multiline w={260}>
+                      <Badge color="orange" variant="light" data-aufnahme-veraltet>
+                        Aufnahme veraltet
+                      </Badge>
+                    </Tooltip>
+                  )}
                 </Group>
-                <Text size="xs" c="dimmed">
-                  ca. {audioLength(seconds)} · {block.plays}× abspielen
-                </Text>
+                <Group gap="xs" wrap="nowrap" align="flex-start">
+                  <Text size="xs" c="dimmed" data-hoerdauer={zeit.echt ? 'gemessen' : 'geschaetzt'}>
+                    {dauerAngabe(zeit)}
+                    {zeit.echt ? ' (gemessen)' : ''} · {block.plays}× abspielen
+                  </Text>
+                  {/* Änderungswunsch an das Skript – die Aufgaben zum Hörtext werden mit angepasst */}
+                  {onWunsch && wunschKontext && block.transcript.trim() && (
+                    <KiWunschKnoepfe
+                      blockId={block.id}
+                      kontext={() => wunschKontext(block)}
+                      busy={wunschLaeuft?.(block.id) ?? false}
+                      onAusfuehren={(art, wunsch) => onWunsch(block.id, art, wunsch)}
+                      name={block.title}
+                    />
+                  )}
+                </Group>
               </Group>
 
               <Textarea
@@ -592,7 +657,7 @@ export function AudioPanel({
                   onClick={() => void generate(block)}
                   title={block.origin === 'archiv' && block.audio ? 'Ersetzt die eingebundene Originalaufnahme durch eine Vertonung' : undefined}
                 >
-                  {block.audio ? 'Neu vertonen' : 'Vertonen'}
+                  {!block.audio ? 'Vertonen' : zeit.veraltet && block.audio.segmente?.length ? 'Geänderte Stellen neu vertonen' : 'Neu vertonen'}
                 </Button>
               </Group>
 
@@ -621,6 +686,14 @@ export function AudioPanel({
                     </Button>
                   )}
                 </Group>
+              )}
+
+              {/* Zeitmarken je Sprecherzeile (01.10.2026): gemessen aus der Aufnahme, sonst geschätzt */}
+              {zeilen.length > 1 && (
+                <Text size="xs" c="dimmed" data-zeitmarken={zeit.markenEcht ? 'gemessen' : 'geschaetzt'}>
+                  {zeit.markenEcht ? 'Zeitmarken (gemessen): ' : 'Zeitmarken (geschätzt): '}
+                  {zeilen.map((z, i) => `${minSek(zeit.marken[i] ?? 0)} ${z.name || '–'}`).join(' · ')}
+                </Text>
               )}
 
               <TextInput

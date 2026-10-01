@@ -2984,3 +2984,21 @@
 .ws-fussnoten-seite .rt-editable-inline {
   display: inline;
 }
+
+/* Zeitmarken je Sprecherzeile im Skript des Lösungsteils (01.10.2026) */
+.ws-audio-zeile {
+  display: flex;
+  gap: 2mm;
+  align-items: baseline;
+}
+.ws-audio-zeile > .ws-zeitmarke {
+  flex: none;
+  min-width: 9mm;
+  font-size: 0.85em;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+.ws-audio-zeile > :last-child {
+  flex: 1;
+  min-width: 0;
+}

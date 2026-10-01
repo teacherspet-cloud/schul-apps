@@ -43,7 +43,8 @@ import {
   IconArrowLeft
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
-import { notifyError } from '../../../shared/util'
+import { notifyError, notifyInfo } from '../../../shared/util'
+import { gemesseneHoerzeiten, hoertextWunschKlassenarbeit, hoerteilZeitenAnpassen } from '../hoertext'
 import { comprehensionFormatById } from '../../arbeitsblatt/didactics/comprehensionFormats'
 import { druckAusgabe, speichereBlatt, type BlattQuelle } from '../../arbeitsblatt/export/blattAusgabe'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
@@ -149,8 +150,10 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    * in allen Fassungen dieselben). Geändert wird die Arbeit selbst: Der Baustein wird über
    * seine id in jedem Teil und jeder Fassung gesucht.
    */
-  const updateAudio = (fn: (ws: Worksheet) => void, gruppe?: string): void =>
+  const updateAudio = (fn: (ws: Worksheet) => void, gruppe?: string): void => {
+    let zeiten: string[] = []
     updateExam((draft) => {
+      const vorher = gemesseneHoerzeiten(draft)
       const view = examToWorksheet(draft, 0)
       fn(view)
       const neu = new Map(view.sheets.flatMap((s) => s.blocks).map((b) => [b.id, b]))
@@ -159,7 +162,11 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
         if (part.weitereFassungen)
           part.weitereFassungen = part.weitereFassungen.map((liste) => liste.map((b) => (neu.get(b.id) ? structuredClone(neu.get(b.id)!) : b)))
       }
+      // Neu gemessene Aufnahme (01.10.2026): Bearbeitungszeit des Hörteils folgt ihr – im selben Schritt
+      zeiten = hoerteilZeitenAnpassen(draft, vorher)
     }, gruppe)
+    if (zeiten.length) notifyInfo(zeiten.join(' · '))
+  }
   const settings = useAppSettings((s) => s.settings)
   const logo = useAppSettings((s) => s.logoDataUrl)
   // Teile, an denen gerade ein Auftrag „überarbeiten" arbeitet (je Teil und Fassung)
@@ -438,6 +445,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
    * dieser Fassung, der bisherige Stand bleibt als Fassung abrufbar.
    */
   const bausteinUeberarbeiten = (block: WsBlock, instruction = '', wie: WunschArt = 'ueberarbeiten'): void => {
+    // Hörtext (01.10.2026): neues Skript, die Aufgaben dazu in allen Fassungen angepasst – ein Rückgängig-Schritt
+    if (block.type === 'audio') return hoertextWunschKlassenarbeit(exam, docId, titel, block.id, wie, instruction)
     const f = fassung
     const neu = wie === 'neu'
     void starteAuftrag({
@@ -963,6 +972,10 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                 ws={audioSicht}
                 onUpdate={updateAudio}
                 ablage={quelle(false).ziel}
+                // Änderungswunsch am Skript (01.10.2026): wie am Baustein, die Aufgaben ziehen mit
+                onWunsch={(audioId, art, wunsch) => hoertextWunschKlassenarbeit(exam, docId, titel, audioId, art, wunsch)}
+                wunschKontext={(b) => wunschKontextFuer(b, audioSicht.meta, 'Klassenarbeit')}
+                wunschLaeuft={(audioId) => busy.has(`block-${audioId}`)}
                 // Die erste Aufgabe zum Hörtext (verknüpft oder direkt dahinter) bekommt die neuen Fragen
                 onZusatzfragen={(audioId) => {
                   for (const p of exam.parts) {

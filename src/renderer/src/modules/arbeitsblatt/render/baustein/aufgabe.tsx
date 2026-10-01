@@ -15,6 +15,7 @@ import { bereinigeSkizze } from '../../generation/solution'
 import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
 import { linieGebunden, stars, useSetter } from './hilfen'
 import { stufenZeile } from '../../../../shared/verstehen/anzeige'
+import { fundstellen, hoertextZu, hoerzeit } from '../../../../shared/verstehen/hoerzeit'
 import { briefAbschnitte, erwartungsAbschnitte, Abschnitt, gruppiereAntworten, gruppiereTeilaufgaben } from './brief'
 
 export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }): React.JSX.Element {
@@ -31,7 +32,8 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     ohneSchreibhilfen,
     ohneLernhilfen,
     correctionMargin,
-    contentWidthMm
+    contentWidthMm,
+    blattBausteine
   } = useWs()
   const edit = mode === 'edit'
   // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026) – Anzeige und Platzhalter folgen weiter `edit`
@@ -411,10 +413,14 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     }
     // Schwierigkeitsstufe (29.09.2026): nur hier im Lösungsteil, nie auf dem Schülerblatt
     const stufe = stufenZeile(block)
-    if (block.afb || block.operator || taskItems(block) > 1 || stufe) {
+    // Hörverstehen (01.10.2026): wo im Hörtext die Antworten stehen – „a) ab 0:45" aus der Aufnahme, sonst geschätzt
+    const hoertext = blattBausteine ? hoertextZu(block, blattBausteine) : undefined
+    const fund = hoertext ? fundstellen(block, hoertext, hoerzeit(hoertext)) : []
+    if (block.afb || block.operator || taskItems(block) > 1 || stufe || fund.length) {
       const angaben = [
         block.afb ? `AFB ${block.afb}` : '',
         stufe,
+        fund.length ? `Hörtext: ${fund.join(' · ')}` : '',
         block.operator ? `Operator: ${block.operator}` : '',
         /* Zahl der einzeln bewerteten Einheiten – sonst muss die Lehrkraft beim
            Korrigieren nachzählen, ob die Punkte zur Aufgabe passen. Erst ab zwei:

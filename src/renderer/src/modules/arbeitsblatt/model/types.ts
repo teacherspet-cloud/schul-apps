@@ -645,7 +645,18 @@ export interface AudioBlock extends BaseBlock {
    */
   voiceSettings?: TtsSettings
   /** erzeugte Audiodatei */
-  audio?: { dataUrl?: string; fileName?: string }
+  audio?: {
+    dataUrl?: string
+    fileName?: string
+    /** Gemessene Spieldauer in Sekunden (01.10.2026, `shared/verstehen/hoerzeit.ts`) */
+    sekunden?: number
+    /** Beginn jeder Sprecherzeile in Sekunden – Grundlage für „ab 1:45" */
+    zeitmarken?: number[]
+    /** Abschnitte der Datei: Unveränderte Zeilen werden beim Neuvertonen übernommen (`shared/vertonung.ts`) */
+    segmente?: import('@shared/vertonung').TtsSegment[]
+    /** Fingerabdruck des vertonten Skripts – weicht er ab, passt die Aufnahme nicht mehr */
+    skript?: string
+  }
   /** Adresse für den QR-Code auf dem Blatt (z. B. Cloud-Ordner); leer = kein QR-Code */
   url?: string
   /**

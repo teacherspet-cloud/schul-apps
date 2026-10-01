@@ -16,7 +16,9 @@
  * die Variable nie.
  */
 import { appendFileSync, readFileSync } from 'fs'
-import type { GeladeneQuelle, Materialanfrage, OnlineImageHit, Quellentreffer, StructuredRequest } from '@shared/types'
+import type { GeladeneQuelle, Materialanfrage, OnlineImageHit, Quellentreffer, StructuredRequest, TtsVoice } from '@shared/types'
+import { stilleMp3, verbinde } from '@shared/mp3'
+import type { Synthese } from '@shared/vertonung'
 import { AbbruchFehler } from '@shared/abbruch'
 import { fliesstext } from '../sources/fliesstext'
 import { seitentitelAusHtml } from '@shared/artikelText'
@@ -60,6 +62,12 @@ interface AttrappenDatei {
   quellen?: { treffer: Quellentreffer[]; texte: Record<string, { titel: string; text?: string; html?: string }> }
   /** Funde der Websuche des Anbieters (sonst keine) */
   websuche?: Netzfund[]
+  /**
+   * Sprachsynthese ohne Netz (01.10.2026): zwei Stimmen, jede Zeile als Stille mit bekannter
+   * Länge (`zeichenJeSekunde`, Vorgabe 15) plus 0,3 s Pause – mit Zeitmarken wie die
+   * Dialog-Schnittstelle. Jeder Auftrag landet als `schemaName: "tts"` im Protokoll.
+   */
+  tts?: { zeichenJeSekunde?: number }
 }
 
 /** Wie oft je Auftragsart schon geantwortet wurde – für `folge` */
@@ -99,6 +107,46 @@ export function attrappeQuelleLaden(url: string): GeladeneQuelle | undefined {
   // Titel wie im Betrieb aus dem HTML (og:title, <h1>, <title>); der hinterlegte nur als Rückfall
   const titel = (t.html ? seitentitelAusHtml(t.html) : '') || t.titel
   return { url, titel, text, wortzahl: (text.match(/[\p{L}\p{N}]+/gu) ?? []).length }
+}
+
+/** Stimmen der Attrappe (undefined = echte Liste) */
+export function attrappeStimmen(): TtsVoice[] | undefined {
+  if (!attrappeAktiv() || !lies().tts) return undefined
+  return [
+    { id: 'probe-w', name: 'Probe weiblich', language: 'en', gender: 'female', description: 'Attrappe', usable: true },
+    { id: 'probe-m', name: 'Probe männlich', language: 'en', gender: 'male', description: 'Attrappe', usable: true }
+  ]
+}
+
+/** Sprachsynthese der Attrappe: Stille mit bekannter Länge je Zeile, mit Zeitmarken (undefined = echter Dienst) */
+export function attrappeSynthese(): Synthese | undefined {
+  if (!attrappeAktiv()) return undefined
+  const datei = lies()
+  if (!datei.tts) return undefined
+  const jeSekunde = datei.tts.zeichenJeSekunde ?? 15
+  return {
+    modell: 'attrappe',
+    async vertone(zeilen) {
+      if (datei.protokoll) {
+        try {
+          appendFileSync(datei.protokoll, `${JSON.stringify({ schemaName: 'tts', system: '', user: zeilen.map((z) => z.text).join('\n'), bilder: 0 })}\n`)
+        } catch {
+          // Nur für Tests
+        }
+      }
+      const teile: Uint8Array[] = []
+      const zeiten: { von: number; bis: number }[] = []
+      let t = 0
+      zeilen.forEach((z, i) => {
+        const dauer = Math.max(0.5, z.text.trim().length / jeSekunde)
+        teile.push(stilleMp3(dauer, i + 1), stilleMp3(0.3))
+        const echt = Math.max(1, Math.round(dauer / (1152 / 44100))) * (1152 / 44100)
+        zeiten.push({ von: t, bis: t + echt })
+        t += echt + Math.max(1, Math.round(0.3 / (1152 / 44100))) * (1152 / 44100)
+      })
+      return [{ mp3: verbinde(teile), zeilen: zeilen.length, zeiten }]
+    }
+  }
 }
 
 /** Bildauftrag der Attrappe: protokollieren, hinterlegtes Bild liefern */

@@ -17,7 +17,9 @@ import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
 import { getSecret } from '../storage/settings'
 import { abrufe } from '../images/politeFetch'
-import { istOpenAiStimme, OPENAI_TTS_MODEL, openAiStimmen, sprichOpenAi } from './openaiTts'
+import { istOpenAiStimme, OPENAI_TTS_MODEL, openAiStimmen, sprichOpenAi, sprichOpenAiTeile } from './openaiTts'
+import { vertoneHoertext, zeitenAusAusrichtung, zeitenAusDialog, type Synthese, type SyntheseTeil, type Vorlage } from '@shared/vertonung'
+import { attrappeStimmen, attrappeSynthese } from '../ai/attrappe'
 
 // Basis ohne Fassungsnummer: Die Stimmenliste braucht v2 (nur dort gibt es `sharing`),
 // alles andere v1. Jeder Pfad nennt seine Fassung deshalb selbst.
@@ -77,11 +79,19 @@ function audioDir(): string {
   return dir
 }
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await abrufe(`${API}${path}`, {
+/** Anfrage ohne Fehlerprüfung – für Endpunkte mit Rückfall (Zeitmarken, 01.10.2026) */
+function requestRoh(path: string, init: RequestInit = {}): Promise<Response> {
+  return abrufe(`${API}${path}`, {
     ...init,
     headers: { 'xi-api-key': key(), 'content-type': 'application/json', ...(init.headers ?? {}) }
   })
+}
+
+async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  return pruefeAntwort(await requestRoh(path, init))
+}
+
+async function pruefeAntwort(res: Response): Promise<Response> {
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     const message = apiMessage(body)
@@ -173,6 +183,9 @@ export async function listVoices(): Promise<TtsVoice[]> {
    * OpenAI-API-Schlüssel hinterlegt ist. Scheitert ElevenLabs (kein oder falscher Schlüssel),
    * bleiben die OpenAI-Stimmen nutzbar; ohne beide gilt die Meldung von ElevenLabs.
    */
+  // Oberflächentests mit Attrappe (nie im Betrieb): zwei Stimmen ohne Netz
+  const probe = attrappeStimmen()
+  if (probe) return probe
   const openai = getSecret('openai') ? openAiStimmen() : []
   if (!getSecret('elevenlabs') && openai.length) return openai
   try {
@@ -297,6 +310,27 @@ async function ttsStueck(
 /** Reserve zum Limit von 10 000 Zeichen bei eleven_multilingual_v2. */
 const SOLO_MAX_ZEICHEN = 9000
 
+/** Antwort der Endpunkte „…/with-timestamps": Ton als Base64 und Zeitmarken. */
+interface MitZeitmarken {
+  audio_base64?: string
+  alignment?: { characters?: unknown; character_start_times_seconds?: unknown; character_end_times_seconds?: unknown }
+  voice_segments?: unknown
+}
+
+/**
+ * Anfrage an einen Endpunkt mit Zeitmarken (01.10.2026). Kennt das Konto ihn nicht (404/405),
+ * kommt null zurück und der gewohnte Endpunkt ohne Marken springt ein – dann verteilt die App
+ * die Zeitmarken nach Zeichen.
+ */
+async function mitZeitmarken(path: string, body: string): Promise<{ daten: MitZeitmarken; id: string } | null> {
+  const res = await requestRoh(path, { method: 'POST', body })
+  if (res.status === 404 || res.status === 405) return null
+  await pruefeAntwort(res)
+  const daten = (await res.json()) as MitZeitmarken
+  if (!daten.audio_base64) throw new Error('ElevenLabs hat keinen Ton geliefert.')
+  return { daten, id: res.headers.get('request-id') ?? '' }
+}
+
 /**
  * Ein einzelner Sprecher: der GANZE Text in einem Auftrag.
  *
@@ -306,27 +340,46 @@ const SOLO_MAX_ZEICHEN = 9000
  * Hörtext der Schule. Nur wenn es doch länger wird, entstehen Stücke – und die werden
  * aneinandergebunden.
  *
+ * Seit 01.10.2026 über `…/with-timestamps`: Die Zeichen-Ausrichtung liefert den Beginn jeder
+ * Sprecherzeile. Werden nur einzelne Zeilen neu vertont, gehen die Nachbarzeilen als
+ * `previous_text`/`next_text` mit – so setzt die Sprechmelodie an der Naht fort.
+ *
  * Audio-Tags fliegen hier raus: eleven_multilingual_v2 versteht sie nicht und würde sie
  * vorlesen.
  */
-async function sprichSolo(req: TtsRequest): Promise<Buffer[]> {
-  const text = req.turns
-    .map((t) => ohneTags(t.text))
-    .filter(Boolean)
-    .join(` ${TURN_BREAK} `)
-  const stuecke = textStuecke(text, SOLO_MAX_ZEICHEN)
-  const voiceId = req.turns[0].voiceId
-  const parts: Buffer[] = []
-  const ids: string[] = []
-  for (let i = 0; i < stuecke.length; i++) {
-    const { buf, id } = await ttsStueck(voiceId, stuecke[i], req.settings, {
-      ...(i > 0 ? { previous_text: stuecke[i - 1], previous_request_ids: ids.slice(-3) } : {}),
-      ...(i + 1 < stuecke.length ? { next_text: stuecke[i + 1] } : {})
-    })
-    parts.push(buf)
-    if (id) ids.push(id)
+function soloSynthese(req: TtsRequest): Synthese {
+  return {
+    modell: TTS_MODEL,
+    async vertone(zeilen, kontext) {
+      const voiceId = zeilen[0].voiceId
+      const texte = zeilen.map((z) => ohneTags(z.text).trim())
+      const text = texte.filter(Boolean).join(` ${TURN_BREAK} `)
+      const rand = {
+        ...(kontext.davor && ohneTags(kontext.davor).trim() ? { previous_text: ohneTags(kontext.davor).trim() } : {}),
+        ...(kontext.danach && ohneTags(kontext.danach).trim() ? { next_text: ohneTags(kontext.danach).trim() } : {})
+      }
+      const stuecke = textStuecke(text, SOLO_MAX_ZEICHEN)
+      if (stuecke.length === 1) {
+        const r = await mitZeitmarken(
+          `/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`,
+          // eleven_multilingual_v2 erkennt die Sprache selbst; language_code wird dort nicht unterstützt
+          JSON.stringify({ text, model_id: TTS_MODEL, voice_settings: settingsBody(req.settings), ...rand })
+        )
+        if (r) return [{ mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'), zeilen: zeilen.length, zeiten: zeitenAusAusrichtung(r.daten.alignment, texte) }]
+      }
+      const parts: Buffer[] = []
+      const ids: string[] = []
+      for (let i = 0; i < stuecke.length; i++) {
+        const { buf, id } = await ttsStueck(voiceId, stuecke[i], req.settings, {
+          ...(i > 0 ? { previous_text: stuecke[i - 1], previous_request_ids: ids.slice(-3) } : rand.previous_text ? { previous_text: rand.previous_text } : {}),
+          ...(i + 1 < stuecke.length ? { next_text: stuecke[i + 1] } : rand.next_text ? { next_text: rand.next_text } : {})
+        })
+        parts.push(buf)
+        if (id) ids.push(id)
+      }
+      return [{ mp3: Buffer.concat(parts), zeilen: zeilen.length }]
+    }
   }
-  return parts
 }
 
 /**
@@ -340,32 +393,68 @@ async function sprichSolo(req: TtsRequest): Promise<Buffer[]> {
  * Nur eleven_v3 kann das. Dessen Grenzen sind am Konto geprüft: rund 2000 Zeichen je
  * Auftrag, und `previous_request_ids`/`previous_text` werden ausdrücklich abgelehnt. Lange
  * Dialoge zerfallen deshalb in möglichst wenige, möglichst große Blöcke.
+ *
+ * Seit 01.10.2026 über `…/with-timestamps`: `voice_segments` nennt Beginn und Ende jeder
+ * Zeile – daraus entstehen die Zeitmarken und die Schnittstellen für spätere Teil-Vertonungen.
  */
-async function sprichDialog(req: TtsRequest): Promise<Buffer[]> {
-  const bloecke = dialogBloecke(req.turns.map((t) => ({ voiceId: t.voiceId, text: t.text.trim() })).filter((z) => z.text))
-  const parts: Buffer[] = []
-  for (const block of bloecke) {
-    const res = await request('/v1/text-to-dialogue?output_format=mp3_44100_128', {
-      method: 'POST',
-      body: JSON.stringify({
-        model_id: DIALOG_MODEL,
-        inputs: block.map((z) => ({ text: z.text, voice_id: z.voiceId })),
-        settings: settingsBody(req.settings),
-        ...(req.languageCode ? { language_code: req.languageCode } : {})
-      })
-    })
-    parts.push(Buffer.from(await res.arrayBuffer()))
+function dialogSynthese(req: TtsRequest): Synthese {
+  return {
+    modell: DIALOG_MODEL,
+    async vertone(zeilen) {
+      const teile: SyntheseTeil[] = []
+      for (const block of dialogBloecke(zeilen.map((t) => ({ voiceId: t.voiceId, text: t.text.trim() })))) {
+        const body = JSON.stringify({
+          model_id: DIALOG_MODEL,
+          inputs: block.map((z) => ({ text: z.text, voice_id: z.voiceId })),
+          settings: settingsBody(req.settings),
+          ...(req.languageCode ? { language_code: req.languageCode } : {})
+        })
+        const r = await mitZeitmarken('/v1/text-to-dialogue/with-timestamps?output_format=mp3_44100_128', body)
+        if (r) {
+          teile.push({ mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'), zeilen: block.length, zeiten: zeitenAusDialog(r.daten.voice_segments, block.length) })
+          continue
+        }
+        const res = await request('/v1/text-to-dialogue?output_format=mp3_44100_128', { method: 'POST', body })
+        teile.push({ mp3: Buffer.from(await res.arrayBuffer()), zeilen: block.length })
+      }
+      return teile
+    }
   }
-  return parts
+}
+
+/** OpenAI-Stimmen: je Stimmblock ein Stück, ohne Zeitmarken (die Schnittstelle liefert keine). */
+function openAiSynthese(req: TtsRequest): Synthese {
+  return {
+    modell: OPENAI_TTS_MODEL,
+    async vertone(zeilen) {
+      const teile = await sprichOpenAiTeile({ ...req, turns: zeilen }, getSecret('openai') ?? '')
+      return teile.map((t) => ({ mp3: Buffer.concat(t.mp3), zeilen: t.zeilen }))
+    }
+  }
+}
+
+/**
+ * Die bisherige Aufnahme als Vorlage für eine Teil-Vertonung – oder der Grund, warum es keine gibt.
+ */
+function ladeVorlage(vorher: TtsRequest['vorher']): { vorlage: Vorlage | null; fehlt?: string } {
+  if (!vorher) return { vorlage: null }
+  if (!vorher.segmente?.length) return { vorlage: null, fehlt: 'Die bisherige Aufnahme stammt aus einer älteren Fassung ohne gemerkte Abschnitte.' }
+  try {
+    const datei = pruefeAudioName(vorher.fileName)
+    if (!existsSync(datei)) return { vorlage: null, fehlt: 'Die bisherige Aufnahme liegt nicht auf diesem Rechner.' }
+    return { vorlage: { mp3: new Uint8Array(readFileSync(datei)), segmente: vorher.segmente } }
+  } catch {
+    return { vorlage: null, fehlt: 'Die bisherige Aufnahme ließ sich nicht lesen.' }
+  }
 }
 
 /**
  * Vertont einen Hörtext als EINE Datei.
  *
  * Der Weg richtet sich nach der Zahl der Stimmen: ein Sprecher über das bewährte
- * eleven_multilingual_v2, ein Gespräch über die Dialog-Schnittstelle. Entstehen doch
- * mehrere Teile, werden die MP3-Puffer hintereinandergehängt – gleiche Abtastrate und
- * Bitrate, deshalb trägt das.
+ * eleven_multilingual_v2, ein Gespräch über die Dialog-Schnittstelle. Die Stücke werden
+ * gemessen, an Rahmengrenzen geschnitten und hintereinandergehängt (`shared/vertonung.ts`).
+ * Liegt eine frühere Aufnahme mit Segmenten vor, werden nur geänderte Zeilen neu vertont.
  */
 export async function speak(req: TtsRequest): Promise<TtsResult> {
   const turns = req.turns.filter((t) => t.text.trim())
@@ -374,15 +463,13 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
   const dialog = stimmen.size > 1
   // OpenAI-Stimme gewählt (Großprogramm 0.4, F6): der ganze Hörtext über OpenAI
   const ueberOpenAi = turns.some((t) => istOpenAiStimme(t.voiceId))
-  const parts = ueberOpenAi
-    ? await sprichOpenAi({ ...req, turns }, getSecret('openai') ?? '')
-    : dialog
-      ? await sprichDialog({ ...req, turns })
-      : await sprichSolo({ ...req, turns })
-  if (!parts.length) throw new Error('Der Hörtext enthält keinen Text zum Vertonen.')
-  const modell = ueberOpenAi ? OPENAI_TTS_MODEL : dialog ? DIALOG_MODEL : TTS_MODEL
-  merkeVerbrauch(ueberOpenAi ? 'openai' : 'elevenlabs', modell, { ttsZeichen: turns.reduce((n, t) => n + t.text.length, 0) })
-  const mp3 = Buffer.concat(parts)
+  // Oberflächentests (nie im Betrieb): Stille mit bekannter Länge statt eines Dienstes
+  const attrappe = attrappeSynthese()
+  const synth = attrappe ?? (ueberOpenAi ? openAiSynthese(req) : dialog ? dialogSynthese(req) : soloSynthese(req))
+  const { vorlage, fehlt } = ladeVorlage(req.vorher)
+  const erg = await vertoneHoertext(turns, { settings: req.settings, sprache: req.languageCode }, synth, vorlage, fehlt)
+  if (!attrappe) merkeVerbrauch(ueberOpenAi ? 'openai' : 'elevenlabs', synth.modell, { ttsZeichen: erg.zeichen })
+  const mp3 = Buffer.from(erg.mp3.buffer, erg.mp3.byteOffset, erg.mp3.byteLength)
   const fileName = `${req.id}.mp3`
   writeAtomic(join(audioDir(), fileName), mp3)
   return {
@@ -390,8 +477,15 @@ export async function speak(req: TtsRequest): Promise<TtsResult> {
     dataUrl: `data:audio/mpeg;base64,${mp3.toString('base64')}`,
     bytes: mp3.length,
     mode: dialog ? 'dialog' : 'solo',
-    model: modell,
-    requests: parts.length
+    model: synth.modell,
+    requests: erg.auftraege,
+    sekunden: erg.sekunden,
+    zeitmarken: erg.zeitmarken,
+    segmente: erg.segmente,
+    weg: erg.weg,
+    neu: erg.neu,
+    zeilen: erg.zeilen,
+    ...(erg.grund ? { grund: erg.grund } : {})
   }
 }
 

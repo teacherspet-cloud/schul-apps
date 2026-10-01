@@ -1,4 +1,5 @@
 import { plainText } from '../../../shared/richtext/parse'
+import { dauerAngabe, hoerzeit } from '../../../shared/verstehen/hoerzeit'
 import type { Answer, Sheet, WsBlock } from '../model/types'
 import { ohneFussnotenMarken } from '../didactics/anmerkungen'
 
@@ -74,7 +75,7 @@ export function describeBlock(b: WsBlock): string {
     }
     case 'audio':
       return [
-        `Hörtext „${b.title}“ (${b.textType}, ${b.plays}× hören, ca. ${b.seconds} s)`,
+        `Hörtext „${b.title}“ (${b.textType}, ${b.plays}× hören, ${dauerAngabe(hoerzeit(b))})`,
         b.beforeListening ? `  Vor dem Hören: ${plainText(b.beforeListening)}` : '',
         `  Skript: ${plainText(b.transcript)}`
       ]

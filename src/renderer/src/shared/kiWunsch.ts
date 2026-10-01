@@ -136,6 +136,12 @@ export function regelVorschlaege(k: WunschKontext): string[] {
     case 'vokabel':
       v.push('Mehr Kontextsätze', 'Schwierigere Ablenker', 'Anfangsbuchstaben als Hilfe', 'Andere Satzbeispiele')
       break
+    // Hörtext (01.10.2026): Das Skript ändert sich, die Aufgaben dazu werden mit angepasst
+    case 'audio':
+      v.push('Kürzer', 'Langsamer und einfachere Sprache', 'Mehr Sprecherinnen und Sprecher', 'Mit regionalem Akzent oder Dialekt', 'Andere Situation')
+      if (!/\n/.test(k.inhalt.trim())) break
+      v.push('Mehr Redundanz bei den Schlüsselinformationen')
+      break
   }
 
   // --- Allgemein

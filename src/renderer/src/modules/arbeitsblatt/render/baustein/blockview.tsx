@@ -16,8 +16,10 @@ import { archivesForSubject, searchesMediaSources } from '../../didactics/mediaA
 import { headerLine } from '../../didactics/sourceHeader'
 import { narrationNote } from '../../didactics/narration'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
+import { STANDARD_ABLAUF } from '../../didactics/hoerablauf'
+import { ablaufZeile, dauerAngabe, hoerzeit, minSek, scriptTurns } from '../../../../shared/verstehen/hoerzeit'
 import { Illustriert, IllustrationView } from '../Illustration'
-import { LONG_TEXT_CHARS, kastenZeilen, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, audioLength, linieGebunden, shortLink, useSetter } from './hilfen'
+import { LONG_TEXT_CHARS, kastenZeilen, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, linieGebunden, shortLink, useSetter } from './hilfen'
 import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
@@ -403,6 +405,9 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       // Fach entscheidet über Abspielzahl und darüber, ob das Transkript aufs Blatt gehört
       const subjectId = ctx.subjectId ?? ''
       const audioRegeln = audioRulesFor(subjectId)
+      // Dauer und Zeitmarken: aus der Aufnahme, sonst geschätzt und mit „ca." (01.10.2026)
+      const zeit = hoerzeit(block)
+      const zeilen = scriptTurns(block)
       return (
         // Die Kennung geht mit ins HTML: Der PDF-Export braucht sie, um die MP3 an der
         // richtigen Stelle einzubetten (siehe `main/services/export/audioInPdf.ts`).
@@ -420,7 +425,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                * Die Abspielzahl folgt dem Fach: In den Sprachen wird zweimal gehört, im
                * Sachfach so oft wie nötig. Begründung in `didactics/audioRules.ts`.
                */}
-              {[block.textType, block.seconds ? audioLength(block.seconds) : '', playsLabelFor(subjectId, block.plays, ctx.anrede)].filter(Boolean).join(' · ')}
+              {[block.textType, zeit.sekunden ? dauerAngabe(zeit) : '', playsLabelFor(subjectId, block.plays, ctx.anrede)].filter(Boolean).join(' · ')}
             </span>
           </div>
           <div className="ws-audio-body">
@@ -460,10 +465,46 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
            * „in verschriftlichter Form beizufügen"), in den Sprachen nur in den Lösungsteil,
            * sonst prüft man Lesen statt Hören.
            */}
+          {/*
+           * Bearbeitungszeit des Hörteils (01.10.2026, nur Lehrkraft): Einlesezeit, Durchgänge, Pausen
+           * und Nachbearbeitung nach den Vorgaben des Landes – aus der gemessenen Dauer, sobald vertont ist.
+           */}
+          {isKeyMode(mode) && !audioRegeln.transcriptOnSheet && zeit.sekunden > 0 && (
+            <div className="ws-teacher-note" data-hoerablauf>
+              Hörteil: {ablaufZeile(zeit, block.plays, ctx.hoerablauf ?? STANDARD_ABLAUF)}
+            </div>
+          )}
           {(isKeyMode(mode) || audioRegeln.transcriptOnSheet) && block.transcript && (
             <div className="ws-audio-script">
-              <div className="ws-audio-script-title">{audioRegeln.transcriptOnSheet && !isKeyMode(mode) ? 'Text der Aufnahme' : 'Skript'}</div>
-              <RichText value={block.transcript} editable={mode === 'keyEdit'} onChange={set((d, v) => ((d as typeof block).transcript = v))} />
+              <div className="ws-audio-script-title">
+                {audioRegeln.transcriptOnSheet && !isKeyMode(mode) ? 'Text der Aufnahme' : 'Skript'}
+                {isKeyMode(mode) && zeilen.length > 0 ? ` · Zeitmarken ${zeit.markenEcht ? 'aus der Aufnahme' : 'geschätzt'}` : ''}
+              </div>
+              {/*
+               * Lösungsteil: je Sprecherzeile ihre Zeitmarke (01.10.2026). Jede Zeile bleibt in der
+               * Lösungsansicht bearbeitbar; das Skript wird danach aus den Zeilen neu zusammengesetzt.
+               */}
+              {isKeyMode(mode) && zeilen.length > 0 ? (
+                zeilen.map((z, i) => (
+                  <div className="ws-audio-zeile" key={i} data-zeitmarke={zeit.marken[i] ?? 0}>
+                    <span className="ws-zeitmarke">{minSek(zeit.marken[i] ?? 0)}</span>
+                    <RichText
+                      value={z.name ? `${z.name}: ${z.text}` : z.text}
+                      inline
+                      editable={mode === 'keyEdit'}
+                      onChange={set((d, v) => {
+                        const b = d as typeof block
+                        const liste = scriptTurns(b).map((t) => (t.name ? `${t.name}: ${t.text}` : t.text))
+                        if (v.trim()) liste[i] = v.trim()
+                        else liste.splice(i, 1)
+                        b.transcript = liste.join('\n')
+                      })}
+                    />
+                  </div>
+                ))
+              ) : (
+                <RichText value={block.transcript} editable={mode === 'keyEdit'} onChange={set((d, v) => ((d as typeof block).transcript = v))} />
+              )}
             </div>
           )}
         </div>

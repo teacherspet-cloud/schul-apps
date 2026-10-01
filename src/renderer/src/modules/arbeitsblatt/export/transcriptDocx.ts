@@ -16,8 +16,7 @@ import { kiMetaTag, kiWordEigenschaften, type KiHerkunft } from '@shared/kiKennz
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph } from 'docx'
 import { run } from '../../../shared/export/docxKit'
 import type { AudioBlock } from '../model/types'
-import { audioLength } from '../render/BlockView'
-import { scriptTurns } from '../steps/AudioPanel'
+import { dauerAngabe, hoerzeit, minSek, scriptTurns } from '../../../shared/verstehen/hoerzeit'
 
 export interface TranscriptInfo {
   /** Überschrift des Dokuments, z. B. Titel des Blattes */
@@ -38,12 +37,15 @@ function speakerLine(block: AudioBlock): string {
 export function transcriptFacts(block: AudioBlock): string[] {
   const facts: string[] = []
   if (block.textType) facts.push(block.textType)
-  if (block.seconds) facts.push(audioLength(block.seconds))
+  // Spieldauer aus der Aufnahme, sonst geschätzt mit „ca." (01.10.2026)
+  const zeit = hoerzeit(block)
+  if (zeit.sekunden) facts.push(dauerAngabe(zeit))
   if (block.plays) facts.push(block.plays === 1 ? 'einmal vorspielen' : `${block.plays}-mal vorspielen`)
   const speakers = speakerLine(block)
   if (speakers) facts.push(`Sprecher: ${speakers}`)
-  if (block.audio?.dataUrl) facts.push('vertont')
+  if (block.audio?.dataUrl) facts.push(zeit.veraltet ? 'vertont – Aufnahme passt nicht mehr zum Skript' : 'vertont')
   else facts.push('nicht vertont – zum Vorlesen')
+  if (scriptTurns(block).length > 1) facts.push(zeit.markenEcht ? 'Zeitmarken aus der Aufnahme' : 'Zeitmarken geschätzt')
   return facts
 }
 
@@ -77,16 +79,18 @@ export async function buildTranscriptDocx(blocks: AudioBlock[], info: Transcript
     }
 
     const turns = scriptTurns(block)
+    const marken = hoerzeit(block).marken
     if (turns.length) {
-      // Mit Sprecherzeilen: Name fett, damit man beim Vorlesen die eigene Zeile wiederfindet
-      for (const turn of turns) {
+      // Mit Sprecherzeilen: Name fett, damit man beim Vorlesen die eigene Zeile wiederfindet; davor die Zeitmarke (01.10.2026)
+      turns.forEach((turn, k) => {
+        const marke = turns.length > 1 ? [run(`${minSek(marken[k] ?? 0)}  `, { color: '666666', size: 18 })] : []
         children.push(
           new Paragraph({
             spacing: { after: 80 },
-            children: turn.name ? [run(`${turn.name}: `, { bold: true }), run(turn.text)] : [run(turn.text)]
+            children: [...marke, ...(turn.name ? [run(`${turn.name}: `, { bold: true }), run(turn.text)] : [run(turn.text)])]
           })
         )
-      }
+      })
     } else {
       for (const line of block.transcript.split('\n')) {
         if (line.trim()) children.push(new Paragraph({ spacing: { after: 80 }, children: [run(line.trim())] }))
@@ -134,8 +138,14 @@ export function buildTranscriptHtml(blocks: AudioBlock[], info: TranscriptInfo):
     ? blocks
         .map((block, i) => {
           const turns = scriptTurns(block)
+          const marken = hoerzeit(block).marken
           const script = turns.length
-            ? turns.map((t) => `<p>${t.name ? `<b>${esc(t.name)}:</b> ` : ''}${esc(t.text)}</p>`).join('')
+            ? turns
+                .map(
+                  (t, k) =>
+                    `<p>${turns.length > 1 ? `<span class="marke">${minSek(marken[k] ?? 0)}</span> ` : ''}${t.name ? `<b>${esc(t.name)}:</b> ` : ''}${esc(t.text)}</p>`
+                )
+                .join('')
             : block.transcript
                 .split('\n')
                 .filter((l) => l.trim())
@@ -164,6 +174,7 @@ export function buildTranscriptHtml(blocks: AudioBlock[], info: TranscriptInfo):
   .note { color: #555; font-style: italic; font-size: 9pt; margin: 0 0 6mm; }
   .facts { color: #555; font-size: 9pt; margin: 0 0 2mm; }
   .before { margin: 0 0 3mm; }
+  .marke { color: #666; font-size: 9pt; font-variant-numeric: tabular-nums; }
   p { margin: 0 0 1.6mm; }
   /* Ein Hörtext soll nicht mitten im Satz umbrechen, wenn er auf eine Seite passt */
   section { break-inside: auto; }

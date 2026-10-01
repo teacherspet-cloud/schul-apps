@@ -68,19 +68,38 @@ export type Abrufer = (url: string, init: RequestInit) => Promise<Response>
  * Liefert die MP3-Teile in der Reihenfolge des Skripts.
  */
 export async function sprichOpenAi(req: TtsRequest, schluessel: string, abrufen: Abrufer = fetch): Promise<Buffer[]> {
+  return (await sprichOpenAiTeile(req, schluessel, abrufen)).flatMap((t) => t.mp3)
+}
+
+/**
+ * Wie `sprichOpenAi`, aber je Stimmblock mit der Zahl der Sprecherzeilen, die er enthält
+ * (01.10.2026) – daraus entstehen die Segmente für spätere Teil-Vertonungen. Zeilen, die nach dem
+ * Entfernen der Audio-Tags leer sind, zählen beim benachbarten Block mit.
+ */
+export async function sprichOpenAiTeile(req: TtsRequest, schluessel: string, abrufen: Abrufer = fetch): Promise<{ mp3: Buffer[]; zeilen: number }[]> {
   if (!schluessel)
     throw new Error('Für OpenAI-Stimmen ist ein OpenAI-API-Schlüssel nötig (Einstellungen › KI-Zugang). Der Abo-Weg liefert keine Sprachausgabe.')
-  const bloecke: { stimme: string; text: string }[] = []
+  const bloecke: { stimme: string; text: string; zeilen: number }[] = []
+  let ohneText = 0
   for (const t of req.turns) {
     const text = ohneTags(t.text).trim()
-    if (!text) continue
+    if (!text) {
+      if (bloecke.length) bloecke[bloecke.length - 1].zeilen++
+      else ohneText++
+      continue
+    }
     const stimme = istOpenAiStimme(t.voiceId) ? t.voiceId.slice(OPENAI_PRAEFIX.length) : 'alloy'
     const letzter = bloecke[bloecke.length - 1]
-    if (letzter && letzter.stimme === stimme) letzter.text += `\n\n${text}`
-    else bloecke.push({ stimme, text })
+    if (letzter && letzter.stimme === stimme) {
+      letzter.text += `\n\n${text}`
+      letzter.zeilen++
+    } else bloecke.push({ stimme, text, zeilen: 1 + ohneText })
+    ohneText = 0
   }
-  const teile: Buffer[] = []
-  for (const b of bloecke)
+  const teile: { mp3: Buffer[]; zeilen: number }[] = []
+  for (const b of bloecke) {
+    const block: Buffer[] = []
+    teile.push({ mp3: block, zeilen: b.zeilen })
     for (const stueck of textStuecke(b.text, MAX_ZEICHEN)) {
       const res = await abrufen('https://api.openai.com/v1/audio/speech', {
         method: 'POST',
@@ -93,7 +112,8 @@ export async function sprichOpenAi(req: TtsRequest, schluessel: string, abrufen:
         if (res.status === 429) throw new Error('Das OpenAI-Kontingent ist erschöpft oder es laufen zu viele Anfragen gleichzeitig.')
         throw new Error(`OpenAI meldet einen Fehler bei der Vertonung (${res.status}). ${text.slice(0, 200)}`)
       }
-      teile.push(Buffer.from(await res.arrayBuffer()))
+      block.push(Buffer.from(await res.arrayBuffer()))
     }
+  }
   return teile
 }
