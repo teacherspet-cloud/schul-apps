@@ -19,3 +19,8 @@ export const Scanner = registerPlugin('Scanner', {
 export const Hintergrund = registerPlugin('Hintergrund', {
   web: () => import('./web.js').then((m) => new m.HintergrundWeb())
 })
+
+/** In die Dateien-App exportieren (UIDocumentPickerViewController; im Browser: Herunterladen). */
+export const Dateien = registerPlugin('Dateien', {
+  web: () => import('./web.js').then((m) => new m.DateienWeb())
+})

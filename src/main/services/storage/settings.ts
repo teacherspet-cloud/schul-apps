@@ -51,6 +51,8 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     ...(base.pcKi || stored.pcKi ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } } : {}),
     // Netzzugang: Einzelne Felder (Port, PIN, Autostart) ändern, ohne die übrigen zu verlieren (30.09.2026)
     ...(base.lan || stored.lan ? { lan: { port: 8420, pin: '', ...base.lan, ...(stored.lan as object) } } : {}),
+    // IServ: Ziel ändern, ohne Adresse und Benutzer zu verlieren (01.10.2026)
+    ...(base.iserv || stored.iserv ? { iserv: { schule: '', benutzer: '', ...base.iserv, ...(stored.iserv as object) } } : {}),
     sicherung: { ...base.sicherung, ...(stored.sicherung as object) },
     datenschutz: { ...base.datenschutz, ...(stored.datenschutz as object) },
     briefkopf: { ...base.briefkopf, ...(stored.briefkopf as object) },

@@ -19,6 +19,8 @@ import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '
 import type { LanStatus } from '../main/services/lanServer'
 import type { WindowsFreigabeErgebnis, WindowsFreigabeStatus } from '../main/services/netz/windowsFreigabe'
 import type { Netzfund } from '../main/services/ai/provider'
+import type { IservStatus } from '../main/services/iserv/iserv'
+import type { DavEintrag } from './iserv'
 import type {
   AiProviderId,
   AiProgress,
@@ -150,6 +152,17 @@ export function buildApi(call: Call, extras: ApiExtras) {
      */
     pcKi: {
       testen: (adresse: string, pin: string) => call<PcKiTest>('pcki:testen', adresse, pin)
+    },
+    /**
+     * IServ per WebDAV (01.10.2026, main/services/iserv): verbinden (testet und merkt; das Passwort
+     * geht in den Schlüsselbund bzw. verschlüsselt in secrets.json), Ordner zeigen, trennen.
+     * Gespeichert wird über files.save/exporter.pdf mit `ziel.ort = 'iserv'`.
+     */
+    iserv: {
+      status: () => call<IservStatus>('iserv:status'),
+      verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) => call<{ basis: string; ordner: DavEintrag[] }>('iserv:verbinden', eingabe),
+      ordner: (pfad: string) => call<DavEintrag[]>('iserv:ordner', pfad),
+      trennen: () => call<void>('iserv:trennen')
     },
     settings: {
       get: () => call<AppSettings>('settings:get'),

@@ -12,7 +12,8 @@ import { htmlToPdf, printHtml } from './services/export/pdf'
 import { measureAndPrint } from './services/export/fillablePdf'
 import { lanEreignis, lanRundruf, lanStatus, startLan, stopLan } from './services/lanServer'
 import { ladeSicherung, listeSicherungen, sichereJetzt } from './services/storage/autoSicherung'
-import { getSettings, setSettings } from './services/storage/settings'
+import { getSecret, getSettings, setSecret, setSettings } from './services/storage/settings'
+import type { DavAbruf } from './services/iserv/webdav'
 import { paketAusArgumenten } from './services/paket/wege'
 import { langerExePfad, windowsFreigabe } from './services/netz/windowsFreigabe'
 
@@ -161,6 +162,27 @@ export function electronUmgebung(o: ElectronUmgebungOptionen): Umgebung {
       exe: () => langerExePfad()
     }),
     // „Abo über den PC" gibt es nur in der iPad-App – der PC IST der PC
-    pcKi: null
+    pcKi: null,
+    // IServ per WebDAV (01.10.2026): Node-fetch (kein CORS), Passwort verschlüsselt in secrets.json
+    iserv: {
+      abruf: nodeDavAbruf,
+      passwort: {
+        lies: async () => getSecret('iserv') ?? null,
+        setze: async (wert) => setSecret('iserv', wert),
+        loesche: async () => setSecret('iserv', '')
+      }
+    }
   }
+}
+
+/** WebDAV über das fetch von Node – Weiterleitungen nur auf https (sonst ginge das Passwort offen) */
+const nodeDavAbruf: DavAbruf = async (a) => {
+  const res = await fetch(a.url, {
+    method: a.methode,
+    headers: a.kopf,
+    body: a.koerper === undefined ? undefined : typeof a.koerper === 'string' ? a.koerper : Buffer.from(a.koerper),
+    signal: AbortSignal.timeout(60_000)
+  })
+  if (res.url && !res.url.startsWith('https://')) throw new Error('Weiterleitung auf eine unverschlüsselte Adresse')
+  return { status: res.status, text: await res.text() }
 }

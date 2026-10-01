@@ -6,6 +6,7 @@ import { imNetz } from '../shared/netzZugang'
 import { aufIos } from '../shared/plattform'
 import { AiCard, AppearanceCard, HoertextCard, ImageAiCard, SchoolCard } from './SettingsPage'
 import AblageCard from './AblageCard'
+import IservCard from './IservCard'
 import SicherungEinlesen from './SicherungEinlesen'
 
 /**
@@ -110,8 +111,13 @@ export default function Einrichtung(): React.JSX.Element | null {
             beschreibung: 'Wohin erstellte Dateien kommen',
             icon: <IconFolder size={18} />,
             hinweis:
-              'Eingeschaltet liegt jedes erstellte Material geordnet nach Fach und Themenbereich in der Dateien-App – auch ohne Netz jederzeit wieder da.',
-            inhalt: <AblageCard settings={settings} update={update} />
+              'Eingeschaltet liegt jedes erstellte Material geordnet nach Fach und Themenbereich in der Dateien-App – auch ohne Netz jederzeit wieder da. Optional mit dem IServ-Zugang der Schule: Dann geht Material auf Wunsch direkt in die Ordner auf IServ.',
+            inhalt: (
+              <Stack gap="md">
+                <AblageCard settings={settings} update={update} />
+                <IservCard settings={settings} update={update} />
+              </Stack>
+            )
           }
         ]
       : []),

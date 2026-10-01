@@ -96,6 +96,7 @@ import { leseVerbrauch, merkeVerbrauch } from './services/ai/verbrauch'
 import type { LanStatus } from './services/lanServer'
 import type { WindowsFreigabe, WindowsFreigabeStatus } from './services/netz/windowsFreigabe'
 import type { SicherungsEintrag } from './services/storage/autoSicherung'
+import { iservAblegen, iservOrdner, iservStatus, iservTrennen, iservVerbinden, type IservGeraet } from './services/iserv/iserv'
 
 /** Registriert einen Aufruf; Fehler kommen als lesbare Meldung in der Oberfläche an (Sache der Umgebung). */
 export type Handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => R | Promise<R>) => void
@@ -163,6 +164,8 @@ export interface Umgebung {
   windowsFreigabe: WindowsFreigabe | null
   /** KI über die App am PC („Abo über den PC") – nur in der iPad-App (mobil/pcKi.ts) */
   pcKi: { testen(adresse: string, pin: string): Promise<PcKiTest> } | null
+  /** IServ per WebDAV (01.10.2026): Abrufer des Geräts und Ort des Passworts (iPad: Schlüsselbund) */
+  iserv: IservGeraet
 }
 
 /** Meldung, wenn eine Funktion nur am PC existiert */
@@ -493,9 +496,16 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('audio:show', (fileName: string) => u.imOrdnerZeigen(audioPath(fileName)))
 
   handle('files:docx-html', (data: Uint8Array) => docxToHtml(data))
-  handle('files:save', (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) =>
-    u.dateiAusgeben(defaultName, filters, data, ziel)
-  )
+  /** Ausgeben – aufs Gerät oder, mit Ziel „IServ" (01.10.2026), per WebDAV in den Ordner von Fach und Themenbereich */
+  const ausgeben = async (name: string, filters: FileFilter[], daten: AusgabeDaten, ziel?: AblageZiel): Promise<string | null> => {
+    if (ziel?.ort !== 'iserv') return u.dateiAusgeben(name, filters, daten, ziel)
+    return iservAblegen(u.iserv, name, typeof daten === 'function' ? await daten() : daten, ziel)
+  }
+  handle('files:save', (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) => ausgeben(defaultName, filters, data, ziel))
+  handle('iserv:status', () => iservStatus(u.iserv))
+  handle('iserv:verbinden', (eingabe: { schule: string; benutzer: string; passwort?: string }) => iservVerbinden(u.iserv, eingabe))
+  handle('iserv:ordner', (pfad: string) => iservOrdner(u.iserv, pfad))
+  handle('iserv:trennen', () => iservTrennen(u.iserv))
   handle('files:open', async (filters: FileFilter[]) => {
     const path = await u.dateiWaehlen(filters)
     if (!path) return null
@@ -583,7 +593,7 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    * Schreiblinien lässt sich tippen, Kästchen lassen sich ankreuzen.
    */
   handle('export:pdf', (html: string, defaultName: string, opts?: PdfExtras, ziel?: AblageZiel) =>
-    u.dateiAusgeben(defaultName, [{ name: 'PDF', extensions: ['pdf'] }], () => pdfBytes(html, opts), ziel)
+    ausgeben(defaultName, [{ name: 'PDF', extensions: ['pdf'] }], () => pdfBytes(html, opts), ziel)
   )
   /** Dasselbe PDF ohne Dialog in einen schon gewählten Ordner (siehe `files:choose-folder`) */
   handle('export:pdf-in-folder', async (ordner: string, html: string, name: string, opts?: PdfExtras) =>

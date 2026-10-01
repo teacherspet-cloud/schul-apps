@@ -7,6 +7,8 @@ import { imNetz } from '../netzZugang'
 import { aufIos } from '../plattform'
 import { useAppSettings } from '../settingsStore'
 import { notifyError, notifySuccess } from '../util'
+import { istIservPfad, iservAnzeige } from '@shared/iserv'
+import { mitOrt } from './ausgabeOrt'
 
 /**
  * Dateien ausgeben – eine mit dem gewohnten Speichern-Dialog, mehrere in EINEN Ordner.
@@ -57,7 +59,11 @@ async function inOrdner(ordner: string, d: AusgabeDatei): Promise<string> {
 const dateiname = (pfad: string): string => pfad.split(/[\\/]/).pop() ?? pfad
 
 /** Legt die iPad-App mit diesem Ziel unter Schulmaterial ab? (Einstellung „schulmaterialAblage", Standard: an) */
-const schulmaterialAblage = (ziel?: AblageZiel): boolean => Boolean(ziel) && aufIos() && useAppSettings.getState().settings.schulmaterialAblage !== false
+const schulmaterialAblage = (ziel?: AblageZiel): boolean =>
+  // IServ und Dateien-App: je Datei ohne Ordnerwahl (01.10.2026); Teilen: wie ohne Ablage
+  ziel?.ort === 'iserv' || ziel?.ort === 'dateien'
+    ? true
+    : Boolean(ziel) && ziel?.ort !== 'teilen' && aufIos() && useAppSettings.getState().settings.schulmaterialAblage !== false
 
 /**
  * Meldung nach dem Speichern. Liegt die Datei unter Schulmaterial (iPad), nennt sie den Ort, wie
@@ -66,6 +72,22 @@ const schulmaterialAblage = (ziel?: AblageZiel): boolean => Boolean(ziel) && auf
  */
 export function meldeAblage(pfade: string | string[], meldung: string): void {
   const liste = (Array.isArray(pfade) ? pfade : [pfade]).filter(Boolean)
+  // Auf IServ bzw. in die Dateien-App (01.10.2026): Ort nennen, nichts zu teilen
+  if (liste.length && liste.every((p) => istIservPfad(p) || p.startsWith('dateien:'))) {
+    const iserv = liste.filter((p) => istIservPfad(p))
+    notifications.show({
+      title: meldung,
+      autoClose: 15000,
+      message: (
+        <Text size="sm" data-iserv-ort={iserv.length ? iservAnzeige(iserv[0]) : undefined}>
+          {iserv.length
+            ? `Gespeichert unter ${iservAnzeige(iserv[0])}${liste.length > 1 ? ` (${liste.length} Dateien)` : ''}.`
+            : 'Am gewählten Ort der Dateien-App gesichert.'}
+        </Text>
+      )
+    })
+    return
+  }
   const ort = liste.length === 1 ? anzeigeOrt(liste[0]) : liste.length ? anzeigeOrt(liste[0].replace(/\/[^/]*$/, '')) : null
   if (!ort) {
     notifySuccess(meldung)
@@ -99,6 +121,10 @@ export function meldeAblage(pfade: string | string[], meldung: string): void {
  */
 export async function speichereAusgabe(dateien: AusgabeDatei[], meldung: string, ziel?: AblageZiel): Promise<number> {
   if (!dateien.length) return 0
+  // iPad: Ort wählen (Gerät, IServ, Dateien-App, Teilen – export/ausgabeOrt.tsx), EINMAL für alle Dateien
+  const mitGewaehltemOrt = await mitOrt(ziel, dateien.length)
+  if (mitGewaehltemOrt === null) return 0
+  ziel = mitGewaehltemOrt
   // iPad mit Schulmaterial-Ablage: kein Ordner zu wählen, alles kommt in den Ordner von Fach und Themenbereich
   if (schulmaterialAblage(ziel)) {
     const pfade: string[] = []

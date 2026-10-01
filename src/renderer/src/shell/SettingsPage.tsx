@@ -73,6 +73,7 @@ import { amPc, aufIos } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
 import { PcKiVerbindung, PcKiWahl } from './PcKiZugang'
 import AblageCard from './AblageCard'
+import IservCard from './IservCard'
 import { PICTOGRAMS } from '../modules/arbeitsblatt/render/pictograms'
 import { PictogramIcon } from '../modules/arbeitsblatt/render/Pictogram'
 import HaeufigSelect from '../shared/components/HaeufigSelect'
@@ -171,6 +172,8 @@ export default function SettingsPage(): React.JSX.Element {
             <Stack gap="lg">
               {/* Nur iPad: wohin erstellte Dateien kommen (30.09.2026) */}
               {aufIos() && <AblageCard settings={settings} update={update} />}
+              {/* Nur iPad: IServ per WebDAV (01.10.2026) */}
+              {aufIos() && <IservCard settings={settings} update={update} />}
               <FachfarbenSettings settings={settings} update={update} />
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />

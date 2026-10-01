@@ -20,6 +20,8 @@ gestenEinrichten()
 import { MantineProvider } from '@mantine/core'
 import { useColorScheme } from '@mantine/hooks'
 import { Notifications } from '@mantine/notifications'
+import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt'
+import { aufIos } from './shared/plattform'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -36,6 +38,9 @@ if (!imNetz()) {
   window.addEventListener('unhandledrejection', (e) => melde(`Unbehandelt: ${e.reason instanceof Error ? e.reason.message : String(e.reason)}`))
 }
 
+// iPad: Speichern mit Ablageziel fragt bei Bedarf nach dem Ort (IServ, 01.10.2026)
+if (aufIos()) installiereOrtWahl()
+
 if (new URLSearchParams(location.search).has('selftest')) void import('./selftest').then((m) => m.installSelftest())
 
 function Root(): React.JSX.Element {
@@ -50,6 +55,8 @@ function Root(): React.JSX.Element {
   return (
     <MantineProvider theme={theme} cssVariablesResolver={themeCssVariables} forceColorScheme={scheme}>
       <Notifications position="top-right" />
+      {/* iPad: wohin speichern – Gerät, IServ, Dateien-App, Teilen (shared/export/ausgabeOrt.tsx) */}
+      <AusgabeOrtDialog />
       <App />
     </MantineProvider>
   )

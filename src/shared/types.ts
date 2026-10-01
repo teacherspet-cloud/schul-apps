@@ -15,7 +15,7 @@ export type DeepPartial<T> = {
 
 export type AiProviderId = 'openai' | 'anthropic' | 'google'
 export type ImageProviderId = 'openai' | 'google' | 'anthropic' | 'none'
-export type SecretName = AiProviderId | 'pixabay' | 'elevenlabs'
+export type SecretName = AiProviderId | 'pixabay' | 'elevenlabs' | 'iserv'
 export type ModelKind = 'text' | 'image'
 
 export interface AiProviderInfo {
@@ -309,6 +309,28 @@ export interface AppSettings {
    * <Fach>/<Themenbereich> (30.09.2026, shared/schulmaterial.ts). Fehlt = an.
    */
   schulmaterialAblage?: boolean
+  /**
+   * IServ per WebDAV (01.10.2026, shared/iserv.ts): Schuladresse, Benutzername, gefundene
+   * WebDAV-Adresse und Standardziel. Das Passwort steht NIE hier – iPad: Schlüsselbund (eigener
+   * Eintrag), PC: verschlüsselt in secrets.json.
+   */
+  iserv?: IservEinstellungen
+  /** Wohin Material standardmäßig geht; 'fragen' = vor jedem Speichern wählen. Fehlt = Gerät (mit IServ: fragen) */
+  ausgabeOrt?: AusgabeOrt | 'fragen'
+}
+
+/** Wohin eine Datei geht: aufs Gerät (iPad: Schulmaterial, PC: Speichern-Dialog), IServ, Dateien-App-Export, Teilen-Menü */
+export type AusgabeOrt = 'geraet' | 'iserv' | 'dateien' | 'teilen'
+
+export interface IservEinstellungen {
+  /** Wie eingetragen, z. B. „meineschule.de" */
+  schule: string
+  /** IServ-Benutzername, meist vorname.nachname */
+  benutzer: string
+  /** Die WebDAV-Adresse, die geantwortet hat (https://webdav.meineschule.de/) – leer = nicht verbunden */
+  basis?: string
+  /** Standardziel unterhalb der Basis, z. B. „Home/Schulmaterial" */
+  ziel?: string
 }
 
 /**
@@ -322,6 +344,8 @@ export interface AblageZiel {
   fach?: string
   /** Themenbereich von oben nach unten (mit Unterbereichen) */
   themenbereich?: string[]
+  /** Wohin (01.10.2026) – fehlt = aufs Gerät wie bisher */
+  ort?: AusgabeOrt
 }
 
 /** iPad: was über den PC läuft und wie er erreichbar ist */

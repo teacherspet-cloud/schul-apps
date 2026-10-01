@@ -15,22 +15,24 @@ export class PdfDruckWeb extends WebPlugin {
   }
 }
 
+const schluessel = (konto) => (konto ? `${SCHLUESSEL}.${konto}` : SCHLUESSEL)
+
 export class SchluesselbundWeb extends WebPlugin {
-  async get() {
+  async get(optionen) {
     try {
-      return { value: window.localStorage.getItem(SCHLUESSEL) }
+      return { value: window.localStorage.getItem(schluessel(optionen?.konto)) }
     } catch {
       return { value: null }
     }
   }
 
   async set(optionen) {
-    window.localStorage.setItem(SCHLUESSEL, String(optionen?.value ?? ''))
+    window.localStorage.setItem(schluessel(optionen?.konto), String(optionen?.value ?? ''))
   }
 
-  async remove() {
+  async remove(optionen) {
     try {
-      window.localStorage.removeItem(SCHLUESSEL)
+      window.localStorage.removeItem(schluessel(optionen?.konto))
     } catch {
       /* nichts zu tun */
     }
@@ -49,4 +51,19 @@ export class HintergrundWeb extends WebPlugin {
   }
 
   async beenden() {}
+}
+
+export class DateienWeb extends WebPlugin {
+  async exportieren(optionen) {
+    const roh = atob(String(optionen?.base64 ?? ''))
+    const bytes = new Uint8Array(roh.length)
+    for (let i = 0; i < roh.length; i++) bytes[i] = roh.charCodeAt(i)
+    const url = URL.createObjectURL(new Blob([bytes]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = String(optionen?.name ?? 'Datei')
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    return { gespeichert: true }
+  }
 }

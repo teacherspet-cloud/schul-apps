@@ -30,9 +30,15 @@ export interface PdfDruckPlugin extends Plugin {
 }
 
 export interface SchluesselbundPlugin extends Plugin {
-  get(): Promise<{ value: string | null }>
-  set(optionen: { value: string }): Promise<void>
-  remove(): Promise<void>
+  /** `konto`: eigener Eintrag (Kleinbuchstaben/Ziffern, z. B. 'iserv'); ohne = Eintrag der API-Schluessel */
+  get(optionen?: { konto?: string }): Promise<{ value: string | null }>
+  set(optionen: { value: string; konto?: string }): Promise<void>
+  remove(optionen?: { konto?: string }): Promise<void>
+}
+
+export interface DateienPlugin extends Plugin {
+  /** Dokumentauswahl-Dialog von iOS im Exportmodus; gespeichert false = abgebrochen */
+  exportieren(optionen: { name: string; base64: string }): Promise<{ gespeichert: boolean }>
 }
 
 export interface ScannerPlugin extends Plugin {
@@ -50,3 +56,4 @@ export declare const PdfDruck: PdfDruckPlugin
 export declare const Schluesselbund: SchluesselbundPlugin
 export declare const Scanner: ScannerPlugin
 export declare const Hintergrund: HintergrundPlugin
+export declare const Dateien: DateienPlugin

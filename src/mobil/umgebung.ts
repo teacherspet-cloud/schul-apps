@@ -11,6 +11,8 @@
  *    danach alle Dateien darin
  *  - Im Ordner zeigen → teilen
  *  - Drucken → AirPrint (mobil/export/druckmaschine.ts)
+ *  - Ziel „IServ" (01.10.2026) läuft in main/kanaele.ts über WebDAV; „Dateien-App" zeigt den
+ *    Exportdialog von iOS, „Teilen" das Teilen-Menü (AblageZiel.ort)
  * Netzzugang und Abo-Zugang gibt es nicht (lan: null; stubs/cli.ts) – wohl aber „Abo über den PC":
  * KI-Aufrufe an die App am PC weiterreichen (mobil/pcKi.ts, hier nur der Verbindungstest).
  */
@@ -24,12 +26,19 @@ import { getSettings } from '../main/services/storage/settings'
 import type { Umgebung } from '../main/kanaele'
 import { bus } from './bus'
 import { druckmaschine } from './export/druckmaschine'
+import { nachBase64 } from './base64'
+import { mobilDavAbruf } from './netz/davAbruf'
+import { Dateien, Schluesselbund } from './plugins'
 import type { PcKi } from './pcKi'
 import { ladeSicherung, listeSicherungen, sichereJetzt } from './sicherung/autoSicherung'
 import { DOKUMENTE, USERDATA } from './vfs/mounts'
 import { normiere, vfs } from './vfs/speicher'
 
 export const AUSGABEN = `${DOKUMENTE}/Ausgaben`
+/** Eigener Eintrag im Schlüsselbund für das IServ-Passwort – getrennt von den API-Schlüsseln */
+export const ISERV_KONTO = 'iserv'
+/** Rückgabe nach dem Export in die Dateien-App (der Ort ist der App unbekannt) */
+export const DATEIEN_PRAEFIX = 'dateien:'
 
 const zwei = (n: number): string => String(n).padStart(2, '0')
 const stempel = (d = new Date()): string => `${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())} ${zwei(d.getHours())}-${zwei(d.getMinutes())}`
@@ -149,7 +158,15 @@ export function mobilUmgebung(pcKi?: PcKi): Umgebung {
     anOberflaeche: (kanal, wert) => bus.emit(kanal, wert),
     fenster: { gesichert: aus, rueckfrage: aus, bleiben: aus },
     dateiAusgeben: async (name, _filters, daten, ablage) => {
-      const geordnet = schulmaterialAn(ablage)
+      // Dateien-App (01.10.2026): Dokumentauswahl von iOS im Exportmodus – jeder Ort, den die Dateien-App kennt
+      if (ablage?.ort === 'dateien' && Dateien.verfuegbar()) {
+        const inhalt = typeof daten === 'function' ? await daten() : daten
+        const bytes = typeof inhalt === 'string' ? new TextEncoder().encode(inhalt) : new Uint8Array(inhalt)
+        const gespeichert = await Dateien.exportieren(sauber(name), nachBase64(bytes))
+        if (gespeichert !== null) return gespeichert ? `${DATEIEN_PRAEFIX}${sauber(name)}` : null
+        // Ältere App ohne den Dialog: wie „Teilen" (dort gibt es „In Dateien sichern")
+      }
+      const geordnet = ablage?.ort === 'teilen' || ablage?.ort === 'dateien' ? null : schulmaterialAn(ablage)
       const ordner = geordnet ? schulmaterialOrdner(DOKUMENTE, geordnet) : AUSGABEN
       vfs.ordnerAnlegen(ordner, true)
       const inhalt = typeof daten === 'function' ? await daten() : daten
@@ -209,6 +226,15 @@ export function mobilUmgebung(pcKi?: PcKi): Umgebung {
       testen: async (adresse, pin) => {
         if (!pcKi) throw new Error('Die Verbindung zum PC ist noch nicht bereit.')
         return pcKi.testen(adresse, pin)
+      }
+    },
+    // IServ per WebDAV (01.10.2026): native HTTP-Schicht, Passwort als eigener Eintrag im Schlüsselbund
+    iserv: {
+      abruf: mobilDavAbruf,
+      passwort: {
+        lies: async () => (await Schluesselbund.get({ konto: ISERV_KONTO })).value ?? null,
+        setze: (wert) => Schluesselbund.set({ value: wert, konto: ISERV_KONTO }),
+        loesche: () => Schluesselbund.remove({ konto: ISERV_KONTO })
       }
     }
   }

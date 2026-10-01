@@ -14,10 +14,11 @@ export interface PdfDruckPlugin {
   drucken(o: { pdf: string; name?: string }): Promise<{ abgeschlossen: boolean }>
 }
 
+/** `konto`: eigener Eintrag (z. B. 'iserv', 01.10.2026); ohne = der Eintrag der API-Schlüssel */
 export interface SchluesselbundPlugin {
-  get(): Promise<{ value?: string | null }>
-  set(o: { value: string }): Promise<void>
-  remove(): Promise<void>
+  get(o?: { konto?: string }): Promise<{ value?: string | null }>
+  set(o: { value: string; konto?: string }): Promise<void>
+  remove(o?: { konto?: string }): Promise<void>
 }
 
 export const nativ = (): boolean => Capacitor.isNativePlatform()
@@ -27,24 +28,25 @@ const schluesselbundNativ = registerPlugin<SchluesselbundPlugin>('Schluesselbund
 
 /** Derselbe Schlüssel wie im Web-Ersatz des Plugins (plugins/schulapps-nativ/web.js) */
 const SPEICHER_SCHLUESSEL = 'schulapps.secrets'
+const speicherSchluessel = (konto?: string): string => (konto ? `${SPEICHER_SCHLUESSEL}.${konto}` : SPEICHER_SCHLUESSEL)
 
 export const Schluesselbund: SchluesselbundPlugin = {
-  get: async () => {
-    if (nativ()) return schluesselbundNativ.get()
+  get: async (o) => {
+    if (nativ()) return schluesselbundNativ.get(o?.konto ? { konto: o.konto } : undefined)
     try {
-      return { value: localStorage.getItem(SPEICHER_SCHLUESSEL) }
+      return { value: localStorage.getItem(speicherSchluessel(o?.konto)) }
     } catch {
       return { value: null }
     }
   },
   set: async (o) => {
     if (nativ()) return schluesselbundNativ.set(o)
-    localStorage.setItem(SPEICHER_SCHLUESSEL, o.value)
+    localStorage.setItem(speicherSchluessel(o.konto), o.value)
   },
-  remove: async () => {
-    if (nativ()) return schluesselbundNativ.remove()
+  remove: async (o) => {
+    if (nativ()) return schluesselbundNativ.remove(o?.konto ? { konto: o.konto } : undefined)
     try {
-      localStorage.removeItem(SPEICHER_SCHLUESSEL)
+      localStorage.removeItem(speicherSchluessel(o?.konto))
     } catch {
       // nichts zu tun
     }
@@ -80,5 +82,30 @@ export const Hintergrund = {
   beenden: async (id: string): Promise<void> => {
     if (!nativ() || !id) return
     await hintergrundNativ.beenden({ id }).catch(() => undefined)
+  }
+}
+
+interface DateienPlugin {
+  exportieren(o: { name: string; base64: string }): Promise<{ gespeichert: boolean }>
+}
+
+const dateienNativ = registerPlugin<DateienPlugin>('Dateien')
+
+/**
+ * In die Dateien-App exportieren (01.10.2026): der Dokumentauswahl-Dialog von iOS im Exportmodus
+ * – jeder Ort, den die Dateien-App kennt (iCloud Drive, Auf meinem iPad, eingebundene Anbieter).
+ * null = nicht verfügbar (Browser oder ältere App ohne diese Methode).
+ */
+export const Dateien = {
+  verfuegbar: nativ,
+  exportieren: async (name: string, base64: string): Promise<boolean | null> => {
+    if (!nativ()) return null
+    try {
+      return (await dateienNativ.exportieren({ name, base64 })).gespeichert
+    } catch (e) {
+      const text = e instanceof Error ? e.message : String(e)
+      if (/not implemented|unimplemented|nicht implementiert/i.test(text)) return null
+      throw e
+    }
   }
 }
