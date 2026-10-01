@@ -19,7 +19,7 @@ import { notenpunkteFuer } from '../../../shared/notenpunkte'
 import { formatById } from '../model/formats'
 import type { Exam } from '../model/types'
 import { fassungsLabel, fassungsZahl, teileDerFassung } from '../model/fassungen'
-import { operatorenBlock } from '../didactics/operatorenliste'
+import { amtlicheListe, anlageWunsch, OPERATOREN_ANHANG_ID, operatorenAnhangTitel, operatorenBlock } from '../didactics/operatorenliste'
 import { examGrades, examPoints } from '../model/types'
 import { RU_BALL, RU_MINUTA, russischPlural } from '../../../shared/russischPlural'
 import { polnischPlural, tschechischPlural } from '../../../shared/kopfSprache'
@@ -286,14 +286,15 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
   const bloecke: WsBlock[] = upperSecondary(exam.meta)
     ? blocks.map((b) => (b.type === 'task' && b.answer.kind === 'lines' ? { ...b, answer: { ...b.answer, kind: 'none' as const } } : b))
     : blocks
-  // Operatorenliste (27.09.2026) – DIREKT hinter der letzten Aufgabe, nicht hinter dem Material (Wunsch der Lehrkraft)
+  /*
+   * Operatorenliste (27.09.2026) – seit 01.10.2026 als eigener Anhang am ENDE der Arbeit, mit
+   * Überschrift. Vorher stand sie direkt hinter der letzten Aufgabe; bei einer Sprachmittlung
+   * (Aufgabe, dann Material) also zwischen Aufgabe und M1 und wirkte wie eine Hilfe zur Aufgabe.
+   */
   const operatoren = operatorenBlock(exam)
   if (operatoren) {
-    let letzteAufgabe = -1
-    bloecke.forEach((b, k) => {
-      if (b.type === 'task') letzteAufgabe = k
-    })
-    bloecke.splice(letzteAufgabe + 1, 0, operatoren)
+    const liste = amtlicheListe(exam.meta.stateId, exam.meta.subjectId, anlageWunsch(exam.meta))
+    bloecke.push({ id: OPERATOREN_ANHANG_ID, type: 'divider', title: operatorenAnhangTitel(liste?.sprache ?? 'de') }, operatoren)
   }
   // Fassung A behält die bisherige Blattkennung – so bleibt alles gültig, was sich darauf bezieht
   const sheet: Sheet = {

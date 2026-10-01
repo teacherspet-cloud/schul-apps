@@ -2,6 +2,7 @@ import { STUFEN_WERTE, stufenLabel } from '../../../shared/verstehen/stufen'
 import ProtokollEinstellungen from './ProtokollEinstellungen'
 import { Anchor, Button, Group, NumberInput, Popover, Select, Slider, Stack, Switch, Text, Textarea, TextInput } from '@mantine/core'
 import { wortzahl } from '../generation/kuerzung'
+import { zielWortzahl } from '../generation/zuschnitt'
 import { hatMasse } from '../render/tabelleMasse'
 import { useArbeitsblatt } from '../store'
 import { IconAdjustments } from '@tabler/icons-react'
@@ -752,7 +753,7 @@ export function BlockSettings({
               <Text size="xs" data-testid="material-umfang">
                 Umfang: {wortzahl(block.body)} Wörter
                 {block.zuschnitt
-                  ? ` · Ziel ${block.zuschnitt.zielMin}–${block.zuschnitt.zielMax} (${block.zuschnitt.zielGrund}) · Ausschnitt aus ${wortzahl(block.zuschnitt.original)} Wörtern des Originals`
+                  ? ` · Ziel ${block.zuschnitt.zielMin}–${block.zuschnitt.zielMax}, angestrebt etwa ${zielWortzahl({ min: block.zuschnitt.zielMin, max: block.zuschnitt.zielMax })} (${block.zuschnitt.zielGrund}) · Ausschnitt aus ${wortzahl(block.zuschnitt.original)} Wörtern des Originals`
                   : ''}
               </Text>
               {block.zuschnitt && (

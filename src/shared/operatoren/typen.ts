@@ -16,13 +16,13 @@ export interface OperatorDefinition {
   afb?: AfbAngabe
   /** Weitere Formen, wie sie in Arbeitsanweisungen stehen („Nimm Stellung", „Setze … in Beziehung") */
   formen?: string[]
-  /** Illustrierende Aufgabenbeispiele im Wortlaut der Liste */
+  /** Illustrierende Aufgabenbeispiele im Wortlaut der Liste – keine Definition, nie auf dem Schülerblatt (01.10.2026) */
   beispiele?: string[]
   /** Kompetenzbereich, für den dieser Eintrag gilt (Schreiben, Sprachmittlung, Sprechen, Hör-/Hörsehverstehen, Leseverstehen) */
   kompetenzbereich?: string
   /** Gilt nur für diese Fächer (Kennungen aus subjects.ts) */
   nurFaecher?: string[]
-  /** Weitere Spalten der Liste im Wortlaut (Spaltenname → Inhalt) */
+  /** Weitere Spalten der Liste im Wortlaut (Spaltenname → Inhalt), auch Hinweise und Fußnoten – nur für die Lehrkraft */
   zusatz?: Record<string, string>
 }
 
@@ -35,7 +35,7 @@ export interface Operatorenliste {
   sprache: Listensprache
   quelle: string
   operatoren: OperatorDefinition[]
-  /** Vorbemerkungen der Liste je Kompetenzbereich im Wortlaut */
+  /** Vorbemerkungen der Liste je Kompetenzbereich im Wortlaut – richten sich an die Lehrkraft, nie auf das Schülerblatt (01.10.2026) */
   hinweise?: Record<string, string>
 }
 

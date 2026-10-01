@@ -1257,7 +1257,14 @@
     },
     {
      "operator": "beschreiben, formulieren",
-     "definition": "einen Sachverhalt oder ein Verfahren in vollständigen Sätzen unter Verwendung der Fachsprache mit eigenen Worten wiedergeben (hier sind auch Einschränkungen möglich: „Beschreiben Sie in Stichworten“) beziehungsweise in einer vorgeschriebenen Form darstellen (zum Beispiel: „Beschreiben Sie als Term“)",
+     "definition": "einen Sachverhalt oder ein Verfahren in vollständigen Sätzen unter Verwendung der Fachsprache mit eigenen Worten wiedergeben beziehungsweise in einer vorgeschriebenen Form darstellen",
+     "beispiele": [
+      "Beschreiben Sie in Stichworten",
+      "Beschreiben Sie als Term"
+     ],
+     "zusatz": {
+      "Hinweis": "hier sind auch Einschränkungen möglich"
+     },
      "afb": "II",
      "formen": [
       "beschreiben",
@@ -1759,7 +1766,14 @@
     },
     {
      "operator": "beschreiben",
-     "definition": "Strukturen, Sachverhalte, Verfahren, Prozesse und Eigenschaften von Objekten in der Regel unter Verwendung der Fachsprache in vollständigen Sätzen wiedergeben (hier sind auch Einschränkungen möglich: „Beschreiben Sie in Stichworten“) beziehungsweise in einer vorgeschriebenen Form darstellen (zum Beispiel: „Beschreiben Sie als Term“)",
+     "definition": "Strukturen, Sachverhalte, Verfahren, Prozesse und Eigenschaften von Objekten in der Regel unter Verwendung der Fachsprache in vollständigen Sätzen wiedergeben beziehungsweise in einer vorgeschriebenen Form darstellen",
+     "beispiele": [
+      "Beschreiben Sie in Stichworten",
+      "Beschreiben Sie als Term"
+     ],
+     "zusatz": {
+      "Hinweis": "hier sind auch Einschränkungen möglich"
+     },
      "afb": "II"
     },
     {
@@ -4208,7 +4222,14 @@
     },
     {
      "operator": "beschreiben, formulieren",
-     "definition": "einen Sachverhalt oder ein Verfahren in vollständigen Sätzen unter Verwendung der Fachsprache mit eigenen Worten wiedergeben (hier sind auch Einschränkungen möglich: „Beschreiben Sie in Stichworten“) beziehungsweise in einer vorgeschriebenen Form darstellen (zum Beispiel: „Beschreiben Sie als Term“)",
+     "definition": "einen Sachverhalt oder ein Verfahren in vollständigen Sätzen unter Verwendung der Fachsprache mit eigenen Worten wiedergeben beziehungsweise in einer vorgeschriebenen Form darstellen",
+     "beispiele": [
+      "Beschreiben Sie in Stichworten",
+      "Beschreiben Sie als Term"
+     ],
+     "zusatz": {
+      "Hinweis": "hier sind auch Einschränkungen möglich"
+     },
      "afb": "II",
      "formen": [
       "beschreiben",
@@ -4688,7 +4709,14 @@
     },
     {
      "operator": "beschreiben",
-     "definition": "Strukturen, Sachverhalte, Verfahren, Prozesse und Eigenschaften von Objekten in der Regel unter Verwendung der Fachsprache in vollständigen Sätzen wiedergeben (hier sind auch Einschränkungen möglich: „Beschreiben Sie in Stichworten“) beziehungsweise in einer vorgeschriebenen Form darstellen (zum Beispiel: „Beschreiben Sie als Term“)",
+     "definition": "Strukturen, Sachverhalte, Verfahren, Prozesse und Eigenschaften von Objekten in der Regel unter Verwendung der Fachsprache in vollständigen Sätzen wiedergeben beziehungsweise in einer vorgeschriebenen Form darstellen",
+     "beispiele": [
+      "Beschreiben Sie in Stichworten",
+      "Beschreiben Sie als Term"
+     ],
+     "zusatz": {
+      "Hinweis": "hier sind auch Einschränkungen möglich"
+     },
      "afb": "II"
     },
     {

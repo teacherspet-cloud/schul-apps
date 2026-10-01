@@ -12,7 +12,7 @@
  * Die Listen selbst: `operatorenlistenDaten.ts` (Land → Fach → Operatoren mit Quelle).
  */
 import { fachDerArbeit, formatArt } from '../model/faecher'
-import type { InfoBoxBlock, TaskBlock, WsBlock } from '../../arbeitsblatt/model/types'
+import type { InfoBoxBlock, TaskBlock } from '../../arbeitsblatt/model/types'
 import type { AnlageWunsch } from '@shared/operatoren/zugriff'
 import { anlageFuer, operatorenAuswahl } from '@shared/operatoren/zugriff'
 import type { Listensprache, OperatorDefinition, Operatorenliste } from '@shared/operatoren/typen'
@@ -21,6 +21,7 @@ import { upperSecondary } from '../generation/generateExam'
 import { alleFassungen } from '../model/fassungen'
 import type { Exam } from '../model/types'
 import { OPERATORENLISTEN } from './operatorenlistenDaten'
+import { STOPPWOERTER } from '@shared/stoppwoerter'
 
 /*
  * Die Typen stehen seit dem gemeinsamen Operatoren-Bestand (Großprogramm 0.4, D3) in
@@ -197,35 +198,119 @@ export function passt(op: string, d: OperatorDefinition, sprache: Listensprache 
   return enthaeltOperatorForm(op, d, { sprache })
 }
 
+/*
+ * ---------- Darstellung auf dem Schülerblatt (01.10.2026) ----------
+ *
+ * Befund der Lehrkraft zu einer Englisch-Klausur (NI, Sek II) mit Sprachmittlung: Unter der
+ * Aufgabe stand ein Kasten „Operators used in this test" mit der deutschen Vorbemerkung des
+ * Ministeriums („Es ist erforderlich, die hier dargestellten Operatoren in einen situativen
+ * Rahmen … einzubetten.") und dem illustrierenden Aufgabenbeispiel der Liste.
+ *
+ * Herkunft: Seit 849edee (28.09.2026, „alles aus der amtlichen Liste") setzte `operatorenBlock`
+ * Vorbemerkungen (`hinweise`), Aufgabenbeispiele (`beispiele`), weitere Spalten (`zusatz`) und
+ * die deutschen Namen der Kompetenzbereiche mit auf das Blatt. Die Vorbemerkung richtet sich an
+ * die Aufgabenersteller, die Beispiele sind keine Definitionen. Seit 13e5784 (27.09.2026) stand
+ * der Kasten zudem DIREKT hinter der letzten Aufgabe – bei einer Sprachmittlung also zwischen
+ * Aufgabe und Material M1, als gehöre er zur Aufgabe.
+ *
+ * Jetzt: eine knappe Liste – Operator und Erläuterung in der Sprache der Liste, jeder Operator
+ * einmal – als eigener Anhang am Ende der Arbeit. Vorbemerkungen bekommt nur die Lehrkraft
+ * (`operatorenVorbemerkungen`, Hinweis im Aufgabenschritt).
+ */
+
+/** Ein Wort aus einer Liste: Deutsch erkennbar an seinen Stoppwörtern */
+const DEUTSCH = new Set(STOPPWOERTER.de)
+
+/** Steht eine Erläuterung auf Deutsch, obwohl die Liste eine Fremdsprache ist? (HE/NW erläutern englische Operatoren deutsch) */
+export function erlaeuterungDeutsch(text: string, sprache: Listensprache): boolean {
+  if (sprache === 'de') return false
+  const woerter = text.toLowerCase().match(/[\p{L}]+/gu) ?? []
+  if (woerter.length < 4) return false
+  const ziel = new Set(STOPPWOERTER[sprache] ?? [])
+  const de = woerter.filter((w) => DEUTSCH.has(w) && !ziel.has(w)).length
+  return de / woerter.length >= 0.12 || /[äöüß]/.test(text)
+}
+
+/**
+ * Die Erläuterung eines Operators für das Schülerblatt: nur der Definitionstext, ohne angehängte
+ * Hinweise („Besonderer Hinweis: …") – leer, wenn es keine Erläuterung in der Sprache der Liste gibt.
+ */
+export function schuelerErlaeuterung(d: OperatorDefinition, sprache: Listensprache): string {
+  const def = (d.definition ?? '')
+    .replace(/\s*(?:besonderer\s+)?(?:hinweis|anmerkung|note|nota)\s*:[\s\S]*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!def || erlaeuterungDeutsch(def, sprache)) return ''
+  return def
+}
+
+/** Die Einträge des Schülerblatts: je Operator EINMAL (der erste Fund), nur mit Erläuterung in der Sprache der Liste */
+export function schuelerEintraege(befund: OperatorenBefund): { operator: string; erlaeuterung: string }[] {
+  if (!befund.liste) return []
+  const out: { operator: string; erlaeuterung: string }[] = []
+  const gesehen = new Set<string>()
+  for (const d of befund.gefunden) {
+    const k = normal(d.operator)
+    if (gesehen.has(k)) continue
+    const erlaeuterung = schuelerErlaeuterung(d, befund.liste.sprache)
+    if (!erlaeuterung) continue
+    gesehen.add(k)
+    out.push({ operator: d.operator, erlaeuterung })
+  }
+  return out
+}
+
+/** Verwendete Operatoren, deren amtliche Erläuterung nicht aufs Schülerblatt kommt (fehlt oder steht nur auf Deutsch) – für den Hinweis an die Lehrkraft */
+export function ohneSchuelerErlaeuterung(befund: OperatorenBefund): string[] {
+  if (!befund.liste) return []
+  const drauf = new Set(schuelerEintraege(befund).map((e) => normal(e.operator)))
+  return [...new Set(befund.gefunden.filter((d) => !drauf.has(normal(d.operator))).map((d) => d.operator))]
+}
+
+/** Vorbemerkungen der Liste zu den Kompetenzbereichen der verwendeten Operatoren – nur für die Lehrkraft */
+export function operatorenVorbemerkungen(befund: OperatorenBefund): { bereich: string; text: string }[] {
+  const h = befund.liste?.hinweise ?? {}
+  const bereiche = [...new Set(befund.gefunden.map((d) => d.kompetenzbereich ?? ''))]
+  return bereiche.filter((b) => h[b]?.trim()).map((b) => ({ bereich: b, text: h[b] }))
+}
+
+const TITEL: Record<Listensprache, string> = {
+  de: 'Operatoren dieser Arbeit',
+  en: 'Operators used in this test',
+  fr: 'Consignes utilisées dans ce devoir',
+  es: 'Operadores de este examen',
+  it: 'Operatori usati in questa verifica',
+  ru: 'Операторы в этой работе'
+}
+const QUELLE: Record<Listensprache, string> = { de: 'Quelle', en: 'Source', fr: 'Source', es: 'Fuente', it: 'Fonte', ru: 'Источник' }
+const ANHANG: Record<Listensprache, string> = { de: 'Anhang', en: 'Appendix', fr: 'Annexe', es: 'Anexo', it: 'Allegato', ru: 'Приложение' }
+
+/** Überschrift des Anhangs, unter dem die Liste steht – trennt sie sichtbar vom letzten Teil */
+export const OPERATOREN_ANHANG_ID = 'exam-operatoren-anhang'
+export const operatorenAnhangTitel = (sprache: Listensprache): string => ANHANG[sprache] ?? ANHANG.de
+
 /**
  * Der Baustein für das Ende der Arbeit – ein Kasten ohne Materialnummer. Null, wenn die Liste
- * nicht vorgesehen ist oder kein verwendeter Operator eine amtliche Definition hat.
+ * nicht vorgesehen ist oder kein verwendeter Operator eine Erläuterung für das Blatt hat.
  */
-export function operatorenBlock(exam: Exam): WsBlock | null {
+export function operatorenBlock(exam: Exam): InfoBoxBlock | null {
   if (!operatorenlisteAktiv(exam)) return null
-  const { gefunden, liste } = operatorenBefund(exam)
-  if (!liste || !gefunden.length) return null
-  const en = liste.sprache !== 'de'
-  // Nach Kompetenzbereich gruppiert, wenn die Liste danach gliedert – mit der Vorbemerkung des Bereichs
-  const bereiche = [...new Set(gefunden.map((d) => d.kompetenzbereich ?? ''))]
-  const zeilen: string[] = []
-  for (const bereich of bereiche) {
-    if (bereich && bereiche.length > 1) zeilen.push(`**${bereich}**`)
-    // Vorbemerkung der Liste zum Bereich (bzw. zur ganzen Liste) im Wortlaut
-    if (liste.hinweise?.[bereich]) zeilen.push(`_${liste.hinweise[bereich]}_`)
-    for (const d of gefunden.filter((x) => (x.kompetenzbereich ?? '') === bereich)) zeilen.push(...operatorZeilen(d, en))
-  }
-  const block: InfoBoxBlock = {
+  const befund = operatorenBefund(exam)
+  const { liste } = befund
+  if (!liste) return null
+  const eintraege = schuelerEintraege(befund)
+  if (!eintraege.length) return null
+  const sprache = liste.sprache
+  return {
     id: OPERATOREN_BLOCK_ID,
     type: 'infoBox',
     variant: 'definition',
-    title: en ? 'Operators used in this test' : 'Operatoren dieser Arbeit',
-    body: [...zeilen, '', `${en ? 'Source' : 'Quelle'}: ${liste.quelle}`].join('\n')
+    title: TITEL[sprache] ?? TITEL.de,
+    body: [...eintraege.map((e) => `- **${e.operator}**: ${e.erlaeuterung}`), '', `${QUELLE[sprache] ?? QUELLE.de}: ${liste.quelle}`].join('\n')
   }
-  return block
 }
 
-/** Ein Operator mit allem, was die Liste angibt: Erläuterung, AFB, Beispiele, weitere Spalten */
+/** Ein Operator mit allem, was die Liste angibt (Erläuterung, AFB, Beispiele, weitere Spalten) – nur für Ansichten der Lehrkraft, nie für das Schülerblatt */
 export function operatorZeilen(d: OperatorDefinition, en: boolean): string[] {
   const kopf = `**${d.operator}**${d.afb ? ` (${en ? 'level' : 'AFB'} ${d.afb})` : ''}${d.definition ? `: ${d.definition}` : ''}`
   const out = [kopf]

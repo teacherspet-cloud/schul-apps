@@ -7,10 +7,18 @@
 //  1. Die Adresse rechts unter „Material für die Arbeit" wurde ungekürzt und mit Seitenbeiwerk
 //     („News", Datum, Vorspann, „© … Polaris/laif") als Sprachmittlungstext eingesetzt.
 //  2. Die Aufgabe trug Hilfen: Kasten „Adressat · Textsorte · Zweck" und Teilpunkte „Outline why …".
+//  3. (01.10.2026, später) Das Material hieß „M1 Bewertung: 2" (Bewertungswidget als Schlagzeile), der
+//     Text hatte 455 Wörter bei 450–650 („150 Wörter zu kurz"), und unter der Sprachmittlung stand die
+//     Operatorenliste mit deutscher Vorbemerkung des Ministeriums und Aufgabenbeispiel.
 // Geprüft über die Oberfläche (Englisch, Klasse 12, Sprachmittlung):
 //  - der deutsche Text steht gekürzt im Zielbereich (450–650 Wörter), wörtlich, ohne Beiwerk,
 //    mit kursivem Einleitungssatz und Quellenzeile „(gekürzt)" samt Medium, Datum und Adresse,
-//  - das Schülerblatt hat keinen Hilfekasten und keine Teilpunkte; sie stehen im Erwartungshorizont.
+//  - das Schülerblatt hat keinen Hilfekasten und keine Teilpunkte; sie stehen im Erwartungshorizont,
+//  - Fixtur MIT Bewertungswidget (artikel-bewertung.json): Titel ist die Schlagzeile, kein Widget im Text,
+//  - der Text erreicht mindestens die Mitte des Zielbereichs (550 Wörter) – die KI-Attrappe liefert
+//    absichtlich nur rund 505 Wörter, also greift die auffüllende Absatzkürzung,
+//  - Operatorenliste (NI, an): eigener Anhang am Ende, knapp, ohne Vorbemerkung und Beispiel; die
+//    Vorbemerkung sieht nur die Lehrkraft.
 import { _electron as electron } from 'playwright-core'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -21,7 +29,8 @@ import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/klausur-material-url')
 mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-material-url-'))
-const olk = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'artikel-olk.json'), 'utf8'))
+// Olk-Fixtur mit Bewertungswidget über der Schlagzeile und unter dem Text (01.10.2026)
+const olk = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'artikel-bewertung.json'), 'utf8'))
 
 /** Wörtlicher Ausschnitt aus den Absätzen, Lücken mit […] – so, wie eine gute KI kürzen würde */
 const ausschnitt = (indizes) => {
@@ -80,6 +89,7 @@ writeFileSync(
         publikationsort: 'EINSICHTEN. Das Forschungsmagazin der LMU München',
         datum: '10.03.2025'
       },
+      // Rund 505 Wörter: im Bereich 450–650, aber unter der Mitte – gilt jetzt als zu kurz
       material_zuschnitt: {
         gekuerzt: ausschnitt([0, 1, 3, 4, 5, 7]),
         begruendung: 'Macht, Offenheit und junges Publikum – passend zur Sprachmittlung.',
@@ -139,6 +149,12 @@ try {
     .first()
     .waitFor({ timeout: 15000 })
   pruefe(true, 'Die Adresse ist als Material eingetragen')
+  // Operatorenliste: in der Oberstufe vorgesehen
+  const opSchalter = page.getByRole('switch', { name: 'Operatorenliste anhängen' })
+  if (await opSchalter.count()) {
+    if (!(await opSchalter.isChecked())) await opSchalter.check({ force: true })
+    pruefe(await opSchalter.isChecked(), 'Operatorenliste ist angeschaltet')
+  }
   // Der Schalter „Hilfen für Lernende" ist in der Klassenarbeit aus
   const schalter = page.getByTestId('lernhilfen-schalter')
   if (await schalter.count()) pruefe(!(await schalter.isChecked()), '„Hilfen für Lernende" ist standardmäßig aus')
@@ -163,6 +179,10 @@ try {
   if (material) {
     const n = woerter(material.body)
     pruefe(n >= 450 && n <= 650, `Gekürzt auf den Zielbereich 450–650 Wörter (${n} Wörter, Original ${woerter(material.zuschnitt.original)})`)
+    pruefe(n >= 550, `Mindestens die Mitte des Zielbereichs (${n} ≥ 550 Wörter)`)
+    pruefe(!/Bewertung|★/.test(material.title), `Titel ohne Bewertungswidget: „${material.title}"`)
+    for (const m of ['Bewertung', '★', 'Kommentare', 'hilfreich', 'Jetzt bewerten', 'von 5 Sternen'])
+      pruefe(!material.body.includes(m), `Kein Bewertungswidget im Text: „${m}"`)
     pruefe(material.language === 'de', 'Der Ausgangstext der Sprachmittlung bleibt deutsch')
     pruefe(material.lineNumbers === true, 'Zeilennummern sind an')
     for (const m of ['News', '10.03.2025', 'Aus dem Magazin', '©', 'Polaris/laif', 'Mehr zum Thema'])
@@ -205,6 +225,23 @@ try {
     await page.screenshot({ path: join(out, '4-quellenzeile.png') })
   }
   pruefe(blatt.includes('(gekürzt)'), 'Die Quellenzeile mit „(gekürzt)" steht auf dem Blatt')
+  pruefe(!/M\d+\s*Bewertung/.test(blatt), 'Keine Materialüberschrift „M1 Bewertung …"')
+
+  // Operatorenliste: knapp, in der Zielsprache, als Anhang hinter dem Material – nicht unter der Aufgabe
+  pruefe(blatt.includes('Operators used in this test'), 'Die Operatorenliste steht auf dem Blatt')
+  pruefe(blatt.includes('produce a text with specific features'), 'Operator mit Erläuterung der Liste')
+  for (const m of ['situativen Rahmen', 'Es ist erforderlich', 'Example', 'Using the information in the input article', 'level III'])
+    pruefe(!blatt.includes(m), `Nichts aus Vorbemerkung/Beispiel auf dem Schülerblatt: „${m}"`)
+  pruefe(blatt.indexOf('Operators used in this test') > blatt.lastIndexOf('(gekürzt)'), 'Die Liste steht hinter dem Material, nicht zwischen Aufgabe und M1')
+  pruefe(blatt.includes('Appendix'), 'Eigene Überschrift „Appendix" über der Liste')
+  const lehrkraft = page.getByTestId('operatoren-hinweis')
+  const hinweisText = (await lehrkraft.count()) ? await lehrkraft.first().innerText() : ''
+  pruefe(hinweisText.includes('situativen Rahmen') && hinweisText.includes('nur für die Lehrkraft'), 'Die Vorbemerkung der Liste sieht nur die Lehrkraft')
+  const liste = page.locator('.ws-editor-pages').getByText('Operators used in this test').first()
+  if (await liste.count()) {
+    await liste.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: join(out, '4b-operatorenliste.png') })
+  }
 
   // Erwartungshorizont: Situierung und Teilpunkte stehen dort
   await sichtbar(page.getByText('Erwartungshorizont', { exact: true })).click()

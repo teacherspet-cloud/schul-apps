@@ -18,6 +18,7 @@ import type { GeladeneQuelle, Materialanfrage, Quellentreffer } from '@shared/ty
 import { politeFetch } from '../images/politeFetch'
 import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { fetchText, kennungFuer, stripHtml, WIKIMEDIA_UA } from '../images/sources'
+import { seitentitelAusHtml } from '@shared/artikelText'
 
 /** Sprachen, für die es eine eigene Wikisource gibt und die in dieser App vorkommen. */
 const WIKISOURCE_SPRACHEN = new Set(['de', 'en', 'fr', 'es', 'it', 'la', 'ru', 'pl', 'nl', 'pt'])
@@ -304,7 +305,8 @@ export async function ladeOriginalquelle(adresse: string): Promise<GeladeneQuell
 
   const seite = await fetchText(url)
   if ('error' in seite) return { url: adresse, titel: '', text: '', wortzahl: 0, fehler: seite.error }
-  const titel = stripHtml(/<title[^>]*>([\s\S]{1,300}?)<\/title>/i.exec(seite.raw)?.[1] ?? '')
+  // Titel des Artikels: og:title, <h1> im Artikel, <title> ohne Website-Namen – nie ein Bewertungs- oder Zählerelement (01.10.2026)
+  const titel = seitentitelAusHtml(seite.raw) || stripHtml(/<title[^>]*>([\s\S]{1,300}?)<\/title>/i.exec(seite.raw)?.[1] ?? '')
   const text = url.hostname.endsWith('gutenberg.org') ? ohneGutenbergRahmen(seite.text) : seite.text
   return { url: adresse, titel, text, wortzahl: zaehleWoerter(text) }
 }

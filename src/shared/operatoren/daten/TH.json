@@ -2628,7 +2628,10 @@
     },
     {
      "operator": "entwerfen",
-     "definition": "Darstellung einer Lösungsidee (verbal, Struktogramm oder Pseudocode) Besonderer Hinweis: für Entwürfe von Algorithmen die Angabe von Datenstrukturen explizit fordern"
+     "definition": "Darstellung einer Lösungsidee (verbal, Struktogramm oder Pseudocode)",
+     "zusatz": {
+      "Besonderer Hinweis": "für Entwürfe von Algorithmen die Angabe von Datenstrukturen explizit fordern"
+     }
     },
     {
      "operator": "entwickeln",
@@ -2855,7 +2858,10 @@
     },
     {
      "operator": "entwerfen",
-     "definition": "Darstellung einer Lösungsidee (verbal, Struktogramm oder Pseudocode) Besonderer Hinweis: für Entwürfe von Algorithmen die Angabe von Datenstrukturen explizit fordern"
+     "definition": "Darstellung einer Lösungsidee (verbal, Struktogramm oder Pseudocode)",
+     "zusatz": {
+      "Besonderer Hinweis": "für Entwürfe von Algorithmen die Angabe von Datenstrukturen explizit fordern"
+     }
     },
     {
      "operator": "entwickeln",

@@ -67,7 +67,7 @@ import { addVersion, switchVersion } from '../../arbeitsblatt/model/versions'
 import { newBlock } from '../../arbeitsblatt/model/factory'
 import { newId } from '../../vokabeltest/model/random'
 import { examHeadBlock } from '../render/examWorksheet'
-import { operatorenBefund, operatorenlisteAktiv } from '../didactics/operatorenliste'
+import { ohneSchuelerErlaeuterung, operatorenBefund, operatorenlisteAktiv, operatorenVorbemerkungen } from '../didactics/operatorenliste'
 import type { WsBlockType } from '../../arbeitsblatt/model/types'
 import { WsContext, type WsContextValue } from '../../arbeitsblatt/render/WsContext'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
@@ -200,7 +200,15 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   const operatorenHinweis = useMemo(() => {
     const b = operatorenBefund(exam)
     if (!b.liste) return `Für ${meta.stateId} und ${meta.subjectLabel} ist keine amtliche Operatorenliste hinterlegt – die Anlage „Operatoren" entfällt.`
-    return b.fehlend.length ? `Ohne amtliche Definition in der Operatorenliste (${b.liste.quelle}): ${b.fehlend.join(', ')}.` : ''
+    // Vorbemerkungen der Liste und Operatoren ohne Erläuterung in der Sprache der Liste: nur für die Lehrkraft, nie auf dem Blatt (01.10.2026)
+    const ohne = ohneSchuelerErlaeuterung(b)
+    return [
+      b.fehlend.length ? `Ohne amtliche Definition in der Operatorenliste (${b.liste.quelle}): ${b.fehlend.join(', ')}.` : '',
+      ohne.length ? `Ohne Erläuterung in der Sprache der Liste, daher nicht im Anhang: ${ohne.join(', ')}.` : '',
+      ...operatorenVorbemerkungen(b).map((v) => `Vorbemerkung der Liste${v.bereich ? ` (${v.bereich})` : ''}, nur für die Lehrkraft: ${v.text}`)
+    ]
+      .filter(Boolean)
+      .join('\n')
   }, [exam, meta.stateId, meta.subjectLabel])
   // Anrede der Lernenden in allen Fassungen prüfen – auch nach Überarbeitung und Änderungen von Hand (Paket 8b)
   const anrede = useMemo(() => (hasContent ? anredeBefunde(worksheet.meta, worksheet.sheets) : []), [hasContent, worksheet])
@@ -937,8 +945,10 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
           {hasContent && !hoertexte && (
             <>
               {operatorenlisteAktiv(exam) && operatorenHinweis && (
-                <Alert color="yellow" variant="light" mb="xs" p="xs">
-                  <Text size="xs">{operatorenHinweis}</Text>
+                <Alert color="yellow" variant="light" mb="xs" p="xs" data-testid="operatoren-hinweis">
+                  <Text size="xs" style={{ whiteSpace: 'pre-line' }}>
+                    {operatorenHinweis}
+                  </Text>
                 </Alert>
               )}
               <Text size="xs" c="dimmed" mb="xs">

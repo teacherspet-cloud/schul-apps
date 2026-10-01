@@ -19,6 +19,7 @@ import { appendFileSync, readFileSync } from 'fs'
 import type { GeladeneQuelle, Materialanfrage, OnlineImageHit, Quellentreffer, StructuredRequest } from '@shared/types'
 import { AbbruchFehler } from '@shared/abbruch'
 import { fliesstext } from '../sources/fliesstext'
+import { seitentitelAusHtml } from '@shared/artikelText'
 import type { AiProvider, ChunkListener, Netzfund, RawModel } from './provider'
 
 interface AttrappenDatei {
@@ -95,7 +96,9 @@ export function attrappeQuelleLaden(url: string): GeladeneQuelle | undefined {
   if (!t) return { url, titel: '', text: '', wortzahl: 0, fehler: 'Attrappe: Adresse unbekannt.' }
   // Eine hinterlegte HTML-Seite geht durch dieselbe Fließtext-Extraktion wie im Betrieb (01.10.2026)
   const text = t.html ? fliesstext(t.html, 'de') : (t.text ?? '')
-  return { url, titel: t.titel, text, wortzahl: (text.match(/[\p{L}\p{N}]+/gu) ?? []).length }
+  // Titel wie im Betrieb aus dem HTML (og:title, <h1>, <title>); der hinterlegte nur als Rückfall
+  const titel = (t.html ? seitentitelAusHtml(t.html) : '') || t.titel
+  return { url, titel, text, wortzahl: (text.match(/[\p{L}\p{N}]+/gu) ?? []).length }
 }
 
 /** Bildauftrag der Attrappe: protokollieren, hinterlegtes Bild liefern */

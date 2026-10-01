@@ -21,7 +21,7 @@
  *    KI recherchieren – übernommen wird nur, was belegt ist, mit Fundstelle für die Lehrkraft.
  */
 import type { StructuredRequest } from '@shared/types'
-import { bereinigeArtikeltext, type Artikel } from '@shared/artikelText'
+import { bereinigeArtikeltext, keineSchlagzeile, ohneSeitenname, type Artikel } from '@shared/artikelText'
 import { stoppwortSatz } from '@shared/stoppwoerter'
 import { arr, bool, obj, str } from '../../../shared/aiSchema'
 import { LANGUAGE_NAMES } from '../model/subjects'
@@ -115,18 +115,44 @@ function themenwoerter(thema: string, sprache: string): Set<string> {
   )
 }
 
+/*
+ * ---------- Ziellänge (01.10.2026) ----------
+ *
+ * Befund der Lehrkraft: Bei 450–650 Wörtern kam ein Text mit 455 Wörtern heraus – „etwa 150 Wörter
+ * zu kurz". Ursache: Jede Länge ab 90 % des MINIMUMS galt als getroffen (405 Wörter hätten
+ * gereicht), und die Absatzkürzung suchte nur „unter dem Maximum", nicht „nah am Ziel".
+ * Jetzt zielt der Zuschnitt auf etwa 90 % des Maximums; angenommen wird nur, was im Bereich
+ * liegt UND mindestens die Mitte erreicht. Darunter gilt der Ausschnitt als zu kurz.
+ */
+
+/** Mitte des Zielbereichs – darunter ist ein Ausschnitt zu kurz */
+export const mitteDesBereichs = (ziel: Pick<Zielbereich, 'min' | 'max'>): number => Math.ceil((ziel.min + ziel.max) / 2)
+
+/** Angestrebte Wortzahl: etwa 90 % des Maximums, nie unter der Mitte des Bereichs */
+export const zielWortzahl = (ziel: Pick<Zielbereich, 'min' | 'max'>): number => Math.max(Math.round(ziel.max * 0.9), mitteDesBereichs(ziel))
+
+/** Länge eines Ausschnitts: zu kurz (unter der Mitte), passend oder zu lang (über dem Maximum) */
+export function laengeBewerten(n: number, ziel: Pick<Zielbereich, 'min' | 'max'>): 'zuKurz' | 'passt' | 'zuLang' {
+  if (n > ziel.max) return 'zuLang'
+  return n < mitteDesBereichs(ziel) ? 'zuKurz' : 'passt'
+}
+
 /**
- * Ausschnitt OHNE KI: das zusammenhängende Stück aus ganzen Absätzen, das in den Zielbereich
- * passt und die meisten Themenwörter enthält. Wörtlich ist es von selbst – es wird nichts
- * umgestellt. Ein einzelner überlanger Absatz wird nach ganzen Sätzen abgeschnitten.
+ * Ausschnitt OHNE KI: das zusammenhängende Stück aus ganzen Absätzen, das der angestrebten Länge
+ * (`zielWortzahl`) am nächsten kommt, ohne das Maximum zu überschreiten, und dabei möglichst viele
+ * Themenwörter enthält. Bleibt es unter dem Ziel, wird mit ganzen Sätzen des folgenden Absatzes
+ * aufgefüllt. Wörtlich ist es von selbst – es wird nichts umgestellt. Ein einzelner überlanger
+ * Absatz wird nach ganzen Sätzen abgeschnitten.
  */
 export function absatzAuswahl(original: string, ziel: Zielbereich, thema = '', sprache = 'de'): string {
   const liste = absaetze(original)
   if (!liste.length) return ''
   const n = liste.map((a) => wortzahl(a))
+  const soll = zielWortzahl(ziel)
+  const mitte = mitteDesBereichs(ziel)
   const themen = themenwoerter(thema, sprache)
   const treffer = liste.map((a) => zerlege(a).filter((w) => themen.has(w.norm)).length)
-  let best: { von: number; bis: number; punkte: number } | null = null
+  let best: { von: number; bis: number; summe: number; punkte: number } | null = null
   for (let i = 0; i < liste.length; i++) {
     let summe = 0
     let punkte = 0
@@ -134,13 +160,30 @@ export function absatzAuswahl(original: string, ziel: Zielbereich, thema = '', s
       summe += n[j]
       punkte += treffer[j]
       if (summe > ziel.max) break
-      // Im Zielbereich zählen die Themenwörter; darunter zählt die Nähe zum Minimum
-      const wert = (summe >= ziel.min ? 1000 : summe) + punkte * 5 - i * 0.01
-      if (!best || wert > best.punkte) best = { von: i, bis: j, punkte: wert }
+      // Ab der Mitte des Bereichs zählen Nähe zum Ziel und Themenwörter; darunter zählt die Länge
+      const laenge = summe >= mitte ? 1000 - Math.abs(summe - soll) * 2 : summe >= ziel.min ? 500 + summe - ziel.min : summe
+      const wert = laenge + punkte * 5 - i * 0.01
+      if (!best || wert > best.punkte) best = { von: i, bis: j, summe, punkte: wert }
     }
   }
-  if (best) return liste.slice(best.von, best.bis + 1).join('\n\n')
-  // Schon der erste Absatz ist zu lang: ganze Sätze bis zum Maximum
+  if (best) {
+    const teile = liste.slice(best.von, best.bis + 1)
+    // Unter dem Ziel: mit ganzen Sätzen des nächsten Absatzes auffüllen (nie über das Maximum)
+    let summe = best.summe
+    const naechster = liste[best.bis + 1]
+    if (summe < soll && naechster && !AUSLASSUNG_ABSATZ.test(naechster) && !naechster.startsWith('**')) {
+      const dazu: string[] = []
+      for (const satz of saetze(naechster)) {
+        const w = wortzahl(satz)
+        if (summe + w > ziel.max || (summe >= mitte && Math.abs(summe + w - soll) > Math.abs(summe - soll))) break
+        dazu.push(satz)
+        summe += w
+      }
+      if (dazu.length) teile.push(dazu.join(' '))
+    }
+    return teile.join('\n\n')
+  }
+  // Schon der erste Absatz ist zu lang: ganze Sätze bis zum Ziel
   const aus: string[] = []
   let summe = 0
   for (const s of saetze(liste[0])) {
@@ -148,6 +191,7 @@ export function absatzAuswahl(original: string, ziel: Zielbereich, thema = '', s
     if (summe + w > ziel.max && summe >= Math.min(ziel.min, ziel.max / 2)) break
     aus.push(s)
     summe += w
+    if (summe >= soll) break
   }
   return aus.join(' ')
 }
@@ -258,12 +302,13 @@ export function quellenangabeAus(e: Pick<ZuschnittEingabe, 'quellenangabe' | 'ur
   return quellenangabeMitAbruf(angabe, { url: e.url, titel: titel || e.url, urheber: e.urheber, herkunft: 'netz', auszug: '' }, heute)
 }
 
-/** Seitentitel ohne Website-Namen („Shakespeares Werke | LMU München" → „Shakespeares Werke") */
+/**
+ * Seitentitel ohne Website-Namen („Shakespeares Werke | LMU München" → „Shakespeares Werke");
+ * leer, wenn er nach Bewertung, Zähler oder Knopf aussieht (01.10.2026: „Bewertung: 2").
+ */
 export function bereinigterSeitentitel(t: string): string {
-  return t
-    .replace(/^(?:webseite|adresse|titel):\s*/i, '')
-    .split(/\s+[|–—-]\s+/)[0]
-    .trim()
+  const titel = ohneSeitenname(t)
+  return titel && !keineSchlagzeile(titel) ? titel : ''
 }
 
 // ---------- Schritt 2: Ausschnitt wählen ----------
@@ -289,7 +334,7 @@ function zuschnittAuftrag(e: ZuschnittEingabe, original: string, ziel: Zielberei
       `Fach: ${e.fach}. Jahrgang: ${e.jahrgang}. Thema: ${e.thema}.`,
       e.leitgedanke ? `ROTER FADEN DER ARBEIT (alle Teile beziehen sich auf dasselbe Thema):\n${e.leitgedanke}` : '',
       e.teil ? `Der Ausschnitt ist das Material für: ${e.teil}${e.aufgabe ? ` – ${e.aufgabe}` : ''}.` : '',
-      `ZIELLÄNGE: zwischen ${ziel.min} und ${ziel.max} Wörtern (${ziel.grund}). Das Original hat ${wortzahl(original)} Wörter.`,
+      `ZIELLÄNGE: etwa ${zielWortzahl(ziel)} Wörter – zulässig ${mitteDesBereichs(ziel)} bis ${ziel.max} Wörter (Zielbereich ${ziel.min}–${ziel.max}: ${ziel.grund}). Kürzere Ausschnitte gelten als zu kurz. Das Original hat ${wortzahl(original)} Wörter.`,
       'AUSWAHL: Wähle die Abschnitte, die für dieses Thema und diese Aufgabe ergiebig sind (Standpunkte, Gründe, Beispiele, Ergebnisse). Der Ausschnitt muss für sich verständlich sein und einen Gedankengang tragen – keine Anhäufung loser Sätze.',
       e.mediation
         ? `SPRACHMITTLUNG: Der Text bleibt in der Ausgangssprache (${sprachName(
@@ -438,8 +483,6 @@ export async function einleitungErstellen(e: EinleitungEingabe, ai: AiRuf): Prom
 
 // ---------- Ablauf ----------
 
-/** Liegt die Wortzahl im Zielbereich (mit etwas Spielraum)? */
-const imZiel = (n: number, ziel: Zielbereich): boolean => n >= Math.floor(ziel.min * 0.9) && n <= Math.ceil(ziel.max * 1.1)
 
 export async function schneideZu(
   e: ZuschnittEingabe,
@@ -456,24 +499,30 @@ export async function schneideZu(
   const protokoll: string[] = []
 
   if (nOriginal > e.ziel.max || e.wunsch) {
-    opts.fortschritt?.(`Der Text wird auf ${e.ziel.min}–${e.ziel.max} Wörter zugeschnitten …`)
+    opts.fortschritt?.(`Der Text wird auf etwa ${zielWortzahl(e.ziel)} Wörter (${e.ziel.min}–${e.ziel.max}) zugeschnitten …`)
     let rueckmeldung = ''
+    // Wörtlicher KI-Ausschnitt im Bereich, aber unter der Mitte: nur, wenn die App selbst nichts Passenderes findet
+    let zuKurz: { text: string; n: number; antwort: ZuschnittAntwort } | null = null
     for (let versuch = 0; versuch < 2 && weg !== 'ki'; versuch++) {
       try {
         const r = await ai<ZuschnittAntwort>(zuschnittAuftrag(e, original, e.ziel, rueckmeldung))
         const kandidat = String(r?.gekuerzt ?? '').trim()
         const p = pruefeKuerzung(original, kandidat)
-        if (kandidat && p.ok && imZiel(p.wortzahlGekuerzt, e.ziel)) {
+        const laenge = laengeBewerten(p.wortzahlGekuerzt, e.ziel)
+        if (kandidat && p.ok && laenge === 'passt') {
           gekuerzt = kandidat
           weg = 'ki'
           worthilfen = pruefeWorthilfen(r?.worthilfen, kandidat, e.mediation ? e.zielsprache ?? e.sprache : e.sprache)
           if (r?.begruendung) protokoll.push(`Auswahl: ${r.begruendung}`)
         } else {
+          if (kandidat && p.ok && laenge === 'zuKurz' && p.wortzahlGekuerzt >= e.ziel.min && (!zuKurz || p.wortzahlGekuerzt > zuKurz.n))
+            zuKurz = { text: kandidat, n: p.wortzahlGekuerzt, antwort: r }
           rueckmeldung = [
             ...p.verstoesse,
-            kandidat && !imZiel(p.wortzahlGekuerzt, e.ziel)
-              ? `Der Ausschnitt hatte ${p.wortzahlGekuerzt} Wörter; verlangt sind ${e.ziel.min}–${e.ziel.max}.`
-              : ''
+            kandidat && laenge === 'zuKurz'
+              ? `Der Ausschnitt hatte ${p.wortzahlGekuerzt} Wörter – zu kurz. Verlangt sind ${e.ziel.min}–${e.ziel.max}, angestrebt etwa ${zielWortzahl(e.ziel)} Wörter (mindestens ${mitteDesBereichs(e.ziel)}). Weitere zusammenhängende Absätze aufnehmen.`
+              : '',
+            kandidat && laenge === 'zuLang' ? `Der Ausschnitt hatte ${p.wortzahlGekuerzt} Wörter – zu lang. Verlangt sind höchstens ${e.ziel.max}.` : ''
           ]
             .filter(Boolean)
             .join(' ')
@@ -483,10 +532,21 @@ export async function schneideZu(
       }
     }
     if (weg !== 'ki' && nOriginal > e.ziel.max) {
-      // Ersatzweg: Die App kürzt selbst – ganze Absätze, sicher wörtlich
-      gekuerzt = absatzAuswahl(original, e.ziel, [e.thema, e.teil].filter(Boolean).join(' '), e.sprache)
-      weg = 'app'
-      protokoll.push('Die KI-Kürzung ließ sich nicht verwenden (Wortlaut oder Länge); die App hat absatzweise gekürzt.')
+      // Ersatzweg: Die App kürzt selbst – ganze Absätze, sicher wörtlich, aufgefüllt bis nahe an das Ziel
+      const app = absatzAuswahl(original, e.ziel, [e.thema, e.teil].filter(Boolean).join(' '), e.sprache)
+      const nApp = wortzahl(app)
+      const soll = zielWortzahl(e.ziel)
+      if (zuKurz && Math.abs(zuKurz.n - soll) < Math.abs(nApp - soll)) {
+        // Der KI-Ausschnitt kommt dem Ziel trotzdem näher als die Absatzkürzung
+        gekuerzt = zuKurz.text
+        weg = 'ki'
+        worthilfen = pruefeWorthilfen(zuKurz.antwort?.worthilfen, zuKurz.text, e.mediation ? e.zielsprache ?? e.sprache : e.sprache)
+        protokoll.push(`Der Ausschnitt der KI liegt mit ${zuKurz.n} Wörtern unter der Mitte des Zielbereichs; die Absatzkürzung kam dem Ziel nicht näher.`)
+      } else {
+        gekuerzt = app
+        weg = 'app'
+        protokoll.push(`Die KI-Kürzung ließ sich nicht verwenden (Wortlaut oder Länge); die App hat absatzweise auf ${nApp} Wörter gekürzt.`)
+      }
     }
   }
 

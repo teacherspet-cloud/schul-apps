@@ -6,14 +6,14 @@ import type { TaskBlock, TextBlock } from '../src/renderer/src/modules/arbeitsbl
 import { suggestOutlineItem } from '../src/renderer/src/modules/arbeitsblatt/generation/generate'
 import { buildLearnerProfile } from '../src/renderer/src/modules/arbeitsblatt/didactics/profile'
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
-import { OPERATOREN_BLOCK_ID } from '../src/renderer/src/modules/klassenarbeit/didactics/operatorenliste'
+import { OPERATOREN_ANHANG_ID, OPERATOREN_BLOCK_ID } from '../src/renderer/src/modules/klassenarbeit/didactics/operatorenliste'
 import { arbeitsmaterialAblage, quellenangabenErmitteln } from '../src/renderer/src/modules/klassenarbeit/generation/generateExam'
 import { defaultExamMeta } from '../src/renderer/src/modules/klassenarbeit/model/defaults'
 import type { Exam, ExamPart } from '../src/renderer/src/modules/klassenarbeit/model/types'
 import { examToWorksheet } from '../src/renderer/src/modules/klassenarbeit/render/examWorksheet'
 
 /*
- * Befunde der Lehrkraft zur PDF „Test" (27.09.2026): Operatorenliste direkt unter die Aufgabe,
+ * Befunde der Lehrkraft zur PDF „Test" (27.09.2026): Operatorenliste direkt unter die Aufgabe (seit 01.10.2026 als Anhang am Ende),
  * keine Schreiblinien in der Sek II, vollständige Quellenangabe statt nackter Adresse, und der
  * Zauberstab der Gliederung nimmt einen Änderungswunsch an.
  */
@@ -55,12 +55,18 @@ const arbeit = (over: Partial<Exam['meta']>, blocks: (TaskBlock | TextBlock)[]):
   }) as unknown as Exam
 
 describe('Klausur: Operatoren unter der Aufgabe, keine Linien in der Sek II', () => {
-  it('die Operatorenliste steht direkt hinter der letzten Aufgabe, vor dem Material', () => {
+  /*
+   * 01.10.2026: Zwischen Sprachmittlungsaufgabe und M1 wirkte die Liste wie eine Hilfe zur Aufgabe
+   * (Befund der Lehrkraft). Jetzt steht sie als eigener Anhang mit Überschrift am Ende der Arbeit.
+   */
+  it('die Operatorenliste steht als Anhang am Ende der Arbeit – nicht zwischen Aufgabe und Material', () => {
     const ws = examToWorksheet(arbeit({}, [aufgabe('**Write** an email based on M1.'), text()]))
-    const ids = ws.sheets[0].blocks.map((b) => b.id)
-    const aufgabeId = ws.sheets[0].blocks.find((b) => b.type === 'task')!.id
-    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBe(ids.indexOf(aufgabeId) + 1)
-    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBeLessThan(ids.indexOf('m1'))
+    const bloecke = ws.sheets[0].blocks
+    const ids = bloecke.map((b) => b.id)
+    expect(ids.slice(-2)).toEqual([OPERATOREN_ANHANG_ID, OPERATOREN_BLOCK_ID])
+    expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBeGreaterThan(ids.indexOf('m1'))
+    const anhang = bloecke[bloecke.length - 2]
+    expect(anhang.type === 'divider' && anhang.title).toBe('Appendix')
   })
 
   it('Sek II: Schreibaufgaben bekommen keine Linien, Sek I behält sie', () => {

@@ -9,7 +9,10 @@ import {
   operatorenBlock,
   operatorenDerArbeit,
   operatorenlisteAktiv,
-  OPERATOREN_BLOCK_ID
+  operatorenVorbemerkungen,
+  ohneSchuelerErlaeuterung,
+  OPERATOREN_BLOCK_ID,
+  schuelerErlaeuterung
 } from '../src/renderer/src/modules/klassenarbeit/didactics/operatorenliste'
 import { defaultExamMeta } from '../src/renderer/src/modules/klassenarbeit/model/defaults'
 import type { Exam, ExamPart } from '../src/renderer/src/modules/klassenarbeit/model/types'
@@ -70,7 +73,7 @@ describe('Operatoren aus den Aufgaben', () => {
     expect(examToWorksheet(e).sheets[0].blocks.some((b) => b.id === OPERATOREN_BLOCK_ID)).toBe(false)
   })
 
-  it('Niedersachsen, Englisch: verwendete Operatoren mit amtlichem Wortlaut und Aufgabenbeispielen', () => {
+  it('Niedersachsen, Englisch: verwendete Operatoren mit amtlichem Wortlaut – knapp, ohne Aufgabenbeispiele', () => {
     const e = arbeit({}, [
       aufgabe('**Tick** the correct answer.'),
       aufgabe('**Outline** the review.', ['**Comment on** the ending.']),
@@ -81,8 +84,12 @@ describe('Operatoren aus den Aufgaben', () => {
     expect(b.gefunden.map((d) => d.operator)).toEqual(['tick', 'outline', 'comment (on)', 'write (+ text type)'])
     const block = operatorenBlock(e)
     expect(block?.type).toBe('infoBox')
-    expect(block && block.type === 'infoBox' ? block.body : '').toContain('**outline** (level I): give the main features')
-    expect(block && block.type === 'infoBox' ? block.body : '').toContain('Stand 1. Februar 2024')
+    const body = block?.body ?? ''
+    expect(body).toContain('- **outline**: give the main features')
+    expect(body).toContain('Stand 1. Februar 2024')
+    // „tick" hat in der Liste nur ein Aufgabenbeispiel, keine Erläuterung – auf dem Blatt stünde nur das Wort
+    expect(body).not.toContain('**tick**')
+    expect(ohneSchuelerErlaeuterung(b)).toEqual(['tick'])
     const ws = examToWorksheet(e)
     expect(ws.sheets[0].blocks[ws.sheets[0].blocks.length - 1].id).toBe(OPERATOREN_BLOCK_ID)
     // Unbekannter Operator: nicht auf dem Blatt, aber im Befund
@@ -99,21 +106,35 @@ describe('Operatoren aus den Aufgaben', () => {
     // Getrennte Operatoren werden zusammengesetzt: „**Setze** … **in Beziehung**" → in Beziehung setzen
     expect(b.gefunden.map((d) => d.operator)).toEqual(['analysieren', 'erläutern', 'Stellung nehmen', 'in Beziehung setzen'])
     expect(b.fehlend).toEqual([])
-    expect(operatorenBlock(e) && (operatorenBlock(e) as { body: string }).body).toContain('**Stellung nehmen** (AFB III)')
+    expect(operatorenBlock(e)?.body).toContain('- **Stellung nehmen**: Beurteilung mit zusätzlicher Reflexion')
   })
 
-  it('übernimmt alles aus der Liste: Beispiele, Kompetenzbereich, Vorbemerkung, Fächer-Einschränkung (28.09.2026)', () => {
-    // Mediation: die Erläuterung aus dem Kompetenzbereich Sprachmittlung, mit Vorbemerkung und Beispiel
+  /*
+   * Befund der Lehrkraft (01.10.2026): Unter einer Sprachmittlung stand die deutsche Vorbemerkung des
+   * Ministeriums („Es ist erforderlich, … in einen situativen Rahmen … einzubetten.") und das
+   * Aufgabenbeispiel der Liste. Seit 28.09.2026 setzte der Baustein ALLES aus der Liste aufs Blatt.
+   */
+  it('Schülerblatt: Operator und Erläuterung in der Sprache der Liste – keine Vorbemerkung, kein Beispiel, keine weiteren Spalten (01.10.2026)', () => {
+    // Mediation: die Erläuterung aus dem Kompetenzbereich Sprachmittlung
     const mediation = { ...arbeit({}, [aufgabe('**Write** an email based on M1.')]) }
     mediation.parts[0].formatId = 'en-mediation'
-    const body = (operatorenBlock(mediation) as { body: string }).body
-    expect(body).toContain('situativen Rahmen')
-    expect(body).toContain('**write (+ text type)**: produce a text with specific features')
-    expect(body).toContain('Example: “Using the information in the input article')
-    // Schreiben: mit Anforderungsbereich und mehreren Beispielen
-    const schreiben = (operatorenBlock(arbeit({}, [aufgabe('**Analyse** the way the atmosphere is created.')])) as { body: string }).body
-    expect(schreiben).toContain('**analyse, examine** (level II): describe and explain in detail')
-    expect(schreiben).toMatch(/Examples: “Analyse the way\(s\) in which/)
+    const body = operatorenBlock(mediation)?.body ?? ''
+    expect(body).toContain('- **write (+ text type)**: produce a text with specific features')
+    for (const verboten of ['situativen Rahmen', 'Es ist erforderlich', 'Example', 'Using the information in the input article', 'Sprachmittlung', 'level III'])
+      expect(body).not.toContain(verboten)
+    // Die Vorbemerkung bekommt nur die Lehrkraft
+    expect(operatorenVorbemerkungen(operatorenBefund(mediation))).toEqual([{ bereich: 'Sprachmittlung', text: expect.stringContaining('situativen Rahmen') }])
+    // Schreiben: ohne Anforderungsbereich und ohne Beispiele
+    const schreiben = operatorenBlock(arbeit({}, [aufgabe('**Analyse** the way the atmosphere is created.')]))?.body ?? ''
+    expect(schreiben).toContain('- **analyse, examine**: describe and explain in detail')
+    expect(schreiben).not.toMatch(/Examples?:|level II/)
+    // Derselbe Operator in zwei Teilen (Schreiben und Sprachmittlung): einmal
+    const zwei = arbeit({}, [aufgabe('**Write** a comment.')])
+    zwei.parts.push({ ...zwei.parts[0], id: 'p2', formatId: 'en-mediation', blocks: [aufgabe('**Write** an email based on M1.')] })
+    expect((operatorenBlock(zwei)?.body.match(/\*\*write \(\+ text type\)\*\*/g) ?? []).length).toBe(1)
+  })
+
+  it('übernimmt Kompetenzbereich und Fächer-Einschränkung der Liste (28.09.2026)', () => {
     // „darstellen" gilt nur für Erdkunde und Politik – in Geschichte ist es kein Operator der Liste
     const ge = arbeit({ subjectId: 'geschichte', subjectLabel: 'Geschichte' }, [
       aufgabe('**Stelle** die Entwicklung **dar**.'),
@@ -123,6 +144,30 @@ describe('Operatoren aus den Aufgaben', () => {
     expect(befundGe.gefunden.map((d) => d.operator)).toEqual(['interpretieren'])
     const ek = arbeit({ subjectId: 'erdkunde' as never, subjectLabel: 'Erdkunde' }, [aufgabe('**Stelle** die Entwicklung **dar**.')])
     expect(operatorenBefund(ek).gefunden.map((d) => d.operator)).toEqual(['darstellen'])
-    expect((operatorenBlock(ge) as { body: string }).body).toContain('Hinweis: Operator, der Leistungen in allen drei Anforderungsbereichen verlangt')
+    // Weitere Spalten der Liste („Hinweis: …") sind Auskunft für die Lehrkraft, nicht für das Blatt (01.10.2026)
+    expect(operatorenBlock(ge)?.body).not.toContain('Hinweis')
+  })
+})
+
+describe('Operatorenliste: Erläuterungen nur in der Sprache der Liste (01.10.2026)', () => {
+  it('deutsche Erläuterungen englischer Operatoren (HE, NRW Sek I) und angehängte Hinweise kommen nicht aufs Blatt', () => {
+    expect(schuelerErlaeuterung({ operator: 'describe', definition: 'give a detailed account of sth.' }, 'en')).toBe('give a detailed account of sth.')
+    expect(schuelerErlaeuterung({ operator: 'discuss', definition: 'eine These unter Abwägen von Pro- und Kontraargumenten hinterfragen' }, 'en')).toBe('')
+    expect(schuelerErlaeuterung({ operator: 'match', definition: 'Ordne die Aussagen korrekt zu.' }, 'en')).toBe('')
+    expect(schuelerErlaeuterung({ operator: 'analyser', definition: 'examiner un texte et en dégager les caractéristiques' }, 'fr')).not.toBe('')
+    const entwerfen = 'Darstellung einer Lösungsidee (verbal, Struktogramm oder Pseudocode)'
+    expect(schuelerErlaeuterung({ operator: 'entwerfen', definition: `${entwerfen} Besonderer Hinweis: für Entwürfe von Algorithmen …` }, 'de')).toBe(entwerfen)
+  })
+
+  it('Bestand: keine Erläuterung trägt eine Vorbemerkung oder ein Beispiel im Wortlaut', async () => {
+    const { BESTAND } = await import('../src/shared/operatoren/zugriff')
+    const { OPERATORENLISTEN } = await import('../src/renderer/src/modules/klassenarbeit/didactics/operatorenlistenDaten')
+    const alle = [
+      ...Object.values(BESTAND).flatMap((b) => b.listen.flatMap((l) => l.operatoren)),
+      ...Object.values(OPERATORENLISTEN).flatMap((f) => Object.values(f).flatMap((l) => l.operatoren))
+    ]
+    const muster = /(?:^|[\s(])(?:examples?|beispiele?|exemples?|ejemplos?|aufgabenbeispiel)\s*:|es ist erforderlich|(?:besonderer\s+)?hinweis\s*:|anmerkung\s*:/i
+    const verdaechtig = alle.filter((o) => muster.test(o.definition ?? ''))
+    expect(verdaechtig.map((o) => `${o.operator}: ${o.definition}`)).toEqual([])
   })
 })

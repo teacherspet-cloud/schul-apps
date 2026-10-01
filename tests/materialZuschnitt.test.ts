@@ -139,7 +139,8 @@ describe('Zuschnitt: wörtlich, roter Faden, Quellenangabe „(gekürzt)"', () =
 
   it('übernimmt einen wörtlichen Ausschnitt der KI im Zielbereich – mit Einleitung, Titel und vollständiger Quellenangabe', async () => {
     const calls: StructuredRequest[] = []
-    const gekuerzt = ausschnitt([0, 1, 3, 4, 5, 7])
+    // Sieben von neun Absätzen (593 Wörter): nah am Ziel von etwa 585 Wörtern (01.10.2026)
+    const gekuerzt = ausschnitt([0, 1, 2, 3, 4, 5, 7])
     const ai = async <T>(req: StructuredRequest): Promise<T> => {
       calls.push(req)
       if (req.schemaName === 'material_zuschnitt')
@@ -171,7 +172,8 @@ describe('Zuschnitt: wörtlich, roter Faden, Quellenangabe „(gekürzt)"', () =
     expect(auftrag).toContain('ROTER FADEN')
     expect(auftrag).toContain('Shakespeare today')
     expect(auftrag).toContain('2. en-mediation (dieser Teil)')
-    expect(auftrag).toContain('zwischen 450 und 650 Wörtern')
+    expect(auftrag).toContain('Zielbereich 450–650')
+    expect(auftrag).toContain('etwa 585 Wörter')
     expect(auftrag).toContain('Nicht übersetzen')
     expect(auftrag).toContain('NIEMALS UMSCHREIBEN')
     // Quellenangabe: Medium, Datum, Adresse, Abrufdatum – und der Kürzungsvermerk

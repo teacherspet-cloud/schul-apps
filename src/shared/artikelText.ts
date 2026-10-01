@@ -67,6 +67,25 @@ const DATUM = new RegExp(
 const WIDGET =
   /^(?:(?:lesezeit:?\s*)?\d{1,2}\s*(?:min\.?|minuten|minutes?)(?:\s*lesezeit|\s*read)?|teilen|artikel teilen|seite teilen|share|share this( article)?|drucken|seite drucken|print|e-?mail|per e-?mail (?:senden|teilen)|facebook|twitter|x|whatsapp|linkedin|pinterest|instagram|threads|mastodon|bluesky|link kopieren|copy link|merken|speichern|newsletter.*|jetzt abonnieren.*|abonnieren|abo|zum newsletter.*|mehr zum thema.*|mehr zu diesem thema.*|weitere artikel.*|weitere informationen:?|das könnte sie auch interessieren.*|das koennte sie auch interessieren.*|lesen sie auch.*|auch interessant.*|related( articles)?.*|read more.*|mehr lesen|weiterlesen|zurück|zurück zur übersicht|zur übersicht|nach oben|top|kommentare?(?:\s*\(\d+\))?|kommentieren|anzeige|werbung|advertisement|audio(?:version)?(?: anhören)?|artikel (?:vor)?lesen lassen|vorlesen|feedback|schlagworte:?.*|tags:?.*|themen:?\s*$)$/i
 
+/**
+ * Bewertungs-, Abstimmungs- und Zählerelemente (01.10.2026): Über einem Artikel stand „Bewertung: 2",
+ * und das Material hieß danach „M1 Bewertung: 2". Erfasst Sterne, „4,5 von 5", „(12 Bewertungen)",
+ * „Artikel bewerten", „War dieser Artikel hilfreich?", Kommentar-/Like-Zähler.
+ */
+const BEWERTUNG_MUSTER: RegExp[] = [
+  // „Bewertung: 2", „Rating: 4.5/5", „Durchschnittliche Bewertung 3,8", „Votes: 12"
+  /^(?:(?:durchschnittliche |gesamt|nutzer|leser)?bewertung(?:en)?|rating(?:s)?|average rating|user rating|votes?|stimmen|sterne|stars?|punkte|score|likes?|gefällt mir|kommentare?|comments?|shares?|aufrufe|views)\s*:?\s*[\d.,/\s()★☆⭐✩✪+-]*(?:sterne|stars?|von \d+|out of \d+|stimmen|votes?|bewertungen|ratings?)?\s*$/iu,
+  // „4,5 von 5 Sternen", „4 out of 5 stars", „3.8/5", „(12 Bewertungen)", „12 Kommentare"
+  /^\(?\s*\d+(?:[.,]\d+)?\s*(?:\/\s*\d+|von \d+|out of \d+)?\s*(?:sternen?|stars?|bewertungen|ratings?|stimmen|votes?|kommentare?|comments?|likes?|reviews?|rezensionen|punkte)?\s*\)?$/iu,
+  // Sternreihen „★★★★☆", „⭐⭐⭐"
+  /^[\s★☆⭐✩✪✭✮✯]+(?:\s*\(?\d+(?:[.,]\d+)?\)?)?$/u,
+  // Aufforderungen und Fragen des Bewertungswidgets
+  /^(?:(?:jetzt |artikel |beitrag |seite |text )?bewerten!?|(?:diesen |den )?(?:artikel|beitrag|text) bewerten|rate (?:this|the) (?:article|post|story))$/iu,
+  /^(?:(?:war|ist) (?:dieser|der) (?:artikel|beitrag|text|inhalt) hilfreich|(?:was|is) this (?:article|post|page|content) (?:helpful|useful))\??$/iu,
+  /^(?:(?:ja|nein|yes|no)\s*[/|]\s*(?:nein|ja|no|yes)|daumen (?:hoch|runter))$/iu
+]
+const istBewertung = (z: string): boolean => BEWERTUNG_MUSTER.some((r) => r.test(z))
+
 /** Bildnachweise und Rechtezeilen */
 const BILDNACHWEIS =
   /^(?:©|\(c\)|copyright\b|foto(?:s|grafie)?\s*:|bild(?:er|quelle)?\s*:|abbildung\s*:|abb\.\s*\d*:?|grafik\s*:|illustration\s*:|image\s*:|images?\s+(?:by|credit)|photo(?:s|graph)?\s*(?:by|:)|credit\s*:|quelle\s*:\s*(?:dpa|afp|reuters|ap|epd|kna|imago|getty))/i
@@ -98,6 +117,7 @@ function istBeiwerk(zeile: string): string | null {
   if (n <= 3 && RUBRIK.test(z)) return 'Rubrik'
   if (n <= 12 && DATUM.test(z)) return 'Datum'
   if (n <= 8 && WIDGET.test(z)) return 'Seitenelement'
+  if (n <= 12 && istBewertung(z)) return 'Bewertung'
   if (n <= 30 && (BILDNACHWEIS.test(z) || /©/.test(z) || (AGENTUR.test(z) && !SATZENDE.test(z)))) return 'Bildnachweis'
   if (n <= 40 && COOKIE.test(z) && /(akzeptier|zustimm|einverstanden|ablehnen|accept|agree|einstellungen)/i.test(z)) return 'Cookie-Hinweis'
   if (n <= 16 && BROTKRUMEN.test(z)) return 'Brotkrumen'
@@ -162,21 +182,27 @@ export function bereinigeArtikeltext(roh: string, opts: { seitentitel?: string }
     behalten.push(absatz)
   }
 
-  // Schlagzeile: die erste kurze Zeile ohne Satzschluss vor dem ersten langen Absatz
+  /*
+   * Schlagzeile: eine kurze Zeile ohne Satzschluss vor dem ersten langen Absatz. Stimmt eine mit
+   * dem Seitentitel überein, hat sie Vorrang; Bewertungen, Zähler, Knöpfe, Datum und Rubriken
+   * kommen nie in Frage (01.10.2026: „M1 Bewertung: 2").
+   */
   const ersterLanger = behalten.findIndex((a) => woerter(a).length >= 40)
   const kopf = ersterLanger < 0 ? 0 : ersterLanger
   const seitentitel = (opts.seitentitel ?? '').toLowerCase()
+  const kandidaten: { i: number; z: string; gleich: boolean }[] = []
   for (let i = 0; i < kopf; i++) {
     const a = behalten[i]
     const z = ohneFett(a)
-    const kurz = woerter(z).length <= 16
-    const gleichSeitentitel = seitentitel && woerter(z).length >= 2 && seitentitel.includes(z.toLowerCase().slice(0, 40))
-    if (kurz && (a.startsWith('**') || !SATZENDE.test(z) || gleichSeitentitel)) {
-      out.titel = z.replace(/[.:]$/, '')
-      entfernt.push(`Schlagzeile (als Titel verwendet): ${z}`)
-      behalten.splice(i, 1)
-      break
-    }
+    if (woerter(z).length > 16 || keineSchlagzeile(z)) continue
+    const gleich = Boolean(seitentitel) && woerter(z).length >= 2 && seitentitel.includes(z.toLowerCase().slice(0, 40))
+    if (a.startsWith('**') || !SATZENDE.test(z) || gleich) kandidaten.push({ i, z, gleich })
+  }
+  const schlagzeile = kandidaten.find((k) => k.gleich) ?? kandidaten[0]
+  if (schlagzeile) {
+    out.titel = schlagzeile.z.replace(/[.:]$/, '')
+    entfernt.push(`Schlagzeile (als Titel verwendet): ${schlagzeile.z}`)
+    behalten.splice(schlagzeile.i, 1)
   }
 
   /*
@@ -202,4 +228,110 @@ export function bereinigeArtikeltext(roh: string, opts: { seitentitel?: string }
 
   out.text = behalten.join('\n\n').trim()
   return out
+}
+
+// ---------- Titel des Materials (01.10.2026) ----------
+
+/**
+ * Taugt eine Zeile NICHT als Schlagzeile? Bewertungs- und Zählerelemente („Bewertung: 2",
+ * „★★★☆☆", „12 Kommentare"), Knöpfe („Teilen"), Datumszeilen, Rubriken, Brotkrumen,
+ * Bildnachweise und „Bezeichnung: Zahl"-Zeilen.
+ */
+export function keineSchlagzeile(zeile: string): boolean {
+  const z = ohneFett(zeile).trim()
+  const w = woerter(z)
+  if (!w.length || w.every((x) => /^\d+$/.test(x))) return true
+  if (istBewertung(z) || WIDGET.test(z) || DATUM.test(z) || BROTKRUMEN.test(z) || BILDNACHWEIS.test(z) || /©/.test(z)) return true
+  if (w.length <= 3 && RUBRIK.test(z)) return true
+  // „Bewertung: 2", „Kommentare: 5", „Lesezeit: 4 Min."
+  if (/^[\p{L} ]{2,30}:\s*[\d.,/]+\s*\p{L}{0,10}\.?$/u.test(z)) return true
+  // Kurze Zeilen mit Widget-Wörtern („Jetzt bewerten", „Artikel teilen")
+  return w.length <= 4 && /(?:bewert|rating|teilen|share|kommentar|comment|gefällt|like)/i.test(z)
+}
+
+/** Seitentitel ohne Website-Namen („Shakespeares Werke | LMU München" → „Shakespeares Werke") */
+export function ohneSeitenname(t: string): string {
+  const teile = t
+    .replace(/^(?:webseite|adresse|titel):\s*/i, '')
+    .split(/\s+[|–—-]\s+|\s+[|»·]\s*|\s*::\s*/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  if (!teile.length) return ''
+  // Gewöhnlich steht der Titel vorn; ist der vordere Teil nur ein kurzer Name („LMU | Shakespeares Werke: …"), der längste
+  const vorn = teile[0]
+  if (teile.length > 1 && woerter(vorn).length <= 2) {
+    const laengster = [...teile].sort((a, b) => woerter(b).length - woerter(a).length)[0]
+    if (woerter(laengster).length >= 3) return laengster
+  }
+  return vorn
+}
+
+const ENTITAETEN: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  ndash: '–',
+  mdash: '—',
+  bdquo: '„',
+  ldquo: '“',
+  rdquo: '”',
+  lsquo: '‘',
+  rsquo: '’',
+  laquo: '«',
+  raquo: '»',
+  hellip: '…',
+  auml: 'ä',
+  ouml: 'ö',
+  uuml: 'ü',
+  Auml: 'Ä',
+  Ouml: 'Ö',
+  Uuml: 'Ü',
+  szlig: 'ß'
+}
+
+function htmlZeile(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, c: string) => {
+      if (c[0] === '#') {
+        const n = c[1].toLowerCase() === 'x' ? parseInt(c.slice(2), 16) : parseInt(c.slice(1), 10)
+        return Number.isFinite(n) ? String.fromCodePoint(n) : m
+      }
+      return ENTITAETEN[c] ?? m
+    })
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Inhalt eines <meta>-Tags mit property/name = schluessel (Reihenfolge der Attribute beliebig) */
+function metaInhalt(html: string, schluessel: string): string {
+  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const tag = m[0]
+    const name = /\b(?:property|name)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1]
+    if (name?.toLowerCase() !== schluessel) continue
+    const inhalt = /\bcontent\s*=\s*"([^"]*)"|\bcontent\s*=\s*'([^']*)'/i.exec(tag)
+    if (inhalt) return htmlZeile(inhalt[1] ?? inhalt[2] ?? '')
+  }
+  return ''
+}
+
+/**
+ * Titel eines Artikels aus dem HTML der Seite (01.10.2026) – in dieser Rangfolge: og:title,
+ * twitter:title, <h1> im <article>, erstes <h1>, <title> ohne Website-Namen. Kandidaten, die
+ * nach Bewertung, Zähler, Knopf, Datum oder Rubrik aussehen, fallen weg.
+ */
+export function seitentitelAusHtml(html: string): string {
+  const artikel = /<article\b[^>]*>([\s\S]*?)<\/article>/i.exec(html)?.[1] ?? ''
+  const h1 = (quelle: string): string => htmlZeile(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i.exec(quelle)?.[1] ?? '')
+  const kandidaten = [
+    ohneSeitenname(metaInhalt(html, 'og:title')),
+    ohneSeitenname(metaInhalt(html, 'twitter:title')),
+    h1(artikel),
+    h1(html),
+    ohneSeitenname(htmlZeile(/<title[^>]*>([\s\S]{1,300}?)<\/title>/i.exec(html)?.[1] ?? ''))
+  ]
+  return kandidaten.find((k) => k && woerter(k).length <= 25 && !keineSchlagzeile(k)) ?? ''
 }
