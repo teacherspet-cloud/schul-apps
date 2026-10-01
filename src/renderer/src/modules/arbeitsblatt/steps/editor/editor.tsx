@@ -33,6 +33,7 @@ import { notifyError, notifySuccess, safeFileName } from '../../../../shared/uti
 import { checkTasksPerPage } from '../../didactics/checks'
 import { browserDocxDeps } from '../../export/browserDeps'
 import { buildWorksheetDocx } from '../../export/docx'
+import { wordSeitenQuelle } from '../../export/wordSeiten'
 import { fuelleBaustein, regenerateBlock } from '../../generation/generate'
 import { generateExample } from '../../generation/example'
 import { generateSolution } from '../../generation/solution'
@@ -980,19 +981,33 @@ export function EditorStep(): React.JSX.Element {
                   ws,
                   { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument },
                   { ...deps, deckblatt: ws.meta.coverPage ? await deckblattBilder(ws, layouts, logo, schoolName, citationStyle) : undefined }
+                ),
+              // Seitenauswahl (01.10.2026, export/wordSeiten.ts): Word bekommt die Inhalte der gewählten Seiten
+              seiten: wordSeitenQuelle(ws, layouts, { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument }, logo, schoolName, async (seiten) =>
+                buildWorksheetDocx(
+                  ws,
+                  { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument, seiten },
+                  { ...deps, deckblatt: ws.meta.coverPage && seiten.deckblatt ? await deckblattBilder(ws, layouts, logo, schoolName, citationStyle) : undefined }
                 )
+              )
             })
             if (keyMode === 'separate')
               dateien.push({
                 name: `${baseName}${suffix} - Lösungen.docx`,
                 filter: WORD_FILTER,
-                daten: () => buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, deps)
+                daten: () => buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, deps),
+                seiten: wordSeitenQuelle(ws, layouts, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, logo, schoolName, (seiten) =>
+                  buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei, seiten }, deps)
+                )
               })
             if (tafel.eigeneDatei)
               dateien.push({
                 name: `${baseName} - Tafelbild.docx`,
                 filter: WORD_FILTER,
-                daten: () => buildWorksheetDocx(ws, { sheetIds: [], includeKey: false, includeBoard: true }, deps)
+                daten: () => buildWorksheetDocx(ws, { sheetIds: [], includeKey: false, includeBoard: true }, deps),
+                seiten: wordSeitenQuelle(ws, layouts, { sheetIds: [], includeKey: false, includeBoard: true }, logo, schoolName, (seiten) =>
+                  buildWorksheetDocx(ws, { sheetIds: [], includeKey: false, includeBoard: true, seiten }, deps)
+                )
               })
           }
           dateien.push(...audioDateien(ws, baseName))

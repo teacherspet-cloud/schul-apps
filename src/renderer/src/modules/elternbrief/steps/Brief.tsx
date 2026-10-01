@@ -28,6 +28,7 @@ import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { FAMILIENSPRACHEN, spracheNach } from '../../../shared/familiensprachen'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, safeFileName } from '../../../shared/util'
+import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 import { briefNeuFormulieren, briefUebersetzen, teileNachuebersetzen, teilUeberarbeiten } from '../auftrag'
 import { briefDocx, briefHtml, type Briefkopf } from '../ausgabe'
 import { AKTIONEN, geaenderteTeile, gleicherAufbau, pruefeBrief, teilLesen, type Aktion } from '../bearbeiten'
@@ -137,7 +138,19 @@ export default function Brief(): React.JSX.Element | null {
               ...(pw ? { pdf: { signatur: { passwort: pw, grund: b.text?.betreff || 'Elternbrief', name: b.meta.absender || bk.lehrkraft } } } : {})
             }
           ]
-        : [{ name: `${name}.docx`, filter: WORD_FILTER, daten: () => briefDocx(b, kopf) }],
+        : [
+            {
+              name: `${name}.docx`,
+              filter: WORD_FILTER,
+              daten: () => briefDocx(b, kopf),
+              // Seitenauswahl (01.10.2026): je Fassung eine Seite – Word bekommt die gewählten Fassungen
+              seiten: {
+                html: () => briefHtml(b, kopf),
+                mitAuswahl: (_s, marken) => briefDocx(b, kopf, marken.map((m) => m.art ?? '')),
+                hinweis: 'Gespeichert werden die Fassungen (Sprachen) der gewählten Seiten.'
+              }
+            }
+          ],
       `Elternbrief${anzahl ? ` mit ${anzahl} Übersetzung${anzahl === 1 ? '' : 'en'}` : ''} gespeichert${pw ? ' und digital signiert' : ''}.`,
       ablageZiel('elternbrief', docId)
     ).catch(notifyError)
@@ -233,6 +246,8 @@ export default function Brief(): React.JSX.Element | null {
             <Button size="xs" variant="light" leftSection={<IconFileTypeDocx size={14} />} onClick={() => speichern('docx')}>
               Word
             </Button>
+            {/* Seitenauswahl (01.10.2026) für die nächste Ausgabe */}
+            <SeitenWahlSchalter kompakt />
           </Group>
         </Group>
 

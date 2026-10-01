@@ -3,7 +3,8 @@ import { kiMetaTag } from '@shared/kiKennzeichnung'
 import type { Worksheet } from '../model/types'
 import type { PagePlan } from './paginate'
 import { BoardPage } from './BoardView'
-import { contextFor, layoutKey, pageInfoFor, SheetPages } from './SheetPages'
+import { contextFor, layoutKey, pageInfoFor, SheetPages, zusatzSeiten } from './SheetPages'
+import { markiereSeiten } from '../../../shared/export/seitenAuswahl'
 import { deckblattVorschau } from './deckblattVorschau'
 import wsCss from './ws.css?raw'
 import { boardList } from '../didactics/boardDesign'
@@ -26,6 +27,9 @@ export interface WorksheetPrintSelection {
   audioAttached?: boolean
 }
 
+/** Zählgruppe der Seiten eines Blattes in der Seitenauswahl – Schüler- und Lösungsteil zählen getrennt */
+export const seitenGruppe = (sheetId: string, key: boolean): string => `${sheetId}:${key ? 'loesung' : 'blatt'}`
+
 /** Vollständiges HTML aller gewählten Seiten für Druck und PDF (identisch mit der Editor-Ansicht). */
 export function buildWorksheetHtml(
   ws: Worksheet,
@@ -38,16 +42,23 @@ export function buildWorksheetHtml(
   const parts: string[] = []
   const render = (key: boolean): void => {
     for (const sheet of sheets) {
+      const html = renderToStaticMarkup(
+        <SheetPages
+          ws={ws}
+          sheet={sheet}
+          plans={layouts.get(layoutKey(sheet.id, key))}
+          info={pageInfoFor(ws, sheet, logo, schoolName, key)}
+          context={{ ...contextFor(ws, sheet, key ? 'key' : 'print'), audioAttached: sel.audioAttached }}
+        />
+      )
+      // Seitenmarken für die Seitenauswahl (shared/export/seitenAuswahl.ts): je Blatt und Teil eine Zählung
+      const zusatz = zusatzSeiten(ws, sheet, key)
       parts.push(
-        renderToStaticMarkup(
-          <SheetPages
-            ws={ws}
-            sheet={sheet}
-            plans={layouts.get(layoutKey(sheet.id, key))}
-            info={pageInfoFor(ws, sheet, logo, schoolName, key)}
-            context={{ ...contextFor(ws, sheet, key ? 'key' : 'print'), audioAttached: sel.audioAttached }}
-          />
-        )
+        markiereSeiten(html, (i, n) => {
+          const art = i >= n - zusatz.length ? zusatz[i - (n - zusatz.length)] : undefined
+          const teil = key ? 'loesung' : art === 'hilfsblatt' || art === 'hilfekarten' ? 'material' : 'blatt'
+          return { teil, gruppe: seitenGruppe(sheet.id, key), index: i + 1, ...(art ? { art } : {}) }
+        })
       )
     }
   }
@@ -57,15 +68,21 @@ export function buildWorksheetHtml(
       EINZELNE Seiten, nicht ganze Blätter (gemeldet am 24.09.2026). Seit Paket 11 dieselben
       Seiten in derselben Lage wie im Editor – auch Lösungen, Hilfekarten und Tafelbild.
     */
-    parts.push(renderToStaticMarkup(<CoverPage ws={ws} vorschau={deckblattVorschau(ws, layouts, logo, schoolName)} />))
+    parts.push(
+      markiereSeiten(renderToStaticMarkup(<CoverPage ws={ws} vorschau={deckblattVorschau(ws, layouts, logo, schoolName)} />), () => ({
+        teil: 'deckblatt',
+        gruppe: 'deckblatt'
+      }))
+    )
   }
   if (!sel.keyOnly) render(false)
   if (sel.includeKey || sel.keyOnly) render(true)
   if (sel.includeBoard) {
     // Je gewähltem Tafelformat eine eigene Seite
-    for (const board of boardList(ws)) {
-      parts.push(renderToStaticMarkup(<BoardPage board={board} meta={ws.meta} accent={druckAkzent(ws)} fontFamily={ws.design.page.fontFamily} />))
-    }
+    boardList(ws).forEach((board, b) => {
+      const html = renderToStaticMarkup(<BoardPage board={board} meta={ws.meta} accent={druckAkzent(ws)} fontFamily={ws.design.page.fontFamily} />)
+      parts.push(markiereSeiten(html, () => ({ teil: 'tafel', gruppe: 'tafel', index: b + 1 })))
+    })
   }
 
   const title = (ws.meta.title || ws.meta.topic).replace(/[&<>"]/g, '')

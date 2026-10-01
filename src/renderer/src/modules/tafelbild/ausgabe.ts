@@ -72,7 +72,7 @@ function planungsHtml(t: Tafelbild): string {
     .map((l) => `<li><span class="farbe" style="background:${farbwert(medium === 'kreide' ? 'marker' : medium, l.farbe)}"></span>${esc(FARB_NAMEN.marker[l.farbe])}: ${esc(l.bedeutung)}</li>`)
     .join('')
   const loes = loesungen(tafel)
-  return `<section class="seite hoch"><h1>Planungshilfe: ${esc(t.inhalt.titel)}</h1>
+  return `<section class="seite hoch" data-sa-seite="planung"><h1>Planungshilfe: ${esc(t.inhalt.titel)}</h1>
 <p class="meta">${esc(STRUKTUR_NAMEN[t.inhalt.struktur])}${t.inhalt.strukturGrund ? ` – ${esc(t.inhalt.strukturGrund)}` : ''}</p>
 <h2>Aufbau im Unterricht</h2><table><thead><tr><th>Schritt</th><th>Phase</th><th>Impuls der Lehrkraft</th><th>Neu an der Tafel</th></tr></thead><tbody>${zeilen}</tbody></table>
 ${legende ? `<h2>Farben mit fester Bedeutung</h2><ul class="legende">${legende}</ul>` : ''}
@@ -91,7 +91,8 @@ export function pdfHtml(t: Tafelbild, w: PdfWahl, schule = ''): string {
       const m = svgMasse(svg)
       // Querformat: Breite füllt die Seite; hochkant: Höhe begrenzt
       const stil = f.seite === 'quer' ? `width:100%;max-height:${m.hoehe / m.breite > 0.62 ? '165mm' : 'none'}` : 'height:250mm;max-width:100%'
-      return `<section class="seite ${f.seite}"><div class="kopf"><span>${esc(s.titel)}</span><span>${kopf}</span></div><div class="flaeche">${svg.replace('<svg ', `<svg style="${stil}" `)}</div></section>`
+      // data-sa-seite: Seitenmarke für die Seitenauswahl (shared/export/seitenAuswahl.ts) – ohne Seitenzahlen
+      return `<section class="seite ${f.seite}" data-sa-seite="tafel"><div class="kopf"><span>${esc(s.titel)}</span><span>${kopf}</span></div><div class="flaeche">${svg.replace('<svg ', `<svg style="${stil}" `)}</div></section>`
     })
     .join('')
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${esc(t.inhalt?.titel || t.meta.title || 'Tafelbild')}</title><style>

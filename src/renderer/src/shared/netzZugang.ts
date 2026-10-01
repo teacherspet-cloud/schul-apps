@@ -18,6 +18,7 @@
  */
 import { buildApi } from '@shared/apiShape'
 import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
+import { pdfMitSeiten } from '@shared/seitenPdf'
 import { AuftragUnterbrochen, fuehreAuftragAus, kennungIn, REGISTER_KANAELE } from './netzAuftrag'
 import { AnmeldungAbgelaufen, netzVerbindung, OhneAuftragsregister } from './netzVerbindung'
 
@@ -344,9 +345,11 @@ export function netzZugangEinrichten(): void {
       feld.click()
     })
 
-  api.exporter.pdf = async (html, defaultName) => {
+  api.exporter.pdf = async (html, defaultName, opts) => {
     // `export:pdf` wuerde auf dem entfernten Rechner speichern; die Vorschau liefert dieselben Bytes
-    herunterladen(defaultName, await api.exporter.preview(html), 'application/pdf')
+    const bytes = await api.exporter.preview(html)
+    // Seitenauswahl bei Dokumenten ohne Seitenzahlen (shared/seitenPdf.ts)
+    herunterladen(defaultName, opts?.seiten?.length ? await pdfMitSeiten(bytes, opts.seiten) : bytes, 'application/pdf')
     return defaultName
   }
   /*

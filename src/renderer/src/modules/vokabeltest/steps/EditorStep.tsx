@@ -33,7 +33,8 @@ import { meldeAblage, speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '.
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { imageSize } from '../../../shared/images'
 import { notifyError, safeFileName } from '../../../shared/util'
-import { buildDocx } from '../export/docx'
+import { buildDocx, vtWordAuswahl } from '../export/docx'
+import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 import { standardMaskottchen, useMaskottchen } from '../../../shared/maskottchenStore'
 import { vokabeltestFigurVorschlag } from '../render/maskottchen'
 import { canRegenerateItem, createAdditionalBlock, regenerateBlock, regenerateItem } from '../generation/edit'
@@ -739,14 +740,25 @@ function ExportModal({
           {
             name: `${baseName}${suffix}.docx`,
             filter: WORD_FILTER,
-            daten: () => buildDocx(doc, { variantIds, includeKey: key === 'append', credits, layouts }, imageSize)
+            daten: () => buildDocx(doc, { variantIds, includeKey: key === 'append', credits, layouts }, imageSize),
+            // Seitenauswahl (01.10.2026): an den Seiten des Druck-HTML wählen, Word bekommt deren Aufgaben
+            seiten: {
+              html: () => buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts),
+              mitAuswahl: (_s, marken) =>
+                buildDocx(doc, { variantIds, includeKey: key === 'append', credits, layouts, auswahl: vtWordAuswahl(doc, layouts, marken) }, imageSize)
+            }
           }
         ]
         if (key === 'separate')
           dateien.push({
             name: `${baseName}${suffix} - Lösungen.docx`,
             filter: WORD_FILTER,
-            daten: () => buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts }, imageSize)
+            daten: () => buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts }, imageSize),
+            seiten: {
+              html: () => buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts),
+              mitAuswahl: (_s, marken) =>
+                buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts, auswahl: vtWordAuswahl(doc, layouts, marken) }, imageSize)
+            }
           })
         await speichereAusgabe(dateien, 'Word-Dokument gespeichert.', ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage))
       }
@@ -779,6 +791,8 @@ function ExportModal({
             </Checkbox.Group>
           )}
           <LoesungsWahl value={key} onChange={setKey} modus={mode} />
+          {/* Seitenauswahl (01.10.2026): beim Drucken steckt sie in der Druckvorschau */}
+          {mode !== null && mode !== 'print' && <SeitenWahlSchalter />}
           <Group justify="flex-end">
             <Button variant="default" onClick={onClose}>
               Abbrechen

@@ -1,6 +1,7 @@
 import { Button, Group, Modal, Radio, Stack } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { notifyError } from '../util'
+import { SeitenWahlSchalter } from './SeitenAuswahl'
 import { loesungsTexte, loesungsVorgabe, merkeLoesungsWahl, type AusgabeModus, type LoesungsModus } from '../loesungen'
 
 export { loesungsTexte, loesungsVorgabe, merkeLoesungsWahl }
@@ -71,6 +72,8 @@ export function AusgabeDialog({
       <Stack>
         {children}
         <LoesungsWahl value={loesung} onChange={setLoesung} modus={modus} erwartungshorizont={erwartungshorizont} />
+        {/* Seitenauswahl (01.10.2026): beim Drucken steckt sie in der Druckvorschau */}
+        {modus !== null && modus !== 'print' && <SeitenWahlSchalter />}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
             Abbrechen

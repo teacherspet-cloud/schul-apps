@@ -39,7 +39,9 @@ import {
 } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useLaufendeSchluessel } from '../../../shared/auftraege'
-import { speichereAusgabe, WORD_FILTER } from '../../../shared/export/ausgabe'
+import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import PrintPreview from '../../../shared/components/PrintPreview'
+import { SeitenWahlSchalter, useSeitenWahl } from '../../../shared/components/SeitenAuswahl'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { FAMILIENSPRACHEN, spracheNach } from '../../../shared/familiensprachen'
 import { thresholdsForSubject } from '../../../shared/gradeScale'
@@ -87,6 +89,21 @@ const hinweiseVon = (b: Bogen | undefined): string[] => (Array.isArray(b?.hinwei
  * Seiten wie das Blatt in der Ansicht. Oben der Knopf „Weitere Abgabe" (Fenster WeitereAbgabe.tsx):
  * Die neue Abgabe erscheint aufgeklappt in der Liste, mit Lader, bis ihr Bogen da ist.
  */
+/**
+ * Bögen auf den gewählten Seiten – aus den Seitenzahlen der Bögen im Druck-HTML (blattLayout.ts,
+ * `data-bl-seiten`). Passt die Summe nicht zur Seitenzahl des PDFs, null (= alle Bögen).
+ */
+function abgabenDerSeiten(html: string, seiten: number[], anzahl: number): Set<string> | null {
+  const ids = new Set<string>()
+  let seite = 0
+  for (const m of html.matchAll(/data-bl-blatt="([^"]*)"(?:\s+data-bl-seiten="(\d+)")?/g)) {
+    const n = Number(m[2] ?? 1)
+    for (let k = 1; k <= n; k++) if (seiten.includes(seite + k)) ids.add(m[1])
+    seite += n
+  }
+  return seite === anzahl ? ids : null
+}
+
 export default function Boegen(): React.JSX.Element | null {
   const { dok: r, update, docId } = useRueckmeldung()
   const settings = useAppSettings((s) => s.settings)
@@ -95,6 +112,7 @@ export default function Boegen(): React.JSX.Element | null {
   const [tts, setTts] = useState(false)
   const [markerBei, setMarkerBei] = useState<string | null>(null)
   const [sperre, setSperre] = useState<{ ids: string[]; weiter: () => void } | null>(null)
+  const [druck, setDruck] = useState<string | null>(null)
   const [suche, setSuche] = useState('')
   const [offen, setOffen] = useState<string[]>(() => ladeOffen(docId))
   const [weitere, setWeitere] = useState(false)
@@ -155,10 +173,29 @@ export default function Boegen(): React.JSX.Element | null {
       const basis = safeFileName(`${d.meta.title || d.grundlage.titel || 'Rückmeldung'}${liste.length === 1 ? ` - ${liste[0].name.trim() || liste[0].kuerzel}` : ''}`)
       void (async () => {
         // PDF: Seiten gemessen wie in der Ansicht (auch für Bögen, die gerade zugeklappt sind)
-        const datei =
+        // Word mit Seitenauswahl (01.10.2026): gewählt wird an den Seiten des PDFs, Word bekommt die Bögen dieser Seiten
+        const seitenHtml = dateiart === 'docx' && useSeitenWahl.getState().gewuenscht ? await boegenDruckHtml(d, liste, { zeichen }) : null
+        const datei: AusgabeDatei =
           dateiart === 'pdf'
             ? { name: `${basis}.pdf`, html: await boegenDruckHtml(d, liste, { zeichen }) }
-            : { name: `${basis}.docx`, filter: WORD_FILTER, daten: async () => boegenDocx(d, liste, { zeichen, scanBilder: await scanBilderFuer(liste) }) }
+            : {
+                name: `${basis}.docx`,
+                filter: WORD_FILTER,
+                daten: async () => boegenDocx(d, liste, { zeichen, scanBilder: await scanBilderFuer(liste) }),
+                ...(seitenHtml
+                  ? {
+                      seiten: {
+                        html: seitenHtml,
+                        hinweis: 'Gespeichert werden die Bögen, die auf den gewählten Seiten stehen.',
+                        mitAuswahl: async (seiten: number[], _m: unknown, anzahl: number) => {
+                          const ids = abgabenDerSeiten(seitenHtml, seiten, anzahl)
+                          const auswahl = ids ? liste.filter((a) => ids.has(a.id)) : liste
+                          return boegenDocx(d, auswahl, { zeichen, scanBilder: await scanBilderFuer(auswahl) })
+                        }
+                      }
+                    }
+                  : {})
+              }
         await speichereAusgabe([datei], liste.length === 1 ? 'Rückmeldung gespeichert.' : `${liste.length} Rückmeldungen gespeichert.`, ablage())
       })().catch(notifyError)
     })
@@ -167,8 +204,9 @@ export default function Boegen(): React.JSX.Element | null {
     mitFreigabe(ids, () => {
       const f = frisch(ids)
       if (!f?.liste.length) return
+      // Druckvorschau mit Seitenauswahl (01.10.2026) statt gleich des Druckdialogs von Windows
       void boegenDruckHtml(f.d, f.liste, { zeichen })
-        .then((html) => window.api.exporter.print(html))
+        .then((html) => setDruck(html))
         .catch(notifyError)
     })
 
@@ -227,6 +265,7 @@ export default function Boegen(): React.JSX.Element | null {
 
   return (
     <ScrollArea h="100%">
+      <PrintPreview html={druck} title="Drucken – Rückmeldungen" onClose={() => setDruck(null)} />
       <Container size="xl" py="lg">
         <Group justify="space-between" mb="md">
           <Group gap="md">
@@ -257,6 +296,8 @@ export default function Boegen(): React.JSX.Element | null {
             <Button size="xs" variant="light" leftSection={<IconFileTypeDocx size={14} />} disabled={!fertige.length} onClick={() => speichern(alleIds, 'docx')}>
               Alle als Word
             </Button>
+            {/* Seitenauswahl (01.10.2026) für die nächste Ausgabe */}
+            <SeitenWahlSchalter kompakt />
             {m.elternfassung && (
               <>
                 {uebersetzungOffen && (

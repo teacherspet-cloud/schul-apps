@@ -23,6 +23,8 @@ import type { Block, TestDocument, Variant } from '../model/types'
 import { geltendeFachfarbe } from '../../../shared/fachfarben'
 import { blockHelp } from '../render/helpTexts'
 import type { TestLayouts } from '../render/useTestLayout'
+import { vtSeitenGruppe } from '../render/printHtml'
+import type { SeitenMarke } from '../../../shared/export/seitenAuswahl'
 
 import {
   A4_WIDTH as PAGE_WIDTH,
@@ -77,6 +79,28 @@ export interface DocxOptions {
   credits?: string[]
   /** Seitenaufteilung aus dem Editor: gleiche Schriftgröße und Seitenumbrüche vor den gleichen Aufgaben */
   layouts?: TestLayouts | null
+  /**
+   * Seitenauswahl (01.10.2026): je Zählgruppe (render/printHtml.tsx, `vtSeitenGruppe`) die Aufgaben
+   * der gewählten Seiten. Word bricht selbst um – ausgegeben wird, was auf diesen Seiten steht.
+   */
+  auswahl?: Map<string, Set<string>>
+}
+
+/** Aus den Marken der gewählten Seiten die Aufgaben je Variante und Teil (für `auswahl`) */
+export function vtWordAuswahl(doc: TestDocument, layouts: TestLayouts | null | undefined, marken: SeitenMarke[]): Map<string, Set<string>> {
+  const aus = new Map<string, Set<string>>()
+  for (const m of marken) {
+    const gruppe = m.gruppe ?? ''
+    const trenn = gruppe.lastIndexOf(':')
+    const variante = doc.variants.find((v) => v.id === gruppe.slice(0, trenn))
+    if (!variante) continue
+    const ids = aus.get(gruppe) ?? new Set<string>()
+    aus.set(gruppe, ids)
+    const layout = (gruppe.slice(trenn + 1) === 'loesung' ? layouts?.key : layouts?.student)?.get(variante.id)
+    const seite = layout?.pages[(m.index ?? 1) - 1]
+    for (const id of seite ? seite.items.map((it) => it.id) : variante.blocks.map((b) => b.id)) ids.add(id)
+  }
+  return aus
 }
 
 export async function buildDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer): Promise<Uint8Array> {
@@ -99,6 +123,9 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
 
   const addSections = async (mode: Mode): Promise<void> => {
     for (const v of variants) {
+      // Seitenauswahl: nur Varianten mit gewählten Seiten, davon nur deren Aufgaben
+      const gewaehlt = opts.auswahl?.get(vtSeitenGruppe(v.id, mode === 'key'))
+      if (opts.auswahl && !gewaehlt) continue
       const children: (Paragraph | Table)[] = [...(mode === 'print' ? await figurAbsatz(ctx, 'winkend') : []), ...header(ctx, v, mode)]
       const layout = (mode === 'key' ? opts.layouts?.key : opts.layouts?.student)?.get(v.id)
       // Aufgaben, die im Editor oben auf einer neuen Seite beginnen
@@ -109,6 +136,7 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
           .map((it) => it.id)
       )
       for (let i = 0; i < v.blocks.length; i++) {
+        if (gewaehlt && !gewaehlt.has(v.blocks[i].id)) continue
         children.push(...(await blockContent(ctx, v.blocks[i], i + 1, mode, pageStarts.has(v.blocks[i].id))))
       }
       if (mode === 'print') children.push(...(await figurAbsatz(ctx, 'jubelnd')))
@@ -133,6 +161,8 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
   }
   if (!opts.keyOnly) await addSections('print')
   if (opts.includeKey || opts.keyOnly) await addSections('key')
+  // Ganz ohne Inhalt würde Word die Datei nicht öffnen
+  if (!sections.length) sections.push({ children: [new Paragraph('')] })
 
   const document = new Document({
     creator: 'Schul-Apps',

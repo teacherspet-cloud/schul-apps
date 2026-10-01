@@ -38,6 +38,7 @@ import type { Worksheet } from '../model/types'
 import { aiCall, useArbeitsblatt } from '../store'
 import { brauchtBild } from '../../../shared/stundenverlauf/einstiegsimpuls'
 import { EinstiegsimpulsKarte, impulsBildHolen } from './EinstiegsimpulsKarte'
+import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 
 /**
  * Reiter „Stundenverlauf" im Editor des Arbeitsblatts (Großprogramm 0.4, F4): mit KI aus dem
@@ -168,6 +169,8 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
             <Button size="xs" variant="light" leftSection={<IconFileTypePdf size={14} />} onClick={() => speichern('pdf')}>
               PDF
             </Button>
+            {/* Seitenauswahl (01.10.2026) – beim PDF; Word bricht den Verlauf selbst um */}
+            <SeitenWahlSchalter kompakt beschreibung="Gilt für das PDF: Vor dem Speichern erscheinen die Seiten zum Auswählen." />
             <Tooltip label="Stundenverlauf entfernen">
               <ActionIcon variant="subtle" color="red" aria-label="Stundenverlauf entfernen" onClick={() => update((w) => delete w.stundenverlauf)}>
                 <IconTrash size={16} />

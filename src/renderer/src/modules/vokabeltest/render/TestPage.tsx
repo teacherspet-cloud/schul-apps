@@ -110,9 +110,10 @@ export function TestPage({
           {pi === pages.length - 1 && vermerkSichtbar(doc.ki, doc.kiVermerk, showsAnswers(mode)) && (
             <div className="vt-ki-vermerk">{kiVermerkText(doc.ki!, 'de')}</div>
           )}
+          {/* Seitenzahl mit Marken – bei einer Seitenauswahl neu gezählt (shared/export/seitenAuswahl.ts) */}
           {pages.length > 1 && (
-            <div className="vt-page-number">
-              {pi + 1} / {pages.length}
+            <div className="vt-page-number" data-sa-zahl="">
+              <span data-sa-nr="">{pi + 1}</span> / <span data-sa-von="">{pages.length}</span>
             </div>
           )}
         </div>

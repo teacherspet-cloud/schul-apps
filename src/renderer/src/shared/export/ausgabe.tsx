@@ -7,6 +7,9 @@ import { imNetz } from '../netzZugang'
 import { aufIos } from '../plattform'
 import { useAppSettings } from '../settingsStore'
 import { notifyError, notifySuccess } from '../util'
+import { frageSeitenWahl, nimmSeitenWunsch, type SeitenDokument } from '../components/SeitenAuswahl'
+import { renderPages } from '../components/PrintPreview'
+import { seitenMarken, waehleSeitenImHtml, type SeitenMarke } from './seitenAuswahl'
 import { istIservPfad, iservAnzeige } from '@shared/iserv'
 import { mitOrt } from './ausgabeOrt'
 
@@ -28,17 +31,38 @@ import { mitOrt } from './ausgabeOrt'
  *    export/ablageZiel.ts). Die iPad-App legt dann – solange die Ablage eingeschaltet ist –
  *    geordnet unter Dokumente/Schulmaterial/<Fach>/<Themenbereich> ab, ohne Ordnerwahl; die
  *    Meldung nennt den Ort in der Dateien-App und bietet „Teilen" an. Der PC ignoriert das Ziel.
+ *  - Seit 01.10.2026 lassen sich Seiten wählen: Ist im Ausgabe-Dialog „Nur bestimmte Seiten"
+ *    angekreuzt (components/SeitenAuswahl.tsx), erscheinen vor dem Speichern die Seiten aller
+ *    Dateien. PDFs mit Seitenzahlen werden VOR dem Umrechnen gekürzt und neu gezählt
+ *    (export/seitenAuswahl.ts), PDFs ohne Seitenzahlen danach geschnitten (shared/seitenPdf.ts),
+ *    Word-Dateien aus den Inhalten der gewählten Seiten neu gebaut (`seiten` an der Datei),
+ *    mehrere Bilder (PNG) als je eine Seite gewählt.
  */
 
 type PdfZusatz = {
   fillable?: boolean
   audio?: { id: string; fileName: string; title: string; base64: string }[]
   signatur?: { passwort: string; grund?: string; name?: string }
+  /** Nur diese Seiten – setzt die Seitenauswahl bei Dokumenten ohne Seitenzahlen */
+  seiten?: number[]
+}
+
+/**
+ * Seitenwahl für Dateien, die nicht aus HTML entstehen (Word): Ausgewählt wird an den Seiten des
+ * Druck-HTML derselben Inhalte; `mitAuswahl` baut die Datei dann nur aus diesen Seiten.
+ */
+export interface SeitenQuelle {
+  /** Druck-HTML (gern als Funktion – gebaut wird es erst, wenn Seiten gewählt werden) */
+  html: string | (() => string)
+  /** `marken` der gewählten Seiten (leer, wenn das HTML keine trägt); `anzahl`: Seiten des ganzen Dokuments */
+  mitAuswahl: (seiten: number[], marken: SeitenMarke[], anzahl: number) => Promise<Uint8Array | string>
+  /** Hinweis im Auswahl-Dialog; Standard: der zu Word */
+  hinweis?: string
 }
 
 export type AusgabeDatei =
   /** Fertige Daten (Word, MP3, …) – gern als Funktion, dann wird erst nach der Ordnerwahl gebaut */
-  | { name: string; daten: Uint8Array | string | (() => Promise<Uint8Array | string>); filter: FileFilter[] }
+  | { name: string; daten: Uint8Array | string | (() => Promise<Uint8Array | string>); filter: FileFilter[]; seiten?: SeitenQuelle }
   /** PDF aus HTML; das Umrechnen übernimmt der Hauptprozess */
   | { name: string; html: string; pdf?: PdfZusatz }
 
@@ -115,12 +139,100 @@ export function meldeAblage(pfade: string | string[], meldung: string): void {
   })
 }
 
+export const WORD_SEITEN_HINWEIS =
+  'Word setzt die Seiten selbst: Gespeichert werden die Inhalte der gewählten Seiten, die Seitenzahlen zählt Word für die Auswahl neu. Die Umbrüche können von der Vorschau abweichen.'
+
+const istBild = (d: AusgabeDatei): boolean => !('html' in d) && d.filter.some((f) => f.extensions.some((e) => /^(png|jpe?g|webp)$/i.test(e)))
+
+/** Seitenbilder eines Druck-HTML (wie in der Druckvorschau) */
+const vorschauVon = async (html: string): Promise<string[]> => renderPages(await window.api.exporter.preview(html))
+
+/**
+ * Seiten wählen lassen und die Dateien entsprechend kürzen; null = abgebrochen.
+ * Dateien ohne Seiten (MP3, PowerPoint) bleiben, wie sie sind.
+ */
+async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | null> {
+  const ergebnis: (AusgabeDatei | null)[] = [...dateien]
+  const eintraege: { dok: SeitenDokument; anwenden: (seiten: number[]) => void }[] = []
+  dateien.forEach((d, i) => {
+    if ('html' in d) {
+      const marken = seitenMarken(d.html)
+      let anzahl = 0
+      eintraege.push({
+        dok: {
+          name: d.name,
+          teile: marken.map((m) => m.teil),
+          bilder: async () => {
+            const b = await vorschauVon(d.html)
+            anzahl = b.length
+            return b
+          }
+        },
+        anwenden: (seiten) => {
+          if (!seiten.length) ergebnis[i] = null
+          else if (seiten.length === anzahl) ergebnis[i] = d
+          // Seiten mit Marken: vor dem Umrechnen wählen und neu zählen; passt die Zahl nicht (Überlauf), im PDF schneiden
+          else if (marken.length && marken.length === anzahl) ergebnis[i] = { ...d, html: waehleSeitenImHtml(d.html, seiten) }
+          else ergebnis[i] = { ...d, pdf: { ...d.pdf, seiten } }
+        }
+      })
+    } else if (d.seiten) {
+      const q = d.seiten
+      const html = typeof q.html === 'function' ? q.html() : q.html
+      const marken = seitenMarken(html)
+      let anzahl = 0
+      eintraege.push({
+        dok: {
+          name: d.name,
+          teile: marken.map((m) => m.teil),
+          bilder: async () => {
+            const b = await vorschauVon(html)
+            anzahl = b.length
+            return b
+          },
+          hinweis: q.hinweis ?? WORD_SEITEN_HINWEIS
+        },
+        anwenden: (seiten) => {
+          if (!seiten.length) ergebnis[i] = null
+          // Passen Marken und Seiten nicht zusammen (Überlauf), lässt sich nichts zuordnen – dann die ganze Datei
+          else if ((marken.length && marken.length !== anzahl) || seiten.length === anzahl) ergebnis[i] = d
+          else ergebnis[i] = { name: d.name, filter: d.filter, daten: () => q.mitAuswahl(seiten, marken.length ? seiten.map((s) => marken[s - 1]) : [], anzahl) }
+        }
+      })
+    }
+  })
+  // Mehrere Bilder (Tafelbild als PNG): jedes Bild ist eine Seite
+  const bilder = dateien.flatMap((d, i) => (istBild(d) && !('html' in d) && !d.seiten ? [{ d, i }] : []))
+  if (bilder.length > 1) {
+    const daten = await Promise.all(bilder.map(({ d }) => (!('html' in d) ? (typeof d.daten === 'function' ? d.daten() : d.daten) : '')))
+    eintraege.push({
+      dok: {
+        name: `${bilder.length} Bilder`,
+        bilder: daten.map((x) => (typeof x === 'string' ? x : URL.createObjectURL(new Blob([new Uint8Array(x).slice().buffer], { type: 'image/png' })))),
+        hinweis: 'Jedes Bild ist eine eigene Datei.'
+      },
+      anwenden: (seiten) =>
+        bilder.forEach(({ d, i }, k) => {
+          ergebnis[i] = seiten.includes(k + 1) && !('html' in d) ? { name: d.name, filter: d.filter, daten: daten[k] } : null
+        })
+    })
+  }
+  if (!eintraege.length) return dateien
+  const auswahl = await frageSeitenWahl(eintraege.map((e) => e.dok))
+  if (!auswahl) return null
+  eintraege.forEach((e, k) => e.anwenden(auswahl[k] ?? []))
+  return ergebnis.filter((d): d is AusgabeDatei => d !== null)
+}
+
 /**
  * Speichert die Dateien und meldet es. Liefert die Zahl der gespeicherten Dateien – 0 heißt:
  * abgebrochen (dann gibt es auch keine Meldung). `ziel`: wohin das Material gehört (iPad).
  */
-export async function speichereAusgabe(dateien: AusgabeDatei[], meldung: string, ziel?: AblageZiel): Promise<number> {
-  if (!dateien.length) return 0
+export async function speichereAusgabe(alle: AusgabeDatei[], meldung: string, ziel?: AblageZiel): Promise<number> {
+  if (!alle.length) return 0
+  // „Nur bestimmte Seiten" im Ausgabe-Dialog: erst die Seiten wählen (gilt für genau diese Ausgabe)
+  const dateien = nimmSeitenWunsch() ? await mitSeitenWahl(alle) : alle
+  if (!dateien?.length) return 0
   // iPad: Ort wählen (Gerät, IServ, Dateien-App, Teilen – export/ausgabeOrt.tsx), EINMAL für alle Dateien
   const mitGewaehltemOrt = await mitOrt(ziel, dateien.length)
   if (mitGewaehltemOrt === null) return 0

@@ -62,7 +62,8 @@ interface Seite {
 
 function seiten(b: Elternbrief, codes?: string[]): Seite[] {
   if (!b.text) return []
-  const out: Seite[] = [{ text: b.text, sprache: 'de', rtl: false }]
+  // `codes` wählt die Fassungen (Seitenauswahl, 01.10.2026) – mit „de" auch die deutsche
+  const out: Seite[] = !codes || codes.includes('de') ? [{ text: b.text, sprache: 'de', rtl: false }] : []
   for (const u of b.uebersetzungen) {
     if (codes && !codes.includes(u.code)) continue
     const s = spracheNach(u.code)
@@ -82,7 +83,8 @@ export function briefHtml(b: Elternbrief, kopf: Briefkopf, codes?: string[]): st
   const html = seiten(b, codes)
     .map((s) => {
       const t = s.text
-      return `<section class="seite" lang="${s.sprache}" dir="${s.rtl ? 'rtl' : 'ltr'}">
+      // data-sa-art: die Fassung – damit wählt die Seitenauswahl auch im Word-Export (Brief.tsx)
+      return `<section class="seite" lang="${s.sprache}" dir="${s.rtl ? 'rtl' : 'ltr'}" data-sa-seite="brief" data-sa-art="${s.sprache}">
 <header dir="ltr"><div class="absender">${absenderZeilen(kopf, b.meta.absender)
         .map(esc)
         .join('<br>')}</div>${kopf.logo ? `<img src="${kopf.logo}" alt="">` : ''}</header>

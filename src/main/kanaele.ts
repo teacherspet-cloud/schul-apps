@@ -44,6 +44,7 @@ import { generateSvgImage } from './services/ai/svg'
 import { KiPlaetze } from './services/ai/kiPlaetze'
 import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche, attrappeQuelleLaden, attrappeQuellensuche } from './services/ai/attrappe'
 import { istAbbruch } from '@shared/abbruch'
+import { pdfMitSeiten } from '@shared/seitenPdf'
 import { freierDateiname } from '@shared/dateiname'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
 import { createProvider, createTextProvider, getModelList, healModelSelection, refreshProvider } from './services/ai/models'
@@ -177,6 +178,8 @@ type PdfExtras = {
   audio?: { id: string; fileName: string; title: string; base64: string }[]
   /** Digital signieren mit dem Zertifikat aus den Einstellungen (Elternbriefe, 29.09.2026) */
   signatur?: { passwort: string; grund?: string; name?: string }
+  /** Nur diese Seiten (1-basiert), geschnitten VOR Metadaten und Signatur (shared/seitenPdf.ts) */
+  seiten?: number[]
 }
 
 export function registriereKanaele(handle: Handle, u: Umgebung): void {
@@ -582,7 +585,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   const pdfBytes = async (html: string, opts?: PdfExtras): Promise<Buffer> => {
     const audio = (opts?.audio ?? []).map((a) => ({ id: a.id, fileName: a.fileName, title: a.title, bytes: Buffer.from(a.base64, 'base64') }))
     // Nur den teuren Weg gehen, wenn auch etwas hinzukommt
-    const roh = opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }, messen) : await u.druck.pdf(html)
+    const ganz = opts?.fillable || audio.length ? await htmlToPdfWithExtras(html, { fillable: opts?.fillable, audio }, messen) : await u.druck.pdf(html)
+    // Seitenauswahl bei Dokumenten ohne Seitenzahlen – mit Seitenzahlen wählt die Oberfläche schon im HTML aus
+    const roh = opts?.seiten?.length ? await pdfMitSeiten(new Uint8Array(ganz), opts.seiten) : ganz
     // Erzeuger und KI-Kennzeichnung ins Info-Verzeichnis (Großprogramm 0.4)
     const mitMeta = await mitPdfMetadaten(new Uint8Array(roh), html)
     if (!opts?.signatur) return Buffer.from(mitMeta)

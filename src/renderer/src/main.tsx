@@ -20,6 +20,7 @@ gestenEinrichten()
 import { MantineProvider } from '@mantine/core'
 import { useColorScheme } from '@mantine/hooks'
 import { Notifications } from '@mantine/notifications'
+import { SeitenWahlHost } from './shared/components/SeitenAuswahl'
 import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt'
 import { aufIos } from './shared/plattform'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
@@ -55,6 +56,8 @@ function Root(): React.JSX.Element {
   return (
     <MantineProvider theme={theme} cssVariablesResolver={themeCssVariables} forceColorScheme={scheme}>
       <Notifications position="top-right" />
+      {/* Seitenauswahl vor dem Speichern (shared/export/ausgabe.tsx) */}
+      <SeitenWahlHost />
       {/* iPad: wohin speichern – Gerät, IServ, Dateien-App, Teilen (shared/export/ausgabeOrt.tsx) */}
       <AusgabeOrtDialog />
       <App />

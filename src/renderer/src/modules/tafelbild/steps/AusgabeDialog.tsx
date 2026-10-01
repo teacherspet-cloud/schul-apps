@@ -3,6 +3,8 @@ import { IconFileTypePdf, IconPhoto, IconPresentation, IconPrinter } from '@tabl
 import { useEffect, useState } from 'react'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { speichereAusgabe, type AusgabeDatei } from '../../../shared/export/ausgabe'
+import PrintPreview from '../../../shared/components/PrintPreview'
+import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 import { useAppSettings } from '../../../shared/settingsStore'
 import { notifyError, safeFileName } from '../../../shared/util'
 import { pdfHtml, pngFuer, pptxFuer, standardPdfWahl, type PdfWahl } from '../ausgabe'
@@ -19,6 +21,8 @@ export const PPTX_FILTER = [{ name: 'PowerPoint', extensions: ['pptx'] }]
 export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafelbild; docId: string; offen: boolean; schliessen: () => void }): React.JSX.Element {
   const [w, setW] = useState<PdfWahl>(() => standardPdfWahl(t))
   const [laeuft, setLaeuft] = useState<string | null>(null)
+  /** Druckvorschau mit Seitenauswahl (01.10.2026) – vorher öffnete „Drucken" gleich den Dialog von Windows */
+  const [druck, setDruck] = useState<string | null>(null)
   const schule = useAppSettings((s) => s.settings.schoolName)
   useEffect(() => {
     if (offen) setW(standardPdfWahl(t))
@@ -41,7 +45,7 @@ export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafe
   }
 
   const pdf = (): Promise<void> => los('pdf', async () => void (await speichereAusgabe([{ name: `${name}.pdf`, html: pdfHtml(t, w, schule) }], 'Tafelbild als PDF gespeichert.', ziel())))
-  const drucken = (): Promise<void> => los('druck', () => window.api.exporter.print(pdfHtml(t, w, schule)))
+  const drucken = (): Promise<void> => los('druck', async () => setDruck(pdfHtml(t, w, schule)))
   const png = (): Promise<void> =>
     los('png', async () => {
       const dateien: AusgabeDatei[] = []
@@ -63,48 +67,53 @@ export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafe
   )
 
   return (
-    <Modal opened={offen} onClose={schliessen} title="Tafelbild ausgeben" size="lg">
-      <Stack gap="sm">
-        <Text size="sm" fw={500}>
-          Formate
-        </Text>
-        <Group gap="md">
-          {t.tafeln.map((x) => (
-            <Checkbox
-              key={x.format}
-              label={formatInfo(x.format).label}
-              checked={w.formate.includes(x.format)}
-              onChange={(e) => setW({ ...w, formate: e.currentTarget.checked ? [...w.formate, x.format] : w.formate.filter((f) => f !== x.format) })}
-            />
-          ))}
-        </Group>
-        <Text size="sm" fw={500}>
-          Fassungen (PDF, Drucken, PNG, PowerPoint)
-        </Text>
-        <Stack gap={6}>
-          {schalter('vollstaendig', 'Vollständiges Tafelbild')}
-          {schalter('luecke', 'Lückenfassung (mit Wortspeicher)', !hatLuecken)}
-          {schalter('niveaus', 'Differenziert ★ / ★★ (nur PDF)')}
-          {schalter('planung', 'Planungshilfe: Aufbau in Schritten, Farbbedeutung, Lösungen (nur PDF)')}
+    <>
+      <PrintPreview html={druck} title={`Drucken – ${standardName(t)}`} onClose={() => setDruck(null)} />
+      <Modal opened={offen} onClose={schliessen} title="Tafelbild ausgeben" size="lg">
+        <Stack gap="sm">
+          <Text size="sm" fw={500}>
+            Formate
+          </Text>
+          <Group gap="md">
+            {t.tafeln.map((x) => (
+              <Checkbox
+                key={x.format}
+                label={formatInfo(x.format).label}
+                checked={w.formate.includes(x.format)}
+                onChange={(e) => setW({ ...w, formate: e.currentTarget.checked ? [...w.formate, x.format] : w.formate.filter((f) => f !== x.format) })}
+              />
+            ))}
+          </Group>
+          <Text size="sm" fw={500}>
+            Fassungen (PDF, Drucken, PNG, PowerPoint)
+          </Text>
+          <Stack gap={6}>
+            {schalter('vollstaendig', 'Vollständiges Tafelbild')}
+            {schalter('luecke', 'Lückenfassung (mit Wortspeicher)', !hatLuecken)}
+            {schalter('niveaus', 'Differenziert ★ / ★★ (nur PDF)')}
+            {schalter('planung', 'Planungshilfe: Aufbau in Schritten, Farbbedeutung, Lösungen (nur PDF)')}
+          </Stack>
+          <Text size="xs" c="dimmed">
+            PowerPoint baut das Tafelbild Folie für Folie in den Aufbauschritten auf. PNG in hoher Auflösung für Beamer und digitale Tafel.
+          </Text>
+          {/* Seitenauswahl (01.10.2026): für PDF und PNG; beim Drucken in der Druckvorschau */}
+          <SeitenWahlSchalter beschreibung="Gilt für PDF (Seiten) und PNG (Bilder): Vor dem Speichern erscheinen sie zum Auswählen." />
+          <Group gap="xs" mt="sm">
+            <Button leftSection={<IconFileTypePdf size={16} />} loading={laeuft === 'pdf'} disabled={!tafeln.length} onClick={() => void pdf()} data-tb-pdf>
+              PDF
+            </Button>
+            <Button variant="light" leftSection={<IconPhoto size={16} />} loading={laeuft === 'png'} disabled={!tafeln.length} onClick={() => void png()} data-tb-png>
+              PNG
+            </Button>
+            <Button variant="light" leftSection={<IconPresentation size={16} />} loading={laeuft === 'pptx'} disabled={!tafeln.length} onClick={() => void pptx()} data-tb-pptx>
+              PowerPoint
+            </Button>
+            <Button variant="default" leftSection={<IconPrinter size={16} />} loading={laeuft === 'druck'} disabled={!tafeln.length} onClick={() => void drucken()}>
+              Drucken
+            </Button>
+          </Group>
         </Stack>
-        <Text size="xs" c="dimmed">
-          PowerPoint baut das Tafelbild Folie für Folie in den Aufbauschritten auf. PNG in hoher Auflösung für Beamer und digitale Tafel.
-        </Text>
-        <Group gap="xs" mt="sm">
-          <Button leftSection={<IconFileTypePdf size={16} />} loading={laeuft === 'pdf'} disabled={!tafeln.length} onClick={() => void pdf()} data-tb-pdf>
-            PDF
-          </Button>
-          <Button variant="light" leftSection={<IconPhoto size={16} />} loading={laeuft === 'png'} disabled={!tafeln.length} onClick={() => void png()} data-tb-png>
-            PNG
-          </Button>
-          <Button variant="light" leftSection={<IconPresentation size={16} />} loading={laeuft === 'pptx'} disabled={!tafeln.length} onClick={() => void pptx()} data-tb-pptx>
-            PowerPoint
-          </Button>
-          <Button variant="default" leftSection={<IconPrinter size={16} />} loading={laeuft === 'druck'} disabled={!tafeln.length} onClick={() => void drucken()}>
-            Drucken
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
+      </Modal>
+    </>
   )
 }

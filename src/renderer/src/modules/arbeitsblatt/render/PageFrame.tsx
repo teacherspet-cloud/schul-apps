@@ -410,8 +410,20 @@ export function PageFrame({
   const d = info.design;
   const insets = contentInsets(d);
   const first = page === 1;
-  const footerTexts = [d.footer.left, d.footer.center, d.footer.right].map(
-    (slot) => footerSlotText(slot, info, page, pages)
+  /*
+   * Die Seitenzahl mit Marken (01.10.2026): Bei einer Seitenauswahl zählt
+   * shared/export/seitenAuswahl.ts die Zahlen für die Auswahl neu („Seite 1 / 5" statt „1 / 9").
+   */
+  const footerTexts: React.ReactNode[] = [d.footer.left, d.footer.center, d.footer.right].map(
+    (slot) =>
+      slot === "pageNumber" && pages > 1 ? (
+        <span data-sa-zahl="">
+          {SEITE[info.language ?? "de"]} <span data-sa-nr="">{page}</span> /{" "}
+          <span data-sa-von="">{pages}</span>
+        </span>
+      ) : (
+        footerSlotText(slot, info, page, pages)
+      )
   );
   const style = {
     fontFamily: d.page.fontFamily,

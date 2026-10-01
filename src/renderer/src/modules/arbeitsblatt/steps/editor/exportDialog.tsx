@@ -2,6 +2,7 @@ import { Button, Checkbox, Group, Modal, Stack } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { LoesungsWahl, merkeLoesungsWahl, type LoesungsModus } from '../../../../shared/components/LoesungsWahl'
 import { notifyError } from '../../../../shared/util'
+import { SeitenWahlSchalter } from '../../../../shared/components/SeitenAuswahl'
 import { tafelbildHinweis } from '../../export/tafelbildZiel'
 import '../../render/ws.css'
 import '../../../vokabeltest/steps/editor.css'
@@ -94,6 +95,8 @@ export function ExportModal({
            */
           <LoesungsWahl value={key} onChange={setKey} modus={mode} />
         )}
+        {/* Seitenauswahl (01.10.2026): beim Drucken steckt sie in der Druckvorschau */}
+        {mode !== null && mode !== 'print' && <SeitenWahlSchalter />}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
             Abbrechen

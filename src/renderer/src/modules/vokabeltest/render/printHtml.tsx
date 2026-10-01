@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { kiMetaTag } from '@shared/kiKennzeichnung'
+import { markiereSeiten } from '../../../shared/export/seitenAuswahl'
 import type { ImageRef, TestDocument } from '../model/types'
 import { RenderContext } from './RenderContext'
 import testCss from './test.css?raw'
@@ -13,6 +14,9 @@ export interface PrintSelection {
   /** Nur Lösungen */
   keyOnly?: boolean
 }
+
+/** Zählgruppe einer Testvariante in der Seitenauswahl – Test und Lösungen zählen getrennt */
+export const vtSeitenGruppe = (variantId: string, key: boolean): string => `${variantId}:${key ? 'loesung' : 'blatt'}`
 
 export function imageCredits(doc: TestDocument): string[] {
   const credits = new Set<string>()
@@ -47,13 +51,13 @@ export function buildPrintHtml(doc: TestDocument, sel: PrintSelection, layouts?:
   const render = (mode: 'print' | 'key'): void => {
     for (const v of variants) {
       const layout = (mode === 'key' ? layouts?.key : layouts?.student)?.get(v.id)
-      pages.push(
-        renderToStaticMarkup(
-          <RenderContext.Provider value={{ mode, language: doc.settings.targetLanguage }}>
-            <TestPage doc={doc} variant={v} layout={layout} footer={footer} />
-          </RenderContext.Provider>
-        )
+      const html = renderToStaticMarkup(
+        <RenderContext.Provider value={{ mode, language: doc.settings.targetLanguage }}>
+          <TestPage doc={doc} variant={v} layout={layout} footer={footer} />
+        </RenderContext.Provider>
       )
+      // Seitenmarken für die Seitenauswahl: je Variante und Teil eine Zählung
+      pages.push(markiereSeiten(html, (i) => ({ teil: mode === 'key' ? 'loesung' : 'blatt', gruppe: vtSeitenGruppe(v.id, mode === 'key'), index: i + 1 })))
     }
   }
   if (!sel.keyOnly) render('print')

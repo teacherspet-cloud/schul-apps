@@ -1,6 +1,7 @@
 import type { Worksheet } from '../model/types'
 import type { PagePlan } from '../render/paginate'
-import { buildWorksheetHtml } from '../render/printHtml'
+import { buildWorksheetHtml, type WorksheetPrintSelection } from '../render/printHtml'
+import { wordSeitenQuelle } from './wordSeiten'
 import { buildWorksheetDocx } from './docx'
 import { browserDocxDeps } from './browserDeps'
 import { speichereAusgabe, WORD_FILTER, type AusgabeDatei } from '../../../shared/export/ausgabe'
@@ -29,14 +30,10 @@ export interface BlattQuelle {
   ziel?: AblageZiel
 }
 
-const html = (q: BlattQuelle, teil: 'blatt' | 'loesung', anhaengen: boolean): string =>
-  buildWorksheetHtml(
-    q.ws,
-    q.layouts,
-    teil === 'loesung' ? { sheetIds: q.sheetIds, includeKey: false, keyOnly: true } : { sheetIds: q.sheetIds, includeKey: anhaengen },
-    q.logo,
-    q.schoolName
-  )
+const auswahl = (q: BlattQuelle, teil: 'blatt' | 'loesung', anhaengen: boolean): WorksheetPrintSelection =>
+  teil === 'loesung' ? { sheetIds: q.sheetIds, includeKey: false, keyOnly: true } : { sheetIds: q.sheetIds, includeKey: anhaengen }
+
+const html = (q: BlattQuelle, teil: 'blatt' | 'loesung', anhaengen: boolean): string => buildWorksheetHtml(q.ws, q.layouts, auswahl(q, teil, anhaengen), q.logo, q.schoolName)
 
 /** Für die Druckvorschau: das Blatt und – bei „separat drucken" – die Lösungen als eigener Auftrag */
 export function druckAusgabe(q: BlattQuelle, loesung: LoesungsModus): { html: string; loesung: { html: string; titel: string } | null } {
@@ -57,12 +54,11 @@ export function speichereBlatt(q: BlattQuelle, art: 'docx' | 'pdf', loesung: Loe
       dateien.push({
         name: `${name}.docx`,
         filter: WORD_FILTER,
-        daten: () =>
-          buildWorksheetDocx(
-            q.ws,
-            teil === 'loesung' ? { sheetIds: q.sheetIds, includeKey: false, keyOnly: true } : { sheetIds: q.sheetIds, includeKey: loesung === 'append' },
-            browserDocxDeps(q.logo, q.schoolName)
-          )
+        daten: () => buildWorksheetDocx(q.ws, auswahl(q, teil, loesung === 'append'), browserDocxDeps(q.logo, q.schoolName)),
+        // Seitenauswahl (01.10.2026): an den Seiten des Druck-HTML wählen, Word bekommt deren Inhalte
+        seiten: wordSeitenQuelle(q.ws, q.layouts, auswahl(q, teil, loesung === 'append'), q.logo, q.schoolName, (seiten) =>
+          buildWorksheetDocx(q.ws, { ...auswahl(q, teil, loesung === 'append'), seiten }, browserDocxDeps(q.logo, q.schoolName))
+        )
       })
   }
   return speichereAusgabe(dateien, art === 'pdf' ? 'PDF gespeichert.' : 'Word-Dokument gespeichert.', q.ziel)

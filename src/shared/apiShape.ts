@@ -451,6 +451,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
           fillable?: boolean
           audio?: { id: string; fileName: string; title: string; base64: string }[]
           signatur?: { passwort: string; grund?: string; name?: string }
+          /** Nur diese Seiten (1-basiert) – für Dokumente ohne Seitenzahlen (shared/seitenPdf.ts) */
+          seiten?: number[]
         },
         /** Wohin die Datei gehört (iPad: Schulmaterial; der PC ignoriert es) */
         ziel?: AblageZiel
@@ -460,7 +462,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
         folder: string,
         html: string,
         name: string,
-        opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[] }
+        opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[]; seiten?: number[] }
       ) => call<string>('export:pdf-in-folder', folder, html, name, opts),
       fillablePreview: (html: string, audio?: { id: string; fileName: string; title: string; base64: string }[]) =>
         call<Uint8Array>('export:fillable-preview', html, audio),

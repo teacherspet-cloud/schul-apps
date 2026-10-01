@@ -33,6 +33,7 @@ import { imageCredits, isHelpCard, isPhraseSheet } from '../../render/SheetPages
 import { contentInsets } from '../../render/PageFrame'
 import { blockLayout, materialNumbersFor, pageInfoFor, taskNumbersFor, zurAnzeige } from '../../render/SheetPages'
 import { boardList } from '../../didactics/boardDesign'
+import { seitenGruppe } from '../../render/printHtml'
 import { phraseSheetModus } from '../../generation/prompts'
 import { zeigtUebersetzung } from '../../didactics/phraseRules'
 import { anredeFuerMeta } from '../../didactics/anrede'
@@ -48,14 +49,23 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
   const sheets = ws.sheets.filter((s) => opts.sheetIds.includes(s.id))
   const add = async (key: boolean): Promise<void> => {
     // Verweise „M{karte}" → „M3", wie am Bildschirm
-    for (const sheet of sheets) sections.push(...(await sheetSections(ws, zurAnzeige(sheet), key, deps)))
+    for (const sheet of sheets) {
+      // Seitenauswahl: nur Blätter mit gewählten Seiten, und davon nur deren Inhalte
+      const filter = opts.seiten ? opts.seiten.blaetter.get(seitenGruppe(sheet.id, key)) : undefined
+      if (opts.seiten && !filter) continue
+      sections.push(...(await sheetSections(ws, zurAnzeige(sheet), key, deps, filter)))
+    }
   }
   // Das Deckblatt steht vor allem anderen – aber nicht vor einer reinen Lösungsdatei
-  if (deps.deckblatt && ws.meta.coverPage && !opts.keyOnly) sections.push(await deckblattAbschnitt(deps.deckblatt, deps.raster))
+  if (deps.deckblatt && ws.meta.coverPage && !opts.keyOnly && (!opts.seiten || opts.seiten.deckblatt))
+    sections.push(await deckblattAbschnitt(deps.deckblatt, deps.raster))
   if (!opts.keyOnly) await add(false)
   if (opts.includeKey || opts.keyOnly) await add(true)
   // Je gewähltem Tafelformat ein eigener Abschnitt
-  if (opts.includeBoard) for (const board of boardList(ws)) sections.push(await boardSection(ws, board, deps.raster))
+  if (opts.includeBoard)
+    for (const [b, board] of boardList(ws).entries()) if (!opts.seiten || opts.seiten.tafeln.has(b + 1)) sections.push(await boardSection(ws, board, deps.raster))
+  // Ganz ohne Inhalt würde Word die Datei nicht öffnen
+  if (!sections.length) sections.push({ children: [new Paragraph('')] })
 
   const info = pageInfoFor(ws, ws.sheets[0], deps.logo, deps.schoolName, false)
   const doc = new Document({
@@ -209,7 +219,16 @@ export async function schwebenderBehaelter(
   })
 }
 
-export async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, deps: WorksheetDocxDeps): Promise<ISectionOptions[]> {
+export async function sheetSections(
+  ws: Worksheet,
+  sheet: Sheet,
+  key: boolean,
+  deps: WorksheetDocxDeps,
+  /** Seitenauswahl: nur diese Bausteine und Schlussseiten (export/wordSeiten.ts) */
+  filter?: { bausteine: Set<string>; zusatz: Set<string> }
+): Promise<ISectionOptions[]> {
+  const zeigt = (block: WsBlock, side?: WsBlock): boolean => !filter || filter.bausteine.has(block.id) || Boolean(side && filter.bausteine.has(side.id))
+  const zusatzGewaehlt = (art: string): boolean => !filter || filter.zusatz.has(art)
   const info = pageInfoFor(ws, sheet, deps.logo, deps.schoolName, key)
   // Mit Fachfarbe (Paket 10a) – pageInfoFor hat sie schon eingesetzt, Word soll aussehen wie die Vorschau
   const d = info.design
@@ -277,6 +296,7 @@ export async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, d
   const ownPhrasePage = phraseSheetModus(ws.meta) === 'blatt'
   // `true`: auch die frei platzierten Bausteine – siehe `blockLayout`, sie gingen sonst verloren
   for (const { block, side, sideAt } of blockLayout(sheet.blocks, ownPhrasePage, true)) {
+    if (!zeigt(block, side)) continue
     const main = await blockContent(ctx, block, numbers)
     if (!main.length) continue
     /*
@@ -320,7 +340,7 @@ export async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, d
   flush(false)
 
   // Hilfsblatt mit nützlichen Ausdrücken auf einer eigenen Schlussseite, wenn so gewählt
-  const phraseBlocks = !key && ownPhrasePage ? sheet.blocks.filter(isPhraseSheet) : []
+  const phraseBlocks = !key && ownPhrasePage && zusatzGewaehlt('hilfsblatt') ? sheet.blocks.filter(isPhraseSheet) : []
   if (phraseBlocks.length) {
     children = []
     for (const block of phraseBlocks) children.push(...((await blockContent(ctx, block, numbers)) as Child[]))
@@ -328,7 +348,7 @@ export async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, d
   }
 
   // Hilfekarten auf einer eigenen Schlussseite (nur im Schülerblatt)
-  const helpCards = key ? [] : sheet.blocks.filter(isHelpCard)
+  const helpCards = key || !zusatzGewaehlt('hilfekarten') ? [] : sheet.blocks.filter(isHelpCard)
   if (helpCards.length) {
     children = [
       new Paragraph({ spacing: { after: 160 }, children: [run('Tipp- und Hilfekarten', { bold: true, size: ctx.size + 4 })] }),
@@ -345,7 +365,7 @@ export async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, d
    * Sekundarstufe II steht die Punktetabelle 15 … 0 (shared/notenpunkte.ts), sonst der
    * Schlüssel 1–6.
    */
-  const scaleGroups = key ? (ctx.ws.meta.gradeScale?.groups ?? []).filter((g) => g.points > 0) : []
+  const scaleGroups = key && zusatzGewaehlt('lehrkraft') ? (ctx.ws.meta.gradeScale?.groups ?? []).filter((g) => g.points > 0) : []
   if (scaleGroups.length) {
     const punkte = ctx.ws.meta.gradeScale?.punkte
     children = [new Paragraph({ spacing: { after: 160 }, children: [run('Notenschlüssel', { bold: true, size: ctx.size + 4 })] })]
@@ -383,7 +403,7 @@ export async function sheetSections(ws: Worksheet, sheet: Sheet, key: boolean, d
   }
 
   // Bildnachweise auf einer eigenen Schlussseite – das Blatt selbst bleibt frei davon
-  const credits = key ? [] : imageCredits(sheet)
+  const credits = key || !zusatzGewaehlt('nachweise') ? [] : imageCredits(sheet)
   if (credits.length) {
     children = [
       new Paragraph({ spacing: { after: 160 }, children: [run('Bildnachweise', { bold: true, size: ctx.size + 4 })] }),

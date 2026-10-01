@@ -1,14 +1,15 @@
-import { Alert, Box, Button, Center, Group, Loader, Modal, NumberInput, ScrollArea, SegmentedControl, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Box, Button, Center, Group, Loader, Modal, NumberInput, ScrollArea, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 import { IconPrinter } from '@tabler/icons-react'
 import * as pdfjs from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PrinterInfo } from '../../../../preload/index'
-import { parsePageRanges } from '../printRanges'
+import { alleSeiten, neueNummern, seitenMarken, waehleSeitenImHtml, type SeitenMarke } from '../export/seitenAuswahl'
 import { druckeImBrowser, imNetz } from '../netzZugang'
 import { aufIos } from '../plattform'
 import { notifyError, notifySuccess } from '../util'
 import { ZoomFlaeche } from '../touch/zoom'
+import { SeitenAuswahlFelder, SeitenHaken, umschalten } from './SeitenAuswahl'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -43,15 +44,35 @@ export async function pdfTexte(data: Uint8Array): Promise<string[]> {
 
 const PRINTER_KEY = 'schulapps.printer'
 
+/** Seitenzahl, mit der eine gewählte Seite gedruckt wird – zur Anzeige unter dem Seitenbild */
+const druckZahl = (nr: { nr: number; von: number }): string => (nr.von > 1 ? `Seite ${nr.nr} / ${nr.von}` : 'ohne Seitenzahl')
+
+/** Aufeinanderfolgende Seiten als Bereiche für den Drucker */
+function bereicheVon(seiten: number[]): { from: number; to: number }[] {
+  const aus: { from: number; to: number }[] = []
+  for (const s of seiten) {
+    const letzter = aus[aus.length - 1]
+    if (letzter && letzter.to === s - 1) letzter.to = s
+    else aus.push({ from: s, to: s })
+  }
+  return aus
+}
+
 /**
  * Druckvorschau mit Seitenansicht: zeigt genau die Seiten, die gedruckt werden,
- * und druckt mit gewähltem Drucker, Exemplaren, Seitenbereich, Duplex und Farbe.
+ * und druckt mit gewähltem Drucker, Exemplaren, Seitenauswahl, Duplex und Farbe.
  *
  * `loesung`: Lösungen (bzw. Erwartungshorizont) als EIGENER Druckauftrag nach dem Blatt.
  * Anlass (25.09.2026): „Lösungen als eigene Datei" gab es beim Drucken nicht – wer sie
  * wählte, bekam gar keine Lösungen. Ein eigener Auftrag ist das Gegenstück zur eigenen Datei:
- * 28 Blätter für die Klasse, aber nur ein Lösungsblatt. Deshalb eigene Exemplarzahl; der
- * Seitenbereich gilt nur für das Blatt.
+ * 28 Blätter für die Klasse, aber nur ein Lösungsblatt. Deshalb eigene Exemplarzahl.
+ *
+ * SEITENAUSWAHL (01.10.2026): Seiten per Eingabe („1-4, 6"), Antippen der Seitenbilder oder
+ * Schnellauswahl (components/SeitenAuswahl.tsx). Blatt und Lösungen bilden EINE Seitenfolge, wie
+ * die Vorschau sie zeigt. Gedruckt wird die Auswahl als eigenes Dokument: Seiten mit Marken
+ * werden vor dem Umrechnen gewählt und neu gezählt („Seite 1 / 5" statt „Seite 1 / 9",
+ * export/seitenAuswahl.ts). Dokumente ohne Marken (ohne Seitenzahlen) druckt der PC mit
+ * Seitenbereichen; auf dem iPad und im Browser wählt dort der Druckdialog des Geräts.
  */
 export default function PrintPreview({
   html,
@@ -71,12 +92,16 @@ export default function PrintPreview({
   const [printers, setPrinters] = useState<PrinterInfo[]>([])
   const [printer, setPrinter] = useState<string | null>(null)
   const [copies, setCopies] = useState(1)
-  const [rangeMode, setRangeMode] = useState<'all' | 'range'>('all')
-  const [range, setRange] = useState('')
+  /** Gewählte Seiten (1-basiert) über Blatt UND Lösungen, wie die Vorschau sie zeigt */
+  const [auswahl, setAuswahl] = useState<number[]>([])
+  const [auswahlGueltig, setAuswahlGueltig] = useState(true)
+  /** Die Seite, die gerade am meisten zu sehen ist – für „Aktuelle Seite" */
+  const [sichtbar, setSichtbar] = useState(1)
+  const vorschauRef = useRef<HTMLDivElement>(null)
   const [duplex, setDuplex] = useState<'simplex' | 'longEdge' | 'shortEdge'>('simplex')
   const [color, setColor] = useState<'color' | 'bw'>('bw')
   const [printing, setPrinting] = useState(false)
-  // iPad: Drucker, Exemplare, Seiten, Duplex und Farbe wählt AirPrint selbst
+  // iPad: Drucker, Exemplare, Duplex und Farbe wählt AirPrint selbst
   const ios = aufIos()
 
   useEffect(() => {
@@ -85,6 +110,8 @@ export default function PrintPreview({
     setPages(null)
     setLoesungPages(null)
     setLoesungExemplare(1)
+    setAuswahl([])
+    setAuswahlGueltig(true)
     setError(null)
     window.api.exporter
       .preview(html)
@@ -118,19 +145,76 @@ export default function PrintPreview({
   }, [html]) // eslint-disable-line react-hooks/exhaustive-deps -- `loesung` entsteht immer zusammen mit `html`
 
   const pageCount = pages?.length ?? 0
-  const ranges = useMemo(() => (rangeMode === 'range' ? parsePageRanges(range, pageCount) : undefined), [rangeMode, range, pageCount])
-  const selected = useMemo(() => {
-    if (!pages) return new Set<number>()
-    if (!ranges) return new Set(pages.map((_, i) => i + 1))
-    const set = new Set<number>()
-    for (const r of ranges) for (let p = r.from; p <= r.to; p++) set.add(p)
-    return set
-  }, [pages, ranges])
-  const invalidRange = rangeMode === 'range' && ranges === null
-  const sheets = duplex === 'simplex' ? selected.size : Math.ceil(selected.size / 2)
   const loesungSeiten = loesungPages?.length ?? 0
-  const loesungBlaetter = duplex === 'simplex' ? loesungSeiten : Math.ceil(loesungSeiten / 2)
-  const mitLoesung = Boolean(loesung) && loesungExemplare > 0
+  const bereit = Boolean(pages) && (!loesung || Boolean(loesungPages))
+  const gesamt = pageCount + loesungSeiten
+
+  // Marken der Seiten (Teil, Zählgruppe) – nur, wenn sie zu den erzeugten Seiten passen
+  const blattMarken = useMemo(() => (html ? seitenMarken(html) : []), [html])
+  const loesungMarken = useMemo(() => (loesung ? seitenMarken(loesung.html) : []), [loesung])
+  const blattMarkiert = blattMarken.length > 0 && blattMarken.length === pageCount
+  const loesungMarkiert = loesungMarken.length > 0 && loesungMarken.length === loesungSeiten
+  const teile = useMemo(
+    () => [
+      ...Array.from({ length: pageCount }, (_, i) => (blattMarkiert ? blattMarken[i].teil : undefined)),
+      ...Array.from({ length: loesungSeiten }, (_, i) => (loesungMarkiert ? loesungMarken[i].teil : 'loesung'))
+    ],
+    [pageCount, loesungSeiten, blattMarkiert, loesungMarkiert, blattMarken, loesungMarken]
+  )
+  // Sobald alle Seiten da sind: alles gewählt
+  useEffect(() => {
+    if (bereit) setAuswahl(alleSeiten(gesamt))
+  }, [bereit, gesamt])
+
+  /** Auswahl getrennt nach Blatt (1 … pageCount) und Lösungen (1 … loesungSeiten) */
+  const blattAuswahl = auswahl.filter((s) => s <= pageCount)
+  const loesungAuswahl = auswahl.filter((s) => s > pageCount).map((s) => s - pageCount)
+  const alleBlatt = blattAuswahl.length === pageCount
+  const alleLoesung = loesungAuswahl.length === loesungSeiten
+  // Ohne Marken lässt sich nur am PC (Seitenbereiche des Druckers) auswählen
+  const auswahlMoeglich = (blattMarkiert && (!loesung || loesungMarkiert)) || (!ios && !imNetz())
+  const gewaehlt = (seite: number): boolean => auswahl.includes(seite)
+  // Neue Seitenzahlen der gewählten Seiten – zur Anzeige unter den Seitenbildern
+  const nummern = useMemo(() => {
+    const zahlen = (marken: SeitenMarke[], ok: boolean, wahl: number[]): Map<number, { nr: number; von: number }> => (ok ? neueNummern(marken, wahl) : new Map())
+    return { blatt: zahlen(blattMarken, blattMarkiert, blattAuswahl), loesung: zahlen(loesungMarken, loesungMarkiert, loesungAuswahl) }
+  }, [auswahl.join(','), blattMarkiert, loesungMarkiert]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mitBlatt = blattAuswahl.length > 0
+  const mitLoesung = Boolean(loesung) && loesungExemplare > 0 && loesungAuswahl.length > 0
+  const sheets = duplex === 'simplex' ? blattAuswahl.length : Math.ceil(blattAuswahl.length / 2)
+  const loesungBlaetter = duplex === 'simplex' ? loesungAuswahl.length : Math.ceil(loesungAuswahl.length / 2)
+
+  /** Das Druck-HTML der Auswahl – mit Marken gekürzt und neu gezählt, sonst unverändert */
+  const blattHtml = (): string | null => (!html || !mitBlatt ? null : blattMarkiert && !alleBlatt ? waehleSeitenImHtml(html, blattAuswahl) : html)
+  const loesungHtml = (): string | null =>
+    !loesung || !mitLoesung ? null : loesungMarkiert && !alleLoesung ? waehleSeitenImHtml(loesung.html, loesungAuswahl) : loesung.html
+  /** Seitenbereiche für den Drucker – nur ohne Marken (sonst ist das HTML schon gekürzt) */
+  const bereiche = (wahl: number[], markiert: boolean, anzahl: number): { from: number; to: number }[] | undefined =>
+    markiert || wahl.length === anzahl ? undefined : bereicheVon(wahl)
+
+  // „Aktuelle Seite": die Seite, die in der Vorschau am meisten zu sehen ist
+  useEffect(() => {
+    const wurzel = vorschauRef.current
+    if (!wurzel || !bereit || typeof IntersectionObserver === 'undefined') return
+    const anteile = new Map<number, number>()
+    const beobachter = new IntersectionObserver(
+      (eintraege) => {
+        for (const e of eintraege) anteile.set(Number((e.target as HTMLElement).dataset.vorschauSeite), e.intersectionRatio)
+        let beste = 1
+        let max = -1
+        for (const [seite, anteil] of anteile)
+          if (anteil > max) {
+            max = anteil
+            beste = seite
+          }
+        setSichtbar(beste)
+      },
+      { threshold: [0, 0.25, 0.5, 0.75, 1] }
+    )
+    wurzel.querySelectorAll('[data-vorschau-seite]').forEach((el) => beobachter.observe(el))
+    return () => beobachter.disconnect()
+  }, [bereit, gesamt])
 
   /*
    * Im Browser (Tablet) gibt es keinen Drucker des Rechners: Blatt und – falls gewählt –
@@ -142,8 +226,9 @@ export default function PrintPreview({
     if (!html) return
     setPrinting(true)
     try {
-      const wie = await druckeImBrowser(loesung && mitLoesung ? [html, loesung.html] : [html], `${title ?? 'Druck'}.pdf`)
-      const was = loesung && mitLoesung ? `Blatt und ${loesung.titel}` : 'Blatt'
+      const teileZumDruck = [blattHtml(), loesungHtml()].filter((t): t is string => Boolean(t))
+      const wie = await druckeImBrowser(teileZumDruck, `${title ?? 'Druck'}.pdf`)
+      const was = loesung && mitLoesung ? (mitBlatt ? `Blatt und ${loesung.titel}` : loesung.titel) : 'Blatt'
       notifySuccess(
         wie === 'tab' ? `Druckansicht im neuen Tab geöffnet (${was}).` : `Der Browser hat den neuen Tab blockiert – das PDF (${was}) wurde heruntergeladen.`
       )
@@ -155,13 +240,20 @@ export default function PrintPreview({
     }
   }
 
+  /** Blatt und Lösungen über den Druckdialog des Systems – iPad (AirPrint) und „Druckdialog von Windows" */
+  const druckeMitDialog = async (): Promise<void> => {
+    const blatt = blattHtml()
+    const loes = loesungHtml()
+    if (blatt) await window.api.exporter.print(blatt)
+    if (loes) await window.api.exporter.print(loes)
+  }
+
   /** iPad: je Dokument der Druckdialog von AirPrint (main/kanaele.ts → mobil/export/druckmaschine.ts) */
   const druckeAufIos = async (): Promise<void> => {
     if (!html) return
     setPrinting(true)
     try {
-      await window.api.exporter.print(html)
-      if (loesung && mitLoesung) await window.api.exporter.print(loesung.html)
+      await druckeMitDialog()
       onClose()
     } catch (e) {
       notifyError(e, 'Drucken fehlgeschlagen')
@@ -181,10 +273,19 @@ export default function PrintPreview({
       } catch {
         // nicht kritisch
       }
-      await window.api.exporter.print(html, { deviceName: printer, copies, duplex, color: color === 'color', pages: ranges ?? undefined })
-      if (loesung && mitLoesung)
-        await window.api.exporter.print(loesung.html, { deviceName: printer, copies: loesungExemplare, duplex, color: color === 'color' })
-      notifySuccess(loesung && mitLoesung ? `Zwei Druckaufträge gesendet (Blatt und ${loesung.titel}).` : 'Druckauftrag gesendet.')
+      const blatt = blattHtml()
+      const loes = loesungHtml()
+      if (blatt)
+        await window.api.exporter.print(blatt, { deviceName: printer, copies, duplex, color: color === 'color', pages: bereiche(blattAuswahl, blattMarkiert, pageCount) })
+      if (loes)
+        await window.api.exporter.print(loes, {
+          deviceName: printer,
+          copies: loesungExemplare,
+          duplex,
+          color: color === 'color',
+          pages: bereiche(loesungAuswahl, loesungMarkiert, loesungSeiten)
+        })
+      notifySuccess(blatt && loes ? `Zwei Druckaufträge gesendet (Blatt und ${loesung!.titel}).` : 'Druckauftrag gesendet.')
       onClose()
     } catch (e) {
       notifyError(e, 'Drucken fehlgeschlagen')
@@ -196,13 +297,49 @@ export default function PrintPreview({
   const systemDialog = async (): Promise<void> => {
     if (!html) return
     try {
-      await window.api.exporter.print(html)
-      if (loesung && mitLoesung) await window.api.exporter.print(loesung.html)
+      // Der Dialog von Windows bekommt die gekürzte Fassung; ohne Marken wählt man dort selbst
+      await druckeMitDialog()
       onClose()
     } catch (e) {
       notifyError(e, 'Drucken fehlgeschlagen')
     }
   }
+
+  /** Ein Seitenbild – Antippen wählt die Seite ab bzw. wieder an (Maus oder Finger) */
+  const seitenBild = (src: string, seite: number, an: boolean, alt: string, attr: Record<string, number>): React.JSX.Element => (
+    <Box
+      component="button"
+      type="button"
+      onClick={() => auswahlMoeglich && setAuswahl((a) => umschalten(a, seite))}
+      aria-pressed={an}
+      aria-label={`${alt} ${an ? 'abwählen' : 'wählen'}`}
+      style={{
+        position: 'relative',
+        display: 'inline-block',
+        padding: 0,
+        border: 0,
+        background: 'none',
+        cursor: auswahlMoeglich ? 'pointer' : 'default',
+        touchAction: 'manipulation',
+        width: 'min(560px, 100%)'
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        {...attr}
+        style={{
+          width: '100%',
+          display: 'block',
+          background: '#fff',
+          boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
+          filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
+          opacity: an ? 1 : 0.35
+        }}
+      />
+      {auswahlMoeglich && gesamt > 1 && <SeitenHaken an={gewaehlt(seite)} />}
+    </Box>
+  )
 
   return (
     <Modal opened={html !== null} onClose={onClose} title={title ?? 'Drucken'} size="min(1100px, 95vw)" padding="md">
@@ -224,52 +361,40 @@ export default function PrintPreview({
           ) : (
             // Mit dem Finger: Zwei-Finger-Zoom und Zoom-Knöpfe (shared/touch/zoom.tsx); am PC unverändert
             <ZoomFlaeche>
-              <Stack align="center" gap="lg" py="lg">
-                {pages.map((src, i) => (
-                  <Box key={i} style={{ textAlign: 'center' }}>
-                    <img
-                      src={src}
-                      alt={`Seite ${i + 1}`}
-                      data-print-page={i + 1}
-                      style={{
-                        width: 'min(560px, 100%)',
-                        background: '#fff',
-                        boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
-                        filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
-                        opacity: selected.has(i + 1) ? 1 : 0.35
-                      }}
-                    />
-                    <Text size="xs" c="dimmed" mt={4}>
-                      Seite {i + 1} von {pages.length}
-                      {!selected.has(i + 1) && ' · wird nicht gedruckt'}
-                    </Text>
-                  </Box>
-                ))}
+              <Stack align="center" gap="lg" py="lg" ref={vorschauRef}>
+                {pages.map((src, i) => {
+                  const an = gewaehlt(i + 1)
+                  const nr = nummern.blatt.get(i + 1)
+                  return (
+                    <Box key={i} style={{ textAlign: 'center' }} data-vorschau-seite={i + 1}>
+                      {seitenBild(src, i + 1, an, `Seite ${i + 1}`, { 'data-print-page': i + 1 })}
+                      <Text size="xs" c="dimmed" mt={4} data-seite-unterschrift={i + 1}>
+                        Seite {i + 1} von {gesamt}
+                        {!an ? ' · wird nicht gedruckt' : !alleBlatt && nr ? ` · gedruckt mit „${druckZahl(nr)}“` : ''}
+                      </Text>
+                    </Box>
+                  )
+                })}
                 {loesung && loesungPages && (
                   <Text size="sm" fw={600} c="dimmed" data-loesung-trenner>
                     {loesung.titel} – eigener Druckauftrag{loesungExemplare === 0 ? ' (wird nicht gedruckt)' : ''}
                   </Text>
                 )}
                 {loesung &&
-                  loesungPages?.map((src, i) => (
-                    <Box key={`l${i}`} style={{ textAlign: 'center' }}>
-                      <img
-                        src={src}
-                        alt={`${loesung.titel}, Seite ${i + 1}`}
-                        data-print-loesung={i + 1}
-                        style={{
-                          width: 'min(560px, 100%)',
-                          background: '#fff',
-                          boxShadow: '0 3px 16px rgba(0,0,0,0.18)',
-                          filter: color === 'bw' && !ios ? 'grayscale(1)' : undefined,
-                          opacity: loesungExemplare > 0 ? 1 : 0.35
-                        }}
-                      />
-                      <Text size="xs" c="dimmed" mt={4}>
-                        {loesung.titel}, Seite {i + 1} von {loesungPages.length}
-                      </Text>
-                    </Box>
-                  ))}
+                  loesungPages?.map((src, i) => {
+                    const seite = pageCount + i + 1
+                    const an = gewaehlt(seite) && loesungExemplare > 0
+                    const nr = nummern.loesung.get(i + 1)
+                    return (
+                      <Box key={`l${i}`} style={{ textAlign: 'center' }} data-vorschau-seite={seite}>
+                        {seitenBild(src, seite, an, `${loesung.titel}, Seite ${i + 1}`, { 'data-print-loesung': i + 1 })}
+                        <Text size="xs" c="dimmed" mt={4} data-seite-unterschrift={seite}>
+                          Seite {seite} von {gesamt} ({loesung.titel}, Seite {i + 1})
+                          {!an ? ' · wird nicht gedruckt' : !alleLoesung && nr ? ` · gedruckt mit „${druckZahl(nr)}“` : ''}
+                        </Text>
+                      </Box>
+                    )
+                  })}
               </Stack>
             </ZoomFlaeche>
           )}
@@ -288,7 +413,22 @@ export default function PrintPreview({
             <Stack gap="sm">
               {ios && (
                 <Text size="sm" c="dimmed" data-airprint-hinweis>
-                  Drucker, Exemplare, Seiten, Doppelseitig und Farbe stehen im Druckdialog von AirPrint.
+                  Drucker, Exemplare, Doppelseitig und Farbe stehen im Druckdialog von AirPrint.
+                </Text>
+              )}
+              {bereit && gesamt > 1 && auswahlMoeglich && (
+                <SeitenAuswahlFelder
+                  teile={teile}
+                  value={auswahl}
+                  onChange={setAuswahl}
+                  onGueltig={setAuswahlGueltig}
+                  aktuelleSeite={sichtbar}
+                  loesungsBegriff={loesung?.titel}
+                />
+              )}
+              {bereit && gesamt > 1 && !auswahlMoeglich && (
+                <Text size="xs" c="dimmed">
+                  Einzelne Seiten lassen sich im Druckdialog des Geräts wählen.
                 </Text>
               )}
               {!ios && (
@@ -315,29 +455,6 @@ export default function PrintPreview({
               )}
               {!ios && (
                 <>
-                  <div>
-                    <Text size="sm" fw={500} mb={4}>
-                      Seiten
-                    </Text>
-                    <SegmentedControl
-                      fullWidth
-                      value={rangeMode}
-                      onChange={(v) => setRangeMode(v as 'all' | 'range')}
-                      data={[
-                        { value: 'all', label: 'Alle' },
-                        { value: 'range', label: 'Auswahl' }
-                      ]}
-                    />
-                    {rangeMode === 'range' && (
-                      <TextInput
-                        mt={6}
-                        placeholder="z. B. 1-2, 4"
-                        value={range}
-                        onChange={(e) => setRange(e.currentTarget.value)}
-                        error={invalidRange && range.trim() ? `Seiten 1 bis ${pageCount}, z. B. 1-2, 4` : undefined}
-                      />
-                    )}
-                  </div>
                   <div>
                     <Text size="sm" fw={500} mb={4}>
                       Doppelseitig
@@ -371,8 +488,8 @@ export default function PrintPreview({
                 </>
               )}
               {pages && !ios && (
-                <Text size="xs" c="dimmed">
-                  {selected.size} {selected.size === 1 ? 'Seite' : 'Seiten'} × {copies} = {sheets * copies} {sheets * copies === 1 ? 'Blatt' : 'Blätter'}
+                <Text size="xs" c="dimmed" data-blattzahl>
+                  {blattAuswahl.length} {blattAuswahl.length === 1 ? 'Seite' : 'Seiten'} × {copies} = {sheets * copies} {sheets * copies === 1 ? 'Blatt' : 'Blätter'}
                   {mitLoesung && loesungPages && `, dazu ${loesungBlaetter * loesungExemplare} für ${loesung!.titel}`}
                 </Text>
               )}
@@ -385,7 +502,7 @@ export default function PrintPreview({
               leftSection={<IconPrinter size={16} />}
               onClick={() => void print()}
               loading={printing}
-              disabled={!pages || (!printer && !imNetz() && !ios) || invalidRange || (Boolean(loesung) && !loesungPages)}
+              disabled={!bereit || (!printer && !imNetz() && !ios) || !auswahlGueltig || (!mitBlatt && !mitLoesung)}
             >
               Drucken
             </Button>
@@ -395,7 +512,7 @@ export default function PrintPreview({
           </div>
           {/* Im Browser gäbe es nur den Dialog des entfernten Rechners – dort druckt „Drucken" über den Tab */}
           {!imNetz() && !ios && (
-            <Button className="pv-systemdialog" variant="subtle" size="xs" onClick={() => void systemDialog()} disabled={!html}>
+            <Button className="pv-systemdialog" variant="subtle" size="xs" onClick={() => void systemDialog()} disabled={!html || (!mitBlatt && !mitLoesung)}>
               Druckdialog von Windows öffnen
             </Button>
           )}

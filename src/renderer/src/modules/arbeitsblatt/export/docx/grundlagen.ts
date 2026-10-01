@@ -5,6 +5,7 @@ import type { Worksheet } from '../../model/types'
 import { PageInfo } from '../../render/PageFrame'
 import type { Stars } from '../../didactics/differentiation'
 import type { DeckblattBilder } from '../../render/deckblattBilder'
+import type { WordSeitenAuswahl } from '../wordSeiten'
 
 export interface WorksheetDocxDeps {
   logo: string | null
@@ -28,6 +29,8 @@ export interface WorksheetDocxOptions {
   keyOnly?: boolean
   /** Tafelbild-Seite für die Lehrkraft anhängen */
   includeBoard?: boolean
+  /** Nur die Inhalte dieser Seiten (Seitenauswahl, export/wordSeiten.ts) */
+  seiten?: WordSeitenAuswahl
 }
 
 export type Child = Paragraph | Table
