@@ -603,6 +603,12 @@ export interface TaskBlock extends BaseBlock {
   stufe?: 1 | 2 | 3 | 4 | 5
   /** Begründung der Stufe – nur für die Lehrkraft */
   stufeGrund?: string
+  /**
+   * Blindprobe der Ankreuzfragen (01.10.2026, shared/verstehen/blindprobe.ts): Signatur der Fragen
+   * und Optionen beim letzten Durchlauf. Weicht sie ab (neu erzeugt, von Hand geändert), gilt die
+   * Aufgabe wieder als ungeprüft.
+   */
+  mcBlindprobe?: string
 }
 
 /** Sprecherin oder Sprecher eines Hörtextes (Stimme von ElevenLabs). */

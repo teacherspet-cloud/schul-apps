@@ -60,6 +60,7 @@ import { scriptForSheet, wantsListening, writeListeningScript } from '../../arbe
 import type { ListeningScript } from '../../arbeitsblatt/generation/listening'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
 import { stoffBilder, type StoffQuelle } from '../../../shared/files/stoffQuelle'
+import { blindprobeAktiv, blindprobeBloecke, blindprobeMeldung } from '../../../shared/verstehen/blindprobe'
 import {
   alleFassungen,
   bloeckeDerFassung,
@@ -1114,6 +1115,15 @@ async function pruefeFassung(
     }
     notes.push(`${praefix}Teil ${i + 1}: ${findings.map((f) => f.message).join(' ')}`)
   }
+  // Ankreuzfragen zu Texten (01.10.2026): Blindprobe ohne Text, Lösbares neu fassen (shared/verstehen/blindprobe.ts)
+  if (blindprobeAktiv())
+    for (let i = 0; i < out.length; i++) {
+      if (formatArt(out[i].formatId) === 'speaking') continue
+      const b = await blindprobeBloecke(out[i].blocks, ai, { melde: (m) => onProgress(`${praefix}Teil ${i + 1}: ${m}`) }).catch(() => null)
+      if (!b?.geprueft) continue
+      out[i] = { ...out[i], blocks: b.bloecke }
+      if (b.ersetzt || b.markiert) notes.push(`${praefix}Teil ${i + 1} – Ankreuzfragen: ${blindprobeMeldung(b)}`)
+    }
   return out
 }
 

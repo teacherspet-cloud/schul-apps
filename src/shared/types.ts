@@ -182,6 +182,11 @@ export interface AppSettings {
     cliPaths: Record<AiProviderId, string>
     /** Sparmodus: weniger KI-Anfragen (auto = nur beim Abo-Zugang) */
     economy: 'auto' | 'on' | 'off'
+    /**
+     * Blindprobe für Ankreuzfragen zu Texten (01.10.2026): eine zweite Anfrage beantwortet die
+     * Fragen ohne den Text; Lösbares wird neu gefasst. Fehlt der Wert, ist sie an.
+     */
+    mcBlindprobe?: boolean
   }
   appearance: {
     colorScheme: ColorSchemeSetting
