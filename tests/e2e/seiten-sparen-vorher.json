@@ -1,0 +1,197 @@
+{
+  "erstellt": "2026-10-01T13:12:11.641Z",
+  "blaetter": {
+    "teilbar 1 (Design 0) Schülerblatt": {
+      "seiten": 21,
+      "alle": 21,
+      "untergrenze": 17,
+      "geteilt": 2,
+      "allein": [],
+      "fuellung": 77
+    },
+    "teilbar 1 (Design 0) Lösungen": {
+      "seiten": 18,
+      "alle": 18,
+      "untergrenze": 14,
+      "geteilt": 4,
+      "allein": [],
+      "fuellung": 72
+    },
+    "teilbar 2 (Design 1) Schülerblatt": {
+      "seiten": 22,
+      "alle": 22,
+      "untergrenze": 16,
+      "geteilt": 3,
+      "allein": [],
+      "fuellung": 73
+    },
+    "teilbar 2 (Design 1) Lösungen": {
+      "seiten": 17,
+      "alle": 17,
+      "untergrenze": 14,
+      "geteilt": 4,
+      "allein": [],
+      "fuellung": 78
+    },
+    "teilbar 3 (Design 2) Schülerblatt": {
+      "seiten": 21,
+      "alle": 21,
+      "untergrenze": 17,
+      "geteilt": 2,
+      "allein": [],
+      "fuellung": 78
+    },
+    "teilbar 3 (Design 2) Lösungen": {
+      "seiten": 19,
+      "alle": 19,
+      "untergrenze": 14,
+      "geteilt": 4,
+      "allein": [],
+      "fuellung": 69
+    },
+    "tabellen 1 (Design 0) Schülerblatt": {
+      "seiten": 7,
+      "alle": 7,
+      "untergrenze": 7,
+      "geteilt": 5,
+      "allein": [],
+      "fuellung": 86
+    },
+    "tabellen 1 (Design 0) Lösungen": {
+      "seiten": 7,
+      "alle": 7,
+      "untergrenze": 7,
+      "geteilt": 5,
+      "allein": [],
+      "fuellung": 86
+    },
+    "knapp 1 (Design 1) Schülerblatt": {
+      "seiten": 6,
+      "alle": 7,
+      "untergrenze": 6,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 88
+    },
+    "knapp 1 (Design 1) Lösungen": {
+      "seiten": 6,
+      "alle": 6,
+      "untergrenze": 5,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 76
+    },
+    "raender 1 (Design 2) Schülerblatt": {
+      "seiten": 8,
+      "alle": 8,
+      "untergrenze": 6,
+      "geteilt": 4,
+      "allein": [],
+      "fuellung": 70
+    },
+    "raender 1 (Design 2) Lösungen": {
+      "seiten": 6,
+      "alle": 6,
+      "untergrenze": 5,
+      "geteilt": 4,
+      "allein": [],
+      "fuellung": 81
+    },
+    "protokoll 1 (Design 3) Schülerblatt": {
+      "seiten": 12,
+      "alle": 12,
+      "untergrenze": 10,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 81
+    },
+    "protokoll 1 (Design 3) Lösungen": {
+      "seiten": 12,
+      "alle": 12,
+      "untergrenze": 10,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 82
+    },
+    "gemischt 11 (Design 0) Schülerblatt": {
+      "seiten": 13,
+      "alle": 14,
+      "untergrenze": 11,
+      "geteilt": 2,
+      "allein": [],
+      "fuellung": 81
+    },
+    "gemischt 11 (Design 0) Lösungen": {
+      "seiten": 12,
+      "alle": 12,
+      "untergrenze": 10,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 78
+    },
+    "gemischt 23 (Design 1) Schülerblatt": {
+      "seiten": 11,
+      "alle": 12,
+      "untergrenze": 9,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 80
+    },
+    "gemischt 23 (Design 1) Lösungen": {
+      "seiten": 10,
+      "alle": 10,
+      "untergrenze": 8,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 79
+    },
+    "gemischt 37 (Design 4) Schülerblatt": {
+      "seiten": 16,
+      "alle": 17,
+      "untergrenze": 14,
+      "geteilt": 3,
+      "allein": [],
+      "fuellung": 83
+    },
+    "gemischt 37 (Design 4) Lösungen": {
+      "seiten": 16,
+      "alle": 16,
+      "untergrenze": 13,
+      "geteilt": 3,
+      "allein": [],
+      "fuellung": 79
+    },
+    "gemischt 51 (Design 7) Schülerblatt": {
+      "seiten": 16,
+      "alle": 17,
+      "untergrenze": 14,
+      "geteilt": 1,
+      "allein": [],
+      "fuellung": 84
+    },
+    "gemischt 51 (Design 7) Lösungen": {
+      "seiten": 17,
+      "alle": 17,
+      "untergrenze": 14,
+      "geteilt": 0,
+      "allein": [],
+      "fuellung": 78
+    }
+  },
+  "bilder": [
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-1-2.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-2-3.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-3-4.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-4-5.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-5-6.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-6-7.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-7-8.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-8-9.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-9-10.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-10-11.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-11-12.png",
+    "C:\\Users\\TORGE_~1\\AppData\\Local\\Temp\\claude\\D--Dropbox-Claude-code-GyWem-Airline\\82283d62-a101-4bba-86ec-6c737949e55c\\scratchpad\\pag-vorher\\teilbar_1_Design_0_-uebergang-12-13.png"
+  ],
+  "summe": 293,
+  "untergrenze": 241
+}

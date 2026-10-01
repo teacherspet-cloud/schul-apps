@@ -979,6 +979,23 @@
 .ws-solution .rt {
   display: inline;
 }
+/*
+ * Noch leere Lösung (01.10.2026, `loesungsKnoten`): ohne Höhe, damit Lösungsansicht und Druck
+ * dieselben Einheiten gleich hoch messen. Der Platzhalter zum Hineinschreiben liegt rechts über
+ * der Zeile davor.
+ */
+.ws-solution.ws-solution-leer {
+  position: relative;
+  height: 0;
+  margin-top: 0;
+}
+.ws-solution-leer > * {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  min-width: 30%;
+  text-align: right;
+}
 .ws-teacher-note {
   margin: 1mm 0 0 8.5mm;
   font-size: 0.72em;
@@ -2462,6 +2479,25 @@
   font-weight: 600;
   opacity: 0.75;
   margin-bottom: 0.3em;
+}
+
+/*
+ * TEILBARE ANTWORTFORMEN (01.10.2026, `teilbareAntwort`): Die Zeilen stehen als eigene
+ * Umbruch-Einheiten hinter dem Kopf der Teilaufgabe – mit demselben Einzug wie die Anweisung.
+ * Abstände als INNENabstand, damit sie beim Messen mitzählen (siehe `.ws-parts`).
+ */
+.ws-part-antwort {
+  padding-left: 8.5mm;
+  padding-top: 1mm;
+}
+/* Lückentext in Stücken: sieht aus wie EIN Text – Listenpunkte ohne eigenen Abstand, Absätze mit dem gewohnten */
+.ws-gap-zeile .rt-list {
+  margin: 0;
+}
+.ws-gap-zeile + .ws-gap-absatz,
+.ws-gap-absatz + .ws-gap-zeile,
+.ws-info-absatz + .ws-info-absatz {
+  padding-top: 0.35em;
 }
 
 /*

@@ -112,6 +112,9 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
       const style = getComputedStyle(page)
       const inner = PAGE_HEIGHT_MM * PX_PER_MM - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0) - FOOTER_RESERVE_MM * PX_PER_MM
       const header = page.querySelector<HTMLElement>('[data-measure-header]')?.getBoundingClientRect().height ?? 0
+      // Hinweis „Aufgabe N (Fortsetzung)" auf jedem Folgestück (01.10.2026) – mit dem Abstand darunter
+      const probe = page.querySelector<HTMLElement>('[data-continued-probe]')
+      const fortsetzung = probe ? probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(probe).marginBottom) || 0) : 0
       const variant = doc.variants.find((v) => v.id === variantId)
       const items: MeasuredItem[] = []
       page.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((wrap) => {
@@ -122,7 +125,7 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
         if (block && SPLITTABLE_KINDS.has(block.kind) && unitEls.length > 1) {
           const units = unitEls.map((u) => u.getBoundingClientRect().height + (parseFloat(getComputedStyle(u).marginBottom) || 0))
           const unitSum = units.reduce((a, b) => a + b, 0)
-          items.push({ id, height, headHeight: Math.max(0, height - unitSum), units })
+          items.push({ id, height, headHeight: Math.max(0, height - unitSum), units, continuedHead: fortsetzung })
         } else {
           items.push({ id, height })
         }
@@ -184,6 +187,12 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
                 className={`vt-page ${key ? 'vt-key' : ''} ${candidate.compact ? 'vt-compact' : ''}`}
                 style={{ fontSize: `${candidate.fontSize}pt` }}
               >
+                {/* Einmal je Fassung gemessen: der Fortsetzungshinweis – außerhalb des Flusses */}
+                <section className="vt-block vt-block-continued" style={{ position: 'absolute', visibility: 'hidden', left: 0, right: 0 }} aria-hidden>
+                  <div className="vt-continued" data-continued-probe>
+                    Aufgabe 1 (Fortsetzung)
+                  </div>
+                </section>
                 <div data-measure-header style={{ display: 'flow-root' }}>
                   <TestHeader doc={doc} variant={doc.variants[vi]} />
                 </div>

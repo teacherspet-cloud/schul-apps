@@ -1,6 +1,8 @@
 import { RichText } from '../../../../shared/richtext/RichText'
 import type { GridBlock, WsBlock } from '../../model/types'
 import { useWs } from '../WsContext'
+import { continuedLabel } from '../../../../shared/continuedNote'
+import { plainText } from '../../../../shared/richtext/parse'
 
 /** Ab dieser Länge gilt ein Text als „länger" und wird im Blocksatz gesetzt */
 export const LONG_TEXT_CHARS = 320
@@ -78,4 +80,15 @@ export function shortLink(url: string): string {
 export function useSetter<B extends WsBlock>(block: B) {
   const { update } = useWs()
   return (apply: (draft: B, value: string) => void) => (update ? (v: string) => update(block.id, (d) => apply(d as B, v)) : undefined)
+}
+
+/**
+ * Hinweis oben auf dem FOLGESTÜCK eines geteilten Bausteins: „M2 (Fortsetzung)", „Merke
+ * (Fortsetzung)" (01.10.2026). Bei Aufgaben steht „Aufgabe 3 (Fortsetzung)" (`continuedNote`) –
+ * gewünscht ist derselbe Wegweiser überall. Dieselbe Klasse wie bei Aufgaben: Die
+ * Seitenaufteilung misst ihre Höhe einmal je Blatt und rechnet sie jedem Folgestück an.
+ */
+export function FortsetzungsHinweis({ bezeichnung }: { bezeichnung: string }): React.JSX.Element {
+  const { answerLanguage } = useWs()
+  return <div className="ws-task-continued">{continuedLabel(answerLanguage, plainText(bezeichnung ?? '').replace(/\s+/g, ' '))}</div>
 }

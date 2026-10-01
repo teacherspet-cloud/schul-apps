@@ -37,6 +37,11 @@ export function briefAbschnitte({
   const teile: React.JSX.Element[] = []
 
   /*
+   * Alle Vorgaben sind GEBUNDEN (`data-bindet`, 01.10.2026): Sie gehören zur Aufgabenstellung und
+   * stehen nie allein am Seitenende – nach ihnen folgt mindestens die erste Schreiblinie auf
+   * derselben Seite, sonst wandert die Aufgabe als Ganzes (Wunsch der Lehrkraft).
+   */
+  /*
    * Die Situation steht seit dem 24.09.2026 VORN in der Arbeitsanweisung, nicht mehr hier.
    * Sonst staende sie zweimal auf dem Blatt – genau das war die Beschwerde.
    */
@@ -46,7 +51,7 @@ export function briefAbschnitte({
    */
   if (rahmen)
     teile.push(
-      <div className="ws-brief" data-unit key="situation">
+      <div className="ws-brief" data-unit data-bindet key="situation">
         <p className="ws-brief-frame">
           {edit
             ? (['audience', 'textType', 'purpose'] as const)
@@ -69,7 +74,7 @@ export function briefAbschnitte({
    */
   if (notizen.length > 0)
     teile.push(
-      <div className="ws-brief-notes" data-unit key="notes" style={{ gridTemplateColumns: `repeat(${Math.min(notizen.length, 3)}, 1fr)` }}>
+      <div className="ws-brief-notes" data-unit data-bindet key="notes" style={{ gridTemplateColumns: `repeat(${Math.min(notizen.length, 3)}, 1fr)` }}>
         {notizen.map((spalte, i) => (
           <div key={i} className="ws-brief-note">
             <div className="ws-brief-note-title">
@@ -100,7 +105,7 @@ export function briefAbschnitte({
   const punkte = brief.points.map((p, i) => ({ p, i })).filter(({ p }) => plainText(p).trim())
   if (punkte.length > 0)
     teile.push(
-      <ul className="ws-brief-points" data-unit key="points">
+      <ul className="ws-brief-points" data-unit data-bindet key="points">
         {punkte.map(({ p, i }) => (
           <li key={i}>
             <RichText
@@ -124,7 +129,7 @@ export function briefAbschnitte({
   const zeigtWortzahl = Boolean(wordLimit) && brief.words > 0
   if (zeigtWortzahl || form.length > 0)
     teile.push(
-      <p className="ws-brief-form" data-unit key="form">
+      <p className="ws-brief-form" data-unit data-bindet key="form">
         {[zeigtWortzahl ? `Umfang: etwa ${brief.words} Wörter` : '', ...form].filter(Boolean).join(' · ')}
       </p>
     )
@@ -171,7 +176,7 @@ export function erwartungsAbschnitte({
    * Lehrkraft am 24.09.2026 mit einem Mustertext, der mitten im Satz abbrach.
    */
   const out: React.JSX.Element[] = [
-    <div className="ws-expectation ws-expectation-title" data-unit key="eh-titel">
+    <div className="ws-expectation ws-expectation-title" data-unit data-bindet key="eh-titel">
       Erwartungshorizont
     </div>
   ]
@@ -239,6 +244,33 @@ export interface Abschnitt {
   node: React.JSX.Element
   teil?: number
   teilWeiter?: boolean
+  /**
+   * Einheiten, die auf dem Blatt in EINEM Rahmen stehen (Zeilen einer Zuordnung, Aussagen einer
+   * Richtig/Falsch-Tabelle …, 01.10.2026). Jede Zeile ist eine eigene Umbruch-Einheit; erst beim
+   * Rendern setzt `wrap` die Zeilen eines Stücks wieder in ihre Tabelle bzw. Liste – auf einer
+   * Folgeseite mit wiederholter Kopfzeile.
+   */
+  gruppe?: { id: string; wrap: (teile: Abschnitt[]) => React.JSX.Element }
+  /** Laufende Nummer innerhalb der Gruppe (z. B. Zeile der Ankreuz-Fragenreihe) */
+  zeile?: number
+}
+
+/** Aufeinanderfolgende Abschnitte derselben Gruppe in ihren gemeinsamen Rahmen setzen (siehe `Abschnitt.gruppe`) */
+export function gruppiereAntworten(abschnitte: Abschnitt[]): Abschnitt[] {
+  const out: Abschnitt[] = []
+  for (let i = 0; i < abschnitte.length; ) {
+    const g = abschnitte[i].gruppe
+    if (!g) {
+      out.push(abschnitte[i++])
+      continue
+    }
+    let j = i
+    while (j < abschnitte.length && abschnitte[j].gruppe?.id === g.id) j++
+    const lauf = abschnitte.slice(i, j)
+    out.push({ node: g.wrap(lauf), teil: lauf[0].teil, teilWeiter: lauf[0].teilWeiter })
+    i = j
+  }
+  return out
 }
 
 export function gruppiereTeilaufgaben(abschnitte: Abschnitt[]): { node: React.JSX.Element }[] {

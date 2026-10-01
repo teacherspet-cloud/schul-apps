@@ -335,44 +335,71 @@ describe('Erzwungener Seitenumbruch', () => {
   })
 })
 
-describe('Schusterjungen und Hurenkinder', () => {
+describe('Teilen ohne Mindestzahl, aber nie die Aufgabenstellung allein', () => {
   /*
-   * Gemeldet am 25.09.2026: „sobald man den notizrand aktiviert, geht etwas an den
-   * seitenumbrüchen kaputt … Aufgabe/Material wird zerrissen."
-   *
-   * Der Notizrand ist nicht die Ursache. Er macht den Text schmaler und damit höher und
-   * trifft dadurch nur viel häufiger einen Fall, den die Verteilung vorher nicht kannte: Sie
-   * füllte die Seite bis zur letzten passenden Einheit – und ein einzelner übrig gebliebener
-   * Absatz stand allein auf der Folgeseite.
+   * Bis 30.09.2026 galt „mindestens zwei Einheiten je Stück" (Schusterjunge/Hurenkind, nach
+   * „Aufgabe/Material wird zerrissen" vom 25.09.2026). Eine Einheit ist aber ein ganzer Absatz
+   * oder eine Frage – die Regel schob ganze Absätze weiter und kostete Seiten. Entscheidung der
+   * Lehrkraft (01.10.2026): keine harte Mindestzeilen-Regel; die Aufgabenstellung (Kopf) steht
+   * nie ohne die erste Einheit, gebundene Einheiten (`unitGlue`) nie am Ende eines Stücks.
    */
-  it('lässt nicht eine einzelne Einheit allein auf die letzte Seite fallen', () => {
-    // Sieben Einheiten à 100, Seite fasst 6 – ohne Regel stünde die siebte allein
+  it('füllt die Seite bis zur letzten passenden Einheit', () => {
     const units = Array.from({ length: 7 }, () => 100)
     const plan = paginate([{ id: 'text', height: 700, units }], 600, 600)
     expect(plan).toHaveLength(2)
-    const letzte = plan[1].items[0]
-    expect(letzte.to! - letzte.from!).toBeGreaterThanOrEqual(2)
-    // und die erste Seite gibt genau eine Einheit dafür ab
-    expect(plan[0].items[0].to).toBe(5)
+    expect(plan[0].items[0].to).toBe(6)
+    expect(plan[1].items[0]).toMatchObject({ from: 6, to: 7, continued: true })
   })
 
-  it('lässt einen Baustein nicht mit einer einzelnen Einheit am Seitenende anfangen', () => {
-    /*
-     * Unten ist noch Platz für genau eine Einheit. Der Text beginnt dann lieber ganz oben
-     * auf der nächsten Seite – eine einzelne Zeile unter der Aufgabe sieht aus wie ein
-     * Versehen.
-     */
+  it('setzt unten eine einzelne Einheit samt Kopf, statt den Baustein ganz weiterzuschieben', () => {
     const units = Array.from({ length: 6 }, () => 100)
     const plan = paginate(
       [
-        { id: 'aufgabe', height: 500 },
-        { id: 'text', height: 600, units }
+        { id: 'aufgabe', height: 450 },
+        { id: 'text', height: 650, headHeight: 50, units }
       ],
       600,
       600
     )
-    expect(plan[0].items.map((i) => i.id)).toEqual(['aufgabe'])
-    expect(plan[1].items[0].from).toBe(0)
+    expect(plan[0].items.map((i) => i.id)).toEqual(['aufgabe', 'text'])
+    expect(plan[0].items[1]).toMatchObject({ from: 0, to: 1 })
+  })
+
+  it('der Kopf (Aufgabenstellung) steht nie ohne erste Einheit am Seitenende', () => {
+    // Unten passt nur noch der Kopf (80) – die erste Einheit (100) nicht: Der Baustein wandert ganz
+    const plan = paginate(
+      [
+        { id: 'vorher', height: 500 },
+        { id: 'aufgabe', height: 380, headHeight: 80, units: [100, 100, 100] }
+      ],
+      600,
+      600
+    )
+    expect(plan[0].items.map((i) => i.id)).toEqual(['vorher'])
+    expect(plan[1].items[0]).toMatchObject({ id: 'aufgabe', from: 0, to: 3 })
+  })
+
+  it('gebundene Einheiten wandern mit der folgenden – z. B. „b) Ergänze …" nicht ohne seine erste Zeile', () => {
+    // Einheiten: a)-Kopf, Zeile, Zeile, b)-Kopf (gebunden), Zeile, Zeile; unten ist Platz für vier Einheiten
+    const aufgabe = { id: 'a', height: 20 + 600, headHeight: 20, units: Array(6).fill(100), unitGlue: [true, false, false, true, false, false] }
+    const plan = paginate([{ id: 'vorher', height: 180 }, aufgabe], 600, 600)
+    // Ohne Bindung stünde b) als vierte Einheit allein unten – so endet Seite 1 nach der dritten
+    expect(plan[0].items[1]).toMatchObject({ from: 0, to: 3 })
+    expect(plan[1].items[0]).toMatchObject({ from: 3, continued: true })
+  })
+
+  it('eine Kette gebundener Einheiten, die länger ist als die Seite, wird oben auf einer leeren Seite doch geteilt', () => {
+    const plan = paginate([{ id: 'a', height: 900, headHeight: 0, units: [300, 300, 300], unitGlue: [true, true, false] }], 600, 600)
+    expect(plan[0].overflow).toBe(false)
+    expect(plan[0].items[0]).toMatchObject({ from: 0, to: 2 })
+  })
+
+  it('ein Folgestück rechnet die wiederholte Kopfzeile einer inneren Tabelle mit (`unitRepeat`)', () => {
+    const units = Array(20).fill(50)
+    const plan = paginate([{ id: 'tf', height: 1000, headHeight: 0, continuedHead: 20, units, unitRepeat: Array(20).fill(40) }], 300, 300)
+    expect(plan[0].items[0].to).toBe(6)
+    // Seite 2: 20 + 40 + n·50 ≤ 300 → vier Zeilen; ohne die wiederholte Kopfzeile wären es fünf und die Seite liefe über
+    expect(plan[1].items[0].to! - plan[1].items[0].from!).toBe(4)
   })
 
   it('setzt eine übergroße Einheit trotzdem, statt endlos umzubrechen', () => {

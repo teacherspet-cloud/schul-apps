@@ -1,6 +1,8 @@
 /**
  * Verteilt gemessene Bausteine auf A4-Seiten.
- * Texte und Tabellen dürfen an Absatz- bzw. Zeilengrenzen geteilt werden, alles andere bleibt zusammen.
+ * Teilbare Bausteine (mit `units`) dürfen zwischen zwei Einheiten geteilt werden – an den natürlichen
+ * Stellen, die der Baustein selbst als Einheiten ausweist (Absatz, Frage, Tabellenzeile, Schreiblinie …);
+ * alles andere bleibt zusammen.
  */
 
 export interface MeasuredItem {
@@ -19,6 +21,22 @@ export interface MeasuredItem {
   /** Höhe des FUSSES (Wortzahl, Quellenangabe) – er steht nur unter dem letzten Stück (27.09.2026) */
   footHeight?: number
   units?: number[]
+  /**
+   * Einheit i ist an die FOLGENDE gebunden: nach ihr wird nicht umbrochen (01.10.2026).
+   *
+   * Wunsch der Lehrkraft: „Die Aufgabenstellung sollte nicht einzeln vom Rest der Aufgabe
+   * getrennt werden (Aufgabenstellung auf S. 1 unten und Fragen/Sätze auf der nächsten Seite)."
+   * Die Arbeitsanweisung selbst steht im Kopf – der kommt nie ohne erste Einheit auf eine Seite.
+   * Gebunden wird zusätzlich, was zur Stellung gehört oder nur die Folgezeile einleitet: Kopf
+   * einer Teilaufgabe („b) Ergänze …"), Vorgaben einer Schreibaufgabe, gelöstes Beispiel „0.",
+   * Überschrift des Erwartungshorizonts. Passt die Kette nicht mehr, wandert sie geschlossen.
+   */
+  unitGlue?: boolean[]
+  /**
+   * Was ein Folgestück, das mit Einheit i beginnt, ZUSÄTZLICH oben wiederholt – etwa die
+   * Kopfzeile einer Richtig/Falsch-Tabelle innerhalb einer Aufgabe (01.10.2026).
+   */
+  unitRepeat?: number[]
   /** Zeilen je Einheit (für fortlaufende Zeilennummern) */
   unitLines?: number[]
   /** Nicht allein am Seitenende stehen lassen (z. B. Abschnittsüberschrift) */
@@ -84,20 +102,15 @@ const EPS = 0.5
 /** Höchstens so viel einer Seite bleibt leer, wenn Material zusammengehalten wird */
 const KEEP_TOGETHER_MAX_GAP = 0.5
 /*
- * Wie viele Einheiten mindestens auf ein Teilstück gehören.
+ * KEINE Mindestzahl an Einheiten je Teilstück mehr (01.10.2026).
  *
- * Gemeldet am 25.09.2026: „sobald man den notizrand aktiviert, geht etwas an den
- * seitenumbrüchen kaputt … Aufgabe/Material wird zerrissen." Der Notizrand ist nicht die
- * Ursache – er macht den Text schmaler und damit höher und trifft damit nur viel häufiger
- * einen Fall, den die Verteilung vorher nicht kannte: Sie füllte die Seite bis zur letzten
- * passenden Einheit, und was übrig blieb, stand allein auf der Folgeseite. Gemessen: ein
- * einzelner Absatz auf einer sonst leeren vierten Seite.
- *
- * Im Buchsatz heißen die beiden Fälle Schusterjunge (erste Zeile bleibt allein unten) und
- * Hurenkind (letzte Zeile steht allein oben); beide gelten als Satzfehler. Zwei Einheiten
- * sind die überlieferte Untergrenze.
+ * Bis dahin galt die Buchsatzregel „mindestens zwei Einheiten" (Schusterjunge/Hurenkind,
+ * eingeführt am 25.09.2026 nach „Aufgabe/Material wird zerrissen"). Eine Einheit ist hier aber
+ * keine Zeile, sondern ein ganzer Absatz, eine Frage, eine Tabellenzeile – die Regel schob ganze
+ * Absätze auf die nächste Seite und kostete Seiten. Entscheidung der Lehrkraft: keine harte
+ * Mindestzeilen-Regel; maßgeblich ist allein, dass die Aufgabenstellung nie ohne den ersten
+ * Teil ihres Inhalts dasteht (Kopf + erste Einheit, gebundene Einheiten siehe `unitGlue`).
  */
-const MIN_EINHEITEN = 2
 
 /**
  * `abzug`: je Seite (0-basiert) so viele px weniger Platz. Die Prüfung nach dem Setzen
@@ -113,7 +126,16 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
     pages.push({ items: [], overflow: false })
     remaining = otherPageHeight - (abzug[pages.length - 1] ?? 0)
   }
-  const minHeight = (it: MeasuredItem): number => (it.units?.length ? (it.headHeight ?? 0) + it.units[0] : it.height)
+  /** Kleinstes erstes Stück: Kopf + erste Einheit samt allem, was an sie gebunden ist */
+  const minHeight = (it: MeasuredItem): number => {
+    if (!it.units?.length) return it.height
+    let h = it.headHeight ?? 0
+    for (let k = 0; k < it.units.length; k++) {
+      h += it.units[k]
+      if (!it.unitGlue?.[k]) break
+    }
+    return h
+  }
 
   items.forEach((item, index) => {
     const next = items[index + 1]
@@ -166,41 +188,42 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
       let lineCursor = 0
       // Der Fuß gehört zur letzten Einheit: Wer sie setzt, setzt auch ihn
       const mitFuss = (k: number): number => item.units![k] + (k === item.units!.length - 1 ? (item.footHeight ?? 0) : 0)
-      while (from < item.units.length) {
-        const head = from === 0 ? (item.headHeight ?? 0) : (item.continuedHead ?? 0)
+      const n = item.units.length
+      const gebunden = (k: number): boolean => Boolean(item.unitGlue?.[k])
+      while (from < n) {
+        // Ein Folgestück wiederholt seinen Kopf (Fortsetzungshinweis, Tabellenkopf) – und ggf. den einer inneren Tabelle
+        const head = from === 0 ? (item.headHeight ?? 0) : (item.continuedHead ?? 0) + (item.unitRepeat?.[from] ?? 0)
         let used = head
         let to = from
-        while (to < item.units.length && used + mitFuss(to) <= remaining + EPS) {
+        while (to < n && used + mitFuss(to) <= remaining + EPS) {
           used += mitFuss(to)
           to++
         }
         /*
-         * Schusterjunge: Es passt nichts oder zu wenig – dann faengt der Baustein lieber
-         * ganz oben auf der naechsten Seite an, statt mit einer einzelnen Zeile unten.
+         * Gebundene Einheiten (Aufgabenstellung, Kopf einer Teilaufgabe …) nie als letzte eines
+         * Stücks: so weit zurückgehen, bis nach einer freien Einheit umbrochen wird.
          */
-        const zuWenigHier = to - from < MIN_EINHEITEN && item.units.length - from > to - from
-        if (to === from || zuWenigHier) {
+        const gierig = to
+        while (to > from && to < n && gebunden(to - 1)) {
+          to--
+          used -= mitFuss(to)
+        }
+        if (to === from) {
+          // Nicht einmal Kopf + erste Einheit (samt Gebundenem) passen: ganzer Rest auf die nächste Seite
           if (page().items.length > 0) {
             newPage()
             continue
           }
-          if (to === from) {
+          if (gierig > from) {
+            // Oben auf einer leeren Seite und die Kette ist länger als die Seite: dann doch innerhalb der Kette teilen
+            to = gierig
+            used = head
+            for (let k = from; k < to; k++) used += mitFuss(k)
+          } else {
             // Einheit größer als eine ganze Seite: trotzdem setzen
             to = from + 1
             used = head + mitFuss(from)
             page().overflow = true
-          }
-        }
-        /*
-         * Hurenkind: Bliebe fuer die Folgeseite nur noch eine einzelne Einheit uebrig, wird
-         * sie hier abgegeben – dann stehen drueben zwei statt einer.
-         */
-        const rest = item.units.length - to
-        if (rest > 0 && rest < MIN_EINHEITEN && to - from > MIN_EINHEITEN) {
-          const abgeben = MIN_EINHEITEN - rest
-          for (let k = 0; k < abgeben; k++) {
-            to--
-            used -= mitFuss(to)
           }
         }
         const lineCount = sum((item.unitLines ?? []).slice(from, to))

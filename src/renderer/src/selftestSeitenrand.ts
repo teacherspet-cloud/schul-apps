@@ -16,7 +16,7 @@ import type { Answer, AnswerKind, Worksheet, WorksheetMeta, WsBlock } from './mo
 import { createRng } from './modules/vokabeltest/model/random'
 import { useVokabeltest } from './modules/vokabeltest/store'
 
-export type SeitenrandArt = 'tabellen' | 'knapp' | 'raender' | 'protokoll' | 'gemischt'
+export type SeitenrandArt = 'tabellen' | 'knapp' | 'raender' | 'protokoll' | 'gemischt' | 'teilbar'
 
 const SATZ =
   'Der Wasserkreislauf beschreibt, wie Wasser verdunstet, als Wolke weiterzieht und als Niederschlag zurück auf die Erde fällt, wo es versickert oder in Flüsse abfließt. '
@@ -121,6 +121,172 @@ const schreibraum = (hoehe: number): WsBlock => ({ id: id('w'), type: 'workspace
 
 const protokoll = (subjectId: string, grade: number): WsBlock => ({ id: id('p'), type: 'protocol', ...leeresProtokoll({ subjectId, grade }) }) as WsBlock
 
+/*
+ * TEILBARE BAUSTEINE (01.10.2026, Wunsch der Lehrkraft: „Bausteine an geeigneten Stellen
+ * aufteilen … erster Teil auf S. 1 unten, Fortsetzung auf S. 2"). Jede Antwortform, die sich an
+ * natürlichen Stellen teilen lässt, einmal in groß – nach einem Vorlauf, der sie irgendwo auf die
+ * Seite setzt. Die Wache `seiten-sparen.mjs` misst daran Seitenzahl und Untergrenze.
+ */
+const zuordnung = (n: number): WsBlock =>
+  aufgabe(
+    '**Ordne** die Begriffe den Erklärungen zu.',
+    antwort('matching', {
+      left: Array.from({ length: n }, (_, i) => `Begriff ${i + 1}: Verdunstung über ${i % 2 ? 'dem Meer' : 'Seen und Flüssen'}`),
+      right: Array.from({ length: n }, (_, i) => `Erklärung ${i + 1}: ${SATZ.slice(0, 60 + (i % 3) * 30)}`),
+      pairs: Array.from({ length: n }, (_, i) => (i * 3) % n)
+    })
+  )
+
+const ordnen = (n: number): WsBlock =>
+  aufgabe(
+    '**Bringe** die Schritte in die richtige Reihenfolge.',
+    antwort('ordering', {
+      items: Array.from({ length: n }, (_, i) => `Schritt ${i + 1}: ${SATZ.slice(0, 50 + (i % 4) * 25)}`),
+      displayOrder: Array.from({ length: n }, (_, i) => (i * 5) % n)
+    })
+  )
+
+const beschriften = (n: number): WsBlock =>
+  aufgabe('**Beschrifte** die Nummern im Schema.', antwort('labels', { count: n, labels: Array.from({ length: n }, (_, i) => `Teil ${i + 1}`) }))
+
+const ausfuellen = (n: number): WsBlock =>
+  aufgabe(
+    '**Vervollständige** die Tabelle.',
+    antwort('tableFill', {
+      headers: ['Vorgang', 'Ort', 'Ergebnis'],
+      rows: Array.from({ length: n }, (_, i) => [`Vorgang ${i + 1}`, '', i % 2 ? '' : 'Wolke']),
+      solutionRows: Array.from({ length: n }, (_, i) => ['', `Ort ${i + 1}`, i % 2 ? 'Regen' : ''])
+    })
+  )
+
+const lueckenZeilen = (n: number): WsBlock =>
+  aufgabe(
+    '**Ergänze** die Lücken in den Sätzen.',
+    antwort('gapText', {
+      gapText: Array.from({ length: n }, (_, i) => `${i + 1}. Wasser [[verdunstet]] über dem Meer und steigt als [[Wasserdampf]] auf; in der Höhe [[kondensiert]] es (${i + 1}).`).join('\n')
+    })
+  )
+
+const richtigFalsch = (n: number): WsBlock =>
+  aufgabe(
+    '**Kreuze** an: richtig oder falsch?',
+    antwort('trueFalse', { statements: Array.from({ length: n }, (_, i) => ({ text: `Aussage ${i + 1}: ${SATZ.slice(0, 80 + (i % 3) * 40)}`, isTrue: i % 2 === 0 })) })
+  )
+
+const mcReihe = (n: number, lang: boolean): WsBlock =>
+  aufgabe('**Kreuze** die richtige Antwort an.', antwort('lines', { count: 1 }), {
+    parts: Array.from({ length: n }, (_, i) => ({
+      id: id('mc'),
+      instruction: lang ? `Frage ${i + 1}: ${SATZ.slice(0, 70)}?` : `Frage ${i + 1}?`,
+      answer: antwort('multipleChoice', {
+        options: lang ? ['Durch Verdunstung über dem Meer', 'Durch Versickerung im Boden', 'Durch Abfluss in die Flüsse'] : ['Regen', 'Schnee', 'Hagel'],
+        correct: [i % 3]
+      }),
+      solution: ''
+    }))
+  })
+
+const teilaufgabenGemischt = (): WsBlock =>
+  aufgabe('**Bearbeite** die Teilaufgaben.', antwort('lines', { count: 1 }), {
+    parts: [
+      {
+        id: id('tp'),
+        instruction: 'Ordne zu.',
+        answer: antwort('matching', { left: ['Wolke', 'Regen', 'Fluss', 'Meer', 'See', 'Grundwasser'], right: ['fällt', 'fließt', 'verdunstet', 'zieht', 'versickert', 'steht'], pairs: [3, 0, 1, 2, 5, 4] }),
+        solution: ''
+      },
+      { id: id('tp'), instruction: 'Ergänze.', answer: antwort('gapText', { gapText: Array.from({ length: 8 }, (_, i) => `Satz ${i + 1}: Das Wasser [[fließt]] ins Meer.`).join('\n') }), solution: '' },
+      { id: id('tp'), instruction: `Begründe. ${SATZ}`, answer: antwort('lines', { count: 6 }), solution: 'Lösung' },
+      {
+        id: id('tp'),
+        instruction: 'Richtig oder falsch?',
+        answer: antwort('trueFalse', { statements: Array.from({ length: 7 }, (_, i) => ({ text: `Aussage ${i + 1}: ${SATZ.slice(0, 90)}`, isTrue: i % 2 === 1 })) }),
+        solution: ''
+      }
+    ]
+  })
+
+const schreibauftrag = (): WsBlock =>
+  aufgabe('**Schreibe** einen Bericht für die Schülerzeitung.', antwort('lines', { count: 22 }), {
+    brief: {
+      situation: 'Eure Klasse hat eine Wetterstation gebaut.',
+      audience: 'Mitschülerinnen und Mitschüler',
+      textType: 'Bericht',
+      purpose: 'informieren',
+      words: 200,
+      points: ['Aufbau der Station', 'Messergebnisse der ersten Woche', 'Was euch überrascht hat', 'Ausblick'],
+      form: ['Überschrift verwenden'],
+      criteria: ['Sachlichkeit', 'Vollständigkeit'],
+      notes: [
+        { title: 'Aufbau', items: ['Thermometer', 'Regenmesser'], prompts: ['Standort: …'] },
+        { title: 'Ergebnisse', items: ['Niederschlag', 'Temperatur'], prompts: ['Höchstwert: …'] }
+      ]
+    }
+  })
+
+const lernziele = (n: number): WsBlock => ({
+  id: id('lz'),
+  type: 'learningGoals',
+  title: 'Das kann ich jetzt',
+  goals: Array.from({ length: n }, (_, i) => `Ich kann den Schritt ${i + 1} des Wasserkreislaufs erklären und ${SATZ.slice(0, 40 + (i % 3) * 30)}`)
+})
+
+const selbstcheck = (n: number): WsBlock => ({
+  id: id('sc'),
+  type: 'selfCheck',
+  title: 'Selbsteinschätzung',
+  format: 'smileys',
+  statements: Array.from({ length: n }, (_, i) => `Ich kann Aussage ${i + 1} sicher begründen: ${SATZ.slice(0, 50 + (i % 4) * 20)}`)
+})
+
+const merkeLang = (absaetze: number): WsBlock => ({
+  id: id('m'),
+  type: 'infoBox',
+  variant: 'merke',
+  title: 'Merke',
+  body: Array.from({ length: absaetze }, () => SATZ.repeat(2)).join('\n\n')
+})
+
+const tippListe = (n: number): WsBlock => ({
+  id: id('st'),
+  type: 'scaffold',
+  variant: 'satzanfaenge',
+  title: 'Satzanfänge',
+  items: Array.from({ length: n }, (_, i) => `Satzanfang ${i + 1}: Zuerst ${SATZ.slice(0, 40 + (i % 3) * 25)} …`)
+})
+
+/** Vorlauf, der den folgenden Baustein irgendwo auf die Seite schiebt */
+const vorlauf = (r: () => number): WsBlock =>
+  r() < 0.5 ? text(1 + Math.floor(r() * 3), 1 + Math.floor(r() * 2)) : aufgabe('**Notiere** deine Vermutung.', antwort('lines', { count: 2 + Math.floor(r() * 10) }))
+
+function teilbareBausteine(seed: number): WsBlock[] {
+  const r = createRng(seed)
+  const kern: (() => WsBlock)[] = [
+    () => zuordnung(14),
+    () => richtigFalsch(12),
+    () => lueckenZeilen(14),
+    () => mcReihe(10, true),
+    () => mcReihe(12, false),
+    () => teilaufgabenGemischt(),
+    () => ordnen(12),
+    () => beschriften(16),
+    () => ausfuellen(14),
+    () => schreibauftrag(),
+    () => lernziele(9),
+    () => selbstcheck(12),
+    () => merkeLang(4),
+    () => tippListe(10),
+    () => tabelle(16, true),
+    () => text(6, 2)
+  ]
+  const aus: WsBlock[] = []
+  for (const k of kern) {
+    aus.push(vorlauf(r))
+    aus.push(k())
+  }
+  return aus
+}
+
 /** Bausteine in wechselnder Größe – je nach Zufallszahl ein anderes Seitenende */
 function zufallsBaustein(r: () => number): WsBlock {
   const n = Math.floor(r() * 11)
@@ -207,6 +373,8 @@ function bausteine(art: SeitenrandArt, seed: number): WsBlock[] {
       const r = createRng(seed)
       return Array.from({ length: 16 + Math.floor(r() * 10) }, () => zufallsBaustein(r))
     }
+    case 'teilbar':
+      return teilbareBausteine(seed)
   }
 }
 

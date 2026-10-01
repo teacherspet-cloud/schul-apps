@@ -688,6 +688,15 @@ function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Shee
   })
 }
 
+/**
+ * Bausteine, die über eine Seite hinweg geteilt werden dürfen – an den Einheiten (`data-unit`),
+ * die sie selbst ausweisen, und die ein Stück (`PlacedItem.from/to`) darstellen können.
+ * Seit 01.10.2026 auch Merkkasten (Absätze), Lernziele und Hilfen (Listenpunkte), die
+ * Selbsteinschätzung (Aussagen) und der linierte Schreibraum (Linien). NICHT: die nützlichen
+ * Ausdrücke – sie stehen zweispaltig (`column-count`), ein Stück davon ließe sich nicht messen.
+ */
+const TEILBAR = new Set<WsBlock['type']>(['text', 'table', 'task', 'protocol', 'infoBox', 'learningGoals', 'scaffold', 'selfCheck', 'workspace'])
+
 const KEIN_ABZUG = new Map<string, number[]>()
 /** So oft wird nach der Prüfung höchstens neu umbrochen – danach bleibt es beim letzten Stand */
 const PRUEF_RUNDEN = 6
@@ -841,8 +850,15 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
         const rahmen = wrap.getBoundingClientRect()
         const height = rahmen.height
         const block = sheet.blocks.find((b) => b.id === id)
-        const unitEls = Array.from(wrap.querySelectorAll<HTMLElement>('[data-unit]'))
-        const splittable = (block?.type === 'text' || block?.type === 'table' || block?.type === 'task' || block?.type === 'protocol') && unitEls.length > 1
+        /*
+         * Einheiten des Bausteins selbst: nicht die eines seitlich danebenstehenden Bausteins
+         * (eine Tabelle neben der Aufgabe brachte sonst ihre Zeilen in die Rechnung der Aufgabe)
+         * und keine, die in einer anderen Einheit stecken.
+         */
+        const unitEls = Array.from(wrap.querySelectorAll<HTMLElement>('[data-unit]')).filter(
+          (u) => !u.closest('.ws-side-image') && !u.parentElement?.closest('[data-unit]')
+        )
+        const splittable = Boolean(block && TEILBAR.has(block.type)) && unitEls.length > 1
         if (splittable) {
           const units = einheitenHoehen(unitEls)
           const unitSum = units.reduce((a, b) => a + b, 0)
@@ -864,14 +880,33 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
            */
           const vorlauf = Math.max(0, unitEls[0].getBoundingClientRect().top - rahmen.top)
           const tabelle = block?.type === 'table' ? unitEls[0].closest('table') : null
-          const wiederholt = tabelle ? Math.max(0, unitEls[0].getBoundingClientRect().top - tabelle.getBoundingClientRect().top) : block?.type === 'task' ? fortsetzungKopf : 0
+          /*
+           * Jedes Folgestück trägt oben den Hinweis „Aufgabe 3 (Fortsetzung)" bzw. „M2
+           * (Fortsetzung)" (seit 01.10.2026 bei allen geteilten Bausteinen), Tabellen dazu ihre
+           * Kopfzeile.
+           */
+          const wiederholt = (tabelle ? Math.max(0, unitEls[0].getBoundingClientRect().top - tabelle.getBoundingClientRect().top) : 0) + fortsetzungKopf
           if (tabelle) spaltenJe.set(id, spaltenProzent(tabelle))
+          /*
+           * Gebundene Einheiten (`data-bindet`) und Kopfzeilen innerer Tabellen (Richtig/Falsch,
+           * Ausfülltabelle, Selbsteinschätzung), die ein Stück, das mit dieser Zeile beginnt,
+           * wiederholt. Beginnt ein Stück mit der ERSTEN Zeile, steckt die Kopfzeile in der Messung
+           * in der Einheit davor – auf der neuen Seite steht sie trotzdem: also immer anrechnen.
+           */
+          const unitGlue = unitEls.map((u) => u.hasAttribute('data-bindet'))
+          const unitRepeat = unitEls.map((u) => {
+            if (block?.type === 'table' || u.tagName !== 'TR') return 0
+            const kopf = u.closest('table')?.tHead
+            return kopf ? kopf.getBoundingClientRect().height : 0
+          })
           items.push({
             id,
             height,
             headHeight,
             footHeight,
             units,
+            ...(unitGlue.some(Boolean) ? { unitGlue } : {}),
+            ...(unitRepeat.some((x) => x > 0) ? { unitRepeat } : {}),
             /*
              * Zeilennummern zählen nur den Materialtext, nicht die Worterklärungen darunter.
              *
@@ -888,7 +923,14 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
                     return Math.max(1, Math.round(u.getBoundingClientRect().height / zeile))
                   })
                 : undefined,
-            keepTogether: true,
+            /*
+             * KEIN `keepTogether` mehr (01.10.2026). Bis dahin wanderte jeder teilbare Baustein,
+             * der in der unteren Seitenhälfte nicht mehr ganz Platz fand, vollständig auf die
+             * nächste Seite – die Lehrkraft: „Dadurch benötigt man im Druck deutlich mehr Seiten
+             * als vom Inhalt eigentlich notwendig wären." Jetzt wird an der nächsten natürlichen
+             * Stelle geteilt; dass die Aufgabenstellung nicht allein unten steht, sichern Kopf +
+             * erste Einheit und die gebundenen Einheiten.
+             */
             pageBreakBefore: block?.pageBreakBefore,
             continuedHead: Math.max(0, headHeight - vorlauf) + wiederholt
           })

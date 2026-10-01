@@ -1,6 +1,6 @@
 import { RichText } from '../../../../shared/richtext/RichText'
 import type { Answer, TaskBlock, TaskPart } from '../../model/types'
-import { AnswerView, DiagramView, McOptions, diagramWidthMm } from '../Answers'
+import { AnswerView, DiagramView, McOptions, diagramWidthMm, teilbareAntwort } from '../Answers'
 import { PictogramIcon } from '../Pictogram'
 import { pictogramForInstruction, pictogramForSocialForm } from '../pictograms'
 import { SOCIAL_FORM_LABELS, SOCIAL_FORM_SVG } from '../icons'
@@ -15,7 +15,7 @@ import { bereinigeSkizze } from '../../generation/solution'
 import { istAnkreuzAufgabe, istMcListe, mcSpalten, mcZeilen, ohneOperator } from '../mcGrid'
 import { stars, useSetter } from './hilfen'
 import { stufenZeile } from '../../../../shared/verstehen/anzeige'
-import { briefAbschnitte, erwartungsAbschnitte, Abschnitt, gruppiereTeilaufgaben } from './brief'
+import { briefAbschnitte, erwartungsAbschnitte, Abschnitt, gruppiereAntworten, gruppiereTeilaufgaben } from './brief'
 
 export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }): React.JSX.Element {
   const {
@@ -51,12 +51,39 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   const ankreuzen = istAnkreuzAufgabe(block)
 
   /*
+   * LEERE LÖSUNG (01.10.2026). In der Lösungsansicht des Editors steht für eine noch leere Lösung
+   * ein Platzhalter zum Hineinschreiben, im Druck nichts. Bis dahin war der Platzhalter eine
+   * EIGENE Umbruch-Einheit, die es im Druck nicht gab: Die Einheiten der Ansicht passten nicht
+   * mehr zu denen der Messung (Stücke zeigten Einheiten doppelt oder gar nicht), und die Zeile
+   * „Lösung" ragte unten über den Rand (Seitenrand-Wache, Fragenreihen mit leeren Lösungen).
+   * Jetzt gibt es die Einheit in beiden Fassungen – ohne Höhe; der Platzhalter liegt rechts über
+   * der Zeile davor und nimmt keinen Platz ein.
+   */
+  const loesungsKnoten = (wert: string | undefined, onChange: ((v: string) => void) | undefined, platzhalter: string, k: string, einheit: boolean, label?: string): React.JSX.Element | null => {
+    const u = einheit ? { 'data-unit': '' } : {}
+    if (String(wert ?? '').trim())
+      return (
+        <div className="ws-solution" key={k} {...u}>
+          {label && <b>{label} </b>}
+          <RichText value={wert ?? ''} editable={keyEdit} onChange={onChange} placeholder={platzhalter} />
+        </div>
+      )
+    if (!keyEdit && !einheit) return null
+    return (
+      <div className="ws-solution ws-solution-leer" key={k} {...u}>
+        {keyEdit && <RichText value="" editable onChange={onChange} placeholder={platzhalter} />}
+      </div>
+    )
+  }
+
+  /*
    * Gelöstes Beispiel als Punkt „0" – vor den echten Items und optisch zurückgenommen.
    * Es ist keine Aufgabe, sondern zeigt, WIE geantwortet wird (ÖSZ 2024; Goethe- und
    * Cambridge-Modellsätze). Deshalb steht die Lösung hier auch auf dem Schülerblatt.
    */
   const beispielKnoten = block.example ? (
-    <div className="ws-example" data-unit key="example">
+    // Gebunden: Das gelöste Beispiel leitet die Fragen ein und steht nie allein am Seitenende
+    <div className="ws-example" data-unit data-bindet key="example">
       <div className="ws-mc-question">
         <span className="ws-mc-num">0.</span>
         <RichText value={block.example.instruction} editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).example!.instruction = v))} />
@@ -76,48 +103,73 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   /*
    * Fragenreihe zum Ankreuzen: rahmenlose Tabelle, spaltenweise gefüllt.
    * Die Begründung für Aufteilung und fehlenden Rahmen steht in `render/mcGrid.ts`.
-   * Sie bleibt EINE Einheit: Spaltenweise gelesen wäre eine halbe Tabelle sinnlos.
+   *
+   * Jede ZEILE ist eine Umbruch-Einheit (01.10.2026) – vorher war das ganze Gitter eine, und
+   * eine lange Fragenreihe schob die Aufgabe vollständig auf die nächste Seite. Damit die
+   * Spalten auch geteilt von oben nach unten gelesen werden, ordnet jedes Stück SEINE Fragen
+   * neu spaltenweise an: Ein Stück mit den Zeilen [a, b) enthält die Fragen [a·S, b·S) – auf
+   * Seite 1 stehen 1–6, auf Seite 2 7–10, nie 1 neben 7. Ungeteilt ist es das bisherige Gitter.
+   * Eine Frage bleibt mit ihren Antwortmöglichkeiten immer zusammen (sie steht in EINER Zelle).
    */
-  const mcGitter = (
-    <table className="ws-mc-grid" data-unit key="mc">
-      <tbody>
-        {mcZeilen(
-          block.parts.map((part, i) => ({ part, i })),
-          mcSpalten(block.parts)
-        ).map((zeile, z) => (
-          <tr key={z}>
-            {zeile.map((eintrag, sp) => (
-              <td key={sp}>
-                {eintrag && (
-                  <>
-                    <div className="ws-mc-question">
-                      <span className="ws-mc-num">{eintrag.i + 1}.</span>
-                      <RichText
-                        value={ohneOperator(eintrag.part.instruction, block.operator)}
-                        editable={schreiben}
-                        onChange={set((d, v) => ((d as TaskBlock).parts[eintrag.i].instruction = v))}
-                      />
-                    </div>
-                    <McOptions answer={eintrag.part.answer} onChange={onAnswer((d) => d.parts[eintrag.i].answer)} />
-                    {key && (eintrag.part.solution || keyEdit) && (
-                      <div className="ws-solution">
-                        <RichText
-                          value={eintrag.part.solution}
-                          editable={keyEdit}
-                          onChange={set((d, v) => ((d as TaskBlock).parts[eintrag.i].solution = v))}
-                          placeholder="Lösung"
-                        />
-                      </div>
+  const mcAlle = block.parts.map((part, i) => ({ part, i }))
+  const mcS = mcSpalten(block.parts)
+  const mcGruppe: Abschnitt['gruppe'] = {
+    id: 'mc',
+    wrap: (teile) => {
+      const a = teile[0].zeile ?? 0
+      const b = (teile[teile.length - 1].zeile ?? 0) + 1
+      return (
+        <table className="ws-mc-grid" key={`mc-${a}`}>
+          <tbody>
+            {mcZeilen(mcAlle.slice(a * mcS, Math.min(mcAlle.length, b * mcS)), mcS).map((zeile, z) => (
+              <tr key={a + z} data-unit>
+                {zeile.map((eintrag, sp) => (
+                  <td key={sp}>
+                    {eintrag && (
+                      <>
+                        <div className="ws-mc-question">
+                          <span className="ws-mc-num">{eintrag.i + 1}.</span>
+                          <RichText
+                            value={ohneOperator(eintrag.part.instruction, block.operator)}
+                            editable={schreiben}
+                            onChange={set((d, v) => ((d as TaskBlock).parts[eintrag.i].instruction = v))}
+                          />
+                        </div>
+                        <McOptions answer={eintrag.part.answer} onChange={onAnswer((d) => d.parts[eintrag.i].answer)} />
+                        {key && loesungsKnoten(eintrag.part.solution, set((d, v) => ((d as TaskBlock).parts[eintrag.i].solution = v)), 'Lösung', 'loesung', false)}
+                      </>
                     )}
-                  </>
-                )}
-              </td>
+                  </td>
+                ))}
+              </tr>
             ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
+          </tbody>
+        </table>
+      )
+    }
+  }
+  const mcZeilenAbschnitte = (): Abschnitt[] =>
+    Array.from({ length: Math.ceil(mcAlle.length / mcS) }, (_, z) => ({ node: <></>, gruppe: mcGruppe, zeile: z }))
+
+  /*
+   * TEILBARE ANTWORTFORMEN (Zuordnung, Richtig/Falsch, Reihenfolge, Beschriftung,
+   * Ausfülltabelle, Lückentext mit mehreren Absätzen bzw. Punkten): je Zeile eine Einheit, der
+   * Rahmen (Tabelle samt Kopfzeile, Liste) entsteht je Stück – siehe `teilbareAntwort`.
+   */
+  const antwortZeilen = (answer: Answer, onChange: ((fn: (a: Answer) => void) => void) | undefined, id: string, teil?: number): Abschnitt[] | null => {
+    const t = teilbareAntwort(answer, { key, editText: edit && Boolean(onChange), editKey: keyEdit && Boolean(onChange), editRoh: schreiben, answerLanguage: answerLanguage ?? 'de', onChange })
+    if (!t || t.einheiten.length < 2) return null
+    const gruppe: Abschnitt['gruppe'] = {
+      id,
+      wrap: (teile) => (
+        // Dieselbe Hülle wie die ungeteilte Antwort (`<div><AnswerView/></div>`), in Teilaufgaben mit dem Einzug der Anweisung
+        <div className={teil !== undefined ? 'ws-part-antwort' : undefined} key={`${id}-${teile[0].zeile ?? 0}`}>
+          {t.rahmen(teile.map((x) => x.node))}
+        </div>
+      )
+    }
+    return t.einheiten.map((node, z) => ({ node, gruppe, zeile: z, ...(teil !== undefined ? { teil, teilWeiter: true } : {}) }))
+  }
 
   /*
    * Schreiblinien werden in kleinen Päckchen ausgegeben, nicht als ein Klotz.
@@ -258,29 +310,10 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    * Linienteil weiterlaufen; der Listenpunkt wird beim Rendern wieder zusammengesetzt.
    */
   const teilaufgabe = (part: TaskPart, i: number): Abschnitt[] => {
-    const kopf = (
-      <div className="ws-part-kopf" data-unit key={`${part.id}-kopf`}>
-        {/*
-          Der Buchstabe steht IM gemessenen Kasten, nicht als Listenzeichen davor.
-          Ein `::marker` erzeugt eine eigene Zeilenbox, deren Höhe beim Umbruch niemand
-          mitzählt – auf Seite 2 lief der Inhalt dadurch über den Rand hinaus.
-        */}
-        <span className="ws-part-letter">{String.fromCharCode(97 + i)})</span>
-        <RichText value={part.instruction} editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
-        {/* In der Lösungsansicht tritt die Musterlösung an die Stelle von Kästchen und Fläche */}
-        {part.answer.kind !== 'lines' &&
-          !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space' || part.answer.kind === 'diagram')) && (
-            <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />
-          )}
-      </div>
-    )
-    const schluss =
-      key && (part.solution || keyEdit) ? (
-        <div className="ws-solution" data-unit key={`${part.id}-loesung`}>
-          <RichText value={part.solution} editable={keyEdit} onChange={set((d, v) => ((d as TaskBlock).parts[i].solution = v))} placeholder="Lösung" />
-        </div>
-      ) : null
-    // Nur Schreiblinien werden zerlegt; alle anderen Antwortformen bleiben eine Einheit
+    // Teilbare Antwortform: ihre Zeilen folgen dem Kopf als eigene Einheiten (in der Lösungsansicht mit Musterlösung statt Fläche wie bisher)
+    const zeilen = antwortZeilen(part.answer, onAnswer((d) => d.parts[i].answer), `teil-${part.id}`, i)
+    const schluss = key ? loesungsKnoten(part.solution, set((d, v) => ((d as TaskBlock).parts[i].solution = v)), 'Lösung', `${part.id}-loesung`, true) : null
+    // Schreiblinien werden ohnehin zerlegt; alle anderen Antwortformen ohne Zeilen bleiben im Kopf
     const linien = part.answer.kind === 'lines' && !key ? linienAbschnitte(part.answer.count).map((n) => ({ node: n, teil: i, teilWeiter: true })) : []
     const muster = key
       ? musterKnoten(part.answer, part.modelAnswer, part.modelSketch, part.id, (d, v) => (d.parts[i].modelAnswer = v)).map((n) => ({
@@ -289,7 +322,30 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
           teilWeiter: true
         }))
       : []
-    return [{ node: kopf, teil: i }, ...linien, ...muster, ...(schluss ? [{ node: schluss, teil: i, teilWeiter: true }] : [])]
+    const folgt = [...(zeilen ?? []), ...linien, ...muster, ...(schluss ? [{ node: schluss, teil: i, teilWeiter: true }] : [])]
+    /*
+     * Der Kopf („b) Ergänze …") ist GEBUNDEN, wenn noch etwas zur Teilaufgabe folgt
+     * (01.10.2026): Er stünde sonst allein unten auf der Seite und seine Zeilen oben auf der
+     * nächsten – genau das, was die Lehrkraft ausgeschlossen hat.
+     */
+    const kopf = (
+      <div className="ws-part-kopf" data-unit {...(folgt.length ? { 'data-bindet': '' } : {})} key={`${part.id}-kopf`}>
+        {/*
+          Der Buchstabe steht IM gemessenen Kasten, nicht als Listenzeichen davor.
+          Ein `::marker` erzeugt eine eigene Zeilenbox, deren Höhe beim Umbruch niemand
+          mitzählt – auf Seite 2 lief der Inhalt dadurch über den Rand hinaus.
+        */}
+        <span className="ws-part-letter">{String.fromCharCode(97 + i)})</span>
+        <RichText value={part.instruction} editable={schreiben} onChange={set((d, v) => ((d as TaskBlock).parts[i].instruction = v))} />
+        {/* In der Lösungsansicht tritt die Musterlösung an die Stelle von Kästchen und Fläche */}
+        {!zeilen &&
+          part.answer.kind !== 'lines' &&
+          !(key && hatMuster(part) && (part.answer.kind === 'grid' || part.answer.kind === 'space' || part.answer.kind === 'diagram')) && (
+            <AnswerView answer={part.answer} onChange={onAnswer((d) => d.parts[i].answer)} />
+          )}
+      </div>
+    )
+    return [{ node: kopf, teil: i }, ...folgt]
   }
 
   /*
@@ -299,10 +355,11 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    */
   // Der Mustertext steht oben auf den Linien – dann nicht noch einmal am Ende
   const mustertextGezeigt = Boolean(key && block.answer.kind === 'lines' && !block.parts.length && block.brief?.model)
+  const hauptZeilen = block.parts.length ? null : antwortZeilen(block.answer, onAnswer((d) => d.answer), 'antwort')
   const abschnitte: Abschnitt[] = []
   for (const teil of briefAbschnitte({ block, edit, set, wordLimit, ohneHilfen: ohneSchreibhilfen })) abschnitte.push({ node: teil })
   if (block.example) abschnitte.push({ node: beispielKnoten })
-  if (mcListe) abschnitte.push({ node: mcGitter })
+  if (mcListe) abschnitte.push(...mcZeilenAbschnitte())
   else if (block.parts.length > 0) block.parts.forEach((part, i) => abschnitte.push(...teilaufgabe(part, i)))
   /*
    * Lösungsansicht: Wo die Lernenden schreiben, steht der Mustertext – und wo es keinen
@@ -317,6 +374,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     for (const n of musterKnoten(block.answer, block.modelAnswer, block.modelSketch, 'aufgabe', (d, v) => (d.modelAnswer = v))) abschnitte.push({ node: n })
   } else if (block.answer.kind === 'lines' && block.answer.count > LINIEN_PRO_EINHEIT)
     for (const n of linienAbschnitte(block.answer.count)) abschnitte.push({ node: n })
+  else if (hauptZeilen) abschnitte.push(...hauptZeilen)
   else
     abschnitte.push({
       node: (
@@ -335,21 +393,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    * Mustertext, der mitten im Satz abbrach. Als Einheiten brechen sie sauber um.
    */
   if (key) {
-    if (block.solution || keyEdit) {
-      abschnitte.push({
-        node: (
-          <div className="ws-solution" data-unit key="loesung">
-            <b>Lösung: </b>
-            <RichText
-              value={block.solution}
-              editable={keyEdit}
-              onChange={set((d, v) => ((d as TaskBlock).solution = v))}
-              placeholder="Lösung / Erwartungshorizont"
-            />
-          </div>
-        )
-      })
-    }
+    abschnitte.push({ node: loesungsKnoten(block.solution, set((d, v) => ((d as TaskBlock).solution = v)), 'Lösung / Erwartungshorizont', 'loesung', true, 'Lösung:')! })
     if (block.brief) {
       for (const n of erwartungsAbschnitte({ block, edit: keyEdit, set, mitMustertext: !mustertextGezeigt })) abschnitte.push({ node: n })
     }
@@ -389,7 +433,8 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   const von = placed?.from ?? 0
   const bis = placed?.to ?? abschnitte.length
   const zeigtKopf = von === 0
-  const sichtbar = gruppiereTeilaufgaben(abschnitte.slice(von, bis))
+  // Erst die Zeilen eines Stücks in ihre Tabelle/Liste, dann die Teilaufgaben in ihre Liste
+  const sichtbar = gruppiereTeilaufgaben(gruppiereAntworten(abschnitte.slice(von, bis)))
 
   return (
     <div className={`ws-block ws-task ${placed?.continued ? 'ws-continued' : ''}`}>

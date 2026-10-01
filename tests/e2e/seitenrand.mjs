@@ -214,6 +214,9 @@ try {
       ['knapp', 1, 1],
       ['raender', 1, 2],
       ['protokoll', 1, 3],
+      // Teilbare Antwortformen, Lernziele, Merkkasten, Selbsteinschätzung … (01.10.2026, seiten-sparen.mjs)
+      ['teilbar', 1, 0],
+      ['teilbar', 2, 5],
       ['gemischt', 11, 0],
       ['gemischt', 23, 1],
       ['gemischt', 37, 4],
@@ -232,6 +235,7 @@ try {
     await page.waitForTimeout(600)
     for (const [art, seed] of [
       ['tabellen', 1],
+      ['teilbar', 2],
       ['gemischt', 23]
     ]) {
       const name = `Klassenarbeit ${art}${art === 'gemischt' ? ` ${seed}` : ''}`
@@ -257,6 +261,7 @@ try {
     await page.waitForTimeout(600)
     for (const [art, seed] of [
       ['tabellen', 1],
+      ['teilbar', 3],
       ['gemischt', 37]
     ]) {
       const name = `Lernzielkontrolle ${art}${art === 'gemischt' ? ` ${seed}` : ''}`

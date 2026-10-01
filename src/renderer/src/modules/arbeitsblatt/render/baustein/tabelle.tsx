@@ -4,7 +4,8 @@ import type { TableBlock } from '../../model/types'
 import type { PlacedItem } from '../paginate'
 import { spaltenBreiten, spalteVerschieben, tabellenBreite, zeilenHoehe, zeilenHoehen } from '../tabelleMasse'
 import { isEditMode, useWs } from '../WsContext'
-import { Feld, useSetter } from './hilfen'
+import { Feld, FortsetzungsHinweis, useSetter } from './hilfen'
+import { stripMaterialNo } from './galerie'
 
 /**
  * Tabelle mit ziehbaren Maßen (27.09.2026, render/tabelleMasse.ts).
@@ -90,6 +91,8 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
 
   return (
     <div className={`ws-block ws-table-block ${placed?.continued ? 'ws-continued' : ''}`}>
+      {/* Folgestück: „M3 (Fortsetzung)" über der wiederholten Kopfzeile (01.10.2026) */}
+      {from > 0 && <FortsetzungsHinweis bezeichnung={ctx.materialNumbers?.get(block.id) ?? stripMaterialNo(block.title)} />}
       {from === 0 && (block.title || ctx.materialNumbers?.get(block.id)) && (
         <div className="ws-table-title" data-head>
           {ctx.materialNumbers?.get(block.id) && <span className="ws-material-no">{ctx.materialNumbers.get(block.id)}</span>}

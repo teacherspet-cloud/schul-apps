@@ -164,6 +164,12 @@
 .vt-block.vt-block-continued {
   margin-top: 0;
 }
+/* „Aufgabe 3 (Fortsetzung)" – ein Wegweiser, keine zweite Überschrift (wie `.ws-task-continued`) */
+.vt-continued {
+  font-weight: 600;
+  opacity: 0.75;
+  margin-bottom: 0.3em;
+}
 
 .vt-block {
   margin-top: 7mm;

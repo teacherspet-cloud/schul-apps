@@ -34,3 +34,36 @@ const HINWEISE: Record<string, (nummer: number) => string> = {
 export function continuedNote(language: string | undefined, nummer: number): string {
   return (HINWEISE[(language ?? 'de').toLowerCase().slice(0, 2)] ?? HINWEISE.de)(nummer)
 }
+
+/** Nur der Zusatz „(Fortsetzung)" in der Sprache des Faches */
+const ZUSATZ: Record<string, string> = {
+  de: '(Fortsetzung)',
+  en: '(continued)',
+  fr: '(suite)',
+  es: '(continuación)',
+  it: '(continua)',
+  nl: '(vervolg)',
+  ru: '(продолжение)',
+  pl: '(ciąg dalszy)',
+  cs: '(pokračování)',
+  pt: '(continuação)',
+  tr: '(devamı)',
+  zh: '（续）',
+  ja: '（続き）',
+  ar: '(تابع)',
+  da: '(fortsat)',
+  el: '(συνέχεια)',
+  la: '(Fortsetzung)'
+}
+
+/**
+ * „M2 (Fortsetzung)", „Merke (Fortsetzung)" – derselbe Hinweis für jeden anderen geteilten
+ * Baustein (01.10.2026, Wunsch der Lehrkraft: überall einheitlich). Ohne Bezeichnung steht nur
+ * der Zusatz.
+ */
+export function continuedLabel(language: string | undefined, bezeichnung: string): string {
+  const zusatz = ZUSATZ[(language ?? 'de').toLowerCase().slice(0, 2)] ?? ZUSATZ.de
+  const name = bezeichnung.trim()
+  if (!name) return zusatz
+  return /^[（]/.test(zusatz) ? `${name}${zusatz}` : `${name} ${zusatz}`
+}

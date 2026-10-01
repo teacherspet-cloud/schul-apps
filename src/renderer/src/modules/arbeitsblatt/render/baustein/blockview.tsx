@@ -17,7 +17,7 @@ import { headerLine } from '../../didactics/sourceHeader'
 import { narrationNote } from '../../didactics/narration'
 import { AI_AUDIO_NOTE, audioRulesFor, playsLabelFor } from '../../didactics/audioRules'
 import { Illustriert, IllustrationView } from '../Illustration'
-import { LONG_TEXT_CHARS, splitParagraphs, Feld, gridAlt, audioLength, shortLink, useSetter } from './hilfen'
+import { LONG_TEXT_CHARS, splitParagraphs, Feld, FortsetzungsHinweis, gridAlt, audioLength, shortLink, useSetter } from './hilfen'
 import { TabelleAnsicht } from './tabelle'
 import { TaskView } from './aufgabe'
 import { stripMaterialNo, GalleryView } from './galerie'
@@ -54,6 +54,9 @@ export function BlockView({ block, placed }: { block: WsBlock; placed?: PlacedIt
   )
 }
 
+/** Einheiten [von, bis) des gesetzten Stücks; ohne Aufteilung alle */
+const stueck = (placed: PlacedItem | undefined, anzahl: number): [number, number] => [placed?.from ?? 0, placed?.to ?? anzahl]
+
 export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: PlacedItem }): React.JSX.Element | null {
   const ctx = useWs()
   const { mode } = ctx
@@ -69,39 +72,74 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
     case 'illustration':
       if (isKeyMode(mode)) return null
       return <IllustrationView block={block} editable={schreiben} onBubble={set((d, v) => ((d as typeof block).bubble = v))} />
-    case 'learningGoals':
+    case 'learningGoals': {
       if (isKeyMode(mode)) return null
+      // Teilbar zwischen zwei Lernzielen (01.10.2026)
+      const [von, bis] = stueck(placed, block.goals.length)
       return (
-        <div className="ws-block ws-goals">
-          <div className="ws-goals-title">
-            <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
-          </div>
+        <div className={`ws-block ws-goals ${placed?.continued ? 'ws-continued' : ''}`}>
+          {von === 0 ? (
+            <div className="ws-goals-title">
+              <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
+            </div>
+          ) : (
+            <FortsetzungsHinweis bezeichnung={block.title} />
+          )}
           <ul>
-            {block.goals.map((g, i) => (
-              <li key={i}>
-                <RichText value={g} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).goals[i] = v))} />
+            {block.goals.slice(von, bis).map((g, k) => (
+              <li key={von + k} data-unit>
+                <RichText value={g} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).goals[von + k] = v))} />
               </li>
             ))}
           </ul>
         </div>
       )
+    }
 
     case 'infoBox': {
       const v = INFO_VARIANTS[block.variant] ?? INFO_VARIANTS.merke
+      /*
+       * Ein Kasten mit mehreren Absätzen ist zwischen zwei Absätzen teilbar (01.10.2026); das
+       * Folgestück ist wieder ein Kasten, oben mit „Merke (Fortsetzung)". Ein einzelner Absatz
+       * bleibt die gewohnte Darstellung und wird nie geteilt (mitten im Satz).
+       */
+      const absaetze = splitParagraphs(block.body ?? '')
+      const [von, bis] = stueck(placed, absaetze.length)
       return (
-        <div className={`ws-block ws-info ws-info-${block.variant}`}>
-          <div className="ws-info-head">
-            <span className="ws-info-symbol">{v.symbol}</span>
-            <Feld className="ws-info-title" value={block.title || v.label} editable={schreiben} onChange={set((d, val) => ((d as typeof block).title = val))} />
-          </div>
-          <RichText
-            value={block.body}
-            editable={schreiben}
-            onChange={set((d, val) => ((d as typeof block).body = val))}
-            placeholder="Inhalt des Kastens"
-            // Ein Merkkasten darf Lücken tragen, die die Lernenden selbst füllen
-            renderText={gapRenderText(isKeyMode(mode))}
-          />
+        <div className={`ws-block ws-info ws-info-${block.variant} ${placed?.continued ? 'ws-continued' : ''}`}>
+          {von === 0 ? (
+            <div className="ws-info-head">
+              <span className="ws-info-symbol">{v.symbol}</span>
+              <Feld className="ws-info-title" value={block.title || v.label} editable={schreiben} onChange={set((d, val) => ((d as typeof block).title = val))} />
+            </div>
+          ) : (
+            <FortsetzungsHinweis bezeichnung={block.title || v.label} />
+          )}
+          {absaetze.length < 2 ? (
+            <RichText
+              value={block.body}
+              editable={schreiben}
+              onChange={set((d, val) => ((d as typeof block).body = val))}
+              placeholder="Inhalt des Kastens"
+              // Ein Merkkasten darf Lücken tragen, die die Lernenden selbst füllen
+              renderText={gapRenderText(isKeyMode(mode))}
+            />
+          ) : (
+            absaetze.slice(von, bis).map((absatz, k) => (
+              <div key={von + k} data-unit className="ws-info-absatz">
+                <RichText
+                  value={absatz}
+                  editable={schreiben}
+                  onChange={set((d, val) => {
+                    const alle = splitParagraphs((d as typeof block).body ?? '')
+                    alle[von + k] = val
+                    ;(d as typeof block).body = alle.filter((x) => x.trim()).join('\n\n')
+                  })}
+                  renderText={gapRenderText(isKeyMode(mode))}
+                />
+              </div>
+            ))
+          )}
         </div>
       )
     }
@@ -131,6 +169,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             ctx.notesMargin ? 'ws-notizrand' : ''
           }`}
         >
+          {/* Folgestück: „M2 (Fortsetzung)" – derselbe Wegweiser wie bei Aufgaben (01.10.2026) */}
+          {!showHead && <FortsetzungsHinweis bezeichnung={materialNo ?? stripMaterialNo(block.title)} />}
           {showHead && (block.title || materialNo) && (
             <div className="ws-text-title" data-head>
               {/* Die Nummer vergibt die App – so verweist keine Aufgabe auf ein Material, das es nicht gibt */}
@@ -360,13 +400,19 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
     case 'task':
       return <TaskView block={block} placed={placed} />
 
-    case 'scaffold':
+    case 'scaffold': {
       if (isKeyMode(mode)) return null
+      // Listen (Tipps, Satzanfänge) teilbar zwischen zwei Punkten (01.10.2026); Wortspeicher und Hilfekarten nicht
+      const [von, bis] = stueck(placed, block.items.length)
       return (
-        <div className={`ws-block ws-scaffold ws-scaffold-${block.variant}`}>
-          <div className="ws-scaffold-title">
-            <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
-          </div>
+        <div className={`ws-block ws-scaffold ws-scaffold-${block.variant} ${placed?.continued ? 'ws-continued' : ''}`}>
+          {von === 0 ? (
+            <div className="ws-scaffold-title">
+              <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
+            </div>
+          ) : (
+            <FortsetzungsHinweis bezeichnung={block.title} />
+          )}
           {block.variant === 'wortspeicher' ? (
             <div className="ws-wordbank">
               {block.items.map((it, i) => (
@@ -386,31 +432,49 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
             </div>
           ) : (
             <ul>
-              {block.items.map((it, i) => (
-                <li key={i}>
-                  <RichText value={it} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).items[i] = v))} />
+              {block.items.slice(von, bis).map((it, k) => (
+                <li key={von + k} data-unit>
+                  <RichText value={it} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).items[von + k] = v))} />
                 </li>
               ))}
             </ul>
           )}
         </div>
       )
+    }
 
     case 'table':
       return <TabelleAnsicht block={block} placed={placed} />
 
-    case 'workspace':
+    case 'workspace': {
       if (isKeyMode(mode)) return null
+      /*
+       * Ein LINIERTER Schreibraum ist zwischen zwei Linien teilbar (01.10.2026) – wie die
+       * Schreiblinien einer Aufgabe: je Linie eine Einheit (8,5 mm), die letzte nimmt den Rest.
+       * Kästchen und freie Fläche bleiben ein Stück (Zeichnung, Rechnung).
+       */
+      const LINIE_MM = 8.5
+      const linien = block.kind === 'lines' ? Math.max(1, Math.round(block.heightMm / LINIE_MM)) : 1
+      const [von, bis] = stueck(placed, linien)
+      const hoehe = (k: number): number => (k < linien - 1 ? LINIE_MM : Math.max(1, block.heightMm - (linien - 1) * LINIE_MM))
       return (
-        <div className="ws-block ws-workspace">
-          {block.label && (
+        <div className={`ws-block ws-workspace ${placed?.continued ? 'ws-continued' : ''}`}>
+          {von > 0 && <FortsetzungsHinweis bezeichnung={block.label} />}
+          {von === 0 && block.label && (
             <div className="ws-workspace-label">
               <Feld value={block.label} editable={schreiben} onChange={set((d, v) => ((d as typeof block).label = v))} />
             </div>
           )}
-          <div className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${block.heightMm}mm` }} />
+          {linien < 2 ? (
+            <div className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${block.heightMm}mm` }} />
+          ) : (
+            Array.from({ length: bis - von }, (_, k) => (
+              <div key={von + k} data-unit className={`ws-workspace-area ws-workspace-${block.kind}`} style={{ height: `${hoehe(von + k)}mm` }} />
+            ))
+          )}
         </div>
       )
+    }
 
     case 'grid': {
       // Fertig gezeichnete Zeitleiste (Material) oder leeres Gitternetz (Zeichenfläche)
@@ -627,10 +691,13 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       )
     }
 
-    case 'selfCheck':
+    case 'selfCheck': {
       if (isKeyMode(mode)) return null
+      // Teilbar zwischen zwei Aussagen (01.10.2026); die Kopfzeile steht auf jedem Stück
+      const [von, bis] = stueck(placed, block.statements.length)
       return (
-        <div className="ws-block ws-selfcheck">
+        <div className={`ws-block ws-selfcheck ${placed?.continued ? 'ws-continued' : ''}`}>
+          {von > 0 && <FortsetzungsHinweis bezeichnung={block.title} />}
           <table>
             <thead>
               <tr>
@@ -645,10 +712,10 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
               </tr>
             </thead>
             <tbody>
-              {block.statements.map((s, i) => (
-                <tr key={i}>
+              {block.statements.slice(von, bis).map((s, k) => (
+                <tr key={von + k} data-unit>
                   <td>
-                    <RichText value={s} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).statements[i] = v))} />
+                    <RichText value={s} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).statements[von + k] = v))} />
                   </td>
                   <td className="ws-sc-cell" />
                   <td className="ws-sc-cell" />
@@ -659,6 +726,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
           </table>
         </div>
       )
+    }
 
     case 'divider':
       return (

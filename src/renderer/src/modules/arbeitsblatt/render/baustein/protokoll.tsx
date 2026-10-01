@@ -5,7 +5,7 @@ import { GESTIS_URL, SCHUTZMASSNAHMEN, SICHERHEIT_HINWEIS, artInfo } from '../..
 import type { PlacedItem } from '../paginate'
 import { isKeyMode, useWs } from '../WsContext'
 import { GhsPiktogramm } from '../ghs'
-import { Feld, useSetter } from './hilfen'
+import { Feld, FortsetzungsHinweis, useSetter } from './hilfen'
 
 /** „___" im vorgegebenen Text als Schreiblücke */
 function mitLuecken(text: string): React.JSX.Element[] {
@@ -189,7 +189,9 @@ export function ProtokollView({ block, placed }: { block: ProtocolBlock; placed?
   const gezeigt = units.slice(from, bis)
 
   return (
-    <div className="ws-block ws-protokoll" data-protokoll={block.art}>
+    <div className={`ws-block ws-protokoll ${from > 0 ? 'ws-continued' : ''}`} data-protokoll={block.art}>
+      {/* Folgestück: „Versuchsprotokoll (Fortsetzung)" – derselbe Wegweiser wie bei Aufgaben (01.10.2026) */}
+      {from > 0 && <FortsetzungsHinweis bezeichnung={block.title || artInfo(block.art).label} />}
       {from === 0 && (
         <div className="ws-protokoll-kopf">
           <Feld value={block.title} editable={edit} onChange={set((d, v) => ((d as ProtocolBlock).title = v))} />
