@@ -42,7 +42,7 @@ import type { PrinterInfo, PrintOptions } from '@shared/apiShape'
 import { createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
 import { generateSvgImage } from './services/ai/svg'
 import { KiPlaetze } from './services/ai/kiPlaetze'
-import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche } from './services/ai/attrappe'
+import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche, attrappeQuelleLaden, attrappeQuellensuche } from './services/ai/attrappe'
 import { istAbbruch } from '@shared/abbruch'
 import { freierDateiname } from '@shared/dateiname'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
@@ -52,6 +52,7 @@ import { htmlToPdfWithExtras, MEASURE_SCRIPT, type Gemessen, type Messen } from 
 import { fetchAsDataUrl, getOpenMojiSvg, searchOnline, searchOpenMoji } from './services/images/images'
 import { checkMediaSource, checkQuote } from './services/images/sources'
 import { ladeOriginalquelle, sucheOriginalquellen } from './services/sources/materialSuche'
+import { ablehnungAufheben, leseAblehnungen, quelleAblehnen } from './services/storage/quellenAblehnungen'
 import { ladeVideo } from './services/sources/video'
 import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePose } from './services/storage/maskottchen'
 import { audioPath, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
@@ -474,8 +475,16 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    * Die App sucht und laedt SELBST. Nur was sie gelesen hat, darf als Originaltext aufs
    * Blatt – eine Fundstelle aus dem Gedaechtnis des Sprachmodells kann erfunden sein.
    */
-  handle('sources:suche', (anfrage: Materialanfrage) => sucheOriginalquellen(anfrage))
-  handle('sources:laden', (url: string) => ladeOriginalquelle(url))
+  // In den Oberflächentests mit Attrappe (nie im Betrieb) kommen Treffer und Wortlaut ohne Netz aus der Attrappe
+  handle('sources:suche', (anfrage: Materialanfrage) => attrappeQuellensuche(anfrage) ?? sucheOriginalquellen(anfrage))
+  handle('sources:laden', (url: string) => attrappeQuelleLaden(url) ?? ladeOriginalquelle(url))
+  /*
+   * Abgelehnte Quellen (01.10.2026): EINE Liste für alle Programme und Geräte. Aussortierte
+   * Funde wurden vorher nirgends gespeichert und kamen bei der nächsten Suche wieder.
+   */
+  handle('sources:ablehnungen', () => leseAblehnungen())
+  handle('sources:ablehnen', (eingaben: Parameters<typeof quelleAblehnen>[0]) => quelleAblehnen(eingaben))
+  handle('sources:ablehnung-aufheben', (auswahl: { url?: string; thema?: string }) => ablehnungAufheben(auswahl))
   // Video als Material: Titel, Beschreibung, Transkript aus den Untertiteln (26.09.2026)
   handle('sources:video', (url: string) => ladeVideo(url))
   // Maskottchen für Illustrationen (26.09.2026)

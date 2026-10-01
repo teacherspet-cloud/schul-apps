@@ -97,7 +97,9 @@ const DATEIEN = [
   'model-cache.json',
   // Themenbereiche und die Zuordnung der Materialien (Paket 10b) – ohne sie käme nach dem
   // Einlesen alles Material ungeordnet zurück
-  'themenbereiche.json'
+  'themenbereiche.json',
+  // Abgelehnte Quellen (01.10.2026) – sonst kämen aussortierte Funde nach dem Einlesen wieder
+  'quellen-ablehnungen.json'
 ]
 
 const userData = (): string => app.getPath('userData')

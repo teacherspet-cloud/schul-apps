@@ -15,6 +15,8 @@
  */
 import type { GeladeneQuelle, Materialanfrage, Quellentreffer, StructuredRequest } from '@shared/types'
 import { arr, int, obj, str } from '../../../shared/aiSchema'
+import { ablehnungsPruefer, normalisiereQuellenUrl, type AblehnungsDaten } from '@shared/quellenAblehnung'
+import { pruefeRelevanz, relevanzText, type RelevanzBefund } from '../../../shared/quellenRelevanz'
 import { wantsSourceHeader } from '../didactics/sourceHeader'
 import { istUebungsklausur } from './abiturPrompt'
 import { LANGUAGE_NAMES, subjectById } from '../model/subjects'
@@ -41,6 +43,11 @@ export interface MaterialDienste {
    * `laden` und misst ihn – eine erfundene Adresse fällt dabei auf.
    */
   netzsuche?: (auftrag: string) => Promise<Quellentreffer[]>
+  /**
+   * Die dauerhaft abgelehnten Quellen (01.10.2026) – gemeinsam für alle Programme.
+   * Fehlt der Dienst (Tests, ältere Gegenstelle), wird nichts ausgeblendet.
+   */
+  ablehnungen?: () => Promise<AblehnungsDaten>
 }
 
 export interface MaterialWunsch {
@@ -62,6 +69,16 @@ export interface MaterialWunsch {
    * nicht. In der Prüfung wiegt die Echtheit des Materials schwerer als die Bequemlichkeit.
    */
   pruefung: boolean
+  /**
+   * Thema, unter dem Ablehnungen gespeichert werden (01.10.2026). Die Klassenarbeit sucht mit
+   * „Thema – Teil" – abgelehnt wird aber für das Thema der ARBEIT, sonst gälte eine Ablehnung
+   * im Teil „Mediation" nicht im Teil „Reading". Fehlt es, gilt `thema`.
+   */
+  kernthema?: string
+  /** Lernziel bzw. Erwartung – für die Relevanzprüfung */
+  lernziel?: string
+  /** Sprachmittlung: Der Ausgangstext ist absichtlich deutsch */
+  mediation?: boolean
 }
 
 export interface Originalmaterial {
@@ -93,9 +110,57 @@ export type MaterialErgebnis =
 // ---------- Schritt 1: Wonach wird gesucht? ----------
 
 const SUCHE_SCHEMA = obj({
-  begriffe: arr(str('Suchwörter für ein Textarchiv, 2–5 Wörter'), '4–6 verschiedene Suchanfragen, von der genauesten zur allgemeinsten'),
+  begriffe: arr(
+    str('Suchwörter für ein Textarchiv, 2–5 Wörter, in der Sprache des gesuchten Textes'),
+    '4–6 verschiedene Suchanfragen, von der genauesten zur allgemeinsten'
+  ),
+  kernbegriffe: arr(
+    str('Ein Begriff oder Name, ohne den ein Text nicht vom Thema handeln kann'),
+    '1–4 Kernbegriffe in der Sprache des gesuchten Textes (z. B. ein Werktitel, ein Name, ein Fachbegriff)'
+  ),
   gesucht: str('Was für ein Text gesucht wird (Textsorte, Zeit, Perspektive) – ein Satz')
 })
+
+/**
+ * Wörter, die allein keine Suchanfrage tragen: Sie stehen in jedem zweiten Verzeichnis.
+ *
+ * Gemeldet am 01.10.2026: Aus „German Macbeth Adaptations" werden leicht Anfragen wie
+ * „Rezeption Deutschland" oder „Adaption Bühne". Die Volltextsuche von Wikisource liefert darauf
+ * Zeitschriften-Inhaltsverzeichnisse – dort stehen solche Wörter gehäuft (nachgemessen: „Macbeth
+ * Rezeption Deutschland" → „William Shakespeare", „Friedrich Schiller", „Die Musikforschung").
+ */
+const ALLGEMEIN = new Set(
+  'text texte quelle quellen auszug material deutsch deutsche deutschen deutschland german germany english englisch rezeption reception adaption adaptation adaptionen adaptations bearbeitung bearbeitungen geschichte history analyse analysis interpretation thema topic artikel article beispiel beispiele'.split(
+    ' '
+  )
+)
+
+/**
+ * Räumt die Suchanfragen der KI auf: keine Einzelwörter, keine Anfragen ganz ohne Kernbegriff.
+ *
+ * Eine Anfrage ohne Kernbegriff („Rezeption Deutschland") findet alles, was irgendwie mit
+ * Rezeption zu tun hat. Fehlt der Kernbegriff, wird er vorangestellt; besteht eine Anfrage nur
+ * aus allgemeinen Wörtern, fällt sie weg.
+ */
+export function bereinigeSuchbegriffe(begriffe: string[], kern: string[]): string[] {
+  const kernKlein = kern.map((k) => k.toLowerCase()).filter((k) => k.length >= 3)
+  const aus: string[] = []
+  for (const roh of begriffe) {
+    const b = roh
+      .replace(/["„“”]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const woerter = b.split(' ').filter(Boolean)
+    if (!woerter.length) continue
+    // Ein einzelnes Wort trägt nur, wenn es selbst ein Kernbegriff ist (ein Werktitel wie „Faust")
+    if (woerter.length < 2 && !kernKlein.includes(b.toLowerCase())) continue
+    const hatKern = kernKlein.some((k) => b.toLowerCase().includes(k))
+    const tragend = woerter.filter((w) => w.length > 2 && !ALLGEMEIN.has(w.toLowerCase()))
+    if (!tragend.length && !hatKern) continue
+    aus.push(hatKern || !kern.length ? b : `${kern[0]} ${b}`)
+  }
+  return [...new Set(aus)]
+}
 
 /**
  * Lässt die KI Suchanfragen formulieren.
@@ -112,14 +177,25 @@ const SUCHE_SCHEMA = obj({
  * Urheber und Titel geht dort ins Leere. Zu „Loreley" gibt es eines, und nur die gezielte
  * Suche findet es. Welcher Fall vorliegt, weiß das Sprachmodell – die App nicht.
  */
-export async function suchbegriffe(wunsch: MaterialWunsch, ai: AiRuf): Promise<{ begriffe: string[]; gesucht: string }> {
-  const data = await ai<{ begriffe: string[]; gesucht: string }>({
+export async function suchbegriffe(wunsch: MaterialWunsch, ai: AiRuf): Promise<{ begriffe: string[]; gesucht: string; kernbegriffe: string[] }> {
+  const data = await ai<{ begriffe: string[]; gesucht: string; kernbegriffe?: string[] }>({
     system:
       'Du hilfst einer Lehrkraft, einen echten, veröffentlichten Originaltext für den Unterricht zu finden. Du erfindest nichts und nennst keine Internetadressen – du formulierst nur Suchanfragen.',
     user: [
-      `Fach: ${wunsch.fach}. Thema: ${wunsch.thema}. Jahrgang: ${wunsch.jahrgang}. Sprache des Textes: ${wunsch.sprache}.`,
+      `Fach: ${wunsch.fach}. Thema: ${wunsch.thema}. Jahrgang: ${wunsch.jahrgang}. Sprache des Textes: ${sprachName(wunsch.sprache)}.`,
+      wunsch.lernziel?.trim() ? `Lernziel: ${wunsch.lernziel.trim()}` : '',
       `Gesucht wird ein zusammenhängender Originaltext von etwa ${wunsch.zielWortzahl} Wörtern (er darf deutlich länger sein und wird dann gekürzt).`,
       'Gesucht wird in Textarchiven und im offenen Netz.',
+      /*
+       * Sprache der Suchwörter (01.10.2026): Das Thema „German Macbeth Adaptations" ist
+       * englisch formuliert, der Ausgangstext der Sprachmittlung aber deutsch. Halb englische,
+       * halb deutsche Suchwörter finden in einem deutschen Archiv nur Zufallstreffer.
+       */
+      `SPRACHE DER SUCHWÖRTER: Formuliere ALLE Suchanfragen und Kernbegriffe auf ${sprachName(wunsch.sprache)} – auch wenn das Thema in einer anderen Sprache formuliert ist. Übersetze das Thema dazu sinngemäß und nutze die dort üblichen Fachwörter und Synonyme.`,
+      wunsch.mediation
+        ? 'Es geht um eine SPRACHMITTLUNG: Gesucht wird ein deutscher Gebrauchs- oder Sachtext (Zeitungsartikel, Kritik, Informationsseite) ZUM Thema – keine Literaturgeschichte und kein Verzeichnis.'
+        : '',
+      'KERNBEGRIFFE: Nenne 1–4 Begriffe oder Namen, ohne die ein Text nicht vom Thema handeln kann (bei „German Macbeth Adaptations" etwa „Macbeth"). Jede Suchanfrage muss mindestens einen Kernbegriff enthalten.',
       'SUCHE ZUERST ALLGEMEIN NACH MATERIAL ZUM THEMA:',
       '- Verbinde das Sachthema mit der Textsorte und, wo es passt, mit Zeit oder Ort („Migration Debatte Kommentar", „Weimarer Republik Rede Reichstag 1930").',
       '- Denke an die Textsorten, die zum Fach gehören: Zeitungskommentar, Rede, Brief, Essay, Gesetzestext, Bericht, Statistik.',
@@ -131,17 +207,29 @@ export async function suchbegriffe(wunsch: MaterialWunsch, ai: AiRuf): Promise<{
       '- Ist der bekannte Titel volkstümlich, nenne zusätzlich den echten Titel oder die erste Zeile („Loreley" → „Ich weiß nicht, was soll es bedeuten").',
       '',
       '- Vermeide Gattungswörter allein („Text", „Quelle", „Auszug") – sie stehen in keinem Titel.',
+      '- Vermeide Anfragen aus lauter allgemeinen Wörtern („Rezeption Deutschland", „Adaption Bühne"): Sie finden Register und Zeitschriftenverzeichnisse, in denen diese Wörter zufällig stehen.',
+      '- Achte auf Verwechslungen mit gleichnamigen Werken (Oper, Film) und grenze sie durch ein weiteres Wort ab („Macbeth Inszenierung Schauspiel").',
       '- Gib verschiedene Wege an, nicht Abwandlungen desselben: ein Sachthema, eine Textsorte mit Zeitbezug, ein Werk (falls einschlägig). Gefunden wird oft erst mit dem dritten.'
     ].join('\n'),
     schemaName: 'material_suche',
     schema: SUCHE_SCHEMA
   })
-  const begriffe = (data.begriffe ?? []).map((b) => String(b).trim()).filter(Boolean)
+  const kernbegriffe = (Array.isArray(data?.kernbegriffe) ? data.kernbegriffe : [])
+    .map((b) => String(b).trim())
+    .filter((b) => b.length >= 3)
+    .slice(0, 4)
+  const roh = (Array.isArray(data?.begriffe) ? data.begriffe : []).map((b) => String(b).trim()).filter(Boolean)
+  const begriffe = bereinigeSuchbegriffe(roh, kernbegriffe)
   return {
-    begriffe: begriffe.slice(0, 6),
-    gesucht: String(data.gesucht ?? '')
+    // Bleibt nach dem Aufräumen nichts übrig, sind die Rohanfragen besser als gar keine
+    begriffe: (begriffe.length ? begriffe : roh).slice(0, 6),
+    gesucht: String(data?.gesucht ?? ''),
+    kernbegriffe
   }
 }
+
+const sprachName = (code: string): string =>
+  ({ de: 'Deutsch', en: 'Englisch', fr: 'Französisch', es: 'Spanisch', it: 'Italienisch', la: 'Latein', ...LANGUAGE_NAMES })[code] ?? code
 
 // ---------- Schritt 2: Auswählen und kürzen ----------
 
@@ -245,6 +333,10 @@ export interface GepruefterTreffer {
   befund: string
   /** 0 bis 1 – bestimmt die Reihenfolge */
   rang: number
+  /** Relevanzprüfung (01.10.2026): Textart, Passung, Begründung der KI */
+  relevanz?: RelevanzBefund
+  /** Kurzfassung der Relevanzprüfung für die Trefferliste */
+  begruendung?: string
 }
 
 export interface MaterialLauf {
@@ -265,19 +357,88 @@ export interface MaterialLauf {
   auswahl?: (treffer: GepruefterTreffer[]) => Promise<string | null>
 }
 
+/** Höchstens so viele Funde derselben Website werden geladen, solange es andere gibt */
+const MAX_JE_SEITE = 4
+
+/**
+ * Reihenfolge zum Laden: Archive und offenes Netz abwechselnd, je Website begrenzt.
+ *
+ * Befund vom 01.10.2026: Die Archivtreffer kamen zuerst in die Liste, die Netzfunde dahinter –
+ * und geladen wurden nur die ersten zwölf. Lieferte Wikisource zwölf Treffer, wurde KEIN
+ * einziger Netzfund je geprüft, so gut er war. Zu „German Macbeth Adaptations" bestand die
+ * Auswahl deshalb nur aus Wikisource-Seiten, darunter ein Zeitschriftenverzeichnis und eine
+ * Autorenseite – während eine Theaterkritik aus dem Netz nie geladen wurde.
+ *
+ * Reicht die Vielfalt nicht (nur ein Archiv lieferte etwas), wird mit den übrigen aufgefüllt:
+ * Begrenzt wird die Reihenfolge, nicht die Auswahl.
+ */
+export function mischeQuellen(treffer: Quellentreffer[], max = MAX_LADEN): Quellentreffer[] {
+  const seite = (t: Quellentreffer): string => {
+    try {
+      return new URL(t.url).hostname.replace(/^www\./, '')
+    } catch {
+      return t.url
+    }
+  }
+  const gruppen = new Map<string, Quellentreffer[]>()
+  for (const t of treffer) gruppen.set(t.herkunft, [...(gruppen.get(t.herkunft) ?? []), t])
+  const reihen = [...gruppen.values()]
+  const je = new Map<string, number>()
+  const vorn: Quellentreffer[] = []
+  const zurueck: Quellentreffer[] = []
+  for (let i = 0; reihen.some((r) => i < r.length); i++) {
+    for (const r of reihen) {
+      const t = r[i]
+      if (!t) continue
+      const s = seite(t)
+      const n = je.get(s) ?? 0
+      if (n < MAX_JE_SEITE) {
+        je.set(s, n + 1)
+        vorn.push(t)
+      } else zurueck.push(t)
+    }
+  }
+  return [...vorn, ...zurueck].slice(0, max)
+}
+
+/** Rang aus Form (Messung) und Passung (KI): Die Passung wiegt schwerer – ein schöner Text zum falschen Thema nützt nichts */
+function gesamtRang(form: number, relevanz?: RelevanzBefund): number {
+  if (relevanz?.punkte === undefined) return form
+  return Number((0.6 * (relevanz.punkte / 10) + 0.4 * form).toFixed(4))
+}
+
 export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<MaterialErgebnis> {
   const { wunsch, dienste, ai } = lauf
   lauf.fortschritt?.('Suchbegriffe werden bestimmt …')
-  const { begriffe } = await suchbegriffe(wunsch, ai).catch(() => ({
+  const { begriffe, kernbegriffe } = await suchbegriffe(wunsch, ai).catch(() => ({
     begriffe: [wunsch.thema],
-    gesucht: ''
+    gesucht: '',
+    kernbegriffe: [] as string[]
   }))
+
+  /*
+   * Dauerhaft abgelehnte Quellen ausblenden (01.10.2026) – für dieses Thema oder überhaupt.
+   * Vorher galt „Keine davon" nur für den einen Lauf; die nächste Suche brachte dieselben Funde.
+   */
+  const ablehnungen = dienste.ablehnungen ? await dienste.ablehnungen().catch(() => null) : null
+  const abgelehnt = ablehnungen ? ablehnungsPruefer(ablehnungen, wunsch.kernthema || wunsch.thema) : () => undefined
+  let ausgeblendet = 0
 
   // Der Reihe nach suchen, bis genug Treffer da sind – die erste Anfrage ist die genaueste
   const treffer: Quellentreffer[] = []
   const gesehen = new Set<string>()
   const aufnehmen = (neue: Quellentreffer[]): void => {
-    for (const t of neue) if (!gesehen.has(t.url)) (gesehen.add(t.url), treffer.push(t))
+    for (const t of neue) {
+      // Dieselbe Seite in anderer Schreibweise (mobil, Unterstrich, Anker) ist dieselbe Seite
+      const schluessel = normalisiereQuellenUrl(t.url) || t.url
+      if (gesehen.has(schluessel)) continue
+      gesehen.add(schluessel)
+      if (abgelehnt(t.url)) {
+        ausgeblendet++
+        continue
+      }
+      treffer.push(t)
+    }
   }
   const anfragen = begriffe.length ? begriffe : [wunsch.thema]
   for (const [i, begriff] of anfragen.entries()) {
@@ -294,15 +455,16 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
    * wie möglich" ist (EPA Geographie 3.3).
    *
    * Die Netzsuche läuft NACH den Archiven, aber immer: Die Lehrkraft hat am 24.09.2026
-   * ausdrücklich gründliche Suche gewünscht. Die Archivtreffer stehen trotzdem vorn – eine
-   * gemeinfreie Quelle ist rechtlich die ruhigere Wahl –, aber ein Fund aus dem offenen Netz
-   * kann sachlich der bessere sein, und das entscheidet die Messung, nicht die Herkunft.
+   * ausdrücklich gründliche Suche gewünscht. Geladen wird anschließend abwechselnd aus Archiv
+   * und Netz (`mischeQuellen`) – ein Fund aus dem offenen Netz kann sachlich der bessere sein,
+   * und das entscheidet die Prüfung, nicht die Herkunft.
    */
   if (dienste.netzsuche) {
     lauf.fortschritt?.('Im Internet wird nach weiteren Quellen gesucht …')
     aufnehmen(await dienste.netzsuche(netzAuftrag(wunsch, begriffe)).catch(() => []))
   }
-  if (!treffer.length) return ergebnisOhneFund(wunsch, 'In den freien Archiven wurde zu diesem Thema kein Originaltext gefunden.', [])
+  const ausgeblendetSatz = ausgeblendet ? ` ${ausgeblendet === 1 ? 'Ein abgelehnter Fund wurde' : `${ausgeblendet} abgelehnte Funde wurden`} ausgeblendet.` : ''
+  if (!treffer.length) return ergebnisOhneFund(wunsch, `In den freien Archiven wurde zu diesem Thema kein Originaltext gefunden.${ausgeblendetSatz}`, [])
 
   /*
    * Laden, messen, aussortieren, sortieren – und ERST DANN der Lehrkraft zeigen.
@@ -323,7 +485,7 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
     bewertung: Bewertung
   }[] = []
   const verworfen: string[] = []
-  for (const t of treffer.slice(0, MAX_LADEN)) {
+  for (const t of mischeQuellen(treffer)) {
     lauf.fortschritt?.(`Quelle wird geprüft: ${t.titel} …`)
     const quelle = await dienste.laden(t.url).catch((e) => ({
       url: t.url,
@@ -343,26 +505,60 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
     }
     geprueft.push({ treffer: t, quelle, bewertung })
   }
-  geprueft.sort((a, b) => b.bewertung.rang - a.bewertung.rang)
 
-  if (!geprueft.length) {
+  /*
+   * Passt der Fund zum THEMA? (01.10.2026)
+   *
+   * Die Messung oben prüft nur die Form. „Die Musikforschung" (ein Zeitschriftenverzeichnis)
+   * und „Friedrich Gundolf" (eine Autorenseite) bestanden sie beide – und landeten in der
+   * Auswahl zu „German Macbeth Adaptations". Jetzt prüfen feste Regeln (Sprache, Seitenart,
+   * Kernbegriffe) und danach die KI jeden Fund, BEVOR er der Lehrkraft gezeigt wird.
+   */
+  let passend: ((typeof geprueft)[number] & { relevanz?: RelevanzBefund })[] = geprueft
+  if (geprueft.length) {
+    lauf.fortschritt?.('Die KI prüft, ob die Funde zu Thema, Fach und Jahrgang passen …')
+    const relevanz = await pruefeRelevanz(
+      geprueft.map((g) => ({ treffer: g.treffer, text: g.quelle.text })),
+      {
+        thema: wunsch.thema,
+        fach: wunsch.fach,
+        jahrgang: wunsch.jahrgang,
+        sprache: wunsch.sprache,
+        lernziel: wunsch.lernziel,
+        kernbegriffe,
+        mediation: wunsch.mediation,
+        pruefung: wunsch.pruefung
+      },
+      ai
+    )
+    passend = []
+    geprueft.forEach((g, i) => {
+      const r = relevanz[i]
+      if (!r.ok) verworfen.push(`${g.treffer.titel}: ${r.gruende.join('; ')}`)
+      else passend.push({ ...g, relevanz: r })
+    })
+  }
+  passend.sort((a, b) => gesamtRang(b.bewertung.rang, b.relevanz) - gesamtRang(a.bewertung.rang, a.relevanz))
+
+  if (!passend.length) {
     const details = verworfen.length ? ` Geprüft und verworfen: ${verworfen.slice(0, 3).join('; ')}.` : ''
-    return ergebnisOhneFund(wunsch, `Keiner der gefundenen Texte war als Unterrichtsmaterial brauchbar.${details}`, treffer)
+    return ergebnisOhneFund(wunsch, `Keiner der gefundenen Texte war als Unterrichtsmaterial zu diesem Thema brauchbar.${details}${ausgeblendetSatz}`, treffer)
   }
 
   // In Sek II entscheidet die Lehrkraft, welche der geprüften Quellen genommen wird
-  let kandidaten = geprueft
+  let kandidaten = passend
   if (lauf.auswahl) {
     const gewaehlt = await lauf.auswahl(
-      geprueft.map((g) => ({
+      passend.map((g) => ({
         treffer: g.treffer,
         wortzahl: g.quelle.wortzahl,
         befund: befundText(g.bewertung.befund, qualitaet),
-        rang: g.bewertung.rang
+        rang: gesamtRang(g.bewertung.rang, g.relevanz),
+        ...(g.relevanz ? { relevanz: g.relevanz, begruendung: relevanzText(g.relevanz) } : {})
       }))
     )
     if (!gewaehlt) return ergebnisOhneFund(wunsch, 'Keiner der gefundenen Texte wurde übernommen.', treffer)
-    kandidaten = geprueft.filter((g) => g.treffer.url === gewaehlt)
+    kandidaten = passend.filter((g) => g.treffer.url === gewaehlt)
   }
   kandidaten = kandidaten.slice(0, MAX_KANDIDATEN)
 
@@ -385,6 +581,7 @@ export async function beschaffeOriginalmaterial(lauf: MaterialLauf): Promise<Mat
         ...(auftrag.vorbemerkung ? [`Vorbemerkung der Lehrkraft: „${auftrag.vorbemerkung}"`] : []),
         // Die Wortzahlen stehen im Kürzungsprotokoll („Umfang: …") – hier nicht noch einmal
         `Gewählt: ${gewaehlt.treffer.titel}`,
+        ...(gewaehlt.relevanz?.kiGeprueft ? [`Relevanzprüfung: ${relevanzText(gewaehlt.relevanz)}`] : []),
         ...kuerzungsProtokoll(pruefung)
       ],
       pruefung

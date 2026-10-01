@@ -1,16 +1,28 @@
 import { cleanImageBackground, KEY_GREEN } from './imageCleanup'
 import { ImageServices, onlineCredit } from './imageChoice'
 import { loadImage, normalizeImage, svgToDataUrl } from './util'
+import { findeAblehnung, leereAblehnungen, type AblehnungsDaten } from '@shared/quellenAblehnung'
 
-/** Bildsuche und -umwandlung über die App (für die KI-geprüfte Bildauswahl) */
-export function browserImageServices(): ImageServices {
+/**
+ * Bildsuche und -umwandlung über die App (für die KI-geprüfte Bildauswahl).
+ *
+ * `thema`: Mit Thema gelten auch die Ausblendungen „für dieses Thema", sonst nur „Nie wieder
+ * vorschlagen" (01.10.2026, dieselbe Liste wie für Textquellen). Die Liste wird einmal je
+ * Suche geholt, nicht je Treffer.
+ */
+export function browserImageServices(thema = ''): ImageServices {
+  let ablehnungen: Promise<AblehnungsDaten> | null = null
   return {
     searchOpenMoji: (q) => window.api.images.searchOpenMoji(q),
     openMojiPng: (hex, size) => openMojiAsPng(hex, size),
     search: (q, source) => window.api.images.searchOnline(q, source),
     fetchImage: (url) => window.api.images.fetch(url),
     normalize: (dataUrl, size, format) => normalizeImage(dataUrl, size, format),
-    clean: (dataUrl) => cleanImageBackground(dataUrl)
+    clean: (dataUrl) => cleanImageBackground(dataUrl),
+    abgelehnt: async (url) => {
+      ablehnungen ??= window.api.sources.ablehnungen().catch(() => leereAblehnungen())
+      return Boolean(findeAblehnung(await ablehnungen, url, thema))
+    }
   }
 }
 

@@ -49,6 +49,8 @@ interface WikiSeite {
   extract?: string
   /** Groesse des Seitenquelltextes in Bytes (prop=info) */
   length?: number
+  /** sichtbare Kategorien (prop=categories) */
+  categories?: { title: string }[]
 }
 
 /** Eine einzelne Suchabfrage an eine Wikisource-Sprachausgabe. */
@@ -60,10 +62,17 @@ async function wikisourceAbfrage(lang: string, suche: string, limit: number): Pr
     gsrsearch: suche,
     gsrlimit: String(limit),
     gsrnamespace: '0',
-    prop: 'extracts|info',
+    prop: 'extracts|info|categories',
     exlimit: 'max',
     explaintext: '1',
-    exchars: '600'
+    exchars: '600',
+    /*
+     * Kategorien mitholen (01.10.2026): Nur an ihnen erkennt man sicher, dass „Friedrich
+     * Gundolf" eine Autorenseite (Werkliste) und „Die Musikforschung" das Inhaltsverzeichnis
+     * einer Zeitschrift ist. Am Titel sieht man es keiner der beiden an.
+     */
+    clshow: '!hidden',
+    cllimit: 'max'
   })
   const res = await politeFetch(
     `https://${lang}.wikisource.org/w/api.php?${params}`,
@@ -80,7 +89,8 @@ async function wikisourceAbfrage(lang: string, suche: string, limit: number): Pr
       herkunft: 'wikisource' as const,
       zeichen: p.length,
       auszug: kuerzeAuszug(p.extract ?? ''),
-      lizenz: 'gemeinfrei bzw. freie Lizenz (siehe Seite)'
+      lizenz: 'gemeinfrei bzw. freie Lizenz (siehe Seite)',
+      ...(p.categories?.length ? { kategorien: p.categories.map((c) => c.title) } : {})
     }))
 }
 
@@ -98,10 +108,31 @@ async function wikisourceAbfrage(lang: string, suche: string, limit: number): Pr
  * Ein zu grober Filter wäre hier schlimmer als gar keiner: Er nimmt der Lehrkraft Treffer
  * weg, ohne dass sie erfährt, dass es sie gab.
  */
-export function istVerzeichnis(titel: string): boolean {
+export function istVerzeichnis(titel: string, kategorien: string[] = []): boolean {
   const letzter = titel.split('/').pop() ?? titel
-  return /^[A-ZÄÖÜ][\wÄÖÜäöüß]{1,10}:/.test(titel) || /^(Inhalt|Register|Verzeichnis|Inhaltsverzeichnis|Gedichtanfänge|Liste\b)/i.test(letzter)
+  return (
+    /^[A-ZÄÖÜ][\wÄÖÜäöüß]{1,10}:/.test(titel) ||
+    /^(Inhalt|Register|Verzeichnis|Inhaltsverzeichnis|Gedichtanfänge|Liste\b)/i.test(letzter) ||
+    kategorien.some((k) => KEIN_TEXT.test(k))
+  )
 }
+
+/**
+ * Kategorien, die nie einen zusammenhängenden Quellentext bezeichnen (01.10.2026).
+ *
+ * Gemeldet von der Lehrkraft: Zu „German Macbeth Adaptations" kamen wiederholt die
+ * Autorenseite „Friedrich Gundolf" (Kategorie:Autoren – eine Werkliste, in der „Macbeth" als
+ * Bandinhalt seiner Shakespeare-Übersetzung steht) und „Die Musikforschung"
+ * (Kategorie:Zeitschrift – das Inhaltsverzeichnis von 67 Jahrgängen, in dem ein Aufsatz über
+ * Verdis „Macbeth" steht). Beide Seiten sind Verzeichnisse, auch wenn ihr Titel es nicht sagt.
+ *
+ * Nachgemessen am selben Tag mit „Macbeth Rezeption Deutschland": Alle acht besten Treffer waren
+ * Autoren-, Zeitschriften- und Themenseiten („William Shakespeare", „Friedrich Schiller",
+ * „Die Musikforschung", „Archiv für Musikwissenschaft", „Hexenwesen" – Kategorie:Thema –,
+ * „Merkur (Zeitschrift)", „Der Merker/Inhalt" – Kategorie:Zeitschriftenartikelliste).
+ */
+const KEIN_TEXT =
+  /^(Kategorie|Category):(Autoren|Autorinnen|Authors?|Zeitschrift|Zeitschriftenartikelliste|Zeitung|Periodikum|Periodicals?|Kalender|Begriffsklärung|Disambiguation|Thema|Themen|Portal)\b/i
 
 /**
  * Wikisource ist das Archiv für gemeinfreie Quellentexte: Reden, Urkunden, Gesetze, Briefe,
@@ -119,8 +150,9 @@ async function sucheWikisource(anfrage: Materialanfrage, limit: number): Promise
     imTitel ? wikisourceAbfrage(lang, imTitel, limit) : Promise.resolve([]),
     wikisourceAbfrage(lang, anfrage.suchwoerter, limit)
   ])
-  const aus = titel.status === 'fulfilled' ? titel.value : []
-  const rest = (volltext.status === 'fulfilled' ? volltext.value : []).filter((t) => !istVerzeichnis(t.titel))
+  // Auch die Titeltreffer prüfen – eine Autorenseite heißt wie die Person, nicht wie ein Verzeichnis
+  const aus = (titel.status === 'fulfilled' ? titel.value : []).filter((t) => !istVerzeichnis(t.titel, t.kategorien))
+  const rest = (volltext.status === 'fulfilled' ? volltext.value : []).filter((t) => !istVerzeichnis(t.titel, t.kategorien))
   const gesehen = new Set(aus.map((t) => t.url))
   return [...aus, ...rest.filter((t) => !gesehen.has(t.url))].slice(0, limit)
 }

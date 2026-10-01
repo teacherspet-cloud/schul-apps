@@ -39,6 +39,11 @@ export interface ImageServices {
   normalize: (dataUrl: string, maxSize: number, format: 'png' | 'jpeg') => Promise<string>
   /** Entfernt Schachbrett- und Greenscreen-Hintergründe (optional) */
   clean?: (dataUrl: string) => Promise<{ dataUrl: string; kind: string }>
+  /**
+   * Abgelehnte Fundstellen (01.10.2026) – dieselbe Liste wie für Textquellen
+   * (@shared/quellenAblehnung). Was die Lehrkraft aussortiert hat, kommt nicht wieder.
+   */
+  abgelehnt?: (url: string) => boolean | Promise<boolean>
 }
 
 export interface Choice {
@@ -118,7 +123,20 @@ export async function gatherCandidates(need: ImageNeed, services: ImageServices,
   }
 
   const online = async (kind: CandidateKind, source: OnlineImageSource, queries: string[], count: number): Promise<void> => {
-    const hits = await searchHits(queries, source, services)
+    const gefunden = await searchHits(queries, source, services)
+    // Abgelehntes vor dem Laden herausnehmen – sonst nähme es einen der wenigen Plätze ein
+    const pruefe = services.abgelehnt
+    const hits = pruefe
+      ? (
+          await Promise.all(
+            gefunden.map(async (h) => {
+              const weg = await Promise.resolve(pruefe(h.url)).catch(() => false)
+              const wegLizenz = !weg && h.licenseUrl ? await Promise.resolve(pruefe(h.licenseUrl)).catch(() => false) : false
+              return weg || wegLizenz ? null : h
+            })
+          )
+        ).filter((h): h is OnlineImageHit => h !== null)
+      : gefunden
     for (const h of hits.slice(0, count)) {
       jobs.push(async () => {
         const raw = await services.fetchImage(h.thumbnail || h.url)

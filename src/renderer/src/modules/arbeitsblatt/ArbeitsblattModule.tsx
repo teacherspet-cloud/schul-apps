@@ -156,6 +156,7 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
         <QuellenAuswahl
           treffer={(quellenFrage.daten as QuellenFrage).treffer}
           thema={(quellenFrage.daten as QuellenFrage).thema}
+          programm="arbeitsblatt"
           onWaehlen={(url) => quellenFrage.antworte(url)}
         />
       )}

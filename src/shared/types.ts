@@ -655,6 +655,12 @@ export interface Quellentreffer {
   /** die ersten Sätze – damit sich die Eignung beurteilen lässt, ohne alles zu laden */
   auszug: string
   lizenz?: string
+  /**
+   * Kategorien der Archivseite (Wikisource), z. B. „Kategorie:Autoren" oder
+   * „Kategorie:Zeitschrift" – daran erkennt die Relevanzprüfung Werklisten und
+   * Inhaltsverzeichnisse, die keine Quellentexte sind (01.10.2026).
+   */
+  kategorien?: string[]
 }
 
 /** Der tatsächlich geladene Wortlaut einer Quelle. Nur was hier steht, darf aufs Blatt. */

@@ -763,7 +763,14 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
           jahrgang: exam.meta.grade,
           zielWortzahl: sourceTextWords(teilMeta),
           // Klausur: kein Ausweichen auf einen Autorentext
-          pruefung: true
+          pruefung: true,
+          /*
+           * Ablehnungen gelten für das Thema der ARBEIT, nicht für „Thema – Teil" (01.10.2026):
+           * Eine in „Mediation" aussortierte Seite soll auch im Teil „Reading" nicht wiederkommen.
+           */
+          kernthema: exam.meta.topic,
+          lernziel: teilMeta.learningGoals,
+          mediation: formatArt(part.formatId) === 'mediation'
         },
         dienste: browserMaterialDienste(opts.websuche),
         ai,

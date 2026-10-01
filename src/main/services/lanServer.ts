@@ -103,6 +103,10 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'sources:suche',
   'sources:laden',
   'sources:video',
+  // Abgelehnte Quellen (01.10.2026): am Tablet abgelehnt = auch am PC abgelehnt
+  'sources:ablehnungen',
+  'sources:ablehnen',
+  'sources:ablehnung-aufheben',
   'maskottchen:list',
   'ai:websuche',
   'audio:voices',

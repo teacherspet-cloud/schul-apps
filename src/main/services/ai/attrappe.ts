@@ -16,7 +16,7 @@
  * die Variable nie.
  */
 import { appendFileSync, readFileSync } from 'fs'
-import type { OnlineImageHit, StructuredRequest } from '@shared/types'
+import type { GeladeneQuelle, Materialanfrage, OnlineImageHit, Quellentreffer, StructuredRequest } from '@shared/types'
 import { AbbruchFehler } from '@shared/abbruch'
 import type { AiProvider, ChunkListener, Netzfund, RawModel } from './provider'
 
@@ -50,6 +50,14 @@ interface AttrappenDatei {
    * damit die Tests ohne Netz laufen. `[]` = die Suche findet nichts.
    */
   bildsuche?: OnlineImageHit[]
+  /**
+   * Materialsuche ohne Netz (01.10.2026): Treffer der Archivsuche und die Texte, die `sources:laden`
+   * zu einer Adresse liefert. So lässt sich die Quellenauswahl samt Aussortieren prüfen, ohne
+   * Wikisource zu belasten.
+   */
+  quellen?: { treffer: Quellentreffer[]; texte: Record<string, { titel: string; text: string }> }
+  /** Funde der Websuche des Anbieters (sonst keine) */
+  websuche?: Netzfund[]
 }
 
 /** Wie oft je Auftragsart schon geantwortet wurde – für `folge` */
@@ -70,6 +78,22 @@ export const attrappeBild = (): string | undefined => (attrappeAktiv() ? lies().
 
 /** Treffer der Bildsuche aus der Attrappe (undefined = echte Suche) */
 export const attrappeBildsuche = (): OnlineImageHit[] | undefined => (attrappeAktiv() ? lies().bildsuche : undefined)
+
+/** Archivsuche der Attrappe (undefined = echte Suche) */
+export function attrappeQuellensuche(_anfrage: Materialanfrage): Quellentreffer[] | undefined {
+  if (!attrappeAktiv()) return undefined
+  return lies().quellen?.treffer
+}
+
+/** Wortlaut einer Adresse aus der Attrappe (undefined = echt laden) */
+export function attrappeQuelleLaden(url: string): GeladeneQuelle | undefined {
+  if (!attrappeAktiv()) return undefined
+  const q = lies().quellen
+  if (!q) return undefined
+  const t = q.texte[url]
+  if (!t) return { url, titel: '', text: '', wortzahl: 0, fehler: 'Attrappe: Adresse unbekannt.' }
+  return { url, titel: t.titel, text: t.text, wortzahl: (t.text.match(/[\p{L}\p{N}]+/gu) ?? []).length }
+}
 
 /** Bildauftrag der Attrappe: protokollieren, hinterlegtes Bild liefern */
 export function attrappeBildErzeugen(prompt: string): string {
@@ -137,6 +161,6 @@ export class AttrappeProvider implements AiProvider {
   }
 
   async websuche(): Promise<Netzfund[]> {
-    return []
+    return lies().websuche ?? []
   }
 }

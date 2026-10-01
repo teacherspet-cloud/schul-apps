@@ -14,12 +14,12 @@ import { notifyError, safeFileName } from '../../../shared/util'
 import type { ImageBlock, Worksheet } from '../model/types'
 import { aiCall, useArbeitsblatt } from '../store'
 
-/** Suche, KI-Prüfung und Bild-KI über die App */
-export async function impulsBildDeps(): Promise<ImpulsBildDeps> {
+/** Suche, KI-Prüfung und Bild-KI über die App; mit Thema gelten auch die Ausblendungen dieses Themas */
+export async function impulsBildDeps(thema = ''): Promise<ImpulsBildDeps> {
   const kannBilder = await imageGenerationAvailable()
   return {
     ai: aiCall,
-    services: browserImageServices(),
+    services: browserImageServices(thema),
     generateImage: kannBilder ? (prompt) => window.api.ai.image(prompt) : undefined,
     variants: sourceSearchVariants,
     format: async (d) => {
@@ -33,7 +33,26 @@ export async function impulsBildDeps(): Promise<ImpulsBildDeps> {
 export async function impulsBildHolen(phaseId: string, ws: Worksheet, modus: ImpulsBildModus, wunsch = ''): Promise<void> {
   const impuls = ws.stundenverlauf?.phasen.find((p) => p.id === phaseId)?.impuls
   if (!impuls) return
-  const r = await beschaffeImpulsBild(impuls, ws.meta, await impulsBildDeps(), { modus, wunsch })
+  /*
+   * „Anderes Bild" heißt: Das gezeigte passt nicht (01.10.2026). Vorher merkte sich nur dieser
+   * eine Impuls das Bild (`gesehen`) – im nächsten Stundenverlauf zum selben Thema kam es wieder.
+   * Jetzt landet es in der gemeinsamen Ablehnungsliste, für dieses Thema.
+   */
+  const bisher = impuls.image?.citation?.url
+  if (modus === 'suche' && bisher && impuls.image?.source !== 'ai' && ws.meta.topic.trim()) {
+    await window.api.sources
+      .ablehnen({
+        url: bisher,
+        titel: impuls.image?.citation?.title ?? impuls.bild?.motiv ?? '',
+        umfang: 'thema',
+        thema: ws.meta.topic,
+        themaText: ws.meta.topic,
+        art: 'bild',
+        programm: 'stundenverlauf'
+      })
+      .catch(() => undefined)
+  }
+  const r = await beschaffeImpulsBild(impuls, ws.meta, await impulsBildDeps(ws.meta.topic), { modus, wunsch })
   useArbeitsblatt.getState().update((w) => {
     const i = w.stundenverlauf?.phasen.find((p) => p.id === phaseId)?.impuls
     if (!i) return

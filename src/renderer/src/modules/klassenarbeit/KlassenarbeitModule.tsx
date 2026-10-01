@@ -45,6 +45,7 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
           <QuellenAuswahl
             treffer={(quellenFrage.daten as QuellenFrage).treffer}
             thema={(quellenFrage.daten as QuellenFrage).thema}
+            programm="klassenarbeit"
             onWaehlen={(url) => quellenFrage.antworte(url)}
           />
         )

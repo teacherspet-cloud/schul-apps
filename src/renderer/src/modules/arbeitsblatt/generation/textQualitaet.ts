@@ -178,6 +178,14 @@ export function ausschlussgruende(b: Textbefund, wunsch: Qualitaetswunsch): stri
   if (b.stoppwortdichte < 0.12) gruende.push('Verzeichnis oder Tabelle, kein Fließtext')
   // C4: Fließtext endet auf Satzzeichen; Listen und Kolumnentitel tun das nicht
   if (b.satzende < 0.35) gruende.push('überwiegend Listenzeilen ohne Satzzeichen')
+  /*
+   * Werklisten und Inhaltsverzeichnisse enden oft MIT Punkt („Verschiedenes. S. 46",
+   * „1911. 394 S.") und bestehen die Prüfung oben. Ihre „Sätze" sind aber im Mittel nur drei
+   * bis vier Wörter lang – nachgemessen am 01.10.2026 an den beiden gemeldeten Fehlvorschlägen
+   * „Die Musikforschung" (Ø 4) und „Friedrich Gundolf" (Ø 3). Fließtext liegt selbst in
+   * Kinderbüchern deutlich darüber.
+   */
+  if (b.saetze >= 10 && b.satzlaenge < 5) gruende.push(`überwiegend Listeneinträge (Ø ${Math.round(b.satzlaenge)} Wörter je Satz)`)
   if (b.buchstaben < 0.6) gruende.push('überwiegend Zahlen und Sonderzeichen')
   if (b.muell.length >= 2) gruende.push('überwiegend Seitenbeiwerk (Navigation, Rechtstexte)')
   // EPA Geschichte 3.3.3: „in drucktechnisch einwandfreiem Zustand"

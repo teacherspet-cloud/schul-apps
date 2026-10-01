@@ -72,7 +72,10 @@ async function materialBeschaffen(ws: Worksheet, k: AuftragsKontext) {
       jahrgang: meta.grade,
       zielWortzahl: sourceTextWords(meta),
       // Arbeitsblätter dürfen ausweichen, Klausuren nicht – entschieden am 24.09.2026
-      pruefung: false
+      pruefung: false,
+      // Relevanzprüfung (01.10.2026): Lernziel und Sprachmittlung entscheiden mit, was passt
+      lernziel: meta.learningGoals,
+      mediation: meta.skillFocus === 'mediation'
     },
     dienste: browserMaterialDienste(k.websuche),
     ai: k.ai,

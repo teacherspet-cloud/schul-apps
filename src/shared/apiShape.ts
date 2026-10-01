@@ -16,6 +16,7 @@ import type { VerbListe, VerbListeMeta } from './verben'
 import type { SchulQuelle, SchulTreffer, SuchOptionen } from './schulsuche'
 import type { DesignTemplate } from '@shared/design'
 import type { BereichsUebernahme, ThemenDaten, Themenbereich, Zuordnung } from '@shared/themen'
+import type { AblehnungsDaten, AblehnungsEingabe } from '@shared/quellenAblehnung'
 import type { LanStatus } from '../main/services/lanServer'
 import type { WindowsFreigabeErgebnis, WindowsFreigabeStatus } from '../main/services/netz/windowsFreigabe'
 import type { Netzfund } from '../main/services/ai/provider'
@@ -395,6 +396,13 @@ export function buildApi(call: Call, extras: ApiExtras) {
       suche: (anfrage: Materialanfrage) => call<Quellentreffer[]>('sources:suche', anfrage),
       /** Laedt den Wortlaut einer Quelle – auch fuer Fundstellen, die die KI selbst gefunden hat */
       laden: (url: string) => call<GeladeneQuelle>('sources:laden', url),
+      /** Abgelehnte Quellen – eine Liste für alle Programme (01.10.2026) */
+      ablehnungen: () => call<AblehnungsDaten>('sources:ablehnungen'),
+      /** „Für dieses Thema ausblenden" (umfang: 'thema', mit thema) oder „Nie wieder vorschlagen" (umfang: 'global') */
+      ablehnen: (eingaben: (AblehnungsEingabe & { thema?: string })[] | (AblehnungsEingabe & { thema?: string })) =>
+        call<AblehnungsDaten>('sources:ablehnen', eingaben),
+      /** Ablehnung aufheben: eine Seite (url) oder alle Ausblendungen eines Themas (thema) */
+      ablehnungAufheben: (auswahl: { url?: string; thema?: string }) => call<AblehnungsDaten>('sources:ablehnung-aufheben', auswahl),
       /** Titel, Beschreibung und Transkript eines YouTube-Videos – Material aus einer Adresse (26.09.2026) */
       video: (url: string) => call<VideoQuelle>('sources:video', url)
     },

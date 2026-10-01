@@ -26,6 +26,8 @@ export const browserMaterialDienste = (
   websuche: (auftrag: string) => Promise<Netzfund[]> = (auftrag) => window.api.ai.websuche(auftrag)
 ): MaterialDienste => ({
   suche: (anfrage) => window.api.sources.suche(anfrage),
+  // Dauerhaft abgelehnte Quellen – eine Liste für alle Programme (01.10.2026)
+  ablehnungen: () => window.api.sources.ablehnungen(),
   laden: async (url) => {
     const quelle = await window.api.sources.laden(url)
     if (!quelle.pdf) return quelle
