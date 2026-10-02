@@ -171,7 +171,8 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
       vorbereiten: async (settings, k) => {
         k.melde('Passende Aufgabenformate werden ausgewählt …')
         const { tasks, vocabCount } = await planAutoTasks(usable, settings, points, k.ai)
-        return { ...settings, tasks, vocabCount, seed: randomSeed() }
+        // Die Vorgabe reist mit: Nach der Erzeugung werden die Punkte auf genau diese Summe gebracht (generation/punkteZiel.ts)
+        return { ...settings, tasks, vocabCount, zielPunkte: points, seed: randomSeed() }
       },
       abschluss: (result) => {
         const total = result.variants[0] ? variantPoints(result.variants[0]) : 0

@@ -284,6 +284,19 @@ describe('Alle Aufgabentypen', () => {
     if (process.env.WRITE_FIXTURE) writeFileSync(process.env.WRITE_FIXTURE, serializeProject(doc))
   })
 
+  /*
+   * Befund der Lehrkraft (02.10.2026): 21 Punkte vorgegeben, 25 oder 26 erhalten. Mit allen
+   * Aufgabentypen (Verbtabellen, Lückentexte, Zuordnungen …) weicht die Itemzahl am stärksten ab.
+   */
+  it('halten eine vorgegebene Gesamtpunktzahl in jeder Variante ein', async () => {
+    const big: VocabEntry[] = Array.from({ length: 6 }, (_, r) => vocab.map((v) => ({ ...v, id: `${v.id}r${r}`, term: v.term + 'abcdef'.slice(0, r) }))).flat()
+    for (const ziel of [21, 30]) {
+      const all = settings({ variantCount: 2, zielPunkte: ziel, tasks: types.slice(0, 5).map((type) => ({ type, count: 4, pointsPerItem: 1 })) })
+      const doc = await generateTest(big, all, defaultHeader(''), { ai: mockAi(), review: false })
+      for (const v of doc.variants) expect(variantPoints(v)).toBe(ziel)
+    }
+  })
+
   it('erzeugen auch für Latein gültige Blöcke und lassen sich exportieren', async () => {
     const lateinTypen = typesFuer('la')
     const all = settings({

@@ -421,6 +421,12 @@ export interface TestSettings {
   grade: number
   level: CefrLevel
   vocabCount: number
+  /**
+   * Gewünschte Gesamtpunktzahl („Test automatisch erstellen", 02.10.2026): Nach der Erzeugung
+   * werden die Punkte je Aufgabe an die tatsächlich entstandenen Items angepasst, damit jede
+   * Variante genau diese Summe hat. Fehlt = keine Vorgabe (Punkte aus den Einstellungen).
+   */
+  zielPunkte?: number
   variantCount: number
   variantMode: 'sameVocab' | 'differentVocab'
   tasks: TaskSelection[]

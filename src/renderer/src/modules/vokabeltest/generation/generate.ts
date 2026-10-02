@@ -1,4 +1,5 @@
 import { fuerTest } from '../model/vocab'
+import { punkteAufZiel } from './punkteZiel'
 import type { StructuredRequest } from '@shared/types'
 import { CEFR_DESCRIPTORS } from '../model/cefr'
 import { createRng, newId, Rng } from '../model/random'
@@ -416,6 +417,8 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
   }
 
   const plans = planVariants(vocab, settings)
+  // Gewünschte Gesamtpunktzahl (02.10.2026): erst an den fertigen Aufgaben angleichen – die KI liefert oft mehr Items als geplant
+  const aufZiel = (blocks: Block[]): Block[] => (settings.zielPunkte && settings.zielPunkte > 0 ? punkteAufZiel(blocks, settings.zielPunkte) : blocks)
   const ctx: GenContext = { settings, languageName: languageName(settings.targetLanguage), rng, allVocab: vocab, known: opts.known }
   /*
    * Vorschau: die fertigen Aufgaben jeder Variante in der geplanten Reihenfolge (sie entstehen
@@ -463,7 +466,7 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
       header,
       settings,
       vocab,
-      variants: plans.map((p, vi) => ({ id: newId(rng), label: p.label, blocks: done2.find((r) => r.vi === vi)?.blocks ?? [] })),
+      variants: plans.map((p, vi) => ({ id: newId(rng), label: p.label, blocks: aufZiel(done2.find((r) => r.vi === vi)?.blocks ?? []) })),
       fontSize: 12,
       createdAt: new Date().toISOString()
     }
@@ -494,7 +497,7 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
   const variants: Variant[] = plans.map((p, vi) => ({
     id: newId(rng),
     label: p.label,
-    blocks: results.filter((r) => r.vi === vi).map((r) => r.block)
+    blocks: aufZiel(results.filter((r) => r.vi === vi).map((r) => r.block))
   }))
 
   return {
