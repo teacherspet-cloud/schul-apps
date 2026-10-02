@@ -99,6 +99,20 @@ const bloecke = await page.evaluate(() =>
 )
 console.log('Abschnittsblöcke:', bloecke.join(' | ') || 'keine')
 
+/*
+ * Seit 02.10.2026 ist zunächst KEIN Abschnitt gewählt (Wunsch der Lehrkraft: auswählen statt
+ * abwählen). Ohne Wahl gibt es keinen Knopf „Vokabeln anzeigen und auswählen" – also erst „alle".
+ */
+const vorgewaehlt = await page.locator('[role="dialog"] .mantine-Chip-root input:checked').count()
+console.log('Vorgewählte Abschnitte:', vorgewaehlt)
+// Nach dem Klick heißt der Knopf „keine" – deshalb immer den ersten verbliebenen „alle" nehmen
+const alleKnopf = page.locator('[role="dialog"]').getByRole('button', { name: 'alle', exact: true })
+for (let i = 0; i < 6 && (await alleKnopf.count()); i++) {
+  await alleKnopf.first().click()
+  await page.waitForTimeout(200)
+}
+await page.waitForTimeout(500)
+
 // Ein Abschnitt abwählen: Die Zahl im Knopf muss sinken
 const vorher = await page
   .getByRole('button', { name: /Vokabeln anzeigen und auswählen/ })
@@ -163,6 +177,7 @@ console.log('Im Formular vermerkt:', badge ? `${badge[1]} Wörter` : 'NICHTS')
 
 const probleme = []
 if (beiMathe !== 0) probleme.push('Der Knopf erscheint auch bei Mathematik')
+if (vorgewaehlt !== 0) probleme.push(`Nach der Wahl der Units sind schon ${vorgewaehlt} Abschnitte gewählt – sie sollen ausgewählt, nicht abgewählt werden`)
 if (stand.zeilen === 0) probleme.push('Das Pop-up hat keine Wörter geholt')
 if (gewaehlteUnits.length < 2) probleme.push(`Es ließen sich keine zwei Units zugleich wählen (${gewaehlteUnits.length})`)
 if (bloecke.length < 2) probleme.push(`Es gibt nicht je Unit einen Abschnittsblock (${bloecke.length})`)

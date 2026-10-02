@@ -82,8 +82,9 @@ describe('Verteilung auf Varianten', () => {
     }
     const a = new Set(plans[0].assignments.flatMap((x) => x.vocab.map((v) => v.id)))
     const b = plans[1].assignments.flatMap((x) => x.vocab.map((v) => v.id))
-    // Bei 14 Wörtern und 7 pro Variante überschneiden sich die Varianten nicht
-    expect(b.filter((id) => a.has(id))).toHaveLength(0)
+    // Seit 02.10.2026 gewollt (Wunsch der Lehrkraft): etwa ein Drittel gemeinsam, der Rest neu
+    expect(b.filter((id) => a.has(id)).length).toBeGreaterThanOrEqual(1)
+    expect(b.filter((id) => !a.has(id)).length).toBeGreaterThanOrEqual(4)
   })
 
   it('nutzt bei „gleiche Vokabeln" dieselbe Auswahl in allen Varianten', () => {

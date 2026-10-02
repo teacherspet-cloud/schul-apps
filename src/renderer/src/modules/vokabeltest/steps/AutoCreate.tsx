@@ -1,3 +1,4 @@
+import { genugFuerVarianten } from '../generation/distribute'
 import { Alert, Button, Checkbox, Group, Loader, Modal, SegmentedControl, Select, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconSparkles } from '@tabler/icons-react'
@@ -148,7 +149,8 @@ function AutoCreateModal({ opened, onClose }: { opened: boolean; onClose: () => 
     const s = base && table ? suggestLevel(table, base.stateId, base.schoolTypeId, base.languageOrder, grade) : null
     patch(s ? { grade, level: s.level } : { grade })
   }
-  const differentPossible = usable.length >= tested * (base?.variantCount ?? 1)
+  // Varianten überschneiden sich seit 02.10.2026 – ein Drittel neue Wörter genügt (generation/distribute.ts)
+  const differentPossible = genugFuerVarianten(usable.length, tested)
   const language = LANGUAGES.find((l) => l.value === base?.targetLanguage)?.label ?? base?.targetLanguage
 
   /*

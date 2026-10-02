@@ -260,12 +260,12 @@ export function TextbookPicker({
       const next: Record<string, string[]> = {}
       for (const u of book?.units.filter((x) => units.includes(x.name)) ?? []) {
         /*
-         * Neu hinzugekommene Unit: Bei Mehrfachauswahl sind zunächst ALLE Abschnitte dabei –
-         * wer mehrere Units nimmt, will in aller Regel den ganzen Stoff und schränkt danach
-         * ein. Im Einzelmodus bleibt es wie bisher bei keinem Abschnitt, damit die Lehrkraft
-         * im Vokabeltest gezielt auswählt.
+         * Neu hinzugekommene Unit: zunächst KEIN Abschnitt – auch bei Mehrfachauswahl (Arbeitsblatt,
+         * Schwerpunkt Vokabeln). Bis 02.10.2026 waren dort sofort alle Abschnitte gewählt; Befund der
+         * Lehrkraft: „man muss erst alle abwählen – die Abschnitte sollen ausgewählt und nicht
+         * abgewählt werden müssen", wie im Vokabeltest. Für den ganzen Stoff gibt es „alle".
          */
-        next[u.name] = old[u.name] ?? (multiUnit ? u.sections.map((s) => s.name) : [])
+        next[u.name] = old[u.name] ?? []
       }
       return next
     })

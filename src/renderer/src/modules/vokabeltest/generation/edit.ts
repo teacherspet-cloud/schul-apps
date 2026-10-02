@@ -1,4 +1,5 @@
 import { createRng, randomSeed } from '../model/random'
+import { fuerTest } from '../model/vocab'
 import type { Block, TaskTypeId, TestDocument, Variant, VocabEntry } from '../model/types'
 import { AiCall, analyzeVocab, generateBlock, GenerateOptions, languageName } from './generate'
 import { GenContext, TASK_TYPES } from './taskTypes'
@@ -38,7 +39,7 @@ function context(doc: TestDocument): GenContext {
     settings: doc.settings,
     languageName: languageName(doc.settings.targetLanguage),
     rng: createRng(randomSeed()),
-    allVocab: doc.vocab
+    allVocab: fuerTest(doc.vocab)
   }
 }
 
@@ -55,7 +56,7 @@ export async function regenerateBlock(
   hinweis?: string
 ): Promise<Block> {
   const ids = blockVocabIds(block)
-  const vocab = doc.vocab.filter((v) => ids.includes(v.id))
+  const vocab = fuerTest(doc.vocab).filter((v) => ids.includes(v.id))
   const ctx = context(doc)
   // Mindmap (02.10.2026): die im Editor gewählte Form und der freie Ast bleiben beim Neuerzeugen erhalten
   if (block.kind === 'mindmap' && block.variante)
@@ -75,7 +76,7 @@ export async function regenerateItem(doc: TestDocument, variant: Variant, block:
   if (!('items' in block) || block.kind === 'picture') return block
   const items = block.items as { id: string; vocabId?: string }[]
   const index = items.findIndex((i) => i.id === itemId)
-  const vocab = doc.vocab.find((v) => v.id === items[index]?.vocabId)
+  const vocab = fuerTest(doc.vocab).find((v) => v.id === items[index]?.vocabId)
   if (index < 0 || !vocab) return block
   const fresh = await generateBlock(block.taskType, [vocab], context(doc), { ai, review: false }, variantLabel(doc, variant))
   const newItem = 'items' in fresh ? (fresh.items as { id: string }[])[0] : undefined
@@ -95,7 +96,7 @@ export async function createAdditionalBlock(
   images: Pick<GenerateOptions, 'findImage' | 'findImages'> = {}
 ): Promise<{ block: Block; vocab: VocabEntry[] }> {
   const used = new Set(variant.blocks.flatMap(blockVocabIds))
-  let vocab = doc.vocab
+  let vocab = fuerTest(doc.vocab)
   if (type === 'pictureLabel') vocab = await analyzeVocab(vocab, doc.settings, ai)
   const ctx = context({ ...doc, vocab })
   const def = TASK_TYPES[type]

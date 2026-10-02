@@ -1,3 +1,4 @@
+import { fuerTest } from '../model/vocab'
 import type { StructuredRequest } from '@shared/types'
 import { CEFR_DESCRIPTORS } from '../model/cefr'
 import { createRng, newId, Rng } from '../model/random'
@@ -401,7 +402,8 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
   const rng: Rng = createRng(settings.seed)
   // Unveränderter Standardtitel („Vocabulary test", „Vokabeltest" …) folgt der Testsprache
   const header = istStandardTitel(headerInput.title) ? { ...headerInput, title: kopfTexte(settings.targetLanguage).title } : headerInput
-  let vocab = vocabInput
+  // Klammer-Hinweise der Wortliste („[no pl]") weder abdrucken noch als Antwort verlangen (02.10.2026)
+  let vocab = fuerTest(vocabInput)
   const needsAnalysis = settings.tasks.some((t) => t.type === 'pictureLabel')
   const total0 = settings.variantCount * settings.tasks.length + (needsAnalysis ? 1 : 0)
   let done = 0

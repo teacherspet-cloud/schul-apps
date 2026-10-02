@@ -68,12 +68,10 @@ export function planVariants(vocab: VocabEntry[], settings: TestSettings): Varia
   const plans: VariantPlan[] = []
   for (let v = 0; v < settings.variantCount; v++) {
     let selection: VocabEntry[]
-    if (settings.variantMode === 'sameVocab' || usable.length <= needed) {
+    if (settings.variantMode === 'sameVocab' || usable.length <= needed || v === 0) {
       selection = pool
     } else {
-      // Rotierende Auswahl: jede Variante beginnt an einer anderen Stelle des gemischten Pools
-      const offset = (v * needed) % pool.length
-      selection = [...pool.slice(offset), ...pool.slice(0, offset)]
+      selection = mitUeberschneidung(pool, plans, needed, rng)
     }
     const assignments = assign(selection, settings.tasks)
     if (settings.variantMode === 'sameVocab' && v > 0) {
@@ -85,6 +83,40 @@ export function planVariants(vocab: VocabEntry[], settings: TestSettings): Varia
     plans.push({ label: VARIANT_LABELS[v] ?? String(v + 1), assignments })
   }
   return plans
+}
+
+/**
+ * Anteil der Vokabeln einer weiteren Variante, der schon in einer früheren vorkam.
+ *
+ * Wunsch der Lehrkraft (02.10.2026): Bei „Unterschiedliche Vokabeln je Variante" sollen nicht
+ * ALLE Vokabeln anders sein – „Test B darf durchaus auch Vokabeln haben, die auf Test A
+ * abgeprüft werden, und Test C welche, die auf B und A geprüft werden". Vorher rotierte die
+ * Auswahl lückenlos durch die Liste, die Varianten überschnitten sich nie. Faustregel: ein
+ * Drittel gemeinsam. Reicht die Liste für den Rest nicht, wird es von selbst mehr.
+ */
+export const UEBERSCHNEIDUNG = 1 / 3
+
+/** Reicht die Liste für unterschiedliche Varianten? Für Variante B muss mindestens ein Drittel neu sein. */
+export const genugFuerVarianten = (vorhanden: number, abgefragt: number): boolean => abgefragt > 0 && vorhanden >= abgefragt + Math.ceil(abgefragt / 3)
+
+/**
+ * Auswahl für eine weitere Variante: ein Teil aus den bisherigen Varianten (zufällig über alle
+ * verteilt), der Rest aus Wörtern, die noch keine Variante hatte. Dahinter der übrige Pool – die
+ * Aufgaben mit Einschränkungen (Bilder, Rätsel) brauchen Ersatz, wenn ein Wort nicht passt.
+ * Gemeinsame und neue Wörter werden gemischt, damit ein Wort aus A in B in einer anderen
+ * Aufgabe landen kann.
+ */
+function mitUeberschneidung(pool: VocabEntry[], bisher: VariantPlan[], needed: number, rng: ReturnType<typeof createRng>): VocabEntry[] {
+  const benutzt = new Set(bisher.flatMap((p) => p.assignments.flatMap((a) => a.vocab.map((x) => x.id))))
+  const neu = pool.filter((x) => !benutzt.has(x.id))
+  const alt = shuffle(
+    pool.filter((x) => benutzt.has(x.id)),
+    rng
+  )
+  const gemeinsam = Math.max(1, Math.round(needed * UEBERSCHNEIDUNG), needed - neu.length)
+  const kern = shuffle([...alt.slice(0, gemeinsam), ...neu.slice(0, needed - Math.min(gemeinsam, alt.length))], rng)
+  const drin = new Set(kern.map((x) => x.id))
+  return [...kern, ...pool.filter((x) => !drin.has(x.id))]
 }
 
 function assign(selection: VocabEntry[], tasks: TaskSelection[]): TaskAssignment[] {

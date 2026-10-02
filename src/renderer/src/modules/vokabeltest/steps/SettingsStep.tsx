@@ -1,3 +1,4 @@
+import { genugFuerVarianten } from '../generation/distribute'
 import {
   Alert,
   Badge,
@@ -393,8 +394,13 @@ export default function SettingsStep(): React.JSX.Element {
                           <Radio
                             value="differentVocab"
                             label="Unterschiedliche Vokabeln je Variante"
-                            disabled={usable.length < requested * 2}
-                            description={usable.length < requested * 2 ? 'Dafür ist die Liste zu kurz.' : undefined}
+                            // Seit 02.10.2026 überschneiden sich die Varianten (etwa ein Drittel gemeinsam) – es genügt ein Drittel neue Wörter
+                            disabled={!genugFuerVarianten(usable.length, requested)}
+                            description={
+                              genugFuerVarianten(usable.length, requested)
+                                ? 'Etwa ein Drittel der Vokabeln kommt auch in anderen Varianten vor, der Rest ist neu.'
+                                : 'Dafür ist die Liste zu kurz.'
+                            }
                           />
                         </Stack>
                       </Radio.Group>
