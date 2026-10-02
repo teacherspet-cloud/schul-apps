@@ -150,6 +150,8 @@ function programmSeite(): string {
     '<meta charset="UTF-8" />',
     '<meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />\n    <script src="/server/ich.js"></script>'
   )
+  // Bündel absolut laden – die Seite kommt auch unter tieferen Pfaden (/s/t/<Code>)
+  html = html.replace(/(src|href)="\.\/assets\//g, '$1="/assets/')
   seiteZwischenspeicher = { mtime, html }
   return html
 }
@@ -358,7 +360,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
 
     if (req.method === 'GET') {
       // Schülerinnen und Schüler sehen nur ihren Bereich
-      if (istSchueler && !url.pathname.startsWith('/assets/')) {
+      if (istSchueler && !url.pathname.startsWith('/assets/') && !url.pathname.startsWith('/s/')) {
         res.writeHead(302, { location: '/s/' })
         return void res.end()
       }

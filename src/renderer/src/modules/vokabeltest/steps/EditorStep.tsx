@@ -1,3 +1,4 @@
+import OnlinetestKnopf from '../../onlinetest/OnlinetestKnopf'
 import {
   ActionIcon,
   Alert,
@@ -310,6 +311,8 @@ export default function EditorStep(): React.JSX.Element {
               ziel={ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage)}
             />
             <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
+            {/* Onlinetest (02.10.2026) – nur mit dem Schul-Apps-Server */}
+            <OnlinetestKnopf doc={doc} />
           </>
         }
       />

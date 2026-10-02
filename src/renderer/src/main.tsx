@@ -25,6 +25,7 @@ import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt
 import { EingabeOrtDialog, installiereDateiWahl } from './shared/export/eingabeOrt'
 import { installiereTabellenAuswahl, TabellenKreismenue } from './modules/arbeitsblatt/render/tabellenAuswahl'
 import { beobachteTrennung, htmlMitTrennung } from './shared/silbentrennung'
+import { aufServer } from './shared/plattform'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -96,11 +97,27 @@ function Root(): React.JSX.Element {
  * Beim zweiten Besuch lag die Anmeldung im Browserspeicher, dann ging es gut – deshalb war
  * der Fehler launisch.
  */
-const ersterLauf = imNetz() && abgemeldet() ? Promise.resolve() : useAppSettings.getState().load()
-ersterLauf.finally(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <Root />
-    </StrictMode>
+/*
+ * Server: Der Schülerbereich (/s/…, Onlinetest) braucht weder Programme noch Einstellungen –
+ * Schülerinnen und Schüler haben auf die Programme keinen Zugriff (src/server/http.ts).
+ */
+if (aufServer() && window.location.pathname.startsWith('/s/')) {
+  void import('./modules/onlinetest/SchuelerBereich').then(({ default: SchuelerBereich }) =>
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <MantineProvider>
+          <SchuelerBereich />
+        </MantineProvider>
+      </StrictMode>
+    )
   )
-})
+} else {
+  const ersterLauf = imNetz() && abgemeldet() ? Promise.resolve() : useAppSettings.getState().load()
+  ersterLauf.finally(() => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <Root />
+      </StrictMode>
+    )
+  })
+}

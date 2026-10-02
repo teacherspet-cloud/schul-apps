@@ -34,7 +34,17 @@ interface Form {
 }
 
 export type ProgrammSymbolForm =
-  'vokabeltest' | 'vokabelliste' | 'arbeitsblatt' | 'lernzielkontrolle' | 'grammatiktest' | 'klassenarbeit' | 'rueckmeldung' | 'elternbrief' | 'tafelbild'
+  | 'vokabeltest'
+  | 'vokabelliste'
+  | 'arbeitsblatt'
+  | 'lernzielkontrolle'
+  | 'grammatiktest'
+  | 'klassenarbeit'
+  | 'rueckmeldung'
+  | 'elternbrief'
+  | 'tafelbild'
+  | 'onlinetest'
+  | 'verwaltung'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
@@ -157,6 +167,30 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
       { d: 'M7 16L5.5 21M17 16L18.5 21', art: 'strich' }
     ],
     vorn: [{ d: 'M15 21.5L21.5 15', art: 'strich', breite: 2.5 }]
+  },
+  // Onlinetest (02.10.2026, Server): Tablet mit Ankreuzfeld, davor ein Haken im Kreis
+  onlinetest: {
+    aussparen: HAKEN_KREIS,
+    aussparenBreite: 3,
+    hinten: [
+      { d: 'M4 2H16A2 2 0 0 1 18 4V20A2 2 0 0 1 16 22H4A2 2 0 0 1 2 20V4A2 2 0 0 1 4 2Z', art: 'strich' },
+      { d: 'M5 6H9V10H5Z', art: 'akzent' },
+      { d: 'M11 7H15M5 14H13M9.5 19H10.5', art: 'strich', breite: 1.5 }
+    ],
+    vorn: [
+      { d: HAKEN_KREIS, art: 'strich', breite: 1.75 },
+      { d: 'M15.5 18L17.3 19.8L20.5 16.3', art: 'strich', breite: 1.75 }
+    ]
+  },
+  // Verwaltung (02.10.2026, Server, nur Admin): Schieberegler
+  verwaltung: {
+    hinten: [
+      { d: 'M4 6H20M4 12H20M4 18H20', art: 'strich' },
+      { d: 'M7 4H11V8H7Z', art: 'akzent' },
+      { d: 'M13 10H17V14H13Z', art: 'akzent' },
+      { d: 'M6 16H10V20H6Z', art: 'akzent' }
+    ],
+    vorn: []
   }
 }
 

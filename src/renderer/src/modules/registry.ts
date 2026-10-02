@@ -9,7 +9,10 @@ import VokabeltestModule from './vokabeltest/VokabeltestModule'
 import RueckmeldungModule from './rueckmeldung/RueckmeldungModule'
 import ElternbriefModule from './elternbrief/ElternbriefModule'
 import TafelbildModule from './tafelbild/TafelbildModule'
-import { PROGRAMM_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
+import OnlinetestModule from './onlinetest/OnlinetestModule'
+import VerwaltungModule from './verwaltung/VerwaltungModule'
+import { aufServer, serverIch } from '../shared/plattform'
+import { PROGRAMM_FAECHER, SPRACH_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
 
 /**
  * Jedes Programm der Schul-Apps ist ein Modul.
@@ -163,5 +166,36 @@ export const modules: SchulModule[] = [
     leistenbild: leistenbild('vokabelliste'),
     faecher: PROGRAMM_FAECHER.vokabelliste,
     component: VokabellisteModule
-  }
+  },
+  /*
+   * Nur mit dem Schul-Apps-Server (02.10.2026): Onlinetest (Lerngruppen, Live-Stand, Auswertung)
+   * und – nur für Admins – die Verwaltung. In der Exe ohne Server und auf dem iPad gibt es sie nicht.
+   */
+  ...(aufServer()
+    ? [
+        {
+          id: 'onlinetest',
+          name: 'Onlinetest',
+          description: 'Vokabeltests am iPad der Lernenden: Code oder QR-Code, Zeitlimit, Live-Stand, Auswertung mit KI – dazu Lerngruppen mit Notenverlauf.',
+          icon: programmSymbol('onlinetest', 'teal'),
+          color: 'teal',
+          // Nur mit dem Schul-Apps-Server – deshalb nicht in PROGRAMM_FAECHER (feste Folge der Programme überall)
+          faecher: SPRACH_FAECHER,
+          component: OnlinetestModule
+        }
+      ]
+    : []),
+  ...(aufServer() && serverIch()?.rolle === 'admin'
+    ? [
+        {
+          id: 'verwaltung',
+          name: 'Verwaltung',
+          description: 'Nutzer und Testkonten, KI-Schlüssel für alle, IServ-Anbindung, Hörtext-Freigaben und Zustand des Servers.',
+          icon: programmSymbol('verwaltung', 'gray'),
+          color: 'gray',
+          faecher: 'alle' as const,
+          component: VerwaltungModule
+        }
+      ]
+    : [])
 ]
