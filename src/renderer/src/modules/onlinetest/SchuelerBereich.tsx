@@ -7,6 +7,7 @@
  *  /s/aufgaben    Aufgaben mit Feedback (offene und abgeschlossene)
  *  /s/blaetter    freigegebene Arbeitsblätter (folgt)
  *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
+ *  /s/f/<CODE>    Aufgabe mit Feedback per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/a/<ID>
  *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
  *
  * Regeln (Wunsch der Lehrkraft): Zeitlimit; wer die Seite verlässt (anderer Tab, andere App,
@@ -94,6 +95,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   const pfad = window.location.pathname
   const code = /^\/s\/t\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const fbCode = /^\/s\/f\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const rueckblick = /^\/s\/e\/([A-Za-z0-9_-]{6,64})/.exec(pfad)?.[1]
   const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter)\/?$/.exec(pfad)?.[1]
   const ich = window.__schulappsServer
@@ -101,6 +103,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
   const inhalt = code ? (
     <TestAblauf code={code.toUpperCase()} />
+  ) : fbCode ? (
+    <FeedbackBeitritt code={fbCode.toUpperCase()} />
   ) : aufgabe ? (
     <FeedbackAufgabe id={aufgabe} />
   ) : rueckblick && !gast ? (
@@ -120,7 +124,7 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
         <Text fw={700} size="lg" component="a" href="/s/" style={{ color: 'inherit', textDecoration: 'none' }}>
-          Schul-Apps{gast ? ' · Onlinetest' : ''}
+          Schul-Apps{gast ? (aufgabe || fbCode ? ' · Rückmeldung' : ' · Onlinetest') : ''}
         </Text>
         {!gast && (
           <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
@@ -353,6 +357,93 @@ function BlaetterSeite(): React.JSX.Element {
   )
 }
 
+/** Ein Code kann zu einem Test oder zu einer Aufgabe mit Feedback gehören (Etappe 4) */
+async function oeffneCode(code: string): Promise<void> {
+  const aufgabe = await holen<{ id: string }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  window.location.assign(aufgabe?.id ? `/s/f/${code}` : `/s/t/${code}`)
+}
+
+/** Aufgabe mit Feedback per QR-Code/Code: Gäste geben ihren Namen ein, Lernende mit Konto kommen gleich hinein */
+function FeedbackBeitritt({ code }: { code: string }): React.JSX.Element {
+  const [info, setInfo] = useState<{ id: string; titel: string; gaeste: boolean; dabei: boolean } | null | undefined>(undefined)
+  const [name, setName] = useState('')
+  const [fehler, setFehler] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+  const ich = window.__schulappsServer
+  const mitKonto = Boolean(ich?.angemeldet && ich.quelle !== 'gast')
+  const beitreten = useCallback(
+    async (mitName?: string): Promise<void> => {
+      setLaeuft(true)
+      setFehler('')
+      try {
+        const r = await senden<{ id: string }>('/s/api/aufgabe/gast', { code, ...(mitName ? { name: mitName } : {}) })
+        window.location.assign(`/s/a/${r.id}`)
+      } catch (e) {
+        setFehler(e instanceof Error ? e.message : String(e))
+        setLaeuft(false)
+      }
+    },
+    [code]
+  )
+  useEffect(() => {
+    void holen<{ id: string; titel: string; gaeste: boolean; dabei: boolean }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).then(
+      (d) => {
+        if (d.dabei) return window.location.assign(`/s/a/${d.id}`)
+        if (mitKonto) return void beitreten()
+        if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(`/s/f/${code}`)}`)
+        setInfo(d)
+      },
+      () => setInfo(null)
+    )
+  }, [code, mitKonto, beitreten])
+  if (info === null) return <Alert color="orange">Diese Aufgabe gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
+  if (!info)
+    return fehler ? (
+      <Alert color="red">{fehler}</Alert>
+    ) : (
+      <Center py="xl">
+        <Loader />
+      </Center>
+    )
+  const gueltig = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u.test(name.trim().replace(/\s+/g, ' '))
+  return (
+    <Card withBorder padding="lg" data-feedback-beitritt>
+      <Text c="dimmed" size="sm">
+        Aufgabe mit Feedback
+      </Text>
+      <Title order={3} mb="md">
+        {info.titel}
+      </Title>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (gueltig && !laeuft) void beitreten(name)
+        }}
+      >
+        <TextInput
+          label="Wie heißt du?"
+          description="Vorname und Anfangsbuchstabe des Nachnamens, z. B. „Anna K.“"
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+          size="md"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          data-gastname
+        />
+        {fehler && (
+          <Alert color="red" mt="sm">
+            {fehler}
+          </Alert>
+        )}
+        <Button type="submit" mt="md" fullWidth size="md" disabled={!gueltig} loading={laeuft}>
+          Weiter
+        </Button>
+      </form>
+    </Card>
+  )
+}
+
 function Uebersicht(): React.JSX.Element {
   const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean }[] | null>(null)
   const [code, setCode] = useState('')
@@ -383,14 +474,14 @@ function Uebersicht(): React.JSX.Element {
             spellCheck={false}
             size="md"
           />
-          <Button size="md" disabled={code.length < 4} onClick={() => window.location.assign(`/s/t/${code}`)}>
+          <Button size="md" disabled={code.length < 4} onClick={() => void oeffneCode(code)}>
             Öffnen
           </Button>
         </Group>
         <Button mt="sm" variant="light" fullWidth size="md" onClick={() => setScannen(true)} data-code-scannen>
           QR-Code scannen
         </Button>
-        {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => window.location.assign(`/s/t/${c}`)} />}
+        {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => void oeffneCode(c)} />}
       </Card>
       {aufAppleMobil() && !alsWebApp() && (
         <Alert variant="light" color="blue" data-home-tipp>
@@ -437,6 +528,16 @@ function NameEingeben({ code, fertig }: { code: string; fertig: () => void }): R
   const [fehler, setFehler] = useState('')
   const [laeuft, setLaeuft] = useState(false)
   const gueltig = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u.test(name.trim().replace(/\s+/g, ' '))
+  // Test nur mit Schülerkonto (Etappe 3): gleich zur Anmeldung, zurück zu diesem Test
+  const zurAnmeldung = (): void => window.location.assign(`/anmelden?ziel=${encodeURIComponent(`/s/t/${code}`)}`)
+  useEffect(() => {
+    void holen<{ gaeste: boolean }>(`/s/api/zugang?code=${encodeURIComponent(code)}`)
+      .then((d) => {
+        if (d.gaeste === false) zurAnmeldung()
+      })
+      .catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code])
   const weiter = async (): Promise<void> => {
     setLaeuft(true)
     setFehler('')
@@ -1170,9 +1271,11 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
   }
   return (
     <Stack>
-      <Button variant="subtle" component="a" href="/s/aufgaben" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
-        Rückmeldung
-      </Button>
+      {window.__schulappsServer?.quelle !== 'gast' && (
+        <Button variant="subtle" component="a" href="/s/aufgaben" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+          Rückmeldung
+        </Button>
+      )}
       <Card withBorder padding="lg">
         <Title order={3}>{a.titel}</Title>
         <Text mt="xs" style={{ whiteSpace: 'pre-wrap' }}>

@@ -93,7 +93,16 @@ interface TestDetail {
   link: string
   status: 'wartend' | 'offen' | 'beendet'
   erstellt: string
-  einstellungen: { zeitMin: number; schwellen: number[]; thema?: string; gestartet?: number; ergebnisFrei?: boolean; art?: string; blatt?: BlattKopf }
+  einstellungen: {
+    zeitMin: number
+    schwellen: number[]
+    thema?: string
+    gestartet?: number
+    ergebnisFrei?: boolean
+    art?: string
+    blatt?: BlattKopf
+    gaeste?: boolean
+  }
   lerngruppe: { name: string } | null
   ohneIserv: boolean
   ki: { laeuft: boolean; fehler: string | null }
@@ -528,7 +537,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   const offen = d.teilnahmen.reduce((s, t) => s + t.offen, 0)
   const zuEntscheiden = d.teilnahmen.reduce((s, t) => s + t.zuEntscheiden, 0)
   const nameVon = (t: Teilnahme, i: number): string => (verdeckt ? `Person ${i + 1}` : t.name)
-  const status = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten'): Promise<void> => {
+  const status = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten' | 'gaeste' | 'nurKonto'): Promise<void> => {
     if (s === 'beendet' && !window.confirm('Test beenden? Wer noch schreibt, gibt mit dem zuletzt gesicherten Stand ab.')) return
     await senden(`/server/onlinetest/${id}/status`, { status: s }).catch((e: unknown) => notifyError(e))
     laden()
@@ -656,6 +665,17 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                 <Text size="sm" c="dimmed">
                   Nichts zu entscheiden.
                 </Text>
+              )}
+              {d.ohneIserv && d.status !== 'beendet' && (
+                <Tooltip label="Nur mit Konto: Ergebnisse stehen bei den Lernenden unter „Meine Ergebnisse“. Gäste geben nur ihren Namen ein.">
+                  <Switch
+                    size="sm"
+                    label="auch Gäste (mit Namen)"
+                    checked={d.einstellungen.gaeste !== false}
+                    onChange={(e) => void status(e.currentTarget.checked ? 'gaeste' : 'nurKonto')}
+                    data-gaeste-schalter
+                  />
+                </Tooltip>
               )}
             </Group>
             <Group gap="xs">

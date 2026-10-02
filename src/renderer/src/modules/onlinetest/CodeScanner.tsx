@@ -10,10 +10,10 @@ import { Alert, Button, Modal, Stack, Text } from '@mantine/core'
 import jsQR from 'jsqr'
 import { useEffect, useRef, useState } from 'react'
 
-/** Aus dem Inhalt eines QR-Codes den Testcode lesen (Link auf /s/t/<CODE> oder der Code selbst) */
+/** Aus dem Inhalt eines QR-Codes den Code lesen (Link auf /s/t/<CODE> bzw. /s/f/<CODE> oder der Code selbst) */
 export function codeAus(inhalt: string): string | null {
   const t = inhalt.trim()
-  const ausLink = /\/s\/t\/([A-Za-z0-9]{4,12})\/?(?:[?#].*)?$/.exec(t)?.[1]
+  const ausLink = /\/s\/[tf]\/([A-Za-z0-9]{4,12})\/?(?:[?#].*)?$/.exec(t)?.[1]
   if (ausLink) return ausLink.toUpperCase()
   return /^[A-Za-z0-9]{4,12}$/.test(t) ? t.toUpperCase() : null
 }

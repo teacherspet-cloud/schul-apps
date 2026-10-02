@@ -10,8 +10,11 @@
  *    Rückmeldungs-App (renderer/modules/rueckmeldung) – im Namen der LEHRKRAFT (ihr Schlüssel),
  *    über den Namensschutz; der eigene Name der Schülerin/des Schülers wird vorher durch das
  *    Kürzel ersetzt (`ohneNamen`).
- *  - Abos (ChatGPT/Claude) dürfen dafür NICHT laufen: Die Anfragen stellen Lernende – das wäre
- *    ein geteiltes Konto. Es braucht einen API-Schlüssel (eigener oder von der Verwaltung freigegeben).
+ *  - KI: der Zugang der freigebenden Lehrkraft – API-Schlüssel ODER ihr Abo (Entscheidung der
+ *    Lehrkraft, 02.10.2026; vorher nur Schlüssel).
+ *  - Etappe 4 (02.10.2026): Freigabe an die ganze Lerngruppe ODER an einzelne Lernende (Spalte
+ *    `schueler`, Benutzernamen); Gäste per QR-Code/Code und Namenseingabe (`/s/f/<CODE>`, nur
+ *    solange IServ nicht eingerichtet ist) – wie beim Onlinetest, ein Gastkonto je Aufgabe.
  *  - An die Lernenden geht der Bogen OHNE Einstufung/Notenvorschlag und ohne Hinweise für die
  *    Lehrkraft; die Lehrkraft sieht alle Fassungen und holt sie in ihre Rückmeldung.
  */
@@ -20,10 +23,12 @@ import { getSettings } from '../main/services/storage/settings'
 import { bogenAnfrage, bogenAus, ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { bogenKontextAus, rueckmeldungSystem } from '../renderer/src/modules/rueckmeldung/system'
 import type { Abgabe, Bogen, Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
-import { alleNutzer, datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer } from './kontext'
-import { alsNutzer, json, type Anfrage, type Aufruf } from './http'
-import { gehoertZu, lerngruppe } from './onlinetest'
+import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { iservBereit } from './anmeldung'
+import { registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
 
 const SCHEMA = `
@@ -45,6 +50,11 @@ CREATE TABLE IF NOT EXISTS feedback_abgaben (
   fassungen TEXT NOT NULL DEFAULT '[]',
   aktualisiert TEXT NOT NULL,
   UNIQUE (freigabe_id, schueler_id)
+);
+CREATE TABLE IF NOT EXISTS feedback_gaeste (
+  freigabe_id TEXT NOT NULL REFERENCES feedback_freigaben(id) ON DELETE CASCADE,
+  nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  PRIMARY KEY (freigabe_id, nutzer_id)
 );`
 
 let bereit = false
@@ -52,6 +62,10 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    // Etappe 4: einzelne Lernende, Gast-Code
+    const spalten = new Set((d.prepare('PRAGMA table_info(feedback_freigaben)').all() as { name: string }[]).map((x) => x.name))
+    if (!spalten.has('schueler')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN schueler TEXT NOT NULL DEFAULT '[]'")
+    if (!spalten.has('code')) d.exec('ALTER TABLE feedback_freigaben ADD COLUMN code TEXT')
     bereit = true
   }
   return d
@@ -75,6 +89,10 @@ interface Freigabe {
   bis: number | null
   status: 'offen' | 'beendet'
   erstellt: string
+  /** JSON-Liste von Benutzernamen; leer = ganze Lerngruppe */
+  schueler: string
+  /** Code für Gäste (QR-Code + Name); null = keine Gäste */
+  code: string | null
 }
 
 const json_ = <T>(s: string, r: T): T => {
@@ -99,21 +117,41 @@ export function bogenFuerLernende(b: Bogen | undefined): Partial<Bogen> | undefi
 
 const freigabe = (id: string): Freigabe | null => (db().prepare('SELECT * FROM feedback_freigaben WHERE id = ?').get(id) as Freigabe | undefined) ?? null
 
-function offenFuer(f: Freigabe, ich: NutzerInfo): boolean {
-  const g = lerngruppe(f.lerngruppe_id)
-  return f.status === 'offen' && (!f.bis || Date.now() < f.bis) && Boolean(g && gehoertZu(g, ich))
+const schuelerVon = (f: Freigabe): string[] => json_(f.schueler ?? '[]', [] as string[])
+
+/** Gehört die Aufgabe dieser Person? Lerngruppe (ggf. nur ausgewählte) oder als Gast beigetreten */
+function istFuer(f: Freigabe, ich: NutzerInfo): boolean {
+  // Per Code beigetreten (Gast oder Konto)?
+  if (db().prepare('SELECT 1 FROM feedback_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(f.id, ich.id)) return true
+  if (ich.quelle === 'gast') return false
+  const g = f.lerngruppe_id ? lerngruppe(f.lerngruppe_id) : null
+  if (!g || !gehoertZu(g, ich)) return false
+  const nur = schuelerVon(f)
+  return !nur.length || nur.includes(ich.benutzer)
 }
 
-/** Bogen erzeugen – im Namen der Lehrkraft, nur mit API-Schlüssel */
+function offenFuer(f: Freigabe, ich: NutzerInfo): boolean {
+  return f.status === 'offen' && (!f.bis || Date.now() < f.bis) && istFuer(f, ich)
+}
+
+const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function neuerCode(): string {
+  for (;;) {
+    const c = Array.from(randomBytes(6), (b) => CODE_ZEICHEN[b % CODE_ZEICHEN.length]).join('')
+    if (!db().prepare('SELECT 1 FROM feedback_freigaben WHERE code = ?').get(c)) return c
+  }
+}
+const freigabeNachCode = (code: string): Freigabe | null =>
+  /^[A-Z0-9]{4,12}$/.test(code) ? ((db().prepare('SELECT * FROM feedback_freigaben WHERE code = ?').get(code) as Freigabe | undefined) ?? null) : null
+const MAX_GAESTE = 80
+
+/** Bogen erzeugen – im Namen der Lehrkraft, mit ihrem KI-Zugang (Schlüssel oder Abo) */
 async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf): Promise<Bogen> {
   const lehrkraft = nutzerNachId(f.lehrkraft_id)
   if (!lehrkraft) throw new Error('Die Lehrkraft gibt es nicht mehr.')
   const r = json_(f.vorlage, {} as Rueckmeldung)
   return imNutzer(alsNutzer(lehrkraft), async () => {
     const settings = getSettings()
-    const anbieter = settings.ai.textProvider
-    if (settings.ai.access[anbieter] === 'subscription')
-      throw new Error('Für Feedback an Lernende braucht die Lehrkraft einen API-Schlüssel (eigener oder von der Verwaltung freigegeben) – ein persönliches Abo darf nicht für andere laufen.')
     const a: Abgabe = { id: 'a', kuerzel: 'S1', name: schueler.name, dateiname: '', text, bilder: [] }
     const { text: ohne } = ohneNamen(a)
     const anonym = { ...a, text: ohne }
@@ -123,12 +161,49 @@ async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, au
   })
 }
 
-export function feedbackRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
+export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promise<boolean> {
+  const link = (code: string): string => `${adresse.replace(/\/$/, '')}/s/f/${code}`
   return async (k) => {
     const { url, req, res, sitzung } = k
     const schueler = url.pathname.startsWith('/s/api/aufgaben') || url.pathname.startsWith('/s/api/aufgabe/')
     const lehrer = url.pathname.startsWith('/server/feedback')
     if (!schueler && !lehrer) return false
+    const mitKopf0 = typeof req.headers['x-schulapps-token'] === 'string'
+
+    // ---------- Gäste per Code (QR) und Namen – vor der Anmeldeprüfung
+    if (req.method === 'GET' && url.pathname === '/s/api/aufgabe/zugang') {
+      const f = freigabeNachCode(String(url.searchParams.get('code') ?? '').toUpperCase())
+      if (!f || f.status !== 'offen') return (json(res, 404, { fehler: 'Diese Aufgabe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      return (json(res, 200, { id: f.id, titel: f.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(f, sitzung.nutzer)) }), true)
+    }
+    if (req.method === 'POST' && url.pathname === '/s/api/aufgabe/gast') {
+      if (!mitKopf0) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const f = freigabeNachCode(String(k0.code ?? '').toUpperCase())
+      if (!f || f.status !== 'offen') return (json(res, 404, { fehler: 'Diese Aufgabe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      if (sitzung && istFuer(f, sitzung.nutzer)) return (json(res, 200, { ok: true, id: f.id }), true)
+      // Mit Schülerkonto per Code: ohne Namen dazu – die Abgabe steht dann unter dem Konto
+      if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
+        db().prepare('INSERT OR IGNORE INTO feedback_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)').run(f.id, sitzung.nutzer.id)
+        return (json(res, 200, { ok: true, id: f.id }), true)
+      }
+      if (iservBereit()) return (json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true)
+      const name = gastName(k0.name)
+      if (!name) return (json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true)
+      const gaeste = db().prepare('SELECT nutzer_id FROM feedback_gaeste WHERE freigabe_id = ?').all(f.id) as { nutzer_id: string }[]
+      const namen = new Map(alleNutzer().map((n) => [n.id, n.name.toLowerCase()]))
+      if (gaeste.some((x) => namen.get(x.nutzer_id) === name.toLowerCase()))
+        return (json(res, 409, { fehler: `„${name}“ ist schon dabei. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“` }), true)
+      if (gaeste.length >= MAX_GAESTE) return (json(res, 429, { fehler: 'Für diese Aufgabe sind schon zu viele Gäste angemeldet.' }), true)
+      const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
+      registerVergessen()
+      db().prepare('INSERT INTO feedback_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)').run(f.id, gast.id)
+      const neu = sitzungAnlegen(gast.id, 'schueler')
+      setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS.schueler, Boolean((req.socket as { encrypted?: boolean }).encrypted))
+      protokolliereServer('feedback', 'Beitritt mit Namen (ohne IServ)', gast.id)
+      return (json(res, 200, { ok: true, id: f.id }), true)
+    }
+
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     const ich = sitzung.nutzer
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
@@ -143,7 +218,7 @@ export function feedbackRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
           db()
             .prepare('SELECT f.* FROM feedback_freigaben f JOIN feedback_abgaben a ON a.freigabe_id = f.id WHERE a.schueler_id = ? ORDER BY f.erstellt DESC')
             .all(ich.id) as unknown as Freigabe[]
-        ).filter((f) => !offen.some((o) => o.id === f.id))
+        ).filter((f) => !offen.some((o) => o.id === f.id) && istFuer(f, ich))
         const alle = [...offen, ...frueher]
         return (
           json(res, 200, {
@@ -209,36 +284,55 @@ export function feedbackRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
             status: f.status,
             runden: f.runden,
             bis: f.bis,
-            lerngruppe: lerngruppe(f.lerngruppe_id)?.name ?? '',
+            lerngruppe: (f.lerngruppe_id ? lerngruppe(f.lerngruppe_id)?.name : '') ?? '',
+            schueler: schuelerVon(f).length,
+            ...(f.code ? { code: f.code, link: link(f.code) } : {}),
             abgaben: (db().prepare('SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ?').get(f.id) as { n: number }).n
           }))
         }),
         true
       )
     }
+    // Mitglieder einer eigenen Lerngruppe – für die Auswahl einzelner Lernender
+    if (req.method === 'GET' && teile[0] === 'mitglieder') {
+      const g = lerngruppe(String(url.searchParams.get('gruppe') ?? ''))
+      if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true)
+      return (json(res, 200, { mitglieder: mitgliederVon(g).map((n) => ({ benutzer: n.benutzer, name: n.name || n.benutzer })) }), true)
+    }
     if (req.method === 'POST' && teile[0] === 'freigeben') {
       const k0 = (await k.koerper()) as Record<string, unknown>
-      const g = lerngruppe(String(k0.lerngruppeId ?? ''))
-      if (!g || g.lehrkraft_id !== ich.id) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
+      const mitGaesten = k0.gaeste === true && !iservBereit()
+      const gruppeId = String(k0.lerngruppeId ?? '')
+      const g = gruppeId ? lerngruppe(gruppeId) : null
+      if (gruppeId && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
+      if (!g && !mitGaesten) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe wählen oder Gäste mit QR-Code zulassen.' }), true)
+      // Einzelne Lernende: nur Mitglieder der gewählten Lerngruppe
+      const erlaubt = new Set(g ? mitgliederVon(g).map((n) => n.benutzer) : [])
+      const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
       const r = k0.rueckmeldung as Rueckmeldung | undefined
       if (!r?.grundlage?.aufgaben?.trim()) return (json(res, 400, { fehler: 'Die Rückmeldung braucht eine Aufgabenstellung (Schritt „Einrichten“).' }), true)
       // Nur die Vorlage – keine vorhandenen Abgaben (fremde Schülerdaten)
       const vorlage: Rueckmeldung = { ...r, abgaben: [] }
       const id = randomBytes(8).toString('hex')
       db()
-        .prepare('INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .prepare(
+          'INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt, schueler, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )
         .run(
           id,
           ich.id,
-          g.id,
+          g?.id ?? '',
           String(k0.titel ?? r.meta?.title ?? r.grundlage.titel ?? 'Aufgabe').slice(0, 160),
           JSON.stringify(vorlage),
           Math.max(1, Math.min(10, Math.round(Number(k0.runden) || 2))),
           typeof k0.bis === 'number' ? k0.bis : null,
           'offen',
-          new Date().toISOString()
+          new Date().toISOString(),
+          JSON.stringify(einzelne),
+          mitGaesten ? neuerCode() : null
         )
-      return (json(res, 200, { id }), true)
+      const neu = freigabe(id)!
+      return (json(res, 200, { id, ...(neu.code ? { code: neu.code, link: link(neu.code) } : {}) }), true)
     }
     const f = teile[0] ? freigabe(teile[0]) : null
     if (!f || f.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)

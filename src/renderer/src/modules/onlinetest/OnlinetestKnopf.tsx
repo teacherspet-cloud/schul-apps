@@ -4,7 +4,7 @@
  * Verteilung der Fassungen, Figur; danach Code, Link und QR-Code für die Lernenden. Gestartet
  * wird in der App „Onlinetest" – für alle gemeinsam.
  */
-import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stack, Text, TextInput, Radio } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceLaptop } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { TestDocument } from '../vokabeltest/model/types'
@@ -57,6 +57,8 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
   const jubelnd = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'jubelnd')
   const [mitFigur, setMitFigur] = useState(Boolean(figurWahl))
   const [handschrift, setHandschrift] = useState(true)
+  // Etappe 3 (02.10.2026): nur mit Schülerkonto oder auch Gäste mit Namen
+  const [gaeste, setGaeste] = useState(true)
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [zeit, setZeit] = useState<number>(20)
   const [zuteilung, setZuteilung] = useState<string>('abwechselnd')
@@ -77,6 +79,7 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
         lerngruppeId: gruppe ?? '',
         ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
         handschrift,
+        gaeste,
         zeitMin: zeit,
         zuteilung: zuteilung === 'abwechselnd' || zuteilung === 'zufall' ? zuteilung : Number(zuteilung)
       })
@@ -121,6 +124,17 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
             clearable
             placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
           />
+          <Radio.Group
+            label="Wer darf teilnehmen?"
+            value={gaeste ? 'gaeste' : 'konto'}
+            onChange={(v) => setGaeste(v === 'gaeste')}
+            description="Nur mit Konto: Die Ergebnisse stehen bei den Lernenden unter „Meine Ergebnisse“. Gäste geben per QR-Code nur ihren Namen ein (Vorname + Anfangsbuchstabe)."
+          >
+            <Group mt={6}>
+              <Radio value="konto" label="nur mit Schülerkonto" data-nur-konto />
+              <Radio value="gaeste" label="auch Gäste mit Namen" />
+            </Group>
+          </Radio.Group>
           <NumberInput label="Zeitlimit (Minuten)" min={1} max={240} value={zeit} onChange={(v) => setZeit(Number(v) || 20)} />
           {doc.variants.length > 1 && (
             <Select

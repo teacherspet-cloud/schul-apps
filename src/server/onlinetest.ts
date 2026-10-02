@@ -190,6 +190,11 @@ export interface Einstellungen {
   figur?: boolean
   /** Handschrift erlaubt (Schreibfläche mit Erkennung, renderer/modules/onlinetest/handschrift.ts) */
   handschrift?: boolean
+  /**
+   * Beitritt mit Namen erlaubt (Etappe 3, 02.10.2026)? false = nur mit Schülerkonto – dann stehen alle
+   * Ergebnisse auch in „Meine Ergebnisse". Fehlt bei älteren Tests: erlaubt (wie bisher).
+   */
+  gaeste?: boolean
   /** Kopf und Einstellungen des Vokabeltests – für die Abgabe als Blatt (renderer/modules/onlinetest/blattAnsicht.tsx) */
   blatt?: Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
 }
@@ -260,6 +265,7 @@ export function testErstellen(
     thema?: string
     figur?: { winkend?: unknown; jubelnd?: unknown }
     handschrift?: boolean
+    gaeste?: boolean
   }
 ): Test {
   if (!e.test?.variants?.length) throw new Error('Der Test hat keine Variante.')
@@ -285,6 +291,7 @@ export function testErstellen(
     ...(e.hinweis ? { hinweis: e.hinweis.slice(0, 500) } : {}),
     ...(figuren.length ? { figur: true } : {}),
     handschrift: e.handschrift !== false,
+    gaeste: e.gaeste !== false,
     blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize }
   }
   const fassungen = e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v), original: v }))
@@ -696,6 +703,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       const test = testNachCode(String(k0.code ?? ''))
       if (!test) return (json(res, 404, { fehler: 'Diesen Test gibt es nicht. Bitte den Code prüfen.' }), true)
       if (test.status === 'beendet') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
+      if (test.einstellungen.gaeste === false)
+        return (json(res, 403, { fehler: 'Diesen Test schreibst du mit deinem Schülerkonto – bitte anmelden.', anmelden: true }), true)
       const name = gastName(k0.name)
       if (!name) return (json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true)
       const ts = teilnahmenVon(test.id)
@@ -712,6 +721,12 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS.schueler, Boolean((req.socket as { encrypted?: boolean }).encrypted))
       protokolliereServer('onlinetest', 'Beitritt mit Namen (ohne IServ)', gast.id)
       return (json(res, 200, { ok: true, name }), true)
+    }
+
+    // Vor dem Beitritt: Darf man mit Namen hinein oder nur mit Konto? (ohne Anmeldung abfragbar)
+    if (req.method === 'GET' && was === 'zugang') {
+      const test = testNachCode(String(url.searchParams.get('code') ?? ''))
+      return (json(res, 200, { gaeste: !test || test.einstellungen.gaeste !== false }), true)
     }
 
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
@@ -980,7 +995,8 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           hinweis: typeof k0.hinweis === 'string' ? k0.hinweis : undefined,
           thema: typeof k0.thema === 'string' ? k0.thema : undefined,
           figur: k0.figur && typeof k0.figur === 'object' ? (k0.figur as { winkend?: unknown; jubelnd?: unknown }) : undefined,
-          handschrift: k0.handschrift !== false
+          handschrift: k0.handschrift !== false,
+          gaeste: k0.gaeste !== false
         })
         return (json(res, 200, { id: t.id, code: t.code, link: link(t.code) }), true)
       } catch (e) {
@@ -1027,6 +1043,10 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         db().prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE test_id = ? AND beginn = 0 AND abgabe IS NULL').run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, test.id)
         einstellungenSetzen(test, { gestartet: jetzt })
         protokolliereServer('onlinetest', 'Onlinetest gestartet', ich.id)
+        return (json(res, 200, { ok: true }), true)
+      }
+      if (k0.status === 'gaeste' || k0.status === 'nurKonto') {
+        einstellungenSetzen(test, { gaeste: k0.status === 'gaeste' })
         return (json(res, 200, { ok: true }), true)
       }
       if (k0.status === 'freigeben' || k0.status === 'zurueckhalten') {

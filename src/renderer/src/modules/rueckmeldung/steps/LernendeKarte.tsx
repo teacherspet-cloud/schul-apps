@@ -6,9 +6,13 @@
  * Die Lernenden schreiben im Schülerbereich, fordern Feedback an, überarbeiten und fordern
  * erneut an (so oft, wie die Lehrkraft erlaubt). Mit „Abgaben holen" landen die jeweils neuesten
  * Fassungen samt Bogen hier als Abgaben – zum Durchsehen, Bearbeiten und Ausgeben wie immer.
+ *
+ * Etappe 4 (02.10.2026): an die ganze Lerngruppe ODER an einzelne Lernende; auf Wunsch Gäste per
+ * QR-Code und Namen (solange IServ nicht eingerichtet ist). KI: Zugang der Lehrkraft, auch Abo.
  */
-import { Alert, Badge, Button, Card, Group, NumberInput, Select, Stack, Text, Title } from '@mantine/core'
-import { IconDownload, IconSend } from '@tabler/icons-react'
+import { Alert, Badge, Button, Card, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text, Title } from '@mantine/core'
+import { IconDownload, IconQrcode, IconSend } from '@tabler/icons-react'
+import { Zugang } from '../../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
 import type { Abgabe, Bogen, Rueckmeldung } from '../model/types'
 import { aufServer } from '../../../shared/plattform'
@@ -23,6 +27,10 @@ interface FreigabeListe {
   runden: number
   lerngruppe: string
   abgaben: number
+  /** Zahl ausgewählter Lernender (0 = ganze Lerngruppe) */
+  schueler?: number
+  code?: string
+  link?: string
 }
 
 export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: (fn: (d: Rueckmeldung) => void) => void }): React.JSX.Element | null {
@@ -30,6 +38,18 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
   const [liste, setListe] = useState<FreigabeListe[]>([])
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [runden, setRunden] = useState(2)
+  const [mitglieder, setMitglieder] = useState<{ benutzer: string; name: string }[]>([])
+  const [einzelne, setEinzelne] = useState<string[]>([])
+  const [gaeste, setGaeste] = useState(false)
+  const [qr, setQr] = useState<{ titel: string; code: string; link: string } | null>(null)
+  useEffect(() => {
+    setEinzelne([])
+    if (!gruppe) return setMitglieder([])
+    void holen<{ mitglieder: { benutzer: string; name: string }[] }>(`/server/feedback/mitglieder?gruppe=${encodeURIComponent(gruppe)}`).then(
+      (d) => setMitglieder(d.mitglieder),
+      () => setMitglieder([])
+    )
+  }, [gruppe])
   const laden = useCallback(() => {
     void holen<{ freigaben: FreigabeListe[] }>('/server/feedback').then((d) => setListe(d.freigaben), () => setListe([]))
   }, [])
@@ -42,8 +62,17 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
 
   const freigeben = async (): Promise<void> => {
     try {
-      await senden('/server/feedback/freigeben', { rueckmeldung: r, lerngruppeId: gruppe, runden, titel: r.meta.title || r.grundlage.titel })
-      notifySuccess('Freigegeben – die Lernenden finden die Aufgabe im Schülerbereich (Anmeldung mit IServ).')
+      const titel = r.meta.title || r.grundlage.titel
+      const neu = await senden<{ id: string; code?: string; link?: string }>('/server/feedback/freigeben', {
+        rueckmeldung: r,
+        lerngruppeId: gruppe ?? '',
+        schueler: einzelne,
+        gaeste,
+        runden,
+        titel
+      })
+      notifySuccess('Freigegeben – die Lernenden finden die Aufgabe im Schülerbereich unter „Rückmeldung“.')
+      if (neu.code && neu.link) setQr({ titel: titel || 'Aufgabe', code: neu.code, link: neu.link })
       laden()
     } catch (e) {
       notifyError(e)
@@ -81,16 +110,51 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
         Lernende reichen selbst ein
       </Title>
       <Text size="sm" c="dimmed" mb="sm">
-        Die Lernenden schreiben ihre Lösung im Schülerbereich und bekommen sofort Feedback – ohne Notenvorschlag. Danach können sie überarbeiten und erneut Feedback anfordern.
-        Die Anfragen laufen über den API-Schlüssel der Lehrkraft (eigener oder von der Verwaltung freigegeben), ohne Namen.
+        Die Lernenden schreiben ihre Lösung im Schülerbereich und bekommen sofort Feedback – ohne Notenvorschlag. Danach können sie überarbeiten und erneut
+        Feedback anfordern. Die Anfragen laufen über den KI-Zugang der Lehrkraft (Schlüssel oder Abo), ohne Namen.
       </Text>
       <Group align="end" mb="md">
-        <Select label="Lerngruppe" data={gruppen.map((g) => ({ value: g.id, label: g.name }))} value={gruppe} onChange={setGruppe} placeholder={gruppen.length ? 'wählen …' : 'in der App „Onlinetest“ anlegen'} w={220} />
+        <Select
+          label="Lerngruppe"
+          data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
+          value={gruppe}
+          onChange={setGruppe}
+          clearable
+          placeholder={gruppen.length ? 'wählen …' : 'in der App „Onlinetest“ anlegen'}
+          w={220}
+        />
         <NumberInput label="Feedback-Runden je Person" min={1} max={10} value={runden} onChange={(v) => setRunden(Number(v) || 2)} w={180} />
-        <Button leftSection={<IconSend size={16} />} disabled={!gruppe || !r.grundlage.aufgaben.trim()} onClick={() => void freigeben()}>
+        <Button
+          leftSection={<IconSend size={16} />}
+          disabled={(!gruppe && !gaeste) || !r.grundlage.aufgaben.trim()}
+          onClick={() => void freigeben()}
+          data-feedback-freigeben
+        >
           Freigeben
         </Button>
       </Group>
+      {gruppe && (
+        <MultiSelect
+          mb="sm"
+          label="Nur für einzelne Lernende"
+          description="Leer lassen = die ganze Lerngruppe."
+          data={mitglieder.map((m) => ({ value: m.benutzer, label: m.name }))}
+          value={einzelne}
+          onChange={setEinzelne}
+          searchable
+          clearable
+          placeholder={mitglieder.length ? 'alle' : 'noch niemand in der Lerngruppe'}
+          data-einzelne
+        />
+      )}
+      <Checkbox
+        mb="md"
+        label="Auch Gäste per QR-Code und Namen (ohne Konto)"
+        description="Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstaben ein. Lernende mit Konto kommen über denselben Code direkt hinein."
+        checked={gaeste}
+        onChange={(e) => setGaeste(e.currentTarget.checked)}
+        data-feedback-gaeste
+      />
       {!r.grundlage.aufgaben.trim() && (
         <Alert color="orange" mb="sm">
           Zuerst die Aufgabenstellung eintragen – sie sehen die Lernenden.
@@ -104,7 +168,10 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
                 {f.titel}
               </Text>
               <Text size="xs" c="dimmed">
-                {f.lerngruppe} · {f.runden} Runden · {f.abgaben} Abgabe{f.abgaben === 1 ? '' : 'n'}{' '}
+                {[f.lerngruppe && (f.schueler ? `${f.lerngruppe} (${f.schueler} ausgewählt)` : f.lerngruppe), f.code && 'Gäste per QR']
+                  .filter(Boolean)
+                  .join(' · ')}{' '}
+                · {f.runden} Runden · {f.abgaben} Abgabe{f.abgaben === 1 ? '' : 'n'}{' '}
                 {f.status !== 'offen' && (
                   <Badge size="xs" color="gray">
                     beendet
@@ -113,6 +180,16 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
               </Text>
             </div>
             <Group gap={4}>
+              {f.code && f.link && (
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  leftSection={<IconQrcode size={14} />}
+                  onClick={() => setQr({ titel: f.titel, code: f.code!, link: f.link! })}
+                >
+                  QR-Code
+                </Button>
+              )}
               <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={() => void abholen(f.id)}>
                 Abgaben holen
               </Button>
@@ -128,6 +205,11 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           </Group>
         ))}
       </Stack>
+      {qr && (
+        <Modal opened onClose={() => setQr(null)} title={qr.titel} size="lg">
+          <Zugang code={qr.code} link={qr.link} />
+        </Modal>
+      )}
     </Card>
   )
 }
