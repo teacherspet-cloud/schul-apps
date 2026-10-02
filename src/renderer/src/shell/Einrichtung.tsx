@@ -1,9 +1,10 @@
 import { Button, Group, Modal, Stack, Stepper, Text, Title } from '@mantine/core'
 import { aufServer, serverIch } from '../shared/plattform'
 import { IconFolder, IconHeadphones, IconPalette, IconPhoto, IconSchool, IconSparkles } from '@tabler/icons-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
 import { imNetz } from '../shared/netzZugang'
+import { iservHier } from '../shared/iservAbgleich'
 import { aufIos } from '../shared/plattform'
 import { AiCard, AppearanceCard, HoertextCard, ImageAiCard, SchoolCard } from './SettingsPage'
 import AblageCard from './AblageCard'
@@ -45,6 +46,8 @@ export default function Einrichtung(): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
   const [schritt, setSchritt] = useState(0)
   const [geprueft, setGeprueft] = useState(false)
+  // IServ-Schritt vorn: beim Öffnen festgelegt – er bleibt stehen, auch wenn IServ währenddessen verbunden wird
+  const iservAmAnfang = useRef<boolean | null>(null)
 
   useEffect(() => {
     /*
@@ -92,7 +95,25 @@ export default function Einrichtung(): React.JSX.Element | null {
   }
   const ios = aufIos()
 
+  /*
+   * IServ zuerst (02.10.2026, Wunsch der Lehrkraft): Ist noch keine Anmeldung bei IServ erfolgt,
+   * fragt der Assistent als Erstes danach – und übernimmt daraus die Fächer (Gruppenordner, siehe
+   * IservCard › faecherAusIservUebernehmen). Gilt für die Exe ohne Server, die iPad-App und die Exe
+   * „Schul-Apps Online"; im reinen Browser auf dem Server geht es nicht (Passwort nie an den Server).
+   */
+  if (iservAmAnfang.current === null) iservAmAnfang.current = iservHier() && !settings.iserv?.basis
+  const iservZuerst = iservAmAnfang.current
+  const iservSchritt = {
+    label: 'IServ',
+    beschreibung: 'Mit IServ anmelden',
+    icon: <IconFolder size={18} />,
+    hinweis:
+      'Mit dem IServ-Zugang der Schule übernimmt die App die eigenen Fächer aus den Gruppen (der Ordner „Englisch“ unter „Gruppen“ heißt: Englisch), speichert Material direkt in die Ordner auf IServ und öffnet Dateien von dort. Das Passwort liegt verschlüsselt nur auf diesem Gerät – Schul-Apps-Server und KI sehen es nie.',
+    inhalt: <IservCard settings={settings} update={update} />
+  }
+
   const schritte = [
+    ...(iservZuerst ? [iservSchritt] : []),
     {
       label: 'Schule',
       beschreibung: 'Wo wird unterrichtet?',
@@ -126,20 +147,7 @@ export default function Einrichtung(): React.JSX.Element | null {
         'Optional: Für Hörverstehen spricht eine Stimme das Skript ein. Ohne Stimme bleibt das Skript als Lesetext für die Lehrkraft erhalten.',
       inhalt: <HoertextCard settings={settings} update={update} />
     },
-    // Nur iPad: wohin erstellte Dateien kommen
-    ...(!ios && !aufServer()
-      ? [
-          // PC (02.10.2026): IServ verbinden – Material dort speichern und von dort öffnen
-          {
-            label: 'IServ',
-            beschreibung: 'Optional: IServ-Ordner',
-            icon: <IconFolder size={18} />,
-            hinweis:
-              'Optional: Mit dem IServ-Zugang der Schule speichert die App Material direkt in die Ordner auf IServ und öffnet Dateien von dort. Das Passwort liegt verschlüsselt nur auf diesem PC.',
-            inhalt: <IservCard settings={settings} update={update} />
-          }
-        ]
-      : []),
+    // Nur iPad: wohin erstellte Dateien kommen (IServ steht als eigener Schritt vorn)
     ...(ios
       ? [
           {
@@ -147,13 +155,8 @@ export default function Einrichtung(): React.JSX.Element | null {
             beschreibung: 'Wohin erstellte Dateien kommen',
             icon: <IconFolder size={18} />,
             hinweis:
-              'Eingeschaltet liegt jedes erstellte Material geordnet nach Fach und Themenbereich in der Dateien-App – auch ohne Netz jederzeit wieder da. Optional mit dem IServ-Zugang der Schule: Dann geht Material auf Wunsch direkt in die Ordner auf IServ.',
-            inhalt: (
-              <Stack gap="md">
-                <AblageCard settings={settings} update={update} />
-                <IservCard settings={settings} update={update} />
-              </Stack>
-            )
+              'Eingeschaltet liegt jedes erstellte Material geordnet nach Fach und Themenbereich in der Dateien-App – auch ohne Netz jederzeit wieder da. Mit IServ geht Material auf Wunsch direkt in die Ordner auf IServ.',
+            inhalt: <AblageCard settings={settings} update={update} />
           }
         ]
       : []),

@@ -30,6 +30,11 @@ try {
   const page = await app.firstWindow()
   await app.evaluate(async ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1400, 950))
   await warteAufOberflaeche(page, 3, { assistent: true })
+  // Einrichtungsassistent (02.10.2026): ohne IServ-Anmeldung zuerst IServ – daraus kommen die Fächer
+  const ersterSchritt = await page.getByRole('dialog').locator('.mantine-Stepper-stepLabel').first().innerText().catch(() => '')
+  pruefe(ersterSchritt.trim() === 'IServ', `Assistent: erster Schritt ist die IServ-Anmeldung („${ersterSchritt.trim()}")`)
+  pruefe(await page.getByText('der Ordner „Englisch“ unter „Gruppen“').first().isVisible().catch(() => false), 'Assistent erklärt die Fächer aus den IServ-Gruppen')
+  await page.screenshot({ path: join(out, '0-assistent.png') })
   const spaeter = page.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
 

@@ -1,7 +1,7 @@
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
 import { EigenesFensterKnopf } from '../eigenesFenster'
 import { nurPcNetz } from '../plattform'
-import { TeilenMenuePunkt } from './Fachordner'
+import { FachschaftsListe, TeilenMenuePunkt } from './Fachordner'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
@@ -209,6 +209,8 @@ export function BibliothekKopf({
           <EigenesFensterKnopf name={titel} />
         </Group>
       </Group>
+      {/* Server: freigegebenes Material der Fachschaft für dieses Programm */}
+      <FachschaftsListe />
       <TextInput
         leftSection={<IconSearch size={16} />}
         placeholder={`Suchen (${suchHinweis})`}

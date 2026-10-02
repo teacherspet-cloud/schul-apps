@@ -1,6 +1,5 @@
 import { ActionIcon, AppShell, Button, Indicator, Menu, Tooltip } from '@mantine/core'
-import { aufServer, serverIch } from './shared/plattform'
-import { TeilenDialog } from './shared/components/Fachordner'
+import { aufServer, hatClient, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconChevronsLeft, IconExternalLink, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconSettings } from '@tabler/icons-react'
@@ -19,6 +18,7 @@ import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
 import { druckeAktives, openModule, useNavigation } from './shared/navigation'
+import { faecherAusIservUebernehmen } from './shared/iservAbgleich'
 import { AktuellesProgramm, eigeneFensterMoeglich, einzelnesProgramm, inEigenemFenster } from './shared/eigenesFenster'
 import { useTelefon, useTouch } from './shared/touch/touchModus'
 import { ZoomProgramm } from './shared/touch/zoom'
@@ -121,6 +121,11 @@ export default function App(): React.JSX.Element {
    * übernimmt die Auftragsleiste (shell/AuftragsLayer.tsx), weil sie vorher fragen muss,
    * wenn noch Aufträge laufen.
    */
+  // Server mit der Exe „Schul-Apps Online": Fächer aus den IServ-Gruppen still abgleichen (Fachschaft)
+  useEffect(() => {
+    if (aufServer() && hatClient()) void faecherAusIservUebernehmen().catch(() => undefined)
+  }, [])
+
   // Im Browser (Zugang aus dem Netz) gibt es kein Schließen-Ereignis – dort zumindest anstoßen
   useEffect(() => {
     const weg = (): void => void sichereAlles()
@@ -258,8 +263,6 @@ export default function App(): React.JSX.Element {
 
       {/* Nach dem ersten Start und nach dem Zurücksetzen: die Einrichtung in drei Schritten */}
       {!einzeln && <Einrichtung />}
-      {/* Server: Material in den Fachordner teilen (shared/components/Fachordner.tsx) */}
-      <TeilenDialog />
 
       <AppShell.Main className="app-main" data-mobil-tabs={telefon || undefined}>
         {/* Die Startseite wird bei jedem Zurückkommen neu aufgebaut – damit ist „Zuletzt bearbeitet" aktuell */}

@@ -25,6 +25,7 @@ import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
 import { lehrkraftRoute, schuelerRoute } from './onlinetest'
+import { fachschaftRoute, mitFachschaft, setzeEntferner } from './fachschaft'
 import { fachordnerRoute } from './fachordner'
 import { feedbackRoute } from './schuelerfeedback'
 import { aktuellerNutzer } from './kontext'
@@ -61,7 +62,9 @@ async function main(): Promise<void> {
     return fn(...args)
   }
   // Klarnamen nie an eine KI (namensfilter.ts) – EINE Stelle für alle KI- und Sprachausgabe-Aufrufe
-  const geschuetzt = mitNamensschutz(roh)
+  // Freigaben für die Fachschaft: Arbeitskopien bleiben aus der Bibliothek, bis sie geändert werden (fachschaft.ts)
+  const geschuetzt = mitFachschaft(mitNamensschutz(roh))
+  setzeEntferner(roh)
   // Hörtexte: jede Aufnahme bekommt eine Adresse für den QR-Code (hoertexte.ts)
   const aufruf = async (kanal: string, args: unknown[]): Promise<unknown> => {
     const wert = await geschuetzt(kanal, args)
@@ -78,7 +81,7 @@ async function main(): Promise<void> {
   const key = env.SCHULAPPS_TLS_KEY
   const tls = cert && key && existsSync(cert) && existsSync(key) ? { cert, key } : undefined
 
-  await starteServer({ port, adresse, hosts, aufruf, tls, routen: [hoertextRoute, feedbackRoute(aufruf), schuelerRoute(aufruf), lehrkraftRoute(aufruf, adresse), fachordnerRoute(), verwaltungsRoute] })
+  await starteServer({ port, adresse, hosts, aufruf, tls, routen: [hoertextRoute, feedbackRoute(aufruf), schuelerRoute(aufruf), lehrkraftRoute(aufruf, adresse), fachschaftRoute(), fachordnerRoute(), verwaltungsRoute] })
   console.log(`Schul-Apps-Server läuft: ${adresse} (${tls ? 'TLS' : 'ohne TLS'}), Daten: ${DATEN}, Oberfläche: ${OBERFLAECHE}`)
   protokolliereServer('start', `Server gestartet (${tls ? 'TLS' : 'ohne TLS'})`)
 

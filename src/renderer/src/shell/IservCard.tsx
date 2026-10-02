@@ -6,6 +6,8 @@ import { SCHULMATERIAL } from '@shared/schulmaterial'
 import type { AppSettings, AusgabeOrt, DeepPartial } from '@shared/types'
 import { aufIos } from '../shared/plattform'
 import { useAppSettings } from '../shared/settingsStore'
+import { faecherAusIservUebernehmen } from '../shared/iservAbgleich'
+import { FAECHER } from '@shared/faecher'
 import { notifyError, notifySuccess } from '../shared/util'
 
 /**
@@ -45,7 +47,10 @@ export default function IservCard({
       await window.api.iserv.verbinden({ schule, benutzer, ...(passwort ? { passwort } : {}) })
       setPasswort('')
       await useAppSettings.getState().load()
-      notifySuccess('Die Anmeldung bei IServ hat geklappt.', 'IServ verbunden')
+      // Fächer aus den IServ-Gruppen (Ordner „Englisch" unter „Gruppen" = Englischlehrkraft)
+      const faecher = await faecherAusIservUebernehmen().catch(() => null)
+      const namen = (faecher ?? []).map((id) => FAECHER.find((f) => f.id === id)?.label ?? id)
+      notifySuccess(namen.length ? `Fächer aus IServ übernommen: ${namen.join(', ')}.` : 'Die Anmeldung bei IServ hat geklappt.', 'IServ verbunden')
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
     } finally {
