@@ -2136,6 +2136,7 @@ export function installSelftest(): void {
     vtJetzt,
     vtJahrgang,
     vtHinweiszeile,
+    wsJetzt: () => useArbeitsblatt.getState().worksheet,
     gtJetzt: () => useGrammatiktest.getState().test,
     kaJetzt: () => useKlassenarbeit.getState().exam,
     lzkJetzt: () => useLernzielkontrolle.getState().test,

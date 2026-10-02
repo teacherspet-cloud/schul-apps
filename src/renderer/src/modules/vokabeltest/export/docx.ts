@@ -46,6 +46,7 @@ import { vokabeltestPfad } from '../render/TestPage'
 import { kopfTexte } from '../render/aufgabenTexte'
 import { istRtl, wordSchrift } from '../../../shared/sprachSchrift'
 import { mindmapAeste, mindmapLage, mindmapSvg } from '../render/mindmapLayout'
+import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 /*
  * Arabisch (30.09.2026): Absätze und Tabellen von rechts nach links. Statt jede der vielen
@@ -199,6 +200,8 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
 
   const document = new Document({
     creator: 'Schul-Apps',
+    // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
+    hyphenation: WORD_TRENNUNG,
     title: doc.header.title,
     // KI-Kennzeichnung, maschinenlesbar (Großprogramm 0.4)
     ...kiWordEigenschaften(doc.ki),

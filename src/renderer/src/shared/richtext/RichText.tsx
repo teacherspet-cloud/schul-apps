@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { texToSvg } from './math'
 import { Inline, parseRichText } from './parse'
+import { ohneTrennung } from '../silbentrennung'
 
 export const RICHTEXT_HELP = '**fett**   *kursiv*   $x^2$ Formel   $$…$$ abgesetzte Formel   \\ce{H2O} Chemie   „- " Aufzählung'
 
@@ -142,7 +143,7 @@ export function RichText({
         spellCheck
         title={RICHTEXT_HELP}
         placeholder={RICHTEXT_HELP}
-        onChange={(e) => setDraft(e.currentTarget.value)}
+        onChange={(e) => setDraft(ohneTrennung(e.currentTarget.value))}
         onBlur={() => {
           setEditing(false)
           if (draft !== value) onChange(draft)

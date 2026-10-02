@@ -22,6 +22,7 @@ import { kiMetaTag, kiWordEigenschaften } from '@shared/kiKennzeichnung'
 import { spracheNach } from '../../shared/familiensprachen'
 import { dataUrlBytes, MM } from '../../shared/export/docxKit'
 import { DEUTSCHER_VERMERK, type BriefText, type Elternbrief } from './model'
+import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 /**
  * Briefkopf (29.09.2026): Absender oben links (Lehrkraft, Schule, Straße, PLZ Ort, Telefon),
@@ -201,6 +202,8 @@ export async function briefDocx(b: Elternbrief, kopf: Briefkopf, codes?: string[
   const rand = Math.round(18 * MM)
   const doc = new Document({
     creator: 'Schul-Apps',
+    // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
+    hyphenation: WORD_TRENNUNG,
     title: b.text?.betreff ?? 'Elternbrief',
     ...kiWordEigenschaften(b.meta.ki),
     styles: { default: { document: { run: { font: 'Calibri', size: 23 } } } },

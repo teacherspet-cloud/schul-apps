@@ -17,6 +17,7 @@ import { AlignmentType, Document, HeadingLevel, Packer, Paragraph } from 'docx'
 import { run } from '../../../shared/export/docxKit'
 import type { AudioBlock } from '../model/types'
 import { dauerAngabe, hoerzeit, minSek, scriptTurns } from '../../../shared/verstehen/hoerzeit'
+import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 export interface TranscriptInfo {
   /** Überschrift des Dokuments, z. B. Titel des Blattes */
@@ -108,6 +109,8 @@ export async function buildTranscriptDocx(blocks: AudioBlock[], info: Transcript
 
   const doc = new Document({
     creator: 'Schul-Apps',
+    // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
+    hyphenation: WORD_TRENNUNG,
     title: `Hörtexte – ${info.title}`,
     ...kiWordEigenschaften(info.ki),
     styles: { default: { document: { run: { font: 'Calibri', size: 22 } } } },

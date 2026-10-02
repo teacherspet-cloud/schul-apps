@@ -44,6 +44,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { boardSection } from './tafel'
 import { headerFor, footerFor } from './kopf'
 import { blockContent, gridTable } from './bausteine'
+import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptions, deps: WorksheetDocxDeps): Promise<Uint8Array> {
   const sections: ISectionOptions[] = []
@@ -73,6 +74,8 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
   const info = pageInfoFor(ws, ws.sheets[0], deps.logo, deps.schoolName, false)
   const doc = new Document({
     creator: 'Schul-Apps',
+    // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
+    hyphenation: WORD_TRENNUNG,
     title: ws.meta.title || ws.meta.topic,
     // KI-Kennzeichnung, maschinenlesbar (Großprogramm 0.4)
     ...kiWordEigenschaften(ws.meta.ki),

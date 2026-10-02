@@ -7,6 +7,7 @@ import { kiWordEigenschaften, type KiHerkunft } from '@shared/kiKennzeichnung'
 import { A4_HEIGHT, A4_WIDTH, ALL_BORDERS, imageRun, MM } from '../export/docxKit'
 import { bildKennzeichnung, IMPULS_ARTEN, lizenzHinweis, type Einstiegsimpuls } from './einstiegsimpuls'
 import type { Stundenverlauf } from './stundenverlauf'
+import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 const RAND = Math.round(14 * MM)
 
@@ -28,6 +29,8 @@ export async function verlaufDocx(v: Stundenverlauf, titel: string, untertitel: 
   const zeilen = v.phasen.map((p) => new TableRow({ children: [p.phase, `${p.minuten}′`, p.geschehen, p.sozialform, p.medien].map((t, i) => zelle(t, i)) }))
   const doc = new Document({
     creator: 'Schul-Apps',
+    // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
+    hyphenation: WORD_TRENNUNG,
     title: `Stundenverlauf – ${titel}`,
     ...kiWordEigenschaften(ki),
     styles: { default: { document: { run: { font: 'Calibri', size: 21 } } } },

@@ -20,6 +20,7 @@ import { kreisLage, kreisRadius } from '../../../../shared/components/Kreismenue
 import { enumOf, int, obj, str } from '../../../../shared/aiSchema'
 import { plainText } from '../../../../shared/richtext/parse'
 import { touchAktiv } from '../../../../shared/touch/touchModus'
+import { ohneTrennung } from '../../../../shared/silbentrennung'
 import { begriffImText, ohneFussnotenMarken } from '../../didactics/anmerkungen'
 import {
   absaetzeVon,
@@ -91,7 +92,8 @@ function sichtbarerText(range: Range, wurzel: HTMLElement): string {
     const bis = n === range.endContainer ? range.endOffset : n.data.length
     out += n.data.slice(von, bis)
   }
-  return out
+  // Weiche Trennstriche der Silbentrennung (shared/silbentrennung.ts) gehören nicht zum Text
+  return ohneTrennung(out)
 }
 
 function absatzVon(node: Node | null): HTMLElement | null {

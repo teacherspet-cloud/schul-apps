@@ -1,3 +1,5 @@
+import { ohneTrennung } from '../silbentrennung'
+
 export interface EditableProps {
   value: string
   onChange?: (v: string) => void
@@ -26,7 +28,8 @@ export function Editable({ value, onChange, className, placeholder, block, edita
       data-placeholder={placeholder}
       spellCheck
       onBlur={(e) => {
-        const next = e.currentTarget.innerText.replace(/ /g, ' ')
+        // Weiche Trennstriche der Silbentrennung (shared/silbentrennung.ts) gehören nicht zum Text
+        const next = ohneTrennung(e.currentTarget.innerText.replace(/ /g, ' '))
         if (next !== value) onChange(next)
       }}
       onKeyDown={(e) => {

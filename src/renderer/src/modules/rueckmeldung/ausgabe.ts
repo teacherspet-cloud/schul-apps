@@ -54,6 +54,7 @@ import {
 import type { NummerierterKommentar, Textteil } from './korrekturrand'
 import { ausgleichKurz } from './nachteilsausgleich'
 import type { Abgabe, Bogen, Einstufungswert, Rueckmeldung } from './model/types'
+import { WORD_TRENNUNG } from '@renderer/shared/silbentrennung'
 
 export { aufScan, mitName, skalenName } from './blattLayout'
 
@@ -444,6 +445,8 @@ export async function boegenDocx(r: Rueckmeldung, abgaben: Abgabe[], opt: Ausgab
 async function dokument(r: Rueckmeldung, kinder: (Paragraph | Table)[], rand: number, links: number, titel = titelZeile(r), rechts = rand): Promise<Uint8Array> {
   const doc = new Document({
     creator: 'Schul-Apps',
+    // Silbentrennung von Word (02.10.2026, shared/silbentrennung.ts)
+    hyphenation: WORD_TRENNUNG,
     title: titel,
     ...kiWordEigenschaften(r.meta.ki),
     styles: { default: { document: { run: { font: 'Calibri', size: 23 } } } },
