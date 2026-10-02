@@ -9,6 +9,7 @@
  *  /s/w/<CODE>    Arbeitsblatt per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/b/<ID>
  *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
  *  /s/f/<CODE>    Aufgabe mit Feedback per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/a/<ID>
+ *  /s/reihen, /s/r/<ZID>[/<SID>]  Unterrichtsreihen (ReiheAnsicht.tsx)
  *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
  *
  * Regeln (Wunsch der Lehrkraft): Zeitlimit; wer die Seite verlässt (anderer Tab, andere App,
@@ -38,9 +39,10 @@ import {
   Text,
   TextInput,
   Textarea,
-  Title
+  Title,
+  ThemeIcon
 } from '@mantine/core'
-import { IconAlertTriangle, IconArrowLeft, IconCheck, IconClock, IconHourglass, IconLogout, IconX } from '@tabler/icons-react'
+import { IconAlertTriangle, IconArrowLeft, IconCheck, IconClock, IconHourglass, IconLogout, IconX, IconRoute } from '@tabler/icons-react'
 import bildOnlinetest from '../../assets/programme/onlinetest.webp'
 import bildRueckmeldung from '../../assets/programme/rueckmeldung.webp'
 import bildArbeitsblatt from '../../assets/programme/arbeitsblatt.webp'
@@ -60,6 +62,7 @@ import {
   type OnlineEintrag
 } from './kern'
 import BlattAusfuellen from './BlattAusfuellen'
+import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import { holen, senden } from './serverApi'
 
 interface Beitritt {
@@ -110,8 +113,11 @@ export default function SchuelerBereich(): React.JSX.Element {
   const fbCode = /^\/s\/f\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blattCode = /^\/s\/w\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const reiheM = /^\/s\/r\/([a-f0-9]{8,32})(?:\/([a-z0-9]{2,20}))?/.exec(pfad)
+  // Aus einer Unterrichtsreihe geöffnet (Arbeitsblatt, Aufgabe, Test): Rückweg zur Reihe
+  const ausReihe = new URLSearchParams(window.location.search).get('reihe')
   const rueckblick = /^\/s\/e\/([A-Za-z0-9_-]{6,64})/.exec(pfad)?.[1]
-  const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter)\/?$/.exec(pfad)?.[1]
+  const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter|reihen)\/?$/.exec(pfad)?.[1]
   const ich = window.__schulappsServer
   // Gäste (Beitritt mit Namen) haben kein Konto zum Abmelden – sie gehören nur zu diesem Test
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
@@ -123,6 +129,10 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Beitritt code={blattCode.toUpperCase()} art="blatt" />
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
+  ) : reiheM && !gast ? (
+    <ReiheWeg zid={reiheM[1]} schritt={reiheM[2]} />
+  ) : bereich === 'reihen' && !gast ? (
+    <ReihenListe />
   ) : aufgabe ? (
     <FeedbackAufgabe id={aufgabe} />
   ) : rueckblick && !gast ? (
@@ -150,6 +160,11 @@ export default function SchuelerBereich(): React.JSX.Element {
           </Button>
         )}
       </Group>
+      {ausReihe && /^[a-f0-9]{8,32}$/.test(ausReihe) && (
+        <Button variant="light" component="a" href={`/s/r/${ausReihe}`} mb="sm" leftSection={<IconArrowLeft size={16} />} data-zur-reihe>
+          Zur Unterrichtsreihe
+        </Button>
+      )}
       {inhalt}
     </Container>
   )
@@ -187,11 +202,19 @@ interface FruehereErgebnis {
 }
 
 /** Eine Kachel der Startseite: Bild, Titel, Zahl/Hinweis */
-function Kachel(props: { href: string; bild: string; titel: string; text: string; zahl?: number; daten: string }): React.JSX.Element {
+function Kachel(props: {
+  href: string
+  bild?: string
+  symbol?: React.ReactNode
+  titel: string
+  text: string
+  zahl?: number
+  daten: string
+}): React.JSX.Element {
   return (
     <Card component="a" href={props.href} withBorder padding="md" radius="lg" data-kachel={props.daten} style={{ textDecoration: 'none', color: 'inherit' }}>
       <Group wrap="nowrap" gap="md">
-        <Image src={props.bild} alt="" w={72} h={72} fit="contain" />
+        {props.bild ? <Image src={props.bild} alt="" w={72} h={72} fit="contain" /> : props.symbol}
         <Stack gap={2} style={{ flex: 1 }}>
           <Group gap="xs">
             <Text fw={700} size="lg">
@@ -218,7 +241,12 @@ function Startseite(): React.JSX.Element {
   const [tests, setTests] = useState<{ abgegeben: boolean }[] | null>(null)
   const [ergebnisse, setErgebnisse] = useState<FruehereErgebnis[] | null>(null)
   const [aufgaben, setAufgaben] = useState<AufgabeMitFeedback[] | null>(null)
+  const [reihen, setReihen] = useState<{ fortschritt: number; fertig: boolean }[] | null>(null)
   useEffect(() => {
+    void holen<{ reihen: { fortschritt: number; fertig: boolean }[] }>('/s/api/reihen').then(
+      (d) => setReihen(d.reihen ?? []),
+      () => setReihen([])
+    )
     void holen<{ tests: { abgegeben: boolean }[] }>('/s/api/tests').then(
       (d) => setTests(d.tests ?? []),
       () => setTests([])
@@ -279,6 +307,20 @@ function Startseite(): React.JSX.Element {
               : 'Noch keine Aufgaben mit Feedback'
         }
       />
+      {Boolean(reihen?.length) && (
+        <Kachel
+          href="/s/reihen"
+          symbol={
+            <ThemeIcon size={72} radius="lg" color="indigo" variant="light">
+              <IconRoute size={42} />
+            </ThemeIcon>
+          }
+          titel="Unterrichtsreihen"
+          daten="reihen"
+          zahl={reihen!.filter((r) => !r.fertig).length}
+          text={`${reihen!.length} Reihe${reihen!.length === 1 ? '' : 'n'} – Schritt für Schritt`}
+        />
+      )}
       <Kachel href="/s/blaetter" bild={bildArbeitsblatt} titel="Arbeitsblätter" daten="blaetter" text="Freigegebene Arbeitsblätter ausfüllen" />
     </Stack>
   )
@@ -1308,7 +1350,7 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
   const [laeuft, setLaeuft] = useState(false)
   const [fehler, setFehler] = useState('')
   const laden = useCallback(() => {
-    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then(
+    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben?mit=reihe').then(
       (d) => {
         const x = d.aufgaben.find((y) => y.id === id) ?? null
         setA(x)

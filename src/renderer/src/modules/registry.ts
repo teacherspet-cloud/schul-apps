@@ -10,6 +10,7 @@ import RueckmeldungModule from './rueckmeldung/RueckmeldungModule'
 import ElternbriefModule from './elternbrief/ElternbriefModule'
 import TafelbildModule from './tafelbild/TafelbildModule'
 import OnlinetestModule from './onlinetest/OnlinetestModule'
+import UnterrichtsreiheModule from './unterrichtsreihe/UnterrichtsreiheModule'
 import VerwaltungModule from './verwaltung/VerwaltungModule'
 import { aufServer, serverIch } from '../shared/plattform'
 import { PROGRAMM_FAECHER, SPRACH_FAECHER, type ProgrammFaecher } from '../shared/programmSichtbarkeit'
@@ -126,6 +127,19 @@ export const modules: SchulModule[] = [
           // Nur mit dem Schul-Apps-Server – deshalb nicht in PROGRAMM_FAECHER (feste Folge der Programme überall)
           faecher: SPRACH_FAECHER,
           component: OnlinetestModule
+        },
+        // Unterrichtsreihe (Etappe 6, 02.10.2026): Lernpfad für Lernende mit Freischalten – alle Fächer
+        {
+          id: 'unterrichtsreihe',
+          name: 'Unterrichtsreihe',
+          description:
+            'Lernpfade für Lernende: Schritte freischalten, Lernziele aus dem Kerncurriculum, eigenes Tempo mit Haltepunkten, Übersicht mit Handlungsbedarf.',
+          icon: programmSymbol('unterrichtsreihe', 'indigo'),
+          color: 'indigo',
+          illustration: illustration('unterrichtsreihe'),
+          leistenbild: leistenbild('unterrichtsreihe'),
+          faecher: 'alle' as const,
+          component: UnterrichtsreiheModule
         }
       ]
     : []),

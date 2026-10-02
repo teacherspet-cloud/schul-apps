@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS blatt_freigaben (
   einstellungen TEXT NOT NULL,
   rueckmeldung_id TEXT NOT NULL,
   status TEXT NOT NULL,
-  erstellt TEXT NOT NULL
+  erstellt TEXT NOT NULL,
+  reihe TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS blatt_abgaben (
   freigabe_id TEXT NOT NULL REFERENCES blatt_freigaben(id) ON DELETE CASCADE,
@@ -68,6 +69,8 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    const spalten = new Set((d.prepare('PRAGMA table_info(blatt_freigaben)').all() as { name: string }[]).map((x) => x.name))
+    if (!spalten.has('reihe')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN reihe TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -228,7 +231,10 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     // ---------- Lernende
     if (schueler) {
       if (req.method === 'GET' && url.pathname === '/s/api/blaetter') {
-        const alle = (db().prepare('SELECT * FROM blatt_freigaben ORDER BY erstellt DESC').all() as unknown as Zeile[]).filter((z) => blattIstFuer(z, ich))
+        // Blätter einer Unterrichtsreihe stehen dort, nicht hier
+        const alle = (db().prepare("SELECT * FROM blatt_freigaben WHERE reihe = '' ORDER BY erstellt DESC").all() as unknown as Zeile[]).filter((z) =>
+          blattIstFuer(z, ich)
+        )
         // Beendete nur, wenn schon etwas eingetragen ist (zum Nachlesen)
         return (json(res, 200, { blaetter: alle.filter((z) => z.status === 'offen' || abgabeVon(z.id, ich.id)).map((z) => kurz(z, ich)) }), true)
       }
@@ -349,7 +355,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
     if (req.method === 'GET' && teile.length === 0) {
-      const liste = db().prepare('SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? ORDER BY erstellt DESC').all(ich.id) as unknown as Zeile[]
+      const liste = db().prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND reihe = '' ORDER BY erstellt DESC").all(ich.id) as unknown as Zeile[]
       return (
         json(res, 200, {
           blaetter: liste.map((z) => ({
@@ -455,12 +461,65 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
 }
 
 /** Für die Unterrichtsreihe: Stand einer Person bei einem freigegebenen Blatt */
-export function blattStand(freigabeId: string, schuelerId: string): { eingereicht: number; kriterien: string[] } | null {
+export function blattStand(freigabeId: string, schuelerId: string): { eingereicht: number; runden: number; kriterien?: string[] } | null {
   const z = freigabe(freigabeId)
   if (!z) return null
   const a = abgabeVon(z.id, schuelerId)
   const letzte = blattFassungen(z.rueckmeldung_id, schuelerId).at(-1)
-  return { eingereicht: a?.abgaben ?? 0, kriterien: (letzte?.volleBogen?.kriterien ?? []).map((k) => k.einschaetzung) }
+  return {
+    eingereicht: a?.abgaben ?? 0,
+    runden: einstellungenVon(z).runden,
+    ...(letzte?.volleBogen ? { kriterien: letzte.volleBogen.kriterien.map((k) => k.einschaetzung) } : {})
+  }
 }
 
 export { freigabe as blattFreigabe }
+
+/** Blatt für einen Schritt einer Unterrichtsreihe freigeben (gleiche Ablage, nicht in der Liste „Arbeitsblätter") */
+export function reihenBlattAnlegen(e: {
+  lehrkraftId: string
+  lerngruppeId: string
+  schueler: string[]
+  titel: string
+  html: string
+  aufgaben: BlattAufgabe[]
+  vorlage: Rueckmeldung
+  runden: number
+  stift: boolean
+  reiheId: string
+}): string {
+  const einstellungen: BlattEinstellungen = {
+    feedback: true,
+    aufgabenFeedback: true,
+    runden: Math.max(1, Math.min(5, e.runden)),
+    aufgabenRunden: 2,
+    stift: e.stift
+  }
+  const rid = verknuepfteFreigabeAnlegen({
+    lehrkraftId: e.lehrkraftId,
+    lerngruppeId: e.lerngruppeId,
+    schueler: e.schueler,
+    titel: `Arbeitsblatt: ${e.titel}`,
+    vorlage: e.vorlage,
+    runden: einstellungen.runden
+  })
+  const id = randomBytes(8).toString('hex')
+  db()
+    .prepare(
+      "INSERT INTO blatt_freigaben (id, lehrkraft_id, lerngruppe_id, schueler, code, titel, html, aufgaben, einstellungen, rueckmeldung_id, status, erstellt, reihe) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, 'offen', ?, ?)"
+    )
+    .run(
+      id,
+      e.lehrkraftId,
+      e.lerngruppeId,
+      JSON.stringify(e.schueler),
+      e.titel.slice(0, 160),
+      e.html,
+      JSON.stringify(e.aufgaben),
+      JSON.stringify(einstellungen),
+      rid,
+      new Date().toISOString(),
+      e.reiheId
+    )
+  return id
+}

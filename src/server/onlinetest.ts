@@ -195,6 +195,8 @@ export interface Einstellungen {
    * Ergebnisse auch in „Meine Ergebnisse". Fehlt bei älteren Tests: erlaubt (wie bisher).
    */
   gaeste?: boolean
+  /** Gehört zu einer Unterrichtsreihe (eigenes Tempo, startet beim Beitreten; nicht in der Liste „Offene Tests") */
+  reihe?: boolean
   /** Kopf und Einstellungen des Vokabeltests – für die Abgabe als Blatt (renderer/modules/onlinetest/blattAnsicht.tsx) */
   blatt?: Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
 }
@@ -739,6 +741,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       // Offene Tests der eigenen Lerngruppen (Gäste: nur der eigene Test)
       const tests = (db().prepare("SELECT * FROM onlinetests WHERE status != 'beendet'").all() as unknown as TestZeile[]).map(alsTest).filter((t) => {
         if (gast) return meine.has(t.id)
+        if (t.einstellungen.reihe) return false
         const g = t.lerngruppe_id ? lerngruppe(t.lerngruppe_id) : null
         return g && gehoertZu(g, ich)
       })
@@ -1206,3 +1209,28 @@ export function historie(g: Lerngruppe) {
 }
 
 export type { Nutzer }
+
+// ---------------------------------------------------------------- Unterrichtsreihe (Etappe 6)
+
+/** Test für eine Reihe: eigenes Tempo – sofort offen, Ergebnis gleich nach der Abgabe */
+export function reihenTestAnlegen(lehrkraftId: string, e: { titel: string; test: TestDocument; lerngruppeId?: string; zeitMin: number }): string {
+  const lehrkraft = nutzerNachId(lehrkraftId)
+  if (!lehrkraft) throw new Error('Unbekannte Lehrkraft.')
+  const t = testErstellen(lehrkraft, { titel: e.titel, test: e.test, lerngruppeId: e.lerngruppeId, zeitMin: e.zeitMin, gaeste: false, handschrift: true })
+  db().prepare("UPDATE onlinetests SET status = 'offen' WHERE id = ?").run(t.id)
+  einstellungenSetzen(t, { gestartet: Date.now(), ergebnisFrei: true, reihe: true })
+  return t.id
+}
+
+export const reihenTestCode = (testId: string): string | null => testNachId(testId)?.code ?? null
+
+/** Stand einer Person in einem Test: abgegeben? Prozent (sobald frei) */
+export function onlinetestStand(testId: string, schuelerId: string): { eingereicht: number; runden: number; prozent?: number } | null {
+  const test = testNachId(testId)
+  if (!test) return null
+  const t = db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? AND schueler_id = ?').get(test.id, schuelerId) as unknown as TeilnahmeZeile | undefined
+  if (!t?.abgabe) return { eingereicht: 0, runden: 1 }
+  const max = test.fassungen[t.variante]?.fassung.punkte ?? 0
+  const punkte = summe(json_(t.bewertung, {} as Bewertung))
+  return { eingereicht: 1, runden: 1, ...(max ? { prozent: Math.round((punkte / max) * 100) } : {}) }
+}

@@ -36,7 +36,8 @@ export const SENSIBEL: Record<string, string[]> = {
   blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback'],
   fach_kopien: ['titel'],
   reihen_zuweisungen: ['schueler'],
-  reihen_stand: ['daten']
+  reihen_stand: ['daten'],
+  reihen_dateien: ['daten', 'name']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())
 

@@ -182,11 +182,13 @@ export function verknuepfteFreigabeAnlegen(e: {
   titel: string
   vorlage: Rueckmeldung
   runden: number
+  /** 'blatt' (Arbeitsblatt), 'reihe' (Schritt einer Unterrichtsreihe – über die Reihe erreichbar), 'reihe-aufgabe' (nur KI-Bogen) */
+  art?: 'blatt' | 'reihe' | 'reihe-aufgabe'
 }): string {
   const id = randomBytes(8).toString('hex')
   db()
     .prepare(
-      "INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt, schueler, code, art) VALUES (?, ?, ?, ?, ?, ?, NULL, 'offen', ?, ?, NULL, 'blatt')"
+      "INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt, schueler, code, art) VALUES (?, ?, ?, ?, ?, ?, NULL, 'offen', ?, ?, NULL, ?)"
     )
     .run(
       id,
@@ -196,13 +198,14 @@ export function verknuepfteFreigabeAnlegen(e: {
       JSON.stringify({ ...e.vorlage, abgaben: [] }),
       e.runden,
       new Date().toISOString(),
-      JSON.stringify(e.schueler)
+      JSON.stringify(e.schueler),
+      e.art ?? 'blatt'
     )
   return id
 }
 
 export function verknuepfteFreigabeStatus(id: string, status: 'offen' | 'beendet'): void {
-  db().prepare("UPDATE feedback_freigaben SET status = ? WHERE id = ? AND art = 'blatt'").run(status, id)
+  db().prepare("UPDATE feedback_freigaben SET status = ? WHERE id = ? AND art != ''").run(status, id)
 }
 
 /**
@@ -307,9 +310,13 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     // ---------- Lernende
     if (schueler) {
       if (req.method === 'GET' && url.pathname === '/s/api/aufgaben') {
-        const offen = (db().prepare("SELECT * FROM feedback_freigaben WHERE status = 'offen' AND art = ''").all() as unknown as Freigabe[]).filter((f) =>
-          offenFuer(f, ich)
-        )
+        const offen = (
+          db()
+            .prepare(
+              `SELECT * FROM feedback_freigaben WHERE status = 'offen' AND ${url.searchParams.get('mit') === 'reihe' ? "art IN ('', 'reihe')" : "art = ''"}`
+            )
+            .all() as unknown as Freigabe[]
+        ).filter((f) => offenFuer(f, ich))
         // Abgeschlossene Aufgaben mit eigener Abgabe bleiben zum Nachlesen da (Schüler-Startseite, 02.10.2026)
         const frueher = (
           db()
@@ -343,7 +350,8 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       if (req.method === 'POST' && url.pathname === '/s/api/aufgabe/einreichen') {
         const k0 = (await k.koerper()) as Record<string, unknown>
         const f = freigabe(String(k0.id ?? ''))
-        if (!f || f.art === 'blatt' || !offenFuer(f, ich)) return (json(res, 404, { fehler: 'Diese Aufgabe ist nicht (mehr) freigegeben.' }), true)
+        if (!f || (f.art !== '' && f.art !== 'reihe') || !offenFuer(f, ich))
+          return (json(res, 404, { fehler: 'Diese Aufgabe ist nicht (mehr) freigegeben.' }), true)
         const text = String(k0.text ?? '')
           .trim()
           .slice(0, 20000)
@@ -456,4 +464,16 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     }
     return (json(res, 404, { fehler: 'Unbekannt.' }), true)
   }
+}
+
+/** Stand einer Person in einer Rückmeldungs-Freigabe (für die Unterrichtsreihe) */
+export function feedbackStand(freigabeId: string, schuelerId: string): { eingereicht: number; runden: number; kriterien?: string[] } | null {
+  const f = freigabe(freigabeId)
+  if (!f) return null
+  const zeile = db().prepare('SELECT fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, schuelerId) as
+    { fassungen: string } | undefined
+  const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
+  const mitBogen = fassungen.filter((x) => x.bogen)
+  const letzte = mitBogen[mitBogen.length - 1]
+  return { eingereicht: mitBogen.length, runden: f.runden, ...(letzte?.bogen ? { kriterien: letzte.bogen.kriterien.map((k) => k.einschaetzung) } : {}) }
 }

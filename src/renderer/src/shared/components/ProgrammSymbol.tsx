@@ -45,6 +45,7 @@ export type ProgrammSymbolForm =
   | 'tafelbild'
   | 'onlinetest'
   | 'verwaltung'
+  | 'unterrichtsreihe'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
@@ -180,6 +181,21 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
     vorn: [
       { d: HAKEN_KREIS, art: 'strich', breite: 1.75 },
       { d: 'M15.5 18L17.3 19.8L20.5 16.3', art: 'strich', breite: 1.75 }
+    ]
+  },
+  // Unterrichtsreihe (02.10.2026, Server): geschwungener Lernpfad mit Stationen, oben die Zielfahne
+  unterrichtsreihe: {
+    aussparen: 'M16 2V9M16 2.5H21.5L20 4.5L21.5 6.5H16',
+    aussparenBreite: 3,
+    hinten: [
+      { d: 'M4 20C4 16 8 16 11 16S18 16 18 12.5 14 9.5 11 9.5 4 9.5 4 6', art: 'strich' },
+      { d: 'M2.5 18.5H5.5V21.5H2.5Z', art: 'akzent' },
+      { d: 'M9.5 14.5H12.5V17.5H9.5Z', art: 'akzent' },
+      { d: 'M9.5 8H12.5V11H9.5Z', art: 'akzent' }
+    ],
+    vorn: [
+      { d: 'M16 2V9', art: 'strich', breite: 1.75 },
+      { d: 'M16 2.5H21.5L20 4.5L21.5 6.5H16Z', art: 'akzent' }
     ]
   },
   // Verwaltung (02.10.2026, Server, nur Admin): Schieberegler
