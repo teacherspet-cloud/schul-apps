@@ -1,0 +1,43 @@
+# Schul-Apps-Server auf dem Strato-VPS (02.10.2026).
+#
+# EIGENES Compose-Projekt in /opt/schul-apps – Gywem Aviation (/opt/gywem-aviation, Container
+# GyWem-Aviation-Server, Volume gywem-aviation-data, Ports 80/443/8787) bleibt unberührt.
+# Erreichbar nur unter https://217.154.120.64:8443 – Anfragen über gywemaviation.de beantwortet
+# der Server mit 404 (src/server/http.ts).
+name: schul-apps
+services:
+  schul-apps:
+    build: .
+    image: schul-apps-server:aktuell
+    container_name: schul-apps
+    restart: unless-stopped
+    ports:
+      - '8443:8443'
+    environment:
+      SCHULAPPS_ADRESSE: https://217.154.120.64:8443
+      SCHULAPPS_HOSTS: 217.154.120.64:8443
+      SCHULAPPS_TLS_CERT: /daten/tls/le.crt
+      SCHULAPPS_TLS_KEY: /daten/tls/le.key
+      # Nur beim ersten Start bzw. zum Zurücksetzen setzen, danach wieder entfernen:
+      # SCHULAPPS_NOTZUGANG_PASSWORT: …
+    env_file:
+      - path: ./notzugang.env
+        required: false
+    volumes:
+      - schul-apps-daten:/daten
+      # Hauptschlüssel AUSSERHALB des Datenvolumes (nur lesbar)
+      - ./geheim:/geheim:ro
+    # Gywem behält Vorrang: Deckel für Arbeitsspeicher und Prozessoren
+    mem_limit: 900m
+    memswap_limit: 1800m
+    cpus: 1.5
+    shm_size: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  schul-apps-daten:
+    name: schul-apps-daten

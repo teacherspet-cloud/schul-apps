@@ -1,0 +1,9 @@
+{
+  "name": "schul-apps-server",
+  "private": true,
+  "description": "Laufzeit des Schul-Apps-Servers (alles andere steckt gebündelt in server/start.mjs)",
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "1.63.0"
+  }
+}

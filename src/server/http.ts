@@ -174,6 +174,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
 
   const behandle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const host = String(req.headers.host ?? '').toLowerCase()
+    // Gesundheit (Docker prüft im Container über 127.0.0.1) – ohne Inhalte, vor der Adressprüfung
+    if (req.method === 'GET' && req.url === '/gesundheit' && !host.includes('gywemaviation')) return json(res, 200, { name: 'Schul-Apps', server: true, laeuft: true })
     // Nie über die Adresse von Gywem Aviation – und nur unter den eigenen Adressen
     if (host.includes('gywemaviation') || (hosts.size && !hosts.has(host))) return void res.writeHead(404, { 'content-type': 'text/plain' }).end('Nicht gefunden.')
     res.setHeader('x-content-type-options', 'nosniff')
@@ -196,8 +198,6 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
     // Aufrufe mit Wirkung nur mit der eigenen Kopfzeile (siehe oben)
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
-
-    if (req.method === 'GET' && url.pathname === '/gesundheit') return json(res, 200, { name: 'Schul-Apps', server: true, laeuft: true })
 
     // ---------- Anmeldung
     if (req.method === 'GET' && url.pathname === '/anmelden') {
