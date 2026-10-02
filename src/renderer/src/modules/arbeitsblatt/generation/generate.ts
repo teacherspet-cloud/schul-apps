@@ -44,6 +44,8 @@ import { FLAT_BLOCK, OUTLINE_SCHEMA, REVIEW_SCHEMA, WORKSHEET_SCHEMA } from './s
 import { antwortRaumAnwenden, antwortRaumUebersicht, schreibRegelFuerMeta, schreibraumRichtwerte, type AntwortRaumVorschlag } from '../didactics/schreibraum'
 import { seitenPlanAus, seitenPlanRegeln } from '../didactics/seiten'
 import { linkListeningTasks, scriptForSheet, wantsListening, writeListeningScripts } from './listening'
+// Useful vocabulary zu Hörtexten/Videos (02.10.2026)
+import { mitHoerVokabular } from './hoerVokabular'
 import type { ListeningScript } from './listening'
 import { listeningCount } from '../didactics/listeningFormats'
 import { expandObserverGroups } from '../render/observerGroups'
@@ -715,7 +717,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       }),
       3
     )
-    return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai)
+    return mitHoerVokabular(await mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai), opts.ai)
   }
 
   const sheets = await runLimited(
@@ -777,7 +779,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
   )
 
   // Nachbesserungen erzeugen Bausteine neu – die Adresse des Videos geht dabei wieder verloren
-  return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai)
+  return mitHoerVokabular(await mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai), opts.ai)
 }
 
 /**

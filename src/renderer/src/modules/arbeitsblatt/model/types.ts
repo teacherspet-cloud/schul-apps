@@ -765,7 +765,12 @@ export interface PhrasesBlock extends BaseBlock {
   title: string
   /** Kurzer Hinweis, wie das Blatt zu benutzen ist */
   hint: string
-  groups: { label: string; items: { text: string; german: string }[] }[]
+  /**
+   * `art: 'vokabeln'` (02.10.2026, generation/hoerVokabular.ts): Verstehenswortschatz zu einem
+   * Hörtext/Video – `german` trägt dann die Erklärung (deutsch oder einsprachig nach Niveau) und
+   * steht immer da; `kontext` ist der Satz aus dem Text, in dem das Wort vorkommt.
+   */
+  groups: { label: string; art?: 'vokabeln'; items: { text: string; german: string; kontext?: string }[] }[]
 }
 
 export interface TableBlock extends BaseBlock {

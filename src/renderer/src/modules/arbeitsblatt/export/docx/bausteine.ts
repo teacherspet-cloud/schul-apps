@@ -373,10 +373,13 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
               children: [
                 run('• '),
                 ...(await richRun(ctx, item.text)),
-                ...(item.german && ctx.phraseGerman ? [run(' – ', { color: '666666' }), ...(await richRun(ctx, item.german, { color: '666666' }))] : [])
+                ...(item.german && (ctx.phraseGerman || group.art === 'vokabeln') ? [run(' – ', { color: '666666' }), ...(await richRun(ctx, item.german, { color: '666666' }))] : [])
               ]
             })
           )
+          // Vokabelgruppe (Hörtext/Video): der Satz aus dem Text, kursiv darunter
+          if (group.art === 'vokabeln' && item.kontext)
+            out.push(new Paragraph({ indent: { left: 280 }, spacing: { after: 40 }, children: [run(`„${item.kontext}“`, { italics: true, size: ctx.size - 3, color: '666666' })] }))
         }
       }
       out.push(spacer())

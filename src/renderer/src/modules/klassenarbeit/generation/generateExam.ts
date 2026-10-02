@@ -59,6 +59,7 @@ import { generateSprechDaten, sprechBausteine } from './sprechpruefung'
 import { scriptForSheet, wantsListening, writeListeningScript } from '../../arbeitsblatt/generation/listening'
 import type { ListeningScript } from '../../arbeitsblatt/generation/listening'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
+import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
 import { stoffBilder, type StoffQuelle } from '../../../shared/files/stoffQuelle'
 import { blindprobeAktiv, blindprobeBloecke, blindprobeMeldung } from '../../../shared/verstehen/blindprobe'
 import {
@@ -1066,6 +1067,25 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
    * Fassungen gibt, für jede von ihnen: Fassung B hat ihre eigenen Höraufgaben.
    */
   for (const part of result.parts) for (const liste of alleFassungen(part)) linkListeningTasks(liste)
+
+  /*
+   * Annotationen zu Hörtexten/Videos (02.10.2026, arbeitsblatt/generation/hoerVokabular.ts):
+   * höchstens drei je Text, einsprachig, nur wenn ein Wort für eine Aufgabe unerlässlich ist –
+   * eine Anfrage je Teil, dieselben Wörter für alle Fassungen desselben Textes.
+   */
+  {
+    const teile: ExamPart[] = []
+    for (const part of result.parts) {
+      if (!part.blocks.some((b) => b.type === 'audio' || b.type === 'video')) {
+        teile.push(part)
+        continue
+      }
+      onProgress('Annotationen zum Hörtext werden ausgewählt …')
+      const [erste, ...weitere] = await vokabelnFuerFassungen(worksheetMetaFor(exam, part), alleFassungen(part), 'pruefung', ai)
+      teile.push({ ...part, blocks: erste, ...(part.weitereFassungen ? { weitereFassungen: weitere } : {}) })
+    }
+    result = { ...result, parts: teile }
+  }
 
   /*
    * Ohne „Hilfen für Lernende" (Voreinstellung der Klassenarbeit, 01.10.2026): Teilpunkte, die die

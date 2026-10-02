@@ -3185,3 +3185,11 @@ html[data-griff-zug] * {
 .ws-zeilen-schnitt:focus-within > .ws-paragraph {
   margin-top: 0 !important;
 }
+
+/* Vokabelgruppe im Phrases-Kasten (generation/hoerVokabular.ts): Satz aus dem Hörtext/Video */
+.ws-phrases-kontext {
+  font-size: 0.85em;
+  font-style: italic;
+  color: #555;
+  margin: 0.2mm 0 0.8mm 0;
+}

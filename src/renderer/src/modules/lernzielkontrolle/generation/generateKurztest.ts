@@ -12,6 +12,9 @@
  * Lernzielkontrolle, die den Anlass für dieses Programm gab, war selbst KI-erzeugt.
  */
 import { pruefungsVersuchRegeln, setzeProtokollInPruefung } from '../../arbeitsblatt/didactics/protokoll'
+import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
+import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
+import { worksheetMetaForKurztest } from '../render/kurztestWorksheet'
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { AiCall } from '../../../shared/imageChoice'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
@@ -256,11 +259,18 @@ export async function generateKurztest(
   else for (const a of aufgabenIn(blocks)) a.points = 0
   zwischenstand?.(blocks)
   // Ankreuzfragen zu Texten (01.10.2026): Blindprobe ohne Text, Lösbares neu fassen (shared/verstehen/blindprobe.ts)
+  let fertig = blocks
   if (blindprobeAktiv()) {
     const probe = await blindprobeBloecke(blocks, ai, { melde: onStep }).catch(() => null)
-    if (probe?.geprueft) return probe.bloecke
+    if (probe?.geprueft) fertig = probe.bloecke
   }
-  return blocks
+  // Annotationen zu Hörtexten/Videos (02.10.2026): sparsam wie in Prüfungen (arbeitsblatt/generation/hoerVokabular.ts)
+  if (fertig.some((b) => b.type === 'audio' || b.type === 'video')) {
+    linkListeningTasks(fertig)
+    onStep('Annotationen zum Hörtext werden ausgewählt …')
+    ;[fertig] = await vokabelnFuerFassungen(worksheetMetaForKurztest(test), [fertig], 'pruefung', ai)
+  }
+  return fertig
 }
 
 /**

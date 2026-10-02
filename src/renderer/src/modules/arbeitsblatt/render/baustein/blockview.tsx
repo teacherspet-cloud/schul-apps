@@ -269,7 +269,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                         so bleibt der Blick auf der Zielsprache. Ab dem mittleren Niveau und
                         ab B1+ entfällt sie ganz; warum, steht in `didactics/phraseRules.ts`.
                       */}
-                      {item.german && ctx.phraseGerman && (
+                      {/* Vokabelgruppe (Hörtext/Video, 02.10.2026): die Erklärung gehört immer dazu */}
+                      {item.german && (ctx.phraseGerman || group.art === 'vokabeln') && (
                         <span className="ws-phrases-de">
                           {' – '}
                           <RichText
@@ -279,6 +280,16 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                             onChange={set((d, v) => ((d as typeof block).groups[gi].items[ii].german = v))}
                           />
                         </span>
+                      )}
+                      {group.art === 'vokabeln' && (item.kontext || edit) && (
+                        <div className="ws-phrases-kontext">
+                          <Feld
+                            value={item.kontext ?? ''}
+                            editable={schreiben}
+                            onChange={set((d, v) => ((d as typeof block).groups[gi].items[ii].kontext = v))}
+                            placeholder="Satz aus dem Text (optional)"
+                          />
+                        </div>
                       )}
                     </li>
                   ))}
