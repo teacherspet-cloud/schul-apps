@@ -1,3 +1,4 @@
+import { FachordnerKarte } from "../shared/components/Fachordner";
 import { nurPcNetz } from "../shared/plattform";
 import {
   Alert,
@@ -243,6 +244,9 @@ export default function Home(): React.JSX.Element {
           )}
         </Stack>
       )}
+
+      {/* Server (02.10.2026): gemeinsame Fachordner */}
+      <FachordnerKarte />
 
       {!imNetz() && (
         <Group justify="flex-end" mb="xs">

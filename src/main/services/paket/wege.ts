@@ -68,6 +68,11 @@ export function leseGeoeffnetesPaketEin(): { art: PaketArt; id: string; name: st
   if (!geoeffnet) throw new Error('Es ist kein Schulpaket geöffnet.')
   const daten = geoeffnet
   geoeffnet = null
+  return lesePaketEin(daten)
+}
+
+/** Ein Paket in die Ablagen einlesen (auch: gemeinsame Fachordner des Servers, 02.10.2026) */
+export function lesePaketEin(daten: Uint8Array): { art: PaketArt; id: string; name: string }[] {
   const vorhandeneDesigns = new Set(listDesigns().map((d) => d.id))
   return paketEinlesen(
     daten,

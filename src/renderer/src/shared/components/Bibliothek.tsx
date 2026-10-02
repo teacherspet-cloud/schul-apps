@@ -1,5 +1,6 @@
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
 import { nurPcNetz } from '../plattform'
+import { TeilenMenuePunkt } from './Fachordner'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
@@ -58,6 +59,8 @@ export interface Bibliothek<M extends BibliotheksEintrag> {
   kopieren: (id: string) => Promise<M | null>
   /** Die zuletzt angelegte Kopie – wird hervorgehoben, damit man sie gleich findet */
   neuId: string | null
+  /** Programm (modules/registry.ts) – für „Mit der Fachschaft teilen" (Server) */
+  moduleId?: string
 }
 
 /**
@@ -154,7 +157,7 @@ export function useBibliothek<M extends BibliotheksEintrag>(
   const treffer = (felder: (e: M) => (string | number | null | undefined)[]): M[] =>
     (eintraege ?? []).filter((e) => passtZurSuche([e.name, ...felder(e)], suche))
 
-  return { eintraege, suche, setSuche, treffer, umbenennen, setUmbenennen, umbenennenSpeichern, loeschen, setLoeschen, loeschenBestaetigen, kopieren, neuId }
+  return { eintraege, suche, setSuche, treffer, umbenennen, setUmbenennen, umbenennenSpeichern, loeschen, setLoeschen, loeschenBestaetigen, kopieren, neuId, moduleId: opts.moduleId }
 }
 
 /**
@@ -266,6 +269,8 @@ export function EintragMenue<M extends BibliotheksEintrag>({
             Verschieben nach …
           </Menu.Item>
         )}
+        {/* Server (02.10.2026): eine Kopie in den gemeinsamen Fachordner */}
+        <TeilenMenuePunkt moduleId={bib.moduleId} id={eintrag.id} name={eintrag.name} />
         {/* Löschen gibt es nur am Rechner – über das Netz ist es gesperrt */}
         {!nurPcNetz() && (
           <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={weiter(() => bib.setLoeschen(eintrag))}>

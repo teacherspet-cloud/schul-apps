@@ -1,5 +1,6 @@
 import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
 import { aufServer, serverIch } from './shared/plattform'
+import { TeilenDialog } from './shared/components/Fachordner'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
 import { IconChevronsLeft, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconSettings } from '@tabler/icons-react'
@@ -246,6 +247,8 @@ export default function App(): React.JSX.Element {
 
       {/* Nach dem ersten Start und nach dem Zurücksetzen: die Einrichtung in drei Schritten */}
       <Einrichtung />
+      {/* Server: Material in den Fachordner teilen (shared/components/Fachordner.tsx) */}
+      <TeilenDialog />
 
       <AppShell.Main className="app-main" data-mobil-tabs={telefon || undefined}>
         {/* Die Startseite wird bei jedem Zurückkommen neu aufgebaut – damit ist „Zuletzt bearbeitet" aktuell */}
