@@ -61,6 +61,9 @@ try {
   zuLoeschen.push(lehrer.id)
   const lk = await browser.newContext()
   await anmelden(lk, lehrer.benutzer, lehrer.passwort)
+  // Wie bei der Lehrkraft: KI über das ChatGPT-Abo – die Erkennung muss darüber laufen (02.10.2026)
+  const abo = await (await lk.request.post(`${A}/api`, { headers: KOPF, data: { channel: 'settings:set', args: [{ ai: { textProvider: 'openai', access: { openai: 'subscription' } } }] } })).json()
+  pruefe(abo.ok, 'Lehrkraft nutzt das Abo (ChatGPT)')
   const neu = await (await lk.request.post(`${A}/server/onlinetest/erstellen`, { headers: KOPF, data: { titel: 'Handschrift', test: TEST, zeitMin: 10, handschrift: true } })).json()
   await lk.request.post(`${A}/server/onlinetest/${neu.id}/status`, { headers: KOPF, data: { status: 'starten' } })
 

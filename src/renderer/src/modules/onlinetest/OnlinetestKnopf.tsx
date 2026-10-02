@@ -143,7 +143,7 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
           )}
           <Checkbox
             label="Handschrift erlauben (Stift oder Finger, mit Erkennung)"
-            description="Die Erkennung läuft über den API-Schlüssel der Lehrkraft (eigener oder von der Verwaltung freigegeben) – nie über ein Abo. Die Schrift bleibt gespeichert und ist in der Durchsicht zu sehen."
+            description="Die Erkennung läuft über den eigenen KI-Zugang (API-Schlüssel oder Abo). Die Schrift bleibt gespeichert und ist in der Durchsicht zu sehen."
             checked={handschrift}
             onChange={(e) => setHandschrift(e.currentTarget.checked)}
             data-handschrift-wahl

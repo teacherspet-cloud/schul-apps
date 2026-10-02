@@ -329,7 +329,14 @@ function Tests(): React.JSX.Element {
 }
 
 function QrCode({ wert, mm = 40 }: { wert: string; mm?: number }): React.JSX.Element {
-  return <div style={{ width: `${mm}mm`, background: '#fff', padding: 4 }} dangerouslySetInnerHTML={{ __html: qrSvg(wert, mm) }} />
+  // content-box: Der weiße Rand kommt ZU den 40 mm dazu – mit border-box ragte der Code rechts über den Hintergrund (02.10.2026)
+  return (
+    <div
+      style={{ boxSizing: 'content-box', width: `${mm}mm`, height: `${mm}mm`, background: '#fff', padding: 6, lineHeight: 0, flexShrink: 0 }}
+      dangerouslySetInnerHTML={{ __html: qrSvg(wert, mm) }}
+      data-qr
+    />
+  )
 }
 
 export function Zugang({ code, link }: { code: string; link: string }): React.JSX.Element {

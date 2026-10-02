@@ -209,3 +209,22 @@ describe('QR-Code in der Web-App (02.10.2026)', () => {
     expect(codeAus('https://example.com/irgendwas')).toBeNull()
   })
 })
+
+describe('Handschrift gebündelt (02.10.2026)', () => {
+  it('ordnet die Ergebnisse den Bildern zu; Fehlendes bleibt leer und unsicher', async () => {
+    const { erkennungenAus, erkennungsAnfrage } = await import('../src/renderer/src/modules/onlinetest/handschrift')
+    const r = erkennungsAnfrage(
+      [
+        { png: 'data:image/png;base64,AA', kontext: 'Gap 1' },
+        { png: 'data:image/png;base64,BB', kontext: 'Gap 2' }
+      ],
+      'en'
+    )
+    expect(r.images).toHaveLength(2)
+    expect(r.system).toMatch(/Verbessere NICHTS/)
+    expect(erkennungenAus({ ergebnisse: [{ nr: 2, text: 'verry', unsicher: false }] }, 2)).toEqual([
+      { text: '', unsicher: true },
+      { text: 'verry', unsicher: false }
+    ])
+  })
+})

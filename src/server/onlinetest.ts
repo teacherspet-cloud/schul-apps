@@ -42,7 +42,7 @@ import {
   type OnlineFassung
 } from '../renderer/src/modules/onlinetest/kern'
 import { kiAnfrage, urteileAus, type KiFall, type KiUrteil } from '../renderer/src/modules/onlinetest/kiBewertung'
-import { erkennungAus, erkennungsAnfrage, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
+import { erkennungenAus, erkennungsAnfrage, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER } from '@shared/faecher'
 import { getSettings } from '../main/services/storage/settings'
@@ -595,17 +595,45 @@ const kiStand = (testId: string): { laeuft: boolean; fehler: string | null } => 
 
 // ---------------------------------------------------------------- Handschrift
 
-/** Erkennung im Namen der Lehrkraft – nur mit API-Schlüssel (die Anfrage stellen Lernende) */
-async function handschriftErkennen(test: Test, png: string, kontext: string): Promise<Erkennung> {
-  const lehrkraft = nutzerNachId(test.lehrkraft_id)
-  if (!lehrkraft || !kiAufruf) throw new Error('Keine Erkennung möglich.')
-  const aufruf = kiAufruf
-  return imNutzer(alsNutzer(lehrkraft), async () => {
-    const settings = getSettings()
-    if (settings.ai.access[settings.ai.textProvider] === 'subscription')
-      throw new Error('Für die Handschrifterkennung braucht die Lehrkraft einen API-Schlüssel (eigener oder von der Verwaltung freigegeben) – ein persönliches Abo darf nicht für andere laufen.')
-    return erkennungAus(await aufruf('ai:structured', [erkennungsAnfrage(png, test.einstellungen.zielsprache, kontext)]))
+/**
+ * Erkennung im Namen der Lehrkraft, die den Test angelegt und gestartet hat – mit IHREM KI-Zugang,
+ * auch über ihr Abo (Wunsch der Lehrkraft, 02.10.2026). Gebündelt: Was aus einem Test innerhalb von
+ * 1,2 s ankommt, geht als EINE Anfrage mit mehreren Bildern hinaus (höchstens 8 je Anfrage).
+ */
+const BUENDEL_MS = 1200
+const BUENDEL_MAX = 8
+const warteschlangen = new Map<string, { proben: { png: string; kontext: string; ok: (e: Erkennung) => void; fehler: (e: unknown) => void }[]; zeit: ReturnType<typeof setTimeout> | null }>()
+
+function handschriftErkennen(test: Test, png: string, kontext: string): Promise<Erkennung> {
+  return new Promise((ok, fehler) => {
+    const w = warteschlangen.get(test.id) ?? { proben: [], zeit: null }
+    warteschlangen.set(test.id, w)
+    w.proben.push({ png, kontext, ok, fehler })
+    if (w.proben.length >= BUENDEL_MAX) {
+      if (w.zeit) clearTimeout(w.zeit)
+      w.zeit = null
+      void buendelSenden(test)
+    } else if (!w.zeit) w.zeit = setTimeout(() => void buendelSenden(test), BUENDEL_MS)
   })
+}
+
+async function buendelSenden(test: Test): Promise<void> {
+  const w = warteschlangen.get(test.id)
+  if (!w) return
+  w.zeit = null
+  const proben = w.proben.splice(0, BUENDEL_MAX)
+  if (w.proben.length && !w.zeit) w.zeit = setTimeout(() => void buendelSenden(test), 50)
+  if (!proben.length) return
+  try {
+    const lehrkraft = nutzerNachId(test.lehrkraft_id)
+    if (!lehrkraft || !kiAufruf) throw new Error('Keine Erkennung möglich.')
+    const aufruf = kiAufruf
+    const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [erkennungsAnfrage(proben, test.einstellungen.zielsprache)]))
+    const ergebnisse = erkennungenAus(antwort, proben.length)
+    proben.forEach((p, i) => p.ok(ergebnisse[i]))
+  } catch (e) {
+    for (const p of proben) p.fehler(e)
+  }
 }
 
 // ---------------------------------------------------------------- Gäste (ohne IServ)
