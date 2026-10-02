@@ -14,6 +14,8 @@ async function call<T>(kanal: string, ...args: unknown[]): Promise<T> {
 
 contextBridge.exposeInMainWorld('__schulappsClient', {
   name: 'Schul-Apps Online',
+  /** Figuren der Exe ohne Server am selben PC (nur lesen) */
+  lokaleMaskottchen: () => call('client:lokale-maskottchen'),
   iserv: {
     status: () => call('client:iserv-status'),
     verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) => call('client:iserv-verbinden', eingabe),

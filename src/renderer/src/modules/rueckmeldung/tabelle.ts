@@ -82,7 +82,12 @@ export function sprachKriterienAnweisung(r: Rueckmeldung): string[] {
 
 export function tabelleEntwurfAnfrage(r: Rueckmeldung): StructuredRequest {
   const art = einstufungVon(r.meta)
-  const mitPunkten = art === 'notenpunkte' || art === 'note' || art === 'noteTendenz'
+  /*
+   * Punkte je Kriterium (und damit je Bereich) bei JEDER Einstufung außer „ohne“ (Lehrkraft,
+   * 02.10.2026: Bei „++ · + · 0 · − · −−“ hatten die Bereiche keine Punkte). Die Punkte wirken
+   * dort als Gewichte – die Einstufung ergibt sich aus dem Anteil (art.ts, tabellenSumme).
+   */
+  const mitPunkten = art !== 'keine'
   const skala = EINSTUFUNGEN.find((e) => e.id === art)?.label ?? 'ohne Einstufung'
   const sprache = sprachKriterienAnweisung(r)
   return {
@@ -90,7 +95,7 @@ export function tabelleEntwurfAnfrage(r: Rueckmeldung): StructuredRequest {
     user: [
       'Entwirf eine Bewertungstabelle zu dieser Aufgabe – Kriterien aus Aufgabenstellung und Erwartungshorizont, konkret und an der Arbeit prüfbar, 4–10 Kriterien.',
       mitPunkten
-        ? 'Bewertet wird mit PUNKTEN (Bewertungseinheiten): je Kriterium eine Höchstpunktzahl nach Gewicht und Anforderungsbereich; „stufen“ bleibt leer.'
+        ? 'Bewertet wird mit PUNKTEN (Bewertungseinheiten): JEDES Kriterium bekommt eine Höchstpunktzahl größer 0 nach Gewicht und Anforderungsbereich (die Summe je Bereich ergibt die Gewichtung der Bereiche); „stufen“ bleibt leer; je Kriterium Stufenbeschreibungen mit Punktspannen in „deskriptoren“.'
         : 'Bewertet wird über STUFEN statt Punkten (vier Stufen, beste zuerst); je Kriterium eine kurze Beschreibung jeder Stufe; punkte = 0.',
       ...(sprache.length
         ? sprache

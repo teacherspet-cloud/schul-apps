@@ -22,6 +22,7 @@ import { useUndoKeys } from '../useUndoKeys'
 import { notifyError } from '../util'
 import type { Bibliothek } from './bibliothek'
 import type { ProjektDatei } from './projekt'
+import { EigenesFensterKnopf } from '../eigenesFenster'
 
 export interface BibliotheksSeiteProps {
   onNew: () => void
@@ -171,6 +172,7 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
             {p.texte.neu}
           </Button>
         </Group>
+        <EigenesFensterKnopf />
       </Group>
       {/*
         Schritt 1 scrollt selbst: Sein Hauptknopf steht in einer festen Fußleiste unter dem

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { serverIch } from '../../shared/plattform'
+import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 interface Uebersicht {
   nutzer: { id: string; benutzer: string; name: string; rolle: 'admin' | 'lehrkraft' | 'schueler'; quelle: string; gesperrt: boolean; eingerichtet: boolean; zuletzt: string | null; gruppen: number; passwortWechseln?: boolean }[]
@@ -50,7 +51,10 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
   return (
     <Container size="xl" py="md">
       <Group justify="space-between" mb="sm">
-        <Title order={2}>Verwaltung</Title>
+        <Group gap={4}>
+          <Title order={2}>Verwaltung</Title>
+          <EigenesFensterKnopf />
+        </Group>
         <ActionIcon variant="subtle" onClick={laden} aria-label="Neu laden">
           <IconRefresh size={18} />
         </ActionIcon>

@@ -1,4 +1,5 @@
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
+import { EigenesFensterKnopf } from '../eigenesFenster'
 import { nurPcNetz } from '../plattform'
 import { TeilenMenuePunkt } from './Fachordner'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
@@ -205,6 +206,7 @@ export function BibliothekKopf({
         </div>
         <Group gap="xs" wrap="nowrap">
           {children}
+          <EigenesFensterKnopf name={titel} />
         </Group>
       </Group>
       <TextInput

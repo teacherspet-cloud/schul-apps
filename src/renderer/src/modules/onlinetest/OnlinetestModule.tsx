@@ -44,6 +44,7 @@ import { holen, senden } from './serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { hatClient } from '../../shared/plattform'
 import { ergebnisDocx, ergebnisHtml, ergebnisXlsx, notenSpalte, teachertoolCsv, type ErgebnisDaten, type NotenFormat } from './ergebnisExport'
+import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 interface TestListe {
   id: string
@@ -115,9 +116,10 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
   if (!active) return null
   return (
     <Container size="xl" py="md">
-      <Title order={2} mb="sm">
-        Onlinetest
-      </Title>
+      <Group gap={4} mb="sm">
+        <Title order={2}>Onlinetest</Title>
+        <EigenesFensterKnopf />
+      </Group>
       <Tabs value={reiter} onChange={setReiter}>
         <Tabs.List mb="md">
           <Tabs.Tab value="tests">Tests</Tabs.Tab>

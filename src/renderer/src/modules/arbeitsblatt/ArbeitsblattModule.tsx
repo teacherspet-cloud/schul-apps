@@ -27,6 +27,7 @@ import { GeruestVorschau, MaterialVorschau, ZwischenstandsBlatt } from './render
 import type { OriginalMaterialAblage, Outline, Worksheet } from './model/types'
 import QuellenAuswahl from './steps/QuellenAuswahl'
 import { QUELLENAUSWAHL, type QuellenFrage } from './auftraege'
+import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 export default function ArbeitsblattModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, worksheet, loadWorksheet, undo, redo, docId, docName } = useArbeitsblatt()
@@ -135,6 +136,7 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
             Neues Arbeitsblatt
           </Button>
         )}
+        <EigenesFensterKnopf />
       </Group>
       <Box style={{ flex: 1, minHeight: 0 }}>
         {area === 'designs' ? (

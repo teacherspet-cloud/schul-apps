@@ -1,9 +1,9 @@
-import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
+import { ActionIcon, AppShell, Button, Indicator, Menu, Tooltip } from '@mantine/core'
 import { aufServer, serverIch } from './shared/plattform'
 import { TeilenDialog } from './shared/components/Fachordner'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconChevronsLeft, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconSettings } from '@tabler/icons-react'
+import { IconChevronsLeft, IconExternalLink, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconSettings } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
@@ -19,6 +19,7 @@ import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
 import { druckeAktives, openModule, useNavigation } from './shared/navigation'
+import { AktuellesProgramm, eigeneFensterMoeglich, einzelnesProgramm, inEigenemFenster } from './shared/eigenesFenster'
 import { useTelefon, useTouch } from './shared/touch/touchModus'
 import { ZoomProgramm } from './shared/touch/zoom'
 import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
@@ -93,7 +94,9 @@ export default function App(): React.JSX.Element {
   const telefon = useTelefon()
   const [leisteAus, setLeisteAus] = useState(leseLeisteAus)
   const [schublade, setSchublade] = useState(false)
-  const ohneLeiste = telefon || (touch && leisteAus)
+  // Ein Programm im eigenen Fenster (?einzeln=<id>, 02.10.2026): nur dieses Programm, ohne Leiste
+  const einzeln = einzelnesProgramm()
+  const ohneLeiste = Boolean(einzeln) || telefon || (touch && leisteAus)
   const leisteAusblenden = (aus: boolean): void => {
     setLeisteAus(aus)
     try {
@@ -105,6 +108,13 @@ export default function App(): React.JSX.Element {
   const schubladeAuf = useCallback(() => setSchublade(true), [])
   useRandWischen(ohneLeiste, schubladeAuf)
   const navDaten: NavigationsDaten = { programme: sichtbar, active, laufpunkte, oeffnen: openModule }
+  useEffect(() => {
+    if (!einzeln) return
+    const m = modules.find((x) => x.id === einzeln)
+    if (!m) return
+    openModule(m.id)
+    document.title = `${m.name} – Schul-Apps`
+  }, [einzeln])
 
   /*
    * Vor dem Schließen des Fensters alles sichern und dem Hauptprozess Bescheid geben – das
@@ -195,6 +205,7 @@ export default function App(): React.JSX.Element {
                 badge={laufpunkte[m.id]}
                 bild={m.leistenbild}
                 onClick={() => openModule(m.id)}
+                fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
               >
                 <m.icon size={22} />
               </NavIcon>
@@ -246,7 +257,7 @@ export default function App(): React.JSX.Element {
       )}
 
       {/* Nach dem ersten Start und nach dem Zurücksetzen: die Einrichtung in drei Schritten */}
-      <Einrichtung />
+      {!einzeln && <Einrichtung />}
       {/* Server: Material in den Fachordner teilen (shared/components/Fachordner.tsx) */}
       <TeilenDialog />
 
@@ -256,20 +267,25 @@ export default function App(): React.JSX.Element {
         {active === 'settings' && <SettingsPage />}
         {/* Themenbereiche über alle Programme (Paket 10b) – erreichbar von der Startseite */}
         {active === 'themen' && <Themenuebersicht />}
-        {modules.map((m) => (
-          // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
-          <div key={m.id} hidden={m.id !== current?.id} className="module-container">
-            {/* Zoom der Blätter je Programm (shared/touch/zoom.tsx) */}
-            <ZoomProgramm.Provider value={m.id}>
-              <m.component active={m.id === current?.id} />
-            </ZoomProgramm.Provider>
-          </div>
-        ))}
+        {modules
+          // Im eigenen Fenster nur dieses eine Programm
+          .filter((m) => !einzeln || m.id === einzeln)
+          .map((m) => (
+            // Module bleiben gemountet, damit angefangene Arbeit beim Wechseln erhalten bleibt.
+            <div key={m.id} hidden={m.id !== current?.id} className="module-container">
+              {/* Zoom der Blätter je Programm (shared/touch/zoom.tsx); Programm für „In eigenem Fenster" */}
+              <ZoomProgramm.Provider value={m.id}>
+                <AktuellesProgramm.Provider value={m.id}>
+                  <m.component active={m.id === current?.id} />
+                </AktuellesProgramm.Provider>
+              </ZoomProgramm.Provider>
+            </div>
+          ))}
       </AppShell.Main>
 
-      {telefon && <MobilTabs daten={navDaten} onProgramme={schubladeAuf} />}
-      {!telefon && ohneLeiste && <LeistenGriff onClick={schubladeAuf} />}
-      {ohneLeiste && (
+      {telefon && !einzeln && <MobilTabs daten={navDaten} onProgramme={schubladeAuf} />}
+      {!telefon && ohneLeiste && !einzeln && <LeistenGriff onClick={schubladeAuf} />}
+      {ohneLeiste && !einzeln && (
         <ProgrammSchublade
           offen={schublade}
           onClose={() => setSchublade(false)}
@@ -305,8 +321,41 @@ function NavIcon(props: {
   badge?: boolean
   bild?: string
   onClick: () => void
+  /** Rechtsklick: „In eigenem Fenster öffnen" (02.10.2026) */
+  fenster?: () => void
   children: React.ReactNode
 }): React.JSX.Element {
+  const knopf = <NavKnopf {...props} />
+  if (!props.fenster) return knopf
+  return <MitFensterMenue label={props.label} fenster={props.fenster}>{knopf}</MitFensterMenue>
+}
+
+/** Rechtsklick (bzw. langes Drücken) auf einen Eintrag der Leiste öffnet ein kleines Menü */
+function MitFensterMenue({ label, fenster, children }: { label: string; fenster: () => void; children: React.ReactNode }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  return (
+    <Menu opened={offen} onChange={setOffen} position="right-start" withArrow shadow="md">
+      <Menu.Target>
+        <div
+          onContextMenu={(e) => {
+            e.preventDefault()
+            setOffen(true)
+          }}
+        >
+          {children}
+        </div>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Label>{label}</Menu.Label>
+        <Menu.Item leftSection={<IconExternalLink size={14} />} onClick={fenster} data-leiste-eigenes-fenster>
+          In eigenem Fenster öffnen
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  )
+}
+
+function NavKnopf(props: { label: string; active: boolean; breit: boolean; badge?: boolean; bild?: string; onClick: () => void; children: React.ReactNode }): React.JSX.Element {
   // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
   const variant = props.active ? 'filled' : props.bild ? 'subtle' : 'light'
   const color = props.active ? undefined : 'gray'

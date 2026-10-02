@@ -26,7 +26,7 @@ import { app, BrowserWindow } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 
-const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit', 'rueckmeldung', 'elternbrief', 'tafelbild']
+const IDS = ['vokabeltest', 'vokabelliste', 'arbeitsblatt', 'lernzielkontrolle', 'grammatiktest', 'klassenarbeit', 'rueckmeldung', 'elternbrief', 'tafelbild', 'onlinetest', 'verwaltung']
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320
 const KANTE_LEISTE = 96

@@ -18,8 +18,10 @@ import { paketAusArgumenten } from './services/paket/wege'
 import { langerExePfad, windowsFreigabe } from './services/netz/windowsFreigabe'
 
 export interface ElectronUmgebungOptionen {
-  /** Das Hauptfenster (kann fehlen, solange es noch nicht offen ist) */
+  /** Das Fenster für Dialoge (vorn, sonst das Hauptfenster; kann fehlen, solange es noch nicht offen ist) */
   fenster: () => BrowserWindow | null
+  /** Alle offenen Fenster – Meldungen gehen an jedes (Programme im eigenen Fenster, 02.10.2026) */
+  alleFenster?: () => BrowserWindow[]
   /** Zustand des Schließens (main/index.ts, createWindow) */
   schliessen: { gesichert(): void; rueckfrage(): void; bleiben(): void }
   /** Alle registrierten Aufrufe – der Netzzugang leitet dorthin weiter */
@@ -30,8 +32,8 @@ export interface ElectronUmgebungOptionen {
 
 export function electronUmgebung(o: ElectronUmgebungOptionen): Umgebung {
   const an = (kanal: string, wert: unknown): void => {
-    const win = o.fenster()
-    if (win && !win.isDestroyed()) win.webContents.send(kanal, wert)
+    const fenster = o.alleFenster?.() ?? [o.fenster()]
+    for (const win of fenster) if (win && !win.isDestroyed()) win.webContents.send(kanal, wert)
   }
   const fenster = (): BrowserWindow => o.fenster()!
   let letzterOrdner: string | undefined

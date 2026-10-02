@@ -17,6 +17,7 @@ import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import { TestVorschau } from './render/TestVorschau'
+import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, undoVocab, redoVocab, testId, listName, lastSavedAt } = useVokabeltest()
@@ -108,6 +109,7 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
         <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => newTestSafely().catch(notifyError)}>
           Neuer Vokabeltest
         </Button>
+        <EigenesFensterKnopf />
       </Group>
       <Box style={{ flex: 1, minHeight: 0 }}>
         {libraryOpen ? (

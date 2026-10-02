@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { cleanupWorkDirs } from './services/ai/cli'
 import { oeffnePaket, paketAusArgumenten } from './services/paket/wege'
@@ -23,14 +24,20 @@ let mainWindow: BrowserWindow | null = null
  */
 const SICHERN_BEIM_SCHLIESSEN_MS = 3000
 
-/** Meldung der Oberfläche „alles gesichert" – gesetzt, solange auf sie gewartet wird. */
-let gesichert: (() => void) | null = null
 /**
- * Die Oberfläche fragt nach (es laufen noch Aufträge): Die Frist von drei Sekunden hält an,
- * bis die Lehrkraft entschieden hat. `bleiben` bricht das Schließen ab.
+ * Schließen mit Sichern – je Fenster (Hauptfenster und Programme im eigenen Fenster, 02.10.2026).
+ * `gesichert`: Meldung der Oberfläche „alles gesichert", gesetzt, solange auf sie gewartet wird.
+ * `rueckfrage`: Die Oberfläche fragt nach (es laufen noch Aufträge) – die Frist von drei Sekunden
+ * hält an, bis die Lehrkraft entschieden hat. `bleiben` bricht das Schließen ab.
  */
-let rueckfrage: (() => void) | null = null
-let bleiben: (() => void) | null = null
+interface Schliessen {
+  gesichert: (() => void) | null
+  rueckfrage: (() => void) | null
+  bleiben: (() => void) | null
+}
+const schliessen = new Map<number, Schliessen>()
+/** Absender des gerade bearbeiteten Aufrufs – die Meldungen zum Schließen gelten seinem Fenster */
+let absender = -1
 
 /** Gemerkte Fenstergröße und -lage (siehe fensterStand.ts) – je Rechner, nicht in der Sicherung */
 const fensterDatei = (): string => join(app.getPath('userData'), 'fenster.json')
@@ -58,6 +65,87 @@ function merkeFensterStand(win: BrowserWindow): void {
   }
 }
 
+/** Adresse der eigenen Oberfläche (Entwicklung: Vite, sonst die Datei im Paket) */
+const eigeneSeite = (): string =>
+  is.dev && process.env['ELECTRON_RENDERER_URL'] ? process.env['ELECTRON_RENDERER_URL'] : pathToFileURL(join(__dirname, '../renderer/index.html')).href
+
+/**
+ * Regeln für jedes Fenster: Links ins Netz im Browser; ein Programm im eigenen Fenster
+ * (`?einzeln=<id>`, Wunsch der Lehrkraft 02.10.2026) mit derselben Brücke wie das Hauptfenster;
+ * versehentlich fallengelassene Dateien verlassen die App nicht.
+ */
+function fensterRegeln(win: BrowserWindow): void {
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith(eigeneSeite().split('?')[0]) && /[?&]einzeln=[a-z0-9-]+/i.test(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1280,
+          height: 860,
+          minWidth: MINDEST_GROESSE.width,
+          minHeight: MINDEST_GROESSE.height,
+          icon: fensterSymbol,
+          autoHideMenuBar: true,
+          webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false, contextIsolation: true }
+        }
+      }
+    }
+    if (/^https?:\/\//.test(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  win.webContents.on('did-create-window', (neu) => {
+    fensterRegeln(neu)
+    schuetzeSchliessen(neu, false)
+  })
+  // Dateien, die versehentlich neben die Drop-Fläche fallen, sollen die App nicht verlassen.
+  // Durch darf nur die eigene Oberfläche – der erste Aufruf eines Programms im eigenen Fenster.
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.split('?')[0] !== eigeneSeite().split('?')[0]) e.preventDefault()
+  })
+}
+
+/*
+ * Vor dem Schließen die Oberfläche sichern lassen.
+ *
+ * Die Programme sichern mit ein bis zwei Sekunden Verzögerung. Wer direkt nach einer
+ * Änderung das Fenster schloss, verlor sie bis 25.09.2026 still. Jetzt hält das Schließen
+ * kurz an, die Oberfläche führt alles Anstehende sofort aus und meldet sich zurück – oder
+ * nach drei Sekunden geht das Fenster ohnehin zu. Gilt für jedes Fenster (auch Programme im
+ * eigenen Fenster); nur das Hauptfenster merkt sich Größe und Lage.
+ */
+function schuetzeSchliessen(win: BrowserWindow, haupt: boolean): void {
+  const id = win.webContents.id
+  const zustand: Schliessen = { gesichert: null, rueckfrage: null, bleiben: null }
+  schliessen.set(id, zustand)
+  win.on('closed', () => schliessen.delete(id))
+  let schliessenErlaubt = false
+  win.on('close', (e) => {
+    if (haupt && !win.isDestroyed()) merkeFensterStand(win)
+    if (schliessenErlaubt || win.webContents.isDestroyed() || win.webContents.isCrashed()) return
+    e.preventDefault()
+    if (zustand.gesichert) return // Es wird schon gewartet – ein zweiter Klick aufs Kreuz ändert daran nichts
+    const aufraeumen = (): void => {
+      clearTimeout(zeit)
+      zustand.gesichert = zustand.rueckfrage = zustand.bleiben = null
+    }
+    const zu = (): void => {
+      aufraeumen()
+      schliessenErlaubt = true
+      if (!win.isDestroyed()) win.close()
+    }
+    const zeit = setTimeout(zu, SICHERN_BEIM_SCHLIESSEN_MS)
+    zustand.gesichert = zu
+    /*
+     * Laufen noch Hintergrund-Aufträge, fragt die Oberfläche nach („trotzdem beenden?").
+     * Solange die Frage offen ist, gilt die Frist nicht – sonst ginge das Fenster zu, während
+     * die Lehrkraft noch liest.
+     */
+    zustand.rueckfrage = () => clearTimeout(zeit)
+    zustand.bleiben = aufraeumen
+    win.webContents.send('fenster:schliessen')
+  })
+}
+
 function createWindow(): void {
   const stand = ladeFensterStand()
   mainWindow = new BrowserWindow({
@@ -79,47 +167,8 @@ function createWindow(): void {
     mainWindow?.show()
   })
 
-  /*
-   * Vor dem Schließen die Oberfläche sichern lassen.
-   *
-   * Die Programme sichern mit ein bis zwei Sekunden Verzögerung. Wer direkt nach einer
-   * Änderung das Fenster schloss, verlor sie bis 25.09.2026 still. Jetzt hält das Schließen
-   * kurz an, die Oberfläche führt alles Anstehende sofort aus und meldet sich zurück – oder
-   * nach drei Sekunden geht das Fenster ohnehin zu.
-   */
-  let schliessenErlaubt = false
-  mainWindow.on('close', (e) => {
-    const win = mainWindow
-    if (win && !win.isDestroyed()) merkeFensterStand(win)
-    if (schliessenErlaubt || !win || win.webContents.isDestroyed() || win.webContents.isCrashed()) return
-    e.preventDefault()
-    if (gesichert) return // Es wird schon gewartet – ein zweiter Klick aufs Kreuz ändert daran nichts
-    const aufraeumen = (): void => {
-      clearTimeout(zeit)
-      gesichert = rueckfrage = bleiben = null
-    }
-    const zu = (): void => {
-      aufraeumen()
-      schliessenErlaubt = true
-      if (!win.isDestroyed()) win.close()
-    }
-    const zeit = setTimeout(zu, SICHERN_BEIM_SCHLIESSEN_MS)
-    gesichert = zu
-    /*
-     * Laufen noch Hintergrund-Aufträge, fragt die Oberfläche nach („trotzdem beenden?").
-     * Solange die Frage offen ist, gilt die Frist nicht – sonst ginge das Fenster zu, während
-     * die Lehrkraft noch liest.
-     */
-    rueckfrage = () => clearTimeout(zeit)
-    bleiben = aufraeumen
-    win.webContents.send('fenster:schliessen')
-  })
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) shell.openExternal(url)
-    return { action: 'deny' }
-  })
-  // Dateien, die versehentlich neben die Drop-Fläche fallen, sollen die App nicht verlassen.
-  mainWindow.webContents.on('will-navigate', (e) => e.preventDefault())
+  schuetzeSchliessen(mainWindow, true)
+  fensterRegeln(mainWindow)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -141,7 +190,9 @@ const aufrufe = new Map<string, (...args: unknown[]) => unknown>()
 /** Registriert einen IPC-Handler; Fehler kommen als lesbare Meldung in der Oberfläche an. */
 function handle<A extends unknown[], R>(channel: string, fn: (...args: A) => R | Promise<R>): void {
   aufrufe.set(channel, fn as (...args: unknown[]) => unknown)
-  ipcMain.handle(channel, async (_e, ...args) => {
+  ipcMain.handle(channel, async (e, ...args) => {
+    // Für die Meldungen zum Schließen: Sie gelten dem Fenster, von dem der Aufruf kommt
+    absender = e.sender.id
     try {
       return { ok: true, value: await fn(...(args as A)) }
     } catch (err) {
@@ -161,11 +212,13 @@ function registerIpc(): void {
   registriereKanaele(
     handle,
     electronUmgebung({
-      fenster: () => mainWindow,
+      // Dialoge gehören zum Fenster vorn; Meldungen gehen an alle Fenster (Programme im eigenen Fenster)
+      fenster: () => BrowserWindow.getFocusedWindow() ?? mainWindow,
+      alleFenster: () => BrowserWindow.getAllWindows(),
       schliessen: {
-        gesichert: () => gesichert?.(),
-        rueckfrage: () => rueckfrage?.(),
-        bleiben: () => bleiben?.()
+        gesichert: () => schliessen.get(absender)?.gesichert?.(),
+        rueckfrage: () => schliessen.get(absender)?.rueckfrage?.(),
+        bleiben: () => schliessen.get(absender)?.bleiben?.()
       },
       aufruf: async (channel, args) => {
         const fn = aufrufe.get(channel)

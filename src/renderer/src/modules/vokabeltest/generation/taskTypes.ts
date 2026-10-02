@@ -1,5 +1,6 @@
 import type { CefrLevel } from '@shared/types'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
+import { profilVon } from '@shared/schulformen'
 import { newId, Rng, shuffle } from '../model/random'
 import type { Block, BlockKind, CategorizeBlock, GapItem, MindmapItem, TaskTypeId, TestSettings, TextPart, VocabEntry } from '../model/types'
 import { buildCrossword, crosswordForm, isCrosswordWord, scrambleWord } from './crossword'
@@ -94,6 +95,27 @@ function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction
     pointsPerItem: points
   }
 }
+
+/**
+ * „Write sentences": Situation und Musterbeispiel helfen am Gymnasium zu sehr (Lehrkraft,
+ * 02.10.2026) – dort steht nur das Wort. Mit Vorgabe: Haupt- und Realschule, Förderschule,
+ * Grundschule und integrierte Schulformen ohne Kursangabe (abgestimmt: E-Kurs wie Gymnasium;
+ * der Vokabeltest kennt kein Kursniveau, deshalb gilt dort „mit Vorgabe").
+ */
+export function mitSituation(settings: Pick<TestSettings, 'schoolTypeId' | 'stateId'> & { kursniveau?: string }): boolean {
+  const profil = profilVon(settings.schoolTypeId, settings.stateId)
+  if (profil === 'gymnasium') return false
+  if (profil === 'integriert' && (settings.kursniveau === 'E' || settings.kursniveau === 'BB-G' || settings.kursniveau === 'BB-H')) return false
+  return true
+}
+
+/** Sätze der KI-Anweisung, die ein Beispiel bzw. eine „mögliche Antwort" ankündigen, fallen weg */
+export const ohneBeispielHinweis = (anweisung: string): string =>
+  anweisung
+    .split(/(?<=[.!?])(?<!e\.g\.)\s+/)
+    .filter((satz) => !/\b(example|examples|possible answer|exemple|ejemplo|esempio|voorbeeld|beispiel)\b|e\.g\./i.test(satz))
+    .join(' ')
+    .trim()
 
 /** Sie-Form nach Stufe – nur für die deutschen Anweisungen der Altsprachen von Belang (Paket 8b) */
 const sieAnrede = (ctx: GenContext): boolean => anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId, ctx.settings.stateId) === 'sie'
@@ -737,7 +759,7 @@ ${vocabLines(vocab)}`,
   {
     id: 'writeSentences',
     label: 'Sätze bilden',
-    description: 'Eigene Sätze mit den Vokabeln schreiben, mit kleiner Situationsvorgabe.',
+    description: 'Eigene Sätze mit den Vokabeln schreiben – an Haupt- und Realschule mit kleiner Situationsvorgabe, am Gymnasium nur das Wort.',
     kind: 'open',
     minLevel: 'A2',
     usesVocab: true,
@@ -745,10 +767,20 @@ ${vocabLines(vocab)}`,
     defaultTitle: 'Write sentences',
     defaultInstruction: 'Write a sentence with each word. Show that you know what it means.',
     schema: itemSchema({ vocabId: str(), prompt: str('The word plus a short situation, e.g. "to explore – your last holiday"'), modelAnswer: str() }),
-    prompt: (vocab) =>
-      `Task type: students write one meaningful sentence with each word. "prompt" shows the word and a short situation that helps them show the meaning. Give a model answer.\n\nWords:\n${vocabLines(vocab)}`,
+    prompt: (vocab, ctx) =>
+      mitSituation(ctx.settings)
+        ? `Task type: students write one meaningful sentence with each word. "prompt" shows the word and a short situation that helps them show the meaning. Give a model answer.\n\nWords:\n${vocabLines(vocab)}`
+        : `Task type: students write one meaningful sentence with each word. "prompt" is ONLY the word itself – no situation, no example, no hint. Do not write any example or "possible answer" into the instruction. Give a model answer (for the answer key only).\n\nWords:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
-      return { ...base(this, data, ctx), kind: 'open', items: openItems(vocab, data, ctx, 2) }
+      const b = base(this, data, ctx)
+      if (mitSituation(ctx.settings)) return { ...b, kind: 'open', items: openItems(vocab, data, ctx, 2) }
+      // Gymnasium (Wunsch der Lehrkraft, 02.10.2026): nur das Wort – keine Situation, kein Beispiel
+      return {
+        ...b,
+        instruction: ohneBeispielHinweis(b.instruction) || this.defaultInstruction,
+        kind: 'open',
+        items: openItems(vocab, data, ctx, 2).map((it: { vocabId?: string; prompt: string }) => ({ ...it, prompt: findVocab(vocab, it.vocabId ?? '')?.term ?? it.prompt }))
+      }
     }
   },
   {

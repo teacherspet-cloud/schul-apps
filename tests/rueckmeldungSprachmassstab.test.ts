@@ -471,6 +471,12 @@ describe("Anfragen an die KI", () => {
     ).not.toMatch(/Sprachrichtigkeit/);
   });
 
+  it("Tabellen-Entwurf: Punkte bei jeder Einstufung außer „ohne“ (Lehrkraft, 02.10.2026: Bereiche ohne Punkte bei ++/+/0/−/−−)", () => {
+    for (const einstufung of ["plusMinus", "smileys", "note", "notenpunkte"] as const)
+      expect(tabelleEntwurfAnfrage(doc({ einstufung })).user).toMatch(/mit PUNKTEN/);
+    expect(tabelleEntwurfAnfrage(doc({ einstufung: "keine" })).user).toMatch(/über STUFEN/);
+  });
+
   it("Stufenbeschreibungen bleiben auch bei Punkten erhalten und gehen an die KI", () => {
     const t = tabelleAus(
       {

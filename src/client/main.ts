@@ -14,7 +14,7 @@
  *  - Ohne Verbindung: eine Hinweisseite mit „Erneut versuchen".
  */
 import { app, BrowserWindow, ipcMain, Menu, safeStorage, session, shell } from 'electron'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { iservAblegen, iservEintraege, iservLaden, iservOrdner, iservStatus, iservTrennen, iservVerbinden, type IservGeraet } from '../main/services/iserv/iserv'
 import type { DavAbruf } from '../main/services/iserv/webdav'
@@ -79,6 +79,7 @@ function iservKanaele(): void {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
     })
+  h('client:lokale-maskottchen', () => lokaleMaskottchen())
   h('client:iserv-status', () => iservStatus(geraet))
   h('client:iserv-verbinden', (eingabe: { schule: string; benutzer: string; passwort?: string }) => iservVerbinden(geraet, eingabe))
   h('client:iserv-ordner', (pfad: string) => iservOrdner(geraet, pfad))
@@ -91,6 +92,41 @@ function iservKanaele(): void {
     if (e && typeof standardZiel === 'string' && standardZiel) setSettings({ iserv: { ...e, ziel: standardZiel } })
     return iservAblegen(geraet, name, daten, ziel)
   })
+}
+
+// ---------- Figuren (Maskottchen) der Exe ohne Server am selben PC (02.10.2026)
+
+/**
+ * Die Figuren der bisherigen Exe (Schul-Apps.exe) liegen im Profil %APPDATA%/schul-apps/maskottchen.
+ * Wunsch der Lehrkraft: Sie sollen auch auf dem Server zur Verfügung stehen. Diese Exe liest sie
+ * (nur lesen) und gibt sie der Oberfläche, die sie über die normalen Kanäle auf den Server legt.
+ */
+function lokaleMaskottchen(): { id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string; posen: Record<string, string> }[] {
+  const wurzel = join(app.getPath('appData'), 'schul-apps', 'maskottchen')
+  if (!existsSync(wurzel)) return []
+  const png = (datei: string): string => `data:image/png;base64,${readFileSync(datei).toString('base64')}`
+  const out: ReturnType<typeof lokaleMaskottchen> = []
+  for (const id of readdirSync(wurzel)) {
+    const ordner = join(wurzel, id)
+    const metaDatei = join(ordner, 'figur.json')
+    if (!/^[a-z0-9-]+$/i.test(id) || !existsSync(metaDatei)) continue
+    try {
+      const meta = JSON.parse(readFileSync(metaDatei, 'utf8')) as { name?: string; beschreibung?: string; quelle?: string }
+      const posen: Record<string, string> = {}
+      for (const f of readdirSync(ordner)) if (f.endsWith('.png') && f !== 'vorlage.png' && /^[a-z0-9-]+\.png$/i.test(f)) posen[f.slice(0, -4)] = png(join(ordner, f))
+      out.push({
+        id,
+        name: meta.name ?? id,
+        beschreibung: meta.beschreibung ?? '',
+        quelle: meta.quelle === 'upload' ? 'upload' : 'ki',
+        ...(existsSync(join(ordner, 'vorlage.png')) ? { vorlage: png(join(ordner, 'vorlage.png')) } : {}),
+        posen
+      })
+    } catch {
+      // Eine unlesbare Figur wird übersprungen
+    }
+  }
+  return out
 }
 
 // ---------- Fenster
@@ -131,20 +167,37 @@ function fenster(): void {
       return false
     }
   }
-  win.webContents.on('will-navigate', (e, url) => {
-    if (!erlaubt(url)) {
-      e.preventDefault()
-      void shell.openExternal(url)
-    }
-  })
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    // Druckansicht (PDF als blob:) und leere Tabs der Oberfläche im eigenen Fenster mit PDF-Ansicht
-    if (url === 'about:blank' || url.startsWith('blob:') || url.startsWith(ursprung)) {
-      return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: { partition: PARTITION, plugins: true } } }
-    }
-    if (/^https?:/i.test(url)) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  const regeln = (w: BrowserWindow): void => {
+    w.webContents.on('will-navigate', (e, url) => {
+      if (!erlaubt(url)) {
+        e.preventDefault()
+        void shell.openExternal(url)
+      }
+    })
+    w.webContents.setWindowOpenHandler(({ url }) => {
+      // Ein Programm im eigenen Fenster (?einzeln=…, 02.10.2026): mit Brücke (IServ) wie das Hauptfenster
+      if (url.startsWith(ursprung) && /[?&]einzeln=/.test(url)) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 1280,
+            height: 860,
+            autoHideMenuBar: true,
+            backgroundColor: '#f3f6f8',
+            webPreferences: { partition: PARTITION, preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, spellcheck: true }
+          }
+        }
+      }
+      // Druckansicht (PDF als blob:) und leere Tabs der Oberfläche im eigenen Fenster mit PDF-Ansicht
+      if (url === 'about:blank' || url.startsWith('blob:') || url.startsWith(ursprung)) {
+        return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, webPreferences: { partition: PARTITION, plugins: true } } }
+      }
+      if (/^https?:/i.test(url)) void shell.openExternal(url)
+      return { action: 'deny' }
+    })
+    w.webContents.on('did-create-window', (neu) => regeln(neu))
+  }
+  regeln(win)
   win.webContents.on('did-fail-load', (_e, code, beschreibung, url, hauptframe) => {
     if (!hauptframe || code === -3 || url.startsWith('data:')) return
     void win.loadURL(OFFLINE(adresse, `${beschreibung} (${code})`))

@@ -1,4 +1,5 @@
 import { FachordnerKarte } from "../shared/components/Fachordner";
+import { EigenesFensterKnopf } from "../shared/eigenesFenster";
 import { nurPcNetz } from "../shared/plattform";
 import {
   Alert,
@@ -369,44 +370,51 @@ export default function Home(): React.JSX.Element {
       </Title>
       <SimpleGrid cols={{ base: 2, md: 3 }} spacing="lg">
         {programme.map((m) => (
-          // Als Knopf: mit Tab erreichbar, mit Enter oder Leertaste zu öffnen
-          <Card
-            key={m.id}
-            component="button"
-            type="button"
-            withBorder
-            padding="xl"
-            className="home-tile"
-            onClick={() => openModule(m.id)}
-          >
-            {/* Illustration, sobald eine vorliegt (registry.ts); sonst das Vektorsymbol in gleicher Größe */}
-            {m.illustration ? (
-              <img
-                src={m.illustration}
-                className="home-illustration"
-                width={96}
-                height={96}
-                alt=""
-                draggable={false}
-              />
-            ) : (
-              <ThemeIcon
-                size={96}
-                radius="lg"
-                variant="light"
-                color={m.color}
-                className="home-illustration"
-              >
-                <m.icon size={56} />
-              </ThemeIcon>
-            )}
-            <Text fw={700} size="lg">
-              {m.name}
-            </Text>
-            <Text size="sm" c="dimmed" mt={4}>
-              {m.description}
-            </Text>
-          </Card>
+          // Als Knopf: mit Tab erreichbar, mit Enter oder Leertaste zu öffnen.
+          // Daneben (nicht darin – kein Knopf im Knopf) „In eigenem Fenster öffnen"
+          <div key={m.id} style={{ position: "relative" }}>
+            <div style={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
+              <EigenesFensterKnopf id={m.id} name={m.name} />
+            </div>
+            <Card
+              w="100%"
+              h="100%"
+              component="button"
+              type="button"
+              withBorder
+              padding="xl"
+              className="home-tile"
+              onClick={() => openModule(m.id)}
+            >
+              {/* Illustration, sobald eine vorliegt (registry.ts); sonst das Vektorsymbol in gleicher Größe */}
+              {m.illustration ? (
+                <img
+                  src={m.illustration}
+                  className="home-illustration"
+                  width={96}
+                  height={96}
+                  alt=""
+                  draggable={false}
+                />
+              ) : (
+                <ThemeIcon
+                  size={96}
+                  radius="lg"
+                  variant="light"
+                  color={m.color}
+                  className="home-illustration"
+                >
+                  <m.icon size={56} />
+                </ThemeIcon>
+              )}
+              <Text fw={700} size="lg">
+                {m.name}
+              </Text>
+              <Text size="sm" c="dimmed" mt={4}>
+                {m.description}
+              </Text>
+            </Card>
+          </div>
         ))}
       </SimpleGrid>
     </Container>

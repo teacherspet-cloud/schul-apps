@@ -27,6 +27,7 @@ import { cleanImageBackground } from '../shared/imageCleanup'
 import { useMaskottchen } from '../shared/maskottchenStore'
 import { normalizeImage, notifyError, notifySuccess, readFileAsDataUrl } from '../shared/util'
 import { ILLUSTRATIONEN_BIS_KLASSE } from '../modules/arbeitsblatt/generation/illustrationen'
+import { hatClient } from '../shared/plattform'
 
 /**
  * Einstellungen → Maskottchen (26.09.2026).
@@ -188,6 +189,28 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
 
   const standardId = illu.standardId ?? liste[0]?.id
 
+  // Exe „Schul-Apps Online": Figuren der Exe ohne Server am selben PC auf den Server übernehmen (02.10.2026)
+  const [uebertrage, setUebertrage] = useState(false)
+  const ausExeUebernehmen = async (): Promise<void> => {
+    const lesen = window.__schulappsClient?.lokaleMaskottchen
+    if (!lesen) return
+    setUebertrage(true)
+    try {
+      const lokal = await lesen()
+      if (!lokal.length) return notifySuccess('In der Exe an diesem PC gibt es keine Figuren.')
+      for (const m of lokal) {
+        await window.api.maskottchen.save({ id: m.id, name: m.name, beschreibung: m.beschreibung, quelle: m.quelle, ...(m.vorlage ? { vorlage: m.vorlage } : {}) })
+        for (const [pose, bild] of Object.entries(m.posen)) await window.api.maskottchen.pose(m.id, pose, bild)
+      }
+      useMaskottchen.getState().setze(await window.api.maskottchen.list())
+      notifySuccess(`${lokal.length} Figur${lokal.length === 1 ? '' : 'en'} übernommen: ${lokal.map((m) => m.name).join(', ')}.`)
+    } catch (e) {
+      notifyError(e, 'Figuren nicht übernommen')
+    } finally {
+      setUebertrage(false)
+    }
+  }
+
   return (
     <Card withBorder padding="lg">
       <Title order={4} mb={4}>
@@ -197,6 +220,16 @@ export default function MaskottchenSettings({ settings, update }: { settings: Ap
         Für jüngere Jahrgänge setzen die Programme altersgerechte Figuren auf die Materialien – an Merkkästen, Aufgaben und als Begrüßung; auf Arbeiten nur am
         Kopf und am Schluss. Jede Figur hat eine Vorlage und zwölf Posen (winkend, zeigend, denkend, schreibend, sprechend …).
       </Text>
+      {hatClient() && window.__schulappsClient?.lokaleMaskottchen && (
+        <Group mb="md">
+          <Button variant="light" leftSection={<IconUpload size={16} />} loading={uebertrage} onClick={() => void ausExeUebernehmen()} data-figuren-uebernehmen>
+            Figuren aus der Exe an diesem PC übernehmen
+          </Button>
+          <Text size="xs" c="dimmed">
+            Liest die Figuren der Schul-Apps-Exe (ohne Server) auf diesem PC und legt sie hier ab. Gleichnamige werden aktualisiert.
+          </Text>
+        </Group>
+      )}
       <Group align="flex-end" mb="md">
         <ZahlFeld
           label="Illustrationen bis Klasse"

@@ -36,6 +36,7 @@ import { passtZurSuche } from '../../shared/bibliothek'
 import { testAusListe } from '../vokabeltest/library'
 import { ZUSATZ } from '../vokabeltest/steps/VokabelTabelle'
 import { vokabellistenApi } from './listenApi'
+import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import {
   FILTER_FELDER,
   filterOptionen,
@@ -171,7 +172,10 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
       <Container size="lg" py="lg">
         <Group justify="space-between" mb="md">
           <div>
-            <Title order={2}>Vokabellisten</Title>
+            <Group gap={4}>
+              <Title order={2}>Vokabellisten</Title>
+              <EigenesFensterKnopf />
+            </Group>
             <Text c="dimmed" size="sm">
               Schulbuch-Vokabeln bearbeiten und eigene Listen anlegen. Sie stehen anschließend im Vokabeltest und bei den Klassenarbeiten zur Auswahl.
             </Text>

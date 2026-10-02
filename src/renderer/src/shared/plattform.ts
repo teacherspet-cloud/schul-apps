@@ -47,7 +47,12 @@ declare global {
     /** Setzt der Server (/server/ich.js) vor dem Start der Oberfläche */
     __schulappsServer?: ServerIch
     /** Setzt die Exe „Schul-Apps Online" (src/client/preload.ts) */
-    __schulappsClient?: { name: string; iserv: ClientIserv }
+    __schulappsClient?: {
+      name: string
+      iserv: ClientIserv
+      /** Figuren der Exe ohne Server am selben PC */
+      lokaleMaskottchen?: () => Promise<{ id: string; name: string; beschreibung: string; quelle: 'ki' | 'upload'; vorlage?: string; posen: Record<string, string> }[]>
+    }
   }
 }
 
