@@ -62,3 +62,34 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
 </body>
 </html>`
 }
+
+/** Eigenes Passwort setzen – Pflicht nach der ersten Anmeldung mit einem vorübergehenden Passwort */
+export function passwortSeite(o: { name: string; fehler: string; ziel: string }): string {
+  const ziel = /^\/[a-zA-Z0-9/_-]*$/.test(o.ziel) ? o.ziel : '/'
+  return `<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Schul-Apps – Eigenes Passwort</title>
+<style>${STIL}</style>
+</head>
+<body>
+<main>
+  <h1>Eigenes Passwort</h1>
+  <p class="leise">Angemeldet als ${esc(o.name)}. Das vorübergehende Passwort gilt nur für die erste Anmeldung – bitte jetzt ein eigenes festlegen (mindestens 10 Zeichen).</p>
+  ${o.fehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
+  <form method="post" action="/auth/passwort">
+    <input type="hidden" name="ziel" value="${esc(ziel)}">
+    <label for="alt">Vorübergehendes Passwort</label>
+    <input id="alt" name="alt" type="password" autocomplete="current-password" required>
+    <label for="neu">Neues Passwort</label>
+    <input id="neu" name="neu" type="password" autocomplete="new-password" minlength="10" required>
+    <label for="neu2">Neues Passwort wiederholen</label>
+    <input id="neu2" name="neu2" type="password" autocomplete="new-password" minlength="10" required>
+    <button type="submit">Speichern</button>
+  </form>
+</main>
+</body>
+</html>`
+}

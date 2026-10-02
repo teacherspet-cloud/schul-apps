@@ -9,21 +9,46 @@
  *  - Zeitlimit durch die Lehrkraft; wer die Seite verlässt, gibt automatisch ab (gegen Nachschlagen)
  *  - Hinweis, dass die Lehrkraft die Abgaben trotzdem prüfen muss (steht in der App)
  *
+ * Zweite Runde (02.10.2026 abends, abgestimmt):
+ *  - Die Lehrkraft startet den Test für alle gemeinsam; vorher sehen die Lernenden einen
+ *    Wartebildschirm (Status „wartend"). Wer später kommt, bekommt die volle Zeit.
+ *  - Solange IServ nicht freigeschaltet ist, treten Lernende mit „Vorname + Anfangsbuchstabe"
+ *    bei (Gastkonto nur für diesen Test, Quelle „gast").
+ *  - Nach jeder Abgabe wertet die KI automatisch aus (Zugang der Lehrkraft) und prüft auch die
+ *    automatisch falschen Wort-Antworten auf Sinn im Zusammenhang; kleine Fehler und vertretbare
+ *    Abweichungen entscheidet die Lehrkraft (bis dahin 0 Punkte).
+ *  - Das Ergebnis sehen die Lernenden, sobald alle abgegeben haben oder die Lehrkraft es
+ *    freigibt – als „vorläufig", solange noch etwas offen ist; mit den Lösungen.
+ *  - Optional die Figur des Tests (Maskottchen) auf Wartebildschirm, im Kopf und beim Ergebnis.
+ *
  * Die Lösungen bleiben auf dem Server: Die Lernenden bekommen nur die Schülerfassung
- * (renderer/modules/onlinetest/kern.ts). Die Uhr läuft auf dem Server – ein verstelltes Gerät ändert nichts.
- * Abgeben geht auch per sendBeacon (beim Verlassen der Seite): Statt der Kopfzeile schützt dort
- * das Geheimnis der Teilnahme (nur dieses Gerät kennt es).
+ * (renderer/modules/onlinetest/kern.ts), Lösungen erst mit dem Ergebnis. Die Uhr läuft auf dem
+ * Server – ein verstelltes Gerät ändert nichts. Abgeben geht auch per sendBeacon (beim Verlassen
+ * der Seite): Statt der Kopfzeile schützt dort das Geheimnis der Teilnahme (nur dieses Gerät kennt es).
  */
 import { randomBytes } from 'node:crypto'
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
-import { bewerte, offeneEinheiten, onlineFassung, summe, type Antworten, type Bewertung, type OnlineFassung } from '../renderer/src/modules/onlinetest/kern'
-import { kiAnfrage, urteileAus, type KiFall } from '../renderer/src/modules/onlinetest/kiBewertung'
+import {
+  bewerte,
+  kontextVon,
+  offeneEinheiten,
+  onlineFassung,
+  summe,
+  vergleiche,
+  zuEntscheiden,
+  type Antworten,
+  type Bewertung,
+  type OnlineFassung
+} from '../renderer/src/modules/onlinetest/kern'
+import { kiAnfrage, urteileAus, type KiFall, type KiUrteil } from '../renderer/src/modules/onlinetest/kiBewertung'
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER } from '@shared/faecher'
 import { getSettings } from '../main/services/storage/settings'
-import { alleNutzer, datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer, type Nutzer } from './kontext'
-import { alsNutzer, json, leseKoerper, type Anfrage, type Aufruf } from './http'
+import { alsNutzer, json, leseKoerper, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { iservBereit } from './anmeldung'
+import { registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
 
 const SCHEMA = `
@@ -63,6 +88,12 @@ CREATE TABLE IF NOT EXISTS teilnahmen (
   verlassen INTEGER NOT NULL DEFAULT 0,
   UNIQUE (test_id, schueler_id)
 );
+CREATE TABLE IF NOT EXISTS onlinetest_figuren (
+  test_id TEXT NOT NULL REFERENCES onlinetests(id) ON DELETE CASCADE,
+  pose TEXT NOT NULL,
+  png BLOB NOT NULL,
+  PRIMARY KEY (test_id, pose)
+);
 `
 
 let bereit = false
@@ -76,6 +107,7 @@ const db = () => {
 }
 export const onlinetestZuruecksetzen = (): void => {
   bereit = false
+  kiLaeufe.clear()
 }
 
 const neueId = (): string => randomBytes(10).toString('hex')
@@ -117,10 +149,12 @@ export function gehoertZu(g: Lerngruppe, n: Pick<NutzerInfo, 'benutzer' | 'grupp
 }
 
 export function mitgliederVon(g: Lerngruppe): NutzerInfo[] {
-  return alleNutzer().filter((n) => n.rolle === 'schueler' && gehoertZu(g, n))
+  return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && gehoertZu(g, n))
 }
 
 // ---------------------------------------------------------------- Tests
+
+export type TestStatus = 'wartend' | 'offen' | 'beendet'
 
 export interface Einstellungen {
   zeitMin: number
@@ -132,6 +166,16 @@ export interface Einstellungen {
   schwellen: number[]
   /** Hinweis der Lehrkraft an die Lernenden (optional) */
   hinweis?: string
+  /** Testart für die Liste der Lehrkraft (bisher nur „Vokabeltest") */
+  art?: string
+  /** Thema/Unit des Tests – macht gleichnamige Tests unterscheidbar */
+  thema?: string
+  /** Zeitpunkt, zu dem die Lehrkraft den Test gestartet hat */
+  gestartet?: number
+  /** Ergebnisse für die Lernenden freigegeben (sonst erst, wenn alle abgegeben haben) */
+  ergebnisFrei?: boolean
+  /** Figur (Maskottchen) auf Wartebildschirm, im Kopf und beim Ergebnis */
+  figur?: boolean
 }
 
 interface TestZeile {
@@ -142,7 +186,7 @@ interface TestZeile {
   code: string
   fassungen: string
   einstellungen: string
-  status: 'offen' | 'beendet'
+  status: TestStatus
   erstellt: string
   beendet: string | null
 }
@@ -164,6 +208,11 @@ function testNachId(id: string): Test | null {
   return z ? alsTest(z) : null
 }
 
+const einstellungenSetzen = (test: Test, patch: Partial<Einstellungen>): void => {
+  test.einstellungen = { ...test.einstellungen, ...patch }
+  db().prepare('UPDATE onlinetests SET einstellungen = ? WHERE id = ?').run(JSON.stringify(test.einstellungen), test.id)
+}
+
 const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 function neuerCode(): string {
   for (;;) {
@@ -175,9 +224,25 @@ function neuerCode(): string {
 /** Fach zur Zielsprache des Vokabeltests (für den Notenschlüssel je Fach) */
 const fachZuSprache = (sprache: string): string => FAECHER.find((f) => f.sprache === sprache)?.id ?? 'englisch'
 
+/** PNG aus einer data:-Adresse (Figur), höchstens 3 MB */
+function pngAus(dataUrl: unknown): Buffer | null {
+  if (typeof dataUrl !== 'string' || !/^data:image\/png;base64,/i.test(dataUrl)) return null
+  const b = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64')
+  return b.length > 0 && b.length <= 3 * 1024 * 1024 ? b : null
+}
+
 export function testErstellen(
   lehrkraft: NutzerInfo,
-  e: { titel: string; test: TestDocument; lerngruppeId?: string; zeitMin?: number; zuteilung?: Einstellungen['zuteilung']; hinweis?: string }
+  e: {
+    titel: string
+    test: TestDocument
+    lerngruppeId?: string
+    zeitMin?: number
+    zuteilung?: Einstellungen['zuteilung']
+    hinweis?: string
+    thema?: string
+    figur?: { winkend?: unknown; jubelnd?: unknown }
+  }
 ): Test {
   if (!e.test?.variants?.length) throw new Error('Der Test hat keine Variante.')
   if (e.lerngruppeId) {
@@ -187,6 +252,9 @@ export function testErstellen(
   const fach = fachZuSprache(e.test.settings.targetLanguage)
   // Notenschlüssel der Lehrkraft (Einstellungen › Material) – in ihrem Kontext gelesen
   const schwellen = imNutzer(alsNutzer(lehrkraft), () => thresholdsForSubject(getSettings().gradeScale, fach))
+  const figuren = Object.entries(e.figur ?? {})
+    .map(([pose, url]) => [pose, pngAus(url)] as const)
+    .filter((x): x is readonly [string, Buffer] => (x[0] === 'winkend' || x[0] === 'jubelnd') && Boolean(x[1]))
   const einstellungen: Einstellungen = {
     zeitMin: Math.max(1, Math.min(240, Math.round(e.zeitMin ?? 20))),
     zuteilung: e.zuteilung ?? 'abwechselnd',
@@ -194,17 +262,33 @@ export function testErstellen(
     zielsprache: e.test.settings.targetLanguage,
     niveau: e.test.settings.level,
     schwellen,
-    ...(e.hinweis ? { hinweis: e.hinweis.slice(0, 500) } : {})
+    art: 'Vokabeltest',
+    ...(e.thema ? { thema: e.thema.slice(0, 120) } : {}),
+    ...(e.hinweis ? { hinweis: e.hinweis.slice(0, 500) } : {}),
+    ...(figuren.length ? { figur: true } : {})
   }
   const fassungen = e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v) }))
   const id = neueId()
   const code = neuerCode()
   db()
     .prepare('INSERT INTO onlinetests (id, lehrkraft_id, lerngruppe_id, titel, code, fassungen, einstellungen, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, lehrkraft.id, e.lerngruppeId ?? null, e.titel.slice(0, 160) || e.test.header.title || 'Onlinetest', code, JSON.stringify(fassungen), JSON.stringify(einstellungen), 'offen', new Date().toISOString())
+    .run(
+      id,
+      lehrkraft.id,
+      e.lerngruppeId ?? null,
+      e.titel.trim().slice(0, 160) || e.test.header.title || 'Onlinetest',
+      code,
+      JSON.stringify(fassungen),
+      JSON.stringify(einstellungen),
+      'wartend',
+      new Date().toISOString()
+    )
+  for (const [pose, png] of figuren) db().prepare('INSERT INTO onlinetest_figuren (test_id, pose, png) VALUES (?, ?, ?)').run(id, pose, png)
   protokolliereServer('onlinetest', `Onlinetest erstellt (${fassungen.length} Fassung(en))`, lehrkraft.id)
   return testNachId(id)!
 }
+
+const figurPosen = (testId: string): string[] => (db().prepare('SELECT pose FROM onlinetest_figuren WHERE test_id = ?').all(testId) as { pose: string }[]).map((x) => x.pose)
 
 // ---------------------------------------------------------------- Teilnahmen
 
@@ -214,6 +298,7 @@ interface TeilnahmeZeile {
   schueler_id: string
   variante: number
   geheim: string
+  /** 0 = wartet auf den Start durch die Lehrkraft */
   beginn: number
   ende: number
   abgabe: number | null
@@ -230,10 +315,10 @@ function teilnahme(id: string): TeilnahmeZeile | null {
 }
 
 function teilnahmenVon(testId: string): TeilnahmeZeile[] {
-  return db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? ORDER BY beginn').all(testId) as unknown as TeilnahmeZeile[]
+  return db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? ORDER BY rowid').all(testId) as unknown as TeilnahmeZeile[]
 }
 
-/** Endgültig abgeben: Antworten festschreiben, sofort bewerten, was eindeutig ist */
+/** Endgültig abgeben: Antworten festschreiben, sofort bewerten, was eindeutig ist – den Rest danach die KI */
 function abschliessen(t: TeilnahmeZeile, test: Test, antworten: Antworten, grund: string): void {
   if (t.abgabe) return
   const fassung = test.fassungen[t.variante]?.fassung
@@ -242,6 +327,7 @@ function abschliessen(t: TeilnahmeZeile, test: Test, antworten: Antworten, grund
   db()
     .prepare('UPDATE teilnahmen SET abgabe = ?, grund = ?, antworten = ?, bewertung = ?, verlassen = ? WHERE id = ? AND abgabe IS NULL')
     .run(Date.now(), grund, JSON.stringify(antworten), JSON.stringify(bewertung), grund === 'verlassen' ? 1 : t.verlassen, t.id)
+  kiPlanen(test.id)
 }
 
 /** Antworten nur für bekannte Felder, als kurze Texte */
@@ -253,13 +339,36 @@ function bereinigeAntworten(f: OnlineFassung, roh: unknown): Antworten {
   return out
 }
 
+/** Neue Teilnahme: Fassung nach Zuteilung; vor dem Start wartet sie (beginn 0), danach volle Zeit ab jetzt */
+function teilnahmeAnlegen(test: Test, schuelerId: string): TeilnahmeZeile {
+  const n = (db().prepare('SELECT COUNT(*) AS n FROM teilnahmen WHERE test_id = ?').get(test.id) as { n: number }).n
+  const z = test.einstellungen.zuteilung
+  const variante = typeof z === 'number' ? Math.min(test.fassungen.length - 1, Math.max(0, z)) : z === 'zufall' ? randomBytes(1)[0] % test.fassungen.length : n % test.fassungen.length
+  const id = neueId()
+  const jetzt = test.status === 'offen' ? Date.now() : 0
+  db()
+    .prepare('INSERT INTO teilnahmen (id, test_id, schueler_id, variante, geheim, beginn, ende) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, test.id, schuelerId, variante, randomBytes(18).toString('base64url'), jetzt, jetzt ? jetzt + test.einstellungen.zeitMin * 60_000 : 0)
+  return teilnahme(id)!
+}
+
 function abgelaufeneAbschliessen(test: Test): void {
-  for (const t of teilnahmenVon(test.id)) if (!t.abgabe && Date.now() > t.ende + NACHFRIST_MS) abschliessen(t, test, json_(t.antworten, {}), 'zeit')
+  for (const t of teilnahmenVon(test.id)) if (!t.abgabe && t.beginn > 0 && Date.now() > t.ende + NACHFRIST_MS) abschliessen(t, test, json_(t.antworten, {}), 'zeit')
+}
+
+/** Ergebnisse sichtbar: freigegeben, oder alle, die mitschreiben, haben abgegeben */
+function ergebnisFrei(test: Test, ts = teilnahmenVon(test.id)): boolean {
+  if (test.einstellungen.ergebnisFrei) return true
+  if (test.status === 'wartend') return false
+  return ts.length > 0 && ts.every((t) => t.abgabe)
 }
 
 // ---------------------------------------------------------------- Auswertung
 
 const noteFuer = (test: Test, punkte: number, max: number): number => gradeForPoints(punkte, max, test.einstellungen.schwellen).grade
+
+/** Für die Historie: Gäste über ihren Namen, sonst über den Benutzernamen */
+const schluesselVon = (n: NutzerInfo | undefined): string => (n?.quelle === 'gast' ? `gast:${n.name.toLowerCase()}` : (n?.benutzer ?? ''))
 
 /** Übersicht einer Teilnahme für die Lehrkraft */
 function ueberblick(test: Test, t: TeilnahmeZeile, namen: Map<string, NutzerInfo>) {
@@ -270,7 +379,9 @@ function ueberblick(test: Test, t: TeilnahmeZeile, namen: Map<string, NutzerInfo
   return {
     id: t.id,
     name: n?.name ?? '',
-    benutzer: n?.benutzer ?? '',
+    benutzer: n?.quelle === 'gast' ? '' : (n?.benutzer ?? ''),
+    schluessel: schluesselVon(n),
+    gast: n?.quelle === 'gast',
     variante: test.fassungen[t.variante]?.label ?? '',
     beginn: t.beginn,
     ende: t.ende,
@@ -280,13 +391,20 @@ function ueberblick(test: Test, t: TeilnahmeZeile, namen: Map<string, NutzerInfo
     punkte,
     max,
     offen: offeneEinheiten(b),
+    zuEntscheiden: zuEntscheiden(b),
     note: t.abgabe ? noteFuer(test, punkte, max) : null
   }
 }
 
+type Fall = KiFall & { teilnahme: string; einheit: string; feld: string; art: 'ki' | 'wort' }
+
 /**
- * KI-Auswertung offener Antworten – im Namen der LEHRKRAFT (ihr Schlüssel bzw. Abo), über den
- * Namensschutz des Servers. Eine Anfrage je Aufgabe und Fassung, alle Abgaben gesammelt.
+ * KI-Auswertung – im Namen der LEHRKRAFT (ihr Schlüssel bzw. Abo), über den Namensschutz des
+ * Servers. Eine Anfrage je Aufgabe und Fassung, alle Abgaben gesammelt. Geprüft werden
+ *  - offene Antworten (Status „ki"): richtig / falsch / Lehrkraft entscheidet
+ *  - automatisch falsche Wort-Antworten (einmal): kleiner Fehler oder im Zusammenhang sinnvoll? →
+ *    Lehrkraft entscheidet, sonst bleibt es falsch
+ * Urteile der Lehrkraft werden nie überschrieben.
  */
 async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): Promise<{ anfragen: number; bewertet: number }> {
   const alle = teilnahmenVon(test.id).filter((t) => t.abgabe)
@@ -297,59 +415,179 @@ async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): P
     const teil = alle.filter((t) => t.variante === v)
     for (const aufgabe of fassung.aufgaben) {
       const einheiten = fassung.einheiten.filter((e) => e.aufgabe === aufgabe.id)
-      const faelle: (KiFall & { teilnahme: string; einheit: string; feld: string })[] = []
+      const faelle: Fall[] = []
+      /** Automatisch falsche Einheiten ohne prüfbares Wort: nur als geprüft vermerken */
+      const ohneFall = new Map<string, string[]>()
       let nr = 0
       for (const t of teil) {
         const b = json_(t.bewertung, {} as Bewertung)
         const antworten = json_(t.antworten, {} as Antworten)
         for (const e of einheiten) {
-          if (b[e.id]?.status !== 'ki') continue
-          for (const feld of e.felder) {
-            const l = fassung.loesungen[feld]
-            if (!l || (l.art !== 'ki' && l.art !== 'menge')) continue
-            faelle.push({
-              id: `A${++nr}`,
-              frage: l.frage,
-              erwartung: l.art === 'ki' ? l.erwartung : `eines dieser Wörter oder ein anderes passendes: ${l.werte.join(', ')}`,
-              antwort: antworten[feld] ?? '',
-              teilnahme: t.id,
-              einheit: e.id,
-              feld
-            })
+          const be = b[e.id]
+          if (!be || be.quelle === 'lehrkraft') continue
+          if (be.status === 'ki') {
+            for (const feld of e.felder) {
+              const l = fassung.loesungen[feld]
+              if (!l || (l.art !== 'ki' && l.art !== 'menge')) continue
+              faelle.push({
+                id: `A${++nr}`,
+                frage: l.frage,
+                erwartung: l.art === 'ki' ? l.erwartung : `eines dieser Wörter oder ein anderes passendes: ${l.werte.join(', ')}`,
+                antwort: antworten[feld] ?? '',
+                teilnahme: t.id,
+                einheit: e.id,
+                feld,
+                art: 'ki'
+              })
+            }
+          } else if (be.status === 'falsch' && be.quelle === 'auto' && !be.kiGeprueft) {
+            // Nur Einheiten, bei denen ausschließlich Wörter abweichen (eine falsche Auswahl bleibt falsch)
+            const falscheWoerter: string[] = []
+            let andererFehler = false
+            for (const feld of e.felder) {
+              const l = fassung.loesungen[feld]
+              if (!l) continue
+              const a = antworten[feld] ?? ''
+              if (l.art === 'genau') {
+                const vgl = vergleiche(a, l.werte, l.artikelFrei)
+                if (vgl === 'leer') andererFehler = true
+                else if (vgl !== 'richtig') falscheWoerter.push(feld)
+              } else if (l.art === 'auswahl' && a !== l.wert) andererFehler = true
+            }
+            if (andererFehler || !falscheWoerter.length) {
+              ohneFall.set(t.id, [...(ohneFall.get(t.id) ?? []), e.id])
+              continue
+            }
+            for (const feld of falscheWoerter) {
+              const l = fassung.loesungen[feld] as { art: 'genau'; werte: string[] }
+              faelle.push({
+                id: `A${++nr}`,
+                frage: kontextVon(fassung, feld),
+                erwartung: l.werte.join(' / '),
+                antwort: antworten[feld] ?? '',
+                wortloesung: true,
+                teilnahme: t.id,
+                einheit: e.id,
+                feld,
+                art: 'wort'
+              })
+            }
           }
         }
+      }
+      // Nichts zu fragen – nur vermerken, damit es nicht jedes Mal neu durchsucht wird
+      for (const [tid, eids] of ohneFall) {
+        const t = teilnahme(tid)
+        if (!t) continue
+        const b = json_(t.bewertung, {} as Bewertung)
+        for (const eid of eids) if (b[eid] && b[eid].quelle === 'auto') b[eid] = { ...b[eid], kiGeprueft: true }
+        db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
       }
       // In Paketen zu höchstens 40 Antworten
       for (let i = 0; i < faelle.length; i += 40) {
         const paket = faelle.slice(i, i + 40)
         const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [kiAnfrage(test.einstellungen.zielsprache, test.einstellungen.niveau, paket)]))
         anfragen++
-        const urteile = urteileAus(antwort, paket)
-        // Je Teilnahme die Urteile einarbeiten: Einheit richtig nur, wenn ALLE ihre KI-Felder richtig sind
-        const jeTeilnahme = new Map<string, typeof paket>()
-        for (const f of paket) jeTeilnahme.set(f.teilnahme, [...(jeTeilnahme.get(f.teilnahme) ?? []), f])
-        for (const [tid, fs] of jeTeilnahme) {
-          const t = teilnahme(tid)
-          if (!t) continue
-          const b = json_(t.bewertung, {} as Bewertung)
-          const jeEinheit = new Map<string, typeof fs>()
-          for (const f of fs) jeEinheit.set(f.einheit, [...(jeEinheit.get(f.einheit) ?? []), f])
-          for (const [eid, efs] of jeEinheit) {
-            const us = efs.map((f) => urteile.get(f.id))
-            if (us.some((u) => !u)) continue
-            const richtig = us.every((u) => u!.richtig)
-            const e = fassung.einheiten.find((x) => x.id === eid)!
-            b[eid] = { status: richtig ? 'richtig' : 'falsch', punkte: richtig ? e.punkte : 0, quelle: 'ki', hinweis: us.map((u) => u!.begruendung).join(' ') }
-            bewertet++
-          }
-          db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
-        }
+        bewertet += einarbeiten(fassung, paket, urteileAus(antwort, paket))
       }
     }
   }
   protokolliereServer('onlinetest', `KI-Auswertung: ${anfragen} Anfrage(n), ${bewertet} Antworten bewertet`, lehrkraft.id)
   return { anfragen, bewertet }
 }
+
+/** Urteile je Teilnahme und Einheit einarbeiten – frisch gelesen, Urteile der Lehrkraft bleiben */
+function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string, KiUrteil>): number {
+  let bewertet = 0
+  const jeTeilnahme = new Map<string, Fall[]>()
+  for (const f of paket) jeTeilnahme.set(f.teilnahme, [...(jeTeilnahme.get(f.teilnahme) ?? []), f])
+  for (const [tid, fs] of jeTeilnahme) {
+    const t = teilnahme(tid)
+    if (!t) continue
+    const b = json_(t.bewertung, {} as Bewertung)
+    const jeEinheit = new Map<string, Fall[]>()
+    for (const f of fs) jeEinheit.set(f.einheit, [...(jeEinheit.get(f.einheit) ?? []), f])
+    for (const [eid, efs] of jeEinheit) {
+      if (b[eid]?.quelle === 'lehrkraft') continue
+      const us = efs.map((f) => urteile.get(f.id))
+      if (us.some((u) => !u)) continue
+      const e = fassung.einheiten.find((x) => x.id === eid)!
+      const hinweis = us.map((u) => u!.begruendung).filter(Boolean).join(' ')
+      const pruefen = us.some((u) => u!.urteil === 'kleinerFehler') ? 'kleinerFehler' : 'sinnvoll'
+      if (efs[0].art === 'wort') {
+        // Bleibt falsch – außer die Lehrkraft akzeptiert
+        b[eid] = us.some((u) => u!.urteil === 'falsch')
+          ? { ...b[eid], kiGeprueft: true, ...(hinweis ? { hinweis: [b[eid]?.hinweis, `KI: ${hinweis}`].filter(Boolean).join('; ') } : {}) }
+          : { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, kiGeprueft: true, hinweis }
+      } else if (us.every((u) => u!.urteil === 'richtig')) b[eid] = { status: 'richtig', punkte: e.punkte, quelle: 'ki', hinweis }
+      else if (us.some((u) => u!.urteil === 'falsch')) b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', hinweis }
+      else b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis }
+      bewertet++
+    }
+    db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
+  }
+  return bewertet
+}
+
+// ---------- Automatisch nach jeder Abgabe (gebündelt: 4 s Ruhe, je Test nacheinander)
+
+const kiLaeufe = new Map<string, { laeuft: boolean; erneut: boolean; zeitgeber?: ReturnType<typeof setTimeout>; fehler?: string }>()
+let kiAufruf: Aufruf | null = null
+
+function kiPlanen(testId: string): void {
+  if (!kiAufruf) return
+  const s = kiLaeufe.get(testId) ?? { laeuft: false, erneut: false }
+  kiLaeufe.set(testId, s)
+  if (s.laeuft) {
+    s.erneut = true
+    return
+  }
+  if (s.zeitgeber) clearTimeout(s.zeitgeber)
+  s.zeitgeber = setTimeout(() => void kiLauf(testId), 4000)
+}
+
+async function kiLauf(testId: string): Promise<void> {
+  const s = kiLaeufe.get(testId)
+  const test = testNachId(testId)
+  const lehrkraft = test ? nutzerNachId(test.lehrkraft_id) : null
+  if (!s || !test || !lehrkraft || !kiAufruf) return
+  s.laeuft = true
+  s.zeitgeber = undefined
+  try {
+    await kiAuswerten(test, lehrkraft, kiAufruf)
+    s.fehler = undefined
+  } catch (e) {
+    s.fehler = e instanceof Error ? e.message : String(e)
+    protokolliereServer('onlinetest', `KI-Auswertung fehlgeschlagen: ${s.fehler.slice(0, 200)}`, lehrkraft.id)
+  } finally {
+    s.laeuft = false
+    if (s.erneut) {
+      s.erneut = false
+      kiPlanen(testId)
+    }
+  }
+}
+
+const kiStand = (testId: string): { laeuft: boolean; fehler: string | null } => {
+  const s = kiLaeufe.get(testId)
+  return { laeuft: Boolean(s && (s.laeuft || s.zeitgeber)), fehler: s?.fehler ?? null }
+}
+
+// ---------------------------------------------------------------- Gäste (ohne IServ)
+
+/** „anna k", „Anna K." → „Anna K."; bis zu drei Buchstaben des Nachnamens (zwei Annas) */
+export function gastName(roh: unknown): string | null {
+  const s = String(roh ?? '')
+    .normalize('NFC')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const m = /^(\p{L}[\p{L}'-]{0,29}(?: \p{L}[\p{L}'-]{0,29})?) (\p{L}{1,3})\.?$/u.exec(s)
+  if (!m) return null
+  const gross = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1)
+  return `${m[1].split(' ').map(gross).join(' ')} ${gross(m[2].toLowerCase())}.`
+}
+
+const MAX_GAESTE = 80
 
 // ---------------------------------------------------------------- Routen: Lernende
 
@@ -359,26 +597,94 @@ async function koerperRoh(k: Anfrage): Promise<Record<string, unknown>> {
   return t ? (JSON.parse(t) as Record<string, unknown>) : {}
 }
 
-export function schuelerRoute(): (k: Anfrage) => Promise<boolean> {
+/** Was die Lernenden nach der Freigabe sehen: eigene Antworten, Bewertung, Lösungen */
+function ergebnisFuer(test: Test, t: TeilnahmeZeile) {
+  const f = test.fassungen[t.variante].fassung
+  const b = json_(t.bewertung, {} as Bewertung)
+  const punkte = summe(b)
+  const ki = kiStand(test.id)
+  return {
+    punkte,
+    max: f.punkte,
+    note: noteFuer(test, punkte, f.punkte),
+    vorlaeufig: ki.laeuft || offeneEinheiten(b) > 0 || zuEntscheiden(b) > 0,
+    aufgaben: f.aufgaben,
+    einheiten: f.einheiten,
+    loesungen: f.loesungen,
+    antworten: json_(t.antworten, {}),
+    // Für die Lernenden ohne Begründungen der KI (die richten sich an die Lehrkraft)
+    bewertung: Object.fromEntries(Object.entries(b).map(([k, x]) => [k, { status: x.status, punkte: x.punkte, ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {}) }]))
+  }
+}
+
+export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean> {
+  if (aufruf) kiAufruf = aufruf
   return async (k) => {
     const { url, req, res, sitzung } = k
     if (!url.pathname.startsWith('/s/api/')) return false
-    if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
-    const ich = sitzung.nutzer
     const was = url.pathname.slice('/s/api/'.length)
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
 
-    if (req.method === 'GET' && was === 'ich') return (json(res, 200, { name: ich.name, benutzer: ich.benutzer, rolle: ich.rolle }), true)
+    // ---------- Beitritt mit Namen (ohne IServ): Gastkonto nur für diesen Test
+    if (req.method === 'POST' && was === 'gast') {
+      if (!mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      if (iservBereit()) return (json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true)
+      const k0 = await koerperRoh(k)
+      const test = testNachCode(String(k0.code ?? ''))
+      if (!test) return (json(res, 404, { fehler: 'Diesen Test gibt es nicht. Bitte den Code prüfen.' }), true)
+      if (test.status === 'beendet') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
+      const name = gastName(k0.name)
+      if (!name) return (json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true)
+      const ts = teilnahmenVon(test.id)
+      const namen = new Map(alleNutzer().map((n) => [n.id, n]))
+      // Schon in diesem Test (dasselbe Gerät, z. B. nach einem Neuladen)? Dann einfach weiter
+      if (sitzung?.nutzer.quelle === 'gast' && ts.some((t) => t.schueler_id === sitzung.nutzer.id)) return (json(res, 200, { ok: true, name: sitzung.nutzer.name }), true)
+      if (ts.some((t) => namen.get(t.schueler_id)?.name.toLowerCase() === name.toLowerCase()))
+        return (json(res, 409, { fehler: `„${name}“ schreibt diesen Test schon. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“ statt „Anna K.“` }), true)
+      if (ts.length >= MAX_GAESTE) return (json(res, 429, { fehler: 'Der Test ist voll.' }), true)
+      const gast = nutzerAnlegen({ benutzer: `gast-${neueId().slice(0, 12)}`, name, rolle: 'schueler', quelle: 'gast' })
+      registerVergessen()
+      teilnahmeAnlegen(test, gast.id)
+      const neu = sitzungAnlegen(gast.id, 'schueler')
+      setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS.schueler, Boolean((req.socket as { encrypted?: boolean }).encrypted))
+      protokolliereServer('onlinetest', 'Beitritt mit Namen (ohne IServ)', gast.id)
+      return (json(res, 200, { ok: true, name }), true)
+    }
+
+    if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
+    const ich = sitzung.nutzer
+    const gast = ich.quelle === 'gast'
+
+    if (req.method === 'GET' && was === 'ich') return (json(res, 200, { name: ich.name, benutzer: gast ? '' : ich.benutzer, rolle: ich.rolle, gast }), true)
     if (req.method === 'GET' && was === 'tests') {
-      // Offene Tests der eigenen Lerngruppen
-      const tests = (db().prepare("SELECT * FROM onlinetests WHERE status = 'offen' AND lerngruppe_id IS NOT NULL").all() as unknown as TestZeile[])
-        .map(alsTest)
-        .filter((t) => {
-          const g = t.lerngruppe_id ? lerngruppe(t.lerngruppe_id) : null
-          return g && gehoertZu(g, ich)
-        })
       const meine = new Map((db().prepare('SELECT test_id, abgabe FROM teilnahmen WHERE schueler_id = ?').all(ich.id) as { test_id: string; abgabe: number | null }[]).map((x) => [x.test_id, x.abgabe]))
-      return (json(res, 200, { tests: tests.map((t) => ({ code: t.code, titel: t.titel, zeitMin: t.einstellungen.zeitMin, abgegeben: Boolean(meine.get(t.id)) })) }), true)
+      // Offene Tests der eigenen Lerngruppen (Gäste: nur der eigene Test)
+      const tests = (db().prepare("SELECT * FROM onlinetests WHERE status != 'beendet'").all() as unknown as TestZeile[]).map(alsTest).filter((t) => {
+        if (gast) return meine.has(t.id)
+        const g = t.lerngruppe_id ? lerngruppe(t.lerngruppe_id) : null
+        return g && gehoertZu(g, ich)
+      })
+      return (json(res, 200, { tests: tests.map((t) => ({ code: t.code, titel: t.titel, zeitMin: t.einstellungen.zeitMin, abgegeben: Boolean(meine.get(t.id)), wartend: t.status === 'wartend' })) }), true)
+    }
+    if (req.method === 'GET' && was.startsWith('figur/')) {
+      // Figur des Tests (Maskottchen) – nur für Angemeldete, lange zwischenspeicherbar
+      const [, code, pose] = was.split('/')
+      const test = testNachCode(String(code ?? ''))
+      const z = test ? (db().prepare('SELECT png FROM onlinetest_figuren WHERE test_id = ? AND pose = ?').get(test.id, String(pose ?? '')) as { png: Uint8Array } | undefined) : undefined
+      if (!z) return (json(res, 404, { fehler: 'Keine Figur.' }), true)
+      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400' })
+      return (res.end(Buffer.from(z.png)), true)
+    }
+    if (req.method === 'GET' && was === 'ergebnis') {
+      const t = teilnahme(url.searchParams.get('id') ?? '')
+      if (!t || t.schueler_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
+      const test = testNachId(t.test_id)!
+      if (!t.abgabe) return (json(res, 200, { frei: false, abgegeben: false }), true)
+      if (!ergebnisFrei(test)) {
+        const ts = teilnahmenVon(test.id)
+        return (json(res, 200, { frei: false, abgegeben: true, fertig: ts.filter((x) => x.abgabe).length, alle: ts.length }), true)
+      }
+      return (json(res, 200, { frei: true, abgegeben: true, ...ergebnisFuer(test, t) }), true)
     }
     if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
 
@@ -387,38 +693,41 @@ export function schuelerRoute(): (k: Anfrage) => Promise<boolean> {
       const k0 = await koerperRoh(k)
       const test = testNachCode(String(k0.code ?? ''))
       if (!test) return (json(res, 404, { fehler: 'Diesen Test gibt es nicht. Bitte den Code prüfen.' }), true)
-      if (test.lerngruppe_id) {
+      if (test.lerngruppe_id && !gast) {
         const g = lerngruppe(test.lerngruppe_id)
         if (g && !gehoertZu(g, ich) && ich.rolle === 'schueler') return (json(res, 403, { fehler: 'Dieser Test ist für eine andere Lerngruppe.' }), true)
       }
       abgelaufeneAbschliessen(test)
       let t = db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? AND schueler_id = ?').get(test.id, ich.id) as TeilnahmeZeile | undefined
       if (!t) {
-        if (test.status !== 'offen') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
-        const n = (db().prepare('SELECT COUNT(*) AS n FROM teilnahmen WHERE test_id = ?').get(test.id) as { n: number }).n
-        const z = test.einstellungen.zuteilung
-        const variante = typeof z === 'number' ? Math.min(test.fassungen.length - 1, Math.max(0, z)) : z === 'zufall' ? randomBytes(1)[0] % test.fassungen.length : n % test.fassungen.length
+        if (test.status === 'beendet') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
+        if (gast) return (json(res, 403, { fehler: 'Dieser Name gehört zu einem anderen Test. Bitte den QR-Code erneut scannen.' }), true)
+        t = teilnahmeAnlegen(test, ich.id)
+      } else if (!t.abgabe && t.beginn === 0 && test.status === 'offen') {
+        // Gestartet, während dieses Gerät gewartet hat (Sicherheitsnetz zu „starten")
         const jetzt = Date.now()
-        const id = neueId()
-        db()
-          .prepare('INSERT INTO teilnahmen (id, test_id, schueler_id, variante, geheim, beginn, ende) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .run(id, test.id, ich.id, variante, randomBytes(18).toString('base64url'), jetzt, jetzt + test.einstellungen.zeitMin * 60_000)
-        t = teilnahme(id)!
+        db().prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE id = ? AND beginn = 0').run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, t.id)
+        t = teilnahme(t.id)!
       }
       const fassung = test.fassungen[t.variante].fassung
+      const wartet = !t.abgabe && t.beginn === 0
       return (
         json(res, 200, {
           id: t.id,
           geheim: t.abgabe ? undefined : t.geheim,
           titel: test.titel,
+          name: ich.name,
           hinweis: test.einstellungen.hinweis ?? '',
           variante: test.fassungen[t.variante].label,
+          zeitMin: test.einstellungen.zeitMin,
+          wartet,
           ende: t.ende,
           jetzt: Date.now(),
           abgegeben: Boolean(t.abgabe),
-          // NUR die Schülerfassung – die Lösungen bleiben hier
-          aufgaben: t.abgabe ? [] : fassung.aufgaben,
-          antworten: t.abgabe ? {} : json_(t.antworten, {})
+          figur: test.einstellungen.figur ? figurPosen(test.id) : [],
+          // NUR die Schülerfassung – die Lösungen bleiben hier (bis zum Ergebnis)
+          aufgaben: t.abgabe || wartet ? [] : fassung.aufgaben,
+          antworten: t.abgabe || wartet ? {} : json_(t.antworten, {})
         }),
         true
       )
@@ -432,6 +741,7 @@ export function schuelerRoute(): (k: Anfrage) => Promise<boolean> {
       if (!t || t.schueler_id !== ich.id || t.geheim !== String(k0.geheim ?? '')) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
       const test = testNachId(t.test_id)!
       if (t.abgabe) return (json(res, 200, { abgegeben: true }), true)
+      if (t.beginn === 0) return (json(res, 409, { fehler: 'Der Test ist noch nicht gestartet.' }), true)
       const antworten = bereinigeAntworten(test.fassungen[t.variante].fassung, k0.antworten)
       const zuSpaet = Date.now() > t.ende + NACHFRIST_MS
       if (was === 'speichern' && !zuSpaet) {
@@ -451,6 +761,7 @@ export function schuelerRoute(): (k: Anfrage) => Promise<boolean> {
 // ---------------------------------------------------------------- Routen: Lehrkraft
 
 export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) => Promise<boolean> {
+  kiAufruf = aufruf
   return async (k) => {
     const { url, req, res, sitzung } = k
     const istTest = url.pathname.startsWith('/server/onlinetest')
@@ -512,9 +823,13 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           tests: tests.map((t) => {
             abgelaufeneAbschliessen(t)
             const ts = teilnahmenVon(t.id)
+            const bs = ts.map((x) => json_(x.bewertung, {} as Bewertung))
             return {
               id: t.id,
               titel: t.titel,
+              art: t.einstellungen.art ?? 'Vokabeltest',
+              thema: t.einstellungen.thema ?? '',
+              zielsprache: t.einstellungen.zielsprache,
               code: t.code,
               link: link(t.code),
               status: t.status,
@@ -522,7 +837,8 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
               lerngruppe: t.lerngruppe_id ? (lerngruppe(t.lerngruppe_id)?.name ?? '') : '',
               teilnehmer: ts.length,
               abgegeben: ts.filter((x) => x.abgabe).length,
-              offen: ts.reduce((s, x) => s + offeneEinheiten(json_(x.bewertung, {})), 0)
+              offen: bs.reduce((s, b) => s + offeneEinheiten(b), 0),
+              zuEntscheiden: bs.reduce((s, b) => s + zuEntscheiden(b), 0)
             }
           })
         }),
@@ -538,7 +854,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           lerngruppeId: typeof k0.lerngruppeId === 'string' && k0.lerngruppeId ? k0.lerngruppeId : undefined,
           zeitMin: Number(k0.zeitMin) || 20,
           zuteilung: k0.zuteilung === 'zufall' ? 'zufall' : typeof k0.zuteilung === 'number' ? k0.zuteilung : 'abwechselnd',
-          hinweis: typeof k0.hinweis === 'string' ? k0.hinweis : undefined
+          hinweis: typeof k0.hinweis === 'string' ? k0.hinweis : undefined,
+          thema: typeof k0.thema === 'string' ? k0.thema : undefined,
+          figur: k0.figur && typeof k0.figur === 'object' ? (k0.figur as { winkend?: unknown; jubelnd?: unknown }) : undefined
         })
         return (json(res, 200, { id: t.id, code: t.code, link: link(t.code) }), true)
       } catch (e) {
@@ -563,6 +881,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           einstellungen: test.einstellungen,
           erstellt: test.erstellt,
           lerngruppe: test.lerngruppe_id ? lerngruppe(test.lerngruppe_id) : null,
+          ohneIserv: !iservBereit(),
+          ki: kiStand(test.id),
+          ergebnisSichtbar: ergebnisFrei(test, ts),
           // Wer aus der Lerngruppe noch nicht begonnen hat
           fehlend: mitglieder.filter((m) => !ts.some((t) => t.schueler_id === m.id)).map((m) => ({ name: m.name, benutzer: m.benutzer })),
           fassungen: test.fassungen.map((f) => ({ label: f.label, punkte: f.fassung.punkte, aufgaben: f.fassung.aufgaben, einheiten: f.fassung.einheiten, loesungen: f.fassung.loesungen })),
@@ -574,16 +895,45 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
     if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
     const k0 = (await k.koerper()) as Record<string, unknown>
     if (teile[1] === 'status') {
-      const status = k0.status === 'beendet' ? 'beendet' : 'offen'
+      if (k0.status === 'starten') {
+        // Gemeinsamer Start: alle Wartenden bekommen jetzt ihre Zeit
+        if (test.status !== 'wartend') return (json(res, 409, { fehler: 'Der Test läuft schon.' }), true)
+        const jetzt = Date.now()
+        db().prepare("UPDATE onlinetests SET status = 'offen' WHERE id = ?").run(test.id)
+        db().prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE test_id = ? AND beginn = 0 AND abgabe IS NULL').run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, test.id)
+        einstellungenSetzen(test, { gestartet: jetzt })
+        protokolliereServer('onlinetest', 'Onlinetest gestartet', ich.id)
+        return (json(res, 200, { ok: true }), true)
+      }
+      if (k0.status === 'freigeben' || k0.status === 'zurueckhalten') {
+        einstellungenSetzen(test, { ergebnisFrei: k0.status === 'freigeben' })
+        return (json(res, 200, { ok: true }), true)
+      }
+      const status: TestStatus = k0.status === 'beendet' ? 'beendet' : test.einstellungen.gestartet ? 'offen' : 'wartend'
       db().prepare('UPDATE onlinetests SET status = ?, beendet = ? WHERE id = ?').run(status, status === 'beendet' ? new Date().toISOString() : null, test.id)
-      // Beenden: alle Laufenden mit dem zuletzt gespeicherten Stand abgeben
-      if (status === 'beendet') for (const t of teilnahmenVon(test.id)) if (!t.abgabe) abschliessen(t, test, json_(t.antworten, {}), 'lehrkraft')
+      if (status === 'beendet') {
+        for (const t of teilnahmenVon(test.id)) {
+          if (t.abgabe) continue
+          // Nie gestartet: Die Wartenden haben nichts geschrieben – ihre Teilnahme entfällt
+          if (t.beginn === 0) db().prepare('DELETE FROM teilnahmen WHERE id = ?').run(t.id)
+          // Laufende geben mit dem zuletzt gespeicherten Stand ab
+          else abschliessen(t, test, json_(t.antworten, {}), 'lehrkraft')
+        }
+      }
       return (json(res, 200, { ok: true }), true)
     }
     if (teile[1] === 'abschliessen') {
       const t = teilnahme(String(k0.teilnahme ?? ''))
       if (!t || t.test_id !== test.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      if (t.beginn === 0) return (json(res, 409, { fehler: 'Der Test ist für diese Person noch nicht gestartet.' }), true)
       abschliessen(t, test, json_(t.antworten, {}), 'lehrkraft')
+      return (json(res, 200, { ok: true }), true)
+    }
+    if (teile[1] === 'entfernen') {
+      // Eine Teilnahme entfernen (z. B. vertippter Name im Wartebildschirm)
+      const t = teilnahme(String(k0.teilnahme ?? ''))
+      if (!t || t.test_id !== test.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      db().prepare('DELETE FROM teilnahmen WHERE id = ?').run(t.id)
       return (json(res, 200, { ok: true }), true)
     }
     if (teile[1] === 'korrektur') {
@@ -594,27 +944,51 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       const b = json_(t.bewertung, {} as Bewertung)
       // Ganze Punkte zwischen 0 und dem Höchstwert der Einheit (Freitext); sonst richtig/falsch
       const punkte = typeof k0.punkte === 'number' ? Math.max(0, Math.min(e.punkte, Math.round(k0.punkte))) : k0.richtig ? e.punkte : 0
-      b[e.id] = { status: punkte > 0 ? 'richtig' : 'falsch', punkte, quelle: 'lehrkraft', ...(typeof k0.hinweis === 'string' && k0.hinweis ? { hinweis: k0.hinweis.slice(0, 300) } : {}) }
+      const alt = b[e.id]
+      b[e.id] = {
+        status: punkte > 0 ? 'richtig' : 'falsch',
+        punkte,
+        quelle: 'lehrkraft',
+        ...(alt?.pruefen ? { pruefen: alt.pruefen } : {}),
+        ...(typeof k0.hinweis === 'string' && k0.hinweis ? { hinweis: k0.hinweis.slice(0, 300) } : alt?.hinweis ? { hinweis: alt.hinweis } : {})
+      }
       db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), t.id)
       return (json(res, 200, { ok: true }), true)
     }
     if (teile[1] === 'auswerten') {
-      // Lange Anfrage: Lebenszeichen wie bei /api
+      // Von Hand anstoßen (z. B. nach einem Fehler) – lange Anfrage: Lebenszeichen wie bei /api
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
       const puls = setInterval(() => res.write(' '), PULS_MS)
       res.on('close', () => clearInterval(puls))
+      const s = kiLaeufe.get(test.id) ?? { laeuft: false, erneut: false }
+      kiLaeufe.set(test.id, s)
       try {
+        if (s.laeuft) throw new Error('Die KI wertet gerade schon aus – gleich noch einmal neu laden.')
+        if (s.zeitgeber) clearTimeout(s.zeitgeber)
+        s.zeitgeber = undefined
+        s.laeuft = true
         const lehrkraft = nutzerNachId(ich.id)!
-        res.end(JSON.stringify({ ok: true, ...(await kiAuswerten(test, lehrkraft, aufruf)) }))
+        const r = await kiAuswerten(test, lehrkraft, aufruf)
+        s.fehler = undefined
+        res.end(JSON.stringify({ ok: true, ...r }))
       } catch (e) {
-        res.end(JSON.stringify({ ok: false, fehler: e instanceof Error ? e.message : String(e) }))
+        s.fehler = e instanceof Error ? e.message : String(e)
+        res.end(JSON.stringify({ ok: false, fehler: s.fehler }))
       } finally {
+        s.laeuft = false
         clearInterval(puls)
       }
       return true
     }
+    if (teile[1] === 'umbenennen') {
+      const titel = String(k0.titel ?? '').trim().slice(0, 160)
+      if (!titel) return (json(res, 400, { fehler: 'Bitte einen Namen angeben.' }), true)
+      db().prepare('UPDATE onlinetests SET titel = ? WHERE id = ?').run(titel, test.id)
+      return (json(res, 200, { ok: true }), true)
+    }
     if (teile[1] === 'loeschen') {
       db().prepare('DELETE FROM onlinetests WHERE id = ?').run(test.id)
+      kiLaeufe.delete(test.id)
       protokolliereServer('onlinetest', 'Onlinetest gelöscht', ich.id)
       return (json(res, 200, { ok: true }), true)
     }
@@ -634,10 +1008,11 @@ export function historie(g: Lerngruppe) {
     const verteilung = [1, 2, 3, 4, 5, 6].map((n) => ergebnisse.filter((e) => e.note === n).length)
     for (const e of ergebnisse) {
       if (e.note == null) continue
-      const s = jeSchueler.get(e.benutzer) ?? { name: e.name, benutzer: e.benutzer, noten: [], prozente: [] }
+      // Gäste (ohne IServ) über ihren Namen in der Lerngruppe
+      const s = jeSchueler.get(e.schluessel) ?? { name: e.name, benutzer: e.benutzer, noten: [], prozente: [] }
       s.noten.push(e.note)
       s.prozente.push(e.max ? (e.punkte / e.max) * 100 : 0)
-      jeSchueler.set(e.benutzer, s)
+      jeSchueler.set(e.schluessel, s)
     }
     const noten = ergebnisse.map((e) => e.note).filter((n): n is number => n != null)
     return {
@@ -646,7 +1021,7 @@ export function historie(g: Lerngruppe) {
       datum: t.erstellt,
       status: t.status,
       teilnehmer: ergebnisse.length,
-      offen: ergebnisse.reduce((s, e) => s + e.offen, 0),
+      offen: ergebnisse.reduce((s, e) => s + e.offen + e.zuEntscheiden, 0),
       durchschnitt: noten.length ? Math.round((noten.reduce((a, b) => a + b, 0) / noten.length) * 100) / 100 : null,
       verteilung,
       ergebnisse: ergebnisse.map((e) => ({ name: e.name, benutzer: e.benutzer, punkte: e.punkte, max: e.max, note: e.note, verlassen: e.verlassen }))

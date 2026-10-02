@@ -21,12 +21,13 @@ import { extname, join, normalize, sep } from 'node:path'
 import { AUFTRAGS_KANAELE, AuftragsFehler, gueltigeAuftragsId, gueltigesGeraet, kennungDesAuftrags, MAX_WARTEN_MS } from '../main/services/lanAuftraege'
 import { kennzeichne, kennzeichneAuftrag, PULS_MS } from '../main/services/lanServer'
 import { imNutzer, type Nutzer } from './kontext'
-import { sitzungAnlegen, sitzungBeenden, sitzungPruefen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { nutzerAendern, passwortHashVon, protokolliereServer, sitzungAnlegen, sitzungBeenden, sitzungPruefen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { passwortHash, passwortPruefen } from './geheim'
 import { AnmeldeFehler, iservAnmeldeAdresse, iservBereit, iservRueckruf, notzugangAn, passwortAnmeldung } from './anmeldung'
 import { auftragsRegister, buendel, oeffneStrom, sitzungVergessen } from './ereignisse'
 import { beschneideServer, SERVER_KANAELE } from './freigaben'
 import { OBERFLAECHE } from './pfade'
-import { anmeldeSeite } from './seiten'
+import { anmeldeSeite, passwortSeite } from './seiten'
 
 export type Aufruf = (kanal: string, args: unknown[]) => Promise<unknown>
 
@@ -244,7 +245,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         const nutzer = await passwortAnmeldung(form.get('benutzer') ?? '', form.get('passwort') ?? '', ip)
         const neu = sitzungAnlegen(nutzer.id, nutzer.rolle)
         setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS[nutzer.rolle], sicher)
-        res.writeHead(303, { location: nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel })
+        const weiter = nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel
+        res.writeHead(303, { location: nutzer.passwortWechseln ? `/passwort?ziel=${encodeURIComponent(weiter)}` : weiter })
       } catch (e) {
         res.writeHead(303, { location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(ziel)}` })
       }
@@ -256,6 +258,46 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       if (sitzung) sitzungVergessen(sitzung.kennung)
       loescheCookie(res, sicher)
       return json(res, 200, { ok: true })
+    }
+
+    // ---------- Eigenes Passwort statt des vorübergehenden (vom Admin angelegte Konten, 02.10.2026)
+    const zielAus = (wert: string | null): string => (/^\/[a-zA-Z0-9/_-]*$/.test(wert ?? '') ? wert! : '/')
+    if (req.method === 'GET' && url.pathname === '/passwort') {
+      if (!sitzung) return void res.writeHead(302, { location: '/anmelden' }).end()
+      res.writeHead(200, {
+        'content-type': TYPEN['.html'],
+        'cache-control': 'no-store',
+        'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
+      })
+      return void res.end(passwortSeite({ name: sitzung.nutzer.name || sitzung.nutzer.benutzer, fehler: url.searchParams.get('fehler') ?? '', ziel: zielAus(url.searchParams.get('ziel')) }))
+    }
+    if (req.method === 'POST' && url.pathname === '/auth/passwort') {
+      const herkunft = String(req.headers.origin ?? '')
+      if (herkunft && !hosts.has(herkunft.replace(/^https?:\/\//, '').toLowerCase()) && hosts.size) return void res.writeHead(403).end()
+      if (!sitzung) return void res.writeHead(303, { location: '/anmelden' }).end()
+      const form = new URLSearchParams(await leseKoerper(req, 64 * 1024))
+      const ziel = zielAus(form.get('ziel'))
+      const neu = form.get('neu') ?? ''
+      const fehler =
+        !passwortPruefen(form.get('alt') ?? '', passwortHashVon(sitzung.nutzer.benutzer))
+          ? 'Das vorübergehende Passwort stimmt nicht.'
+          : neu.length < 10
+            ? 'Das neue Passwort braucht mindestens 10 Zeichen.'
+            : neu !== form.get('neu2')
+              ? 'Die beiden neuen Passwörter stimmen nicht überein.'
+              : neu === form.get('alt')
+                ? 'Bitte ein anderes als das vorübergehende Passwort wählen.'
+                : ''
+      if (fehler) return void res.writeHead(303, { location: `/passwort?fehler=${encodeURIComponent(fehler)}&ziel=${encodeURIComponent(ziel)}` }).end()
+      nutzerAendern(sitzung.nutzer.id, { passwortHash: passwortHash(neu), passwortWechseln: false })
+      protokolliereServer('anmeldung', 'Eigenes Passwort gesetzt', sitzung.nutzer.id)
+      return void res.writeHead(303, { location: sitzung.nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel }).end()
+    }
+    // Solange das vorübergehende Passwort gilt, geht nichts anderes
+    if (sitzung?.nutzer.passwortWechseln && !url.pathname.startsWith('/assets/') && url.pathname !== '/auth/abmelden') {
+      if (req.method === 'GET' && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/server/') && !url.pathname.startsWith('/s/api/'))
+        return void res.writeHead(302, { location: `/passwort?ziel=${encodeURIComponent(url.pathname)}`, 'cache-control': 'no-store' }).end()
+      if (url.pathname !== '/server/ich.js') return json(res, 403, { fehler: 'Bitte zuerst ein eigenes Passwort festlegen.' })
     }
 
     // ---------- Wer bin ich (Skript vor der Oberfläche, siehe programmSeite)
@@ -276,6 +318,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         const datei = url.pathname !== '/' && existsSync(join(OBERFLAECHE, url.pathname)) && !url.pathname.endsWith('.html')
         // Bündel (js/css) dürfen ohne Anmeldung kommen – die Anmeldeseite braucht sie nicht, schadet aber nicht
         if (datei) return statisch(res, decodeURIComponent(url.pathname))
+        // Onlinetest per QR-Code: Solange IServ nicht freigeschaltet ist, reicht der Name (SchuelerBereich, src/server/onlinetest.ts)
+        if (/^\/s\/t\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) && !iservBereit()) return statisch(res, '/')
         res.writeHead(302, { location: `/anmelden?ziel=${encodeURIComponent(url.pathname.startsWith('/s/') ? url.pathname : '/')}`, 'cache-control': 'no-store' })
         return void res.end()
       }

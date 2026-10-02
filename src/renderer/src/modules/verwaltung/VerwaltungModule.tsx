@@ -17,7 +17,7 @@ import { notifyError, notifySuccess } from '../../shared/util'
 import { serverIch } from '../../shared/plattform'
 
 interface Uebersicht {
-  nutzer: { id: string; benutzer: string; name: string; rolle: 'admin' | 'lehrkraft' | 'schueler'; quelle: string; gesperrt: boolean; eingerichtet: boolean; zuletzt: string | null; gruppen: number }[]
+  nutzer: { id: string; benutzer: string; name: string; rolle: 'admin' | 'lehrkraft' | 'schueler'; quelle: string; gesperrt: boolean; eingerichtet: boolean; zuletzt: string | null; gruppen: number; passwortWechseln?: boolean }[]
   schluessel: { name: string; hinterlegt: string; fuerAlle: boolean }[]
   iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean }
   notzugang: boolean
@@ -88,9 +88,30 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
 }
 
 function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
-  const [konto, setKonto] = useState<{ benutzer: string; passwort: string } | null>(null)
+  const [konto, setKonto] = useState<{ benutzer: string; passwort: string; titel?: string } | null>(null)
   const [rolle, setRolle] = useState<string>('lehrkraft')
+  const [neuerNutzer, setNeuerNutzer] = useState({ benutzer: '', name: '', rolle: 'lehrkraft', passwort: '' })
   const ich = serverIch()?.benutzer
+  // Gäste aus Onlinetests (ohne IServ) nur als Zahl – sonst würde die Liste mit jedem Test länger
+  const gaeste = d.nutzer.filter((n) => n.quelle === 'gast').length
+  const konten = d.nutzer.filter((n) => n.quelle !== 'gast')
+  const anlegen = async (): Promise<void> => {
+    try {
+      const r = await senden<{ benutzer: string; passwort: string }>('/server/verwaltung/nutzer-anlegen', neuerNutzer)
+      setKonto({ ...r, titel: 'Nutzer angelegt' })
+      setNeuerNutzer({ benutzer: '', name: '', rolle: neuerNutzer.rolle, passwort: '' })
+      neu()
+    } catch (e) {
+      notifyError(e)
+    }
+  }
+  const zuruecksetzen = (n: Uebersicht['nutzer'][number]): void => {
+    if (!window.confirm(`Für „${n.benutzer}" ein neues vorübergehendes Passwort erzeugen? Laufende Anmeldungen enden.`)) return
+    void senden<{ benutzer: string; passwort: string }>('/server/verwaltung/passwort-zuruecksetzen', { id: n.id }).then(
+      (r) => setKonto({ ...r, titel: 'Neues vorübergehendes Passwort' }),
+      (e: unknown) => notifyError(e)
+    )
+  }
   const testkonto = async (): Promise<void> => {
     try {
       setKonto(await senden<{ benutzer: string; passwort: string }>('/server/verwaltung/testkonto', { rolle }))
@@ -106,6 +127,51 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
   }
   return (
     <Stack>
+      <Card withBorder data-nutzer-anlegen>
+        <Text fw={600} mb="xs">
+          Neuen Nutzer anlegen
+        </Text>
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          <TextInput
+            label="Benutzername"
+            placeholder="m.mustermann"
+            value={neuerNutzer.benutzer}
+            onChange={(e) => setNeuerNutzer({ ...neuerNutzer, benutzer: e.currentTarget.value.toLowerCase() })}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            data-feld="benutzer"
+          />
+          <TextInput label="Name" placeholder="Max Mustermann" value={neuerNutzer.name} onChange={(e) => setNeuerNutzer({ ...neuerNutzer, name: e.currentTarget.value })} />
+          <Select
+            label="Rolle"
+            data={[
+              { value: 'lehrkraft', label: 'Lehrkraft' },
+              { value: 'admin', label: 'Admin' },
+              { value: 'schueler', label: 'Schüler/in' }
+            ]}
+            value={neuerNutzer.rolle}
+            onChange={(v) => v && setNeuerNutzer({ ...neuerNutzer, rolle: v })}
+            allowDeselect={false}
+          />
+          <TextInput
+            label="Vorübergehendes Passwort"
+            description="Leer lassen: wird erzeugt"
+            value={neuerNutzer.passwort}
+            onChange={(e) => setNeuerNutzer({ ...neuerNutzer, passwort: e.currentTarget.value })}
+            autoComplete="off"
+            data-feld="passwort"
+          />
+        </SimpleGrid>
+        <Group justify="space-between" mt="sm">
+          <Text size="xs" c="dimmed">
+            Anmeldung mit Benutzername und Passwort; bei der ersten Anmeldung muss ein eigenes Passwort (mind. 10 Zeichen) festgelegt werden.
+          </Text>
+          <Button leftSection={<IconUserPlus size={16} />} disabled={neuerNutzer.benutzer.length < 2} onClick={() => void anlegen()}>
+            Nutzer anlegen
+          </Button>
+        </Group>
+      </Card>
       <Card withBorder>
         <Group align="end">
           <Select label="Testkonto anlegen als" data={[{ value: 'lehrkraft', label: 'Lehrkraft' }, { value: 'schueler', label: 'Schüler/in' }]} value={rolle} onChange={(v) => v && setRolle(v)} allowDeselect={false} w={200} />
@@ -128,7 +194,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {d.nutzer.map((n) => (
+          {konten.map((n) => (
             <Table.Tr key={n.id} opacity={n.gesperrt ? 0.5 : 1}>
               <Table.Td>
                 <Text fw={600}>{n.name}</Text>
@@ -152,9 +218,14 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
                 />
               </Table.Td>
               <Table.Td>
-                <Badge variant="light" color={n.quelle === 'iserv' ? 'blue' : n.quelle === 'test' ? 'grape' : 'orange'}>
-                  {n.quelle === 'iserv' ? 'IServ' : n.quelle === 'test' ? 'Testkonto' : 'Notzugang'}
+                <Badge variant="light" color={n.quelle === 'iserv' ? 'blue' : n.quelle === 'test' ? 'grape' : n.quelle === 'lokal' ? 'teal' : 'orange'}>
+                  {n.quelle === 'iserv' ? 'IServ' : n.quelle === 'test' ? 'Testkonto' : n.quelle === 'lokal' ? 'Passwort' : 'Notzugang'}
                 </Badge>
+                {n.passwortWechseln && (
+                  <Text size="xs" c="dimmed">
+                    vorübergehendes Passwort
+                  </Text>
+                )}
               </Table.Td>
               <Table.Td>{n.zuletzt ? new Date(n.zuletzt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
               <Table.Td>
@@ -165,6 +236,13 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
                         {n.gesperrt ? <IconLockOpen size={16} /> : <IconLock size={16} />}
                       </ActionIcon>
                     </Tooltip>
+                    {(n.quelle === 'lokal' || n.quelle === 'test') && (
+                      <Tooltip label="Neues vorübergehendes Passwort">
+                        <ActionIcon variant="subtle" onClick={() => zuruecksetzen(n)}>
+                          <IconKey size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                     <Tooltip label="Löschen">
                       <ActionIcon variant="subtle" color="red" onClick={() => loeschen(n)}>
                         <IconTrash size={16} />
@@ -177,8 +255,13 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           ))}
         </Table.Tbody>
       </Table>
+      {gaeste > 0 && (
+        <Text size="xs" c="dimmed">
+          Dazu {gaeste} Gast{gaeste === 1 ? '' : 'e'} aus Onlinetests (Beitritt mit Namen, ohne IServ) – sie haben nur Zugang zu ihrem Test.
+        </Text>
+      )}
       {konto && (
-        <Modal opened onClose={() => setKonto(null)} title="Testkonto angelegt">
+        <Modal opened onClose={() => setKonto(null)} title={konto.titel ?? 'Testkonto angelegt'}>
           <Stack>
             <Alert color="orange">Das Passwort wird nur jetzt angezeigt.</Alert>
             {[

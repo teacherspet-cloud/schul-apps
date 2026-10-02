@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { bewerte, normalisiere, offeneEinheiten, onlineFassung, summe, vergleiche } from '../src/renderer/src/modules/onlinetest/kern'
+import { strFromU8, unzipSync } from 'fflate'
+import { antwortAlsText, bewerte, loesungAlsText, normalisiere, offeneEinheiten, onlineFassung, summe, vergleiche } from '../src/renderer/src/modules/onlinetest/kern'
+import { nachKursliste, noteMitTendenz, xlsx } from '../src/renderer/src/modules/onlinetest/ergebnisExport'
+import { DEFAULT_THRESHOLDS } from '../src/renderer/src/shared/gradeScale'
+import { gastName } from '../src/server/onlinetest'
 import { kiAnfrage, urteileAus } from '../src/renderer/src/modules/onlinetest/kiBewertung'
 import type { Block, Variant } from '../src/renderer/src/modules/vokabeltest/model/types'
 
@@ -125,6 +129,73 @@ describe('KI-Anfrage', () => {
   })
   it('unbekannte Kennungen und kaputte Urteile werden verworfen', () => {
     const u = urteileAus({ urteile: [{ id: 'A1', richtig: true, begruendung: 'ok' }, { id: 'A9', richtig: true }, { id: 'A1', richtig: false }] }, [{ id: 'A1', frage: '', erwartung: '', antwort: '' }])
-    expect([...u.values()]).toEqual([{ id: 'A1', richtig: true, begruendung: 'ok' }])
+    expect([...u.values()]).toEqual([{ id: 'A1', urteil: 'richtig', richtig: true, begruendung: 'ok' }])
+  })
+})
+
+describe('Zweite Runde (02.10.2026)', () => {
+  it('KI-Urteile: kleiner Fehler und vertretbar geben keinen Punkt; eine Wortlösung wird nie von der KI freigegeben', () => {
+    const faelle = [
+      { id: 'A1', frage: '', erwartung: 'heatwave', antwort: 'heatwafe', wortloesung: true },
+      { id: 'A2', frage: '', erwartung: 'heatwave', antwort: 'heat wave', wortloesung: true },
+      { id: 'A3', frage: '', erwartung: 'I like it.', antwort: 'I likes it.' }
+    ]
+    const u = urteileAus(
+      {
+        urteile: [
+          { id: 'A1', urteil: 'kleinerFehler', begruendung: 'Buchstabe' },
+          { id: 'A2', urteil: 'richtig', begruendung: 'Schreibvariante' },
+          { id: 'A3', urteil: 'kleinerFehler', begruendung: 'Endung' }
+        ]
+      },
+      faelle
+    )
+    expect(u.get('A1')).toMatchObject({ urteil: 'kleinerFehler', richtig: false })
+    expect(u.get('A2')).toMatchObject({ urteil: 'vertretbar', richtig: false })
+    expect(u.get('A3')).toMatchObject({ urteil: 'kleinerFehler', richtig: false })
+  })
+
+  it('Anzeige: Auswahl-Antworten als Text statt interner Kennung (Word partners)', () => {
+    const optionen = [
+      { wert: '0ydir4x', text: 'd) heatwave' },
+      { wert: 'abc', text: 'a) storm' }
+    ]
+    expect(antwortAlsText('0ydir4x', optionen)).toBe('d) heatwave')
+    expect(loesungAlsText({ art: 'auswahl', wert: '0ydir4x' }, optionen)).toBe('d) heatwave')
+    expect(loesungAlsText({ art: 'ki', frage: '', erwartung: 'It was hot.' })).toBe('z. B. It was hot.')
+  })
+
+  it('Gäste: Vorname + Anfangsbuchstabe, sauber geschrieben', () => {
+    expect(gastName('anna k')).toBe('Anna K.')
+    expect(gastName('  Anna   Ko. ')).toBe('Anna Ko.')
+    expect(gastName('Jan-Ole S.')).toBe('Jan-Ole S.')
+    expect(gastName('Anna')).toBeNull()
+    expect(gastName('Anna Kowalski')).toBeNull()
+    expect(gastName('<script> x')).toBeNull()
+  })
+
+  it('Noten mit Tendenz (Faustregel) und Kursliste-Reihenfolge', () => {
+    // 20 Punkte, Standardschlüssel: 1 ab 18, 2 ab 16, 3 ab 13 …
+    expect(noteMitTendenz(20, 20, DEFAULT_THRESHOLDS)).toBe('1')
+    expect(noteMitTendenz(18, 20, DEFAULT_THRESHOLDS)).toBe('1-')
+    expect(noteMitTendenz(17, 20, DEFAULT_THRESHOLDS)).toBe('2') // Stufe nur 2 Punkte breit: keine Tendenz
+    expect(noteMitTendenz(39, 40, DEFAULT_THRESHOLDS)).toBe('1')
+    expect(noteMitTendenz(35, 40, DEFAULT_THRESHOLDS)).toBe('2+')
+    expect(noteMitTendenz(31, 40, DEFAULT_THRESHOLDS)).toBe('2-')
+    expect(noteMitTendenz(0, 20, DEFAULT_THRESHOLDS)).toBe('6')
+    const z = (name: string) => ({ name, fassung: 'A', punkte: 1, max: 2, note: 3, abgabe: 1, verlassen: false, offen: 0 })
+    expect(nachKursliste([z('Ben Z.'), z('Anna K.'), z('Carl K.')]).map((x) => x.name)).toEqual(['Anna K.', 'Carl K.', 'Ben Z.'])
+  })
+
+  it('Excel-Datei ist ein gültiges Paket mit der Tabelle', () => {
+    const daten = xlsx('Ergebnisse', [
+      ['Name', 'Punkte'],
+      ['Anna K.', 12]
+    ])
+    const dateien = unzipSync(daten)
+    expect(Object.keys(dateien)).toContain('xl/worksheets/sheet1.xml')
+    const blatt = strFromU8(dateien['xl/worksheets/sheet1.xml'])
+    expect(blatt).toContain('<v>12</v>')
+    expect(blatt).toContain('Anna K.')
   })
 })

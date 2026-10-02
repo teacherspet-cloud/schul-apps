@@ -16,13 +16,13 @@ export type Rolle = 'admin' | 'lehrkraft' | 'schueler'
 
 export interface Nutzer {
   id: string
-  /** IServ-Benutzername (m.mustermann) bzw. test.<n> */
+  /** IServ-Benutzername (m.mustermann), test.<n>, vom Admin angelegt (lokal) bzw. gast-<id> (Onlinetest ohne IServ) */
   benutzer: string
   /** Anzeigename (Klarname – bleibt auf dem Server, geht nie an eine KI) */
   name: string
   rolle: Rolle
   /** Woher die Anmeldung kommt */
-  quelle: 'iserv' | 'test' | 'notzugang'
+  quelle: 'iserv' | 'test' | 'notzugang' | 'lokal' | 'gast'
   /** Kennung der Sitzung (für Ereignisse und Aufträge) */
   sitzung?: string
 }

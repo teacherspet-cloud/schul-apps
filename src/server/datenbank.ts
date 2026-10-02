@@ -61,6 +61,7 @@ export function datenbank(datei = join(DATEN, 'schulapps.db')): DatabaseSync {
   db = new DatabaseSync(datei)
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
   db.exec(SCHEMA)
+  ergaenze(db)
   return db
 }
 
@@ -70,7 +71,15 @@ export function datenbankFuerTests(): DatabaseSync {
   db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys = ON;')
   db.exec(SCHEMA)
+  ergaenze(db)
   return db
+}
+
+/** Spalten, die nach der ersten Fassung dazukamen (vorhandene Datenbanken nachrüsten) */
+function ergaenze(d: DatabaseSync): void {
+  const spalten = new Set((d.prepare('PRAGMA table_info(nutzer)').all() as { name: string }[]).map((s) => s.name))
+  // Vom Admin angelegte Konten: vorübergehendes Passwort, bei der ersten Anmeldung zu ändern (02.10.2026)
+  if (!spalten.has('passwort_wechseln')) d.exec('ALTER TABLE nutzer ADD COLUMN passwort_wechseln INTEGER NOT NULL DEFAULT 0')
 }
 
 const jetzt = (): string => new Date().toISOString()
@@ -89,6 +98,7 @@ interface NutzerZeile {
   gruppen: string
   erstellt: string
   zuletzt: string | null
+  passwort_wechseln: number
 }
 
 export interface NutzerInfo extends Nutzer {
@@ -98,6 +108,8 @@ export interface NutzerInfo extends Nutzer {
   erstellt: string
   zuletzt: string | null
   hatPasswort: boolean
+  /** Vorübergehendes Passwort – bei der nächsten Anmeldung ein eigenes setzen */
+  passwortWechseln: boolean
 }
 
 const alsInfo = (z: NutzerZeile): NutzerInfo => ({
@@ -117,7 +129,8 @@ const alsInfo = (z: NutzerZeile): NutzerInfo => ({
   })(),
   erstellt: z.erstellt,
   zuletzt: z.zuletzt,
-  hatPasswort: Boolean(z.passwort_hash)
+  hatPasswort: Boolean(z.passwort_hash),
+  passwortWechseln: Boolean(z.passwort_wechseln)
 })
 
 export function nutzerNachBenutzer(benutzer: string): NutzerInfo | null {
@@ -148,15 +161,19 @@ export function nutzerAnlegen(n: {
   quelle: Nutzer['quelle']
   passwortHash?: string
   gruppen?: { id: string; name: string }[]
+  passwortWechseln?: boolean
 }): NutzerInfo {
   const id = neueNutzerId()
   datenbank()
-    .prepare('INSERT INTO nutzer (id, benutzer, name, rolle, quelle, passwort_hash, gruppen, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, n.benutzer.toLowerCase(), n.name, n.rolle, n.quelle, n.passwortHash ?? null, JSON.stringify(n.gruppen ?? []), jetzt())
+    .prepare('INSERT INTO nutzer (id, benutzer, name, rolle, quelle, passwort_hash, gruppen, erstellt, passwort_wechseln) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, n.benutzer.toLowerCase(), n.name, n.rolle, n.quelle, n.passwortHash ?? null, JSON.stringify(n.gruppen ?? []), jetzt(), n.passwortWechseln ? 1 : 0)
   return nutzerNachId(id)!
 }
 
-export function nutzerAendern(id: string, patch: Partial<{ name: string; rolle: Rolle; quelle: Nutzer['quelle']; passwortHash: string | null; gesperrt: boolean; eingerichtet: boolean; gruppen: { id: string; name: string }[] }>): void {
+export function nutzerAendern(
+  id: string,
+  patch: Partial<{ name: string; rolle: Rolle; quelle: Nutzer['quelle']; passwortHash: string | null; gesperrt: boolean; eingerichtet: boolean; gruppen: { id: string; name: string }[]; passwortWechseln: boolean }>
+): void {
   const felder: string[] = []
   const werte: (string | number | null)[] = []
   if (patch.name !== undefined) (felder.push('name = ?'), werte.push(patch.name))
@@ -166,6 +183,7 @@ export function nutzerAendern(id: string, patch: Partial<{ name: string; rolle: 
   if (patch.gesperrt !== undefined) (felder.push('gesperrt = ?'), werte.push(patch.gesperrt ? 1 : 0))
   if (patch.eingerichtet !== undefined) (felder.push('eingerichtet = ?'), werte.push(patch.eingerichtet ? 1 : 0))
   if (patch.gruppen !== undefined) (felder.push('gruppen = ?'), werte.push(JSON.stringify(patch.gruppen)))
+  if (patch.passwortWechseln !== undefined) (felder.push('passwort_wechseln = ?'), werte.push(patch.passwortWechseln ? 1 : 0))
   if (!felder.length) return
   datenbank()
     .prepare(`UPDATE nutzer SET ${felder.join(', ')} WHERE id = ?`)

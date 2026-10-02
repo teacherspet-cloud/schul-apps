@@ -258,7 +258,9 @@ export async function passwortAnmeldung(benutzer: string, passwort: string, ip: 
   const b = benutzer.trim().toLowerCase()
   if (gesperrtWegenVersuchen(`ip:${ip}`) || gesperrtWegenVersuchen(`b:${b}`)) throw new AnmeldeFehler('Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.')
   const nutzer = nutzerNachBenutzer(b)
-  const erlaubt = nutzer && !nutzer.gesperrt && (nutzer.quelle === 'test' || (nutzer.quelle === 'notzugang' && notzugangAn()) || (nutzer.rolle === 'admin' && nutzer.hatPasswort && notzugangAn()))
+  // Testkonten und vom Admin angelegte Konten immer; der Notzugang nur, solange er eingeschaltet ist
+  const erlaubt =
+    nutzer && !nutzer.gesperrt && (nutzer.quelle === 'test' || nutzer.quelle === 'lokal' || (nutzer.quelle === 'notzugang' && notzugangAn()) || (nutzer.rolle === 'admin' && nutzer.hatPasswort && notzugangAn()))
   const stimmt = erlaubt ? passwortPruefen(passwort, passwortHashVon(b)) : false
   if (!stimmt || !nutzer) {
     const n = Math.max(fehlversuch(`ip:${ip}`), fehlversuch(`b:${b}`))

@@ -120,6 +120,33 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     // Das Passwort wird nur dieses eine Mal gezeigt
     return (json(res, 200, { benutzer: neu.benutzer, passwort, id: neu.id }), true)
   }
+  if (was === 'nutzer-anlegen') {
+    // Neuer Nutzer mit Benutzername und vorübergehendem Passwort (02.10.2026) – bei der ersten
+    // Anmeldung muss ein eigenes Passwort gesetzt werden (http.ts, /passwort)
+    const benutzer = String(k0.benutzer ?? '').trim().toLowerCase()
+    if (!/^[a-z0-9][a-z0-9._-]{1,63}$/.test(benutzer)) return (json(res, 400, { fehler: 'Benutzername: 2–64 Zeichen, nur Kleinbuchstaben, Ziffern, Punkt, Minus, Unterstrich (z. B. m.mustermann).' }), true)
+    if (benutzer.startsWith('gast-')) return (json(res, 400, { fehler: '„gast-“ ist für Onlinetests reserviert.' }), true)
+    if (nutzerNachBenutzer(benutzer)) return (json(res, 409, { fehler: 'Diesen Benutzernamen gibt es schon.' }), true)
+    const rolle: Rolle = k0.rolle === 'admin' ? 'admin' : k0.rolle === 'schueler' ? 'schueler' : 'lehrkraft'
+    const eigenes = typeof k0.passwort === 'string' ? k0.passwort : ''
+    if (eigenes && eigenes.length < 10) return (json(res, 400, { fehler: 'Das vorübergehende Passwort braucht mindestens 10 Zeichen.' }), true)
+    const passwort = eigenes || zufallsPasswort()
+    const neu = nutzerAnlegen({ benutzer, name: String(k0.name ?? '').trim().slice(0, 80) || benutzer, rolle, quelle: 'lokal', passwortHash: passwortHash(passwort), passwortWechseln: true })
+    registerVergessen()
+    protokolliereServer('verwaltung', `Konto angelegt (${rolle}, vorübergehendes Passwort)`, ich)
+    return (json(res, 200, { benutzer: neu.benutzer, passwort, id: neu.id }), true)
+  }
+  if (was === 'passwort-zuruecksetzen') {
+    // Vergessenes Passwort: neues vorübergehendes Passwort (nur für Konten mit Passwort)
+    const n = nutzerNachId(String(k0.id ?? ''))
+    if (!n) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+    if (n.quelle !== 'lokal' && n.quelle !== 'test') return (json(res, 400, { fehler: 'Dieses Konto meldet sich nicht mit einem Passwort von Schul-Apps an.' }), true)
+    const passwort = zufallsPasswort()
+    nutzerAendern(n.id, { passwortHash: passwortHash(passwort), passwortWechseln: n.quelle === 'lokal' })
+    sitzungenDesNutzersBeenden(n.id)
+    protokolliereServer('verwaltung', 'Passwort zurückgesetzt', ich)
+    return (json(res, 200, { benutzer: n.benutzer, passwort }), true)
+  }
   if (was === 'nutzer-loeschen') {
     const n = nutzerNachId(String(k0.id ?? ''))
     if (!n) return (json(res, 404, { fehler: 'Unbekannt.' }), true)

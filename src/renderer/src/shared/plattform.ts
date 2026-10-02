@@ -57,7 +57,7 @@ export interface ServerIch {
   benutzer?: string
   name?: string
   rolle?: 'admin' | 'lehrkraft' | 'schueler'
-  quelle?: 'iserv' | 'test' | 'notzugang'
+  quelle?: 'iserv' | 'test' | 'notzugang' | 'lokal' | 'gast'
   eingerichtet?: boolean
   /** öffentliche Adresse des Servers (QR-Codes) */
   adresse: string

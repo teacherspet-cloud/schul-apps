@@ -1,39 +1,72 @@
 /**
  * Onlinetest – die App der Lehrkraft (02.10.2026, nur mit dem Schul-Apps-Server).
  *
- *  - Tests: Code, Link und QR-Code für die Lernenden, Live-Stand (wer arbeitet, wer abgegeben
- *    hat, wer die Seite verlassen hat), Auswertung mit KI für offene Antworten, Durchsicht jeder
- *    Antwort mit „richtig/falsch" zum Überstimmen, Test beenden.
- *  - Lerngruppen: aus den IServ-Gruppen oder von Hand; Historie mit Datum, Ergebnissen,
- *    Notenverteilung, Durchschnittsnote und Durchschnitt je Schülerin/Schüler.
+ *  - Tests: Liste mit Sortieren/Filtern je Spalte; Code, Link und QR-Code für die Lernenden;
+ *    gemeinsamer Start; Live-Stand (wer wartet, schreibt, abgegeben, die Seite verlassen hat);
+ *    die KI wertet nach jeder Abgabe selbst aus; Durchsicht jeder Antwort zum Überstimmen,
+ *    „Zu entscheiden" für kleine Fehler und vertretbare Abweichungen; Ergebnisse freigeben;
+ *    Export (PDF, Excel, Word, Drucken, TeacherTool).
+ *  - Lerngruppen: aus IServ (Anmeldung oder Ordner „Gruppen") oder von Hand; Historie mit Datum,
+ *    Ergebnissen, Notenverteilung, Durchschnittsnote und Durchschnitt je Schülerin/Schüler.
  *
  * Wichtig (Wunsch der Lehrkraft): Die Auswertung ist ein VORSCHLAG – die Abgaben bitte trotzdem prüfen.
+ * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
+ * die Namen lassen sich ausblenden.
  */
-import { ActionIcon, Alert, Badge, Button, Card, Container, Group, Loader, Modal, NumberInput, Select, SimpleGrid, Stack, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip } from '@mantine/core'
-import { IconAlertTriangle, IconCheck, IconCopy, IconPlayerStop, IconPlayerPlay, IconRefresh, IconSparkles, IconTrash, IconUsersGroup, IconX } from '@tabler/icons-react'
+import { ActionIcon, Alert, Badge, Button, Card, Checkbox, Collapse, Container, Group, Loader, Menu, Modal, NumberInput, Popover, Select, SimpleGrid, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip } from '@mantine/core'
+import {
+  IconAlertTriangle,
+  IconArrowDown,
+  IconArrowUp,
+  IconArrowsSort,
+  IconCheck,
+  IconChevronDown,
+  IconChevronRight,
+  IconCopy,
+  IconDownload,
+  IconEye,
+  IconEyeOff,
+  IconFilter,
+  IconFolders,
+  IconPencil,
+  IconPlayerPlay,
+  IconPlayerStop,
+  IconPrinter,
+  IconSparkles,
+  IconTrash,
+  IconUsersGroup,
+  IconX
+} from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
-import type { Antworten, Bewertung, Einheit, Loesung, OnlineAufgabe } from './kern'
+import { antwortAlsText, felderVon, loesungAlsText, type Antworten, type Bewertung, type Einheit, type Loesung, type OnlineAufgabe } from './kern'
 import { holen, senden } from './serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
+import { hatClient } from '../../shared/plattform'
+import { ergebnisDocx, ergebnisHtml, ergebnisXlsx, notenSpalte, teachertoolCsv, type ErgebnisDaten, type NotenFormat } from './ergebnisExport'
 
 interface TestListe {
   id: string
   titel: string
+  art: string
+  thema: string
+  zielsprache: string
   code: string
   link: string
-  status: 'offen' | 'beendet'
+  status: 'wartend' | 'offen' | 'beendet'
   erstellt: string
   lerngruppe: string
   teilnehmer: number
   abgegeben: number
   offen: number
+  zuEntscheiden: number
 }
 
 interface Teilnahme {
   id: string
   name: string
   benutzer: string
+  gast: boolean
   variante: string
   varianteNr: number
   beginn: number
@@ -44,6 +77,7 @@ interface Teilnahme {
   punkte: number
   max: number
   offen: number
+  zuEntscheiden: number
   note: number | null
   antworten: Antworten
   bewertung: Bewertung
@@ -54,8 +88,13 @@ interface TestDetail {
   titel: string
   code: string
   link: string
-  status: 'offen' | 'beendet'
-  einstellungen: { zeitMin: number }
+  status: 'wartend' | 'offen' | 'beendet'
+  erstellt: string
+  einstellungen: { zeitMin: number; schwellen: number[]; thema?: string; gestartet?: number; ergebnisFrei?: boolean; art?: string }
+  lerngruppe: { name: string } | null
+  ohneIserv: boolean
+  ki: { laeuft: boolean; fehler: string | null }
+  ergebnisSichtbar: boolean
   fehlend: { name: string; benutzer: string }[]
   fassungen: { label: string; punkte: number; aufgaben: OnlineAufgabe[]; einheiten: Einheit[]; loesungen: Record<string, Loesung> }[]
   teilnahmen: Teilnahme[]
@@ -64,6 +103,12 @@ interface TestDetail {
 export const PRUEF_HINWEIS = 'Die Auswertung ist ein Vorschlag – bitte die Abgaben trotzdem prüfen, besonders die von der KI bewerteten und markierten Antworten.'
 
 const datum = (s: string | number): string => new Date(s).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
+const STATUS_TEXT: Record<TestListe['status'], string> = { wartend: 'wartet auf Start', offen: 'läuft', beendet: 'beendet' }
+const STATUS_FARBE: Record<TestListe['status'], string> = { wartend: 'yellow', offen: 'green', beendet: 'gray' }
+
+/** Allgemeine Titel („Vocabulary Test") machen Tests ununterscheidbar – dann zählt das Thema */
+const ALLGEMEIN = /^(vocabulary test|vokabeltest|vokabeltest englisch|test|onlinetest|vocab test|contrôle de vocabulaire|prueba de vocabulario)$/i
+export const anzeigeName = (t: { titel: string; thema?: string }): string => (ALLGEMEIN.test(t.titel.trim()) && t.thema ? t.thema : t.titel)
 
 export default function OnlinetestModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [reiter, setReiter] = useState<string | null>('tests')
@@ -91,16 +136,109 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
   )
 }
 
+// ---------------------------------------------------------------- Testliste: sortieren und filtern je Spalte
+
+type Spalte = 'name' | 'lerngruppe' | 'art' | 'datum' | 'abgaben' | 'status'
+type Filter = Partial<Record<Spalte, string>>
+const FILTER_TEXT: Record<Spalte, string> = { name: 'Test', lerngruppe: 'Klasse', art: 'Testart', datum: 'ab', abgaben: 'Abgaben', status: 'Status' }
+
+const wertFuer = (t: TestListe, s: Spalte): string | number =>
+  s === 'name' ? anzeigeName(t).toLowerCase() : s === 'lerngruppe' ? t.lerngruppe.toLowerCase() : s === 'art' ? t.art : s === 'datum' ? t.erstellt : s === 'abgaben' ? t.abgegeben : t.status
+
+function SpaltenKopf({
+  label,
+  spalte,
+  sort,
+  setSort,
+  filter,
+  setFilter,
+  auswahl
+}: {
+  label: string
+  spalte: Spalte
+  sort: { spalte: Spalte; ab: boolean }
+  setSort: (s: { spalte: Spalte; ab: boolean }) => void
+  filter: Filter
+  setFilter: (f: Filter) => void
+  /** Feste Werte (Klasse, Testart, Status) statt freiem Text */
+  auswahl?: { value: string; label: string }[]
+}): React.JSX.Element {
+  const aktiv = sort.spalte === spalte
+  const gefiltert = Boolean(filter[spalte])
+  return (
+    <Table.Th>
+      <Group gap={2} wrap="nowrap">
+        <Text fw={700} size="sm">
+          {label}
+        </Text>
+        <Tooltip label={aktiv ? (sort.ab ? 'absteigend – umkehren' : 'aufsteigend – umkehren') : 'sortieren'}>
+          <ActionIcon size="sm" variant={aktiv ? 'light' : 'subtle'} color={aktiv ? undefined : 'gray'} onClick={() => setSort({ spalte, ab: aktiv ? !sort.ab : spalte === 'datum' })} aria-label={`nach ${label} sortieren`}>
+            {aktiv ? sort.ab ? <IconArrowDown size={14} /> : <IconArrowUp size={14} /> : <IconArrowsSort size={14} />}
+          </ActionIcon>
+        </Tooltip>
+        <Popover position="bottom-start" shadow="md" withArrow>
+          <Popover.Target>
+            <ActionIcon size="sm" variant={gefiltert ? 'filled' : 'subtle'} color={gefiltert ? undefined : 'gray'} aria-label={`nach ${label} filtern`} data-filter={spalte}>
+              <IconFilter size={13} />
+            </ActionIcon>
+          </Popover.Target>
+          <Popover.Dropdown>
+            {auswahl ? (
+              <Select
+                label={`${label} filtern`}
+                data={auswahl}
+                value={filter[spalte] ?? null}
+                onChange={(v) => setFilter({ ...filter, [spalte]: v ?? undefined })}
+                clearable
+                placeholder="alle"
+                comboboxProps={{ withinPortal: false }}
+                w={220}
+              />
+            ) : spalte === 'datum' ? (
+              <TextInput label="Datum ab" type="date" value={filter.datum ?? ''} onChange={(e) => setFilter({ ...filter, datum: e.currentTarget.value || undefined })} w={220} />
+            ) : (
+              <TextInput label={`${label} enthält`} value={filter[spalte] ?? ''} onChange={(e) => setFilter({ ...filter, [spalte]: e.currentTarget.value || undefined })} w={220} autoFocus />
+            )}
+          </Popover.Dropdown>
+        </Popover>
+      </Group>
+    </Table.Th>
+  )
+}
+
 function Tests(): React.JSX.Element {
   const [liste, setListe] = useState<TestListe[] | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
+  const [sort, setSort] = useState<{ spalte: Spalte; ab: boolean }>({ spalte: 'datum', ab: true })
+  const [filter, setFilter] = useState<Filter>({})
   const laden = useCallback(() => {
     void holen<{ tests: TestListe[] }>('/server/onlinetest')
       .then((d) => setListe(d.tests))
       .catch((e: unknown) => notifyError(e))
   }, [])
   useEffect(laden, [laden])
+  const sichtbar = useMemo(() => {
+    if (!liste) return []
+    const f = liste.filter(
+      (t) =>
+        (!filter.name || `${t.titel} ${t.thema} ${t.code}`.toLowerCase().includes(filter.name.toLowerCase())) &&
+        (!filter.lerngruppe || t.lerngruppe === filter.lerngruppe) &&
+        (!filter.art || t.art === filter.art) &&
+        (!filter.status || t.status === filter.status) &&
+        (!filter.datum || t.erstellt.slice(0, 10) >= filter.datum) &&
+        (!filter.abgaben || (filter.abgaben === 'offen' ? t.offen + t.zuEntscheiden > 0 : t.offen + t.zuEntscheiden === 0))
+    )
+    return f.sort((a, b) => {
+      const x = wertFuer(a, sort.spalte)
+      const y = wertFuer(b, sort.spalte)
+      const v = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de')
+      return sort.ab ? -v : v
+    })
+  }, [liste, sort, filter])
   if (gewaehlt) return <TestAnsicht id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
+  const werte = (s: Spalte, f: (t: TestListe) => string): { value: string; label: string }[] =>
+    [...new Set((liste ?? []).map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')).map((v) => ({ value: v, label: s === 'status' ? STATUS_TEXT[v as TestListe['status']] : v }))
+  const kopf = { sort, setSort, filter, setFilter }
   return (
     <Stack>
       <Alert variant="light" icon={<IconAlertTriangle size={16} />}>
@@ -108,44 +246,80 @@ function Tests(): React.JSX.Element {
       </Alert>
       {!liste && <Loader />}
       {liste?.length === 0 && <Text c="dimmed">Noch keine Onlinetests.</Text>}
+      {Object.values(filter).some(Boolean) && (
+        <Group gap="xs" data-aktive-filter>
+          <Text size="sm" c="dimmed">
+            Gefiltert:
+          </Text>
+          {(Object.entries(filter) as [Spalte, string | undefined][])
+            .filter(([, v]) => v)
+            .map(([k, v]) => (
+              <Badge
+                key={k}
+                variant="light"
+                rightSection={
+                  <ActionIcon size="xs" variant="transparent" onClick={() => setFilter({ ...filter, [k]: undefined })} aria-label="Filter entfernen">
+                    <IconX size={10} />
+                  </ActionIcon>
+                }
+              >
+                {FILTER_TEXT[k]}: {k === 'status' ? STATUS_TEXT[v as TestListe['status']] : k === 'abgaben' ? (v === 'offen' ? 'noch zu prüfen' : 'alles geprüft') : v}
+              </Badge>
+            ))}
+          <Button variant="subtle" size="xs" onClick={() => setFilter({})}>
+            Filter zurücksetzen
+          </Button>
+        </Group>
+      )}
       {liste && liste.length > 0 && (
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover data-testliste>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Test</Table.Th>
-              <Table.Th>Lerngruppe</Table.Th>
-              <Table.Th>Datum</Table.Th>
-              <Table.Th>Abgaben</Table.Th>
-              <Table.Th>Status</Table.Th>
+              <SpaltenKopf label="Test" spalte="name" {...kopf} />
+              <SpaltenKopf label="Klasse" spalte="lerngruppe" auswahl={werte('lerngruppe', (t) => t.lerngruppe)} {...kopf} />
+              <SpaltenKopf label="Testart" spalte="art" auswahl={werte('art', (t) => t.art)} {...kopf} />
+              <SpaltenKopf label="Datum" spalte="datum" {...kopf} />
+              <SpaltenKopf
+                label="Abgaben"
+                spalte="abgaben"
+                auswahl={[
+                  { value: 'offen', label: 'noch zu prüfen' },
+                  { value: 'fertig', label: 'alles geprüft' }
+                ]}
+                {...kopf}
+              />
+              <SpaltenKopf label="Status" spalte="status" auswahl={werte('status', (t) => t.status)} {...kopf} />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {liste.map((t) => (
+            {sichtbar.map((t) => (
               <Table.Tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setGewaehlt(t.id)}>
                 <Table.Td>
-                  <Text fw={600}>{t.titel}</Text>
+                  <Text fw={600}>{anzeigeName(t)}</Text>
                   <Text size="xs" c="dimmed">
-                    Code {t.code}
+                    {[anzeigeName(t) !== t.titel ? t.titel : t.thema, `Code ${t.code}`].filter(Boolean).join(' · ')}
                   </Text>
                 </Table.Td>
                 <Table.Td>{t.lerngruppe || '–'}</Table.Td>
+                <Table.Td>{t.art}</Table.Td>
                 <Table.Td>{datum(t.erstellt)}</Table.Td>
                 <Table.Td>
                   {t.abgegeben}/{t.teilnehmer}
-                  {t.offen > 0 && (
+                  {t.offen + t.zuEntscheiden > 0 && (
                     <Badge ml="xs" color="orange" size="sm">
-                      {t.offen} offen
+                      {t.offen + t.zuEntscheiden} zu prüfen
                     </Badge>
                   )}
                 </Table.Td>
                 <Table.Td>
-                  <Badge color={t.status === 'offen' ? 'green' : 'gray'}>{t.status === 'offen' ? 'läuft' : 'beendet'}</Badge>
+                  <Badge color={STATUS_FARBE[t.status]}>{STATUS_TEXT[t.status]}</Badge>
                 </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
         </Table>
       )}
+      {liste && liste.length > 0 && sichtbar.length === 0 && <Text c="dimmed">Kein Test passt zum Filter.</Text>}
     </Stack>
   )
 }
@@ -176,25 +350,126 @@ export function Zugang({ code, link }: { code: string; link: string }): React.JS
   )
 }
 
+/** Namen ausblenden (Tafel) – je Gerät gemerkt */
+function useNamenVerdeckt(): [boolean, (v: boolean) => void] {
+  const [v, setV] = useState(() => {
+    try {
+      return localStorage.getItem('onlinetest-namen-verdeckt') === '1'
+    } catch {
+      return false
+    }
+  })
+  return [
+    v,
+    (neu) => {
+      setV(neu)
+      try {
+        localStorage.setItem('onlinetest-namen-verdeckt', neu ? '1' : '0')
+      } catch {
+        // nur eine Annehmlichkeit
+      }
+    }
+  ]
+}
+
+function ergebnisDaten(d: TestDetail): ErgebnisDaten {
+  return {
+    titel: anzeigeName({ titel: d.titel, thema: d.einstellungen.thema }),
+    lerngruppe: d.lerngruppe?.name ?? '',
+    datum: new Date(d.erstellt).toLocaleDateString('de-DE'),
+    schwellen: d.einstellungen.schwellen,
+    zeilen: d.teilnahmen
+      .filter((t) => t.beginn > 0)
+      .map((t) => ({ name: t.name, fassung: t.variante, punkte: t.punkte, max: t.max, note: t.note, abgabe: t.abgabe, verlassen: t.verlassen, offen: t.offen + t.zuEntscheiden }))
+  }
+}
+
+const dateiName = (d: TestDetail): string => `Ergebnisse ${anzeigeName({ titel: d.titel, thema: d.einstellungen.thema })}${d.lerngruppe ? ` ${d.lerngruppe.name}` : ''}`.replace(/[\\/:*?"<>|]/g, '-')
+
+function Export({ d }: { d: TestDetail }): React.JSX.Element {
+  const [format, setFormat] = useState<NotenFormat>('ganz')
+  const daten = ergebnisDaten(d)
+  const speichern = async (endung: string, filter: string, inhalt: Uint8Array | string): Promise<void> => {
+    try {
+      const pfad = await window.api.files.save(`${dateiName(d)}.${endung}`, [{ name: filter, extensions: [endung] }], inhalt)
+      if (pfad) notifySuccess('Gespeichert.')
+    } catch (e) {
+      notifyError(e, 'Nicht gespeichert')
+    }
+  }
+  const leer = daten.zeilen.length === 0
+  return (
+    <Group gap="xs">
+      <Select
+        size="xs"
+        w={180}
+        data={[
+          { value: 'ganz', label: 'Noten ganz (2)' },
+          { value: 'tendenz', label: 'Noten mit Tendenz (2-)' },
+          { value: 'punkte', label: 'Punkte statt Noten' }
+        ]}
+        value={format}
+        onChange={(v) => v && setFormat(v as NotenFormat)}
+        allowDeselect={false}
+        aria-label="Notenformat"
+      />
+      <Menu shadow="md" position="bottom-end">
+        <Menu.Target>
+          <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} disabled={leer} data-export>
+            Ergebnisse ausgeben
+          </Button>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Item leftSection={<IconPrinter size={14} />} onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format)).catch((e: unknown) => notifyError(e))}>
+            Drucken
+          </Menu.Item>
+          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>PDF</Menu.Item>
+          <Menu.Item onClick={() => void speichern('xlsx', 'Excel', ergebnisXlsx(daten, format))}>Excel (.xlsx)</Menu.Item>
+          <Menu.Item onClick={() => void ergebnisDocx(daten, format).then((b) => speichern('docx', 'Word', b))}>Word (.docx)</Menu.Item>
+          <Menu.Divider />
+          <Menu.Label>TeacherTool</Menu.Label>
+          <Menu.Item onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format, true)).catch((e: unknown) => notifyError(e))}>Abschreibliste drucken</Menu.Item>
+          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format, true), `${dateiName(d)} Abschreibliste.pdf`).catch((e: unknown) => notifyError(e))}>
+            Abschreibliste als PDF
+          </Menu.Item>
+          <Menu.Item onClick={() => void navigator.clipboard?.writeText(notenSpalte(daten, format)).then(() => notifySuccess('Notenspalte kopiert (Reihenfolge: Nachname, Vorname).'))}>
+            Notenspalte kopieren
+          </Menu.Item>
+          <Menu.Item onClick={() => void speichern('csv', 'CSV', teachertoolCsv(daten))}>CSV für neuen Kurs (Vorname, Name, Klasse)</Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
+    </Group>
+  )
+}
+
 function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
   const [d, setD] = useState<TestDetail | null>(null)
   const [laeuft, setLaeuft] = useState(false)
-  const [durchsicht, setDurchsicht] = useState<Teilnahme | null>(null)
+  const [durchsicht, setDurchsicht] = useState<string | null>(null)
+  const [entscheiden, setEntscheiden] = useState(false)
+  const [listeOffen, setListeOffen] = useState(false)
+  const [verdeckt, setVerdeckt] = useNamenVerdeckt()
+  const [umbenennen, setUmbenennen] = useState<string | null>(null)
   const laden = useCallback(() => {
     void holen<TestDetail>(`/server/onlinetest/${id}`)
       .then(setD)
       .catch((e: unknown) => notifyError(e))
   }, [id])
   useEffect(laden, [laden])
-  // Live-Stand, solange der Test läuft
+  // Live-Stand: solange der Test läuft oder wartet, und solange die KI noch auswertet
   useEffect(() => {
-    if (d?.status !== 'offen') return
-    const i = setInterval(laden, 5000)
+    if (!d || (d.status === 'beendet' && !d.ki.laeuft)) return
+    const i = setInterval(laden, d.status === 'wartend' ? 3000 : 5000)
     return () => clearInterval(i)
-  }, [d?.status, laden])
+  }, [d, laden])
   if (!d) return <Loader />
+  const wartend = d.teilnahmen.filter((t) => t.beginn === 0)
+  const schreibend = d.teilnahmen.filter((t) => t.beginn > 0 && !t.abgabe)
+  const abgegeben = d.teilnahmen.filter((t) => t.abgabe)
   const offen = d.teilnahmen.reduce((s, t) => s + t.offen, 0)
-  const status = async (s: 'offen' | 'beendet'): Promise<void> => {
+  const zuEntscheiden = d.teilnahmen.reduce((s, t) => s + t.zuEntscheiden, 0)
+  const nameVon = (t: Teilnahme, i: number): string => (verdeckt ? `Person ${i + 1}` : t.name)
+  const status = async (s: 'starten' | 'beendet' | 'offen' | 'freigeben' | 'zurueckhalten'): Promise<void> => {
     if (s === 'beendet' && !window.confirm('Test beenden? Wer noch schreibt, gibt mit dem zuletzt gesicherten Stand ab.')) return
     await senden(`/server/onlinetest/${id}/status`, { status: s }).catch((e: unknown) => notifyError(e))
     laden()
@@ -202,7 +477,8 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   const auswerten = async (): Promise<void> => {
     setLaeuft(true)
     try {
-      const r = await senden<{ anfragen: number; bewertet: number }>(`/server/onlinetest/${id}/auswerten`)
+      const r = await senden<{ ok: boolean; anfragen: number; bewertet: number; fehler?: string }>(`/server/onlinetest/${id}/auswerten`)
+      if (r.ok === false) throw new Error(r.fehler)
       notifySuccess(`${r.bewertet} Antworten von der KI bewertet (${r.anfragen} Anfrage${r.anfragen === 1 ? '' : 'n'}).`)
     } catch (e) {
       notifyError(e, 'Auswertung fehlgeschlagen')
@@ -216,6 +492,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
     await senden(`/server/onlinetest/${id}/loeschen`).catch((e: unknown) => notifyError(e))
     zurueck()
   }
+  const titel = anzeigeName({ titel: d.titel, thema: d.einstellungen.thema })
   return (
     <Stack>
       <Group justify="space-between">
@@ -223,120 +500,314 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
           ← Alle Tests
         </Button>
         <Group gap="xs">
-          <ActionIcon variant="subtle" onClick={laden} aria-label="Neu laden">
-            <IconRefresh size={18} />
-          </ActionIcon>
-          {d.status === 'offen' ? (
+          {d.status === 'wartend' && (
+            <Button color="green" leftSection={<IconPlayerPlay size={16} />} onClick={() => void status('starten')} data-test-starten>
+              Test für alle starten
+            </Button>
+          )}
+          {d.status === 'offen' && (
             <Button color="red" variant="light" leftSection={<IconPlayerStop size={16} />} onClick={() => void status('beendet')}>
               Test beenden
             </Button>
-          ) : (
+          )}
+          {d.status === 'beendet' && (
             <Button variant="light" leftSection={<IconPlayerPlay size={16} />} onClick={() => void status('offen')}>
               Wieder öffnen
             </Button>
           )}
-          <ActionIcon color="red" variant="subtle" onClick={() => void loeschen()} aria-label="Löschen">
-            <IconTrash size={18} />
-          </ActionIcon>
+          <Tooltip label="Test löschen">
+            <ActionIcon color="red" variant="subtle" onClick={() => void loeschen()} aria-label="Test löschen">
+              <IconTrash size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Group>
       <Card withBorder>
-        <Title order={3}>{d.titel}</Title>
+        <Group gap="xs" wrap="nowrap">
+          <Title order={3}>{titel}</Title>
+          <Tooltip label="Umbenennen">
+            <ActionIcon variant="subtle" color="gray" onClick={() => setUmbenennen(d.titel)} aria-label="Umbenennen">
+              <IconPencil size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
         <Text c="dimmed" mb="sm">
-          {d.einstellungen.zeitMin} Minuten · {d.fassungen.map((f) => `Fassung ${f.label}: ${f.punkte} P.`).join(' · ')}
+          {[d.lerngruppe?.name, `${d.einstellungen.zeitMin} Minuten`, ...d.fassungen.map((f) => `Fassung ${f.label}: ${f.punkte} P.`)].filter(Boolean).join(' · ')}
         </Text>
-        {d.status === 'offen' && <Zugang code={d.code} link={d.link} />}
+        {d.status !== 'beendet' && <Zugang code={d.code} link={d.link} />}
+        {d.status === 'wartend' && (
+          <Alert mt="sm" color="yellow" variant="light">
+            {d.ohneIserv ? 'Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstabe ein. ' : 'Die Lernenden scannen den QR-Code und melden sich mit IServ an. '}
+            Sie sehen einen Wartebildschirm, bis der Test gestartet wird. Bereit: {wartend.length}
+          </Alert>
+        )}
       </Card>
+      <SimpleGrid cols={{ base: 2, sm: 4 }}>
+        {[
+          ['warten', wartend.length, 'yellow'],
+          ['schreiben', schreibend.length, 'blue'],
+          ['abgegeben', abgegeben.length, 'green'],
+          ['Seite verlassen', d.teilnahmen.filter((t) => t.verlassen).length, 'red']
+        ].map(([k, n, c]) => (
+          <Card key={k} withBorder padding="sm">
+            <Text size="xl" fw={800} c={`${c}.7`}>
+              {n}
+            </Text>
+            <Text size="sm" c="dimmed">
+              {k}
+            </Text>
+          </Card>
+        ))}
+      </SimpleGrid>
       <Alert color="orange" icon={<IconAlertTriangle size={16} />}>
         {PRUEF_HINWEIS}
       </Alert>
-      <Group>
-        <Button leftSection={laeuft ? <Loader size={14} /> : <IconSparkles size={16} />} disabled={laeuft || offen === 0} onClick={() => void auswerten()}>
-          Offene Antworten mit KI auswerten ({offen})
-        </Button>
-        <Text size="xs" c="dimmed">
-          Eine Anfrage je Aufgabe über den eigenen KI-Zugang – ohne Namen, nur mit Kennungen.
-        </Text>
-      </Group>
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Name</Table.Th>
-            <Table.Th>Fassung</Table.Th>
-            <Table.Th>Stand</Table.Th>
-            <Table.Th>Punkte</Table.Th>
-            <Table.Th>Note</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {d.teilnahmen.map((t) => (
-            <Table.Tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setDurchsicht(t)}>
-              <Table.Td>
-                {t.name}
-                <Text size="xs" c="dimmed">
-                  {t.benutzer}
+      <Card withBorder>
+        <Stack gap="xs">
+          <Group justify="space-between">
+            <Group gap="xs">
+              {d.ki.laeuft || laeuft ? (
+                <>
+                  <Loader size={16} />
+                  <Text size="sm">Die KI wertet die Abgaben aus …</Text>
+                </>
+              ) : d.ki.fehler ? (
+                <Text size="sm" c="red">
+                  KI-Auswertung fehlgeschlagen: {d.ki.fehler}
                 </Text>
-              </Table.Td>
-              <Table.Td>{t.variante}</Table.Td>
-              <Table.Td>
-                {!t.abgabe ? (
-                  <Badge color="blue">schreibt</Badge>
-                ) : t.verlassen ? (
-                  <Tooltip label="Hat die Seite verlassen – automatisch abgegeben">
-                    <Badge color="red">verlassen {new Date(t.abgabe).toLocaleTimeString('de-DE', { timeStyle: 'short' })}</Badge>
-                  </Tooltip>
-                ) : (
-                  <Badge color={t.grund === 'zeit' ? 'orange' : 'green'}>{t.grund === 'zeit' ? 'Zeit abgelaufen' : t.grund === 'lehrkraft' ? 'beendet' : 'abgegeben'}</Badge>
-                )}
-              </Table.Td>
-              <Table.Td>
-                {t.abgabe ? `${t.punkte}/${t.max}` : '–'}
-                {t.offen > 0 && (
-                  <Badge ml="xs" size="sm" color="orange">
-                    {t.offen} offen
-                  </Badge>
-                )}
-              </Table.Td>
-              <Table.Td>{t.note ?? '–'}</Table.Td>
+              ) : (
+                <Text size="sm" c="dimmed">
+                  Die KI wertet jede Abgabe automatisch aus (eigener KI-Zugang, ohne Namen).
+                </Text>
+              )}
+            </Group>
+            {(offen > 0 || d.ki.fehler) && (
+              <Button size="xs" variant="light" leftSection={<IconSparkles size={14} />} disabled={laeuft || d.ki.laeuft} onClick={() => void auswerten()}>
+                Jetzt auswerten ({offen})
+              </Button>
+            )}
+          </Group>
+          <Group justify="space-between">
+            <Group gap="xs">
+              {zuEntscheiden > 0 ? (
+                <Button size="xs" color="orange" onClick={() => setEntscheiden(true)} data-zu-entscheiden>
+                  {zuEntscheiden} Antwort{zuEntscheiden === 1 ? '' : 'en'} zu entscheiden
+                </Button>
+              ) : (
+                <Text size="sm" c="dimmed">
+                  Nichts zu entscheiden.
+                </Text>
+              )}
+            </Group>
+            <Group gap="xs">
+              <Text size="sm" c="dimmed">
+                {d.ergebnisSichtbar ? 'Ergebnisse für die Lernenden sichtbar' : 'Ergebnisse erscheinen, wenn alle abgegeben haben'}
+              </Text>
+              <Button size="xs" variant="light" onClick={() => void status(d.einstellungen.ergebnisFrei ? 'zurueckhalten' : 'freigeben')} data-ergebnis-freigeben>
+                {d.einstellungen.ergebnisFrei ? 'Freigabe zurücknehmen' : 'Ergebnisse jetzt freigeben'}
+              </Button>
+            </Group>
+          </Group>
+        </Stack>
+      </Card>
+      <Group justify="space-between">
+        <Button variant="subtle" leftSection={listeOffen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />} onClick={() => setListeOffen(!listeOffen)} data-namensliste-knopf>
+          Teilnehmende ({d.teilnahmen.length})
+        </Button>
+        <Group gap="xs">
+          <Tooltip label={verdeckt ? 'Namen zeigen' : 'Namen ausblenden (z. B. an der Tafel)'}>
+            <ActionIcon variant="light" onClick={() => setVerdeckt(!verdeckt)} aria-label={verdeckt ? 'Namen zeigen' : 'Namen ausblenden'} data-namen-verdecken>
+              {verdeckt ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+            </ActionIcon>
+          </Tooltip>
+          <Export d={d} />
+        </Group>
+      </Group>
+      <Collapse expanded={listeOffen}>
+        <Table striped highlightOnHover data-namensliste>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Name</Table.Th>
+              <Table.Th>Fassung</Table.Th>
+              <Table.Th>Stand</Table.Th>
+              <Table.Th>Punkte</Table.Th>
+              <Table.Th>Note</Table.Th>
+              <Table.Th />
             </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
-      {d.fehlend.length > 0 && (
-        <Text size="sm" c="dimmed">
-          Noch nicht begonnen: {d.fehlend.map((f) => f.name || f.benutzer).join(', ')}
-        </Text>
-      )}
+          </Table.Thead>
+          <Table.Tbody>
+            {d.teilnahmen.map((t, i) => (
+              <Table.Tr key={t.id} style={{ cursor: t.beginn ? 'pointer' : undefined }} onClick={() => t.beginn && setDurchsicht(t.id)}>
+                <Table.Td>
+                  {nameVon(t, i)}
+                  {!verdeckt && t.benutzer && (
+                    <Text size="xs" c="dimmed">
+                      {t.benutzer}
+                    </Text>
+                  )}
+                </Table.Td>
+                <Table.Td>{t.variante}</Table.Td>
+                <Table.Td>
+                  {t.beginn === 0 ? (
+                    <Badge color="yellow">wartet</Badge>
+                  ) : !t.abgabe ? (
+                    <Badge color="blue">schreibt</Badge>
+                  ) : t.verlassen ? (
+                    <Tooltip label="Hat die Seite verlassen – automatisch abgegeben">
+                      <Badge color="red">verlassen {new Date(t.abgabe).toLocaleTimeString('de-DE', { timeStyle: 'short' })}</Badge>
+                    </Tooltip>
+                  ) : (
+                    <Badge color={t.grund === 'zeit' ? 'orange' : 'green'}>{t.grund === 'zeit' ? 'Zeit abgelaufen' : t.grund === 'lehrkraft' ? 'beendet' : 'abgegeben'}</Badge>
+                  )}
+                </Table.Td>
+                <Table.Td>
+                  {t.abgabe ? `${t.punkte}/${t.max}` : '–'}
+                  {t.offen + t.zuEntscheiden > 0 && (
+                    <Badge ml="xs" size="sm" color="orange">
+                      {t.offen + t.zuEntscheiden} zu prüfen
+                    </Badge>
+                  )}
+                </Table.Td>
+                <Table.Td>{t.note ?? '–'}</Table.Td>
+                <Table.Td>
+                  {t.beginn === 0 && (
+                    <Tooltip label="Entfernen (z. B. vertippter Name)">
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void senden(`/server/onlinetest/${id}/entfernen`, { teilnahme: t.id }).then(laden, (er: unknown) => notifyError(er))
+                        }}
+                        aria-label="Entfernen"
+                      >
+                        <IconX size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+        {d.fehlend.length > 0 && !verdeckt && (
+          <Text size="sm" c="dimmed" mt="xs">
+            Noch nicht beigetreten: {d.fehlend.map((f) => f.name || f.benutzer).join(', ')}
+          </Text>
+        )}
+      </Collapse>
       {durchsicht && (
         <Durchsicht
           test={d}
-          t={d.teilnahmen.find((x) => x.id === durchsicht.id) ?? durchsicht}
+          t={d.teilnahmen.find((x) => x.id === durchsicht)!}
+          name={nameVon(
+            d.teilnahmen.find((x) => x.id === durchsicht)!,
+            d.teilnahmen.findIndex((x) => x.id === durchsicht)
+          )}
           schliessen={() => setDurchsicht(null)}
           geaendert={laden}
         />
+      )}
+      {entscheiden && <Entscheidungen test={d} verdeckt={verdeckt} schliessen={() => setEntscheiden(false)} geaendert={laden} />}
+      {umbenennen != null && (
+        <Modal opened onClose={() => setUmbenennen(null)} title="Test umbenennen">
+          <Stack>
+            <TextInput value={umbenennen} onChange={(e) => setUmbenennen(e.currentTarget.value)} data-autofocus />
+            <Button
+              disabled={!umbenennen.trim()}
+              onClick={() =>
+                void senden(`/server/onlinetest/${id}/umbenennen`, { titel: umbenennen }).then(
+                  () => (setUmbenennen(null), laden()),
+                  (e: unknown) => notifyError(e)
+                )
+              }
+            >
+              Speichern
+            </Button>
+          </Stack>
+        </Modal>
       )}
     </Stack>
   )
 }
 
-const loesungText = (l: Loesung | undefined, optionen?: { wert: string; text: string }[]): string => {
-  if (!l) return ''
-  if (l.art === 'genau') return l.werte.join(' / ')
-  if (l.art === 'auswahl') return optionen?.find((o) => o.wert === l.wert)?.text ?? l.wert
-  if (l.art === 'ki') return `${l.erwartung} (Beispiel)`
-  if (l.art === 'menge') return l.werte.join(', ')
-  return '(frei – Lehrkraft)'
+const PRUEF_TEXT = { kleinerFehler: 'kleiner Fehler – trotzdem Punkt?', sinnvoll: 'andere, sinnvolle Antwort – akzeptieren?' }
+
+/** Eine Bewertungseinheit: Antworten mit Lösung, Hinweis der KI und die Entscheidung der Lehrkraft */
+function EinheitZeile({
+  test,
+  t,
+  e,
+  urteil
+}: {
+  test: TestDetail
+  t: Teilnahme
+  e: Einheit
+  urteil: (einheit: string, richtig: boolean, punkte?: number) => void
+}): React.JSX.Element {
+  const f = test.fassungen[t.varianteNr]
+  const felder = useMemo(() => felderVon(f), [f])
+  const b = t.bewertung[e.id]
+  const offen = b?.pruefen && b.quelle !== 'lehrkraft'
+  const farbe = offen ? 'orange' : b?.status === 'richtig' ? 'green' : b?.status === 'falsch' ? 'red' : 'orange'
+  return (
+    <Group align="start" wrap="nowrap" gap="sm" data-einheit={e.id}>
+      <Badge color={farbe} w={96} variant={b?.quelle === 'lehrkraft' ? 'filled' : 'light'}>
+        {b ? (b.status === 'ki' ? 'KI offen' : b.status === 'lehrkraft' ? 'prüfen' : offen ? 'entscheiden' : `${b.punkte}/${e.punkte}`) : '–'}
+      </Badge>
+      <Stack gap={0} style={{ flex: 1 }}>
+        {e.felder.map((id) => {
+          const x = felder.get(id)
+          return (
+            <Text key={id} size="sm">
+              {x?.feld.beschriftung ? `${x.feld.beschriftung}: ` : ''}
+              <b>{antwortAlsText(t.antworten[id], x?.feld.optionen) || '—'}</b>
+              <Text span size="xs" c="dimmed">
+                {'  '}Lösung: {loesungAlsText(f.loesungen[id], x?.feld.optionen) || '(frei – Lehrkraft)'}
+              </Text>
+            </Text>
+          )
+        })}
+        {b?.pruefen && (
+          <Text size="xs" c="orange.8" fw={600}>
+            {PRUEF_TEXT[b.pruefen]}
+            {b.quelle === 'lehrkraft' ? (b.status === 'richtig' ? ' – akzeptiert' : ' – nicht akzeptiert') : ''}
+          </Text>
+        )}
+        {b?.hinweis && (
+          <Text size="xs" c={b.quelle === 'ki' ? 'violet' : 'dimmed'}>
+            {b.quelle === 'ki' && !b.hinweis.startsWith('KI') ? 'KI: ' : ''}
+            {b.hinweis}
+          </Text>
+        )}
+      </Stack>
+      {e.punkte > 1 && f.loesungen[e.felder[0]]?.art === 'lehrkraft' ? (
+        <NumberInput size="xs" w={80} min={0} max={e.punkte} step={1} defaultValue={b?.punkte ?? 0} onBlur={(ev) => urteil(e.id, true, Number(ev.currentTarget.value))} />
+      ) : (
+        <Group gap={2} wrap="nowrap">
+          <Tooltip label={offen ? 'Akzeptieren (ganzer Punkt)' : 'richtig'}>
+            <ActionIcon color="green" variant={b?.status === 'richtig' ? 'filled' : 'light'} onClick={() => urteil(e.id, true)} aria-label="richtig">
+              <IconCheck size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label={offen ? 'Nicht akzeptieren' : 'falsch'}>
+            <ActionIcon color="red" variant={b?.status === 'falsch' && !offen ? 'filled' : 'light'} onClick={() => urteil(e.id, false)} aria-label="falsch">
+              <IconX size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      )}
+    </Group>
+  )
 }
 
-function Durchsicht({ test, t, schliessen, geaendert }: { test: TestDetail; t: Teilnahme; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
+function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail; t: Teilnahme; name: string; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
   const f = test.fassungen[t.varianteNr]
-  const felder = useMemo(() => new Map(f.aufgaben.flatMap((a) => a.eintraege.flatMap((e) => e.felder.map((x) => [x.id, x] as const)))), [f])
-  const urteil = async (einheit: string, richtig: boolean, punkte?: number): Promise<void> => {
-    await senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig, ...(punkte != null ? { punkte } : {}) }).catch((e: unknown) => notifyError(e))
-    geaendert()
-  }
+  const urteil = (einheit: string, richtig: boolean, punkte?: number): void =>
+    void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig, ...(punkte != null ? { punkte } : {}) }).then(geaendert, (e: unknown) => notifyError(e))
   return (
-    <Modal opened onClose={schliessen} title={`${t.name} · Fassung ${t.variante} · ${t.punkte}/${t.max} Punkte`} size="xl">
+    <Modal opened onClose={schliessen} title={`${name} · Fassung ${t.variante} · ${t.punkte}/${t.max} Punkte`} size="xl">
       <Stack>
         {!t.abgabe && (
           <Button
@@ -347,6 +818,9 @@ function Durchsicht({ test, t, schliessen, geaendert }: { test: TestDetail; t: T
             Für diese Person jetzt abgeben
           </Button>
         )}
+        <Text size="xs" c="dimmed">
+          Jede Antwort lässt sich nachträglich umentscheiden: ✓ gibt den ganzen Punkt, ✗ nimmt ihn.
+        </Text>
         {f.aufgaben.map((a, ai) => (
           <Card key={a.id} withBorder padding="sm">
             <Text fw={700} mb={4}>
@@ -355,46 +829,49 @@ function Durchsicht({ test, t, schliessen, geaendert }: { test: TestDetail; t: T
             <Stack gap={6}>
               {f.einheiten
                 .filter((e) => e.aufgabe === a.id)
-                .map((e) => {
-                  const b = t.bewertung[e.id]
-                  const farbe = b?.status === 'richtig' ? 'green' : b?.status === 'falsch' ? 'red' : 'orange'
-                  return (
-                    <Group key={e.id} align="start" wrap="nowrap" gap="sm">
-                      <Badge color={farbe} w={90} variant={b?.quelle === 'lehrkraft' ? 'filled' : 'light'}>
-                        {b ? (b.status === 'ki' ? 'KI offen' : b.status === 'lehrkraft' ? 'prüfen' : `${b.punkte}/${e.punkte}`) : '–'}
-                      </Badge>
-                      <Stack gap={0} style={{ flex: 1 }}>
-                        {e.felder.map((id) => (
-                          <Text key={id} size="sm">
-                            <b>{t.antworten[id] || '—'}</b>
-                            <Text span size="xs" c="dimmed">
-                              {'  '}Lösung: {loesungText(f.loesungen[id], felder.get(id)?.optionen)}
-                            </Text>
-                          </Text>
-                        ))}
-                        {b?.hinweis && (
-                          <Text size="xs" c={b.quelle === 'ki' ? 'violet' : 'orange'}>
-                            {b.quelle === 'ki' ? 'KI: ' : ''}
-                            {b.hinweis}
-                          </Text>
-                        )}
-                      </Stack>
-                      {e.punkte > 1 && f.loesungen[e.felder[0]]?.art === 'lehrkraft' ? (
-                        <NumberInput size="xs" w={80} min={0} max={e.punkte} step={1} defaultValue={b?.punkte ?? 0} onBlur={(ev) => void urteil(e.id, true, Number(ev.currentTarget.value))} />
-                      ) : (
-                        <Group gap={2}>
-                          <ActionIcon color="green" variant={b?.status === 'richtig' ? 'filled' : 'light'} onClick={() => void urteil(e.id, true)} aria-label="richtig">
-                            <IconCheck size={16} />
-                          </ActionIcon>
-                          <ActionIcon color="red" variant={b?.status === 'falsch' ? 'filled' : 'light'} onClick={() => void urteil(e.id, false)} aria-label="falsch">
-                            <IconX size={16} />
-                          </ActionIcon>
-                        </Group>
-                      )}
-                    </Group>
-                  )
-                })}
+                .map((e) => (
+                  <EinheitZeile key={e.id} test={test} t={t} e={e} urteil={urteil} />
+                ))}
             </Stack>
+          </Card>
+        ))}
+      </Stack>
+    </Modal>
+  )
+}
+
+/** Alle von der KI markierten Antworten aller Lernenden auf einen Blick */
+function Entscheidungen({ test, verdeckt, schliessen, geaendert }: { test: TestDetail; verdeckt: boolean; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
+  const [alle, setAlle] = useState(false)
+  const faelle = test.teilnahmen.flatMap((t, i) =>
+    test.fassungen[t.varianteNr].einheiten
+      .filter((e) => {
+        const b = t.bewertung[e.id]
+        return b?.pruefen && (alle || b.quelle !== 'lehrkraft')
+      })
+      .map((e) => ({ t, e, name: verdeckt ? `Person ${i + 1}` : t.name }))
+  )
+  return (
+    <Modal opened onClose={schliessen} title="Zu entscheiden" size="xl">
+      <Stack>
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            Kleine Fehler und von der Lösung abweichende, sinnvolle Antworten – bis zur Entscheidung 0 Punkte.
+          </Text>
+          <Switch size="xs" label="auch schon entschiedene" checked={alle} onChange={(e) => setAlle(e.currentTarget.checked)} />
+        </Group>
+        {faelle.length === 0 && <Text c="dimmed">Alles entschieden.</Text>}
+        {faelle.map(({ t, e, name }) => (
+          <Card key={`${t.id}-${e.id}`} withBorder padding="xs">
+            <Text size="xs" c="dimmed" mb={4}>
+              {name} · {test.fassungen[t.varianteNr].aufgaben.find((a) => a.id === e.aufgabe)?.titel}
+            </Text>
+            <EinheitZeile
+              test={test}
+              t={t}
+              e={e}
+              urteil={(einheit, richtig) => void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig }).then(geaendert, (er: unknown) => notifyError(er))}
+            />
           </Card>
         ))}
       </Stack>
@@ -420,9 +897,86 @@ interface Historie {
   schueler: { name: string; benutzer: string; tests: number; durchschnitt: number; prozent: number }[]
 }
 
+/**
+ * Gruppen aus den IServ-ORDNERN (02.10.2026, Wunsch der Lehrkraft): Solange IServ die Gruppen
+ * nicht über die Anmeldung liefert, zeigt der Ordner „Groups" (Gruppen), wo jemand Mitglied ist –
+ * „Klasse 10b" heißt: Lerngruppe 10b. Lesen kann das nur die Exe (IServ-Passwort bleibt am PC).
+ */
+const KLASSE_ODER_KURS = /^(klasse|kl\.?|jahrgang|jg\.?|kurs|q[12]|e[f]?|\d{1,2}\s*[a-z]{0,2}\b)/i
+export const lerngruppenName = (ordner: string): string => ordner.replace(/^klasse\s+/i, '').trim()
+
+async function iservGruppenordner(): Promise<string[] | null> {
+  if (!hatClient()) return null
+  const status = (await window.api.iserv.status().catch(() => null)) as { verbunden?: boolean } | null
+  if (!status?.verbunden) return null
+  return (await window.api.iserv.ordner('Groups')).map((e) => e.name).sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+}
+
+function IservGruppenUebernehmen({ vorhanden, fertig }: { vorhanden: string[]; fertig: () => void }): React.JSX.Element {
+  const [ordner, setOrdner] = useState<string[] | null>(null)
+  const [fehler, setFehler] = useState('')
+  const [wahl, setWahl] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    iservGruppenordner()
+      .then((o) => {
+        if (!o) return setFehler(hatClient() ? 'IServ ist in der Exe noch nicht verbunden (Einstellungen › Material › IServ).' : 'Die IServ-Ordner kann nur die Exe „Schul-Apps Online“ lesen – das IServ-Passwort bleibt am PC.')
+        setOrdner(o)
+        setWahl(new Set(o.filter((n) => KLASSE_ODER_KURS.test(n) && !vorhanden.includes(lerngruppenName(n).toLowerCase()))))
+      })
+      .catch((e: unknown) => setFehler(e instanceof Error ? e.message : String(e)))
+  }, [vorhanden])
+  const uebernehmen = async (): Promise<void> => {
+    try {
+      for (const n of wahl) await senden('/server/lerngruppen/anlegen', { name: lerngruppenName(n), iservGruppe: n })
+      notifySuccess(`${wahl.size} Lerngruppe${wahl.size === 1 ? '' : 'n'} angelegt.`)
+      fertig()
+    } catch (e) {
+      notifyError(e)
+    }
+  }
+  return (
+    <Modal opened onClose={fertig} title="Gruppen aus IServ übernehmen" size="lg">
+      <Stack>
+        <Text size="sm" c="dimmed">
+          Aus dem IServ-Ordner „Gruppen“: Jeder Gruppenordner zeigt eine Mitgliedschaft (z. B. „Klasse 10b“ → Lerngruppe „10b“). Klassen und Kurse sind vorausgewählt.
+        </Text>
+        {fehler && <Alert color="orange">{fehler}</Alert>}
+        {!ordner && !fehler && <Loader />}
+        {ordner?.length === 0 && <Text c="dimmed">Im Ordner „Gruppen“ ist nichts.</Text>}
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+          {ordner?.map((n) => {
+            const da = vorhanden.includes(lerngruppenName(n).toLowerCase())
+            return (
+              <Checkbox
+                key={n}
+                label={da ? `${n} (schon angelegt)` : n}
+                disabled={da}
+                checked={wahl.has(n)}
+                onChange={(e) => {
+                  const w = new Set(wahl)
+                  if (e.currentTarget.checked) w.add(n)
+                  else w.delete(n)
+                  setWahl(w)
+                }}
+              />
+            )
+          })}
+        </SimpleGrid>
+        <Group justify="flex-end">
+          <Button disabled={!wahl.size} onClick={() => void uebernehmen()}>
+            {wahl.size} übernehmen
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  )
+}
+
 function Lerngruppen(): React.JSX.Element {
   const [d, setD] = useState<{ gruppen: Gruppe[]; iservGruppen: { id: string; name: string }[] } | null>(null)
   const [neu, setNeu] = useState(false)
+  const [ausIserv, setAusIserv] = useState(false)
+  const [ordnerGruppen, setOrdnerGruppen] = useState<{ id: string; name: string }[]>([])
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const laden = useCallback(() => {
     void holen<NonNullable<typeof d>>('/server/lerngruppen')
@@ -430,11 +984,23 @@ function Lerngruppen(): React.JSX.Element {
       .catch((e: unknown) => notifyError(e))
   }, [])
   useEffect(laden, [laden])
+  // In der Exe: Gruppenordner still mitlesen – sie stehen dann beim Anlegen zur Auswahl
+  useEffect(() => {
+    void iservGruppenordner()
+      .then((o) => setOrdnerGruppen((o ?? []).map((n) => ({ id: n, name: n }))))
+      .catch(() => undefined)
+  }, [])
   if (gewaehlt) return <GruppenHistorie id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
+  const auswahl = [...(d?.iservGruppen ?? []), ...ordnerGruppen.filter((o) => !d?.iservGruppen.some((g) => g.id === o.id))]
   return (
     <Stack>
       <Group>
         <Button onClick={() => setNeu(true)}>Lerngruppe anlegen</Button>
+        <Tooltip label={hatClient() ? 'Klassen und Kurse aus dem IServ-Ordner „Gruppen“' : 'Nur in der Exe „Schul-Apps Online“ (IServ-Passwort bleibt am PC)'}>
+          <Button variant="light" leftSection={<IconFolders size={16} />} onClick={() => setAusIserv(true)} data-iserv-gruppen>
+            Aus IServ übernehmen
+          </Button>
+        </Tooltip>
       </Group>
       {!d && <Loader />}
       <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
@@ -448,9 +1014,18 @@ function Lerngruppen(): React.JSX.Element {
         ))}
       </SimpleGrid>
       {d?.gruppen.length === 0 && <Text c="dimmed">Noch keine Lerngruppe. Am einfachsten aus einer IServ-Gruppe (Klasse oder Kurs).</Text>}
+      {ausIserv && d && (
+        <IservGruppenUebernehmen
+          vorhanden={d.gruppen.map((g) => g.name.toLowerCase())}
+          fertig={() => {
+            setAusIserv(false)
+            laden()
+          }}
+        />
+      )}
       {neu && d && (
         <NeueGruppe
-          iservGruppen={d.iservGruppen}
+          iservGruppen={auswahl}
           fertig={() => {
             setNeu(false)
             laden()
@@ -476,11 +1051,11 @@ function NeueGruppe({ iservGruppen, fertig }: { iservGruppen: { id: string; name
           value={iserv}
           onChange={(v) => {
             setIserv(v)
-            if (v && !name) setName(iservGruppen.find((g) => g.id === v)?.name ?? '')
+            if (v && !name) setName(lerngruppenName(iservGruppen.find((g) => g.id === v)?.name ?? ''))
           }}
           searchable
           clearable
-          nothingFoundMessage={iservGruppen.length ? 'Nicht gefunden' : 'Ohne IServ-Anmeldung keine Gruppen'}
+          nothingFoundMessage={iservGruppen.length ? 'Nicht gefunden' : 'Keine Gruppen – Anmeldung über IServ oder die Exe „Schul-Apps Online“ mit verbundenem IServ'}
         />
         <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="z. B. 8b Englisch" />
         <TextInput label="Fach (optional)" value={fach} onChange={(e) => setFach(e.currentTarget.value)} />
@@ -597,8 +1172,8 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {h.schueler.map((s) => (
-            <Table.Tr key={s.benutzer}>
+          {h.schueler.map((s, i) => (
+            <Table.Tr key={`${s.benutzer}-${s.name}-${i}`}>
               <Table.Td>{s.name}</Table.Td>
               <Table.Td>{s.tests}</Table.Td>
               <Table.Td>{s.durchschnitt.toFixed(2).replace('.', ',')}</Table.Td>

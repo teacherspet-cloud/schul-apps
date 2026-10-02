@@ -367,6 +367,14 @@ export interface EinheitBewertung {
   quelle: 'auto' | 'ki' | 'lehrkraft'
   /** Begründung der KI bzw. Hinweis („nur Groß-/Kleinschreibung") */
   hinweis?: string
+  /**
+   * Die Lehrkraft entscheidet (02.10.2026): kleiner Fehler (Rechtschreibung, Präposition …) oder
+   * eine von der Lösung abweichende, im Zusammenhang sinnvolle Antwort. Bis dahin 0 Punkte
+   * („erst mal falsch", abgestimmt); „akzeptieren" gibt den ganzen Punkt.
+   */
+  pruefen?: 'kleinerFehler' | 'sinnvoll'
+  /** Die KI hat diese (automatisch falsche) Antwort schon auf Sinn im Zusammenhang geprüft */
+  kiGeprueft?: boolean
 }
 
 export type Bewertung = Record<string, EinheitBewertung>
@@ -430,3 +438,47 @@ export function bewerte(f: Pick<OnlineFassung, 'einheiten' | 'loesungen'>, antwo
 
 export const summe = (b: Bewertung): number => Object.values(b).reduce((s, x) => s + x.punkte, 0)
 export const offeneEinheiten = (b: Bewertung): number => Object.values(b).filter((x) => x.status === 'ki' || x.status === 'lehrkraft').length
+/** Von der KI markiert, von der Lehrkraft noch nicht entschieden */
+export const zuEntscheiden = (b: Bewertung): number => Object.values(b).filter((x) => x.pruefen && x.quelle !== 'lehrkraft').length
+
+// ---------------------------------------------------------------- Anzeige
+
+/** Eine Antwort, wie die Lernenden sie gesehen haben (Auswahl: Text statt interner Kennung) */
+export function antwortAlsText(antwort: string | undefined, optionen?: { wert: string; text: string }[]): string {
+  const a = String(antwort ?? '')
+  if (!a) return ''
+  return optionen?.find((o) => o.wert === a)?.text ?? a
+}
+
+/** Die Lösung eines Feldes als Text für Lehrkraft und Ergebnisseite */
+export function loesungAlsText(l: Loesung | undefined, optionen?: { wert: string; text: string }[]): string {
+  if (!l) return ''
+  if (l.art === 'genau') return l.werte.join(' / ')
+  if (l.art === 'auswahl') return antwortAlsText(l.wert, optionen) || l.wert
+  if (l.art === 'ki') return l.erwartung ? `z. B. ${l.erwartung}` : ''
+  if (l.art === 'menge') return l.werte.join(', ')
+  return l.erwartung ? `z. B. ${l.erwartung}` : ''
+}
+
+/** Alle Felder einer Fassung mit ihrem Eintrag und ihrer Aufgabe */
+export function felderVon(f: Pick<OnlineFassung, 'aufgaben'>): Map<string, { feld: Feld; eintrag: OnlineEintrag; aufgabe: OnlineAufgabe }> {
+  const m = new Map<string, { feld: Feld; eintrag: OnlineEintrag; aufgabe: OnlineAufgabe }>()
+  for (const aufgabe of f.aufgaben) for (const eintrag of aufgabe.eintraege) for (const feld of eintrag.felder) m.set(feld.id, { feld, eintrag, aufgabe })
+  return m
+}
+
+/** Zusammenhang eines Feldes für die KI: Aufgabenstellung und das, was um die Lücke steht */
+export function kontextVon(f: Pick<OnlineFassung, 'aufgaben'>, feldId: string): string {
+  const x = felderVon(f).get(feldId)
+  if (!x) return ''
+  const { eintrag: e, aufgabe: a, feld } = x
+  const teile = [a.anweisung]
+  if (e.saetze?.length) teile.push(...e.saetze.map((s) => `${s.vor} ___ ${s.nach}`.trim()))
+  else if (e.vor || e.nach) teile.push(`${(e.vor ?? '').slice(-300)} ___ ${e.nach ?? ''}`.trim())
+  if (e.text) teile.push(e.text)
+  if (e.woerter?.length) teile.push(`Wörter: ${e.woerter.filter(Boolean).join(', ')}`)
+  if (e.hinweis) teile.push(`Hinweis: ${e.hinweis}`)
+  if (feld.beschriftung) teile.push(`Feld: ${feld.beschriftung}`)
+  if (a.wortkasten?.length) teile.push(`Wortkasten: ${a.wortkasten.join(', ')}`)
+  return teile.filter(Boolean).join(' – ')
+}

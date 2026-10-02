@@ -1,17 +1,36 @@
 /**
  * Knopf „Onlinetest" im Vokabeltest (02.10.2026, Wunsch der Lehrkraft) – nur mit dem
- * Schul-Apps-Server. Macht aus dem fertigen Test einen Onlinetest: Lerngruppe, Zeitlimit,
- * Verteilung der Fassungen; danach Code, Link und QR-Code für die Lernenden.
+ * Schul-Apps-Server. Macht aus dem fertigen Test einen Onlinetest: Name, Lerngruppe, Zeitlimit,
+ * Verteilung der Fassungen, Figur; danach Code, Link und QR-Code für die Lernenden. Gestartet
+ * wird in der App „Onlinetest" – für alle gemeinsam.
  */
-import { Alert, Button, Group, Modal, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Image, Modal, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
 import { IconAlertTriangle, IconDeviceLaptop } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { TestDocument } from '../vokabeltest/model/types'
 import { aufServer } from '../../shared/plattform'
 import { openModule } from '../../shared/navigation'
 import { notifyError } from '../../shared/util'
+import { maskottchenBild, useMaskottchen } from '../../shared/maskottchenStore'
+import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
 import { holen, senden } from './serverApi'
 import { PRUEF_HINWEIS, Zugang } from './OnlinetestModule'
+
+/** Thema des Tests (Unit, Themenbereich, Thema) – macht gleichnamige Tests unterscheidbar */
+export function testThema(doc: Pick<TestDocument, 'header' | 'settings'>): string {
+  const teile = [doc.header.ueberthemaAus ? '' : doc.header.ueberthema || doc.header.themenbereich || '', doc.settings.topic || '', doc.header.subtitle || '']
+    .map((t) => t.trim())
+    .filter(Boolean)
+  return [...new Set(teile)].join(' – ')
+}
+
+/** Namensvorschlag statt „Vocabulary Test": Thema und Klasse */
+export function testNameVorschlag(doc: Pick<TestDocument, 'header' | 'settings'>): string {
+  const thema = testThema(doc)
+  const titel = (doc.header.title || 'Vokabeltest').trim()
+  if (!thema) return titel
+  return /^(vocabulary test|vokabeltest|test|vocab test)$/i.test(titel) ? `Vokabeltest ${thema}` : `${titel} – ${thema}`
+}
 
 export default function OnlinetestKnopf({ doc }: { doc: TestDocument }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
@@ -28,7 +47,15 @@ export default function OnlinetestKnopf({ doc }: { doc: TestDocument }): React.J
 
 function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => void }): React.JSX.Element {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const [titel, setTitel] = useState(doc.header.title || 'Vokabeltest')
+  const [titel, setTitel] = useState(() => testNameVorschlag(doc))
+  const figurWahl = vokabeltestFigur(doc)
+  const maskottchenGeladen = useMaskottchen((s) => s.geladen)
+  useEffect(() => {
+    if (!maskottchenGeladen) void useMaskottchen.getState().lade()
+  }, [maskottchenGeladen])
+  const winkend = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'winkend')
+  const jubelnd = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'jubelnd')
+  const [mitFigur, setMitFigur] = useState(Boolean(figurWahl))
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [zeit, setZeit] = useState<number>(20)
   const [zuteilung, setZuteilung] = useState<string>('abwechselnd')
@@ -44,8 +71,10 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
     try {
       const r = await senden<{ code: string; link: string }>('/server/onlinetest/erstellen', {
         titel,
+        thema: testThema(doc),
         test: doc,
         lerngruppeId: gruppe ?? '',
+        ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
         zeitMin: zeit,
         zuteilung: zuteilung === 'abwechselnd' || zuteilung === 'zufall' ? zuteilung : Number(zuteilung)
       })
@@ -60,7 +89,9 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
     <Modal opened onClose={schliessen} title="Als Onlinetest durchführen" size="lg">
       {fertig ? (
         <Stack>
-          <Text>Der Test ist freigegeben. Die Lernenden scannen den QR-Code oder öffnen den Link und melden sich mit IServ an.</Text>
+          <Text>
+            Der Test ist angelegt. Die Lernenden scannen den QR-Code oder öffnen den Link und landen im Wartebildschirm. Gestartet wird für alle gemeinsam in der App „Onlinetest“.
+          </Text>
           <Zugang code={fertig.code} link={fertig.link} />
           <Alert color="orange" icon={<IconAlertTriangle size={16} />}>
             {PRUEF_HINWEIS}
@@ -72,13 +103,13 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
                 openModule('onlinetest')
               }}
             >
-              Zum Live-Stand
+              Zum Start und Live-Stand
             </Button>
           </Group>
         </Stack>
       ) : (
         <Stack>
-          <TextInput label="Titel" value={titel} onChange={(e) => setTitel(e.currentTarget.value)} />
+          <TextInput label="Name des Tests" description="So steht er in der Liste der Onlinetests und bei den Lernenden." value={titel} onChange={(e) => setTitel(e.currentTarget.value)} />
           <Select
             label="Lerngruppe"
             description="Nur Mitglieder dieser Lerngruppe können teilnehmen; die Ergebnisse stehen in ihrer Historie. Ohne Lerngruppe: jeder mit Code."
@@ -102,9 +133,15 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
               allowDeselect={false}
             />
           )}
+          {winkend && (
+            <Group gap="sm" wrap="nowrap">
+              <Checkbox label="Figur zeigen (Wartebildschirm, Kopf, Ergebnis)" checked={mitFigur} onChange={(e) => setMitFigur(e.currentTarget.checked)} data-figur-wahl />
+              {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="" />}
+            </Group>
+          )}
           <Alert variant="light">
-            Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Einfache Antworten wertet der Server sofort aus, offene prüft auf Wunsch
-            die KI – halbe Punkte gibt es nicht.
+            Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang, ohne Namen);
+            kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.
           </Alert>
           <Group justify="flex-end">
             <Button loading={laeuft} onClick={() => void erstellen()}>

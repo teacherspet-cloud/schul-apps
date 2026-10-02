@@ -2,31 +2,56 @@
  * Schülerbereich des Servers (02.10.2026): Onlinetest am iPad, Telefon oder PC.
  *
  *  /s/          offene Tests der eigenen Lerngruppen, Code eingeben, Aufgaben mit Feedback
- *  /s/t/<CODE>  ein Test: Regeln → Start → Aufgaben → Abgabe
+ *  /s/t/<CODE>  ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
  *  /s/a/<ID>    eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
  *
  * Regeln (Wunsch der Lehrkraft): Zeitlimit; wer die Seite verlässt (anderer Tab, andere App,
  * Startbildschirm), gibt SOFORT endgültig ab – Nachschlagen in Übersetzungs-Apps soll nicht
  * gehen. Die Uhr läuft auf dem Server. Zwischenstände werden laufend gesichert.
  * Eingabefelder ohne Autokorrektur und Rechtschreibprüfung – die würden sonst mitschreiben.
+ *
+ * Zweite Runde (02.10.2026 abends): Ohne IServ geben die Lernenden „Vorname + Anfangsbuchstabe"
+ * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
+ * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
 import { Alert, Badge, Button, Card, Center, Container, Group, Image, Loader, NativeSelect, Paper, Radio, SegmentedControl, Stack, Text, TextInput, Textarea, Title } from '@mantine/core'
-import { IconAlertTriangle, IconCheck, IconClock, IconLogout } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCheck, IconClock, IconHourglass, IconLogout, IconX } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Antworten, Feld, OnlineAufgabe, OnlineEintrag } from './kern'
+import { antwortAlsText, loesungAlsText, type Antworten, type Bewertung, type Einheit, type Feld, type Loesung, type OnlineAufgabe, type OnlineEintrag } from './kern'
 import { holen, senden } from './serverApi'
 
 interface Beitritt {
   id: string
   geheim?: string
   titel: string
+  name: string
   hinweis: string
   variante: string
+  zeitMin: number
+  wartet: boolean
   ende: number
   jetzt: number
   abgegeben: boolean
+  /** Posen der Figur, die der Test zeigt (winkend, jubelnd) */
+  figur: string[]
   aufgaben: OnlineAufgabe[]
   antworten: Antworten
+}
+
+interface Ergebnis {
+  frei: boolean
+  abgegeben: boolean
+  fertig?: number
+  alle?: number
+  punkte?: number
+  max?: number
+  note?: number
+  vorlaeufig?: boolean
+  aufgaben?: OnlineAufgabe[]
+  einheiten?: Einheit[]
+  loesungen?: Record<string, Loesung>
+  antworten?: Antworten
+  bewertung?: Bewertung
 }
 
 async function abmelden(): Promise<void> {
@@ -38,15 +63,20 @@ export default function SchuelerBereich(): React.JSX.Element {
   const pfad = window.location.pathname
   const code = /^\/s\/t\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const ich = window.__schulappsServer
+  // Gäste (Beitritt mit Namen) haben kein Konto zum Abmelden – sie gehören nur zu diesem Test
+  const gast = !ich?.angemeldet || ich.quelle === 'gast'
   return (
     <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
         <Text fw={700} size="lg">
           Schul-Apps · Onlinetest
         </Text>
-        <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
-          Abmelden
-        </Button>
+        {!gast && (
+          <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
+            Abmelden
+          </Button>
+        )}
       </Group>
       {code ? <TestAblauf code={code.toUpperCase()} /> : aufgabe ? <FeedbackAufgabe id={aufgabe} /> : <Uebersicht />}
     </Container>
@@ -54,7 +84,7 @@ export default function SchuelerBereich(): React.JSX.Element {
 }
 
 function Uebersicht(): React.JSX.Element {
-  const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean }[] | null>(null)
+  const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean }[] | null>(null)
   const [code, setCode] = useState('')
   useEffect(() => {
     void holen<{ tests: typeof tests }>('/s/api/tests')
@@ -93,14 +123,16 @@ function Uebersicht(): React.JSX.Element {
             <div>
               <Text fw={600}>{t.titel}</Text>
               <Text size="sm" c="dimmed">
-                {t.zeitMin} Minuten
+                {t.zeitMin} Minuten{t.wartend ? ' · startet gleich' : ''}
               </Text>
             </div>
             {t.abgegeben ? (
-              <Badge color="green">abgegeben</Badge>
+              <Button component="a" variant="light" color="green" href={`/s/t/${t.code}`}>
+                Ergebnis
+              </Button>
             ) : (
               <Button component="a" href={`/s/t/${t.code}`}>
-                Starten
+                Öffnen
               </Button>
             )}
           </Group>
@@ -110,10 +142,63 @@ function Uebersicht(): React.JSX.Element {
   )
 }
 
-type Phase = 'laden' | 'regeln' | 'laeuft' | 'abgegeben' | 'fehler'
+/** Figur des Tests (Maskottchen), falls die Lehrkraft sie eingeschaltet hat */
+function Figur({ code, posen, pose, h }: { code: string; posen: string[]; pose: 'winkend' | 'jubelnd'; h: number }): React.JSX.Element | null {
+  if (!posen.includes(pose)) return null
+  return <Image src={`/s/api/figur/${code}/${pose}`} alt="" h={h} w="auto" fit="contain" data-figur={pose} />
+}
+
+/** Ohne IServ: Vorname + Anfangsbuchstabe des Nachnamens */
+function NameEingeben({ code, fertig }: { code: string; fertig: () => void }): React.JSX.Element {
+  const [name, setName] = useState('')
+  const [fehler, setFehler] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+  const gueltig = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u.test(name.trim().replace(/\s+/g, ' '))
+  const weiter = async (): Promise<void> => {
+    setLaeuft(true)
+    setFehler('')
+    try {
+      await senden('/s/api/gast', { code, name })
+      fertig()
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Card withBorder padding="lg">
+      <Title order={3} mb={4}>
+        Wie heißt du?
+      </Title>
+      <Text c="dimmed" mb="md">
+        Vorname und Anfangsbuchstabe des Nachnamens, z. B. „Anna K.“
+      </Text>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (gueltig && !laeuft) void weiter()
+        }}
+      >
+        <TextInput size="lg" value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="Anna K." autoComplete="off" autoCorrect="off" spellCheck={false} data-gastname />
+        {fehler && (
+          <Alert color="red" mt="sm">
+            {fehler}
+          </Alert>
+        )}
+        <Button type="submit" size="lg" fullWidth mt="md" disabled={!gueltig} loading={laeuft}>
+          Weiter
+        </Button>
+      </form>
+    </Card>
+  )
+}
+
+type Phase = 'name' | 'laden' | 'warten' | 'regeln' | 'laeuft' | 'abgegeben' | 'fehler'
 
 function TestAblauf({ code }: { code: string }): React.JSX.Element {
-  const [phase, setPhase] = useState<Phase>('laden')
+  const angemeldet = Boolean(window.__schulappsServer?.angemeldet)
+  const [phase, setPhase] = useState<Phase>(angemeldet ? 'laden' : 'name')
   const [t, setT] = useState<Beitritt | null>(null)
   const [fehler, setFehler] = useState('')
   const [antworten, setAntworten] = useState<Antworten>({})
@@ -123,20 +208,42 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   const stand = useRef<Antworten>({})
   const laeuft = useRef(false)
 
-  useEffect(() => {
+  const beitreten = useCallback(() => {
     void senden<Beitritt>('/s/api/beitreten', { code })
       .then((d) => {
         setT(d)
         versatz.current = d.jetzt - Date.now()
-        stand.current = d.antworten ?? {}
-        setAntworten(d.antworten ?? {})
-        setPhase(d.abgegeben ? 'abgegeben' : 'regeln')
+        if (d.abgegeben) return setPhase('abgegeben')
+        if (d.wartet) return setPhase('warten')
+        // Nach einem Neuladen: Antworten vom Server, sonst aus dem Browser (falls neuer)
+        let lokal: Antworten = {}
+        try {
+          lokal = JSON.parse(localStorage.getItem(`onlinetest-${d.id}`) ?? '{}') as Antworten
+        } catch {
+          lokal = {}
+        }
+        stand.current = { ...lokal, ...(d.antworten ?? {}) }
+        setAntworten(stand.current)
+        // Schon begonnen (Neuladen) → direkt weiter, sonst einmal die Regeln
+        setPhase((p) => (p === 'warten' || Object.keys(stand.current).length ? 'laeuft' : 'regeln'))
       })
       .catch((e: unknown) => {
         setFehler(e instanceof Error ? e.message : String(e))
         setPhase('fehler')
       })
   }, [code])
+  useEffect(() => {
+    if (phase === 'laden') beitreten()
+  }, [phase, beitreten])
+  // Warten auf den Start durch die Lehrkraft
+  useEffect(() => {
+    if (phase !== 'warten') return
+    const i = setInterval(beitreten, 3000)
+    return () => clearInterval(i)
+  }, [phase, beitreten])
+  useEffect(() => {
+    if (phase === 'laeuft') laeuft.current = true
+  }, [phase])
 
   /** Endgültig abgeben – per sendBeacon, wenn die Seite gerade verlassen wird */
   const abgeben = useCallback(
@@ -207,6 +314,7 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
     }
   }
 
+  if (phase === 'name') return <NameEingeben code={code} fertig={() => setPhase('laden')} />
   if (phase === 'laden') return <Loader />
   if (phase === 'fehler')
     return (
@@ -218,53 +326,60 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       </Alert>
     )
   if (!t) return <Loader />
-  if (phase === 'abgegeben')
-    return (
-      <Card withBorder padding="xl">
-        <Center>
-          <Stack align="center" gap="xs">
-            <IconCheck size={48} color="var(--mantine-color-green-6)" />
-            <Title order={3}>Abgegeben</Title>
-            <Text ta="center" c="dimmed">
-              {grund === 'verlassen'
-                ? 'Du hast die Seite verlassen – dein Test wurde deshalb automatisch abgegeben.'
-                : grund === 'zeit'
-                  ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
-                  : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
-            </Text>
-          </Stack>
-        </Center>
-      </Card>
-    )
-  if (phase === 'regeln')
-    return (
-      <Card withBorder padding="lg">
-        <Title order={3}>{t.titel}</Title>
-        <Text c="dimmed" mb="md">
-          Fassung {t.variante} · {Math.round((t.ende - t.jetzt) / 60000)} Minuten
+  if (phase === 'abgegeben') return <ErgebnisAnsicht code={code} t={t} grund={grund} />
+
+  const regeln = (
+    <Alert color="orange" icon={<IconAlertTriangle />} title="Bitte lesen" mb="md">
+      <Stack gap={4}>
+        <Text size="sm">Bleib auf dieser Seite, bis du abgegeben hast.</Text>
+        <Text size="sm" fw={700}>
+          Wenn du die Seite verlässt – anderer Tab, andere App, Startbildschirm –, wird dein Test sofort endgültig abgegeben.
         </Text>
+        <Text size="sm">Du hast {t.zeitMin} Minuten. Deine Eingaben werden laufend gesichert.</Text>
+      </Stack>
+    </Alert>
+  )
+  if (phase === 'warten')
+    return (
+      <Card withBorder padding="lg" data-wartebildschirm>
+        <Stack align="center" gap="xs" mb="md">
+          <Figur code={code} posen={t.figur} pose="winkend" h={160} />
+          <IconHourglass size={36} color="var(--mantine-color-blue-6)" />
+          <Title order={3} ta="center">
+            Gleich geht es los, {t.name}!
+          </Title>
+          <Text c="dimmed" ta="center">
+            {t.titel} – deine Lehrkraft startet den Test gleich für alle. Diese Seite bitte offen lassen.
+          </Text>
+          <Loader type="dots" />
+        </Stack>
         {t.hinweis && (
           <Alert mb="md" variant="light">
             {t.hinweis}
           </Alert>
         )}
-        <Alert color="orange" icon={<IconAlertTriangle />} title="Bitte lesen" mb="md">
-          <Stack gap={4}>
-            <Text size="sm">Bleib auf dieser Seite, bis du abgegeben hast.</Text>
-            <Text size="sm" fw={700}>
-              Wenn du die Seite verlässt – anderer Tab, andere App, Startbildschirm –, wird dein Test sofort endgültig abgegeben.
+        {regeln}
+      </Card>
+    )
+  if (phase === 'regeln')
+    return (
+      <Card withBorder padding="lg">
+        <Group justify="space-between" align="start" wrap="nowrap">
+          <div>
+            <Title order={3}>{t.titel}</Title>
+            <Text c="dimmed" mb="md">
+              Fassung {t.variante} · {t.zeitMin} Minuten
             </Text>
-            <Text size="sm">Die Zeit läuft ab dem Moment, in dem du den Test geöffnet hast. Deine Eingaben werden laufend gesichert.</Text>
-          </Stack>
-        </Alert>
-        <Button
-          size="lg"
-          fullWidth
-          onClick={() => {
-            laeuft.current = true
-            setPhase('laeuft')
-          }}
-        >
+          </div>
+          <Figur code={code} posen={t.figur} pose="winkend" h={90} />
+        </Group>
+        {t.hinweis && (
+          <Alert mb="md" variant="light">
+            {t.hinweis}
+          </Alert>
+        )}
+        {regeln}
+        <Button size="lg" fullWidth onClick={() => setPhase('laeuft')}>
           Test beginnen
         </Button>
       </Card>
@@ -275,7 +390,8 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   return (
     <Stack gap="md" pb={120} translate="no">
       <Paper withBorder p="sm" radius="md" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--mantine-color-body)' }}>
-        <Group justify="space-between">
+        <Group justify="space-between" wrap="nowrap">
+          <Figur code={code} posen={t.figur} pose="winkend" h={40} />
           <Text fw={600} truncate style={{ flex: 1 }}>
             {t.titel}
           </Text>
@@ -290,6 +406,123 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       <Button size="lg" color="green" onClick={() => window.confirm('Test jetzt endgültig abgeben?') && void abgeben('selbst')}>
         Abgeben
       </Button>
+    </Stack>
+  )
+}
+
+/** Nach der Abgabe: warten, bis das Ergebnis frei ist – dann Punkte, Note und jede Aufgabe mit Lösung */
+function ErgebnisAnsicht({ code, t, grund }: { code: string; t: Beitritt; grund: string }): React.JSX.Element {
+  const [e, setE] = useState<Ergebnis | null>(null)
+  const laden = useCallback(() => {
+    void holen<Ergebnis>(`/s/api/ergebnis?id=${encodeURIComponent(t.id)}`)
+      .then(setE)
+      .catch(() => undefined)
+  }, [t.id])
+  useEffect(laden, [laden])
+  // Bis das Ergebnis endgültig ist, regelmäßig nachsehen
+  useEffect(() => {
+    if (e?.frei && !e.vorlaeufig) return
+    const i = setInterval(laden, 5000)
+    return () => clearInterval(i)
+  }, [e?.frei, e?.vorlaeufig, laden])
+  const kopf = (
+    <Card withBorder padding="xl">
+      <Center>
+        <Stack align="center" gap="xs">
+          {e?.frei ? <Figur code={code} posen={t.figur} pose="jubelnd" h={150} /> : <IconCheck size={48} color="var(--mantine-color-green-6)" />}
+          <Title order={3}>Abgegeben</Title>
+          <Text ta="center" c="dimmed">
+            {grund === 'verlassen'
+              ? 'Du hast die Seite verlassen – dein Test wurde deshalb automatisch abgegeben.'
+              : grund === 'zeit'
+                ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
+                : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
+          </Text>
+          {e && !e.frei && (
+            <Text ta="center" size="sm" c="dimmed" data-ergebnis-wartet>
+              Dein Ergebnis erscheint hier, sobald alle abgegeben haben{e.alle ? ` (${e.fertig} von ${e.alle})` : ''} oder deine Lehrkraft es freigibt.
+            </Text>
+          )}
+        </Stack>
+      </Center>
+    </Card>
+  )
+  if (!e?.frei || !e.aufgaben || !e.bewertung || !e.einheiten) return kopf
+  const bewertung = e.bewertung
+  const einheiten = e.einheiten
+  return (
+    <Stack data-ergebnis>
+      {kopf}
+      <Card withBorder padding="lg">
+        <Group justify="space-between">
+          <div>
+            <Text c="dimmed" size="sm">
+              Dein Ergebnis
+            </Text>
+            <Title order={2}>
+              {e.punkte} / {e.max} Punkte
+            </Title>
+          </div>
+          <Badge size="xl" variant="light">
+            Note {e.note}
+          </Badge>
+        </Group>
+        {e.vorlaeufig && (
+          <Alert color="yellow" mt="sm" variant="light">
+            Vorläufig – deine Lehrkraft prüft noch einzelne Antworten. Das Ergebnis kann sich noch ändern.
+          </Alert>
+        )}
+      </Card>
+      {e.aufgaben.map((a, i) => (
+        <Card key={a.id} withBorder padding="md">
+          <Group justify="space-between" mb={6}>
+            <Text fw={700}>
+              {i + 1}. {a.titel}
+            </Text>
+            <Badge variant="light">
+              {einheiten.filter((x) => x.aufgabe === a.id).reduce((s, x) => s + (bewertung[x.id]?.punkte ?? 0), 0)} / {a.punkte} P.
+            </Badge>
+          </Group>
+          <Stack gap={6}>
+            {a.eintraege.map((eintrag) => {
+              const b = bewertung[eintrag.einheit]
+              const richtig = b?.status === 'richtig'
+              const offen = !b || b.status === 'ki' || b.status === 'lehrkraft' || Boolean(b.pruefen)
+              return (
+                <Paper key={eintrag.einheit} withBorder p="xs" radius="sm">
+                  <Group gap="xs" align="start" wrap="nowrap">
+                    {offen ? (
+                      <IconHourglass size={18} color="var(--mantine-color-yellow-7)" />
+                    ) : richtig ? (
+                      <IconCheck size={18} color="var(--mantine-color-green-7)" />
+                    ) : (
+                      <IconX size={18} color="var(--mantine-color-red-7)" />
+                    )}
+                    <Stack gap={0} style={{ flex: 1 }}>
+                      {(eintrag.text || eintrag.vor || eintrag.saetze?.length) && (
+                        <Text size="sm" c="dimmed">
+                          {eintrag.text ?? (eintrag.saetze?.length ? eintrag.saetze.map((s) => `${s.vor} ___ ${s.nach}`).join(' / ') : `${(eintrag.vor ?? '').slice(-80)} ___ ${eintrag.nach ?? ''}`)}
+                        </Text>
+                      )}
+                      {eintrag.felder.map((f) => (
+                        <Text key={f.id} size="sm">
+                          {f.beschriftung ? `${f.beschriftung}: ` : ''}
+                          <b>{antwortAlsText(e.antworten?.[f.id], f.optionen) || '—'}</b>
+                          {!richtig && e.loesungen?.[f.id] && (
+                            <Text span size="sm" c="green.8">
+                              {'  '}→ {loesungAlsText(e.loesungen[f.id], f.optionen)}
+                            </Text>
+                          )}
+                        </Text>
+                      ))}
+                    </Stack>
+                  </Group>
+                </Paper>
+              )
+            })}
+          </Stack>
+        </Card>
+      ))}
     </Stack>
   )
 }
