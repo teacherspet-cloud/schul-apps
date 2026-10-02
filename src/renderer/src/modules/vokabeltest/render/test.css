@@ -581,45 +581,79 @@
   }
 }
 
-/* Mindmap: Oberbegriff in der Mitte, leere Äste zum Eintragen */
-.vt-mindmap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4mm;
-  margin: 2mm 0;
-}
-.vt-mindmap-topic {
-  padding: 2mm 6mm;
-  border: 1.6pt solid #111;
-  border-radius: 999px;
-  font-weight: 700;
-}
-.vt-mindmap-branches {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3mm 8mm;
+/*
+ * Mindmap (02.10.2026): echte Mindmap statt Linienliste – Thema in der Mitte (Fachfarbe), Äste
+ * links und rechts mit Oberbegriff-Kasten (leer und gestrichelt zum selbst Beschriften) und
+ * Zweigen mit Schreiblinien (mind. 38 × 10 mm). Lage aus render/mindmapLayout.ts.
+ */
+.vt-mm {
+  position: relative;
   width: 100%;
+  margin: 2mm auto;
+  break-inside: avoid;
 }
-.vt-mindmap-branch {
+.vt-mm-linien {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.vt-mm-ast-linie {
+  fill: none;
+  stroke: #111;
+  stroke-width: 1.6px;
+}
+.vt-mm-zweig-linie {
+  fill: none;
+  stroke: #111;
+  stroke-width: 1px;
+}
+.vt-mm-mitte,
+.vt-mm-label,
+.vt-mm-zweig {
+  position: absolute;
+  box-sizing: border-box;
   display: flex;
-  align-items: flex-end;
-  gap: 2mm;
-}
-.vt-mindmap-dot {
-  flex: none;
-  width: 5mm;
-  height: 5mm;
-  border: 1pt solid #111;
-  border-radius: 50%;
-  font-size: 0.8em;
-  line-height: 5mm;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  line-height: 1.15;
+  overflow: hidden;
 }
-.vt-mindmap-line {
-  flex: 1;
+.vt-mm-mitte {
+  border: 1.6pt solid var(--vt-accent, #111);
+  color: var(--vt-accent, #111);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 700;
+  padding: 0 3mm;
+}
+.vt-mm-label {
+  border: 1pt solid #111;
+  border-radius: 2mm;
+  background: #fff;
+  font-weight: 600;
+  font-size: 0.9em;
+  padding: 0 1.5mm;
+}
+.vt-mm-label-leer {
+  border-style: dashed;
+  font-weight: 400;
+}
+.vt-mm-vorschlag {
+  color: #c62828;
+  font-style: italic;
+}
+.vt-mm-zweig {
+  align-items: flex-end;
+  padding-bottom: 0.8mm;
+  /* Schreiblinie; Stiel und Zweig dorthin zeichnet das SVG */
   border-bottom: 1pt solid #111;
-  min-height: 6mm;
+}
+.vt-mm-loesung {
+  color: #c62828;
+  font-weight: 600;
 }
 
 /* Buchstabe an der Antwortmöglichkeit – gleiche Form wie im Arbeitsblatt (.ws-mc-letter) */

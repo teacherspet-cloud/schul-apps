@@ -1,6 +1,8 @@
 import { RichText } from '../../../../shared/richtext/RichText'
 import type { TextBlock, WsBlock } from '../../model/types'
-import { gapRenderText } from '../Answers'
+import { gapRenderText, Spalten, TabellenGriffe } from '../Answers'
+import { eigeneBreiten, zugUebernehmen } from '../tabelleMasse'
+import type { ZugErgebnis } from '../tabelleZiehen'
 import { ImageLabelLayer } from '../ImageLabels'
 import { schaltplanEinrasten } from '../schaltplanSvg'
 import { imageSizeFromDataUrl } from '../../../../shared/imageSize'
@@ -125,7 +127,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
         />
       )
       return (
-        <div className={`ws-block ws-info ws-info-${block.variant} ${block.spalten === 2 ? 'ws-info-spalten' : ''} ${placed?.continued ? 'ws-continued' : ''}`}>
+        <div className={`ws-block ws-info ws-info-${block.variant} ${block.spalten === 2 ? 'ws-info-spalten' : ''} ${block.abgesetzt ? 'ws-info-abgesetzt' : ''} ${placed?.continued ? 'ws-continued' : ''}`}>
           {von === 0 ? (
             <div className="ws-info-head">
               <span className="ws-info-symbol">{v.symbol}</span>
@@ -343,7 +345,8 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
        * Schreiblinien einer Aufgabe: je Linie eine Einheit (8,5 mm), die letzte nimmt den Rest.
        * Kästchen und freie Fläche bleiben ein Stück (Zeichnung, Rechnung).
        */
-      const LINIE_MM = 8.5
+      // Linienabstand nach Jahrgang (02.10.2026) – derselbe wie `--ws-linie` der Seite
+      const LINIE_MM = ctx.schreibRegel?.linieMm ?? 8.5
       const linien = block.kind === 'lines' ? Math.max(1, Math.round(block.heightMm / LINIE_MM)) : 1
       const [von, bis] = stueck(placed, linien)
       const hoehe = (k: number): number => (k < linien - 1 ? LINIE_MM : Math.max(1, block.heightMm - (linien - 1) * LINIE_MM))
@@ -631,31 +634,51 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       if (isKeyMode(mode)) return null
       // Teilbar zwischen zwei Aussagen (01.10.2026); die Kopfzeile steht auf jedem Stück
       const [von, bis] = stueck(placed, block.statements.length)
+      /*
+       * Ziehbare Maße (02.10.2026, render/tabelleZiehen.ts): Spalten und Zeilen von Hand, ein
+       * Rückgängig-Schritt je Geste. Ohne Maße die bisherige Aufteilung (ws.css).
+       */
+      const scBreiten = eigeneBreiten(block, 4)
+      const scZiehbar = schreiben && Boolean(ctx.update)
+      const scZug = (z: ZugErgebnis): void =>
+        ctx.update?.(block.id, (d) => {
+          if (d.type === 'selfCheck') zugUebernehmen(d, z, d.statements.length)
+        })
+      const scGriffe = (r: number | 'kopf', c: number): React.ReactNode =>
+        scZiehbar && <TabellenGriffe c={c} spalten={4} zeile={r} breiten={scBreiten} onZug={scZug} />
+      const kopf =
+        block.format === 'kompetenzraster' ? ['sicher', 'teilweise', 'noch nicht'] : block.format === 'ampel' ? ['🟢', '🟡', '🔴'] : ['🙂', '😐', '🙁']
       return (
         <div className={`ws-block ws-selfcheck ${placed?.continued ? 'ws-continued' : ''}`}>
           {von > 0 && <FortsetzungsHinweis bezeichnung={block.title} />}
-          <table>
+          <table className={scZiehbar ? 'ws-table-ziehbar' : undefined} style={scBreiten ? { tableLayout: 'fixed' } : undefined}>
+            <Spalten n={4} breiten={scBreiten} />
             <thead>
-              <tr>
+              <tr style={block.headerHeightMm ? { height: `${block.headerHeightMm}mm` } : undefined}>
                 <th>
                   <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />
+                  {scGriffe('kopf', 0)}
                 </th>
-                {block.format === 'kompetenzraster'
-                  ? ['sicher', 'teilweise', 'noch nicht'].map((l) => <th key={l}>{l}</th>)
-                  : block.format === 'ampel'
-                    ? ['🟢', '🟡', '🔴'].map((l) => <th key={l}>{l}</th>)
-                    : ['🙂', '😐', '🙁'].map((l) => <th key={l}>{l}</th>)}
+                {kopf.map((l, c) => (
+                  <th key={l}>
+                    {l}
+                    {scGriffe('kopf', c + 1)}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {block.statements.slice(von, bis).map((s, k) => (
-                <tr key={von + k} data-unit>
+                <tr key={von + k} data-unit style={block.rowHeightsMm?.[von + k] ? { height: `${block.rowHeightsMm[von + k]}mm` } : undefined}>
                   <td>
                     <RichText value={s} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).statements[von + k] = v))} />
+                    {scGriffe(von + k, 0)}
                   </td>
-                  <td className="ws-sc-cell" />
-                  <td className="ws-sc-cell" />
-                  <td className="ws-sc-cell" />
+                  {[1, 2, 3].map((c) => (
+                    <td key={c} className="ws-sc-cell">
+                      {scGriffe(von + k, c)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -705,6 +728,8 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
   const showGlossary = !fussModus && anm.anmerkungen.length > 0 && to > paragraphs.length
   const lineStart = placed?.lineStart ?? 0
   const lineCount = placed?.lineCount ?? 0
+  // Endet das Stück mitten im letzten Absatz, folgen Wortzahl und Quelle erst unter dem Rest (02.10.2026)
+  const endetImAbsatz = placed?.absatzBis !== undefined
   // Blocksatz nur bei längeren Texten – kurze Absätze würden sonst zerrissen
   const justify = ctx.justify && plainText(block.body).length >= LONG_TEXT_CHARS
   // Auslassungszeichen sind Kennzeichnung, keine Woerter des Originals
@@ -805,23 +830,47 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
             <RichText value="" editable onChange={set((d, v) => ((d as typeof block).body = v))} placeholder="Text (Absätze durch Leerzeile trennen)" />
           </div>
         ) : (
-          paragraphs.slice(from, Math.min(to, paragraphs.length)).map((p, i) => (
-            <div key={from + i} data-unit className="ws-paragraph" data-absatz={from + i}>
-              <RichText
-                value={p}
-                anzeige={gleichGeteilt ? anzeigeAbsaetze[from + i] : undefined}
-                // Lücken aus dem Textauswahl-Menü: im Lösungsteil mit Lösung
-                renderText={gapRenderText(isKeyMode(mode))}
-                editable={schreiben}
-                onChange={set((d, v) => {
-                  // Absatz ersetzen; eine Leerzeile im neuen Text erzeugt weitere Absätze
-                  const all = splitParagraphs((d as typeof block).body)
-                  all[from + i] = v
-                  ;(d as typeof block).body = all.filter((x) => x.trim()).join('\n\n')
-                })}
-              />
-            </div>
-          ))
+          paragraphs.slice(from, Math.min(to, paragraphs.length)).map((p, i) => {
+            /*
+             * ZEILENWEISE TEILUNG (02.10.2026, render/zeilenTeilung.ts): Steht ein Absatz nur zum
+             * Teil auf dieser Seite, wird er GANZ gesetzt – so bricht er um wie beim Messen – und ein
+             * Rahmen zeigt nur seine Zeilen auf dieser Seite: oben um die schon gezeigten Zeilen
+             * verschoben, unten auf die Höhe der Zeilen bis zur Schnittstelle begrenzt.
+             * `ws-absatz-folgt` trägt die Einrückung „Absatz nach Absatz" (ws.css), die im Rahmen
+             * keinen Vorgänger mehr fände.
+             */
+            const ab = i === 0 ? placed?.absatzAb : undefined
+            const bis = from + i === to - 1 ? placed?.absatzBis : undefined
+            const absatz = (
+              <div
+                key={from + i}
+                data-unit
+                className={`ws-paragraph ${from + i > 0 ? 'ws-absatz-folgt' : ''}`}
+                data-absatz={from + i}
+                style={ab ? { marginTop: -ab } : undefined}
+              >
+                <RichText
+                  value={p}
+                  anzeige={gleichGeteilt ? anzeigeAbsaetze[from + i] : undefined}
+                  // Lücken aus dem Textauswahl-Menü: im Lösungsteil mit Lösung
+                  renderText={gapRenderText(isKeyMode(mode))}
+                  editable={schreiben}
+                  onChange={set((d, v) => {
+                    // Absatz ersetzen; eine Leerzeile im neuen Text erzeugt weitere Absätze
+                    const all = splitParagraphs((d as typeof block).body)
+                    all[from + i] = v
+                    ;(d as typeof block).body = all.filter((x) => x.trim()).join('\n\n')
+                  })}
+                />
+              </div>
+            )
+            if (ab === undefined && bis === undefined) return absatz
+            return (
+              <div key={from + i} className="ws-zeilen-schnitt" data-zeilen-schnitt style={bis !== undefined ? { height: bis - (ab ?? 0) } : undefined}>
+                {absatz}
+              </div>
+            )
+          })
         )}
         {showGlossary && (
           <div data-unit className="ws-glossary">
@@ -841,12 +890,12 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
             Gezaehlt wird der ganze Text, nicht nur das Stueck auf dieser Seite – und die
             Auslassungszeichen zaehlen nicht mit.
           */}
-      {to >= paragraphs.length && materialWoerter > 0 && (
+      {to >= paragraphs.length && !endetImAbsatz && materialWoerter > 0 && (
         <div className="ws-wortzahl" data-foot>
           ({wortzahlText(materialWoerter, ctx.labelLanguage)})
         </div>
       )}
-      {block.source && to >= paragraphs.length && (
+      {block.source && to >= paragraphs.length && !endetImAbsatz && (
         <div className="ws-source" data-foot>
           Quelle: <Feld value={block.source} editable={schreiben} onChange={set((d, v) => ((d as typeof block).source = v))} />
         </div>

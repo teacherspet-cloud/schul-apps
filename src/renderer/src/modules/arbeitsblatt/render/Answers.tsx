@@ -1,12 +1,81 @@
 import { trueFalseLabels } from '../../../shared/trueFalseLabels'
 import { RichText } from '../../../shared/richtext/RichText'
 import type { Answer } from '../model/types'
-import { isEditMode, isKeyMode, useWs } from './WsContext'
+import { isEditMode, isKeyMode, useWs, type WsContextValue } from './WsContext'
+import { antwortTabellenMasse, hatFoerderbedarf, schreibRegel, type SchreibRegel } from '../didactics/schreibraum'
+import { tabelleZiehen, type ZugErgebnis } from './tabelleZiehen'
+import { eigeneBreiten, zugUebernehmen } from './tabelleMasse'
 import { optionSpalten } from './mcGrid'
 import { diagramDataUrl, diagramDrawing } from './diagramSvg'
 import type { DiagramSpec } from '../model/types'
 
 const letter = (i: number): string => String.fromCharCode(97 + i)
+
+/**
+ * Schreibraum der Antwortflächen (02.10.2026, didactics/schreibraum.ts): Regel nach Jahrgang und
+ * Förderbedarf, Breite der Ausfülltabelle = Textspalte minus Einzug (CSS: 100 % − 8,5 mm, in
+ * Teilaufgaben etwas weniger). Aus dem Kontext, damit Editor, Druck und Messfläche gleich rechnen.
+ */
+export interface AntwortRaum {
+  regel: SchreibRegel
+  breiteMm: number
+}
+
+export const antwortRaum = (ctx: Pick<WsContextValue, 'lerngruppeText' | 'contentWidthMm' | 'schreibRegel'>): AntwortRaum => ({
+  regel: ctx.schreibRegel ?? schreibRegel(ctx.lerngruppeText?.jahrgang ?? 7, hatFoerderbedarf({ schoolTypeName: ctx.lerngruppeText?.schulform })),
+  breiteMm: (ctx.contentWidthMm ?? 170) - 10
+})
+
+/**
+ * Griffe an den Linien einer Tabellenzelle (02.10.2026): rechts die Spaltenlinie (nicht bei der
+ * letzten Spalte), unten die Zeilenlinie. Für Ausfülltabelle, Richtig/Falsch, Zuordnung,
+ * Fragenreihe und Selbsteinschätzung – dasselbe Muster wie die Tabelle als Baustein. Ein Klick
+ * auf den Griff darf die Zelle darunter nicht auslösen (Richtig/Falsch-Kästchen im Lösungsmodus).
+ */
+export function TabellenGriffe({
+  c,
+  spalten,
+  zeile,
+  breiten,
+  onZug
+}: {
+  c: number
+  spalten: number
+  /** undefined = kein Zeilengriff */
+  zeile?: number | 'kopf'
+  /** aktuelle Spaltenbreiten in Prozent; fehlt = am Bildschirm gemessen */
+  breiten?: number[]
+  onZug: (z: ZugErgebnis) => void
+}): React.JSX.Element {
+  const halt = (e: React.MouseEvent): void => e.stopPropagation()
+  return (
+    <>
+      {c < spalten - 1 && (
+        <span className="ws-spalten-griff" title="Spaltenbreite ziehen" onClick={halt} onPointerDown={(e) => tabelleZiehen(e, 'spalte', c, breiten, onZug)} />
+      )}
+      {zeile !== undefined && (
+        <span
+          className="ws-zeilen-griff"
+          title="Zeilenhöhe ziehen"
+          onClick={halt}
+          onPointerDown={(e) => tabelleZiehen(e, zeile === 'kopf' ? 'kopf' : 'zeile', zeile === 'kopf' ? 0 : zeile, breiten, onZug)}
+        />
+      )}
+    </>
+  )
+}
+
+/** Spaltenkopf einer Tabelle mit eigenen Breiten; ohne Breiten leere Spalten (der Browser verteilt wie bisher) */
+export const Spalten = ({ n, breiten }: { n: number; breiten?: number[] }): React.JSX.Element => (
+  <colgroup>
+    {Array.from({ length: n }, (_, c) => (
+      <col key={c} style={breiten ? { width: `${breiten[c]}%` } : undefined} />
+    ))}
+  </colgroup>
+)
+
+/** Stil der Tabelle und ihrer Zeilen aus den von Hand gezogenen Maßen */
+const zeilenStil = (mm: number | undefined): React.CSSProperties | undefined => (mm && mm > 0 ? { height: `${mm}mm` } : undefined)
 
 /** Lückentext: [[Lösung]] wird im Schülerblatt zur Lücke. */
 export function gapTextParts(source: string): { text: string; answers: string[] } {
@@ -197,16 +266,32 @@ export function teilbareAntwort(
     editKey,
     editRoh,
     answerLanguage,
-    onChange
-  }: { key: boolean; editText: boolean; editKey: boolean; editRoh: boolean; answerLanguage: string; onChange?: (fn: (a: Answer) => void) => void },
+    onChange,
+    raum
+  }: {
+    key: boolean
+    editText: boolean
+    editKey: boolean
+    editRoh: boolean
+    answerLanguage: string
+    onChange?: (fn: (a: Answer) => void) => void
+    /** Schreibraum (02.10.2026); fehlt = Regel für Klasse 7 */
+    raum?: AntwortRaum
+  },
   einheit = true
 ): { einheiten: React.JSX.Element[]; rahmen: (stueck: React.ReactNode[], schluessel?: string) => React.JSX.Element } | null {
   const set = (fn: (a: Answer) => void) => (onChange ? () => onChange(fn) : undefined)
   const u = einheit ? { 'data-unit': '' } : {}
   switch (answer.kind) {
     case 'matching': {
-      const einheiten = Array.from({ length: Math.max(answer.left.length, answer.right.length) }, (_, r) => (
-        <tr key={r} {...u}>
+      // Ziehbare Maße (02.10.2026) – ohne gezogene Breiten bleibt die bisherige Aufteilung (ws.css)
+      const zeilenZahl = Math.max(answer.left.length, answer.right.length)
+      const breiten = eigeneBreiten(answer, 3)
+      const ziehbar = Boolean(onChange) && (editText || editKey)
+      const speichern = (z: ZugErgebnis): void => onChange?.((a) => zugUebernehmen(a, z, zeilenZahl))
+      const g = (r: number, c: number): React.ReactNode => ziehbar && <TabellenGriffe c={c} spalten={3} zeile={r} breiten={breiten} onZug={speichern} />
+      const einheiten = Array.from({ length: zeilenZahl }, (_, r) => (
+        <tr key={r} {...u} style={zeilenStil(answer.rowHeightsMm?.[r])}>
           <td className="ws-match-box">
             {r < answer.left.length && (
               <span
@@ -217,6 +302,7 @@ export function teilbareAntwort(
                 {key && (answer.pairs[r] ?? -1) >= 0 ? letter(answer.pairs[r]) : ''}
               </span>
             )}
+            {g(r, 0)}
           </td>
           <td className="ws-match-left">
             {r < answer.left.length && (
@@ -224,6 +310,7 @@ export function teilbareAntwort(
                 <b>{r + 1}</b> <Zelle value={answer.left[r]} editable={editText} onChange={(v) => onChange?.((a) => (a.left[r] = v))} />
               </>
             )}
+            {g(r, 1)}
           </td>
           <td className="ws-match-right">
             {r < answer.right.length && (
@@ -231,27 +318,37 @@ export function teilbareAntwort(
                 <b>{letter(r)})</b> <Zelle value={answer.right[r]} editable={editText} onChange={(v) => onChange?.((a) => (a.right[r] = v))} />
               </>
             )}
+            {g(r, 2)}
           </td>
         </tr>
       ))
       return {
         einheiten,
         rahmen: (stueck, k) => (
-          <table className="ws-match" key={k}>
+          <table className={`ws-match ${ziehbar ? 'ws-table-ziehbar' : ''}`} key={k} style={breiten ? { tableLayout: 'fixed' } : undefined}>
+            <Spalten n={3} breiten={breiten} />
             <tbody>{stueck}</tbody>
           </table>
         )
       }
     }
     case 'trueFalse': {
+      // Ziehbare Maße (02.10.2026) – Spalten: Aussage, richtig, falsch
+      const breiten = eigeneBreiten(answer, 3)
+      const ziehbar = Boolean(onChange) && (editText || editKey)
+      const speichern = (z: ZugErgebnis): void => onChange?.((a) => zugUebernehmen(a, z, a.statements.length))
+      const g = (r: number | 'kopf', c: number): React.ReactNode =>
+        ziehbar && <TabellenGriffe c={c} spalten={3} zeile={r} breiten={breiten} onZug={speichern} />
       const einheiten = answer.statements.map((s, i) => (
-        <tr key={i} {...u}>
+        <tr key={i} {...u} style={zeilenStil(answer.rowHeightsMm?.[i])}>
           <td>
             <Zelle value={s.text} editable={editText} onChange={(v) => onChange?.((a) => (a.statements[i].text = v))} />
+            {g(i, 0)}
           </td>
-          {[true, false].map((val) => (
+          {[true, false].map((val, k) => (
             <td key={String(val)} className="ws-tf-cell" onClick={editKey ? set((a) => (a.statements[i].isTrue = val)) : undefined}>
               <span className="ws-check">{key && s.isTrue === val ? '✗' : ''}</span>
+              {g(i, k + 1)}
             </td>
           ))}
         </tr>
@@ -259,12 +356,19 @@ export function teilbareAntwort(
       return {
         einheiten,
         rahmen: (stueck, k) => (
-          <table className="ws-tf" key={k}>
+          <table className={`ws-tf ${ziehbar ? 'ws-table-ziehbar' : ''}`} key={k} style={breiten ? { tableLayout: 'fixed' } : undefined}>
+            <Spalten n={3} breiten={breiten} />
             <thead>
-              <tr>
-                <th />
-                <th>{trueFalseLabels(answerLanguage).yes}</th>
-                <th>{trueFalseLabels(answerLanguage).no}</th>
+              <tr style={zeilenStil(answer.headerHeightMm)}>
+                <th>{g('kopf', 0)}</th>
+                <th>
+                  {trueFalseLabels(answerLanguage).yes}
+                  {g('kopf', 1)}
+                </th>
+                <th>
+                  {trueFalseLabels(answerLanguage).no}
+                  {g('kopf', 2)}
+                </th>
               </tr>
             </thead>
             <tbody>{stueck}</tbody>
@@ -306,14 +410,26 @@ export function teilbareAntwort(
       }
     }
     case 'tableFill': {
+      /*
+       * Maße (02.10.2026): von Hand gezogen > KI-Prüfung > Regel nach Jahrgang und erwarteter
+       * Lösung (didactics/schreibraum.ts). Im Editor (Schülerblatt und Lösungen) Griffe an den
+       * Spalten- und Zeilenlinien wie bei der Tabelle als Baustein.
+       */
+      const r0 = raum ?? { regel: schreibRegel(7), breiteMm: 160 }
+      const masse = antwortTabellenMasse(answer, r0.regel, r0.breiteMm)
+      const ziehbar = Boolean(onChange) && (editText || editKey)
+      const speichern = (z: ZugErgebnis): void => onChange?.((a) => zugUebernehmen(a, z, a.rows.length))
+      const griffe = (r: number | 'kopf', c: number): React.ReactNode =>
+        ziehbar && <TabellenGriffe c={c} spalten={masse.colWidths.length} zeile={r} breiten={masse.colWidths} onZug={speichern} />
       const einheiten = answer.rows.map((row, r) => (
-        <tr key={r} {...u}>
+        <tr key={r} {...u} style={masse.rowHeightsMm[r] ? { height: `${masse.rowHeightsMm[r]}mm` } : undefined}>
           {row.map((cell, c) => {
             const solution = answer.solutionRows[r]?.[c] ?? ''
             if (cell) {
               return (
                 <td key={c}>
                   <Zelle value={cell} editable={editText} onChange={(v) => onChange?.((a) => (a.rows[r][c] = v))} />
+                  {griffe(r, c)}
                 </td>
               )
             }
@@ -332,6 +448,7 @@ export function teilbareAntwort(
                     }
                   />
                 )}
+                {griffe(r, c)}
               </td>
             )
           })}
@@ -340,13 +457,19 @@ export function teilbareAntwort(
       return {
         einheiten,
         rahmen: (stueck, k) => (
-          <table className="ws-table ws-table-fill" key={k}>
+          <table className={`ws-table ws-table-fill ${ziehbar ? 'ws-table-ziehbar' : ''}`} key={k} style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              {masse.colWidths.map((w, c) => (
+                <col key={c} style={{ width: `${w}%` }} />
+              ))}
+            </colgroup>
             {answer.headers.length > 0 && (
               <thead>
-                <tr>
+                <tr style={masse.headerHeightMm ? { height: `${masse.headerHeightMm}mm` } : undefined}>
                   {answer.headers.map((h, c) => (
                     <th key={c}>
                       <Zelle value={h} editable={editText} onChange={(v) => onChange?.((a) => (a.headers[c] = v))} />
+                      {griffe('kopf', c)}
                     </th>
                   ))}
                 </tr>
@@ -397,14 +520,23 @@ export function teilbareAntwort(
 }
 
 export function AnswerView({ answer, onChange }: { answer: Answer; onChange?: (fn: (a: Answer) => void) => void }): React.JSX.Element | null {
-  const { mode, answerLanguage, contentWidthMm } = useWs()
+  const ctx = useWs()
+  const { mode, answerLanguage, contentWidthMm } = ctx
   const key = isKeyMode(mode)
   const editText = mode === 'edit' && onChange
   const editKey = mode === 'keyEdit' && onChange
   // Zeilen der teilbaren Antwortformen – hier OHNE `data-unit`: Die Antwort steht dann innerhalb einer anderen Einheit
   const teilbar = teilbareAntwort(
     answer,
-    { key, editText: Boolean(editText), editKey: Boolean(editKey), editRoh: isEditMode(mode), answerLanguage: answerLanguage ?? 'de', onChange },
+    {
+      key,
+      editText: Boolean(editText),
+      editKey: Boolean(editKey),
+      editRoh: isEditMode(mode),
+      answerLanguage: answerLanguage ?? 'de',
+      onChange,
+      raum: antwortRaum(ctx)
+    },
     false
   )
 

@@ -154,9 +154,15 @@ function stamm(w: string): string {
 /**
  * Stichwörter eines Textes. „Unit 3", „Lektion 12" werden zu einem Wort („unit3"), denn in
  * Sprachenfächern ist genau das die Einheit.
+ *
+ * Ebenso der BAND eines Lehrwerks (02.10.2026): „Green Line 3" wird zu „green" + „line3". Vorher
+ * fiel die Zahl weg, „Green Line 1", „3" und „6" ergaben dieselben Stichwörter – Vokabeltests aus
+ * Band 3 und 6 landeten im Bereich „Green Line 1". Allgemein: Wort + ein- oder zweistellige Zahl.
  */
 export function stichwoerter(text: string): string[] {
-  const zusammen = text.replace(/\b(unit|lektion|kapitel|chapter|chapitre|unidad|unite|unité|lezione|module|modul)\s*(\d+)\b/gi, '$1$2')
+  const zusammen = text
+    .replace(/\b(unit|lektion|kapitel|chapter|chapitre|unidad|unite|unité|lezione|module|modul)\s*(\d+)\b/gi, '$1$2')
+    .replace(/(\p{L}{2,})\s+(\d{1,2})(?![\p{N}.,:])/gu, '$1$2')
   const woerter = zusammen.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
   const raus = new Set<string>()
   for (const roh of woerter) {
@@ -176,6 +182,24 @@ export function passt(a: string, b: string): boolean {
   const kurz = Math.min(a.length, b.length)
   if (kurz >= 4 && (a.startsWith(b) || b.startsWith(a))) return true
   return kurz >= 5 && (a.includes(b) || b.includes(a))
+}
+
+/**
+ * Widersprechen sich zwei Texte in einer Nummer? „line3" gegen „line1", „unit2" gegen „unit3":
+ * gleiches Wort, andere Zahl. Dann ist es ein anderer Band bzw. eine andere Einheit – egal, wie
+ * viele Wörter sonst passen (02.10.2026, Green Line).
+ */
+export function widersprechen(a: string[], b: string[]): boolean {
+  const nummern = (w: string[]): Map<string, string> =>
+    new Map(
+      w
+        .map((x) => /^(\p{L}+)(\d+)$/u.exec(x))
+        .filter((m): m is RegExpExecArray => Boolean(m))
+        .map((m) => [m[1], m[2]])
+    )
+  const nb = nummern(b)
+  for (const [wort, zahl] of nummern(a)) if (nb.has(wort) && nb.get(wort) !== zahl) return true
+  return false
 }
 
 /** Anteil der Stichwörter des kürzeren Textes, die im anderen vorkommen (0 … 1) */
@@ -229,7 +253,12 @@ export function besterBereich(m: ThemenMaterial, bereiche: Themenbereich[], mitg
   let wert: Bewertung = [0, 0, 0]
   for (const b of bereiche) {
     if (b.fachId !== m.fachId) continue
-    const s = [stichwoerter(b.name), ...(mitglieder.get(b.id) ?? [])].map((x) => bewertung(w, x)).reduce((a, c) => (vergleiche(c, a) > 0 ? c : a))
+    // Anderer Band/andere Einheit im Namen des Bereichs: nie dorthin, auch wenn Materialien darin ähnlich heißen
+    if (widersprechen(w, stichwoerter(b.name))) continue
+    const s = [stichwoerter(b.name), ...(mitglieder.get(b.id) ?? [])]
+      .filter((x) => !widersprechen(w, x))
+      .map((x) => bewertung(w, x))
+      .reduce((a, c) => (vergleiche(c, a) > 0 ? c : a), [0, 0, 0] as Bewertung)
     if (s[0] < AEHNLICH) continue
     const v = beste.length ? vergleiche(s, wert) : 1
     if (v > 0) {
@@ -300,6 +329,8 @@ function besterKatalogIndex(m: ThemenMaterial, katalog: KatalogMitWoertern): num
     // „Unit 3" in Klasse 6 ist eine andere Unit als in Klasse 8
     const jg = katalog[i].k.jahrgaenge
     if (m.grade && jg && !jg.includes(m.grade)) continue
+    // „Green Line 3" gehört nie zu „Green Line 1" (02.10.2026)
+    if (widersprechen(w, katalog[i].w)) continue
     const d = deckung(w, katalog[i].w)
     /*
      * Mindestens ein aussagekräftiges Wort muss passen, nicht nur Kurzwörter – ODER der ganze

@@ -22,7 +22,14 @@ const addNote = (ws: Worksheet, note: string): void => {
 }
 
 /** Nach dem Ausformulieren: Quellen prüfen, Bilder suchen/erzeugen, optional Tafelbild. */
-export async function finishWorksheet(result: Worksheet, profile: LearnerProfile, deps: FinishDeps, onProgress?: Progress): Promise<Worksheet> {
+export async function finishWorksheet(
+  result: Worksheet,
+  profile: LearnerProfile,
+  deps: FinishDeps,
+  onProgress?: Progress,
+  /** Live-Vorschau (02.10.2026): das Blatt, sobald ein Bild oder eine Figur eingesetzt ist */
+  zwischenstand?: (ws: Worksheet, was: string) => void
+): Promise<Worksheet> {
   const found = await completeOriginalSources(allBlocks(result), deps.sources, (done, total) =>
     onProgress?.(`Originalquellen werden geprüft (${done} von ${total}) …`, done, total)
   )
@@ -56,7 +63,12 @@ export async function finishWorksheet(result: Worksheet, profile: LearnerProfile
     const ersetze = (imageId: string, block: WsBlock): void => {
       for (const sheet of result.sheets) sheet.blocks = sheet.blocks.map((b) => (b.id === imageId ? block : b))
     }
-    const images = await completeWorksheetImages(allBlocks(result), result.meta, { ...deps.images, ersetze }, onProgress)
+    const images = await completeWorksheetImages(allBlocks(result), result.meta, { ...deps.images, ersetze }, (message, done, total) => {
+      onProgress?.(message, done, total)
+      // Die Bilder landen in den Bausteinen selbst – jedes erscheint in der Vorschau, sobald es da ist
+      zwischenstand?.(result, message)
+    })
+    zwischenstand?.(result, 'Bilder eingesetzt')
     if (images.web + images.ai + images.missing + images.reused + images.gezeichnet > 0) {
       addNote(
         result,
@@ -70,6 +82,7 @@ export async function finishWorksheet(result: Worksheet, profile: LearnerProfile
   // Illustrationen (26.09.2026): nach Regeln gesetzt, Sprechblasen von der KI – nur bei jüngeren Jahrgängen
   try {
     result.sheets = (await platziereIllustrationen(result, { ai: deps.ai })).sheets
+    zwischenstand?.(result, 'Figuren gesetzt')
   } catch {
     /* ohne Figuren weiter */
   }

@@ -1,6 +1,7 @@
 import { BorderStyle, Paragraph, ParagraphChild, ShadingType, Table, TableCell, TableLayoutType, TableRow, TabStopType, TextRun, WidthType } from 'docx'
 import { MUSTER_FORMEN } from '../../generation/solution'
-import { imageRun, NO_BORDERS, RED, run } from '../../../../shared/export/docxKit'
+import { imageRun, MM, NO_BORDERS, RED, run } from '../../../../shared/export/docxKit'
+import { eigeneBreiten } from '../../render/tabelleMasse'
 import { richTextRuns } from '../../../../shared/richtext/docx'
 import { plainText } from '../../../../shared/richtext/parse'
 import type { TaskBlock } from '../../model/types'
@@ -188,18 +189,22 @@ export async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): 
       block.parts.map((part, i) => ({ part, i })),
       spalten
     )
-    const zellBreite = Math.floor((ctx.contentWidth - indent) / spalten)
+    // Von Hand gezogene Spalten und Zeilen (02.10.2026, TaskBlock.mcGitter) – sonst gleich breit
+    const eigene = eigeneBreiten(block.mcGitter, spalten)
+    const zellBreiten = Array.from({ length: spalten }, (_, sp) => Math.floor(((ctx.contentWidth - indent) * (eigene ? eigene[sp] : 100 / spalten)) / 100))
     out.push(
       new Table({
         width: { size: ctx.contentWidth - indent, type: WidthType.DXA },
+        ...(eigene ? { columnWidths: zellBreiten } : {}),
         indent: { size: indent, type: WidthType.DXA },
         borders: { ...NO_BORDERS, insideHorizontal: NO_BORDERS.top, insideVertical: NO_BORDERS.top },
         rows: await Promise.all(
           zeilen.map(
-            async (zeile) =>
+            async (zeile, z) =>
               new TableRow({
+                ...(block.mcGitter?.rowHeightsMm?.[z] ? { height: { value: Math.round(block.mcGitter.rowHeightsMm[z] * MM), rule: 'atLeast' as const } } : {}),
                 children: await Promise.all(
-                  zeile.map(async (eintrag) => {
+                  zeile.map(async (eintrag, sp) => {
                     const kinder: Paragraph[] = []
                     if (eintrag) {
                       kinder.push(
@@ -235,7 +240,7 @@ export async function taskContent(ctx: Ctx, block: TaskBlock, number?: number): 
                     } else {
                       kinder.push(new Paragraph({ children: [] }))
                     }
-                    return new TableCell({ width: { size: zellBreite, type: WidthType.DXA }, borders: NO_BORDERS, children: kinder })
+                    return new TableCell({ width: { size: zellBreiten[sp], type: WidthType.DXA }, borders: NO_BORDERS, children: kinder })
                   })
                 )
               })

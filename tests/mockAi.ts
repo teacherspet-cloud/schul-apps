@@ -76,7 +76,15 @@ export function mockAi(calls: StructuredRequest[] = []) {
         instruction: 'Which word belongs to the family?',
         items: items((e) => ({ vocabId: e.id, related: `${e.base}ness`, relatedPos: 'noun', answer: e.base }))
       },
-      mindmap: { instruction: 'Fill in the mind map.', topic: 'School things', words: items((e) => ({ vocabId: e.id })) },
+      // Mindmap mit Oberbegriffen (02.10.2026): je Ast die Wörter
+      mindmap: {
+        instruction: 'Fill in the mind map.',
+        topic: 'School things',
+        categories: [
+          { name: 'Group one', vocabIds: entries.filter((_, i) => i % 2 === 0).map((e) => e.id) },
+          { name: 'Group two', vocabIds: entries.filter((_, i) => i % 2 === 1).map((e) => e.id) }
+        ]
+      },
       writeSentences: {
         instruction: 'Write sentences.',
         items: items((e) => ({ vocabId: e.id, prompt: `${e.term} – your holidays`, modelAnswer: `I used ${e.base} in my holidays.` }))

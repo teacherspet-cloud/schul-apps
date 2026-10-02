@@ -12,6 +12,7 @@ import { ghsSvg } from '../../render/ghs'
 import type { Child, Ctx } from './grundlagen'
 import { PX_PER_MM, PX_MM } from './grundlagen'
 import { gridArea, gridTable, spacer } from './bausteine'
+import { linieMmFuerMeta } from '../../didactics/schreibraum'
 
 const RAND = { style: BorderStyle.SINGLE, size: 6, color: '999999' }
 
@@ -73,7 +74,7 @@ export async function protokollDocx(ctx: Ctx, block: ProtocolBlock): Promise<Chi
     else if (a.form === 'tabelle') {
       const spalten = a.spalten?.length ? a.spalten : ['', '']
       out.push(await gridTable(ctx, spalten, Array.from({ length: a.tabellenZeilen ?? 6 }, () => spalten.map(() => '')), ctx.contentWidth))
-    } else if (a.zeilen) out.push(...writingLines(a.zeilen, 0))
+    } else if (a.zeilen) out.push(...writingLines(a.zeilen, 0, 0, linieMmFuerMeta(ctx.ws.meta)))
   }
   if (!key && block.checkliste?.length) {
     out.push(new Paragraph({ keepNext: true, spacing: { before: 160 }, children: [run('Ist mein Protokoll vollständig?', { bold: true })] }))

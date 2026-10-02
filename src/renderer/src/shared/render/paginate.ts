@@ -99,6 +99,16 @@ export interface PlacedItem {
    * GANZE Tabelle beim Messen hatte.
    */
   spalten?: number[]
+  /**
+   * ZEILENWEISE GETEILTER Materialtext (02.10.2026, render/zeilenTeilung.ts): Der erste Absatz
+   * des Stücks beginnt erst `absatzAb` px unter seiner Oberkante (die Zeilen davor stehen auf der
+   * Seite zuvor), der letzte endet `absatzBis` px unter seiner Oberkante. Fehlt der Wert, steht
+   * der Absatz an dieser Seite vollständig.
+   */
+  absatzAb?: number
+  absatzBis?: number
+  /** Nummern der Anmerkungen, deren Ziffer in diesem Stück steht (Fußnoten unten auf der Seite) */
+  noten?: number[]
 }
 
 export interface PagePlan {

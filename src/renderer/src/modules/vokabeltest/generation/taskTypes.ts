@@ -1,7 +1,7 @@
 import type { CefrLevel } from '@shared/types'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { newId, Rng, shuffle } from '../model/random'
-import type { Block, BlockKind, CategorizeBlock, GapItem, TaskTypeId, TestSettings, TextPart, VocabEntry } from '../model/types'
+import type { Block, BlockKind, CategorizeBlock, GapItem, MindmapItem, TaskTypeId, TestSettings, TextPart, VocabEntry } from '../model/types'
 import { buildCrossword, crosswordForm, isCrosswordWord, scrambleWord } from './crossword'
 import { arr, bool, enumOf, int, obj, str } from '../../../shared/aiSchema'
 import type { KnownVocab } from '../../../shared/knownVocab'
@@ -11,8 +11,9 @@ import { mitNennform } from '../input/lateinNennform'
 import { istGriechisch, mitGriechischerNennform } from '../didactics/griechisch'
 import { ASPEKT_LABEL, LESUNG_LABEL, mitLesung, WURZEL_LABEL } from '../didactics/sprachAufgaben'
 import { griechischUmschrift } from '../../../shared/sonderzeichen'
-import { aufgabenText, FESTE_ANWEISUNG, zuordnungsKoepfe } from '../render/aufgabenTexte'
+import { aufgabenText, FESTE_ANWEISUNG, mindmapAnweisung, synonymTexte, zuordnungsKoepfe, type SynonymArt } from '../render/aufgabenTexte'
 import { baueVerbBlock } from './verbAufgabe'
+import { ersatzWoerter, wortartenVon, wortartVon } from './wortart'
 
 export interface GenContext {
   settings: TestSettings
@@ -94,6 +95,23 @@ function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction
   }
 }
 
+/** Sie-Form nach Stufe – nur für die deutschen Anweisungen der Altsprachen von Belang (Paket 8b) */
+const sieAnrede = (ctx: GenContext): boolean => anredeFuer(ctx.settings.grade, ctx.settings.schoolTypeId, ctx.settings.stateId) === 'sie'
+
+/** Mindmap-Anweisung zur gewählten Form, in der Testsprache und Anrede der Stufe (02.10.2026) */
+export const mindmapAnweisungFuer = (settings: TestSettings, variante: 'oberbegriffe' | 'offen'): string =>
+  mindmapAnweisung(settings.targetLanguage, variante, anredeFuer(settings.grade, settings.schoolTypeId, settings.stateId) === 'sie')
+
+/** Gegenteile, die eine Synonym-/Gegenteil-Aufgabe mit n Paaren mindestens enthalten soll (02.10.2026) */
+export const mindestGegenteile = (n: number): number => (n >= 3 ? Math.ceil(n / 3) : 0)
+
+/** Welche Beziehungen kommen vor? Danach richtet sich die Anweisung. */
+export function synonymArt(relationen: string[]): SynonymArt {
+  const gleich = relationen.some((r) => r === '=')
+  const gegenteil = relationen.some((r) => r === '≠')
+  return gleich && gegenteil ? 'gemischt' : gegenteil ? 'gegenteil' : 'gleich'
+}
+
 const earlyLevel = (ctx: GenContext): boolean => ['Pre-A1', 'A1', 'A1+', 'A2'].includes(ctx.settings.level)
 
 const PICTURE_INSTRUCTIONS: Record<string, string> = {
@@ -116,31 +134,13 @@ const GAP_RULES = `Rules for gaps:
 - The answer must never appear in "before" or "after".
 ${UNIQUE_RULE}`
 
-/** Notreserve, falls weder die KI noch die Liste passende überzählige Wörter liefern */
-const FALLBACK_EXTRA_WORDS: Record<string, string[]> = {
-  en: ['window', 'bottle', 'garden', 'pencil', 'kitchen', 'bicycle', 'blanket', 'ladder', 'mirror', 'orange'],
-  fr: ['fenêtre', 'bouteille', 'jardin', 'crayon', 'cuisine', 'vélo', 'miroir', 'orange'],
-  es: ['ventana', 'botella', 'jardín', 'lápiz', 'cocina', 'bicicleta', 'espejo', 'naranja'],
-  it: ['finestra', 'bottiglia', 'giardino', 'matita', 'cucina', 'bicicletta', 'specchio', 'arancia'],
-  nl: ['raam', 'fles', 'tuin', 'potlood', 'keuken', 'fiets', 'spiegel', 'sinaasappel'],
-  ru: ['окно', 'бутылка', 'сад', 'карандаш', 'кухня', 'велосипед', 'зеркало', 'апельсин'],
-  // Schulsprachen seit 30.09.2026 – dieselben Alltagswörter
-  pl: ['okno', 'butelka', 'ogród', 'ołówek', 'kuchnia', 'rower', 'lustro', 'pomarańcza'],
-  cs: ['okno', 'láhev', 'zahrada', 'tužka', 'kuchyně', 'kolo', 'zrcadlo', 'pomeranč'],
-  pt: ['janela', 'garrafa', 'jardim', 'lápis', 'cozinha', 'bicicleta', 'espelho', 'laranja'],
-  tr: ['pencere', 'şişe', 'bahçe', 'kalem', 'mutfak', 'bisiklet', 'ayna', 'portakal'],
-  zh: ['窗户', '瓶子', '花园', '铅笔', '厨房', '自行车', '镜子', '橙子'],
-  ja: ['まど', 'びん', 'にわ', 'えんぴつ', 'だいどころ', 'じてんしゃ', 'かがみ', 'オレンジ'],
-  ar: ['نافذة', 'زجاجة', 'حديقة', 'قلم', 'مطبخ', 'دراجة', 'مرآة', 'برتقالة'],
-  da: ['vindue', 'flaske', 'have', 'blyant', 'køkken', 'cykel', 'spejl', 'appelsin'],
-  el: ['παράθυρο', 'μπουκάλι', 'κήπος', 'μολύβι', 'κουζίνα', 'ποδήλατο', 'καθρέφτης', 'πορτοκάλι']
-}
-
 /** Mindestens so viele überzählige Wörter stehen in jedem Wortkasten bzw. jeder Zuordnung */
 export const MIN_EXTRA_WORDS = 2
 
+// Überzählige Wörter (02.10.2026): dieselbe Wortart und Form wie die Wörter im Kasten – ein Verb
+// zwischen lauter Nomen fällt sonst ohne Nachdenken heraus
 const extraWordsRule = (_vocab: VocabEntry[], ctx: GenContext): string =>
-  `Word box: the students see all tested words plus the "extraWords". Give 2 or 3 extra words (same word class, level and topic) that fit NONE of the gaps in any grammatical form – check every gap. Do NOT use any word from this vocabulary list as an extra word (they may be tested in other tasks): ${ctx.allVocab
+  `Word box: the students see all tested words plus the "extraWords". Give 2 or 3 extra words that fit NONE of the gaps in any grammatical form – check every gap. Each extra word must be a real distractor: the same word class as at least one tested word (mirror the mix of word classes in the box), written in the same way as the words in the box (base form; with article / "to" exactly when the tested words have one), same level and topic, so that it looks plausible at first glance and can only be ruled out by meaning. Do NOT use any word from this vocabulary list as an extra word (they may be tested in other tasks): ${ctx.allVocab
     .map((v) => v.term)
     .slice(0, 60)
     .join(', ')}.`
@@ -149,7 +149,15 @@ const extraWordsRule = (_vocab: VocabEntry[], ctx: GenContext): string =>
  * Überzählige Wörter für Wortkasten/Zuordnung: Vorschläge der KI, ergänzt um andere Wörter der Liste,
  * damit immer mindestens zwei Wörter nicht gebraucht werden.
  */
-export function ensureExtraWords(proposed: unknown, vocab: VocabEntry[], ctx: GenContext, used: string[] = vocab.map((v) => v.term), max = 4): string[] {
+export function ensureExtraWords(
+  proposed: unknown,
+  vocab: VocabEntry[],
+  ctx: GenContext,
+  used: string[] = vocab.map((v) => v.term),
+  max = 4,
+  /** Ersatzwörter aus der Notreserve erlaubt? (nicht bei Kollokations-Enden – die sind keine Einzelwörter) */
+  ersatz = true
+): string[] {
   // Wörter, die in dieser Variante abgefragt werden, dürfen nicht als Ablenker auftauchen (sie würden Lösungen verraten)
   const tested = ctx.variantVocab ?? ctx.allVocab
   const taken = new Set([...used, ...tested.map((v) => v.term)].map(baseForm))
@@ -161,20 +169,46 @@ export function ensureExtraWords(proposed: unknown, vocab: VocabEntry[], ctx: Ge
     words.push(clean)
   }
   if (Array.isArray(proposed)) proposed.forEach((w) => typeof w === 'string' && add(w))
+  const sprache = ctx.settings.targetLanguage
+  const arten = wortartenVon(vocab, sprache)
   if (words.length < MIN_EXTRA_WORDS && ctx.variantVocab) {
-    // Nicht abgefragte Wörter der Liste sind unbedenklich
+    // Nicht abgefragte Wörter der Liste sind unbedenklich – aber nur in einer Wortart, die auch
+    // abgefragt wird (02.10.2026); Wörter unbekannter Wortart bleiben erlaubt
     const untested = shuffle(
-      ctx.allVocab.filter((v) => !ctx.variantVocab!.some((x) => x.id === v.id)).map((v) => v.term),
+      ctx.allVocab
+        .filter((v) => !ctx.variantVocab!.some((x) => x.id === v.id))
+        .filter((v) => {
+          const art = wortartVon(v, sprache)
+          return !art || !arten.length || arten.includes(art)
+        })
+        .map((v) => v.term),
       ctx.rng
     )
     for (const o of untested) if (words.length < MIN_EXTRA_WORDS) add(o)
   }
-  if (words.length < MIN_EXTRA_WORDS) {
-    const fallback = shuffle(FALLBACK_EXTRA_WORDS[ctx.settings.targetLanguage] ?? FALLBACK_EXTRA_WORDS.en, ctx.rng)
+  if (words.length < MIN_EXTRA_WORDS && ersatz) {
+    // Notreserve in der Wortart der abgefragten Wörter (generation/wortart.ts); passt keine, bleibt es dabei
+    const fallback = shuffle(ersatzWoerter(vocab, sprache), ctx.rng)
     for (const o of fallback) if (words.length < MIN_EXTRA_WORDS) add(o)
   }
   return words.slice(0, max)
 }
+
+/*
+ * Ablenker bei Multiple Choice (02.10.2026, Befund der Lehrkraft): Die Regel „bevorzugt andere
+ * Wörter der Liste ODER Wörter derselben Wortart" widersprach sich – die KI nahm Listenwörter
+ * jeder Wortart, die schon an der Form als falsch zu erkennen waren. Jetzt zuerst Wortart und
+ * Form, dann Plausibilität, und nur eine Option passt nach Bedeutung bzw. Kollokation.
+ */
+const MC_DISTRACTOR_RULES = (ctx: GenContext): string =>
+  `Rules for the 3 distractors:
+- SAME word class as the correct answer, and inflected into exactly the SAME form the gap needs (same tense, person, number, comparison; same kind of article/gender where the sentence fixes it). Every option must fit the sentence grammatically, so that no option can be excluded by its form, its word class or its length alone.
+- Plausible at first glance: same topic or a typical confusion (similar meaning field, similar spelling, typical learner mistakes). No absurd or obviously unrelated words.
+- Only ONE option fits the meaning or the collocation of the sentence; no distractor may be a synonym or otherwise acceptable.
+- Where possible take distractors from this vocabulary list – but ONLY words of the same word class, inflected like the answer: ${ctx.allVocab
+    .map((v) => v.term)
+    .slice(0, 60)
+    .join(', ')}. Otherwise use other words of the same word class at the students' level.`
 
 // ---------- Aufgabentypen ----------
 
@@ -378,11 +412,14 @@ const defs: TaskTypeDef[] = [
       vocabId: str(),
       before: str(),
       after: str(),
-      options: arr(str(), 'Exactly 4 options in the form that fits the gap: the correct answer and 3 distractors of the same word class'),
+      options: arr(
+        str(),
+        'Exactly 4 options, all of the SAME word class and inflected into the SAME form that the gap needs (tense, person, number, gender/article): the correct answer and 3 distractors'
+      ),
       correctIndex: int('0-based index of the correct option')
     }),
     prompt: (vocab, ctx) =>
-      `Task type: multiple choice in context. One sentence per word with a gap and 4 options. Distractors should preferably be other words from this vocabulary list (${ctx.allVocab.map((v) => v.term).join(', ')}) or words of the same word class. Exactly one option may fit: distractors must be clearly wrong in this context (no synonyms, no words that would also be acceptable).\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
+      `Task type: multiple choice in context. One sentence per word with a gap and 4 options.\n${MC_DISTRACTOR_RULES(ctx)}\n${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
       const items = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
@@ -407,13 +444,39 @@ const defs: TaskTypeDef[] = [
     defaultInstruction: 'Match each word with a word that has the same (=) or the opposite (≠) meaning.',
     schema: obj({
       instruction: str(),
-      pairs: arr(obj({ vocabId: str(), partner: str("A clear synonym or antonym at or below the students' level"), relation: enumOf(['=', '≠']) })),
+      pairs: arr(
+        obj({
+          vocabId: str(),
+          partner: str("A clear synonym or antonym at or below the students' level, same word class as the word"),
+          relation: enumOf(['=', '≠'])
+        })
+      ),
       extraWords: arr(str(), '2 or 3 extra words that are neither synonym nor antonym of any word')
     }),
-    prompt: (vocab) =>
-      `Task type: match synonyms/opposites. For each word give ONE clear synonym or antonym (prefer the one that is unambiguous and known at this level) and mark the relation.\n\nWords:\n${vocabLines(vocab)}`,
+    /*
+     * Mischung verlangt (02.10.2026, Befund der Lehrkraft): Die Anweisung nennt gleiche UND
+     * entgegengesetzte Bedeutung, die KI lieferte aber fast nur Synonyme. Mindestens ein Drittel
+     * Gegenteile, soweit die Wörter welche haben; was dann wirklich kommt, bestimmt die Anweisung
+     * (build) und prüft quality.ts.
+     */
+    prompt: (vocab) => {
+      const min = mindestGegenteile(vocab.length)
+      return (
+        'Task type: match synonyms and opposites. For each word give ONE clear partner word of the same word class and mark the relation: "=" for a synonym (same meaning), "≠" for an antonym (opposite meaning). Prefer partners that are unambiguous and known at this level.\n' +
+        (min
+          ? `MIX THE RELATIONS: at least ${min} of the ${vocab.length} pairs must be antonyms (≠), the others synonyms (=). Words with a clear opposite (most adjectives, many verbs and adverbs, some nouns) are the best candidates for ≠. Use fewer antonyms only if the words really have no clear opposite.\n`
+          : 'Use an antonym (≠) wherever a clear opposite exists.\n') +
+        'The mark must be correct: never mark a synonym as ≠ or an antonym as =. No partner may fit a second word of the list.\n\n' +
+        `Words:\n${vocabLines(vocab)}`
+      )
+    },
     build(vocab, data, ctx) {
-      const pairs = (data.pairs ?? []).map((p: any) => ({ v: findVocab(vocab, p.vocabId), partner: p.partner, rel: p.relation })).filter((p: any) => p.v)
+      const pairs = (data.pairs ?? [])
+        .map((p: any) => ({ v: findVocab(vocab, p.vocabId), partner: String(p.partner ?? '').trim(), rel: p.relation === '≠' ? '≠' : '=' }))
+        .filter((p: any) => p.v && p.partner)
+      const art = synonymArt(pairs.map((p: any) => p.rel))
+      // Anweisung, Überschrift und Spaltenkopf nach dem, was wirklich gefragt ist (nicht die KI-Formulierung)
+      const texte = synonymTexte(ctx.settings.targetLanguage, art, sieAnrede(ctx))
       const right = shuffle(
         [
           ...pairs.map((p: any) => ({ id: newId(ctx.rng), text: p.partner, vocabId: p.v.id as string | undefined })),
@@ -428,14 +491,18 @@ const defs: TaskTypeDef[] = [
       const left = shuffle(pairs, ctx.rng).map((p: any) => ({
         id: newId(ctx.rng),
         vocabId: p.v.id,
-        text: `${p.v.term} (${p.rel})`,
-        answerId: right.find((r) => r.vocabId === p.v.id)!.id
+        // Das Zeichen am Wort nur bei gemischter Aufgabe – sonst sagt es die Anweisung
+        text: art === 'gemischt' ? `${p.v.term} (${p.rel})` : p.v.term,
+        answerId: right.find((r) => r.vocabId === p.v.id)!.id,
+        relation: p.rel
       }))
       return {
         ...base(this, data, ctx),
+        title: texte.title,
+        instruction: texte.instruction,
         kind: 'match',
-        leftLabel: 'Words',
-        rightLabel: 'Synonyms / opposites',
+        leftLabel: texte.leftLabel,
+        rightLabel: texte.rightLabel,
         left,
         right: right.map(({ id, text }) => ({ id, text }))
       }
@@ -540,32 +607,74 @@ ${vocabLines(vocab)}`,
   {
     id: 'mindmap',
     label: 'Mindmap',
-    description: 'Zu einem Oberbegriff (z. B. „School things") die gelernten Vokabeln in leere Äste eintragen.',
+    description: 'Oberbegriff in der Mitte, Äste mit vorgegebenen Oberbegriffen oder ganz offen; die gelernten Vokabeln kommen auf die Zweige.',
     kind: 'mindmap',
     minLevel: 'Pre-A1',
     usesVocab: true,
     minItems: 4,
     defaultPoints: 1,
     defaultTitle: 'Mind map',
-    defaultInstruction: 'Write the words you have learned about this topic into the empty branches.',
+    defaultInstruction: 'Write the words you have learned about this topic on the lines of the matching branch.',
+    /*
+     * Echte Mindmap (02.10.2026): Die KI schlägt neben dem Thema 3–5 Oberbegriffe für die Äste vor
+     * (Orte, Tätigkeiten, Adjektive …) und ordnet jedes Wort genau einem zu. Die Oberbegriffe
+     * kommen immer mit – so lässt sich im Editor ohne neue Anfrage zwischen „mit Oberbegriffen"
+     * und „ganz offen" wechseln, und der Lösungsteil zeigt die Wörter je Ast.
+     */
     schema: obj({
       instruction: str('Short task instruction for the students in the target language'),
       topic: str('Superordinate topic that fits ALL the words, in the target language (e.g. "School things")'),
-      words: arr(obj({ vocabId: str() }), 'All words that belong to the topic')
+      categories: arr(
+        obj({
+          name: str('Short branch label in the target language, e.g. "places", "activities", "adjectives"'),
+          vocabIds: arr(str(), 'ids of the words that belong to this branch')
+        }),
+        '3 to 5 branches; every word belongs to exactly one branch'
+      )
     }),
     prompt: (vocab) =>
-      `Task type: mind map. Find ONE superordinate topic that fits all the words (e.g. "School things", "Free time", "Food"). List every word by its id.
+      `Task type: mind map. Find ONE superordinate topic that fits all the words (e.g. "School things", "Free time", "Food"). Then divide the words into 3 to 5 branches with short, clear labels in the target language at the students' level – meaning-based sub-topics (e.g. places, people, activities, things, feelings) or word classes where that is clearer (e.g. "adjectives to describe …"). Every word belongs to exactly ONE branch without doubt; each branch should get at least 2 words where possible. The labels must not contain any of the words. List every word by its id.
 
 Words:
 ${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
-      const listed = (data.words ?? []).flatMap((w: any) => {
-        const v = findVocab(vocab, w.vocabId)
-        return v ? [{ id: newId(ctx.rng), vocabId: v.id, answer: v.term }] : []
-      })
-      // Ohne brauchbare Antwort der KI stehen die zugeteilten Vokabeln als Lösung
-      const items = listed.length ? listed : vocab.map((v) => ({ id: newId(ctx.rng), vocabId: v.id, answer: v.term }))
-      return { ...base(this, data, ctx), kind: 'mindmap', topic: String(data?.topic ?? '').trim() || 'Topic', items }
+      const variante = ctx.settings.mindmapVariante ?? 'oberbegriffe'
+      const vergeben = new Set<string>()
+      const branches: { id: string; label: string }[] = []
+      const items: MindmapItem[] = []
+      for (const c of Array.isArray(data?.categories) ? data.categories : []) {
+        const label = String(c?.name ?? '').trim()
+        if (!label) continue
+        const id = newId(ctx.rng)
+        const woerter = (Array.isArray(c.vocabIds) ? c.vocabIds : []).flatMap((vid: any) => {
+          const v = findVocab(vocab, String(vid))
+          if (!v || vergeben.has(v.id)) return []
+          vergeben.add(v.id)
+          return [{ id: newId(ctx.rng), vocabId: v.id, answer: v.term, branchId: id }]
+        })
+        if (!woerter.length) continue
+        branches.push({ id, label })
+        items.push(...woerter)
+      }
+      // Ältere Antwortform (nur Wortliste) und Wörter, die die KI keinem Ast zugeordnet hat: ohne Ast
+      const rest = (Array.isArray(data?.words) && !branches.length ? data.words.map((w: any) => findVocab(vocab, w.vocabId)) : vocab).filter(
+        (v: VocabEntry | undefined): v is VocabEntry => Boolean(v) && !vergeben.has(v!.id)
+      )
+      for (const v of rest) {
+        vergeben.add(v.id)
+        items.push({ id: newId(ctx.rng), vocabId: v.id, answer: v.term })
+      }
+      return {
+        ...base(this, data, ctx),
+        // Anweisung nach der Form – die KI kennt die gewählte Form nicht
+        instruction: mindmapAnweisungFuer(ctx.settings, variante),
+        kind: 'mindmap',
+        topic: String(data?.topic ?? '').trim() || 'Topic',
+        items,
+        branches,
+        variante,
+        freierAst: variante === 'oberbegriffe' && Boolean(ctx.settings.mindmapFreierAst)
+      }
     }
   },
   {
@@ -944,6 +1053,8 @@ ${vocabLines(vocab)}`,
     prompt: (vocab, ctx) =>
       `Aufgabentyp: Monosemieren. Zu jedem mehrdeutigen Wort ein kurzer ${alteSpracheAdjektiv(ctx.settings.targetLanguage)}er Satz und drei deutsche Bedeutungen, von denen nur eine im Satz passt.\n` +
       'Die falschen Bedeutungen sind ECHTE Bedeutungen des Wortes, die hier nur nicht passen – keine erfundenen.\n' +
+      // Ablenker nicht schon an der Form erkennbar (02.10.2026): gleiche Wortart und Form im Deutschen
+      'Alle drei Bedeutungen stehen in derselben Wortart und Form (z. B. alle als Infinitiv, alle als Nomen mit bzw. ohne Artikel), sind auf den ersten Blick plausibel, und nur eine passt nach Sinn und Zusammenhang des Satzes.\n' +
       'Der Satz benutzt nur Formen und Vokabeln, die zum Lernstand passen.\n\n' +
       `Wörter:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {

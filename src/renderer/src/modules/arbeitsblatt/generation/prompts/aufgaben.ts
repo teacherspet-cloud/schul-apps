@@ -27,7 +27,9 @@ export function comprehensionRules(meta: WorksheetMeta): string {
      * steht jetzt dabei, dass JEDES gewählte Format vorkommen muss – und bei genau einem
      * Format, dass es das einzige ist.
      */
-    `AUFGABENFORMATE (${skill === 'listening' ? 'Hörverstehen' : 'Leseverstehen'}):`,
+    `AUFGABENFORMATE (${skill === 'listening' ? 'Hör-/Sehverstehen' : 'Leseverstehen'}):`,
+    // Wunsch der Lehrkraft (02.10.2026): nur die gewählten Formate zum vorgegebenen Hör-/Sehtext, sonst nichts
+    meta.nurGewaehlteFormate ? '- NUR diese Formate: Außer den Verstehensaufgaben in diesen Formaten entsteht keine weitere Aufgabe.' : '',
     chosen.length === 1
       ? `- Benutze AUSSCHLIESSLICH dieses eine Format. Kein anderes Antwortformat kommt vor.`
       : wantedTasks(meta) === 1

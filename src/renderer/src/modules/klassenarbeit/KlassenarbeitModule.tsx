@@ -8,6 +8,9 @@ import TasksStep from './steps/TasksStep'
 import { useKlassenarbeit } from './store'
 import QuellenAuswahl from '../arbeitsblatt/steps/QuellenAuswahl'
 import { QUELLENAUSWAHL, type QuellenFrage } from '../arbeitsblatt/auftraege'
+import { ZwischenstandsBlatt } from '../arbeitsblatt/render/BlattVorschau'
+import { examToWorksheetAlle } from './render/examWorksheet'
+import type { Exam } from './model/types'
 
 /**
  * Programm „Klassenarbeiten".
@@ -40,6 +43,8 @@ export default function KlassenarbeitModule({ active }: { active: boolean }): Re
       einstellen={<FrameStep />}
       bearbeiten={(exam) => <TasksStep exam={exam} />}
       texte={{ meine: 'Meine Klassenarbeiten', neu: 'Neue Klassenarbeit' }}
+      // Live-Vorschau (02.10.2026): die entstehende Arbeit in allen Fassungen
+      vorschau={(z) => <ZwischenstandsBlatt<Exam> z={z} alsBlatt={examToWorksheetAlle} />}
       zusatz={
         quellenFrage && (
           <QuellenAuswahl

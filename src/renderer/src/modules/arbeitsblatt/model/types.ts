@@ -1,3 +1,4 @@
+import type { InterkulturSetup } from '../didactics/interkulturalitaet'
 import type { ProtokollInhalt, VersuchSetup } from './protokoll'
 import type { DesignTemplate } from '@shared/design'
 import type { AiProviderId, CefrLevel, TtsSettings } from '@shared/types'
@@ -181,6 +182,11 @@ export interface InfoBoxBlock extends BaseBlock {
    * Listenpunkt (Quelle) über die ganze Breite.
    */
   spalten?: 2
+  /**
+   * Deutlich abgesetzt von den Bausteinen davor und danach (01.10.2026, Operatorenliste der
+   * Klausur): Sie stand sonst so dicht an den Aufgaben, als gehöre sie zu einer davon.
+   */
+  abgesetzt?: boolean
 }
 
 export interface TextBlock extends BaseBlock {
@@ -425,6 +431,16 @@ export interface Answer {
   headers: string[]
   rows: string[][]
   solutionRows: string[][]
+  /**
+   * tableFill (auch trueFalse/matching: nur von Hand gezogen): Maße von Hand oder aus der KI-Prüfung (02.10.2026, render/tabelleMasse.ts) –
+   * Spaltenbreiten in Prozent (Summe 100), Mindesthöhe je Zeile und der Kopfzeile in mm,
+   * Mindesthöhe aller Ausfüllzellen in mm. Fehlt ein Wert, gilt die Regel nach Jahrgang und
+   * erwarteter Lösung (didactics/schreibraum.ts); von Hand Gezogenes geht immer vor.
+   */
+  colWidths?: number[]
+  rowHeightsMm?: number[]
+  headerHeightMm?: number
+  cellHeightMm?: number
   /** labels: Lösungen der Beschriftungen */
   labels: string[]
   /** diagram: die Zeichenfläche mit Achsen (26.09.2026) */
@@ -539,6 +555,11 @@ export interface TaskBlock extends BaseBlock {
   socialForm: SocialForm
   answer: Answer
   parts: TaskPart[]
+  /**
+   * Fragenreihe zum Ankreuzen (render/mcGrid.ts): von Hand gezogene Spaltenbreiten (Prozent) und
+   * Mindesthöhen je Gitterzeile (mm) – 02.10.2026, render/tabelleZiehen.ts. Fehlt = wie bisher.
+   */
+  mcGitter?: { colWidths?: number[]; rowHeightsMm?: number[] }
   solution: string
   points: number
   minutes: number
@@ -831,6 +852,10 @@ export interface SelfCheckBlock extends BaseBlock {
   title: string
   statements: string[]
   format: 'smileys' | 'ampel' | 'kompetenzraster'
+  /** Von Hand gezogene Maße (02.10.2026, render/tabelleZiehen.ts): Spalten in Prozent, Zeilen je Aussage und Kopfzeile in mm */
+  colWidths?: number[]
+  rowHeightsMm?: number[]
+  headerHeightMm?: number
 }
 
 export interface DividerBlock extends BaseBlock {
@@ -1015,7 +1040,13 @@ export interface WorksheetMeta {
   ueberthemaAus?: boolean
   themenbereich?: string
   /** Fremdsprachen: Kompetenzschwerpunkt des Blattes ('mixed' = gemischt) */
-  skillFocus?: LanguageSkill | 'mixed'
+  // 'interkulturell' (02.10.2026): eigener Schwerpunkt nur des Arbeitsblatts (didactics/interkulturalitaet.ts)
+  skillFocus?: LanguageSkill | 'mixed' | 'interkulturell'
+  /**
+   * Interkultureller Zusatzschwerpunkt (02.10.2026): setzt auf jeden Schwerpunkt auf; in der
+   * Klassenarbeit der einzige Weg (integrativ). Siehe didactics/interkulturalitaet.ts.
+   */
+  interkulturell?: InterkulturSetup
   /** Schwerpunkt Sprechen: gewählte Teile des Blattes (didactics/sprechen.ts); fehlt = alle vier */
   sprechTeile?: import('../didactics/sprechen').SprechTeil[]
   /**
@@ -1093,6 +1124,11 @@ export interface WorksheetMeta {
   acquisitionStage?: number
   /** Hör- und Leseverstehen: gewählte Aufgabenformate (ids aus comprehensionFormats.ts) */
   comprehensionFormats?: string[]
+  /**
+   * NUR die gewählten Formate zum vorgegebenen Hör-/Sehtext bzw. Lesetext (02.10.2026, Wunsch der
+   * Lehrkraft): keine Vorentlastung, keine weiterführende Aufgabe, nur die Verstehensaufgaben.
+   */
+  nurGewaehlteFormate?: boolean
   /**
    * Fremdsprachen: Hilfsblatt mit nützlichen Ausdrücken und Wortschatz für die Lernenden.
    * 'aus' = keines · 'blatt' = eigenes Blatt am Ende · 'inline' = auf dem Aufgabenblatt.

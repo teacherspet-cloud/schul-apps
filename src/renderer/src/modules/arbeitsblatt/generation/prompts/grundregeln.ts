@@ -18,6 +18,7 @@ import { knownVocabRulesDe } from '../../../../shared/knownVocab'
 import { rolePlayRules } from '../../didactics/rolePlay'
 import { demandRules } from '../../didactics/demand'
 import { interkulturellRegeln } from '../../didactics/interkulturell'
+import { interkulturZusatzRegeln } from '../../didactics/interkulturalitaet'
 import { helpCardRules, skillFocusPrompt, loesungsspracheRegel, phraseSheetRules, grammarRules } from './fertigkeiten'
 import { comprehensionRules, mcItemRules, itemWordingRules, singleTaskFocus } from './aufgaben'
 import { mcAusschlussRegeln } from '../../../../shared/verstehen/blindprobe'
@@ -119,6 +120,8 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
      * hat (Mathematik, Physik …), eine leere Zeichenkette – dann steht auch nichts im Prompt.
      */
     interkulturellRegeln(meta),
+    // Interkultureller Zusatzschwerpunkt (02.10.2026) – auch für die Klassenarbeit, die ihre Teile über diese Regeln baut
+    interkulturZusatzRegeln(meta, { klassenarbeit: meta.sheetType === 'lernkontrolle' }),
     '',
     umfangRegeln(meta),
     '',

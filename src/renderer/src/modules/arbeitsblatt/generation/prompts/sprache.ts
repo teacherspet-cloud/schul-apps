@@ -3,6 +3,7 @@ import type { WorksheetMeta } from '../../model/types'
 import { subjectById } from '../../model/subjects'
 import { listeningCount, listeningFormatById, listeningFormatsFor, listeningRules, listeningSeconds, listeningWords } from '../../didactics/listeningFormats'
 import { listeningStateRulesText } from '../../didactics/listeningStates'
+import { hatZeitmarken, sehverstehenMitVideo } from '../../didactics/sehtext'
 import { levelAtLeast } from '../../../../shared/cefr'
 import {
   duringPolicy,
@@ -118,16 +119,29 @@ export function languageSkillRules(meta: WorksheetMeta): string {
     `- Bis B1 nennt die Aufgabe selbst die nötigen Redemittel (zwei bis vier Wendungen auf ${target} in der Arbeitsanweisung) – kein eigener Hilfe-Baustein.`,
     '- criteria in brief: 3–5 Kriterien für die Bewertung (Inhalt, Textsortenmerkmale, Sprache).',
     '',
-    'HÖRVERSTEHEN (Baustein "audio" mit Aufgaben, die skill = "listening" tragen):',
-    `- Der Baustein "audio" enthält in body das vollständige Skript in ${target}, in variant die Textsorte und in speakers die Sprechenden mit Namen.`,
-    listeningTextRules(meta),
-    `- Das Skript ist gesprochene Sprache: kurze Sätze, natürliche Wechsel, Rückfragen, Füllwörter – kein vorgelesener Sachtext.`,
-    '- Sprecherzeilen im Skript als „Name: Text", je Sprecherwechsel eine neue Zeile.',
-    '- plays = 2 (der Text wird zweimal gehört). instruction des Bausteins: ein Satz, worauf beim Hören zu achten ist (vor dem ersten Hören).',
-    '- Die Aufgaben zum Hören müssen WÄHREND des Hörens auszufüllen sein: ankreuzen, zuordnen, Tabelle ergänzen, richtig/falsch, Stichworte notieren. Keine zusammenhängenden Texte schreiben, während gehört wird.',
-    '- Die gefragten Informationen verteilen sich über den ganzen Text und kommen in der Reihenfolge des Textes vor; jede Antwort steht wörtlich oder sinngemäß im Skript.',
-    '- Keine Fragen, die nur mit auswendig gemerktem Wortlaut zu lösen sind, und keine, die man ohne den Hörtext schon aus dem Vorwissen beantwortet.',
-    '- Nach dem Hören darf eine weiterführende Aufgabe folgen (Meinung, Schreiben) – als eigene Aufgabe ohne skill = "listening".'
+    // Hör-/Sehverstehen mit Video (02.10.2026, didactics/sehtext.ts): kein Hörtext, das Video ist der Text
+    ...(sehverstehenMitVideo(meta)
+      ? [
+          'HÖR-/SEHVERSTEHEN MIT VIDEO (Aufgaben mit skill = "listening" zum Baustein "video"):',
+          '- Es gibt KEINEN Baustein "audio" und kein Skript – der Hör-/Sehtext ist das Video (siehe FILM- UND VIDEOBEOBACHTUNG).',
+          '- Die Aufgaben zum Video tragen skill = "listening" und viewingPhase; die gefragten Informationen stehen im Inhalt mit Zeitmarken und kommen in der Reihenfolge des Videos vor.',
+          '- Auch Gezeigtes darf gefragt werden (Bildinhalt in [Klammern] im Inhaltsprotokoll), nicht nur Gesagtes.',
+          '- Keine Fragen, die man ohne das Video schon aus dem Vorwissen beantwortet.'
+        ]
+      : [
+          'HÖRVERSTEHEN (Baustein "audio" mit Aufgaben, die skill = "listening" tragen):',
+          `- Der Baustein "audio" enthält in body das vollständige Skript in ${target}, in variant die Textsorte und in speakers die Sprechenden mit Namen.`,
+          listeningTextRules(meta),
+          `- Das Skript ist gesprochene Sprache: kurze Sätze, natürliche Wechsel, Rückfragen, Füllwörter – kein vorgelesener Sachtext.`,
+          '- Sprecherzeilen im Skript als „Name: Text", je Sprecherwechsel eine neue Zeile.',
+          '- plays = 2 (der Text wird zweimal gehört). instruction des Bausteins: ein Satz, worauf beim Hören zu achten ist (vor dem ersten Hören).',
+          '- Die Aufgaben zum Hören müssen WÄHREND des Hörens auszufüllen sein: ankreuzen, zuordnen, Tabelle ergänzen, richtig/falsch, Stichworte notieren. Keine zusammenhängenden Texte schreiben, während gehört wird.',
+          '- Die gefragten Informationen verteilen sich über den ganzen Text und kommen in der Reihenfolge des Textes vor; jede Antwort steht wörtlich oder sinngemäß im Skript.',
+          '- Keine Fragen, die nur mit auswendig gemerktem Wortlaut zu lösen sind, und keine, die man ohne den Hörtext schon aus dem Vorwissen beantwortet.'
+        ]),
+    meta.nurGewaehlteFormate
+      ? '- KEINE weiterführende Aufgabe nach dem Hören/Sehen – die Lehrkraft hat nur die Verstehensaufgaben in den gewählten Formaten bestellt.'
+      : '- Nach dem Hören/Sehen darf eine weiterführende Aufgabe folgen (Meinung, Schreiben) – als eigene Aufgabe ohne skill = "listening".'
   ].join('\n')
 }
 
@@ -153,9 +167,20 @@ export function videoRules(meta: WorksheetMeta): string {
     `- Das Blatt gehört zu: „${v.title}“${kind ? ` (${kind.label})` : ''}${v.minutes ? `, Laufzeit ${v.minutes} Minuten` : ''}${v.section ? `, gezeigter Abschnitt ${v.section}` : ''}.`,
     v.platform ? `- Herkunft: ${v.platform}.` : '',
     v.url ? `- Es liegt eine Adresse vor; die App druckt daraus QR-Code und Klartextlink. Schreibe die Adresse NICHT in einen Aufgabentext.` : '',
-    v.summary.trim()
-      ? `- Inhaltsangabe der Lehrkraft (verbindlich, sie hat das Video gesehen):\n${v.summary.trim()}`
-      : '- Es liegt KEINE Inhaltsangabe vor. Stütze dich auf dein Wissen zu diesem Titel und baue die Aufträge so, dass sie auch dann tragen, wenn eine Einzelheit anders ist als erwartet (offene Beobachtungsraster statt Fragen nach genauen Einzelheiten).',
+    /*
+     * Untertitel oder Inhaltsprotokoll mit Zeitmarken (02.10.2026, didactics/sehtext.ts): Das Video
+     * ist dann bekannt – die Aufgaben stützen sich nur darauf, und jede nennt ihren Abschnitt.
+     */
+    v.summary.trim() && hatZeitmarken(v.summary)
+      ? [
+          `- Inhalt des Videos mit Zeitmarken [m:ss] (verbindlich – aus den Untertiteln bzw. einem Inhaltsprotokoll; stütze JEDE Aufgabe und Lösung ausschließlich darauf, nichts aus deinem Vorwissen):`,
+          v.summary.trim().length > 60_000 ? `${v.summary.trim().slice(0, 60_000)} …` : v.summary.trim(),
+          '- Trage bei jeder Aufgabe zum Video in timecode den Abschnitt ein, auf den sie sich bezieht (z. B. „03:20–04:10“); die Lösung nennt die Stelle.',
+          '- Verteile die Aufgaben über das ganze Video bzw. den gezeigten Abschnitt und halte die Reihenfolge des Videos ein.'
+        ].join('\n')
+      : v.summary.trim()
+        ? `- Inhaltsangabe der Lehrkraft (verbindlich, sie hat das Video gesehen):\n${v.summary.trim()}`
+        : '- Es liegt KEINE Inhaltsangabe vor. Stütze dich auf dein Wissen zu diesem Titel und baue die Aufträge so, dass sie auch dann tragen, wenn eine Einzelheit anders ist als erwartet (offene Beobachtungsraster statt Fragen nach genauen Einzelheiten).',
     '- Setze genau EINEN Baustein „video“ vor die Aufgaben dazu; er trägt Titel, Art, Laufzeit, Abschnitt und eine knappe Angabe, worum es geht (body).',
     '- Jede Aufgabe zum Video bekommt viewingPhase: "vor", "waehrend" oder "nach".',
     '',

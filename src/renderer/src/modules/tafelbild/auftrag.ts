@@ -34,7 +34,7 @@ import {
 import { kleineSchrift, pruefeAlle, zuLangeKnoten } from './pruefung'
 import { bibliothek } from './store'
 
-type Melder = Pick<AuftragsKontext, 'melde' | 'ai' | 'bild'>
+type Melder = Pick<AuftragsKontext, 'melde' | 'ai' | 'bild'> & Partial<Pick<AuftragsKontext, 'zeige'>>
 
 /** Texte und Bilder des Materials für die KI */
 export function materialFuer(m: TafelbildMeta): { texte: MaterialText[]; bilder: string[] } {
@@ -95,17 +95,20 @@ const knotenMitKleinerSchrift = (tafeln: TbTafel[]): string[] =>
  * fiele (Nachbesserung 30.09.2026) – einmal kürzen lassen: zuerst die zu langen Kästen, sonst die
  * mit zu kleiner Schrift, sonst alle.
  */
+/** Inhalt auf alle gewählten Formate setzen – lokal, ohne KI (auch für die Live-Vorschau) */
+function tafelnFuer(i: TbInhalt, m: TafelbildMeta, alteTafeln: TbTafel[]): { tafeln: TbTafel[]; ueber: Befund[] } {
+  const ueber: Befund[] = []
+  const tafeln = m.formate.map((f) => {
+    const schrift = alteTafeln.find((t) => t.format === f)?.schrift
+    const r = setzeLayout(i, f, { regler: m.regler, varianten: m.varianten, zeitachse: m.zeitachse, ...(schrift ? { schrift } : {}) })
+    for (const t of r.ueberlauf) ueber.push({ format: f, art: 'text', text: t })
+    return r.tafel
+  })
+  return { tafeln, ueber }
+}
+
 export async function setzeUndPruefe(inhalt: TbInhalt, m: TafelbildMeta, k: Melder | null, befunde: Befund[] = [], alteTafeln: TbTafel[] = []): Promise<Ergebnis> {
-  const setzen = (i: TbInhalt): { tafeln: TbTafel[]; ueber: Befund[] } => {
-    const ueber: Befund[] = []
-    const tafeln = m.formate.map((f) => {
-      const schrift = alteTafeln.find((t) => t.format === f)?.schrift
-      const r = setzeLayout(i, f, { regler: m.regler, varianten: m.varianten, zeitachse: m.zeitachse, ...(schrift ? { schrift } : {}) })
-      for (const t of r.ueberlauf) ueber.push({ format: f, art: 'text', text: t })
-      return r.tafel
-    })
-    return { tafeln, ueber }
-  }
+  const setzen = (i: TbInhalt): { tafeln: TbTafel[]; ueber: Befund[] } => tafelnFuer(i, m, alteTafeln)
   let aktuell = inhalt
   let r = setzen(aktuell)
   const lang = zuLangeKnoten(aktuell, m.grade, m.regler.stil)
@@ -128,11 +131,27 @@ async function erzeuge(t: Tafelbild, k: Melder, anfrage: (texte: MaterialText[],
   k.melde(t.meta.modus === 'foto' ? 'Die KI liest das Tafelfoto …' : texte.length || bilder.length ? 'Die KI wertet das Material aus …' : 'Die KI entwirft das Tafelbild …')
   const roh = await k.ai<unknown>(anfrage(texte, bilder))
   const befunde: Befund[] = []
+  // Live-Vorschau (02.10.2026): nach jedem Schritt die gesetzten Tafeln – das Setzen läuft lokal
+  const zeige = (i: TbInhalt, was: string): void => {
+    if (!k.zeige) return
+    try {
+      k.zeige({ ...t, inhalt: i, tafeln: tafelnFuer(i, t.meta, t.tafeln).tafeln }, { was })
+    } catch {
+      // Ein unfertiger Inhalt lässt sich nicht setzen – dann eben ohne Vorschau dieses Schritts
+    }
+  }
   let inhalt = inhaltAus(roh, t.meta)
+  zeige(inhalt, 'Entwurf steht')
+  const vorKorrektur = inhalt
   inhalt = await korrigieren(inhalt, t.meta, k)
+  if (inhalt !== vorKorrektur) zeige(inhalt, 'Einträge korrigiert')
+  const vorZeichnungen = inhalt
   inhalt = await zeichnungenAufloesen(inhalt, t.meta, k, befunde)
+  if (inhalt.zeichnungen.length || vorZeichnungen.zeichnungen.length) zeige(inhalt, 'Zeichnungen eingesetzt')
   k.melde('Layout und Prüfung …')
-  return setzeUndPruefe(inhalt, t.meta, k, befunde, t.tafeln)
+  const ergebnis = await setzeUndPruefe(inhalt, t.meta, k, befunde, t.tafeln)
+  if (ergebnis.inhalt !== inhalt) k.zeige?.({ ...t, inhalt: ergebnis.inhalt, tafeln: ergebnis.tafeln }, { was: 'Für die Tafel gekürzt' })
+  return ergebnis
 }
 
 /**

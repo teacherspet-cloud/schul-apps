@@ -5,6 +5,9 @@ import SetupStep from './steps/SetupStep'
 import TestEditorStep from './steps/TestEditorStep'
 import TestLibrary from './steps/TestLibrary'
 import { useGrammatiktest } from './store'
+import { ZwischenstandsBlatt } from '../arbeitsblatt/render/BlattVorschau'
+import { testToWorksheet } from './render/testWorksheet'
+import type { GrammarTest } from './model/types'
 
 /**
  * Programm „Grammatiktest".
@@ -34,6 +37,8 @@ export default function GrammatiktestModule({ active }: { active: boolean }): Re
       einstellen={<SetupStep />}
       bearbeiten={() => <TestEditorStep />}
       texte={{ meine: 'Meine Grammatiktests', neu: 'Neuer Test' }}
+      // Live-Vorschau (02.10.2026): die Aufgaben, sobald sie stehen
+      vorschau={(z) => <ZwischenstandsBlatt<GrammarTest> z={z} alsBlatt={testToWorksheet} />}
     />
   )
 }

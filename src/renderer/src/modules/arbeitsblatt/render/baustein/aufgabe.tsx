@@ -1,6 +1,8 @@
 import { RichText } from '../../../../shared/richtext/RichText'
 import type { Answer, TaskBlock, TaskPart } from '../../model/types'
-import { AnswerView, DiagramView, McOptions, diagramWidthMm, teilbareAntwort } from '../Answers'
+import { AnswerView, DiagramView, McOptions, Spalten, TabellenGriffe, antwortRaum, diagramWidthMm, teilbareAntwort } from '../Answers'
+import { eigeneBreiten, zugUebernehmen } from '../tabelleMasse'
+import type { ZugErgebnis } from '../tabelleZiehen'
 import { PictogramIcon } from '../Pictogram'
 import { pictogramForInstruction, pictogramForSocialForm } from '../pictograms'
 import { SOCIAL_FORM_LABELS, SOCIAL_FORM_SVG } from '../icons'
@@ -19,6 +21,7 @@ import { fundstellen, hoertextZu, hoerzeit } from '../../../../shared/verstehen/
 import { briefAbschnitte, erwartungsAbschnitte, Abschnitt, gruppiereAntworten, gruppiereTeilaufgaben } from './brief'
 
 export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedItem }): React.JSX.Element {
+  const ctx = useWs()
   const {
     mode,
     update,
@@ -34,7 +37,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
     correctionMargin,
     contentWidthMm,
     blattBausteine
-  } = useWs()
+  } = ctx
   const edit = mode === 'edit'
   // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026) – Anzeige und Platzhalter folgen weiter `edit`
   const schreiben = isEditMode(mode)
@@ -116,18 +119,33 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    */
   const mcAlle = block.parts.map((part, i) => ({ part, i }))
   const mcS = mcSpalten(block.parts)
+  /*
+   * Ziehbare Maße der Fragenreihe (02.10.2026): Spaltenbreiten und Zeilenhöhen von Hand, gespeichert
+   * in `mcGitter` – ein Rückgängig-Schritt je Geste. Ohne Maße gleich breite Spalten wie bisher.
+   */
+  const mcBreiten = eigeneBreiten(block.mcGitter, mcS)
+  const mcZiehbar = schreiben && Boolean(update)
+  const mcZug = (z: ZugErgebnis): void =>
+    update?.(block.id, (d) => {
+      const t = d as TaskBlock
+      const m = { ...t.mcGitter }
+      zugUebernehmen(m, z, Math.ceil(t.parts.length / mcS))
+      t.mcGitter = m
+    })
   const mcGruppe: Abschnitt['gruppe'] = {
     id: 'mc',
     wrap: (teile) => {
       const a = teile[0].zeile ?? 0
       const b = (teile[teile.length - 1].zeile ?? 0) + 1
       return (
-        <table className="ws-mc-grid" key={`mc-${a}`}>
+        <table className={`ws-mc-grid ${mcZiehbar ? 'ws-table-ziehbar' : ''}`} key={`mc-${a}`}>
+          <Spalten n={mcS} breiten={mcBreiten} />
           <tbody>
             {mcZeilen(mcAlle.slice(a * mcS, Math.min(mcAlle.length, b * mcS)), mcS).map((zeile, z) => (
-              <tr key={a + z} data-unit>
+              <tr key={a + z} data-unit style={block.mcGitter?.rowHeightsMm?.[a + z] ? { height: `${block.mcGitter.rowHeightsMm[a + z]}mm` } : undefined}>
                 {zeile.map((eintrag, sp) => (
                   <td key={sp}>
+                    {mcZiehbar && <TabellenGriffe c={sp} spalten={mcS} zeile={a + z} breiten={mcBreiten} onZug={mcZug} />}
                     {eintrag && (
                       <>
                         <div className="ws-mc-question">
@@ -160,7 +178,16 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    * Rahmen (Tabelle samt Kopfzeile, Liste) entsteht je Stück – siehe `teilbareAntwort`.
    */
   const antwortZeilen = (answer: Answer, onChange: ((fn: (a: Answer) => void) => void) | undefined, id: string, teil?: number): Abschnitt[] | null => {
-    const t = teilbareAntwort(answer, { key, editText: edit && Boolean(onChange), editKey: keyEdit && Boolean(onChange), editRoh: schreiben, answerLanguage: answerLanguage ?? 'de', onChange })
+    const t = teilbareAntwort(answer, {
+      key,
+      editText: edit && Boolean(onChange),
+      editKey: keyEdit && Boolean(onChange),
+      editRoh: schreiben,
+      answerLanguage: answerLanguage ?? 'de',
+      onChange,
+      // Schreibraum der Ausfülltabellen nach Jahrgang (02.10.2026, didactics/schreibraum.ts)
+      raum: antwortRaum(ctx)
+    })
     if (!t || t.einheiten.length < 2) return null
     const gruppe: Abschnitt['gruppe'] = {
       id,

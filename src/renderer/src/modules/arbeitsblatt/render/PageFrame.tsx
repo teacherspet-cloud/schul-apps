@@ -20,6 +20,7 @@ import {
   type KopfLabels,
   type KopfSprache,
 } from "../../../shared/kopfSprache";
+import { linieMmFuerMeta } from "../didactics/schreibraum";
 
 export interface PageInfo {
   /** Titel in der Kopfzeile direkt im Blatt ändern (27.09.2026) – fehlt = nur lesen */
@@ -430,6 +431,8 @@ export function PageFrame({
     fontSize: `${info.fontPt}pt`,
     lineHeight: info.lineHeight,
     ["--ws-accent" as string]: d.page.accentColor,
+    // Schreiblinien nach Jahrgang (02.10.2026, didactics/schreibraum.ts) – SheetPages rechnet mit derselben Zahl
+    ["--ws-linie" as string]: `${linieMmFuerMeta(info.meta)}mm`,
     // Farbe + Muster (30.09.2026): Farbband und Seitenleiste tragen das Muster des Fachs (ws.css)
     ["--ws-accent-muster" as string]: musterEbene(d.page.accentMuster, "mm"),
     ["--ws-accent-muster-groesse" as string]: musterGroesse(

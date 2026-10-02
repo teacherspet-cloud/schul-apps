@@ -1,3 +1,4 @@
+import { antwortTabellenMasse, linieMmFuerMeta, schreibRegelFuerMeta } from '../../didactics/schreibraum'
 import {
   AlignmentType,
   BorderStyle,
@@ -31,7 +32,7 @@ import { gridDrawing } from '../../render/gridSvg'
 import { qrSvg } from '../../render/qr'
 import { justifyText } from '../../render/SheetPages'
 import { stripMaterialNo } from '../../render/BlockView'
-import { spaltenBreiten } from '../../render/tabelleMasse'
+import { eigeneBreiten, spaltenBreiten } from '../../render/tabelleMasse'
 import { svgAusDataUrl } from '../../render/schaltplanSvg'
 import { beschriftetesBildSvg } from '../../render/beschriftungSvg'
 import { imageSizeFromDataUrl } from '../../../../shared/imageSize'
@@ -148,7 +149,13 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
         new Paragraph({ spacing: { after: 60 }, children: [run(`${v.symbol}  ${block.title || v.label}`, { bold: true })] }),
         ...(await rich(ctx, block.body))
       ]
-      return [boxTable(ctx, inner, { fill: tint(ctx.accent, 0.1), leftColor: ctx.accent }), spacer()]
+      const kasten = boxTable(ctx, inner, { fill: tint(ctx.accent, 0.1), leftColor: ctx.accent })
+      // Abgesetzt (Operatorenliste): eine Leerzeile plus Abstand davor und danach, wie die 8 mm am Bildschirm
+      if (block.abgesetzt) {
+        const luft = (): Paragraph => new Paragraph({ spacing: { after: 220 }, children: [] })
+        return [luft(), kasten, luft()]
+      }
+      return [kasten, spacer()]
     }
     case 'text': {
       const out: Child[] = []
@@ -423,7 +430,11 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
       if (key) return []
       const out: Child[] = []
       if (block.label) out.push(new Paragraph({ children: await richRun(ctx, block.label, { size: ctx.size - 2 }) }))
-      if (block.kind === 'lines') out.push(...writingLines(Math.max(1, Math.round(block.heightMm / 8.5)), 0))
+      if (block.kind === 'lines') {
+        // Linienabstand nach Jahrgang wie im Blatt (02.10.2026)
+        const linie = linieMmFuerMeta(ctx.ws.meta)
+        out.push(...writingLines(Math.max(1, Math.round(block.heightMm / linie)), 0, 0, linie))
+      }
       else out.push(gridArea(ctx, block.heightMm, block.kind === 'grid'))
       out.push(spacer())
       return out
@@ -553,7 +564,10 @@ export async function blockInhalt(ctx: Ctx, block: WsBlock, numbers: Map<string,
           [block.title, ...heads],
           block.statements.map((s) => [s, '', '', '']),
           ctx.contentWidth,
-          [0.64, 0.12, 0.12, 0.12]
+          // Von Hand gezogene Maße (02.10.2026) wie am Bildschirm
+          eigeneBreiten(block, 4)?.map((w) => w / 100) ?? [0.64, 0.12, 0.12, 0.12],
+          undefined,
+          { rowHeightsMm: block.rowHeightsMm, headerHeightMm: block.headerHeightMm }
         ),
         spacer()
       ]
@@ -674,7 +688,7 @@ export async function answerContent(ctx: Ctx, a: Answer, indent: number): Promis
        * notwendig". An ihrer Stelle steht der Mustertext – eingesetzt wird er dort, wo die
        * Aufgabe zusammengebaut wird (`taskContent`), weil nur dort der Auftrag bekannt ist.
        */
-      return key ? [] : writingLines(Math.max(0, a.count), indent)
+      return key ? [] : writingLines(Math.max(0, a.count), indent, undefined, linieMmFuerMeta(ctx.ws.meta))
     case 'grid':
       return [gridArea(ctx, a.count * 5, true)]
     case 'diagram': {
@@ -712,17 +726,21 @@ export async function answerContent(ctx: Ctx, a: Answer, indent: number): Promis
     case 'matching': {
       const rows = Math.max(a.left.length, a.right.length)
       const border = { style: BorderStyle.SINGLE, size: 6, color: '000000' }
-      const w = [500, Math.round((width - 500) * 0.55), Math.round((width - 500) * 0.45)]
+      // Von Hand gezogene Spalten (02.10.2026), sonst Kästchen + 55 % / 45 % wie bisher
+      const eigene = eigeneBreiten(a, 3)
+      const w = eigene ? eigene.map((p) => Math.round((width * p) / 100)) : [500, Math.round((width - 500) * 0.55), Math.round((width - 500) * 0.45)]
       return [
         new Table({
           width: { size: width, type: WidthType.DXA },
           layout: TableLayoutType.FIXED,
+          ...(eigene ? { columnWidths: w } : {}),
           indent: { size: indent, type: WidthType.DXA },
           rows: await Promise.all(
             Array.from(
               { length: rows },
               async (_, r) =>
                 new TableRow({
+                  ...(a.rowHeightsMm?.[r] ? { height: { value: Math.round(a.rowHeightsMm[r] * MM), rule: 'atLeast' as const } } : {}),
                   children: [
                     new TableCell({
                       width: { size: w[0], type: WidthType.DXA },
@@ -782,7 +800,13 @@ export async function answerContent(ctx: Ctx, a: Answer, indent: number): Promis
     case 'trueFalse': {
       const rows = a.statements.map((s) => [s.text, key && s.isTrue ? '✗' : '', key && !s.isTrue ? '✗' : ''])
       const labels = trueFalseLabels(subjectById(ctx.ws.meta.subjectId).foreignLanguage ?? 'de')
-      return [await gridTable(ctx, ['', labels.yes, labels.no], rows, width, [0.72, 0.14, 0.14])]
+      // Von Hand gezogene Maße (02.10.2026) wie am Bildschirm
+      return [
+        await gridTable(ctx, ['', labels.yes, labels.no], rows, width, eigeneBreiten(a, 3)?.map((w) => w / 100) ?? [0.72, 0.14, 0.14], undefined, {
+          rowHeightsMm: a.rowHeightsMm,
+          headerHeightMm: a.headerHeightMm
+        })
+      ]
     }
     case 'ordering': {
       const order = a.displayOrder.length === a.items.length ? a.displayOrder : a.items.map((_, i) => i)
@@ -797,7 +821,20 @@ export async function answerContent(ctx: Ctx, a: Answer, indent: number): Promis
         )
       )
     }
-    case 'tableFill':
-      return [await gridTable(ctx, a.headers, a.rows, width, undefined, a.solutionRows)]
+    case 'tableFill': {
+      // Dieselben Maße wie am Bildschirm (02.10.2026): von Hand gezogen, sonst nach Jahrgang und erwarteter Antwort (didactics/schreibraum.ts)
+      const m = antwortTabellenMasse(a, schreibRegelFuerMeta(ctx.ws.meta))
+      return [
+        await gridTable(
+          ctx,
+          a.headers,
+          a.rows,
+          width,
+          m.colWidths.map((w) => w / 100),
+          a.solutionRows,
+          { rowHeightsMm: m.rowHeightsMm, headerHeightMm: m.headerHeightMm }
+        )
+      ]
+    }
   }
 }

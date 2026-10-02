@@ -245,3 +245,10 @@
   border-color: var(--mantine-color-blue-6);
   background: var(--mantine-color-blue-light);
 }
+
+/* Live-Vorschau während der Erzeugung (02.10.2026, editor/TafelVorschau.tsx): Tafel in voller Breite */
+.tb-live-tafel svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}

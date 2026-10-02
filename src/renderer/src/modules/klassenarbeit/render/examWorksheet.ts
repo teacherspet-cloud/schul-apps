@@ -292,7 +292,11 @@ function examToWorksheetOhneIllustration(exam: Exam, fassung = 0): Worksheet {
    * `operatorenStelle`: nie zwischen einer Aufgabe und ihrem Material.
    */
   const operatoren = operatorenBlock(exam)
-  if (operatoren) bloecke.splice(operatorenStelle(bloecke), 0, operatoren)
+  if (operatoren) {
+    // Von Hand verschoben (01.10.2026): hinter den gewählten Baustein, sonst die vorgesehene Stelle
+    const nach = exam.meta.operatorenNach ? bloecke.findIndex((b) => b.id === exam.meta.operatorenNach) : -1
+    bloecke.splice(nach >= 0 ? nach + 1 : operatorenStelle(bloecke), 0, operatoren)
+  }
   // Fassung A behält die bisherige Blattkennung – so bleibt alles gültig, was sich darauf bezieht
   const sheet: Sheet = {
     id: f === 0 ? 'exam' : `exam-${label.toLowerCase()}`,

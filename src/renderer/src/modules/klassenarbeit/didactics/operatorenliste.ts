@@ -369,6 +369,7 @@ export function operatorenBlock(exam: Exam): InfoBoxBlock | null {
     type: 'infoBox',
     variant: 'definition',
     title: TITEL[sprache] ?? TITEL.de,
+    abgesetzt: true,
     ...(eintraege.length > 1 ? { spalten: 2 as const } : {}),
     // Jeder Operator ein Absatz, je Zeile ein Paar (Umbruchstelle); die Quelle über die ganze Breite
     body: [...eintraege.map((e) => eintragText(e, sprache)), `${QUELLE[sprache] ?? QUELLE.de}: ${liste.quelle}`].join('\n\n')

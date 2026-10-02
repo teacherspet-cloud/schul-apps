@@ -275,6 +275,18 @@ export interface ExamMeta {
    * die Stufe: Sek II ja, Sek I nein.
    */
   operatorenliste?: boolean
+  /**
+   * Von Hand gewählte Lage der Operatorenliste (01.10.2026): Kennung des Bausteins, HINTER dem
+   * sie steht – die Lehrkraft zieht den Kasten im Blatt nach oben oder unten, die übrigen
+   * Bausteine rücken nach. Fehlt der Wert oder gibt es den Baustein (in dieser Fassung) nicht,
+   * gilt die vorgesehene Stelle (`operatorenStelle`).
+   */
+  operatorenNach?: string
+  /**
+   * Interkultureller Schwerpunkt (02.10.2026) – in der Klassenarbeit nur INTEGRATIV (Entscheidung der
+   * Lehrkraft): die interkulturelle Dimension steckt in den Aufgaben der Teile, bewertet im Inhalt.
+   */
+  interkulturell?: import('../../arbeitsblatt/didactics/interkulturalitaet').InterkulturSetup
   /** Blattoptionen wie beim Arbeitsblatt (27.09.2026): Schulangaben, KI-Test */
   showSchool?: boolean
   aiCanary?: boolean

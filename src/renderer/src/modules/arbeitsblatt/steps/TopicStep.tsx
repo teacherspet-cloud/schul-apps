@@ -1,3 +1,6 @@
+import InterkulturSchalter from './InterkulturSchalter'
+import VideoTranskript, { videoMaterialArt } from './VideoTranskript'
+import { sehtextQuelle } from '../didactics/sehtext'
 import VersuchKarte from './VersuchKarte'
 import { versuchAuftrag } from '../auftraege'
 import { hatProtokolle } from '../didactics/protokoll'
@@ -483,6 +486,10 @@ export default function TopicStep(): React.JSX.Element {
                         allowDeselect={false}
                       />
                     )}
+                    {/* Interkulturelle Kompetenz (02.10.2026): eigener Schwerpunkt (nur Teilbereiche) oder Zusatzschalter */}
+                    {subject.foreignLanguage && (
+                      <InterkulturSchalter meta={meta} nurBereiche={meta.skillFocus === 'interkulturell'} onChange={(interkulturell) => patch({ interkulturell })} />
+                    )}
                     {/* Sprechen (01.10.2026): Teile des Vorbereitungsblatts, voreingestellt alle vier (didactics/sprechen.ts) */}
                     {istSprechblatt(meta) && (
                       <MultiSelect
@@ -511,7 +518,7 @@ export default function TopicStep(): React.JSX.Element {
                     )}
                     {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
                       <MultiSelect
-                        label={meta.skillFocus === 'listening' ? 'Formate für das Hörverstehen' : 'Formate für das Leseverstehen'}
+                        label={meta.skillFocus === 'listening' ? 'Formate für das Hör-/Sehverstehen' : 'Formate für das Leseverstehen'}
                         description="Belegte Prüfungsformate der KMK-Bildungsstandards und der Kerncurricula; leer lassen = Vorschlag nach Jahrgang."
                         data={comprehensionFormatsFor(meta.skillFocus === 'listening' ? 'listening' : 'reading', meta.grade).map((f) => ({
                           value: f.id,
@@ -525,6 +532,22 @@ export default function TopicStep(): React.JSX.Element {
                           .join(' · ')}
                         clearable
                       />
+                    )}
+                    {/* Wunsch der Lehrkraft (02.10.2026): nur die gewählten Formate zum vorgegebenen Hör-/Sehtext bzw. Text */}
+                    {(meta.skillFocus === 'listening' || meta.skillFocus === 'reading') && (
+                      <Checkbox
+                        label="Nur die gewählten Formate erstellen"
+                        description="Keine Vorentlastung und keine weiterführende Aufgabe – nur Verstehensaufgaben zum vorgegebenen Text bzw. Video."
+                        checked={Boolean(meta.nurGewaehlteFormate)}
+                        onChange={(e) => patch({ nurGewaehlteFormate: e.currentTarget.checked || undefined })}
+                        data-nur-formate
+                      />
+                    )}
+                    {meta.skillFocus === 'listening' && sehtextQuelle(meta, worksheet.sources) && (
+                      <Text size="xs" c="dimmed" data-sehtext-hinweis>
+                        Hör-/Sehtext ist das Video „{sehtextQuelle(meta, worksheet.sources)!.fileName}“ aus dem Material – es entsteht kein eigener Hörtext; Link und
+                        QR-Code kommen auf das Blatt.
+                      </Text>
                     )}
                     {meta.skillFocus === 'grammar' && <GrammarPicker meta={meta} onChange={patch} />}
                     {/* Unregelmäßige Verben (30.09.2026): Aufgaben aus der Verbliste, von der App angehängt */}
@@ -1138,7 +1161,7 @@ export default function TopicStep(): React.JSX.Element {
                                 : s.kind === 'docx'
                                   ? 'Word-Dokument'
                                   : s.kind === 'video'
-                                    ? 'Video – Transkript'
+                                    ? videoMaterialArt(s.text)
                                     : s.kind === 'web'
                                       ? 'Webseite'
                                       : 'Text'}
@@ -1150,6 +1173,12 @@ export default function TopicStep(): React.JSX.Element {
                           </Text>
                         </div>
                         <Group gap="xs" wrap="nowrap">
+                          {s.kind === 'video' && (
+                            <VideoTranskript
+                              text={s.text}
+                              onChange={(text) => setWorksheet({ ...worksheet, sources: worksheet.sources.map((x, j) => (j === i ? { ...x, text } : x)) })}
+                            />
+                          )}
                           <Checkbox
                             size="xs"
                             label="Grundlage"

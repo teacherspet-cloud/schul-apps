@@ -7,11 +7,13 @@ import { vocabWorkRules } from '../../didactics/vocabWork'
 import { chosenGrammarTopics, grammarFormatLabel } from '../../didactics/grammar'
 import { wantedTasks } from './grundregeln'
 import { istSprechblatt, sprechRegeln } from '../../didactics/sprechen'
+import { sehverstehenMitVideo } from '../../didactics/sehtext'
+import { interkulturMoeglich, interkulturSchwerpunktRegeln } from '../../didactics/interkulturalitaet'
 import { SPRECHEN_DIALOGISCH, SPRECHEN_MONOLOGISCH } from '../../../../shared/sprechen/kompetenzen'
 
 /** Kompetenzschwerpunkt eines Fremdsprachenblattes (Auswahl in Schritt 1). */
 export const SKILL_FOCUS: {
-  value: 'mixed' | 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary' | 'speaking' | 'interaction'
+  value: 'mixed' | 'mediation' | 'writing' | 'listening' | 'reading' | 'grammar' | 'vocabulary' | 'speaking' | 'interaction' | 'interkulturell'
   label: string
   description: string
   prompt: string
@@ -88,21 +90,37 @@ export const SKILL_FOCUS: {
   },
   {
     value: 'listening',
-    label: 'Hörverstehen (Listening)',
-    description: 'Hörtext mit Skript, dazu Aufgaben, die während des Hörens lösbar sind.',
+    // Hör-/Sehverstehen (02.10.2026, Wunsch der Lehrkraft): auch Videos – siehe didactics/sehtext.ts
+    label: 'Hör-/Sehverstehen (Listening/Viewing)',
+    description: 'Hörtext mit Skript oder ein Video aus dem Material (YouTube, ARD, ZDF, arte), dazu Aufgaben, die während des Hörens bzw. Sehens lösbar sind.',
     prompt:
       'SCHWERPUNKT HÖRVERSTEHEN: Das Blatt enthält einen Baustein "audio" mit Skript, davor eine kurze Aufgabe zur Vorentlastung (Wortschatz, Erwartungen) und danach 2–3 Aufgaben mit skill = "listening" zum Ankreuzen, Zuordnen oder Ergänzen.'
+  },
+  /*
+   * Interkulturelle (kommunikative) Kompetenz als eigener Schwerpunkt (02.10.2026) – nur in den
+   * modernen Fremdsprachen und nur beim Arbeitsblatt; die Regeln stehen in didactics/interkulturalitaet.ts.
+   */
+  {
+    value: 'interkulturell',
+    label: 'Interkulturelle (kommunikative) Kompetenz',
+    description: 'Material zu kulturellen Unterschieden oder einer Begegnung; Orientierungswissen, Umgang mit Differenz, Begegnungssituationen.',
+    prompt: ''
   }
 ]
+
+/** Hör-/Sehverstehen mit Video statt Hörtext (didactics/sehtext.ts) */
+const SEHVERSTEHEN_PROMPT =
+  'SCHWERPUNKT HÖR-/SEHVERSTEHEN MIT VIDEO: Das Blatt enthält einen Baustein "video" (Hör-/Sehtext), davor eine kurze Aufgabe zur Vorentlastung (Wortschatz, Erwartungen) und danach 2–3 Aufgaben mit skill = "listening" zum Ankreuzen, Zuordnen oder Ergänzen – KEINEN Baustein "audio".'
 
 /**
  * Welche Schwerpunkte das Fach anbietet: In den Fremdsprachen alle, in Deutsch nur
  * „gemischt" und „Grammatik" – Sprachmittlung und Hörverstehen sind dort keine eigenen Bereiche.
  */
 export function skillFocusOptions(subjectId: string): typeof SKILL_FOCUS {
-  if (subjectById(subjectId).foreignLanguage) return SKILL_FOCUS
+  // Interkulturelle Kompetenz nur in den modernen Fremdsprachen (nicht Latein/Griechisch, nicht DaZ)
+  if (subjectById(subjectId).foreignLanguage) return SKILL_FOCUS.filter((f) => f.value !== 'interkulturell' || interkulturMoeglich(subjectId))
   // DaZ arbeitet mit denselben Schwerpunkten wie die Fremdsprachen, ohne Sprachmittlung
-  if (subjectId === 'daz') return SKILL_FOCUS.filter((f) => f.value !== 'mediation')
+  if (subjectId === 'daz') return SKILL_FOCUS.filter((f) => f.value !== 'mediation' && f.value !== 'interkulturell')
   /*
    * Deutsch hat als einziges Fach ausserhalb der Fremdsprachen einen eigenen
    * Hoer-Kompetenzbereich: Verstehend zuhoeren ist Kernbereich der KMK-Bildungsstandards
@@ -133,7 +151,17 @@ export function skillFocusPrompt(meta: WorksheetMeta): string {
   if (meta.skillFocus === 'vocabulary') return vocabWorkRules(meta)
   // Sprechen: Teile nach Wahl der Lehrkraft (didactics/sprechen.ts)
   if (istSprechblatt(meta)) return sprechRegeln(meta)
-  const text = SKILL_FOCUS.find((f) => f.value === (meta.skillFocus ?? 'mixed'))?.prompt ?? ''
+  // Interkulturelle Kompetenz als eigener Schwerpunkt (02.10.2026)
+  if (meta.skillFocus === 'interkulturell') return interkulturSchwerpunktRegeln(meta)
+  const grund = sehverstehenMitVideo(meta) ? SEHVERSTEHEN_PROMPT : (SKILL_FOCUS.find((f) => f.value === (meta.skillFocus ?? 'mixed'))?.prompt ?? '')
+  /*
+   * „Nur die gewählten Formate" (02.10.2026): keine Vorentlastungsaufgabe, nur die Verstehensaufgaben –
+   * der Hinweis vor dem Hören/Sehen steht im Baustein selbst.
+   */
+  const text =
+    meta.nurGewaehlteFormate && (meta.skillFocus === 'listening' || meta.skillFocus === 'reading')
+      ? `${grund.replace(/davor eine kurze Aufgabe zur Vorentlastung \(Wortschatz, Erwartungen\) und /, '')} AUSSCHLIESSLICH Aufgaben in den gewählten Formaten zum vorgegebenen Text bzw. Video – keine Vorentlastungsaufgabe, keine weiterführende Aufgabe, kein weiterer Baustein außer dem Text, Hörtext oder Video.`
+      : grund
   const wanted = wantedTasks(meta)
   if (!wanted || !text) return text
   /*

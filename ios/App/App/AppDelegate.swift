@@ -38,7 +38,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         let config = UISceneConfiguration(name: "Default Configuration",
                                           sessionRole: connectingSceneSession.role)
-        config.delegateClass = SceneDelegate.self
+        // AirPlay/Bildschirmspiegelung (02.10.2026): Nur das App-Fenster bekommt den SceneDelegate.
+        // Bekam auch der externe Bildschirm einen, startete iOS dort eine ZWEITE App (frische
+        // Startseite, nicht bedienbar) und hörte auf zu spiegeln – auf dem Whiteboard stand nur
+        // die eingefrorene Startseite. Ohne Delegate spiegelt iOS das iPad wie gewohnt.
+        if connectingSceneSession.role == .windowApplication {
+            config.delegateClass = SceneDelegate.self
+        }
         return config
     }
 }

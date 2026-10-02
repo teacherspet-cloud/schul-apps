@@ -24,6 +24,14 @@ export interface AgeBand {
   scaffolding: 'hoch' | 'mittel' | 'gering'
   selfAssessment: SelfAssessmentFormat
   formats: string
+  /**
+   * Schreibraum der Lernenden (02.10.2026) – Grundlage der Antwortflächen (didactics/schreibraum.ts).
+   * Befund der Lehrkraft: Ausfüllzellen und Antwortfelder waren für Notizen oft viel zu klein.
+   * Alle drei Werte sind Faustregeln aus Recherche 02.10.2026 (Buchstabenbreite der Handschrift,
+   * Linien je ausformuliertem Satz, Linien für eine Begründung); belegt ist nur die Lineatur
+   * (siehe `linienAbstandMm`).
+   */
+  schreibraum: { mmProBuchstabe: number; zeilenProSatz: number; begruendungZeilen: number }
 }
 
 export const AGE_BANDS: AgeBand[] = [
@@ -41,7 +49,8 @@ export const AGE_BANDS: AgeBand[] = [
     scaffolding: 'hoch',
     selfAssessment: 'smileys',
     formats:
-      'überwiegend geschlossene Formate (ankreuzen, verbinden, einkreisen, Bild-Wort-Zuordnung), jeweils mit gelöstem Beispiel als erstem Item, sehr wenig Text, viele Bilder'
+      'überwiegend geschlossene Formate (ankreuzen, verbinden, einkreisen, Bild-Wort-Zuordnung), jeweils mit gelöstem Beispiel als erstem Item, sehr wenig Text, viele Bilder',
+    schreibraum: { mmProBuchstabe: 4.5, zeilenProSatz: 2, begruendungZeilen: 3 }
   },
   {
     id: 'k34',
@@ -57,7 +66,8 @@ export const AGE_BANDS: AgeBand[] = [
     scaffolding: 'hoch',
     selfAssessment: 'ichKannSmileys',
     formats:
-      'geschlossene und halboffene Formate, erste offene Aufgaben; neue Operatoren (beschreibe, vergleiche, begründe) immer mit Satzanfang; Beispiel-Item und Wortspeicher'
+      'geschlossene und halboffene Formate, erste offene Aufgaben; neue Operatoren (beschreibe, vergleiche, begründe) immer mit Satzanfang; Beispiel-Item und Wortspeicher',
+    schreibraum: { mmProBuchstabe: 4.5, zeilenProSatz: 2, begruendungZeilen: 4 }
   },
   {
     id: 'k56',
@@ -72,7 +82,8 @@ export const AGE_BANDS: AgeBand[] = [
     instructionSymbols: false,
     scaffolding: 'mittel',
     selfAssessment: 'ichKann',
-    formats: 'Operatoren fett, nummerierte Teilschritte, Fachbegriffe beim ersten Auftreten erklären, eine Transfer- oder Knobelaufgabe, gestufte Tippkarten'
+    formats: 'Operatoren fett, nummerierte Teilschritte, Fachbegriffe beim ersten Auftreten erklären, eine Transfer- oder Knobelaufgabe, gestufte Tippkarten',
+    schreibraum: { mmProBuchstabe: 3.25, zeilenProSatz: 1.5, begruendungZeilen: 4 }
   },
   {
     id: 'k78',
@@ -87,7 +98,8 @@ export const AGE_BANDS: AgeBand[] = [
     instructionSymbols: false,
     scaffolding: 'mittel',
     selfAssessment: 'kompetenzraster',
-    formats: 'Schwerpunkt Anforderungsbereich II, Lösungsbeispiele nur noch teilweise (Fading), Fachsprache gezielt aufbauen (Wortliste, Satzmuster)'
+    formats: 'Schwerpunkt Anforderungsbereich II, Lösungsbeispiele nur noch teilweise (Fading), Fachsprache gezielt aufbauen (Wortliste, Satzmuster)',
+    schreibraum: { mmProBuchstabe: 3.25, zeilenProSatz: 1.5, begruendungZeilen: 5 }
   },
   {
     id: 'k910',
@@ -102,7 +114,8 @@ export const AGE_BANDS: AgeBand[] = [
     instructionSymbols: false,
     scaffolding: 'gering',
     selfAssessment: 'kompetenzraster',
-    formats: 'offenere, problemorientierte Aufgaben, Operatoren wie in Abschlussprüfungen, Hilfen nur optional'
+    formats: 'offenere, problemorientierte Aufgaben, Operatoren wie in Abschlussprüfungen, Hilfen nur optional',
+    schreibraum: { mmProBuchstabe: 3.25, zeilenProSatz: 1.5, begruendungZeilen: 5 }
   },
   {
     id: 'sek2',
@@ -118,10 +131,32 @@ export const AGE_BANDS: AgeBand[] = [
     scaffolding: 'gering',
     selfAssessment: 'erwartungshorizont',
     formats:
-      'materialgestützte Aufgaben, die alle drei Anforderungsbereiche mit Schwerpunkt II abdecken, kaum Schritt-für-Schritt-Anleitungen (Expertise-Reversal-Effekt)'
+      'materialgestützte Aufgaben, die alle drei Anforderungsbereiche mit Schwerpunkt II abdecken, kaum Schritt-für-Schritt-Anleitungen (Expertise-Reversal-Effekt)',
+    schreibraum: { mmProBuchstabe: 2.75, zeilenProSatz: 1.25, begruendungZeilen: 6 }
   }
 ]
 
 export function ageBandForGrade(grade: number): AgeBand {
   return AGE_BANDS.find((b) => grade >= b.grades[0] && grade <= b.grades[1]) ?? (grade < 1 ? AGE_BANDS[0] : AGE_BANDS[AGE_BANDS.length - 1])
+}
+
+/**
+ * Linienabstand einer Schreiblinie in mm nach Jahrgang (02.10.2026).
+ *
+ * Belegt: Lineaturen der Schulhefte – Kl. 1 Lineatur 1 (15-mm-System), Kl. 2 Lineatur 2 (12 mm),
+ * Kl. 3 Hilfslinien um 3,5–4 mm, Kl. 4 Lineatur 4/9 (9–10 mm), ab Kl. 5 Lineatur 21/25/27 (9 mm);
+ * US „wide ruled" 8,7 mm für Kinder. Leitfäden (zebis 2022, LehrkräftePlus NRW) nennen „zu wenig
+ * Platz in Lücken und auf Linien" als Hauptfehler von Arbeitsblättern.
+ * Faustregel aus Recherche 02.10.2026: Kl. 1–2 ≥ 15 mm, Kl. 3 12 mm, Kl. 4 10 mm, Kl. 5–6 9,5 mm,
+ * Kl. 7–10 9 mm, Oberstufe 8,5 mm (nie unter 7). Mit Förderbedarf (Nachteilsausgleich bei LRS,
+ * Förderschule, Leichte Sprache) eine Stufe größer und mindestens 10 mm.
+ */
+const LINIEN_STUFEN_MM = [15, 12, 10, 9.5, 9, 8.5]
+
+const linienStufe = (grade: number): number => (grade <= 2 ? 0 : grade === 3 ? 1 : grade === 4 ? 2 : grade <= 6 ? 3 : grade <= 10 ? 4 : 5)
+
+export function linienAbstandMm(grade: number, foerder = false): number {
+  const stufe = linienStufe(Number.isFinite(grade) ? grade : 7)
+  if (!foerder) return LINIEN_STUFEN_MM[stufe]
+  return Math.max(10, LINIEN_STUFEN_MM[Math.max(0, stufe - 1)])
 }

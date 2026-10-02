@@ -190,7 +190,13 @@ export function spreadPoints(blocks: WsBlock[], total: number): void {
   }
 }
 
-export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (message: string) => void = () => undefined): Promise<WsBlock[]> {
+export async function generateTest(
+  test: GrammarTest,
+  ai: AiCall,
+  onStep: (message: string) => void = () => undefined,
+  /** Live-Vorschau (02.10.2026): die Aufgaben, sobald sie da sind – vor der Blindprobe */
+  zwischenstand?: (blocks: WsBlock[]) => void
+): Promise<WsBlock[]> {
   onStep('Aufgaben werden entworfen …')
   const data = await ai<{ blocks: Record<string, unknown>[] }>({
     system: testPrompt(test),
@@ -230,6 +236,7 @@ export async function generateTest(test: GrammarTest, ai: AiCall, onStep: (messa
   // Nummern der KI werden zu Kennungen („M{text}"); die Nummern entstehen beim Darstellen aus der Reihenfolge
   blocks.splice(0, blocks.length, ...verschluesseleMaterialverweise(blocks))
   spreadPoints(blocks, test.meta.points)
+  zwischenstand?.(blocks)
   // Ankreuzfragen zu einem Lese- oder Hörtext (01.10.2026): Blindprobe ohne Text – nur ausgewiesene Verstehensaufgaben, Grammatikfragen nie
   if (blindprobeAktiv()) {
     const probe = await blindprobeBloecke(blocks, ai, { melde: onStep, streng: true }).catch(() => null)
@@ -249,7 +256,9 @@ export const testHints = (test: GrammarTest): string[] => testingRules(test.meta
 export async function generateVerbTest(
   test: GrammarTest,
   ai: AiCall | null,
-  onStep: (message: string) => void = () => undefined
+  onStep: (message: string) => void = () => undefined,
+  /** Live-Vorschau (02.10.2026): Gruppe A, sobald sie steht */
+  zwischenstand?: (blocks: WsBlock[]) => void
 ): Promise<{ blocks: WsBlock[]; blocksB?: WsBlock[] }> {
   const a = test.meta.verben
   if (!a) throw new Error('Es sind keine Verben gewählt.')
@@ -258,6 +267,7 @@ export async function generateVerbTest(
   onStep(brauchtKi(a) ? 'Tabellen entstehen, die KI schreibt die Sätze …' : 'Die Aufgaben entstehen aus der Verbliste …')
   const blocks = await erzeugeVerbBloecke(a, anrede, ai, 0, n)
   if (n < 2) return { blocks }
+  zwischenstand?.(blocks)
   onStep('Gruppe B wird erstellt …')
   return { blocks, blocksB: await erzeugeVerbBloecke(a, anrede, ai, 1, n) }
 }

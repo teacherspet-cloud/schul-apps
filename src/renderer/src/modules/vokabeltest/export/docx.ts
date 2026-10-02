@@ -45,6 +45,7 @@ import { vokabeltestFigur } from '../render/maskottchen'
 import { vokabeltestPfad } from '../render/TestPage'
 import { kopfTexte } from '../render/aufgabenTexte'
 import { istRtl, wordSchrift } from '../../../shared/sprachSchrift'
+import { mindmapAeste, mindmapLage, mindmapSvg } from '../render/mindmapLayout'
 
 /*
  * Arabisch (30.09.2026): Absätze und Tabellen von rechts nach links. Statt jede der vielen
@@ -71,6 +72,38 @@ export type { ImageSizer }
 // Druckränder wie in der Vorschau: oben 1,5 cm, unten 2 cm, links 2,5 cm (Lochrand), rechts 2 cm
 const MARGINS = { top: Math.round(1.5 * CM), bottom: Math.round(2 * CM), left: Math.round(2.5 * CM), right: Math.round(2 * CM) }
 const CONTENT = PAGE_WIDTH - MARGINS.left - MARGINS.right
+
+/**
+ * Mindmap als PNG (02.10.2026): SVG über eine Zeichenfläche rechnen, dreifach aufgelöst für einen
+ * scharfen Druck. null ohne Zeichenfläche (Tests, Node) – dann nimmt der Export die Tabelle.
+ */
+async function mindmapPng(svg: string, breiteMm: number, hoeheMm: number): Promise<Uint8Array | null> {
+  if (typeof document === 'undefined' || typeof Image === 'undefined') return null
+  try {
+    const breite = Math.round(breiteMm * PX_MM * 3)
+    const hoehe = Math.round(hoeheMm * PX_MM * 3)
+    const canvas = document.createElement('canvas')
+    canvas.width = breite
+    canvas.height = hoehe
+    const zeichen = canvas.getContext('2d')
+    if (!zeichen) return null
+    const bild = new Image()
+    await new Promise<void>((ok, fehler) => {
+      bild.onload = () => ok()
+      bild.onerror = () => fehler(new Error('Mindmap-Bild nicht ladbar'))
+      // Ohne Antwort binnen weniger Sekunden lieber die Tabelle als ein hängender Export
+      setTimeout(() => fehler(new Error('Zeitüberschreitung')), 4000)
+      bild.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    })
+    zeichen.fillStyle = '#ffffff'
+    zeichen.fillRect(0, 0, breite, hoehe)
+    zeichen.drawImage(bild, 0, 0, breite, hoehe)
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/png'))
+    return blob ? new Uint8Array(await blob.arrayBuffer()) : null
+  } catch {
+    return null
+  }
+}
 
 export interface DocxOptions {
   variantIds: string[]
@@ -618,29 +651,70 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
     }
 
     case 'mindmap': {
-      // Oberbegriff mittig, darunter zwei Spalten mit leeren Ästen
-      out.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [run(block.topic, { bold: true })] }))
-      const rows = Math.ceil(block.items.length / 2)
-      const half = Math.floor(CONTENT / 2)
-      const haelftenRaster = [half, CONTENT - half]
+      /*
+       * Echte Mindmap auch in Word (02.10.2026): dieselbe Zeichnung wie im Druck als Bild
+       * (render/mindmapLayout.ts). Wo sich kein Bild rechnen lässt (ohne Zeichenfläche, z. B. in
+       * den Tests), steht eine Tabelle: je Ast eine Zeile mit Oberbegriff und Schreiblinien.
+       */
+      const lage = mindmapLage(mindmapAeste(block))
+      const png = await mindmapPng(mindmapSvg(block, mode === 'key', ctx.akzent ? `#${ctx.akzent}` : null), lage.breite, lage.hoehe)
+      if (png) {
+        out.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({ type: 'png', data: png, transformation: { width: Math.round(lage.breite * PX_MM), height: Math.round(lage.hoehe * PX_MM) } })
+            ]
+          })
+        )
+        break
+      }
+      out.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 120 },
+          children: [run(block.topic, { bold: true, ...(ctx.akzent ? { color: ctx.akzent } : {}) })]
+        })
+      )
+      const labelW = Math.round(CONTENT * 0.32)
+      const astRaster = [labelW, CONTENT - labelW]
       out.push(
         new Table({
           width: { size: CONTENT, type: WidthType.DXA },
-          columnWidths: haelftenRaster,
+          columnWidths: astRaster,
           layout: TableLayoutType.FIXED,
-          rows: Array.from(
-            { length: rows },
-            (_, r) =>
+          rows: lage.aeste.map(
+            ({ ast }) =>
               new TableRow({
-                height: { value: 440, rule: 'atLeast' },
-                children: [0, 1].map((c) => {
-                  const it = block.items[r * 2 + c]
-                  return new TableCell({
-                    width: { size: half, type: WidthType.DXA },
+                children: [
+                  new TableCell({
+                    width: { size: labelW, type: WidthType.DXA },
                     borders: ALL_BORDERS,
-                    children: [new Paragraph({ children: it ? [run(mode === 'key' ? it.answer : '', { bold: true, color: RED })] : [] })]
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [
+                      new Paragraph({
+                        children: ast.vorgegeben
+                          ? [run(ast.label, { bold: true })]
+                          : mode === 'key' && ast.label
+                            ? [run(`(${ast.label})`, { italics: true, color: RED })]
+                            : []
+                      })
+                    ]
+                  }),
+                  new TableCell({
+                    width: { size: CONTENT - labelW, type: WidthType.DXA },
+                    borders: ALL_BORDERS,
+                    children: Array.from(
+                      { length: ast.zweige },
+                      (_, i) =>
+                        new Paragraph({
+                          spacing: { before: 240 },
+                          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000', space: 1 } },
+                          children: [run(mode === 'key' ? (ast.woerter[i]?.answer ?? ' ') : ' ', { bold: true, color: RED })]
+                        })
+                    )
                   })
-                })
+                ]
               })
           )
         })

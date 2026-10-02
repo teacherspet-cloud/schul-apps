@@ -4,6 +4,7 @@ import { subjectOperators } from '../../didactics/subjectOperators'
 import { operatorenAuswahl } from '@shared/operatoren/zugriff'
 import { imageDesignRules } from '../../didactics/imageDesign'
 import { wantedTasks } from './grundregeln'
+import { schreibRegelFuerMeta, schreibraumRichtwerte } from '../../didactics/schreibraum'
 
 // ---------- Bilder, Lernpsychologie, Fachmethoden ----------
 
@@ -62,7 +63,9 @@ export function learningDesignRules(meta: WorksheetMeta): string {
       ? '- Grundschule: konkrete Dinge und Handlungen, kurze Textmengen, viel Platz zum Schreiben und Malen.'
       : meta.grade <= 10
         ? '- Sekundarstufe I: Alltag und Lebenswelt der Jugendlichen aufgreifen; die erste Aufgabe schaffen alle.'
-        : '- Oberstufe: gesellschaftliche Relevanz, Kontroversen, Studien- und Berufsbezug; fachliche Tiefe statt Verpackung.'
+        : '- Oberstufe: gesellschaftliche Relevanz, Kontroversen, Studien- und Berufsbezug; fachliche Tiefe statt Verpackung.',
+    // Schreibraum (02.10.2026): Befund der Lehrkraft „Antwortfelder viel zu klein" – count der Linien danach wählen
+    `- Antwortflächen großzügig bemessen (answer.count der Schreiblinien, leere Zellen der Ausfülltabellen). ${schreibraumRichtwerte(schreibRegelFuerMeta(meta))}`
   ]
     .filter(Boolean)
     .join('\n')

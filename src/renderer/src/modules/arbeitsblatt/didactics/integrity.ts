@@ -387,6 +387,14 @@ export function checkVideo(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding[
     if (!video.sourceTitle.trim()) {
       findings.push({ blockId: video.id, severity: 'mittel', message: 'Das Video hat keinen Titel – so ist es nicht wiederzufinden.' })
     }
+    // Ohne Adresse kein QR-Code und kein Link (Befund 02.10.2026: „Videoreportage … weder verlinkt noch per QR-Code erreichbar")
+    if (!video.url.trim()) {
+      findings.push({
+        blockId: video.id,
+        severity: 'mittel',
+        message: 'Das Video hat keine Adresse – auf dem Blatt stehen weder QR-Code noch Link. Adresse in den Einstellungen des Bausteins eintragen.'
+      })
+    }
     if (video.url && !/^https?:\/\/\S+$/i.test(video.url.trim())) {
       findings.push({
         blockId: video.id,
@@ -447,4 +455,26 @@ export function checkVideo(sheet: Sheet, meta: WorksheetMeta): IntegrityFinding[
     }
   }
   return findings
+}
+
+/**
+ * Die Adresse aus den Video-Angaben der Lehrkraft in jeden Videobaustein ohne Adresse setzen
+ * (02.10.2026). Die KI bekam nur „es liegt eine Adresse vor", nie die Adresse selbst, und das
+ * Schema verlangte sie „wie die Lehrkraft sie angegeben hat, sonst leer" – sie blieb also leer,
+ * und auf dem Blatt fehlten QR-Code und Link. Die App setzt sie jetzt selbst ein, wie den
+ * Originaltext: Was die Lehrkraft eingegeben hat, gibt die App unverändert weiter.
+ */
+export function setzeVideoAdresse(sheet: Sheet, meta: WorksheetMeta): Sheet {
+  const v = meta.video
+  const url = v?.url.trim()
+  if (!v || !url) return sheet
+  if (!sheet.blocks.some((b) => b.type === 'video' && !b.url.trim())) return sheet
+  return {
+    ...sheet,
+    blocks: sheet.blocks.map((b) =>
+      b.type === 'video' && !b.url.trim()
+        ? { ...b, url, sourceTitle: b.sourceTitle.trim() || v.title, platform: b.platform.trim() || v.platform, searchTerms: undefined }
+        : b
+    )
+  }
 }

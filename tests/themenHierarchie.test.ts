@@ -16,7 +16,7 @@ import {
   type ThemenDaten
 } from '../src/shared/themen'
 import { pruefeLehrplan, type LehrplanDatei } from '../src/shared/lehrplan'
-import { automatischEinsortieren, besterBereich, type ThemenMaterial } from '../src/renderer/src/shared/themenVorschlag'
+import { automatischEinsortieren, besterBereich, stichwoerter, widersprechen, type ThemenMaterial } from '../src/renderer/src/shared/themenVorschlag'
 import { katalogBaum, katalogFuer } from '../src/renderer/src/shared/themenKatalog'
 
 /*
@@ -264,5 +264,25 @@ describe('Automatik ohne Ordner für ein einzelnes Blatt', () => {
     expect(
       automatischEinsortieren([mat('Die Weimarer Republik'), mat('Weimarer Republik – Krisenjahre')], leereThemen(), k2).uebernahmen[0]?.schluessel
     ).toHaveLength(2)
+  })
+})
+
+/*
+ * Befund der Lehrkraft (02.10.2026): Vokabeltests aus Green Line 3 und 6 landeten in „Green Line 1".
+ * Die Bandnummer fiel beim Bilden der Stichwörter weg – alle Bände sahen gleich aus.
+ */
+describe('Lehrwerksbände werden unterschieden', () => {
+  it('„Green Line 3" behält seine Nummer, ein anderer Band widerspricht', () => {
+    expect(stichwoerter('Green Line 3 – Unit 2')).toEqual(expect.arrayContaining(['line3', 'unit2']))
+    expect(widersprechen(stichwoerter('Green Line 3'), stichwoerter('Green Line 1'))).toBe(true)
+    expect(widersprechen(stichwoerter('Green Line 3 Unit 2'), stichwoerter('Green Line 3'))).toBe(false)
+  })
+
+  it('ein Test aus Band 3 kommt nicht in den Bereich „Green Line 1"', () => {
+    let d = bereichSetzen(leereThemen(), { id: 'band1', fachId: 'englisch', name: 'Green Line 1' })
+    d = bereichSetzen(d, { id: 'band3', fachId: 'englisch', name: 'Green Line 3' })
+    expect(besterBereich(mat('Green Line 3 – Unit 2', 'englisch', 7), d.bereiche, new Map())?.id).toBe('band3')
+    const nurBand1 = bereichSetzen(leereThemen(), { id: 'band1', fachId: 'englisch', name: 'Green Line 1' })
+    expect(besterBereich(mat('Green Line 6 – Unit 1', 'englisch', 10), nurBand1.bereiche, new Map([['band1', [stichwoerter('Green Line 1 – Unit 1')]]]))).toBeNull()
   })
 })

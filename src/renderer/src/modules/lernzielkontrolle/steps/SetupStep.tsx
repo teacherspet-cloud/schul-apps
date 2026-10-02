@@ -187,7 +187,16 @@ export default function SetupStep(): React.JSX.Element {
         for (let i = 0; i < anzahl; i++) {
           const label = variantenLabel(i, anzahl)
           // Fortschritt über ALLE Fassungen – sonst spränge der Balken je Fassung auf null zurück
-          const blocks = await generateKurztest(t, label, k.ai, (msg) => k.melde(anzahl > 1 ? `${label}: ${msg}` : msg, i, anzahl))
+          const vorschau = (blocks: WsBlock[], was: string): void =>
+            k.zeige({ ...t, varianten: [...varianten, { id: `v${i + 1}`, label, blocks }] }, { was: anzahl > 1 ? `${label}: ${was}` : was })
+          const blocks = await generateKurztest(
+            t,
+            label,
+            k.ai,
+            (msg) => k.melde(anzahl > 1 ? `${label}: ${msg}` : msg, i, anzahl),
+            (b) => vorschau(b, 'Aufgaben stehen – Ankreuzfragen werden geprüft')
+          )
+          vorschau(blocks, 'fertig')
           varianten.push({ id: `v${i + 1}`, label, blocks })
           k.melde(`${i + 1} von ${anzahl} Fassungen fertig`, i + 1, anzahl)
         }

@@ -15,14 +15,35 @@
  */
 import { extractContent, type ExtractedContent, type ProgressFn } from './extractContent'
 
-/** YouTube-Adresse? Nur dort gibt es ein Transkript; andere Videoseiten werden als Webseite gelesen. */
+/**
+ * Videoadresse mit eigenem Ladeweg (Untertitel mit Zeitmarken): YouTube und – seit 02.10.2026 –
+ * ARD- und ZDF-Mediathek. Andere Videoseiten werden als Webseite gelesen.
+ */
 export function istVideoAdresse(adresse: string): boolean {
   try {
     const host = new URL(normalisiereAdresse(adresse)).hostname.toLowerCase().replace(/^www\.|^m\./, '')
-    return host === 'youtu.be' || host === 'youtube.com' || host === 'youtube-nocookie.com'
+    return (
+      host === 'youtu.be' ||
+      host === 'youtube.com' ||
+      host === 'youtube-nocookie.com' ||
+      host === 'ardmediathek.de' ||
+      host.endsWith('.ardmediathek.de') ||
+      host === 'zdf.de' ||
+      host.endsWith('.zdf.de') ||
+      host === 'zdfheute.de' ||
+      host === 'arte.tv' ||
+      host.endsWith('.arte.tv')
+    )
   } catch {
     return false
   }
+}
+
+/** Woher der Inhalt eines Videos kommt – so steht es auch im Material für die KI */
+function inhaltsKopf(v: { inhaltQuelle?: string; transkriptSprache: string; automatisch: boolean }): string {
+  if (v.inhaltQuelle === 'ki')
+    return 'Inhaltsprotokoll der KI, die das Video gesehen hat (Gemini) – Gesprochenes sinngemäß, Gezeigtes in [Klammern]; KEIN wörtliches Transkript, also nicht nach Wortlaut fragen'
+  return `Transkript aus den Untertiteln mit Zeitmarken [m:ss]${v.transkriptSprache ? ` (${v.transkriptSprache}${v.automatisch ? ', automatisch erzeugte Untertitel – kann Fehler enthalten' : ''})` : ''}`
 }
 
 /** Ergänzt das fehlende „https://" – Adressen werden oft ohne Schema eingegeben. */
@@ -49,21 +70,31 @@ export async function ladeUrlAlsInhalt(adresse: string, onProgress: ProgressFn =
   const leer = { format: 'plain' as const, pageImages: [], pageCount: 0, pagesRead: [], url }
 
   if (istVideoAdresse(url)) {
-    onProgress('Video wird geladen …')
+    onProgress('Video wird geladen – Untertitel werden gelesen …')
     const v = await window.api.sources.video(url)
-    if (!v.titel && !v.transkript && !v.beschreibung) throw new Error(v.fehler ?? 'Das Video ließ sich nicht laden.')
+    // Eine ZDF-Seite ohne Video ist eben eine Webseite – dann wie eine solche lesen
+    const leerGeblieben = !v.titel && !v.transkript && !v.beschreibung
+    if (leerGeblieben && v.anbieter && v.anbieter !== 'youtube') return ladeAlsWebseite(url, leer, onProgress)
+    if (leerGeblieben) throw new Error(v.fehler ?? 'Das Video ließ sich nicht laden.')
     const teile = [
       `Video: ${v.titel || url}`,
-      v.kanal ? `Kanal: ${v.kanal}` : '',
+      v.kanal ? `Herkunft: ${v.kanal}` : '',
       v.dauerSekunden ? `Laufzeit: ${mmss(v.dauerSekunden)}` : '',
       `Adresse: ${url}`,
+      v.verfuegbarBis ? `In der Mediathek verfügbar bis: ${new Date(v.verfuegbarBis).toLocaleDateString('de-DE')}` : '',
       v.beschreibung ? `Beschreibung:\n${v.beschreibung}` : '',
-      v.transkript
-        ? `Transkript${v.transkriptSprache ? ` (${v.transkriptSprache}${v.automatisch ? ', automatisch erzeugte Untertitel – kann Fehler enthalten' : ''})` : ''}:\n${v.transkript}`
-        : `Kein Transkript verfügbar${v.fehler ? ` – ${v.fehler}` : ''}.`
+      v.transkript ? `${inhaltsKopf(v)}:\n${v.transkript}` : `Kein Transkript verfügbar${v.fehler ? ` – ${v.fehler}` : ''}.`
     ]
     return { ...leer, fileName: v.titel || url, kind: 'video', text: teile.filter(Boolean).join('\n\n') }
   }
+  return ladeAlsWebseite(url, leer, onProgress)
+}
+
+async function ladeAlsWebseite(
+  url: string,
+  leer: { format: 'plain'; pageImages: never[]; pageCount: number; pagesRead: never[]; url: string },
+  onProgress: ProgressFn
+): Promise<ExtractedContent> {
 
   onProgress('Webseite wird geladen …')
   const q = await window.api.sources.laden(url)

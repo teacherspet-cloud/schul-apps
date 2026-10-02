@@ -40,7 +40,8 @@ import {
   IconChevronUp,
   IconFileImport,
   IconPlaylistAdd,
-  IconArrowLeft
+  IconArrowLeft,
+  IconArrowBackUp
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { notifyError, notifyInfo } from '../../../shared/util'
@@ -68,7 +69,14 @@ import { addVersion, switchVersion } from '../../arbeitsblatt/model/versions'
 import { newBlock } from '../../arbeitsblatt/model/factory'
 import { newId } from '../../vokabeltest/model/random'
 import { examHeadBlock } from '../render/examWorksheet'
-import { nurMitBeispiel, ohneSchuelerErlaeuterung, operatorenBefund, operatorenlisteAktiv, operatorenVorbemerkungen } from '../didactics/operatorenliste'
+import {
+  nurMitBeispiel,
+  ohneSchuelerErlaeuterung,
+  OPERATOREN_BLOCK_ID,
+  operatorenBefund,
+  operatorenlisteAktiv,
+  operatorenVorbemerkungen
+} from '../didactics/operatorenliste'
 import type { WsBlockType } from '../../arbeitsblatt/model/types'
 import { WsContext, type WsContextValue } from '../../arbeitsblatt/render/WsContext'
 import type { PlacedItem } from '../../arbeitsblatt/render/paginate'
@@ -365,7 +373,8 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
             ? (treffer) => k.frage<string | null>(QUELLENAUSWAHL, { treffer, thema: e.meta.topic } satisfies QuellenFrage)
             : undefined,
           websuche: k.websuche,
-          bild: k.bild
+          bild: k.bild,
+          zwischenstand: (stand, was) => k.zeige(stand, { was })
         }),
       // Die erzeugte Arbeit ersetzt den Stand, aus dem sie entstand – ein Schritt für Strg+Z
       ablegen: (next, e) => legeArbeitAb(docId, e, () => next)
@@ -540,6 +549,30 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   const wrapBlock = (block: WsBlock, placed: PlacedItem, content: React.ReactNode): React.ReactNode => {
     // Kopfkasten: bearbeitbar (Titel und Wortlaut landen in der Arbeit); Teil-Überschriften bleiben berechnet
     if (block.id === 'exam-head') return <WsContext.Provider value={loesung ? nurLesen : kopfBearbeiten}>{content}</WsContext.Provider>
+    /*
+     * Operatorenliste (01.10.2026): berechnet, also nicht zu bearbeiten – aber im Blatt nach oben
+     * oder unten zu ziehen. Die übrigen Bausteine rücken nach; gespeichert wird der Baustein davor.
+     */
+    if (block.id === OPERATOREN_BLOCK_ID)
+      return (
+        <WsContext.Provider value={nurLesen}>
+          <BausteinRahmen
+            block={block}
+            placed={placed}
+            onUpdate={() => undefined}
+            imFluss={(nach) => updateExam((d) => void (d.meta.operatorenNach = nach))}
+            menue={
+              exam.meta.operatorenNach ? (
+                <Menu.Item leftSection={<IconArrowBackUp size={14} />} onClick={() => updateExam((d) => void delete d.meta.operatorenNach)}>
+                  An die vorgesehene Stelle zurück
+                </Menu.Item>
+              ) : undefined
+            }
+          >
+            {content}
+          </BausteinRahmen>
+        </WsContext.Provider>
+      )
     if (!teilVon(block.id)) return <WsContext.Provider value={nurLesen}>{content}</WsContext.Provider>
     const laeuft = busy.has(`block-${block.id}`)
     return (

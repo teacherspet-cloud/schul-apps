@@ -23,6 +23,9 @@ import { politeFetch } from '../images/politeFetch'
 import { begrenzteAntwort, GRENZEN } from '../netz/zieladresse'
 import { BROWSER_UA, stripHtml } from '../images/sources'
 import type { VideoQuelle } from '../../../shared/types'
+import { ladeArd, ladeArte, ladeZdf, mediathekVon } from './mediathek'
+import { alsTranskript, type UntertitelZeile } from './untertitel'
+import { videoInhaltUeberGemini } from './videoKi'
 
 /** Höchstlänge des Transkripts in Zeichen – ein 90-Minuten-Film hat rund 80 000 */
 const TRANSKRIPT_MAX = 120_000
@@ -162,26 +165,29 @@ function besteSpur(spuren: Spur[]): Spur | undefined {
   return [...spuren].filter((s) => s.baseUrl).sort((a, b) => rang(a) - rang(b))[0]
 }
 
-/** Holt eine Spur und setzt sie zu Fließtext zusammen – json3 oder die XML-Formen (timedtext, srv3). */
+/**
+ * Holt eine Spur – json3 oder die XML-Formen (timedtext, srv3) – und behält die Zeitmarken
+ * (02.10.2026): Das Transkript steht danach als „[mm:ss] Text" je Abschnitt da, damit Aufgaben
+ * zum Video sagen können, in welchem Abschnitt etwas vorkommt.
+ */
 async function ladeSpur(spur: Spur, ua: string): Promise<string> {
   const url = `${spur.baseUrl}${spur.baseUrl.includes('fmt=') ? '' : '&fmt=json3'}`
   const res = await politeFetch(url, { headers: { 'User-Agent': ua }, signal: AbortSignal.timeout(15000) })
   if (!res.ok) return ''
   const rohtext = new TextDecoder().decode(await begrenzteAntwort(res, GRENZEN.text))
-  let stuecke: string[] = []
+  let zeilen: UntertitelZeile[] = []
   try {
-    const json = JSON.parse(rohtext) as { events?: { segs?: { utf8?: string }[] }[] }
-    stuecke = (json.events ?? []).map((e) => (e.segs ?? []).map((s) => s.utf8 ?? '').join('')).filter((t) => t.trim())
+    const json = JSON.parse(rohtext) as { events?: { tStartMs?: number; segs?: { utf8?: string }[] }[] }
+    zeilen = (json.events ?? []).map((e) => ({ start: (e.tStartMs ?? 0) / 1000, text: (e.segs ?? []).map((x) => x.utf8 ?? '').join('') }))
   } catch {
-    // XML: <text start=…>…</text> (timedtext) oder <p t=… d=…><s>…</s></p> (srv3)
-    stuecke = [...rohtext.matchAll(/<(?:text|p)\b[^>]*>([\s\S]*?)<\/(?:text|p)>/g)].map((m) => stripHtml(m[1]))
+    // XML: <text start="12.3" …>…</text> (timedtext, Sekunden) oder <p t="12300" …>…</p> (srv3, Millisekunden)
+    zeilen = [...rohtext.matchAll(/<(text|p)\b([^>]*)>([\s\S]*?)<\/(?:text|p)>/g)].map((m) => {
+      const sek = /\bstart="([\d.]+)"/.exec(m[2])?.[1]
+      const ms = /\bt="(\d+)"/.exec(m[2])?.[1]
+      return { start: sek ? Number(sek) : ms ? Number(ms) / 1000 : 0, text: stripHtml(m[3]) }
+    })
   }
-  const text = stuecke
-    .map((t) => t.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s+([.,;:!?])/g, '$1')
-  return text.length > TRANSKRIPT_MAX ? `${text.slice(0, TRANSKRIPT_MAX)} …` : text
+  return alsTranskript(zeilen.map((z) => ({ ...z, text: z.text.replace(/\s+/g, ' ').trim() })).filter((z) => z.text), TRANSKRIPT_MAX)
 }
 
 /** Letzter Rückfall: wenigstens Titel und Kanal über oEmbed. */
@@ -200,6 +206,27 @@ async function oembed(adresse: string): Promise<{ titel: string; kanal: string }
 }
 
 export async function ladeVideo(adresse: string): Promise<VideoQuelle> {
+  // ARD- und ZDF-Mediathek (02.10.2026): eigener Weg über deren Untertitel
+  const mediathek = mediathekVon(adresse)
+  if (mediathek) return mediathek === 'ard' ? ladeArd(adresse) : mediathek === 'zdf' ? ladeZdf(adresse) : ladeArte(adresse)
+  return mitKiRueckfall(await ladeYoutube(adresse))
+}
+
+/**
+ * Ohne Untertitel: Gemini sieht das Video selbst (Entscheidung der Lehrkraft 02.10.2026). Nur
+ * öffentliche YouTube-Videos und nur mit hinterlegtem Google-Schlüssel; das Ergebnis ist ein
+ * Inhaltsprotokoll mit Zeitmarken (gesprochener Text sinngemäß UND Bildinhalt), kein wörtliches
+ * Transkript – so wird es der KI auch angekündigt.
+ */
+async function mitKiRueckfall(v: VideoQuelle): Promise<VideoQuelle> {
+  if (v.transkript || !v.titel) return v
+  const ki = await videoInhaltUeberGemini(v.url).catch((e) => ({ fehler: e instanceof Error ? e.message : String(e) }))
+  if ('protokoll' in ki && ki.protokoll) return { ...v, transkript: ki.protokoll, transkriptSprache: '', automatisch: true, inhaltQuelle: 'ki', fehler: undefined }
+  const grund = 'fehler' in ki && ki.fehler ? ` Gemini: ${ki.fehler}` : ''
+  return { ...v, fehler: `${v.fehler ?? 'Kein Transkript.'}${grund} Tipp: Transkript von Hand einfügen.` }
+}
+
+async function ladeYoutube(adresse: string): Promise<VideoQuelle> {
   const leer: VideoQuelle = {
     url: adresse,
     titel: '',
@@ -208,7 +235,9 @@ export async function ladeVideo(adresse: string): Promise<VideoQuelle> {
     dauerSekunden: 0,
     transkript: '',
     transkriptSprache: '',
-    automatisch: false
+    automatisch: false,
+    anbieter: 'youtube',
+    inhaltQuelle: 'keine'
   }
   const id = youtubeId(adresse)
   if (!id) return { ...leer, fehler: 'Das ist keine YouTube-Adresse. Andere Videoseiten werden als Webseite gelesen.' }
@@ -252,6 +281,7 @@ export async function ladeVideo(adresse: string): Promise<VideoQuelle> {
     ...ergebnis,
     transkript,
     transkriptSprache: spur.languageCode ?? '',
-    automatisch: spur.kind === 'asr'
+    automatisch: spur.kind === 'asr',
+    inhaltQuelle: 'untertitel'
   }
 }

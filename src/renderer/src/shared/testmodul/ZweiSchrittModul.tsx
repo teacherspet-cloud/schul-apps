@@ -12,9 +12,10 @@ import { Box, Button, Group, ScrollArea, Stepper } from '@mantine/core'
 import { IconFolder, IconPlus } from '@tabler/icons-react'
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import type { StoreApi, UseBoundStore } from 'zustand'
-import { useSperrenderAuftrag } from '../auftraege'
+import { useLiveAuftrag, useSperrenderAuftrag } from '../auftraege'
 import { sichereAlles } from '../autosave'
 import AuftragsHinweis from '../components/AuftragsHinweis'
+import { useZwischenstaende, type Zwischenstand } from '../zwischenstand'
 import UndoRedoButtons from '../components/UndoRedoButtons'
 import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../navigation'
 import { useUndoKeys } from '../useUndoKeys'
@@ -58,6 +59,8 @@ export interface ZweiSchrittModulProps<D, S extends Zustand<D>> {
   /** Liste der gespeicherten Dokumente – nur ob es welche gibt, zählt */
   liste: () => Promise<unknown[]>
   BibliotheksSeite: ComponentType<BibliotheksSeiteProps>
+  /** Live-Vorschau eines laufenden Auftrags (02.10.2026, siehe AuftragsHinweis) */
+  vorschau?: (z: Zwischenstand) => ReactNode
   schritte: [{ label: string; description: string }, { label: string; description: string }]
   einstellen: ReactNode
   bearbeiten: (d: D) => ReactNode
@@ -74,6 +77,13 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
   const [library, setLibrary] = useState(false)
   // Läuft für dieses Dokument ein Auftrag, steht statt des Formulars ein Hinweis da (shared/auftraege.ts)
   const auftrag = useSperrenderAuftrag(docId)
+  /*
+   * Nicht sperrende Aufträge (Tafelbild, Rückmeldungen): Mit Zwischenstand steht die Live-Vorschau
+   * vorn – das Formular bleibt dahinter offen und kommt mit „Ausblenden" zurück (02.10.2026).
+   */
+  const live = useLiveAuftrag(p.vorschau ? docId : null)
+  const [ausgeblendet, setAusgeblendet] = useState<string | null>(null)
+  const zeigeLive = !auftrag && live && ausgeblendet !== live.id ? live : undefined
   p.bibliothek.useAutosave()
   // Strg+Z / Strg+Y nur, solange dieses Programm vorn liegt – in beiden Schritten
   useUndoKeys(p.active && !library && !auftrag, undo, redo)
@@ -168,9 +178,9 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
       */}
       <Box style={{ flex: 1, minHeight: 0 }}>
         {auftrag ? (
-          <ScrollArea h="100%">
-            <AuftragsHinweis auftrag={auftrag} neuLabel={p.texte.neu} onNeu={startNew} />
-          </ScrollArea>
+          <AuftragsHinweisMitVorschau auftrag={auftrag} neuLabel={p.texte.neu} onNeu={startNew} vorschau={p.vorschau} />
+        ) : zeigeLive ? (
+          <AuftragsHinweis auftrag={zeigeLive} vorschau={p.vorschau} onAusblenden={() => setAusgeblendet(zeigeLive.id)} />
         ) : step === 0 ? (
           p.einstellen
         ) : (
@@ -180,5 +190,16 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
       {/* Nur im vorderen Programm – ein Dialog aus einem Programm im Hintergrund käme ungefragt nach vorn */}
       {p.active && p.zusatz}
     </Box>
+  )
+}
+
+/** Mit Zwischenstand füllt die Vorschau die Fläche und rollt selbst; ohne steht die Karte wie bisher */
+function AuftragsHinweisMitVorschau(props: React.ComponentProps<typeof AuftragsHinweis>): React.JSX.Element {
+  const mitStand = useZwischenstaende((s) => Boolean(props.vorschau && s.staende[props.auftrag.id]))
+  if (mitStand) return <AuftragsHinweis {...props} />
+  return (
+    <ScrollArea h="100%">
+      <AuftragsHinweis {...props} />
+    </ScrollArea>
   )
 }

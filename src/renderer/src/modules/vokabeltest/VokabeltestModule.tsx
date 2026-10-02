@@ -16,6 +16,7 @@ import { useVokabeltest } from './store'
 import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
+import { TestVorschau } from './render/TestVorschau'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, undoVocab, redoVocab, testId, listName, lastSavedAt } = useVokabeltest()
@@ -117,7 +118,13 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
             zurueck={geladen ? listName.trim() || 'Unbenannter Vokabeltest' : null}
           />
         ) : auftrag ? (
-          <AuftragsHinweis auftrag={auftrag} neuLabel="Neuer Vokabeltest" onNeu={() => newTestSafely().catch(notifyError)} />
+          <AuftragsHinweis
+            auftrag={auftrag}
+            neuLabel="Neuer Vokabeltest"
+            onNeu={() => newTestSafely().catch(notifyError)}
+            // Live-Vorschau (02.10.2026): jede Aufgabe, sobald sie fertig ist
+            vorschau={(z) => <TestVorschau z={z} />}
+          />
         ) : (
           <>
             {step === 0 && <VocabStep />}

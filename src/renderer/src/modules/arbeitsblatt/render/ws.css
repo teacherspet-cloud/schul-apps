@@ -799,8 +799,9 @@
 .ws-task > .ws-lines-fill {
   padding-top: 0;
 }
+/* Linienabstand nach Jahrgang (02.10.2026): PageFrame setzt --ws-linie (didactics/schreibraum.ts) */
 .ws-line {
-  height: 8.5mm;
+  height: var(--ws-linie, 8.5mm);
   border-bottom: 0.25mm solid #666;
 }
 .ws-grid {
@@ -956,15 +957,59 @@
 .ws-zeilen-griff:hover {
   background: color-mix(in srgb, var(--ws-accent) 45%, transparent);
 }
+/*
+ * Griffe sichtbar, sobald der Baustein gewählt ist (02.10.2026). Befund der Lehrkraft: Tabellen
+ * ließen sich beim Bearbeiten nicht größer ziehen – die Griffe erschienen nur beim Überfahren
+ * mit der Maus, auf dem iPad also nie. Jetzt zeigt die gewählte Tabelle ihre ziehbaren Linien
+ * als Akzentstrich mit einem kleinen Anfasser in der Mitte.
+ */
+.ws-spalten-griff::after,
+.ws-zeilen-griff::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ws-accent) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.ws-spalten-griff::after {
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: min(18px, 60%);
+  transform: translate(-50%, -50%);
+}
+.ws-zeilen-griff::after {
+  top: 50%;
+  left: 50%;
+  width: min(18px, 60%);
+  height: 4px;
+  transform: translate(-50%, -50%);
+}
+.editor-block-aktiv .ws-spalten-griff::after,
+.editor-block-aktiv .ws-zeilen-griff::after,
+.editor-block[data-angetippt] .ws-spalten-griff::after,
+.editor-block[data-angetippt] .ws-zeilen-griff::after {
+  opacity: 1;
+}
 @media (pointer: coarse) {
+  /* Trefferfläche 24 px (WCAG 2.5.8) – die Hälfte liegt in der Zelle, die Hälfte jenseits der Linie */
   .ws-spalten-griff {
-    right: -6px;
-    width: 12px;
+    right: -12px;
+    width: 24px;
   }
   .ws-zeilen-griff {
-    bottom: -6px;
-    height: 12px;
+    bottom: -12px;
+    height: 24px;
   }
+}
+/*
+ * Letzte Zeile eines (Tabellen-)Stücks: Der Griff liegt ganz IN der Zelle (02.10.2026). Im Editor
+ * schneidet die Seite oben und unten ab (clip-path, siehe .ws-editor-pages) – saß die Tabelle am
+ * Seitenende, war der untere Griff abgeschnitten und die letzte Zeile nicht zu ziehen.
+ */
+.ws-table-ziehbar tbody tr:last-child .ws-zeilen-griff {
+  bottom: 0;
 }
 .ws-ordering {
   display: flex;
@@ -1065,10 +1110,10 @@
   border-radius: 0;
   background-image: linear-gradient(
     to bottom,
-    transparent calc(8.5mm - 0.25mm),
-    #666 calc(8.5mm - 0.25mm)
+    transparent calc(var(--ws-linie, 8.5mm) - 0.25mm),
+    #666 calc(var(--ws-linie, 8.5mm) - 0.25mm)
   );
-  background-size: 100% 8.5mm;
+  background-size: 100% var(--ws-linie, 8.5mm);
 }
 .ws-workspace-grid {
   background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm),
@@ -2577,6 +2622,15 @@ html[data-griff-zug] * {
 .ws-info-spalten {
   font-size: 0.88em;
 }
+/*
+ * Abgesetzter Kasten (Operatorenliste, 01.10.2026): sichtbar Luft zu den Aufgaben davor und danach.
+ * Die Messung (Hülle mit flow-root) zählt den Außenabstand mit – der Umbruch rechnet also richtig,
+ * höchstens um den sonst üblichen Bausteinabstand vorsichtiger.
+ */
+.ws-info-abgesetzt {
+  margin-top: 8mm;
+  margin-bottom: 8mm;
+}
 .ws-info-paar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -3059,4 +3113,58 @@ html[data-griff-zug] * {
 .ws-audio-zeile > :last-child {
   flex: 1;
   min-width: 0;
+}
+
+/*
+ * Live-Vorschau während der Erzeugung (02.10.2026, BlattVorschau.tsx): Was mit dem letzten
+ * Zwischenstand neu kam oder geändert wurde, leuchtet kurz auf. Nur ein Schatten und eine
+ * Hinterlegung – nichts, was Platz braucht, sonst verschöbe das Aufleuchten den Umbruch.
+ */
+@keyframes ws-live-aufleuchten {
+  0% {
+    box-shadow: 0 0 0 1.2mm color-mix(in srgb, var(--ws-accent, #228be6) 45%, transparent);
+    background: color-mix(in srgb, var(--ws-accent, #228be6) 12%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 1.2mm transparent;
+    background: transparent;
+  }
+}
+.ws-live-neu {
+  border-radius: 1.5mm;
+  animation: ws-live-aufleuchten 2.4s ease-out 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-live-neu {
+    animation-duration: 0.01s;
+    outline: 0.5mm solid color-mix(in srgb, var(--ws-accent, #228be6) 50%, transparent);
+  }
+}
+
+/* ===================================================================================
+ * Zeilenweise Teilung (02.10.2026)
+ *
+ * Ein Materialtext wird seit 02.10.2026 zwischen zwei ZEILEN umbrochen, nicht mehr nur
+ * zwischen Absätzen (render/zeilenTeilung.ts). Ein Absatzstück ist der ganze Absatz in einem
+ * Rahmen, der nur die Zeilen dieser Seite zeigt: Höhe fest (blockview.tsx), der Absatz oben
+ * um die schon gezeigten Zeilen verschoben. `clip` statt `hidden`: Ein Rahmen mit `hidden`
+ * ließe sich beim Bearbeiten verschieben; seitlich bleibt alles sichtbar (Notizrand-Linie,
+ * überhängende Kursive). `flow-root`, damit der negative Rand nicht aus dem Rahmen fällt.
+ * =================================================================================== */
+.ws-zeilen-schnitt {
+  display: flow-root;
+  overflow-x: visible;
+  overflow-y: clip;
+}
+/* Dieselbe Einrückung wie „.ws-paragraph + .ws-paragraph" – auch für den Absatz im Rahmen */
+.ws-text-numbered .ws-absatz-folgt .rt-p:first-child {
+  text-indent: 1.2em;
+}
+/* Beim Bearbeiten den ganzen Absatz zeigen – nach dem Speichern wird ohnehin neu umbrochen */
+.ws-zeilen-schnitt:focus-within {
+  height: auto !important;
+  overflow-y: visible;
+}
+.ws-zeilen-schnitt:focus-within > .ws-paragraph {
+  margin-top: 0 !important;
 }

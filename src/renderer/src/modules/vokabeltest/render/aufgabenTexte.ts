@@ -437,3 +437,227 @@ export const kopfTexte = (sprache: string | undefined): KopfTexte => (sprache ==
 
 /** Ist das einer der Standardtitel (in irgendeiner Sprache)? Dann darf er der Testsprache folgen. */
 export const istStandardTitel = (titel: string): boolean => Object.values(KOPF).some((k) => k.title === titel.trim())
+
+/*
+ * Synonyme/Gegenteile (02.10.2026, Befund der Lehrkraft): Die Anweisung verlangte „gleiche (=)
+ * ODER entgegengesetzte (≠) Bedeutung", die KI lieferte aber fast nur Synonyme. Jetzt richtet
+ * sich die Anweisung nach dem, was wirklich gefragt ist – gemischt (mit =/≠ am Wort), nur
+ * gleiche oder nur entgegengesetzte Bedeutung. Überschrift und Spaltenkopf ziehen mit, damit
+ * über einer reinen Synonymaufgabe nicht „Gegenteile" steht. Gemischt = die Texte oben.
+ * Wie die übrigen Texte nicht muttersprachlich geprüft.
+ */
+export type SynonymArt = 'gemischt' | 'gleich' | 'gegenteil'
+
+/** Je Sprache: [Anweisung nur gleich, Anweisung nur Gegenteil, Kopf gemischt, Kopf gleich, Kopf Gegenteil] */
+const SYNONYM_TEXTE: Record<string, [string, string, string, string, string]> = {
+  en: [
+    'Match each word with a word that has the same meaning.',
+    'Match each word with a word that has the opposite meaning.',
+    'Synonyms / opposites',
+    'Synonyms',
+    'Opposites'
+  ],
+  de: [
+    'Ordne jedem Wort ein Wort mit gleicher Bedeutung zu.',
+    'Ordne jedem Wort ein Wort mit entgegengesetzter Bedeutung zu.',
+    'Synonyme / Gegenteile',
+    'Synonyme',
+    'Gegenteile'
+  ],
+  fr: ['Associe chaque mot à un mot de même sens.', 'Associe chaque mot à un mot de sens contraire.', 'Synonymes / contraires', 'Synonymes', 'Contraires'],
+  es: [
+    'Relaciona cada palabra con otra de significado igual.',
+    'Relaciona cada palabra con otra de significado opuesto.',
+    'Sinónimos / antónimos',
+    'Sinónimos',
+    'Antónimos'
+  ],
+  it: [
+    'Abbina ogni parola a una parola con lo stesso significato.',
+    'Abbina ogni parola a una parola con il significato opposto.',
+    'Sinonimi / contrari',
+    'Sinonimi',
+    'Contrari'
+  ],
+  nl: [
+    'Koppel elk woord aan een woord met dezelfde betekenis.',
+    'Koppel elk woord aan een woord met de tegenovergestelde betekenis.',
+    'Synoniemen / tegenstellingen',
+    'Synoniemen',
+    'Tegenstellingen'
+  ],
+  ru: [
+    'Подбери к каждому слову слово с тем же значением.',
+    'Подбери к каждому слову слово с противоположным значением.',
+    'Синонимы / антонимы',
+    'Синонимы',
+    'Антонимы'
+  ],
+  pl: ['Połącz każdy wyraz z wyrazem o tym samym znaczeniu.', 'Połącz każdy wyraz z wyrazem o przeciwnym znaczeniu.', 'Synonimy / antonimy', 'Synonimy', 'Antonimy'],
+  cs: ['Přiřaď ke každému slovu slovo se stejným významem.', 'Přiřaď ke každému slovu slovo s opačným významem.', 'Synonyma / antonyma', 'Synonyma', 'Antonyma'],
+  pt: [
+    'Faz corresponder cada palavra a uma palavra com o mesmo significado.',
+    'Faz corresponder cada palavra a uma palavra com o significado contrário.',
+    'Sinónimos / antónimos',
+    'Sinónimos',
+    'Antónimos'
+  ],
+  tr: ['Her kelimeyi eş anlamlısıyla eşleştir.', 'Her kelimeyi zıt anlamlısıyla eşleştir.', 'Eş / zıt anlamlılar', 'Eş anlamlılar', 'Zıt anlamlılar'],
+  zh: ['给每个词语找出意思相同的词语。', '给每个词语找出意思相反的词语。', '近义词 / 反义词', '近义词', '反义词'],
+  ja: [
+    'それぞれのことばを、同じ意味のことばと結んでください。',
+    'それぞれのことばを、反対の意味のことばと結んでください。',
+    '似た意味 / 反対の意味',
+    '似た意味のことば',
+    '反対の意味のことば'
+  ],
+  ar: ['صِل كل كلمة بكلمة لها المعنى نفسه.', 'صِل كل كلمة بكلمة لها المعنى المعاكس.', 'المترادفات / الأضداد', 'المترادفات', 'الأضداد'],
+  da: [
+    'Forbind hvert ord med et ord, der betyder det samme.',
+    'Forbind hvert ord med et ord, der betyder det modsatte.',
+    'Synonymer / modsætninger',
+    'Synonymer',
+    'Modsætninger'
+  ],
+  el: [
+    'Αντιστοίχισε κάθε λέξη με μια λέξη που έχει την ίδια σημασία.',
+    'Αντιστοίχισε κάθε λέξη με μια λέξη που έχει την αντίθετη σημασία.',
+    'Συνώνυμα / αντώνυμα',
+    'Συνώνυμα',
+    'Αντώνυμα'
+  ]
+}
+
+/** Gemischte Fassung für Englisch und die Altsprachen (die übrigen Sprachen stehen in TEXTE) */
+const SYNONYM_GEMISCHT: Record<string, [title: string, instruction: string]> = {
+  en: ['Synonyms and opposites', 'Match each word with a word that has the same (=) or the opposite (≠) meaning.'],
+  de: ['Synonyme und Gegenteile', 'Ordne jedem Wort ein Wort mit gleicher (=) oder entgegengesetzter (≠) Bedeutung zu.']
+}
+
+const SYNONYM_SIE: [string, string, string, string, string] = [
+  'Ordnen Sie jedem Wort ein Wort mit gleicher Bedeutung zu.',
+  'Ordnen Sie jedem Wort ein Wort mit entgegengesetzter Bedeutung zu.',
+  'Synonyme / Gegenteile',
+  'Synonyme',
+  'Gegenteile'
+]
+const SYNONYM_GEMISCHT_SIE: [string, string] = [
+  'Synonyme und Gegenteile',
+  'Ordnen Sie jedem Wort ein Wort mit gleicher (=) oder entgegengesetzter (≠) Bedeutung zu.'
+]
+
+const synonymSprache = (sprache: string): string => (sprache === 'la' || sprache === 'grc' ? 'de' : SYNONYM_TEXTE[sprache] ? sprache : 'en')
+
+/**
+ * Überschrift, Anweisung und Spaltenköpfe der Synonym-/Gegenteil-Aufgabe passend zu dem, was
+ * gefragt ist. Bei „gemischt" steht hinter jedem Wort (=) oder (≠) – das erklärt die Anweisung.
+ */
+export function synonymTexte(
+  sprache: string,
+  art: SynonymArt,
+  /** Sie-Form (Altsprachen in der Oberstufe, Paket 8b) */
+  sie = false
+): { title: string; instruction: string; leftLabel: string; rightLabel: string } {
+  const s = synonymSprache(sprache)
+  const t = s === 'de' && sie ? SYNONYM_SIE : SYNONYM_TEXTE[s]
+  const gemischt = s === 'de' && sie ? SYNONYM_GEMISCHT_SIE : (TEXTE[s]?.synonymsAntonyms ?? SYNONYM_GEMISCHT[s] ?? SYNONYM_GEMISCHT.en)
+  const leftLabel = s === 'de' ? 'Wörter' : zuordnungsKoepfe(s)[1]
+  if (art === 'gleich') return { title: t[3], instruction: t[0], leftLabel, rightLabel: t[3] }
+  if (art === 'gegenteil') return { title: t[4], instruction: t[1], leftLabel, rightLabel: t[4] }
+  return { title: gemischt[0], instruction: gemischt[1], leftLabel, rightLabel: t[2] }
+}
+
+/** Alle Sprachen mit Synonym-Texten – für die Tests */
+export const SYNONYM_SPRACHEN = Object.keys(SYNONYM_TEXTE)
+
+/*
+ * Mindmap (02.10.2026): Die Anweisung hängt an der Form – bei vorgegebenen Oberbegriffen tragen
+ * die Lernenden die Wörter am passenden Ast ein, bei der offenen Form schreiben sie zusätzlich
+ * selbst eine Überschrift auf jeden Ast. [mit Oberbegriffen, ganz offen]
+ */
+const MINDMAP_ANWEISUNG: Record<string, [oberbegriffe: string, offen: string]> = {
+  en: [
+    'Write the words you have learned about this topic on the lines of the matching branch.',
+    'Organise the words you have learned about this topic: write a heading on each branch and the matching words on its lines.'
+  ],
+  de: [
+    'Trage die gelernten Wörter zu diesem Thema auf den Linien des passenden Astes ein.',
+    'Ordne die gelernten Wörter zu diesem Thema: Schreibe auf jeden Ast eine Überschrift und auf seine Linien die passenden Wörter.'
+  ],
+  fr: [
+    'Écris les mots que tu as appris sur ce thème sur les lignes de la bonne branche.',
+    'Organise les mots que tu as appris sur ce thème : écris un titre sur chaque branche et les mots qui vont avec sur ses lignes.'
+  ],
+  es: [
+    'Escribe las palabras que has aprendido sobre este tema en las líneas de la rama correcta.',
+    'Organiza las palabras que has aprendido sobre este tema: escribe un título en cada rama y las palabras correspondientes en sus líneas.'
+  ],
+  it: [
+    'Scrivi le parole che hai imparato su questo tema sulle righe del ramo giusto.',
+    'Organizza le parole che hai imparato su questo tema: scrivi un titolo su ogni ramo e le parole che ci vanno sulle sue righe.'
+  ],
+  nl: [
+    'Schrijf de woorden die je over dit onderwerp hebt geleerd op de regels van de juiste tak.',
+    'Orden de woorden die je over dit onderwerp hebt geleerd: schrijf op elke tak een kopje en de bijpassende woorden op de regels.'
+  ],
+  ru: [
+    'Впиши слова по этой теме, которые ты знаешь, на строчки нужной ветки.',
+    'Распредели слова по этой теме: напиши на каждой ветке заголовок, а на её строчках — подходящие слова.'
+  ],
+  pl: [
+    'Wpisz poznane wyrazy na ten temat na linie właściwej gałęzi.',
+    'Uporządkuj poznane wyrazy na ten temat: na każdej gałęzi napisz nagłówek, a na jej liniach pasujące wyrazy.'
+  ],
+  cs: [
+    'Napiš slova k tomuto tématu, která už znáš, na řádky správné větve.',
+    'Uspořádej slova k tomuto tématu: na každou větev napiš nadpis a na její řádky slova, která k němu patří.'
+  ],
+  pt: [
+    'Escreve as palavras que aprendeste sobre este tema nas linhas do ramo certo.',
+    'Organiza as palavras que aprendeste sobre este tema: escreve um título em cada ramo e as palavras correspondentes nas suas linhas.'
+  ],
+  tr: [
+    'Bu konuda öğrendiğin kelimeleri doğru dalın satırlarına yaz.',
+    'Bu konuda öğrendiğin kelimeleri düzenle: her dala bir başlık, satırlarına da uygun kelimeleri yaz.'
+  ],
+  zh: ['把学过的有关这个话题的词语写在对应分支的横线上。', '整理学过的有关这个话题的词语：在每个分支上写一个小标题，再把相应的词语写在横线上。'],
+  ja: [
+    'このテーマについて習ったことばを、合う枝の線の上に書いてください。',
+    'このテーマについて習ったことばを整理してください。それぞれの枝に見出しを書き、合うことばを線の上に書いてください。'
+  ],
+  ar: [
+    'اكتب الكلمات التي تعلمتها عن هذا الموضوع على أسطر الفرع المناسب.',
+    'نظّم الكلمات التي تعلمتها عن هذا الموضوع: اكتب عنوانًا على كل فرع والكلمات المناسبة على أسطره.'
+  ],
+  da: [
+    'Skriv de ord, du har lært om emnet, på linjerne ved den rigtige gren.',
+    'Ordn de ord, du har lært om emnet: skriv en overskrift på hver gren og de ord, der passer til den, på linjerne.'
+  ],
+  el: [
+    'Γράψε τις λέξεις που έμαθες γι’ αυτό το θέμα στις γραμμές του σωστού κλαδιού.',
+    'Οργάνωσε τις λέξεις που έμαθες γι’ αυτό το θέμα: γράψε έναν τίτλο σε κάθε κλαδί και τις λέξεις που ταιριάζουν στις γραμμές του.'
+  ]
+}
+
+/** Anweisung der Mindmap in der Testsprache für die gewählte Form (Latein/Griechisch deutsch) */
+export function mindmapAnweisung(sprache: string, variante: 'oberbegriffe' | 'offen', sie = false): string {
+  const s = sprache === 'la' || sprache === 'grc' ? 'de' : MINDMAP_ANWEISUNG[sprache] ? sprache : 'en'
+  return (s === 'de' && sie ? MINDMAP_SIE : MINDMAP_ANWEISUNG[s])[variante === 'offen' ? 1 : 0]
+}
+
+const MINDMAP_SIE: [string, string] = [
+  'Tragen Sie die gelernten Wörter zu diesem Thema auf den Linien des passenden Astes ein.',
+  'Ordnen Sie die gelernten Wörter zu diesem Thema: Schreiben Sie auf jeden Ast eine Überschrift und auf seine Linien die passenden Wörter.'
+]
+
+/** Alle Fassungen einer Mindmap-Anweisung – zum Erkennen, ob die Lehrkraft sie geändert hat */
+export const MINDMAP_ANWEISUNGEN: string[] = [
+  ...Object.values(MINDMAP_ANWEISUNG).flat(),
+  ...MINDMAP_SIE,
+  // frühere Fassungen („in die leeren Äste") – bis 01.10.2026 erzeugte Blöcke
+  ...Object.values(TEXTE).flatMap((t) => (t.mindmap ? [t.mindmap[1]] : [])),
+  'Write the words you have learned about this topic into the empty branches.'
+]
+
+/** Alle Sprachen mit Mindmap-Anweisungen – für die Tests */
+export const MINDMAP_SPRACHEN = Object.keys(MINDMAP_ANWEISUNG)

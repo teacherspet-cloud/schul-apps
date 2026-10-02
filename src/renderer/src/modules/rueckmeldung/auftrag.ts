@@ -20,6 +20,7 @@ import {
 import { fremdsprachlich, spracheErgaenzen, teileAusKi } from './teilbewertung'
 import { bogenAnfrage, bogenAus, ohneNamen, transkriptAnfrage, transkriptUebernehmen, type BogenKontext } from './generation'
 import type { Abgabe, Bewertungstabelle, Rueckmeldung } from './model/types'
+import type { RueckmeldungsStand } from './steps/RueckmeldungVorschau'
 import { bibliothek } from './store'
 import { useAppSettings } from '../../shared/settingsStore'
 import { thresholdsForSubject } from '../../shared/gradeScale'
@@ -97,6 +98,10 @@ export function rueckmeldungenErzeugen(r: Rueckmeldung, docId: string): void {
           const anonym = { ...a, text }
           const bogen = bogenAus(await k.ai<unknown>(bogenAnfrage(rm, anonym, rueckmeldungSystem(rm), ctx)), rm, anonym, ctx)
           fertig.set(a.id, { ...a, pseudonyme, bogen })
+          // Live-Vorschau (02.10.2026): jeder Bogen, sobald er geschrieben ist
+          k.zeige({ r: { ...rm, abgaben: rm.abgaben.map((x) => fertig.get(x.id) ?? x) }, fertig: [...fertig.keys()] } satisfies RueckmeldungsStand, {
+            was: `${a.kuerzel}: Rückmeldung steht (${fertig.size} von ${offen.length})`
+          })
         } catch (e) {
           if ((e as { name?: string })?.name === 'AbortError') throw e
           fehler.push(`${roh.kuerzel}: ${e instanceof Error ? e.message : String(e)}`)

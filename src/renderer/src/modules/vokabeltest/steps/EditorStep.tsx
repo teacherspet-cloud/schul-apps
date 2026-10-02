@@ -39,7 +39,8 @@ import { standardMaskottchen, useMaskottchen } from '../../../shared/maskottchen
 import { vokabeltestFigurVorschlag } from '../render/maskottchen'
 import { canRegenerateItem, createAdditionalBlock, regenerateBlock, regenerateItem } from '../generation/edit'
 import { pictureOptions } from '../generation/pictureOptions'
-import { TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
+import { mindmapAnweisungFuer, TASK_TYPE_LIST, TASK_TYPES } from '../generation/taskTypes'
+import { MINDMAP_ANWEISUNGEN } from '../render/aufgabenTexte'
 import { blockPoints, formatPoints, variantPoints } from '../model/blocks'
 import type { Block, TaskTypeId, TestDocument } from '../model/types'
 import { buildPrintHtml, imageCredits } from '../render/printHtml'
@@ -520,6 +521,46 @@ function BlockSettings({ block, doc, variantId }: { block: Block; doc: TestDocum
               checked={block.askCorrection}
               onChange={(e) => apply((b) => b.kind === 'trueFalse' && (b.askCorrection = e.currentTarget.checked))}
             />
+          )}
+          {block.kind === 'mindmap' && (
+            <>
+              {/* Mindmap (02.10.2026): beide Formen wählbar – die Oberbegriffe sind schon da, kein neuer KI-Aufruf */}
+              <Select
+                size="xs"
+                label="Form der Mindmap"
+                data={[
+                  { value: 'oberbegriffe', label: 'Äste mit Oberbegriffen' },
+                  { value: 'offen', label: 'Ganz offen (Äste selbst beschriften)' }
+                ]}
+                value={block.variante ?? 'offen'}
+                allowDeselect={false}
+                onChange={(v) =>
+                  v &&
+                  apply((b) => {
+                    if (b.kind !== 'mindmap') return
+                    const variante = v as 'oberbegriffe' | 'offen'
+                    b.variante = variante
+                    // Unveränderte Standardanweisung zieht mit; eine eigene Formulierung der Lehrkraft bleibt
+                    if (!b.instruction.trim() || MINDMAP_ANWEISUNGEN.includes(b.instruction.trim())) {
+                      b.instruction = mindmapAnweisungFuer(doc.settings, variante)
+                    }
+                  })
+                }
+                description={
+                  (block.variante ?? 'offen') === 'oberbegriffe' && (block.branches ?? []).filter((x) => x.label.trim()).length < 2
+                    ? 'Für diese Aufgabe liegen keine Oberbegriffe vor – bitte neu erzeugen.'
+                    : undefined
+                }
+              />
+              {block.variante === 'oberbegriffe' && (
+                <Switch
+                  size="xs"
+                  label="Freier Ast für eigene Wörter"
+                  checked={Boolean(block.freierAst)}
+                  onChange={(e) => apply((b) => b.kind === 'mindmap' && (b.freierAst = e.currentTarget.checked))}
+                />
+              )}
+            </>
           )}
           {block.kind === 'oddOneOut' && (
             <Switch

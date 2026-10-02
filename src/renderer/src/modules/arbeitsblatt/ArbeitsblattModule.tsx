@@ -23,6 +23,8 @@ import { useUndoKeys } from '../../shared/useUndoKeys'
 import { useDokumentOeffner, useNeuAnleger, useZielZeiger } from '../../shared/navigation'
 import { useRueckfrage, useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
+import { GeruestVorschau, MaterialVorschau, ZwischenstandsBlatt } from './render/BlattVorschau'
+import type { OriginalMaterialAblage, Outline, Worksheet } from './model/types'
 import QuellenAuswahl from './steps/QuellenAuswahl'
 import { QUELLENAUSWAHL, type QuellenFrage } from './auftraege'
 
@@ -148,7 +150,18 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
             onZurueck={() => setLibrary(false)}
           />
         ) : auftrag ? (
-          <AuftragsHinweis auftrag={auftrag} neuLabel="Neues Arbeitsblatt" onNeu={startNew} />
+          <AuftragsHinweis
+            auftrag={auftrag}
+            neuLabel="Neues Arbeitsblatt"
+            onNeu={startNew}
+            // Live-Vorschau (02.10.2026): beim Planen das gefundene Material, beim Ausformulieren das Blatt
+            vorschau={(z) => {
+              const stand = z.stand as { sheets?: unknown; material?: OriginalMaterialAblage; geruest?: Outline }
+              if (stand.sheets) return <ZwischenstandsBlatt<Worksheet> z={z} alsBlatt={(ws) => ws} />
+              if (stand.geruest) return <GeruestVorschau outline={stand.geruest} />
+              return stand.material ? <MaterialVorschau material={stand.material} /> : null
+            }}
+          />
         ) : (
           <>
             {step === 0 && <TopicStep />}

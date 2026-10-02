@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { STANDARD_ANREDE } from './render/texte'
 import { useAppSettings } from '../../shared/settingsStore'
 import EinfacheBibliothek from '../../shared/testmodul/EinfacheBibliothek'
+import { RueckmeldungVorschau } from './steps/RueckmeldungVorschau'
 import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testmodul/ZweiSchrittModul'
 import { notifyError } from '../../shared/util'
 import { subjectById } from '../arbeitsblatt/model/subjects'
@@ -104,6 +105,8 @@ export default function RueckmeldungModule({ active }: { active: boolean }): Rea
       einstellen={<Einrichten />}
       bearbeiten={() => <Boegen />}
       texte={{ meine: 'Meine Rückmeldungen', neu: 'Neue Rückmeldung' }}
+      // Live-Vorschau (02.10.2026): jeder Bogen, sobald er geschrieben ist
+      vorschau={(z) => <RueckmeldungVorschau z={z} />}
     />
   )
 }

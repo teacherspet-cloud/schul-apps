@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { sehverstehenMitVideo } from '../didactics/sehtext'
 import { wunschAuftrag, type WunschArt } from '../../../shared/kiWunsch'
 import { setzeVersuchEin } from '../didactics/protokoll'
 import type { StructuredRequest } from '@shared/types'
@@ -6,7 +7,7 @@ import { runLimited } from '../../../shared/async'
 import { obj, str } from '../../../shared/aiSchema'
 import { plainText } from '../../../shared/richtext/parse'
 import { createRng, newId, randomSeed } from '../../vokabeltest/model/random'
-import { checkIntegrity, checkListening, checkVideo, verschluesseleMaterialverweise } from '../didactics/integrity'
+import { checkIntegrity, checkListening, checkVideo, setzeVideoAdresse, verschluesseleMaterialverweise } from '../didactics/integrity'
 import { markiereLoesungsbausteine } from '../didactics/loesungsteil'
 import { lernzieleFormulieren } from './lernziele'
 import { useThemen } from '../../../shared/themenbereiche'
@@ -40,6 +41,7 @@ import {
   taskContext
 } from './prompts'
 import { FLAT_BLOCK, OUTLINE_SCHEMA, REVIEW_SCHEMA, WORKSHEET_SCHEMA } from './schemas'
+import { antwortRaumAnwenden, antwortRaumUebersicht, schreibRegelFuerMeta, schreibraumRichtwerte, type AntwortRaumVorschlag } from '../didactics/schreibraum'
 import { seitenPlanAus, seitenPlanRegeln } from '../didactics/seiten'
 import { linkListeningTasks, scriptForSheet, wantsListening, writeListeningScripts } from './listening'
 import type { ListeningScript } from './listening'
@@ -368,8 +370,9 @@ export async function reviewSheet(
   sheet: Sheet,
   profile: LearnerProfile,
   ai: AiCall
-): Promise<{ blockNumber: number; severity: string; problem: string }[]> {
-  const res = await ai<{ problems: { blockNumber: number; severity: string; problem: string }[] }>({
+): Promise<{ problems: { blockNumber: number; severity: string; problem: string }[]; answerSpace: AntwortRaumVorschlag[] }> {
+  const regel = schreibRegelFuerMeta(ws.meta)
+  const res = await ai<{ problems: { blockNumber: number; severity: string; problem: string }[]; answerSpace?: AntwortRaumVorschlag[] }>({
     system: systemPrompt(ws.meta, profile),
     user: [
       'Prüfe dieses Arbeitsblatt wie eine erfahrene Fachleitung. Melde NUR echte Probleme:',
@@ -379,6 +382,10 @@ export async function reviewSheet(
       '- falsch eingeordneter Anforderungsbereich oder unpassender Operator',
       '- fehlender Lebensweltbezug bzw. unpassende Beispiele für die Schulform',
       'severity „hoch“ = muss korrigiert werden, „mittel“ = Hinweis für die Lehrkraft. Leere Liste, wenn alles passt.',
+      // Schreibraum (02.10.2026): eigenes Feld statt Problem – die App übernimmt die Maße direkt (didactics/schreibraum.ts)
+      'SCHREIBRAUM (Feld answerSpace, NICHT in problems): Prüfe jede Antwortfläche (Schreiblinien, freie Fläche, Ausfülltabelle), ob sie für ihre Funktion und die Altersgruppe groß genug ist – ein Wort, Stichpunkte, ganze Sätze oder eine Begründung brauchen unterschiedlich viel Platz. Melde nur zu kleine Flächen mit den nötigen Maßen; die App vergrößert sie.',
+      schreibraumRichtwerte(regel),
+      antwortRaumUebersicht(sheet, regel),
       sheet.stars ? `Niveaustufe dieser Fassung: ${STAR_LABELS[sheet.stars]} (${stufeText(stufeFuer(ws.meta, sheet.stars))}).` : '',
       describeSheet(sheet)
     ]
@@ -387,7 +394,7 @@ export async function reviewSheet(
     schemaName: 'worksheet_review',
     schema: REVIEW_SCHEMA
   })
-  return Array.isArray(res?.problems) ? res.problems : []
+  return { problems: Array.isArray(res?.problems) ? res.problems : [], answerSpace: Array.isArray(res?.answerSpace) ? res.answerSpace : [] }
 }
 
 /**
@@ -541,6 +548,8 @@ export interface GenerateOptions {
   onProgress?: Progress
   /** Sparmodus: eine Anfrage je Niveaustufe (parallel), ohne KI-Prüfrunde (nur lokale Prüfungen) */
   combined?: boolean
+  /** Live-Vorschau (02.10.2026, shared/zwischenstand.ts): das Blatt nach jedem Schritt jeder Niveaustufe */
+  zwischenstand?: (ws: Worksheet, was: string) => void
 }
 
 function addSheetWarnings(sheet: Sheet, profile: LearnerProfile, meta?: WorksheetMeta): Sheet {
@@ -593,11 +602,23 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
    * dadurch still und sprang danach. Jetzt zählen Hörtexte und Niveaufassungen in derselben
    * Einheit.
    */
-  const scriptCount = wantsListening(meta) ? listeningCount(meta) : 0
+  // Hör-/Sehverstehen mit Video (02.10.2026): das Video ist der Text, ein Hörtext entsteht nicht
+  const mitHoertext = wantsListening(meta) && !sehverstehenMitVideo(meta)
+  const scriptCount = mitHoertext ? listeningCount(meta) : 0
   const perLevel = opts.combined ? 1 : opts.review ? 3 : 1
   const total = scriptCount + levels.length * perLevel
   let done = 0
   const step = (msg: string): void => opts.onProgress?.(msg, done, total)
+  /*
+   * Vorschau: der jüngste Stand jeder Niveaustufe (die Stufen laufen gleichzeitig). Material und
+   * Lehrkraft-Hinweis sind dieselben wie am Ende; Stufen ohne Stand fehlen noch.
+   */
+  const stand: (Sheet | null)[] = levels.map(() => null)
+  const zeige = (i: number, sheet: Sheet, was: string): void => {
+    if (!opts.zwischenstand) return
+    stand[i] = sheet
+    opts.zwischenstand({ ...ws, sheets: stand.filter((s): s is Sheet => s !== null) }, levels.length > 1 ? `${STAR_LABELS[levels[i]!]}: ${was}` : was)
+  }
 
   /*
    * Den beschafften Originaltext setzt die APP ein, nicht die KI.
@@ -616,7 +637,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
    */
   const mitMaterial = (sheet: Sheet): Sheet => {
     // Versuchsprotokoll (29.09.2026): Die App setzt den ausgearbeiteten Versuch selbst ein (didactics/protokoll.ts)
-    const mitVersuch = setzeVersuchEin(sheet, meta)
+    const mitVersuch = setzeVideoAdresse(setzeVersuchEin(sheet, meta), meta)
     const mit = ws.originalMaterial ? setzeMaterialEin(mitVersuch, ws.originalMaterial, meta, newId) : mitVersuch
     // Gespeichert werden KENNUNGEN: Schreibt die KI trotzdem „M2", wird daraus die Kennung des Materials, das jetzt M2 ist.
     // Erst jetzt, wo alle Materialien an ihrem Platz stehen – auch der eingesetzte Ausgangstext. Die Nummern entstehen beim Darstellen.
@@ -645,7 +666,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
   // Modell. Erst danach werden die Aufgaben dazu geschrieben. Bei mehreren Niveaustufen hören
   // alle denselben Text; unterschieden wird über die Aufgaben.
   let scripts: ListeningScript[] = []
-  if (wantsListening(meta)) {
+  if (mitHoertext) {
     try {
       scripts = await writeListeningScripts(meta, profile, opts.ai, { provider: meta.audioProvider, model: meta.audioModel }, (i, n) =>
         opts.onProgress?.(n > 1 ? `Hörtext ${i + 1} von ${n} wird geschrieben …` : 'Der Hörtext wird geschrieben …', i, total)
@@ -666,11 +687,12 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     let finished = 0
     opts.onProgress?.(`${levels.length > 1 ? `${levels.length} Niveaustufen werden gleichzeitig` : 'Das Arbeitsblatt wird'} ausformuliert …`, done, total)
     const sheets = await runLimited(
-      levels.map((level) => async () => {
+      levels.map((level, i) => async () => {
         const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
         const stufe = stufeFuer(meta, level)
         const profil = profilFuerStufe(profile, stufe)
         let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts))
+        zeige(i, sheet, 'ausformuliert')
         /*
          * Auch im Sparmodus: Die Vollständigkeitsprüfungen laufen und bessern einmal nach.
          *
@@ -680,30 +702,34 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
          * Sind keine schweren Befunde da, kostet das auch keine einzige Anfrage.
          */
         sheet = await repairSheet(ws, sheet, profil, opts.ai, () => undefined, label)
+        zeige(i, sheet, 'Vollständigkeit geprüft')
         // Sprache nachmessen und bei Abweichung umschreiben lassen (Entscheidung der Lehrkraft: automatisch)
         sheet = await lesbarkeitAngleichen(meta, sheet, profil, stufe, opts.ai)
+        zeige(i, sheet, 'Sprache angeglichen')
         // Ankreuzfragen zu Texten: Blindprobe ohne Text (01.10.2026) – auch im Sparmodus, sie ist eine Prüfung, keine Prüfrunde
         sheet = await mitBlindprobe(sheet, opts.ai)
+        zeige(i, sheet, 'Ankreuzfragen geprüft')
         finished++
         opts.onProgress?.(`${label} fertig (${finished} von ${levels.length})`, done + finished, total)
         return addSheetWarnings(sheet, profil, meta)
       }),
       3
     )
-    return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }, opts.ai)
+    return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai)
   }
 
   const sheets = await runLimited(
-    levels.map((level) => async () => {
+    levels.map((level, i) => async () => {
       const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
       const stufe = stufeFuer(meta, level)
       const profil = profilFuerStufe(profile, stufe)
       step(`${label}: wird ausformuliert …`)
       let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts))
+      zeige(i, sheet, 'ausformuliert')
       done++
       if (opts.review) {
         step(`${label}: wird geprüft …`)
-        const problems = await reviewSheet(ws, sheet, profil, opts.ai)
+        const { problems, answerSpace } = await reviewSheet(ws, sheet, profil, opts.ai)
         done++
         const severe = problems.filter((p) => p.severity === 'hoch' && p.blockNumber > 0 && p.blockNumber <= sheet.blocks.length)
         step(`${label}: ${severe.length ? `${severe.length} Baustein(e) werden verbessert …` : 'keine Korrekturen nötig'}`)
@@ -714,6 +740,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
           [...byBlock.entries()].map(([num, msgs]) => async () => {
             try {
               blocks[num - 1] = await regenerateBlock({ ...ws, sheets: [sheet] }, sheet, sheet.blocks[num - 1].id, profil, opts.ai, msgs.join(' '))
+              zeige(i, { ...sheet, blocks: [...blocks] }, `Baustein ${num} verbessert`)
             } catch {
               blocks[num - 1] = { ...blocks[num - 1], warnings: [...(blocks[num - 1].warnings ?? []), ...msgs] }
             }
@@ -726,15 +753,20 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
           const b = sheet.blocks[p.blockNumber - 1]
           if (b) b.warnings = [...(b.warnings ?? []), `[KI-Hinweis] ${p.problem}`]
         }
+        // Schreibraum (02.10.2026): Regel + Maße der Prüfrunde übernehmen – nur vergrößern
+        sheet = antwortRaumAnwenden(sheet, answerSpace, schreibRegelFuerMeta(ws.meta))
         done++
       }
       // Vollständigkeit: tote Materialverweise, leeres Material, gleiche Reihenfolge in
       // Vergleichslisten. Läuft auf beiden Wegen – der Sparmodus tut dasselbe weiter oben.
       sheet = await repairSheet(ws, sheet, profil, opts.ai, step, label)
+      zeige(i, sheet, 'Vollständigkeit geprüft')
       // Sprache nachmessen und bei Abweichung umschreiben lassen (Entscheidung der Lehrkraft: automatisch)
       sheet = await lesbarkeitAngleichen(meta, sheet, profil, stufe, opts.ai, (m) => step(`${label}: ${m}`))
+      zeige(i, sheet, 'Sprache angeglichen')
       // Ankreuzfragen zu Texten: Blindprobe ohne Text, Lösbares neu fassen (01.10.2026)
       sheet = await mitBlindprobe(sheet, opts.ai, (m) => step(`${label}: ${m}`))
+      zeige(i, sheet, 'Ankreuzfragen geprüft')
       const sheetWarnings = localChecks(sheet, profil, ws.meta)
       if (sheetWarnings.length && sheet.blocks[0]) {
         sheet.blocks[0].warnings = [...(sheet.blocks[0].warnings ?? []), ...sheetWarnings.map((w) => `[Blatt] ${w.message}`)]
@@ -744,7 +776,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     3
   )
 
-  return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets) }, opts.ai)
+  // Nachbesserungen erzeugen Bausteine neu – die Adresse des Videos geht dabei wieder verloren
+  return mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai)
 }
 
 /**

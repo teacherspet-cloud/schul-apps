@@ -56,7 +56,12 @@ const messen = async () =>
         if (!rahmen) return 0
         const unten = rahmen.getBoundingClientRect().bottom
         const teile = [...rahmen.querySelectorAll('.ws-paragraph, .ws-block')]
-        return Math.round(Math.max(0, ...teile.map((t) => t.getBoundingClientRect().bottom)) - unten)
+        // Zeilenweise geteilter Absatz (02.10.2026): nur der sichtbare Teil im Rahmen zählt
+        const sichtbarUnten = (t) => {
+          const s = t.closest('.ws-zeilen-schnitt')
+          return s ? Math.min(t.getBoundingClientRect().bottom, s.getBoundingClientRect().bottom) : t.getBoundingClientRect().bottom
+        }
+        return Math.round(Math.max(0, ...teile.map(sichtbarUnten)) - unten)
       }),
       /*
        * Zerrissene Bausteine: Ein Teilstueck mit einem einzigen Absatz ist im Buchsatz ein
@@ -123,8 +128,12 @@ for (const [name, m] of [
   ['ohne Notizrand', ohne],
   ['mit Notizrand', mit]
 ]) {
-  const duenn = m.stuecke.filter((n) => n === 1).length
-  pruefe(m.stuecke.length > 1 && duenn === 0, `${name}: kein Textstück steht mit einem einzelnen Absatz allein (Absätze je Stück: ${m.stuecke.join('/')})`)
+  /*
+   * Seit 01.10.2026 gilt keine Mindestzahl mehr (Entscheidung der Lehrkraft), seit 02.10.2026 wird
+   * sogar zwischen Zeilen geteilt – ein Stück mit einem (Teil-)Absatz ist also gewollt. Geprüft wird
+   * nur noch, dass der Text überhaupt geteilt wird, statt ganz auf die nächste Seite zu wandern.
+   */
+  pruefe(m.stuecke.length > 1, `${name}: der Text wird geteilt statt verschoben (Absätze je Stück: ${m.stuecke.join('/')})`)
 }
 
 const seiten = page.locator('.ws-editor-pages .ws-page')

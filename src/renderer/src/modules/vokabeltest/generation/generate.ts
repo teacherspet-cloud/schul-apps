@@ -37,6 +37,8 @@ export interface GenerateOptions {
   combined?: boolean
   /** Wortschatz aus früheren Units und Bänden: begrenzt die Sätze der KI */
   known?: KnownVocab
+  /** Live-Vorschau (02.10.2026, shared/zwischenstand.ts): der Test nach jeder fertigen Aufgabe */
+  zwischenstand?: (doc: TestDocument, was: string) => void
 }
 
 export function languageName(code: string): string {
@@ -133,12 +135,12 @@ export async function generateBlock(
   const words = vocab.map((v) => v.term)
 
   let block = await produce(hinweis)
-  let issues = checkBlock(block, vocab).filter((i) => block.kind !== 'picture' || !i.message.startsWith('Kein Bild'))
+  let issues = checkBlock(block, vocab, ctx.settings.targetLanguage, ctx.allVocab).filter((i) => block.kind !== 'picture' || !i.message.startsWith('Kein Bild'))
   if (aiReview) issues = [...issues, ...(await reviewBlock(block, ctx.settings, opts.ai, words, ctx.known))]
 
   if (issues.length > 0 && def.schema) {
     block = await produce(issues.map(formatIssue).join('\n'))
-    issues = checkBlock(block, vocab)
+    issues = checkBlock(block, vocab, ctx.settings.targetLanguage, ctx.allVocab)
     if (aiReview) {
       // Zweite Prüfung: Was dann noch mehrdeutig ist, bekommt den Anfangsbuchstaben als Hilfe
       const remaining = await reviewBlock(block, ctx.settings, opts.ai, words, ctx.known)
@@ -215,8 +217,8 @@ export function formHinweise(block: Block, vocab: VocabEntry[], ctx: Pick<GenCon
   return formBefunde(block, vocab, formVorwissen(ctx.settings, ctx.known)).map(formatIssue)
 }
 
-const localIssues = (block: Block, vocab: VocabEntry[]): Issue[] =>
-  checkBlock(block, vocab).filter((i) => block.kind !== 'picture' || !i.message.startsWith('Kein Bild'))
+const localIssues = (block: Block, vocab: VocabEntry[], ctx?: GenContext): Issue[] =>
+  checkBlock(block, vocab, ctx?.settings.targetLanguage, ctx?.allVocab).filter((i) => block.kind !== 'picture' || !i.message.startsWith('Kein Bild'))
 
 /**
  * Sparmodus: alle Aufgaben einer Variante in einer einzigen Anfrage.
@@ -254,7 +256,7 @@ export async function generateVariantCombined(
     } catch {
       block = null
     }
-    let issues = block ? localIssues(block, p.vocab) : []
+    let issues = block ? localIssues(block, p.vocab, ctx) : []
     // Nur fehlerhafte Aufgaben einzeln wiederholen (eine Anfrage, ohne weitere KI-Prüfung)
     if ((!block || issues.length > 0) && p.def.schema && p.def.prompt && p.vocab.length > 0 && (p.def.needsAi?.(p.vocab, ctx) ?? true)) {
       const retry = await opts.ai({
@@ -265,7 +267,7 @@ export async function generateVariantCombined(
         schema: p.def.schema
       })
       block = p.def.build(p.vocab, retry, ctx)
-      issues = localIssues(block, p.vocab)
+      issues = localIssues(block, p.vocab, ctx)
     }
     if (!block) block = p.def.build(p.vocab, {}, ctx)
     blocks.push(await finishBlock(block, p.vocab, ctx, opts, issues))
@@ -303,6 +305,7 @@ export async function reviewVariant(blocks: Block[], settings: TestSettings, ai:
       '- an instruction does not make clear what students have to do',
       `- language clearly above level ${settings.level}`,
       FORM_PRUEFUNG,
+      ABLENKER_PRUEFUNG,
       '- a task refers to material or a word list that is not part of the test',
       'taskNumber is the number of the task (starting at 1). Return an empty list if everything is fine.',
       '',
@@ -342,6 +345,15 @@ export function addFirstLetterHint(block: Block, itemNumber?: number): boolean {
   return false
 }
 
+/*
+ * Prüfpunkte Ablenker und Beziehungen (02.10.2026, Befund der Lehrkraft): Ablenker, die schon an
+ * Wortart oder Form als falsch zu erkennen sind, und Synonym-/Gegenteil-Paare mit falschem
+ * Zeichen fielen in der Prüfung nicht auf – die Liste fragte nur nach Eindeutigkeit.
+ */
+export const ABLENKER_PRUEFUNG =
+  '- multiple choice options or extra words in a word box: a distractor can be ruled out by its form alone (different word class, tense, person, number, gender/article or "to" that does not fit the gap), or is obviously absurd at first glance – all options must have the same word class and form, be plausible, and only ONE may fit by meaning/collocation\n' +
+  '- synonyms/opposites: the mark (= same meaning, ≠ opposite meaning) is wrong, or the partner is not a real synonym/antonym'
+
 /** Prüfpunkt Wortformen: Befund, wenn eine Aufgabe eine noch nicht eingeführte Form verlangt (VORWISSEN DER KLASSE) */
 export const FORM_PRUEFUNG =
   '- an item requires a word form the class has not learned yet (see VORWISSEN DER KLASSE, e.g. a past tense or a derived word in early learning years) – name the form and suggest the base form or a form given in brackets'
@@ -359,6 +371,7 @@ export async function reviewBlock(block: Block, settings: TestSettings, ai: AiCa
       '- the instruction does not make clear what students have to do\n' +
       `- language clearly above level ${settings.level}\n` +
       `${FORM_PRUEFUNG}\n` +
+      `${ABLENKER_PRUEFUNG}\n` +
       'Use itemNumber 0 for problems concerning the whole task. Return an empty list if everything is fine.\n\n' +
       (words.length ? `Words tested in this task: ${words.join(', ')}\n\n` : '') +
       describeBlock(block),
@@ -402,6 +415,25 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
 
   const plans = planVariants(vocab, settings)
   const ctx: GenContext = { settings, languageName: languageName(settings.targetLanguage), rng, allVocab: vocab, known: opts.known }
+  /*
+   * Vorschau: die fertigen Aufgaben jeder Variante in der geplanten Reihenfolge (sie entstehen
+   * gleichzeitig und kommen durcheinander an). Die Varianten tragen vorläufige Kennungen.
+   */
+  const vorlaeufig = plans.map((p, vi) => ({ id: `vorschau-${vi}`, label: p.label }))
+  const fertig = plans.map((p) => p.assignments.map((): Block | null => null))
+  const zeige = (was: string): void =>
+    opts.zwischenstand?.(
+      {
+        version: 1,
+        header,
+        settings,
+        vocab,
+        variants: vorlaeufig.map((v, vi) => ({ ...v, blocks: fertig[vi].filter((b): b is Block => b !== null) })),
+        fontSize: 12,
+        createdAt: ''
+      },
+      was
+    )
 
   if (opts.combined) {
     const variantJobs = plans.map((plan, vi) => async () => {
@@ -419,6 +451,8 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
       })
       done += plan.assignments.length
       progress(`Variante ${plan.label} fertig`)
+      blocks.forEach((b, i) => (fertig[vi][i] = b))
+      zeige(`Variante ${plan.label} steht`)
       return { vi, blocks }
     })
     const done2 = await runLimited(variantJobs, 2)
@@ -434,7 +468,7 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
   }
 
   const jobs = plans.flatMap((plan, vi) =>
-    plan.assignments.map((a) => async () => {
+    plan.assignments.map((a, ti) => async () => {
       progress(`Variante ${plan.label}: ${TASK_TYPES[a.task.type].label} …`)
       const block = await generateBlock(
         a.task.type,
@@ -448,6 +482,8 @@ export async function generateTest(vocabInput: VocabEntry[], settings: TestSetti
       }
       done++
       progress(`Variante ${plan.label}: ${TASK_TYPES[a.task.type].label} fertig`)
+      fertig[vi][ti] = block
+      zeige(`${plans.length > 1 ? `Variante ${plan.label}: ` : ''}${TASK_TYPES[a.task.type].label} steht`)
       return { vi, block }
     })
   )

@@ -8,6 +8,7 @@ import { AiProgressTracker, neverBackwards, overallRatio, phaseRatio, type RunPh
 import { istGeloescht, sichereAlles } from './autosave'
 import { glaetteZiel, kiKennung, merkeAnfrage, merkeAuftrag, schaetzeRest } from './restzeit'
 import { useAppSettings } from './settingsStore'
+import { useZwischenstaende, zwischenstandsMelder } from './zwischenstand'
 
 /**
  * Hintergrund-Aufträge: Material entsteht, während die Lehrkraft weiterarbeitet.
@@ -148,6 +149,11 @@ export interface AuftragsKontext {
   melde: (meldung: string, fertig?: number, gesamt?: number, abschnitt?: RunPhase) => void
   /** Eine Frage an die Lehrkraft; der Auftrag wartet auf die Antwort */
   frage: <T>(art: string, daten: unknown) => Promise<T>
+  /**
+   * Zwischenstand für die Live-Vorschau (02.10.2026, shared/zwischenstand.ts): wird kopiert und
+   * gedrosselt angezeigt, nie abgelegt. `geaendert` fehlt meist – dann vergleicht die App selbst.
+   */
+  zeige: (stand: unknown, hinweis?: { geaendert?: string[]; was?: string }) => void
 }
 
 export interface AuftragsStart<I, E> {
@@ -535,8 +541,12 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     }
   }
 
+  const vorschau = zwischenstandsMelder(id)
   const k: AuftragsKontext = {
     signal,
+    zeige: (stand, hinweis) => {
+      if (!signal.aborted) vorschau.zeige(stand, hinweis)
+    },
     ai: <T>(req: StructuredRequest) => anfrage(req.schemaName, (progressId) => window.api.ai.structured<T>({ ...req, progressId }), req),
     bild: (prompt) => anfrage('bild', (anfrageId) => window.api.ai.image(prompt, anfrageId)),
     websuche: (auftrag) => anfrage('websuche', (anfrageId) => window.api.ai.websuche(auftrag, anfrageId)),
@@ -608,6 +618,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       return null
     } finally {
       lz.beendet = true
+      vorschau.ende()
       clearInterval(takt)
       tracker.dispose()
       vergissLaufenden(id)
@@ -644,6 +655,19 @@ export const laufendeAuftraege = (): Auftrag[] => useAuftraege.getState().auftra
 /** Der Auftrag, der dieses Dokument gerade sperrt – falls einer läuft */
 export function useSperrenderAuftrag(docId: string | null | undefined): Auftrag | undefined {
   return useAuftraege((s) => (docId ? s.auftraege.find((a) => a.docId === docId && a.sperrt && laeuft(a)) : undefined))
+}
+
+/**
+ * Ein laufender, NICHT sperrender Auftrag dieses Dokuments mit Zwischenstand (Live-Vorschau,
+ * 02.10.2026) – etwa ein Tafelbild, das entsteht, während das Formular offen bleibt.
+ */
+export function useLiveAuftrag(docId: string | null | undefined): Auftrag | undefined {
+  const mitStand = useZwischenstaende((s) => Object.keys(s.staende).sort().join('|'))
+  return useAuftraege((s) => {
+    if (!docId || !mitStand) return undefined
+    const ids = new Set(mitStand.split('|'))
+    return s.auftraege.find((a) => a.docId === docId && !a.sperrt && laeuft(a) && ids.has(a.id))
+  })
 }
 
 /**

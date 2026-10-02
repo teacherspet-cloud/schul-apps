@@ -146,6 +146,8 @@ export interface MatchLeft {
   vocabId?: string
   text: string
   answerId: string
+  /** Synonyme/Gegenteile: gleiche (=) oder entgegengesetzte (≠) Bedeutung (02.10.2026, für die Prüfung) */
+  relation?: '=' | '≠'
 }
 
 export interface MatchBlock extends BlockBase {
@@ -247,12 +249,37 @@ export interface CategorizeBlock extends BlockBase {
 /**
  * Mindmap: In der Mitte steht ein Oberbegriff (z. B. „School things"), ringsum leere
  * Äste, in die die Lernenden die gelernten Vokabeln eintragen.
+ *
+ * Echte Mindmap seit 02.10.2026 (Befund der Lehrkraft: vorher nur Oberbegriff über einer
+ * nummerierten Linienliste). Zwei Formen, beide wählbar:
+ * - „oberbegriffe": Äste mit vorgegebenen Oberbegriffen (die KI schlägt sie passend zu den
+ *   Vokabeln vor), an jedem Ast so viele leere Zweige wie Wörter dazugehören, optional ein
+ *   freier Ast für eigene Ideen.
+ * - „offen": Äste und Zweige leer – die Lernenden ordnen selbst.
+ * Ältere Blöcke kennen nur `topic` + `items` (ohne `variante`, ohne `branches`); sie werden beim
+ * Zeichnen als offene Mindmap gelesen (render/mindmapLayout.ts → `mindmapAeste`).
  */
+export type MindmapVariante = 'oberbegriffe' | 'offen'
+
+export interface MindmapItem {
+  id: string
+  vocabId?: string
+  answer: string
+  /** Ast (Oberbegriff), zu dem das Wort gehört – fehlt bei alten Blöcken */
+  branchId?: string
+}
+
 export interface MindmapBlock extends BlockBase {
   kind: 'mindmap'
   topic: string
-  /** Erwartete Wörter – zugleich die Zahl der leeren Äste */
-  items: { id: string; vocabId?: string; answer: string }[]
+  /** Erwartete Wörter – je Wort ein Zweig (und ein Punkt) */
+  items: MindmapItem[]
+  /** Oberbegriffe der Äste (KI-Vorschlag, im Editor änderbar); fehlt bei alten Blöcken */
+  branches?: { id: string; label: string }[]
+  /** Fehlt = alter Block → offen */
+  variante?: MindmapVariante
+  /** Zusätzlicher freier Ast für eigene Wörter (nur bei „oberbegriffe", nicht bewertet) */
+  freierAst?: boolean
 }
 
 export interface PictureItem {
@@ -414,6 +441,13 @@ export interface TestSettings {
    * lesen die Lernenden die griechische Schrift; die Umschrift ist eine Hilfe für Anfänger.
    */
   umschrift?: boolean
+  /**
+   * Mindmap (02.10.2026): Äste mit Oberbegriffen oder ganz offen; fehlt = mit Oberbegriffen.
+   * Gilt für neu erzeugte Aufgaben, im Editor je Aufgabe umstellbar.
+   */
+  mindmapVariante?: MindmapVariante
+  /** Mindmap mit Oberbegriffen: zusätzlich ein freier Ast (fehlt = nein) */
+  mindmapFreierAst?: boolean
   /** Aufgabe „Unregelmäßige Verben": Quelle, Verben und Form (30.09.2026, shared/verben) */
   verbAufgabe?: import('../../../shared/verben/formate').VerbAufgabe
 }

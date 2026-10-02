@@ -53,6 +53,11 @@ export interface WsContextValue {
   justify?: boolean
   /** Breite der Textspalte in mm (für Gitternetze, die auf dem Papier stimmen müssen) */
   contentWidthMm?: number
+  /**
+   * Schreibraum der Lerngruppe (02.10.2026, didactics/schreibraum.ts): Linienabstand und Regeln für
+   * Ausfüllzellen nach Jahrgang und Förderbedarf. Fehlt = Klasse 7 bzw. 8,5-mm-Linien.
+   */
+  schreibRegel?: import('../didactics/schreibraum').SchreibRegel
   /** Operatoren fett, Symbole für Sozialformen, Nummernstil, Piktogramme an den Anweisungen */
   taskStyle: { numberStyle: 'circle' | 'square' | 'plain'; showSocialFormIcons: boolean; pictograms?: boolean }
   /**

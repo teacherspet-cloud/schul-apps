@@ -55,7 +55,8 @@ export function erstelleVokabeltest(lauf: VokabeltestLauf): void {
         // Wortschatz früherer Units/Bände: Die Sätze bleiben in dem, was die Klasse kennt
         known: e.known,
         ...(await pictureOptions(settings.pictureSource, { ai: k.ai, bild: k.bild })),
-        onProgress: (done, total, message) => k.melde(message, done, total)
+        onProgress: (done, total, message) => k.melde(message, done, total),
+        zwischenstand: (doc, was) => k.zeige(doc, { was })
       })
     },
     abschluss: lauf.abschluss,

@@ -328,5 +328,21 @@ export const REVIEW_SCHEMA = obj({
       severity: enumOf(['hoch', 'mittel']),
       problem: str()
     })
+  ),
+  /*
+   * Schreibraum (02.10.2026): Antwortflächen, die für ihre Funktion und die Altersgruppe zu klein
+   * sind – als Maße, die die App direkt übernimmt (didactics/schreibraum.ts), statt den Baustein
+   * neu erzeugen zu lassen. Teil derselben Prüfrunde, kein eigener KI-Auftrag.
+   */
+  answerSpace: arr(
+    obj({
+      blockNumber: int('Nummer des Aufgaben-Bausteins (ab 1)'),
+      part: int('0 = Antwort der Aufgabe, 1 = Teilaufgabe a), 2 = b) …'),
+      lines: int('Schreiblinien: nötige Linienzahl; Ausfülltabelle: nötige Zeilen je Ausfüllzelle; 0 = passt'),
+      cellHeightMm: int('Ausfülltabelle bzw. freie Fläche: nötige Mindesthöhe in mm; 0 = passt'),
+      colWidths: arr(int(), 'Ausfülltabelle: Spaltenbreiten in Prozent (Summe 100, eine Zahl je Spalte); leer = passt'),
+      reason: str('Kurz: wofür der Platz nicht reicht')
+    }),
+    'Antwortflächen, die zu klein sind; leere Liste, wenn alle passen'
   )
 })

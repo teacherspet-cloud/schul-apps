@@ -51,6 +51,56 @@ function mitrollen(y: number): void {
  */
 const ZIEH_SCHWELLE = 8
 
+/** Eine Stelle im Satz, an die ein Baustein beim Verschieben im Fluss kommen kann */
+interface Luecke {
+  /** Kennung des Bausteins, hinter dem er dann steht */
+  nach: string
+  x: number
+  y: number
+  breite: number
+}
+
+/**
+ * Alle Stellen zwischen den Bausteinen im Satz (ohne die Stücke des gezogenen selbst).
+ *
+ * Nie vor dem ersten Baustein (Kopf des Blattes) und nie mitten in einen geteilten Baustein:
+ * Vor einem Folgestück liegt keine Lücke. Am Seitenende gibt es zusätzlich eine Lücke unter dem
+ * letzten Stück – sonst käme man auf einer vollen Seite nicht ans Ende.
+ */
+function lueckenImFluss(eigen: string): Luecke[] {
+  const stuecke = [...document.querySelectorAll<HTMLElement>('[data-fluss]')].filter((e) => !e.closest('.ws-measure') && e.dataset.fluss !== eigen)
+  const out: Luecke[] = []
+  const flaeche = (e: HTMLElement): DOMRect => (e.closest('.ws-body') ?? e).getBoundingClientRect()
+  stuecke.forEach((e, i) => {
+    const r = e.getBoundingClientRect()
+    const f = flaeche(e)
+    const davor = stuecke[i - 1]
+    if (davor && !('fortsetzung' in e.dataset)) {
+      const gleicheSeite = davor.closest('.ws-page') === e.closest('.ws-page')
+      out.push({ nach: davor.dataset.fluss!, x: f.left, y: gleicheSeite ? (davor.getBoundingClientRect().bottom + r.top) / 2 : r.top, breite: f.width })
+    }
+    const danach = stuecke[i + 1]
+    if (!danach || (danach.closest('.ws-page') !== e.closest('.ws-page') && !('fortsetzung' in danach.dataset)))
+      out.push({ nach: e.dataset.fluss!, x: f.left, y: r.bottom, breite: f.width })
+  })
+  return out
+}
+
+/** Die Lücke, die dem Zeiger am nächsten liegt (auch bei nebeneinanderstehenden Seiten) */
+function naechsteLuecke(luecken: Luecke[], x: number, y: number): Luecke | null {
+  let beste: Luecke | null = null
+  let abstand = Infinity
+  for (const l of luecken) {
+    const dx = x < l.x ? l.x - x : x > l.x + l.breite ? x - l.x - l.breite : 0
+    const d = Math.hypot(dx, y - l.y)
+    if (d < abstand) {
+      abstand = d
+      beste = l
+    }
+  }
+  return beste
+}
+
 export function BausteinRahmen({
   block,
   placed,
@@ -59,7 +109,8 @@ export function BausteinRahmen({
   onUpdate,
   onMove,
   menue,
-  busy
+  busy,
+  imFluss
 }: {
   block: WsBlock
   placed: PlacedItem
@@ -80,6 +131,12 @@ export function BausteinRahmen({
    */
   menue?: React.ReactNode
   busy?: boolean
+  /**
+   * Ziehen verschiebt IM FLUSS statt frei (01.10.2026, Operatorenliste der Klausur): Der
+   * Baustein wandert nach oben oder unten an eine Stelle zwischen zwei anderen, die übrigen
+   * rücken nach – nichts überdeckt etwas. Gemeldet wird die Kennung des Bausteins davor.
+   */
+  imFluss?: (nach: string) => void
 }): React.JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   // Abstand zwischen Fingerspitze und linker oberer Ecke – sonst springt der Baustein
@@ -164,7 +221,69 @@ export function BausteinRahmen({
    * Stelle liegen, an der er angefasst wurde, und ließ sich nicht bewegen. Genau das hat die
    * Wache `tests/e2e/ziehen.mjs` gefunden.
    */
+  /*
+   * Verschieben im Fluss: Der Baustein hängt sichtbar am Finger, eine Linie zeigt, wo er
+   * landet; erst beim Loslassen ändert sich die Reihenfolge (ein Verlaufsschritt). Hinge die
+   * Reihenfolge schon während des Zuges um, sprängen die Bausteine unter dem Finger hin und her.
+   */
+  const beginnenImFluss = (x: number, y: number, melden: (nach: string) => void): void => {
+    const el = box.current
+    if (!el) return
+    const anfang = el.getBoundingClientRect()
+    const dy = y - anfang.top
+    // Die Seiten sind verkleinert dargestellt: Bildschirmpunkte in Punkte des Blattes umrechnen
+    const massstab = el.offsetHeight ? anfang.height / el.offsetHeight : 1
+    const eigen = block.id
+    const bisher = (() => {
+      const alle = [...document.querySelectorAll<HTMLElement>('[data-fluss]')].filter((e) => !e.closest('.ws-measure'))
+      const i = alle.findIndex((e) => e.dataset.fluss === eigen)
+      return i > 0 ? alle[i - 1].dataset.fluss : undefined
+    })()
+    const linie = document.createElement('div')
+    Object.assign(linie.style, {
+      position: 'fixed',
+      height: '3px',
+      borderRadius: '2px',
+      background: 'var(--mantine-color-blue-6)',
+      boxShadow: '0 0 0 2px rgba(255,255,255,0.8)',
+      pointerEvents: 'none',
+      zIndex: '1000'
+    })
+    linie.setAttribute('data-fluss-linie', '')
+    let laeuft = false
+    let wahl: Luecke | null = null
+    const bewegen = (ev: PointerEvent): void => {
+      if (!laeuft) {
+        if (Math.abs(ev.clientX - x) < ZIEH_SCHWELLE && Math.abs(ev.clientY - y) < ZIEH_SCHWELLE) return
+        laeuft = true
+        document.body.append(linie)
+        Object.assign(el.style, { position: 'relative', zIndex: '20', opacity: '0.85', pointerEvents: 'none' })
+      }
+      ev.preventDefault()
+      mitrollen(ev.clientY)
+      // Lage ohne Versatz messen – beim Mitrollen wandert der Baustein selbst mit
+      el.style.transform = ''
+      const oben = el.getBoundingClientRect().top
+      el.style.transform = `translateY(${(ev.clientY - dy - oben) / massstab}px)`
+      wahl = naechsteLuecke(lueckenImFluss(eigen), ev.clientX, ev.clientY)
+      linie.style.display = wahl ? 'block' : 'none'
+      if (wahl) Object.assign(linie.style, { left: `${wahl.x}px`, top: `${wahl.y - 1.5}px`, width: `${wahl.breite}px` })
+    }
+    const schluss = (): void => {
+      window.removeEventListener('pointermove', bewegen)
+      window.removeEventListener('pointerup', schluss)
+      window.removeEventListener('pointercancel', schluss)
+      linie.remove()
+      Object.assign(el.style, { position: '', zIndex: '', opacity: '', pointerEvents: '', transform: '' })
+      if (laeuft && wahl && wahl.nach !== bisher) melden(wahl.nach)
+    }
+    window.addEventListener('pointermove', bewegen)
+    window.addEventListener('pointerup', schluss)
+    window.addEventListener('pointercancel', schluss)
+  }
+
   const beginnen = (x: number, y: number, vomGriff = false): void => {
+    if (imFluss) return beginnenImFluss(x, y, imFluss)
     const el = box.current
     if (!el) return
     const r = el.getBoundingClientRect()
@@ -313,7 +432,7 @@ export function BausteinRahmen({
             Der Anfassknopf. Er ist bewusst groß (Fingerbreite) und trägt `touch-action: none`:
             Nur hier beginnt das Ziehen, überall sonst bleibt Wischen zum Rollen.
           */}
-          <Tooltip label="Ziehen: frei auf der Seite platzieren" position="right">
+          <Tooltip label={imFluss ? 'Ziehen: im Blatt nach oben oder unten verschieben' : 'Ziehen: frei auf der Seite platzieren'} position="right">
             <ActionIcon
               size="sm"
               variant={block.free ? 'filled' : 'default'}

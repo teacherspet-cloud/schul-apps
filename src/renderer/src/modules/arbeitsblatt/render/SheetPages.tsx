@@ -24,6 +24,8 @@ import { seitenSchluessel, type SeitenKandidat } from './deckblatt'
 import { isMaterial, loeseMaterialverweise, materialNummern, verschluesseleBaustein } from '../didactics/integrity'
 import { ueberlaufUnten } from './seitenUeberlauf'
 import { anmerkungenJeAbsatz, anmerkungenImStueck, anmerkungsArt, anmerkungenVon, type Anmerkung } from '../didactics/anmerkungen'
+import { aufAbsaetze, zeilenBaender, zeilenEinheiten, zeilenSchnitte, type AbsatzMessung, type Streifen, type ZeilenStelle } from './zeilenTeilung'
+import { linieMmFuerMeta, schreibRegelFuerMeta } from '../didactics/schreibraum'
 
 export function profileFromMeta(meta: WorksheetMeta): LearnerProfile {
   return buildLearnerProfile(
@@ -151,6 +153,8 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
   return {
     mode,
     contentWidthMm: 210 - insets.left - insets.right,
+    // Schreiblinien und Ausfüllzellen nach Jahrgang (02.10.2026) – dieselbe Regel wie `--ws-linie` in PageFrame
+    schreibRegel: schreibRegelFuerMeta(ws.meta),
     taskNumbers: taskNumbersFor(sheet),
     materialNumbers: materialNumbersFor(sheet),
     phaseStarts: viewingPhaseStarts(sheet),
@@ -385,8 +389,11 @@ export function SheetPages({
                     <BlockView block={block} placed={placed} />
                   </>
                 )
+                // `data-fluss`: Stücke im Satz – Ziel beim Verschieben im Fluss (BausteinRahmen `imFluss`)
                 return wrapBlock ? (
-                  <div key={`${placed.id}-${placed.from ?? 0}`}>{wrapBlock(block, placed, content)}</div>
+                  <div key={`${placed.id}-${placed.from ?? 0}`} data-fluss={placed.id} data-fortsetzung={placed.continued ? '' : undefined}>
+                    {wrapBlock(block, placed, content)}
+                  </div>
                 ) : (
                   <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow">
                     {content}
@@ -547,7 +554,10 @@ export function fussnotenDerSeite(page: PagePlan, byId: Map<string, WsBlock>): {
   for (const placed of page.items) {
     const block = byId.get(placed.id)
     if (block?.type !== 'text' || block.free) continue
-    const anmerkungen = anmerkungenImStueck(block, placed.from ?? 0, placed.to ?? Infinity)
+    // Zeilenweise geteilt (02.10.2026): Das Stück weiß selbst, welche Ziffern auf ihm stehen
+    const anmerkungen = placed.noten
+      ? anmerkungenVon(block).anmerkungen.filter((a) => placed.noten!.includes(a.nr))
+      : anmerkungenImStueck(block, placed.from ?? 0, placed.to ?? Infinity)
     if (anmerkungen.length) aus.push({ block, anmerkungen })
   }
   return aus
@@ -662,8 +672,12 @@ export function imageCredits(sheet: Sheet, style: CitationStyle = DEFAULT_CITATI
  * Misst alle Blätter (Schülerfassung und Lösungen) in einem unsichtbaren Bereich
  * und berechnet daraus die Seitenaufteilung.
  */
-/** Hoehe einer Schreiblinie in px bei 96 dpi (CSS: 8.5mm) */
-const LINIEN_HOEHE = (8.5 * 96) / 25.4
+/**
+ * Hoehe einer Schreiblinie in px bei 96 dpi – seit 02.10.2026 nach Jahrgang (CSS `--ws-linie`,
+ * gesetzt von PageFrame aus derselben Regel `linieMmFuerMeta`). Weichen beide ab, fuellt die
+ * Auffuellung zu viele oder zu wenige Linien.
+ */
+const linienHoehePx = (meta: WorksheetMeta | undefined): number => (linieMmFuerMeta(meta) * 96) / 25.4
 
 /**
  * Den Rest der letzten Seite mit Schreiblinien fuellen.
@@ -676,7 +690,15 @@ const LINIEN_HOEHE = (8.5 * 96) / 25.4
  *
  * Bewusst NICHT angefasst: Seiten, auf denen noch etwas folgt, und alles ausser Schreiblinien.
  */
-function linienAuffuellen(plaene: PagePlan[], items: MeasuredItem[], sheet: Sheet, ersteHoehe: number, weitereHoehe: number, abzug: readonly number[] = []): PagePlan[] {
+function linienAuffuellen(
+  plaene: PagePlan[],
+  items: MeasuredItem[],
+  sheet: Sheet,
+  ersteHoehe: number,
+  weitereHoehe: number,
+  abzug: readonly number[] = [],
+  LINIEN_HOEHE = linienHoehePx(undefined)
+): PagePlan[] {
   const hoehen = new Map(items.map((i) => [i.id, i]))
   const blockVon = new Map(sheet.blocks.map((b) => [b.id, b]))
   return plaene.map((plan, seite) => {
@@ -760,6 +782,80 @@ function einheitenHoehen(els: HTMLElement[]): number[] {
   const geordnet = r.every((x, i) => i === 0 || x.top >= r[i - 1].bottom - 0.5)
   if (!geordnet) return r.map((x) => x.height)
   return r.map((x, i) => (i < r.length - 1 ? r[i + 1].top - x.top : x.height))
+}
+
+/** Elemente, die beim Schneiden zwischen zwei Zeilen nicht zerteilt werden dürfen */
+const UNTEILBAR = 'img, svg, canvas, video, iframe, input, textarea, button, .rt-math'
+
+/**
+ * ZEILENWEISE TEILUNG (02.10.2026, render/zeilenTeilung.ts): die Einheiten eines Materialtexts
+ * Zeile für Zeile gemessen – Zeilen aus den Rechtecken der Textknoten, Schnittstellen dazwischen,
+ * die Ziffern der Anmerkungen ihrer Zeile zugeordnet.
+ *
+ * `teilen = false` (Bild oder Illustration neben dem Text): Dort ist der Text auf dem Folgestück
+ * anders breit als beim Messen – Zeilen ließen sich nicht verlässlich ausschneiden. Dann bleibt der
+ * Absatz die kleinste Einheit wie bisher.
+ */
+function textZeilen(block: TextBlock, unitEls: HTMLElement[], teilen: boolean, fontPx: number): { units: number[]; lines: number[]; karte: ZeilenStelle[] } {
+  const hoehen = einheitenHoehen(unitEls)
+  const je = anmerkungenJeAbsatz(block)
+  const messungen: AbsatzMessung[] = unitEls.map((u, k) => {
+    const nr = Number(u.dataset.absatz)
+    const absatz = u.dataset.absatz !== undefined && Number.isFinite(nr) ? nr : k
+    if (u.classList.contains('ws-glossary') || u.dataset.absatz === undefined) return { absatz, hoehe: hoehen[k], schnitte: [], zeilenJe: [0], marken: [] }
+    const oben = u.getBoundingClientRect().top
+    const rel = (r: DOMRect): Streifen => ({ top: r.top - oben, bottom: r.bottom - oben })
+    // Textzeilen: Rechtecke der Textknoten – ohne hochgestellte Ziffern, sie ragen in die Zeile darüber
+    const rects: Streifen[] = []
+    const range = document.createRange()
+    const gang = document.createTreeWalker(u, NodeFilter.SHOW_TEXT)
+    for (let n = gang.nextNode(); n; n = gang.nextNode()) {
+      if (!n.textContent?.trim() || n.parentElement?.closest('sup, sub')) continue
+      range.selectNodeContents(n)
+      for (const r of Array.from(range.getClientRects())) rects.push(rel(r))
+    }
+    const baender = zeilenBaender(rects)
+    const zeile = parseFloat(getComputedStyle(u).lineHeight) || fontPx * 1.5
+    const geschaetzt = Math.max(1, Math.round(u.getBoundingClientRect().height / zeile))
+    // Ziffern der Anmerkungen dieses Absatzes, in Reihenfolge den hochgestellten Zahlen im Text zugeordnet
+    const sups = Array.from(u.querySelectorAll('sup'))
+    let s = 0
+    const marken: AbsatzMessung['marken'] = []
+    for (const nrAnm of je.absaetze[absatz] ?? []) {
+      while (s < sups.length && sups[s].textContent?.trim() !== String(nrAnm)) s++
+      if (s >= sups.length) {
+        // Ziffer nicht gefunden: an den Anfang des Absatzes – lieber eine Seite zu früh als zu spät
+        marken.push({ nr: nrAnm, mitte: 0 })
+        continue
+      }
+      const r = rel(sups[s].getBoundingClientRect())
+      marken.push({ nr: nrAnm, mitte: (r.top + r.bottom) / 2 })
+      s++
+    }
+    if (!teilen || baender.length < 2) return { absatz, hoehe: hoehen[k], schnitte: [], zeilenJe: [baender.length || geschaetzt], marken }
+    const hindernisse = Array.from(u.querySelectorAll<HTMLElement>(UNTEILBAR)).flatMap((h) => Array.from(h.getClientRects()).map(rel))
+    // Auch Inline-Blöcke (Lücken als Kästchen) dürfen nicht zerschnitten werden
+    u.querySelectorAll<HTMLElement>('span, mark, u').forEach((h) => {
+      if (getComputedStyle(h).display.startsWith('inline-')) hindernisse.push(...Array.from(h.getClientRects()).map(rel))
+    })
+    const { schnitte, zeilenJe } = zeilenSchnitte(baender, hindernisse)
+    // Die letzte Schnittstelle muss im Absatz liegen – sonst (Messfehler) nicht teilen
+    if (schnitte.length && schnitte[schnitte.length - 1] >= hoehen[k]) return { absatz, hoehe: hoehen[k], schnitte: [], zeilenJe: [baender.length], marken }
+    return { absatz, hoehe: hoehen[k], schnitte, zeilenJe, marken }
+  })
+  return zeilenEinheiten(messungen, je.rest)
+}
+
+/** Die Stücke zeilenweise gemessener Materialtexte auf Absätze zurückrechnen (`aufAbsaetze`) */
+function aufTextAbsaetze(plaene: PagePlan[], karten: Map<string, ZeilenStelle[]>): PagePlan[] {
+  if (!karten.size) return plaene
+  return plaene.map((plan) => ({
+    ...plan,
+    items: plan.items.map((it) => {
+      const karte = karten.get(it.id)
+      return karte ? aufAbsaetze(it, karte) : it
+    })
+  }))
 }
 
 /** Spaltenbreiten einer gemessenen Tabelle in Prozent ihrer Breite (aus der Kopfzeile, sonst der ersten Zeile) */
@@ -888,6 +984,8 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       const fortsetzungKopf = probe ? probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(probe).marginBottom) || 0) : 0
       const items: MeasuredItem[] = []
       const spaltenJe = new Map<string, number[]>()
+      /** Materialtexte mit Zeilen-Einheiten: wo jede Einheit im Text steht (render/zeilenTeilung.ts) */
+      const zeilenKarten = new Map<string, ZeilenStelle[]>()
       /*
        * FUSSNOTEN (01.10.2026): Höhe jeder Anmerkung, gesetzt wie unten auf der Seite (gleiche Breite,
        * gleiche Klassen) – von Oberkante zu Oberkante, die letzte bis zu ihrer Unterkante. Was über der
@@ -936,9 +1034,17 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
         const unitEls = Array.from(wrap.querySelectorAll<HTMLElement>('[data-unit]')).filter(
           (u) => !u.closest('.ws-side-image') && !u.parentElement?.closest('[data-unit]')
         )
-        const splittable = Boolean(block && TEILBAR.has(block.type)) && unitEls.length > 1
+        /*
+         * Materialtexte Zeile für Zeile (02.10.2026): Ihre Einheiten sind die Zeilen, nicht mehr die
+         * Absätze – so ist auch ein Text aus einem einzigen Absatz teilbar.
+         */
+        const zeilen =
+          block?.type === 'text' && unitEls.length
+            ? textZeilen(block, unitEls, !block.illustration && !wrap.querySelector('.ws-side-image'), fontPx)
+            : undefined
+        const splittable = Boolean(block && TEILBAR.has(block.type)) && (zeilen ? zeilen.units.length : unitEls.length) > 1
         if (splittable) {
-          const units = einheitenHoehen(unitEls)
+          const units = zeilen?.units ?? einheitenHoehen(unitEls)
           const unitSum = units.reduce((a, b) => a + b, 0)
           /*
            * Der FUSS (Wortzahl, Quellenangabe) steht nur unter dem letzten Teilstück. Bis zum
@@ -971,13 +1077,21 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
            * wiederholt. Beginnt ein Stück mit der ERSTEN Zeile, steckt die Kopfzeile in der Messung
            * in der Einheit davor – auf der neuen Seite steht sie trotzdem: also immer anrechnen.
            */
-          const unitGlue = unitEls.map((u) => u.hasAttribute('data-bindet'))
-          const unitRepeat = unitEls.map((u) => {
+          // Zeilen-Einheiten eines Texts binden nichts und wiederholen nichts
+          const unitGlue = zeilen ? [] : unitEls.map((u) => u.hasAttribute('data-bindet'))
+          const unitRepeat = (zeilen ? [] : unitEls).map((u) => {
             if (block?.type === 'table' || u.tagName !== 'TR') return 0
             const kopf = u.closest('table')?.tHead
             return kopf ? kopf.getBoundingClientRect().height : 0
           })
-          const noteUnits = notenEinheiten(block, unitEls, true)
+          // Bei Zeilen-Einheiten: Fußnoten bei der Zeile ihrer Ziffer
+          const notenH = block && notenJe.get(block.id)
+          const noteUnits = zeilen
+            ? notenH && zeilen.karte.some((z) => z.noten.length)
+              ? zeilen.karte.map((z) => z.noten.reduce((a, nr) => a + (notenH.get(nr) ?? 0), 0))
+              : undefined
+            : notenEinheiten(block, unitEls, true)
+          if (zeilen) zeilenKarten.set(id, zeilen.karte)
           items.push({
             id,
             height,
@@ -993,15 +1107,17 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
              * Gezählt wird mit der ECHTEN Zeilenhöhe des Absatzes (27.09.2026): Vorher galt fest
              * „Seitenschrift × 1,5" – bei kleiner gesetztem Text kamen so weniger Zeilen heraus als
              * gedruckt, und die Nummern der Folgeseite liefen davon (28 Zeilen gezählt als 26).
+             * Seit 02.10.2026 sind die Einheiten eines Texts seine Zeilen – gezählt werden die
+             * tatsächlich gesetzten Zeilen (`zeilen.lines`), die Schätzung bleibt für alles andere.
              */
             unitLines:
               block?.type === 'text' && block.lineNumbers
-                ? unitEls.map((u) => {
+                ? (zeilen?.lines ?? unitEls.map((u) => {
                     if (u.classList.contains('ws-glossary')) return 0
                     const zeile = parseFloat(getComputedStyle(u).lineHeight) || fontPx * 1.5
                     // Die Höhe des Absatzes selbst – `units` enthält den Abstand zum nächsten mit
                     return Math.max(1, Math.round(u.getBoundingClientRect().height / zeile))
-                  })
+                  }))
                 : undefined,
             /*
              * KEIN `keepTogether` mehr (01.10.2026). Bis dahin wanderte jeder teilbare Baustein,
@@ -1027,8 +1143,17 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       })
       const k = layoutKey(sheet.id, key)
       const abzugHier = abzug.get(k) ?? []
-      const plaene = linienAuffuellen(paginate(items, firstHeight, otherHeight, abzugHier), items, sheet, firstHeight, otherHeight, abzugHier)
-      next.set(k, mitSpalten(plaene, spaltenJe, items))
+      const plaene = linienAuffuellen(
+        paginate(items, firstHeight, otherHeight, abzugHier),
+        items,
+        sheet,
+        firstHeight,
+        otherHeight,
+        abzugHier,
+        linienHoehePx(ws.meta)
+      )
+      // Stücke der Materialtexte von Zeilen zurück auf Absätze – erst ganz zum Schluss, alles davor rechnet in Einheiten
+      next.set(k, aufTextAbsaetze(mitSpalten(plaene, spaltenJe, items), zeilenKarten))
     }
     setLayouts(next)
   }, [ws, variants, logo, schoolName, tick, abzug])

@@ -103,6 +103,8 @@ export function worksheetMetaFor(exam: Exam, part?: ExamPart): WorksheetMeta {
     subjectLabel: m.subjectLabel,
     topic: m.topic,
     priorKnowledge: m.content,
+    // Interkultureller Schwerpunkt: dieselben Regeln wie beim Arbeitsblatt, hier nur integrativ (02.10.2026)
+    interkulturell: m.interkulturell,
     // Bilingual: als Prüfung markiert – das Glossar liegt der Arbeit einmal bei (glossarFuerArbeit)
     bilingual: m.bilingual ? { ...m.bilingual, pruefung: true, pruefsprache: m.bilingual.pruefsprache ?? 'ziel' } : undefined,
     grade: m.grade,
@@ -808,6 +810,11 @@ export interface ExamOptions {
   /** Websuche und Bild-KI eines Hintergrund-Auftrags – dann lassen sie sich mit ihm abbrechen */
   websuche?: Parameters<typeof browserMaterialDienste>[0]
   bild?: (prompt: string) => Promise<string>
+  /**
+   * Live-Vorschau (02.10.2026, shared/zwischenstand.ts): der Stand der Arbeit nach jedem Schritt –
+   * fertige Teile, noch offene als leere Überschrift, Nachbesserungen, Bilder. Nur zum Anzeigen.
+   */
+  zwischenstand?: (stand: Exam, was: string) => void
 }
 
 export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: ExamProgress = () => undefined, opts: ExamOptions = {}): Promise<Exam> {
@@ -823,6 +830,17 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
   const parts: ExamPart[] = []
   const materialNotizen: string[] = []
   const notes: string[] = []
+  /*
+   * Vorschau: die fertigen Teile, dahinter die offenen als leere Überschrift (der Aufbau steht von
+   * Anfang an). `fs` sind die schon geprüften Fassungen – sie ersetzen die ungeprüften Bausteine.
+   */
+  const zeige = (was: string, fs: ExamPart[][] = []): void => {
+    if (!opts.zwischenstand) return
+    const fertige = parts.map((p, i) => fs.reduce((teil, teile, f) => (teile[i] ? mitBloecken(teil, f, teile[i].blocks) : teil), p))
+    const offen = exam.parts.slice(parts.length).map((p) => ({ ...nurFassungA(p), blocks: [] }))
+    opts.zwischenstand({ ...exam, parts: [...fertige, ...offen] }, was)
+  }
+  zeige('Aufbau der Arbeit steht')
   for (let i = 0; i < exam.parts.length; i++) {
     const part = nurFassungA(exam.parts[i])
     /*
@@ -836,6 +854,7 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
       let fertig: ExamPart = { ...part, sprechDaten, blocks: sprechBloecke }
       for (let f = 1; f < anzahl; f++) fertig = mitBloecken(fertig, f, structuredClone(sprechBloecke))
       parts.push(fertig)
+      zeige(`Teil ${i + 1} steht: ${part.label}`)
       continue
     }
     onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label}${anzahl > 1 ? ' (Fassung A)' : ''} …`)
@@ -913,13 +932,24 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
     // Punkte VOR den weiteren Fassungen angleichen – ihr Auftrag nennt die Punkte der Vorlage
     punkteAufTeil(blocks, part.points)
     let fertig: ExamPart = { ...part, blocks }
+    if (anzahl > 1) {
+      parts.push(fertig)
+      zeige(`Teil ${i + 1}, Fassung A steht: ${part.label}`)
+      parts.pop()
+    }
     for (let f = 1; f < anzahl; f++) {
       onProgress(`Teil ${i + 1} von ${exam.parts.length}: ${part.label} (Fassung ${label(f)}) …`)
       const r = await generateParallelPart(exam, part, i + 1, f, blocks, ai, material)
       fertig = mitBloecken(fertig, f, verschluesseleMaterialverweise(r.blocks, [...parts.flatMap((p) => bloeckeDerFassung(p, f)), ...r.blocks]))
       if (r.hinweise.length) notes.push(`Fassung ${label(f)}, Teil ${i + 1}: ${r.hinweise.join(' ')}`)
+      if (f < anzahl - 1) {
+        parts.push(fertig)
+        zeige(`Teil ${i + 1}, Fassung ${label(f)} steht`)
+        parts.pop()
+      }
     }
     parts.push(fertig)
+    zeige(anzahl > 1 ? `Teil ${i + 1} steht in allen Fassungen: ${part.label}` : `Teil ${i + 1} steht: ${part.label}`)
   }
 
   // Prüfung und Nachbesserung: Verweise auf Material, das es nicht gibt, leeres Material,
@@ -928,7 +958,12 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
   onProgress(anzahl > 1 ? `Die ${anzahl} Fassungen werden geprüft …` : 'Die Arbeit wird geprüft …')
   const fassungen: ExamPart[][] = []
   for (let f = 0; f < anzahl; f++) {
-    fassungen.push(await pruefeFassung(exam, teileDerFassung({ ...exam, parts }, f), f, anzahl > 1 ? `Fassung ${label(f)}, ` : '', ai, onProgress, notes))
+    const praefix = anzahl > 1 ? `Fassung ${label(f)}, ` : ''
+    fassungen.push(
+      await pruefeFassung(exam, teileDerFassung({ ...exam, parts }, f), f, praefix, ai, onProgress, notes, (teile, was) =>
+        zeige(`${praefix}${was}`, [...fassungen, teile])
+      )
+    )
   }
 
   /*
@@ -950,6 +985,7 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
       const letzter = parts.length - 1
       if (glossar && letzter >= 0) {
         for (const teile of fassungen) teile[letzter] = { ...teile[letzter], blocks: [...teile[letzter].blocks, structuredClone(glossar)] }
+        zeige('Glossar eingefügt', fassungen)
       } else notes.push('Das zweisprachige Glossar blieb leer – bitte in Schritt 2 einen Baustein „Nützliche Ausdrücke“ ergänzen.')
     } catch {
       notes.push('Das zweisprachige Glossar konnte nicht erstellt werden – bitte in Schritt 2 einen Baustein „Nützliche Ausdrücke“ ergänzen.')
@@ -988,8 +1024,13 @@ export async function generateExam(examEingabe: Exam, ai: AiCall, onProgress: Ex
         blocks,
         meta,
         { ...(await browserWorksheetImageDeps(opts.bild ? { ai, bild: opts.bild } : undefined)), reuse },
-        (message) => onProgress(message)
+        (message) => {
+          onProgress(message)
+          // Bilder werden in die Bausteine eingesetzt – jedes erscheint in der Vorschau, sobald es da ist
+          opts.zwischenstand?.(result, message)
+        }
       )
+      opts.zwischenstand?.(result, 'Bilder eingesetzt')
       const hinweise = [
         found.texts ? `${found.texts} Textquelle(n) geprüft – Wortlaut und Fundstelle vor dem Einsatz kontrollieren.` : '',
         images.web || images.missing || images.reused
@@ -1062,7 +1103,9 @@ async function pruefeFassung(
   praefix: string,
   ai: AiCall,
   onProgress: ExamProgress,
-  notes: string[]
+  notes: string[],
+  /** Live-Vorschau: nach jeder Nachbesserung der Stand dieser Fassung */
+  geaendert: (teile: ExamPart[], was: string) => void = () => undefined
 ): Promise<ExamPart[]> {
   const out = [...teile]
   for (let i = 0; i < out.length; i++) {
@@ -1107,6 +1150,7 @@ async function pruefeFassung(
         // Weitere Fassung mit übernommenem Material: Das Material bleibt, nur die Aufgaben sind neu
         if (fassung > 0 && materialweg(exam, part) === 'gleich') blocks = uebernimmMaterial(part.blocks, blocks)
         out[i] = { ...part, blocks }
+        geaendert(out, `Teil ${i + 1} nachgebessert`)
         notes.push(`${praefix}Teil ${i + 1} nachgebessert: ${severe.map((f) => f.message).join(' ')}`)
         continue
       } catch {
@@ -1122,6 +1166,7 @@ async function pruefeFassung(
       const b = await blindprobeBloecke(out[i].blocks, ai, { melde: (m) => onProgress(`${praefix}Teil ${i + 1}: ${m}`) }).catch(() => null)
       if (!b?.geprueft) continue
       out[i] = { ...out[i], blocks: b.bloecke }
+      if (b.ersetzt) geaendert(out, `Teil ${i + 1}: Ankreuzfragen neu gefasst`)
       if (b.ersetzt || b.markiert) notes.push(`${praefix}Teil ${i + 1} – Ankreuzfragen: ${blindprobeMeldung(b)}`)
     }
   return out

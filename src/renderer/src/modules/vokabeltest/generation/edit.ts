@@ -56,7 +56,11 @@ export async function regenerateBlock(
 ): Promise<Block> {
   const ids = blockVocabIds(block)
   const vocab = doc.vocab.filter((v) => ids.includes(v.id))
-  const fresh = await generateBlock(block.taskType, vocab, context(doc), { ai, review: false, ...images }, variantLabel(doc, variant), hinweis)
+  const ctx = context(doc)
+  // Mindmap (02.10.2026): die im Editor gewählte Form und der freie Ast bleiben beim Neuerzeugen erhalten
+  if (block.kind === 'mindmap' && block.variante)
+    ctx.settings = { ...ctx.settings, mindmapVariante: block.variante, mindmapFreierAst: Boolean(block.freierAst) }
+  const fresh = await generateBlock(block.taskType, vocab, ctx, { ai, review: false, ...images }, variantLabel(doc, variant), hinweis)
   return { ...fresh, id: block.id, title: block.title, pointsPerItem: block.pointsPerItem }
 }
 

@@ -10,6 +10,7 @@
  * (Hörverstehen verknüpfen, Quellen prüfen, Bilder, Tafelbild) laufen wie bisher. Nur WER sie
  * aufruft und WOHIN das Ergebnis geht, hat sich geändert.
  */
+import { mitSehtext } from './didactics/sehtext'
 import { versuchAnfrage, versuchAus } from './didactics/protokoll'
 import type { VersuchDaten } from './model/protokoll'
 import { istAbbruch } from '@shared/abbruch'
@@ -146,9 +147,12 @@ export function planeGliederung(worksheet: Worksheet, docId: string): void {
         notifyInfo(`Die Materialsuche ist fehlgeschlagen (${e instanceof Error ? e.message : String(e)}). Das Blatt entsteht mit einem eigenen Text.`)
         return null
       })
+      // Live-Vorschau: der gefundene Ausgangstext, während die Gliederung entsteht
+      if (material) k.zeige({ material }, { was: `Material gefunden: „${material.titel}"` })
       // Versuch (29.09.2026): zuerst ausarbeiten, damit Gliederung und Aufgaben zu ihm passen
       const versuch = ws.meta.versuch?.aktiv && !ws.meta.versuch.daten ? await versuchAusarbeiten(ws.meta, k) : null
-      const meta = versuch ? { ...ws.meta, versuch: { ...ws.meta.versuch!, daten: versuch } } : ws.meta
+      // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext (02.10.2026, didactics/sehtext.ts)
+      const meta = mitSehtext(versuch ? { ...ws.meta, versuch: { ...ws.meta.versuch!, daten: versuch } } : ws.meta, ws.sources)
       k.melde('Die KI plant Lernziele, Bausteine und Aufgaben passend zur Lerngruppe …')
       const outline = await generateOutline(meta, profileFromMeta(meta), ws.sources, k.ai, material)
       return { outline, material, versuch }
@@ -229,21 +233,28 @@ export function formuliereAus(worksheet: Worksheet, docId: string, optionen: { r
     },
     istOffen: () => blattOffen(docId),
     fehlerTitel: 'Arbeitsblatt konnte nicht erstellt werden',
-    arbeit: async (ws, k) => {
+    arbeit: async (eingabe, k) => {
+      // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext – samt Adresse für QR-Code und Link (didactics/sehtext.ts)
+      const ws = { ...eingabe, meta: mitSehtext(eingabe.meta, eingabe.sources) }
       const profile = profileFromMeta(ws.meta)
+      // Live-Vorschau: sofort das Gerüst aus der Gliederung – die erste Antwort dauert oft über eine Minute
+      if (ws.outline?.items.length) k.zeige({ geruest: ws.outline }, { was: 'Gliederung steht – die KI formuliert aus' })
       // Die inhaltliche Prüfung läuft auch im Sparmodus: Ein Blatt mit falschen Verweisen
       // oder unlösbaren Aufgaben spart kein Kontingent, sondern kostet Unterrichtszeit.
       const result = await generateWorksheet(ws, profile, {
         ai: k.ai,
         review: optionen.review,
         combined: optionen.economy,
-        onProgress: (message, done, total) => k.melde(message, done, total, 'formulate')
+        onProgress: (message, done, total) => k.melde(message, done, total, 'formulate'),
+        zwischenstand: (stand, was) => k.zeige(stand, { was })
       })
+      k.zeige(result, { was: 'Ausformuliert – Quellen und Bilder folgen' })
       await finishWorksheet(
         result,
         profile,
         { ai: k.ai, images: await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild }), sources: browserSourceServices() },
-        (message, done, total) => k.melde(message, done, total, 'finish')
+        (message, done, total) => k.melde(message, done, total, 'finish'),
+        (stand, was) => k.zeige(stand, { was })
       )
       return result
     },

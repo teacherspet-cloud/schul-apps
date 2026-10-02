@@ -1843,6 +1843,65 @@ function vtMitHinweis(hinweis: string): { aufgaben: number } {
   return { aufgaben: 1 }
 }
 
+/**
+ * Vokabeltest mit einer MINDMAP (02.10.2026) – für die Sichtprüfung beider Formen („mit Oberbegriffen",
+ * „ganz offen"), ohne KI: Thema, drei Äste und die Wörter wie aus einer KI-Antwort.
+ */
+function vtMindmap(variante: 'oberbegriffe' | 'offen' = 'oberbegriffe', freierAst = false): { aeste: number } {
+  const woerter: VocabEntry[] = [
+    ['kitchen', 'Küche'],
+    ['garden', 'Garten'],
+    ['bedroom', 'Schlafzimmer'],
+    ['to cook', 'kochen'],
+    ['to tidy up', 'aufräumen'],
+    ['to water', 'gießen'],
+    ['cosy', 'gemütlich'],
+    ['messy', 'unordentlich']
+  ].map(([term, translation], i) => ({ id: `m${i + 1}`, term, translation, include: true }))
+  const einstellungen: TestSettings = {
+    targetLanguage: 'en',
+    stateId: 'NI',
+    schoolTypeId: 'gymnasium',
+    languageOrder: 1,
+    grade: 6,
+    level: 'A1',
+    vocabCount: woerter.length,
+    variantCount: 1,
+    variantMode: 'sameVocab',
+    tasks: [{ type: 'mindmap', count: woerter.length, pointsPerItem: 1 }],
+    topic: 'My home',
+    pictureSource: 'none',
+    answerKey: true,
+    seed: 1,
+    mindmapVariante: variante,
+    mindmapFreierAst: freierAst
+  }
+  const block = TASK_TYPES.mindmap.build(
+    woerter,
+    {
+      topic: 'My home',
+      categories: [
+        { name: 'rooms', vocabIds: ['m1', 'm2', 'm3'] },
+        { name: 'activities', vocabIds: ['m4', 'm5', 'm6'] },
+        { name: 'adjectives', vocabIds: ['m7', 'm8'] }
+      ]
+    },
+    { settings: einstellungen, languageName: 'English', rng: createRng(1), allVocab: woerter } as never
+  )
+  useVokabeltest.getState().loadDocument({
+    version: 1,
+    header: defaultHeader(''),
+    settings: einstellungen,
+    vocab: woerter,
+    variants: [{ id: 'v1', label: 'A', blocks: [block] }],
+    fontSize: 11,
+    createdAt: new Date().toISOString()
+  })
+  useVokabeltest.getState().setListName('My home')
+  useVokabeltest.getState().setStep(2)
+  return { aeste: 3 }
+}
+
 /** Der Vokabeltest im Speicher (für Wachen) */
 const vtJetzt = (): TestDocument | null => useVokabeltest.getState().doc
 
@@ -2073,6 +2132,7 @@ export function installSelftest(): void {
     printHtmlMitTafelbild,
     vtLatein,
     vtMitHinweis,
+    vtMindmap,
     vtJetzt,
     vtJahrgang,
     vtHinweiszeile,

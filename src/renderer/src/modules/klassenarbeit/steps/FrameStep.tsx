@@ -1,3 +1,4 @@
+import InterkulturSchalter from '../../arbeitsblatt/steps/InterkulturSchalter'
 import SchreibGrammatikFeld from './SchreibGrammatikFeld'
 import SprechpruefungKarte from './SprechpruefungKarte'
 import { sprechpruefungAlsArbeit } from '../generation/sprechpruefung'
@@ -1065,6 +1066,8 @@ export default function FrameStep(): React.JSX.Element {
                       checked={meta.operatorenliste ?? upperSecondary(meta)}
                       onChange={(e) => patch({ operatorenliste: e.currentTarget.checked })}
                     />
+                    {/* Interkultureller Schwerpunkt (02.10.2026) – in der Klassenarbeit nur integrativ */}
+                    <InterkulturSchalter meta={meta} klassenarbeit onChange={(interkulturell) => patch({ interkulturell })} />
                     {meta.answerKey && (
                       <Select
                         label="Ausführlichkeit des Erwartungshorizonts"

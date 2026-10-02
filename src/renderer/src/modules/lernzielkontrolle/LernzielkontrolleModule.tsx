@@ -5,6 +5,9 @@ import EditorStep from './steps/EditorStep'
 import KurztestLibrary from './steps/KurztestLibrary'
 import SetupStep from './steps/SetupStep'
 import { useLernzielkontrolle } from './store'
+import { ZwischenstandsBlatt } from '../arbeitsblatt/render/BlattVorschau'
+import { kurztestToWorksheetAlle } from './render/kurztestWorksheet'
+import type { Kurztest } from './model/types'
 
 /**
  * Programm „Lernzielkontrolle".
@@ -40,6 +43,8 @@ export default function LernzielkontrolleModule({ active }: { active: boolean })
       einstellen={<SetupStep />}
       bearbeiten={() => <EditorStep />}
       texte={{ meine: 'Meine Lernzielkontrollen', neu: 'Neue Kontrolle' }}
+      // Live-Vorschau (02.10.2026): die entstehenden Fassungen
+      vorschau={(z) => <ZwischenstandsBlatt<Kurztest> z={z} alsBlatt={(t) => kurztestToWorksheetAlle(t)} />}
     />
   )
 }

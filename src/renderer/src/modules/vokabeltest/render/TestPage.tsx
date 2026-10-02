@@ -13,6 +13,7 @@ import { MaskottchenBild } from '../../arbeitsblatt/render/Illustration'
 import { vokabeltestFigur } from './maskottchen'
 import { kopfTexte } from './aufgabenTexte'
 import { istRtl, schriftFamilie } from '../../../shared/sprachSchrift'
+import { MindmapBild } from './MindmapBild'
 
 /** Seitenaufteilung eines Tests (aus der Messung in useTestLayout). */
 export interface PageLayout {
@@ -833,24 +834,10 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
       )
     }
 
-    case 'mindmap': {
-      // Oberbegriff in der Mitte, ringsum so viele leere Äste wie erwartete Wörter
-      return (
-        <div className="vt-mindmap">
-          <div className="vt-mindmap-topic">
-            <T value={block.topic} onChange={set((d, v) => ((d as typeof block).topic = v))} />
-          </div>
-          <div className="vt-mindmap-branches">
-            {block.items.map((it, i) => (
-              <div key={it.id} className="vt-mindmap-branch">
-                <span className="vt-mindmap-dot">{i + 1}</span>
-                <span className="vt-mindmap-line">{answers ? it.answer : ' '}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )
-    }
+    case 'mindmap':
+      // Echte Mindmap (02.10.2026): Thema in der Mitte, Äste mit Oberbegriffen oder offen – render/MindmapBild.tsx
+      return <MindmapBild block={block} />
+
 
     case 'picture':
       return (

@@ -211,7 +211,14 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
 }
 
 /** Erzeugt die Aufgaben einer Variante. */
-export async function generateKurztest(test: Kurztest, variante: string, ai: AiCall, onStep: (m: string) => void = () => undefined): Promise<WsBlock[]> {
+export async function generateKurztest(
+  test: Kurztest,
+  variante: string,
+  ai: AiCall,
+  onStep: (m: string) => void = () => undefined,
+  /** Live-Vorschau (02.10.2026): die Aufgaben, sobald sie entworfen sind – vor der Blindprobe */
+  zwischenstand?: (blocks: WsBlock[]) => void
+): Promise<WsBlock[]> {
   onStep(variante ? `Variante ${variante} wird entworfen …` : 'Aufgaben werden entworfen …')
   const data = await ai<{ blocks: Record<string, unknown>[] }>({
     system: kurztestPrompt(test, variante),
@@ -247,6 +254,7 @@ export async function generateKurztest(test: Kurztest, variante: string, ai: AiC
   if (test.meta.bewertung.punkteAufBlatt) verteilePunkte(blocks, test.meta.bewertung.bereich)
   // Ohne Punkte auf dem Blatt auch keine im Erwartungshorizont – die KI hält sich nicht immer an „0"
   else for (const a of aufgabenIn(blocks)) a.points = 0
+  zwischenstand?.(blocks)
   // Ankreuzfragen zu Texten (01.10.2026): Blindprobe ohne Text, Lösbares neu fassen (shared/verstehen/blindprobe.ts)
   if (blindprobeAktiv()) {
     const probe = await blindprobeBloecke(blocks, ai, { melde: onStep }).catch(() => null)

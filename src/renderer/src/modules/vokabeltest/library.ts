@@ -26,7 +26,9 @@ export function statsVon(payload: TestPayload, herkunft?: VocabListContext | nul
    */
   const ausName = lehrwerkAngaben(quelle?.bookName || name)
   const language = s?.targetLanguage || quelle?.language || ausName?.language || undefined
-  const grade = s?.grade ?? quelle?.grade ?? ausName?.grade
+  // Der Band des Lehrwerks bestimmt die Stufe (02.10.2026): „Green Line 3" ist Klasse 7, auch wenn der Test
+  // anders eingestellt ist – sonst ließ der Jahrgangsfilter der Themenbereiche nur Band 1 durch
+  const grade = ausName?.grade ?? s?.grade ?? quelle?.grade
   return {
     vocabCount: vocab.filter((v) => v.term.trim()).length,
     includedCount: includedVocab(vocab).length,

@@ -6,6 +6,7 @@ import ZweiSchrittModul, { type BibliotheksSeiteProps } from '../../shared/testm
 import { subjectById } from '../arbeitsblatt/model/subjects'
 import './auftrag'
 import { hatTafel, leeresTafelbild, standardName, type Tafelbild } from './model'
+import { TafelVorschau } from './editor/TafelVorschau'
 import Bearbeiten from './steps/Bearbeiten'
 import Einrichten from './steps/Einrichten'
 import { bibliothek, projektDatei, useTafelbild } from './store'
@@ -66,6 +67,8 @@ export default function TafelbildModule({ active }: { active: boolean }): React.
       einstellen={<Einrichten />}
       bearbeiten={() => <Bearbeiten />}
       texte={{ meine: 'Meine Tafelbilder', neu: 'Neues Tafelbild' }}
+      // Live-Vorschau (02.10.2026): Entwurf, Korrektur, Zeichnungen – das Formular bleibt dahinter offen
+      vorschau={(z) => <TafelVorschau z={z} />}
     />
   )
 }

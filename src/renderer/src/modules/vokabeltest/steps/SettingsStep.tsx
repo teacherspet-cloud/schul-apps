@@ -581,6 +581,34 @@ export default function SettingsStep(): React.JSX.Element {
                             />
                           </Group>
                         )}
+                        {sel && def.id === 'mindmap' && (
+                          <Stack gap={4} mt="xs">
+                            {/* Mindmap (02.10.2026): Wahl der Lehrkraft – „beides wählbar" */}
+                            <SegmentedControl
+                              size="xs"
+                              fullWidth
+                              data={[
+                                { value: 'oberbegriffe', label: 'Mit Oberbegriffen' },
+                                { value: 'offen', label: 'Ganz offen' }
+                              ]}
+                              value={settings.mindmapVariante ?? 'oberbegriffe'}
+                              onChange={(v) => patch({ mindmapVariante: v as TestSettings['mindmapVariante'] })}
+                            />
+                            <Text size="xs" c="dimmed">
+                              {(settings.mindmapVariante ?? 'oberbegriffe') === 'oberbegriffe'
+                                ? 'Die KI schlägt 3–5 Oberbegriffe für die Äste vor; an jedem Ast so viele Linien wie Wörter.'
+                                : 'Äste und Linien bleiben leer – die Lernenden ordnen und beschriften selbst.'}
+                            </Text>
+                            {(settings.mindmapVariante ?? 'oberbegriffe') === 'oberbegriffe' && (
+                              <Checkbox
+                                size="xs"
+                                label="Zusätzlich ein freier Ast für eigene Wörter"
+                                checked={Boolean(settings.mindmapFreierAst)}
+                                onChange={(e) => patch({ mindmapFreierAst: e.currentTarget.checked })}
+                              />
+                            )}
+                          </Stack>
+                        )}
                         {sel && def.id === 'pictureLabel' && (
                           <Select
                             mt="xs"

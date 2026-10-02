@@ -1,5 +1,5 @@
 // Gemeinsame Bausteine für den Word-Export aller Programme.
-import { BorderStyle, ImageRun, Paragraph, TextRun } from 'docx'
+import { BorderStyle, ImageRun, LineRuleType, Paragraph, TextRun } from 'docx'
 
 /** Word misst in Twips (1/20 pt): 1 cm = 567 Twips. */
 export const CM = 567
@@ -26,14 +26,19 @@ export interface RunOptions {
 export const run = (text: string, opts: RunOptions = {}): TextRun => new TextRun({ text, ...opts })
 
 /** Leere Schreiblinien. */
-export function writingLines(count: number, indentLeft = 420, spacingBefore = 200): Paragraph[] {
+export function writingLines(count: number, indentLeft = 420, spacingBefore = 200, linieMm?: number): Paragraph[] {
+  /*
+   * `linieMm` (02.10.2026): Linienabstand nach Jahrgang wie im Blatt (Arbeitsblatt: --ws-linie) –
+   * jede Linie genau so hoch. Ohne Angabe bleibt der bisherige Abstand (Vokabeltest u. a.).
+   */
+  const spacing = linieMm ? { before: 0, after: 0, line: Math.round(linieMm * MM), lineRule: LineRuleType.EXACT } : { before: spacingBefore }
   return Array.from(
     { length: count },
     () =>
       new Paragraph({
         children: [run(' ')],
         indent: { left: indentLeft },
-        spacing: { before: spacingBefore },
+        spacing,
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: '555555', space: 1 } }
       })
   )

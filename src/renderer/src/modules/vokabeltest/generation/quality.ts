@@ -1,5 +1,6 @@
 import { letter } from '../model/blocks'
 import type { Block, VocabEntry } from '../model/types'
+import { hatArtikel, wortartAusForm, wortartVon } from './wortart'
 
 export interface Issue {
   item?: number
@@ -17,7 +18,14 @@ export function containsWord(text: string, word: string): boolean {
 }
 
 /** Lokale, kostenlose Prüfungen direkt nach der Generierung. */
-export function checkBlock(block: Block, expectedVocab: VocabEntry[]): Issue[] {
+export function checkBlock(
+  block: Block,
+  expectedVocab: VocabEntry[],
+  /** Testsprache – für die Formprüfung der Ablenker (02.10.2026); ohne sie entfällt diese Prüfung */
+  sprache?: string,
+  /** Ganze Vokabelliste – Ablenker aus der Liste haben dort ihre Wortart */
+  liste: VocabEntry[] = expectedVocab
+): Issue[] {
   const issues: Issue[] = []
   const vocabById = new Map(expectedVocab.map((v) => [v.id, v]))
 
@@ -74,6 +82,11 @@ export function checkBlock(block: Block, expectedVocab: VocabEntry[]): Issue[] {
       if (new Set(block.right.map((r) => norm(r.text))).size !== block.right.length) {
         issues.push({ message: 'Auswahlwörter kommen doppelt vor.' })
       }
+      // Synonyme/Gegenteile (02.10.2026): Gegenteile müssen wirklich vorkommen (die Anweisung passt sich an)
+      if (block.taskType === 'synonymsAntonyms') {
+        const befund = synonymMischung(block.left.map((l) => l.relation))
+        if (befund) issues.push({ message: befund })
+      }
       coverage(block.left.map((l) => l.vocabId))
       break
     case 'choice':
@@ -86,6 +99,10 @@ export function checkBlock(block: Block, expectedVocab: VocabEntry[]): Issue[] {
         if (correct === undefined) issues.push({ item: i + 1, message: 'Richtige Antwort fehlt.' })
         else if (containsWord(`${it.before} ${it.after}`, correct)) {
           issues.push({ item: i + 1, message: `Die Lösung „${correct}" steht bereits im Satz.` })
+        }
+        if (correct !== undefined && sprache) {
+          const v = it.vocabId ? vocabById.get(it.vocabId) : undefined
+          for (const m of ablenkerBefunde(it.options, it.correct, sprache, v, liste)) issues.push({ item: i + 1, message: m })
         }
       })
       coverage(block.items.map((i) => i.vocabId))
@@ -111,11 +128,29 @@ export function checkBlock(block: Block, expectedVocab: VocabEntry[]): Issue[] {
       if (block.categories.length < 2) issues.push({ message: 'Weniger als zwei Kategorien.' })
       coverage(block.words.map((w) => w.vocabId))
       break
-    case 'mindmap':
+    case 'mindmap': {
       if (!block.topic.trim()) issues.push({ message: 'Der Oberbegriff der Mindmap fehlt.' })
-      if (block.items.length < 3) issues.push({ message: 'Zu wenige Äste für eine Mindmap.' })
+      if (block.items.length < 3) issues.push({ message: 'Zu wenige Wörter für eine Mindmap.' })
+      // Form mit Oberbegriffen (02.10.2026): Ohne mindestens zwei Oberbegriffe wird die Mindmap offen gedruckt
+      if (block.variante === 'oberbegriffe') {
+        const aeste = (block.branches ?? []).filter((b) => b.label.trim())
+        if (aeste.length < 2) {
+          issues.push({
+            message: 'Keine brauchbaren Oberbegriffe für die Äste – die Mindmap erscheint ganz offen. Bitte neu erzeugen oder Oberbegriffe eintragen.'
+          })
+        } else {
+          if (aeste.length > 5) issues.push({ message: `${aeste.length} Äste – mehr als fünf werden unübersichtlich.` })
+          const ohne = block.items.filter((i) => !aeste.some((b) => b.id === i.branchId))
+          if (ohne.length) issues.push({ message: `Keinem Oberbegriff zugeordnet: ${ohne.map((i) => i.answer).join(', ')}` })
+          const leer = aeste.filter((b) => !block.items.some((i) => i.branchId === b.id))
+          if (leer.length) issues.push({ message: `Ast ohne Wörter: ${leer.map((b) => b.label).join(', ')}` })
+          const verraten = aeste.filter((b) => block.items.some((i) => containsWord(b.label, i.answer)))
+          if (verraten.length) issues.push({ message: `Der Oberbegriff „${verraten[0].label}" enthält ein gesuchtes Wort.` })
+        }
+      }
       coverage(block.items.map((i) => i.vocabId))
       break
+    }
     case 'crossword':
       if (block.unplaced.length) issues.push({ message: `Passten nicht ins Rätsel: ${block.unplaced.join(', ')}` })
       block.entries.forEach((e) => {
@@ -146,6 +181,59 @@ export function checkBlock(block: Block, expectedVocab: VocabEntry[]): Issue[] {
       break
   }
   return issues
+}
+
+/**
+ * Synonyme/Gegenteile (02.10.2026): Bei mindestens drei Paaren soll mindestens ein Drittel
+ * Gegenteile sein (`mindestGegenteile`). Nur Gegenteile ist kein Fehler – dann fragt die
+ * Anweisung nach entgegengesetzter Bedeutung. Ohne Angaben (ältere Blöcke) keine Meldung.
+ */
+export function synonymMischung(relationen: (string | undefined)[]): string | null {
+  const n = relationen.length
+  if (n < 3 || relationen.some((r) => r !== '=' && r !== '≠')) return null
+  const gegenteile = relationen.filter((r) => r === '≠').length
+  const min = Math.ceil(n / 3)
+  if (gegenteile >= min) return null
+  return gegenteile === 0
+    ? `Nur Synonyme, keine Gegenteile – die Anweisung fragt deshalb nur nach gleicher Bedeutung. Verlangt sind mindestens ${min} Gegenteile (≠), soweit die Wörter welche haben.`
+    : `Nur ${gegenteile} von ${n} Paaren sind Gegenteile (≠) – verlangt sind mindestens ${min}, soweit die Wörter welche haben.`
+}
+
+/*
+ * Ablenker bei Multiple Choice (02.10.2026, Befund der Lehrkraft): Ein Ablenker darf nicht schon
+ * an seiner Form als falsch erkennbar sein. Ohne KI prüfbar ist nur das Äußerliche: Artikel bzw.
+ * „to" bei einigen Optionen und nicht bei anderen, eine -ing-Form neben Formen ohne, und eine
+ * andere Wortart laut Vokabelliste. Bedeutung und Plausibilität prüft die KI (generate.ts).
+ */
+export function ablenkerBefunde(options: string[], correct: number, sprache: string, vocab: VocabEntry | undefined, liste: VocabEntry[] = []): string[] {
+  const loesung = options[correct]
+  if (loesung === undefined) return []
+  const ablenker = options.filter((_, i) => i !== correct)
+  const out: string[] = []
+  const mitArtikel = (o: string): boolean => hatArtikel(o, sprache)
+  if (ablenker.some((o) => mitArtikel(o) !== mitArtikel(loesung))) {
+    out.push('Ablenker an der Form erkennbar: Der Artikel steht nicht bei allen Antwortmöglichkeiten gleich.')
+  }
+  if (sprache === 'en') {
+    const mitTo = (o: string): boolean => /^to\s+\S/i.test(o.trim())
+    if (ablenker.some((o) => mitTo(o) !== mitTo(loesung))) out.push('Ablenker an der Form erkennbar: „to" steht nicht bei allen Antwortmöglichkeiten.')
+    const ing = (o: string): boolean => /\p{L}{2,}ing$/u.test(o.trim())
+    const verb = vocab ? wortartVon(vocab, sprache) === 'verb' : false
+    if (verb && ing(loesung) && ablenker.some((o) => !ing(o)))
+      out.push('Ablenker an der Form erkennbar: Die Lösung ist eine -ing-Form, nicht alle Ablenker sind es.')
+  }
+  // Wortart: Ablenker, die Wörter der Liste sind, haben dort eine bekannte Wortart; sonst zählt die Form
+  const art = vocab ? wortartVon(vocab, sprache) : undefined
+  if (art) {
+    const ohneVorsatz = (t: string): string => norm(t).replace(/^(to|a|an|the)\s+/, '')
+    const fremd = ablenker.filter((o) => {
+      const eintrag = liste.find((x) => norm(x.term) === norm(o) || ohneVorsatz(x.term) === norm(o))
+      const a = eintrag ? wortartVon(eintrag, sprache) : wortartAusForm(o, sprache)
+      return a !== undefined && a !== art
+    })
+    if (fremd.length) out.push(`Ablenker in anderer Wortart als die Lösung: ${fremd.join(', ')}`)
+  }
+  return out
 }
 
 /** Kompakte Textfassung eines Blocks für die KI-Prüfung. */
@@ -187,10 +275,22 @@ export function describeBlock(block: Block): string {
     case 'oddOneOut':
       block.items.forEach((it, i) => lines.push(`${i + 1}. ${it.words.join(', ')}  → odd one: ${it.answer} (${it.reason})`))
       break
-    case 'mindmap':
+    case 'mindmap': {
       lines.push(`Mind map topic: ${block.topic}`)
-      block.items.forEach((it, i) => lines.push(`${i + 1}. ${it.answer}`))
+      const aeste = (block.branches ?? []).filter((b) => b.label.trim())
+      if (block.variante === 'oberbegriffe' && aeste.length) {
+        // Die Oberbegriffe stehen auf dem Blatt – die Prüfung soll sehen, ob jedes Wort eindeutig zu einem Ast gehört
+        lines.push('(Branch labels are given on the sheet; students write each word on the twigs of the matching branch.)')
+        for (const b of aeste) {
+          const woerter = block.items.filter((i) => i.branchId === b.id).map((i) => i.answer)
+          lines.push(`Branch "${b.label}": ${woerter.join(', ')}`)
+        }
+      } else {
+        lines.push('(Open mind map: students organise the words themselves.)')
+        block.items.forEach((it, i) => lines.push(`${i + 1}. ${it.answer}`))
+      }
       break
+    }
     case 'categorize':
       lines.push(`Categories: ${block.categories.map((c) => c.name).join(', ')}`)
       block.words.forEach((w, i) => lines.push(`${i + 1}. ${w.text} → ${block.categories.find((c) => c.id === w.categoryId)?.name}`))

@@ -61,3 +61,45 @@ export function zeilenHoehe(mm: number): number {
 export function zeilenHoehen(block: Pick<TableBlock, 'rows' | 'rowHeightsMm'>): number[] {
   return block.rows.map((_, r) => block.rowHeightsMm?.[r] ?? 0)
 }
+
+/**
+ * Von Hand gezogene Maße der übrigen Tabellen (02.10.2026): Richtig/Falsch, Zuordnung,
+ * Fragenreihe zum Ankreuzen und Selbsteinschätzung. Befund der Lehrkraft: Antwortfelder zu klein,
+ * Tabellen nicht größer zu ziehen. Ohne Maße bleibt die bisherige Darstellung unverändert.
+ */
+export interface HandMasse {
+  colWidths?: number[]
+  rowHeightsMm?: number[]
+  headerHeightMm?: number
+}
+
+/** Ein Zug an einer Tabellenlinie (render/tabelleZiehen.ts) */
+export interface Zug {
+  art: 'spalte' | 'zeile' | 'kopf'
+  index: number
+  colWidths?: number[]
+  hoeheMm?: number
+}
+
+/** Eigene Spaltenbreiten in Prozent (Summe 100), wenn sie zur Spaltenzahl passen – sonst undefined */
+export function eigeneBreiten(m: HandMasse | undefined, n: number): number[] | undefined {
+  const roh = m?.colWidths
+  if (!roh || roh.length !== n || !roh.every((w) => Number.isFinite(w) && w > 0)) return undefined
+  const summe = roh.reduce((a, b) => a + b, 0)
+  return roh.map((w) => Math.round((w / summe) * 1000) / 10)
+}
+
+/** Einen Zug in die Maße übernehmen – EIN Aufruf je Geste, damit es ein Rückgängig-Schritt bleibt */
+export function zugUebernehmen(d: HandMasse, z: Zug, zeilen: number): void {
+  if (z.art === 'spalte') {
+    if (z.colWidths) d.colWidths = z.colWidths
+  } else if (z.art === 'kopf') {
+    if (z.hoeheMm) d.headerHeightMm = z.hoeheMm
+    else delete d.headerHeightMm
+  } else {
+    const h = Array.from({ length: Math.max(zeilen, z.index + 1) }, (_, r) => d.rowHeightsMm?.[r] ?? 0)
+    h[z.index] = z.hoeheMm ?? 0
+    if (h.some((x) => x > 0)) d.rowHeightsMm = h
+    else delete d.rowHeightsMm
+  }
+}

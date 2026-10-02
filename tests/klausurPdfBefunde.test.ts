@@ -78,6 +78,21 @@ describe('Klausur: Operatoren unter der Aufgabe, keine Linien in der Sek II', ()
     expect(ids.indexOf(OPERATOREN_BLOCK_ID)).toBeGreaterThan(ids.indexOf('t-31'))
   })
 
+  /*
+   * 01.10.2026: Die Lehrkraft zieht den Kasten im Blatt nach oben oder unten; gespeichert wird der
+   * Baustein davor. Gibt es ihn nicht (mehr), gilt wieder die vorgesehene Stelle. Der Kasten ist
+   * abgesetzt, damit er nicht an der Aufgabe klebt.
+   */
+  it('von Hand verschoben: hinter dem gewählten Baustein, sonst an der vorgesehenen Stelle – immer abgesetzt', () => {
+    const bloecke = [aufgabe('**Write** an email based on M1.'), text()]
+    const ids = (nach?: string): string[] => examToWorksheet(arbeit({ operatorenNach: nach }, bloecke)).sheets[0].blocks.map((b) => b.id)
+    expect(ids('m1').indexOf(OPERATOREN_BLOCK_ID)).toBe(ids('m1').indexOf('m1') + 1)
+    expect(ids('t-31').indexOf(OPERATOREN_BLOCK_ID)).toBe(ids('t-31').indexOf('t-31') + 1)
+    expect(ids('gibt-es-nicht')).toEqual(ids())
+    const kasten = examToWorksheet(arbeit({}, bloecke)).sheets[0].blocks.find((b) => b.id === OPERATOREN_BLOCK_ID)
+    expect(kasten?.type === 'infoBox' && kasten.abgesetzt).toBe(true)
+  })
+
   it('operatorenStelle: Text vor den Aufgaben → hinter den Aufgaben; ohne Aufgaben → am Ende', () => {
     const d = (id: string): WsBlock => ({ id, type: 'divider', title: id }) as WsBlock
     const t = (id: string): WsBlock => ({ ...(newBlock('task') as TaskBlock), id })

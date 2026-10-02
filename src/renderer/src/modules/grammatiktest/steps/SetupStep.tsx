@@ -147,7 +147,7 @@ export default function SetupStep(): React.JSX.Element {
         eingabe: test,
         istOffen: () => testOffen(docId),
         fehlerTitel: 'Der Test konnte nicht erstellt werden',
-        arbeit: (t, k) => generateVerbTest(t, brauchtKi(t.meta.verben!) ? k.ai : null, (m) => k.melde(m)),
+        arbeit: (t, k) => generateVerbTest(t, brauchtKi(t.meta.verben!) ? k.ai : null, (m) => k.melde(m), (blocks) => k.zeige({ ...t, blocks }, { was: 'Gruppe A steht' })),
         // Punkte je Form: Die Summe steht danach auch in den Angaben
         ablegen: (r, t) =>
           legeTestAb(
@@ -172,7 +172,7 @@ export default function SetupStep(): React.JSX.Element {
       eingabe: test,
       istOffen: () => testOffen(docId),
       fehlerTitel: 'Der Test konnte nicht erstellt werden',
-      arbeit: (t, k) => generateTest(t, k.ai, (m) => k.melde(m)),
+      arbeit: (t, k) => generateTest(t, k.ai, (m) => k.melde(m), (blocks) => k.zeige({ ...t, blocks }, { was: 'Aufgaben stehen – Ankreuzfragen werden geprüft' })),
       // Ein eigener Verlaufsschritt: Strg+Z holt die vorigen Aufgaben zurück
       ablegen: (blocks, t) => legeTestAb(docId, t, (aktuell) => ({ ...aktuell, blocks }), 1)
     })

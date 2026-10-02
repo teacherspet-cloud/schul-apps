@@ -54,11 +54,23 @@ const SEITEN = (wurzel) => {
       for (const el of [k, ...k.querySelectorAll('*')]) {
         if (el.closest('.editor-block-toolbar, .editor-ai-revise-slot, [data-seitenrand-ignorieren]')) continue
         const r = el.getBoundingClientRect()
-        if (r.width > 0.5 && r.height > 0.5) tiefste = Math.max(tiefste, r.bottom)
+        // Zeilenweise geteilter Absatz (02.10.2026): sichtbar ist nur, was im Rahmen steht – der Rest ist abgeschnitten
+        const schnitt = el.closest('.ws-zeilen-schnitt')
+        const unten = schnitt ? Math.min(r.bottom, schnitt.getBoundingClientRect().bottom) : r.bottom
+        if (r.width > 0.5 && r.height > 0.5) tiefste = Math.max(tiefste, unten)
       }
     }
     return {
-      ziffern: [...seite.querySelectorAll('.ws-paragraph sup')].map((s) => s.textContent.trim()),
+      // Nur sichtbare Ziffern: Bei zeilenweise geteilten Absätzen steckt der Rest abgeschnitten im Rahmen (02.10.2026)
+      ziffern: [...seite.querySelectorAll('.ws-paragraph sup')]
+        .filter((s) => {
+          const rahmen = s.closest('.ws-zeilen-schnitt')
+          if (!rahmen) return true
+          const r = s.getBoundingClientRect()
+          const f = rahmen.getBoundingClientRect()
+          return r.top >= f.top - 1 && r.bottom <= f.bottom + 1
+        })
+        .map((s) => s.textContent.trim()),
       noten: fn ? [...fn.querySelectorAll('[data-fn-nr]')].map((s) => s.getAttribute('data-fn-nr')) : [],
       liste: seite.querySelectorAll('.ws-glossary').length,
       inFussnoten: Math.round(((tiefste - grenze) / mm) * 10) / 10,

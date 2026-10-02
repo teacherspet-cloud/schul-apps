@@ -1078,4 +1078,13 @@ export interface VideoQuelle {
   /** Untertitel automatisch erzeugt (können Fehler enthalten) */
   automatisch: boolean
   fehler?: string
+  /** Woher das Video stammt (02.10.2026) – fehlt bei älteren Antworten: YouTube */
+  anbieter?: 'youtube' | 'ard' | 'zdf' | 'arte'
+  /**
+   * Woher der Inhalt stammt: wörtliche Untertitel (mit Zeitmarken „[mm:ss]"), ein Inhaltsprotokoll
+   * der KI, die das Video selbst gesehen hat (Gemini, nur öffentliche YouTube-Videos), oder nichts.
+   */
+  inhaltQuelle?: 'untertitel' | 'ki' | 'keine'
+  /** Mediathek: abrufbar bis (ISO-Datum) – Sendungen verschwinden nach Monaten */
+  verfuegbarBis?: string
 }

@@ -73,6 +73,13 @@ pruefe(vorher.daneben === 1, `Vorher steht die Tabelle neben der Aufgabe (${vorh
  */
 const griff = page.locator('.ws-side-image [aria-label="Baustein verschieben"]').first()
 await griff.scrollIntoViewIfNeeded()
+/*
+ * Erst den Baustein überfahren: Seit 01.10.2026 rückt die Leiste beim Einblenden an ihren Platz
+ * (shared/touch/leistenLage.ts). Vorher gelesen, lag der Knopf noch an der alten Stelle – der
+ * Druck traf den Tabellenkopf darunter (gefunden 02.10.2026, auch schon im Stand 0.4.14).
+ */
+await page.locator('.ws-side-image .editor-block').first().hover()
+await page.waitForTimeout(300)
 const g = await griff.boundingBox()
 if (!g) throw new Error('Der Anfassknopf der Tabelle ist nicht zu finden')
 
@@ -180,7 +187,12 @@ const textLage = async () =>
           if (!r) return 0
           const unten = r.getBoundingClientRect().bottom
           const teile = [...r.querySelectorAll('.ws-paragraph, .ws-block')]
-          return Math.round(Math.max(0, ...teile.map((t) => t.getBoundingClientRect().bottom)) - unten)
+          // Zeilenweise geteilter Absatz (02.10.2026): nur der sichtbare Teil im Rahmen zählt
+          const sichtbarUnten = (t) => {
+            const s = t.closest('.ws-zeilen-schnitt')
+            return s ? Math.min(t.getBoundingClientRect().bottom, s.getBoundingClientRect().bottom) : t.getBoundingClientRect().bottom
+          }
+          return Math.round(Math.max(0, ...teile.map(sichtbarUnten)) - unten)
         })
       )
     }

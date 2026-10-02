@@ -18,9 +18,13 @@ import { stripMaterialNo } from './galerie'
  */
 export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: PlacedItem }): React.JSX.Element {
   const ctx = useWs()
-  const edit = ctx.mode === 'edit'
   // Texte auch in der Lösungsansicht bearbeitbar (30.09.2026)
   const schreiben = isEditMode(ctx.mode)
+  /*
+   * Griffe auch in der Lösungsansicht (02.10.2026): Die Maße gehören zum Baustein, nicht zur
+   * Ansicht – wer beim Eintragen der Lösungen merkt, dass eine Zelle zu klein ist, zieht sie dort.
+   */
+  const edit = schreiben
   const set = useSetter(block)
   const tableRef = useRef<HTMLTableElement>(null)
   const [vorschau, setVorschau] = useState<{ colWidths: number[]; rowHeightsMm: number[]; headerHeightMm: number; widthPercent: number } | null>(null)
@@ -38,6 +42,14 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
   const kopfHoehe = vorschau?.headerHeightMm ?? block.headerHeightMm ?? 0
   const breite = vorschau?.widthPercent ?? block.widthPercent ?? 100
   const mitMassen = Boolean(block.colWidths?.length || vorschau || gemessen)
+
+  const spaltenGriff = (c: number): React.JSX.Element => (
+    <span
+      className="ws-spalten-griff"
+      title={c < breiten.length - 1 ? 'Spaltenbreite ziehen' : 'Tabellenbreite ziehen'}
+      onPointerDown={(e) => ziehen(e, c < breiten.length - 1 ? 'spalte' : 'tabelle', c)}
+    />
+  )
 
   const ziehen = (e: React.PointerEvent, art: 'spalte' | 'tabelle' | 'zeile' | 'kopf', index: number): void => {
     const table = tableRef.current
@@ -118,11 +130,7 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
                 <Feld value={h} editable={schreiben} onChange={set((d, v) => (d.headers[c] = v))} />
                 {edit && (
                   <>
-                    <span
-                      className="ws-spalten-griff"
-                      title={c < breiten.length - 1 ? 'Spaltenbreite ziehen' : 'Tabellenbreite ziehen'}
-                      onPointerDown={(e) => ziehen(e, c < breiten.length - 1 ? 'spalte' : 'tabelle', c)}
-                    />
+                    {spaltenGriff(c)}
                     <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'kopf', 0)} />
                   </>
                 )}
@@ -136,7 +144,13 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
               {row.map((cell, c) => (
                 <td key={c}>
                   <RichText value={cell} inline editable={schreiben} onChange={set((d, v) => (d.rows[from + r][c] = v))} />
-                  {edit && <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'zeile', from + r)} />}
+                  {/* Spaltengriffe auch in den Zellen (02.10.2026): Tabellen ohne Kopfzeile hatten sonst keine, und auf dem iPad ist die ganze Linie leichter zu treffen */}
+                  {edit && (
+                    <>
+                      {spaltenGriff(c)}
+                      <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'zeile', from + r)} />
+                    </>
+                  )}
                 </td>
               ))}
             </tr>
