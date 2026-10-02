@@ -11,6 +11,7 @@
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
  */
 import { existsSync } from 'node:fs'
+import { ablageVerschluesseln } from './shims/fs'
 import { registriereKanaele, type Handle } from '../main/kanaele'
 import { setzeGeheimRueckfall } from '../main/services/storage/settings'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
@@ -73,6 +74,10 @@ async function main(): Promise<void> {
     if (n && (kanal === 'audio:speak' || kanal === 'audio:import')) return mitFreigabe(wert, n.id, adresse)
     return wert
   }
+
+  // Personenbezogenes verschlüsselt (feldschutz.ts, shims/fs.ts): Altdateien der Ablagen einmal umschreiben
+  const umgeschrieben = ablageVerschluesseln()
+  if (umgeschrieben) console.log(`${umgeschrieben} Dateien der Ablagen verschlüsselt.`)
 
   const hosts = (env.SCHULAPPS_HOSTS || new URL(adresse).host)
     .split(',')

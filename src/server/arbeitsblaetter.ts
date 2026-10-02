@@ -29,6 +29,7 @@ import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFr
 import { PULS_MS } from '../main/services/lanServer'
 import { seitenMitTinte } from './druck'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
+import { ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { aufgabenFeedbackAnfrage, aufgabenFeedbackAus, blattAbgabeText, type BlattAufgabe, type BlattFeld } from '../shared/blattFreigabe'
 
 const SCHEMA = `
@@ -304,7 +305,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         const seiten = [...new Set(felder.map((f) => f.seite))]
         const mitTinte = Object.fromEntries(seiten.filter((s) => tinte[String(s)]).map((s) => [String(s), tinte[String(s)]]))
         const bilder = e.stift ? await seitenMitTinte(z.html, mitTinte).catch(() => [] as string[]) : []
-        const text = blattAbgabeText([aufgabe], felder, antworten)
+        // Eigene und fremde Namen im Text durch Kürzel ersetzen (wie beim Bogen); der Namensfilter greift zusätzlich
+        const text = ohneNamen({ id: 'a', kuerzel: 'S1', name: ich.name, dateiname: '', text: blattAbgabeText([aufgabe], felder, antworten), bilder: [] }).text
         if (!text.trim() && !bilder.length) return (json(res, 400, { fehler: 'Bitte zuerst etwas eintragen.' }), true)
         try {
           const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache)]))

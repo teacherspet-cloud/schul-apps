@@ -109,6 +109,16 @@ export async function seitenMitTinte(html: string, tinte: Record<string, string>
         bild.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:50'
         seite.appendChild(bild)
       }
+      // Kopf mit Name/Klasse/Datum abdecken – ein dort hingeschriebener Name darf nicht an die KI
+      for (const seite of alle) {
+        const kopf = seite.querySelector<HTMLElement>('.ws-header')
+        if (!kopf) continue
+        const p = seite.getBoundingClientRect()
+        const r = kopf.getBoundingClientRect()
+        const decke = document.createElement('div')
+        decke.style.cssText = `position:absolute;left:0;top:${r.top - p.top}px;width:100%;height:${r.height + 4}px;background:#fff;z-index:60`
+        seite.appendChild(decke)
+      }
     }, tinte)
     await s.waitForTimeout(100)
     const bilder: string[] = []

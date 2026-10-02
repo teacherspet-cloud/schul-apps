@@ -14,9 +14,26 @@ import { defineConfig } from 'vite'
 const r = (p: string): string => resolve(__dirname, p)
 const version = (JSON.parse(readFileSync(r('package.json'), 'utf8')) as { version: string }).version
 
+/**
+ * Dateien der Nutzer verschlüsselt (02.10.2026, src/server/shims/fs.ts): Hauptprozess-Bausteine und
+ * Server bekommen statt `fs` die Hülle – außer der Hülle selbst und dem, was sie braucht.
+ */
+const dateischutz = {
+  name: 'schulapps-dateischutz',
+  enforce: 'pre' as const,
+  resolveId(quelle: string, von?: string): string | null {
+    if ((quelle !== 'fs' && quelle !== 'node:fs') || !von) return null
+    const p = von.replace(/\\/g, '/')
+    if (!p.includes('/src/main/') && !p.includes('/src/server/')) return null
+    if (/\/src\/server\/(shims\/fs|geheim|pfade)\.ts$/.test(p)) return null
+    return r('src/server/shims/fs.ts')
+  }
+}
+
 export default defineConfig({
   cacheDir: join(tmpdir(), 'schulapps-vite-server'),
   publicDir: false,
+  plugins: [dateischutz],
   resolve: {
     alias: [
       { find: /^electron$/, replacement: r('src/server/shims/electron.ts') },

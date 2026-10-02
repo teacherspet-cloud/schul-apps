@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import { DATEN, ordner } from './pfade'
 import type { Nutzer, Rolle } from './kontext'
 import { entschluessle, verschluessle } from './geheim'
+import { geschuetzt, migriere } from './feldschutz'
 
 let db: DatabaseSync | null = null
 
@@ -58,20 +59,25 @@ CREATE TABLE IF NOT EXISTS protokoll (
 export function datenbank(datei = join(DATEN, 'schulapps.db')): DatabaseSync {
   if (db) return db
   ordner()
-  db = new DatabaseSync(datei)
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
-  db.exec(SCHEMA)
-  ergaenze(db)
+  const roh = new DatabaseSync(datei)
+  roh.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
+  roh.exec(SCHEMA)
+  ergaenze(roh)
+  // Personenbezogenes nur verschlüsselt (feldschutz.ts); vorhandene Nutzer gleich umschreiben
+  migriere(roh, 'nutzer')
+  db = geschuetzt(roh)
   return db
 }
 
 /** Nur für Tests: eigene Datenbank im Speicher */
 export function datenbankFuerTests(): DatabaseSync {
   db?.close()
-  db = new DatabaseSync(':memory:')
-  db.exec('PRAGMA foreign_keys = ON;')
-  db.exec(SCHEMA)
-  ergaenze(db)
+  const roh = new DatabaseSync(':memory:')
+  roh.exec('PRAGMA foreign_keys = ON;')
+  roh.exec(SCHEMA)
+  ergaenze(roh)
+  migriere(roh, 'nutzer')
+  db = geschuetzt(roh)
   return db
 }
 
@@ -148,7 +154,10 @@ export const passwortHashVon = (benutzer: string): string | null =>
     ?.passwort_hash ?? null)
 
 export function alleNutzer(): NutzerInfo[] {
-  return (datenbank().prepare('SELECT * FROM nutzer ORDER BY rolle, benutzer').all() as unknown as NutzerZeile[]).map(alsInfo)
+  // Sortiert nach dem (entschlüsselten) Benutzernamen – in der Spalte steht nur der Suchschlüssel
+  return (datenbank().prepare('SELECT * FROM nutzer').all() as unknown as NutzerZeile[])
+    .map(alsInfo)
+    .sort((a, b) => a.rolle.localeCompare(b.rolle) || a.benutzer.localeCompare(b.benutzer))
 }
 
 /** Neue Kennung für einen Nutzer: Kleinbuchstaben/Ziffern (taugt als Ordnername) */
@@ -165,8 +174,8 @@ export function nutzerAnlegen(n: {
 }): NutzerInfo {
   const id = neueNutzerId()
   datenbank()
-    .prepare('INSERT INTO nutzer (id, benutzer, name, rolle, quelle, passwort_hash, gruppen, erstellt, passwort_wechseln) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, n.benutzer.toLowerCase(), n.name, n.rolle, n.quelle, n.passwortHash ?? null, JSON.stringify(n.gruppen ?? []), jetzt(), n.passwortWechseln ? 1 : 0)
+    .prepare('INSERT INTO nutzer (id, benutzer, benutzer_v, name, rolle, quelle, passwort_hash, gruppen, erstellt, passwort_wechseln) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, n.benutzer.toLowerCase(), n.benutzer.toLowerCase(), n.name, n.rolle, n.quelle, n.passwortHash ?? null, JSON.stringify(n.gruppen ?? []), jetzt(), n.passwortWechseln ? 1 : 0)
   return nutzerNachId(id)!
 }
 
