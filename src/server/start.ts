@@ -23,6 +23,8 @@ import { herzschlagStarten } from './ereignisse'
 import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
+import { hoertextRoute, mitFreigabe } from './hoertexte'
+import { aktuellerNutzer } from './kontext'
 import { DATEN, OBERFLAECHE } from './pfade'
 
 const env = process.env
@@ -43,6 +45,9 @@ async function main(): Promise<void> {
   // Vom Admin für alle freigegebene Schlüssel – nur, wenn der Nutzer keinen eigenen hat
   setzeGeheimRueckfall(freigegebenerSchluessel)
 
+  const port = Number(env.SCHULAPPS_PORT || 8443)
+  const adresse = (env.SCHULAPPS_ADRESSE || `http://localhost:${port}`).replace(/\/$/, '')
+
   // Alle Aufrufe der Oberfläche, wie am PC – nur mit der Umgebung des Servers
   const aufrufe = new Map<string, (...args: unknown[]) => unknown>()
   const handle: Handle = (kanal, fn) => void aufrufe.set(kanal, fn as (...args: unknown[]) => unknown)
@@ -53,10 +58,15 @@ async function main(): Promise<void> {
     return fn(...args)
   }
   // Klarnamen nie an eine KI (namensfilter.ts) – EINE Stelle für alle KI- und Sprachausgabe-Aufrufe
-  const aufruf = mitNamensschutz(roh)
+  const geschuetzt = mitNamensschutz(roh)
+  // Hörtexte: jede Aufnahme bekommt eine Adresse für den QR-Code (hoertexte.ts)
+  const aufruf = async (kanal: string, args: unknown[]): Promise<unknown> => {
+    const wert = await geschuetzt(kanal, args)
+    const n = aktuellerNutzer()
+    if (n && (kanal === 'audio:speak' || kanal === 'audio:import')) return mitFreigabe(wert, n.id, adresse)
+    return wert
+  }
 
-  const port = Number(env.SCHULAPPS_PORT || 8443)
-  const adresse = (env.SCHULAPPS_ADRESSE || `http://localhost:${port}`).replace(/\/$/, '')
   const hosts = (env.SCHULAPPS_HOSTS || new URL(adresse).host)
     .split(',')
     .map((h) => h.trim())
@@ -65,7 +75,7 @@ async function main(): Promise<void> {
   const key = env.SCHULAPPS_TLS_KEY
   const tls = cert && key && existsSync(cert) && existsSync(key) ? { cert, key } : undefined
 
-  await starteServer({ port, adresse, hosts, aufruf, tls, routen: [verwaltungsRoute] })
+  await starteServer({ port, adresse, hosts, aufruf, tls, routen: [hoertextRoute, verwaltungsRoute] })
   console.log(`Schul-Apps-Server läuft: ${adresse} (${tls ? 'TLS' : 'ohne TLS'}), Daten: ${DATEN}, Oberfläche: ${OBERFLAECHE}`)
   protokolliereServer('start', `Server gestartet (${tls ? 'TLS' : 'ohne TLS'})`)
 

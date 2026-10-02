@@ -456,7 +456,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
       /** Gespeicherte Datei erneut laden; null, wenn sie nicht mehr da ist */
       read: (fileName: string) => call<string | null>('audio:read', fileName),
       /** Eigene MP3 (z. B. Original-Hördatei des Verlags) als Aufnahme des Bausteins `id` ablegen (29.09.2026) */
-      import: (id: string, daten: Uint8Array) => call<{ fileName: string; dataUrl: string; bytes: number }>('audio:import', id, daten),
+      import: (id: string, daten: Uint8Array) => call<{ fileName: string; dataUrl: string; bytes: number; freigabe?: string }>('audio:import', id, daten),
       showInFolder: (fileName: string) => call<void>('audio:show', fileName)
     },
     files: {

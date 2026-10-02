@@ -37,6 +37,7 @@ import { DATEN, nutzerOrdner } from './pfade'
 import { offeneStroeme } from './ereignisse'
 import type { Rolle } from './kontext'
 import { registerVergessen } from './namensschutz'
+import { alleFreigaben, freigabeWiderrufen } from './hoertexte'
 
 /** Schlüssel, die der Admin für alle freigeben kann */
 export const TEILBARE_SCHLUESSEL: SecretName[] = ['openai', 'anthropic', 'google', 'elevenlabs', 'pixabay']
@@ -94,6 +95,10 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
         }),
         true
       )
+    }
+    if (was === 'hoertexte') {
+      const namen = new Map(alleNutzer().map((n) => [n.id, n.benutzer]))
+      return (json(res, 200, { freigaben: alleFreigaben().map((f) => ({ ...f, benutzer: namen.get(f.nutzer_id) ?? '' })) }), true)
     }
     if (was === 'protokoll') return (json(res, 200, { eintraege: leseServerProtokoll(Number(url.searchParams.get('anzahl')) || 300) }), true)
     return (json(res, 404, { fehler: 'Unbekannt.' }), true)
@@ -160,6 +165,11 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     if (typeof k0.geheimnis === 'string' && k0.geheimnis.trim()) setzeServerGeheimnis('iserv-client', k0.geheimnis.trim())
     protokolliereServer('verwaltung', 'IServ-Anbindung geändert', ich)
     return (json(res, 200, { ok: true }), true)
+  }
+  if (was === 'hoertext-widerrufen') {
+    const ok = freigabeWiderrufen(String(k0.kennung ?? ''))
+    if (ok) protokolliereServer('verwaltung', 'Hörtext-Freigabe widerrufen', ich)
+    return (json(res, 200, { ok }), true)
   }
   if (was === 'notzugang') {
     setzeServerWert('notzugang', Boolean(k0.an))

@@ -73,7 +73,7 @@ export function spieldauer(dataUrl: string, wartezeit = 4000): Promise<number> {
 }
 
 /** MP3 an den Hauptprozess geben; liefert Dateiname und Adresse zum Abspielen. */
-export async function importiereHoerdatei(blockId: string, file: File): Promise<{ fileName: string; dataUrl: string; bytes: number; seconds: number }> {
+export async function importiereHoerdatei(blockId: string, file: File): Promise<{ fileName: string; dataUrl: string; bytes: number; seconds: number; freigabe?: string }> {
   if (!/\.mp3$/i.test(file.name) && file.type !== 'audio/mpeg') throw new Error('Nur MP3-Dateien – andere Formate (WAV, M4A) bitte vorher umwandeln.')
   const res = await window.api.audio.import(blockId, new Uint8Array(await file.arrayBuffer()))
   return { ...res, seconds: await spieldauer(res.dataUrl) }

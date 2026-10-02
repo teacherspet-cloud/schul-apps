@@ -451,6 +451,8 @@ export interface TtsRequest {
 }
 
 export interface TtsResult {
+  /** Server (02.10.2026, src/server/hoertexte.ts): Adresse der Abspielseite für den QR-Code */
+  freigabe?: string
   fileName: string
   dataUrl: string
   bytes: number

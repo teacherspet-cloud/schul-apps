@@ -1,4 +1,5 @@
 import { ActionIcon, Alert, Badge, Button, Card, Chip, FileButton, Group, Select, Stack, Switch, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
+import { aufServer } from '../../../shared/plattform'
 import {
   IconDownload,
   IconExternalLink,
@@ -41,6 +42,9 @@ import { dauerAngabe, ersetzeDauerangaben, hoertextZu, hoerzeit, minSek, scriptT
 export { scriptTurns }
 
 /** Namen, die im Skript sprechen – Grundlage für die Stimmenauswahl. */
+/** Eine vom Schul-Apps-Server vergebene Hörtext-Adresse (…/h/<kennung>) */
+const istServerHoertext = (url: string): boolean => /\/h\/[A-Za-z0-9_-]{16,40}$/.test(url)
+
 export function speakerNames(block: AudioBlock): string[] {
   const names = scriptTurns(block)
     .map((t) => t.name)
@@ -227,6 +231,8 @@ export function AudioPanel({
         b.audio = { dataUrl: res.dataUrl, fileName: res.fileName, ...(res.seconds > 0 ? { sekunden: res.seconds } : {}) }
         b.origin = 'archiv'
         if (res.seconds > 0) b.seconds = res.seconds
+        // Server: auch die eigene Hördatei bekommt eine Adresse für den QR-Code
+        if (res.freigabe && (!b.url || istServerHoertext(b.url))) b.url = res.freigabe
       })
       notifySuccess(`Hördatei eingebunden (${Math.round(res.bytes / 1024)} kB) – im Unterricht läuft diese Aufnahme.`)
     } catch (e) {
@@ -333,6 +339,8 @@ export function AudioPanel({
         }
         // Vertont von der Sprachsynthese: wieder als KI-Aufnahme kennzeichnen (29.09.2026)
         delete b.origin
+        // Server (02.10.2026): Adresse der Abspielseite als QR-Adresse – eine eigene Adresse bleibt
+        if (res.freigabe && (!b.url || istServerHoertext(b.url))) b.url = res.freigabe
         const nach = hoerzeit(b)
         b.seconds = Math.round(nach.sekunden)
         neueDauer = nach.sekunden
@@ -697,8 +705,13 @@ export function AudioPanel({
               )}
 
               <TextInput
+                key={block.url ?? ''}
                 label="Adresse für den QR-Code auf dem Blatt (optional)"
-                description="Die MP3 z. B. in einen Cloud-Ordner legen und den Link hier eintragen; dann können die Lernenden den Text selbst noch einmal hören."
+                description={
+                  aufServer()
+                    ? 'Wird beim Vertonen automatisch gesetzt: Die Lernenden öffnen den Hörtext über den QR-Code auf dem Schul-Apps-Server – ohne Anmeldung.'
+                    : 'Die MP3 z. B. in einen Cloud-Ordner legen und den Link hier eintragen; dann können die Lernenden den Text selbst noch einmal hören.'
+                }
                 placeholder="https://…"
                 defaultValue={block.url ?? ''}
                 onBlur={(e) => setBlock(block.id, (b) => (b.url = e.currentTarget.value.trim() || undefined))}
