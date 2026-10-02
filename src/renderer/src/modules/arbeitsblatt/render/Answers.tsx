@@ -5,6 +5,7 @@ import { isEditMode, isKeyMode, useWs, type WsContextValue } from './WsContext'
 import { antwortTabellenMasse, hatFoerderbedarf, schreibRegel, type SchreibRegel } from '../didactics/schreibraum'
 import { tabelleZiehen, type ZugErgebnis } from './tabelleZiehen'
 import { eigeneBreiten, zugUebernehmen } from './tabelleMasse'
+import { zelleAnmelden } from './tabellenAuswahl'
 import { optionSpalten } from './mcGrid'
 import { diagramDataUrl, diagramDrawing } from './diagramSvg'
 import type { DiagramSpec } from '../model/types'
@@ -50,6 +51,17 @@ export function TabellenGriffe({
   const halt = (e: React.MouseEvent): void => e.stopPropagation()
   return (
     <>
+      {/* Zelle fürs Markieren und Angleichen anmelden (render/tabellenAuswahl.tsx, 02.10.2026) */}
+      <span
+        hidden
+        ref={zelleAnmelden({
+          c,
+          zeile,
+          spalten,
+          breiten,
+          anwenden: (a) => onZug({ art: 'angleichen', index: 0, colWidths: a.colWidths, zeilen: a.zeilen })
+        })}
+      />
       {c < spalten - 1 && (
         <span className="ws-spalten-griff" title="Spaltenbreite ziehen" onClick={halt} onPointerDown={(e) => tabelleZiehen(e, 'spalte', c, breiten, onZug)} />
       )}

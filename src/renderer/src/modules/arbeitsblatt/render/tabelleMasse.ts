@@ -73,12 +73,17 @@ export interface HandMasse {
   headerHeightMm?: number
 }
 
-/** Ein Zug an einer Tabellenlinie (render/tabelleZiehen.ts) */
+/**
+ * Ein Zug an einer Tabellenlinie (render/tabelleZiehen.ts) – oder, mit `angleichen`, mehrere
+ * Spalten/Zeilen auf einmal aus dem Kreismenü der markierten Zellen (render/tabellenAuswahl.tsx).
+ */
 export interface Zug {
-  art: 'spalte' | 'zeile' | 'kopf'
+  art: 'spalte' | 'zeile' | 'kopf' | 'angleichen'
   index: number
   colWidths?: number[]
   hoeheMm?: number
+  /** angleichen: neue Mindesthöhen (0 = nach Inhalt) je Zeile bzw. der Kopfzeile */
+  zeilen?: { index: number | 'kopf'; mm: number }[]
 }
 
 /** Eigene Spaltenbreiten in Prozent (Summe 100), wenn sie zur Spaltenzahl passen – sonst undefined */
@@ -91,6 +96,12 @@ export function eigeneBreiten(m: HandMasse | undefined, n: number): number[] | u
 
 /** Einen Zug in die Maße übernehmen – EIN Aufruf je Geste, damit es ein Rückgängig-Schritt bleibt */
 export function zugUebernehmen(d: HandMasse, z: Zug, zeilen: number): void {
+  if (z.art === 'angleichen') {
+    if (z.colWidths) d.colWidths = z.colWidths
+    for (const zeile of z.zeilen ?? [])
+      zugUebernehmen(d, zeile.index === 'kopf' ? { art: 'kopf', index: 0, hoeheMm: zeile.mm } : { art: 'zeile', index: zeile.index, hoeheMm: zeile.mm }, zeilen)
+    return
+  }
   if (z.art === 'spalte') {
     if (z.colWidths) d.colWidths = z.colWidths
   } else if (z.art === 'kopf') {

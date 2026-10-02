@@ -4,6 +4,7 @@ import type { TableBlock } from '../../model/types'
 import type { PlacedItem } from '../paginate'
 import { spaltenBreiten, spalteVerschieben, tabellenBreite, zeilenHoehe, zeilenHoehen } from '../tabelleMasse'
 import { isEditMode, useWs } from '../WsContext'
+import { zelleAnmelden, type Angleichung } from '../tabellenAuswahl'
 import { Feld, FortsetzungsHinweis, useSetter } from './hilfen'
 import { stripMaterialNo } from './galerie'
 
@@ -101,6 +102,27 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
     window.addEventListener('pointercancel', ende)
   }
 
+  /** Kreismenü der markierten Zellen (render/tabellenAuswahl.tsx): EIN Speichern, ein Rückgängig-Schritt */
+  const angleichen = (a: Angleichung): void =>
+    ctx.update?.(block.id, (d) => {
+      if (d.type !== 'table') return
+      if (a.colWidths) d.colWidths = a.colWidths
+      for (const z of a.zeilen ?? []) {
+        const mm = zeilenHoehe(z.mm)
+        if (z.index === 'kopf') {
+          if (mm > 0) d.headerHeightMm = mm
+          else delete d.headerHeightMm
+          continue
+        }
+        const h = zeilenHoehen(d)
+        h[z.index] = mm
+        if (h.some((x) => x > 0)) d.rowHeightsMm = h
+        else delete d.rowHeightsMm
+      }
+    })
+  const anmelden = (c: number, zeile: number | 'kopf'): ((el: HTMLElement | null) => void) =>
+    zelleAnmelden({ c, zeile, spalten: breiten.length, breiten: mitMassen ? breiten : undefined, anwenden: angleichen })
+
   return (
     <div className={`ws-block ws-table-block ${placed?.continued ? 'ws-continued' : ''}`}>
       {/* Folgestück: „M3 (Fortsetzung)" über der wiederholten Kopfzeile (01.10.2026) */}
@@ -130,6 +152,7 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
                 <Feld value={h} editable={schreiben} onChange={set((d, v) => (d.headers[c] = v))} />
                 {edit && (
                   <>
+                    <span hidden ref={anmelden(c, 'kopf')} />
                     {spaltenGriff(c)}
                     <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'kopf', 0)} />
                   </>
@@ -147,6 +170,7 @@ export function TabelleAnsicht({ block, placed }: { block: TableBlock; placed?: 
                   {/* Spaltengriffe auch in den Zellen (02.10.2026): Tabellen ohne Kopfzeile hatten sonst keine, und auf dem iPad ist die ganze Linie leichter zu treffen */}
                   {edit && (
                     <>
+                      <span hidden ref={anmelden(c, from + r)} />
                       {spaltenGriff(c)}
                       <span className="ws-zeilen-griff" title="Zeilenhöhe ziehen" onPointerDown={(e) => ziehen(e, 'zeile', from + r)} />
                     </>
