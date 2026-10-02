@@ -98,8 +98,13 @@ try {
   await s2.locator('[data-gastname]').fill('Kim Ta.')
   await s2.getByRole('button', { name: 'Weiter' }).click()
   await s2.locator('[data-wartebildschirm]').waitFor({ timeout: 15000 })
+  const s3 = await geraet()
+  await s3.goto(neu.link)
+  await s3.locator('[data-gastname]').fill('Ole F.')
+  await s3.getByRole('button', { name: 'Weiter' }).click()
+  await s3.locator('[data-wartebildschirm]').waitFor({ timeout: 15000 })
   let d = await detail()
-  pruefe(d.teilnahmen.length === 2 && d.teilnahmen.every((t) => t.beginn === 0), 'Lehrkraft sieht zwei Wartende')
+  pruefe(d.teilnahmen.length === 3 && d.teilnahmen.every((t) => t.beginn === 0), 'Lehrkraft sieht drei Wartende')
   const vorStart = await s1.evaluate(async (code) => JSON.stringify(await (await fetch('/s/api/beitreten', { method: 'POST', headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' }, body: JSON.stringify({ code }) })).json()), neu.code)
   pruefe(!vorStart.includes('Fill in the gaps'), 'vor dem Start keine Aufgaben am Gerät')
 
@@ -108,6 +113,12 @@ try {
   await s1.getByText('Fill in the gaps.').waitFor({ timeout: 10000 })
   await s2.getByText('Fill in the gaps.').waitFor({ timeout: 10000 })
   pruefe(true, 'nach dem Start der Lehrkraft erscheint der Test auf beiden Geräten')
+  // Anderes Fenster daneben: Die Seite bleibt sichtbar, verliert aber den Fokus
+  await s3.getByText('Fill in the gaps.').waitFor({ timeout: 10000 })
+  await s3.evaluate(() => {
+    document.hasFocus = () => false
+  })
+  pruefe(await s3.getByText('automatisch abgegeben').waitFor({ timeout: 5000 }).then(() => true, () => false), 'anderes Fenster (Fokus weg, Seite sichtbar) → sofort abgegeben')
   const quelltext = await s1.evaluate(async (code) => JSON.stringify(await (await fetch('/s/api/beitreten', { method: 'POST', headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' }, body: JSON.stringify({ code }) })).json()), neu.code)
   pruefe(!quelltext.includes('school') && !quelltext.includes('integrate more easily') && !quelltext.includes('"answer"') && !quelltext.includes('answerId'), 'Das Gerät bekommt keine Lösungen')
   const felder = s1.locator('input:not([type=radio]):not([type=hidden]), textarea')

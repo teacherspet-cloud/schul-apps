@@ -325,16 +325,29 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
     return () => clearInterval(i)
   }, [phase, t, abgeben])
 
-  // Seite verlassen → sofort abgeben
+  /*
+   * Seite verlassen → sofort abgeben.
+   *  - Anderer Tab, andere App, Startbildschirm, Bildschirmsperre: die Seite wird unsichtbar.
+   *  - Anderes FENSTER daneben (Wörterbuch im zweiten Browserfenster, geteilte Ansicht am iPad):
+   *    Die Seite bleibt sichtbar, verliert aber den Fokus (Befund der Lehrkraft, 02.10.2026 – das
+   *    ging bis dahin durch). Darum ein Fokus-Wächter: länger als ~1,5 s ohne Fokus = verlassen.
+   *    Die kurze Frist fängt Kurzes ab, das kein Verlassen ist (Bestätigungsfrage beim Abgeben).
+   */
   useEffect(() => {
     if (phase !== 'laeuft') return
     const weg = (): void => {
       if (document.visibilityState === 'hidden') void abgeben('verlassen')
     }
     const raus = (): void => void abgeben('verlassen')
+    let ohneFokus = 0
+    const fokus = setInterval(() => {
+      if (document.hasFocus()) ohneFokus = 0
+      else if (++ohneFokus >= 3) void abgeben('verlassen')
+    }, 500)
     document.addEventListener('visibilitychange', weg)
     window.addEventListener('pagehide', raus)
     return () => {
+      clearInterval(fokus)
       document.removeEventListener('visibilitychange', weg)
       window.removeEventListener('pagehide', raus)
     }
@@ -378,7 +391,7 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       <Stack gap={4}>
         <Text size="sm">Bleib auf dieser Seite, bis du abgegeben hast.</Text>
         <Text size="sm" fw={700}>
-          Wenn du die Seite verlässt – anderer Tab, andere App, Startbildschirm –, wird dein Test sofort endgültig abgegeben.
+          Wenn du die Seite verlässt – anderer Tab, anderes Fenster, andere App, Startbildschirm –, wird dein Test sofort endgültig abgegeben.
         </Text>
         <Text size="sm">Du hast {t.zeitMin} Minuten. Deine Eingaben werden laufend gesichert.</Text>
       </Stack>
@@ -497,7 +510,7 @@ function ErgebnisAnsicht({ code, t, grund }: { code: string; t: Beitritt; grund:
           <Title order={3}>Abgegeben</Title>
           <Text ta="center" c="dimmed">
             {grund === 'verlassen'
-              ? 'Du hast die Seite verlassen – dein Test wurde deshalb automatisch abgegeben.'
+              ? 'Du hast die Seite verlassen (anderer Tab, anderes Fenster oder andere App) – dein Test wurde deshalb automatisch abgegeben.'
               : grund === 'zeit'
                 ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
                 : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
