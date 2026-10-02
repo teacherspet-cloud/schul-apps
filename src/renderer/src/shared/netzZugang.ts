@@ -314,6 +314,24 @@ export function netzZugangEinrichten(): void {
     // Die Kopie ist nötig: Ein Uint8Array kann auf einem geteilten Puffer liegen, den Blob nicht annimmt
     const teil: BlobPart = typeof daten === 'string' ? daten : new Uint8Array(daten).slice().buffer
     const blob = new Blob([teil], { type: typ })
+    /*
+     * Als App vom Home-Bildschirm (iPad/iPhone, 02.10.2026): Blob-Downloads sind dort
+     * unzuverlässig – das Teilen-Menü („In Dateien sichern", AirDrop …) ist der sichere Weg.
+     * Lehnt das Gerät ab (z. B. weil die Geste zu lange her ist), geht es wie im Browser weiter.
+     */
+    const webApp = (navigator as Navigator & { standalone?: boolean }).standalone === true
+    if (webApp && typeof navigator.share === 'function') {
+      const datei = new File([blob], name, { type: typ })
+      if (navigator.canShare?.({ files: [datei] })) {
+        void navigator.share({ files: [datei], title: name }).catch((e: unknown) => {
+          if ((e as { name?: string })?.name !== 'AbortError') herunterladenPerLink(blob, name)
+        })
+        return
+      }
+    }
+    herunterladenPerLink(blob, name)
+  }
+  const herunterladenPerLink = (blob: Blob, name: string): void => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

@@ -140,20 +140,56 @@ export function setzeSitzungsCookie(res: ServerResponse, cookie: string, maxAgeM
 const loescheCookie = (res: ServerResponse, sicher: boolean): void =>
   void res.setHeader('set-cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${sicher ? '; Secure' : ''}`)
 
+/**
+ * Web-App für den Home-Bildschirm (02.10.2026): je ein Manifest für Lehrkräfte (Start „/") und
+ * für Lernende (Start und Bereich „/s/") – wer den Onlinetest ablegt, landet nicht in den Programmen.
+ */
+export function webManifest(fuerSchueler: boolean): string {
+  return JSON.stringify({
+    name: fuerSchueler ? 'Schul-Apps · Onlinetest' : 'Schul-Apps',
+    short_name: fuerSchueler ? 'Onlinetest' : 'Schul-Apps',
+    lang: 'de',
+    start_url: fuerSchueler ? '/s/' : '/',
+    scope: fuerSchueler ? '/s/' : '/',
+    id: fuerSchueler ? '/s/' : '/',
+    display: 'standalone',
+    background_color: '#f3f6f8',
+    theme_color: '#0f7b6c',
+    icons: [
+      { src: '/web-app/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/web-app/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/web-app/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ]
+  })
+}
+
 /** Die Seite der Programme mit dem Skript, das den angemeldeten Nutzer bekannt macht */
-let seiteZwischenspeicher: { mtime: number; html: string } | null = null
-function programmSeite(): string {
+const seitenZwischenspeicher = new Map<boolean, { mtime: number; html: string }>()
+function programmSeite(fuerSchueler = false): string {
   const datei = join(OBERFLAECHE, 'index.html')
   const mtime = statSync(datei).mtimeMs
-  if (seiteZwischenspeicher?.mtime === mtime) return seiteZwischenspeicher.html
+  const gemerkt = seitenZwischenspeicher.get(fuerSchueler)
+  if (gemerkt?.mtime === mtime) return gemerkt.html
   let html = readFileSync(datei, 'utf8')
   html = html.replace(
     '<meta charset="UTF-8" />',
-    '<meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />\n    <script src="/server/ich.js"></script>'
+    [
+      '<meta charset="UTF-8" />',
+      '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />',
+      // Home-Bildschirm (iPad, iPhone, Android): eigene App ohne Browserleiste
+      `<link rel="manifest" href="${fuerSchueler ? '/s/manifest.webmanifest' : '/manifest.webmanifest'}" />`,
+      '<meta name="apple-mobile-web-app-capable" content="yes" />',
+      '<meta name="mobile-web-app-capable" content="yes" />',
+      `<meta name="apple-mobile-web-app-title" content="${fuerSchueler ? 'Onlinetest' : 'Schul-Apps'}" />`,
+      '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
+      '<meta name="theme-color" content="#0f7b6c" />',
+      '<link rel="apple-touch-icon" href="/web-app/apple-touch-icon.png" />',
+      '<script src="/server/ich.js"></script>'
+    ].join('\n    ')
   )
   // Bündel absolut laden – die Seite kommt auch unter tieferen Pfaden (/s/t/<Code>)
   html = html.replace(/(src|href)="\.\/assets\//g, '$1="/assets/')
-  seiteZwischenspeicher = { mtime, html }
+  seitenZwischenspeicher.set(fuerSchueler, { mtime, html })
   return html
 }
 
@@ -162,7 +198,7 @@ function statisch(res: ServerResponse, pfad: string): void {
   if (!ziel.startsWith(OBERFLAECHE + sep)) return void res.writeHead(403).end('verboten')
   if (!existsSync(ziel) || !statSync(ziel).isFile() || ziel.endsWith('index.html')) {
     res.writeHead(200, { 'content-type': TYPEN['.html'], 'cache-control': 'no-store' })
-    return void res.end(programmSeite())
+    return void res.end(programmSeite(pfad.startsWith('/s/')))
   }
   res.writeHead(200, { 'content-type': TYPEN[extname(ziel)] ?? 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable' })
   createReadStream(ziel).pipe(res)
@@ -201,6 +237,12 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     }
     // Aufrufe mit Wirkung nur mit der eigenen Kopfzeile (siehe oben)
     const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
+
+    // ---------- Web-App-Manifest (ohne Anmeldung – der Home-Bildschirm fragt vorher)
+    if (req.method === 'GET' && (url.pathname === '/manifest.webmanifest' || url.pathname === '/s/manifest.webmanifest')) {
+      res.writeHead(200, { 'content-type': 'application/manifest+json; charset=utf-8', 'cache-control': 'no-cache' })
+      return void res.end(webManifest(url.pathname.startsWith('/s/')))
+    }
 
     // ---------- Anmeldung
     if (req.method === 'GET' && url.pathname === '/anmelden') {
@@ -319,7 +361,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         // Bündel (js/css) dürfen ohne Anmeldung kommen – die Anmeldeseite braucht sie nicht, schadet aber nicht
         if (datei) return statisch(res, decodeURIComponent(url.pathname))
         // Onlinetest per QR-Code: Solange IServ nicht freigeschaltet ist, reicht der Name (SchuelerBereich, src/server/onlinetest.ts)
-        if (/^\/s\/t\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) && !iservBereit()) return statisch(res, '/')
+        if ((/^\/s\/t\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) || url.pathname === '/s/' || url.pathname === '/s') && !iservBereit()) return statisch(res, '/s/')
         res.writeHead(302, { location: `/anmelden?ziel=${encodeURIComponent(url.pathname.startsWith('/s/') ? url.pathname : '/')}`, 'cache-control': 'no-store' })
         return void res.end()
       }

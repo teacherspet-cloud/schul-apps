@@ -199,3 +199,13 @@ describe('Zweite Runde (02.10.2026)', () => {
     expect(blatt).toContain('Anna K.')
   })
 })
+
+describe('QR-Code in der Web-App (02.10.2026)', () => {
+  it('liest den Testcode aus Link oder Code', async () => {
+    const { codeAus } = await import('../src/renderer/src/modules/onlinetest/CodeScanner')
+    expect(codeAus('https://217.154.120.64:8443/s/t/ab3x9k')).toBe('AB3X9K')
+    expect(codeAus('https://x/s/t/AB3X9K/?a=1')).toBe('AB3X9K')
+    expect(codeAus(' AB3X9K ')).toBe('AB3X9K')
+    expect(codeAus('https://example.com/irgendwas')).toBeNull()
+  })
+})

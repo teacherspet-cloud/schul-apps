@@ -22,8 +22,14 @@ export function einzelnesProgramm(): string | null {
   return id && /^[a-z0-9-]+$/i.test(id) ? id : null
 }
 
-/** Eigene Fenster gehen am PC (Exe, Browser), nicht in der iPad-App – und nicht aus einem Einzelfenster heraus */
-export const eigeneFensterMoeglich = (): boolean => typeof window !== 'undefined' && typeof window.open === 'function' && !aufIos() && !einzelnesProgramm()
+/** Als App vom Home-Bildschirm geöffnet (Safari: navigator.standalone, sonst display-mode) */
+const alsWebApp = (): boolean =>
+  (typeof navigator !== 'undefined' && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
+  (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches === true)
+
+/** Nicht in der iPad-App, nicht als App vom Home-Bildschirm (dort öffnet window.open nur eine Browseransicht ohne Anmeldung) */
+export const eigeneFensterMoeglich = (): boolean =>
+  typeof window !== 'undefined' && typeof window.open === 'function' && !aufIos() && !einzelnesProgramm() && !alsWebApp()
 
 export function inEigenemFenster(id: string): void {
   const u = new URL(window.location.href)

@@ -18,6 +18,7 @@ import { Alert, Badge, Button, Card, Center, Container, Group, Image, Loader, Na
 import { IconAlertTriangle, IconCheck, IconClock, IconHourglass, IconLogout, IconX } from '@tabler/icons-react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { HandFeld, TastaturFeld } from './HandFeld'
+import { CodeScanner } from './CodeScanner'
 import type { Erkennung } from './handschrift'
 import { antwortAlsText, loesungAlsText, type Antworten, type Bewertung, type Einheit, type Feld, type Loesung, type OnlineAufgabe, type OnlineEintrag } from './kern'
 import { holen, senden } from './serverApi'
@@ -87,14 +88,24 @@ export default function SchuelerBereich(): React.JSX.Element {
   )
 }
 
+/** Als App vom Home-Bildschirm geöffnet? (Safari: navigator.standalone, sonst display-mode) */
+export const alsWebApp = (): boolean =>
+  (typeof navigator !== 'undefined' && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
+  (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches === true)
+const aufAppleMobil = (): boolean => typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+
 function Uebersicht(): React.JSX.Element {
   const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean }[] | null>(null)
   const [code, setCode] = useState('')
+  const [scannen, setScannen] = useState(false)
+  // Ohne Anmeldung (Beitritt mit Namen): nur Code eingeben oder scannen
+  const angemeldet = Boolean(window.__schulappsServer?.angemeldet)
   useEffect(() => {
+    if (!angemeldet) return setTests([])
     void holen<{ tests: typeof tests }>('/s/api/tests')
       .then((d) => setTests(d.tests ?? []))
       .catch(() => setTests([]))
-  }, [])
+  }, [angemeldet])
   return (
     <Stack>
       <Card withBorder padding="lg">
@@ -116,11 +127,20 @@ function Uebersicht(): React.JSX.Element {
             Öffnen
           </Button>
         </Group>
+        <Button mt="sm" variant="light" fullWidth size="md" onClick={() => setScannen(true)} data-code-scannen>
+          QR-Code scannen
+        </Button>
+        {scannen && <CodeScanner schliessen={() => setScannen(false)} gefunden={(c) => window.location.assign(`/s/t/${c}`)} />}
       </Card>
-      <AufgabenListe />
-      <Title order={4}>Offene Tests</Title>
+      {aufAppleMobil() && !alsWebApp() && (
+        <Alert variant="light" color="blue" data-home-tipp>
+          Tipp: Über „Teilen“ › „Zum Home-Bildschirm“ wird der Onlinetest zur App. Dort dann „QR-Code scannen“ nutzen – die Kamera-App öffnet sonst immer Safari.
+        </Alert>
+      )}
+      {angemeldet && <AufgabenListe />}
+      {angemeldet && <Title order={4}>Offene Tests</Title>}
       {!tests && <Loader />}
-      {tests?.length === 0 && <Text c="dimmed">Gerade ist kein Test für dich freigegeben.</Text>}
+      {angemeldet && tests?.length === 0 && <Text c="dimmed">Gerade ist kein Test für dich freigegeben.</Text>}
       {tests?.map((t) => (
         <Card key={t.code} withBorder padding="md">
           <Group justify="space-between">
