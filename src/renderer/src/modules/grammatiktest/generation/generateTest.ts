@@ -10,6 +10,7 @@
  * - **Jede Aufgabe zielt auf eine benannte Stolperstelle** und trägt sie mit. Daraus entsteht
  *   das Fehlerprofil im Lösungsteil.
  */
+import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import type { AiCall } from '../../../shared/imageChoice'
 import { createRng, newId } from '../../vokabeltest/model/random'
 import { chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf } from '../../arbeitsblatt/didactics/grammar'
@@ -88,6 +89,7 @@ export function testPrompt(test: GrammarTest): string {
       .filter((t) => t.description || t.examples?.length)
       .map((t) => `- ${t.label}: ${[t.description, t.examples?.length ? `Beispiele: ${t.examples.join(' | ')}` : ''].filter(Boolean).join(' ')}`),
     `Umfang: ${m.minutes} Minuten, insgesamt ${m.points} Punkte.`,
+    LUECKEN_REGELN_DE,
     '',
     'ART DER AUFGABEN:',
     '- Es wird GEPRÜFT, nicht erarbeitet: kein Merkkasten, keine Regelherleitung, keine Hilfekarten, keine Tippkästen.',

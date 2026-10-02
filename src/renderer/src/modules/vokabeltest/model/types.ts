@@ -108,6 +108,11 @@ interface BlockBase {
 export interface GapSentence {
   before: string
   after: string
+  /**
+   * Zweiteilige Wendung (02.10.2026, „not only … but also"): Text ZWISCHEN den beiden Lücken. Die
+   * Lösung steht dann als „Teil 1 … Teil 2" (shared/luecken.ts); beide Teile = ein Punkt.
+   */
+  mitte?: string
 }
 
 export interface GapItem {
@@ -131,7 +136,10 @@ export interface GapBlock extends BlockBase {
   extraBankWords: string[]
 }
 
-export type TextPart = { type: 'text'; text: string } | { type: 'gap'; id: string; answer: string; bankWord?: string; vocabId?: string; firstLetter?: boolean }
+export type TextPart =
+  | { type: 'text'; text: string }
+  /** `folge`: zweiter Teil einer zweiteiligen Wendung – zählt mit der Lücke davor als EIN Punkt (02.10.2026) */
+  | { type: 'gap'; id: string; answer: string; bankWord?: string; vocabId?: string; firstLetter?: boolean; folge?: boolean }
 
 export interface GapTextBlock extends BlockBase {
   kind: 'gapText'

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { LUECKEN_PRUEFUNG_DE } from '@shared/luecken'
 import { sehverstehenMitVideo } from '../didactics/sehtext'
 import { wunschAuftrag, type WunschArt } from '../../../shared/kiWunsch'
 import { setzeVersuchEin } from '../didactics/protokoll'
@@ -401,6 +402,7 @@ export async function reviewSheet(
     user: [
       'Prüfe dieses Arbeitsblatt wie eine erfahrene Fachleitung. Melde NUR echte Probleme:',
       '- fachliche Fehler oder falsche Lösungen',
+      LUECKEN_PRUEFUNG_DE,
       '- unklare oder mehrdeutige Arbeitsanweisungen; Aufgaben, die mit dem Material nicht lösbar sind',
       '- Sprache oder Anforderungen passen nicht zur Lerngruppe (Jahrgang, Schulform, Sprachniveau)',
       '- falsch eingeordneter Anforderungsbereich oder unpassender Operator',

@@ -1,4 +1,5 @@
 import { versuchRegeln } from '../../didactics/protokoll'
+import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import type { LearnerProfile } from '../../didactics/profile'
 import { anredeRegel } from '../../../../shared/anrede'
 import { anredeFuerMeta } from '../../didactics/anrede'
@@ -101,6 +102,7 @@ export function systemPrompt(meta: WorksheetMeta, profile: LearnerProfile): stri
     '- Mathematische Ausdrücke als LaTeX in $…$ (abgesetzt: $$…$$ in eigener Zeile), chemische Formeln mit \\ce{…} innerhalb von $…$.',
     '- Aufzählungen mit „- " am Zeilenanfang; Absätze durch eine Leerzeile.',
     '- Lückentexte: jede Lücke als [[Lösung]].',
+    LUECKEN_REGELN_DE,
     '',
     'BILDER (Baustein „image“):',
     '- Nur, wo ein Bild dem Lernen dient: Foto eines Objekts/Phänomens, Schema oder Diagramm, Karte, Versuchsaufbau, Bewegungsablauf, Kunstwerk, Bildquelle.',

@@ -11,6 +11,7 @@
  * werden gebraucht, weil sich die KI nicht zuverlässig an den Auftrag hält – die
  * Lernzielkontrolle, die den Anlass für dieses Programm gab, war selbst KI-erzeugt.
  */
+import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import { pruefungsVersuchRegeln, setzeProtokollInPruefung } from '../../arbeitsblatt/didactics/protokoll'
 import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
 import { linkListeningTasks } from '../../arbeitsblatt/generation/listening'
@@ -157,6 +158,7 @@ export function kurztestPrompt(test: Kurztest, variante: string): string {
       : 'Für dieses Bundesland ist kein eigenes Kurztestformat belegt.',
     `Vorgesehene Bearbeitungszeit: ${m.minutes} Minuten. Der Umfang richtet sich nach dieser Zeit, nicht umgekehrt.`,
     `Thema: ${m.thema || fach.label}.`,
+    LUECKEN_REGELN_DE,
     m.stoff ? `Im Unterricht wurde unmittelbar vorher behandelt: ${m.stoff}` : '',
     ...stoffQuellenTeil(test),
     format?.stoffStunden

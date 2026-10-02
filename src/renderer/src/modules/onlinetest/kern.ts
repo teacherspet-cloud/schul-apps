@@ -14,6 +14,7 @@
  *  - die LÖSUNGEN je Feld (bleiben auf dem Server): genau (mit Normalisierung), Auswahl, KI
  *    (Erwartung für die Plausibilitätsprüfung) oder Lehrkraft (freies Schreiben).
  */
+import { mitOptionalem, teileVon } from '@shared/luecken'
 import type { Block, Variant } from '../vokabeltest/model/types'
 
 export type FeldArt = 'text' | 'langtext' | 'auswahl' | 'wahr'
@@ -38,8 +39,8 @@ export interface OnlineEintrag {
   vor?: string
   nach?: string
   text?: string
-  /** Mehrere Sätze mit derselben Lücke */
-  saetze?: { vor: string; nach: string }[]
+  /** Mehrere Sätze mit derselben Lücke; `mitte` = zweite Lücke dazwischen (zweiteilige Wendung) */
+  saetze?: { vor: string; nach: string; mitte?: string }[]
   hinweis?: string
   bild?: string
   /** Wörter (Odd one out, Durcheinander) */
@@ -108,12 +109,23 @@ export function normalisiere(s: string): string {
     .trim()
 }
 
-/** Lösungsalternativen aus der Lösung („sth / something", „colour; color") */
+/** Lösungsalternativen aus der Lösung („sth / something", „colour; color", „but (also)") */
 export const alternativen = (loesung: string): string[] =>
   String(loesung ?? '')
     .split(/\s+\/\s+|;|\|/)
+    .flatMap((x) => mitOptionalem(x))
     .map((x) => normalisiere(x))
     .filter(Boolean)
+
+/** Wer das Wort vor der Lücke wiederholt („to reward" bei „She wanted to ___"), liegt nicht falsch (02.10.2026) */
+const mitVorwort = (vor: string, loesung: string): string[] => {
+  const w = String(vor ?? '')
+    .trim()
+    .split(/\s+/)
+    .pop()
+    ?.replace(/[^\p{L}'’-]/gu, '')
+  return w ? [loesung, `${w} ${loesung}`] : [loesung]
+}
 
 export type Vergleich = 'richtig' | 'falsch' | 'nurGross' | 'leer'
 
@@ -154,13 +166,32 @@ export function onlineFassung(variante: Variant): OnlineFassung {
         if (b.wordBank) a.wortkasten = sortiertesWortkastenBild([...b.items.map((i) => i.bankWord || i.answer), ...b.extraBankWords])
         for (const it of b.items) {
           const f = feldId(b.id, it.id)
+          const teile = teileVon(it.answer)
+          const zweiteilig = it.sentences.length === 1 && it.sentences[0].mitte !== undefined && teile.length === 2
+          if (zweiteilig) {
+            // Zweiteilige Wendung: zwei Felder, beide richtig = ein Punkt
+            const f2 = feldId(b.id, it.id, 'b')
+            const s0 = it.sentences[0]
+            a.eintraege.push({
+              einheit: f,
+              saetze: [{ vor: s0.before, mitte: s0.mitte, nach: s0.after }],
+              felder: [
+                { id: f, art: 'text', beschriftung: '1. Lücke', ...(b.firstLetterHint || it.firstLetter ? { anfang: teile[0].charAt(0) } : {}) },
+                { id: f2, art: 'text', beschriftung: '2. Lücke', ...(b.firstLetterHint || it.firstLetter ? { anfang: teile[1].charAt(0) } : {}) }
+              ]
+            })
+            loesungen[f] = { art: 'genau', werte: mitVorwort(s0.before, teile[0]) }
+            loesungen[f2] = { art: 'genau', werte: mitVorwort(s0.mitte ?? '', teile[1]) }
+            einheit(f, [f, f2])
+            continue
+          }
           a.eintraege.push({
             einheit: f,
             saetze: it.sentences.map((s) => ({ vor: s.before, nach: s.after })),
             ...(it.hint ? { hinweis: it.hint } : {}),
             felder: [{ id: f, art: 'text', ...(b.firstLetterHint || it.firstLetter ? { anfang: it.answer.trim().charAt(0) } : {}) }]
           })
-          loesungen[f] = { art: 'genau', werte: [it.answer] }
+          loesungen[f] = { art: 'genau', werte: it.sentences.length === 1 ? mitVorwort(it.sentences[0].before, it.answer) : [it.answer] }
           einheit(f, [f])
         }
         break
@@ -169,15 +200,26 @@ export function onlineFassung(variante: Variant): OnlineFassung {
         if (b.wordBank) a.wortkasten = sortiertesWortkastenBild([...b.parts.flatMap((p) => (p.type === 'gap' ? [p.bankWord || p.answer] : [])), ...b.extraBankWords])
         // Der Text als Folge: Textstücke und Lücken in einem Eintrag je Lücke (vor = Text davor)
         let vor = ''
+        let letzteEinheit: Einheit | null = null
         for (const p of b.parts) {
           if (p.type === 'text') {
             vor += p.text
             continue
           }
           const f = feldId(b.id, p.id)
-          a.eintraege.push({ einheit: f, vor, felder: [{ id: f, art: 'text', ...(b.firstLetterHint || p.firstLetter ? { anfang: p.answer.trim().charAt(0) } : {}) }] })
-          loesungen[f] = { art: 'genau', werte: [p.answer] }
-          einheit(f, [f])
+          a.eintraege.push({
+            einheit: p.folge && letzteEinheit ? letzteEinheit.id : f,
+            vor,
+            felder: [{ id: f, art: 'text', ...(b.firstLetterHint || p.firstLetter ? { anfang: p.answer.trim().charAt(0) } : {}) }]
+          })
+          loesungen[f] = { art: 'genau', werte: mitVorwort(vor, p.answer) }
+          if (p.folge && letzteEinheit) {
+            // Zweiter Teil einer zweiteiligen Wendung: gehört zur Einheit davor (ein Punkt für beide)
+            letzteEinheit.felder.push(f)
+          } else {
+            einheit(f, [f])
+            letzteEinheit = einheiten[einheiten.length - 1]
+          }
           vor = ''
         }
         if (vor) a.vorlage = vor
@@ -473,7 +515,7 @@ export function kontextVon(f: Pick<OnlineFassung, 'aufgaben'>, feldId: string): 
   if (!x) return ''
   const { eintrag: e, aufgabe: a, feld } = x
   const teile = [a.anweisung]
-  if (e.saetze?.length) teile.push(...e.saetze.map((s) => `${s.vor} ___ ${s.nach}`.trim()))
+  if (e.saetze?.length) teile.push(...e.saetze.map((s) => `${s.vor} ___ ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.nach}`.trim()))
   else if (e.vor || e.nach) teile.push(`${(e.vor ?? '').slice(-300)} ___ ${e.nach ?? ''}`.trim())
   if (e.text) teile.push(e.text)
   if (e.woerter?.length) teile.push(`Wörter: ${e.woerter.filter(Boolean).join(', ')}`)

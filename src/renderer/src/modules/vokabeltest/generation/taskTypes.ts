@@ -14,6 +14,7 @@ import { ASPEKT_LABEL, LESUNG_LABEL, mitLesung, WURZEL_LABEL } from '../didactic
 import { griechischUmschrift } from '../../../shared/sonderzeichen'
 import { aufgabenText, FESTE_ANWEISUNG, mindmapAnweisung, synonymTexte, zuordnungsKoepfe, type SynonymArt } from '../render/aufgabenTexte'
 import { baueVerbBlock } from './verbAufgabe'
+import { LUECKEN_REGELN, ohneDoppelte, teileVon } from '@shared/luecken'
 import { ersatzWoerter, wortartenVon, wortartVon } from './wortart'
 
 export interface GenContext {
@@ -149,7 +150,32 @@ const UNIQUE_RULE = `Students must be able to see without doubt which word is as
 - Students see all words of this task (e.g. in a word box). For every item, try each OTHER word of the list in any grammatical form. If another word would also make sense, add a clearer context clue (typical collocation, situation, reason, contrast) until only the target word fits.
 - Avoid items where a synonym, a more general word or a word from the same topic would also be correct.`
 
-const GAP_RULES = `Rules for gaps:
+/**
+ * Ein Lückensatz (02.10.2026): doppelte Wörter an der Lücke aus der Lösung nehmen („to ___" + „to
+ * reward" → „reward"), zweiteilige Wendungen mit Mittelteil (shared/luecken.ts).
+ */
+export function lueckenSatz(
+  before: unknown,
+  answer: unknown,
+  after: unknown,
+  middle?: unknown
+): { sentences: { before: string; after: string; mitte?: string }[]; answer: string } {
+  const vor = String(before ?? '').trim()
+  const nach = String(after ?? '').trim()
+  const mitte = String(middle ?? '').trim()
+  const teile = teileVon(String(answer ?? ''))
+  if (mitte && teile.length === 2) {
+    const a = ohneDoppelte(vor, teile[0], mitte).loesung
+    const b = ohneDoppelte(mitte, teile[1], nach).loesung
+    return { sentences: [{ before: vor, mitte, after: nach }], answer: `${a} … ${b}` }
+  }
+  return { sentences: [{ before: vor, after: nach }], answer: ohneDoppelte(vor, String(answer ?? '').trim(), nach).loesung }
+}
+
+const GAP_RULES = `${LUECKEN_REGELN}
+For gap sentences with a two-part expression: put the text between the two parts in "middle" and write "answer" as "part 1 … part 2" (e.g. answer "not only … but also", before "The club", middle "sold cards", after "collected old books."); otherwise "middle" is "".
+In texts with [[vocabId]] markers: for a two-part expression put the same [[vocabId]] at BOTH parts and give its answer as "part 1 … part 2".
+Rules for gaps:
 - "before" + [gap] + "after" together form one natural sentence; the gap replaces exactly the tested word/phrase.
 - "answer" is the exact form that fits the gap. Inflect only with forms the class already knows (see VORWISSEN DER KLASSE); otherwise build the sentence so that the base form fits.
 - The context must make the tested word the ONLY sensible solution among all words of the list. Add clues (collocations, typical situations) to remove ambiguity.
@@ -247,7 +273,9 @@ const defs: TaskTypeDef[] = [
     defaultInstruction: 'Complete the sentences with the correct words.',
     schema: obj({
       instruction: str('Short task instruction for the students in the target language'),
-      items: arr(obj({ vocabId: str(), before: str(), answer: str(), after: str() })),
+      items: arr(
+        obj({ vocabId: str(), before: str(), answer: str(), middle: str('Only for two-part expressions: text between the two gaps, else empty'), after: str() })
+      ),
       extraWords: arr(str(), '2 or 3 extra words for the word box that fit none of the gaps')
     }),
     prompt: (vocab, ctx) =>
@@ -256,7 +284,7 @@ const defs: TaskTypeDef[] = [
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
         if (!v) return []
-        return [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, bankWord: v.term }]
+        return [{ id: newId(ctx.rng), vocabId: v.id, ...lueckenSatz(it.before, it.answer, it.after, it.middle), bankWord: v.term }]
       })
       // Ohne Wortkasten hilft der Anfangsbuchstabe, die gesuchte Vokabel eindeutig zu erkennen
       return {
@@ -587,7 +615,7 @@ const defs: TaskTypeDef[] = [
     build(vocab, data, ctx) {
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
-        return v ? [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, hint: it.stem }] : []
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, ...lueckenSatz(it.before, it.answer, it.after), hint: it.stem }] : []
       })
       return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
     }
@@ -1257,7 +1285,7 @@ ${vocabLines(vocab)}`,
     build(vocab, data, ctx) {
       const items: GapItem[] = (data.items ?? []).flatMap((it: any) => {
         const v = findVocab(vocab, it.vocabId)
-        return v ? [{ id: newId(ctx.rng), vocabId: v.id, sentences: [{ before: it.before, after: it.after }], answer: it.answer, hint: it.base || v.term }] : []
+        return v ? [{ id: newId(ctx.rng), vocabId: v.id, ...lueckenSatz(it.before, it.answer, it.after), hint: it.base || v.term }] : []
       })
       return { ...base(this, data, ctx), kind: 'gap', items, wordBank: false, firstLetterHint: false, extraBankWords: [] }
     }
@@ -1340,5 +1368,24 @@ export function parseGapText(data: any, vocab: VocabEntry[], rng: Rng): TextPart
     last = m.index + m[0].length
   }
   if (last < text.length) parts.push({ type: 'text', text: text.slice(last) })
+  /*
+   * Zweiteilige Wendung (02.10.2026): Steht dieselbe Vokabel zweimal als Lücke und hat ihre Lösung
+   * zwei Teile („not only … but also"), bekommt jede Lücke ihren Teil; die zweite zählt mit der
+   * ersten als ein Punkt. Danach an jeder Lücke doppelte Wörter aus der Lösung nehmen.
+   */
+  const gesehen = new Map<string, Extract<TextPart, { type: 'gap' }>>()
+  parts.forEach((p, i) => {
+    if (p.type !== 'gap') return
+    const erste = p.vocabId ? gesehen.get(p.vocabId) : undefined
+    const teile = teileVon(p.answer)
+    if (erste && teile.length === 2) {
+      erste.answer = teile[0]
+      p.answer = teile[1]
+      p.folge = true
+    } else if (p.vocabId) gesehen.set(p.vocabId, p)
+    const vor = parts[i - 1]?.type === 'text' ? (parts[i - 1] as { text: string }).text : ''
+    const nach = parts[i + 1]?.type === 'text' ? (parts[i + 1] as { text: string }).text : ''
+    p.answer = ohneDoppelte(vor, p.answer, nach).loesung
+  })
   return parts
 }

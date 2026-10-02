@@ -1,4 +1,5 @@
 import type { PagePlan } from '../../../shared/render/paginate'
+import { teileVon } from '@shared/luecken'
 import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
@@ -463,6 +464,28 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
                     ) : (
                       gap
                     )
+                  // Zweiteilige Wendung (02.10.2026): Satz – Lücke – Mittelteil – Lücke – Rest, eine Nummer, ein Punkt
+                  const teile = teileVon(it.answer)
+                  if (!wrongWord && !twoSentences && s.mitte !== undefined && teile.length === 2) {
+                    const setzeTeil = (n: 0 | 1) =>
+                      set((d, v) => {
+                        const t = teileVon((d as typeof block).items[idx].answer)
+                        t[n] = v
+                        ;(d as typeof block).items[idx].answer = `${t[0] ?? ''} … ${t[1] ?? ''}`
+                      })
+                    return (
+                      <div key={si} className={it.sentences.length > 1 ? 'vt-subsentence' : undefined} data-zweiteilig>
+                        <T value={s.before} onChange={set((d, v) => ((d as typeof block).items[idx].sentences[si].before = v))} />{' '}
+                        <EditableGap answer={teile[0]} hintFirstLetter={block.firstLetterHint || it.firstLetter} onChange={setzeTeil(0)} />{' '}
+                        <T value={s.mitte} onChange={set((d, v) => ((d as typeof block).items[idx].sentences[si].mitte = v))} />{' '}
+                        <AfterGap
+                          glued={<EditableGap answer={teile[1]} hintFirstLetter={block.firstLetterHint || it.firstLetter} onChange={setzeTeil(1)} />}
+                          text={s.after}
+                          onChange={set((d, v) => ((d as typeof block).items[idx].sentences[si].after = v))}
+                        />
+                      </div>
+                    )
+                  }
                   return (
                     <div key={si} className={it.sentences.length > 1 ? 'vt-subsentence' : undefined}>
                       {it.sentences.length > 1 && <span className="vt-sub-label">{letter(si)})</span>}

@@ -20,6 +20,7 @@ import { istStandardTitel, kopfTexte } from '../render/aufgabenTexte'
 import { anredeMeldung, anredeRegel, falscheAnrede } from '../../../shared/anrede'
 import { anredeFuer } from '../../arbeitsblatt/didactics/anrede'
 import { formBefunde, formVorwissen, vorwissenRegel } from '../didactics/formVorwissen'
+import { LUECKEN_PRUEFUNG } from '@shared/luecken'
 
 export type AiCall = <T>(req: StructuredRequest) => Promise<T>
 export type ImageFinder = (item: PictureItem, settings: TestSettings) => Promise<ImageRef | undefined>
@@ -373,6 +374,7 @@ export async function reviewBlock(block: Block, settings: TestSettings, ai: AiCa
       '- the instruction does not make clear what students have to do\n' +
       `- language clearly above level ${settings.level}\n` +
       `${FORM_PRUEFUNG}\n` +
+      `${LUECKEN_PRUEFUNG}\n` +
       `${ABLENKER_PRUEFUNG}\n` +
       'Use itemNumber 0 for problems concerning the whole task. Return an empty list if everything is fine.\n\n' +
       (words.length ? `Words tested in this task: ${words.join(', ')}\n\n` : '') +

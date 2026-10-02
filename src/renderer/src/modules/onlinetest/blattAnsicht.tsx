@@ -39,13 +39,24 @@ export function mitAntworten(v: Variant, a: Antworten, b: Bewertung = {}): Varia
     const k = structuredClone(blk) as Block
     switch (k.kind) {
       case 'gap':
-        k.items.forEach((it) => (it.answer = text(feldId(k.id, it.id))))
-        break
-      case 'gapText':
-        k.parts.forEach((p) => {
-          if (p.type === 'gap') p.answer = text(feldId(k.id, p.id))
+        k.items.forEach((it) => {
+          // Zweiteilige Wendung: beide Felder, die Marke einmal am Ende
+          if (it.sentences.length === 1 && it.sentences[0].mitte !== undefined && it.answer.includes('…')) {
+            const e = feldId(k.id, it.id)
+            it.answer = `${(a[e] ?? '').trim() || '—'} … ${(a[feldId(k.id, it.id, 'b')] ?? '').trim() || '—'}${marke(b, e)}`
+          } else it.answer = text(feldId(k.id, it.id))
         })
         break
+      case 'gapText': {
+        let vorige = ''
+        k.parts.forEach((p) => {
+          if (p.type !== 'gap') return
+          // Zweiter Teil einer Wendung: Bewertung steht an der Lücke davor
+          p.answer = p.folge && vorige ? text(feldId(k.id, p.id), vorige) : text(feldId(k.id, p.id))
+          if (!p.folge) vorige = feldId(k.id, p.id)
+        })
+        break
+      }
       case 'match':
         k.left.forEach((l) => (l.answerId = a[feldId(k.id, l.id)] ?? ''))
         break
@@ -139,7 +150,19 @@ const blattHtml = (kopf: BlattKopf, variante: Variant, antworten: Antworten, bew
 }
 
 /** Ein Blatt für die Anzeige in der App (nur zum Ansehen – deshalb als fertiges HTML) */
-export function AbgabeBlatt({ kopf, variante, antworten, bewertung, abgabe }: { kopf: BlattKopf; variante: Variant; antworten: Antworten; bewertung: Bewertung; abgabe: Abgabe }): React.JSX.Element {
+export function AbgabeBlatt({
+  kopf,
+  variante,
+  antworten,
+  bewertung,
+  abgabe
+}: {
+  kopf: BlattKopf
+  variante: Variant
+  antworten: Antworten
+  bewertung: Bewertung
+  abgabe: Abgabe
+}): React.JSX.Element {
   return <div className="editor-sheet" data-abgabe-blatt dangerouslySetInnerHTML={{ __html: blattHtml(kopf, variante, antworten, bewertung, abgabe) }} />
 }
 

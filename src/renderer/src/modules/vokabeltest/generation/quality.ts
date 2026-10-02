@@ -243,7 +243,9 @@ export function describeBlock(block: Block): string {
     case 'gap':
       block.items.forEach((it, i) =>
         lines.push(
-          `${i + 1}. ${it.sentences.map((s) => `${s.before} ___${it.hint ? ` (${it.hint})` : ''} ${s.after}`).join(' / ')}  → answer: ${it.answer}${block.firstLetterHint || it.firstLetter ? ' (first letter given)' : ''}`
+          `${i + 1}. ${it.sentences
+            .map((s) => `${s.before} ___${it.hint ? ` (${it.hint})` : ''} ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.after}`)
+            .join(' / ')}  → answer: ${it.answer}${block.firstLetterHint || it.firstLetter ? ' (first letter given)' : ''}`
         )
       )
       if (block.wordBank) lines.push(`(Students get a word box: ${[...block.items.map((i) => i.bankWord || i.answer), ...block.extraBankWords].join(', ')})`)
@@ -251,7 +253,9 @@ export function describeBlock(block: Block): string {
       break
     case 'gapText': {
       let n = 0
-      lines.push(block.parts.map((p) => (p.type === 'text' ? p.text : `(${++n}) ___[answer: ${p.answer}]`)).join(''))
+      lines.push(
+        block.parts.map((p) => (p.type === 'text' ? p.text : p.folge ? `___[2nd part, answer: ${p.answer}]` : `(${++n}) ___[answer: ${p.answer}]`)).join('')
+      )
       break
     }
     case 'match':

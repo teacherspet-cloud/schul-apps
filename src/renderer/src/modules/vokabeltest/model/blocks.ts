@@ -13,7 +13,8 @@ export function itemCount(block: Block): number {
     case 'mindmap':
       return block.items.length
     case 'gapText':
-      return block.parts.filter((p) => p.type === 'gap').length
+      // Zweiter Teil einer zweiteiligen Wendung zählt nicht extra
+      return block.parts.filter((p) => p.type === 'gap' && !p.folge).length
     case 'match':
       return block.left.length
     case 'categorize':

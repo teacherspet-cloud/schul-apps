@@ -578,7 +578,10 @@ function ErgebnisAnsicht({ code, t, grund }: { code: string; t: Beitritt; grund:
                     <Stack gap={0} style={{ flex: 1 }}>
                       {(eintrag.text || eintrag.vor || eintrag.saetze?.length) && (
                         <Text size="sm" c="dimmed">
-                          {eintrag.text ?? (eintrag.saetze?.length ? eintrag.saetze.map((s) => `${s.vor} ___ ${s.nach}`).join(' / ') : `${(eintrag.vor ?? '').slice(-80)} ___ ${eintrag.nach ?? ''}`)}
+                          {eintrag.text ??
+                            (eintrag.saetze?.length
+                              ? eintrag.saetze.map((s) => `${s.vor} ___ ${s.mitte !== undefined ? `${s.mitte} ___ ` : ''}${s.nach}`).join(' / ')
+                              : `${(eintrag.vor ?? '').slice(-80)} ___ ${eintrag.nach ?? ''}`)}
                         </Text>
                       )}
                       {eintrag.felder.map((f) => (
@@ -682,7 +685,13 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
         {e.bild && <Image src={e.bild} alt="" h={120} w="auto" fit="contain" />}
         {e.saetze?.map((s, i) => (
           <Text key={i}>
-            {s.vor} <b>_____</b> {s.nach}
+            {s.vor} <b>{s.mitte !== undefined ? '(1) _____' : '_____'}</b>{' '}
+            {s.mitte !== undefined && (
+              <>
+                {s.mitte} <b>(2) _____</b>{' '}
+              </>
+            )}
+            {s.nach}
           </Text>
         ))}
         {(e.vor || e.nach) && (

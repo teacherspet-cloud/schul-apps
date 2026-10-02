@@ -16,6 +16,7 @@ import {
   VerticalAlign,
   WidthType
 } from 'docx'
+import { teileVon } from '@shared/luecken'
 import type { IParagraphOptions, ITableOptions } from 'docx'
 import { kiVermerkText, kiWordEigenschaften, vermerkSichtbar } from '@shared/kiKennzeichnung'
 import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
@@ -409,8 +410,12 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
           const children: ParagraphChild[] = []
           if (it.sentences.length > 1) children.push(run(`${letter(si)}) `, { bold: true }))
           children.push(run(`${s.before} `))
+          const teile = teileVon(it.answer)
           if (wrong) children.push(new TextRun({ text: it.hint ?? '', underline: { type: 'thick' }, bold: true }))
           else if (twoSentences) children.push(run('__________'))
+          // Zweiteilige Wendung (02.10.2026): zwei Lücken mit dem Mittelteil dazwischen
+          else if (s.mitte !== undefined && teile.length === 2)
+            children.push(...gapRuns(teile[0], mode, firstLetter), run(` ${s.mitte} `), ...gapRuns(teile[1], mode, firstLetter))
           else children.push(...gapRuns(it.answer, mode, firstLetter))
           if (!wrong && !twoSentences && it.hint) children.push(run(` (${it.hint})`))
           children.push(run(` ${s.after}`))

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { lueckentextOhneDoppelte } from '@shared/luecken'
 import { stufeAus } from '../../../shared/verstehen/stufen'
 import { newId, Rng, shuffle } from '../../vokabeltest/model/random'
 import type { Stars } from '../didactics/differentiation'
@@ -130,7 +131,8 @@ export function convertAnswer(a: any, rng: Rng): Answer {
   const out = emptyAnswer(pick<AnswerKind>(a?.kind, ANSWER_KINDS, 'lines'))
   out.count = Math.max(0, Math.min(30, Number(a?.count) || (out.kind === 'grid' ? 6 : 3)))
   out.heightMm = Math.max(10, Math.min(200, Number(a?.heightMm) || 40))
-  out.gapText = text(a?.gapText)
+  // Doppeltes an der Lücke aus der Lösung („to [[to reward]]“ → „to [[reward]]“, 02.10.2026)
+  out.gapText = lueckentextOhneDoppelte(text(a?.gapText))
   out.labels = strings(a?.labels)
   // Zeichenfläche mit Achsen: bereinigt, damit Bereich und Schrittweite brauchbar sind
   if (out.kind === 'diagram') {
