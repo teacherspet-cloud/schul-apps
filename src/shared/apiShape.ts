@@ -195,7 +195,9 @@ export function buildApi(call: Call, extras: ApiExtras) {
       },
       htmlVorbereiten: (fn: HtmlVorbereitenFn | null) => {
         htmlVorbereiten = fn
-      }
+      },
+      /** Die angemeldeten Rückfragen – für die Browser-Fassung, die files.save/open selbst ersetzt (netzZugang.ts) */
+      aktuell: () => ({ ortWahl, dateiWahl })
     },
     settings: {
       get: () => call<AppSettings>('settings:get'),

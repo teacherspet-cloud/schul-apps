@@ -40,7 +40,12 @@ export default defineConfig({
     sourcemap: true,
     reportCompressedSize: false,
     rollupOptions: {
-      output: { format: 'es', entryFileNames: 'start.mjs', inlineDynamicImports: true }
+      output: { format: 'es', entryFileNames: 'start.mjs', inlineDynamicImports: true },
+      // „use client" der Oberflächen-Bibliotheken (Mantine) ist auf dem Server bedeutungslos
+      onwarn(w, weiter) {
+        if (w.code === 'MODULE_LEVEL_DIRECTIVE') return
+        weiter(w)
+      }
     }
   }
 })

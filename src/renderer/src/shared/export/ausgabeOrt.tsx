@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { create } from 'zustand'
 import { inGruppenordner, iservAnzeige, iservOrdnerFuer, pfadTeile } from '@shared/iserv'
 import type { AblageZiel, AusgabeOrt } from '@shared/types'
-import { amPc, aufIos } from '../plattform'
+import { amPc, aufIos, hatClient } from '../plattform'
 import { useAppSettings } from '../settingsStore'
 
 /**
@@ -33,7 +33,7 @@ const useAbfrage = create<{ offen: Abfrage | null }>(() => ({ offen: null }))
 
 /** Welche Orte dieses Gerät anbietet */
 export function orteDiesesGeraets(iservVerbunden: boolean): AusgabeOrt[] {
-  if (amPc()) return iservVerbunden ? ['geraet', 'iserv'] : []
+  if (amPc() || hatClient()) return iservVerbunden ? ['geraet', 'iserv'] : []
   if (!aufIos()) return []
   return iservVerbunden ? ['geraet', 'iserv', 'dateien', 'teilen'] : ['geraet', 'dateien', 'teilen']
 }

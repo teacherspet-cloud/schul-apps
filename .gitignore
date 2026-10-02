@@ -10,3 +10,4 @@ recherche/
 # Zwischenstände von electron-vite und electron-builder
 electron.vite.config.*.mjs
 win-unpacked.tmp/
+out-client/

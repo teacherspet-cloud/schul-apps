@@ -96,9 +96,10 @@ describe('Freigaben', () => {
       expect(SERVER_KANAELE.has(k), k).toBe(false)
     for (const k of ['secrets:set', 'sheets:delete', 'ai:login-start', 'ai:structured', 'export:preview']) expect(SERVER_KANAELE.has(k), k).toBe(true)
   })
-  it('Einstellungen: keine Programmpfade, kein Netzzugang, kein IServ, kein Zertifikat', () => {
+  it('Einstellungen: keine Programmpfade, kein Netzzugang, kein Zertifikat', () => {
     const r = beschneideEinstellungen({ schoolName: 'X', lan: { pin: '1' }, iserv: {}, ai: { cliPaths: { openai: 'C:/böse.exe' }, textProvider: 'openai' }, briefkopf: { zertifikat: 'x', ort: 'Y' } }) as Record<string, unknown>
-    expect(r).toEqual({ schoolName: 'X', ai: { textProvider: 'openai' }, briefkopf: { ort: 'Y' } })
+    // IServ-Angaben ohne Passwort bleiben (Exe „Schul-Apps Online“), alles andere Gefährliche fällt weg
+    expect(r).toEqual({ schoolName: 'X', iserv: {}, ai: { textProvider: 'openai' }, briefkopf: { ort: 'Y' } })
   })
   it('freigegebene Schlüssel nur, wenn der Admin sie für alle freigibt; Abos nie', () => {
     setzeServerGeheimnis('schluessel:openai', 'sk-admin')

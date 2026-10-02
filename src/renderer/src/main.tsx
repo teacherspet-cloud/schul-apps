@@ -25,7 +25,7 @@ import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt
 import { EingabeOrtDialog, installiereDateiWahl } from './shared/export/eingabeOrt'
 import { installiereTabellenAuswahl, TabellenKreismenue } from './modules/arbeitsblatt/render/tabellenAuswahl'
 import { beobachteTrennung, htmlMitTrennung } from './shared/silbentrennung'
-import { aufServer } from './shared/plattform'
+import { aufServer, hatClient } from './shared/plattform'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -50,7 +50,7 @@ installiereTabellenAuswahl()
 window.api?.vermittlung?.htmlVorbereiten(htmlMitTrennung)
 beobachteTrennung()
 
-if (!imNetz()) {
+if (!imNetz() || hatClient()) {
   installiereOrtWahl()
   installiereDateiWahl()
 }

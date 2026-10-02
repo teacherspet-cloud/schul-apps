@@ -31,6 +31,9 @@ export const aufServer = (): boolean => typeof window !== 'undefined' && Boolean
  */
 export const nurPcNetz = (): boolean => imNetz() && !aufServer()
 
+/** Die Exe „Schul-Apps Online" (src/client) – kann IServ-Ordner mit dem lokal gespeicherten Passwort */
+export const hatClient = (): boolean => typeof window !== 'undefined' && Boolean(window.__schulappsClient)
+
 /** In der iPad-/iPhone-App? */
 export const aufIos = (): boolean => plattform() === 'ios'
 
@@ -43,6 +46,8 @@ declare global {
     __plattform?: 'ios'
     /** Setzt der Server (/server/ich.js) vor dem Start der Oberfläche */
     __schulappsServer?: ServerIch
+    /** Setzt die Exe „Schul-Apps Online" (src/client/preload.ts) */
+    __schulappsClient?: { name: string; iserv: ClientIserv }
   }
 }
 
@@ -59,3 +64,14 @@ export interface ServerIch {
 }
 
 export const serverIch = (): ServerIch | null => (typeof window !== 'undefined' ? (window.__schulappsServer ?? null) : null)
+
+/** IServ in der Exe „Schul-Apps Online" – gleiche Form wie window.api.iserv, dazu `ablegen` */
+export interface ClientIserv {
+  status: () => Promise<unknown>
+  verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) => Promise<{ basis: string; ordner: unknown[] }>
+  ordner: (pfad: string) => Promise<unknown[]>
+  eintraege: (pfad: string) => Promise<unknown[]>
+  laden: (pfad: string) => Promise<{ name: string; data: Uint8Array }>
+  trennen: () => Promise<void>
+  ablegen: (name: string, daten: Uint8Array | string, ziel: unknown, standardZiel?: string) => Promise<string>
+}

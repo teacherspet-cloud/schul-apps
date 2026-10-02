@@ -69,7 +69,7 @@ import WartungCard from './WartungCard'
 import SicherungenCard from './SicherungenCard'
 import VerbrauchCard from './VerbrauchCard'
 import { imNetz } from '../shared/netzZugang'
-import { amPc, aufIos, nurPcNetz } from '../shared/plattform'
+import { amPc, aufIos, aufServer, hatClient, nurPcNetz, serverIch } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
 import { PcKiVerbindung, PcKiWahl } from './PcKiZugang'
 import AblageCard from './AblageCard'
@@ -115,6 +115,26 @@ export default function SettingsPage(): React.JSX.Element {
         <Title order={2} mb="md">
           Einstellungen
         </Title>
+        {/* Server: Konto und Abmelden – auch auf dem Telefon, wo die Leiste fehlt (02.10.2026) */}
+        {aufServer() && (
+          <Group justify="space-between" mb="md" data-konto>
+            <Text size="sm" c="dimmed">
+              Angemeldet als {serverIch()?.name || serverIch()?.benutzer} ({serverIch()?.benutzer})
+            </Text>
+            <Button
+              size="xs"
+              variant="light"
+              color="gray"
+              onClick={() =>
+                void fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } })
+                  .catch(() => undefined)
+                  .then(() => window.location.assign('/anmelden'))
+              }
+            >
+              Abmelden
+            </Button>
+          </Group>
+        )}
         <Tabs.List>
           <Tabs.Tab value="schule" leftSection={<IconSchool size={16} />}>
             Schule
@@ -173,7 +193,7 @@ export default function SettingsPage(): React.JSX.Element {
               {/* Nur iPad: wohin erstellte Dateien kommen (30.09.2026) */}
               {aufIos() && <AblageCard settings={settings} update={update} />}
               {/* IServ per WebDAV: iPad (01.10.2026) und PC (02.10.2026) – nicht im Browser des Netzzugangs */}
-              {!imNetz() && <IservCard settings={settings} update={update} />}
+              {(!imNetz() || hatClient()) && <IservCard settings={settings} update={update} />}
               <FachfarbenSettings settings={settings} update={update} />
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />

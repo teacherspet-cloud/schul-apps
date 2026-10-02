@@ -322,7 +322,40 @@ export function netzZugangEinrichten(): void {
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
-  api.files.save = async (defaultName, _filters, daten) => {
+  /*
+   * Exe „Schul-Apps Online" (02.10.2026): IServ-Ordner über die Exe (Passwort nur auf dem PC).
+   * Die Einstellungen (Schule, Benutzer, Ziel – kein Passwort) liegen auf dem Server.
+   */
+  const client = window.__schulappsClient
+  if (client) {
+    const iserv = client.iserv
+    api.iserv = {
+      ...api.iserv,
+      status: iserv.status as typeof api.iserv.status,
+      ordner: iserv.ordner as typeof api.iserv.ordner,
+      eintraege: iserv.eintraege as typeof api.iserv.eintraege,
+      laden: iserv.laden,
+      verbinden: async (eingabe) => {
+        const r = await iserv.verbinden(eingabe)
+        const alt = (await api.settings.get()).iserv
+        await api.settings.set({ iserv: { schule: eingabe.schule.trim(), benutzer: eingabe.benutzer.trim(), basis: r.basis, ziel: alt?.ziel || 'Home/Schulmaterial' } })
+        return r as Awaited<ReturnType<typeof api.iserv.verbinden>>
+      },
+      trennen: async () => {
+        await iserv.trennen()
+        const alt = (await api.settings.get()).iserv
+        if (alt) await api.settings.set({ iserv: { ...alt, basis: '' } })
+      }
+    }
+  }
+  const aufIservAblegen = async (name: string, daten: Uint8Array | string, ziel: unknown): Promise<string> =>
+    client!.iserv.ablegen(name, daten, ziel, (await api.settings.get()).iserv?.ziel)
+
+  api.files.save = async (defaultName, _filters, daten, ziel) => {
+    // Rückfrage „Wohin?" (shared/export/ausgabeOrt.tsx) – mit der Exe auch IServ
+    const z = await api.vermittlung.aktuell().ortWahl?.(ziel)
+    if (z === null) return null
+    if (z?.ort === 'iserv' && client) return aufIservAblegen(defaultName, daten, z)
     herunterladen(
       defaultName,
       daten,
@@ -344,7 +377,7 @@ export function netzZugangEinrichten(): void {
    * „Datei öffnen" braucht im Browser die Dateiauswahl des GERÄTS. Der Dialog des Rechners
    * wäre dort unsichtbar – die Oberfläche hinge, und niemand wüsste warum.
    */
-  api.files.open = (filters) =>
+  const imBrowserOeffnen = (filters: Parameters<typeof api.files.open>[0]): ReturnType<typeof api.files.open> =>
     new Promise((ok) => {
       const feld = document.createElement('input')
       feld.type = 'file'
@@ -359,10 +392,19 @@ export function netzZugangEinrichten(): void {
       feld.oncancel = () => ok(null)
       feld.click()
     })
+  // Rückfrage „Von wo?" (shared/export/eingabeOrt.tsx) – mit der Exe auch IServ
+  api.files.open = async (filters) => {
+    const gewaehlt = await api.vermittlung.aktuell().dateiWahl?.(filters)
+    if (gewaehlt !== undefined) return gewaehlt
+    return imBrowserOeffnen(filters)
+  }
 
-  api.exporter.pdf = async (html, defaultName, opts) => {
+  api.exporter.pdf = async (html, defaultName, opts, ziel) => {
+    const z = await api.vermittlung.aktuell().ortWahl?.(ziel)
+    if (z === null) return null
     // `export:pdf` wuerde auf dem entfernten Rechner speichern; die Vorschau liefert dieselben Bytes
     const bytes = await api.exporter.preview(html)
+    if (z?.ort === 'iserv' && client) return aufIservAblegen(defaultName, opts?.seiten?.length ? await pdfMitSeiten(bytes, opts.seiten) : bytes, z)
     // Seitenauswahl bei Dokumenten ohne Seitenzahlen (shared/seitenPdf.ts)
     herunterladen(defaultName, opts?.seiten?.length ? await pdfMitSeiten(bytes, opts.seiten) : bytes, 'application/pdf')
     return defaultName
