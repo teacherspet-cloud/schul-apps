@@ -163,12 +163,18 @@ export function attrappeBildErzeugen(prompt: string): string {
   return datei.bild
 }
 
-/** Wartet `ms`, meldet dabei Zeichen und endet beim Abbruch sofort. */
-function warte(ms: number, laenge: number, onChunk?: ChunkListener, signal?: AbortSignal): Promise<void> {
+/**
+ * Wartet `ms`, meldet dabei Zeichen und endet beim Abbruch sofort. Wie ein Anbieter mit
+ * Antwortstrom liefert sie den bisherigen Text mit (Live-Vorschau, 02.10.2026).
+ */
+function warte(ms: number, text: string, onChunk?: ChunkListener, signal?: AbortSignal): Promise<void> {
   return new Promise((fertig, fehler) => {
     if (signal?.aborted) return fehler(new AbbruchFehler())
     const start = Date.now()
-    const takt = setInterval(() => onChunk?.(Math.round((laenge * (Date.now() - start)) / Math.max(1, ms))), 200)
+    const takt = setInterval(() => {
+      const n = Math.min(text.length, Math.round((text.length * (Date.now() - start)) / Math.max(1, ms)))
+      onChunk?.(n, text.slice(0, n))
+    }, 200)
     const zeit = setTimeout(() => {
       clearInterval(takt)
       signal?.removeEventListener('abort', ab)
@@ -206,7 +212,7 @@ export class AttrappeProvider implements AiProvider {
         // Nur für Tests – ein fehlendes Protokoll darf die Antwort nicht verhindern
       }
     }
-    await warte(datei.verzoegerungMs ?? 2000, JSON.stringify(antwort).length, onChunk, datei.abbruchTaub ? undefined : signal)
+    await warte(datei.verzoegerungMs ?? 2000, JSON.stringify(antwort), onChunk, datei.abbruchTaub ? undefined : signal)
     return structuredClone(antwort) as T
   }
 

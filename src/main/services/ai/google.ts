@@ -60,7 +60,7 @@ export class GoogleProvider implements AiProvider {
         if (chunk.usageMetadata) nutzung = chunk.usageMetadata
         if (chunk.text) {
           text += chunk.text
-          onChunk(text.length)
+          onChunk(text.length, text)
         }
       }
       merkeVerbrauch('google', model, { eingabe: nutzung?.promptTokenCount ?? 0, ausgabe: nutzung?.candidatesTokenCount ?? 0 })

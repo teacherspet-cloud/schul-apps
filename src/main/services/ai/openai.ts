@@ -47,7 +47,7 @@ export class OpenAiProvider implements AiProvider {
       for await (const event of stream) {
         if (event.type === 'response.output_text.delta') {
           text += event.delta
-          onChunk(text.length)
+          onChunk(text.length, text)
         } else if (event.type === 'response.completed') {
           merkeVerbrauch('openai', model, { eingabe: event.response.usage?.input_tokens ?? 0, ausgabe: event.response.usage?.output_tokens ?? 0 })
         }

@@ -3158,6 +3158,49 @@ html[data-griff-zug] * {
   }
 }
 
+/* Platzhalter der Live-Vorschau (02.10.2026): reservierte Fläche eines noch fehlenden Bausteins */
+.ws-platzhalter {
+  position: relative;
+  border: 0.4mm dashed color-mix(in srgb, var(--ws-accent, #868e96) 45%, #adb5bd);
+  border-radius: 1.5mm;
+  background: linear-gradient(100deg, #f1f3f5 30%, #f8f9fa 50%, #f1f3f5 70%);
+  background-size: 300% 100%;
+  animation: ws-platzhalter-schimmer 2.2s linear infinite;
+}
+.ws-platzhalter-inhalt {
+  visibility: hidden;
+}
+.ws-platzhalter-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1mm;
+  padding: 2mm 4mm;
+  text-align: center;
+  color: #6c757d;
+  font-size: 9.5pt;
+}
+.ws-platzhalter-text small {
+  font-size: 8pt;
+  color: #868e96;
+}
+@keyframes ws-platzhalter-schimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-platzhalter {
+    animation: none;
+  }
+}
+
 /* ===================================================================================
  * Zeilenweise Teilung (02.10.2026)
  *

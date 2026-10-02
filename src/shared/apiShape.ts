@@ -281,7 +281,11 @@ export function buildApi(call: Call, extras: ApiExtras) {
       onSetupEvent: (cb: (event: SetupEvent) => void) => extras.subscribe('ai:setup-event', cb as (value: unknown) => void),
       models: (provider: AiProviderId, kind: ModelKind, refresh = false) => call<ModelListResult>('ai:models', provider, kind, refresh),
       onModelsUpdated: (cb: (notes: string[]) => void) => extras.subscribe('models:updated', cb as (value: unknown) => void),
-      structured: <T>(req: StructuredRequest) => call<T>('ai:structured', req),
+      structured: <T>(req: StructuredRequest) => {
+        // Der Rückruf für den Teiltext lebt nur in der Oberfläche (shared/auftraege.ts) – er ließe sich nicht übertragen
+        const { onTeilText: _rueckruf, ...anfrage } = req
+        return call<T>('ai:structured', anfrage)
+      },
       /** Sucht im offenen Netz nach Fundstellen; leere Liste, wenn der Anbieter das nicht kann */
       websuche: (auftrag: string, anfrageId?: string) => call<Netzfund[]>('ai:websuche', auftrag, anfrageId),
       image: (prompt: string, anfrageId?: string) => call<string>('ai:image', prompt, anfrageId),

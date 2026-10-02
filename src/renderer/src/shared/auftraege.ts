@@ -547,7 +547,21 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     zeige: (stand, hinweis) => {
       if (!signal.aborted) vorschau.zeige(stand, hinweis)
     },
-    ai: <T>(req: StructuredRequest) => anfrage(req.schemaName, (progressId) => window.api.ai.structured<T>({ ...req, progressId }), req),
+    ai: <T>(req: StructuredRequest) =>
+      anfrage(
+        req.schemaName,
+        async (progressId) => {
+          // Live-Vorschau: den bisher gelieferten Text an den Aufrufer (nur bei Anbietern mit Antwortstrom)
+          const { onTeilText, ...ohne } = req
+          const weg = onTeilText ? window.api.ai.onProgress((p) => p.id === progressId && p.text && !signal.aborted && onTeilText(p.text)) : undefined
+          try {
+            return await window.api.ai.structured<T>({ ...ohne, progressId, ...(onTeilText ? { teilText: true } : {}) })
+          } finally {
+            weg?.()
+          }
+        },
+        req
+      ),
     bild: (prompt) => anfrage('bild', (anfrageId) => window.api.ai.image(prompt, anfrageId)),
     websuche: (auftrag) => anfrage('websuche', (anfrageId) => window.api.ai.websuche(auftrag, anfrageId)),
     melde: (meldung, fertig, gesamt, abschnitt) => {

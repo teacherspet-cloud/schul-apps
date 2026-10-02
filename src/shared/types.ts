@@ -584,6 +584,13 @@ export interface StructuredRequest {
    * empfangen und die Zahl der eingetroffenen Zeichen laufend gemeldet.
    */
   progressId?: string
+  /**
+   * Live-Vorschau (02.10.2026): den bisher gelieferten Antworttext mitschicken (ai:progress, höchstens
+   * einmal je Sekunde). Nur Anbieter mit Antwortstrom (API-Schlüssel); das Abo liefert erst am Ende.
+   */
+  teilText?: boolean
+  /** Nur in der Oberfläche: bekommt den bisher gelieferten Text (wird vor dem Senden entfernt) */
+  onTeilText?: (text: string) => void
 }
 
 /** Fortschritt einer laufenden KI-Anfrage */
@@ -591,6 +598,8 @@ export interface AiProgress {
   id: string
   /** Zeichen der Antwort, die bisher eingetroffen sind */
   chars: number
+  /** Bisher gelieferter Antworttext – nur bei `teilText` (Live-Vorschau) */
+  text?: string
 }
 
 export interface ConnectionResult {

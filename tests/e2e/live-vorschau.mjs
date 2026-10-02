@@ -143,8 +143,23 @@ try {
   const kam = await warte(async () => (await anzahl('[data-live-vorschau]')) > 0, 30000)
   pruefe(kam, 'Beim Ausformulieren erscheint eine Live-Vorschau')
   if (kam) {
+    // Platzhalter im echten Blatt (02.10.2026): erst alle, dann Baustein für Baustein ersetzt
+    const platz = async () => page.locator('[data-live-vorschau] [data-live-platzhalter]').count()
+    const anfangs = await platz()
+    pruefe(anfangs > 0 && (await page.locator('[data-live-vorschau] .ws-page').count()) > 0, `Sofort ein Blatt mit Platzhaltern (${anfangs}) statt einer Liste`)
+    await page.screenshot({ path: join(out, '0-platzhalter.png') })
+    const gesehen = new Set([anfangs])
+    for (let i = 0; i < 40; i++) {
+      gesehen.add(await platz().catch(() => -1))
+      if ((await anzahl('[data-live-vorschau]')) === 0) break
+      await page.waitForTimeout(150)
+    }
+    const zwischen = [...gesehen].filter((n) => n > 0 && n < anfangs)
+    pruefe(zwischen.length > 0, `Bausteine ersetzen ihre Platzhalter nacheinander (gesehen: ${[...gesehen].sort().join(', ')})`)
+  }
+  if (kam && (await anzahl('[data-live-vorschau]')) > 0) {
     pruefe((await anzahl('[data-live-kopf]')) > 0, 'Der Auftrag läuft noch, während die Vorschau steht (Kopfzeile)')
-    const text = await sichtbar(page.locator('[data-live-vorschau]')).innerText()
+    const text = (await sichtbar(page.locator('[data-live-vorschau]')).innerText()).replace(/\u00ad/g, '')
     pruefe(text.includes('Der Igel im Winter'), 'Die Vorschau zeigt das entstehende Blatt')
     pruefe((await page.locator('[data-live-vorschau] .ws-live-neu').count()) > 0, 'Neue Bausteine leuchten auf (ws-live-neu)')
     const laufzeile = (await sichtbar(page.locator('[data-live-laufzeile]')).innerText()).trim()

@@ -16,7 +16,8 @@ export interface RawModel {
  * Damit lässt sich ein Fortschrittsbalken füllen, der tatsächlich etwas anzeigt: Bis dahin
  * stand er still, weil eine Anfrage erst ganz am Ende ein Ergebnis liefert.
  */
-export type ChunkListener = (chars: number) => void
+/** Fortschritt einer Antwort im Strom: Zeichenzahl und – wo vorhanden – der bisherige Text (Live-Vorschau) */
+export type ChunkListener = (chars: number, text?: string) => void
 
 /**
  * Eine Fundstelle aus dem offenen Netz.

@@ -321,12 +321,16 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
     const id = req.progressId
     // Fortschritt melden, aber höchstens fünfmal je Sekunde – sonst überflutet es die Oberfläche
     let last = 0
+    let letzterText = 0
     const onChunk = id
-      ? (chars: number): void => {
+      ? (chars: number, text?: string): void => {
           const now = Date.now()
-          if (now - last < 200) return
+          // Live-Vorschau: der bisherige Text, höchstens einmal je Sekunde (er wächst auf viele KB)
+          const mitText = Boolean(req.teilText && text && now - letzterText >= 1000)
+          if (now - last < 200 && !mitText) return
           last = now
-          u.sende('ai:progress', { id, chars })
+          if (mitText) letzterText = now
+          u.sende('ai:progress', mitText ? { id, chars, text } : { id, chars })
         }
       : undefined
     const anbieter = req.provider ?? getSettings().ai.textProvider

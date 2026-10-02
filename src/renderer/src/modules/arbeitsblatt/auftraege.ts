@@ -237,8 +237,7 @@ export function formuliereAus(worksheet: Worksheet, docId: string, optionen: { r
       // Hör-/Sehverstehen: ein Video aus dem Material wird zum Sehtext – samt Adresse für QR-Code und Link (didactics/sehtext.ts)
       const ws = { ...eingabe, meta: mitSehtext(eingabe.meta, eingabe.sources) }
       const profile = profileFromMeta(ws.meta)
-      // Live-Vorschau: sofort das Gerüst aus der Gliederung – die erste Antwort dauert oft über eine Minute
-      if (ws.outline?.items.length) k.zeige({ geruest: ws.outline }, { was: 'Gliederung steht – die KI formuliert aus' })
+      // Live-Vorschau: sofort das Blatt mit Platzhaltern je Gliederungspunkt (generateWorksheet) – die erste Antwort dauert oft über eine Minute
       // Die inhaltliche Prüfung läuft auch im Sparmodus: Ein Blatt mit falschen Verweisen
       // oder unlösbaren Aufgaben spart kein Kontingent, sondern kostet Unterrichtszeit.
       const result = await generateWorksheet(ws, profile, {

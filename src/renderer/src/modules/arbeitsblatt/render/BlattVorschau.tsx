@@ -3,8 +3,8 @@ import { useMemo } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import type { Zwischenstand } from '../../../shared/zwischenstand'
 import { useAppSettings } from '../../../shared/settingsStore'
-import { BLOCK_LABELS } from '../model/factory'
-import type { OriginalMaterialAblage, Outline, Worksheet, WsBlock } from '../model/types'
+import type { OriginalMaterialAblage, Worksheet, WsBlock } from '../model/types'
+import { PLATZHALTER_PRAEFIX } from '../generation/generate'
 import { contextFor, pageInfoFor, SheetPages, useSheetLayouts } from './SheetPages'
 import type { PlacedItem } from './paginate'
 
@@ -18,17 +18,31 @@ import type { PlacedItem } from './paginate'
  * Neue und geänderte Bausteine des letzten Standes tragen `ws-live-neu` (kurzes Aufleuchten,
  * ws.css). Der Schlüssel enthält die Nummer des Standes – so leuchtet ein Baustein bei jeder
  * weiteren Änderung erneut auf. Die Ansicht rollt nicht von selbst mit.
+ *
+ * Platzhalter (02.10.2026, Wunsch der Lehrkraft: „die Ansicht soll schon so aussehen wie das
+ * fertige Arbeitsblatt"): Gliederungspunkte, zu denen noch kein Baustein da ist, stehen als
+ * reservierte Fläche (generation/generate.ts, `platzhalter`) auf dem Blatt; hier zeichnen sie
+ * sich als grauer Kasten mit Bausteinart und Zweck.
  */
 export function BlattVorschau({ ws, markiert, nr }: { ws: Worksheet; markiert: string[]; nr: number }): React.JSX.Element {
   const logo = useAppSettings((s) => s.logoDataUrl)
   const settings = useAppSettings((s) => s.settings)
   const { layouts, measure } = useSheetLayouts(ws, logo, settings.schoolName)
   const neu = useMemo(() => new Set(markiert), [markiert])
-  const wrapBlock = (block: WsBlock, _placed: PlacedItem, content: React.ReactNode): React.ReactNode => (
-    <div key={neu.has(block.id) ? `neu-${nr}` : 'alt'} className={neu.has(block.id) ? 'ws-live-neu' : undefined} data-live-baustein={block.id}>
-      {content}
-    </div>
-  )
+  const wrapBlock = (block: WsBlock, _placed: PlacedItem, content: React.ReactNode): React.ReactNode =>
+    block.id.startsWith(PLATZHALTER_PRAEFIX) && block.type === 'workspace' ? (
+      <div key="platzhalter" className="ws-platzhalter" data-live-platzhalter={block.id}>
+        <div className="ws-platzhalter-inhalt">{content}</div>
+        <div className="ws-platzhalter-text">
+          <span>{block.label}</span>
+          <small>wird ausformuliert …</small>
+        </div>
+      </div>
+    ) : (
+      <div key={neu.has(block.id) ? `neu-${nr}` : 'alt'} className={neu.has(block.id) ? 'ws-live-neu' : undefined} data-live-baustein={block.id}>
+        {content}
+      </div>
+    )
   return (
     <div data-live-vorschau>
       {ws.sheets.map((sheet) => (
@@ -94,34 +108,6 @@ export function MaterialVorschau({ material }: { material: OriginalMaterialAblag
         <Text size="xs" c="dimmed">
           {material.quellenangabe}
         </Text>
-      </Stack>
-    </Card>
-  )
-}
-
-/**
- * Ausformulieren, bevor die erste Antwort da ist (02.10.2026): das Gerüst aus der Gliederung.
- * Die erste Anfrage schreibt das ganze Blatt und dauert mit echter KI oft über eine Minute –
- * bis dahin sah die Lehrkraft nur die Statuskarte und hielt die Vorschau für kaputt.
- */
-export function GeruestVorschau({ outline }: { outline: Outline }): React.JSX.Element {
-  return (
-    <Card withBorder maw={820} mx="auto" padding="lg" data-live-geruest>
-      <Stack gap="xs">
-        <Text size="xs" c="dimmed">
-          Geplanter Aufbau – die Bausteine werden gerade ausformuliert und erscheinen hier, sobald die KI sie liefert
-        </Text>
-        <Title order={4}>{outline.title}</Title>
-        {outline.items.map((item, i) => (
-          <Card key={item.id || i} withBorder padding="xs" style={{ borderStyle: 'dashed' }} className="ws-live-geruest-punkt">
-            <Text size="sm">
-              <Text span fw={600}>
-                {BLOCK_LABELS[item.type] ?? item.type}
-              </Text>
-              {item.purpose ? ` – ${item.purpose}` : ''}
-            </Text>
-          </Card>
-        ))}
       </Stack>
     </Card>
   )

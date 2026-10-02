@@ -23,7 +23,9 @@ import { COMBINED_RULES, DIFFERENTIATION_PRINCIPLES, STAR_LABELS, Stars } from '
 import { fassungsLabel, istMittel, profilFuerStufe, stufeFuer, stufenRegeln, stufeText } from '../didactics/schwierigkeit'
 import { lesbarkeitAngleichen } from './lesbarkeit'
 import type { LearnerProfile } from '../didactics/profile'
-import type { OriginalMaterialAblage, Outline, OutlineItem, Sheet, SourceMaterial, Worksheet, WorksheetMeta, WsBlock } from '../model/types'
+import type { OriginalMaterialAblage, Outline, OutlineItem, Sheet, SourceMaterial, Worksheet, WorksheetMeta, WsBlock, WsBlockType } from '../model/types'
+import { BLOCK_LABELS } from '../model/factory'
+import { vollstaendigeElemente } from '../../../shared/teilJson'
 import { convertBlock, convertOutline } from './convert'
 import { describeBlock, describeSheet } from './describe'
 import { setzeMaterialEin } from './originalmaterial'
@@ -207,13 +209,32 @@ export async function generateSheet(
   level: Stars | null,
   ai: AiCall,
   /** Bereits geschriebene Hörtexte; die Aufgaben werden dann zu ihnen gebaut */
-  script?: ListeningScript | ListeningScript[] | null
+  script?: ListeningScript | ListeningScript[] | null,
+  /**
+   * Live-Vorschau (02.10.2026): das Blatt aus den bisher VOLLSTÄNDIG gelieferten Bausteinen und
+   * die Gliederungspunkte, zu denen schon einer da ist (nur Anbieter mit Antwortstrom).
+   */
+  teil?: (sheet: Sheet, geliefert: Set<number>) => void
 ): Promise<Sheet> {
   const { meta, sources } = ws
   const outline = ws.outline!
   const images = embeddableImages(sources)
   // Anforderungsbereiche, Sprachgrenzen und Hilfen der gewählten Stufe
   profile = profilFuerStufe(profile, stufeFuer(meta, level))
+  let bisher = 0
+  const onTeilText = teil
+    ? (text: string): void => {
+        const roh = vollstaendigeElemente(text, 'blocks')
+        if (roh.length <= bisher) return
+        bisher = roh.length
+        try {
+          const geliefert = new Set<number>(roh.map((b: unknown) => Number((b as { outlineIndex?: unknown }).outlineIndex)).filter((n: number) => Number.isInteger(n) && n >= 0))
+          teil(buildSheet({ blocks: roh }, level, images, anredeFuerMeta(meta)), geliefert)
+        } catch {
+          // Ein Zwischenstand, der sich nicht bauen lässt, wird übersprungen – das fertige Blatt kommt ohnehin
+        }
+      }
+    : undefined
   const data = await ai<any>({
     system: systemPrompt(meta, profile),
     user: [
@@ -243,7 +264,8 @@ export async function generateSheet(
       .join('\n\n'),
     images: materialImages(sources),
     schemaName: 'worksheet',
-    schema: WORKSHEET_SCHEMA
+    schema: WORKSHEET_SCHEMA,
+    ...(onTeilText ? { onTeilText } : {})
   })
   const sheet = buildSheet(data, level, images, anredeFuerMeta(meta))
   // Die Fassung heißt nach ihrer gewählten Stufe („★ grundlegend", „★★ anspruchsvoll") – so steht es im Blattwechsler und beim Export
@@ -544,6 +566,46 @@ ${describeSheet(sheet)}`,
 
 // ---------- Gesamtablauf ----------
 
+/** Ungefähre Höhe je Bausteinart (mm) – nur für die Platzhalter der Live-Vorschau */
+const PLATZHALTER_MM: Partial<Record<WsBlockType, number>> = {
+  learningGoals: 22,
+  infoBox: 40,
+  text: 70,
+  image: 55,
+  task: 45,
+  scaffold: 30,
+  phrases: 35,
+  table: 50,
+  workspace: 35,
+  grid: 60,
+  audio: 25,
+  video: 30,
+  selfCheck: 35,
+  divider: 8,
+  illustration: 30,
+  protocol: 70
+}
+
+/** Kennung, an der die Vorschau einen Platzhalter erkennt (render/BlattVorschau.tsx) */
+export const PLATZHALTER_PRAEFIX = 'platzhalter-'
+
+/** Platzhalter für alle Gliederungspunkte, zu denen noch kein Baustein da ist */
+export function platzhalter(outline: Outline | undefined, geliefert: Set<number>): WsBlock[] {
+  return (outline?.items ?? []).flatMap((item, i) =>
+    geliefert.has(i)
+      ? []
+      : [
+          {
+            id: `${PLATZHALTER_PRAEFIX}${item.id || i}`,
+            type: 'workspace' as const,
+            kind: 'blank' as const,
+            heightMm: PLATZHALTER_MM[item.type] ?? 40,
+            label: [BLOCK_LABELS[item.type] ?? item.type, item.purpose].filter(Boolean).join(' – ')
+          }
+        ]
+  )
+}
+
 export interface GenerateOptions {
   ai: AiCall
   review: boolean
@@ -621,6 +683,21 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     stand[i] = sheet
     opts.zwischenstand({ ...ws, sheets: stand.filter((s): s is Sheet => s !== null) }, levels.length > 1 ? `${STAR_LABELS[levels[i]!]}: ${was}` : was)
   }
+  /*
+   * Live-Vorschau als Blatt (Lehrkraft, 02.10.2026): sofort das echte Blatt mit Platzhaltern je
+   * Gliederungspunkt; jeder vollständig gelieferte Baustein ersetzt seinen Platzhalter (nur mit
+   * Antwortstrom – beim Abo kommen alle zusammen).
+   */
+  const platzhalterBlatt = (i: number, sheet: Sheet | null, geliefert: Set<number>): Sheet => {
+    const level = levels[i]
+    const basis: Sheet = sheet ?? { id: `vorschau-${i}`, label: level ? STAR_LABELS[level] : 'Arbeitsblatt', blocks: [] }
+    return { ...basis, blocks: [...basis.blocks, ...platzhalter(ws.outline ?? undefined, geliefert)] }
+  }
+  const teilFuer = opts.zwischenstand
+    ? (i: number) =>
+        (sheet: Sheet, geliefert: Set<number>): void =>
+          zeige(i, platzhalterBlatt(i, mitMaterial(sheet), geliefert), `${sheet.blocks.length} Baustein${sheet.blocks.length === 1 ? '' : 'e'} ausformuliert`)
+    : () => undefined
 
   /*
    * Den beschafften Originaltext setzt die APP ein, nicht die KI.
@@ -664,6 +741,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     return { ...meta, teacherNote: [meta.teacherNote, kopf, ...m.protokoll].filter(Boolean).join('\n') }
   }
 
+  if (opts.zwischenstand && ws.outline?.items.length) levels.forEach((_, i) => zeige(i, platzhalterBlatt(i, null, new Set()), 'Gliederung steht – die KI formuliert aus'))
+
   // Der Hörtext entsteht zuerst und in einer eigenen Anfrage – auf Wunsch mit einem stärkeren
   // Modell. Erst danach werden die Aufgaben dazu geschrieben. Bei mehreren Niveaustufen hören
   // alle denselben Text; unterschieden wird über die Aufgaben.
@@ -693,7 +772,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
         const label = level ? STAR_LABELS[level] : 'Arbeitsblatt'
         const stufe = stufeFuer(meta, level)
         const profil = profilFuerStufe(profile, stufe)
-        let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts))
+        let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts, teilFuer(i)))
         zeige(i, sheet, 'ausformuliert')
         /*
          * Auch im Sparmodus: Die Vollständigkeitsprüfungen laufen und bessern einmal nach.
@@ -726,7 +805,7 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       const stufe = stufeFuer(meta, level)
       const profil = profilFuerStufe(profile, stufe)
       step(`${label}: wird ausformuliert …`)
-      let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts))
+      let sheet = mitMaterial(await generateSheet(ws, profil, level, opts.ai, scripts, teilFuer(i)))
       zeige(i, sheet, 'ausformuliert')
       done++
       if (opts.review) {

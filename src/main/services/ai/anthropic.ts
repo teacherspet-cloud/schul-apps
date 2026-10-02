@@ -56,10 +56,10 @@ export class AnthropicProvider implements AiProvider {
       const response = onChunk
         ? await (() => {
             const stream = this.client.beta.messages.stream(params, { signal })
-            let chars = 0
+            let text = ''
             stream.on('text', (delta) => {
-              chars += delta.length
-              onChunk(chars)
+              text += delta
+              onChunk(text.length, text)
             })
             return stream.finalMessage()
           })()
