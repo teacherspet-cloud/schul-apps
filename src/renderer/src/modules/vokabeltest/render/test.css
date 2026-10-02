@@ -705,3 +705,39 @@
   margin-right: 0;
   margin-left: 1.5mm;
 }
+
+/* Abgabe eines Onlinetests als Blatt (02.10.2026): Eintragungen der Lernenden in Stiftblau statt Lösungsrot */
+.vt-abgabe .vt-gap-answer,
+.vt-abgabe.vt-key .vt-model-answer,
+.vt-abgabe.vt-key .vt-cw-letter,
+.vt-abgabe.vt-key .vt-picture-answer,
+.vt-abgabe.vt-key .vt-box,
+.vt-abgabe.vt-key .vt-option-correct,
+.vt-abgabe.vt-key .vt-categories td,
+.vt-abgabe.vt-key .vt-odd-answer,
+.vt-abgabe .vt-field-line,
+.vt-abgabe .vt-score-blank {
+  color: #1d4ed8;
+}
+.vt-abgabe .vt-field-line,
+.vt-abgabe .vt-score-blank {
+  font-weight: 600;
+  text-align: center;
+}
+/* Haken grün, Kreuze rot, offen orange – in Ansicht und Druck (Wunsch der Lehrkraft) */
+.vt-abgabe .vt-marke {
+  font-weight: 800;
+}
+.vt-abgabe .vt-marke-ok {
+  color: #2f9e44;
+}
+.vt-abgabe .vt-marke-falsch {
+  color: #e03131;
+}
+.vt-abgabe .vt-marke-offen {
+  color: #f08c00;
+}
+.vt-abgabe .vt-aufgabe-erreicht {
+  color: #1d4ed8;
+  font-weight: 700;
+}

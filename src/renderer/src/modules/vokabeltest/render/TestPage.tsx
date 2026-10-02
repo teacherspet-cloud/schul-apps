@@ -66,10 +66,10 @@ export function TestPage({
   /** Erscheint am Ende der letzten Seite */
   footer?: React.ReactNode
 }): React.JSX.Element {
-  const { mode } = useRender()
+  const { mode, abgabe } = useRender()
   const fontSize = layout?.fontSize ?? doc.fontSize
   const pages: PagePlan[] = layout?.pages ?? [{ items: variant.blocks.map((b) => ({ id: b.id })), overflow: false }]
-  const pageClass = `vt-page ${showsAnswers(mode) ? 'vt-key' : ''} ${layout?.compact ? 'vt-compact' : ''} ${layout ? 'vt-page-fixed' : ''}`
+  const pageClass = `vt-page ${showsAnswers(mode) ? 'vt-key' : ''} ${abgabe ? 'vt-abgabe' : ''} ${layout?.compact ? 'vt-compact' : ''} ${layout ? 'vt-page-fixed' : ''}`
   // Kopflinie und Aufgabennummern in der Fachfarbe der Sprache (Paket 10a); ohne sie schwarz wie bisher
   const akzent = vokabeltestFarbe(doc)
   // Schlussfigur (27.09.2026): jubelnd unten rechts im Seitenrand der letzten Seite – nie im Lösungsteil
@@ -124,15 +124,16 @@ export function TestPage({
 }
 
 export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Variant }): React.JSX.Element {
-  const { mode } = useRender()
-  const key = showsAnswers(mode)
+  const { mode, abgabe } = useRender()
+  // Abgabe eines Onlinetests: Antworten wie Lösungen eingetragen, Kopf aber wie beim Schülerblatt, ausgefüllt
+  const key = showsAnswers(mode) && !abgabe
   const h = doc.header
   const total = variantPoints(variant)
   const multi = doc.variants.length > 1
   // Überthema (Paket 11): „Englisch › Unit 3" oben rechts im Kopf; ohne Überthema wie bisher
   const pfad = vokabeltestPfad(doc)
   // Kopffigur (27.09.2026): winkend oben rechts; Kopfzeile und Titelzeile rücken ihr aus dem Weg
-  const figur = key ? null : vokabeltestFigur(doc)
+  const figur = key || abgabe ? null : vokabeltestFigur(doc)
   // Feste Kopftexte in der Testsprache (30.09.2026) – vorher immer englisch
   const k = kopfTexte(doc.settings.targetLanguage)
   return (
@@ -161,7 +162,7 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
           {h.showName && (
             <div className="vt-field vt-field-name">
               <span>{k.name}</span>
-              <span className="vt-field-line" />
+              <span className="vt-field-line">{abgabe?.name}</span>
             </div>
           )}
           {h.showClass && (
@@ -173,7 +174,7 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
           {h.showDate && (
             <div className="vt-field vt-field-date">
               <span>{k.datum}</span>
-              <span className="vt-field-line" />
+              <span className="vt-field-line">{abgabe?.datum}</span>
             </div>
           )}
         </div>
@@ -182,12 +183,12 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
         <div className="vt-score">
           {h.showPoints && (
             <span>
-              {k.punkte} {key ? '' : <span className="vt-score-blank" />} / {formatPoints(total)}
+              {k.punkte} {key ? '' : <span className="vt-score-blank">{abgabe ? formatPoints(abgabe.punkte) : null}</span>} / {formatPoints(abgabe?.max ?? total)}
             </span>
           )}
           {h.showGrade && !key && (
             <span>
-              {k.note} <span className="vt-score-blank" />
+              {k.note} <span className="vt-score-blank">{abgabe?.note ?? null}</span>
             </span>
           )}
         </div>
@@ -197,7 +198,9 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
 }
 
 export function BlockView({ block, number, lang = 'en', range }: { block: Block; number: number; lang?: string; range?: BlockRange }): React.JSX.Element {
-  const { mode, updateBlock } = useRender()
+  const { mode, updateBlock, abgabe } = useRender()
+  // Abgabe als Blatt: erreichte Punkte je Aufgabe (Onlinetest – ganze Punkte je Teilaufgabe)
+  const erreicht = abgabe?.jeAufgabe?.[block.id]
   const set = <K extends keyof Block>(key: K) =>
     updateBlock
       ? (v: string) =>
@@ -224,7 +227,8 @@ export function BlockView({ block, number, lang = 'en', range }: { block: Block;
             <T className="vt-block-title" value={block.title} onChange={set('title')} />
             {points > 0 && (
               <span className="vt-points">
-                {showsAnswers(mode) ? '' : '____ '}/ {formatPoints(points)} P.
+                {erreicht ? <span className="vt-aufgabe-erreicht">{formatPoints(erreicht.erreicht)} </span> : showsAnswers(mode) ? '' : '____ '}/{' '}
+                {formatPoints(erreicht?.max ?? points)} P.
               </span>
             )}
           </div>

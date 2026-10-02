@@ -176,6 +176,8 @@ export interface Einstellungen {
   ergebnisFrei?: boolean
   /** Figur (Maskottchen) auf Wartebildschirm, im Kopf und beim Ergebnis */
   figur?: boolean
+  /** Kopf und Einstellungen des Vokabeltests – für die Abgabe als Blatt (renderer/modules/onlinetest/blattAnsicht.tsx) */
+  blatt?: Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
 }
 
 interface TestZeile {
@@ -192,7 +194,8 @@ interface TestZeile {
 }
 
 interface Test extends Omit<TestZeile, 'fassungen' | 'einstellungen'> {
-  fassungen: { label: string; fassung: OnlineFassung }[]
+  /** `original`: die Variante des Vokabeltests (Abgabe als Blatt); fehlt bei Tests vor dem 02.10.2026 abends */
+  fassungen: { label: string; fassung: OnlineFassung; original?: TestDocument['variants'][number] }[]
   einstellungen: Einstellungen
 }
 
@@ -265,9 +268,10 @@ export function testErstellen(
     art: 'Vokabeltest',
     ...(e.thema ? { thema: e.thema.slice(0, 120) } : {}),
     ...(e.hinweis ? { hinweis: e.hinweis.slice(0, 500) } : {}),
-    ...(figuren.length ? { figur: true } : {})
+    ...(figuren.length ? { figur: true } : {}),
+    blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize }
   }
-  const fassungen = e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v) }))
+  const fassungen = e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v), original: v }))
   const id = neueId()
   const code = neuerCode()
   db()
@@ -886,7 +890,7 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           ergebnisSichtbar: ergebnisFrei(test, ts),
           // Wer aus der Lerngruppe noch nicht begonnen hat
           fehlend: mitglieder.filter((m) => !ts.some((t) => t.schueler_id === m.id)).map((m) => ({ name: m.name, benutzer: m.benutzer })),
-          fassungen: test.fassungen.map((f) => ({ label: f.label, punkte: f.fassung.punkte, aufgaben: f.fassung.aufgaben, einheiten: f.fassung.einheiten, loesungen: f.fassung.loesungen })),
+          fassungen: test.fassungen.map((f) => ({ label: f.label, punkte: f.fassung.punkte, aufgaben: f.fassung.aufgaben, einheiten: f.fassung.einheiten, loesungen: f.fassung.loesungen, original: f.original ?? null })),
           teilnahmen: ts.map((t) => ({ ...ueberblick(test, t, namen), antworten: json_(t.antworten, {}), bewertung: json_(t.bewertung, {}), varianteNr: t.variante }))
         }),
         true

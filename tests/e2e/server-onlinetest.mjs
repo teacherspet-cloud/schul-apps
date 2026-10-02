@@ -182,8 +182,23 @@ try {
   await p.getByText('a) heatwave').first().waitFor({ timeout: 5000 })
   pruefe((await p.getByText('r1x9q').count()) === 0, 'Word partners: Lehrkraft sieht „a) heatwave", keine interne Kennung')
   await p.screenshot({ path: join(out, '4-durchsicht.png') })
+  // Abgabe als DIN-A4-Blatt
+  await p.locator('[data-als-blatt]').click()
+  await p.locator('[data-abgabe-blatt] .vt-page').first().waitFor({ timeout: 10000 })
+  const blatt = await p.locator('[data-abgabe-blatt]').innerText()
+  pruefe(blatt.includes('school') && blatt.includes('dgo'), 'Als Blatt: die Eingaben stehen in den Lücken')
+  pruefe((await p.locator('[data-abgabe-blatt] .vt-marke-ok').count()) > 0 && (await p.locator('[data-abgabe-blatt] .vt-marke-falsch, [data-abgabe-blatt] .vt-marke-ok').count()) >= 2, 'Haken grün, Kreuze rot markiert')
+  pruefe(!blatt.includes('Lösung'), 'Kopf ohne „Lösung“, mit Name und Punkten')
+  await p.screenshot({ path: join(out, '4b-als-blatt.png') })
   await p.keyboard.press('Escape')
   await p.locator('[data-namen-verdecken]').click()
+  // Nach dem Ende des Tests: Bewertung lässt sich weiter ändern
+  await lk.request.post(`${A}/server/onlinetest/${neu.id}/status`, { headers: KOPF, data: { status: 'beendet' } })
+  const kimId = (await detail()).teilnahmen.find((t) => t.name === 'Kim T.').id
+  const g1 = (await detail()).fassungen[0].einheiten.find((e) => e.id.includes('g1'))
+  await lk.request.post(`${A}/server/onlinetest/${neu.id}/korrektur`, { headers: KOPF, data: { teilnahme: kimId, einheit: g1.id, richtig: false } })
+  pruefe((await detail()).teilnahmen.find((t) => t.id === kimId).punkte === 4, 'nach „Test beenden“ noch änderbar (5 → 4 Punkte)')
+  await lk.request.post(`${A}/server/onlinetest/${neu.id}/korrektur`, { headers: KOPF, data: { teilnahme: kimId, einheit: g1.id, richtig: true } })
   pruefe(await p.locator('[data-export]').isEnabled(), 'Export-Menü (PDF, Excel, Word, Drucken, TeacherTool) bereit')
   await p.locator('[data-export]').click()
   pruefe(await p.getByText('Abschreibliste drucken').waitFor({ timeout: 5000 }).then(() => true, () => false), 'TeacherTool-Abschreibliste im Menü')

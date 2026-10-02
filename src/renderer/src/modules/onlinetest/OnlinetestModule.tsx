@@ -43,6 +43,8 @@ import { antwortAlsText, felderVon, loesungAlsText, type Antworten, type Bewertu
 import { holen, senden } from './serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { hatClient } from '../../shared/plattform'
+import { AbgabeBlatt, abgabenHtml, type BlattKopf } from './blattAnsicht'
+import type { Variant } from '../vokabeltest/model/types'
 import { ergebnisDocx, ergebnisHtml, ergebnisXlsx, notenSpalte, teachertoolCsv, type ErgebnisDaten, type NotenFormat } from './ergebnisExport'
 import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
@@ -91,13 +93,13 @@ interface TestDetail {
   link: string
   status: 'wartend' | 'offen' | 'beendet'
   erstellt: string
-  einstellungen: { zeitMin: number; schwellen: number[]; thema?: string; gestartet?: number; ergebnisFrei?: boolean; art?: string }
+  einstellungen: { zeitMin: number; schwellen: number[]; thema?: string; gestartet?: number; ergebnisFrei?: boolean; art?: string; blatt?: BlattKopf }
   lerngruppe: { name: string } | null
   ohneIserv: boolean
   ki: { laeuft: boolean; fehler: string | null }
   ergebnisSichtbar: boolean
   fehlend: { name: string; benutzer: string }[]
-  fassungen: { label: string; punkte: number; aufgaben: OnlineAufgabe[]; einheiten: Einheit[]; loesungen: Record<string, Loesung> }[]
+  fassungen: { label: string; punkte: number; aufgaben: OnlineAufgabe[]; einheiten: Einheit[]; loesungen: Record<string, Loesung>; original?: Variant | null }[]
   teilnahmen: Teilnahme[]
 }
 
@@ -388,6 +390,28 @@ function ergebnisDaten(d: TestDetail): ErgebnisDaten {
 
 const dateiName = (d: TestDetail): string => `Ergebnisse ${anzeigeName({ titel: d.titel, thema: d.einstellungen.thema })}${d.lerngruppe ? ` ${d.lerngruppe.name}` : ''}`.replace(/[\\/:*?"<>|]/g, '-')
 
+/** Abgabe als Blatt: geht nur mit Kopf und Originalfassung (Tests ab 02.10.2026 abends) */
+const blattMoeglich = (d: TestDetail, t: Teilnahme): boolean => Boolean(d.einstellungen.blatt && d.fassungen[t.varianteNr]?.original && t.beginn > 0)
+const abgabeVon = (d: TestDetail, t: Teilnahme, name: string) => ({
+  variante: d.fassungen[t.varianteNr].original!,
+  antworten: t.antworten,
+  bewertung: t.bewertung,
+  abgabe: {
+    name,
+    datum: new Date(t.abgabe ?? t.beginn).toLocaleDateString('de-DE'),
+    punkte: t.punkte,
+    max: t.max,
+    note: t.note,
+    // Je Aufgabe: erreicht und möglich (Aufgabe = Block des Vokabeltests)
+    jeAufgabe: Object.fromEntries(
+      d.fassungen[t.varianteNr].aufgaben.map((a) => [
+        a.id,
+        { erreicht: d.fassungen[t.varianteNr].einheiten.filter((e) => e.aufgabe === a.id).reduce((s, e) => s + (t.bewertung[e.id]?.punkte ?? 0), 0), max: a.punkte }
+      ])
+    )
+  }
+})
+
 function Export({ d }: { d: TestDetail }): React.JSX.Element {
   const [format, setFormat] = useState<NotenFormat>('ganz')
   const daten = ergebnisDaten(d)
@@ -428,6 +452,32 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
           <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>PDF</Menu.Item>
           <Menu.Item onClick={() => void speichern('xlsx', 'Excel', ergebnisXlsx(daten, format))}>Excel (.xlsx)</Menu.Item>
           <Menu.Item onClick={() => void ergebnisDocx(daten, format).then((b) => speichern('docx', 'Word', b))}>Word (.docx)</Menu.Item>
+          {d.einstellungen.blatt && d.teilnahmen.some((t) => blattMoeglich(d, t)) && (
+            <>
+              <Menu.Divider />
+              <Menu.Label>Abgaben als Blatt (DIN A4)</Menu.Label>
+              <Menu.Item
+                leftSection={<IconPrinter size={14} />}
+                onClick={() =>
+                  void window.api.exporter
+                    .print(abgabenHtml(d.einstellungen.blatt!, d.teilnahmen.filter((t) => blattMoeglich(d, t)).map((t) => abgabeVon(d, t, t.name))))
+                    .catch((e: unknown) => notifyError(e))
+                }
+              >
+                Alle drucken
+              </Menu.Item>
+              <Menu.Item
+                onClick={() =>
+                  void window.api.exporter
+                    .pdf(abgabenHtml(d.einstellungen.blatt!, d.teilnahmen.filter((t) => blattMoeglich(d, t)).map((t) => abgabeVon(d, t, t.name))), `${dateiName(d)} Abgaben.pdf`)
+                    .catch((e: unknown) => notifyError(e))
+                }
+                data-alle-blaetter
+              >
+                Alle als PDF
+              </Menu.Item>
+            </>
+          )}
           <Menu.Divider />
           <Menu.Label>TeacherTool</Menu.Label>
           <Menu.Item onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format, true)).catch((e: unknown) => notifyError(e))}>Abschreibliste drucken</Menu.Item>
@@ -806,6 +856,31 @@ function EinheitZeile({
 
 function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail; t: Teilnahme; name: string; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
   const f = test.fassungen[t.varianteNr]
+  const [blatt, setBlatt] = useState(false)
+  if (blatt && blattMoeglich(test, t)) {
+    const a = abgabeVon(test, t, name)
+    return (
+      <Modal opened onClose={schliessen} title={`${name} · als Blatt`} size="auto" data-blatt-modal>
+        <Group mb="sm" gap="xs">
+          <Button variant="subtle" onClick={() => setBlatt(false)}>
+            ← Zur Durchsicht
+          </Button>
+          <Button variant="light" leftSection={<IconPrinter size={14} />} onClick={() => void window.api.exporter.print(abgabenHtml(test.einstellungen.blatt!, [a])).catch((e: unknown) => notifyError(e))}>
+            Drucken
+          </Button>
+          <Button
+            variant="light"
+            onClick={() => void window.api.exporter.pdf(abgabenHtml(test.einstellungen.blatt!, [a]), `${dateiName(test)} ${name}.pdf`).catch((e: unknown) => notifyError(e))}
+          >
+            PDF
+          </Button>
+        </Group>
+        <div style={{ overflowX: 'auto' }}>
+          <AbgabeBlatt kopf={test.einstellungen.blatt!} {...a} />
+        </div>
+      </Modal>
+    )
+  }
   const urteil = (einheit: string, richtig: boolean, punkte?: number): void =>
     void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig, ...(punkte != null ? { punkte } : {}) }).then(geaendert, (e: unknown) => notifyError(e))
   return (
@@ -820,9 +895,16 @@ function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail
             Für diese Person jetzt abgeben
           </Button>
         )}
-        <Text size="xs" c="dimmed">
-          Jede Antwort lässt sich nachträglich umentscheiden: ✓ gibt den ganzen Punkt, ✗ nimmt ihn.
-        </Text>
+        <Group justify="space-between">
+          <Text size="xs" c="dimmed">
+            Jede Antwort lässt sich nachträglich umentscheiden – auch nach dem Ende des Tests: ✓ gibt den ganzen Punkt, ✗ nimmt ihn.
+          </Text>
+          <Tooltip label={blattMoeglich(test, t) ? 'Der ganze Test als DIN-A4-Blatt mit den Eingaben' : 'Nur für Onlinetests, die ab dem 02.10.2026 abends angelegt wurden'}>
+            <Button size="xs" variant="light" disabled={!blattMoeglich(test, t)} onClick={() => setBlatt(true)} data-als-blatt>
+              Als Blatt ansehen
+            </Button>
+          </Tooltip>
+        </Group>
         {f.aufgaben.map((a, ai) => (
           <Card key={a.id} withBorder padding="sm">
             <Text fw={700} mb={4}>

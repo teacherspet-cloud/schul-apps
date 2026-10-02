@@ -28,6 +28,12 @@ export interface RenderContextValue {
   /** Ändert einen Block (Entwurf wird geklont und übergeben) */
   updateBlock?: (blockId: string, fn: (draft: Block) => void) => void
   actions?: ItemActions
+  /**
+   * Abgabe eines Onlinetests als Blatt (02.10.2026): An den Stellen der Lösungen stehen die
+   * Antworten der Lernenden (modules/onlinetest/blattAnsicht.tsx); der Kopf zeigt Name, Datum,
+   * Punkte und Note statt „– Lösung".
+   */
+  abgabe?: { name: string; datum: string; punkte: number; max: number; note: number | null; jeAufgabe?: Record<string, { erreicht: number; max: number }> }
 }
 
 export const RenderContext = createContext<RenderContextValue>({ mode: 'print' })
