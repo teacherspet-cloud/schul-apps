@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { DATEN, ordner } from './pfade'
 import type { Nutzer, Rolle } from './kontext'
 import { entschluessle, verschluessle } from './geheim'
-import { geschuetzt, migriere } from './feldschutz'
+import { geschuetzt, migriere, SENSIBEL } from './feldschutz'
 
 let db: DatabaseSync | null = null
 
@@ -63,8 +63,8 @@ export function datenbank(datei = join(DATEN, 'schulapps.db')): DatabaseSync {
   roh.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
   roh.exec(SCHEMA)
   ergaenze(roh)
-  // Personenbezogenes nur verschlüsselt (feldschutz.ts); vorhandene Nutzer gleich umschreiben
-  migriere(roh, 'nutzer')
+  // Personenbezogenes nur verschlüsselt (feldschutz.ts): alle vorhandenen Tabellen gleich beim Start umschreiben
+  for (const t of Object.keys(SENSIBEL)) migriere(roh, t)
   db = geschuetzt(roh)
   return db
 }
