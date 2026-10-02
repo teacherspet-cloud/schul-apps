@@ -36,6 +36,7 @@ import { iservEinstellung, ISERV_STANDARD, type IservEinstellung } from './anmel
 import { DATEN, nutzerOrdner } from './pfade'
 import { offeneStroeme } from './ereignisse'
 import type { Rolle } from './kontext'
+import { registerVergessen } from './namensschutz'
 
 /** Schlüssel, die der Admin für alle freigeben kann */
 export const TEILBARE_SCHLUESSEL: SecretName[] = ['openai', 'anthropic', 'google', 'elevenlabs', 'pixabay']
@@ -109,6 +110,7 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     while (nutzerNachBenutzer(`test.${n}`)) n++
     const passwort = zufallsPasswort()
     const neu = nutzerAnlegen({ benutzer: `test.${n}`, name: String(k0.name ?? '').slice(0, 80) || `Testkonto ${n}`, rolle, quelle: 'test', passwortHash: passwortHash(passwort) })
+    registerVergessen()
     protokolliereServer('verwaltung', `Testkonto angelegt (${rolle})`, ich)
     // Das Passwort wird nur dieses eine Mal gezeigt
     return (json(res, 200, { benutzer: neu.benutzer, passwort, id: neu.id }), true)
@@ -125,6 +127,7 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     } catch {
       // Ordner fehlte – nichts zu tun
     }
+    registerVergessen()
     protokolliereServer('verwaltung', `Konto gelöscht (${n.quelle}, ${n.rolle})`, ich)
     return (json(res, 200, { ok: true }), true)
   }

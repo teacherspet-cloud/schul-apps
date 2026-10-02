@@ -19,6 +19,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import type { Rolle } from './kontext'
 import { nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, passwortHashVon, protokolliereServer, serverGeheimnis, serverWert, type NutzerInfo } from './datenbank'
 import { passwortPruefen } from './geheim'
+import { registerVergessen } from './namensschutz'
 
 export const ADMIN_BENUTZER = 't.kornahrens'
 
@@ -211,6 +212,8 @@ export async function iservRueckruf(
     nutzerAendern(nutzer.id, { name, gruppen, rolle: nutzer.rolle === 'admin' ? 'admin' : rolle, quelle: nutzer.quelle === 'test' ? 'test' : 'iserv' })
     nutzer = nutzerNachBenutzer(benutzer)!
   } else nutzer = nutzerAnlegen({ benutzer, name, rolle, quelle: 'iserv', gruppen })
+  // Neue oder geänderte Namen sofort im Namensschutz (namensschutz.ts)
+  registerVergessen()
   if (nutzer.gesperrt) throw new AnmeldeFehler('Dieses Konto ist gesperrt. Bitte an die Verwaltung von Schul-Apps wenden.')
   protokolliereServer('anmeldung', `Anmeldung über IServ (${nutzer.rolle})`, nutzer.id)
   return { nutzer, ziel: v.ziel }

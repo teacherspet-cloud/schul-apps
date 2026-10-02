@@ -22,6 +22,7 @@ import { starteServer } from './http'
 import { herzschlagStarten } from './ereignisse'
 import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { druckBeenden } from './druck'
+import { mitNamensschutz } from './namensschutz'
 import { DATEN, OBERFLAECHE } from './pfade'
 
 const env = process.env
@@ -46,11 +47,13 @@ async function main(): Promise<void> {
   const aufrufe = new Map<string, (...args: unknown[]) => unknown>()
   const handle: Handle = (kanal, fn) => void aufrufe.set(kanal, fn as (...args: unknown[]) => unknown)
   registriereKanaele(handle, serverUmgebung())
-  const aufruf = async (kanal: string, args: unknown[]): Promise<unknown> => {
+  const roh = async (kanal: string, args: unknown[]): Promise<unknown> => {
     const fn = aufrufe.get(kanal)
     if (!fn) throw new Error(`Unbekannter Aufruf „${kanal}".`)
     return fn(...args)
   }
+  // Klarnamen nie an eine KI (namensfilter.ts) – EINE Stelle für alle KI- und Sprachausgabe-Aufrufe
+  const aufruf = mitNamensschutz(roh)
 
   const port = Number(env.SCHULAPPS_PORT || 8443)
   const adresse = (env.SCHULAPPS_ADRESSE || `http://localhost:${port}`).replace(/\/$/, '')
