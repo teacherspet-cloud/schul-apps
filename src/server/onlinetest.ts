@@ -729,6 +729,31 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       })
       return (json(res, 200, { tests: tests.map((t) => ({ code: t.code, titel: t.titel, zeitMin: t.einstellungen.zeitMin, abgegeben: Boolean(meine.get(t.id)), wartend: t.status === 'wartend' })) }), true)
     }
+    if (req.method === 'GET' && was === 'ergebnisse') {
+      // Frühere Ergebnisse (Schüler-Startseite, 02.10.2026) – nur mit Konto; Gäste gehören nur zu einem Test
+      if (gast) return (json(res, 200, { ergebnisse: [] }), true)
+      const zeilen = db()
+        .prepare('SELECT * FROM teilnahmen WHERE schueler_id = ? AND abgabe IS NOT NULL ORDER BY abgabe DESC')
+        .all(ich.id) as unknown as TeilnahmeZeile[]
+      const ergebnisse = zeilen.flatMap((t) => {
+        const test = testNachId(t.test_id)
+        if (!test) return []
+        const frei = ergebnisFrei(test)
+        const e = frei ? ergebnisFuer(test, t) : null
+        return [
+          {
+            id: t.id,
+            code: test.code,
+            titel: test.titel,
+            datum: t.abgabe,
+            frei,
+            ...(e ? { punkte: e.punkte, max: e.max, note: e.note, vorlaeufig: e.vorlaeufig } : {}),
+            figur: test.einstellungen.figur ? figurPosen(test.id) : []
+          }
+        ]
+      })
+      return (json(res, 200, { ergebnisse }), true)
+    }
     if (req.method === 'GET' && was.startsWith('figur/')) {
       // Figur des Tests (Maskottchen) – nur für Angemeldete, lange zwischenspeicherbar
       const [, code, pose] = was.split('/')

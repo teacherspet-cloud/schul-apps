@@ -1,9 +1,13 @@
 /**
  * Schülerbereich des Servers (02.10.2026): Onlinetest am iPad, Telefon oder PC.
  *
- *  /s/          offene Tests der eigenen Lerngruppen, Code eingeben, Aufgaben mit Feedback
- *  /s/t/<CODE>  ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
- *  /s/a/<ID>    eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
+ *  /s/            Startseite mit Kacheln (mit Konto); Gäste: Code eingeben/scannen
+ *  /s/tests       offene Tests der eigenen Lerngruppen, Code eingeben
+ *  /s/ergebnisse  frühere Ergebnisse (nur mit Konto), /s/e/<ID> eines davon
+ *  /s/aufgaben    Aufgaben mit Feedback (offene und abgeschlossene)
+ *  /s/blaetter    freigegebene Arbeitsblätter (folgt)
+ *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
+ *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
  *
  * Regeln (Wunsch der Lehrkraft): Zeitlimit; wer die Seite verlässt (anderer Tab, andere App,
  * Startbildschirm), gibt SOFORT endgültig ab – Nachschlagen in Übersetzungs-Apps soll nicht
@@ -14,8 +18,30 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
-import { Alert, Badge, Button, Card, Center, Container, Group, Image, Loader, NativeSelect, Paper, Radio, SegmentedControl, Stack, Text, TextInput, Textarea, Title } from '@mantine/core'
-import { IconAlertTriangle, IconCheck, IconClock, IconHourglass, IconLogout, IconX } from '@tabler/icons-react'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Center,
+  Container,
+  Group,
+  Image,
+  Loader,
+  NativeSelect,
+  Paper,
+  Radio,
+  SegmentedControl,
+  Stack,
+  Text,
+  TextInput,
+  Textarea,
+  Title
+} from '@mantine/core'
+import { IconAlertTriangle, IconArrowLeft, IconCheck, IconClock, IconHourglass, IconLogout, IconX } from '@tabler/icons-react'
+import bildOnlinetest from '../../assets/programme/onlinetest.webp'
+import bildRueckmeldung from '../../assets/programme/rueckmeldung.webp'
+import bildArbeitsblatt from '../../assets/programme/arbeitsblatt.webp'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { HandFeld, TastaturFeld } from './HandFeld'
 import { CodeScanner } from './CodeScanner'
@@ -68,14 +94,33 @@ export default function SchuelerBereich(): React.JSX.Element {
   const pfad = window.location.pathname
   const code = /^\/s\/t\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const rueckblick = /^\/s\/e\/([A-Za-z0-9_-]{6,64})/.exec(pfad)?.[1]
+  const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter)\/?$/.exec(pfad)?.[1]
   const ich = window.__schulappsServer
   // Gäste (Beitritt mit Namen) haben kein Konto zum Abmelden – sie gehören nur zu diesem Test
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
+  const inhalt = code ? (
+    <TestAblauf code={code.toUpperCase()} />
+  ) : aufgabe ? (
+    <FeedbackAufgabe id={aufgabe} />
+  ) : rueckblick && !gast ? (
+    <ErgebnisRueckblick id={rueckblick} />
+  ) : gast || bereich === 'tests' ? (
+    <Uebersicht />
+  ) : bereich === 'ergebnisse' ? (
+    <ErgebnisListe />
+  ) : bereich === 'aufgaben' ? (
+    <AufgabenSeite />
+  ) : bereich === 'blaetter' ? (
+    <BlaetterSeite />
+  ) : (
+    <Startseite />
+  )
   return (
     <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
-        <Text fw={700} size="lg">
-          Schul-Apps · Onlinetest
+        <Text fw={700} size="lg" component="a" href="/s/" style={{ color: 'inherit', textDecoration: 'none' }}>
+          Schul-Apps{gast ? ' · Onlinetest' : ''}
         </Text>
         {!gast && (
           <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
@@ -83,7 +128,7 @@ export default function SchuelerBereich(): React.JSX.Element {
           </Button>
         )}
       </Group>
-      {code ? <TestAblauf code={code.toUpperCase()} /> : aufgabe ? <FeedbackAufgabe id={aufgabe} /> : <Uebersicht />}
+      {inhalt}
     </Container>
   )
 }
@@ -92,7 +137,221 @@ export default function SchuelerBereich(): React.JSX.Element {
 export const alsWebApp = (): boolean =>
   (typeof navigator !== 'undefined' && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
   (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches === true)
-const aufAppleMobil = (): boolean => typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+const aufAppleMobil = (): boolean =>
+  typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+
+/** Zurück zur Startseite (nur mit Konto – Gäste haben keine) */
+function ZurStartseite(): React.JSX.Element | null {
+  const ich = window.__schulappsServer
+  if (!ich?.angemeldet || ich.quelle === 'gast') return null
+  return (
+    <Button variant="subtle" component="a" href="/s/" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+      Startseite
+    </Button>
+  )
+}
+
+interface FruehereErgebnis {
+  id: string
+  code: string
+  titel: string
+  datum: number
+  frei: boolean
+  punkte?: number
+  max?: number
+  note?: number
+  vorlaeufig?: boolean
+  figur: string[]
+}
+
+/** Eine Kachel der Startseite: Bild, Titel, Zahl/Hinweis */
+function Kachel(props: { href: string; bild: string; titel: string; text: string; zahl?: number; daten: string }): React.JSX.Element {
+  return (
+    <Card component="a" href={props.href} withBorder padding="md" radius="lg" data-kachel={props.daten} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <Group wrap="nowrap" gap="md">
+        <Image src={props.bild} alt="" w={72} h={72} fit="contain" />
+        <Stack gap={2} style={{ flex: 1 }}>
+          <Group gap="xs">
+            <Text fw={700} size="lg">
+              {props.titel}
+            </Text>
+            {Boolean(props.zahl) && (
+              <Badge color="red" variant="filled" circle>
+                {props.zahl}
+              </Badge>
+            )}
+          </Group>
+          <Text size="sm" c="dimmed">
+            {props.text}
+          </Text>
+        </Stack>
+      </Group>
+    </Card>
+  )
+}
+
+/** Startseite der Lernenden mit Konto (Etappe 2 des Schülerbereichs, 02.10.2026) */
+function Startseite(): React.JSX.Element {
+  const ich = window.__schulappsServer
+  const [tests, setTests] = useState<{ abgegeben: boolean }[] | null>(null)
+  const [ergebnisse, setErgebnisse] = useState<FruehereErgebnis[] | null>(null)
+  const [aufgaben, setAufgaben] = useState<AufgabeMitFeedback[] | null>(null)
+  useEffect(() => {
+    void holen<{ tests: { abgegeben: boolean }[] }>('/s/api/tests').then(
+      (d) => setTests(d.tests ?? []),
+      () => setTests([])
+    )
+    void holen<{ ergebnisse: FruehereErgebnis[] }>('/s/api/ergebnisse').then(
+      (d) => setErgebnisse(d.ergebnisse ?? []),
+      () => setErgebnisse([])
+    )
+    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then(
+      (d) => setAufgaben(d.aufgaben ?? []),
+      () => setAufgaben([])
+    )
+  }, [])
+  const offeneTests = tests?.filter((t) => !t.abgegeben).length ?? 0
+  const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden).length ?? 0
+  const vorname = (ich?.name ?? '').split(/\s+/)[0]
+  return (
+    <Stack data-startseite>
+      <Title order={3}>{vorname ? `Hallo ${vorname}!` : 'Hallo!'}</Title>
+      <Kachel
+        href="/s/tests"
+        bild={bildOnlinetest}
+        titel="Onlinetest"
+        daten="tests"
+        zahl={offeneTests}
+        text={
+          tests === null
+            ? '…'
+            : offeneTests
+              ? `${offeneTests} offene${offeneTests === 1 ? 'r' : ''} Test${offeneTests === 1 ? '' : 's'}`
+              : 'Test mit Code öffnen oder QR-Code scannen'
+        }
+      />
+      <Kachel
+        href="/s/ergebnisse"
+        bild={bildOnlinetest}
+        titel="Meine Ergebnisse"
+        daten="ergebnisse"
+        text={
+          ergebnisse === null
+            ? '…'
+            : ergebnisse.length
+              ? `${ergebnisse.length} Test${ergebnisse.length === 1 ? '' : 's'} – zuletzt ${ergebnisse[0].titel}`
+              : 'Noch keine Ergebnisse'
+        }
+      />
+      <Kachel
+        href="/s/aufgaben"
+        bild={bildRueckmeldung}
+        titel="Rückmeldung"
+        daten="aufgaben"
+        zahl={offeneAufgaben}
+        text={
+          aufgaben === null
+            ? '…'
+            : aufgaben.length
+              ? `${offeneAufgaben} offen · ${aufgaben.length - offeneAufgaben} erledigt oder abgeschlossen`
+              : 'Noch keine Aufgaben mit Feedback'
+        }
+      />
+      <Kachel href="/s/blaetter" bild={bildArbeitsblatt} titel="Arbeitsblätter" daten="blaetter" text="Freigegebene Arbeitsblätter ausfüllen" />
+    </Stack>
+  )
+}
+
+const datumText = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+/** Frühere Ergebnisse (nur mit Konto) */
+function ErgebnisListe(): React.JSX.Element {
+  const [liste, setListe] = useState<FruehereErgebnis[] | null>(null)
+  useEffect(() => {
+    void holen<{ ergebnisse: FruehereErgebnis[] }>('/s/api/ergebnisse').then(
+      (d) => setListe(d.ergebnisse ?? []),
+      () => setListe([])
+    )
+  }, [])
+  return (
+    <Stack data-ergebnisliste>
+      <ZurStartseite />
+      <Title order={3}>Meine Ergebnisse</Title>
+      {!liste && <Loader />}
+      {liste?.length === 0 && <Text c="dimmed">Sobald du einen Onlinetest abgegeben hast, steht er hier.</Text>}
+      {liste?.map((e) => (
+        <Card key={e.id} withBorder padding="md" component="a" href={`/s/e/${e.id}`} style={{ textDecoration: 'none', color: 'inherit' }} data-ergebnis-eintrag>
+          <Group justify="space-between" wrap="nowrap">
+            <div>
+              <Text fw={600}>{e.titel}</Text>
+              <Text size="sm" c="dimmed">
+                {datumText(e.datum)}
+                {e.vorlaeufig ? ' · vorläufig' : ''}
+              </Text>
+            </div>
+            {e.frei ? (
+              <Stack gap={0} align="end">
+                <Badge size="lg" variant="light">
+                  Note {e.note}
+                </Badge>
+                <Text size="xs" c="dimmed">
+                  {e.punkte} / {e.max} P.
+                </Text>
+              </Stack>
+            ) : (
+              <Badge variant="light" color="gray">
+                noch nicht freigegeben
+              </Badge>
+            )}
+          </Group>
+        </Card>
+      ))}
+    </Stack>
+  )
+}
+
+/** Ein früheres Ergebnis ansehen */
+function ErgebnisRueckblick({ id }: { id: string }): React.JSX.Element {
+  const [e, setE] = useState<FruehereErgebnis | null | undefined>(undefined)
+  useEffect(() => {
+    void holen<{ ergebnisse: FruehereErgebnis[] }>('/s/api/ergebnisse').then(
+      (d) => setE(d.ergebnisse?.find((x) => x.id === id) ?? null),
+      () => setE(null)
+    )
+  }, [id])
+  if (e === undefined) return <Loader />
+  if (e === null) return <Alert color="orange">Dieses Ergebnis gibt es nicht.</Alert>
+  return (
+    <Stack>
+      <Button variant="subtle" component="a" href="/s/ergebnisse" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+        Meine Ergebnisse
+      </Button>
+      <ErgebnisAnsicht code={e.code} t={{ id: e.id, figur: e.figur }} grund="" rueckblick={{ titel: e.titel, datum: e.datum }} />
+    </Stack>
+  )
+}
+
+/** Aufgaben mit Feedback als eigene Seite */
+function AufgabenSeite(): React.JSX.Element {
+  return (
+    <Stack>
+      <ZurStartseite />
+      <Title order={3}>Rückmeldung</Title>
+      <AufgabenListe leer="Gerade ist keine Aufgabe mit Feedback für dich freigegeben." />
+    </Stack>
+  )
+}
+
+/** Freigegebene Arbeitsblätter (Etappe 5) */
+function BlaetterSeite(): React.JSX.Element {
+  return (
+    <Stack>
+      <ZurStartseite />
+      <Title order={3}>Arbeitsblätter</Title>
+      <Text c="dimmed">Gerade ist kein Arbeitsblatt für dich freigegeben.</Text>
+    </Stack>
+  )
+}
 
 function Uebersicht(): React.JSX.Element {
   const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean }[] | null>(null)
@@ -108,6 +367,7 @@ function Uebersicht(): React.JSX.Element {
   }, [angemeldet])
   return (
     <Stack>
+      <ZurStartseite />
       <Card withBorder padding="lg">
         <Title order={4} mb="xs">
           Test mit Code öffnen
@@ -137,7 +397,6 @@ function Uebersicht(): React.JSX.Element {
           Tipp: Über „Teilen“ › „Zum Home-Bildschirm“ wird der Onlinetest zur App. Dort dann „QR-Code scannen“ nutzen – die Kamera-App öffnet sonst immer Safari.
         </Alert>
       )}
-      {angemeldet && <AufgabenListe />}
       {angemeldet && <Title order={4}>Offene Tests</Title>}
       {!tests && <Loader />}
       {angemeldet && tests?.length === 0 && <Text c="dimmed">Gerade ist kein Test für dich freigegeben.</Text>}
@@ -488,7 +747,18 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
 }
 
 /** Nach der Abgabe: warten, bis das Ergebnis frei ist – dann Punkte, Note und jede Aufgabe mit Lösung */
-function ErgebnisAnsicht({ code, t, grund }: { code: string; t: Beitritt; grund: string }): React.JSX.Element {
+function ErgebnisAnsicht({
+  code,
+  t,
+  grund,
+  rueckblick
+}: {
+  code: string
+  t: Pick<Beitritt, 'id' | 'figur'>
+  grund: string
+  /** Früheres Ergebnis aus der Liste: Titel und Datum statt „Abgegeben" */
+  rueckblick?: { titel: string; datum: number }
+}): React.JSX.Element {
   const [e, setE] = useState<Ergebnis | null>(null)
   const laden = useCallback(() => {
     void holen<Ergebnis>(`/s/api/ergebnis?id=${encodeURIComponent(t.id)}`)
@@ -507,13 +777,15 @@ function ErgebnisAnsicht({ code, t, grund }: { code: string; t: Beitritt; grund:
       <Center>
         <Stack align="center" gap="xs">
           {e?.frei ? <Figur code={code} posen={t.figur} pose="jubelnd" h={150} /> : <IconCheck size={48} color="var(--mantine-color-green-6)" />}
-          <Title order={3}>Abgegeben</Title>
+          <Title order={3}>{rueckblick ? rueckblick.titel : 'Abgegeben'}</Title>
           <Text ta="center" c="dimmed">
-            {grund === 'verlassen'
-              ? 'Du hast die Seite verlassen (anderer Tab, anderes Fenster oder andere App) – dein Test wurde deshalb automatisch abgegeben.'
-              : grund === 'zeit'
-                ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
-                : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
+            {rueckblick
+              ? `Abgegeben am ${datumText(rueckblick.datum)}`
+              : grund === 'verlassen'
+                ? 'Du hast die Seite verlassen (anderer Tab, anderes Fenster oder andere App) – dein Test wurde deshalb automatisch abgegeben.'
+                : grund === 'zeit'
+                  ? 'Die Zeit ist abgelaufen – dein Test wurde abgegeben.'
+                  : 'Dein Test ist bei deiner Lehrkraft angekommen.'}
           </Text>
           {e && !e.frei && (
             <Text ta="center" size="sm" c="dimmed" data-ergebnis-wartet>
@@ -772,17 +1044,19 @@ interface AufgabeMitFeedback {
   genutzt: number
   bis: number | null
   fassungen: { nr: number; text: string; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
+  /** false: abgeschlossen (nur noch nachlesen) */
+  offen?: boolean
 }
 
-function AufgabenListe(): React.JSX.Element | null {
+function AufgabenListe({ leer }: { leer: string }): React.JSX.Element | null {
   const [liste, setListe] = useState<AufgabeMitFeedback[] | null>(null)
   useEffect(() => {
     void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then((d) => setListe(d.aufgaben), () => setListe([]))
   }, [])
-  if (!liste?.length) return null
+  if (!liste) return <Loader />
+  if (!liste.length) return <Text c="dimmed">{leer}</Text>
   return (
     <>
-      <Title order={4}>Aufgaben mit Feedback</Title>
       {liste.map((a) => (
         <Card key={a.id} withBorder padding="md">
           <Group justify="space-between">
@@ -790,11 +1064,11 @@ function AufgabenListe(): React.JSX.Element | null {
               <Text fw={600}>{a.titel}</Text>
               <Text size="sm" c="dimmed">
                 {a.genutzt} von {a.runden} Feedback-Runden genutzt
-                {a.bis ? ` · bis ${new Date(a.bis).toLocaleDateString('de-DE')}` : ''}
+                {a.offen === false ? ' · abgeschlossen' : a.bis ? ` · bis ${new Date(a.bis).toLocaleDateString('de-DE')}` : ''}
               </Text>
             </div>
-            <Button component="a" href={`/s/a/${a.id}`}>
-              Öffnen
+            <Button component="a" href={`/s/a/${a.id}`} variant={a.offen === false ? 'light' : 'filled'}>
+              {a.offen === false ? 'Ansehen' : 'Öffnen'}
             </Button>
           </Group>
         </Card>
@@ -896,8 +1170,8 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
   }
   return (
     <Stack>
-      <Button variant="subtle" component="a" href="/s/" w="fit-content">
-        ← Übersicht
+      <Button variant="subtle" component="a" href="/s/aufgaben" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+        Rückmeldung
       </Button>
       <Card withBorder padding="lg">
         <Title order={3}>{a.titel}</Title>
@@ -913,30 +1187,42 @@ function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
           <BogenAnsicht b={letzte.bogen} />
         </Card>
       )}
-      <Card withBorder padding="lg">
-        <Title order={4} mb="xs">
-          {a.fassungen.length ? 'Überarbeiten' : 'Deine Lösung'}
-        </Title>
-        <Textarea autosize minRows={8} value={text} onChange={(e) => setText(e.currentTarget.value)} placeholder="Hier schreiben …" />
-        {fehler && (
-          <Alert color="red" mt="sm">
-            {fehler}
-          </Alert>
-        )}
-        <Group justify="space-between" mt="sm">
-          <Text size="sm" c="dimmed">
-            Noch {rest} von {a.runden} Feedback-Runden
+      {a.offen === false ? (
+        <Card withBorder padding="lg" data-abgeschlossen>
+          <Title order={4} mb="xs">
+            Deine letzte Fassung
+          </Title>
+          <Text style={{ whiteSpace: 'pre-wrap' }}>{a.fassungen[a.fassungen.length - 1]?.text ?? '—'}</Text>
+          <Text size="sm" c="dimmed" mt="sm">
+            Diese Aufgabe ist abgeschlossen.
           </Text>
-          <Button loading={laeuft} disabled={rest <= 0 || text.trim().length < 20} onClick={() => void einreichen()}>
-            Feedback anfordern
-          </Button>
-        </Group>
-        {laeuft && (
-          <Text size="sm" c="dimmed" mt="xs">
-            Das Feedback wird geschrieben – das dauert etwa eine Minute.
-          </Text>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        <Card withBorder padding="lg">
+          <Title order={4} mb="xs">
+            {a.fassungen.length ? 'Überarbeiten' : 'Deine Lösung'}
+          </Title>
+          <Textarea autosize minRows={8} value={text} onChange={(e) => setText(e.currentTarget.value)} placeholder="Hier schreiben …" />
+          {fehler && (
+            <Alert color="red" mt="sm">
+              {fehler}
+            </Alert>
+          )}
+          <Group justify="space-between" mt="sm">
+            <Text size="sm" c="dimmed">
+              Noch {rest} von {a.runden} Feedback-Runden
+            </Text>
+            <Button loading={laeuft} disabled={rest <= 0 || text.trim().length < 20} onClick={() => void einreichen()}>
+              Feedback anfordern
+            </Button>
+          </Group>
+          {laeuft && (
+            <Text size="sm" c="dimmed" mt="xs">
+              Das Feedback wird geschrieben – das dauert etwa eine Minute.
+            </Text>
+          )}
+        </Card>
+      )}
     </Stack>
   )
 }

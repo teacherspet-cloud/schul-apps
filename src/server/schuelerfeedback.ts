@@ -137,7 +137,14 @@ export function feedbackRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
     // ---------- Lernende
     if (schueler) {
       if (req.method === 'GET' && url.pathname === '/s/api/aufgaben') {
-        const alle = (db().prepare("SELECT * FROM feedback_freigaben WHERE status = 'offen'").all() as unknown as Freigabe[]).filter((f) => offenFuer(f, ich))
+        const offen = (db().prepare("SELECT * FROM feedback_freigaben WHERE status = 'offen'").all() as unknown as Freigabe[]).filter((f) => offenFuer(f, ich))
+        // Abgeschlossene Aufgaben mit eigener Abgabe bleiben zum Nachlesen da (Schüler-Startseite, 02.10.2026)
+        const frueher = (
+          db()
+            .prepare('SELECT f.* FROM feedback_freigaben f JOIN feedback_abgaben a ON a.freigabe_id = f.id WHERE a.schueler_id = ? ORDER BY f.erstellt DESC')
+            .all(ich.id) as unknown as Freigabe[]
+        ).filter((f) => !offen.some((o) => o.id === f.id))
+        const alle = [...offen, ...frueher]
         return (
           json(res, 200, {
             aufgaben: alle.map((f) => {
@@ -147,6 +154,7 @@ export function feedbackRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> 
               return {
                 id: f.id,
                 titel: f.titel,
+                offen: offen.includes(f),
                 aufgabe: v.grundlage?.aufgaben ?? '',
                 runden: f.runden,
                 genutzt: fassungen.filter((x) => x.bogen).length,
