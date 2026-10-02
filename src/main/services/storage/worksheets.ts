@@ -45,6 +45,24 @@ export function saveWorksheet(input: SavedWorksheetInput): SavedWorksheetMeta {
   return meta
 }
 
+/**
+ * Nur das Vorschaubild nachtragen (02.10.2026): Blätter, die im Hintergrund fertig wurden, ohne im
+ * Editor offen zu sein, hatten keins („Keine Vorschau"). Das Bearbeitungsdatum bleibt unverändert.
+ */
+export function setWorksheetThumb(id: string, thumb: string): SavedWorksheetMeta | null {
+  const list = listWorksheets()
+  const meta = list.find((t) => t.id === checkId(id))
+  if (!meta || typeof thumb !== 'string' || !thumb.startsWith('data:image/')) return null
+  const file = join(dir(), `${meta.id}.json`)
+  if (existsSync(file)) {
+    const voll = JSON.parse(readFileSync(file, 'utf8')) as SavedWorksheet
+    writeAtomic(file, JSON.stringify({ ...voll, thumb }))
+  }
+  const neu = { ...meta, thumb }
+  writeAtomic(indexFile(), JSON.stringify(list.map((t) => (t.id === meta.id ? neu : t)), null, 1))
+  return neu
+}
+
 export function deleteWorksheet(id: string): SavedWorksheetMeta[] {
   loescheDatei(join(dir(), `${checkId(id)}.json`))
   const list = listWorksheets().filter((t) => t.id !== id)

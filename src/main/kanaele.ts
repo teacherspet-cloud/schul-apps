@@ -62,7 +62,7 @@ import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './ser
 import { deleteVerbList, getVerbList, listVerbLists, saveVerbList } from './services/storage/verbListen'
 import type { VerbListe } from '@shared/verben'
 import { deleteExam, getExam, listExams, saveExam } from './services/storage/exams'
-import { deleteWorksheet, getWorksheet, listWorksheets, saveWorksheet } from './services/storage/worksheets'
+import { deleteWorksheet, setWorksheetThumb, getWorksheet, listWorksheets, saveWorksheet } from './services/storage/worksheets'
 import { docxToHtml } from './services/ocr/docx'
 import type { DesignTemplate } from '@shared/design'
 import { getLogo, getUnterschrift, removeLogo, removeUnterschrift, setLogo, setUnterschrift } from './services/storage/branding'
@@ -439,6 +439,7 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('sheets:get', (id: string) => getWorksheet(id))
   handle('sheets:save', (input: SavedWorksheetInput) => saveWorksheet(input))
   handle('sheets:delete', (id: string) => deleteWorksheet(id))
+  handle('sheets:thumb', (id: string, thumb: string) => setWorksheetThumb(id, thumb))
   handle('textbooks:list', () => listTextbooks())
   handle('textbooks:get', (id: string) => getTextbook(id))
   handle('textbooks:save', (books: Textbook[]) => saveTextbooks(books))

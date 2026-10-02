@@ -47,6 +47,8 @@ export interface BibliotheksApi<M extends BibliotheksEintrag> {
 export interface Bibliothek<M extends BibliotheksEintrag> {
   /** null, solange die Liste lädt */
   eintraege: M[] | null
+  /** Liste neu holen */
+  neuLaden: () => void
   suche: string
   setSuche: (s: string) => void
   /** Einträge, die zur Suche passen (alle, wenn nichts eingegeben ist) */
@@ -158,7 +160,9 @@ export function useBibliothek<M extends BibliotheksEintrag>(
   const treffer = (felder: (e: M) => (string | number | null | undefined)[]): M[] =>
     (eintraege ?? []).filter((e) => passtZurSuche([e.name, ...felder(e)], suche))
 
-  return { eintraege, suche, setSuche, treffer, umbenennen, setUmbenennen, umbenennenSpeichern, loeschen, setLoeschen, loeschenBestaetigen, kopieren, neuId, moduleId: opts.moduleId }
+  /** Liste neu holen (z. B. nach nachgetragenen Vorschaubildern) */
+  const neuLaden = (): void => void api.list().then(setEintraege).catch(() => undefined)
+  return { eintraege, suche, setSuche, treffer, umbenennen, setUmbenennen, umbenennenSpeichern, loeschen, setLoeschen, loeschenBestaetigen, kopieren, neuId, moduleId: opts.moduleId, neuLaden }
 }
 
 /**

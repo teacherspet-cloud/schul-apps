@@ -371,6 +371,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
       list: () => call<SavedWorksheetMeta[]>('sheets:list'),
       get: (id: string) => call<SavedWorksheet>('sheets:get', id),
       save: (input: SavedWorksheetInput) => call<SavedWorksheetMeta>('sheets:save', input),
+      /** Nur das Vorschaubild nachtragen (Datum bleibt) */
+      thumb: (id: string, thumb: string) => call<SavedWorksheetMeta | null>('sheets:thumb', id, thumb),
       delete: (id: string) => call<SavedWorksheetMeta[]>('sheets:delete', id)
     },
     textbooks: {

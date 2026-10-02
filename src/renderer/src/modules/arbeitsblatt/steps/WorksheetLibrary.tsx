@@ -1,12 +1,12 @@
 import { Badge, Box, Button, Card, Container, Group, Image, Menu, ScrollArea, SimpleGrid, Text } from '@mantine/core'
 import { FachPunkt } from '../../../shared/components/FachFarbe'
 import { IconChalkboard, IconFilePlus, IconFolderOpen } from '@tabler/icons-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { ThemenAnsicht } from '../../../shared/components/Themenbereiche'
 import { nurListe } from '../../../shell/materialien'
 import type { SavedWorksheetMeta } from '@shared/types'
 import { notifyError } from '../../../shared/util'
-import { openSavedWorksheet } from '../library'
+import { openSavedWorksheet, vorschauenNachtragen } from '../library'
 import { useArbeitsblatt } from '../store'
 import {
   type Bibliothek,
@@ -57,6 +57,13 @@ export default function WorksheetLibrary({
     geloescht: () => useArbeitsblatt.getState().forgetSaved(),
     moduleId: 'arbeitsblatt'
   })
+  // Fehlende Vorschaubilder nachtragen (Blätter, die ohne offenen Editor fertig wurden) – einmal je Öffnen
+  const nachgetragen = useRef(false)
+  useEffect(() => {
+    if (!bib.eintraege || nachgetragen.current) return
+    nachgetragen.current = true
+    void vorschauenNachtragen(bib.eintraege).then((etwas) => etwas && bib.neuLaden())
+  }, [bib.eintraege, bib])
   const sheets = useMemo(() => bib.eintraege ?? [], [bib.eintraege])
   const suche = bib.suche.trim()
   const treffer = bib.treffer((s) => [s.topic, s.subjectLabel, `Klasse ${s.grade}`, s.grade, s.schoolTypeName])

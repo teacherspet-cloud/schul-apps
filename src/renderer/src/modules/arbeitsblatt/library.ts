@@ -1,4 +1,5 @@
 // Arbeitsblätter in der App speichern (wie die Vokabeltests) – mit Vorschaubild der ersten Seite.
+import { useAppSettings } from '../../shared/settingsStore'
 import { cleanImageBackground } from '../../shared/imageCleanup'
 import * as pdfjs from 'pdfjs-dist'
 import { useRef } from 'react'
@@ -68,8 +69,9 @@ export async function worksheetThumb(ws: Worksheet, layouts: Map<string, PagePla
     const thumb = canvas.toDataURL('image/jpeg', 0.7)
     pdf.cleanup()
     return thumb
-  } catch {
-    // Ohne Vorschaubild ist die Kachel schlichter, mehr nicht
+  } catch (e) {
+    // Ohne Vorschaubild ist die Kachel schlichter, mehr nicht – der Grund steht in der Konsole
+    console.warn('Vorschaubild nicht erzeugt:', e instanceof Error ? e.message : e)
     return undefined
   }
 }
@@ -92,10 +94,8 @@ export async function saveCurrentWorksheet(
   // Ein gelöschtes Dokument wird nicht wieder angelegt (shared/bibliothek.ts, `loescheDokument`)
   if (istGeloescht(id)) return
   const name = opts.name?.trim() || dokumentName(id, state.docName, defaultWorksheetName(ws))
-  const thumb =
-    opts.withThumb === false || !opts.layouts || !ws.sheets.length
-      ? undefined
-      : await worksheetThumb(ws, opts.layouts, opts.logo ?? null, opts.schoolName ?? '')
+  // Ohne gemessene Seiten (Editor nicht offen): Ersatz-Aufteilung – für das kleine Bild reicht sie
+  const thumb = opts.withThumb === false || !ws.sheets.length ? undefined : await worksheetThumb(ws, opts.layouts ?? new Map(), opts.logo ?? null, opts.schoolName ?? '')
   const meta = await window.api.sheets.save({ id, name, stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
   useArbeitsblatt.getState().markSaved(meta.id, meta.updatedAt, meta.name)
   // Sofort in die Themenbereiche einsortieren – nicht erst beim nächsten Besuch der Startseite (27.09.2026)
@@ -141,7 +141,10 @@ export function legeArbeitsblattAb(docId: string, schnappschuss: Worksheet, eina
         return { name: w.name, dok: w.payload as Worksheet }
       },
       speichern: async (id, name, ws) => {
-        await window.api.sheets.save({ id, name: name ?? defaultWorksheetName(ws), stats: worksheetStats(ws), payload: withoutAudioData(ws) })
+        // Fertig im Hintergrund, ohne offenen Editor: das Vorschaubild gleich mit (sonst „Keine Vorschau")
+        const { logoDataUrl, settings } = useAppSettings.getState()
+        const thumb = ws.sheets.length ? await worksheetThumb(ws, new Map(), logoDataUrl ?? null, settings.schoolName ?? '') : undefined
+        await window.api.sheets.save({ id, name: name ?? defaultWorksheetName(ws), stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
         void einsortierenNachSpeichern()
       }
     },
@@ -222,7 +225,7 @@ export function useWorksheetAutosave(logo: string | null, schoolName: string): v
       const { docId, worksheet } = useArbeitsblatt.getState()
       if (vorschau.docId !== docId) Object.assign(vorschau, { docId, zuletzt: 0 })
       const now = Date.now()
-      const withThumb = Boolean(worksheet?.sheets.length && vorschauLayouts) && now - vorschau.zuletzt > 120_000
+      const withThumb = Boolean(worksheet?.sheets.length) && now - vorschau.zuletzt > 120_000
       if (withThumb) vorschau.zuletzt = now
       return saveCurrentWorksheet({ logo, schoolName, withThumb, layouts: vorschauLayouts ?? undefined })
     }
@@ -265,4 +268,25 @@ export async function cleanWorksheetImages(): Promise<number> {
     }
   })
   return cleaned.size
+}
+
+/**
+ * Fehlende Vorschaubilder nachtragen (02.10.2026) – für Blätter, die ohne offenen Editor fertig
+ * wurden. Höchstens `anzahl` je Aufruf, nacheinander; das Bearbeitungsdatum bleibt.
+ */
+export async function vorschauenNachtragen(eintraege: { id: string; thumb?: string; sheetCount?: number }[], anzahl = 4): Promise<boolean> {
+  const fehlend = eintraege.filter((e) => !e.thumb && (e.sheetCount ?? 0) > 0).slice(0, anzahl)
+  if (!fehlend.length) return false
+  const { logoDataUrl, settings } = useAppSettings.getState()
+  let etwas = false
+  for (const e of fehlend) {
+    try {
+      const w = await window.api.sheets.get(e.id)
+      const thumb = await worksheetThumb(w.payload as Worksheet, new Map(), logoDataUrl ?? null, settings.schoolName ?? '')
+      if (thumb && (await window.api.sheets.thumb(e.id, thumb))) etwas = true
+    } catch {
+      // Ein Blatt ohne Bild bleibt eben ohne Bild
+    }
+  }
+  return etwas
 }

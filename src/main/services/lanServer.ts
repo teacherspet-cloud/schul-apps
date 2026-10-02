@@ -152,6 +152,7 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
    * Arbeit. LÖSCHEN bleibt gesperrt; das lässt sich nicht rückgängig machen.
    */
   'sheets:save',
+  'sheets:thumb',
   'exams:save',
   'tests:save',
   'kurztests:save',
