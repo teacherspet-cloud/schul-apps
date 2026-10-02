@@ -14,6 +14,7 @@ import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, Icon
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
+import { KlassenlisteKarte } from './Klassenliste'
 import { serverIch } from '../../shared/plattform'
 import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
@@ -176,6 +177,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           </Button>
         </Group>
       </Card>
+      <KlassenlisteKarte fertig={neu} />
       <Card withBorder>
         <Group align="end">
           <Select label="Testkonto anlegen als" data={[{ value: 'lehrkraft', label: 'Lehrkraft' }, { value: 'schueler', label: 'Schüler/in' }]} value={rolle} onChange={(v) => v && setRolle(v)} allowDeselect={false} w={200} />

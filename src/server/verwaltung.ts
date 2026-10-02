@@ -36,6 +36,7 @@ import { iservEinstellung, ISERV_STANDARD, type IservEinstellung } from './anmel
 import { DATEN, nutzerOrdner } from './pfade'
 import { offeneStroeme } from './ereignisse'
 import type { Rolle } from './kontext'
+import { benutzerFuer, klassenGruppe, nameAusZeile, startPasswort } from './klassenliste'
 import { registerVergessen } from './namensschutz'
 import { alleFreigaben, freigabeWiderrufen } from './hoertexte'
 
@@ -119,6 +120,34 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     protokolliereServer('verwaltung', `Testkonto angelegt (${rolle})`, ich)
     // Das Passwort wird nur dieses eine Mal gezeigt
     return (json(res, 200, { benutzer: neu.benutzer, passwort, id: neu.id }), true)
+  }
+  if (was === 'klassenliste') {
+    // Schülerkonten gesammelt (klassenliste.ts): Namensliste + Klasse → Konten mit Startpasswort
+    const klasse = String(k0.klasse ?? '').trim().slice(0, 40)
+    if (!klasse) return (json(res, 400, { fehler: 'Bitte die Klasse angeben (z. B. 10b).' }), true)
+    const zeilen = String(k0.namen ?? '').split(/\r?\n/).slice(0, 60)
+    const gruppe = klassenGruppe(klasse)
+    const angelegt: { name: string; benutzer: string; passwort: string; schonDa?: boolean }[] = []
+    for (const zeile of zeilen) {
+      const n = nameAusZeile(zeile)
+      if (!n) continue
+      const name = `${n.vorname} ${n.nachname}`
+      let benutzer = benutzerFuer(n.vorname, n.nachname)
+      const vorhanden = nutzerNachBenutzer(benutzer)
+      // Schon in dieser Klasse? Dann nicht doppelt anlegen
+      if (vorhanden && vorhanden.name === name && vorhanden.gruppen.some((g) => g.id === gruppe.id)) {
+        angelegt.push({ name, benutzer, passwort: '', schonDa: true })
+        continue
+      }
+      for (let i = 2; nutzerNachBenutzer(benutzer); i++) benutzer = `${benutzerFuer(n.vorname, n.nachname)}${i}`
+      const passwort = startPasswort()
+      nutzerAnlegen({ benutzer, name, rolle: 'schueler', quelle: 'lokal', passwortHash: passwortHash(passwort), passwortWechseln: true, gruppen: [gruppe] })
+      angelegt.push({ name, benutzer, passwort })
+    }
+    if (!angelegt.length) return (json(res, 400, { fehler: 'In der Liste wurden keine Namen erkannt (eine Zeile je Kind: „Vorname Nachname").' }), true)
+    registerVergessen()
+    protokolliereServer('verwaltung', `Schülerkonten angelegt (${angelegt.filter((x) => !x.schonDa).length}, Klasse ${klasse})`, ich)
+    return (json(res, 200, { klasse, angelegt }), true)
   }
   if (was === 'nutzer-anlegen') {
     // Neuer Nutzer mit Benutzername und vorübergehendem Passwort (02.10.2026) – bei der ersten

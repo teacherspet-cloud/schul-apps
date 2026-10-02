@@ -251,7 +251,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         'cache-control': 'no-store',
         'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
       })
-      return void res.end(anmeldeSeite({ iserv: iservBereit(), notzugang: notzugangAn(), fehler: url.searchParams.get('fehler') ?? '', ziel: url.searchParams.get('ziel') ?? '/' }))
+      return void res.end(anmeldeSeite({ iserv: iservBereit(), notzugang: notzugangAn(), fehler: url.searchParams.get('fehler') ?? '', ziel: url.searchParams.get('ziel') ?? '/', benutzer: url.searchParams.get('benutzer') ?? '' }))
     }
     if (req.method === 'GET' && url.pathname === '/auth/iserv') {
       try {

@@ -874,7 +874,10 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
     if (istGruppe) {
       if (req.method === 'GET' && teile.length === 0) {
         const gruppen = lerngruppenVon(ich.id).map((g) => ({ ...g, anzahl: mitgliederVon(g).length }))
-        return (json(res, 200, { gruppen, iservGruppen: nutzerNachId(ich.id)?.gruppen ?? [] }), true)
+        // Klassen der Schülerkonten aus der Verwaltung („klasse:10b") stehen zur Auswahl wie IServ-Gruppen
+        const klassen = new Map<string, { id: string; name: string }>()
+        for (const n of alleNutzer()) if (n.rolle === 'schueler') for (const g of n.gruppen) if (g.id.startsWith('klasse:')) klassen.set(g.id, { id: g.id, name: `Klasse ${g.name}` })
+        return (json(res, 200, { gruppen, iservGruppen: [...(nutzerNachId(ich.id)?.gruppen ?? []), ...[...klassen.values()].sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))] }), true)
       }
       if (req.method === 'GET' && teile.length === 1) {
         const g = lerngruppe(teile[0])

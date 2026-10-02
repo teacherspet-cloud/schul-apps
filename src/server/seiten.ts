@@ -25,7 +25,7 @@ summary { cursor: pointer; color: var(--leise); }
 .hinweis { font-size: .85rem; color: var(--leise); margin-top: 18px; }
 `
 
-export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: string; ziel: string }): string {
+export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: string; ziel: string; benutzer?: string }): string {
   const ziel = /^\/[a-zA-Z0-9/_-]*$/.test(o.ziel) ? o.ziel : '/'
   const fuerSchueler = ziel.startsWith('/s/')
   return `<!doctype html>
@@ -47,12 +47,12 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
   <p class="hinweis">Das IServ-Passwort gibst du nur bei IServ ein – Schul-Apps sieht und speichert es nicht.</p>`
       : `<p class="hinweis">Die Anmeldung über IServ ist noch nicht freigeschaltet. Bis dahin geht es nur mit einem Testkonto.</p>`
   }
-  <details${o.iserv ? '' : ' open'}>
+  <details${o.iserv && !o.benutzer ? '' : ' open'}>
     <summary>${o.notzugang ? 'Testkonto oder Notzugang' : 'Testkonto'}</summary>
     <form method="post" action="/auth/lokal">
       <input type="hidden" name="ziel" value="${esc(ziel)}">
       <label for="benutzer">Benutzername</label>
-      <input id="benutzer" name="benutzer" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      <input id="benutzer" name="benutzer" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required value="${esc((o.benutzer ?? '').replace(/[^a-z0-9._-]/gi, '').slice(0, 64))}">
       <label for="passwort">Passwort</label>
       <input id="passwort" name="passwort" type="password" autocomplete="current-password" required>
       <button type="submit">Anmelden</button>
