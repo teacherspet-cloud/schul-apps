@@ -16,7 +16,9 @@
  */
 import { Alert, Badge, Button, Card, Center, Container, Group, Image, Loader, NativeSelect, Paper, Radio, SegmentedControl, Stack, Text, TextInput, Textarea, Title } from '@mantine/core'
 import { IconAlertTriangle, IconCheck, IconClock, IconHourglass, IconLogout, IconX } from '@tabler/icons-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { HandFeld, TastaturFeld } from './HandFeld'
+import type { Erkennung } from './handschrift'
 import { antwortAlsText, loesungAlsText, type Antworten, type Bewertung, type Einheit, type Feld, type Loesung, type OnlineAufgabe, type OnlineEintrag } from './kern'
 import { holen, senden } from './serverApi'
 
@@ -34,6 +36,8 @@ interface Beitritt {
   abgegeben: boolean
   /** Posen der Figur, die der Test zeigt (winkend, jubelnd) */
   figur: string[]
+  /** Handschrift erlaubt (Schreibfläche mit Erkennung) */
+  handschrift?: boolean
   aufgaben: OnlineAufgabe[]
   antworten: Antworten
 }
@@ -194,6 +198,15 @@ function NameEingeben({ code, fertig }: { code: string; fertig: () => void }): R
   )
 }
 
+/** Handschrift im laufenden Test: welche Felder mit dem Stift, und die Erkennung je Feld */
+interface HandKontext {
+  an: boolean
+  stift: (feld: string) => boolean
+  umschalten: (feld: string, stift: boolean) => void
+  erkenne: (feld: string) => (segment: string, png: string) => Promise<Erkennung>
+}
+const Handschrift = createContext<HandKontext>({ an: false, stift: () => false, umschalten: () => undefined, erkenne: () => () => Promise.reject(new Error('aus')) })
+
 type Phase = 'name' | 'laden' | 'warten' | 'regeln' | 'laeuft' | 'abgegeben' | 'fehler'
 
 function TestAblauf({ code }: { code: string }): React.JSX.Element {
@@ -207,6 +220,18 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   const versatz = useRef(0)
   const stand = useRef<Antworten>({})
   const laeuft = useRef(false)
+  // Handschrift: Standard für alle Felder (Kopfleiste) und Ausnahmen je Feld
+  const [stiftStandard, setStiftStandard] = useState(false)
+  const [ausnahmen, setAusnahmen] = useState<Record<string, boolean>>({})
+  const hand = useMemo<HandKontext>(
+    () => ({
+      an: Boolean(t?.handschrift),
+      stift: (feld) => ausnahmen[feld] ?? stiftStandard,
+      umschalten: (feld, stift) => setAusnahmen((a) => ({ ...a, [feld]: stift })),
+      erkenne: (feld) => (segment, png) => senden<Erkennung>('/s/api/handschrift', { id: t?.id, geheim: t?.geheim, feld, segment, png })
+    }),
+    [t, ausnahmen, stiftStandard]
+  )
 
   const beitreten = useCallback(() => {
     void senden<Beitritt>('/s/api/beitreten', { code })
@@ -399,10 +424,29 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
             {minuten}:{String(sekunden).padStart(2, '0')}
           </Badge>
         </Group>
+        {t.handschrift && (
+          <SegmentedControl
+            mt={6}
+            size="xs"
+            fullWidth
+            value={stiftStandard ? 'stift' : 'tastatur'}
+            onChange={(v) => {
+              setStiftStandard(v === 'stift')
+              setAusnahmen({})
+            }}
+            data={[
+              { value: 'tastatur', label: '⌨ Tastatur' },
+              { value: 'stift', label: '✎ Stift / Finger' }
+            ]}
+            data-schreibart
+          />
+        )}
       </Paper>
-      {t.aufgaben.map((a, i) => (
-        <AufgabeKarte key={a.id} nr={i + 1} aufgabe={a} antworten={antworten} setze={setze} />
-      ))}
+      <Handschrift.Provider value={hand}>
+        {t.aufgaben.map((a, i) => (
+          <AufgabeKarte key={a.id} nr={i + 1} aufgabe={a} antworten={antworten} setze={setze} />
+        ))}
+      </Handschrift.Provider>
       <Button size="lg" color="green" onClick={() => window.confirm('Test jetzt endgültig abgeben?') && void abgeben('selbst')}>
         Abgeben
       </Button>
@@ -530,6 +574,31 @@ function ErgebnisAnsicht({ code, t, grund }: { code: string; t: Beitritt; grund:
 const KEINE_HILFE = { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false } as const
 
 function FeldEingabe({ feld, wert, setze }: { feld: Feld; wert: string; setze: (f: string, w: string) => void }): React.JSX.Element {
+  const hand = useContext(Handschrift)
+  if (hand.an && (feld.art === 'text' || feld.art === 'langtext')) {
+    if (hand.stift(feld.id))
+      return (
+        <HandFeld
+          feld={feld.id}
+          wert={wert}
+          setze={setze}
+          erkenne={hand.erkenne(feld.id)}
+          lang={feld.art === 'langtext'}
+          beschriftung={feld.beschriftung}
+          zurTastatur={() => hand.umschalten(feld.id, false)}
+        />
+      )
+    return (
+      <TastaturFeld
+        wert={wert}
+        onChange={(w) => setze(feld.id, w)}
+        lang={feld.art === 'langtext'}
+        beschriftung={feld.beschriftung}
+        placeholder={feld.anfang ? `${feld.anfang}…` : feld.laenge ? `${feld.laenge} Buchstaben` : ''}
+        zumStift={() => hand.umschalten(feld.id, true)}
+      />
+    )
+  }
   if (feld.art === 'langtext') return <Textarea autosize minRows={3} value={wert} onChange={(e) => setze(feld.id, e.currentTarget.value)} label={feld.beschriftung} {...KEINE_HILFE} />
   if (feld.art === 'wahr')
     return (

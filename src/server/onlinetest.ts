@@ -30,6 +30,7 @@ import { randomBytes } from 'node:crypto'
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
 import {
   bewerte,
+  felderVon,
   kontextVon,
   offeneEinheiten,
   onlineFassung,
@@ -41,6 +42,7 @@ import {
   type OnlineFassung
 } from '../renderer/src/modules/onlinetest/kern'
 import { kiAnfrage, urteileAus, type KiFall, type KiUrteil } from '../renderer/src/modules/onlinetest/kiBewertung'
+import { erkennungAus, erkennungsAnfrage, type Erkennung } from '../renderer/src/modules/onlinetest/handschrift'
 import { gradeForPoints, thresholdsForSubject } from '../renderer/src/shared/gradeScale'
 import { FAECHER } from '@shared/faecher'
 import { getSettings } from '../main/services/storage/settings'
@@ -87,6 +89,16 @@ CREATE TABLE IF NOT EXISTS teilnahmen (
   bewertung TEXT NOT NULL DEFAULT '{}',
   verlassen INTEGER NOT NULL DEFAULT 0,
   UNIQUE (test_id, schueler_id)
+);
+CREATE TABLE IF NOT EXISTS onlinetest_tinte (
+  teilnahme_id TEXT NOT NULL REFERENCES teilnahmen(id) ON DELETE CASCADE,
+  feld TEXT NOT NULL,
+  segment TEXT NOT NULL,
+  png BLOB NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  unsicher INTEGER NOT NULL DEFAULT 0,
+  erstellt INTEGER NOT NULL,
+  PRIMARY KEY (teilnahme_id, feld, segment)
 );
 CREATE TABLE IF NOT EXISTS onlinetest_figuren (
   test_id TEXT NOT NULL REFERENCES onlinetests(id) ON DELETE CASCADE,
@@ -176,6 +188,8 @@ export interface Einstellungen {
   ergebnisFrei?: boolean
   /** Figur (Maskottchen) auf Wartebildschirm, im Kopf und beim Ergebnis */
   figur?: boolean
+  /** Handschrift erlaubt (Schreibfläche mit Erkennung, renderer/modules/onlinetest/handschrift.ts) */
+  handschrift?: boolean
   /** Kopf und Einstellungen des Vokabeltests – für die Abgabe als Blatt (renderer/modules/onlinetest/blattAnsicht.tsx) */
   blatt?: Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
 }
@@ -245,6 +259,7 @@ export function testErstellen(
     hinweis?: string
     thema?: string
     figur?: { winkend?: unknown; jubelnd?: unknown }
+    handschrift?: boolean
   }
 ): Test {
   if (!e.test?.variants?.length) throw new Error('Der Test hat keine Variante.')
@@ -269,6 +284,7 @@ export function testErstellen(
     ...(e.thema ? { thema: e.thema.slice(0, 120) } : {}),
     ...(e.hinweis ? { hinweis: e.hinweis.slice(0, 500) } : {}),
     ...(figuren.length ? { figur: true } : {}),
+    handschrift: e.handschrift !== false,
     blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize }
   }
   const fassungen = e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v), original: v }))
@@ -577,6 +593,21 @@ const kiStand = (testId: string): { laeuft: boolean; fehler: string | null } => 
   return { laeuft: Boolean(s && (s.laeuft || s.zeitgeber)), fehler: s?.fehler ?? null }
 }
 
+// ---------------------------------------------------------------- Handschrift
+
+/** Erkennung im Namen der Lehrkraft – nur mit API-Schlüssel (die Anfrage stellen Lernende) */
+async function handschriftErkennen(test: Test, png: string, kontext: string): Promise<Erkennung> {
+  const lehrkraft = nutzerNachId(test.lehrkraft_id)
+  if (!lehrkraft || !kiAufruf) throw new Error('Keine Erkennung möglich.')
+  const aufruf = kiAufruf
+  return imNutzer(alsNutzer(lehrkraft), async () => {
+    const settings = getSettings()
+    if (settings.ai.access[settings.ai.textProvider] === 'subscription')
+      throw new Error('Für die Handschrifterkennung braucht die Lehrkraft einen API-Schlüssel (eigener oder von der Verwaltung freigegeben) – ein persönliches Abo darf nicht für andere laufen.')
+    return erkennungAus(await aufruf('ai:structured', [erkennungsAnfrage(png, test.einstellungen.zielsprache, kontext)]))
+  })
+}
+
 // ---------------------------------------------------------------- Gäste (ohne IServ)
 
 /** „anna k", „Anna K." → „Anna K."; bis zu drei Buchstaben des Nachnamens (zwei Annas) */
@@ -729,12 +760,44 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
           jetzt: Date.now(),
           abgegeben: Boolean(t.abgabe),
           figur: test.einstellungen.figur ? figurPosen(test.id) : [],
+          handschrift: Boolean(test.einstellungen.handschrift),
           // NUR die Schülerfassung – die Lösungen bleiben hier (bis zum Ergebnis)
           aufgaben: t.abgabe || wartet ? [] : fassung.aufgaben,
           antworten: t.abgabe || wartet ? {} : json_(t.antworten, {})
         }),
         true
       )
+    }
+
+    if (was === 'handschrift') {
+      // Handschrift erkennen, sobald die Lernenden kurz absetzen – Tinte bleibt als Beleg gespeichert
+      if (!mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      const k0 = await koerperRoh(k)
+      const t = teilnahme(String(k0.id ?? ''))
+      if (!t || t.schueler_id !== ich.id || t.geheim !== String(k0.geheim ?? '')) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
+      const test = testNachId(t.test_id)!
+      if (!test.einstellungen.handschrift) return (json(res, 403, { fehler: 'Handschrift ist in diesem Test nicht vorgesehen.' }), true)
+      if (t.abgabe || t.beginn === 0 || Date.now() > t.ende + NACHFRIST_MS) return (json(res, 409, { fehler: 'Der Test läuft nicht.' }), true)
+      const fassung = test.fassungen[t.variante].fassung
+      const feld = String(k0.feld ?? '')
+      const segment = String(k0.segment ?? '').replace(/[^a-z0-9-]/gi, '').slice(0, 40)
+      const f = felderVon(fassung).get(feld)
+      if (!f || (f.feld.art !== 'text' && f.feld.art !== 'langtext') || !segment) return (json(res, 400, { fehler: 'Unbekanntes Feld.' }), true)
+      const png = pngAus(k0.png)
+      if (!png || png.length > 600 * 1024) return (json(res, 400, { fehler: 'Das Schriftbild fehlt oder ist zu groß.' }), true)
+      const anzahl = (db().prepare('SELECT COUNT(*) AS n FROM onlinetest_tinte WHERE teilnahme_id = ?').get(t.id) as { n: number }).n
+      if (anzahl >= 600) return (json(res, 429, { fehler: 'Zu viele Schriftproben in diesem Test.' }), true)
+      try {
+        const e = await handschriftErkennen(test, `data:image/png;base64,${png.toString('base64')}`, kontextVon(fassung, feld))
+        db()
+          .prepare('INSERT OR REPLACE INTO onlinetest_tinte (teilnahme_id, feld, segment, png, text, unsicher, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(t.id, feld, segment, png, e.text, e.unsicher ? 1 : 0, Date.now())
+        return (json(res, 200, e), true)
+      } catch (e) {
+        // Tinte trotzdem aufbewahren – die Lehrkraft kann sie lesen
+        db().prepare('INSERT OR REPLACE INTO onlinetest_tinte (teilnahme_id, feld, segment, png, text, unsicher, erstellt) VALUES (?, ?, ?, ?, ?, 1, ?)').run(t.id, feld, segment, png, '', Date.now())
+        return (json(res, 503, { fehler: e instanceof Error ? e.message : String(e) }), true)
+      }
     }
 
     if (was === 'speichern' || was === 'abgeben' || was === 'verlassen') {
@@ -860,7 +923,8 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           zuteilung: k0.zuteilung === 'zufall' ? 'zufall' : typeof k0.zuteilung === 'number' ? k0.zuteilung : 'abwechselnd',
           hinweis: typeof k0.hinweis === 'string' ? k0.hinweis : undefined,
           thema: typeof k0.thema === 'string' ? k0.thema : undefined,
-          figur: k0.figur && typeof k0.figur === 'object' ? (k0.figur as { winkend?: unknown; jubelnd?: unknown }) : undefined
+          figur: k0.figur && typeof k0.figur === 'object' ? (k0.figur as { winkend?: unknown; jubelnd?: unknown }) : undefined,
+          handschrift: k0.handschrift !== false
         })
         return (json(res, 200, { id: t.id, code: t.code, link: link(t.code) }), true)
       } catch (e) {
@@ -932,6 +996,24 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       if (t.beginn === 0) return (json(res, 409, { fehler: 'Der Test ist für diese Person noch nicht gestartet.' }), true)
       abschliessen(t, test, json_(t.antworten, {}), 'lehrkraft')
       return (json(res, 200, { ok: true }), true)
+    }
+    if (teile[1] === 'tinte') {
+      const t = teilnahme(String(k0.teilnahme ?? ''))
+      if (!t || t.test_id !== test.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      const zeilen = db().prepare('SELECT feld, segment, png, text, unsicher, erstellt FROM onlinetest_tinte WHERE teilnahme_id = ? ORDER BY erstellt').all(t.id) as {
+        feld: string
+        segment: string
+        png: Uint8Array
+        text: string
+        unsicher: number
+        erstellt: number
+      }[]
+      return (
+        json(res, 200, {
+          tinte: zeilen.map((z) => ({ feld: z.feld, segment: z.segment, text: z.text, unsicher: Boolean(z.unsicher), bild: `data:image/png;base64,${Buffer.from(z.png).toString('base64')}` }))
+        }),
+        true
+      )
     }
     if (teile[1] === 'entfernen') {
       // Eine Teilnahme entfernen (z. B. vertippter Name im Wartebildschirm)

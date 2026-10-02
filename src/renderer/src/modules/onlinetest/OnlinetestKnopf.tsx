@@ -56,6 +56,7 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
   const winkend = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'winkend')
   const jubelnd = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'jubelnd')
   const [mitFigur, setMitFigur] = useState(Boolean(figurWahl))
+  const [handschrift, setHandschrift] = useState(true)
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [zeit, setZeit] = useState<number>(20)
   const [zuteilung, setZuteilung] = useState<string>('abwechselnd')
@@ -75,6 +76,7 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
         test: doc,
         lerngruppeId: gruppe ?? '',
         ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
+        handschrift,
         zeitMin: zeit,
         zuteilung: zuteilung === 'abwechselnd' || zuteilung === 'zufall' ? zuteilung : Number(zuteilung)
       })
@@ -139,6 +141,13 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
               {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="" />}
             </Group>
           )}
+          <Checkbox
+            label="Handschrift erlauben (Stift oder Finger, mit Erkennung)"
+            description="Die Erkennung läuft über den API-Schlüssel der Lehrkraft (eigener oder von der Verwaltung freigegeben) – nie über ein Abo. Die Schrift bleibt gespeichert und ist in der Durchsicht zu sehen."
+            checked={handschrift}
+            onChange={(e) => setHandschrift(e.currentTarget.checked)}
+            data-handschrift-wahl
+          />
           <Alert variant="light">
             Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang, ohne Namen);
             kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.

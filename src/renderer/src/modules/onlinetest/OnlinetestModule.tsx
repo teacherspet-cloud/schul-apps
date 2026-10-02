@@ -787,16 +787,21 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
 const PRUEF_TEXT = { kleinerFehler: 'kleiner Fehler – trotzdem Punkt?', sinnvoll: 'andere, sinnvolle Antwort – akzeptieren?' }
 
 /** Eine Bewertungseinheit: Antworten mit Lösung, Hinweis der KI und die Entscheidung der Lehrkraft */
+/** Handschrift einer Teilnahme: je Feld die Schriftbilder mit dem erkannten Text */
+type Tinte = Record<string, { bild: string; text: string; unsicher: boolean }[]>
+
 function EinheitZeile({
   test,
   t,
   e,
-  urteil
+  urteil,
+  tinte
 }: {
   test: TestDetail
   t: Teilnahme
   e: Einheit
   urteil: (einheit: string, richtig: boolean, punkte?: number) => void
+  tinte?: Tinte
 }): React.JSX.Element {
   const f = test.fassungen[t.varianteNr]
   const felder = useMemo(() => felderVon(f), [f])
@@ -821,6 +826,20 @@ function EinheitZeile({
             </Text>
           )
         })}
+        {e.felder.flatMap((id) => tinte?.[id] ?? []).length > 0 && (
+          <Group gap={6} mt={4} data-tinte>
+            {e.felder
+              .flatMap((id) => tinte?.[id] ?? [])
+              .map((x, i) => (
+                <Tooltip key={i} label={`erkannt als: ${x.text || '—'}${x.unsicher ? ' (unsicher)' : ''}`}>
+                  <img src={x.bild} alt={`Handschrift: ${x.text}`} style={{ height: 34, background: '#fff', border: `1px solid ${x.unsicher ? '#f08c00' : '#ced4da'}`, borderRadius: 4 }} />
+                </Tooltip>
+              ))}
+            <Text size="xs" c="dimmed">
+              Handschrift
+            </Text>
+          </Group>
+        )}
         {b?.pruefen && (
           <Text size="xs" c="orange.8" fw={600}>
             {PRUEF_TEXT[b.pruefen]}
@@ -857,6 +876,16 @@ function EinheitZeile({
 function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail; t: Teilnahme; name: string; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
   const f = test.fassungen[t.varianteNr]
   const [blatt, setBlatt] = useState(false)
+  const [tinte, setTinte] = useState<Tinte>({})
+  useEffect(() => {
+    void senden<{ tinte: { feld: string; bild: string; text: string; unsicher: boolean }[] }>(`/server/onlinetest/${test.id}/tinte`, { teilnahme: t.id })
+      .then((r) => {
+        const m: Tinte = {}
+        for (const x of r.tinte) (m[x.feld] ??= []).push(x)
+        setTinte(m)
+      })
+      .catch(() => undefined)
+  }, [test.id, t.id])
   if (blatt && blattMoeglich(test, t)) {
     const a = abgabeVon(test, t, name)
     return (
@@ -914,7 +943,7 @@ function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail
               {f.einheiten
                 .filter((e) => e.aufgabe === a.id)
                 .map((e) => (
-                  <EinheitZeile key={e.id} test={test} t={t} e={e} urteil={urteil} />
+                  <EinheitZeile key={e.id} test={test} t={t} e={e} urteil={urteil} tinte={tinte} />
                 ))}
             </Stack>
           </Card>
