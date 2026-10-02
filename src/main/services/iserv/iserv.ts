@@ -8,7 +8,7 @@
 import { ISERV_PRAEFIX, ISERV_STANDARD_ZIEL, iservAdressFehler, iservOrdnerFuer, pfadTeile, type DavEintrag } from '@shared/iserv'
 import type { AblageZiel, IservEinstellungen } from '@shared/types'
 import { getSettings, setSettings } from '../storage/settings'
-import { hochladen, IservFehler, liste, verbindungFinden, type DavAbruf, type IservZugang } from './webdav'
+import { herunterladen, hochladen, IservFehler, liste, verbindungFinden, type DavAbruf, type IservZugang } from './webdav'
 
 /** Was je Gerät verschieden ist: der Abrufer und der Ort des Passworts */
 export interface IservGeraet {
@@ -73,6 +73,19 @@ async function zugang(g: IservGeraet): Promise<IservZugang> {
 export async function iservOrdner(g: IservGeraet, pfad: string | string[]): Promise<DavEintrag[]> {
   const z = await zugang(g)
   return (await liste(z, pfadTeile(pfad))).filter((e) => e.ordner)
+}
+
+/** Ordner und Dateien eines Ordners (Dateien von IServ öffnen, 02.10.2026) */
+export async function iservEintraege(g: IservGeraet, pfad: string | string[]): Promise<DavEintrag[]> {
+  const z = await zugang(g)
+  return liste(z, pfadTeile(pfad))
+}
+
+/** Eine Datei von IServ laden – für „Datei öffnen" aus den IServ-Ordnern */
+export async function iservLaden(g: IservGeraet, pfad: string | string[]): Promise<{ name: string; data: Uint8Array }> {
+  const z = await zugang(g)
+  const teile = pfadTeile(pfad)
+  return { name: teile[teile.length - 1] ?? 'Datei', data: await herunterladen(z, teile) }
 }
 
 /** Abmelden: Passwort aus dem Schlüsselbund, WebDAV-Adresse vergessen (Schule und Benutzer bleiben zum Wiederverbinden) */

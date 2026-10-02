@@ -13,16 +13,20 @@ import { davUrl, iservKandidaten, inhaltstyp, leseMultistatus, pfadTeile, type D
 import { freierDateiname } from '@shared/dateiname'
 
 export interface DavAnfrage {
-  methode: 'PROPFIND' | 'MKCOL' | 'PUT'
+  methode: 'PROPFIND' | 'MKCOL' | 'PUT' | 'GET'
   url: string
   kopf: Record<string, string>
   /** Text (PROPFIND) oder Bytes (PUT) */
   koerper?: string | Uint8Array
+  /** Antwort als Bytes statt Text (GET einer Datei, 02.10.2026) */
+  binaer?: boolean
 }
 
 export interface DavAntwort {
   status: number
   text: string
+  /** Nur bei `binaer`: der Inhalt der Datei */
+  bytes?: Uint8Array
 }
 
 /** Eine Anfrage absetzen; wirft bei Netzfehlern (keine Antwort) */
@@ -148,6 +152,19 @@ export async function hochladen(z: IservZugang, ordner: string[], name: string, 
   const r = await anfrage(z, { methode: 'PUT', url: davUrl(z.basis, ziel), kopf: { 'Content-Type': inhaltstyp(frei) }, koerper: daten })
   if (r.status !== 201 && r.status !== 204 && r.status !== 200) throw fehlerAus(r.status)
   return ziel
+}
+
+/** Höchstgröße einer Datei, die die App von IServ lädt (Arbeitsspeicher, Übertragung über die Brücke) */
+export const MAX_LADEN = 100 * 1024 * 1024
+
+/** Eine Datei von IServ laden (02.10.2026: Dateien aus den IServ-Ordnern öffnen) */
+export async function herunterladen(z: IservZugang, teile: string[]): Promise<Uint8Array> {
+  if (!teile.length) throw new IservFehler('unbekannt', 'IServ: Es ist keine Datei gewählt.')
+  const r = await anfrage(z, { methode: 'GET', url: davUrl(z.basis, teile), binaer: true })
+  if (r.status !== 200) throw fehlerAus(r.status)
+  const bytes = r.bytes ?? new TextEncoder().encode(r.text)
+  if (bytes.byteLength > MAX_LADEN) throw new IservFehler('unbekannt', 'IServ: Die Datei ist zu groß (höchstens 100 MB).')
+  return bytes
 }
 
 /**

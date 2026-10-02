@@ -184,5 +184,6 @@ const nodeDavAbruf: DavAbruf = async (a) => {
     signal: AbortSignal.timeout(60_000)
   })
   if (res.url && !res.url.startsWith('https://')) throw new Error('Weiterleitung auf eine unverschlüsselte Adresse')
+  if (a.binaer) return { status: res.status, text: '', bytes: new Uint8Array(await res.arrayBuffer()) }
   return { status: res.status, text: await res.text() }
 }

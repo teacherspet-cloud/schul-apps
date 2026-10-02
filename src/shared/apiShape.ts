@@ -126,7 +126,23 @@ export interface SavedDokumentMeta {
   [feld: string]: unknown
 }
 
+/**
+ * Rückfragen der Oberfläche vor dem Speichern und Öffnen (02.10.2026): Am PC ist window.api über
+ * die Electron-Brücke unveränderlich – die Oberfläche kann files.save & Co. nicht umhüllen. Sie
+ * meldet deshalb hier zwei Funktionen an (shared/export/ausgabeOrt.tsx, eingabeOrt.tsx):
+ *  - ortWahl: vor files.save/exporter.pdf den Ort wählen (Gerät, IServ …); null = abgebrochen
+ *  - dateiWahl: vor files.open die Quelle wählen; undefined = wie bisher vom Gerät, null = abgebrochen
+ */
+export type OrtWahlFn = (ziel: AblageZiel | undefined) => Promise<AblageZiel | undefined | null>
+export type DateiWahlFn = (filters: FileFilter[]) => Promise<OpenedFile | null | undefined>
+/** HTML vor Druck/PDF/Vorschau aufbereiten (Silbentrennung, 02.10.2026: renderer/shared/silbentrennung.ts) */
+export type HtmlVorbereitenFn = (html: string) => Promise<string>
+
 export function buildApi(call: Call, extras: ApiExtras) {
+  let ortWahl: OrtWahlFn | null = null
+  let dateiWahl: DateiWahlFn | null = null
+  let htmlVorbereiten: HtmlVorbereitenFn | null = null
+  const vorbereitet = async (html: string): Promise<string> => (htmlVorbereiten ? htmlVorbereiten(html).catch(() => html) : html)
   /** Bibliothek eines neuen Programms (Großprogramm 0.4) – main/services/storage/dokumente.ts */
   const dokumentAblage = (kanal: 'rueckmeldungen' | 'elternbriefe' | 'tafelbilder' | 'bewertungstabellen' | 'nachteilsausgleiche') => ({
     list: () => call<SavedDokumentMeta[]>(`${kanal}:list`),
@@ -163,7 +179,23 @@ export function buildApi(call: Call, extras: ApiExtras) {
       status: () => call<IservStatus>('iserv:status'),
       verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) => call<{ basis: string; ordner: DavEintrag[] }>('iserv:verbinden', eingabe),
       ordner: (pfad: string) => call<DavEintrag[]>('iserv:ordner', pfad),
-      trennen: () => call<void>('iserv:trennen')
+      trennen: () => call<void>('iserv:trennen'),
+      /** Ordner UND Dateien eines Ordners (02.10.2026) */
+      eintraege: (pfad: string) => call<DavEintrag[]>('iserv:eintraege', pfad),
+      /** Eine Datei von IServ laden */
+      laden: (pfad: string) => call<OpenedFile>('iserv:laden', pfad)
+    },
+    /** Rückfragen vor Speichern/Öffnen anmelden (siehe OrtWahlFn) – einmal beim Start der Oberfläche */
+    vermittlung: {
+      ortWahl: (fn: OrtWahlFn | null) => {
+        ortWahl = fn
+      },
+      dateiWahl: (fn: DateiWahlFn | null) => {
+        dateiWahl = fn
+      },
+      htmlVorbereiten: (fn: HtmlVorbereitenFn | null) => {
+        htmlVorbereiten = fn
+      }
     },
     settings: {
       get: () => call<AppSettings>('settings:get'),
@@ -430,9 +462,16 @@ export function buildApi(call: Call, extras: ApiExtras) {
     files: {
       docxToHtml: (data: Uint8Array) => call<string>('files:docx-html', data),
       /** `ziel`: wohin die Datei gehört – die iPad-App legt danach unter Schulmaterial ab, der PC ignoriert es */
-      save: (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) =>
-        call<string | null>('files:save', defaultName, filters, data, ziel),
-      open: (filters: FileFilter[]) => call<OpenedFile | null>('files:open', filters),
+      save: async (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) => {
+        const z = ortWahl ? await ortWahl(ziel) : ziel
+        if (z === null) return null
+        return call<string | null>('files:save', defaultName, filters, data, z)
+      },
+      open: async (filters: FileFilter[]) => {
+        const gewaehlt = dateiWahl ? await dateiWahl(filters) : undefined
+        if (gewaehlt !== undefined) return gewaehlt
+        return call<OpenedFile | null>('files:open', filters)
+      },
       launchFile: () => call<OpenedFile | null>('files:launch-file'),
       /** Mehrere Pfade: auf dem iPad gemeinsam teilen; am PC zeigt der Explorer den ersten */
       showInFolder: (path: string | string[]) => call<void>('files:show', path),
@@ -444,7 +483,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
       pathOf: (file: File) => extras.pathOf(file)
     },
     exporter: {
-      pdf: (
+      pdf: async (
         html: string,
         defaultName: string,
         opts?: {
@@ -456,19 +495,23 @@ export function buildApi(call: Call, extras: ApiExtras) {
         },
         /** Wohin die Datei gehört (iPad: Schulmaterial; der PC ignoriert es) */
         ziel?: AblageZiel
-      ) => call<string | null>('export:pdf', html, defaultName, opts, ziel),
+      ) => {
+        const z = ortWahl ? await ortWahl(ziel) : ziel
+        if (z === null) return null
+        return call<string | null>('export:pdf', await vorbereitet(html), defaultName, opts, z)
+      },
       /** Wie `pdf`, aber ohne Dialog in einen schon gewählten Ordner (siehe files.chooseFolder) */
       pdfInFolder: (
         folder: string,
         html: string,
         name: string,
         opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[]; seiten?: number[] }
-      ) => call<string>('export:pdf-in-folder', folder, html, name, opts),
+      ) => vorbereitet(html).then((h) => call<string>('export:pdf-in-folder', folder, h, name, opts)),
       fillablePreview: (html: string, audio?: { id: string; fileName: string; title: string; base64: string }[]) =>
-        call<Uint8Array>('export:fillable-preview', html, audio),
+        vorbereitet(html).then((h) => call<Uint8Array>('export:fillable-preview', h, audio)),
       /** Ohne Optionen: Druckdialog von Windows; mit Optionen: direkt drucken (aus der Druckvorschau) */
-      print: (html: string, options?: PrintOptions) => call<void>('export:print', html, options),
-      preview: (html: string) => call<Uint8Array>('export:preview', html),
+      print: (html: string, options?: PrintOptions) => vorbereitet(html).then((h) => call<void>('export:print', h, options)),
+      preview: (html: string) => vorbereitet(html).then((h) => call<Uint8Array>('export:preview', h)),
       printers: () => call<PrinterInfo[]>('export:printers')
     }
   }

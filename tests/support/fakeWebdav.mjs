@@ -1,6 +1,6 @@
 // Ein kleiner WebDAV-Server wie IServ (01.10.2026) – für tests/iserv.test.ts und tests/e2e/mobil-iserv.mjs.
 //
-// Kann PROPFIND (Depth 0/1), MKCOL und PUT, prüft Basic-Anmeldung, antwortet mit CORS (der
+// Kann PROPFIND (Depth 0/1), MKCOL, PUT und GET (seit 02.10.2026), prüft Basic-Anmeldung, antwortet mit CORS (der
 // Prüf-Build im Browser ruft mit fetch ab) und lässt sich Fehler aufzwingen (401/405/507 …).
 // Oberste Ebene wie bei IServ: Home (Eigene Dateien) und Groups (je Gruppe ein Ordner).
 //
@@ -74,6 +74,12 @@ export function fakeWebdav(o = {}) {
       baum.set(pfad, { ordner: false, daten: Buffer.from(koerper ?? []), typ: kopf['content-type'] ?? kopf['Content-Type'] })
       return { status: neu ? 201 : 204, text: '' }
     }
+    if (methode === 'GET') {
+      const e = baum.get(pfad)
+      if (!e) return { status: 404, text: '' }
+      if (e.ordner) return { status: 405, text: '' }
+      return { status: 200, text: '', bytes: new Uint8Array(e.daten) }
+    }
     return { status: 405, text: '' }
   }
 
@@ -99,7 +105,7 @@ export function fakeWebdav(o = {}) {
       req.on('data', (t) => teile.push(t))
       req.on('end', () => {
         res.setHeader('Access-Control-Allow-Origin', '*')
-        res.setHeader('Access-Control-Allow-Methods', 'PROPFIND, MKCOL, PUT, OPTIONS')
+        res.setHeader('Access-Control-Allow-Methods', 'PROPFIND, MKCOL, PUT, GET, OPTIONS')
         res.setHeader('Access-Control-Allow-Headers', 'Authorization, Depth, Content-Type')
         if (req.method === 'OPTIONS') return res.writeHead(204).end()
         const roh = (req.url ?? '/').split('?')[0].split('/').map((t) => decodeURIComponent(t))
@@ -107,6 +113,7 @@ export function fakeWebdav(o = {}) {
         const host = roh[1] ?? ''
         const pfad = '/' + roh.slice(2).join('/')
         const antwort = behandle(req.method ?? 'GET', host, pfad === '/' ? '' : pfad, req.headers, Buffer.concat(teile))
+        if (antwort.bytes) return res.writeHead(antwort.status, { 'Content-Type': 'application/octet-stream' }).end(Buffer.from(antwort.bytes))
         res.writeHead(antwort.status, { 'Content-Type': antwort.status === 207 ? 'application/xml; charset=utf-8' : 'text/plain' }).end(antwort.text)
       })
     })

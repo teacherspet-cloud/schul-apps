@@ -22,7 +22,9 @@ import { useColorScheme } from '@mantine/hooks'
 import { Notifications } from '@mantine/notifications'
 import { SeitenWahlHost } from './shared/components/SeitenAuswahl'
 import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt'
-import { aufIos } from './shared/plattform'
+import { EingabeOrtDialog, installiereDateiWahl } from './shared/export/eingabeOrt'
+import { installiereTabellenAuswahl, TabellenKreismenue } from './modules/arbeitsblatt/render/tabellenAuswahl'
+import { beobachteTrennung, htmlMitTrennung } from './shared/silbentrennung'
 import { StrictMode, useLayoutEffect, useMemo } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
@@ -39,8 +41,18 @@ if (!imNetz()) {
   window.addEventListener('unhandledrejection', (e) => melde(`Unbehandelt: ${e.reason instanceof Error ? e.reason.message : String(e.reason)}`))
 }
 
-// iPad: Speichern mit Ablageziel fragt bei Bedarf nach dem Ort (IServ, 01.10.2026)
-if (aufIos()) installiereOrtWahl()
+// iPad und – seit 02.10.2026 – PC: Speichern mit Ablageziel fragt bei Bedarf nach dem Ort, Öffnen nach der Quelle (IServ)
+// Tabellen: Zellen markieren, Rechtsklick → Kreismenü „angleichen" (02.10.2026)
+installiereTabellenAuswahl()
+
+// Silbentrennung (02.10.2026): Druck/PDF aller Programme und die Seiten am Bildschirm
+window.api?.vermittlung?.htmlVorbereiten(htmlMitTrennung)
+beobachteTrennung()
+
+if (!imNetz()) {
+  installiereOrtWahl()
+  installiereDateiWahl()
+}
 
 if (new URLSearchParams(location.search).has('selftest')) void import('./selftest').then((m) => m.installSelftest())
 
@@ -60,6 +72,10 @@ function Root(): React.JSX.Element {
       <SeitenWahlHost />
       {/* iPad: wohin speichern – Gerät, IServ, Dateien-App, Teilen (shared/export/ausgabeOrt.tsx) */}
       <AusgabeOrtDialog />
+      {/* Datei öffnen: dieses Gerät oder IServ (shared/export/eingabeOrt.tsx) */}
+      <EingabeOrtDialog />
+      {/* Markierte Tabellenzellen angleichen (modules/arbeitsblatt/render/tabellenAuswahl.tsx) */}
+      <TabellenKreismenue />
       <App />
     </MantineProvider>
   )

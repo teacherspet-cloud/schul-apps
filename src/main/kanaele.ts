@@ -98,7 +98,7 @@ import { leseVerbrauch, merkeVerbrauch } from './services/ai/verbrauch'
 import type { LanStatus } from './services/lanServer'
 import type { WindowsFreigabe, WindowsFreigabeStatus } from './services/netz/windowsFreigabe'
 import type { SicherungsEintrag } from './services/storage/autoSicherung'
-import { iservAblegen, iservOrdner, iservStatus, iservTrennen, iservVerbinden, type IservGeraet } from './services/iserv/iserv'
+import { iservAblegen, iservEintraege, iservLaden, iservOrdner, iservStatus, iservTrennen, iservVerbinden, type IservGeraet } from './services/iserv/iserv'
 
 /** Registriert einen Aufruf; Fehler kommen als lesbare Meldung in der Oberfläche an (Sache der Umgebung). */
 export type Handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => R | Promise<R>) => void
@@ -518,6 +518,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('iserv:verbinden', (eingabe: { schule: string; benutzer: string; passwort?: string }) => iservVerbinden(u.iserv, eingabe))
   handle('iserv:ordner', (pfad: string) => iservOrdner(u.iserv, pfad))
   handle('iserv:trennen', () => iservTrennen(u.iserv))
+  // Dateien aus den IServ-Ordnern öffnen (02.10.2026) – PC und iPad
+  handle('iserv:eintraege', (pfad: string) => iservEintraege(u.iserv, pfad))
+  handle('iserv:laden', (pfad: string) => iservLaden(u.iserv, pfad))
   handle('files:open', async (filters: FileFilter[]) => {
     const path = await u.dateiWaehlen(filters)
     if (!path) return null

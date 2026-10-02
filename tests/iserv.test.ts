@@ -250,6 +250,47 @@ describe('Dienst: verbinden, ablegen, trennen – Passwort nur im Geräte-Speich
   })
 })
 
+describe('Dateien von IServ öffnen (02.10.2026)', () => {
+  let fake: Fake
+  beforeEach(() => {
+    fake = fakeWebdav()
+  })
+
+  it('lädt eine Datei unverändert (Bytes, nicht Text)', async () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00, 0xff, 0x80, 0x0a])
+    await dav.hochladen(ZUGANG(fake), ['Home', 'Unterricht'], 'Blatt.pdf', pdf)
+    expect([...(await dav.herunterladen(ZUGANG(fake), ['Home', 'Unterricht', 'Blatt.pdf']))]).toEqual([...pdf])
+  })
+
+  it('fehlende Datei und falsches Passwort → verständliche Fehler', async () => {
+    await expect(dav.herunterladen(ZUGANG(fake), ['Home', 'gibtsnicht.pdf'])).rejects.toMatchObject({ art: 'nicht-freigeschaltet' })
+    await expect(dav.herunterladen({ ...ZUGANG(fake), passwort: 'falsch' }, ['Home', 'x.pdf'])).rejects.toMatchObject({ art: 'anmeldung' })
+    await expect(dav.herunterladen(ZUGANG(fake), [])).rejects.toBeInstanceOf(dav.IservFehler)
+  })
+
+  it('Dienst: Einträge mit Dateien, Laden liefert Name und Daten', async () => {
+    const s = speicher()
+    const g = { abruf: fake.abruf, passwort: s.passwort }
+    einstellungen = {}
+    await dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: fake.benutzer, passwort: fake.passwort })
+    await dav.hochladen(ZUGANG(fake), ['Home', 'Unterricht'], 'Vokabeln.csv', new TextEncoder().encode('house;Haus'))
+    const eintraege = await dienst.iservEintraege(g, 'Home/Unterricht')
+    expect(eintraege.map((e) => [e.name, e.ordner])).toEqual([['Vokabeln.csv', false]])
+    // Die Ordnerauswahl zeigt weiter nur Ordner
+    expect(await dienst.iservOrdner(g, 'Home/Unterricht')).toEqual([])
+    const datei = await dienst.iservLaden(g, 'Home/Unterricht/Vokabeln.csv')
+    expect(datei.name).toBe('Vokabeln.csv')
+    expect(new TextDecoder().decode(datei.data)).toBe('house;Haus')
+  })
+
+  it('ohne Verbindung: klare Meldung statt Netzanfrage', async () => {
+    einstellungen = {}
+    const g = { abruf: fake.abruf, passwort: speicher().passwort }
+    await expect(dienst.iservLaden(g, 'Home/x.pdf')).rejects.toThrow(/noch nicht verbunden/)
+    expect(fake.protokoll).toHaveLength(0)
+  })
+})
+
 describe('Kanäle: files:save und export:pdf mit Ziel „IServ"', () => {
   it('leitet zu IServ statt aufs Gerät', async () => {
     einstellungen = {}

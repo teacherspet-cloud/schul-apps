@@ -13,7 +13,9 @@
 //     Ziel/Fach/Themenbereich ab (Ordner per MKCOL angelegt, Bytes unverändert, kein Überschreiben).
 //  4. Abbrechen speichert nichts; „Auf dem iPad" wie bisher unter /documents/Schulmaterial;
 //     „Auswahl merken" fragt beim nächsten Mal nicht mehr.
-//  5. Trennen löscht das Passwort aus dem Schlüsselbund.
+//  5. Datei öffnen (02.10.2026): Quelle wählen → IServ → Ordner → Datei; Bytes unverändert,
+//     unpassende Endungen ausgeblendet, „Doch vom iPad" fällt auf den gewohnten Weg zurück.
+//  6. Trennen löscht das Passwort aus dem Schlüsselbund.
 import { chromium, webkit } from 'playwright-core'
 import { createServer } from 'http'
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs'
@@ -145,7 +147,26 @@ async function lauf(name, typ, optionen) {
     const p4 = await speichern()
     pruefe(p4 === 'iserv:Home/Unterricht/Schulmaterial/Englisch/Unit 1/Vokabeltest (4).pdf', `${name}: gemerkte Auswahl ohne Rückfrage (${p4})`)
 
-    // ---------- 5. Trennen
+    // ---------- 5. Datei von IServ öffnen
+    const csv = [...new TextEncoder().encode('house;Haus')]
+    fake.baum.set('/Home/Unterricht/Vokabeln.csv', { ordner: false, daten: Buffer.from(csv) })
+    fake.baum.set('/Home/Unterricht/Bild.png', { ordner: false, daten: Buffer.from([1, 2, 3]) })
+    const oeffnen = () =>
+      page.evaluate(() => window.api.files.open([{ name: 'Tabelle', extensions: ['csv'] }]).then((d) => (d ? { name: d.name, bytes: [...d.data] } : d)))
+    let offen = oeffnen()
+    await page.locator('button[data-quelle="iserv"]').click({ timeout: 10000 })
+    await page.locator('[data-iserv-dateiwahl] [data-iserv-eintrag="Unterricht"]').click({ timeout: 10000 })
+    await page.locator('[data-iserv-dateiwahl] [data-iserv-datei="Vokabeln.csv"]').waitFor({ timeout: 10000 })
+    pruefe((await page.locator('[data-iserv-dateiwahl] [data-iserv-datei="Bild.png"]').count()) === 0, `${name}: unpassende Endung ausgeblendet`)
+    await page.screenshot({ path: join(out, `${name}-5-oeffnen.png`) })
+    await page.locator('[data-iserv-dateiwahl] [data-iserv-datei="Vokabeln.csv"]').click()
+    const gelesen = await offen
+    pruefe(gelesen?.name === 'Vokabeln.csv' && JSON.stringify(gelesen.bytes) === JSON.stringify(csv), `${name}: Datei von IServ geöffnet, Bytes unverändert`)
+    offen = oeffnen()
+    await page.locator('[data-eingabe-ort]').getByRole('button', { name: 'Abbrechen' }).click({ timeout: 10000 })
+    pruefe((await offen) === null, `${name}: Abbrechen beim Öffnen liefert nichts`)
+
+    // ---------- 6. Trennen
     await sichtbar(karte.locator('[data-iserv-trennen]')).click()
     await page.waitForTimeout(800)
     pruefe((await page.evaluate(() => localStorage.getItem('schulapps.secrets.iserv'))) === null, `${name}: Trennen löscht das Passwort`)

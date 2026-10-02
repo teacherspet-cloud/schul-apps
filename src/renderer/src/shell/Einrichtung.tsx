@@ -104,6 +104,19 @@ export default function Einrichtung(): React.JSX.Element | null {
       inhalt: <HoertextCard settings={settings} update={update} />
     },
     // Nur iPad: wohin erstellte Dateien kommen
+    ...(!ios
+      ? [
+          // PC (02.10.2026): IServ verbinden – Material dort speichern und von dort öffnen
+          {
+            label: 'IServ',
+            beschreibung: 'Optional: IServ-Ordner',
+            icon: <IconFolder size={18} />,
+            hinweis:
+              'Optional: Mit dem IServ-Zugang der Schule speichert die App Material direkt in die Ordner auf IServ und öffnet Dateien von dort. Das Passwort liegt verschlüsselt nur auf diesem PC.',
+            inhalt: <IservCard settings={settings} update={update} />
+          }
+        ]
+      : []),
     ...(ios
       ? [
           {

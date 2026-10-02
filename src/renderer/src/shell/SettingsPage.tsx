@@ -172,8 +172,8 @@ export default function SettingsPage(): React.JSX.Element {
             <Stack gap="lg">
               {/* Nur iPad: wohin erstellte Dateien kommen (30.09.2026) */}
               {aufIos() && <AblageCard settings={settings} update={update} />}
-              {/* Nur iPad: IServ per WebDAV (01.10.2026) */}
-              {aufIos() && <IservCard settings={settings} update={update} />}
+              {/* IServ per WebDAV: iPad (01.10.2026) und PC (02.10.2026) – nicht im Browser des Netzzugangs */}
+              {!imNetz() && <IservCard settings={settings} update={update} />}
               <FachfarbenSettings settings={settings} update={update} />
               <GradeScaleSettings settings={settings} update={update} />
               <KorrekturzeichenSettings settings={settings} update={update} />

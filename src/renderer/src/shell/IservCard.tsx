@@ -4,19 +4,28 @@ import { useEffect, useState } from 'react'
 import { anzeigeTeil, inGruppenordner, iservAdressFehler, iservAnzeige, ISERV_STANDARD_ZIEL, pfadTeile, type DavEintrag } from '@shared/iserv'
 import { SCHULMATERIAL } from '@shared/schulmaterial'
 import type { AppSettings, AusgabeOrt, DeepPartial } from '@shared/types'
+import { aufIos } from '../shared/plattform'
 import { useAppSettings } from '../shared/settingsStore'
 import { notifyError, notifySuccess } from '../shared/util'
 
 /**
  * IServ verbinden (01.10.2026) – Einstellungen › Material und Schritt „Ablage" des
- * Einrichtungsassistenten, nur in der iPad-App.
+ * Einrichtungsassistenten; in der iPad-App und seit 02.10.2026 auch in der App am PC (dort liegt
+ * das Passwort verschlüsselt in secrets.json, Windows-Datenschutz-API). Mit Verbindung lassen
+ * sich Dateien auch VON IServ öffnen (shared/export/eingabeOrt.tsx).
  *
  * Schuladresse, Benutzername, Passwort → „Verbindung testen" (PROPFIND auf webdav.<domain>
  * bzw. <domain>/webdav, main/services/iserv). Das Passwort geht erst nach erfolgreicher Anmeldung
  * in den Schlüsselbund – als eigener Eintrag, nie in die Einstellungen. Danach: Ordner auf IServ
  * wählen (Eigene Dateien, Gruppen) und festlegen, wohin Material beim Speichern geht.
  */
-export default function IservCard({ settings, update }: { settings: AppSettings; update: (patch: DeepPartial<AppSettings>) => Promise<void> }): React.JSX.Element {
+export default function IservCard({
+  settings,
+  update
+}: {
+  settings: AppSettings
+  update: (patch: DeepPartial<AppSettings>) => Promise<void>
+}): React.JSX.Element {
   const gespeichert = settings.iserv
   const verbunden = Boolean(gespeichert?.basis)
   const [schule, setSchule] = useState(gespeichert?.schule ?? '')
@@ -55,6 +64,7 @@ export default function IservCard({ settings, update }: { settings: AppSettings;
   }
 
   const ort = settings.ausgabeOrt ?? (verbunden ? 'fragen' : 'geraet')
+  const ios = aufIos()
 
   return (
     <Card withBorder padding="lg" data-iserv-karte>
@@ -69,8 +79,8 @@ export default function IservCard({ settings, update }: { settings: AppSettings;
         )}
       </Group>
       <Text size="sm" c="dimmed" mb="md">
-        Mit dem IServ-Zugang der Schule speichert die App Material direkt in die Ordner auf IServ – in „Eigene Dateien“ oder einen Gruppenordner, geordnet nach Fach
-        und Themenbereich. Voraussetzung: Die Schule hat das IServ-Modul „WebDAV“ freigeschaltet.
+        Mit dem IServ-Zugang der Schule speichert die App Material direkt in die Ordner auf IServ – in „Eigene Dateien“ oder einen Gruppenordner, geordnet nach
+        Fach und Themenbereich – und öffnet Dateien aus diesen Ordnern. Voraussetzung: Die Schule hat das IServ-Modul „WebDAV“ freigeschaltet.
       </Text>
       <Stack gap="xs">
         <TextInput
@@ -100,7 +110,9 @@ export default function IservCard({ settings, update }: { settings: AppSettings;
           label="Passwort"
           description={
             verbunden
-              ? 'Gespeichert im Schlüsselbund dieses Geräts – leer lassen, um es zu behalten.'
+              ? ios
+                ? 'Gespeichert im Schlüsselbund dieses Geräts – leer lassen, um es zu behalten.'
+                : 'Verschlüsselt auf diesem PC gespeichert – leer lassen, um es zu behalten.'
               : 'Das IServ-Passwort; ein Code der Zwei-Faktor-Anmeldung wird nicht gebraucht.'
           }
           placeholder={verbunden ? '••••••••' : ''}
@@ -168,25 +180,56 @@ export default function IservCard({ settings, update }: { settings: AppSettings;
           label="Beim Speichern von Material"
           data={[
             { value: 'fragen', label: 'Jedes Mal fragen' },
-            { value: 'geraet', label: 'Auf dem iPad (Schulmaterial)' },
+            { value: 'geraet', label: ios ? 'Auf dem iPad (Schulmaterial)' : 'Auf diesem PC (Speichern-Dialog)' },
             ...(verbunden ? [{ value: 'iserv', label: 'Auf IServ' }] : []),
-            { value: 'dateien', label: 'Dateien-App (Ort wählen)' },
-            { value: 'teilen', label: 'Teilen-Menü' }
+            ...(ios
+              ? [
+                  { value: 'dateien', label: 'Dateien-App (Ort wählen)' },
+                  { value: 'teilen', label: 'Teilen-Menü' }
+                ]
+              : [])
           ]}
           value={ort === 'iserv' && !verbunden ? 'geraet' : ort}
           onChange={(v) => v && void update({ ausgabeOrt: v as AusgabeOrt | 'fragen' })}
           allowDeselect={false}
           data-iserv-ausgabe-ort
         />
-        <Text size="xs" c="dimmed">
-          <IconCloudUpload size={12} style={{ verticalAlign: 'middle' }} /> „Dateien-App“ öffnet den Speichern-Dialog von iOS: Dort steht jeder Ort zur Wahl, den die
-          Dateien-App kennt – auch ein Anbieter, der IServ einbindet. Das Passwort liegt nur im Schlüsselbund dieses Geräts, nie in Einstellungen, Sicherungen oder dem
-          Protokoll. Mehr zur Einrichtung:{' '}
-          <Anchor size="xs" href="https://doku.iserv.de/cookbook/external/webdav/" target="_blank" rel="noreferrer">
-            IServ-Dokumentation zu WebDAV
-          </Anchor>
-          .
-        </Text>
+        {verbunden && (
+          <Select
+            label="Beim Öffnen von Dateien"
+            data={[
+              { value: 'fragen', label: 'Jedes Mal fragen' },
+              { value: 'geraet', label: ios ? 'Vom iPad' : 'Von diesem PC' },
+              { value: 'iserv', label: 'Von IServ' }
+            ]}
+            value={settings.eingabeOrt ?? 'fragen'}
+            onChange={(v) => v && void update({ eingabeOrt: v as 'fragen' | 'geraet' | 'iserv' })}
+            allowDeselect={false}
+            data-iserv-eingabe-ort
+          />
+        )}
+        {!ios && (
+          <Text size="xs" c="dimmed">
+            <IconCloudUpload size={12} style={{ verticalAlign: 'middle' }} /> Die App spricht IServ direkt an – ein Netzlaufwerk in Windows ist dafür nicht
+            nötig. Das Passwort liegt verschlüsselt nur auf diesem PC, nie in Einstellungen, Sicherungen, dem Protokoll oder auf einem Server. Mehr zur
+            Einrichtung:{' '}
+            <Anchor size="xs" href="https://doku.iserv.de/cookbook/external/webdav/" target="_blank" rel="noreferrer">
+              IServ-Dokumentation zu WebDAV
+            </Anchor>
+            .
+          </Text>
+        )}
+        {ios && (
+          <Text size="xs" c="dimmed">
+            <IconCloudUpload size={12} style={{ verticalAlign: 'middle' }} /> „Dateien-App“ öffnet den Speichern-Dialog von iOS: Dort steht jeder Ort zur Wahl,
+            den die Dateien-App kennt – auch ein Anbieter, der IServ einbindet. Das Passwort liegt nur im Schlüsselbund dieses Geräts, nie in Einstellungen,
+            Sicherungen oder dem Protokoll. Mehr zur Einrichtung:{' '}
+            <Anchor size="xs" href="https://doku.iserv.de/cookbook/external/webdav/" target="_blank" rel="noreferrer">
+              IServ-Dokumentation zu WebDAV
+            </Anchor>
+            .
+          </Text>
+        )}
       </Stack>
     </Card>
   )

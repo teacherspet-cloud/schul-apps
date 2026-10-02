@@ -1,10 +1,10 @@
 import { Alert, Button, Checkbox, Group, Modal, Stack, Text } from '@mantine/core'
-import { IconAlertTriangle, IconCloudUpload, IconDeviceTablet, IconFolders, IconShare } from '@tabler/icons-react'
+import { IconAlertTriangle, IconCloudUpload, IconDeviceDesktop, IconDeviceTablet, IconFolders, IconShare } from '@tabler/icons-react'
 import { useState } from 'react'
 import { create } from 'zustand'
 import { inGruppenordner, iservAnzeige, iservOrdnerFuer, pfadTeile } from '@shared/iserv'
 import type { AblageZiel, AusgabeOrt } from '@shared/types'
-import { aufIos } from '../plattform'
+import { amPc, aufIos } from '../plattform'
 import { useAppSettings } from '../settingsStore'
 
 /**
@@ -15,9 +15,10 @@ import { useAppSettings } from '../settingsStore'
  * vor dem Speichern – für alles, was mit Ablageziel gespeichert wird (files.save, exporter.pdf,
  * speichereAusgabe). Ohne IServ und ohne Einstellung „Jedes Mal fragen" bleibt alles wie bisher.
  *
- * Nur in der iPad-App: Am PC ist window.api über die Electron-Brücke unveränderlich, im Browser
- * des Tablets (Netzzugang) wird heruntergeladen. Der Unterbau (Kanäle iserv:*, WebDAV über
- * Node-fetch, Passwort verschlüsselt) steht am PC trotzdem bereit.
+ * iPad-App und – seit 02.10.2026 – App am PC („Auf diesem PC" = Speichern-Dialog von Windows oder
+ * „IServ"). Am PC ist window.api über die Electron-Brücke unveränderlich; die Rückfrage meldet sich
+ * deshalb über `window.api.vermittlung.ortWahl` an (shared/apiShape.ts). Im Browser des Tablets
+ * (Netzzugang) wird weiter heruntergeladen.
  */
 
 export type OrtWahl = { ort: AusgabeOrt; merken: boolean } | null
@@ -32,12 +33,13 @@ const useAbfrage = create<{ offen: Abfrage | null }>(() => ({ offen: null }))
 
 /** Welche Orte dieses Gerät anbietet */
 export function orteDiesesGeraets(iservVerbunden: boolean): AusgabeOrt[] {
+  if (amPc()) return iservVerbunden ? ['geraet', 'iserv'] : []
   if (!aufIos()) return []
   return iservVerbunden ? ['geraet', 'iserv', 'dateien', 'teilen'] : ['geraet', 'dateien', 'teilen']
 }
 
 export const ORT_NAME = (ort: AusgabeOrt): string =>
-  ort === 'geraet' ? 'Auf dem iPad' : ort === 'iserv' ? 'IServ' : ort === 'dateien' ? 'Dateien-App …' : 'Teilen …'
+  ort === 'geraet' ? (aufIos() ? 'Auf dem iPad' : 'Auf diesem PC') : ort === 'iserv' ? 'IServ' : ort === 'dateien' ? 'Dateien-App …' : 'Teilen …'
 
 const iservVerbunden = (): boolean => Boolean(useAppSettings.getState().settings.iserv?.basis)
 
@@ -58,18 +60,19 @@ export async function mitOrt(ziel: AblageZiel | undefined, anzahl = 1): Promise<
   return { ...ziel, ort: wahl.ort }
 }
 
-const SYMBOL: Record<AusgabeOrt, React.ReactNode> = {
-  geraet: <IconDeviceTablet size={18} />,
+const SYMBOL = (): Record<AusgabeOrt, React.ReactNode> => ({
+  geraet: aufIos() ? <IconDeviceTablet size={18} /> : <IconDeviceDesktop size={18} />,
   iserv: <IconCloudUpload size={18} />,
   dateien: <IconFolders size={18} />,
   teilen: <IconShare size={18} />
-}
+})
 
 function beschreibung(ort: AusgabeOrt, ziel: AblageZiel): string {
   const s = useAppSettings.getState().settings
   if (ort === 'iserv') return iservAnzeige(iservOrdnerFuer(s.iserv?.ziel, ziel))
   if (ort === 'dateien') return 'Ort in der Dateien-App frei wählen (iCloud Drive, eingebundene Anbieter …)'
   if (ort === 'teilen') return 'AirDrop, Mail, Drucken, „In Dateien sichern“'
+  if (!aufIos()) return 'Ort im Speichern-Dialog von Windows wählen'
   return s.schulmaterialAblage === false ? 'Ordner „Ausgaben“ in der Dateien-App' : 'Dateien-App › Schulmaterial › Fach › Themenbereich'
 }
 
@@ -93,7 +96,7 @@ export function AusgabeOrtDialog(): React.JSX.Element | null {
           <Button
             key={ort}
             variant={ort === 'iserv' ? 'filled' : 'light'}
-            leftSection={SYMBOL[ort]}
+            leftSection={SYMBOL()[ort]}
             justify="flex-start"
             h="auto"
             py={8}
@@ -135,6 +138,11 @@ export function AusgabeOrtDialog(): React.JSX.Element | null {
  */
 export function installiereOrtWahl(): void {
   const api = window.api
+  // Über die Brücke (PC) bzw. buildApi (iPad): eine Anmeldung statt Umhüllen
+  if (api?.vermittlung) {
+    api.vermittlung.ortWahl((ziel) => mitOrt(ziel))
+    return
+  }
   if (!api?.files || !api.exporter || (api as { __ortWahl?: boolean }).__ortWahl) return
   ;(api as { __ortWahl?: boolean }).__ortWahl = true
   const speichern = api.files.save

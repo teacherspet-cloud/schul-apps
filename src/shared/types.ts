@@ -322,6 +322,8 @@ export interface AppSettings {
   iserv?: IservEinstellungen
   /** Wohin Material standardmäßig geht; 'fragen' = vor jedem Speichern wählen. Fehlt = Gerät (mit IServ: fragen) */
   ausgabeOrt?: AusgabeOrt | 'fragen'
+  /** Woher „Datei öffnen" liest, solange IServ verbunden ist (02.10.2026); fehlt = fragen */
+  eingabeOrt?: 'geraet' | 'iserv' | 'fragen'
 }
 
 /** Wohin eine Datei geht: aufs Gerät (iPad: Schulmaterial, PC: Speichern-Dialog), IServ, Dateien-App-Export, Teilen-Menü */
