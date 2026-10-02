@@ -1,4 +1,5 @@
-import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Select, Stack, Tabs, Text, TextInput, Title } from '@mantine/core'
+import { Alert, Badge, Button, Card, Container, Group, ScrollArea, Stack, Tabs, Text, TextInput, Title } from '@mantine/core'
+import HaeufigSelect from '../../../shared/components/HaeufigSelect'
 import { IconArrowRight, IconBook2, IconClipboard, IconDeviceFloppy, IconFileUpload, IconList } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SavedVocabList } from '@shared/types'
@@ -283,7 +284,8 @@ function MeineListen({ sprache, onUebernehmen }: { sprache: string; onUebernehme
   return (
     <Stack gap="xs">
       <Group gap="xs" align="flex-end">
-        <Select
+        <HaeufigSelect
+          art="fach"
           label="Fach"
           size="sm"
           w={200}

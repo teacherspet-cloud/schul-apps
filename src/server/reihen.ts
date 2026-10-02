@@ -11,9 +11,9 @@
  *  Lehrkraft: /server/reihen …   Lernende: /s/api/reihen, /s/api/reihe …
  */
 import { randomBytes } from 'node:crypto'
-import { datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
+import { alleNutzer, datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage, type Aufruf } from './http'
-import { gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
+import { gehoertZu, lerngruppe, lerngruppenVon, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
 import { blattFassung, feedbackStand, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { blattStand, reihenBlattAnlegen } from './arbeitsblaetter'
 import { PULS_MS } from '../main/services/lanServer'
@@ -111,6 +111,8 @@ const zuweisung = (id: string): ZuweisungZeile | null =>
 /** Gehört die Zuweisung dieser Person? (Lerngruppe, ggf. nur Ausgewählte) */
 function istFuer(z: ZuweisungZeile, ich: NutzerInfo): boolean {
   if (ich.quelle === 'gast') return false
+  // Einzelnen Lernenden zugewiesen, ohne Lerngruppe (03.10.2026)
+  if (!z.lerngruppe_id) return ich.rolle === 'schueler' && json_(z.schueler, [] as string[]).includes(ich.benutzer)
   const g = lerngruppe(z.lerngruppe_id)
   if (!g || !gehoertZu(g, ich)) return false
   const nur = json_(z.schueler, [] as string[])
@@ -118,6 +120,10 @@ function istFuer(z: ZuweisungZeile, ich: NutzerInfo): boolean {
 }
 
 function lernendeVon(z: ZuweisungZeile): NutzerInfo[] {
+  if (!z.lerngruppe_id) {
+    const nur = new Set(json_(z.schueler, [] as string[]))
+    return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.has(n.benutzer))
+  }
   const g = lerngruppe(z.lerngruppe_id)
   if (!g) return []
   const nur = json_(z.schueler, [] as string[])
@@ -502,7 +508,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
               geaendert: x.geaendert,
               zuweisungen: zw.map((z) => ({
                 id: z.id,
-                lerngruppe: lerngruppe(z.lerngruppe_id)?.name ?? '',
+                lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende',
                 schueler: json_(z.schueler, [] as string[]).length,
                 status: z.status
               }))
@@ -573,7 +579,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         return (
           json(res, 200, {
             reihe: r,
-            zuweisung: { id: z.id, lerngruppe: lerngruppe(z.lerngruppe_id)?.name ?? '', status: z.status, halteFrei },
+            zuweisung: { id: z.id, lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende', status: z.status, halteFrei },
             lernende,
             bedarf
           }),
@@ -648,16 +654,19 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
     }
     if (req.method === 'POST' && teile[1] === 'zuweisen') {
       const k0 = (await k.koerper()) as Record<string, unknown>
-      const g = lerngruppe(String(k0.lerngruppeId ?? ''))
-      if (!g || g.lehrkraft_id !== ich.id) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
-      const erlaubt = new Set(mitgliederVon(g).map((n) => n.benutzer))
+      const gid = String(k0.lerngruppeId ?? '')
+      const g = gid ? lerngruppe(gid) : null
+      if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
+      // Ohne Lerngruppe: einzelne Lernende aus allen eigenen Lerngruppen
+      const erlaubt = new Set((g ? [g] : lerngruppenVon(ich.id)).flatMap((x) => mitgliederVon(x).map((n) => n.benutzer)))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
+      if (!g && !einzelne.length) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe oder einzelne Lernende wählen.' }), true)
       const id = neueId()
       db()
         .prepare(
           'INSERT INTO reihen_zuweisungen (id, reihe_id, lehrkraft_id, lerngruppe_id, schueler, halte_frei, verknuepft, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
-        .run(id, r.id, ich.id, g.id, JSON.stringify(einzelne), '[]', '{}', 'offen', new Date().toISOString())
+        .run(id, r.id, ich.id, g?.id ?? '', JSON.stringify(einzelne), '[]', '{}', 'offen', new Date().toISOString())
       verknuepfe(zuweisung(id)!, r)
       protokolliereServer('reihe', 'Unterrichtsreihe zugewiesen', ich.id)
       return (json(res, 200, { id }), true)

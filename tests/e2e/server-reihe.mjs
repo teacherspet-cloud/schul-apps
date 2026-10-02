@@ -65,6 +65,7 @@ try {
     grade: 7,
     oberthema: 'Wetter und Klima',
     lernziele: [],
+    teile: ['Teil 1', 'Abschluss'],
     schritte: [
       {
         id: 'sd',
@@ -117,6 +118,7 @@ try {
       },
       {
         id: 'sh',
+        abschnitt: 'Abschluss',
         titel: 'Merkkasten: Wetter',
         lernziele: [],
         rolle: 'pflicht',
@@ -126,6 +128,7 @@ try {
       },
       {
         id: 'sr',
+        abschnitt: 'Abschluss',
         titel: 'Wie sicher bist du?',
         halt: { art: 'freigabe' },
         lernziele: [],
@@ -135,6 +138,7 @@ try {
       },
       {
         id: 'sp',
+        abschnitt: 'Abschluss',
         titel: 'Wetterbericht als Plakat',
         lernziele: [],
         rolle: 'pflicht',
@@ -167,7 +171,13 @@ try {
     'KI-Vorschläge für die Lernziele der Reihe übernommen'
   )
   // Arbeitsblatt-Schritt über den Dialog
-  await p.locator('[data-schritt-neu]').click()
+  // Teil anlegen (03.10.2026), dann den Arbeitsblatt-Schritt in diesen Teil
+  await p.locator('[data-teil-neu]').click()
+  pruefe((await p.locator('[data-teil="Teil 2"]').count()) === 1, 'Neuer Teil „Teil 2" angelegt (leer)')
+  await p.locator('[data-teil="Teil 2"] [data-teil-name]').fill('Vertiefung')
+  await p.locator('[data-teil="Teil 2"] [data-teil-name]').press('Enter')
+  pruefe((await p.locator('[data-teil="Vertiefung"]').count()) === 1, 'Teil umbenannt in „Vertiefung"')
+  await p.locator('[data-teil="Vertiefung"] [data-schritt-neu]').click()
   await p.locator('[data-schritt-art="arbeitsblatt"]').click()
   await p.locator('[data-ablage-wahl]').click()
   await p.getByRole('option', { name: 'Reihen-Blatt' }).click()
@@ -209,7 +219,10 @@ try {
   await s.locator('[data-kachel="reihen"]').click()
   await s.locator('[data-reihe-eintrag]').first().click()
   await s.locator('[data-reihe-weg]').waitFor()
-  const status = async () => s.locator('[data-station]').evaluateAll((e) => e.map((x) => x.getAttribute('data-station')))
+  const status = async () => {
+    await s.locator('[data-station]').first().waitFor()
+    return s.locator('[data-station]').evaluateAll((e) => e.map((x) => x.getAttribute('data-station')))
+  }
   pruefe((await status())[0] === 'offen' && (await status())[1] === 'gesperrt', `Weg am Anfang: ${(await status()).join(', ')}`)
   pruefe(await s.getByText('Ich kann das Wetter auf Englisch beschreiben.').isVisible(), 'Lernziele der Reihe sichtbar')
   await s.screenshot({ path: join(out, '3-weg-anfang.png'), fullPage: true })
@@ -317,6 +330,20 @@ try {
   // Keine Lösungen bei den Lernenden
   const roh = JSON.stringify(await (await sm.request.get(`${A}/s/api/reihe?id=${zid}`, { headers: KOPF })).json())
   pruefe(!roh.includes('Three sentences, weather words') && !roh.includes('"richtig"'), 'Lernende bekommen keine Erwartungen und keine Diagnose-Lösungen')
+  // Zuweisen an eine einzelne Schülerin ohne Lerngruppe (03.10.2026)
+  const einzeln = await (
+    await lk.request.post(`${A}/server/reihen/${gesp.id}/zuweisen`, { headers: KOPF, data: { lerngruppeId: '', schueler: [mia.benutzer] } })
+  ).json()
+  const miaReihen = (await (await sm.request.get(`${A}/s/api/reihen`, { headers: KOPF })).json()).reihen ?? []
+  pruefe(
+    Boolean(einzeln.id) && miaReihen.some((x) => x.id === einzeln.id),
+    'Reihe an eine einzelne Schülerin (ohne Lerngruppe) zugewiesen und bei ihr sichtbar'
+  )
+  const zEinzeln = await (await lk.request.get(`${A}/server/reihen/z/${einzeln.id}`, { headers: KOPF })).json()
+  pruefe(
+    zEinzeln.lernende?.length === 1 && zEinzeln.zuweisung.lerngruppe === 'Einzelne Lernende',
+    `Übersicht: 1 Lernende, „Einzelne Lernende" (${zEinzeln.lernende?.length})`
+  )
   await lk.request.post(`${A}/server/reihen/${gesp.id}/loeschen`, { headers: KOPF, data: {} })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 8).join(' | ')}`)

@@ -807,7 +807,8 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       let t = db().prepare('SELECT * FROM teilnahmen WHERE test_id = ? AND schueler_id = ?').get(test.id, ich.id) as TeilnahmeZeile | undefined
       if (!t) {
         if (test.status === 'beendet') return (json(res, 409, { fehler: 'Dieser Test ist beendet.' }), true)
-        if (gast) return (json(res, 403, { fehler: 'Dieser Name gehört zu einem anderen Test. Bitte den QR-Code erneut scannen.' }), true)
+        // Gast eines anderen Tests: die Seite fragt neu nach dem Namen (SchuelerBereich, 03.10.2026)
+        if (gast) return (json(res, 403, { fehler: 'Dieser Name gehört zu einem anderen Test.' }), true)
         t = teilnahmeAnlegen(test, ich.id)
       } else if (!t.abgabe && t.beginn === 0 && test.status === 'offen') {
         // Gestartet, während dieses Gerät gewartet hat (Sicherheitsnetz zu „starten")

@@ -128,9 +128,11 @@ function istFuer(f: Freigabe, ich: NutzerInfo): boolean {
   // Per Code beigetreten (Gast oder Konto)?
   if (db().prepare('SELECT 1 FROM feedback_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(f.id, ich.id)) return true
   if (ich.quelle === 'gast') return false
-  const g = f.lerngruppe_id ? lerngruppe(f.lerngruppe_id) : null
-  if (!g || !gehoertZu(g, ich)) return false
   const nur = schuelerVon(f)
+  // Ohne Lerngruppe (Unterrichtsreihe an Einzelne, 03.10.2026): nur die genannten Lernenden
+  if (!f.lerngruppe_id) return ich.rolle === 'schueler' && nur.includes(ich.benutzer)
+  const g = lerngruppe(f.lerngruppe_id)
+  if (!g || !gehoertZu(g, ich)) return false
   return !nur.length || nur.includes(ich.benutzer)
 }
 

@@ -7,7 +7,10 @@ import { programmPasst, programmSichtbar } from '../shared/programmSichtbarkeit'
 type Update = (patch: DeepPartial<AppSettings>) => Promise<void>
 
 /** Alle wählbaren Fächer – „Anderes Fach …" ist kein Fach, das man unterrichtet */
-const FAECHER = SUBJECTS.filter((s) => s.id !== 'anderes').map((s) => ({ value: s.id, label: s.label }))
+// Alphabetisch (03.10.2026)
+const FAECHER = SUBJECTS.filter((s) => s.id !== 'anderes')
+  .map((s) => ({ value: s.id, label: s.label }))
+  .sort((a, b) => a.label.localeCompare(b.label, 'de', { sensitivity: 'base' }))
 
 /**
  * „Unterrichtete Fächer" (Paket 12) – Mehrfachwahl im Reiter „Schule" und im

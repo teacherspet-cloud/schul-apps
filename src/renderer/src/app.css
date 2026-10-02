@@ -71,6 +71,9 @@ body {
 
 .module-container {
   height: 100%;
+  /* Apps ohne eigene Scrollfläche (Verwaltung, Onlinetest, Unterrichtsreihe) scrollen hier (03.10.2026);
+     Apps mit eigener ScrollArea füllen den Rahmen genau aus – dort entsteht keine zweite Leiste */
+  overflow-y: auto;
 }
 
 .module-container[hidden] {

@@ -30,7 +30,8 @@ export default function HaeufigSelect({
     () =>
       gruppiereHaeufig(
         data.map((d) => ({ value: d.value, label: d.label })),
-        zaehler,
+        // Fächer (03.10.2026, Wunsch der Lehrkraft): alphabetisch, NUR die eigenen Fächer oben – ohne „häufig gewählt"
+        art === 'fach' ? {} : zaehler,
         undefined,
         art === 'fach' ? eigeneWerte(eigeneFaecher ?? [], data) : []
       ),

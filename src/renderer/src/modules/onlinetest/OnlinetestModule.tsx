@@ -13,7 +13,38 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
-import { ActionIcon, Alert, Badge, Button, Card, Checkbox, Collapse, Container, Group, Loader, Menu, Modal, NumberInput, Popover, Select, SimpleGrid, Stack, Switch, Table, Tabs, Text, TextInput, Textarea, Title, Tooltip } from '@mantine/core'
+import { FAECHER } from '@shared/faecher'
+import HaeufigSelect from '../../shared/components/HaeufigSelect'
+import { useDokumentOeffner } from '../../shared/navigation'
+import type { TestDocument } from '../vokabeltest/model/types'
+import { Erstellen } from './OnlinetestKnopf'
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Collapse,
+  Container,
+  Group,
+  Loader,
+  Menu,
+  Modal,
+  NumberInput,
+  Popover,
+  Select,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Textarea,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import {
   IconAlertTriangle,
   IconArrowDown,
@@ -35,7 +66,8 @@ import {
   IconSparkles,
   IconTrash,
   IconUsersGroup,
-  IconX
+  IconX,
+  IconPlus
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
@@ -124,13 +156,26 @@ export const anzeigeName = (t: { titel: string; thema?: string }): string => (AL
 
 export default function OnlinetestModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [reiter, setReiter] = useState<string | null>('tests')
+  // Von außen geöffnet (nach dem Erstellen): Detailansicht dieses Tests
+  const [ziel, setZiel] = useState<string | null>(null)
+  const [neu, setNeu] = useState(false)
+  useDokumentOeffner('onlinetest', async (id) => {
+    setReiter('tests')
+    setZiel(id)
+  })
   if (!active) return null
   return (
     <Container size="xl" py="md">
-      <Group gap={4} mb="sm">
-        <Title order={2}>Onlinetest</Title>
-        <EigenesFensterKnopf />
+      <Group justify="space-between" mb="sm">
+        <Group gap={4}>
+          <Title order={2}>Onlinetest</Title>
+          <EigenesFensterKnopf />
+        </Group>
+        <Button leftSection={<IconPlus size={16} />} onClick={() => setNeu(true)} data-onlinetest-neu>
+          Neuer Onlinetest
+        </Button>
       </Group>
+      {neu && <NeuerOnlinetest schliessen={() => setNeu(false)} />}
       <Tabs value={reiter} onChange={setReiter}>
         <Tabs.List mb="md">
           <Tabs.Tab value="tests">Tests</Tabs.Tab>
@@ -139,7 +184,7 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
           </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="tests">
-          <Tests />
+          <Tests ziel={ziel} zielErledigt={() => setZiel(null)} />
         </Tabs.Panel>
         <Tabs.Panel value="gruppen">
           <Lerngruppen />
@@ -219,9 +264,14 @@ function SpaltenKopf({
   )
 }
 
-function Tests(): React.JSX.Element {
+function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () => void }): React.JSX.Element {
   const [liste, setListe] = useState<TestListe[] | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
+  useEffect(() => {
+    if (!ziel) return
+    setGewaehlt(ziel)
+    zielErledigt()
+  }, [ziel, zielErledigt])
   const [sort, setSort] = useState<{ spalte: Spalte; ab: boolean }>({ spalte: 'datum', ab: true })
   const [filter, setFilter] = useState<Filter>({})
   const laden = useCallback(() => {
@@ -254,9 +304,6 @@ function Tests(): React.JSX.Element {
   const kopf = { sort, setSort, filter, setFilter }
   return (
     <Stack>
-      <Alert variant="light" icon={<IconAlertTriangle size={16} />}>
-        Neue Onlinetests entstehen im Vokabeltest: Test erstellen, dann im Editor „Onlinetest“ wählen.
-      </Alert>
       {!liste && <Loader />}
       {liste?.length === 0 && <Text c="dimmed">Noch keine Onlinetests.</Text>}
       {Object.values(filter).some(Boolean) && (
@@ -1198,7 +1245,15 @@ function NeueGruppe({ iservGruppen, fertig }: { iservGruppen: { id: string; name
           nothingFoundMessage={iservGruppen.length ? 'Nicht gefunden' : 'Keine Gruppen – Anmeldung über IServ oder die Exe „Schul-Apps Online“ mit verbundenem IServ'}
         />
         <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="z. B. 8b Englisch" />
-        <TextInput label="Fach (optional)" value={fach} onChange={(e) => setFach(e.currentTarget.value)} />
+        <HaeufigSelect
+          art="fach"
+          label="Fach (optional)"
+          searchable
+          clearable
+          data={FAECHER.filter((f) => f.id !== 'anderes').map((f) => ({ value: f.label, label: f.label }))}
+          value={fach || null}
+          onChange={(v) => setFach(v ?? '')}
+        />
         <Textarea
           label="Weitere Mitglieder (IServ-Benutzernamen, optional)"
           description="Eine Zeile je Person, z. B. für Kurse ohne eigene IServ-Gruppe."
@@ -1323,5 +1378,46 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
         </Table.Tbody>
       </Table>
     </Stack>
+  )
+}
+
+/**
+ * „Neuer Onlinetest" oben rechts (03.10.2026, Wunsch der Lehrkraft): einen gespeicherten Vokabeltest
+ * wählen, dann derselbe Dialog wie im Vokabeltest – ohne Umweg über dessen Editor.
+ */
+function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.Element {
+  const [liste, setListe] = useState<{ id: string; name: string; updatedAt?: string }[] | null>(null)
+  const [doc, setDoc] = useState<TestDocument | null>(null)
+  useEffect(() => {
+    void window.api.tests.list().then(
+      (l) => setListe([...l].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))),
+      () => setListe([])
+    )
+  }, [])
+  if (doc) return <Erstellen doc={doc} schliessen={schliessen} />
+  return (
+    <Modal opened onClose={schliessen} title="Neuer Onlinetest" size="lg">
+      <Stack>
+        <Text size="sm" c="dimmed">
+          Welcher Vokabeltest soll online geschrieben werden? Neue Tests entstehen in der App „Vokabeltest“.
+        </Text>
+        {!liste && <Loader size="sm" />}
+        {liste?.length === 0 && <Text c="dimmed">Noch kein Vokabeltest gespeichert.</Text>}
+        <Select
+          searchable
+          label="Vokabeltest"
+          placeholder="suchen …"
+          data={(liste ?? []).map((t) => ({ value: t.id, label: t.name }))}
+          onChange={(id) => {
+            if (!id) return
+            void window.api.tests.get(id).then(
+              (t) => setDoc(t.payload as TestDocument),
+              (e: unknown) => notifyError(e)
+            )
+          }}
+          data-onlinetest-wahl
+        />
+      </Stack>
+    </Modal>
   )
 }

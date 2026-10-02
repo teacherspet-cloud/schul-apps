@@ -143,7 +143,8 @@ export default function NewListWizard({
         {/* Name und Fach auch ohne Datei: Eine leere Liste lässt sich von Hand füllen (Paket 7) */}
         <Group grow align="flex-start">
           <TextInput label="Name der Liste" placeholder="z. B. Unit 3 – Station 2" value={name} onChange={(e) => setName(e.currentTarget.value)} />
-          <Select
+          <HaeufigSelect
+            art="fach"
             label="Fach / Sprache"
             data={LANGUAGES.map((l) => ({ value: l.value, label: l.label }))}
             value={language}

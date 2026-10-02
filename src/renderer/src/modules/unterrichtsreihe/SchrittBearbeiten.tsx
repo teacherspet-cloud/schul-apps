@@ -65,12 +65,15 @@ export function SchrittBearbeiten({
   reihe,
   schritt,
   speichern,
-  schliessen
+  schliessen,
+  teile = []
 }: {
   reihe: Reihe
   schritt: Schritt
   speichern: (s: Schritt) => void
   schliessen: () => void
+  /** Teile der Reihe zur Auswahl */
+  teile?: string[]
 }): React.JSX.Element {
   const [s, setS] = useState<Schritt>(schritt)
   const setze = (teil: Partial<Schritt>): void => setS((x) => ({ ...x, ...teil }))
@@ -130,11 +133,15 @@ export function SchrittBearbeiten({
           )}
         </Group>
         <Group grow align="start">
-          <TextInput
-            label="Abschnitt"
-            description="Für Abzeichen, z. B. „Teil 1: Grundlagen“"
-            value={s.abschnitt ?? ''}
-            onChange={(e) => setze({ abschnitt: e.currentTarget.value || undefined })}
+          <Select
+            label="Teil"
+            description="Abzeichen, sobald alle Pflichtschritte eines Teils geschafft sind"
+            data={teile}
+            value={s.abschnitt ?? null}
+            onChange={(v) => setze({ abschnitt: v ?? undefined })}
+            clearable
+            placeholder="ohne Teil"
+            data-schritt-teil
           />
           <Select
             label="Haltepunkt davor"

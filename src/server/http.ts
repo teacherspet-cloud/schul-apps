@@ -263,6 +263,14 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         return void res.end()
       }
     }
+    /*
+     * Wohin nach der Anmeldung (03.10.2026, Befund der Lehrkraft: nach dem Abmelden auf der
+     * Schülerseite landete der Admin wieder auf der Schüler-Startseite – „/s/" stand als Ziel in der
+     * Anmeldeseite). Lernende nur in ihren Bereich; Lehrkräfte von der Schüler-Startseite zurück zur
+     * App, Links zu einem bestimmten Test (/s/t/…) bleiben.
+     */
+    const zielFuer = (rolle: string, z: string): string =>
+      rolle === 'schueler' ? (z.startsWith('/s/') ? z : '/s/') : /^\/s\/?$|^\/s\/(tests|ergebnisse|aufgaben|blaetter|reihen)\/?$/.test(z) ? '/' : z
     if (req.method === 'GET' && url.pathname === '/auth/rueckruf') {
       try {
         const fehlerVonIserv = url.searchParams.get('error')
@@ -270,7 +278,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         const { nutzer, ziel } = await iservRueckruf(rueckruf, url.searchParams.get('state') ?? '', url.searchParams.get('code') ?? '')
         const neu = sitzungAnlegen(nutzer.id, nutzer.rolle)
         setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS[nutzer.rolle], sicher)
-        res.writeHead(302, { location: nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel, 'cache-control': 'no-store' })
+        res.writeHead(302, { location: zielFuer(nutzer.rolle, ziel), 'cache-control': 'no-store' })
         return void res.end()
       } catch (e) {
         res.writeHead(302, { location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Die Anmeldung bei IServ ist fehlgeschlagen.')}` })
@@ -287,7 +295,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         const nutzer = await passwortAnmeldung(form.get('benutzer') ?? '', form.get('passwort') ?? '', ip)
         const neu = sitzungAnlegen(nutzer.id, nutzer.rolle)
         setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS[nutzer.rolle], sicher)
-        const weiter = nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel
+        const weiter = zielFuer(nutzer.rolle, ziel)
         res.writeHead(303, { location: nutzer.passwortWechseln ? `/passwort?ziel=${encodeURIComponent(weiter)}` : weiter })
       } catch (e) {
         res.writeHead(303, { location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(ziel)}` })
@@ -320,14 +328,16 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       const form = new URLSearchParams(await leseKoerper(req, 64 * 1024))
       const ziel = zielAus(form.get('ziel'))
       const neu = form.get('neu') ?? ''
+      // Das vorübergehende Passwort fragt die Seite nicht mehr ab (03.10.2026): Wer hier ist, hat sich gerade damit angemeldet
+      const nurMitAltem = !sitzung.nutzer.passwortWechseln
       const fehler =
-        !passwortPruefen(form.get('alt') ?? '', passwortHashVon(sitzung.nutzer.benutzer))
-          ? 'Das vorübergehende Passwort stimmt nicht.'
+        nurMitAltem && !passwortPruefen(form.get('alt') ?? '', passwortHashVon(sitzung.nutzer.benutzer))
+          ? 'Das bisherige Passwort stimmt nicht.'
           : neu.length < 10
             ? 'Das neue Passwort braucht mindestens 10 Zeichen.'
             : neu !== form.get('neu2')
               ? 'Die beiden neuen Passwörter stimmen nicht überein.'
-              : neu === form.get('alt')
+              : passwortPruefen(neu, passwortHashVon(sitzung.nutzer.benutzer))
                 ? 'Bitte ein anderes als das vorübergehende Passwort wählen.'
                 : ''
       if (fehler) return void res.writeHead(303, { location: `/passwort?fehler=${encodeURIComponent(fehler)}&ziel=${encodeURIComponent(ziel)}` }).end()

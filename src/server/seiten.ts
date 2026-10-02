@@ -81,8 +81,6 @@ export function passwortSeite(o: { name: string; fehler: string; ziel: string })
   ${o.fehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
   <form method="post" action="/auth/passwort">
     <input type="hidden" name="ziel" value="${esc(ziel)}">
-    <label for="alt">Vorübergehendes Passwort</label>
-    <input id="alt" name="alt" type="password" autocomplete="current-password" required>
     <label for="neu">Neues Passwort</label>
     <input id="neu" name="neu" type="password" autocomplete="new-password" minlength="10" required>
     <label for="neu2">Neues Passwort wiederholen</label>

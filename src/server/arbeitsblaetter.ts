@@ -137,9 +137,11 @@ const abgabeVon = (fid: string, sid: string): Abgabe | null =>
 export function blattIstFuer(z: Zeile, ich: NutzerInfo): boolean {
   if (db().prepare('SELECT 1 FROM blatt_gaeste WHERE freigabe_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   if (ich.quelle === 'gast') return false
-  const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
-  if (!g || !gehoertZu(g, ich)) return false
   const nur = json_(z.schueler, [] as string[])
+  // Ohne Lerngruppe (Unterrichtsreihe an Einzelne, 03.10.2026): nur die genannten Lernenden
+  if (!z.lerngruppe_id) return ich.rolle === 'schueler' && nur.includes(ich.benutzer)
+  const g = lerngruppe(z.lerngruppe_id)
+  if (!g || !gehoertZu(g, ich)) return false
   return !nur.length || nur.includes(ich.benutzer)
 }
 

@@ -120,7 +120,22 @@ export interface Reihe {
   oberthema: string
   lernziele: Lernziel[]
   schritte: Schritt[]
+  /**
+   * Teile der Reihe in ihrer Reihenfolge (03.10.2026: von Hand anlegen, umbenennen, verschieben –
+   * auch leer). Ein Schritt gehört über `abschnitt` (Name des Teils) dazu; Schritte ohne Teil stehen vorn.
+   */
+  teile?: string[]
   geaendert?: string
+}
+
+/** Teile der Reihe: die angelegten, dazu die nur an Schritten genannten */
+export const teileVon = (r: Pick<Reihe, 'teile' | 'schritte'>): string[] => [
+  ...new Set([...(r.teile ?? []), ...r.schritte.map((s) => s.abschnitt).filter((a): a is string => Boolean(a))])
+]
+
+/** Schritte in die Reihenfolge der Teile bringen (ohne Teil zuerst, innerhalb eines Teils wie bisher) */
+export function ordneNachTeilen(schritte: Schritt[], teile: string[]): Schritt[] {
+  return [...schritte.filter((s) => !s.abschnitt || !teile.includes(s.abschnitt)), ...teile.flatMap((t) => schritte.filter((s) => s.abschnitt === t))]
 }
 
 /** Stand einer Person je Schritt – was der Server speichert (verschlüsselt) */

@@ -23,6 +23,7 @@
  */
 import {
   Alert,
+  Anchor,
   Badge,
   Button,
   Card,
@@ -33,19 +34,23 @@ import {
   Loader,
   NativeSelect,
   Paper,
+  Progress,
   Radio,
   SegmentedControl,
+  SimpleGrid,
   Stack,
   Text,
   TextInput,
   Textarea,
-  Title,
-  ThemeIcon
+  ThemeIcon,
+  Title
 } from '@mantine/core'
-import { IconAlertTriangle, IconArrowLeft, IconCheck, IconClock, IconHourglass, IconLogout, IconX, IconRoute } from '@tabler/icons-react'
+import { IconAlertTriangle, IconArrowLeft, IconArrowRight, IconCheck, IconClock, IconHourglass, IconLogout, IconPlayerPlay, IconX } from '@tabler/icons-react'
 import bildOnlinetest from '../../assets/programme/onlinetest.webp'
 import bildRueckmeldung from '../../assets/programme/rueckmeldung.webp'
 import bildArbeitsblatt from '../../assets/programme/arbeitsblatt.webp'
+import bildErgebnisse from '../../assets/programme/ergebnisse.webp'
+import bildReihe from '../../assets/programme/unterrichtsreihe.webp'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { HandFeld, TastaturFeld } from './HandFeld'
 import { CodeScanner } from './CodeScanner'
@@ -201,53 +206,68 @@ interface FruehereErgebnis {
   figur: string[]
 }
 
-/** Eine Kachel der Startseite: Bild, Titel, Zahl/Hinweis */
+/** Eine Kachel der Startseite: farbiger Verlauf, App-Bild, Titel, Zähler, ggf. Fortschritt */
 function Kachel(props: {
   href: string
   bild?: string
   symbol?: React.ReactNode
+  farbe?: string
   titel: string
   text: string
   zahl?: number
   daten: string
+  fortschritt?: number
 }): React.JSX.Element {
+  const f = props.farbe ?? 'blue'
   return (
-    <Card component="a" href={props.href} withBorder padding="md" radius="lg" data-kachel={props.daten} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <Group wrap="nowrap" gap="md">
-        {props.bild ? <Image src={props.bild} alt="" w={72} h={72} fit="contain" /> : props.symbol}
-        <Stack gap={2} style={{ flex: 1 }}>
-          <Group gap="xs">
-            <Text fw={700} size="lg">
+    <a
+      href={props.href}
+      className="sa-kachel"
+      data-kachel={props.daten}
+      style={{
+        background: `linear-gradient(140deg, var(--mantine-color-${f}-0) 0%, var(--mantine-color-${f}-1) 100%)`,
+        border: `1px solid var(--mantine-color-${f}-2)`
+      }}
+    >
+      <div className="sa-blase" style={{ background: `var(--mantine-color-${f}-5)` }} />
+      <Group wrap="nowrap" gap="md" align="center" style={{ position: 'relative' }}>
+        {props.bild ? <Image src={props.bild} alt="" w={64} h={64} fit="contain" /> : props.symbol}
+        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+          <Group gap="xs" wrap="nowrap">
+            <Text fw={800} size="lg" c={`${f}.9`} truncate>
               {props.titel}
             </Text>
             {Boolean(props.zahl) && (
-              <Badge color="red" variant="filled" circle>
+              <Badge color="red" variant="filled" circle size="lg">
                 {props.zahl}
               </Badge>
             )}
           </Group>
-          <Text size="sm" c="dimmed">
+          <Text size="sm" c="dimmed" lineClamp={2}>
             {props.text}
           </Text>
+          {props.fortschritt !== undefined && <Progress value={props.fortschritt * 100} color={f} size="sm" radius="xl" mt={4} />}
         </Stack>
       </Group>
-    </Card>
+    </a>
   )
 }
 
-/** Startseite der Lernenden mit Konto (Etappe 2 des Schülerbereichs, 02.10.2026) */
+/**
+ * Startseite der Lernenden mit Konto (Etappe 2; neu gestaltet 03.10.2026 – Wunsch der Lehrkraft:
+ * „attraktiver als eine bloße Auflistung"). Oben ein Kopf mit Begrüßung nach Tageszeit und
+ * schwebenden Formen, darunter „Als Nächstes" (die wichtigste offene Sache mit großem Knopf) und
+ * farbige Kacheln mit den App-Bildern und Zählern. Keine Vergleiche mit anderen.
+ */
 function Startseite(): React.JSX.Element {
   const ich = window.__schulappsServer
-  const [tests, setTests] = useState<{ abgegeben: boolean }[] | null>(null)
+  const [tests, setTests] = useState<{ code: string; titel: string; abgegeben: boolean; wartend: boolean }[] | null>(null)
   const [ergebnisse, setErgebnisse] = useState<FruehereErgebnis[] | null>(null)
   const [aufgaben, setAufgaben] = useState<AufgabeMitFeedback[] | null>(null)
-  const [reihen, setReihen] = useState<{ fortschritt: number; fertig: boolean }[] | null>(null)
+  const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
+  const [reihen, setReihen] = useState<{ id: string; titel: string; fortschritt: number; fertig: boolean }[] | null>(null)
   useEffect(() => {
-    void holen<{ reihen: { fortschritt: number; fertig: boolean }[] }>('/s/api/reihen').then(
-      (d) => setReihen(d.reihen ?? []),
-      () => setReihen([])
-    )
-    void holen<{ tests: { abgegeben: boolean }[] }>('/s/api/tests').then(
+    void holen<{ tests: NonNullable<typeof tests> }>('/s/api/tests').then(
       (d) => setTests(d.tests ?? []),
       () => setTests([])
     )
@@ -259,72 +279,215 @@ function Startseite(): React.JSX.Element {
       (d) => setAufgaben(d.aufgaben ?? []),
       () => setAufgaben([])
     )
+    void holen<{ blaetter: BlattKurz[] }>('/s/api/blaetter').then(
+      (d) => setBlaetter(d.blaetter ?? []),
+      () => setBlaetter([])
+    )
+    void holen<{ reihen: NonNullable<typeof reihen> }>('/s/api/reihen').then(
+      (d) => setReihen(d.reihen ?? []),
+      () => setReihen([])
+    )
   }, [])
-  const offeneTests = tests?.filter((t) => !t.abgegeben).length ?? 0
-  const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden).length ?? 0
+  const offeneTests = tests?.filter((t) => !t.abgegeben) ?? []
+  const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden) ?? []
+  const offeneBlaetter = blaetter?.filter((b) => b.offen && b.genutzt < b.runden) ?? []
+  const offeneReihen = reihen?.filter((r) => !r.fertig) ?? []
   const vorname = (ich?.name ?? '').split(/\s+/)[0]
-  return (
-    <Stack data-startseite>
-      <Title order={3}>{vorname ? `Hallo ${vorname}!` : 'Hallo!'}</Title>
-      <Kachel
-        href="/s/tests"
-        bild={bildOnlinetest}
-        titel="Onlinetest"
-        daten="tests"
-        zahl={offeneTests}
-        text={
-          tests === null
-            ? '…'
-            : offeneTests
-              ? `${offeneTests} offene${offeneTests === 1 ? 'r' : ''} Test${offeneTests === 1 ? '' : 's'}`
-              : 'Test mit Code öffnen oder QR-Code scannen'
+  const stunde = new Date().getHours()
+  const gruss = stunde < 11 ? 'Guten Morgen' : stunde < 17 ? 'Hallo' : 'Guten Abend'
+  const heute = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
+  const geladen = tests && aufgaben && blaetter && reihen
+  // Das Wichtigste zuerst: ein laufender Test, dann die Reihe, dann Blätter und Aufgaben
+  const naechstes: { titel: string; text: string; href: string; knopf: string; farbe: string } | null = offeneTests[0]
+    ? {
+        titel: offeneTests[0].titel,
+        text: offeneTests[0].wartend ? 'Dein Test startet gleich.' : 'Ein Test ist für dich offen.',
+        href: `/s/t/${offeneTests[0].code}`,
+        knopf: 'Zum Test',
+        farbe: 'teal'
+      }
+    : offeneReihen[0]
+      ? {
+          titel: offeneReihen[0].titel,
+          text: `Unterrichtsreihe – ${Math.round(offeneReihen[0].fortschritt * 100)} % geschafft. Weiter geht's!`,
+          href: `/s/r/${offeneReihen[0].id}`,
+          knopf: 'Weitermachen',
+          farbe: 'indigo'
         }
-      />
-      <Kachel
-        href="/s/ergebnisse"
-        bild={bildOnlinetest}
-        titel="Meine Ergebnisse"
-        daten="ergebnisse"
-        text={
-          ergebnisse === null
-            ? '…'
-            : ergebnisse.length
-              ? `${ergebnisse.length} Test${ergebnisse.length === 1 ? '' : 's'} – zuletzt ${ergebnisse[0].titel}`
-              : 'Noch keine Ergebnisse'
-        }
-      />
-      <Kachel
-        href="/s/aufgaben"
-        bild={bildRueckmeldung}
-        titel="Rückmeldung"
-        daten="aufgaben"
-        zahl={offeneAufgaben}
-        text={
-          aufgaben === null
-            ? '…'
-            : aufgaben.length
-              ? `${offeneAufgaben} offen · ${aufgaben.length - offeneAufgaben} erledigt oder abgeschlossen`
-              : 'Noch keine Aufgaben mit Feedback'
-        }
-      />
-      {Boolean(reihen?.length) && (
-        <Kachel
-          href="/s/reihen"
-          symbol={
-            <ThemeIcon size={72} radius="lg" color="indigo" variant="light">
-              <IconRoute size={42} />
-            </ThemeIcon>
+      : offeneBlaetter[0]
+        ? {
+            titel: offeneBlaetter[0].titel,
+            text: offeneBlaetter[0].begonnen ? 'Dein Arbeitsblatt ist angefangen.' : 'Ein neues Arbeitsblatt wartet auf dich.',
+            href: `/s/b/${offeneBlaetter[0].id}`,
+            knopf: offeneBlaetter[0].begonnen ? 'Weiter ausfüllen' : 'Öffnen',
+            farbe: 'blue'
           }
-          titel="Unterrichtsreihen"
-          daten="reihen"
-          zahl={reihen!.filter((r) => !r.fertig).length}
-          text={`${reihen!.length} Reihe${reihen!.length === 1 ? '' : 'n'} – Schritt für Schritt`}
-        />
+        : offeneAufgaben[0]
+          ? {
+              titel: offeneAufgaben[0].titel,
+              text: 'Eine Aufgabe mit Feedback ist offen.',
+              href: `/s/a/${offeneAufgaben[0].id}`,
+              knopf: 'Öffnen',
+              farbe: 'green'
+            }
+          : null
+  return (
+    <Stack data-startseite gap="lg">
+      <style>{STARTSEITE_CSS}</style>
+      {ich?.rolle && ich.rolle !== 'schueler' && (
+        <Alert color="blue" variant="light" data-lehrkraft-hinweis>
+          Du bist als Lehrkraft angemeldet und siehst gerade den Schülerbereich.{' '}
+          <Anchor href="/" fw={600}>
+            Zur Lehrkraft-Ansicht
+          </Anchor>
+        </Alert>
       )}
-      <Kachel href="/s/blaetter" bild={bildArbeitsblatt} titel="Arbeitsblätter" daten="blaetter" text="Freigegebene Arbeitsblätter ausfüllen" />
+      <div className="sa-kopf">
+        <svg className="sa-formen" viewBox="0 0 400 160" preserveAspectRatio="none" aria-hidden>
+          <circle className="sa-schwebt" cx="340" cy="30" r="38" fill="rgba(255,255,255,0.13)" />
+          <circle className="sa-schwebt2" cx="372" cy="118" r="20" fill="rgba(255,255,255,0.18)" />
+          <rect className="sa-schwebt2" x="250" y="96" width="34" height="34" rx="8" fill="rgba(255,255,255,0.12)" transform="rotate(18 267 113)" />
+          <path className="sa-schwebt" d="M300 70 l6 12 13 2 -9 9 2 13 -12-6 -12 6 2-13 -9-9 13-2z" fill="rgba(255,236,153,0.55)" />
+          <path d="M0 140 C 90 110, 170 170, 260 135 S 380 120, 400 132 L400 160 L0 160 Z" fill="rgba(255,255,255,0.10)" />
+        </svg>
+        <Text className="sa-datum">{heute}</Text>
+        <Title order={2} className="sa-gruss" data-gruss>
+          {gruss}
+          {vorname ? `, ${vorname}` : ''}!
+        </Title>
+        <Text className="sa-unter">
+          {!geladen
+            ? '…'
+            : naechstes
+              ? 'Schön, dass du da bist. Hier ist, was ansteht:'
+              : 'Gerade ist nichts offen – gut gemacht! Schau gern in deine Ergebnisse.'}
+        </Text>
+      </div>
+
+      {naechstes && (
+        <Paper className="sa-naechstes" withBorder radius="xl" p="lg" data-naechstes style={{ borderColor: `var(--mantine-color-${naechstes.farbe}-3)` }}>
+          <Group justify="space-between" wrap="nowrap" align="center">
+            <Group gap="md" wrap="nowrap" style={{ minWidth: 0 }}>
+              <ThemeIcon size={52} radius="xl" color={naechstes.farbe} className="sa-puls">
+                <IconPlayerPlay size={26} />
+              </ThemeIcon>
+              <div style={{ minWidth: 0 }}>
+                <Text size="xs" tt="uppercase" fw={700} c={`${naechstes.farbe}.7`}>
+                  Als Nächstes
+                </Text>
+                <Text fw={700} size="lg" truncate>
+                  {naechstes.titel}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {naechstes.text}
+                </Text>
+              </div>
+            </Group>
+            <Button component="a" href={naechstes.href} color={naechstes.farbe} radius="xl" size="md" rightSection={<IconArrowRight size={16} />}>
+              {naechstes.knopf}
+            </Button>
+          </Group>
+        </Paper>
+      )}
+
+      <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="md">
+        <Kachel
+          href="/s/tests"
+          bild={bildOnlinetest}
+          farbe="teal"
+          titel="Onlinetest"
+          daten="tests"
+          zahl={offeneTests.length}
+          text={
+            tests === null
+              ? '…'
+              : offeneTests.length
+                ? `${offeneTests.length} offene${offeneTests.length === 1 ? 'r' : ''} Test${offeneTests.length === 1 ? '' : 's'}`
+                : 'Code eingeben oder QR-Code scannen'
+          }
+        />
+        {Boolean(reihen?.length) && (
+          <Kachel
+            href="/s/reihen"
+            bild={bildReihe}
+            farbe="indigo"
+            titel="Unterrichtsreihen"
+            daten="reihen"
+            zahl={offeneReihen.length}
+            text={`${reihen!.length} Reihe${reihen!.length === 1 ? '' : 'n'} – Schritt für Schritt`}
+            fortschritt={offeneReihen[0]?.fortschritt}
+          />
+        )}
+        <Kachel
+          href="/s/blaetter"
+          bild={bildArbeitsblatt}
+          farbe="blue"
+          titel="Arbeitsblätter"
+          daten="blaetter"
+          zahl={offeneBlaetter.length}
+          text={
+            blaetter === null
+              ? '…'
+              : blaetter.length
+                ? `${offeneBlaetter.length} offen · ${blaetter.length - offeneBlaetter.length} erledigt`
+                : 'Noch keine Arbeitsblätter'
+          }
+        />
+        <Kachel
+          href="/s/aufgaben"
+          bild={bildRueckmeldung}
+          farbe="green"
+          titel="Rückmeldung"
+          daten="aufgaben"
+          zahl={offeneAufgaben.length}
+          text={
+            aufgaben === null
+              ? '…'
+              : aufgaben.length
+                ? `${offeneAufgaben.length} offen · ${aufgaben.length - offeneAufgaben.length} erledigt`
+                : 'Noch keine Aufgaben mit Feedback'
+          }
+        />
+        <Kachel
+          href="/s/ergebnisse"
+          bild={bildErgebnisse}
+          farbe="orange"
+          titel="Meine Ergebnisse"
+          daten="ergebnisse"
+          text={
+            ergebnisse === null
+              ? '…'
+              : ergebnisse.length
+                ? `${ergebnisse.length} Test${ergebnisse.length === 1 ? '' : 's'} – zuletzt ${ergebnisse[0].titel}`
+                : 'Noch keine Ergebnisse'
+          }
+        />
+      </SimpleGrid>
     </Stack>
   )
 }
+
+const STARTSEITE_CSS = `
+.sa-kopf { position: relative; overflow: hidden; border-radius: 24px; padding: 26px 24px 30px; color: #fff;
+  background: linear-gradient(135deg, #4c6ef5 0%, #7048e8 45%, #15aabf 100%); box-shadow: 0 10px 30px rgba(76,110,245,0.25); }
+.sa-formen { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.sa-gruss { color: #fff; position: relative; font-size: clamp(1.6rem, 5vw, 2.2rem); }
+.sa-datum { position: relative; opacity: 0.85; font-size: 0.85rem; text-transform: capitalize; }
+.sa-unter { position: relative; opacity: 0.95; margin-top: 4px; }
+@keyframes sa-schweben { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+.sa-schwebt { animation: sa-schweben 6s ease-in-out infinite; }
+.sa-schwebt2 { animation: sa-schweben 8s ease-in-out infinite reverse; }
+@keyframes sa-pulsieren { 0%,100% { box-shadow: 0 0 0 0 rgba(76,110,245,0.35) } 50% { box-shadow: 0 0 0 10px rgba(76,110,245,0) } }
+.sa-puls { animation: sa-pulsieren 2.4s ease-out infinite; }
+.sa-naechstes { background: var(--mantine-color-body); }
+.sa-kachel { position: relative; overflow: hidden; display: block; text-decoration: none; color: inherit; border-radius: 22px; padding: 18px;
+  transition: transform .18s ease, box-shadow .18s ease; min-height: 128px; }
+.sa-kachel:hover, .sa-kachel:focus-visible { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.12); }
+.sa-kachel img { transition: transform .25s ease; }
+.sa-kachel:hover img { transform: rotate(-6deg) scale(1.06); }
+.sa-blase { position: absolute; right: -30px; bottom: -40px; width: 140px; height: 140px; border-radius: 50%; opacity: 0.18; }
+@media (prefers-reduced-motion: reduce) { .sa-schwebt, .sa-schwebt2, .sa-puls { animation: none } .sa-kachel, .sa-kachel img { transition: none } }
+`
 
 const datumText = (ms: number): string => new Date(ms).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -749,7 +912,10 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
         setPhase((p) => (p === 'warten' || Object.keys(stand.current).length ? 'laeuft' : 'regeln'))
       })
       .catch((e: unknown) => {
-        setFehler(e instanceof Error ? e.message : String(e))
+        const text = e instanceof Error ? e.message : String(e)
+        // Als Gast schon in einem anderen Test (03.10.2026): für diesen Test neu mit Namen beitreten
+        if (window.__schulappsServer?.quelle === 'gast' && /anderen Test/.test(text)) return setPhase('name')
+        setFehler(text)
         setPhase('fehler')
       })
   }, [code])
@@ -816,8 +982,14 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
     }
     const raus = (): void => void abgeben('verlassen')
     let ohneFokus = 0
+    /*
+     * Nur am PC (Maus, kein Touch – 03.10.2026): Am Handy meldet document.hasFocus() auch auf der
+     * aktiven Seite zeitweise „kein Fokus" (Befund der Lehrkraft: Abgabe kurz nach dem Start, obwohl
+     * die Seite offen war). Dort genügt das Verlassen über Tab- oder App-Wechsel (visibilitychange).
+     */
+    const amPc = window.matchMedia?.('(pointer: fine)').matches && !('ontouchstart' in window) && navigator.maxTouchPoints === 0
     const fokus = setInterval(() => {
-      if (document.hasFocus()) ohneFokus = 0
+      if (!amPc || document.hasFocus()) ohneFokus = 0
       else if (++ohneFokus >= 3) void abgeben('verlassen')
     }, 500)
     document.addEventListener('visibilitychange', weg)

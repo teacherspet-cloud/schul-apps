@@ -9,7 +9,7 @@ import { IconAlertTriangle, IconDeviceLaptop } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { TestDocument } from '../vokabeltest/model/types'
 import { aufServer } from '../../shared/plattform'
-import { openModule } from '../../shared/navigation'
+import { openDocument, openModule } from '../../shared/navigation'
 import { notifyError } from '../../shared/util'
 import { maskottchenBild, useMaskottchen } from '../../shared/maskottchenStore'
 import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
@@ -22,6 +22,26 @@ export function testThema(doc: Pick<TestDocument, 'header' | 'settings'>): strin
     .map((t) => t.trim())
     .filter(Boolean)
   return [...new Set(teile)].join(' – ')
+}
+
+/** Fundstelle der Vokabeln: „Green Line 6 › Unit 1 › Station 2" → „Green Line 6 - Unit 1 - Station 2" */
+export function testFundstelle(doc: Pick<TestDocument, 'header' | 'settings'>): string {
+  const roh = (doc.header.themenbereich || (doc.header.ueberthemaAus ? '' : doc.header.ueberthema) || doc.settings.topic || '').trim()
+  return roh
+    .split(/\s*(?:›|>|»|\/|–|—)\s*/)
+    .map((t) => t.trim())
+    .filter((t) => t && !/^(englisch|französisch|spanisch|latein|italienisch|russisch|deutsch)$/i.test(t))
+    .join(' - ')
+}
+
+/**
+ * Name eines Onlinetests (03.10.2026, Muster der Lehrkraft): „10b 03.10.2026 - Green Line 6 - Unit 1 - Station 2" –
+ * Lerngruppe, Datum, Fundstelle. Ohne Fundstelle der Titel des Tests.
+ */
+export function onlinetestName(doc: Pick<TestDocument, 'header' | 'settings'>, gruppe: string, datum = new Date()): string {
+  const tag = datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const fundstelle = testFundstelle(doc) || (doc.header.title || 'Vokabeltest').trim()
+  return [[gruppe.trim(), tag].filter(Boolean).join(' '), fundstelle].join(' - ')
 }
 
 /** Namensvorschlag statt „Vocabulary Test": Thema und Klasse */
@@ -45,9 +65,11 @@ export default function OnlinetestKnopf({ doc }: { doc: TestDocument }): React.J
   )
 }
 
-function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => void }): React.JSX.Element {
+export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => void }): React.JSX.Element {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const [titel, setTitel] = useState(() => testNameVorschlag(doc))
+  const [titel, setTitel] = useState(() => onlinetestName(doc, ''))
+  // Solange der Name nicht von Hand geändert ist, folgt er der gewählten Lerngruppe
+  const [titelVonHand, setTitelVonHand] = useState(false)
   const figurWahl = vokabeltestFigur(doc)
   const maskottchenGeladen = useMaskottchen((s) => s.geladen)
   useEffect(() => {
@@ -63,7 +85,8 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
   const [zeit, setZeit] = useState<number>(20)
   const [zuteilung, setZuteilung] = useState<string>('abwechselnd')
   const [laeuft, setLaeuft] = useState(false)
-  const [fertig, setFertig] = useState<{ code: string; link: string } | null>(null)
+  // Fertig: Detailansicht in der App „Onlinetest“ (die frühere Code-Ansicht hier bleibt ungenutzt)
+  const [fertig] = useState<{ code: string; link: string } | null>(null)
   useEffect(() => {
     void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen')
       .then((d) => setGruppen(d.gruppen))
@@ -72,7 +95,7 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
   const erstellen = async (): Promise<void> => {
     setLaeuft(true)
     try {
-      const r = await senden<{ code: string; link: string }>('/server/onlinetest/erstellen', {
+      const r = await senden<{ id: string; code: string; link: string }>('/server/onlinetest/erstellen', {
         titel,
         thema: testThema(doc),
         test: doc,
@@ -83,7 +106,9 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
         zeitMin: zeit,
         zuteilung: zuteilung === 'abwechselnd' || zuteilung === 'zufall' ? zuteilung : Number(zuteilung)
       })
-      setFertig(r)
+      // Gleich in die Detailansicht des Tests (dort „Test für alle starten“, Code und QR-Code) – 03.10.2026
+      schliessen()
+      void openDocument('onlinetest', r.id)
     } catch (e) {
       notifyError(e, 'Onlinetest nicht erstellt')
     } finally {
@@ -114,13 +139,22 @@ function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => v
         </Stack>
       ) : (
         <Stack>
-          <TextInput label="Name des Tests" description="So steht er in der Liste der Onlinetests und bei den Lernenden." value={titel} onChange={(e) => setTitel(e.currentTarget.value)} />
+          <TextInput
+            label="Name des Tests"
+            description="So steht er in der Liste der Onlinetests und bei den Lernenden."
+            value={titel}
+            onChange={(e) => (setTitel(e.currentTarget.value), setTitelVonHand(true))}
+            data-onlinetest-name
+          />
           <Select
             label="Lerngruppe"
             description="Nur Mitglieder dieser Lerngruppe können teilnehmen; die Ergebnisse stehen in ihrer Historie. Ohne Lerngruppe: jeder mit Code."
             data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
             value={gruppe}
-            onChange={setGruppe}
+            onChange={(g) => {
+              setGruppe(g)
+              if (!titelVonHand) setTitel(onlinetestName(doc, gruppen.find((x) => x.id === g)?.name ?? ''))
+            }}
             clearable
             placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
           />

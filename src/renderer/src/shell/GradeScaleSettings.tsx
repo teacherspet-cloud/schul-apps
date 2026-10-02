@@ -1,4 +1,5 @@
-import { ActionIcon, Badge, Button, Card, Group, Select, Stack, Text } from '@mantine/core'
+import { ActionIcon, Badge, Button, Card, Group, Stack, Text } from '@mantine/core'
+import HaeufigSelect from '../shared/components/HaeufigSelect'
 import ZahlFeld from '../shared/components/ZahlFeld'
 import { IconPlus, IconX } from '@tabler/icons-react'
 import { useState } from 'react'
@@ -108,7 +109,8 @@ export default function GradeScaleSettings({ settings, update }: { settings: App
 
         {offeneFaecher.length > 0 && (
           <Group gap="xs" align="flex-end">
-            <Select
+            <HaeufigSelect
+              art="fach"
               size="xs"
               label="Eigener Schlüssel für ein Fach"
               placeholder="Fach wählen"

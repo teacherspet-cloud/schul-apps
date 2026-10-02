@@ -22,7 +22,14 @@ const MOTIVE = {
     'in front of the tablet a small round white stopwatch with a teal hand; a tiny QR-code sticker in the corner of the tablet.',
   verwaltung:
     'Tile colour: slate grey-blue (#868e96 to #495057). Motif: a large white gear wheel, in front of it two simple white person silhouettes (head and shoulders) ' +
-    'and a small golden key leaning against the gear.'
+    'and a small golden key leaning against the gear.',
+  // 03.10.2026: Unterrichtsreihe (Lernpfad) und „Meine Ergebnisse" im Schülerbereich
+  unterrichtsreihe:
+    'Tile colour: indigo (#5c7cfa to #3b5bdb). Motif: a winding white path seen from above that climbs from the lower left to the upper right like a board-game trail, ' +
+    'with four round white stepping stones on it, the first two marked with small green check marks; at the top end a small golden flag on a pole.',
+  ergebnisse:
+    'Tile colour: warm orange to coral (#ff922b to #f76707). Motif: a white sheet of paper with a large friendly green check mark and three short grey lines, ' +
+    'in front of it a small golden medal with a ribbon and a tiny white bar chart with three rising bars.'
 }
 
 const out = resolve(process.argv[2] ?? 'test-results/programmbilder')
