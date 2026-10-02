@@ -1,8 +1,9 @@
 /**
  * Schülerbereich des Servers (02.10.2026): Onlinetest am iPad, Telefon oder PC.
  *
- *  /s/          offene Tests der eigenen Lerngruppen, Code eingeben
+ *  /s/          offene Tests der eigenen Lerngruppen, Code eingeben, Aufgaben mit Feedback
  *  /s/t/<CODE>  ein Test: Regeln → Start → Aufgaben → Abgabe
+ *  /s/a/<ID>    eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
  *
  * Regeln (Wunsch der Lehrkraft): Zeitlimit; wer die Seite verlässt (anderer Tab, andere App,
  * Startbildschirm), gibt SOFORT endgültig ab – Nachschlagen in Übersetzungs-Apps soll nicht
@@ -36,6 +37,7 @@ async function abmelden(): Promise<void> {
 export default function SchuelerBereich(): React.JSX.Element {
   const pfad = window.location.pathname
   const code = /^\/s\/t\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   return (
     <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
@@ -46,7 +48,7 @@ export default function SchuelerBereich(): React.JSX.Element {
           Abmelden
         </Button>
       </Group>
-      {code ? <TestAblauf code={code.toUpperCase()} /> : <Uebersicht />}
+      {code ? <TestAblauf code={code.toUpperCase()} /> : aufgabe ? <FeedbackAufgabe id={aufgabe} /> : <Uebersicht />}
     </Container>
   )
 }
@@ -81,6 +83,7 @@ function Uebersicht(): React.JSX.Element {
           </Button>
         </Group>
       </Card>
+      <AufgabenListe />
       <Title order={4}>Offene Tests</Title>
       {!tests && <Loader />}
       {tests?.length === 0 && <Text c="dimmed">Gerade ist kein Test für dich freigegeben.</Text>}
@@ -404,5 +407,192 @@ function AufgabeKarte({ nr, aufgabe, antworten, setze }: { nr: number; aufgabe: 
       </Stack>
       {aufgabe.vorlage && aufgabe.art === 'gapText' && <Text mt="xs">{aufgabe.vorlage}</Text>}
     </Card>
+  )
+}
+
+// ---------------------------------------------------------------- Aufgaben mit Feedback
+
+interface FeedbackBogen {
+  staerken: string[]
+  schritte: string[]
+  kriterien: { kriterium: string; einschaetzung: string; beleg?: string }[]
+  schluss?: string
+  ueberarbeitung?: { zitat: string; auftrag: string }
+}
+
+interface AufgabeMitFeedback {
+  id: string
+  titel: string
+  aufgabe: string
+  runden: number
+  genutzt: number
+  bis: number | null
+  fassungen: { nr: number; text: string; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
+}
+
+function AufgabenListe(): React.JSX.Element | null {
+  const [liste, setListe] = useState<AufgabeMitFeedback[] | null>(null)
+  useEffect(() => {
+    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then((d) => setListe(d.aufgaben), () => setListe([]))
+  }, [])
+  if (!liste?.length) return null
+  return (
+    <>
+      <Title order={4}>Aufgaben mit Feedback</Title>
+      {liste.map((a) => (
+        <Card key={a.id} withBorder padding="md">
+          <Group justify="space-between">
+            <div>
+              <Text fw={600}>{a.titel}</Text>
+              <Text size="sm" c="dimmed">
+                {a.genutzt} von {a.runden} Feedback-Runden genutzt
+                {a.bis ? ` · bis ${new Date(a.bis).toLocaleDateString('de-DE')}` : ''}
+              </Text>
+            </div>
+            <Button component="a" href={`/s/a/${a.id}`}>
+              Öffnen
+            </Button>
+          </Group>
+        </Card>
+      ))}
+    </>
+  )
+}
+
+const EINSCHAETZUNG: Record<string, string> = { sicher: 'sicher', teilweise: 'teilweise', 'noch nicht': 'noch nicht' }
+
+function BogenAnsicht({ b }: { b: FeedbackBogen }): React.JSX.Element {
+  return (
+    <Stack gap="xs">
+      {b.staerken.length > 0 && (
+        <div>
+          <Text fw={700} c="green">
+            Das gelingt dir schon
+          </Text>
+          {b.staerken.map((x, i) => (
+            <Text key={i} size="sm">
+              • {x}
+            </Text>
+          ))}
+        </div>
+      )}
+      {b.schritte.length > 0 && (
+        <div>
+          <Text fw={700} c="blue">
+            Deine nächsten Schritte
+          </Text>
+          {b.schritte.map((x, i) => (
+            <Text key={i} size="sm">
+              {i + 1}. {x}
+            </Text>
+          ))}
+        </div>
+      )}
+      {b.kriterien.length > 0 && (
+        <div>
+          <Text fw={700}>Kriterien</Text>
+          {b.kriterien.map((k, i) => (
+            <Text key={i} size="sm">
+              <b>{k.kriterium}:</b> {EINSCHAETZUNG[k.einschaetzung] ?? k.einschaetzung}
+              {k.beleg ? ` – „${k.beleg}“` : ''}
+            </Text>
+          ))}
+        </div>
+      )}
+      {b.ueberarbeitung && (
+        <Alert variant="light" title="Überarbeite diese Stelle">
+          „{b.ueberarbeitung.zitat}“ – {b.ueberarbeitung.auftrag}
+        </Alert>
+      )}
+      {b.schluss && <Text size="sm" fs="italic">{b.schluss}</Text>}
+    </Stack>
+  )
+}
+
+function FeedbackAufgabe({ id }: { id: string }): React.JSX.Element {
+  const [a, setA] = useState<AufgabeMitFeedback | null | undefined>(undefined)
+  const [text, setText] = useState('')
+  const [laeuft, setLaeuft] = useState(false)
+  const [fehler, setFehler] = useState('')
+  const laden = useCallback(() => {
+    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then(
+      (d) => {
+        const x = d.aufgaben.find((y) => y.id === id) ?? null
+        setA(x)
+        if (x?.fassungen.length) setText((t) => t || x.fassungen[x.fassungen.length - 1].text)
+      },
+      () => setA(null)
+    )
+  }, [id])
+  useEffect(laden, [laden])
+  if (a === undefined) return <Loader />
+  if (a === null)
+    return (
+      <Alert color="orange">
+        Diese Aufgabe ist nicht (mehr) freigegeben.
+        <Button mt="sm" variant="light" component="a" href="/s/">
+          Zur Übersicht
+        </Button>
+      </Alert>
+    )
+  const rest = a.runden - a.genutzt
+  const letzte = [...a.fassungen].reverse().find((f) => f.bogen)
+  const einreichen = async (): Promise<void> => {
+    setLaeuft(true)
+    setFehler('')
+    try {
+      const r = await senden<{ ok: boolean; fehler?: string }>('/s/api/aufgabe/einreichen', { id, text })
+      if (!r.ok && r.fehler) setFehler(r.fehler)
+      laden()
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLaeuft(false)
+    }
+  }
+  return (
+    <Stack>
+      <Button variant="subtle" component="a" href="/s/" w="fit-content">
+        ← Übersicht
+      </Button>
+      <Card withBorder padding="lg">
+        <Title order={3}>{a.titel}</Title>
+        <Text mt="xs" style={{ whiteSpace: 'pre-wrap' }}>
+          {a.aufgabe}
+        </Text>
+      </Card>
+      {letzte?.bogen && (
+        <Card withBorder padding="lg">
+          <Title order={4} mb="xs">
+            Feedback zu Fassung {letzte.nr}
+          </Title>
+          <BogenAnsicht b={letzte.bogen} />
+        </Card>
+      )}
+      <Card withBorder padding="lg">
+        <Title order={4} mb="xs">
+          {a.fassungen.length ? 'Überarbeiten' : 'Deine Lösung'}
+        </Title>
+        <Textarea autosize minRows={8} value={text} onChange={(e) => setText(e.currentTarget.value)} placeholder="Hier schreiben …" />
+        {fehler && (
+          <Alert color="red" mt="sm">
+            {fehler}
+          </Alert>
+        )}
+        <Group justify="space-between" mt="sm">
+          <Text size="sm" c="dimmed">
+            Noch {rest} von {a.runden} Feedback-Runden
+          </Text>
+          <Button loading={laeuft} disabled={rest <= 0 || text.trim().length < 20} onClick={() => void einreichen()}>
+            Feedback anfordern
+          </Button>
+        </Group>
+        {laeuft && (
+          <Text size="sm" c="dimmed" mt="xs">
+            Das Feedback wird geschrieben – das dauert etwa eine Minute.
+          </Text>
+        )}
+      </Card>
+    </Stack>
   )
 }

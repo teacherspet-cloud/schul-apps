@@ -1,3 +1,4 @@
+import LernendeKarte from './LernendeKarte'
 import {
   ActionIcon,
   Badge,
@@ -392,6 +393,8 @@ export default function Einrichten(): React.JSX.Element | null {
               {hatForm(r.meta, 'tabelle') && <TabelleKarte />}
               <TeileKarte r={r} docId={docId} update={update} />
             </Stack>
+            {/* Server (02.10.2026): Lernende reichen selbst ein und bekommen Feedback */}
+            <LernendeKarte r={r} update={(fn) => update(fn)} />
             <Card withBorder>
               <Title order={4} mb="sm">
                 Abgaben
