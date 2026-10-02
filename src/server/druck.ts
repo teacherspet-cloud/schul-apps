@@ -84,3 +84,40 @@ export async function druckBeenden(): Promise<void> {
   browser = null
   await b?.then((x) => x.close()).catch(() => undefined)
 }
+
+/**
+ * Seiten eines freigegebenen Arbeitsblatts MIT den Stift-Einträgen als Bilder (Etappe 5): Die
+ * Stift-Ebene allein sagt der KI wenig – erst über dem Blatt sieht sie, was wohin geschrieben ist.
+ * Nur Seiten mit Tinte; JPEG, damit die Anfrage klein bleibt.
+ */
+export async function seitenMitTinte(html: string, tinte: Record<string, string>): Promise<string[]> {
+  const seiten = Object.keys(tinte)
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 0)
+    .sort((a, b) => a - b)
+  if (!seiten.length) return []
+  return mitSeite(html, async (s) => {
+    await s.setViewportSize({ width: 900, height: 1300 })
+    await s.evaluate((t) => {
+      const alle = [...document.querySelectorAll<HTMLElement>('.ws-page')]
+      for (const [k, url] of Object.entries(t)) {
+        const seite = alle[Number(k)]
+        if (!seite) continue
+        if (getComputedStyle(seite).position === 'static') seite.style.position = 'relative'
+        const bild = document.createElement('img')
+        bild.src = url
+        bild.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:50'
+        seite.appendChild(bild)
+      }
+    }, tinte)
+    await s.waitForTimeout(100)
+    const bilder: string[] = []
+    for (const n of seiten) {
+      const el = s.locator('.ws-page').nth(n)
+      if (!(await el.count())) continue
+      const jpg = await el.screenshot({ type: 'jpeg', quality: 70 })
+      bilder.push(`data:image/jpeg;base64,${Buffer.from(jpg).toString('base64')}`)
+    }
+    return bilder
+  })
+}

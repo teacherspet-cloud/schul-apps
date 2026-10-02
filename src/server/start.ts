@@ -28,6 +28,7 @@ import { lehrkraftRoute, schuelerRoute } from './onlinetest'
 import { fachschaftRoute, mitFachschaft, setzeEntferner } from './fachschaft'
 import { fachordnerRoute } from './fachordner'
 import { feedbackRoute } from './schuelerfeedback'
+import { blaetterRoute } from './arbeitsblaetter'
 import { aktuellerNutzer } from './kontext'
 import { DATEN, OBERFLAECHE } from './pfade'
 
@@ -81,7 +82,7 @@ async function main(): Promise<void> {
   const key = env.SCHULAPPS_TLS_KEY
   const tls = cert && key && existsSync(cert) && existsSync(key) ? { cert, key } : undefined
 
-  await starteServer({ port, adresse, hosts, aufruf, tls, routen: [hoertextRoute, feedbackRoute(aufruf, adresse), schuelerRoute(aufruf), lehrkraftRoute(aufruf, adresse), fachschaftRoute(), fachordnerRoute(), verwaltungsRoute] })
+  await starteServer({ port, adresse, hosts, aufruf, tls, routen: [hoertextRoute, feedbackRoute(aufruf, adresse), blaetterRoute(aufruf, adresse), schuelerRoute(aufruf), lehrkraftRoute(aufruf, adresse), fachschaftRoute(), fachordnerRoute(), verwaltungsRoute] })
   console.log(`Schul-Apps-Server läuft: ${adresse} (${tls ? 'TLS' : 'ohne TLS'}), Daten: ${DATEN}, Oberfläche: ${OBERFLAECHE}`)
   protokolliereServer('start', `Server gestartet (${tls ? 'TLS' : 'ohne TLS'})`)
 

@@ -66,6 +66,8 @@ const db = () => {
     const spalten = new Set((d.prepare('PRAGMA table_info(feedback_freigaben)').all() as { name: string }[]).map((x) => x.name))
     if (!spalten.has('schueler')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN schueler TEXT NOT NULL DEFAULT '[]'")
     if (!spalten.has('code')) d.exec('ALTER TABLE feedback_freigaben ADD COLUMN code TEXT')
+    // Etappe 5: verknüpfte Rückmeldung eines freigegebenen Arbeitsblatts (art 'blatt') – erscheint nicht in der Aufgabenliste der Lernenden
+    if (!spalten.has('art')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN art TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
@@ -93,6 +95,8 @@ interface Freigabe {
   schueler: string
   /** Code für Gäste (QR-Code + Name); null = keine Gäste */
   code: string | null
+  /** '' = Rückmeldungsaufgabe, 'blatt' = gehört zu einem freigegebenen Arbeitsblatt (src/server/arbeitsblaetter.ts) */
+  art?: string
 }
 
 const json_ = <T>(s: string, r: T): T => {
@@ -146,7 +150,7 @@ const freigabeNachCode = (code: string): Freigabe | null =>
 const MAX_GAESTE = 80
 
 /** Bogen erzeugen – im Namen der Lehrkraft, mit ihrem KI-Zugang (Schlüssel oder Abo) */
-async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf): Promise<Bogen> {
+async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf, bilder: string[] = []): Promise<Bogen> {
   const lehrkraft = nutzerNachId(f.lehrkraft_id)
   if (!lehrkraft) throw new Error('Die Lehrkraft gibt es nicht mehr.')
   const r = json_(f.vorlage, {} as Rueckmeldung)
@@ -156,9 +160,100 @@ async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, au
     const { text: ohne } = ohneNamen(a)
     const anonym = { ...a, text: ohne }
     const ctx = bogenKontextAus(settings, r)
-    const antwort = await aufruf('ai:structured', [bogenAnfrage(r, anonym, rueckmeldungSystem(r), ctx)])
+    const anfrage = bogenAnfrage(r, anonym, rueckmeldungSystem(r), ctx)
+    // Handschriftliche Einträge (Arbeitsblatt im Stift-Modus): Seitenbilder mitgeben
+    if (bilder.length) {
+      anfrage.images = [...(anfrage.images ?? []), ...bilder.slice(0, 8)]
+      anfrage.user +=
+        '\nHANDSCHRIFTLICHE EINTRÄGE: Die beigefügten Seitenbilder zeigen das Blatt mit dem, was mit dem Stift eingetragen wurde – beziehe es ein.'
+    }
+    const antwort = await aufruf('ai:structured', [anfrage])
     return bogenAus(antwort, r, anonym, ctx)
   })
+}
+
+// ---------------------------------------------------------------- für freigegebene Arbeitsblätter (Etappe 5)
+
+/** Verknüpfte Rückmeldung anlegen: Aufgaben + Lösungsblatt sind der Erwartungshorizont */
+export function verknuepfteFreigabeAnlegen(e: {
+  lehrkraftId: string
+  lerngruppeId: string
+  schueler: string[]
+  titel: string
+  vorlage: Rueckmeldung
+  runden: number
+}): string {
+  const id = randomBytes(8).toString('hex')
+  db()
+    .prepare(
+      "INSERT INTO feedback_freigaben (id, lehrkraft_id, lerngruppe_id, titel, vorlage, runden, bis, status, erstellt, schueler, code, art) VALUES (?, ?, ?, ?, ?, ?, NULL, 'offen', ?, ?, NULL, 'blatt')"
+    )
+    .run(
+      id,
+      e.lehrkraftId,
+      e.lerngruppeId,
+      e.titel.slice(0, 160),
+      JSON.stringify({ ...e.vorlage, abgaben: [] }),
+      e.runden,
+      new Date().toISOString(),
+      JSON.stringify(e.schueler)
+    )
+  return id
+}
+
+export function verknuepfteFreigabeStatus(id: string, status: 'offen' | 'beendet'): void {
+  db().prepare("UPDATE feedback_freigaben SET status = ? WHERE id = ? AND art = 'blatt'").run(status, id)
+}
+
+/**
+ * Fassung eines Arbeitsblatts in die verknüpfte Rückmeldung legen (mit oder ohne Bogen) – so sieht
+ * die Lehrkraft sie in der Rückmeldungs-App („Abgaben holen").
+ */
+export async function blattFassung(
+  freigabeId: string,
+  schueler: NutzerInfo,
+  text: string,
+  bilder: string[],
+  mitFeedback: boolean,
+  aufruf: Aufruf
+): Promise<{ nr: number; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen }> {
+  const f = freigabe(freigabeId)
+  if (!f) throw new Error('Die verknüpfte Rückmeldung fehlt.')
+  const zeile = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, schueler.id) as
+    { id: string; fassungen: string } | undefined
+  const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
+  const neu: Fassung & { bilder?: string[] } = { nr: fassungen.length + 1, text, zeit: new Date().toISOString(), ...(bilder.length ? { bilder } : {}) }
+  if (mitFeedback) {
+    try {
+      neu.bogen = await bogenErzeugen(f, schueler, text, aufruf, bilder)
+    } catch (e) {
+      neu.fehler = e instanceof Error ? e.message : String(e)
+    }
+  }
+  const alle = [...fassungen, neu]
+  if (zeile) db().prepare('UPDATE feedback_abgaben SET fassungen = ?, aktualisiert = ? WHERE id = ?').run(JSON.stringify(alle), neu.zeit, zeile.id)
+  else
+    db()
+      .prepare('INSERT INTO feedback_abgaben (id, freigabe_id, schueler_id, fassungen, aktualisiert) VALUES (?, ?, ?, ?, ?)')
+      .run(randomBytes(8).toString('hex'), f.id, schueler.id, JSON.stringify(alle), neu.zeit)
+  protokolliereServer('feedback', neu.bogen ? 'Feedback zu einem Arbeitsblatt erzeugt' : 'Arbeitsblatt abgegeben', schueler.id)
+  return { nr: neu.nr, bogen: bogenFuerLernende(neu.bogen), fehler: neu.fehler, volleBogen: neu.bogen }
+}
+
+/** Die Fassungen einer Person in einer verknüpften Rückmeldung (für die Lernenden, ohne Lehrkraft-Teile) */
+export function blattFassungen(
+  freigabeId: string,
+  schuelerId: string
+): { nr: number; zeit: string; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen }[] {
+  const zeile = db().prepare('SELECT fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(freigabeId, schuelerId) as
+    { fassungen: string } | undefined
+  return json_(zeile?.fassungen ?? '[]', [] as Fassung[]).map((x) => ({
+    nr: x.nr,
+    zeit: x.zeit,
+    bogen: bogenFuerLernende(x.bogen),
+    fehler: x.fehler,
+    volleBogen: x.bogen
+  }))
 }
 
 export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promise<boolean> {
@@ -212,11 +307,15 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     // ---------- Lernende
     if (schueler) {
       if (req.method === 'GET' && url.pathname === '/s/api/aufgaben') {
-        const offen = (db().prepare("SELECT * FROM feedback_freigaben WHERE status = 'offen'").all() as unknown as Freigabe[]).filter((f) => offenFuer(f, ich))
+        const offen = (db().prepare("SELECT * FROM feedback_freigaben WHERE status = 'offen' AND art = ''").all() as unknown as Freigabe[]).filter((f) =>
+          offenFuer(f, ich)
+        )
         // Abgeschlossene Aufgaben mit eigener Abgabe bleiben zum Nachlesen da (Schüler-Startseite, 02.10.2026)
         const frueher = (
           db()
-            .prepare('SELECT f.* FROM feedback_freigaben f JOIN feedback_abgaben a ON a.freigabe_id = f.id WHERE a.schueler_id = ? ORDER BY f.erstellt DESC')
+            .prepare(
+              "SELECT f.* FROM feedback_freigaben f JOIN feedback_abgaben a ON a.freigabe_id = f.id WHERE a.schueler_id = ? AND f.art = '' ORDER BY f.erstellt DESC"
+            )
             .all(ich.id) as unknown as Freigabe[]
         ).filter((f) => !offen.some((o) => o.id === f.id) && istFuer(f, ich))
         const alle = [...offen, ...frueher]
@@ -244,8 +343,10 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       if (req.method === 'POST' && url.pathname === '/s/api/aufgabe/einreichen') {
         const k0 = (await k.koerper()) as Record<string, unknown>
         const f = freigabe(String(k0.id ?? ''))
-        if (!f || !offenFuer(f, ich)) return (json(res, 404, { fehler: 'Diese Aufgabe ist nicht (mehr) freigegeben.' }), true)
-        const text = String(k0.text ?? '').trim().slice(0, 20000)
+        if (!f || f.art === 'blatt' || !offenFuer(f, ich)) return (json(res, 404, { fehler: 'Diese Aufgabe ist nicht (mehr) freigegeben.' }), true)
+        const text = String(k0.text ?? '')
+          .trim()
+          .slice(0, 20000)
         if (text.length < 20) return (json(res, 400, { fehler: 'Bitte zuerst etwas schreiben (mindestens ein paar Sätze).' }), true)
         const zeile = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as { id: string; fassungen: string } | undefined
         const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
@@ -282,6 +383,7 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             id: f.id,
             titel: f.titel,
             status: f.status,
+            ...(f.art ? { art: f.art } : {}),
             runden: f.runden,
             bis: f.bis,
             lerngruppe: (f.lerngruppe_id ? lerngruppe(f.lerngruppe_id)?.name : '') ?? '',

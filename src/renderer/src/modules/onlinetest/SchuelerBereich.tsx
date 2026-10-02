@@ -5,7 +5,8 @@
  *  /s/tests       offene Tests der eigenen Lerngruppen, Code eingeben
  *  /s/ergebnisse  frühere Ergebnisse (nur mit Konto), /s/e/<ID> eines davon
  *  /s/aufgaben    Aufgaben mit Feedback (offene und abgeschlossene)
- *  /s/blaetter    freigegebene Arbeitsblätter (folgt)
+ *  /s/blaetter    freigegebene Arbeitsblätter, /s/b/<ID> eines ausfüllen (BlattAusfuellen.tsx)
+ *  /s/w/<CODE>    Arbeitsblatt per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/b/<ID>
  *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
  *  /s/f/<CODE>    Aufgabe mit Feedback per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/a/<ID>
  *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
@@ -47,7 +48,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { HandFeld, TastaturFeld } from './HandFeld'
 import { CodeScanner } from './CodeScanner'
 import type { Erkennung } from './handschrift'
-import { antwortAlsText, loesungAlsText, type Antworten, type Bewertung, type Einheit, type Feld, type Loesung, type OnlineAufgabe, type OnlineEintrag } from './kern'
+import {
+  antwortAlsText,
+  loesungAlsText,
+  type Antworten,
+  type Bewertung,
+  type Einheit,
+  type Feld,
+  type Loesung,
+  type OnlineAufgabe,
+  type OnlineEintrag
+} from './kern'
+import BlattAusfuellen from './BlattAusfuellen'
 import { holen, senden } from './serverApi'
 
 interface Beitritt {
@@ -96,6 +108,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const code = /^\/s\/t\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const fbCode = /^\/s\/f\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  const blattCode = /^\/s\/w\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const rueckblick = /^\/s\/e\/([A-Za-z0-9_-]{6,64})/.exec(pfad)?.[1]
   const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter)\/?$/.exec(pfad)?.[1]
   const ich = window.__schulappsServer
@@ -104,7 +118,11 @@ export default function SchuelerBereich(): React.JSX.Element {
   const inhalt = code ? (
     <TestAblauf code={code.toUpperCase()} />
   ) : fbCode ? (
-    <FeedbackBeitritt code={fbCode.toUpperCase()} />
+    <Beitritt code={fbCode.toUpperCase()} art="aufgabe" />
+  ) : blattCode ? (
+    <Beitritt code={blattCode.toUpperCase()} art="blatt" />
+  ) : blatt ? (
+    <BlattAusfuellen id={blatt} />
   ) : aufgabe ? (
     <FeedbackAufgabe id={aufgabe} />
   ) : rueckblick && !gast ? (
@@ -124,7 +142,7 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
         <Text fw={700} size="lg" component="a" href="/s/" style={{ color: 'inherit', textDecoration: 'none' }}>
-          Schul-Apps{gast ? (aufgabe || fbCode ? ' · Rückmeldung' : ' · Onlinetest') : ''}
+          Schul-Apps{gast ? (aufgabe || fbCode ? ' · Rückmeldung' : blatt || blattCode ? ' · Arbeitsblatt' : ' · Onlinetest') : ''}
         </Text>
         {!gast && (
           <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
@@ -346,13 +364,47 @@ function AufgabenSeite(): React.JSX.Element {
   )
 }
 
+interface BlattKurz {
+  id: string
+  titel: string
+  offen: boolean
+  feedback: boolean
+  runden: number
+  genutzt: number
+  begonnen: boolean
+}
+
 /** Freigegebene Arbeitsblätter (Etappe 5) */
 function BlaetterSeite(): React.JSX.Element {
+  const [liste, setListe] = useState<BlattKurz[] | null>(null)
+  useEffect(() => {
+    void holen<{ blaetter: BlattKurz[] }>('/s/api/blaetter').then(
+      (d) => setListe(d.blaetter ?? []),
+      () => setListe([])
+    )
+  }, [])
   return (
-    <Stack>
+    <Stack data-blaetter>
       <ZurStartseite />
       <Title order={3}>Arbeitsblätter</Title>
-      <Text c="dimmed">Gerade ist kein Arbeitsblatt für dich freigegeben.</Text>
+      {!liste && <Loader />}
+      {liste?.length === 0 && <Text c="dimmed">Gerade ist kein Arbeitsblatt für dich freigegeben.</Text>}
+      {liste?.map((b) => (
+        <Card key={b.id} withBorder padding="md">
+          <Group justify="space-between" wrap="nowrap">
+            <div>
+              <Text fw={600}>{b.titel}</Text>
+              <Text size="sm" c="dimmed">
+                {!b.offen ? 'abgeschlossen' : b.genutzt ? `${b.genutzt}× eingereicht` : b.begonnen ? 'angefangen' : 'neu'}
+                {b.feedback ? ' · mit Feedback' : ''}
+              </Text>
+            </div>
+            <Button component="a" href={`/s/b/${b.id}`} variant={!b.offen || b.genutzt >= b.runden ? 'light' : 'filled'} data-blatt-oeffnen>
+              {!b.offen || b.genutzt >= b.runden ? 'Ansehen' : b.begonnen ? 'Weiter' : 'Öffnen'}
+            </Button>
+          </Group>
+        </Card>
+      ))}
     </Stack>
   )
 }
@@ -360,11 +412,33 @@ function BlaetterSeite(): React.JSX.Element {
 /** Ein Code kann zu einem Test oder zu einer Aufgabe mit Feedback gehören (Etappe 4) */
 async function oeffneCode(code: string): Promise<void> {
   const aufgabe = await holen<{ id: string }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  window.location.assign(aufgabe?.id ? `/s/f/${code}` : `/s/t/${code}`)
+  if (aufgabe?.id) return window.location.assign(`/s/f/${code}`)
+  const blatt = await holen<{ id: string }>(`/s/api/blatt/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  window.location.assign(blatt?.id ? `/s/w/${code}` : `/s/t/${code}`)
 }
 
-/** Aufgabe mit Feedback per QR-Code/Code: Gäste geben ihren Namen ein, Lernende mit Konto kommen gleich hinein */
-function FeedbackBeitritt({ code }: { code: string }): React.JSX.Element {
+const BEITRITT = {
+  aufgabe: {
+    zugang: '/s/api/aufgabe/zugang',
+    gast: '/s/api/aufgabe/gast',
+    ziel: (id: string) => `/s/a/${id}`,
+    seite: (c: string) => `/s/f/${c}`,
+    art: 'Aufgabe mit Feedback',
+    fehlt: 'Diese Aufgabe'
+  },
+  blatt: {
+    zugang: '/s/api/blatt/zugang',
+    gast: '/s/api/blatt/gast',
+    ziel: (id: string) => `/s/b/${id}`,
+    seite: (c: string) => `/s/w/${c}`,
+    art: 'Arbeitsblatt',
+    fehlt: 'Dieses Arbeitsblatt'
+  }
+}
+
+/** Aufgabe mit Feedback bzw. Arbeitsblatt per QR-Code/Code: Gäste geben ihren Namen ein, Lernende mit Konto kommen gleich hinein */
+function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): React.JSX.Element {
+  const w = BEITRITT[art]
   const [info, setInfo] = useState<{ id: string; titel: string; gaeste: boolean; dabei: boolean } | null | undefined>(undefined)
   const [name, setName] = useState('')
   const [fehler, setFehler] = useState('')
@@ -376,27 +450,27 @@ function FeedbackBeitritt({ code }: { code: string }): React.JSX.Element {
       setLaeuft(true)
       setFehler('')
       try {
-        const r = await senden<{ id: string }>('/s/api/aufgabe/gast', { code, ...(mitName ? { name: mitName } : {}) })
-        window.location.assign(`/s/a/${r.id}`)
+        const r = await senden<{ id: string }>(w.gast, { code, ...(mitName ? { name: mitName } : {}) })
+        window.location.assign(w.ziel(r.id))
       } catch (e) {
         setFehler(e instanceof Error ? e.message : String(e))
         setLaeuft(false)
       }
     },
-    [code]
+    [code, w]
   )
   useEffect(() => {
-    void holen<{ id: string; titel: string; gaeste: boolean; dabei: boolean }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).then(
+    void holen<{ id: string; titel: string; gaeste: boolean; dabei: boolean }>(`${w.zugang}?code=${encodeURIComponent(code)}`).then(
       (d) => {
-        if (d.dabei) return window.location.assign(`/s/a/${d.id}`)
+        if (d.dabei) return window.location.assign(w.ziel(d.id))
         if (mitKonto) return void beitreten()
-        if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(`/s/f/${code}`)}`)
+        if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(w.seite(code))}`)
         setInfo(d)
       },
       () => setInfo(null)
     )
-  }, [code, mitKonto, beitreten])
-  if (info === null) return <Alert color="orange">Diese Aufgabe gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
+  }, [code, mitKonto, beitreten, w])
+  if (info === null) return <Alert color="orange">{w.fehlt} gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
   if (!info)
     return fehler ? (
       <Alert color="red">{fehler}</Alert>
@@ -409,7 +483,7 @@ function FeedbackBeitritt({ code }: { code: string }): React.JSX.Element {
   return (
     <Card withBorder padding="lg" data-feedback-beitritt>
       <Text c="dimmed" size="sm">
-        Aufgabe mit Feedback
+        {w.art}
       </Text>
       <Title order={3} mb="md">
         {info.titel}
@@ -1129,7 +1203,7 @@ function AufgabeKarte({ nr, aufgabe, antworten, setze }: { nr: number; aufgabe: 
 
 // ---------------------------------------------------------------- Aufgaben mit Feedback
 
-interface FeedbackBogen {
+export interface FeedbackBogen {
   staerken: string[]
   schritte: string[]
   kriterien: { kriterium: string; einschaetzung: string; beleg?: string }[]
@@ -1180,7 +1254,7 @@ function AufgabenListe({ leer }: { leer: string }): React.JSX.Element | null {
 
 const EINSCHAETZUNG: Record<string, string> = { sicher: 'sicher', teilweise: 'teilweise', 'noch nicht': 'noch nicht' }
 
-function BogenAnsicht({ b }: { b: FeedbackBogen }): React.JSX.Element {
+export function BogenAnsicht({ b }: { b: FeedbackBogen }): React.JSX.Element {
   return (
     <Stack gap="xs">
       {b.staerken.length > 0 && (

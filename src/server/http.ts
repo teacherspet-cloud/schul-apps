@@ -361,7 +361,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         // Bündel (js/css) dürfen ohne Anmeldung kommen – die Anmeldeseite braucht sie nicht, schadet aber nicht
         if (datei) return statisch(res, decodeURIComponent(url.pathname))
         // Onlinetest per QR-Code: Solange IServ nicht freigeschaltet ist, reicht der Name (SchuelerBereich, src/server/onlinetest.ts)
-        if ((/^\/s\/[tf]\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) || url.pathname === '/s/' || url.pathname === '/s') && !iservBereit()) return statisch(res, '/s/')
+        if ((/^\/s\/[tfw]\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) || url.pathname === '/s/' || url.pathname === '/s') && !iservBereit()) return statisch(res, '/s/')
         res.writeHead(302, { location: `/anmelden?ziel=${encodeURIComponent(url.pathname.startsWith('/s/') ? url.pathname : '/')}`, 'cache-control': 'no-store' })
         return void res.end()
       }

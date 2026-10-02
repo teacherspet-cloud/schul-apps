@@ -2,6 +2,7 @@ import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Toolt
 import { fragenAusBlatt } from '../../../../shared/export/lms/fragen'
 import LmsExport from '../../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../../rueckmeldung/RueckmeldungKnopf'
+import BlattFreigabeKnopf from '../../BlattFreigabeKnopf'
 import { rasterAuftrag } from '../../auftraege'
 import { StundenverlaufPanel } from '../StundenverlaufPanel'
 import BlattLeveln from '../BlattLeveln'
@@ -750,6 +751,7 @@ export function EditorStep(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="arbeitsblatt" docId={docId} />
+            <BlattFreigabeKnopf ws={ws} layouts={layouts} logo={logo} schoolName={schoolName} />
             <LmsExport titel={ws.meta.title || ws.meta.topic} bericht={() => fragenAusBlatt(ws)} ziel={ablage()} />
           </>
         }

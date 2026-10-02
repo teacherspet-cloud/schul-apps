@@ -81,7 +81,9 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
 
   const abholen = async (id: string): Promise<void> => {
     try {
-      const d = await holen<{ abgaben: { name: string; benutzer: string; fassungen: { nr: number; text: string; bogen?: Bogen }[] }[] }>(`/server/feedback/${id}`)
+      const d = await holen<{ abgaben: { name: string; benutzer: string; fassungen: { nr: number; text: string; bogen?: Bogen; bilder?: string[] }[] }[] }>(
+        `/server/feedback/${id}`
+      )
       let neu = 0
       update((doc) => {
         for (const a of d.abgaben) {
@@ -89,11 +91,25 @@ export default function LernendeKarte({ r, update }: { r: Rueckmeldung; update: 
           if (!letzte) continue
           const kennung = `online:${id}:${a.benutzer}`
           const vorhanden = doc.abgaben.find((x) => x.dateiname === kennung)
-          const daten: Partial<Abgabe> = { text: letzte.text, ...(letzte.bogen ? { bogen: letzte.bogen } : {}) }
+          // Arbeitsblatt mit Stift: Seitenbilder (Blatt + Einträge) als Scans dazu
+          const daten: Partial<Abgabe> = {
+            text: letzte.text,
+            ...(letzte.bogen ? { bogen: letzte.bogen } : {}),
+            ...(letzte.bilder?.length ? { scans: letzte.bilder } : {})
+          }
           if (vorhanden) Object.assign(vorhanden, daten)
           else {
             const nr = Math.max(0, ...doc.abgaben.map((x) => Number(/^S(\d+)$/.exec(x.kuerzel)?.[1] ?? 0))) + 1
-            doc.abgaben.push({ id: newId(), kuerzel: `S${nr}`, name: a.name || a.benutzer, dateiname: kennung, text: letzte.text, bilder: [], ...(letzte.bogen ? { bogen: letzte.bogen } : {}) })
+            doc.abgaben.push({
+              id: newId(),
+              kuerzel: `S${nr}`,
+              name: a.name || a.benutzer,
+              dateiname: kennung,
+              text: letzte.text,
+              bilder: [],
+              ...(letzte.bogen ? { bogen: letzte.bogen } : {}),
+              ...(letzte.bilder?.length ? { scans: letzte.bilder } : {})
+            })
             neu++
           }
         }
