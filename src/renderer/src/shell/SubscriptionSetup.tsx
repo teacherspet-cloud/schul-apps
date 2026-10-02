@@ -1,4 +1,5 @@
 import { Alert, Anchor, Badge, Button, Checkbox, Collapse, Group, Image, Loader, Progress, Select, Stack, Text, TextInput, ThemeIcon } from '@mantine/core'
+import { aufServer } from '../shared/plattform'
 import { IconAlertTriangle, IconCheck, IconDownload, IconExternalLink, IconLogin, IconPhoto, IconRefresh } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import { AiProviderId, AppSettings, DeepPartial, ModelOption, SUBSCRIPTIONS, SubscriptionStatus } from '@shared/types'
@@ -277,11 +278,17 @@ export default function SubscriptionSetup({
                   </Group>
                 )}
                 <Group gap="xs">
-                  {phase.url && (
-                    <Button variant="light" size="xs" leftSection={<IconExternalLink size={14} />} onClick={() => void window.api.ai.openLoginPage(phase.url!)}>
-                      Anmeldeseite erneut öffnen
-                    </Button>
-                  )}
+                  {phase.url &&
+                    (aufServer() ? (
+                      // Server: Das Programm läuft dort – die Seite öffnet hier der eigene Browser
+                      <Button component="a" href={phase.url} target="_blank" rel="noreferrer" size="xs" leftSection={<IconExternalLink size={14} />}>
+                        Anmeldeseite öffnen
+                      </Button>
+                    ) : (
+                      <Button variant="light" size="xs" leftSection={<IconExternalLink size={14} />} onClick={() => void window.api.ai.openLoginPage(phase.url!)}>
+                        Anmeldeseite erneut öffnen
+                      </Button>
+                    ))}
                   <Button variant="subtle" size="xs" color="gray" onClick={() => void cancelLogin()}>
                     Abbrechen
                   </Button>

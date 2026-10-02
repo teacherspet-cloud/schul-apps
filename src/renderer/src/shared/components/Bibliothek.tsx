@@ -1,10 +1,10 @@
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
+import { nurPcNetz } from '../plattform'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { sichereAlles } from '../autosave'
 import { kopieName, loescheDokument, passtZurSuche } from '../bibliothek'
 import { useMenueFokus } from '../menueFokus'
-import { imNetz } from '../netzZugang'
 import { useConfirmKeys } from '../useConfirmKeys'
 import { notifyError, notifySuccess, uid } from '../util'
 import WischZeile from '../touch/WischZeile'
@@ -267,7 +267,7 @@ export function EintragMenue<M extends BibliotheksEintrag>({
           </Menu.Item>
         )}
         {/* Löschen gibt es nur am Rechner – über das Netz ist es gesperrt */}
-        {!imNetz() && (
+        {!nurPcNetz() && (
           <Menu.Item leftSection={<IconTrash size={14} />} color="red" onClick={weiter(() => bib.setLoeschen(eintrag))}>
             Löschen
           </Menu.Item>
@@ -385,7 +385,7 @@ export function EintragZeile<M extends BibliotheksEintrag>({
    */
   const aktionen = [
     { label: 'Kopie', icon: <IconCopy size={18} />, farbe: 'var(--mantine-color-blue-6)', onClick: () => void bib.kopieren(eintrag.id) },
-    ...(imNetz() ? [] : [{ label: 'Löschen', icon: <IconTrash size={18} />, farbe: 'var(--mantine-color-red-6)', onClick: () => bib.setLoeschen(eintrag) }])
+    ...(nurPcNetz() ? [] : [{ label: 'Löschen', icon: <IconTrash size={18} />, farbe: 'var(--mantine-color-red-6)', onClick: () => bib.setLoeschen(eintrag) }])
   ]
   return (
     <WischZeile aktionen={aktionen} onLangerDruck={() => setMenueOffen(true)}>

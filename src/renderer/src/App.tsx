@@ -1,7 +1,8 @@
 import { ActionIcon, AppShell, Button, Indicator, Tooltip } from '@mantine/core'
+import { aufServer, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconChevronsLeft, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSettings } from '@tabler/icons-react'
+import { IconChevronsLeft, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconSettings } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
@@ -40,13 +41,20 @@ const leseLeisteAus = (): boolean => {
   }
 }
 
+/** Server: abmelden (Sitzung beenden) und zur Anmeldeseite */
+async function abmelden(): Promise<void> {
+  await fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' }, cache: 'no-store' }).catch(() => undefined)
+  window.location.assign('/anmelden')
+}
+
 export default function App(): React.JSX.Element {
   /*
    * Kommt die Oberfläche aus dem Netz, steht die PIN-Abfrage davor. Ohne Anmeldung weist der
    * Server ohnehin jeden Aufruf ab – dann lieber einmal klar fragen, als die Oberfläche mit
    * lauter Fehlermeldungen aufbauen.
    */
-  const [angemeldet, setAngemeldet] = useState(() => !imNetz() || !abgemeldet())
+  // Auf dem Server meldet die Anmeldeseite an (Cookie) – die PIN-Abfrage gibt es dort nicht
+  const [angemeldet, setAngemeldet] = useState(() => !imNetz() || aufServer() || !abgemeldet())
   // Wohin die App zeigt, steht im Navigations-Store – so können auch Hinweise und die Startseite dorthin führen
   const active = useNavigation((s) => s.active)
   const laufpunkte = useNavigation((s) => s.laufpunkte)
@@ -226,6 +234,12 @@ export default function App(): React.JSX.Element {
             <NavIcon label="Einstellungen" breit={breit} active={active === 'settings'} onClick={() => openModule('settings')}>
               <IconSettings size={22} />
             </NavIcon>
+            {/* Server (02.10.2026): angemeldet bleibt man – abmelden geht nur hier, ausdrücklich */}
+            {aufServer() && (
+              <NavIcon label={`Abmelden (${serverIch()?.benutzer ?? ''})`} breit={breit} active={false} onClick={() => void abmelden()}>
+                <IconLogout size={22} />
+              </NavIcon>
+            )}
           </AppShell.Section>
         </AppShell.Navbar>
       )}

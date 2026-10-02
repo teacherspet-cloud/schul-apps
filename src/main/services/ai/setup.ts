@@ -10,7 +10,7 @@ import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { createGunzip } from 'zlib'
 import { AiProviderId, SetupEvent, SUBSCRIPTIONS } from '@shared/types'
-import { cliEnv, findCli, managedCliPath, MANAGED_DIR } from './cli'
+import { aufServer, cliEnv, findCli, managedCliPath, MANAGED_DIR } from './cli'
 import { textSammler } from './textstrom'
 
 type Emit = (event: SetupEvent) => void
@@ -218,6 +218,12 @@ async function installSingleExe(provider: AiProviderId, d: Download, emit: Emit)
 const installing = new Set<AiProviderId>()
 
 export async function installCli(provider: AiProviderId, emit: Emit): Promise<string> {
+  // Server: Die Programme sind im Docker-Bild eingebaut – nichts herunterzuladen
+  if (aufServer()) {
+    const pfad = findCli(provider)
+    if (!pfad) throw new Error(provider === 'google' ? 'Antigravity steht auf dem Server nicht zur Verfügung.' : 'Das KI-Programm fehlt auf dem Server.')
+    return pfad
+  }
   if (installing.has(provider)) throw new Error('Die Einrichtung läuft bereits.')
   installing.add(provider)
   try {
@@ -239,13 +245,27 @@ export async function installCli(provider: AiProviderId, emit: Emit): Promise<st
 
 // ---------- Anmeldung ----------
 
-const logins = new Map<AiProviderId, ChildProcess>()
+/*
+ * Laufende Anmeldungen – je Datenordner und Anbieter: Auf dem Server (02.10.2026) melden sich
+ * mehrere Lehrkräfte gleichzeitig an, jede in ihrem eigenen Ordner. Am PC ist es einer.
+ */
+const logins = new Map<string, ChildProcess>()
+const loginSchluessel = (provider: AiProviderId): string => `${app.getPath('userData')}|${provider}`
 
 /** Anmeldeseite aus der Ausgabe des Programms (für „Anmeldeseite erneut öffnen"). */
-export function findLoginUrl(output: string): string | undefined {
+export function findLoginUrl(output: string, mitGeraetecode = aufServer()): string | undefined {
   // eslint-disable-next-line no-control-regex
   const clean = output.replace(/\x1b\[[0-9;]*m/g, '')
-  return /https:\/\/[^\s"'<>]*(?:oauth|authorize)[^\s"'<>]*/.exec(clean)?.[0]
+  // Nur auf dem Server: Anmeldung mit Gerätecode (https://auth.openai.com/codex/device) – am PC nie
+  const muster = mitGeraetecode ? /https:\/\/[^\s"'<>]*(?:oauth|authorize|\/device)[^\s"'<>]*/ : /https:\/\/[^\s"'<>]*(?:oauth|authorize)[^\s"'<>]*/
+  return muster.exec(clean)?.[0]
+}
+
+/** Einmal-Code der Anmeldung mit Gerätecode (Codex auf dem Server, z. B. „ABCD-12345") */
+export function findGeraeteCode(output: string): string | undefined {
+  // eslint-disable-next-line no-control-regex
+  const clean = output.replace(/\x1b\[[0-9;]*m/g, '').replace(/https:\/\/\S+/g, '')
+  return /\b[A-Z0-9]{4,5}-[A-Z0-9]{4,6}\b/.exec(clean)?.[0]
 }
 
 function workDir(): string {
@@ -269,9 +289,10 @@ export function startLogin(provider: AiProviderId, emit: Emit, isLoggedIn: () =>
     return
   }
 
-  const args = provider === 'openai' ? ['login'] : ['auth', 'login', '--claudeai']
+  // Server: ChatGPT per Gerätecode – der Rücksprung auf localhost ginge dort ins Leere
+  const args = provider === 'openai' ? (aufServer() ? ['login', '--device-auth'] : ['login']) : ['auth', 'login', '--claudeai']
   const child = spawn(exe, args, { cwd, env: cliEnv(), windowsHide: true })
-  logins.set(provider, child)
+  logins.set(loginSchluessel(provider), child)
   // Auch hier stückweise Ausgabe – siehe `textstrom.ts`
   const sammler = textSammler()
   let urlSent = false
@@ -279,8 +300,20 @@ export function startLogin(provider: AiProviderId, emit: Emit, isLoggedIn: () =>
     sammler.push(d)
     const output = sammler.text()
     const url = findLoginUrl(output)
-    if (url && !urlSent) {
+    const geraeteCode = provider === 'openai' && aufServer() ? findGeraeteCode(output) : undefined
+    // Gerätecode: erst melden, wenn auch der Code da ist
+    if (url && !urlSent && (!aufServer() || provider !== 'openai' || geraeteCode)) {
       urlSent = true
+      if (geraeteCode) {
+        emit({
+          provider,
+          type: 'login-url',
+          url,
+          needsCode: false,
+          message: `Den Link öffnen, bei ChatGPT anmelden und diesen Code eingeben: ${geraeteCode} (15 Minuten gültig). Danach geht es hier automatisch weiter.`
+        })
+        return
+      }
       emit({
         provider,
         type: 'login-url',
@@ -298,8 +331,8 @@ export function startLogin(provider: AiProviderId, emit: Emit, isLoggedIn: () =>
   child.stdin.on('error', () => undefined)
   child.on('error', (e) => emit({ provider, type: 'error', message: `Anmeldung konnte nicht gestartet werden: ${e.message}` }))
   child.on('close', async (code) => {
-    if (logins.get(provider) !== child) return // abgebrochen oder ersetzt
-    logins.delete(provider)
+    if (logins.get(loginSchluessel(provider)) !== child) return // abgebrochen oder ersetzt
+    logins.delete(loginSchluessel(provider))
     const ok = await isLoggedIn().catch(() => false)
     if (ok) emit({ provider, type: 'logged-in', message: 'Anmeldung erfolgreich.' })
     else {
@@ -332,7 +365,7 @@ function startAgyLogin(exe: string, cwd: string, emit: Emit, isLoggedIn: () => P
     windowsHide: false,
     stdio: 'ignore'
   })
-  logins.set(provider, child)
+  logins.set(loginSchluessel(provider), child)
   emit({
     provider,
     type: 'login-url',
@@ -341,18 +374,18 @@ function startAgyLogin(exe: string, cwd: string, emit: Emit, isLoggedIn: () => P
       'Ein Fenster von Antigravity hat sich geöffnet und startet die Google-Anmeldung im Browser. Nach der Anmeldung schließt sich das Fenster automatisch.'
   })
   const poll = setInterval(async () => {
-    if (logins.get(provider) !== child) return clearInterval(poll)
+    if (logins.get(loginSchluessel(provider)) !== child) return clearInterval(poll)
     if (await isLoggedIn().catch(() => false)) {
       clearInterval(poll)
-      logins.delete(provider)
+      logins.delete(loginSchluessel(provider))
       killTree(child)
       emit({ provider, type: 'logged-in', message: 'Anmeldung erfolgreich.' })
     }
   }, 4000)
   child.on('close', async () => {
     clearInterval(poll)
-    if (logins.get(provider) !== child) return
-    logins.delete(provider)
+    if (logins.get(loginSchluessel(provider)) !== child) return
+    logins.delete(loginSchluessel(provider))
     const ok = await isLoggedIn().catch(() => false)
     emit(
       ok
@@ -364,19 +397,23 @@ function startAgyLogin(exe: string, cwd: string, emit: Emit, isLoggedIn: () => P
 
 function killTree(child: ChildProcess): void {
   if (!child.pid) return
+  if (process.platform !== 'win32') {
+    child.kill('SIGKILL')
+    return
+  }
   spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
 }
 
 export function submitLoginCode(provider: AiProviderId, code: string): void {
-  const child = logins.get(provider)
+  const child = logins.get(loginSchluessel(provider))
   if (!child?.stdin?.writable) throw new Error('Es läuft keine Anmeldung. Bitte „Anmelden" erneut wählen.')
   child.stdin.write(`${code.trim()}\n`)
 }
 
 export function cancelLogin(provider: AiProviderId): void {
-  const child = logins.get(provider)
+  const child = logins.get(loginSchluessel(provider))
   if (!child) return
-  logins.delete(provider)
+  logins.delete(loginSchluessel(provider))
   killTree(child)
 }
 

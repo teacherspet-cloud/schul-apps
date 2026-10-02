@@ -72,7 +72,28 @@ export function resolveShim(cmdPath: string, provider: AiProviderId): string | n
   return null
 }
 
+/**
+ * Auf dem Server (02.10.2026, src/server): Die KI-Programme sind im Docker-Bild fest eingebaut
+ * (SCHULAPPS_CLI_OPENAI / _ANTHROPIC); eigene Pfade der Nutzer gibt es nicht. Jede Lehrkraft
+ * bekommt eigene Anmeldeordner unter ihrer Ablage (siehe `cliEnv`) – ihr EIGENES Abo, nie das
+ * einer anderen (Nutzungsbedingungen: Konten nicht teilen). Antigravity braucht ein sichtbares
+ * Fenster für die Anmeldung und steht auf dem Server deshalb nicht zur Verfügung.
+ */
+export const aufServer = (): boolean => process.env.SCHULAPPS_SERVER === '1'
+
+/** Anmeldeordner des Nutzers auf dem Server (nur für ihn lesbar) */
+export function serverKiOrdner(teil: 'codex' | 'claude' | 'home'): string {
+  const dir = join(app.getPath('userData'), 'ki', teil)
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 })
+  return dir
+}
+
 export function findCli(provider: AiProviderId): string | null {
+  if (aufServer()) {
+    if (provider === 'google') return null
+    const pfad = (provider === 'openai' ? env.SCHULAPPS_CLI_OPENAI : env.SCHULAPPS_CLI_ANTHROPIC) || `/usr/local/bin/${SUBSCRIPTIONS[provider].command}`
+    return isFile(pfad) ? pfad : null
+  }
   const custom = getSettings().ai.cliPaths[provider]?.trim()
   if (custom) {
     if (/\.cmd$/i.test(custom)) return resolveShim(custom, provider)
@@ -136,6 +157,12 @@ export function cliEnv(): NodeJS.ProcessEnv {
   out.NO_COLOR = '1'
   // Claude Code soll sich nicht selbst woandershin aktualisieren; Updates übernimmt die App
   out.DISABLE_AUTOUPDATER = '1'
+  // Server: Anmeldung und Einstellungen der Programme je Nutzer (nie geteilt)
+  if (aufServer()) {
+    out.HOME = serverKiOrdner('home')
+    out.CODEX_HOME = serverKiOrdner('codex')
+    out.CLAUDE_CONFIG_DIR = serverKiOrdner('claude')
+  }
   return out
 }
 
@@ -264,6 +291,7 @@ export const IMAGE_TIMEOUT_MS = 6 * 60 * 1000
 const IMAGE_ONLY = 'Führe keine anderen Aktionen aus (keine Befehle, keine weiteren Dateien). Antworte danach nur mit „fertig".'
 
 function codexHome(): string {
+  if (aufServer()) return serverKiOrdner('codex')
   return process.env.CODEX_HOME || join(home, '.codex')
 }
 

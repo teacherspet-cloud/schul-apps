@@ -1,3 +1,4 @@
+import { nurPcNetz } from "../shared/plattform";
 import {
   Alert,
   Badge,
@@ -97,8 +98,8 @@ export default function Home(): React.JSX.Element {
       void abgleichen(m.filter((x) => x.moduleId !== "vokabelliste"));
     });
     void ladeThemen().catch(() => undefined);
-    // Am Tablet richtet niemand den KI-Zugang ein – dort wäre der Hinweis nur Lärm
-    if (!imNetz())
+    // Am Tablet richtet niemand den KI-Zugang ein – dort wäre der Hinweis nur Lärm (auf dem Server schon)
+    if (!nurPcNetz())
       window.api.ai
         .status()
         .then((s) => !weg && setOhneKi(!s.hasTextKey))

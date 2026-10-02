@@ -1,4 +1,5 @@
 import { setzeFachVorgabe } from "../fachVorgabe";
+import { nurPcNetz } from '../plattform'
 import {
   ActionIcon,
   Alert,
@@ -61,7 +62,6 @@ import {
 import { artFarbe } from "../materialart";
 import { neuAnlegen, openDocument, openThemen } from "../navigation";
 import { useMenueFokus } from "../menueFokus";
-import { imNetz } from "../netzZugang";
 import {
   abgleichen,
   allesEinsortieren,
@@ -1389,8 +1389,8 @@ function BereichMenue({
             Verschieben nach …
           </Menu.Item>
         )}
-        {/* Löschen gibt es wie bei den Materialien nur am Rechner */}
-        {!imNetz() && (
+        {/* Löschen gibt es wie bei den Materialien nur am Rechner – und auf dem Server (eigene Ablage) */}
+        {!nurPcNetz() && (
           <Menu.Item
             leftSection={<IconTrash size={14} />}
             color="red"

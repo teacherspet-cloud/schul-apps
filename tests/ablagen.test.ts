@@ -17,7 +17,8 @@ const NICHT_SICHERN: Record<string, string> = {
   'fenster.json': 'Fensterlage dieses Bildschirms',
   sicherungen: 'die Sicherungen selbst',
   'protokoll.log': 'Fehlerprotokoll dieses Rechners',
-  'verbrauch.json': 'Verbrauchszählung dieses Rechners'
+  'verbrauch.json': 'Verbrauchszählung dieses Rechners',
+  ki: 'Server (02.10.2026): Anmeldung der KI-Programme je Nutzer – Zugangsdaten, gehören nie in eine Sicherung'
 }
 
 function dateien(dir: string): string[] {

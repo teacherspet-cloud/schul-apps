@@ -36,10 +36,25 @@ export const imNetz = (): boolean => imBrowserGestartet
 
 const SCHLUESSEL = 'schulapps-netz-token'
 
+/**
+ * Auf dem Schul-Apps-Server (02.10.2026, src/server) gilt die Sitzung per Cookie: Der Server
+ * setzt es bei der Anmeldung (IServ oder Testkonto), der Browser schickt es von selbst mit. Die
+ * Kopfzeile x-schulapps-token trägt dann nur ein festes Zeichen (Schutz gegen untergeschobene
+ * Formulare). Läuft die Sitzung ab, geht es zurück zur Anmeldeseite.
+ */
+const aufDemServer = typeof window !== 'undefined' && Boolean(window.__schulappsServer)
+const serverSpeicher = {
+  lies: (): string => 'server',
+  schreibe: (): void => undefined,
+  loesche: (): void => {
+    window.location.assign(`/anmelden?ziel=${encodeURIComponent('/')}`)
+  }
+}
+
 /** Die Verbindung zum PC – Adresse ist die eigene Herkunft, die Anmeldung liegt im localStorage */
 const verbindung = netzVerbindung({
   basis: '',
-  speicher: {
+  speicher: aufDemServer ? serverSpeicher : {
     lies: () => {
       try {
         return localStorage.getItem(SCHLUESSEL) ?? ''

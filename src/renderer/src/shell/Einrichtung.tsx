@@ -1,4 +1,5 @@
 import { Button, Group, Modal, Stack, Stepper, Text, Title } from '@mantine/core'
+import { aufServer, serverIch } from '../shared/plattform'
 import { IconFolder, IconHeadphones, IconPalette, IconPhoto, IconSchool, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { useAppSettings } from '../shared/settingsStore'
@@ -51,6 +52,17 @@ export default function Einrichtung(): React.JSX.Element | null {
      * KI-Anbieter, Logo-Datei). Vom Tablet aus liefe er ins Leere. In der iPad-App dagegen
      * schon – sie ist ein eigenes Programm mit eigenen Einstellungen (imNetz() ist dort false).
      */
+    /*
+     * Server (02.10.2026): beim ERSTEN Anmelden jeder Lehrkraft – der Server merkt sich, dass sie
+     * eingerichtet ist (POST /server/eingerichtet), unabhängig davon, was schon eingetragen ist.
+     */
+    if (aufServer()) {
+      if (!geprueft) {
+        setOffen(!serverIch()?.eingerichtet)
+        setGeprueft(true)
+      }
+      return
+    }
     if (imNetz() || geprueft) return
     let abgebrochen = false
     void (async () => {
@@ -67,6 +79,17 @@ export default function Einrichtung(): React.JSX.Element | null {
   }, [settings.schoolName, geprueft])
 
   if (!offen) return null
+
+  /** Schließen – auf dem Server zugleich „eingerichtet" merken (der Assistent kommt nicht wieder) */
+  function schliessen(): void {
+    setOffen(false)
+    if (!aufServer()) return
+    void fetch('/server/eingerichtet', { method: 'POST', headers: { 'x-schulapps-token': 'server' } })
+      .then(() => {
+        if (window.__schulappsServer) window.__schulappsServer.eingerichtet = true
+      })
+      .catch(() => undefined)
+  }
   const ios = aufIos()
 
   const schritte = [
@@ -104,7 +127,7 @@ export default function Einrichtung(): React.JSX.Element | null {
       inhalt: <HoertextCard settings={settings} update={update} />
     },
     // Nur iPad: wohin erstellte Dateien kommen
-    ...(!ios
+    ...(!ios && !aufServer()
       ? [
           // PC (02.10.2026): IServ verbinden – Material dort speichern und von dort öffnen
           {
@@ -153,7 +176,7 @@ export default function Einrichtung(): React.JSX.Element | null {
   const aktuell = schritte[schritt]
 
   return (
-    <Modal opened onClose={() => setOffen(false)} title="Willkommen bei Schul-Apps" size="xl" closeOnClickOutside={false}>
+    <Modal opened onClose={schliessen} title="Willkommen bei Schul-Apps" size="xl" closeOnClickOutside={false}>
       <Stack gap="lg">
         <Group justify="space-between" align="center" wrap="nowrap">
           <Text size="sm" c="dimmed">
@@ -181,7 +204,7 @@ export default function Einrichtung(): React.JSX.Element | null {
         </div>
 
         <Group justify="space-between">
-          <Button variant="subtle" onClick={() => setOffen(false)}>
+          <Button variant="subtle" onClick={schliessen}>
             Später einrichten
           </Button>
           <Group>
@@ -190,10 +213,10 @@ export default function Einrichtung(): React.JSX.Element | null {
                 Zurück
               </Button>
             )}
-            <Button variant="light" onClick={() => (letzter ? setOffen(false) : setSchritt((n) => n + 1))}>
+            <Button variant="light" onClick={() => (letzter ? schliessen() : setSchritt((n) => n + 1))}>
               Überspringen
             </Button>
-            <Button onClick={() => (letzter ? setOffen(false) : setSchritt((n) => n + 1))}>{letzter ? 'Fertig' : 'Weiter'}</Button>
+            <Button onClick={() => (letzter ? schliessen() : setSchritt((n) => n + 1))}>{letzter ? 'Fertig' : 'Weiter'}</Button>
           </Group>
         </Group>
       </Stack>

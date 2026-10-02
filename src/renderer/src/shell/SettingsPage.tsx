@@ -69,7 +69,7 @@ import WartungCard from './WartungCard'
 import SicherungenCard from './SicherungenCard'
 import VerbrauchCard from './VerbrauchCard'
 import { imNetz } from '../shared/netzZugang'
-import { amPc, aufIos } from '../shared/plattform'
+import { amPc, aufIos, nurPcNetz } from '../shared/plattform'
 import PictogramStudio from './PictogramStudio'
 import { PcKiVerbindung, PcKiWahl } from './PcKiZugang'
 import AblageCard from './AblageCard'
@@ -100,7 +100,7 @@ export default function SettingsPage(): React.JSX.Element {
   const gewuenscht = useNavigation((s) => s.settingsTab)
   const setTab = useNavigation((s) => s.setSettingsTab)
   // KI-Zugang, Netzwerk und Wartung gibt es nur am Rechner – vom Tablet aus gilt dann der erste Reiter
-  const tab = (imNetz() && ['ki', 'netzwerk', 'wartung'].includes(gewuenscht)) || (aufIos() && gewuenscht === 'netzwerk') ? 'schule' : gewuenscht
+  const tab = (imNetz() && (['netzwerk', 'wartung'].includes(gewuenscht) || (nurPcNetz() && gewuenscht === 'ki'))) || (aufIos() && gewuenscht === 'netzwerk') ? 'schule' : gewuenscht
 
   return (
     <Tabs
@@ -133,7 +133,7 @@ export default function SettingsPage(): React.JSX.Element {
            * deshalb sind die Aufrufe gesperrt. Die Reiter dann trotzdem zu zeigen hieße,
            * jemanden in eine Fehlermeldung laufen zu lassen.
            */}
-          {!imNetz() && (
+          {!nurPcNetz() && (
             <Tabs.Tab value="ki" leftSection={<IconSparkles size={16} />}>
               KI-Zugang
             </Tabs.Tab>
@@ -243,7 +243,7 @@ export default function SettingsPage(): React.JSX.Element {
             <AppearanceCard settings={settings} update={update} />
           </Tabs.Panel>
 
-          {!imNetz() && (
+          {!nurPcNetz() && (
             <Tabs.Panel value="ki">
               <Stack gap="md">
                 <AiCard settings={settings} update={update} />
@@ -259,7 +259,7 @@ export default function SettingsPage(): React.JSX.Element {
                 bei Bildern und Hörtexten – und die Piktogramm-Werkstatt verwies auf sie. Am Tablet
                 nicht: Die Anmeldung beim Anbieter läuft auf dem Rechner.
               */}
-              {!imNetz() && <ImageAiCard settings={settings} update={update} />}
+              {!nurPcNetz() && <ImageAiCard settings={settings} update={update} />}
               <Card withBorder padding="lg">
                 <Title order={4} mb="md">
                   Bildsuche

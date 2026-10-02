@@ -108,10 +108,19 @@ export function setSecret(name: SecretName, value: string): void {
   writeJson('secrets.json', store)
 }
 
+/**
+ * Server (02.10.2026, src/server): vom Admin für alle freigegebene Schlüssel – gilt nur, wenn der
+ * Nutzer keinen eigenen hinterlegt hat. Am PC und auf dem iPad nie gesetzt.
+ */
+let geheimRueckfall: ((name: SecretName) => string | undefined) | null = null
+export const setzeGeheimRueckfall = (fn: ((name: SecretName) => string | undefined) | null): void => {
+  geheimRueckfall = fn
+}
+
 export function getSecret(name: SecretName): string | undefined {
   const store = readJson<SecretStore>('secrets.json', {})
   const enc = store[name]
-  if (!enc) return undefined
+  if (!enc) return geheimRueckfall?.(name) || undefined
   try {
     return safeStorage.decryptString(Buffer.from(enc, 'base64'))
   } catch {
