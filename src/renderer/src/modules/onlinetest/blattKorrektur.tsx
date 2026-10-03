@@ -99,16 +99,19 @@ export function FeldMarkierung(p: {
   )
 }
 
-/** Randkommentare: Spalte neben der Seite (breit) oder Marken am Seitenrand (schmal) */
-export function Rand(p: { eintraege: { a: Anmerkung; y: number }[]; spalte: { x: number; w: number } | null; randX: number }): React.JSX.Element {
-  // Untereinander, ohne Überlappung (in der Spalte rutscht ein Kommentar unter den vorigen)
+/**
+ * Randkommentare. Neben Schreiblinien (x/w gesetzt) stehen sie im Korrekturrand auf Höhe der Stelle –
+ * kurz gefasst, ein Tipp zeigt den ganzen Text; andere Stellen (Lücken, Kästchen) bekommen eine Marke.
+ */
+export function Rand(p: { eintraege: { a: Anmerkung; y: number; x?: number; w?: number }[]; randX: number }): React.JSX.Element {
+  // Untereinander, ohne Überlappung (ein Kommentar rutscht unter den vorigen)
   const sortiert = [...p.eintraege].sort((x, y) => x.y - y.y)
   let unten = -Infinity
   return (
     <>
-      {sortiert.map(({ a, y }) => {
+      {sortiert.map(({ a, y, x, w }) => {
         const farbe = ANMERKUNG_FARBE[a.art]
-        if (!p.spalte)
+        if (x === undefined || w === undefined)
           return (
             <Popover key={a.nr} position="left" withArrow shadow="md" width={240}>
               <Popover.Target>
@@ -143,30 +146,45 @@ export function Rand(p: { eintraege: { a: Anmerkung; y: number }[]; spalte: { x:
               </Popover.Dropdown>
             </Popover>
           )
-        const top = Math.max(y - 4, unten + 6)
-        unten = top + 22 + Math.ceil(a.text.length / 32) * 16
+        const top = Math.max(y - 2, unten + 4)
+        const zeilen = Math.min(5, Math.ceil(((a.zeichen ? a.zeichen.length + 2 : 0) + a.text.length + 3) / Math.max(10, Math.floor(w / 6.2))))
+        unten = top + 6 + zeilen * 14
         return (
-          <div
-            key={a.nr}
-            style={{
-              position: 'absolute',
-              left: p.spalte.x,
-              top,
-              width: p.spalte.w,
-              borderLeft: `3px solid ${farbe}`,
-              background: 'var(--mantine-color-body)',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-              borderRadius: 4,
-              padding: '3px 6px',
-              fontSize: 12.5,
-              lineHeight: 1.35,
-              zIndex: 25
-            }}
-            data-rand-kommentar={a.nr}
-          >
-            <b style={{ color: farbe }}>{a.nr}</b> {a.zeichen ? <b>{a.zeichen}: </b> : null}
-            {a.text}
-          </div>
+          <Popover key={a.nr} position="right" withArrow shadow="md" width={260}>
+            <Popover.Target>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: x,
+                  top,
+                  width: w,
+                  borderLeft: `3px solid ${farbe}`,
+                  background: 'rgba(255,255,255,0.94)',
+                  borderRadius: 3,
+                  padding: '1px 4px',
+                  fontSize: 11,
+                  lineHeight: '14px',
+                  color: '#222',
+                  zIndex: 25,
+                  cursor: 'pointer',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 5,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}
+                data-rand-kommentar={a.nr}
+              >
+                <b style={{ color: farbe }}>{a.nr}</b> {a.zeichen ? <b style={{ color: farbe }}>{a.zeichen} </b> : null}
+                {a.text}
+              </div>
+            </Popover.Target>
+            <Popover.Dropdown p="xs">
+              <Text size="sm">
+                {a.zeichen ? <b>{a.zeichen}: </b> : null}
+                {a.text}
+              </Text>
+            </Popover.Dropdown>
+          </Popover>
         )
       })}
     </>

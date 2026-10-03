@@ -31,8 +31,9 @@ import {
 } from '@mantine/core'
 import { IconArrowBackUp, IconArrowLeft, IconDownload, IconMessageCircle, IconPrinter, IconSend } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { digitalisieren, zusatzLinien } from '@shared/blattDigital'
-import { objekteAus, objekteSvg, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
+import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
+import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
+import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import type { BlattFeldArt } from '@shared/blattFreigabe'
@@ -41,6 +42,8 @@ import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
+/** Korrekturrand in Pixeln (34 mm bei 96 dpi) */
+const RAND_PX = Math.round((KORREKTURRAND_MM * 96) / 25.4)
 
 interface Feld {
   id: string
@@ -59,6 +62,8 @@ interface Feld {
   text?: string
   /** zeilen: Nummer der letzten Originallinie (Anker für zusätzliche Linien, blattDigital.ts) */
   anker?: number
+  /** Index des (ersten) Elements in doc.querySelectorAll(FELDER) – die Druckfassung schreibt dort hinein */
+  el?: number
 }
 
 interface Seite {
@@ -107,7 +112,6 @@ type AufgabenFb = {
 }
 
 // Wie das ausfüllbare PDF, dazu die leeren Zellen von Ausfülltabellen
-const FELDER = '.ws-line, .ws-label-line, .ws-check:not(.ws-check-demo), .ws-gap, .ws-space, .ws-workspace, .ws-box, .ws-tf-cell, .ws-cell-empty'
 
 /** Felder, Seiten und Aufgaben im gezeichneten Blatt messen (Dokumentreihenfolge = Lesereihenfolge) */
 function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[] } {
@@ -135,6 +139,8 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
     }
     return nr
   }
+  const index = new Map<Element, number>()
+  doc.querySelectorAll(FELDER).forEach((el, i) => index.set(el, i))
   doc.querySelectorAll('.ws-page').forEach((p, i) => {
     const r = p.getBoundingClientRect()
     seiten.push({ x: r.left, y: r.top, w: r.width, h: r.height })
@@ -163,6 +169,7 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
       const li = el.getAttribute('data-li')
       roh.push({
         ...(li !== null ? { anker: Number(li) } : {}),
+        el: index.get(el),
         nr: n,
         art,
         seite: i,
@@ -285,9 +292,10 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       return { nr: i + 1, zitat: a.zitat, art: a.art, text: a.text, ...(zeichen ? { zeichen } : {}) }
     })
   }, [letzteFassung, aufgabenFb])
-  const SPALTE = 250
-  const spalte = ansicht === 'blatt' && anmerkungen.length > 0 && breite >= BREITE * 0.95 + SPALTE
-  const massstab = Math.min(1.25, (breite - (spalte ? SPALTE : 0)) / BREITE)
+  // Randkommentare stehen im Korrekturrand der Seite (blattDigital.ts) – keine Spalte daneben
+  const spalte = false
+  const SPALTE = 0
+  const massstab = Math.min(1.25, breite / BREITE)
 
   const messe = useCallback((): void => {
     const doc = iframe.current?.contentDocument
@@ -384,65 +392,24 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    * Der Server macht daraus ein PDF (ohne Skripte, ohne Netz).
    */
   const [pdfLaeuft, setPdfLaeuft] = useState<'speichern' | 'drucken' | null>(null)
-  const blattHtml = (): string | null => {
+  const blattHtml = async (): Promise<string | null> => {
     const doc = iframe.current?.contentDocument
     if (!doc || !gemessen) return null
-    const klon = doc.documentElement.cloneNode(true) as HTMLElement
-    const seitenEl = [...klon.querySelectorAll<HTMLElement>('.ws-page')]
-    const schrift = '"Segoe Print", "Comic Sans MS", system-ui, sans-serif'
-    for (const f of gemessen.felder) {
-      const wert = (antworten[f.id] ?? '').trim()
-      const s = gemessen.seiten[f.seite]
-      const seite = seitenEl[f.seite]
-      if (!wert || !s || !seite) continue
-      const div = doc.createElement('div')
-      const abstand = f.abstand ?? 24
-      const mehrzeilig = f.art === 'zeilen' && (f.zeilen ?? 1) > 1
-      div.textContent = f.art === 'kreuz' ? '✗' : wert
-      div.style.cssText = [
-        'position:absolute',
-        `left:${f.x - s.x}px`,
-        `top:${f.y - s.y}px`,
-        `width:${f.w}px`,
-        `min-height:${f.h}px`,
-        'color:#1d4ed8',
-        `font-family:${schrift}`,
-        'white-space:pre-wrap',
-        'overflow-wrap:break-word',
-        'z-index:40',
-        f.art === 'kreuz'
-          ? `font-size:${Math.min(f.w, f.h) * 0.9}px;line-height:${f.h}px;text-align:center;font-weight:700`
-          : mehrzeilig
-            ? `font-size:${Math.max(12, Math.min(18, abstand * 0.6))}px;line-height:${abstand}px;padding:${Math.max(0, abstand * 0.2)}px 3px 0`
-            : `font-size:${Math.max(12, Math.min(18, f.h * 0.65))}px;line-height:${f.h}px;padding:0 3px`
-      ].join(';')
-      seite.appendChild(div)
-    }
-    seitenEl.forEach((seite, i) => {
-      const s = gemessen.seiten[i]
-      if (!s) return
-      if (tinte[String(i)]) {
-        const img = doc.createElement('img')
-        img.src = tinte[String(i)]
-        img.style.cssText = `position:absolute;left:0;top:0;width:${s.w}px;height:auto;z-index:50;pointer-events:none`
-        seite.appendChild(img)
-      }
-      const eigene = objekte.filter((o) => o.s === i)
-      if (eigene.length) seite.insertAdjacentHTML('beforeend', objekteSvg(eigene, s.w, 1))
-    })
-    const druck = doc.createElement('style')
-    druck.textContent =
-      '@page{size:A4;margin:0}html,body{background:#fff !important}.ws-page{break-after:page;margin:0 !important;box-shadow:none !important}.ws-page:last-child{break-after:auto}'
-    klon.querySelector('head')?.appendChild(druck)
-    return `<!doctype html>${klon.outerHTML}`
+    return druckfassung(doc, gemessen, antworten, tinte, objekte, anmerkungen)
   }
   const pdf = async (art: 'speichern' | 'drucken'): Promise<void> => {
-    // Für „Drucken" das Fenster sofort öffnen (sonst blockiert der Browser es), dann das PDF hinein
-    const fenster = art === 'drucken' ? window.open('', '_blank') : null
     setPdfLaeuft(art)
+    // iPad/iPhone drucken ein verstecktes Fenster nicht zuverlässig: dort das PDF öffnen (Teilen › Drucken)
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    const fenster = art === 'drucken' && ios ? window.open('', '_blank') : null
     try {
-      const html = blattHtml()
+      const html = await blattHtml()
       if (!html) throw new Error('Das Blatt ist noch nicht geladen.')
+      if (art === 'drucken' && !ios) {
+        // Druckdialog mit Seitenvorschau: dieselbe Druckfassung, die auch das PDF bekommt
+        await druckenImRahmen(html)
+        return
+      }
       const r = await fetch(lehrkraft ? '/server/blaetter/pdf' : '/s/api/blatt/pdf', {
         method: 'POST',
         headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
@@ -598,9 +565,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 markerFarbe={markerFarbe}
                 objekte={objekte}
                 setObjekte={setObjekte}
-                wachsen={offen ? wachsen : undefined}
+                wachsen={wachsen}
                 anmerkungen={anmerkungen}
-                spalte={spalte ? { x: BREITE + 8, w: SPALTE - 16 } : null}
                 tinte={tinte}
                 setTinte={(s, url) => {
                   stand.current.tinteGeaendert = true
@@ -723,7 +689,6 @@ function Ebene(p: {
   setObjekte: (o: BlattObjekt[]) => void
   wachsen?: (anker: number, mehr: number) => void
   anmerkungen: Anmerkung[]
-  spalte: { x: number; w: number } | null
   tinte: Record<string, string>
   setTinte: (seite: number, url: string) => void
   pruefen?: (nr: number) => Promise<void>
@@ -735,8 +700,12 @@ function Ebene(p: {
   const schreibt = p.werkzeug !== 'tastatur'
   const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
   // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
-  const [lagen, setLagen] = useState<Record<number, number>>({})
-  const meldeLage = useCallback((nr: number, y: number): void => setLagen((l) => (Math.abs((l[nr] ?? -1) - y) < 0.5 ? l : { ...l, [nr]: y })), [])
+  const [lagen, setLagen] = useState<Record<number, { y: number; feld: string }>>({})
+  const meldeLage = useCallback(
+    (nr: number, y: number, feld: string): void =>
+      setLagen((l) => (l[nr] && Math.abs(l[nr].y - y) < 0.5 && l[nr].feld === feld ? l : { ...l, [nr]: { y, feld } })),
+    []
+  )
   // Jede Anmerkung höchstens einmal markieren – im ersten Feld, in dem ihr Zitat steht
   const vergeben = new Set<number>()
   const trefferVon = (wert: string): ReturnType<typeof fundstellen> => {
@@ -813,7 +782,7 @@ function Ebene(p: {
                 treffer={treffer}
                 stil={{ ...eingabeStil, lineHeight: `${hoehe}px` }}
                 einzeilig
-                lage={(nr, y) => meldeLage(nr, f.y + f.h - hoehe + y)}
+                lage={(nr, y) => meldeLage(nr, f.y + f.h - hoehe + y, f.id)}
               />
             ) : null,
             <input
@@ -842,7 +811,14 @@ function Ebene(p: {
         const treffer = trefferVon(wert)
         return [
           treffer.length ? (
-            <FeldMarkierung key={`m${f.id}`} wert={wert} treffer={treffer} stil={flaechenStil} einzeilig={false} lage={(nr, y) => meldeLage(nr, f.y + y)} />
+            <FeldMarkierung
+              key={`m${f.id}`}
+              wert={wert}
+              treffer={treffer}
+              stil={flaechenStil}
+              einzeilig={false}
+              lage={(nr, y) => meldeLage(nr, f.y + y, f.id)}
+            />
           ) : null,
           <textarea
             key={f.id}
@@ -863,8 +839,14 @@ function Ebene(p: {
         ]
       })}
       <Rand
-        eintraege={p.anmerkungen.filter((a) => lagen[a.nr] !== undefined && vergeben.has(a.nr)).map((a) => ({ a, y: lagen[a.nr] }))}
-        spalte={p.spalte}
+        eintraege={p.anmerkungen
+          .filter((a) => lagen[a.nr] !== undefined && vergeben.has(a.nr))
+          .map((a) => {
+            const l = lagen[a.nr]
+            const f = p.felder.find((x) => x.id === l.feld)
+            // Neben Schreiblinien: in den Korrekturrand (zwischen Linienende und Seitenrand)
+            return f && f.art === 'zeilen' && (f.zeilen ?? 1) > 1 ? { a, y: l.y, x: f.x + f.w + 6, w: Math.max(80, RAND_PX - 12) } : { a, y: l.y }
+          })}
         randX={BREITE - 30}
       />
       {p.seiten.map((s, i) => (

@@ -13,6 +13,13 @@
  * Seitenbilder an die KI) – deshalb ohne Importe und Hilfsfunktionen von außen: Der Server
  * übergibt den Quelltext der Funktion an `page.evaluate`.
  */
+/**
+ * Korrekturrand (03.10.2026, Wunsch der Lehrkraft: „Randkommentare … neben den Schülertexten. Dafür
+ * musst du die Breite der Zeilen reduzieren"): Schreiblinien enden diesen Abstand vor dem rechten
+ * Rand – dort stehen die Kommentare auf Höhe ihrer Stelle, am Bildschirm wie im PDF.
+ */
+export const KORREKTURRAND_MM = 34
+
 export function digitalisieren(doc: Document): number {
   if (doc.documentElement.hasAttribute('data-digital')) return 0
   doc.documentElement.setAttribute('data-digital', '')
@@ -20,6 +27,8 @@ export function digitalisieren(doc: Document): number {
   stil.textContent =
     '.ws-page{height:auto !important;min-height:297mm;overflow:visible !important;display:flow-root}' +
     '.ws-body{overflow:visible !important}' +
+    // Korrekturrand: Zahl wie KORREKTURRAND_MM (der Server übergibt nur den Quelltext dieser Funktion)
+    '.ws-lines{margin-right:34mm !important}' +
     '.ws-content{position:relative !important;left:auto !important;right:auto !important;top:auto !important;bottom:auto !important}'
   doc.head.appendChild(stil)
   /*
