@@ -23,15 +23,20 @@ import {
   IconX
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { falschschreibungen } from '@shared/vokabelFehler'
 import {
+  auswahlFsOptionen,
   auswahlOptionen,
   buchstaben,
+  lueckenMuster,
+  paarFuer,
   istSicher,
   ohneAngaben,
   satzMitLuecke,
   sitzungsWoerter,
   uebersicht,
   uebungFuer,
+  varianten,
   type Uebung,
   type Urteil,
   type Vokabel,
@@ -310,7 +315,7 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
    */
   const uebung = useMemo<Uebung>(() => (v && st ? uebungFuer(st, v) : 'karte'), [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const antworten = async (wert: { antwort?: string; gewusst?: boolean }): Promise<void> => {
+  const antworten = async (wert: { antwort?: string; gewusst?: boolean; gezeigt?: string }): Promise<void> => {
     if (!v || laeuft) return
     setLaeuft(true)
     try {
@@ -390,6 +395,10 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
             waehle={(a) => void antworten({ antwort: a })}
             ergebnis={ergebnis}
           />
+        ) : uebung === 'auswahlFs' ? (
+          <AuswahlFs v={v} liste={d.woerter} sprache={d.sprache} waehle={(a) => void antworten({ antwort: a })} ergebnis={ergebnis} />
+        ) : uebung === 'paar' ? (
+          <Paar v={v} liste={d.woerter} sprache={d.sprache} urteil={(a, gezeigt) => void antworten({ antwort: a, gezeigt })} ergebnis={ergebnis} />
         ) : uebung === 'buchstaben' ? (
           <Buchstaben v={v} pruefen={(a) => void antworten({ antwort: a })} gesperrt={Boolean(ergebnis)} />
         ) : (
@@ -606,6 +615,130 @@ function Auswahl({
   )
 }
 
+/** Richtige Schreibweise in der Fremdsprache wählen – gelegentlich zwischen typischen Falschschreibungen */
+function AuswahlFs({
+  v,
+  liste,
+  sprache,
+  waehle,
+  ergebnis
+}: {
+  v: Vokabel
+  liste: Vokabel[]
+  sprache: string
+  waehle: (a: string) => void
+  ergebnis: Ergebnis | null
+}): React.JSX.Element {
+  const optionen = useMemo(
+    () => auswahlFsOptionen(v, liste, sprache, (w, n, verboten) => falschschreibungen(w, sprache, n, Math.random, verboten)),
+    [v.id] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null)
+  // Stehen Falschschreibungen dabei (Wörter, die es in der Liste nicht gibt)? Dann geht es um die Schreibweise
+  const mitFehlern = useMemo(() => {
+    const bekannt = new Set(liste.flatMap((x) => [ohneAngaben(x.term), ohneAngaben(varianten(x.term)[0] ?? x.term)].map((t) => t.toLowerCase())))
+    return optionen.filter((o) => !bekannt.has(o.toLowerCase())).length > 0
+  }, [optionen, liste])
+  return (
+    <Stack align="center">
+      <Text className="vt-frage">{mitFehlern ? 'Welche Schreibweise ist richtig?' : 'Welches Wort ist gemeint?'}</Text>
+      <Group gap="xs">
+        {v.bild && <img src={v.bild} alt="" style={{ width: 44, height: 44 }} />}
+        <Text fw={800} size="1.8rem" c="#1f2937">
+          {v.translation}
+        </Text>
+      </Group>
+      <SimpleGrid cols={{ base: 1, xs: 2 }} w="100%" maw={560}>
+        {optionen.map((o) => {
+          const istRichtig = ergebnis && (o === ergebnis.richtig || (ergebnis.urteil === 'richtig' && o === gewaehlt))
+          const falsch = ergebnis && o === gewaehlt && ergebnis.urteil !== 'richtig'
+          return (
+            <Button
+              key={o}
+              size="lg"
+              radius="lg"
+              className="vt-option"
+              data-zustand={istRichtig ? 'richtig' : falsch ? 'falsch' : undefined}
+              onClick={() => {
+                if (ergebnis) return
+                setGewaehlt(o)
+                waehle(o)
+              }}
+              styles={{ label: { whiteSpace: 'normal', fontWeight: 700, letterSpacing: 0.3 } }}
+              h="auto"
+              py="sm"
+              data-option-fs
+            >
+              {o}
+            </Button>
+          )
+        })}
+      </SimpleGrid>
+    </Stack>
+  )
+}
+
+/** Stimmt das Paar? – schnelles Erkennen */
+function Paar({
+  v,
+  liste,
+  sprache,
+  urteil,
+  ergebnis
+}: {
+  v: Vokabel
+  liste: Vokabel[]
+  sprache: string
+  urteil: (a: 'stimmt' | 'stimmt nicht', gezeigt: string) => void
+  ergebnis: Ergebnis | null
+}): React.JSX.Element {
+  const gezeigt = useMemo(() => paarFuer(v, liste), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => sprich(v.term, sprache), [v.term, sprache])
+  return (
+    <Stack align="center">
+      <Text className="vt-frage">Stimmt das?</Text>
+      <Card radius="xl" padding="lg" withBorder style={{ borderColor: '#fed7aa', background: 'linear-gradient(160deg, #fff, #fff7ed)', minWidth: 280 }}>
+        <Stack gap={4} align="center">
+          <Text fw={800} size="1.7rem" c="#1f2937">
+            {v.term}
+          </Text>
+          <Text size="sm" c="dimmed">
+            bedeutet
+          </Text>
+          <Text fw={700} size="1.4rem" c="#c2410c">
+            {gezeigt}
+          </Text>
+        </Stack>
+      </Card>
+      <Group>
+        <Button
+          size="lg"
+          radius="xl"
+          color="red"
+          variant="light"
+          disabled={Boolean(ergebnis)}
+          onClick={() => urteil('stimmt nicht', gezeigt)}
+          leftSection={<IconX size={18} />}
+          data-paar="nein"
+        >
+          Stimmt nicht
+        </Button>
+        <Button
+          size="lg"
+          radius="xl"
+          color="teal"
+          disabled={Boolean(ergebnis)}
+          onClick={() => urteil('stimmt', gezeigt)}
+          leftSection={<IconCheck size={18} />}
+          data-paar="ja"
+        >
+          Stimmt
+        </Button>
+      </Group>
+    </Stack>
+  )
+}
+
 function Buchstaben({ v, pruefen, gesperrt }: { v: Vokabel; pruefen: (a: string) => void; gesperrt: boolean }): React.JSX.Element {
   const kacheln = useMemo(() => buchstaben(v.term).map((b, i) => ({ b, i })), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [gelegt, setGelegt] = useState<number[]>([])
@@ -664,6 +797,7 @@ function Schreiben({
   const [text, setText] = useState('')
   const feld = useRef<HTMLInputElement>(null)
   const luecke = uebung === 'luecke' && v.example ? satzMitLuecke(v.example, v.term) : null
+  const muster = useMemo(() => (uebung === 'luecken' ? lueckenMuster(v.term) : ''), [v.id, uebung]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (uebung === 'diktat') sprich(v.term, sprache)
     feld.current?.focus()
@@ -678,12 +812,27 @@ function Schreiben({
   return (
     <Stack align="center">
       <Text className="vt-frage">
-        {uebung === 'diktat' ? 'Hör zu und schreib das Wort' : luecke ? 'Ergänze den Satz' : 'Schreib das Wort in der Fremdsprache'}
+        {uebung === 'diktat'
+          ? 'Hör zu und schreib das Wort'
+          : luecke
+            ? 'Ergänze den Satz'
+            : muster
+              ? 'Ergänze die fehlenden Buchstaben'
+              : 'Schreib das Wort in der Fremdsprache'}
       </Text>
       {uebung === 'diktat' ? (
         <ActionIcon size={72} radius="xl" variant="light" color="orange" onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">
           <IconVolume size={36} />
         </ActionIcon>
+      ) : muster ? (
+        <Stack gap={4} align="center">
+          <Text fw={800} size="2rem" c="#c2410c" style={{ letterSpacing: 6, fontFamily: 'ui-monospace, monospace' }} data-luecken-muster>
+            {muster}
+          </Text>
+          <Text size="md" c="dimmed">
+            {v.translation}
+          </Text>
+        </Stack>
       ) : luecke ? (
         <Card withBorder radius="md" maw={560}>
           <Text size="lg" ta="center">
@@ -720,7 +869,7 @@ function Schreiben({
           autoCorrect="off"
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="…"
+          placeholder={muster ? 'ganzes Wort' : '…'}
           data-eingabe
         />
         {AKZENTE[sprache] && (

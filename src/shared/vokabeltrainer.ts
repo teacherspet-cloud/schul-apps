@@ -66,16 +66,27 @@ export const neuerStand = (): WortStand => ({
 
 export type Urteil = 'richtig' | 'fast' | 'falsch'
 
-export type Uebung = 'karte' | 'auswahl' | 'hoeren' | 'buchstaben' | 'frei' | 'diktat' | 'luecke'
+/**
+ * Übungsarten. Seit 03.10.2026 (Wunsch der Lehrkraft: „weitere Arten"): `auswahlFs` (die richtige
+ * Schreibweise der Fremdsprache wählen – mit typischen Falschschreibungen als Distraktoren),
+ * `paar` (stimmt das Paar Fremdwort – Übersetzung?), `luecken` (Wort mit fehlenden Buchstaben).
+ */
+export type Uebung = 'karte' | 'auswahl' | 'hoeren' | 'buchstaben' | 'frei' | 'diktat' | 'luecke' | 'auswahlFs' | 'paar' | 'luecken'
+export const UEBUNGEN: Uebung[] = ['karte', 'auswahl', 'hoeren', 'buchstaben', 'frei', 'diktat', 'luecke', 'auswahlFs', 'paar', 'luecken']
+/** Erkennen (nicht selbst schreiben): bringt höchstens bis Fach 2 */
+export const ERKENNEN: Uebung[] = ['auswahl', 'hoeren', 'auswahlFs', 'paar']
 
 /** Welche Übung als Nächstes für dieses Wort (je nach Fach) – Erstkontakt mit Karte, dann steigend */
 export function uebungFuer(st: WortStand, v: Vokabel, zufall = Math.random()): Uebung {
   if (st.fach === 0 && st.versuche === 0) return 'karte'
-  if (st.fach <= 1) return zufall < 0.5 ? 'auswahl' : 'buchstaben'
-  if (st.fach === 2) return zufall < 0.6 ? 'buchstaben' : 'frei'
-  // Ab Fach 3 frei schreiben, abwechselnd mit Lückensatz (wenn es einen Beispielsatz gibt) und Diktat
-  if (v.example && enthaeltWort(v.example, v.term) && zufall < 0.35) return 'luecke'
-  if (zufall > 0.85) return 'diktat'
+  // Fach 0–1: erkennen in mehreren Formen, dazu Buchstaben legen
+  if (st.fach <= 1) return zufall < 0.28 ? 'auswahl' : zufall < 0.46 ? 'paar' : zufall < 0.7 ? 'auswahlFs' : 'buchstaben'
+  // Fach 2: Schreibweise festigen
+  if (st.fach === 2) return zufall < 0.3 ? 'buchstaben' : zufall < 0.5 ? 'luecken' : zufall < 0.62 ? 'auswahlFs' : 'frei'
+  // Ab Fach 3 frei schreiben, abwechselnd mit Lückensatz (wenn es einen Beispielsatz gibt), Diktat und Buchstabenlücken
+  if (v.example && enthaeltWort(v.example, v.term) && zufall < 0.3) return 'luecke'
+  if (zufall > 0.86) return 'diktat'
+  if (zufall > 0.74) return 'luecken'
   return 'frei'
 }
 
@@ -170,11 +181,22 @@ export function abstand(a: string, b: string): number {
  *  - nur Akzent fehlt → fast („Akzent fehlt: é")
  *  - ein Tippfehler bei Wörtern ab 5 Buchstaben → fast
  */
-export function bewerte(antwort: string, loesung: string): { urteil: Urteil; hinweis?: string; richtig: string } {
+export function bewerte(antwort: string, loesung: string, strikt = false): { urteil: Urteil; hinweis?: string; richtig: string } {
   const a = normal(antwort)
   const alle = varianten(loesung)
   const richtig = alle[0] ?? loesung
   if (!a) return { urteil: 'falsch', richtig }
+  /*
+   * Die ganze Lösung zählt (03.10.2026, Befund der Lehrkraft: richtig angeklickt, als falsch gewertet) –
+   * bei „welche, welcher, welches" zerlegte `varianten` die Lösung, die angeklickte ganze Angabe passte
+   * dann zu keinem Teil.
+   */
+  if (a === normal(loesung) || kernform(a) === kernform(normal(loesung))) return { urteil: 'richtig', richtig: ohneAngaben(loesung) }
+  // Auswahl (z. B. zwischen Falschschreibungen): nur genau richtig zählt, kein „fast"
+  if (strikt) {
+    for (const l of alle) if (a === normal(l) || kernform(a) === kernform(normal(l))) return { urteil: 'richtig', richtig: l }
+    return { urteil: 'falsch', richtig }
+  }
   for (const l of alle) {
     const n = normal(l)
     if (a === n || kernform(a) === kernform(n)) return { urteil: 'richtig', richtig: l }
@@ -208,7 +230,7 @@ export function istSicher(st: WortStand): boolean {
  */
 export function nachAbfrage(st0: WortStand, uebung: Uebung, urteil: Urteil, antwort: string, jetzt = Date.now(), testTermin?: number): WortStand {
   const st: WortStand = { ...st0, frei: [...st0.frei], fehlerTexte: [...st0.fehlerTexte], versuche: st0.versuche + 1, zuletzt: jetzt }
-  const erkennen = uebung === 'auswahl' || uebung === 'hoeren'
+  const erkennen = ERKENNEN.includes(uebung)
   if (erkennen) {
     st.erkennenVersuche++
     if (urteil === 'richtig') st.erkannt++
@@ -284,6 +306,50 @@ export function auswahlOptionen(v: Vokabel, liste: Vokabel[], richtung: 'fs' | '
   const andere = liste.filter((x) => x.id !== v.id && x[feld] && x[feld] !== v[feld])
   const gemischt = [...andere].sort(() => zufall() - 0.5).slice(0, 3)
   return [v[feld], ...gemischt.map((x) => x[feld])].sort(() => zufall() - 0.5)
+}
+
+/**
+ * Auswahl in der Fremdsprache (03.10.2026): die richtige Schreibweise unter Wörtern der Liste – und
+ * gelegentlich (etwa jede zweite Frage) typischen Falschschreibungen des Wortes selbst (vokabelFehler.ts).
+ */
+export function auswahlFsOptionen(
+  v: Vokabel,
+  liste: Vokabel[],
+  sprache: string,
+  falsch: (w: string, n: number, verboten: string[]) => string[],
+  zufall: () => number = Math.random
+): string[] {
+  const richtig = ohneAngaben(varianten(v.term)[0] ?? v.term)
+  const andere = [...new Set(liste.filter((x) => x.id !== v.id).map((x) => ohneAngaben(varianten(x.term)[0] ?? x.term)))].filter((t) => t && t !== richtig)
+  const mitFehlern = zufall() < 0.55 || andere.length < 3
+  const fehler = mitFehlern ? falsch(richtig, andere.length < 3 ? 3 : 2, [...varianten(v.term), ...andere]) : []
+  const rest = [...andere].sort(() => zufall() - 0.5).slice(0, Math.max(0, 3 - fehler.length))
+  void sprache
+  return [richtig, ...fehler, ...rest].slice(0, 4).sort(() => zufall() - 0.5)
+}
+
+/** Paar für „Stimmt das?": in etwa der Hälfte der Fälle die richtige Übersetzung, sonst die eines anderen Wortes */
+export function paarFuer(v: Vokabel, liste: Vokabel[], zufall: () => number = Math.random): string {
+  const andere = liste.filter((x) => x.id !== v.id && x.translation && normal(x.translation) !== normal(v.translation))
+  if (!andere.length || zufall() < 0.5) return v.translation
+  return andere[Math.floor(zufall() * andere.length)].translation
+}
+
+/** Wort mit Lücken („w h _ t _"): etwa 40 % der Buchstaben fehlen, nie der erste; Leerzeichen bleiben */
+export function lueckenMuster(term: string, zufall: () => number = Math.random): string {
+  const kern = ohneAngaben(varianten(term)[0] ?? term)
+  const stellen = [...kern].map((c, i) => ({ c, i })).filter((x) => i_ok(x.i, x.c))
+  const n = Math.max(1, Math.round(stellen.length * 0.4))
+  const weg = new Set(
+    [...stellen]
+      .sort(() => zufall() - 0.5)
+      .slice(0, n)
+      .map((x) => x.i)
+  )
+  return [...kern].map((c, i) => (weg.has(i) ? '_' : c)).join('')
+  function i_ok(i: number, c: string): boolean {
+    return i > 0 && /\p{L}/u.test(c)
+  }
 }
 
 /** Buchstaben des Wortes (Kernform) gemischt, für „Buchstaben legen" */

@@ -90,7 +90,7 @@ try {
   const arten = new Set()
   let sauber = true
   let buchstabenOk = true
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 40; i++) {
     if (await h.locator('[data-sitzung-fertig]').isVisible()) break
     await h.waitForTimeout(250)
     if ((await h.locator('[data-urteil]').count()) > 0) sauber = false
@@ -99,6 +99,16 @@ try {
       await h.locator('[data-lernkarte]').click()
       // Erst „nicht gewusst" – so kommt das Wort in anderer Form wieder
       await h.locator(i % 2 ? '[data-karte-gewusst]' : '[data-karte-nicht]').click()
+    } else if ((await h.locator('[data-option-fs]').count()) > 0) {
+      arten.add('schreibweise')
+      await h.screenshot({ path: join(out, '2e-schreibweise.png') })
+      if (await h.locator('[data-option-fs]').first().isDisabled()) sauber = false
+      await h.locator('[data-option-fs]').first().click()
+    } else if ((await h.locator('[data-paar]').count()) > 0) {
+      arten.add('paar')
+      await h.screenshot({ path: join(out, '2f-paar.png') })
+      if (await h.locator('[data-paar="ja"]').isDisabled()) sauber = false
+      await h.locator('[data-paar="ja"]').click()
     } else if ((await h.locator('[data-option]').count()) > 0) {
       arten.add('auswahl')
       if (await h.locator('[data-option]').first().isDisabled()) sauber = false

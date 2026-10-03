@@ -29,6 +29,7 @@ import {
   satzMitLuecke,
   TAG,
   uebersicht,
+  UEBUNGEN,
   type Urteil,
   type Uebung,
   type Vokabel,
@@ -345,14 +346,27 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         const k0 = (await k.koerper()) as Record<string, unknown>
         const v = woerter.find((w) => w.id === k0.wortId)
         const uebung = String(k0.uebung ?? '') as Uebung
-        if (!v || !['karte', 'auswahl', 'hoeren', 'buchstaben', 'frei', 'diktat', 'luecke'].includes(uebung))
-          return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
+        if (!v || !UEBUNGEN.includes(uebung)) return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
         const antwort = String(k0.antwort ?? '').slice(0, 200)
         // Lernkarte: Selbsteinschätzung nur beim ersten Kontakt; alles andere wertet der Server
+        // „Stimmt das Paar?": richtig, wenn das Urteil zur gezeigten Übersetzung passt
+        const paarStimmt = uebung === 'paar' ? bewerte(String(k0.gezeigt ?? ''), v.translation, true).urteil === 'richtig' : false
         const ergebnis: { urteil: Urteil; hinweis?: string; richtig: string } =
-          uebung === 'karte' ? { urteil: k0.gewusst === true ? 'richtig' : 'falsch', richtig: v.term } : bewerte(antwort, loesungFuer(v, uebung))
+          uebung === 'karte'
+            ? { urteil: k0.gewusst === true ? 'richtig' : 'falsch', richtig: v.term }
+            : uebung === 'paar'
+              ? { urteil: (antwort === 'stimmt') === paarStimmt ? 'richtig' : 'falsch', richtig: `${v.term} – ${v.translation}` }
+              : bewerte(antwort, loesungFuer(v, uebung), uebung === 'auswahlFs')
         const jetzt = Date.now()
-        const neu = nachAbfrage(st.woerter[v.id] ?? neuerStand(), uebung, ergebnis.urteil, uebung === 'karte' ? '' : antwort, jetzt, z.test_termin ?? undefined)
+        const neu = nachAbfrage(
+          st.woerter[v.id] ?? neuerStand(),
+          uebung,
+          ergebnis.urteil,
+          // „Typische Falschantworten" nur aus eigenen Antworten – nicht aus vorgegebenen Falschschreibungen oder „stimmt nicht"
+          uebung === 'karte' || uebung === 'paar' || uebung === 'auswahlFs' ? '' : antwort,
+          jetzt,
+          z.test_termin ?? undefined
+        )
         st.woerter[v.id] = neu
         const heute = new Date(jetzt).toISOString().slice(0, 10)
         if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
