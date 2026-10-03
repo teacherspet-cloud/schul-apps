@@ -7,6 +7,7 @@
  * legen, frei schreiben (mit Akzentleiste), Diktat, Lückensatz. Falsches kommt in der Sitzung wieder.
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
+import { Spielwahl } from './spiele/Spiele'
 import { besteStimme } from './stimme'
 import { ActionIcon, Alert, Badge, Button, Card, Center, Group, Loader, Progress, SimpleGrid, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core'
 import {
@@ -52,6 +53,8 @@ interface Liste {
   testTermin: number | null
   woerter: Vokabel[]
   staende: Record<string, WortStand>
+  rekorde?: Record<string, number>
+  ansehen?: string[]
 }
 
 const STIMME: Record<string, string> = {
@@ -165,15 +168,25 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
     )
   if (!d) return <Alert color="orange">{fehler || 'Diese Vokabeln gibt es nicht.'}</Alert>
   if (sitzung) return <Sitzung d={d} woerter={sitzung} fertig={(st) => (setD({ ...d, staende: st }), setSitzung(null))} />
-  return <Kasten d={d} starten={(w) => setSitzung(w)} />
+  return <Kasten d={d} starten={(w) => setSitzung(w)} aktualisieren={(r) => setD({ ...d, ...r })} />
 }
 
-function Kasten({ d, starten }: { d: Liste; starten: (w: Vokabel[]) => void }): React.JSX.Element {
+function Kasten({
+  d,
+  starten,
+  aktualisieren
+}: {
+  d: Liste
+  starten: (w: Vokabel[]) => void
+  aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
+}): React.JSX.Element {
   const u = uebersicht(d.woerter, d.staende)
   const heute = sitzungsWoerter(d.woerter, d.staende)
   const max = Math.max(1, ...u.faecher)
   const tage = d.testTermin ? Math.ceil((d.testTermin - Date.now()) / 86_400_000) : null
   const anteil = Math.round((u.sicher / Math.max(1, u.gesamt)) * 100)
+  // Während eines Spiels nur das Spiel zeigen
+  const [spielt, setSpielt] = useState(false)
   const ich = window.__schulappsServer
   // Gäste (per QR-Code) haben keinen Lernraum – zurück zu ihrer Übersicht
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
@@ -201,78 +214,97 @@ function Kasten({ d, starten }: { d: Liste; starten: (w: Vokabel[]) => void }): 
       <Button variant="subtle" color="orange" component="a" href={gast ? '/s/' : '/s/lernen'} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
         {gast ? 'Meine Materialien' : 'Lernraum'}
       </Button>
-      <div className="vt-kopf">
-        <div className="vt-kopf-zeile">
-          <div style={{ minWidth: 0 }}>
-            <Text size="sm" fw={600} style={{ opacity: 0.9 }}>
-              {d.fach} · {d.woerter.length} Vokabeln
-            </Text>
-            <Title order={2} style={{ color: '#fff', lineHeight: 1.15 }}>
-              {d.titel}
-            </Title>
-            <Text size="sm" mt={6} style={{ opacity: 0.92 }}>
-              {heute.length ? `${heute.length} ${heute.length === 1 ? 'Wort wartet' : 'Wörter warten'} heute auf dich.` : 'Für heute ist alles geübt.'}
-            </Text>
-          </div>
-          <div
-            className="vt-ring"
-            style={{ background: `conic-gradient(#fff ${anteil * 3.6}deg, rgba(255,255,255,0.28) 0deg)` }}
-            aria-label={`${anteil} Prozent sicher`}
-          >
-            <div className="vt-ring-innen">
-              <div>
-                <Text fw={800} size="lg" lh={1}>
-                  {anteil}%
+      {!spielt && (
+        <>
+          <div className="vt-kopf">
+            <div className="vt-kopf-zeile">
+              <div style={{ minWidth: 0 }}>
+                <Text size="sm" fw={600} style={{ opacity: 0.9 }}>
+                  {d.fach} · {d.woerter.length} Vokabeln
                 </Text>
-                <Text size="10px" fw={600}>
-                  sicher
+                <Title order={2} style={{ color: '#fff', lineHeight: 1.15 }}>
+                  {d.titel}
+                </Title>
+                <Text size="sm" mt={6} style={{ opacity: 0.92 }}>
+                  {heute.length ? `${heute.length} ${heute.length === 1 ? 'Wort wartet' : 'Wörter warten'} heute auf dich.` : 'Für heute ist alles geübt.'}
                 </Text>
+              </div>
+              <div
+                className="vt-ring"
+                style={{ background: `conic-gradient(#fff ${anteil * 3.6}deg, rgba(255,255,255,0.28) 0deg)` }}
+                aria-label={`${anteil} Prozent sicher`}
+              >
+                <div className="vt-ring-innen">
+                  <div>
+                    <Text fw={800} size="lg" lh={1}>
+                      {anteil}%
+                    </Text>
+                    <Text size="10px" fw={600}>
+                      sicher
+                    </Text>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      <div>
-        <Text size="sm" fw={700} mb={6} c="#9a3412">
-          Dein Karteikasten
-        </Text>
-        <div className="vt-kasten" aria-label="Dein Karteikasten">
-          {u.faecher.map((n, i) => (
-            <Tooltip key={i} label={i === 0 ? `${n} noch nicht gelernt` : i === 6 ? `${n} im Langzeitfach` : `${n} in Fach ${i}`}>
-              <div className="vt-fach" data-fach={i}>
-                <div className="vt-fach-fuellung" style={{ height: `${n ? 18 + (n / max) * 62 : 0}%`, backgroundColor: FACH_FARBEN[i] }} />
-                <span className="vt-fach-zahl">{n}</span>
-                <span className="vt-fach-name">{i === 0 ? 'neu' : i === 6 ? '∞' : `Fach ${FACH_NAMEN[i]}`}</span>
-              </div>
-            </Tooltip>
-          ))}
-        </div>
-      </div>
-      <div className="vt-werte">
-        {werte.map((w) => (
-          <div key={w.name} className="vt-wert">
-            <div className="vt-wert-symbol" style={{ background: `${w.farbe}1f`, color: w.farbe }}>
-              {w.symbol}
-            </div>
-            <div>
-              <Text size="xs" c="dimmed">
-                {w.name}
-              </Text>
-              <Text fw={800} size="lg" lh={1.2} c="#1f2937">
-                {w.wert}
-              </Text>
+          <div>
+            <Text size="sm" fw={700} mb={6} c="#9a3412">
+              Dein Karteikasten
+            </Text>
+            <div className="vt-kasten" aria-label="Dein Karteikasten">
+              {u.faecher.map((n, i) => (
+                <Tooltip key={i} label={i === 0 ? `${n} noch nicht gelernt` : i === 6 ? `${n} im Langzeitfach` : `${n} in Fach ${i}`}>
+                  <div className="vt-fach" data-fach={i}>
+                    <div className="vt-fach-fuellung" style={{ height: `${n ? 18 + (n / max) * 62 : 0}%`, backgroundColor: FACH_FARBEN[i] }} />
+                    <span className="vt-fach-zahl">{n}</span>
+                    <span className="vt-fach-name">{i === 0 ? 'neu' : i === 6 ? '∞' : `Fach ${FACH_NAMEN[i]}`}</span>
+                  </div>
+                </Tooltip>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
+          <div className="vt-werte">
+            {werte.map((w) => (
+              <div key={w.name} className="vt-wert">
+                <div className="vt-wert-symbol" style={{ background: `${w.farbe}1f`, color: w.farbe }}>
+                  {w.symbol}
+                </div>
+                <div>
+                  <Text size="xs" c="dimmed">
+                    {w.name}
+                  </Text>
+                  <Text fw={800} size="lg" lh={1.2} c="#1f2937">
+                    {w.wert}
+                  </Text>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {heute.length ? (
         <Button size="xl" radius="xl" className="vt-los" leftSection={<IconPlayerPlay size={22} />} onClick={() => starten(heute)} data-vokabel-start>
           Jetzt üben · {heute.length} {heute.length === 1 ? 'Wort' : 'Wörter'}
         </Button>
       ) : (
-        <Alert color="teal" radius="lg" icon={<IconCheck />}>
-          Für heute ist alles erledigt. Der Kasten meldet sich, wenn die nächsten Wörter fällig sind.
-        </Alert>
+        <>
+          {!spielt && (
+            <Alert color="teal" radius="lg" icon={<IconCheck />}>
+              Für heute ist alles erledigt. Der Kasten meldet sich, wenn die nächsten Wörter fällig sind.
+            </Alert>
+          )}
+          {/* Spiele mit den gelernten Wörtern (03.10.2026, abgestimmt) */}
+          <Spielwahl
+            woerter={d.woerter}
+            staende={d.staende}
+            sprache={d.sprache}
+            rekorde={d.rekorde ?? {}}
+            ansehen={d.ansehen ?? []}
+            listeId={d.id}
+            aktualisieren={aktualisieren}
+            spielt={setSpielt}
+          />
+        </>
       )}
       {ohneStimme && (
         <Alert color="yellow" radius="lg" data-ohne-stimme>

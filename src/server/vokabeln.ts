@@ -15,6 +15,7 @@
  *             GET /s/api/vokabeln/zugang?code= · POST /s/api/vokabeln/gast {code, name} → persönlicher
  *             Wiedereinstiegs-Code · POST /s/api/vokabeln/wieder {code, name, wieder}
  */
+import { istRekord, SPIELE, type SpielId } from '../shared/vokabelSpiele'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { json, setzeSitzungsCookie, type Anfrage } from './http'
@@ -131,6 +132,9 @@ const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(12
 export interface VokStand {
   woerter: Record<string, WortStand>
   tage: string[]
+  /** Spiele (03.10.2026): eigener Rekord je Spiel; Wörter, die im Spiel danebengingen („nochmal ansehen") */
+  rekorde?: Record<string, number>
+  ansehen?: string[]
 }
 
 const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM vok_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
@@ -340,7 +344,36 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const woerter = json_(z.woerter, [] as Vokabel[])
       const st = standVon(z.id, ich.id)
       if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/liste')
-        return (json(res, 200, { id: z.id, titel: z.titel, sprache: z.sprache, fach: z.fach, testTermin: z.test_termin, woerter, staende: st.woerter }), true)
+        return (
+          json(res, 200, {
+            id: z.id,
+            titel: z.titel,
+            sprache: z.sprache,
+            fach: z.fach,
+            testTermin: z.test_termin,
+            woerter,
+            staende: st.woerter,
+            rekorde: st.rekorde ?? {},
+            ansehen: st.ansehen ?? []
+          }),
+          true
+        )
+      // Spiel beendet: Rekord und „nochmal ansehen" – der Karteikasten bleibt unverändert (abgestimmt 03.10.2026)
+      if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/spiel') {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        const spiel = String(k0.spiel ?? '') as SpielId
+        const wert = Number(k0.wert)
+        if (!SPIELE.some((x) => x.id === spiel) || !Number.isFinite(wert) || wert < 0 || wert > 100000)
+          return (json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true)
+        const rekord = istRekord(spiel, wert, st.rekorde?.[spiel])
+        if (rekord) st.rekorde = { ...(st.rekorde ?? {}), [spiel]: wert }
+        const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter((wid) => woerter.some((w) => w.id === wid))
+        st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)
+        const heute = new Date().toISOString().slice(0, 10)
+        if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
+        standSpeichern(z.id, ich.id, st)
+        return (json(res, 200, { rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true)
+      }
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/antwort') {
         if (!istOffen(z)) return (json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true)
         const k0 = (await k.koerper()) as Record<string, unknown>
@@ -368,6 +401,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           z.test_termin ?? undefined
         )
         st.woerter[v.id] = neu
+        // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
+        if (ergebnis.urteil === 'richtig' && st.ansehen?.includes(v.id)) st.ansehen = st.ansehen.filter((x) => x !== v.id)
         const heute = new Date(jetzt).toISOString().slice(0, 10)
         if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
         standSpeichern(z.id, ich.id, st)
