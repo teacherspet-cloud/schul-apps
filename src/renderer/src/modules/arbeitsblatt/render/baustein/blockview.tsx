@@ -127,11 +127,18 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
         />
       )
       return (
-        <div className={`ws-block ws-info ws-info-${block.variant} ${block.spalten === 2 ? 'ws-info-spalten' : ''} ${block.abgesetzt ? 'ws-info-abgesetzt' : ''} ${placed?.continued ? 'ws-continued' : ''}`}>
+        <div
+          className={`ws-block ws-info ws-info-${block.variant} ${block.spalten === 2 ? 'ws-info-spalten' : ''} ${block.abgesetzt ? 'ws-info-abgesetzt' : ''} ${placed?.continued ? 'ws-continued' : ''}`}
+        >
           {von === 0 ? (
             <div className="ws-info-head">
               <span className="ws-info-symbol">{v.symbol}</span>
-              <Feld className="ws-info-title" value={block.title || v.label} editable={schreiben} onChange={set((d, val) => ((d as typeof block).title = val))} />
+              <Feld
+                className="ws-info-title"
+                value={block.title || v.label}
+                editable={schreiben}
+                onChange={set((d, val) => ((d as typeof block).title = val))}
+              />
             </div>
           ) : (
             <FortsetzungsHinweis bezeichnung={block.title || v.label} />
@@ -257,12 +264,7 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
                     <li key={ii}>
                       {/* **fett** wie überall auf dem Blatt – vorher standen die Sternchen im Druck; seit 30.09.2026 bearbeitbar */}
                       <span className="ws-phrases-text">
-                        <RichText
-                          value={item.text}
-                          inline
-                          editable={schreiben}
-                          onChange={set((d, v) => ((d as typeof block).groups[gi].items[ii].text = v))}
-                        />
+                        <RichText value={item.text} inline editable={schreiben} onChange={set((d, v) => ((d as typeof block).groups[gi].items[ii].text = v))} />
                       </span>
                       {/*
                         Die deutsche Entsprechung steht gedämpft daneben, nicht darunter –
@@ -735,7 +737,13 @@ function MaterialText({ block, placed }: { block: TextBlock; placed?: PlacedItem
    */
   const fussModus = ctx.anmerkungsArt === 'fussnoten' && !block.free
   const to = placed?.to ?? paragraphs.length + (anm.anmerkungen.length && !fussModus ? 1 : 0)
-  const showHead = from === 0
+  /*
+   * Kopf (Titel, Quellenangabe, Einleitung) nur auf dem ersten Stück. Nicht an `from` ablesbar: Teilt
+   * der Umbruch schon den ERSTEN Absatz, beginnt auch das Folgestück bei Absatz 0 – der Kopf stand dann
+   * auf der neuen Seite ein zweites Mal (03.10.2026, Befund der Lehrkraft). `continued` setzt paginate
+   * nach Zeilen, also auch mitten im Absatz.
+   */
+  const showHead = placed ? !placed.continued : from === 0
   const showGlossary = !fussModus && anm.anmerkungen.length > 0 && to > paragraphs.length
   const lineStart = placed?.lineStart ?? 0
   const lineCount = placed?.lineCount ?? 0
