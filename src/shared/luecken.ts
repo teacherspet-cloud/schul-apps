@@ -73,6 +73,37 @@ export function ohneDoppelte(vor: string, loesung: string, nach: string): { loes
   return { loesung: teile.join(' '), vorne, hinten }
 }
 
+/**
+ * Optionaler Teil der Vokabel direkt an der Lücke (03.10.2026, Befund der Lehrkraft: „there are
+ * (3) ______ of books" mit „lots (of)"): Das in der Vokabel eingeklammerte Wort gehört in die
+ * Lösung, nicht in den Satz – die Lernenden sollen „lots of" selbst schreiben. Also: aus dem Satz
+ * nehmen, in der Lösung ohne Klammern verlangen. „to ___" mit „(to) go" → „___" mit „to go".
+ */
+export function optionalesInLoesung(vor: string, loesung: string, nach: string): { vor: string; loesung: string; nach: string } {
+  const s = String(loesung ?? '').trim()
+  const hinten = /^(.*\S)\s*\(([^)]+)\)$/.exec(s)
+  const vorne = /^\(([^)]+)\)\s*(\S.*)$/.exec(s)
+  const nachWoerter = String(nach ?? '').replace(/^\s+/, '')
+  const vorText = String(vor ?? '').replace(/\s+$/, '')
+  if (hinten) {
+    const opt = hinten[2].trim()
+    const m = new RegExp(`^${opt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}'’-])`, 'iu').exec(nachWoerter)
+    if (m) {
+      const rest = nachWoerter.slice(m[0].length).replace(/^\s+/, '')
+      return { vor, loesung: `${hinten[1].trim()} ${opt}`, nach: rest && /^\s/.test(nach) && !/^[.,;:!?]/.test(rest) ? ` ${rest}` : rest }
+    }
+  }
+  if (vorne) {
+    const opt = vorne[1].trim()
+    const m = new RegExp(`(?<![\\p{L}\\p{N}'’-])${opt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'iu').exec(vorText)
+    if (m) {
+      const rest = vorText.slice(0, m.index).replace(/\s+$/, '')
+      return { vor: rest ? `${rest} ` : '', loesung: `${opt} ${vorne[2].trim()}`, nach }
+    }
+  }
+  return { vor, loesung, nach }
+}
+
 /** Lückentext mit [[Lösung]]-Markierungen: doppelte Wörter an jeder Lücke aus der Lösung nehmen */
 export function lueckentextOhneDoppelte(text: string): string {
   const s = String(text ?? '')

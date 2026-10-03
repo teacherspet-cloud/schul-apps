@@ -11,6 +11,7 @@ import type { TestDocument } from '../vokabeltest/model/types'
 import { aufServer } from '../../shared/plattform'
 import { openDocument, openModule } from '../../shared/navigation'
 import { notifyError } from '../../shared/util'
+import { abschnitteAusName } from '../../shared/ueberthema'
 import { maskottchenBild, useMaskottchen } from '../../shared/maskottchenStore'
 import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
 import { holen, senden } from './serverApi'
@@ -38,9 +39,12 @@ export function testFundstelle(doc: Pick<TestDocument, 'header' | 'settings'>): 
  * Name eines Onlinetests (03.10.2026, Muster der Lehrkraft): „10b 03.10.2026 - Green Line 6 - Unit 1 - Station 2" –
  * Lerngruppe, Datum, Fundstelle. Ohne Fundstelle der Titel des Tests.
  */
-export function onlinetestName(doc: Pick<TestDocument, 'header' | 'settings'>, gruppe: string, datum = new Date()): string {
+export function onlinetestName(doc: Pick<TestDocument, 'header' | 'settings'>, gruppe: string, datum = new Date(), listName = ''): string {
   const tag = datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const fundstelle = testFundstelle(doc) || (doc.header.title || 'Vokabeltest').trim()
+  // Abschnitte der Unit aus dem Namen der Liste („… Unit 1, Station 1 + Station 2" → „Station 1 und 2", 03.10.2026)
+  const teile = abschnitteAusName(listName)
+  const basis = testFundstelle(doc) || (doc.header.title || 'Vokabeltest').trim()
+  const fundstelle = teile && !basis.includes(teile) ? `${basis} - ${teile}` : basis
   return [[gruppe.trim(), tag].filter(Boolean).join(' '), fundstelle].join(' - ')
 }
 
@@ -52,7 +56,7 @@ export function testNameVorschlag(doc: Pick<TestDocument, 'header' | 'settings'>
   return /^(vocabulary test|vokabeltest|test|vocab test)$/i.test(titel) ? `Vokabeltest ${thema}` : `${titel} – ${thema}`
 }
 
-export default function OnlinetestKnopf({ doc }: { doc: TestDocument }): React.JSX.Element | null {
+export default function OnlinetestKnopf({ doc, listName }: { doc: TestDocument; listName?: string }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
   if (!aufServer()) return null
   return (
@@ -60,14 +64,14 @@ export default function OnlinetestKnopf({ doc }: { doc: TestDocument }): React.J
       <Button variant="light" leftSection={<IconDeviceLaptop size={16} />} onClick={() => setOffen(true)} data-onlinetest-knopf>
         Onlinetest
       </Button>
-      {offen && <Erstellen doc={doc} schliessen={() => setOffen(false)} />}
+      {offen && <Erstellen doc={doc} listName={listName} schliessen={() => setOffen(false)} />}
     </>
   )
 }
 
-export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: () => void }): React.JSX.Element {
+export function Erstellen({ doc, listName = '', schliessen }: { doc: TestDocument; listName?: string; schliessen: () => void }): React.JSX.Element {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const [titel, setTitel] = useState(() => onlinetestName(doc, ''))
+  const [titel, setTitel] = useState(() => onlinetestName(doc, '', undefined, listName))
   // Solange der Name nicht von Hand geändert ist, folgt er der gewählten Lerngruppe
   const [titelVonHand, setTitelVonHand] = useState(false)
   const figurWahl = vokabeltestFigur(doc)
@@ -83,7 +87,7 @@ export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: 
   const [gaeste, setGaeste] = useState(true)
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [zeit, setZeit] = useState<number>(20)
-  const [zuteilung, setZuteilung] = useState<string>('abwechselnd')
+  const [zuteilung, setZuteilung] = useState<string>('zufall')
   const [laeuft, setLaeuft] = useState(false)
   // Fertig: Detailansicht in der App „Onlinetest“ (die frühere Code-Ansicht hier bleibt ungenutzt)
   const [fertig] = useState<{ code: string; link: string } | null>(null)
@@ -120,7 +124,8 @@ export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: 
       {fertig ? (
         <Stack>
           <Text>
-            Der Test ist angelegt. Die Lernenden scannen den QR-Code oder öffnen den Link und landen im Wartebildschirm. Gestartet wird für alle gemeinsam in der App „Onlinetest“.
+            Der Test ist angelegt. Die Lernenden scannen den QR-Code oder öffnen den Link und landen im Wartebildschirm. Gestartet wird für alle gemeinsam in
+            der App „Onlinetest“.
           </Text>
           <Zugang code={fertig.code} link={fertig.link} />
           <Alert color="orange" icon={<IconAlertTriangle size={16} />}>
@@ -153,7 +158,7 @@ export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: 
             value={gruppe}
             onChange={(g) => {
               setGruppe(g)
-              if (!titelVonHand) setTitel(onlinetestName(doc, gruppen.find((x) => x.id === g)?.name ?? ''))
+              if (!titelVonHand) setTitel(onlinetestName(doc, gruppen.find((x) => x.id === g)?.name ?? '', undefined, listName))
             }}
             clearable
             placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
@@ -185,7 +190,12 @@ export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: 
           )}
           {winkend && (
             <Group gap="sm" wrap="nowrap">
-              <Checkbox label="Figur zeigen (Wartebildschirm, Kopf, Ergebnis)" checked={mitFigur} onChange={(e) => setMitFigur(e.currentTarget.checked)} data-figur-wahl />
+              <Checkbox
+                label="Figur zeigen (Wartebildschirm, Kopf, Ergebnis)"
+                checked={mitFigur}
+                onChange={(e) => setMitFigur(e.currentTarget.checked)}
+                data-figur-wahl
+              />
               {mitFigur && <Image src={winkend} h={48} w="auto" fit="contain" alt="" />}
             </Group>
           )}
@@ -197,8 +207,8 @@ export function Erstellen({ doc, schliessen }: { doc: TestDocument; schliessen: 
             data-handschrift-wahl
           />
           <Alert variant="light">
-            Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang, ohne Namen);
-            kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.
+            Wer während des Tests die Seite verlässt (anderer Tab, andere App), gibt automatisch ab. Nach jeder Abgabe wertet die KI aus (eigener KI-Zugang,
+            ohne Namen); kleine Fehler und abweichende, sinnvolle Antworten entscheidet die Lehrkraft – halbe Punkte gibt es nicht.
           </Alert>
           <Group justify="flex-end">
             <Button loading={laeuft} onClick={() => void erstellen()}>

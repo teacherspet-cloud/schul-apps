@@ -143,7 +143,10 @@ export interface Lerngruppe {
   erstellt: string
 }
 
-const alsGruppe = (z: Record<string, unknown>): Lerngruppe => ({ ...(z as unknown as Lerngruppe), mitglieder: json_(String(z.mitglieder ?? '[]'), [] as string[]) })
+const alsGruppe = (z: Record<string, unknown>): Lerngruppe => ({
+  ...(z as unknown as Lerngruppe),
+  mitglieder: json_(String(z.mitglieder ?? '[]'), [] as string[])
+})
 
 export function lerngruppenVon(lehrkraftId: string): Lerngruppe[] {
   return (db().prepare('SELECT * FROM lerngruppen WHERE lehrkraft_id = ? ORDER BY name').all(lehrkraftId) as Record<string, unknown>[]).map(alsGruppe)
@@ -283,7 +286,7 @@ export function testErstellen(
     .filter((x): x is readonly [string, Buffer] => (x[0] === 'winkend' || x[0] === 'jubelnd') && Boolean(x[1]))
   const einstellungen: Einstellungen = {
     zeitMin: Math.max(1, Math.min(240, Math.round(e.zeitMin ?? 20))),
-    zuteilung: e.zuteilung ?? 'abwechselnd',
+    zuteilung: e.zuteilung ?? 'zufall',
     fach,
     zielsprache: e.test.settings.targetLanguage,
     niveau: e.test.settings.level,
@@ -300,7 +303,9 @@ export function testErstellen(
   const id = neueId()
   const code = neuerCode()
   db()
-    .prepare('INSERT INTO onlinetests (id, lehrkraft_id, lerngruppe_id, titel, code, fassungen, einstellungen, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .prepare(
+      'INSERT INTO onlinetests (id, lehrkraft_id, lerngruppe_id, titel, code, fassungen, einstellungen, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
     .run(
       id,
       lehrkraft.id,
@@ -317,7 +322,8 @@ export function testErstellen(
   return testNachId(id)!
 }
 
-const figurPosen = (testId: string): string[] => (db().prepare('SELECT pose FROM onlinetest_figuren WHERE test_id = ?').all(testId) as { pose: string }[]).map((x) => x.pose)
+const figurPosen = (testId: string): string[] =>
+  (db().prepare('SELECT pose FROM onlinetest_figuren WHERE test_id = ?').all(testId) as { pose: string }[]).map((x) => x.pose)
 
 // ---------------------------------------------------------------- Teilnahmen
 
@@ -372,7 +378,12 @@ function bereinigeAntworten(f: OnlineFassung, roh: unknown): Antworten {
 function teilnahmeAnlegen(test: Test, schuelerId: string): TeilnahmeZeile {
   const n = (db().prepare('SELECT COUNT(*) AS n FROM teilnahmen WHERE test_id = ?').get(test.id) as { n: number }).n
   const z = test.einstellungen.zuteilung
-  const variante = typeof z === 'number' ? Math.min(test.fassungen.length - 1, Math.max(0, z)) : z === 'zufall' ? randomBytes(1)[0] % test.fassungen.length : n % test.fassungen.length
+  const variante =
+    typeof z === 'number'
+      ? Math.min(test.fassungen.length - 1, Math.max(0, z))
+      : z === 'zufall'
+        ? randomBytes(1)[0] % test.fassungen.length
+        : n % test.fassungen.length
   const id = neueId()
   const jetzt = test.status === 'offen' ? Date.now() : 0
   db()
@@ -382,7 +393,8 @@ function teilnahmeAnlegen(test: Test, schuelerId: string): TeilnahmeZeile {
 }
 
 function abgelaufeneAbschliessen(test: Test): void {
-  for (const t of teilnahmenVon(test.id)) if (!t.abgabe && t.beginn > 0 && Date.now() > t.ende + NACHFRIST_MS) abschliessen(t, test, json_(t.antworten, {}), 'zeit')
+  for (const t of teilnahmenVon(test.id))
+    if (!t.abgabe && t.beginn > 0 && Date.now() > t.ende + NACHFRIST_MS) abschliessen(t, test, json_(t.antworten, {}), 'zeit')
 }
 
 /** Ergebnisse sichtbar: freigegeben, oder alle, die mitschreiben, haben abgegeben */
@@ -515,7 +527,9 @@ async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): P
       // In Paketen zu höchstens 40 Antworten
       for (let i = 0; i < faelle.length; i += 40) {
         const paket = faelle.slice(i, i + 40)
-        const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [kiAnfrage(test.einstellungen.zielsprache, test.einstellungen.niveau, paket)]))
+        const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
+          aufruf('ai:structured', [kiAnfrage(test.einstellungen.zielsprache, test.einstellungen.niveau, paket)])
+        )
         anfragen++
         bewertet += einarbeiten(fassung, paket, urteileAus(antwort, paket))
       }
@@ -541,7 +555,10 @@ function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string,
       const us = efs.map((f) => urteile.get(f.id))
       if (us.some((u) => !u)) continue
       const e = fassung.einheiten.find((x) => x.id === eid)!
-      const hinweis = us.map((u) => u!.begruendung).filter(Boolean).join(' ')
+      const hinweis = us
+        .map((u) => u!.begruendung)
+        .filter(Boolean)
+        .join(' ')
       const pruefen = us.some((u) => u!.urteil === 'kleinerFehler') ? 'kleinerFehler' : 'sinnvoll'
       if (efs[0].art === 'wort') {
         // Bleibt falsch – außer die Lehrkraft akzeptiert
@@ -611,7 +628,10 @@ const kiStand = (testId: string): { laeuft: boolean; fehler: string | null } => 
  */
 const BUENDEL_MS = 1200
 const BUENDEL_MAX = 8
-const warteschlangen = new Map<string, { proben: { png: string; kontext: string; ok: (e: Erkennung) => void; fehler: (e: unknown) => void }[]; zeit: ReturnType<typeof setTimeout> | null }>()
+const warteschlangen = new Map<
+  string,
+  { proben: { png: string; kontext: string; ok: (e: Erkennung) => void; fehler: (e: unknown) => void }[]; zeit: ReturnType<typeof setTimeout> | null }
+>()
 
 function handschriftErkennen(test: Test, png: string, kontext: string): Promise<Erkennung> {
   return new Promise((ok, fehler) => {
@@ -685,7 +705,9 @@ function ergebnisFuer(test: Test, t: TeilnahmeZeile) {
     loesungen: f.loesungen,
     antworten: json_(t.antworten, {}),
     // Für die Lernenden ohne Begründungen der KI (die richten sich an die Lehrkraft)
-    bewertung: Object.fromEntries(Object.entries(b).map(([k, x]) => [k, { status: x.status, punkte: x.punkte, ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {}) }]))
+    bewertung: Object.fromEntries(
+      Object.entries(b).map(([k, x]) => [k, { status: x.status, punkte: x.punkte, ...(x.pruefen && x.quelle !== 'lehrkraft' ? { pruefen: x.pruefen } : {}) }])
+    )
   }
 }
 
@@ -712,9 +734,15 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       const ts = teilnahmenVon(test.id)
       const namen = new Map(alleNutzer().map((n) => [n.id, n]))
       // Schon in diesem Test (dasselbe Gerät, z. B. nach einem Neuladen)? Dann einfach weiter
-      if (sitzung?.nutzer.quelle === 'gast' && ts.some((t) => t.schueler_id === sitzung.nutzer.id)) return (json(res, 200, { ok: true, name: sitzung.nutzer.name }), true)
+      if (sitzung?.nutzer.quelle === 'gast' && ts.some((t) => t.schueler_id === sitzung.nutzer.id))
+        return (json(res, 200, { ok: true, name: sitzung.nutzer.name }), true)
       if (ts.some((t) => namen.get(t.schueler_id)?.name.toLowerCase() === name.toLowerCase()))
-        return (json(res, 409, { fehler: `„${name}“ schreibt diesen Test schon. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“ statt „Anna K.“` }), true)
+        return (
+          json(res, 409, {
+            fehler: `„${name}“ schreibt diesen Test schon. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“ statt „Anna K.“`
+          }),
+          true
+        )
       if (ts.length >= MAX_GAESTE) return (json(res, 429, { fehler: 'Der Test ist voll.' }), true)
       const gast = nutzerAnlegen({ benutzer: `gast-${neueId().slice(0, 12)}`, name, rolle: 'schueler', quelle: 'gast' })
       registerVergessen()
@@ -737,7 +765,12 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
 
     if (req.method === 'GET' && was === 'ich') return (json(res, 200, { name: ich.name, benutzer: gast ? '' : ich.benutzer, rolle: ich.rolle, gast }), true)
     if (req.method === 'GET' && was === 'tests') {
-      const meine = new Map((db().prepare('SELECT test_id, abgabe FROM teilnahmen WHERE schueler_id = ?').all(ich.id) as { test_id: string; abgabe: number | null }[]).map((x) => [x.test_id, x.abgabe]))
+      const meine = new Map(
+        (db().prepare('SELECT test_id, abgabe FROM teilnahmen WHERE schueler_id = ?').all(ich.id) as { test_id: string; abgabe: number | null }[]).map((x) => [
+          x.test_id,
+          x.abgabe
+        ])
+      )
       // Offene Tests der eigenen Lerngruppen (Gäste: nur der eigene Test)
       const tests = (db().prepare("SELECT * FROM onlinetests WHERE status != 'beendet'").all() as unknown as TestZeile[]).map(alsTest).filter((t) => {
         if (gast) return meine.has(t.id)
@@ -745,7 +778,18 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
         const g = t.lerngruppe_id ? lerngruppe(t.lerngruppe_id) : null
         return g && gehoertZu(g, ich)
       })
-      return (json(res, 200, { tests: tests.map((t) => ({ code: t.code, titel: t.titel, zeitMin: t.einstellungen.zeitMin, abgegeben: Boolean(meine.get(t.id)), wartend: t.status === 'wartend' })) }), true)
+      return (
+        json(res, 200, {
+          tests: tests.map((t) => ({
+            code: t.code,
+            titel: t.titel,
+            zeitMin: t.einstellungen.zeitMin,
+            abgegeben: Boolean(meine.get(t.id)),
+            wartend: t.status === 'wartend'
+          }))
+        }),
+        true
+      )
     }
     if (req.method === 'GET' && was === 'ergebnisse') {
       // Frühere Ergebnisse (Schüler-Startseite, 02.10.2026) – nur mit Konto; Gäste gehören nur zu einem Test
@@ -776,7 +820,11 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       // Figur des Tests (Maskottchen) – nur für Angemeldete, lange zwischenspeicherbar
       const [, code, pose] = was.split('/')
       const test = testNachCode(String(code ?? ''))
-      const z = test ? (db().prepare('SELECT png FROM onlinetest_figuren WHERE test_id = ? AND pose = ?').get(test.id, String(pose ?? '')) as { png: Uint8Array } | undefined) : undefined
+      const z = test
+        ? (db()
+            .prepare('SELECT png FROM onlinetest_figuren WHERE test_id = ? AND pose = ?')
+            .get(test.id, String(pose ?? '')) as { png: Uint8Array } | undefined)
+        : undefined
       if (!z) return (json(res, 404, { fehler: 'Keine Figur.' }), true)
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'private, max-age=86400' })
       return (res.end(Buffer.from(z.png)), true)
@@ -813,7 +861,9 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       } else if (!t.abgabe && t.beginn === 0 && test.status === 'offen') {
         // Gestartet, während dieses Gerät gewartet hat (Sicherheitsnetz zu „starten")
         const jetzt = Date.now()
-        db().prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE id = ? AND beginn = 0').run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, t.id)
+        db()
+          .prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE id = ? AND beginn = 0')
+          .run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, t.id)
         t = teilnahme(t.id)!
       }
       const fassung = test.fassungen[t.variante].fassung
@@ -852,7 +902,9 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       if (t.abgabe || t.beginn === 0 || Date.now() > t.ende + NACHFRIST_MS) return (json(res, 409, { fehler: 'Der Test läuft nicht.' }), true)
       const fassung = test.fassungen[t.variante].fassung
       const feld = String(k0.feld ?? '')
-      const segment = String(k0.segment ?? '').replace(/[^a-z0-9-]/gi, '').slice(0, 40)
+      const segment = String(k0.segment ?? '')
+        .replace(/[^a-z0-9-]/gi, '')
+        .slice(0, 40)
       const f = felderVon(fassung).get(feld)
       if (!f || (f.feld.art !== 'text' && f.feld.art !== 'langtext') || !segment) return (json(res, 400, { fehler: 'Unbekanntes Feld.' }), true)
       const png = pngAus(k0.png)
@@ -867,7 +919,9 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
         return (json(res, 200, e), true)
       } catch (e) {
         // Tinte trotzdem aufbewahren – die Lehrkraft kann sie lesen
-        db().prepare('INSERT OR REPLACE INTO onlinetest_tinte (teilnahme_id, feld, segment, png, text, unsicher, erstellt) VALUES (?, ?, ?, ?, ?, 1, ?)').run(t.id, feld, segment, png, '', Date.now())
+        db()
+          .prepare('INSERT OR REPLACE INTO onlinetest_tinte (teilnahme_id, feld, segment, png, text, unsicher, erstellt) VALUES (?, ?, ?, ?, ?, 1, ?)')
+          .run(t.id, feld, segment, png, '', Date.now())
         return (json(res, 503, { fehler: e instanceof Error ? e.message : String(e) }), true)
       }
     }
@@ -920,8 +974,18 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         const gruppen = lerngruppenVon(ich.id).map((g) => ({ ...g, anzahl: mitgliederVon(g).length }))
         // Klassen der Schülerkonten aus der Verwaltung („klasse:10b") stehen zur Auswahl wie IServ-Gruppen
         const klassen = new Map<string, { id: string; name: string }>()
-        for (const n of alleNutzer()) if (n.rolle === 'schueler') for (const g of n.gruppen) if (g.id.startsWith('klasse:')) klassen.set(g.id, { id: g.id, name: `Klasse ${g.name}` })
-        return (json(res, 200, { gruppen, iservGruppen: [...(nutzerNachId(ich.id)?.gruppen ?? []), ...[...klassen.values()].sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))] }), true)
+        for (const n of alleNutzer())
+          if (n.rolle === 'schueler') for (const g of n.gruppen) if (g.id.startsWith('klasse:')) klassen.set(g.id, { id: g.id, name: `Klasse ${g.name}` })
+        return (
+          json(res, 200, {
+            gruppen,
+            iservGruppen: [
+              ...(nutzerNachId(ich.id)?.gruppen ?? []),
+              ...[...klassen.values()].sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
+            ]
+          }),
+          true
+        )
       }
       if (req.method === 'GET' && teile.length === 1) {
         const g = lerngruppe(teile[0])
@@ -930,28 +994,50 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       }
       if (req.method === 'POST' && teile[0] === 'anlegen') {
         const k0 = (await k.koerper()) as Record<string, unknown>
-        const name = String(k0.name ?? '').trim().slice(0, 80)
+        const name = String(k0.name ?? '')
+          .trim()
+          .slice(0, 80)
         if (!name) return (json(res, 400, { fehler: 'Bitte einen Namen angeben.' }), true)
         const id = neueId()
-        const mitglieder = Array.isArray(k0.mitglieder) ? (k0.mitglieder as unknown[]).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[a-z0-9._-]{2,64}$/.test(x)) : []
+        const mitglieder = Array.isArray(k0.mitglieder)
+          ? (k0.mitglieder as unknown[]).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[a-z0-9._-]{2,64}$/.test(x))
+          : []
         db()
           .prepare('INSERT INTO lerngruppen (id, lehrkraft_id, name, fach, iserv_gruppe, mitglieder, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .run(id, ich.id, name, String(k0.fach ?? '').slice(0, 40), String(k0.iservGruppe ?? '').slice(0, 120), JSON.stringify(mitglieder), new Date().toISOString())
+          .run(
+            id,
+            ich.id,
+            name,
+            String(k0.fach ?? '').slice(0, 40),
+            String(k0.iservGruppe ?? '').slice(0, 120),
+            JSON.stringify(mitglieder),
+            new Date().toISOString()
+          )
         return (json(res, 200, { id }), true)
       }
       if (req.method === 'POST' && teile[0] === 'aendern') {
         const k0 = (await k.koerper()) as Record<string, unknown>
         const g = lerngruppe(String(k0.id ?? ''))
         if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
-        const mitglieder = Array.isArray(k0.mitglieder) ? (k0.mitglieder as unknown[]).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[a-z0-9._-]{2,64}$/.test(x)) : g.mitglieder
+        const mitglieder = Array.isArray(k0.mitglieder)
+          ? (k0.mitglieder as unknown[]).map((x) => String(x).trim().toLowerCase()).filter((x) => /^[a-z0-9._-]{2,64}$/.test(x))
+          : g.mitglieder
         db()
           .prepare('UPDATE lerngruppen SET name = ?, fach = ?, iserv_gruppe = ?, mitglieder = ? WHERE id = ?')
-          .run(String(k0.name ?? g.name).slice(0, 80), String(k0.fach ?? g.fach).slice(0, 40), String(k0.iservGruppe ?? g.iserv_gruppe).slice(0, 120), JSON.stringify(mitglieder), g.id)
+          .run(
+            String(k0.name ?? g.name).slice(0, 80),
+            String(k0.fach ?? g.fach).slice(0, 40),
+            String(k0.iservGruppe ?? g.iserv_gruppe).slice(0, 120),
+            JSON.stringify(mitglieder),
+            g.id
+          )
         return (json(res, 200, { ok: true }), true)
       }
       if (req.method === 'POST' && teile[0] === 'loeschen') {
         const k0 = (await k.koerper()) as Record<string, unknown>
-        db().prepare('DELETE FROM lerngruppen WHERE id = ? AND lehrkraft_id = ?').run(String(k0.id ?? ''), ich.id)
+        db()
+          .prepare('DELETE FROM lerngruppen WHERE id = ? AND lehrkraft_id = ?')
+          .run(String(k0.id ?? ''), ich.id)
         return (json(res, 200, { ok: true }), true)
       }
       return (json(res, 404, { fehler: 'Unbekannt.' }), true)
@@ -1030,8 +1116,20 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
           ergebnisSichtbar: ergebnisFrei(test, ts),
           // Wer aus der Lerngruppe noch nicht begonnen hat
           fehlend: mitglieder.filter((m) => !ts.some((t) => t.schueler_id === m.id)).map((m) => ({ name: m.name, benutzer: m.benutzer })),
-          fassungen: test.fassungen.map((f) => ({ label: f.label, punkte: f.fassung.punkte, aufgaben: f.fassung.aufgaben, einheiten: f.fassung.einheiten, loesungen: f.fassung.loesungen, original: f.original ?? null })),
-          teilnahmen: ts.map((t) => ({ ...ueberblick(test, t, namen), antworten: json_(t.antworten, {}), bewertung: json_(t.bewertung, {}), varianteNr: t.variante }))
+          fassungen: test.fassungen.map((f) => ({
+            label: f.label,
+            punkte: f.fassung.punkte,
+            aufgaben: f.fassung.aufgaben,
+            einheiten: f.fassung.einheiten,
+            loesungen: f.fassung.loesungen,
+            original: f.original ?? null
+          })),
+          teilnahmen: ts.map((t) => ({
+            ...ueberblick(test, t, namen),
+            antworten: json_(t.antworten, {}),
+            bewertung: json_(t.bewertung, {}),
+            varianteNr: t.variante
+          }))
         }),
         true
       )
@@ -1044,7 +1142,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         if (test.status !== 'wartend') return (json(res, 409, { fehler: 'Der Test läuft schon.' }), true)
         const jetzt = Date.now()
         db().prepare("UPDATE onlinetests SET status = 'offen' WHERE id = ?").run(test.id)
-        db().prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE test_id = ? AND beginn = 0 AND abgabe IS NULL').run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, test.id)
+        db()
+          .prepare('UPDATE teilnahmen SET beginn = ?, ende = ? WHERE test_id = ? AND beginn = 0 AND abgabe IS NULL')
+          .run(jetzt, jetzt + test.einstellungen.zeitMin * 60_000, test.id)
         einstellungenSetzen(test, { gestartet: jetzt })
         protokolliereServer('onlinetest', 'Onlinetest gestartet', ich.id)
         return (json(res, 200, { ok: true }), true)
@@ -1058,7 +1158,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         return (json(res, 200, { ok: true }), true)
       }
       const status: TestStatus = k0.status === 'beendet' ? 'beendet' : test.einstellungen.gestartet ? 'offen' : 'wartend'
-      db().prepare('UPDATE onlinetests SET status = ?, beendet = ? WHERE id = ?').run(status, status === 'beendet' ? new Date().toISOString() : null, test.id)
+      db()
+        .prepare('UPDATE onlinetests SET status = ?, beendet = ? WHERE id = ?')
+        .run(status, status === 'beendet' ? new Date().toISOString() : null, test.id)
       if (status === 'beendet') {
         for (const t of teilnahmenVon(test.id)) {
           if (t.abgabe) continue
@@ -1080,7 +1182,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
     if (teile[1] === 'tinte') {
       const t = teilnahme(String(k0.teilnahme ?? ''))
       if (!t || t.test_id !== test.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
-      const zeilen = db().prepare('SELECT feld, segment, png, text, unsicher, erstellt FROM onlinetest_tinte WHERE teilnahme_id = ? ORDER BY erstellt').all(t.id) as {
+      const zeilen = db()
+        .prepare('SELECT feld, segment, png, text, unsicher, erstellt FROM onlinetest_tinte WHERE teilnahme_id = ? ORDER BY erstellt')
+        .all(t.id) as {
         feld: string
         segment: string
         png: Uint8Array
@@ -1090,7 +1194,13 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       }[]
       return (
         json(res, 200, {
-          tinte: zeilen.map((z) => ({ feld: z.feld, segment: z.segment, text: z.text, unsicher: Boolean(z.unsicher), bild: `data:image/png;base64,${Buffer.from(z.png).toString('base64')}` }))
+          tinte: zeilen.map((z) => ({
+            feld: z.feld,
+            segment: z.segment,
+            text: z.text,
+            unsicher: Boolean(z.unsicher),
+            bild: `data:image/png;base64,${Buffer.from(z.png).toString('base64')}`
+          }))
         }),
         true
       )
@@ -1147,7 +1257,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       return true
     }
     if (teile[1] === 'umbenennen') {
-      const titel = String(k0.titel ?? '').trim().slice(0, 160)
+      const titel = String(k0.titel ?? '')
+        .trim()
+        .slice(0, 160)
       if (!titel) return (json(res, 400, { fehler: 'Bitte einen Namen angeben.' }), true)
       db().prepare('UPDATE onlinetests SET titel = ? WHERE id = ?').run(titel, test.id)
       return (json(res, 200, { ok: true }), true)

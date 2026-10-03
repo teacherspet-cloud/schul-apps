@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lueckentextOhneDoppelte, mitOptionalem, ohneDoppelte, teileVon } from '../src/shared/luecken'
+import { lueckentextOhneDoppelte, mitOptionalem, ohneDoppelte, optionalesInLoesung, teileVon } from '../src/shared/luecken'
 
 /* Lücken (02.10.2026): zweiteilige Wendungen, doppelte Wörter an der Lücke */
 describe('Lücken', () => {
@@ -89,5 +89,28 @@ describe('Lücken im Vokabeltest', () => {
     const b = bewerte(f, { 'b.z.a': 'not only', 'b.z.b': 'but', 'b.t.a': 'to reward' })
     expect(summe(b)).toBe(2)
     expect(summe(bewerte(f, { 'b.z.a': 'not only', 'b.z.b': '', 'b.t.a': 'reward' }))).toBe(1)
+  })
+})
+
+describe('Optionaler Teil der Vokabel an der Lücke (03.10.2026)', () => {
+  it('„lots (of)" + „___ of books": „of" aus dem Satz in die Lösung', () => {
+    expect(optionalesInLoesung('Mia: Yes, and there are', 'lots (of)', ' of books there.')).toEqual({
+      vor: 'Mia: Yes, and there are',
+      loesung: 'lots of',
+      nach: ' books there.'
+    })
+    const s = lueckenSatz('Mia: Yes, and there are', 'lots (of)', 'of books there.')
+    expect(s.answer).toBe('lots of')
+    expect(s.sentences[0].after).toBe('books there.')
+  })
+  it('vorne: „to ___" mit „(to) go" → Lösung „to go"', () => {
+    const o = optionalesInLoesung('I want to', '(to) go', 'home.')
+    expect(o).toEqual({ vor: 'I want ', loesung: 'to go', nach: 'home.' })
+  })
+  it('ohne passenden Nachbarn bleibt alles, wie es ist', () => {
+    expect(optionalesInLoesung('There are', 'lots (of)', 'apples.')).toEqual({ vor: 'There are', loesung: 'lots (of)', nach: 'apples.' })
+    expect(optionalesInLoesung('He is', 'often', 'late.')).toEqual({ vor: 'He is', loesung: 'often', nach: 'late.' })
+    // „of" nur als ganzes Wort – „offer" bleibt
+    expect(optionalesInLoesung('a', 'lots (of)', 'offer').loesung).toBe('lots (of)')
   })
 })

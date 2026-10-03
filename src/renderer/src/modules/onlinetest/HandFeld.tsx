@@ -15,6 +15,7 @@
 import { ActionIcon, Badge, Button, Group, Loader, Modal, Stack, Text, TextInput, Tooltip } from '@mantine/core'
 import { IconArrowBackUp, IconEraser, IconKeyboard, IconMaximize, IconPencil, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useStiftTouch } from './stiftScroll'
 import { woerterVon, type Erkennung } from './handschrift'
 import { Schreibflaeche, type Werkzeug } from './Schreibflaeche'
 import { geste, rahmen, schriftbild, type Strich } from './tinte'
@@ -115,13 +116,7 @@ export function HandFeld({
           {beschriftung}
         </Text>
       )}
-      {karten.length > 0 && (
-        <KartenZeile
-          karten={karten}
-          aendern={aendereKarten}
-          oeffne={(f) => setFenster(f)}
-        />
-      )}
+      {karten.length > 0 && <KartenZeile karten={karten} aendern={aendereKarten} oeffne={(f) => setFenster(f)} />}
       <div style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8, background: 'var(--mantine-color-body)' }}>
         <Schreibflaeche
           striche={striche}
@@ -143,7 +138,13 @@ export function HandFeld({
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Radierer">
-            <ActionIcon variant={werkzeug === 'radierer' ? 'filled' : 'subtle'} onClick={() => setWerkzeug('radierer')} aria-label="Radierer" size="lg" data-radierer>
+            <ActionIcon
+              variant={werkzeug === 'radierer' ? 'filled' : 'subtle'}
+              onClick={() => setWerkzeug('radierer')}
+              aria-label="Radierer"
+              size="lg"
+              data-radierer
+            >
               <IconEraser size={18} />
             </ActionIcon>
           </Tooltip>
@@ -209,8 +210,18 @@ export function HandFeld({
  * Die erkannten Wörter als Kärtchen. Darüber liegt eine Ebene für Korrekturzeichen: Antippen
  * eines Kärtchens oder eines „+", Gedrückthalten zum Verschieben, sonst gezeichnete Zeichen.
  */
-function KartenZeile({ karten, aendern, oeffne }: { karten: Karte[]; aendern: (k: Karte[]) => void; oeffne: (f: { art: 'einfuegen'; pos: number } | { art: 'ersetzen'; index: number }) => void }): React.JSX.Element {
+function KartenZeile({
+  karten,
+  aendern,
+  oeffne
+}: {
+  karten: Karte[]
+  aendern: (k: Karte[]) => void
+  oeffne: (f: { art: 'einfuegen'; pos: number } | { art: 'ersetzen'; index: number }) => void
+}): React.JSX.Element {
   const huelle = useRef<HTMLDivElement>(null)
+  // Mit Stift scrollt der Finger über dem Feld (stiftScroll.ts)
+  const beruehrung = useStiftTouch(huelle)
   const [strich, setStrich] = useState<[number, number][] | null>(null)
   const [zieht, setZieht] = useState<{ index: number; x: number; y: number } | null>(null)
   const druck = useRef<{ start: [number, number]; zeit: ReturnType<typeof setTimeout> | null; index: number | null } | null>(null)
@@ -234,7 +245,8 @@ function KartenZeile({ karten, aendern, oeffne }: { karten: Karte[]; aendern: (k
   const naechsteLuecke = (p: [number, number]): number => {
     const ls = lueckenLage()
     let best = ls[0]
-    for (const l of ls) if (Math.hypot(l.x + l.b / 2 - p[0], l.y + l.h / 2 - p[1]) < Math.hypot(best.x + best.b / 2 - p[0], best.y + best.h / 2 - p[1])) best = l
+    for (const l of ls)
+      if (Math.hypot(l.x + l.b / 2 - p[0], l.y + l.h / 2 - p[1]) < Math.hypot(best.x + best.b / 2 - p[0], best.y + best.h / 2 - p[1])) best = l
     return best?.i ?? karten.length
   }
 
@@ -245,7 +257,16 @@ function KartenZeile({ karten, aendern, oeffne }: { karten: Karte[]; aendern: (k
       </Text>
       <div
         ref={huelle}
-        style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, padding: '4px 2px', touchAction: 'none', userSelect: 'none' }}
+        style={{
+          position: 'relative',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 2,
+          padding: '4px 2px',
+          touchAction: beruehrung,
+          userSelect: 'none'
+        }}
         data-kartenzeile
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)
@@ -343,7 +364,14 @@ function KartenZeile({ karten, aendern, oeffne }: { karten: Karte[]; aendern: (k
         ))}
         {strich && strich.length > 1 && (
           <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-            <polyline points={strich.map((q) => q.join(',')).join(' ')} fill="none" stroke="rgba(224,49,49,0.85)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+            <polyline
+              points={strich.map((q) => q.join(',')).join(' ')}
+              fill="none"
+              stroke="rgba(224,49,49,0.85)"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         )}
         {zieht && (
@@ -366,7 +394,17 @@ function Luecke({ i }: { i: number }): React.JSX.Element {
     <span
       data-luecke
       data-i={i}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 30, color: 'var(--mantine-color-dimmed)', fontWeight: 700, borderRadius: 6, cursor: 'pointer' }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 22,
+        height: 30,
+        color: 'var(--mantine-color-dimmed)',
+        fontWeight: 700,
+        borderRadius: 6,
+        cursor: 'pointer'
+      }}
       aria-label="Hier einfügen"
     >
       +
@@ -375,7 +413,17 @@ function Luecke({ i }: { i: number }): React.JSX.Element {
 }
 
 /** Vergrößerte Schreibfläche: Einfügen, Ersetzen oder einfach größer schreiben */
-function GrossesFeld({ titel, erkenne, schliessen, uebernehmen }: { titel: string; erkenne: Erkennen; schliessen: () => void; uebernehmen: (e: Erkennung) => void }): React.JSX.Element {
+function GrossesFeld({
+  titel,
+  erkenne,
+  schliessen,
+  uebernehmen
+}: {
+  titel: string
+  erkenne: Erkennen
+  schliessen: () => void
+  uebernehmen: (e: Erkennung) => void
+}): React.JSX.Element {
   const [striche, setStriche] = useState<Strich[]>([])
   const [werkzeug, setWerkzeug] = useState<Werkzeug>('stift')
   const [ergebnis, setErgebnis] = useState<Erkennung | null>(null)
@@ -510,7 +558,16 @@ export function TastaturFeld({
       {lang ? (
         <Textarea_ value={wert} onChange={onChange} beschriftung={beschriftung} {...stift} />
       ) : (
-        <TextInput style={{ flex: 1 }} value={wert} onChange={(e) => onChange(e.currentTarget.value)} label={beschriftung} placeholder={placeholder} size="md" {...KEINE_HILFE} {...stift} />
+        <TextInput
+          style={{ flex: 1 }}
+          value={wert}
+          onChange={(e) => onChange(e.currentTarget.value)}
+          label={beschriftung}
+          placeholder={placeholder}
+          size="md"
+          {...KEINE_HILFE}
+          {...stift}
+        />
       )}
       {zumStift && (
         <Tooltip label="Mit dem Stift schreiben">
@@ -523,7 +580,17 @@ export function TastaturFeld({
   )
 }
 
-function Textarea_({ value, onChange, beschriftung, onPointerDown }: { value: string; onChange: (w: string) => void; beschriftung?: string; onPointerDown?: (e: React.PointerEvent) => void }): React.JSX.Element {
+function Textarea_({
+  value,
+  onChange,
+  beschriftung,
+  onPointerDown
+}: {
+  value: string
+  onChange: (w: string) => void
+  beschriftung?: string
+  onPointerDown?: (e: React.PointerEvent) => void
+}): React.JSX.Element {
   return (
     <div style={{ flex: 1 }}>
       {beschriftung && (
@@ -536,7 +603,17 @@ function Textarea_({ value, onChange, beschriftung, onPointerDown }: { value: st
         onChange={(e) => onChange(e.currentTarget.value)}
         onPointerDown={onPointerDown}
         rows={3}
-        style={{ width: '100%', font: 'inherit', fontSize: 16, padding: 8, borderRadius: 8, border: '1px solid var(--mantine-color-default-border)', background: 'var(--mantine-color-body)', color: 'inherit', resize: 'vertical' }}
+        style={{
+          width: '100%',
+          font: 'inherit',
+          fontSize: 16,
+          padding: 8,
+          borderRadius: 8,
+          border: '1px solid var(--mantine-color-default-border)',
+          background: 'var(--mantine-color-body)',
+          color: 'inherit',
+          resize: 'vertical'
+        }}
         {...KEINE_HILFE}
       />
     </div>

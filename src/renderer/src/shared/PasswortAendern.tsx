@@ -20,13 +20,13 @@ export function PasswortAendern({ fertig }: { fertig?: () => void }): React.JSX.
   if (ich?.quelle === 'iserv')
     return (
       <Text size="sm" c="dimmed">
-        Du meldest dich über IServ an. Dein Passwort änderst du deshalb in IServ.
+        Die Anmeldung läuft über IServ – das Passwort wird deshalb in IServ geändert.
       </Text>
     )
   if (ok)
     return (
       <Alert color="green" icon={<IconCheck />} title="Passwort geändert" data-passwort-ok>
-        Ab jetzt gilt dein neues Passwort{andere ? ' – andere Geräte sind abgemeldet' : ''}.
+        Ab jetzt gilt das neue Passwort{andere ? ' – andere Geräte sind abgemeldet' : ''}.
         {fertig && (
           <Button mt="sm" size="xs" variant="light" display="block" onClick={fertig}>
             Schließen

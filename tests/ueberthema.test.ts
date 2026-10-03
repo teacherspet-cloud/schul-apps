@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { presetDesigns, type DesignTemplate } from '../src/shared/design'
-import { fachPfad, mitThemenbereich, ueberthemaVon, unitAusName } from '../src/renderer/src/shared/ueberthema'
+import { abschnitteAusName, fachPfad, mitThemenbereich, ueberthemaVon, unitAusName } from '../src/renderer/src/shared/ueberthema'
 import { defaultMeta } from '../src/renderer/src/modules/arbeitsblatt/model/defaults'
 import type { Worksheet } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 import { kopfUeberthema, PageFrame, sidebarText } from '../src/renderer/src/modules/arbeitsblatt/render/PageFrame'
@@ -52,6 +52,13 @@ describe('Überthema: woher es kommt', () => {
 
   it('Vokabeltest: die Unit aus dem Namen der Liste', () => {
     expect(unitAusName('Green Line 5 – Unit 3, Station 1')).toBe('Unit 3')
+    // Abschnitte für den Namen des Onlinetests (03.10.2026)
+    expect(abschnitteAusName('Green Line 5 – Unit 3, Station 1')).toBe('Station 1')
+    expect(abschnitteAusName('Green Line 5 – Unit 1, Station 1 + Station 2')).toBe('Station 1 und 2')
+    expect(abschnitteAusName('Green Line 5 – Unit 1, Station 1 + Station 2 + Station 3')).toBe('Station 1, 2 und 3')
+    expect(abschnitteAusName('Green Line 5 – Unit 1, Story + Station 2')).toBe('Story und Station 2')
+    expect(abschnitteAusName('Green Line 5 – Unit 1')).toBe('')
+    expect(abschnitteAusName('Meine Liste, Teil 2')).toBe('')
     expect(unitAusName('Découvertes 2 – Unité 4')).toBe('Unité 4')
     expect(unitAusName('Prima nova Lektion 12')).toBe('Lektion 12')
     expect(unitAusName('Tiere und Pflanzen')).toBe('')

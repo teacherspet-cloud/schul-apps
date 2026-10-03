@@ -14,7 +14,7 @@ import { ASPEKT_LABEL, LESUNG_LABEL, mitLesung, WURZEL_LABEL } from '../didactic
 import { griechischUmschrift } from '../../../shared/sonderzeichen'
 import { aufgabenText, FESTE_ANWEISUNG, mindmapAnweisung, synonymTexte, zuordnungsKoepfe, type SynonymArt } from '../render/aufgabenTexte'
 import { baueVerbBlock } from './verbAufgabe'
-import { LUECKEN_REGELN, ohneDoppelte, teileVon } from '@shared/luecken'
+import { LUECKEN_REGELN, ohneDoppelte, optionalesInLoesung, teileVon } from '@shared/luecken'
 import { ersatzWoerter, wortartenVon, wortartVon } from './wortart'
 
 export interface GenContext {
@@ -172,7 +172,9 @@ export function lueckenSatz(
     const b = ohneDoppelte(mitte, teile[1], nach).loesung
     return { sentences: [{ before: vor, mitte, after: nach }], answer: `${a} … ${b}` }
   }
-  return { sentences: [{ before: vor, after: nach }], answer: ohneDoppelte(vor, String(answer ?? '').trim(), nach).loesung }
+  // Optionaler Teil der Vokabel an der Lücke („lots (of)" + „___ of books") gehört in die Lösung (03.10.2026)
+  const o = optionalesInLoesung(vor, String(answer ?? '').trim(), nach)
+  return { sentences: [{ before: o.vor.trim(), after: o.nach.trim() }], answer: ohneDoppelte(o.vor, o.loesung, o.nach).loesung }
 }
 
 const GAP_RULES = `${LUECKEN_REGELN}
@@ -1414,9 +1416,13 @@ export function parseGapText(data: any, vocab: VocabEntry[], rng: Rng): TextPart
       p.answer = teile[1]
       p.folge = true
     } else if (p.vocabId) gesehen.set(p.vocabId, p)
-    const vor = parts[i - 1]?.type === 'text' ? (parts[i - 1] as { text: string }).text : ''
-    const nach = parts[i + 1]?.type === 'text' ? (parts[i + 1] as { text: string }).text : ''
-    p.answer = ohneDoppelte(vor, p.answer, nach).loesung
+    const davor = parts[i - 1]?.type === 'text' ? (parts[i - 1] as { text: string }) : null
+    const danach = parts[i + 1]?.type === 'text' ? (parts[i + 1] as { text: string }) : null
+    // Optionaler Teil der Vokabel an der Lücke: aus dem Text in die Lösung (03.10.2026)
+    const o = optionalesInLoesung(davor?.text ?? '', p.answer, danach?.text ?? '')
+    if (davor) davor.text = o.vor
+    if (danach) danach.text = o.nach
+    p.answer = ohneDoppelte(o.vor, o.loesung, o.nach).loesung
   })
   return parts
 }

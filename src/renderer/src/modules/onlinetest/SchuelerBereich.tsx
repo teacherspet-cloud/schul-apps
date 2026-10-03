@@ -81,6 +81,7 @@ import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
 import { SchuelerEinstellungen } from './SchuelerEinstellungen'
+import { amPcGeraet, fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import { holen, senden } from './serverApi'
 
@@ -1077,7 +1078,7 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
      * aktiven Seite zeitweise „kein Fokus" (Befund der Lehrkraft: Abgabe kurz nach dem Start, obwohl
      * die Seite offen war). Dort genügt das Verlassen über Tab- oder App-Wechsel (visibilitychange).
      */
-    const amPc = window.matchMedia?.('(pointer: fine)').matches && !('ontouchstart' in window) && navigator.maxTouchPoints === 0
+    const amPc = amPcGeraet()
     const fokus = setInterval(() => {
       if (!amPc || document.hasFocus()) ohneFokus = 0
       else if (++ohneFokus >= 3) void abgeben('verlassen')
@@ -1090,6 +1091,34 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       window.removeEventListener('pagehide', raus)
     }
   }, [phase, abgeben])
+
+  /*
+   * Kein zweites Fenster daneben (fensterWaechter.ts, 03.10.2026): Vor dem Start gesperrt mit
+   * Warnung; im Test verdeckt eine Meldung den Test, und nach 10 s gilt es als Verlassen.
+   */
+  const [fenster, setFenster] = useState(fensterLage)
+  const [geteiltSeit, setGeteiltSeit] = useState<number | null>(null)
+  useEffect(() => {
+    const neu = (): void => setFenster(fensterLage())
+    window.addEventListener('resize', neu)
+    window.addEventListener('orientationchange', neu)
+    document.addEventListener('fullscreenchange', neu)
+    const i = setInterval(neu, 1000)
+    return () => {
+      window.removeEventListener('resize', neu)
+      window.removeEventListener('orientationchange', neu)
+      document.removeEventListener('fullscreenchange', neu)
+      clearInterval(i)
+    }
+  }, [])
+  useEffect(() => {
+    if (phase !== 'laeuft' || !fenster.geteilt) return setGeteiltSeit(null)
+    setGeteiltSeit((x) => x ?? Date.now())
+  }, [phase, fenster.geteilt])
+  const geteiltRest = geteiltSeit ? Math.max(0, 10 - Math.floor((Date.now() - geteiltSeit) / 1000)) : null
+  useEffect(() => {
+    if (phase === 'laeuft' && geteiltSeit && Date.now() - geteiltSeit >= 10_000) void abgeben('verlassen')
+  }, [phase, geteiltSeit, fenster, abgeben])
 
   // Zwischenstand: 2 s nach der letzten Eingabe an den Server
   useEffect(() => {
@@ -1131,7 +1160,26 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
         <Text size="sm" fw={700}>
           Wenn du die Seite verlässt – anderer Tab, anderes Fenster, andere App, Startbildschirm –, wird dein Test sofort endgültig abgegeben.
         </Text>
+        <Text size="sm" fw={700}>
+          Neben dem Test darf kein anderes Fenster zu sehen sein (kein zweites Browserfenster, keine geteilte Ansicht am Tablet).
+        </Text>
         <Text size="sm">Du hast {t.zeitMin} Minuten. Deine Eingaben werden laufend gesichert.</Text>
+      </Stack>
+    </Alert>
+  )
+  const fensterWarnung = fenster.geteilt && (
+    <Alert color="red" variant="filled" icon={<IconAlertTriangle />} title="Neben dem Test ist noch Platz für ein anderes Fenster" mb="md" data-fenster-warnung>
+      <Stack gap={6}>
+        <Text size="sm">
+          {fenster.amPc
+            ? 'Dein Browserfenster füllt nicht den ganzen Bildschirm. Bitte maximiere es oder schalte auf Vollbild – sonst kannst du den Test nicht beginnen.'
+            : 'Die Seite teilt sich den Bildschirm mit einer anderen App (geteilte Ansicht). Bitte schließe die andere App, sodass nur der Test zu sehen ist.'}
+        </Text>
+        {fenster.amPc && (
+          <Button variant="white" color="red" w="fit-content" onClick={() => void vollbild()} data-vollbild>
+            Vollbild einschalten
+          </Button>
+        )}
       </Stack>
     </Alert>
   )
@@ -1154,6 +1202,7 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
             {t.hinweis}
           </Alert>
         )}
+        {fensterWarnung}
         {regeln}
       </Card>
     )
@@ -1174,8 +1223,9 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
             {t.hinweis}
           </Alert>
         )}
+        {fensterWarnung}
         {regeln}
-        <Button size="lg" fullWidth onClick={() => setPhase('laeuft')}>
+        <Button size="lg" fullWidth disabled={fenster.geteilt} onClick={() => setPhase('laeuft')} data-test-beginnen>
           Test beginnen
         </Button>
       </Card>
@@ -1185,6 +1235,38 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   const sekunden = rest % 60
   return (
     <Stack gap="md" pb={120} translate="no">
+      {geteiltRest !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 400,
+            background: 'var(--mantine-color-red-9)',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24
+          }}
+          data-fenster-sperre
+        >
+          <Stack align="center" gap="sm" maw={460} ta="center">
+            <IconAlertTriangle size={48} />
+            <Title order={2}>Bitte nur den Test zeigen</Title>
+            <Text>
+              {fenster.amPc
+                ? 'Das Testfenster ist verkleinert – daneben ist Platz für ein anderes Fenster.'
+                : 'Der Test teilt sich den Bildschirm mit einer anderen App.'}{' '}
+              Stelle das Vollbild wieder her, sonst wird dein Test in <b>{geteiltRest} s</b> automatisch abgegeben.
+            </Text>
+            {fenster.amPc && (
+              <Button variant="white" color="red" onClick={() => void vollbild()}>
+                Vollbild einschalten
+              </Button>
+            )}
+          </Stack>
+        </div>
+      )}
       <Paper withBorder p="sm" radius="md" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--mantine-color-body)' }}>
         <Group justify="space-between" wrap="nowrap">
           <Figur code={code} posen={t.figur} pose="winkend" h={40} />
@@ -1472,6 +1554,57 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
   )
 }
 
+/** Sprecher am Zeilenanfang eines Dialogs („Mia:", „Mr Brown:") */
+const SPRECHER = /(?:^|\s)((?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?)?\s?[A-ZÄÖÜ][\p{L}'-]{0,18}):\s/gu
+
+/**
+ * Lückentext als zusammenhängender Text (03.10.2026, gemeldet: Dialoge zerfielen in Kästen – Text,
+ * darunter das Feld, dann der nächste Satzanfang). Die Felder stehen jetzt in der Zeile; bei einem
+ * Dialog beginnt jede Sprecherin und jeder Sprecher eine neue Zeile, der Name fett.
+ */
+function FliessText({ aufgabe, antworten, setze }: { aufgabe: OnlineAufgabe; antworten: Antworten; setze: (f: string, w: string) => void }): React.JSX.Element {
+  const stuecke: ({ text: string } | { feld: Feld })[] = []
+  for (const e of aufgabe.eintraege) {
+    if (e.vor) stuecke.push({ text: e.vor })
+    for (const f of e.felder) stuecke.push({ feld: f })
+  }
+  if (aufgabe.vorlage) stuecke.push({ text: aufgabe.vorlage })
+  const ganz = stuecke.map((x) => ('text' in x ? x.text : ' _ ')).join('')
+  const dialog = [...ganz.matchAll(SPRECHER)].length >= 2
+  const textTeil = (t: string, k: number): React.ReactNode => {
+    if (!dialog) return <span key={k}>{t}</span>
+    // Vor jedem Sprecher eine neue Zeile; den Namen fett
+    const teile: React.ReactNode[] = []
+    let rest = t
+    let n = 0
+    const muster = new RegExp(SPRECHER.source, 'u')
+    for (let m = muster.exec(rest); m; m = muster.exec(rest)) {
+      const start = m.index + (m[0].length - m[0].trimStart().length)
+      teile.push(<span key={`${k}-${n++}`}>{rest.slice(0, start)}</span>)
+      if (start > 0 || k > 0) teile.push(<br key={`${k}-${n++}`} />)
+      teile.push(<b key={`${k}-${n++}`}>{m[1]}:</b>, ' ')
+      rest = rest.slice(m.index + m[0].length)
+    }
+    teile.push(<span key={`${k}-${n++}`}>{rest}</span>)
+    return teile
+  }
+  return (
+    <Paper withBorder p="md" radius="md" data-fliesstext={dialog ? 'dialog' : 'text'}>
+      <div style={{ lineHeight: 2.4 }}>
+        {stuecke.map((x, k) =>
+          'text' in x ? (
+            textTeil(x.text, k)
+          ) : (
+            <span key={k} style={{ display: 'inline-block', width: '11em', maxWidth: '100%', verticalAlign: 'middle', margin: '0 4px' }}>
+              <FeldEingabe feld={x.feld} wert={antworten[x.feld.id] ?? ''} setze={setze} />
+            </span>
+          )
+        )}
+      </div>
+    </Paper>
+  )
+}
+
 function AufgabeKarte({
   nr,
   aufgabe,
@@ -1518,12 +1651,15 @@ function AufgabeKarte({
         </Paper>
       )}
       {aufgabe.vorlage && aufgabe.art === 'freeText' && <Text mb="sm">{aufgabe.vorlage}</Text>}
-      <Stack gap="sm">
-        {aufgabe.eintraege.map((e) => (
-          <EintragZeile key={e.einheit} e={e} antworten={antworten} setze={setze} />
-        ))}
-      </Stack>
-      {aufgabe.vorlage && aufgabe.art === 'gapText' && <Text mt="xs">{aufgabe.vorlage}</Text>}
+      {aufgabe.art === 'gapText' ? (
+        <FliessText aufgabe={aufgabe} antworten={antworten} setze={setze} />
+      ) : (
+        <Stack gap="sm">
+          {aufgabe.eintraege.map((e) => (
+            <EintragZeile key={e.einheit} e={e} antworten={antworten} setze={setze} />
+          ))}
+        </Stack>
+      )}
     </Card>
   )
 }

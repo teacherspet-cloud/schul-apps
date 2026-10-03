@@ -312,7 +312,7 @@ export default function EditorStep(): React.JSX.Element {
             />
             <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
             {/* Onlinetest (02.10.2026) – nur mit dem Schul-Apps-Server */}
-            <OnlinetestKnopf doc={doc} />
+            <OnlinetestKnopf doc={doc} listName={listName} />
           </>
         }
       />
@@ -687,14 +687,7 @@ function HeaderSettingsInhalt({
       />
       {/* Paket 11: „Englisch › Unit 3" im Kopf – Themenbereich oder Unit der Liste, überschreibbar */}
       <UeberthemaFeld size="xs" werte={doc.header} bereich={bereich} rueckfall={unit} onChange={(p) => onChange((d) => Object.assign(d.header, p))} />
-      <ZahlFeld
-        size="xs"
-        label="Schriftgröße (pt)"
-        min={9}
-        max={16}
-        value={doc.fontSize}
-        onChange={(v) => onChange((d) => (d.fontSize = Number(v) || 12))}
-      />
+      <ZahlFeld size="xs" label="Schriftgröße (pt)" min={9} max={16} value={doc.fontSize} onChange={(v) => onChange((d) => (d.fontSize = Number(v) || 12))} />
       <Text size="xs" fw={500}>
         Seitenumfang je Test
       </Text>

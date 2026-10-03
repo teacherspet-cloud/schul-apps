@@ -12,6 +12,7 @@
  *   (`onGeste`) und verschwinden nach dem Zeichnen.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useStiftTouch } from './stiftScroll'
 import { BREITE, geste, radieren, wegkritzeln, type Geste, type Strich } from './tinte'
 
 export type Werkzeug = 'stift' | 'radierer'
@@ -93,6 +94,8 @@ export function Schreibflaeche({
     const r = leinwand.current!.getBoundingClientRect()
     return [(e.clientX - r.left) / skala, (e.clientY - r.top) / skala]
   }
+  // Mit Stift scrollt der Finger über dem Feld (stiftScroll.ts)
+  const beruehrung = useStiftTouch(leinwand)
   const nimmt = (e: React.PointerEvent): boolean => {
     if (e.pointerType === 'pen') stiftGesehen.current = true
     // Handballen: Ist ein Stift im Spiel, schreiben Finger nicht
@@ -108,7 +111,7 @@ export function Schreibflaeche({
         ref={leinwand}
         data-schreibflaeche={korrektur ? 'korrektur' : 'schrift'}
         data-striche={striche.length}
-        style={{ width: breite, height: hoehe, touchAction: 'none', display: 'block', cursor: werkzeug === 'radierer' ? 'cell' : 'crosshair' }}
+        style={{ width: breite, height: hoehe, touchAction: beruehrung, display: 'block', cursor: werkzeug === 'radierer' ? 'cell' : 'crosshair' }}
         onPointerDown={(e) => {
           if (!nimmt(e)) return
           e.currentTarget.setPointerCapture(e.pointerId)

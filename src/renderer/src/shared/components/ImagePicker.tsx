@@ -17,6 +17,8 @@ import {
 } from '@mantine/core'
 import { IconMoodSmile, IconPhoto, IconSearch, IconSparkles, IconUpload } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
+import { create } from 'zustand'
+import { useAppSettings } from '../settingsStore'
 import type { OnlineImageHit, OnlineImageSource, OpenMojiHit } from '@shared/types'
 import { aiImagePrompt, generateAiImage, imageCredit, openMojiAsPng, PickedImage, preparePickedImage } from '../images'
 import { notifyError, readFileAsDataUrl, svgToDataUrl } from '../util'
@@ -36,7 +38,11 @@ interface Props {
 
 /** Bildauswahl mit vier Quellen: Piktogramme, eigene Bilder, Online-Suche, KI – optional Material. */
 export default function ImagePicker({ opened, onClose, onPick, keywords, materialImages, sourceSearch }: Props): React.JSX.Element {
-  const [tab, setTab] = useState<string | null>(sourceSearch ? 'online' : materialImages?.length ? 'material' : 'openmoji')
+  const kiStand = useKiBild((z) => z.je[kiSchluessel(keywords)])
+  // Läuft oder wartet ein KI-Bild zu diesem Bild, öffnet der Dialog gleich dort
+  const [tab, setTab] = useState<string | null>(
+    kiStand?.laeuft || kiStand?.ergebnis ? 'ai' : sourceSearch ? 'online' : materialImages?.length ? 'material' : 'openmoji'
+  )
   const pick = (img: PickedImage): void => {
     onPick(img)
     onClose()
@@ -59,7 +65,7 @@ export default function ImagePicker({ opened, onClose, onPick, keywords, materia
           <Tabs.Tab value="online" leftSection={<IconPhoto size={16} />}>
             Online-Suche
           </Tabs.Tab>
-          <Tabs.Tab value="ai" leftSection={<IconSparkles size={16} />}>
+          <Tabs.Tab value="ai" leftSection={kiStand?.laeuft ? <Loader size={14} /> : <IconSparkles size={16} />}>
             KI-Bild
           </Tabs.Tab>
         </Tabs.List>
@@ -268,38 +274,77 @@ function OnlineTab({
   )
 }
 
+/*
+ * KI-Bild außerhalb des Dialogs gemerkt (03.10.2026): Vorher ging eine laufende oder fertige
+ * Erzeugung verloren, sobald man den Dialog schloss oder zum Reiter „Eigenes Bild“ wechselte –
+ * der Reiter wird beim Wechsel abgebaut. Jetzt läuft sie weiter, und das Ergebnis wartet hier.
+ */
+interface KiBildStand {
+  prompt: string
+  laeuft: boolean
+  ergebnis?: PickedImage
+}
+const useKiBild = create<{ je: Record<string, KiBildStand>; setze: (k: string, s: Partial<KiBildStand>) => void }>((set) => ({
+  je: {},
+  setze: (k, teil) => set((z) => ({ je: { ...z.je, [k]: { ...(z.je[k] ?? { prompt: '', laeuft: false }), ...teil } } }))
+}))
+const kiSchluessel = (keywords: string[]): string => keywords.join('|') || 'frei'
+
+/** Kostenhinweis passend zum Zugang: Abo ohne Zusatzkosten, API-Schlüssel kostet je Bild */
+function kostenHinweis(): string {
+  const ai = useAppSettings.getState().settings.ai
+  const img = ai.imageProvider
+  if (img && img !== 'none' && ai.imageAccess[img] === 'subscription') return 'Dauert etwa 10–60 Sekunden und läuft über das Abo – ohne Zusatzkosten.'
+  return 'Dauert etwa 10–40 Sekunden und kostet über den API-Schlüssel einige Cent.'
+}
+
 function AiTab({ keywords, onPick }: { keywords: string[]; onPick: (img: PickedImage) => void }): React.JSX.Element {
-  const [prompt, setPrompt] = useState(aiImagePrompt(keywords[0] ?? ''))
-  const [result, setResult] = useState<PickedImage | null>(null)
-  const [loading, setLoading] = useState(false)
+  const k = kiSchluessel(keywords)
+  const stand = useKiBild((z) => z.je[k])
+  const setze = useKiBild((z) => z.setze)
+  const prompt = stand?.prompt || aiImagePrompt(keywords[0] ?? '')
+  const erzeugen = (): void => {
+    const p = prompt
+    setze(k, { laeuft: true, prompt: p })
+    // Kein await im Bauteil: Die Erzeugung gehört nicht dem Reiter und überlebt sein Abbauen
+    void generateAiImage(p).then(
+      (ergebnis) => setze(k, { laeuft: false, ergebnis }),
+      (e: unknown) => {
+        setze(k, { laeuft: false })
+        notifyError(e)
+      }
+    )
+  }
   return (
     <Stack>
-      <Textarea label="Bildbeschreibung" autosize minRows={3} value={prompt} onChange={(e) => setPrompt(e.currentTarget.value)} />
+      <Textarea label="Bildbeschreibung" autosize minRows={3} value={prompt} onChange={(e) => setze(k, { prompt: e.currentTarget.value })} />
       <Group>
-        <Button
-          leftSection={<IconSparkles size={16} />}
-          loading={loading}
-          onClick={async () => {
-            setLoading(true)
-            try {
-              setResult(await generateAiImage(prompt))
-            } catch (e) {
-              notifyError(e)
-            } finally {
-              setLoading(false)
-            }
-          }}
-        >
+        <Button leftSection={<IconSparkles size={16} />} loading={stand?.laeuft} onClick={erzeugen} data-ki-bild-erzeugen>
           Bild erzeugen
         </Button>
         <Text size="xs" c="dimmed">
-          Dauert etwa 10–40 Sekunden und kostet einige Cent.
+          {kostenHinweis()} Der Dialog darf dabei geschlossen oder der Reiter gewechselt werden.
         </Text>
       </Group>
-      {result && (
+      {stand?.ergebnis && (
         <Group align="end">
-          <Image src={result.dataUrl} h={220} w={220} fit="contain" style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }} />
-          <Button onClick={() => onPick(result)}>Dieses Bild verwenden</Button>
+          <Image
+            src={stand.ergebnis.dataUrl}
+            h={220}
+            w={220}
+            fit="contain"
+            style={{ border: '1px solid var(--mantine-color-default-border)', borderRadius: 8 }}
+          />
+          <Button
+            onClick={() => {
+              const e = stand.ergebnis!
+              setze(k, { ergebnis: undefined })
+              onPick(e)
+            }}
+            data-ki-bild-nehmen
+          >
+            Dieses Bild verwenden
+          </Button>
         </Group>
       )}
     </Stack>

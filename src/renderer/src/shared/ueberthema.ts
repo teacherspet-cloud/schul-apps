@@ -77,6 +77,27 @@ export function mitThemenbereich<T extends { meta: UeberthemaFelder }>(material:
  * „Green Line 5 – Unit 3, Station 1" → „Unit 3". Ohne erkennbare Einheit bleibt es leer –
  * lieber kein Überthema als ein geratenes.
  */
+/**
+ * Abschnitte einer Unit aus dem Namen der Liste (03.10.2026, Wunsch der Lehrkraft):
+ * „Green Line 5 – Unit 1, Station 1 + Station 2 + Station 3" → „Station 1, 2 und 3".
+ * Gleiche Bezeichnungen werden zusammengefasst; verschiedene bleiben stehen
+ * („Story + Station 2" → „Story und Station 2"). Ohne Abschnitte (ganze Unit) leer.
+ */
+export function abschnitteAusName(name: string | undefined): string {
+  const m = /,\s*([^,]+(?:\s*\+\s*[^,+]+)*)\s*$/.exec(name ?? '')
+  if (!m || !unitAusName(name)) return ''
+  const teile = m[1]
+    .split(/\s*\+\s*/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+  if (!teile.length) return ''
+  const liste = (xs: string[]): string => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} und ${xs[xs.length - 1]}`)
+  const zerlegt = teile.map((t) => /^(.*?)\s*(\d+[a-z]?)$/i.exec(t))
+  const praefix = zerlegt[0]?.[1]
+  if (zerlegt.every((z) => z && z[1] === praefix && praefix)) return `${praefix} ${liste(zerlegt.map((z) => z![2]))}`
+  return liste(teile)
+}
+
 export function unitAusName(name: string | undefined): string {
   if (!name) return ''
   const m = name.match(

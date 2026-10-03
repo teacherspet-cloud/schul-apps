@@ -1556,13 +1556,14 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
 function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.Element {
   const [liste, setListe] = useState<{ id: string; name: string; updatedAt?: string }[] | null>(null)
   const [doc, setDoc] = useState<TestDocument | null>(null)
+  const [listName, setListName] = useState('')
   useEffect(() => {
     void window.api.tests.list().then(
       (l) => setListe([...l].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))),
       () => setListe([])
     )
   }, [])
-  if (doc) return <Erstellen doc={doc} schliessen={schliessen} />
+  if (doc) return <Erstellen doc={doc} listName={listName} schliessen={schliessen} />
   return (
     <Modal opened onClose={schliessen} title="Neuer Onlinetest" size="lg">
       <Stack>
@@ -1579,7 +1580,14 @@ function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.
           onChange={(id) => {
             if (!id) return
             void window.api.tests.get(id).then(
-              (t) => setDoc(t.payload as TestDocument),
+              (t) => {
+                // Gespeicherte Vokabeltests: { vocab, settings, doc } – ältere/Test-Dateien: das Dokument selbst
+                const p = t.payload as { doc?: TestDocument | null } & Partial<TestDocument>
+                const d = p.doc ?? (p.variants ? (p as TestDocument) : null)
+                if (!d) return notifyError(new Error('Dieser Vokabeltest ist noch nicht erstellt (nur eine Vokabelliste).'))
+                setListName(t.name)
+                setDoc(d)
+              },
               (e: unknown) => notifyError(e)
             )
           }}
