@@ -410,7 +410,13 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           // Korrekturzeichen der Lehrkraft (Einstellungen › Material), sonst die Voreinstellung des Fachs
           const einst = (await imNutzer(alsNutzer(lehrkraft), () => aufruf('settings:get', [])).catch(() => undefined)) as Parameters<typeof zeichenFuer>[1]
           const nurZeichenflaeche = k0.nurZeichenflaeche === true && !felder.some((f) => f.art === 'zeilen' || f.art === 'text')
-          const zusatz = { zeichen: zeichenFuer(fachId, einst), ...(nurZeichenflaeche ? { nurZeichenflaeche } : {}), ...(befund ? { abschrift: befund } : {}) }
+          const material = typeof k0.material === 'string' ? k0.material.slice(0, 24000) : ''
+          const zusatz = {
+            zeichen: zeichenFuer(fachId, einst),
+            ...(nurZeichenflaeche ? { nurZeichenflaeche } : {}),
+            ...(material ? { material } : {}),
+            ...(befund ? { abschrift: befund } : {})
+          }
           const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
             aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)])
           )
@@ -439,7 +445,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         try {
           // Stift-Einträge über dem Blatt als Seitenbilder (sonst sieht die KI nur Striche ohne Zusammenhang)
           const bilder = e.stift ? await seitenMitTinte(z.html, tinte, blattExtra(antworten)).catch(() => [] as string[]) : []
-          const r = await blattFassung(z.rueckmeldung_id, nutzerNachId(ich.id)!, text, bilder, e.feedback, aufruf)
+          const material = typeof k0.material === 'string' ? k0.material.slice(0, 24000) : ''
+          const r = await blattFassung(z.rueckmeldung_id, nutzerNachId(ich.id)!, text, bilder, e.feedback, aufruf, material)
           res.end(JSON.stringify({ ok: !r.fehler, fehler: r.fehler, bogen: r.bogen, nr: r.nr }))
         } catch (err) {
           res.end(JSON.stringify({ ok: false, fehler: err instanceof Error ? err.message : String(err) }))

@@ -159,7 +159,7 @@ const freigabeNachCode = (code: string): Freigabe | null =>
 const MAX_GAESTE = 80
 
 /** Bogen erzeugen – im Namen der Lehrkraft, mit ihrem KI-Zugang (Schlüssel oder Abo) */
-async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf, bilder: string[] = []): Promise<Bogen> {
+async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, aufruf: Aufruf, bilder: string[] = [], material = ''): Promise<Bogen> {
   const lehrkraft = nutzerNachId(f.lehrkraft_id)
   if (!lehrkraft) throw new Error('Die Lehrkraft gibt es nicht mehr.')
   const r = json_(f.vorlage, {} as Rueckmeldung)
@@ -183,6 +183,9 @@ async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, au
       anfrage.user +=
         '\nHANDSCHRIFTLICHE EINTRÄGE: Die beigefügten Seitenbilder zeigen das Blatt mit dem, was mit dem Stift eingetragen wurde – beziehe es ein.'
     }
+    // Zeilenangaben prüfbar machen (03.10.2026): das Material so nummeriert, wie es gedruckt ist
+    if (material)
+      anfrage.user += `\n${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; nicht Teil der Antwort):'}\n${material}`
     const antwort = await aufruf('ai:structured', [anfrage])
     return bogenAus(antwort, r, anonym, ctx)
   })
@@ -234,7 +237,8 @@ export async function blattFassung(
   text: string,
   bilder: string[],
   mitFeedback: boolean,
-  aufruf: Aufruf
+  aufruf: Aufruf,
+  material = ''
 ): Promise<{ nr: number; bogen?: Partial<Bogen>; fehler?: string; volleBogen?: Bogen }> {
   const f = freigabe(freigabeId)
   if (!f) throw new Error('Die verknüpfte Rückmeldung fehlt.')
@@ -244,7 +248,7 @@ export async function blattFassung(
   const neu: Fassung & { bilder?: string[] } = { nr: fassungen.length + 1, text, zeit: new Date().toISOString(), ...(bilder.length ? { bilder } : {}) }
   if (mitFeedback) {
     try {
-      neu.bogen = await bogenErzeugen(f, schueler, text, aufruf, bilder)
+      neu.bogen = await bogenErzeugen(f, schueler, text, aufruf, bilder, material)
     } catch (e) {
       neu.fehler = e instanceof Error ? e.message : String(e)
     }

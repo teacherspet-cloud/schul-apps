@@ -70,6 +70,8 @@ export interface FeedbackZusatz {
   abschrift?: AbschriftBefund
   /** Die Aufgabe hat nur eine Zeichenfläche (Zeitleiste, Diagramm), keine Schreiblinien */
   nurZeichenflaeche?: boolean
+  /** Materialtexte mit Zeilennummern, wie gedruckt (materialZeilen.ts) */
+  material?: string
 }
 
 /**
@@ -106,6 +108,9 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       sprache && sprache !== 'de' ? `- Schreibe das Feedback auf Deutsch; Zitate aus der Antwort bleiben in der Originalsprache (${sprache}).` : '',
       bilder.length
         ? '- Mit dem Stift Eingetragenes, Textkästchen und Linien stehen auf den beigefügten Seitenbildern; beziehe nur ein, was zu dieser Aufgabe gehört.'
+        : '',
+      zusatz.material
+        ? `${'MATERIAL DES BLATTS MIT ZEILENNUMMERN (genau so gedruckt; verbindlich für jede Zeilenangabe – prüfe Zeilenangaben und Belege der Person NUR hieran; was du hier nicht eindeutig widerlegen kannst, bemängelst du nicht; nicht Teil der Antwort):'}\n${zusatz.material}`
         : '',
       `AUFGABE ${a.nr}: ${a.anweisung}`,
       `ERWARTUNG UND LÖSUNG (nur für dich, nicht verraten):\n${a.erwartung}`,

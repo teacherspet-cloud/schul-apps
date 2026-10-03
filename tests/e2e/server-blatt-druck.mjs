@@ -132,6 +132,18 @@ try {
     const feld = await t.evaluate((el) => el.getBoundingClientRect())
     pruefe(lage.left >= feld.right - 2, 'Kommentar steht rechts neben dem Schülertext, nicht darüber')
   }
+  // Spiegel mit den Markierungen bricht genau wie das Feld um (keine Markierung unter leeren Zeilen)
+  const gleich = await t.evaluate((x) => {
+    const m = x.parentElement?.querySelector('[data-markierung]')
+    return m ? { m: m.scrollHeight, t: x.scrollHeight } : null
+  })
+  pruefe(Boolean(gleich) && Math.abs(gleich.m - gleich.t) < 2, `Markierungen umbrechen wie der Text (${gleich?.m} / ${gleich?.t} px)`)
+  pruefe((await s.locator('[data-rand-leitung]').count()) > 0, 'Verbindungslinien von den Stellen zu den Randkommentaren')
+  await rand.first().hover()
+  await s.waitForTimeout(200)
+  const hervor = await s.locator('[data-anm]').evaluateAll((els) => els.some((e) => e.style.outline && e.style.outline !== 'none'))
+  pruefe(hervor, 'Zeigen auf einen Kommentar hebt seine Stelle hervor')
+  await s.screenshot({ path: join(out, '1b-zuordnung.png') })
   await t.scrollIntoViewIfNeeded()
   await s.screenshot({ path: join(out, '1-rand.png') })
   // PDF: Druckfassung abfangen und selbst rendern

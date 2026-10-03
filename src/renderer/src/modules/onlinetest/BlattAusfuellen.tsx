@@ -34,6 +34,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
 import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
 import type { Andock } from './blattWerkzeuge'
+import { materialMitZeilen } from './materialZeilen'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
@@ -435,6 +436,12 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     (gemessen?.felder ?? []).map((f) => ({ id: f.id, nr: f.nr, art: f.art, seite: f.seite }))
 
   const [pruefFehler, setPruefFehler] = useState<Record<string, string>>({})
+  /** Materialtexte mit Zeilennummern für die KI (Zeilenangaben prüfbar) */
+  const materialAngabe = (): { material?: string } => {
+    const doc = iframe.current?.contentDocument
+    const m = doc ? materialMitZeilen(doc) : ''
+    return m ? { material: m } : {}
+  }
   const aufgabePruefen = async (nr: number): Promise<void> => {
     setLaeuft(`a${nr}`)
     setMeldung('')
@@ -453,6 +460,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         felder: felderAlsDaten(),
         ...(bereich ? { bereich } : {}),
         ...(a?.zeichnen ? { nurZeichenflaeche: true } : {}),
+        ...materialAngabe(),
         ...(stand.current.tinteGeaendert ? { tinte } : {})
       })
       stand.current.tinteGeaendert = false
@@ -472,6 +480,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     try {
       const r = await senden<{ ok: boolean; bogen?: FeedbackBogen; nr: number; fehler?: string }>('/s/api/blatt/abgeben', {
         id: d.id,
+        ...materialAngabe(),
         antworten,
         felder: felderAlsDaten(),
         tinte
@@ -804,12 +813,18 @@ function Ebene(p: {
   const schreibt = p.werkzeug !== 'tastatur'
   const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
   // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
-  const [lagen, setLagen] = useState<Record<number, { y: number; feld: string }>>({})
+  const [lagen, setLagen] = useState<Record<number, { y: number; feld: string; ende: { x: number; y: number } }>>({})
   const meldeLage = useCallback(
-    (nr: number, y: number, feld: string): void =>
-      setLagen((l) => (l[nr] && Math.abs(l[nr].y - y) < 0.5 && l[nr].feld === feld ? l : { ...l, [nr]: { y, feld } })),
+    (nr: number, y: number, feld: string, ende: { x: number; y: number }): void =>
+      setLagen((l) =>
+        l[nr] && Math.abs(l[nr].y - y) < 0.5 && l[nr].feld === feld && Math.abs(l[nr].ende.x - ende.x) < 0.5 && Math.abs(l[nr].ende.y - ende.y) < 0.5
+          ? l
+          : { ...l, [nr]: { y, feld, ende } }
+      ),
     []
   )
+  // Kommentar und Stelle gemeinsam hervorheben
+  const [aktivAnm, setAktivAnm] = useState<number | null>(null)
   // Jede Anmerkung höchstens einmal markieren – im ersten Feld, in dem ihr Zitat steht
   const vergeben = new Set<number>()
   const trefferVon = (wert: string, aufgabe: number): ReturnType<typeof fundstellen> => {
@@ -886,7 +901,8 @@ function Ebene(p: {
                 treffer={treffer}
                 stil={{ ...eingabeStil, lineHeight: `${hoehe}px` }}
                 einzeilig
-                lage={(nr, y) => meldeLage(nr, f.y + f.h - hoehe + y, f.id)}
+                lage={(nr, y, e) => meldeLage(nr, f.y + f.h - hoehe + y, f.id, { x: f.x + e.x, y: f.y + f.h - hoehe + e.y })}
+                aktiv={aktivAnm}
               />
             ) : null,
             <input
@@ -921,7 +937,8 @@ function Ebene(p: {
               treffer={treffer}
               stil={flaechenStil}
               einzeilig={false}
-              lage={(nr, y) => meldeLage(nr, f.y + y, f.id)}
+              lage={(nr, y, e) => meldeLage(nr, f.y + y, f.id, { x: f.x + e.x, y: f.y + e.y })}
+              aktiv={aktivAnm}
             />
           ) : null,
           <textarea
@@ -949,9 +966,13 @@ function Ebene(p: {
             const l = lagen[a.nr]
             const f = p.felder.find((x) => x.id === l.feld)
             // Neben Schreiblinien: in den Korrekturrand (zwischen Linienende und Seitenrand)
-            return f && f.art === 'zeilen' && (f.zeilen ?? 1) > 1 ? { a, y: l.y, x: f.x + f.w + 6, w: Math.max(80, RAND_PX - 12) } : { a, y: l.y }
+            return f && f.art === 'zeilen' && (f.zeilen ?? 1) > 1
+              ? { a, y: l.y, x: f.x + f.w + 6, w: Math.max(80, RAND_PX - 12), ende: l.ende, feldRechts: f.x + f.w }
+              : { a, y: l.y }
           })}
         randX={BREITE - 30}
+        aktiv={aktivAnm}
+        setAktiv={setAktivAnm}
       />
       {p.seiten.map((s, i) => (
         <TintenSeite

@@ -263,9 +263,36 @@ try {
     }
     return best?.nr
   }, ac.y)
+  // Material mit Zeilennummern geht mit (Zeilenangaben prüfbar) – und stimmt mit der gedruckten Nummer 5 überein
+  let anfrage = null
+  await s.route('**/s/api/blatt/aufgabe', async (r) => {
+    anfrage = JSON.parse(r.request().postData() ?? '{}')
+    await r.continue()
+  })
+  const fuenf = await s.evaluate(() => {
+    const doc = document.querySelector('iframe').contentDocument
+    const marke = [...doc.querySelectorAll('.ws-line-numbers span')].find((x) => x.textContent.trim() === '5')
+    if (!marke) return null
+    const y = marke.getBoundingClientRect().top
+    const body = marke.closest('.ws-text-body')
+    const w = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+    const r = doc.createRange()
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (n.parentElement.closest('.ws-line-numbers')) continue
+      for (const m of n.textContent.matchAll(/\S+/g)) {
+        r.setStart(n, m.index)
+        r.setEnd(n, m.index + m[0].length)
+        const b = r.getClientRects()[0]
+        if (b && Math.abs(b.top - y) < 6) return m[0]
+      }
+    }
+    return null
+  })
   await s.locator(`[data-aufgabe-pruefen="${nr}"]`).click()
   await s.locator('[data-aufgabe-pruefen-los]').click()
   await s.waitForTimeout(4000)
+  const zeile5 = /Z\. 5: (\S+)/.exec(anfrage?.material ?? '')?.[1]
+  pruefe(Boolean(fuenf) && zeile5 === fuenf, `Material mit Zeilennummern an die KI, Z. 5 beginnt mit „${zeile5}" (gedruckt: „${fuenf}")`)
   const fehler = await s.locator('[data-pruef-fehler]').allInnerTexts()
   pruefe(fehler.length === 0 && (await s.getByText('Gelungen').count()) > 0, `KI-Prüfung der Zeitleisten-Aufgabe ${nr} liefert Feedback ${fehler.join(' ')}`)
   await s.screenshot({ path: join(out, '2-zeitleiste.png') })
