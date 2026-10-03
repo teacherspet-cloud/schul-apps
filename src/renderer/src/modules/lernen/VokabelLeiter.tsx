@@ -7,6 +7,7 @@
 import { Group, Progress, Stack, Text } from '@mantine/core'
 import { holen } from '../onlinetest/serverApi'
 import { tuerKlick } from './tuer'
+import { lesbarAuf } from './vtFarben'
 import { IconCheck, IconConfetti, IconLock, IconMapPin } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { fehlenBis, type Stufe } from '@shared/vokabelLaufbahn'
@@ -33,7 +34,7 @@ export const LEITER_CSS = `
 .vw-knoten { position: relative; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 800; font-size: .8rem;
   border: 3px solid var(--vt-linie); background: var(--vt-flaeche); color: var(--vt-leise); transition: transform .2s; }
 .vw-knoten.frei { border-color: var(--vt-a-zart); color: var(--vt-a-dunkel); }
-.vw-knoten.gelernt { border-color: var(--vt-a); background: var(--vt-a); color: #fff; }
+.vw-knoten.gelernt { border-color: var(--vt-a); background: var(--vt-a); color: var(--vt-auf-akzent); }
 .vw-knoten.aktuell { border-color: transparent; color: var(--vt-a-dunkel); box-shadow: 0 0 0 4px var(--vt-a-rand); animation: vw-puls 2.2s ease-in-out infinite; }
 .vw-knoten.zu { background: var(--vt-a-hell); opacity: .75; }
 .vw-name { font-size: .66rem; color: var(--vt-leise); text-align: center; margin-top: 4px; width: 68px; margin-left: -11px; line-height: 1.15; }
@@ -180,6 +181,8 @@ export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element
         const gelernt = w.stufen.filter((s) => s.gelernt).length
         const aktuell = w.stufen.find((s) => s.aktuell)
         const farbe = w.farbe ?? '#ea580c'
+        // Schrift auf der Fachfarbe: Schwarz oder Weiß, was besser trägt
+        const schrift = lesbarAuf(farbe)
         return (
           <a
             key={w.key}
@@ -197,7 +200,7 @@ export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element
             data-vokabelweg-karte={w.key}
           >
             <Group justify="space-between" wrap="nowrap">
-              <div style={{ color: '#fff' }}>
+              <div style={{ color: schrift }}>
                 <Text size="xs" fw={600} style={{ opacity: 0.9 }}>
                   Mein Vokabelweg · {w.fach}
                 </Text>
@@ -208,7 +211,7 @@ export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element
                   {aktuell ? `Gerade dran: ${aktuell.unit} · ${aktuell.section}` : 'Alles freigeschaltete ist gelernt.'}
                 </Text>
               </div>
-              <Text fw={800} size="xl" c="#fff" style={{ whiteSpace: 'nowrap' }}>
+              <Text fw={800} size="xl" c={schrift} style={{ whiteSpace: 'nowrap' }}>
                 {gelernt}/{w.stufen.length}
               </Text>
             </Group>

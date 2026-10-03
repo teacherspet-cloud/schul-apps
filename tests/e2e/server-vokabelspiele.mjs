@@ -204,6 +204,8 @@ try {
   await s.locator('[data-modus-knopf]').click()
   await s.waitForTimeout(300)
   pruefe((await s.locator('[data-vt-dunkel]').count()) > 0, 'Dunkle Darstellung über den Schalter in der Kopfzeile')
+  const seitenGrund = await s.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  pruefe(seitenGrund !== 'rgb(255, 255, 255)', `Seitenhintergrund wird mit dunkel (${seitenGrund})`)
   await s.screenshot({ path: join(out, '6-franzoesisch-dunkel.png'), fullPage: true })
   await s.goto(`${A}/s/einstellungen`)
   await s.locator('[data-design]').getByText('Meine Farbe').click()

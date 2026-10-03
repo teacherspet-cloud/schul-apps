@@ -56,7 +56,7 @@ export const SPIELE_CSS = `
 .vt-memory.auf .vt-memory-innen { transform: rotateY(180deg); }
 .vt-memory-zu, .vt-memory-auf { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   font-weight: 700; padding: 6px; text-align: center; font-size: .95rem; }
-.vt-memory-zu { background: linear-gradient(135deg, var(--vt-a-mittel), var(--vt-a-tief)); color: #fff; font-size: 1.6rem; box-shadow: 0 4px 0 var(--vt-a-dunkel); }
+.vt-memory-zu { background: linear-gradient(135deg, var(--vt-a-mittel), var(--vt-a-tief)); color: var(--vt-auf-a); font-size: 1.6rem; box-shadow: 0 4px 0 var(--vt-a-dunkel); }
 .vt-memory-auf { transform: rotateY(180deg); background: var(--vt-flaeche); border: 2px solid var(--vt-a-rand); color: var(--vt-tinte); }
 .vt-memory-auf.de { background: var(--vt-a-hell); }
 .vt-memory.gefunden .vt-memory-auf { background: var(--vt-gut-bg); border-color: var(--vt-gut-rand); color: var(--vt-gut-text); }

@@ -115,7 +115,7 @@ export function sprich(text: string, sprache: string): void {
 }
 
 const CSS = `
-.vt-kopf { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 22px 20px; color: #fff;
+.vt-kopf { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 22px 20px; color: var(--vt-auf-a);
   background: radial-gradient(120% 140% at 100% 0%, var(--vt-a-zart) 0%, var(--vt-a-mittel) 38%, var(--vt-a-tief) 100%); box-shadow: 0 14px 30px var(--vt-schatten); }
 .vt-kopf::after { content: ''; position: absolute; right: -40px; bottom: -60px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.12); }
 .vt-kopf-zeile { display: flex; align-items: center; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
@@ -127,12 +127,12 @@ const CSS = `
   display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; border: 1px solid var(--vt-a-rand2); }
 .vt-fach-fuellung { position: absolute; left: 0; right: 0; bottom: 0; transition: height .6s cubic-bezier(.2,.8,.2,1); opacity: .9;
   background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 6px, rgba(255,255,255,0.45) 6px 7px); }
-.vt-fach-zahl { position: relative; font-weight: 800; font-size: 1.2rem; color: var(--vt-tinte); }
-.vt-fach-name { position: relative; font-size: .72rem; color: var(--vt-leise); }
+.vt-fach-zahl { position: relative; font-weight: 800; font-size: 1.2rem; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 8px; padding: 0 7px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.vt-fach-name { position: relative; font-size: .72rem; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 6px; padding: 0 5px; margin-top: 3px; opacity: .92; }
 .vt-werte { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
 .vt-wert { border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; background: var(--vt-flaeche); border: 1px solid var(--vt-linie); box-shadow: 0 2px 10px rgba(15,23,42,0.05); }
 .vt-wert-symbol { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; }
-.vt-los { background: linear-gradient(90deg, var(--vt-a-mittel), var(--vt-a-tief)) !important; color: #fff !important; box-shadow: 0 10px 22px var(--vt-schatten); border: 0 !important; }
+.vt-los { background: linear-gradient(90deg, var(--vt-a-mittel), var(--vt-a-tief)) !important; color: var(--vt-auf-a) !important; box-shadow: 0 10px 22px var(--vt-schatten); border: 0 !important; }
 .vt-los:hover { filter: brightness(1.05); }
 .vt-buehne { background: var(--vt-flaeche); border-radius: 22px; padding: 22px 16px; border: 1px solid var(--vt-linie); box-shadow: 0 6px 24px rgba(15,23,42,0.06); }
 .vt-frage { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--vt-a-dunkel); font-weight: 700; }
@@ -257,7 +257,7 @@ function Kasten({
                 <Text size="sm" fw={600} style={{ opacity: 0.9 }}>
                   {d.fach} · {d.woerter.length} Vokabeln
                 </Text>
-                <Title order={2} style={{ color: '#fff', lineHeight: 1.15 }}>
+                <Title order={2} style={{ color: 'var(--vt-auf-a)', lineHeight: 1.15 }}>
                   {d.titel}
                 </Title>
                 <Text size="sm" mt={6} style={{ opacity: 0.92 }}>

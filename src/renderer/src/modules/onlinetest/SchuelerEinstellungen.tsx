@@ -78,13 +78,15 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
     mq?.addEventListener('change', neu)
     return () => mq?.removeEventListener('change', neu)
   }, [setze])
+  // Der frühe Hintergrund aus /server/ich.js hat seinen Dienst getan – ab jetzt bestimmt die Darstellung
+  useEffect(() => document.getElementById('sa-frueh')?.remove(), [])
   useEffect(() => {
     document.documentElement.style.fontSize = d.schrift === 'gross' ? '112.5%' : d.schrift === 'sehrgross' ? '125%' : ''
     document.documentElement.classList.toggle('sa-ruhig', d.ruhig)
   }, [d.schrift, d.ruhig])
   const schema = d.modus === 'auto' ? (systemDunkel ? 'dark' : 'light') : d.modus === 'dunkel' ? 'dark' : 'light'
   return (
-    <MantineProvider theme={{ primaryColor: d.farbe }} forceColorScheme={schema}>
+    <MantineProvider theme={{ primaryColor: d.farbe, autoContrast: true }} forceColorScheme={schema}>
       {children}
     </MantineProvider>
   )
