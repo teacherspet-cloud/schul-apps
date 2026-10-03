@@ -13,9 +13,11 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # Die offiziellen KI-Programme für den Abo-Zugang (jede Lehrkraft meldet IHR eigenes Konto an)
-# Codex fest auf 0.154.0 (03.10.2026): Ab 0.160 erzeugt Codex Bilder über eine „imagegen“-Fähigkeit, die
-# Befehle in einer Sandbox (bwrap) ausführt – im Container gibt es dafür keine Namensräume, und Bilder
-# fielen still aus („kein Bildgenerierungswerkzeug verfügbar“). 0.154 hat das Werkzeug noch eingebaut.
+# Codex auf 0.154.0 (03.10.2026): mit dieser Version ist die Bilderzeugung über das Abo nachgemessen (Plus-Konto).
+# Achtung: Ein Konto im kostenlosen ChatGPT-Tarif hat in Codex KEINE Bilderzeugung („kein
+# Bildgenerierungswerkzeug verfügbar“) und nur Ersatzmodelle – das war die eigentliche Ursache fehlender
+# KI-Bilder auf dem Server. 0.160 im Container ist mit einem Plus-Konto noch nicht geprüft; vor einem
+# Wechsel einmal echt ein Bild erzeugen (im Container fehlen Namensräume für die Sandbox „bwrap“).
 ARG CODEX_VERSION=0.154.0
 ARG CLAUDE_VERSION=2.1.287
 RUN npm install -g --omit=dev @openai/codex@${CODEX_VERSION} @anthropic-ai/claude-code@${CLAUDE_VERSION} \

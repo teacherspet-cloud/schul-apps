@@ -152,21 +152,12 @@ function swapDir(fresh: string, target: string): void {
   rmSync(old, { recursive: true, force: true, maxRetries: 3 })
 }
 
-/**
- * Codex fest auf 0.154.0 statt „neueste" (03.10.2026): Ab 0.160 erzeugt Codex Bilder nur noch über
- * eine Fähigkeit, die Befehle ausführt – mit den abgeschalteten Werkzeugen der App (codexLeanArgs)
- * meldet Codex dann „kein Bildgenerierungswerkzeug verfügbar", und alle KI-Bilder fallen still aus
- * (nachgemessen auf dem Server mit 0.160, mit 0.154 erzeugt dasselbe Konto Bilder). Vor einem
- * Wechsel die Bilderzeugung mit einem echten Aufruf prüfen; der Server nutzt dieselbe Version
- * (deploy/vps/Dockerfile).
- */
-export const CODEX_VERSION = '0.154.0'
-
 async function installCodex(emit: Emit): Promise<void> {
   const provider = 'openai'
-  emit({ provider, type: 'progress', message: 'Version wird ermittelt …' })
+  emit({ provider, type: 'progress', message: 'Neueste Version wird ermittelt …' })
+  const latest = await getJson<{ version: string }>('https://registry.npmjs.org/@openai/codex/latest')
   const meta = await getJson<{ dist: { tarball: string; integrity: string } }>(
-    `https://registry.npmjs.org/@openai/codex/${encodeURIComponent(`${CODEX_VERSION}-win32-x64`)}`
+    `https://registry.npmjs.org/@openai/codex/${encodeURIComponent(`${latest.version}-win32-x64`)}`
   )
   const [algorithm, value] = meta.dist.integrity.split('-')
   if (algorithm !== 'sha512') throw new Error('Unbekanntes Prüfsummenformat.')
