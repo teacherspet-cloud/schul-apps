@@ -38,7 +38,7 @@ import { IconArrowLeft, IconBooks, IconCalendarEvent, IconPlus, IconQrcode, Icon
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import { useCallback, useEffect, useState } from 'react'
-import type { Uebersicht } from '@shared/vokabeltrainer'
+import { STUFEN, type Uebersicht } from '@shared/vokabeltrainer'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { mitBildern, VokabelQuelle, type VokabelAuswahl } from './VokabelQuelle'
@@ -78,7 +78,8 @@ export function VokabeltrainingModule({ active }: { active: boolean }): React.JS
   )
 }
 
-export const FACH_NAMEN = ['neu', 'Fach 1', 'Fach 2', 'Fach 3', 'Fach 4', 'Fach 5', 'Langzeit']
+// Dieselben Lernstufen wie bei den Lernenden (shared/vokabeltrainer.ts, abgestimmt 03.10.2026)
+export const FACH_NAMEN = STUFEN.map((x) => x.name)
 export const FACH_FARBEN = ['gray', 'red', 'orange', 'yellow', 'lime', 'green', 'teal']
 
 /** Balken der Fächerverteilung */
@@ -531,8 +532,8 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           </Table.Tbody>
         </Table>
         <Text size="xs" c="dimmed" mt="xs">
-          Farben: grau neu · rot bis grün Fach 1–5 · türkis Langzeit. „Sicher“ = zweimal frei richtig geschrieben im Abstand von mindestens einer Woche. Keine
-          Rangliste – sortiert nach Namen.
+          Stufen: Neu (grau) → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im Langzeitgedächtnis (türkis). „Sicher“ = zweimal frei richtig
+          geschrieben im Abstand von mindestens einer Woche. Keine Rangliste – sortiert nach Namen.
         </Text>
       </Card>
       {lernende.length === 0 && <Alert>{d.code ? 'Noch niemand dabei – den QR-Code zeigen oder den Code nennen.' : 'Noch niemand in der Lerngruppe.'}</Alert>}

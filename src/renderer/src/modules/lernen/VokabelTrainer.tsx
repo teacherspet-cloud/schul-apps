@@ -14,9 +14,27 @@ import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
 import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
 import { fachFarbeAus } from '../../shared/fachfarben'
-import { ActionIcon, Alert, Badge, Button, Card, Center, Group, Loader, Progress, SimpleGrid, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Center,
+  Group,
+  Loader,
+  Popover,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import {
   IconArrowLeft,
+  IconArrowUp,
   IconBackspace,
   IconCalendarEvent,
   IconCheck,
@@ -38,6 +56,7 @@ import {
   paarFuer,
   istSicher,
   ohneAngaben,
+  STUFEN,
   satzMitLuecke,
   sitzungsWoerter,
   uebersicht,
@@ -93,7 +112,6 @@ const AKZENTE: Record<string, string[]> = {
  * kühl (sicher) – statt Ampel-Rot und Grau.
  */
 const FACH_FARBEN = ['#cbd5e1', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#34d399', '#14b8a6']
-const FACH_NAMEN = ['neu', '1', '2', '3', '4', '5', '∞']
 
 /** Vorlesen mit der Stimme des Geräts (kostenlos, ohne Server) */
 export function sprich(text: string, sprache: string): void {
@@ -121,14 +139,25 @@ const CSS = `
 .vt-kopf-zeile { display: flex; align-items: center; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
 .vt-ring { flex: none; width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; }
 .vt-ring-innen { width: 70px; height: 70px; border-radius: 50%; background: var(--vt-flaeche); color: var(--vt-a-dunkel); display: grid; place-items: center; text-align: center; line-height: 1.05; }
-.vt-kasten { display: flex; gap: 8px; align-items: flex-end; padding: 14px 14px 18px; border-radius: 20px; background: var(--vt-a-hell);
+.vt-kasten { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; padding: 14px 14px 18px; border-radius: 20px; background: var(--vt-a-hell);
   border: 1px solid var(--vt-a-rand); box-shadow: inset 0 -5px 0 var(--vt-a-rand2); }
-.vt-fach { flex: 1; border-radius: 12px 12px 8px 8px; background: var(--vt-flaeche); position: relative; overflow: hidden; min-height: 104px;
+.vt-fach { border: 0; padding: 0; font: inherit; cursor: pointer; border-radius: 12px 12px 8px 8px; background: var(--vt-flaeche); position: relative; overflow: hidden; min-height: 104px;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; border: 1px solid var(--vt-a-rand2); }
 .vt-fach-fuellung { position: absolute; left: 0; right: 0; bottom: 0; transition: height .6s cubic-bezier(.2,.8,.2,1); opacity: .9;
   background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 6px, rgba(255,255,255,0.45) 6px 7px); }
 .vt-fach-zahl { position: relative; font-weight: 800; font-size: 1.2rem; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 8px; padding: 0 7px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
-.vt-fach-name { position: relative; font-size: .72rem; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 6px; padding: 0 5px; margin-top: 3px; opacity: .92; }
+.vt-fach-name { position: relative; font-size: .68rem; font-weight: 700; color: var(--vt-tinte); background: var(--vt-flaeche); border-radius: 6px; padding: 1px 5px; margin-top: 3px;
+  max-width: calc(100% - 6px); text-align: center; line-height: 1.15; hyphens: manual; overflow-wrap: anywhere; }
+.vt-fach-wieder { position: relative; font-size: .6rem; color: var(--vt-leise); background: var(--vt-flaeche); border-radius: 6px; padding: 0 4px; margin-top: 2px; white-space: nowrap; }
+.vt-fach-plus { position: absolute; top: 6px; right: 6px; z-index: 2; font-size: .7rem; font-weight: 800; border-radius: 999px; padding: 1px 6px;
+  background: var(--vt-gut-bg); color: var(--vt-gut-text); border: 1px solid var(--vt-gut-rand); animation: vt-plus 1.2s ease-out; }
+.vt-fach.zuwachs { animation: vt-zuwachs 1.4s ease-out 2; }
+@keyframes vt-plus { 0% { transform: translateY(14px) scale(.6); opacity: 0 } 40% { transform: translateY(-4px) scale(1.1); opacity: 1 } 100% { transform: none } }
+@keyframes vt-zuwachs { 0%, 100% { box-shadow: 0 0 0 0 transparent } 40% { box-shadow: 0 0 0 4px var(--vt-gut-rand) } }
+.vt-aufstieg { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 10px; background: var(--vt-gut-bg); color: var(--vt-gut-text);
+  border: 1px solid var(--vt-gut-rand); font-weight: 600; font-size: .85rem; animation: vt-steigen .7s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes vt-steigen { from { transform: translateY(18px); opacity: 0 } to { transform: none; opacity: 1 } }
+@media (max-width: 560px) { .vt-kasten { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .vt-werte { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
 .vt-wert { border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; background: var(--vt-flaeche); border: 1px solid var(--vt-linie); box-shadow: 0 2px 10px rgba(15,23,42,0.05); }
 .vt-wert-symbol { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; }
@@ -154,13 +183,14 @@ const CSS = `
 .vt-gelegt { border: 2px dashed var(--vt-a-zart); border-radius: 16px; background: var(--vt-a-hell); min-width: 240px; min-height: 60px; display: grid; place-items: center; padding: 6px 14px; }
 @keyframes vt-rein { from { opacity: 0; transform: translateY(12px) scale(.98) } to { opacity: 1; transform: none } }
 .vt-rein { animation: vt-rein .35s ease-out; }
-@media (prefers-reduced-motion: reduce) { .vt-karte, .vt-fach-fuellung { transition: none } .vt-rein { animation: none } }
+@media (prefers-reduced-motion: reduce) { .vt-karte, .vt-fach-fuellung { transition: none } .vt-rein, .vt-fach.zuwachs, .vt-fach-plus, .vt-aufstieg { animation: none } }
 `
 
 export default function VokabelTrainer({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<Liste | null | undefined>(undefined)
   const [fehler, setFehler] = useState('')
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
+  const [vorher, setVorher] = useState<Record<string, WortStand> | null>(null)
   const laden = useCallback(() => {
     void holen<Liste>(`/s/api/vokabeln/liste?id=${encodeURIComponent(id)}`).then(setD, (e: unknown) => {
       setFehler(e instanceof Error ? e.message : String(e))
@@ -178,9 +208,9 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
   return (
     <TrainerFarben fach={d.fach} fachFarbe={d.farbe}>
       {sitzung ? (
-        <Sitzung d={d} woerter={sitzung} fertig={(st) => (setD({ ...d, staende: st }), setSitzung(null))} />
+        <Sitzung d={d} woerter={sitzung} fertig={(st) => (setVorher(d.staende), setD({ ...d, staende: st }), setSitzung(null))} />
       ) : (
-        <Kasten d={d} starten={(w) => setSitzung(w)} aktualisieren={(r) => setD({ ...d, ...r })} />
+        <Kasten d={d} starten={(w) => (setVorher(null), setSitzung(w))} aktualisieren={(r) => setD({ ...d, ...r })} vorher={vorher} />
       )}
     </TrainerFarben>
   )
@@ -208,11 +238,14 @@ function TrainerFarben({ fach, fachFarbe, children }: { fach: string; fachFarbe?
 function Kasten({
   d,
   starten,
-  aktualisieren
+  aktualisieren,
+  vorher
 }: {
   d: Liste
   starten: (w: Vokabel[]) => void
   aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
+  /** Stand vor der letzten Runde (für den Aufstieg) */
+  vorher?: Record<string, WortStand> | null
 }): React.JSX.Element {
   const farbe = useVtFarbe()
   const u = uebersicht(d.woerter, d.staende)
@@ -222,6 +255,12 @@ function Kasten({
   const anteil = Math.round((u.sicher / Math.max(1, u.gesamt)) * 100)
   // Während eines Spiels nur das Spiel zeigen
   const [spielt, setSpielt] = useState(false)
+  // Nach einer Runde: wie viele Wörter sind in jedes Fach dazugekommen? (Aufstieg sichtbar machen)
+  const zuwachs = useMemo(() => {
+    if (!vorher) return [0, 0, 0, 0, 0, 0, 0]
+    const alt = uebersicht(d.woerter, vorher).faecher
+    return u.faecher.map((n, i) => (i > 0 ? Math.max(0, n - alt[i]) : 0))
+  }, [vorher, d.woerter, u.faecher])
   const ich = window.__schulappsServer
   // Gäste (per QR-Code) haben keinen Lernraum – zurück zu ihrer Übersicht
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
@@ -289,16 +328,45 @@ function Kasten({
             </Text>
             <div className="vt-kasten" aria-label="Dein Karteikasten">
               {u.faecher.map((n, i) => (
-                <Tooltip key={i} label={i === 0 ? `${n} noch nicht gelernt` : i === 6 ? `${n} im Langzeitfach` : `${n} in Fach ${i}`}>
-                  <div className="vt-fach" data-fach={i}>
-                    <div
-                      className="vt-fach-fuellung"
-                      style={{ height: `${n ? 18 + (n / max) * 62 : 0}%`, backgroundColor: i === 0 && farbe.dunkel ? '#4b5563' : FACH_FARBEN[i] }}
-                    />
-                    <span className="vt-fach-zahl">{n}</span>
-                    <span className="vt-fach-name">{i === 0 ? 'neu' : i === 6 ? '∞' : `Fach ${FACH_NAMEN[i]}`}</span>
-                  </div>
-                </Tooltip>
+                <Popover key={i} width={250} position="bottom" withArrow shadow="md">
+                  <Popover.Target>
+                    <button
+                      type="button"
+                      className={`vt-fach ${zuwachs[i] > 0 ? 'zuwachs' : ''}`}
+                      data-fach={i}
+                      aria-label={`${STUFEN[i].name}: ${n} ${n === 1 ? 'Wort' : 'Wörter'}`}
+                    >
+                      <div
+                        className="vt-fach-fuellung"
+                        style={{ height: `${n ? 18 + (n / max) * 62 : 0}%`, backgroundColor: i === 0 && farbe.dunkel ? '#4b5563' : FACH_FARBEN[i] }}
+                      />
+                      {zuwachs[i] > 0 && (
+                        <span className="vt-fach-plus" data-fach-zuwachs={i}>
+                          +{zuwachs[i]}
+                        </span>
+                      )}
+                      <span className="vt-fach-zahl">{n}</span>
+                      <span className="vt-fach-name">{STUFEN[i].kurz}</span>
+                      {i > 0 && <span className="vt-fach-wieder">↻ {STUFEN[i].wieder.replace(/^in /, '')}</span>}
+                    </button>
+                  </Popover.Target>
+                  <Popover.Dropdown data-fach-erklaerung={i}>
+                    <Text fw={800} c={FACH_FARBEN[i] === '#cbd5e1' ? undefined : FACH_FARBEN[i]}>
+                      {STUFEN[i].name}
+                    </Text>
+                    <Text size="sm" mt={4}>
+                      {STUFEN[i].hinein}
+                    </Text>
+                    <Text size="sm" c="dimmed" mt={6}>
+                      {n} {n === 1 ? 'Wort' : 'Wörter'} · {i === 0 ? 'werden nach und nach eingeführt' : `kommen ${STUFEN[i].wieder} wieder`}
+                    </Text>
+                    {i > 0 && i < 6 && (
+                      <Text size="xs" c="dimmed" mt={6}>
+                        Richtig → „{STUFEN[i + 1].name}“. Falsch → zwei Stufen zurück{i > 2 ? ` („${STUFEN[Math.max(1, i - 2)].name}“)` : ''}.
+                      </Text>
+                    )}
+                  </Popover.Dropdown>
+                </Popover>
               ))}
             </div>
           </div>
@@ -352,8 +420,9 @@ function Kasten({
         </Alert>
       )}
       <Text size="xs" c="dimmed">
-        So funktioniert der Kasten: Richtig gewusst wandert ein Wort ein Fach weiter und kommt später wieder (1, 3, 7, 16, 35 Tage). Falsch geht es zwei Fächer
-        zurück. „Sicher“ ist ein Wort, wenn du es zweimal im Abstand von einer Woche richtig geschrieben hast.
+        So funktioniert der Kasten: Richtig gewusst steigt ein Wort eine Stufe auf (Neu → Angefangen → Wiedererkannt → Geübt → Gefestigt → Gekonnt → Im
+        Langzeitgedächtnis) und kommt später wieder; falsch geht es zwei Stufen zurück. Tippe ein Fach an, um zu sehen, wie ein Wort hineinkommt. „Sicher“ ist
+        ein Wort, wenn du es zweimal im Abstand von einer Woche richtig geschrieben hast.
       </Text>
     </Stack>
   )
@@ -424,6 +493,11 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
     return () => window.removeEventListener('keydown', taste)
   })
 
+  // Wörter, die in dieser Runde mindestens eine Stufe aufgestiegen sind
+  const aufgestiegen = woerter
+    .filter((w, k, l) => l.findIndex((x) => x.id === w.id) === k)
+    .map((w) => ({ v: w, vor: d.staende[w.id]?.fach ?? 0, nach: Math.min(6, staende[w.id]?.fach ?? 0) }))
+    .filter((x) => x.nach > x.vor)
   if (!v)
     return (
       <Stack align="center" py="xl" className="vt vt-rein" data-sitzung-fertig>
@@ -440,6 +514,20 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
         <Text c="dimmed">
           {zaehler.richtig} von {zaehler.gesamt} Abfragen auf Anhieb richtig.
         </Text>
+        {aufgestiegen.length > 0 && (
+          <Stack gap={6} align="center" data-aufstieg>
+            <Text fw={700}>
+              {aufgestiegen.length} {aufgestiegen.length === 1 ? 'Wort ist' : 'Wörter sind'} aufgestiegen
+            </Text>
+            <Group gap={6} justify="center" maw={520}>
+              {aufgestiegen.slice(0, 12).map((x, k) => (
+                <span key={x.v.id} className="vt-aufstieg" style={{ animationDelay: `${k * 70}ms` }}>
+                  {ohneAngaben(x.v.term)} <IconArrowUp size={12} /> {STUFEN[x.nach].name}
+                </span>
+              ))}
+            </Group>
+          </Stack>
+        )}
         <Button size="lg" radius="xl" className="vt-los" onClick={() => fertig(staende)}>
           Zurück zum Kasten
         </Button>
@@ -453,8 +541,8 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
         <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4}>
           Beenden
         </Button>
-        <Badge variant="light" color={farbe.a} size="lg" radius="sm">
-          {st!.fach === 0 ? 'neues Wort' : st!.fach >= 6 ? 'Langzeitfach' : `Fach ${FACH_NAMEN[st!.fach]}`}
+        <Badge variant="light" color={farbe.a} size="lg" radius="sm" tt="none">
+          {STUFEN[Math.min(6, st!.fach)].name}
         </Badge>
       </Group>
       <Progress value={fortschritt} radius="xl" size="lg" color={farbe.a} />

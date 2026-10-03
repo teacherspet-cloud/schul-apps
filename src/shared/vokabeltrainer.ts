@@ -49,6 +49,31 @@ export interface WortStand {
 }
 
 export const TAG = 86_400_000
+/**
+ * Namen der Fächer (03.10.2026, mit der Lehrkraft abgestimmt: „Lernstufen" – Lernende sollen verstehen,
+ * welche Wörter in welches Fach kommen, und ihren Fortschritt sehen). Je Stufe: Name, kurzer Name für
+ * schmale Kästen, wann das Wort wiederkommt und wie es hineinkommt.
+ */
+export const STUFEN: { name: string; kurz: string; wieder: string; hinein: string }[] = [
+  { name: 'Neu', kurz: 'Neu', wieder: 'in der nächsten Runde', hinein: 'Hier beginnt jedes Wort der Liste – du lernst es mit einer Lernkarte kennen.' },
+  {
+    name: 'Angefangen',
+    kurz: 'Ange­fangen',
+    wieder: 'morgen',
+    hinein: 'Du hast die Lernkarte gewusst. Hierher fällt ein Wort auch zurück, wenn es später danebengeht.'
+  },
+  { name: 'Wiedererkannt', kurz: 'Wieder­erkannt', wieder: 'in 3 Tagen', hinein: 'Du hast das Wort einmal richtig erkannt oder geschrieben.' },
+  { name: 'Geübt', kurz: 'Geübt', wieder: 'in 7 Tagen', hinein: 'Du hast es selbst richtig geschrieben – Erkennen allein reicht ab hier nicht mehr.' },
+  { name: 'Gefestigt', kurz: 'Gefestigt', wieder: 'in 16 Tagen', hinein: 'Nach einer Woche Pause wieder richtig geschrieben.' },
+  { name: 'Gekonnt', kurz: 'Gekonnt', wieder: 'in 35 Tagen', hinein: 'Auch nach über zwei Wochen noch richtig geschrieben.' },
+  {
+    name: 'Im Langzeitgedächtnis',
+    kurz: 'Langzeit',
+    wieder: 'in 90 Tagen',
+    hinein: 'Nach über einem Monat noch gewusst – das Wort sitzt. Ab und zu kommt es zur Sicherheit wieder.'
+  }
+]
+
 /** Abstände je Fach in Tagen (Fach 6 = Langzeit) */
 export const ABSTAENDE = [0, 1, 3, 7, 16, 35, 90]
 

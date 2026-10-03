@@ -85,6 +85,15 @@ try {
   pruefe(await da(h.locator('[data-vokabel-kasten]')), 'Gast lernt im Karteikasten')
   await h.screenshot({ path: join(out, '2b-kasten.png'), fullPage: true })
   // Eine Übungsrunde: Jede Frage startet frei bedienbar – kein altes „Richtig", nichts gesperrt (Befund 03.10.2026)
+  // Fächer mit Lernstufen-Namen, Wiederkehr und Erklärung beim Antippen
+  pruefe(
+    (await h.locator('[data-fach="1"]').innerText()).replace(/­/g, '').includes('Angefangen') &&
+      (await h.locator('[data-fach="1"]').innerText()).includes('morgen'),
+    'Fach „Angefangen“ mit „↻ morgen“'
+  )
+  await h.locator('[data-fach="3"]').click()
+  pruefe(await da(h.locator('[data-fach-erklaerung="3"]').getByText('selbst richtig geschrieben')), 'Antippen erklärt, wie ein Wort ins Fach kommt')
+  await h.keyboard.press('Escape')
   await h.locator('[data-vokabel-start]').click()
   await h.locator('[data-sitzung]').waitFor()
   const arten = new Set()
@@ -133,6 +142,13 @@ try {
   pruefe(sauber, `Jede Frage startet bedienbar ohne altes Ergebnis (${[...arten].join(', ')})`)
   pruefe(arten.size >= 2, `Mehrere Abfrageformate in der Runde (${[...arten].join(', ')})`)
   pruefe(buchstabenOk, 'Buchstaben ohne „[pl]"-Angabe')
+  pruefe(await da(h.locator('[data-aufstieg]'), 5000), 'Am Ende der Runde: aufgestiegene Wörter')
+  await h.waitForTimeout(1200)
+  await h.screenshot({ path: join(out, '2c2-aufstieg.png'), fullPage: true })
+  await h.getByRole('button', { name: 'Zurück zum Kasten' }).click()
+  pruefe(await da(h.locator('[data-fach-zuwachs]').first(), 5000), 'Kasten zeigt den Zuwachs je Fach')
+  await h.waitForTimeout(1300)
+  await h.screenshot({ path: join(out, '2c3-zuwachs.png'), fullPage: true })
   await h.screenshot({ path: join(out, '2c-runde.png'), fullPage: true })
   // Gast: „Meine Materialien" statt Test-Code-Seite
   await h.goto(`${A}/s/`)
