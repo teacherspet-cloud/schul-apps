@@ -112,18 +112,30 @@ export default function BlattFreigabeKnopf(props: {
   )
 }
 
-function Dialog({
+const Dialog = BlattFreigabeDialog
+
+/**
+ * Der Freigabe-Dialog – auch aus der App „Freigegebene Blätter“ heraus, mit einem gespeicherten Blatt
+ * (03.10.2026). Ohne offene Seitenaufteilung (`layouts` leer) teilt der Druckweg selbst auf.
+ */
+export function BlattFreigabeDialog({
   ws,
   layouts,
   logo,
   schoolName,
-  schliessen
+  schliessen,
+  ohneListe,
+  freigegeben
 }: {
   ws: Worksheet
   layouts: Map<string, PagePlan[]>
   logo: string | null
   schoolName: string
   schliessen: () => void
+  /** Die Liste „Bisher freigegeben“ weglassen (die aufrufende Seite zeigt sie schon) */
+  ohneListe?: boolean
+  /** Nach jeder Freigabe */
+  freigegeben?: () => void
 }): React.JSX.Element {
   const [titel, setTitel] = useState(ws.meta.title || ws.meta.topic || 'Arbeitsblatt')
   const [blatt, setBlatt] = useState(ws.sheets[0]?.id ?? '')
@@ -190,6 +202,9 @@ function Dialog({
       notifySuccess('Freigegeben – die Lernenden finden das Blatt im Schülerbereich unter „Arbeitsblätter“.')
       if (r.code && r.link) setQr({ titel, code: r.code, link: r.link })
       laden()
+      freigegeben?.()
+      // Ohne QR-Code ist hier nichts mehr zu tun
+      if (ohneListe && !(r.code && r.link)) schliessen()
     } catch (e) {
       notifyError(e, 'Nicht freigegeben')
     } finally {
@@ -272,7 +287,7 @@ function Dialog({
             Freigeben
           </Button>
         </Group>
-        {liste.length > 0 && (
+        {!ohneListe && liste.length > 0 && (
           <Stack gap={6} mt="sm">
             <Text fw={600} size="sm">
               Bisher freigegeben
@@ -329,7 +344,7 @@ function Dialog({
         )}
       </Stack>
       {qr && (
-        <Modal opened onClose={() => setQr(null)} title={qr.titel} size="lg">
+        <Modal opened onClose={() => (setQr(null), ohneListe && schliessen())} title={qr.titel} size="lg">
           <Zugang code={qr.code} link={qr.link} />
         </Modal>
       )}

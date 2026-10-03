@@ -11,6 +11,7 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { Ausfuellen, type BlattDaten } from '../onlinetest/BlattAusfuellen'
 import { notifyError } from '../../shared/util'
+import { BlattWaehlenKnopf } from './BlattWaehlen'
 
 export interface Freigabe {
   id: string
@@ -101,9 +102,11 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
     <Container size="lg" py="lg" data-freigaben>
       <Title order={2}>Freigegebene Arbeitsblätter</Title>
       <Text c="dimmed" size="sm" mb="md">
-        Freigeben lassen sich Blätter in der App „Arbeitsblatt" (Knopf „Für Lernende freigeben"). Hier ist zu sehen, wer begonnen und eingereicht hat.
+        Hier ist zu sehen, wer begonnen und eingereicht hat. Neue Blätter lassen sich direkt hier freigeben – oder im Editor der App „Arbeitsblatt" (Knopf „Für
+        Lernende").
       </Text>
       <Group mb="md">
+        <BlattWaehlenKnopf freigegeben={laden} />
         <SegmentedControl
           value={filter}
           onChange={(v) => setFilter(v as typeof filter)}
