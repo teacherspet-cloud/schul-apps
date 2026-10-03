@@ -48,7 +48,7 @@ export type ProgrammSymbolForm =
   | 'unterrichtsreihe'
   | 'freigaben'
   | 'laufendereihen'
-  | 'datenverwaltung'
+  | 'vokabeltraining'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
@@ -221,15 +221,15 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
     ],
     vorn: [{ d: 'M20 3V9M20 3.5H23L22 5L23 6.5H20', art: 'strich', breite: 1.5 }]
   },
-  // Datenverwaltung (03.10.2026): Aktenordner mit Rückenschild
-  datenverwaltung: {
+  // Vokabeltraining (03.10.2026): Karteikasten mit Karten, vorne ein Haken
+  vokabeltraining: {
     hinten: [
-      { d: 'M4 4H10V20H4Z', art: 'strich' },
-      { d: 'M10 4H16V20H10Z', art: 'strich' },
-      { d: 'M5.5 7H8.5V10H5.5Z', art: 'akzent' },
-      { d: 'M11.5 7H14.5V10H11.5Z', art: 'akzent' }
+      { d: 'M3 10H19V20H3Z', art: 'strich' },
+      { d: 'M5 6H17V10H5Z', art: 'akzent' },
+      { d: 'M7 3H15V6H7Z', art: 'strich', breite: 1.5 },
+      { d: 'M8 14H14', art: 'strich', breite: 1.5 }
     ],
-    vorn: [{ d: 'M17 6L21 5L23 19L19 20Z', art: 'strich', breite: 1.75 }]
+    vorn: [{ d: 'M16 17L18.5 19.5L23 14', art: 'strich', breite: 2 }]
   },
   // Verwaltung (02.10.2026, Server, nur Admin): Schieberegler
   verwaltung: {

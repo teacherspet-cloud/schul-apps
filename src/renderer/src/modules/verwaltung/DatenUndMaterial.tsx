@@ -1,7 +1,8 @@
 /**
- * Datenverwaltung (03.10.2026, aus dem Vorschlag der Lehrkraft für die Gruppe „Verwaltung"): was
- * früher auf der Startseite stand und dort nicht mehr sein soll – Freigaben der Fachschaften,
- * Themenbereiche über alle Programme – und die Sicherung des eigenen Materials.
+ * Daten und Material (03.10.2026): was früher auf der Startseite stand – Freigaben der Fachschaften,
+ * Themenbereiche über alle Programme – und die Sicherung des eigenen Materials. Seit dem Wunsch
+ * „Kombiniere das Menü Verwaltung mit dem Menü Datenverwaltung" Teil der App „Verwaltung": für
+ * Lehrkräfte die ganze App, für Admins der erste Reiter neben Nutzern, KI-Zugängen usw.
  */
 import { Button, Card, Container, Group, Stack, Text, Title } from '@mantine/core'
 import { IconDeviceFloppy, IconFolders } from '@tabler/icons-react'
@@ -10,13 +11,21 @@ import { openSettings, openThemen } from '../../shared/navigation'
 import { aufServer } from '../../shared/plattform'
 import { imNetz } from '../../shared/netzZugang'
 
-export default function DatenverwaltungModule(): React.JSX.Element {
+export default function VerwaltungLehrkraft(): React.JSX.Element {
   return (
-    <Container size="lg" py="lg" data-datenverwaltung>
+    <Container size="lg" py="lg">
       <Title order={2} mb="md">
-        Datenverwaltung
+        Verwaltung
       </Title>
-      <Stack gap="lg">
+      <DatenUndMaterial />
+    </Container>
+  )
+}
+
+export function DatenUndMaterial(): React.JSX.Element {
+  return (
+    <Stack gap="lg" data-datenverwaltung>
+      <>
         {/* Freigaben der Fachschaften (Server) */}
         {aufServer() && <FachordnerKarte />}
         <Card withBorder padding="md" radius="md">
@@ -47,7 +56,7 @@ export default function DatenverwaltungModule(): React.JSX.Element {
             </Group>
           </Card>
         )}
-      </Stack>
-    </Container>
+      </>
+    </Stack>
   )
 }

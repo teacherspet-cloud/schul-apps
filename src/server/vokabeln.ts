@@ -9,13 +9,18 @@
  *  Der Lernstand je Person liegt verschlüsselt (feldschutz.ts: vok_stand.daten, vok_zuweisungen.schueler).
  *
  *  Lehrkraft: GET /server/vokabeln · POST /server/vokabeln/freigeben · GET /server/vokabeln/<id>
- *             POST /server/vokabeln/<id>/termin|status|loeschen
+ *             POST /server/vokabeln/<id>/termin|zeitraum|status|loeschen
  *  Lernende:  GET /s/api/vokabeln · GET /s/api/vokabeln/liste?id= · POST /s/api/vokabeln/antwort
+ *  Gäste (eigene App „Vokabeltraining", 03.10.2026): per QR-Code/Code über einen längeren Zeitraum –
+ *             GET /s/api/vokabeln/zugang?code= · POST /s/api/vokabeln/gast {code, name} → persönlicher
+ *             Wiedereinstiegs-Code · POST /s/api/vokabeln/wieder {code, name, wieder}
  */
-import { randomBytes } from 'node:crypto'
-import { alleNutzer, datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
-import { json, type Anfrage } from './http'
-import { alleLernenden, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
+import { json, setzeSitzungsCookie, type Anfrage } from './http'
+import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { iservBereit } from './anmeldung'
+import { registerVergessen } from './namensschutz'
 import {
   bewerte,
   istSicher,
@@ -51,6 +56,12 @@ CREATE TABLE IF NOT EXISTS vok_stand (
   daten TEXT NOT NULL,
   aktualisiert INTEGER NOT NULL,
   PRIMARY KEY (zuweisung_id, schueler_id)
+);
+CREATE TABLE IF NOT EXISTS vok_gaeste (
+  zuweisung_id TEXT NOT NULL REFERENCES vok_zuweisungen(id) ON DELETE CASCADE,
+  nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE,
+  wieder TEXT NOT NULL,
+  PRIMARY KEY (zuweisung_id, nutzer_id)
 );`
 
 let bereit = false
@@ -58,6 +69,9 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    const spalten = new Set((d.prepare('PRAGMA table_info(vok_zuweisungen)').all() as { name: string }[]).map((x) => x.name))
+    if (!spalten.has('code')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN code TEXT NOT NULL DEFAULT ''")
+    if (!spalten.has('bis')) d.exec('ALTER TABLE vok_zuweisungen ADD COLUMN bis INTEGER')
     bereit = true
   }
   return d
@@ -83,7 +97,34 @@ interface Zeile {
   reihe: string
   status: 'offen' | 'beendet'
   erstellt: string
+  /** Code für Gäste (QR), leer = ohne Gäste */
+  code: string
+  /** Lernzeitraum bis (ms); danach abgeschlossen */
+  bis: number | null
 }
+
+/** Offen = nicht beendet und Zeitraum nicht abgelaufen */
+const istOffen = (z: Pick<Zeile, 'status' | 'bis'>): boolean => z.status === 'offen' && !(z.bis && z.bis < Date.now())
+
+const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function neuerCode(n = 6): string {
+  for (;;) {
+    const c = Array.from(randomBytes(n), (b) => CODE_ZEICHEN[b % CODE_ZEICHEN.length]).join('')
+    if (n !== 6 || !db().prepare('SELECT 1 FROM vok_zuweisungen WHERE code = ?').get(c)) return c
+  }
+}
+const hashVon = (s: string): string =>
+  createHash('sha256')
+    .update(s.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+    .digest('hex')
+const nachCode = (code: string): Zeile | null =>
+  code ? ((db().prepare("SELECT * FROM vok_zuweisungen WHERE code = ? AND code != ''").get(code.toUpperCase()) as Zeile | undefined) ?? null) : null
+const gaesteVon = (zid: string): NutzerInfo[] =>
+  (db().prepare('SELECT nutzer_id FROM vok_gaeste WHERE zuweisung_id = ?').all(zid) as { nutzer_id: string }[])
+    .map((g) => nutzerNachId(g.nutzer_id))
+    .filter((n): n is NutzerInfo => Boolean(n))
+/** Gäste lernen über Wochen: Sitzung bis zum Ende des Zeitraums (höchstens 120 Tage, mindestens 1 Tag) */
+const gastDauer = (z: Pick<Zeile, 'bis'>): number => Math.max(864e5, Math.min(120 * 864e5, (z.bis ?? Date.now() + 90 * 864e5) - Date.now() + 864e5))
 
 /** Lernstand einer Person in einer Liste: je Wort + Übungstage (für „aktiv in den letzten 7 Tagen") */
 export interface VokStand {
@@ -104,8 +145,11 @@ function standSpeichern(zid: string, sid: string, s: VokStand): void {
     .run(zid, sid, JSON.stringify(s), Date.now())
 }
 
-export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'>, ich: NutzerInfo): boolean {
-  if (ich.quelle === 'gast' || ich.rolle !== 'schueler') return false
+export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'> & { id?: string }, ich: NutzerInfo): boolean {
+  if (ich.rolle !== 'schueler') return false
+  // Gäste (QR-Code) und Lernende mit Konto, die per Code dazugekommen sind
+  if (z.id && db().prepare('SELECT 1 FROM vok_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
+  if (ich.quelle === 'gast') return false
   const nur = json_(z.schueler, [] as string[])
   if (!z.lerngruppe_id) return nur.includes(ich.benutzer)
   const g = lerngruppe(z.lerngruppe_id)
@@ -115,9 +159,14 @@ export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'>, ich: Nu
 
 function lernendeVon(z: Zeile): NutzerInfo[] {
   const nur = json_(z.schueler, [] as string[])
-  if (!z.lerngruppe_id) return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.includes(n.benutzer))
-  const g = lerngruppe(z.lerngruppe_id)
-  return g ? mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer)) : []
+  const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+  const feste = !z.lerngruppe_id
+    ? alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.includes(n.benutzer))
+    : g
+      ? mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer))
+      : []
+  const ids = new Set(feste.map((n) => n.id))
+  return [...feste, ...gaesteVon(z.id).filter((n) => !ids.has(n.id))]
 }
 
 /** Wörter bereinigen (Bilder höchstens 200 KB, höchstens 400 Wörter) */
@@ -153,13 +202,15 @@ export function vokabelnZuweisen(e: {
   woerter: unknown
   testTermin?: number | null
   reihe?: string
+  gaeste?: boolean
+  bis?: number | null
 }): string {
   const id = randomBytes(8).toString('hex')
   const woerter = bereinigeWoerter(e.woerter)
   if (!woerter.length) throw new Error('Die Liste hat keine Vokabeln.')
   db()
     .prepare(
-      "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?)"
+      "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?)"
     )
     .run(
       id,
@@ -172,7 +223,9 @@ export function vokabelnZuweisen(e: {
       JSON.stringify(woerter),
       e.testTermin ?? null,
       e.reihe ?? '',
-      new Date().toISOString()
+      new Date().toISOString(),
+      e.gaeste ? neuerCode() : '',
+      e.bis ?? null
     )
   return id
 }
@@ -193,7 +246,7 @@ export function vokabelListenFuer(
   ich: NutzerInfo
 ): { id: string; titel: string; fach: string; sprache: string; testTermin: number | null; uebersicht: ReturnType<typeof uebersicht> }[] {
   return (db().prepare("SELECT * FROM vok_zuweisungen WHERE status = 'offen' ORDER BY erstellt DESC").all() as unknown as Zeile[])
-    .filter((z) => vokIstFuer(z, ich))
+    .filter((z) => istOffen(z) && vokIstFuer(z, ich))
     .map((z) => ({
       id: z.id,
       titel: z.titel,
@@ -211,15 +264,71 @@ function loesungFuer(v: Vokabel, uebung: Uebung): string {
   return v.term
 }
 
-export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
+export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
+  const link = (code: string): string => `${adresse.replace(/\/$/, '')}/s/vt/${code}`
   return async (k) => {
     const { url, req, res, sitzung } = k
     const schueler = url.pathname === '/s/api/vokabeln' || url.pathname.startsWith('/s/api/vokabeln/')
     const lehrer = url.pathname === '/server/vokabeln' || url.pathname.startsWith('/server/vokabeln/')
     if (!schueler && !lehrer) return false
+    if (req.method === 'POST' && typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+    const sicher = Boolean((req.socket as { encrypted?: boolean }).encrypted)
+
+    // ---------------------------------------------------------------- Zugang per Code (auch ohne Anmeldung)
+    if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/zugang') {
+      const z = nachCode(String(url.searchParams.get('code') ?? ''))
+      if (!z || !istOffen(z)) return (json(res, 404, { fehler: 'Dieses Vokabeltraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      return (json(res, 200, { id: z.id, titel: z.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && vokIstFuer(z, sitzung.nutzer)), bis: z.bis }), true)
+    }
+    if (req.method === 'POST' && (url.pathname === '/s/api/vokabeln/gast' || url.pathname === '/s/api/vokabeln/wieder')) {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const z = nachCode(String(k0.code ?? ''))
+      if (!z || !istOffen(z)) return (json(res, 404, { fehler: 'Dieses Vokabeltraining gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      if (sitzung && vokIstFuer(z, sitzung.nutzer)) return (json(res, 200, { ok: true, id: z.id }), true)
+      // Lernende mit Konto kommen über den Code dazu – ohne Wiedereinstiegs-Code, ihr Konto reicht
+      if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
+        db().prepare('INSERT OR IGNORE INTO vok_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(z.id, sitzung.nutzer.id, '')
+        return (json(res, 200, { ok: true, id: z.id }), true)
+      }
+      if (iservBereit()) return (json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true)
+      const name = gastName(k0.name)
+      if (!name) return (json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true)
+      const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
+      const gleich = gaeste.find((n) => n.name.toLowerCase() === name.toLowerCase())
+      if (url.pathname === '/s/api/vokabeln/wieder') {
+        // Weiterlernen an einem anderen Tag oder Gerät: Name + persönlicher Code
+        const soll = gleich
+          ? (db().prepare('SELECT wieder FROM vok_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, gleich.id) as { wieder: string } | undefined)
+              ?.wieder
+          : undefined
+        const ist = hashVon(String(k0.wieder ?? ''))
+        if (!gleich || !soll || soll.length !== ist.length || !timingSafeEqual(Buffer.from(soll), Buffer.from(ist)))
+          return (json(res, 403, { fehler: 'Name und persönlicher Code passen nicht zusammen.' }), true)
+        const neu = sitzungAnlegen(gleich.id, 'schueler', gastDauer(z))
+        setzeSitzungsCookie(res, neu.cookie, gastDauer(z), sicher)
+        protokolliereServer('vokabeln', 'Wiedereinstieg mit persönlichem Code', gleich.id)
+        return (json(res, 200, { ok: true, id: z.id }), true)
+      }
+      if (gleich)
+        return (
+          json(res, 409, {
+            fehler: `„${name}“ ist schon dabei. Zum Weiterlernen unten „Schon dabei?“ wählen – oder einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“`
+          }),
+          true
+        )
+      if (gaeste.length >= 120) return (json(res, 429, { fehler: 'Für dieses Training sind schon zu viele Gäste angemeldet.' }), true)
+      const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
+      registerVergessen()
+      const wieder = neuerCode(6)
+      db().prepare('INSERT INTO vok_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, ?)').run(z.id, gast.id, hashVon(wieder))
+      const neu = sitzungAnlegen(gast.id, 'schueler', gastDauer(z))
+      setzeSitzungsCookie(res, neu.cookie, gastDauer(z), sicher)
+      protokolliereServer('vokabeln', 'Beitritt mit Namen (ohne IServ)', gast.id)
+      return (json(res, 200, { ok: true, id: z.id, wieder }), true)
+    }
+
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     const ich = sitzung.nutzer
-    if (req.method === 'POST' && typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
 
     // ---------------------------------------------------------------- Lernende
     if (schueler) {
@@ -232,7 +341,7 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
       if (req.method === 'GET' && url.pathname === '/s/api/vokabeln/liste')
         return (json(res, 200, { id: z.id, titel: z.titel, sprache: z.sprache, fach: z.fach, testTermin: z.test_termin, woerter, staende: st.woerter }), true)
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/antwort') {
-        if (z.status !== 'offen') return (json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true)
+        if (!istOffen(z)) return (json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true)
         const k0 = (await k.koerper()) as Record<string, unknown>
         const v = woerter.find((w) => w.id === k0.wortId)
         const uebung = String(k0.uebung ?? '') as Uebung
@@ -268,13 +377,20 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
               id: z.id,
               titel: z.titel,
               fach: z.fach,
-              lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende',
+              lerngruppe: z.lerngruppe_id
+                ? (lerngruppe(z.lerngruppe_id)?.name ?? '')
+                : z.code && !json_(z.schueler, [] as string[]).length
+                  ? 'Per QR-Code'
+                  : 'Einzelne Lernende',
               woerter: woerter.length,
               lernende: lernende.length,
               sicherSchnitt: lernende.length && woerter.length ? sicher.reduce((a, b) => a + b, 0) / lernende.length / woerter.length : 0,
               testTermin: z.test_termin,
-              status: z.status,
-              erstellt: z.erstellt
+              status: istOffen(z) ? 'offen' : 'beendet',
+              erstellt: z.erstellt,
+              bis: z.bis,
+              gaeste: gaesteVon(z.id).filter((n) => n.quelle === 'gast').length,
+              ...(z.code ? { code: z.code, link: link(z.code) } : {})
             }
           })
         }),
@@ -288,7 +404,10 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
       if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
       const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
-      if (!g && !einzelne.length) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe oder einzelne Lernende wählen.' }), true)
+      const mitGaesten = k0.gaeste === true
+      if (!g && !einzelne.length && !mitGaesten)
+        return (json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder den Zugang per QR-Code wählen.' }), true)
+      const bis = typeof k0.bis === 'number' && k0.bis > Date.now() ? k0.bis : null
       try {
         const id = vokabelnZuweisen({
           lehrkraftId: ich.id,
@@ -298,7 +417,9 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
           sprache: String(k0.sprache ?? ''),
           fach: String(k0.fach ?? ''),
           woerter: k0.woerter,
-          testTermin: typeof k0.testTermin === 'number' ? k0.testTermin : null
+          testTermin: typeof k0.testTermin === 'number' ? k0.testTermin : null,
+          gaeste: mitGaesten,
+          bis
         })
         protokolliereServer('vokabeln', 'Vokabeln zum Lernen freigegeben', ich.id)
         return (json(res, 200, { id }), true)
@@ -317,6 +438,7 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
         return {
           id: n.id,
           name: n.name || n.benutzer,
+          gast: n.quelle === 'gast',
           uebersicht: uebersicht(woerter, st.woerter, jetzt),
           tage7: st.tage.filter((t) => t >= vor7).length,
           stand: st.woerter
@@ -358,8 +480,14 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
           fach: z.fach,
           sprache: z.sprache,
           testTermin: z.test_termin,
-          status: z.status,
-          lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende',
+          status: istOffen(z) ? 'offen' : 'beendet',
+          bis: z.bis,
+          ...(z.code ? { code: z.code, link: link(z.code) } : {}),
+          lerngruppe: z.lerngruppe_id
+            ? (lerngruppe(z.lerngruppe_id)?.name ?? '')
+            : z.code && !json_(z.schueler, [] as string[]).length
+              ? 'Per QR-Code'
+              : 'Einzelne Lernende',
           woerter,
           lernende: lernende.map(({ stand: _s, ...rest }) => rest),
           gesamt: uebersicht(
@@ -380,14 +508,26 @@ export function vokabelRoute(): (k: Anfrage) => Promise<boolean> {
           .run(typeof k0.testTermin === 'number' ? k0.testTermin : null, z.id)
         return (json(res, 200, { ok: true }), true)
       }
+      if (teile[1] === 'zeitraum') {
+        db()
+          .prepare('UPDATE vok_zuweisungen SET bis = ? WHERE id = ?')
+          .run(typeof k0.bis === 'number' ? k0.bis : null, z.id)
+        return (json(res, 200, { ok: true }), true)
+      }
       if (teile[1] === 'status') {
+        const auf = k0.status !== 'beendet'
         db()
           .prepare('UPDATE vok_zuweisungen SET status = ? WHERE id = ?')
-          .run(k0.status === 'beendet' ? 'beendet' : 'offen', z.id)
+          .run(auf ? 'offen' : 'beendet', z.id)
+        // Wieder öffnen nach abgelaufenem Zeitraum: Zeitraum aufheben
+        if (auf && z.bis && z.bis < Date.now()) db().prepare('UPDATE vok_zuweisungen SET bis = NULL WHERE id = ?').run(z.id)
         return (json(res, 200, { ok: true }), true)
       }
       if (teile[1] === 'loeschen') {
+        // Gastkonten, die nur für dieses Training angelegt wurden, gehen mit
+        const gaeste = gaesteVon(z.id).filter((n) => n.quelle === 'gast')
         db().prepare('DELETE FROM vok_zuweisungen WHERE id = ?').run(z.id)
+        for (const n of gaeste) nutzerLoeschen(n.id)
         return (json(res, 200, { ok: true }), true)
       }
     }

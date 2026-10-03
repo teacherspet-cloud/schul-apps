@@ -8,6 +8,7 @@
  *  /s/blaetter    freigegebene Arbeitsblätter, /s/b/<ID> eines ausfüllen (BlattAusfuellen.tsx)
  *  /s/w/<CODE>    Arbeitsblatt per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/b/<ID>
  *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
+ *  /s/vt/<CODE>   Vokabeltraining per QR-Code (VokabelBeitritt.tsx) → /s/v/<ID>, auch für Gäste über Wochen
  *  /s/f/<CODE>    Aufgabe mit Feedback per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/a/<ID>
  *  /s/reihen, /s/r/<ZID>[/<SID>]  Unterrichtsreihen (ReiheAnsicht.tsx)
  *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
@@ -21,6 +22,7 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import VokabelBeitritt from '../lernen/VokabelBeitritt'
 import {
   Alert,
   Anchor,
@@ -134,6 +136,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   const blattCode = /^\/s\/w\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokabeln = /^\/s\/v\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const vokCode = /^\/s\/vt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
   const reiheM = /^\/s\/r\/([a-f0-9]{8,32})(?:\/([a-z0-9]{2,20}))?/.exec(pfad)
   // Aus einer Unterrichtsreihe geöffnet (Arbeitsblatt, Aufgabe, Test): Rückweg zur Reihe
@@ -149,9 +152,11 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Beitritt code={fbCode.toUpperCase()} art="aufgabe" />
   ) : blattCode ? (
     <Beitritt code={blattCode.toUpperCase()} art="blatt" />
+  ) : vokCode ? (
+    <VokabelBeitritt code={vokCode.toUpperCase()} />
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
-  ) : vokabeln && !gast ? (
+  ) : vokabeln ? (
     <VokabelTrainer id={vokabeln} />
   ) : lernFach && !gast ? (
     <LernRaum fach={lernFach[1] ? decodeURIComponent(lernFach[1]) : undefined} />
@@ -695,7 +700,9 @@ async function oeffneCode(code: string): Promise<void> {
   const aufgabe = await holen<{ id: string }>(`/s/api/aufgabe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
   if (aufgabe?.id) return window.location.assign(`/s/f/${code}`)
   const blatt = await holen<{ id: string }>(`/s/api/blatt/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
-  window.location.assign(blatt?.id ? `/s/w/${code}` : `/s/t/${code}`)
+  if (blatt?.id) return window.location.assign(`/s/w/${code}`)
+  const vok = await holen<{ id: string }>(`/s/api/vokabeln/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  window.location.assign(vok?.id ? `/s/vt/${code}` : `/s/t/${code}`)
 }
 
 const BEITRITT = {
@@ -725,7 +732,10 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
   const [fehler, setFehler] = useState('')
   const [laeuft, setLaeuft] = useState(false)
   const ich = window.__schulappsServer
-  const mitKonto = Boolean(ich?.angemeldet && ich.quelle !== 'gast')
+  // Direkt hinein nur mit Schülerkonto. Eine angemeldete Lehrkraft (z. B. am Handy, 03.10.2026) bekam
+  // sonst nur die Meldung „Bitte Vorname … eingeben" – ohne Feld. Sie sieht jetzt das Namensfeld.
+  const mitKonto = Boolean(ich?.angemeldet && ich.quelle !== 'gast' && ich.rolle === 'schueler')
+  const lehrkraft = Boolean(ich?.angemeldet && (ich.rolle === 'lehrkraft' || ich.rolle === 'admin'))
   const beitreten = useCallback(
     async (mitName?: string): Promise<void> => {
       setLaeuft(true)
@@ -769,6 +779,12 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
       <Title order={3} mb="md">
         {info.titel}
       </Title>
+      {lehrkraft && (
+        <Alert color="blue" mb="md" data-lehrkraft-hinweis>
+          Mit einem Lehrkraft-Konto angemeldet. Die Abgaben stehen in der App „{art === 'blatt' ? 'Freigegebene Blätter' : 'Rückmeldung'}". Zum Ausprobieren wie
+          ein Gast einen Namen eingeben – das Gerät ist danach als Gast angemeldet, die Anmeldung als Lehrkraft endet hier.
+        </Alert>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault()

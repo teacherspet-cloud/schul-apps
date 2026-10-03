@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
-import DatenverwaltungModule from './datenverwaltung/DatenverwaltungModule'
+import { VokabeltrainingModule } from './lernen/VokabelTraining'
+import VerwaltungLehrkraft from './verwaltung/DatenUndMaterial'
 import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
 import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
 import { programmSymbol, type ProgrammIcon } from '../shared/components/ProgrammSymbol'
@@ -155,6 +156,19 @@ export const modules: SchulModule[] = [
           faecher: 'alle' as const,
           component: FreigegebeneBlaetterModule
         },
+        // Vokabeltraining (03.10.2026): eigene App statt Reiter im Onlinetest – Lernen über Wochen
+        {
+          id: 'vokabeltraining',
+          name: 'Vokabeltraining',
+          description:
+            'Vokabeln über einen längeren Zeitraum im Karteikasten lernen lassen – Lerngruppe, Einzelne oder per QR-Code – mit Lernstand und Prognose.',
+          icon: programmSymbol('vokabeltraining', 'orange'),
+          color: 'orange',
+          illustration: illustration('vokabeltraining'),
+          leistenbild: leistenbild('vokabeltraining'),
+          faecher: SPRACH_FAECHER,
+          component: VokabeltrainingModule
+        },
         // Unterrichtsreihe (Etappe 6, 02.10.2026): Lernpfad für Lernende mit Freischalten – alle Fächer
         {
           id: 'unterrichtsreihe',
@@ -228,34 +242,19 @@ export const modules: SchulModule[] = [
     faecher: PROGRAMM_FAECHER.vokabelliste,
     component: VokabellisteModule
   },
-  // Datenverwaltung (03.10.2026): Fachschaftsfreigaben, Themenbereiche, Sicherung – für alle
+  // Verwaltung (03.10.2026 zusammengelegt mit der Datenverwaltung): für alle – Admins sehen zusätzlich
+  // Nutzer, KI-Zugänge, IServ, Hörtexte und Server
   {
-    id: 'datenverwaltung',
-    name: 'Datenverwaltung',
-    description: 'Freigaben der Fachschaften, Themenbereiche über alle Programme und die Sicherung des eigenen Materials.',
-    icon: programmSymbol('datenverwaltung', 'gray'),
+    id: 'verwaltung',
+    name: 'Verwaltung',
+    description: 'Freigaben der Fachschaften, Themenbereiche und Sicherung – für Admins dazu Nutzer, KI-Schlüssel, IServ-Anbindung und Server.',
+    icon: programmSymbol('verwaltung', 'gray'),
     color: 'gray',
-    illustration: illustration('datenverwaltung'),
-    leistenbild: leistenbild('datenverwaltung'),
+    illustration: illustration('verwaltung'),
+    leistenbild: leistenbild('verwaltung'),
     faecher: 'alle' as const,
-    component: DatenverwaltungModule
-  },
-  // Nur für Admins auf dem Server: die Verwaltung
-  ...(aufServer() && serverIch()?.rolle === 'admin'
-    ? [
-        {
-          id: 'verwaltung',
-          name: 'Verwaltung',
-          description: 'Nutzer und Testkonten, KI-Schlüssel für alle, IServ-Anbindung, Hörtext-Freigaben und Zustand des Servers.',
-          icon: programmSymbol('verwaltung', 'gray'),
-          color: 'gray',
-          illustration: illustration('verwaltung'),
-          leistenbild: leistenbild('verwaltung'),
-          faecher: 'alle' as const,
-          component: VerwaltungModule
-        }
-      ]
-    : [])
+    component: aufServer() && serverIch()?.rolle === 'admin' ? VerwaltungModule : VerwaltungLehrkraft
+  }
 ]
 
 /**
@@ -263,14 +262,17 @@ export const modules: SchulModule[] = [
  * klappt die Apps der Gruppe auf. Apps, die es gerade nicht gibt (Exe ohne Server, kein Admin),
  * fallen weg; eine leere Gruppe erscheint nicht.
  */
+/** Bild eines Obermenüs (KI-Bild „gruppe-<id>“, 03.10.2026); ohne Bild zeigt die Leiste das Vektorsymbol */
+export const gruppenBild = (id: string): string | undefined => leistenbild(`gruppe-${id}`)
+
 export interface ModulGruppe {
   id: string
   name: string
   apps: string[]
 }
 export const MODUL_GRUPPEN: ModulGruppe[] = [
-  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest'] },
+  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'vokabeltraining'] },
   { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Verwaltung', apps: ['elternbrief', 'vokabelliste', 'datenverwaltung', 'verwaltung'] }
+  { id: 'verwaltung', name: 'Verwaltung', apps: ['elternbrief', 'vokabelliste', 'verwaltung'] }
 ]

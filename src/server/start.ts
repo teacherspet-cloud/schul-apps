@@ -101,7 +101,7 @@ async function main(): Promise<void> {
       feedbackRoute(aufruf, adresse),
       blaetterRoute(aufruf, adresse),
       reihenRoute(aufruf),
-      vokabelRoute(),
+      vokabelRoute(adresse),
       lernenRoute(),
       schuelerRoute(aufruf),
       lehrkraftRoute(aufruf, adresse),

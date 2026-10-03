@@ -13,7 +13,6 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
-import VokabelTraining from '../lernen/VokabelTraining'
 import { FAECHER } from '@shared/faecher'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { useDokumentOeffner } from '../../shared/navigation'
@@ -68,8 +67,7 @@ import {
   IconTrash,
   IconUsersGroup,
   IconX,
-  IconPlus,
-  IconCards
+  IconPlus
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
@@ -185,9 +183,6 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
           <Tabs.Tab value="gruppen" leftSection={<IconUsersGroup size={16} />}>
             Lerngruppen
           </Tabs.Tab>
-          <Tabs.Tab value="vokabeln" leftSection={<IconCards size={16} />} data-reiter-vokabeltraining>
-            Vokabeltraining
-          </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="tests">
           <Tests ziel={ziel} zielErledigt={() => setZiel(null)} />
@@ -195,7 +190,6 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
         <Tabs.Panel value="gruppen">
           <Lerngruppen />
         </Tabs.Panel>
-        <Tabs.Panel value="vokabeln">{reiter === 'vokabeln' && <VokabelTraining />}</Tabs.Panel>
       </Tabs>
     </Container>
   )

@@ -1,5 +1,6 @@
 /**
- * Verwaltung – nur für Admins, nur auf dem Schul-Apps-Server (02.10.2026).
+ * Verwaltung für Admins auf dem Schul-Apps-Server (02.10.2026); seit 03.10.2026 mit dem Reiter
+ * „Daten und Material" (Fachschaft, Themenbereiche, Sicherung), den Lehrkräfte als ganze App sehen.
  *
  * Wunsch der Lehrkraft: „Für Admins soll eine Verwaltungs-App erstellt werden, in der die
  * wichtigsten Daten der Haupt- und Unter-Apps verwaltet werden können. Als Admin soll man
@@ -9,7 +10,30 @@
  * Abos (ChatGPT, Claude) sind bewusst NICHT teilbar: Die Nutzungsbedingungen verbieten das
  * Teilen von Konten – jede Lehrkraft meldet ihr eigenes an (Einstellungen › KI-Zugang).
  */
-import { ActionIcon, Alert, Badge, Button, Card, Code, Container, CopyButton, Group, Loader, Modal, PasswordInput, Select, SimpleGrid, Stack, Switch, Table, Tabs, Text, TextInput, Title, Tooltip } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Code,
+  Container,
+  CopyButton,
+  Group,
+  Loader,
+  Modal,
+  PasswordInput,
+  Select,
+  SimpleGrid,
+  Stack,
+  Switch,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconTrash, IconUserPlus } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -17,9 +41,21 @@ import { notifyError, notifySuccess } from '../../shared/util'
 import { KlassenlisteKarte } from './Klassenliste'
 import { serverIch } from '../../shared/plattform'
 import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
+import { DatenUndMaterial } from './DatenUndMaterial'
 
 interface Uebersicht {
-  nutzer: { id: string; benutzer: string; name: string; rolle: 'admin' | 'lehrkraft' | 'schueler'; quelle: string; gesperrt: boolean; eingerichtet: boolean; zuletzt: string | null; gruppen: number; passwortWechseln?: boolean }[]
+  nutzer: {
+    id: string
+    benutzer: string
+    name: string
+    rolle: 'admin' | 'lehrkraft' | 'schueler'
+    quelle: string
+    gesperrt: boolean
+    eingerichtet: boolean
+    zuletzt: string | null
+    gruppen: number
+    passwortWechseln?: boolean
+  }[]
   schluessel: { name: string; hinterlegt: string; fuerAlle: boolean }[]
   iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean }
   notzugang: boolean
@@ -33,13 +69,19 @@ interface Uebersicht {
   }
 }
 
-const NAMEN: Record<string, string> = { openai: 'OpenAI', anthropic: 'Anthropic (Claude)', google: 'Google (Gemini)', elevenlabs: 'ElevenLabs (Hörtexte)', pixabay: 'Pixabay (Bilder)' }
+const NAMEN: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic (Claude)',
+  google: 'Google (Gemini)',
+  elevenlabs: 'ElevenLabs (Hörtexte)',
+  pixabay: 'Pixabay (Bilder)'
+}
 const mb = (b: number): string => `${Math.round(b / 1024 / 1024)} MB`
 const gb = (b: number): string => `${(b / 1024 / 1024 / 1024).toFixed(1).replace('.', ',')} GB`
 
 export default function VerwaltungModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [d, setD] = useState<Uebersicht | null>(null)
-  const [reiter, setReiter] = useState<string | null>('nutzer')
+  const [reiter, setReiter] = useState<string | null>('daten')
   const laden = useCallback(() => {
     void holen<Uebersicht>('/server/verwaltung/uebersicht')
       .then(setD)
@@ -65,12 +107,16 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
       ) : (
         <Tabs value={reiter} onChange={setReiter}>
           <Tabs.List mb="md">
+            <Tabs.Tab value="daten">Daten und Material</Tabs.Tab>
             <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
             <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
             <Tabs.Tab value="iserv">IServ-Anbindung</Tabs.Tab>
             <Tabs.Tab value="hoertexte">Hörtexte</Tabs.Tab>
             <Tabs.Tab value="server">Server</Tabs.Tab>
           </Tabs.List>
+          <Tabs.Panel value="daten">
+            <DatenUndMaterial />
+          </Tabs.Panel>
           <Tabs.Panel value="nutzer">
             <Nutzer d={d} neu={laden} />
           </Tabs.Panel>
@@ -147,7 +193,12 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
             spellCheck={false}
             data-feld="benutzer"
           />
-          <TextInput label="Name" placeholder="Max Mustermann" value={neuerNutzer.name} onChange={(e) => setNeuerNutzer({ ...neuerNutzer, name: e.currentTarget.value })} />
+          <TextInput
+            label="Name"
+            placeholder="Max Mustermann"
+            value={neuerNutzer.name}
+            onChange={(e) => setNeuerNutzer({ ...neuerNutzer, name: e.currentTarget.value })}
+          />
           <Select
             label="Rolle"
             data={[
@@ -180,7 +231,17 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
       <KlassenlisteKarte fertig={neu} />
       <Card withBorder>
         <Group align="end">
-          <Select label="Testkonto anlegen als" data={[{ value: 'lehrkraft', label: 'Lehrkraft' }, { value: 'schueler', label: 'Schüler/in' }]} value={rolle} onChange={(v) => v && setRolle(v)} allowDeselect={false} w={200} />
+          <Select
+            label="Testkonto anlegen als"
+            data={[
+              { value: 'lehrkraft', label: 'Lehrkraft' },
+              { value: 'schueler', label: 'Schüler/in' }
+            ]}
+            value={rolle}
+            onChange={(v) => v && setRolle(v)}
+            allowDeselect={false}
+            w={200}
+          />
           <Button leftSection={<IconUserPlus size={16} />} onClick={() => void testkonto()}>
             Testkonto anlegen
           </Button>
@@ -298,17 +359,20 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
 function Schluessel({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
   const [werte, setWerte] = useState<Record<string, string>>({})
   const speichern = (name: string, patch: object): void =>
-    void senden('/server/verwaltung/schluessel', { name, ...patch }).then(() => {
-      notifySuccess('Gespeichert.')
-      setWerte((w) => ({ ...w, [name]: '' }))
-      neu()
-    }, (e: unknown) => notifyError(e))
+    void senden('/server/verwaltung/schluessel', { name, ...patch }).then(
+      () => {
+        notifySuccess('Gespeichert.')
+        setWerte((w) => ({ ...w, [name]: '' }))
+        neu()
+      },
+      (e: unknown) => notifyError(e)
+    )
   return (
     <Stack>
       <Alert variant="light">
         Freigegebene API-Schlüssel nutzen alle Lehrkräfte, die keinen eigenen hinterlegt haben – die Kosten trägt das Konto des Schlüssels. Schlüssel liegen
-        verschlüsselt auf dem Server und werden nie wieder angezeigt. ChatGPT-/Claude-Abos sind nicht teilbar (Nutzungsbedingungen): Jede Lehrkraft meldet ihr eigenes
-        in den Einstellungen an.
+        verschlüsselt auf dem Server und werden nie wieder angezeigt. ChatGPT-/Claude-Abos sind nicht teilbar (Nutzungsbedingungen): Jede Lehrkraft meldet ihr
+        eigenes in den Einstellungen an.
       </Alert>
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         {d.schluessel.map((s) => (
@@ -330,9 +394,19 @@ function Schluessel({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.E
               </Button>
             </Group>
             <Group justify="space-between" mt="sm">
-              <Switch label="Für alle Lehrkräfte freigeben" checked={s.fuerAlle} disabled={!s.hinterlegt} onChange={(e) => speichern(s.name, { fuerAlle: e.currentTarget.checked })} />
+              <Switch
+                label="Für alle Lehrkräfte freigeben"
+                checked={s.fuerAlle}
+                disabled={!s.hinterlegt}
+                onChange={(e) => speichern(s.name, { fuerAlle: e.currentTarget.checked })}
+              />
               {s.hinterlegt && (
-                <Button size="xs" variant="subtle" color="red" onClick={() => window.confirm('Schlüssel entfernen?') && speichern(s.name, { wert: '', fuerAlle: false })}>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  color="red"
+                  onClick={() => window.confirm('Schlüssel entfernen?') && speichern(s.name, { wert: '', fuerAlle: false })}
+                >
                   Entfernen
                 </Button>
               )}
@@ -357,15 +431,23 @@ function Iserv({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Elemen
       </Alert>
       <TextInput label="IServ-Adresse" value={aussteller} onChange={(e) => setAussteller(e.currentTarget.value)} />
       <TextInput label="Client-ID" value={clientId} onChange={(e) => setClientId(e.currentTarget.value)} />
-      <PasswordInput label="Client-Geheimnis" placeholder={d.iserv.geheimnis ? 'hinterlegt – leer lassen zum Behalten' : ''} value={geheimnis} onChange={(e) => setGeheimnis(e.currentTarget.value)} />
+      <PasswordInput
+        label="Client-Geheimnis"
+        placeholder={d.iserv.geheimnis ? 'hinterlegt – leer lassen zum Behalten' : ''}
+        value={geheimnis}
+        onChange={(e) => setGeheimnis(e.currentTarget.value)}
+      />
       <Group>
         <Button
           onClick={() =>
-            void senden('/server/verwaltung/iserv', { aussteller, clientId, geheimnis }).then(() => {
-              notifySuccess('IServ-Anbindung gespeichert.')
-              setGeheimnis('')
-              neu()
-            }, (e: unknown) => notifyError(e))
+            void senden('/server/verwaltung/iserv', { aussteller, clientId, geheimnis }).then(
+              () => {
+                notifySuccess('IServ-Anbindung gespeichert.')
+                setGeheimnis('')
+                neu()
+              },
+              (e: unknown) => notifyError(e)
+            )
           }
         >
           Speichern
@@ -387,7 +469,14 @@ function Iserv({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Elemen
 
 function Hoertexte(): React.JSX.Element {
   const [liste, setListe] = useState<{ kennung: string; benutzer: string; datei: string; titel: string; erstellt: string; abrufe: number }[] | null>(null)
-  const laden = useCallback(() => void holen<{ freigaben: NonNullable<typeof liste> }>('/server/verwaltung/hoertexte').then((d) => setListe(d.freigaben), (e: unknown) => notifyError(e)), [])
+  const laden = useCallback(
+    () =>
+      void holen<{ freigaben: NonNullable<typeof liste> }>('/server/verwaltung/hoertexte').then(
+        (d) => setListe(d.freigaben),
+        (e: unknown) => notifyError(e)
+      ),
+    []
+  )
   useEffect(laden, [laden])
   if (!liste) return <Loader />
   return (
@@ -417,7 +506,10 @@ function Hoertexte(): React.JSX.Element {
                 size="xs"
                 variant="subtle"
                 color="red"
-                onClick={() => window.confirm('Freigabe widerrufen? Der QR-Code auf gedruckten Blättern funktioniert dann nicht mehr.') && void senden('/server/verwaltung/hoertext-widerrufen', { kennung: f.kennung }).then(laden, (e: unknown) => notifyError(e))}
+                onClick={() =>
+                  window.confirm('Freigabe widerrufen? Der QR-Code auf gedruckten Blättern funktioniert dann nicht mehr.') &&
+                  void senden('/server/verwaltung/hoertext-widerrufen', { kennung: f.kennung }).then(laden, (e: unknown) => notifyError(e))
+                }
               >
                 Widerrufen
               </Button>

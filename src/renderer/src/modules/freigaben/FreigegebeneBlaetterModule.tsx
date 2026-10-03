@@ -5,7 +5,7 @@
  * Kästchen, Markierungen und Randkommentaren, wie die Lernenden es sehen – und als PDF sichern.
  */
 import { Badge, Button, Card, Center, Container, Group, Loader, Modal, SegmentedControl, Stack, Table, Text, TextInput, Title } from '@mantine/core'
-import { IconArrowLeft, IconEye, IconQrcode, IconSearch } from '@tabler/icons-react'
+import { IconArrowLeft, IconEye, IconQrcode, IconSearch, IconTrash, IconUsersGroup } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
@@ -62,6 +62,8 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
   const [filter, setFilter] = useState<'offen' | 'beendet' | 'alle'>('offen')
   const [suche, setSuche] = useState('')
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
+  const [leeren, setLeeren] = useState(false)
+  const [loescht, setLoescht] = useState(false)
   useEffect(() => {
     const auf = (): void => {
       if (sprung) setGewaehlt(sprung)
@@ -80,6 +82,21 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
     )
   const q = suche.trim().toLowerCase()
   const sichtbar = liste.filter((f) => (filter === 'alle' || f.status === filter) && (!q || `${f.titel} ${f.lerngruppe} ${f.fach}`.toLowerCase().includes(q)))
+  // Nach Lerngruppe geordnet (03.10.2026, Wunsch der Lehrkraft); Gäste per QR am Ende, innerhalb neueste zuerst
+  const gruppen = [...new Set(sichtbar.map((f) => f.lerngruppe))].sort((x, y) => (!x ? 1 : !y ? -1 : x.localeCompare(y, 'de', { numeric: true })))
+  const abgeschlossen = liste.filter((f) => f.status !== 'offen').length
+  const allesLeeren = async (): Promise<void> => {
+    setLoescht(true)
+    try {
+      await senden('/server/blaetter/abgeschlossene-loeschen', {})
+      setLeeren(false)
+      laden()
+    } catch (e) {
+      notifyError(e)
+    } finally {
+      setLoescht(false)
+    }
+  }
   return (
     <Container size="lg" py="lg" data-freigaben>
       <Title order={2}>Freigegebene Arbeitsblätter</Title>
@@ -96,40 +113,82 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
             { value: 'alle', label: 'Alle' }
           ]}
         />
-        <TextInput leftSection={<IconSearch size={14} />} placeholder="Titel, Lerngruppe, Fach …" value={suche} onChange={(e) => setSuche(e.currentTarget.value)} w={280} />
+        <TextInput
+          leftSection={<IconSearch size={14} />}
+          placeholder="Titel, Lerngruppe, Fach …"
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          w={280}
+        />
+        {filter === 'beendet' && abgeschlossen > 0 && (
+          <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => setLeeren(true)} data-abgeschlossene-leeren>
+            Liste leeren
+          </Button>
+        )}
       </Group>
+      <Modal opened={leeren} onClose={() => setLeeren(false)} title="Abgeschlossene Blätter löschen?">
+        <Text size="sm" mb="md">
+          {abgeschlossen === 1 ? 'Das abgeschlossene Blatt wird' : `Alle ${abgeschlossen} abgeschlossenen Blätter werden`} endgültig gelöscht – samt
+          ausgefüllter Blätter, Stift-Einträge, Feedback und der Gastzugänge. Das lässt sich nicht rückgängig machen. Die Vorlagen in der App „Arbeitsblatt"
+          bleiben erhalten.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setLeeren(false)}>
+            Abbrechen
+          </Button>
+          <Button color="red" loading={loescht} onClick={() => void allesLeeren()} data-leeren-bestaetigen>
+            Endgültig löschen
+          </Button>
+        </Group>
+      </Modal>
       {!sichtbar.length && <Text c="dimmed">Keine Freigaben{filter === 'offen' ? ' laufen gerade' : ''}.</Text>}
-      <Stack gap="xs">
-        {sichtbar.map((f) => (
-          <Card key={f.id} withBorder padding="sm" radius="md" data-freigabe={f.id}>
-            <Group justify="space-between" wrap="nowrap">
-              <div style={{ minWidth: 0 }}>
-                <Group gap={6}>
-                  <Text fw={700} truncate>
-                    {f.titel}
-                  </Text>
-                  {f.status !== 'offen' && (
-                    <Badge size="xs" color="gray">
-                      abgeschlossen
-                    </Badge>
-                  )}
-                </Group>
-                <Text size="xs" c="dimmed">
-                  {[f.lerngruppe || (f.code ? 'Gäste per QR' : ''), f.fach, new Date(f.erstellt).toLocaleDateString('de-DE')].filter(Boolean).join(' · ')}
-                </Text>
-              </div>
-              <Group gap="xs" wrap="nowrap">
-                <Badge variant="light">{f.begonnen} begonnen</Badge>
-                <Badge variant="light" color="green">
-                  {f.abgaben} eingereicht
+      <Stack gap="lg">
+        {gruppen.map((g) => {
+          const eigene = sichtbar.filter((f) => f.lerngruppe === g)
+          return (
+            <div key={g || '-'} data-freigabe-gruppe={g || 'gaeste'}>
+              <Group gap={6} mb={6}>
+                <IconUsersGroup size={18} color="var(--mantine-color-blue-6)" />
+                <Text fw={700}>{g || 'Gäste per QR-Code'}</Text>
+                <Badge variant="light" color="gray" size="sm">
+                  {eigene.length}
                 </Badge>
-                <Button size="xs" onClick={() => setGewaehlt(f.id)} data-freigabe-oeffnen>
-                  Öffnen
-                </Button>
               </Group>
-            </Group>
-          </Card>
-        ))}
+              <Stack gap="xs">
+                {eigene.map((f) => (
+                  <Card key={f.id} withBorder padding="sm" radius="md" data-freigabe={f.id}>
+                    <Group justify="space-between" wrap="nowrap">
+                      <div style={{ minWidth: 0 }}>
+                        <Group gap={6}>
+                          <Text fw={700} truncate>
+                            {f.titel}
+                          </Text>
+                          {f.status !== 'offen' && (
+                            <Badge size="xs" color="gray">
+                              abgeschlossen
+                            </Badge>
+                          )}
+                        </Group>
+                        <Text size="xs" c="dimmed">
+                          {[f.fach, new Date(f.erstellt).toLocaleDateString('de-DE'), f.code && f.lerngruppe ? 'auch per QR' : ''].filter(Boolean).join(' · ')}
+                        </Text>
+                      </div>
+                      <Group gap="xs" wrap="nowrap">
+                        <Badge variant="light">{f.begonnen} begonnen</Badge>
+                        <Badge variant="light" color="green">
+                          {f.abgaben} eingereicht
+                        </Badge>
+                        <Button size="xs" onClick={() => setGewaehlt(f.id)} data-freigabe-oeffnen>
+                          Öffnen
+                        </Button>
+                      </Group>
+                    </Group>
+                  </Card>
+                ))}
+              </Stack>
+            </div>
+          )
+        })}
       </Stack>
     </Container>
   )
@@ -219,7 +278,14 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                 </Table.Td>
                 <Table.Td>{a.aktualisiert ? new Date(a.aktualisiert).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
                 <Table.Td>
-                  <Button size="xs" variant="light" leftSection={<IconEye size={14} />} onClick={() => ansehen(a.benutzer)} disabled={!a.benutzer} data-blatt-ansehen>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    leftSection={<IconEye size={14} />}
+                    onClick={() => ansehen(a.benutzer)}
+                    disabled={!a.benutzer}
+                    data-blatt-ansehen
+                  >
                     Blatt ansehen
                   </Button>
                 </Table.Td>

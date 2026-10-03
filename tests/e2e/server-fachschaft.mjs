@@ -131,8 +131,8 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
-  // Seit 03.10.2026 nicht mehr auf der Startseite, sondern in der App „Datenverwaltung"
-  await p.locator('.app-leiste [aria-label="Datenverwaltung"]').click()
+  // Seit 03.10.2026 nicht mehr auf der Startseite, sondern in der App „Verwaltung" (Daten und Material)
+  await p.locator('.app-leiste .leiste-gruppe-apps [aria-label="Verwaltung"]').click()
   pruefe(
     await p
       .locator('[data-fachordner] [data-freigabe]')
@@ -142,7 +142,7 @@ try {
         () => true,
         () => false
       ),
-    'Datenverwaltung: Karte „Fachschaft" mit der Freigabe'
+    'Verwaltung: Karte „Fachschaft" mit der Freigabe'
   )
   await p.locator('.app-leiste [aria-label="Vokabeltest"]').click()
   await p

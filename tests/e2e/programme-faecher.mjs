@@ -58,7 +58,7 @@ try {
         'Verwaltung',
         'Elternbriefe',
         'Vokabellisten',
-        'Datenverwaltung'
+        'Verwaltung'
       ]),
     `Reihenfolge der Leiste (${(await leiste()).join(', ')})`
   )
@@ -111,7 +111,7 @@ try {
         'Klassenarbeiten',
         'Verwaltung',
         'Elternbriefe',
-        'Datenverwaltung'
+        'Verwaltung'
       ]),
     `Geschichte + Mathematik: nur passende Programme in der Leiste (${(await leiste()).join(', ')})`
   )

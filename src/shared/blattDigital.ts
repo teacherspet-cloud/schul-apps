@@ -17,8 +17,23 @@ export function digitalisieren(doc: Document): number {
   if (doc.documentElement.hasAttribute('data-digital')) return 0
   doc.documentElement.setAttribute('data-digital', '')
   const stil = doc.createElement('style')
-  stil.textContent = '.ws-page{height:auto !important;min-height:297mm;overflow:visible !important}'
+  stil.textContent =
+    '.ws-page{height:auto !important;min-height:297mm;overflow:visible !important;display:flow-root}' +
+    '.ws-body{overflow:visible !important}' +
+    '.ws-content{position:relative !important;left:auto !important;right:auto !important;top:auto !important;bottom:auto !important}'
   doc.head.appendChild(stil)
+  /*
+   * Die Inhaltsfläche steht im Druck absolut zwischen festen Rändern (A4-Höhe) und schneidet ab, was
+   * darüber hinausgeht – zusätzliche Linien wären unsichtbar, der Text liefe über Fuß und Kopf der
+   * nächsten Seite (Befund der Lehrkraft, 03.10.2026). Digital: Ränder als Außenabstand, Fläche wächst.
+   */
+  doc.querySelectorAll('.ws-content').forEach((c) => {
+    const st = (c as HTMLElement).style
+    const oben = st.top || '0mm'
+    const unten = st.bottom || '0mm'
+    st.margin = oben + ' ' + (st.right || '0mm') + ' ' + unten + ' ' + (st.left || '0mm')
+    st.minHeight = 'calc(297mm - ' + oben + ' - ' + unten + ')'
+  })
   let verschoben = 0
   const aufgaben = Array.from(doc.querySelectorAll('.ws-task'))
   let erstes: Element | null = null
@@ -58,10 +73,15 @@ export function digitalisieren(doc: Document): number {
  * ergänzt. Auf dem Server mit denselben Angaben, damit Stift und Kästchen an derselben Stelle liegen.
  */
 export function zusatzLinien(doc: Document, zusatz: Record<string, number>): void {
+  // Ab 03.10.2026 zählt jede zusätzliche Linie einzeln (Kennzeichen „e"); ältere Stände hängten je
+  // Schritt den ganzen Linienblock an und werden weiter so gelesen
+  const einzeln = Boolean(zusatz.e)
   for (const [anker, anzahl] of Object.entries(zusatz)) {
+    if (anker === 'e') continue
     const linie = doc.querySelector('[data-li="' + Number(anker) + '"]')
     if (!linie) continue
-    const huelle = linie.closest('.ws-lines') || linie
+    const block = linie.closest('.ws-lines')
+    const huelle = einzeln && block && block.querySelectorAll('.ws-line').length > 1 ? linie : block || linie
     let nach: Element = huelle
     let schon = 0
     while (nach.nextElementSibling && nach.nextElementSibling.hasAttribute('data-digital-linie')) {

@@ -1,5 +1,9 @@
 /**
- * Vokabeltraining für Lehrkräfte (03.10.2026, Reiter in der App „Onlinetest"; Server: src/server/vokabeln.ts).
+ * Vokabeltraining für Lehrkräfte (03.10.2026; Server: src/server/vokabeln.ts). Seit dem Wunsch der
+ * Lehrkraft („Mach hieraus eine eigenständige App, in der man über einen längeren Zeitraum für eine
+ * Lerngruppe/einzelne Lerner oder Personen mit QR Code / Code Zugriff auf das Lernen hat") eine
+ * eigene App statt eines Reiters im Onlinetest: Lernzeitraum, Zugang per QR-Code für Gäste
+ * (mit persönlichem Wiedereinstiegs-Code), beenden, wieder öffnen, löschen.
  *
  * Vokabeln (Lehrwerk-Abschnitt oder eigene Liste) einer Lerngruppe oder Einzelnen zum Lernen
  * freigeben, optional mit Testtermin. Lernstand je Lerngruppe und Kind – abgestimmt OHNE Ranglisten:
@@ -8,10 +12,12 @@
  */
 import { useAlleLernenden } from './LernendeWahl'
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
   Card,
+  Container,
   Group,
   Loader,
   Modal,
@@ -21,13 +27,16 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Switch,
   Table,
   Text,
   TextInput,
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconBooks, IconPlus } from '@tabler/icons-react'
+import { IconArrowLeft, IconBooks, IconCalendarEvent, IconPlus, IconQrcode, IconTrash, IconUser } from '@tabler/icons-react'
+import { Zugang } from '../onlinetest/OnlinetestModule'
+import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import { useCallback, useEffect, useState } from 'react'
 import type { Uebersicht } from '@shared/vokabeltrainer'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -44,6 +53,29 @@ interface ZuweisungKurz {
   sicherSchnitt: number
   testTermin: number | null
   status: string
+  bis: number | null
+  gaeste: number
+  code?: string
+  link?: string
+}
+
+const tag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE')
+/** Datumsfeld (JJJJ-MM-TT) ↔ Zeitpunkt: Termine morgens, Zeitraum-Ende am Abend */
+const alsFeld = (ms: number | null): string => (ms ? new Date(ms - new Date(ms).getTimezoneOffset() * 6e4).toISOString().slice(0, 10) : '')
+const ausFeld = (v: string, uhr: string): number | null => (v ? new Date(`${v}T${uhr}`).getTime() : null)
+
+/** Die App „Vokabeltraining" (Gruppe Unterricht) */
+export function VokabeltrainingModule({ active }: { active: boolean }): React.JSX.Element | null {
+  if (!active) return null
+  return (
+    <Container size="xl" py="md">
+      <Group gap={4} mb="sm">
+        <Title order={2}>Vokabeltraining</Title>
+        <EigenesFensterKnopf />
+      </Group>
+      <VokabelTraining />
+    </Container>
+  )
 }
 
 export const FACH_NAMEN = ['neu', 'Fach 1', 'Fach 2', 'Fach 3', 'Fach 4', 'Fach 5', 'Langzeit']
@@ -68,6 +100,7 @@ export default function VokabelTraining(): React.JSX.Element {
   const [liste, setListe] = useState<ZuweisungKurz[] | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
+  const [filter, setFilter] = useState<'offen' | 'beendet'>('offen')
   const laden = useCallback(
     () =>
       void holen<{ zuweisungen: ZuweisungKurz[] }>('/server/vokabeln').then(
@@ -78,20 +111,31 @@ export default function VokabelTraining(): React.JSX.Element {
   )
   useEffect(laden, [laden])
   if (gewaehlt) return <Lernstand id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
+  const sichtbar = (liste ?? []).filter((z) => z.status === filter)
   return (
     <Stack data-vokabeltraining>
       <Group justify="space-between">
-        <Text c="dimmed" size="sm">
-          Vokabeln zum Lernen freigeben – die Lernenden üben im Karteikasten ihrer Lern-App, du siehst den Lernstand.
+        <Text c="dimmed" size="sm" maw={620}>
+          Vokabeln über einen längeren Zeitraum zum Lernen freigeben – für eine Lerngruppe, einzelne Lernende oder per QR-Code. Geübt wird im Karteikasten der
+          Lern-App; hier steht der Lernstand.
         </Text>
         <Button leftSection={<IconPlus size={16} />} onClick={() => setNeu(true)} data-vokabeln-freigeben>
           Vokabeln freigeben
         </Button>
       </Group>
+      <SegmentedControl
+        w="fit-content"
+        value={filter}
+        onChange={(v) => setFilter(v as typeof filter)}
+        data={[
+          { value: 'offen', label: `Laufend${liste ? ` (${liste.filter((z) => z.status === 'offen').length})` : ''}` },
+          { value: 'beendet', label: `Abgeschlossen${liste ? ` (${liste.filter((z) => z.status !== 'offen').length})` : ''}` }
+        ]}
+      />
       {!liste && <Loader size="sm" />}
-      {liste?.length === 0 && <Text c="dimmed">Noch keine Vokabeln freigegeben.</Text>}
+      {liste && sichtbar.length === 0 && <Text c="dimmed">{filter === 'offen' ? 'Gerade läuft kein Vokabeltraining.' : 'Nichts abgeschlossen.'}</Text>}
       <SimpleGrid cols={{ base: 1, md: 2 }}>
-        {liste?.map((z) => (
+        {sichtbar.map((z) => (
           <Card key={z.id} withBorder style={{ cursor: 'pointer' }} onClick={() => setGewaehlt(z.id)} data-vokabel-zuweisung>
             <Group justify="space-between" wrap="nowrap">
               <div style={{ minWidth: 0 }}>
@@ -99,13 +143,22 @@ export default function VokabelTraining(): React.JSX.Element {
                   {z.titel}
                 </Text>
                 <Text size="sm" c="dimmed">
-                  {z.lerngruppe} · {z.woerter} Wörter · {z.lernende} Lernende
-                  {z.testTermin ? ` · Test am ${new Date(z.testTermin).toLocaleDateString('de-DE')}` : ''}
+                  {z.lerngruppe} · {z.woerter} Wörter · {z.lernende} Lernende{z.gaeste ? ` (davon ${z.gaeste} per QR-Code)` : ''}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {[z.bis ? `Lernzeitraum bis ${tag(z.bis)}` : 'ohne Enddatum', z.testTermin ? `Test am ${tag(z.testTermin)}` : ''].filter(Boolean).join(' · ')}
                 </Text>
               </div>
-              <Badge variant="light" color="green">
-                {Math.round(z.sicherSchnitt * 100)} % sicher
-              </Badge>
+              <Stack gap={4} align="flex-end">
+                <Badge variant="light" color="green">
+                  {Math.round(z.sicherSchnitt * 100)} % sicher
+                </Badge>
+                {z.code && (
+                  <Badge variant="light" color="blue" leftSection={<IconQrcode size={10} />}>
+                    {z.code}
+                  </Badge>
+                )}
+              </Stack>
             </Group>
           </Card>
         ))}
@@ -139,10 +192,12 @@ function useLerngruppen(): { gruppen: { id: string; name: string }[]; alle: { gr
 function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Element {
   const [auswahl, setAuswahl] = useState<VokabelAuswahl | null>(null)
   const [titel, setTitel] = useState('')
-  const [art, setArt] = useState<'gruppe' | 'einzeln'>('gruppe')
+  const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code'>('gruppe')
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [einzelne, setEinzelne] = useState<string[]>([])
   const [termin, setTermin] = useState('')
+  const [bis, setBis] = useState('')
+  const [qr, setQr] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
   const { gruppen } = useLerngruppen()
   useEffect(() => {
@@ -160,10 +215,16 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         fach: mit.fach,
         woerter: mit.woerter,
         lerngruppeId: art === 'gruppe' ? gruppe : '',
-        schueler: einzelne,
-        testTermin: termin ? new Date(`${termin}T08:00:00`).getTime() : null
+        schueler: art === 'einzeln' ? einzelne : [],
+        testTermin: ausFeld(termin, '08:00:00'),
+        bis: ausFeld(bis, '23:59:00'),
+        gaeste: art === 'code' || qr
       })
-      notifySuccess('Freigegeben – die Lernenden finden die Vokabeln in ihrer Lern-App.')
+      notifySuccess(
+        art === 'code' || qr
+          ? 'Freigegeben – QR-Code und Code stehen beim Training (Knopf „QR-Code").'
+          : 'Freigegeben – die Lernenden finden die Vokabeln in ihrer Lern-App.'
+      )
       schliessen()
     } catch (e) {
       notifyError(e, 'Nicht freigegeben')
@@ -183,13 +244,20 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         <TextInput label="Titel (sehen die Lernenden)" value={titel} onChange={(e) => setTitel(e.currentTarget.value)} />
         <SegmentedControl
           value={art}
-          onChange={(v) => (setArt(v as 'gruppe' | 'einzeln'), setEinzelne([]))}
+          onChange={(v) => (setArt(v as typeof art), setEinzelne([]))}
           data={[
             { value: 'gruppe', label: 'Lerngruppe' },
-            { value: 'einzeln', label: 'Einzelne Lernende' }
+            { value: 'einzeln', label: 'Einzelne Lernende' },
+            { value: 'code', label: 'Nur per QR-Code' }
           ]}
+          data-vokabel-art
         />
-        {art === 'gruppe' ? (
+        {art === 'code' ? (
+          <Text size="sm" c="dimmed">
+            Wer den QR-Code scannt oder den Code eingibt, lernt mit – Lernende mit Konto direkt, alle anderen mit Vorname und Anfangsbuchstabe. Gäste bekommen
+            einen persönlichen Code, mit dem sie an anderen Tagen und Geräten weiterlernen.
+          </Text>
+        ) : art === 'gruppe' ? (
           <Select
             label="Lerngruppe"
             data={gruppen.map((g) => ({ value: g.id, label: g.name }))}
@@ -210,18 +278,36 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             placeholder="Namen suchen …"
           />
         )}
-        <TextInput
-          type="date"
-          label="Testtermin (optional)"
-          description="Bis dahin plant der Karteikasten so, dass jedes Wort vorher mehrmals verteilt geübt ist."
-          value={termin}
-          onChange={(e) => setTermin(e.currentTarget.value)}
-          w={240}
-        />
+        {art !== 'code' && (
+          <Switch
+            label="Zusätzlich per QR-Code / Code zugänglich"
+            description="Etwa für Lernende ohne Konto oder aus anderen Gruppen."
+            checked={qr}
+            onChange={(e) => setQr(e.currentTarget.checked)}
+            data-vokabel-qr
+          />
+        )}
+        <Group align="flex-start" grow>
+          <TextInput
+            type="date"
+            label="Lernzeitraum bis (optional)"
+            description="Danach ist das Training abgeschlossen; ohne Datum läuft es, bis es beendet wird."
+            value={bis}
+            onChange={(e) => setBis(e.currentTarget.value)}
+            data-vokabel-bis
+          />
+          <TextInput
+            type="date"
+            label="Testtermin (optional)"
+            description="Bis dahin plant der Karteikasten so, dass jedes Wort vorher mehrmals verteilt geübt ist."
+            value={termin}
+            onChange={(e) => setTermin(e.currentTarget.value)}
+          />
+        </Group>
         <Group justify="flex-end">
           <Button
             loading={laeuft}
-            disabled={!auswahl?.woerter.length || (art === 'gruppe' ? !gruppe : !einzelne.length)}
+            disabled={!auswahl?.woerter.length || (art === 'gruppe' ? !gruppe : art === 'einzeln' ? !einzelne.length : false)}
             onClick={() => void los()}
             data-vokabeln-los
           >
@@ -238,17 +324,26 @@ interface Lernstanddaten {
   titel: string
   fach: string
   testTermin: number | null
+  status: string
+  bis: number | null
+  code?: string
+  link?: string
   lerngruppe: string
   woerter: { id: string; term: string; translation: string }[]
-  lernende: { id: string; name: string; uebersicht: Uebersicht; tage7: number }[]
+  lernende: { id: string; name: string; gast?: boolean; uebersicht: Uebersicht; tage7: number }[]
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
 }
 
 function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
   const [d, setD] = useState<Lernstanddaten | null>(null)
-  useEffect(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
+  const [qr, setQr] = useState(false)
+  const [loeschen, setLoeschen] = useState(false)
+  const laden = useCallback(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
+  useEffect(laden, [laden])
   if (!d) return <Loader size="sm" />
+  const aendern = (was: string, daten: Record<string, unknown>): void =>
+    void senden(`/server/vokabeln/${id}/${was}`, daten).then(laden, (e: unknown) => notifyError(e))
   const tageBisTest = d.testTermin ? Math.ceil((d.testTermin - Date.now()) / 86_400_000) : null
   const lernende = [...d.lernende].sort((a, b) => a.name.localeCompare(b.name, 'de'))
   const anteilSicher = d.gesamt.gesamt ? d.gesamt.sicher / d.gesamt.gesamt : 0
@@ -258,12 +353,75 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
       <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck} w="fit-content">
         Alle Freigaben
       </Button>
-      <div>
-        <Title order={3}>{d.titel}</Title>
-        <Text c="dimmed" size="sm">
-          {d.lerngruppe} · {d.woerter.length} Wörter · {lernende.length} Lernende
+      <Group justify="space-between" align="flex-start">
+        <div>
+          <Group gap="xs">
+            <Title order={3}>{d.titel}</Title>
+            {d.status !== 'offen' && <Badge color="gray">abgeschlossen</Badge>}
+          </Group>
+          <Text c="dimmed" size="sm">
+            {d.lerngruppe} · {d.woerter.length} Wörter · {lernende.length} Lernende
+          </Text>
+        </div>
+        <Group gap="xs">
+          {d.code && d.link && (
+            <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-vokabel-qr-zeigen>
+              QR-Code
+            </Button>
+          )}
+          <Button variant="default" onClick={() => aendern('status', { status: d.status === 'offen' ? 'beendet' : 'offen' })} data-vokabel-status>
+            {d.status === 'offen' ? 'Beenden' : 'Wieder öffnen'}
+          </Button>
+          <Tooltip label="Löschen">
+            <ActionIcon variant="subtle" color="red" size="lg" onClick={() => setLoeschen(true)} aria-label="Löschen">
+              <IconTrash size={18} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+      </Group>
+      <Group gap="md" align="flex-end">
+        <TextInput
+          type="date"
+          label="Lernzeitraum bis"
+          leftSection={<IconCalendarEvent size={14} />}
+          value={alsFeld(d.bis)}
+          onChange={(e) => aendern('zeitraum', { bis: ausFeld(e.currentTarget.value, '23:59:00') })}
+          w={200}
+          data-vokabel-bis-aendern
+        />
+        <TextInput
+          type="date"
+          label="Testtermin"
+          value={alsFeld(d.testTermin)}
+          onChange={(e) => aendern('termin', { testTermin: ausFeld(e.currentTarget.value, '08:00:00') })}
+          w={200}
+        />
+      </Group>
+      {qr && d.code && d.link && (
+        <Modal opened onClose={() => setQr(false)} title={d.titel} size="lg">
+          <Zugang code={d.code} link={d.link} />
+          <Text size="sm" c="dimmed" mt="sm">
+            Gäste geben Vorname und Anfangsbuchstabe ein und bekommen einen persönlichen Code zum Weiterlernen an anderen Tagen und Geräten.
+          </Text>
+        </Modal>
+      )}
+      <Modal opened={loeschen} onClose={() => setLoeschen(false)} title="Vokabeltraining löschen?">
+        <Text size="sm" mb="md">
+          Das Training wird samt Lernstand aller Lernenden und der Gastzugänge endgültig gelöscht. Die Vokabelliste selbst bleibt erhalten.
         </Text>
-      </div>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setLoeschen(false)}>
+            Abbrechen
+          </Button>
+          <Button
+            color="red"
+            onClick={() => void senden(`/server/vokabeln/${id}/loeschen`, {}).then(zurueck, (e: unknown) => notifyError(e))}
+            data-vokabel-loeschen
+          >
+            Endgültig löschen
+          </Button>
+        </Group>
+      </Modal>
       <SimpleGrid cols={{ base: 1, md: 3 }}>
         <Card withBorder>
           <Text size="sm" c="dimmed">
@@ -351,7 +509,14 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           <Table.Tbody>
             {lernende.map((l) => (
               <Table.Tr key={l.id}>
-                <Table.Td>{l.name}</Table.Td>
+                <Table.Td>
+                  {l.name}
+                  {l.gast && (
+                    <Tooltip label="Per QR-Code dazugekommen">
+                      <IconUser size={12} style={{ marginLeft: 4, verticalAlign: 'middle', opacity: 0.6 }} />
+                    </Tooltip>
+                  )}
+                </Table.Td>
                 <Table.Td>
                   <Faecherbalken u={l.uebersicht} />
                 </Table.Td>
@@ -369,7 +534,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           Rangliste – sortiert nach Namen.
         </Text>
       </Card>
-      {lernende.length === 0 && <Alert>Noch niemand in der Lerngruppe.</Alert>}
+      {lernende.length === 0 && <Alert>{d.code ? 'Noch niemand dabei – den QR-Code zeigen oder den Code nennen.' : 'Noch niemand in der Lerngruppe.'}</Alert>}
     </Stack>
   )
 }

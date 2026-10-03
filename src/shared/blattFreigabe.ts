@@ -10,6 +10,7 @@
  *  - `aufgabenFeedbackAnfrage`: kurzes Feedback zu EINER Aufgabe, ohne die Lösung zu verraten.
  */
 import type { StructuredRequest } from './types'
+import type { AbschriftBefund } from './abschrift'
 
 export interface BlattAufgabe {
   nr: number
@@ -60,7 +61,13 @@ export interface AufgabenFeedback {
   fehlt?: string
   schritt?: string
   /** Markierungen in der Antwort: wörtliches Zitat, Art, Kommentar */
-  markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string }[]
+  markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string; zeichen?: string }[]
+}
+
+/** Zusätze zur Anfrage (03.10.2026): Korrekturzeichen des Fachs, Befund zum Abschreiben */
+export interface FeedbackZusatz {
+  zeichen?: { zeichen: string; bedeutung: string }[]
+  abschrift?: AbschriftBefund
 }
 
 /**
@@ -68,7 +75,10 @@ export interface AufgabenFeedback {
  * zu verraten. Deutlich ausführlicher seit 03.10.2026 (Befund der Lehrkraft: „sehr rudimentär"):
  * gelungen / fehlt / nächster Schritt mit Beispiel, Inhalt vor Form, Markierungen mit Zitat.
  */
-export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder: string[], sprache?: string): StructuredRequest {
+export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder: string[], sprache?: string, zusatz: FeedbackZusatz = {}): StructuredRequest {
+  const zeichen = (zusatz.zeichen ?? []).filter((z) => z.zeichen && z.bedeutung && !/✓|\^/.test(z.zeichen))
+  const ab = zusatz.abschrift
+  const abgeschrieben = ab && ab.anteil >= 0.4
   return {
     system:
       'Du bist eine erfahrene, zugewandte Lehrkraft. Du gibst Lernenden während der Bearbeitung eines Arbeitsblatts ein genaues, lernförderliches Feedback zu EINER Aufgabe. Sprich die Person mit „du" an.',
@@ -79,7 +89,13 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       '- schritt: EIN machbarer nächster Schritt mit Beispiel, Satzanfang oder Leitfrage, der zeigt, WIE es weitergeht („Lies Z. 5–9 noch einmal: Welche Folge nennt der Autor? Beginne mit: Eine Folge war …").',
       '- INHALT VOR FORM: Prüfe, ob der Operator erfüllt ist („nenne" = Stichpunkte genügen; „erkläre", „beschreibe", „beurteile" = Zusammenhänge). Bemängle die Form (Fließtext, Stichpunkte) NUR, wenn die Aufgabe sie ausdrücklich verlangt.',
       '- Keine Allgemeinplätze („Schau noch einmal in die Quelle", „Achte auf Genauigkeit") ohne zu sagen, WORAUF genau.',
-      '- markierungen: 1–6 Stellen der Antwort mit wörtlichem Zitat (1–8 Wörter, genau wie geschrieben): art „lob" für Gelungenes, „fehler" für Falsches (auch Rechtschreibung), „hinweis" für Unvollständiges; text = kurzer Randkommentar ohne die Lösung.',
+      '- markierungen: Stellen der Antwort mit wörtlichem Zitat (1–8 Wörter, genau wie geschrieben): art „lob" für Gelungenes, „fehler" für Falsches, „hinweis" für Unvollständiges; text = kurzer Randkommentar ohne die Lösung. Inhaltlich 1–6 Stellen.',
+      '- SPRACHE WIE IN EINER KORRIGIERTEN ARBEIT: Markiere JEDEN sprachlichen Fehler einzeln (Rechtschreibung, Zeichensetzung, Grammatik, Satzbau, Ausdruck …) als eigene Markierung mit art „fehler", dem Korrekturzeichen im Feld „zeichen" und als Zitat genau das fehlerhafte Wort bzw. die kurze Wortgruppe; text = kurz, was falsch ist (z. B. „das/dass", „Komma vor dem Nebensatz"), ohne die ganze Verbesserung vorzuschreiben. Höchstens 15 Sprachmarkierungen. Inhaltliche Markierungen: „zeichen" leer oder „Inh".',
+      zeichen.length ? `- Korrekturzeichen (nur diese verwenden): ${zeichen.map((z) => `${z.zeichen} = ${z.bedeutung}`).join('; ')}.` : '',
+      '- EIGENE LEISTUNG: Wörtlich aus dem Material Übernommenes ist KEINE Bearbeitung von Operatoren wie „fasse zusammen", „beschreibe", „erkläre", „ordne ein", „beurteile". Lobe Abgeschriebenes nicht als gelungen; benenne es unter „fehlt" und zeige im nächsten Schritt, wie man in eigenen Worten verdichtet.',
+      abgeschrieben
+        ? `- BEFUND (automatisch gezählt, verlässlich): ${Math.round(ab.anteil * 100)} % der Antwort stehen wörtlich im Material des Blatts (längste übernommene Stelle: ${ab.laengste} Wörter). Behandle das als Abschrift: einschaetzung höchstens „teilweise", ab 70 % „noch nicht"; sage das freundlich, aber klar.`
+        : '',
       '- Verrate die Lösung NICHT – weder wörtlich noch umschrieben. Keine Note, keine Punkte.',
       '- einschaetzung: „sicher" = alles richtig, „teilweise" = Ansätze richtig, „noch nicht" = überwiegend falsch oder leer.',
       sprache && sprache !== 'de' ? `- Schreibe das Feedback auf Deutsch; Zitate aus der Antwort bleiben in der Originalsprache (${sprache}).` : '',
@@ -106,8 +122,13 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
           type: 'array',
           items: {
             type: 'object',
-            properties: { zitat: { type: 'string' }, art: { type: 'string', enum: ['lob', 'fehler', 'hinweis'] }, text: { type: 'string' } },
-            required: ['zitat', 'art', 'text'],
+            properties: {
+              zitat: { type: 'string' },
+              art: { type: 'string', enum: ['lob', 'fehler', 'hinweis'] },
+              text: { type: 'string' },
+              zeichen: { type: 'string' }
+            },
+            required: ['zitat', 'art', 'text', 'zeichen'],
             additionalProperties: false
           }
         }
@@ -133,10 +154,12 @@ export function aufgabenFeedbackAus(roh: unknown): AufgabenFeedback {
     .map((m) => ({
       zitat: t(m.zitat, 120),
       art: (['lob', 'fehler', 'hinweis'].includes(String(m.art)) ? m.art : 'hinweis') as 'lob' | 'fehler' | 'hinweis',
-      text: t(m.text, 240)
+      text: t(m.text, 240),
+      zeichen: t(m.zeichen, 6)
     }))
     .filter((m) => m.zitat && m.text)
-    .slice(0, 8)
+    .map(({ zeichen, ...m }) => (zeichen && zeichen !== '-' ? { ...m, zeichen } : m))
+    .slice(0, 24)
   // Ältere Antworten (nur „text") bleiben lesbar
   const text =
     t(r.text, 1200) ||

@@ -29,7 +29,29 @@ const MOTIVE = {
     'with four round white stepping stones on it, the first two marked with small green check marks; at the top end a small golden flag on a pole.',
   ergebnisse:
     'Tile colour: warm orange to coral (#ff922b to #f76707). Motif: a white sheet of paper with a large friendly green check mark and three short grey lines, ' +
-    'in front of it a small golden medal with a ribbon and a tiny white bar chart with three rising bars.'
+    'in front of it a small golden medal with a ribbon and a tiny white bar chart with three rising bars.',
+  // 03.10.2026 abends: neue Apps und die vier Obermenüs der Leiste (Wunsch der Lehrkraft)
+  laufendereihen:
+    'Tile colour: violet (#9775fa to #7048e8). Motif: a white board with three horizontal progress bars of different lengths, filled in green, ' +
+    'the longest ending at a small golden flag; in front a small round white clock.',
+  freigaben:
+    'Tile colour: bright blue (#4dabf7 to #1c7ed6). Motif: a white worksheet with grey lines and a pencil, from which a curved white arrow leads to two small white tablets ' +
+    'standing side by side, each showing the same tiny worksheet.',
+  vokabeltraining:
+    'Tile colour: warm orange (#ffa94d to #f76707). Motif: a white index-card box (vocabulary card file) seen at an angle, with coloured divider tabs (red, yellow, green) ' +
+    'and cards inside; one card is lifted out above the box and shows a green check mark.',
+  'gruppe-unterricht':
+    'Tile colour: fresh green (#51cf66 to #2f9e44). Motif: a dark green school chalkboard on a light wooden frame with a simple white chalk drawing of a sun and a tree, ' +
+    'a piece of white chalk on the ledge and a small red apple in front.',
+  'gruppe-planung':
+    'Tile colour: sky blue (#74c0fc to #1971c2). Motif: an open white spiral-bound planner with a calendar grid, some days marked with small coloured dots, ' +
+    'a yellow pencil and a short ruler lying diagonally across it.',
+  'gruppe-pruefung':
+    'Tile colour: rose red (#ff8787 to #e03131). Motif: a white clipboard holding a test sheet with short grey lines, three of them with red check marks; ' +
+    'a red pen leaning against the clipboard and a small round white stopwatch.',
+  'gruppe-verwaltung':
+    'Tile colour: cool grey (#adb5bd to #495057). Motif: a white filing cabinet with two drawers, the top drawer slightly open showing coloured folders (blue, yellow, green), ' +
+    'and a small silver gear wheel in front.'
 }
 
 const out = resolve(process.argv[2] ?? 'test-results/programmbilder')

@@ -190,7 +190,13 @@ export function Schnellzugriff(): React.JSX.Element {
         ))}
       </Bereich>
 
-      <Bereich titel="Termine & Vokabeltraining" symbol={<IconCalendarEvent size={18} />} farbe="orange" daten="termine">
+      <Bereich
+        titel="Termine & Vokabeltraining"
+        symbol={<IconCalendarEvent size={18} />}
+        farbe="orange"
+        alle={() => openModule('vokabeltraining')}
+        daten="termine"
+      >
         {vok === null || reihen === null ? null : !termine.length && !halte.length ? <Leer text="Keine anstehenden Termine." /> : null}
         {termine.slice(0, 4).map((v) => {
           const tage = Math.round((v.testTermin! - jetzt) / 864e5)
@@ -199,7 +205,7 @@ export function Schnellzugriff(): React.JSX.Element {
               <Zeile
                 titel={v.titel}
                 unter={`${v.lerngruppe} · Test ${tage <= 0 ? 'heute' : tage === 1 ? 'morgen' : `in ${tage} Tagen`} (${new Date(v.testTermin!).toLocaleDateString('de-DE')})`}
-                onClick={() => openModule('onlinetest')}
+                onClick={() => openModule('vokabeltraining')}
               >
                 <Badge variant="light" color={v.sicherSchnitt >= 0.7 ? 'green' : v.sicherSchnitt >= 0.4 ? 'yellow' : 'red'}>
                   {Math.round(v.sicherSchnitt * 100)} % sicher

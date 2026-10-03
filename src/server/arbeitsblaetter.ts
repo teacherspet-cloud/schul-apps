@@ -24,6 +24,7 @@ import {
   alleNutzer,
   datenbank,
   nutzerAnlegen,
+  nutzerLoeschen,
   nutzerNachBenutzer,
   nutzerNachId,
   protokolliereServer,
@@ -41,6 +42,9 @@ import { PULS_MS } from '../main/services/lanServer'
 import { pdfOhneSkripte, seitenMitTinte } from './druck'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
 import { ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
+import { abschrift, abschriftZaehlt, blattText, deckeln } from '../shared/abschrift'
+import { fachAusName } from '../shared/faecher'
+import { zeichenFuer } from '../renderer/src/shared/korrekturzeichen'
 import { aufgabenFeedbackAnfrage, aufgabenFeedbackAus, blattAbgabeText, type BlattAufgabe, type BlattFeld } from '../shared/blattFreigabe'
 
 const SCHEMA = `
@@ -190,7 +194,7 @@ function linienAus(roh: unknown): Record<string, number> {
   const aus: Record<string, number> = {}
   try {
     const o = JSON.parse(String(roh)) as Record<string, unknown>
-    for (const [k, v] of Object.entries(o).slice(0, 300)) if (/^\d{1,5}$/.test(k) && Number(v) > 0) aus[k] = Math.min(60, Math.round(Number(v)))
+    for (const [k, v] of Object.entries(o).slice(0, 300)) if ((/^\d{1,5}$/.test(k) || k === 'e') && Number(v) > 0) aus[k] = Math.min(60, Math.round(Number(v)))
   } catch {
     // ungültig – keine Zusatzlinien
   }
@@ -377,8 +381,18 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         const text = ohneNamen({ id: 'a', kuerzel: 'S1', name: ich.name, dateiname: '', text: blattAbgabeText([aufgabe], felder, antworten), bilder: [] }).text
         if (!text.trim() && !bilder.length) return (json(res, 400, { fehler: 'Bitte zuerst etwas eintragen.' }), true)
         try {
-          const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache)]))
-          const fb = aufgabenFeedbackAus(antwort)
+          // Abgeschrieben? (03.10.2026) – nur die eigenen Einträge zählen, ohne Aufgabentext
+          const eigen = felder.map((f) => antworten[f.id] ?? '').join(' ')
+          const befund = abschriftZaehlt(aufgabe.anweisung) ? abschrift(eigen, blattText(z.html)) : undefined
+          const fachId = fachAusName((z as Zeile & { fach?: string }).fach ?? '')?.id ?? ''
+          // Korrekturzeichen der Lehrkraft (Einstellungen › Material), sonst die Voreinstellung des Fachs
+          const einst = (await imNutzer(alsNutzer(lehrkraft), () => aufruf('settings:get', [])).catch(() => undefined)) as Parameters<typeof zeichenFuer>[1]
+          const zusatz = { zeichen: zeichenFuer(fachId, einst), ...(befund ? { abschrift: befund } : {}) }
+          const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
+            aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)])
+          )
+          const roh = aufgabenFeedbackAus(antwort)
+          const fb = befund ? { ...roh, einschaetzung: deckeln(roh.einschaetzung, befund) } : roh
           bisher[String(nr)] = [...liste, { ...fb, zeit: Date.now() }]
           speichern(antworten, k0.tinte ? tinte : null, { aufgaben_feedback: JSON.stringify(bisher) })
           protokolliereServer('arbeitsblatt', 'Feedback zu einer Aufgabe', ich.id)
@@ -439,6 +453,13 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         }),
         true
       )
+    }
+    // Liste der abgeschlossenen Blätter leeren (03.10.2026): Freigaben samt Abgaben, Feedback und Gastkonten
+    if (req.method === 'POST' && teile[0] === 'abgeschlossene-loeschen') {
+      const alle = db().prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND reihe = '' AND status = 'beendet'").all(ich.id) as unknown as Zeile[]
+      for (const z of alle) freigabeLoeschen(z)
+      protokolliereServer('arbeitsblatt', `Abgeschlossene Freigaben gelöscht (${alle.length})`, ich.id)
+      return (json(res, 200, { ok: true, geloescht: alle.length }), true)
     }
     if (req.method === 'POST' && teile[0] === 'freigeben') {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -558,11 +579,24 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       return (json(res, 200, { ok: true }), true)
     }
     if (req.method === 'POST' && teile[1] === 'loeschen') {
-      db().prepare('DELETE FROM blatt_freigaben WHERE id = ?').run(z.id)
+      freigabeLoeschen(z)
       return (json(res, 200, { ok: true }), true)
     }
     return (json(res, 404, { fehler: 'Unbekannt.' }), true)
   }
+}
+
+/**
+ * Eine Freigabe ganz löschen: Abgaben und Gast-Zuordnungen (per Fremdschlüssel), die verknüpfte
+ * Rückmeldung mit ihren Fassungen und die Gastkonten, die nur für dieses Blatt angelegt wurden.
+ */
+function freigabeLoeschen(z: Zeile): void {
+  const gaeste = (db().prepare('SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ?').all(z.id) as { nutzer_id: string }[])
+    .map((g) => nutzerNachId(g.nutzer_id))
+    .filter((n): n is NutzerInfo => Boolean(n && n.quelle === 'gast'))
+  db().prepare('DELETE FROM blatt_freigaben WHERE id = ?').run(z.id)
+  if (z.rueckmeldung_id) db().prepare("DELETE FROM feedback_freigaben WHERE id = ? AND art != ''").run(z.rueckmeldung_id)
+  for (const g of gaeste) nutzerLoeschen(g.id)
 }
 
 /** Für die Unterrichtsreihe: Stand einer Person bei einem freigegebenen Blatt */

@@ -150,8 +150,8 @@ export function nutzerNachId(id: string): NutzerInfo | null {
 }
 
 export const passwortHashVon = (benutzer: string): string | null =>
-  ((datenbank().prepare('SELECT passwort_hash FROM nutzer WHERE benutzer = ?').get(benutzer.toLowerCase()) as { passwort_hash: string | null } | undefined)
-    ?.passwort_hash ?? null)
+  (datenbank().prepare('SELECT passwort_hash FROM nutzer WHERE benutzer = ?').get(benutzer.toLowerCase()) as { passwort_hash: string | null } | undefined)
+    ?.passwort_hash ?? null
 
 export function alleNutzer(): NutzerInfo[] {
   // Sortiert nach dem (entschlüsselten) Benutzernamen – in der Spalte steht nur der Suchschlüssel
@@ -174,14 +174,36 @@ export function nutzerAnlegen(n: {
 }): NutzerInfo {
   const id = neueNutzerId()
   datenbank()
-    .prepare('INSERT INTO nutzer (id, benutzer, benutzer_v, name, rolle, quelle, passwort_hash, gruppen, erstellt, passwort_wechseln) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, n.benutzer.toLowerCase(), n.benutzer.toLowerCase(), n.name, n.rolle, n.quelle, n.passwortHash ?? null, JSON.stringify(n.gruppen ?? []), jetzt(), n.passwortWechseln ? 1 : 0)
+    .prepare(
+      'INSERT INTO nutzer (id, benutzer, benutzer_v, name, rolle, quelle, passwort_hash, gruppen, erstellt, passwort_wechseln) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    .run(
+      id,
+      n.benutzer.toLowerCase(),
+      n.benutzer.toLowerCase(),
+      n.name,
+      n.rolle,
+      n.quelle,
+      n.passwortHash ?? null,
+      JSON.stringify(n.gruppen ?? []),
+      jetzt(),
+      n.passwortWechseln ? 1 : 0
+    )
   return nutzerNachId(id)!
 }
 
 export function nutzerAendern(
   id: string,
-  patch: Partial<{ name: string; rolle: Rolle; quelle: Nutzer['quelle']; passwortHash: string | null; gesperrt: boolean; eingerichtet: boolean; gruppen: { id: string; name: string }[]; passwortWechseln: boolean }>
+  patch: Partial<{
+    name: string
+    rolle: Rolle
+    quelle: Nutzer['quelle']
+    passwortHash: string | null
+    gesperrt: boolean
+    eingerichtet: boolean
+    gruppen: { id: string; name: string }[]
+    passwortWechseln: boolean
+  }>
 ): void {
   const felder: string[] = []
   const werte: (string | number | null)[] = []
@@ -212,10 +234,11 @@ const hash = (s: string): string => createHash('sha256').update(s).digest('hex')
 /** Gültigkeit: Lehrkräfte 180 Tage (gleitend), Schülerinnen und Schüler 12 Stunden */
 export const SITZUNG_MS: Record<Rolle, number> = { admin: 180 * 864e5, lehrkraft: 180 * 864e5, schueler: 12 * 36e5 }
 
-export function sitzungAnlegen(nutzerId: string, rolle: Rolle): { cookie: string; kennung: string; laeuftAb: number } {
+/** `dauerMs`: abweichende Dauer (Gäste im Vokabeltraining lernen über Wochen, 03.10.2026) */
+export function sitzungAnlegen(nutzerId: string, rolle: Rolle, dauerMs?: number): { cookie: string; kennung: string; laeuftAb: number } {
   const cookie = randomBytes(32).toString('base64url')
   const kennung = randomBytes(6).toString('hex')
-  const laeuftAb = Date.now() + SITZUNG_MS[rolle]
+  const laeuftAb = Date.now() + (dauerMs ?? SITZUNG_MS[rolle])
   datenbank()
     .prepare('INSERT INTO sitzungen (hash, kennung, nutzer_id, erstellt, laeuft_ab, zuletzt) VALUES (?, ?, ?, ?, ?, ?)')
     .run(hash(cookie), kennung, nutzerId, jetzt(), laeuftAb, Date.now())
@@ -227,8 +250,7 @@ export function sitzungPruefen(cookie: string): { nutzer: NutzerInfo; kennung: s
   if (!cookie || cookie.length > 200) return null
   const h = hash(cookie)
   const s = datenbank().prepare('SELECT kennung, nutzer_id, laeuft_ab, zuletzt FROM sitzungen WHERE hash = ?').get(h) as
-    | { kennung: string; nutzer_id: string; laeuft_ab: number; zuletzt: number }
-    | undefined
+    { kennung: string; nutzer_id: string; laeuft_ab: number; zuletzt: number } | undefined
   if (!s) return null
   if (s.laeuft_ab < Date.now()) {
     datenbank().prepare('DELETE FROM sitzungen WHERE hash = ?').run(h)
@@ -238,7 +260,8 @@ export function sitzungPruefen(cookie: string): { nutzer: NutzerInfo; kennung: s
   if (!nutzer || nutzer.gesperrt) return null
   let laeuftAb = s.laeuft_ab
   if (Date.now() - s.zuletzt > 36e5) {
-    laeuftAb = Date.now() + SITZUNG_MS[nutzer.rolle]
+    // Gleitend verlängern, aber eine längere Sitzung (Vokabel-Gäste) nie verkürzen
+    laeuftAb = Math.max(s.laeuft_ab, Date.now() + SITZUNG_MS[nutzer.rolle])
     datenbank().prepare('UPDATE sitzungen SET laeuft_ab = ?, zuletzt = ? WHERE hash = ?').run(laeuftAb, Date.now(), h)
     nutzerGesehen(nutzer.id)
   }
@@ -292,7 +315,9 @@ export function setzeServerGeheimnis(schluessel: string, wert: string): void {
 /** Ein Eintrag OHNE Klarnamen und ohne Inhalte – nur, was geschah */
 export function protokolliereServer(art: string, text: string, nutzerId?: string): void {
   try {
-    datenbank().prepare('INSERT INTO protokoll (zeit, nutzer_id, art, text) VALUES (?, ?, ?, ?)').run(jetzt(), nutzerId ?? null, art, text.slice(0, 500))
+    datenbank()
+      .prepare('INSERT INTO protokoll (zeit, nutzer_id, art, text) VALUES (?, ?, ?, ?)')
+      .run(jetzt(), nutzerId ?? null, art, text.slice(0, 500))
     // Höchstens 20 000 Einträge
     datenbank().prepare('DELETE FROM protokoll WHERE nr <= (SELECT MAX(nr) - 20000 FROM protokoll)').run()
   } catch {

@@ -20,7 +20,7 @@ import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
 import { useMaskottchen } from './shared/maskottchenStore'
-import { modules, MODUL_GRUPPEN } from './modules/registry'
+import { modules, MODUL_GRUPPEN, gruppenBild } from './modules/registry'
 import Home from './shell/Home'
 import SettingsPage from './shell/SettingsPage'
 import Themenuebersicht from './shell/Themenuebersicht'
@@ -283,6 +283,7 @@ export default function App(): React.JSX.Element {
                   <NavIcon
                     label={g.name}
                     breit={breit}
+                    bild={gruppenBild(g.id)}
                     active={hatAktive && !offen}
                     badge={!offen && apps.some((m) => laufpunkte[m.id])}
                     onClick={() => gruppeUmschalten(g.id, offen)}

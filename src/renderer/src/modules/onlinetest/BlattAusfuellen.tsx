@@ -311,7 +311,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       const doc = iframe.current?.contentDocument
       if (!doc || mehr <= 0) return
       const k = String(anker)
-      zusatz.current = { ...zusatz.current, [k]: Math.min(60, (zusatz.current[k] ?? 0) + mehr) }
+      zusatz.current = { ...zusatz.current, e: 1, [k]: Math.min(60, (zusatz.current[k] ?? 0) + mehr) }
       zusatzLinien(doc, zusatz.current)
       setAntworten((a) => ({ ...a, linien: JSON.stringify(zusatz.current) }))
       messe()
