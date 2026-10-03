@@ -149,7 +149,10 @@ export async function gatherCandidates(need: ImageNeed, services: ImageServices,
           preview: await services.normalize(raw, PREVIEW, 'jpeg'),
           load: async () => {
             // Hintergrund (Schachbrett, Greenscreen) entfernen; danach PNG, damit die Transparenz erhalten bleibt
-            const full = await services.fetchImage(h.url)
+            // Manche Anbieter (svgsilh.com) sperren Downloads zeitweise (403, Bot-Schutz) – dann die Vorschau über Openverse (03.10.2026)
+            const full = await services
+              .fetchImage(h.url)
+              .catch((e: unknown) => (h.thumbnail && h.thumbnail !== h.url ? services.fetchImage(h.thumbnail) : Promise.reject(e)))
             const cleaned = services.clean ? await services.clean(full) : { dataUrl: full, kind: 'none' }
             return services.normalize(cleaned.dataUrl, 1000, cleaned.kind !== 'none' || kind === 'clipart' ? 'png' : 'jpeg')
           }

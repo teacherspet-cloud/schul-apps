@@ -131,6 +131,19 @@ describe('Vokabeltest: Bilder beschriften', () => {
     expect(notes[0]).toContain('KI-Bild verworfen: mehrdeutig')
   })
 
+  it('ein nicht ladbares Bild reißt die anderen nicht mit (403 beim Anbieter, 03.10.2026)', async () => {
+    const list = items()
+    const services = fakeServices()
+    services.openMojiPng = async (hex, size) => {
+      if (hex.includes('bat') && size === 512) throw new Error('Bild konnte nicht geladen werden (403).')
+      return `data:image/png;base64,${hex}`
+    }
+    const notes = await findVocabPictures(list, vocab, settings, { ai: fakeAi('eindeutig'), services })
+    expect(list[0].image).toBeTruthy()
+    expect(list[1].image).toBeUndefined()
+    expect(notes.join(' ')).not.toContain('konnten nicht automatisch gewählt')
+  })
+
   it('meldet, wenn das KI-Bild gar nicht erzeugt werden konnte', async () => {
     const list = items()
     const ai = fakeAi('eindeutig', [], (subject) => !subject.includes('bat'))

@@ -89,8 +89,10 @@ export async function findVocabPictures(
   const missing: typeof gathered = []
   for (const g of gathered) {
     const choice = choices.get(g.need.id)
-    if (choice?.candidate && choice.fit === 'eindeutig') {
-      g.item.image = await loadRef(choice.candidate)
+    // Lässt sich das gewählte Bild nicht laden (z. B. 403 beim Anbieter), gilt nur DIESES Wort als ohne Bild (03.10.2026)
+    const geladen = choice?.candidate && choice.fit === 'eindeutig' ? await loadRef(choice.candidate).catch(() => undefined) : undefined
+    if (geladen) {
+      g.item.image = geladen
     } else {
       missing.push(g)
     }
@@ -143,7 +145,7 @@ export async function findVocabPictures(
         const next = pool.shift()
         if (!next) break
         used.add(next.id)
-        const image = await imageFor(next, rules, deps)
+        const image = await imageFor(next, rules, deps).catch(() => undefined)
         if (!image) continue
         g.item.vocabId = next.id
         g.item.answer = next.term
@@ -169,7 +171,10 @@ async function imageFor(entry: VocabEntry, rules: string, deps: PictureDeps): Pr
   const need = needFor(item, entry)
   const candidates = await gatherCandidates(need, deps.services, 3)
   const choice = (await chooseImages([{ need, candidates }], rules, deps.ai)).get(need.id)
-  if (choice?.candidate && choice.fit === 'eindeutig') return loadRef(choice.candidate)
+  if (choice?.candidate && choice.fit === 'eindeutig') {
+    const geladen = await loadRef(choice.candidate).catch(() => undefined)
+    if (geladen) return geladen
+  }
   if (!deps.generateImage) return undefined
   try {
     const dataUrl = await deps.generateImage(vocabClipartPrompt(item, entry))
