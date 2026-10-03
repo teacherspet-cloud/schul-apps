@@ -106,8 +106,10 @@ export async function findVocabPictures(
           const preview = await deps.services.normalize(dataUrl, 256, 'jpeg')
           const candidate: ImageCandidate = { kind: 'clipart', source: 'ai', title: 'KI-Clipart', credit: 'KI-generiert', preview, load: async () => dataUrl }
           return { g, candidate }
-        } catch {
-          return null // bleibt ohne Bild
+        } catch (e) {
+          // bleibt ohne Bild – aber nicht stillschweigend (03.10.2026: auf dem Server fiel die Erzeugung unbemerkt aus)
+          verworfen.set(g.need.id, `KI-Bild nicht erzeugt: ${e instanceof Error ? e.message : String(e)}`)
+          return null
         }
       }),
       2
@@ -124,7 +126,7 @@ export async function findVocabPictures(
         if (c?.candidate && c.fit !== 'ungeeignet') {
           g.item.image = { dataUrl: await candidate.load(), source: 'ai', credit: 'KI-generiert' }
           if (c.fit === 'brauchbar') notes.push(`Bild zu „${g.item.answer}“ ist nicht ganz eindeutig (${c.reason}) – bitte prüfen.`)
-        } else if (c?.reason) verworfen.set(g.need.id, c.reason)
+        } else if (c?.reason) verworfen.set(g.need.id, `KI-Bild verworfen: ${c.reason}`)
       }
     }
   }
@@ -153,7 +155,7 @@ export async function findVocabPictures(
       if (!g.item.image) {
         const ki = verworfen.get(g.need.id)
         notes.push(
-          `Kein eindeutiges Bild für „${g.item.answer}“ gefunden (${choices.get(g.need.id)?.reason ?? 'keine Treffer'}${ki ? `; KI-Bild verworfen: ${ki}` : ''}) – bitte im Editor auswählen.`
+          `Kein eindeutiges Bild für „${g.item.answer}“ gefunden (${choices.get(g.need.id)?.reason ?? 'keine Treffer'}${ki ? `; ${ki}` : ''}) – bitte im Editor auswählen.`
         )
       }
     }

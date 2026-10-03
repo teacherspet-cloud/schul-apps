@@ -130,6 +130,19 @@ describe('Vokabeltest: Bilder beschriften', () => {
     expect(list[1].image).toBeUndefined()
     expect(notes[0]).toContain('KI-Bild verworfen: mehrdeutig')
   })
+
+  it('meldet, wenn das KI-Bild gar nicht erzeugt werden konnte', async () => {
+    const list = items()
+    const ai = fakeAi('eindeutig', [], (subject) => !subject.includes('bat'))
+    const notes = await findVocabPictures(list, vocab, settings, {
+      ai,
+      services: fakeServices(),
+      generateImage: async () => {
+        throw new Error('Codex hat kein Bild erzeugt')
+      }
+    })
+    expect(notes[0]).toContain('KI-Bild nicht erzeugt: Codex hat kein Bild erzeugt')
+  })
 })
 
 describe('Arbeitsblatt: Bilder für alle Fächer', () => {
