@@ -21,7 +21,8 @@ const KLASSE = `7v${Date.now() % 1000}`
 const WOERTER = [
   { id: 'w1', term: 'weather', translation: 'Wetter' },
   { id: 'w2', term: 'sunny', translation: 'sonnig' },
-  { id: 'w3', term: 'cloud', translation: 'Wolke' }
+  { id: 'w3', term: 'cloud', translation: 'Wolke' },
+  { id: 'w4', term: 'children [pl]', translation: 'Kinder' }
 ]
 const da = (l, ms = 15000) =>
   l.waitFor({ timeout: ms }).then(
@@ -82,6 +83,52 @@ try {
   await h.screenshot({ path: join(out, '2-code.png') })
   await h.locator('[data-vokabeln-los]').click()
   pruefe(await da(h.locator('[data-vokabel-kasten]')), 'Gast lernt im Karteikasten')
+  await h.screenshot({ path: join(out, '2b-kasten.png'), fullPage: true })
+  // Eine Übungsrunde: Jede Frage startet frei bedienbar – kein altes „Richtig", nichts gesperrt (Befund 03.10.2026)
+  await h.locator('[data-vokabel-start]').click()
+  await h.locator('[data-sitzung]').waitFor()
+  const arten = new Set()
+  let sauber = true
+  let buchstabenOk = true
+  for (let i = 0; i < 24; i++) {
+    if (await h.locator('[data-sitzung-fertig]').isVisible()) break
+    await h.waitForTimeout(250)
+    if ((await h.locator('[data-urteil]').count()) > 0) sauber = false
+    if (await h.locator('[data-lernkarte]').isVisible()) {
+      arten.add('karte')
+      await h.locator('[data-lernkarte]').click()
+      // Erst „nicht gewusst" – so kommt das Wort in anderer Form wieder
+      await h.locator(i % 2 ? '[data-karte-gewusst]' : '[data-karte-nicht]').click()
+    } else if ((await h.locator('[data-option]').count()) > 0) {
+      arten.add('auswahl')
+      if (await h.locator('[data-option]').first().isDisabled()) sauber = false
+      await h.locator('[data-option]').first().click()
+    } else if ((await h.locator('[data-buchstabe]').count()) > 0) {
+      arten.add('buchstaben')
+      const k = h.locator('[data-buchstabe]')
+      const n = await k.count()
+      const texte = await k.allInnerTexts()
+      if (texte.some((t) => /[\[\]]/.test(t))) buchstabenOk = false
+      if (await k.first().isDisabled()) sauber = false
+      for (let j = 0; j < n; j++) await k.nth(j).click()
+      await h.locator('[data-pruefen]').click()
+    } else if ((await h.locator('[data-eingabe]').count()) > 0) {
+      arten.add('schreiben')
+      if (await h.locator('[data-eingabe]').isDisabled()) sauber = false
+      await h.locator('[data-eingabe]').fill('cloud')
+      await h.locator('[data-pruefen]').click()
+    }
+    await h.locator('[data-weiter]').click({ timeout: 8000 })
+  }
+  pruefe(sauber, `Jede Frage startet bedienbar ohne altes Ergebnis (${[...arten].join(', ')})`)
+  pruefe(arten.size >= 2, `Mehrere Abfrageformate in der Runde (${[...arten].join(', ')})`)
+  pruefe(buchstabenOk, 'Buchstaben ohne „[pl]"-Angabe')
+  await h.screenshot({ path: join(out, '2c-runde.png'), fullPage: true })
+  // Gast: „Meine Materialien" statt Test-Code-Seite
+  await h.goto(`${A}/s/`)
+  pruefe(await da(h.locator('[data-gast-start] [data-gast-vokabeln]')), 'Gast-Startseite zeigt das Vokabeltraining')
+  pruefe((await h.getByText('Schul-Apps · Onlinetest').count()) === 0, 'Kopfzeile nicht mehr „Onlinetest"')
+  await h.screenshot({ path: join(out, '2d-gast-start.png'), fullPage: true })
   const cookie = (await g1.cookies()).find((c) => c.name === 'sa_sitzung')
   pruefe(Boolean(cookie && cookie.expires * 1000 > Date.now() + 20 * 864e5), 'Gast bleibt über Wochen angemeldet (bis zum Ende des Zeitraums)')
 

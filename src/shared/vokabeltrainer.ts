@@ -96,9 +96,24 @@ export function satzMitLuecke(satz: string, term: string): { vor: string; nach: 
   return { vor: satz.slice(0, i), nach: satz.slice(ende), loesung: satz.slice(i, ende) }
 }
 
+/**
+ * Grammatik- und Gebrauchsangaben aus dem Lehrbuch („children [pl]", „sheep (pl sheep)", „mouse [irr]",
+ * „flat (BE)") gehören nicht zum Wort: Sie werden weder vorgelesen noch eingegeben (03.10.2026).
+ * Eckige Klammern fallen immer weg, runde nur mit einer solchen Angabe – „(to) play" bleibt.
+ */
+const ANGABE =
+  /\s*\((?:pl|sg|pl\.|sg\.|no pl|kein pl\.?|irr\.?|unr\.?|adj\.?|adv\.?|prep\.?|conj\.?|n|v|nt|f|m|mf|c|u|be|ae|bre|ame|infml|fml|inf\.?|coll\.?|ugs\.?|pl [^)]*|Pl\.?[^)]*|Sg\.?)\)/gi
+export function ohneAngaben(t: string): string {
+  return String(t ?? '')
+    .replace(/\s*\[[^\]]*\]/g, '')
+    .replace(ANGABE, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /** „to go" → „go", „the dog" → „dog", „(to) play" → „play" */
 export function kernform(t: string): string {
-  return t
+  return ohneAngaben(t)
     .replace(/\([^)]*\)/g, ' ')
     .replace(/^\s*(to|the|a|an|le|la|les|l'|un|une|el|los|las|il|lo|gli|der|die|das)\s+/i, '')
     .replace(/\s+/g, ' ')
@@ -107,7 +122,7 @@ export function kernform(t: string): string {
 
 /** Zulässige Lösungen: Alternativen („/", „;", „,") und Klammerteile optional */
 export function varianten(loesung: string): string[] {
-  const teile = String(loesung ?? '')
+  const teile = ohneAngaben(String(loesung ?? ''))
     .split(/\s*[/;]\s*|,\s+(?=\S)/)
     .map((x) => x.trim())
     .filter(Boolean)

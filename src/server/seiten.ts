@@ -39,7 +39,7 @@ export function anmeldeSeite(o: { iserv: boolean; notzugang: boolean; fehler: st
 <body>
 <main>
   <h1>Schul-Apps</h1>
-  <p class="leise">${fuerSchueler ? 'Anmelden, um den Test zu starten.' : 'Anmelden mit dem Zugang der Schule.'}</p>
+  <p class="leise">${fuerSchueler ? 'Anmelden – zu den eigenen Arbeitsblättern, Vokabeln, Tests und Aufgaben.' : 'Anmelden mit dem Zugang der Schule.'}</p>
   ${o.fehler ? `<div class="fehler" role="alert">${esc(o.fehler)}</div>` : ''}
   ${
     o.iserv

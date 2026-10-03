@@ -123,9 +123,9 @@ interface Ergebnis {
   bewertung?: Bewertung
 }
 
-async function abmelden(): Promise<void> {
+async function abmelden(ziel = '/anmelden?ziel=/s/'): Promise<void> {
   await fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } }).catch(() => undefined)
-  window.location.assign('/anmelden?ziel=/s/')
+  window.location.assign(ziel)
 }
 
 export default function SchuelerBereich(): React.JSX.Element {
@@ -170,6 +170,9 @@ export default function SchuelerBereich(): React.JSX.Element {
     <FeedbackAufgabe id={aufgabe} />
   ) : rueckblick && !gast ? (
     <ErgebnisRueckblick id={rueckblick} />
+  ) : gast && ich?.angemeldet && !bereich ? (
+    // Gast mit Sitzung (QR-Code): eigene Übersicht statt der Test-Code-Seite (03.10.2026)
+    <GastStart />
   ) : gast || bereich === 'tests' ? (
     <Uebersicht />
   ) : bereich === 'ergebnisse' ? (
@@ -185,7 +188,18 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
         <Text fw={700} size="lg" component="a" href="/s/" style={{ color: 'inherit', textDecoration: 'none' }}>
-          Schul-Apps{gast ? (aufgabe || fbCode ? ' · Rückmeldung' : blatt || blattCode ? ' · Arbeitsblatt' : ' · Onlinetest') : ''}
+          Schul-Apps
+          {gast
+            ? aufgabe || fbCode
+              ? ' · Rückmeldung'
+              : blatt || blattCode
+                ? ' · Arbeitsblatt'
+                : vokabeln || vokCode
+                  ? ' · Vokabeltraining'
+                  : code
+                    ? ' · Onlinetest'
+                    : ''
+            : ''}
         </Text>
         {!gast && (
           <Group gap={4}>
@@ -815,7 +829,103 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
   )
 }
 
-function Uebersicht(): React.JSX.Element {
+/**
+ * Startseite für Gäste (per QR-Code dabei, ohne Konto), 03.10.2026: Befund der Lehrkraft – nach dem
+ * Zurück aus dem Vokabeltraining landete man in der Test-Code-Seite statt bei den eigenen Materialien.
+ * Zeigt Vokabeltrainings und Arbeitsblätter dieses Gastzugangs, dazu „Mit Code öffnen" und Abmelden.
+ */
+function GastStart(): React.JSX.Element {
+  const [vok, setVok] = useState<{ id: string; titel: string; fach: string; uebersicht: { gesamt: number; sicher: number; faellig: number } }[] | null>(null)
+  const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
+  useEffect(() => {
+    void holen<{ listen: typeof vok }>('/s/api/vokabeln').then(
+      (d) => setVok(d.listen ?? []),
+      () => setVok([])
+    )
+    void holen<{ blaetter: BlattKurz[] }>('/s/api/blaetter').then(
+      (d) => setBlaetter(d.blaetter ?? []),
+      () => setBlaetter([])
+    )
+  }, [])
+  const name = window.__schulappsServer?.name
+  const leer = vok?.length === 0 && blaetter?.length === 0
+  return (
+    <Stack data-gast-start>
+      <div>
+        <Title order={3}>Meine Materialien</Title>
+        {name && (
+          <Text c="dimmed" size="sm">
+            Angemeldet als {name}
+          </Text>
+        )}
+      </div>
+      {(!vok || !blaetter) && <Loader />}
+      {vok?.map((v) => (
+        <Card
+          key={v.id}
+          withBorder
+          padding="md"
+          radius="lg"
+          component="a"
+          href={`/s/v/${v.id}`}
+          style={{ textDecoration: 'none', borderLeft: '4px solid #f97316' }}
+          data-gast-vokabeln
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <div>
+              <Text size="xs" c="dimmed">
+                Vokabeltraining · {v.fach}
+              </Text>
+              <Text fw={700}>{v.titel}</Text>
+              <Text size="sm" c="dimmed">
+                {v.uebersicht.sicher} von {v.uebersicht.gesamt} sicher{v.uebersicht.faellig ? ` · ${v.uebersicht.faellig} heute fällig` : ''}
+              </Text>
+            </div>
+            <Button color="orange" radius="xl" component="span">
+              Üben
+            </Button>
+          </Group>
+        </Card>
+      ))}
+      {blaetter?.map((b) => (
+        <Card
+          key={b.id}
+          withBorder
+          padding="md"
+          radius="lg"
+          component="a"
+          href={`/s/b/${b.id}`}
+          style={{ textDecoration: 'none', borderLeft: '4px solid #228be6' }}
+          data-gast-blatt
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <div>
+              <Text size="xs" c="dimmed">
+                Arbeitsblatt
+              </Text>
+              <Text fw={700}>{b.titel}</Text>
+            </div>
+            <Button variant="light" radius="xl" component="span">
+              {!b.offen || b.genutzt >= b.runden ? 'Ansehen' : b.begonnen ? 'Weiter' : 'Öffnen'}
+            </Button>
+          </Group>
+        </Card>
+      ))}
+      {leer && <Text c="dimmed">Hier erscheint, was über einen Code geöffnet wurde.</Text>}
+      <Uebersicht ohneZurueck />
+      <Card withBorder padding="md" radius="lg">
+        <Text size="sm" mb="xs">
+          Auf einem fremden oder geteilten Gerät: abmelden. Beim Vokabeltraining geht es danach mit Name und persönlichem Code weiter.
+        </Text>
+        <Button variant="default" leftSection={<IconLogout size={14} />} onClick={() => void abmelden('/s/')} data-gast-abmelden>
+          Abmelden
+        </Button>
+      </Card>
+    </Stack>
+  )
+}
+
+function Uebersicht({ ohneZurueck = false }: { ohneZurueck?: boolean } = {}): React.JSX.Element {
   const [tests, setTests] = useState<{ code: string; titel: string; zeitMin: number; abgegeben: boolean; wartend: boolean }[] | null>(null)
   const [code, setCode] = useState('')
   const [scannen, setScannen] = useState(false)
@@ -829,15 +939,16 @@ function Uebersicht(): React.JSX.Element {
   }, [angemeldet])
   return (
     <Stack>
-      <ZurStartseite />
+      {!ohneZurueck && <ZurStartseite />}
       <Card withBorder padding="lg">
         <Title order={4} mb="xs">
-          Test mit Code öffnen
+          Mit Code öffnen
         </Title>
         <Group align="end">
           <TextInput
             style={{ flex: 1 }}
             label="Code (steht an der Tafel)"
+            description="für Test, Arbeitsblatt oder Vokabeln"
             value={code}
             onChange={(e) => setCode(e.currentTarget.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             autoCapitalize="characters"
@@ -860,9 +971,9 @@ function Uebersicht(): React.JSX.Element {
           Safari.
         </Alert>
       )}
-      {angemeldet && <Title order={4}>Offene Tests</Title>}
+      {angemeldet && !ohneZurueck && <Title order={4}>Offene Tests</Title>}
       {!tests && <Loader />}
-      {angemeldet && tests?.length === 0 && <Text c="dimmed">Gerade ist kein Test für dich freigegeben.</Text>}
+      {angemeldet && !ohneZurueck && tests?.length === 0 && <Text c="dimmed">Gerade ist kein Test für dich freigegeben.</Text>}
       {tests?.map((t) => (
         <Card key={t.code} withBorder padding="md">
           <Group justify="space-between">
