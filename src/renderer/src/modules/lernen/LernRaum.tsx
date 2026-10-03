@@ -8,6 +8,7 @@
  *    umdrehen) und Mappen je Themenbereich (umblättern: Arbeitsblätter mit Feedback, Tafelbilder,
  *    Schreibaufgaben, Tests, Lernprodukte).
  */
+import { mitTuer } from './tuer'
 import { VokabelwegKarten } from './VokabelLeiter'
 import { ActionIcon, Alert, Badge, Button, Center, Group, Loader, Modal, Stack, Text, Title } from '@mantine/core'
 import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconExternalLink } from '@tabler/icons-react'
@@ -208,7 +209,7 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
               key={i}
               type="button"
               className="lr-kasten"
-              onClick={() => (k.art === 'vokabeln' && k.id ? window.location.assign(`/s/v/${k.id}`) : setKasten(k))}
+              onClick={() => (k.art === 'vokabeln' && k.id ? mitTuer(`/s/v/${k.id}`, farbe) : setKasten(k))}
               aria-label={`Karteikasten: ${k.titel}`}
               data-karteikasten={k.art}
             >

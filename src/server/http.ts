@@ -479,7 +479,17 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
             adresse: opts.adresse
           }
         : { angemeldet: false, adresse: opts.adresse }
-      return void res.end(`window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};`)
+      /*
+       * Schülerbereich im Dunkelmodus (03.10.2026, Befund der Lehrkraft: beim Wechsel der Seite „hellt das
+       * Fenster sehr hell auf"): Die Seite war weiß, bis das Programm geladen hatte. Dieses Skript läuft
+       * vor allem anderen im Kopf und färbt den Hintergrund gleich richtig (gemerkte Darstellung).
+       */
+      const frueh =
+        "(function(){try{if(location.pathname.indexOf('/s/')!==0)return;var d=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');" +
+        "var m=d.modus||'auto';var dk=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);" +
+        "var s=document.createElement('style');s.textContent=dk?'html,body{background:#242424;color-scheme:dark}':'html,body{background:#fff}';" +
+        'document.head.appendChild(s)}catch(e){}})();'
+      return void res.end(`window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};${frueh}`)
     }
 
     // ---------- Zusatzrouten (Verwaltung, Onlinetest, Hörtexte, Schülerbereich)

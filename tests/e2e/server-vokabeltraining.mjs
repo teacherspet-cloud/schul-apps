@@ -139,6 +139,13 @@ try {
   pruefe(await da(h.locator('[data-gast-start] [data-gast-vokabeln]')), 'Gast-Startseite zeigt das Vokabeltraining')
   pruefe((await h.getByText('Schul-Apps · Onlinetest').count()) === 0, 'Kopfzeile nicht mehr „Onlinetest"')
   await h.screenshot({ path: join(out, '2d-gast-start.png'), fullPage: true })
+  // Türübergang beim Öffnen, kein weißes Aufblitzen im Dunkelmodus (frühes Skript im Seitenkopf)
+  await h.locator('[data-gast-vokabeln]').first().click()
+  pruefe(await da(h.locator('[data-tuer-uebergang]'), 2000), 'Klick in „Meine Materialien" öffnet mit Türanimation')
+  await h.screenshot({ path: join(out, '2e-tuer.png') })
+  pruefe(await da(h.locator('[data-vokabel-kasten]')), 'Nach der Tür das Vokabeltraining')
+  const ichJs = await (await g1.request.get(`${A}/server/ich.js`)).text()
+  pruefe(ichJs.includes('schulapps-darstellung') && ichJs.includes('#242424'), 'Dunkler Hintergrund wird vor dem Programm gesetzt')
   const cookie = (await g1.cookies()).find((c) => c.name === 'sa_sitzung')
   pruefe(Boolean(cookie && cookie.expires * 1000 > Date.now() + 20 * 864e5), 'Gast bleibt über Wochen angemeldet (bis zum Ende des Zeitraums)')
 

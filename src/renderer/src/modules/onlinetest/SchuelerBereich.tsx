@@ -22,6 +22,7 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import { tuerKlick } from '../lernen/tuer'
 import { fachFarbeAus } from '../../shared/fachfarben'
 import VokabelBeitritt from '../lernen/VokabelBeitritt'
 import {
@@ -876,6 +877,7 @@ function GastStart(): React.JSX.Element {
           radius="lg"
           component="a"
           href={`/s/v/${v.id}`}
+          onClick={tuerKlick(`/s/v/${v.id}`, fachFarbeAus(v.fach, undefined) ?? undefined)}
           style={{ textDecoration: 'none', borderLeft: `4px solid ${fachFarbeAus(v.fach, undefined) ?? '#ea580c'}` }}
           data-gast-vokabeln
         >
@@ -903,6 +905,7 @@ function GastStart(): React.JSX.Element {
           radius="lg"
           component="a"
           href={`/s/b/${b.id}`}
+          onClick={tuerKlick(`/s/b/${b.id}`, '#228be6')}
           style={{ textDecoration: 'none', borderLeft: '4px solid #228be6' }}
           data-gast-blatt
         >

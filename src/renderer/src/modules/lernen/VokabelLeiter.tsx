@@ -6,6 +6,7 @@
  */
 import { Group, Progress, Stack, Text } from '@mantine/core'
 import { holen } from '../onlinetest/serverApi'
+import { tuerKlick } from './tuer'
 import { IconCheck, IconConfetti, IconLock, IconMapPin } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 import { fehlenBis, type Stufe } from '@shared/vokabelLaufbahn'
@@ -183,6 +184,7 @@ export function VokabelwegKarten({ fach }: { fach?: string }): React.JSX.Element
           <a
             key={w.key}
             href={`/s/vw/${encodeURIComponent(w.key)}`}
+            onClick={tuerKlick(`/s/vw/${encodeURIComponent(w.key)}`, farbe)}
             style={{
               textDecoration: 'none',
               color: 'inherit',
