@@ -23,7 +23,17 @@ import { warteAufOberflaeche } from './warten.mjs'
 const out = resolve(process.argv[2] ?? 'test-results/programmsymbole')
 mkdirSync(out, { recursive: true })
 const userData = mkdtempSync(join(tmpdir(), 'schulapps-symbole-'))
-const PROGRAMME = ['Vokabeltest', 'Vokabellisten', 'Arbeitsblatt', 'Lernzielkontrolle', 'Grammatiktest', 'Klassenarbeiten', 'Rückmeldung', 'Tafelbilder', 'Elternbriefe']
+const PROGRAMME = [
+  'Vokabeltest',
+  'Vokabellisten',
+  'Arbeitsblatt',
+  'Lernzielkontrolle',
+  'Grammatiktest',
+  'Klassenarbeiten',
+  'Rückmeldung',
+  'Tafelbilder',
+  'Elternbriefe'
+]
 /*
  * Programme ohne eigene Illustration zeigen ihr gezeichnetes Symbol. Seit dem 28.09.2026 haben
  * alle acht eine (Rückmeldung und Elternbriefe über den ChatGPT-Zugang der App erzeugt), seit dem
@@ -125,19 +135,19 @@ try {
 
   await darstellung('teal', 'light')
   await page.click('[aria-label="Startseite"]')
-  const kacheln = await page.$$eval('.home-tile', (els) =>
-    els.map((el) => ({ bild: !!el.querySelector('img.home-illustration'), symbol: !!el.querySelector('.home-illustration svg.programm-symbol') }))
+  // Seit 03.10.2026 ohne Programmkacheln auf der Startseite: Bild oder Symbol je Programm in der Leiste
+  const eintraege = await page.$$eval('.app-leiste .leiste-gruppe-apps [aria-label]', (els) =>
+    els.map((el) => ({ name: el.getAttribute('aria-label'), bild: !!el.querySelector('img'), symbol: !!el.querySelector('svg') }))
   )
-  pruefe(kacheln.length === PROGRAMME.length, `Startseite zeigt ${PROGRAMME.length} Kacheln (${kacheln.length})`)
   pruefe(
-    kacheln.every((k) => k.bild || k.symbol),
-    'jede Kachel zeigt Illustration oder Symbol'
+    PROGRAMME.every((n) => eintraege.some((e) => e.name === n)),
+    `Leiste zeigt alle ${PROGRAMME.length} Programme (${eintraege.length})`
   )
-  await page.locator('.home-tile').first().scrollIntoViewIfNeeded()
+  pruefe(
+    eintraege.every((k) => k.bild || k.symbol),
+    'jedes Programm in der Leiste zeigt Bild oder Symbol'
+  )
   await page.screenshot({ path: join(out, 'paket9-start.png') })
-  // Das neunte Programm (Tafelbilder, 30.09.2026) neben den übrigen Kacheln
-  await page.locator('.home-tile', { hasText: 'Tafelbilder' }).first().scrollIntoViewIfNeeded()
-  await page.screenshot({ path: join(out, 'paket9-start-tafelbilder.png') })
 } finally {
   await app.close()
   rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 })

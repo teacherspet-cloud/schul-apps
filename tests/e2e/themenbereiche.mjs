@@ -250,12 +250,13 @@ try {
   console.log('\nÜbergreifend')
   await page.click('[aria-label="Startseite"]')
   await page.waitForTimeout(700)
-  const themenAbschnitt = sichtbar(page.locator('[data-home-themen]'))
-  pruefe((await themenAbschnitt.count()) === 1, 'Startseite: Abschnitt „Themenbereiche"')
-  await themenAbschnitt.getByRole('button', { name: /Mathematik/ }).click()
+  // Seit 03.10.2026 ohne eigenen Abschnitt: über die Suche der Startseite (Treffer „Themenbereich")
+  await sichtbar(page.getByLabel('Materialien durchsuchen')).fill('Potenzen')
+  await page.waitForTimeout(400)
+  const bereichTreffer = sichtbar(page.locator('button', { hasText: 'Potenzen' }).filter({ hasText: 'Themenbereich' }))
+  pruefe((await bereichTreffer.count()) === 1, 'Startseite: Themenbereich über die Suche')
+  await bereichTreffer.click()
   await page.waitForTimeout(800)
-  await ordner('Potenzen').getByRole('button', { name: 'Themenbereich „Potenzen“ öffnen' }).click()
-  await page.waitForTimeout(600)
   pruefe(
     (await karte('Prüflauf Potenzen').count()) === 1 && (await karte('Potenzen üben').count()) === 1,
     'Bereich „Potenzen" zeigt Arbeitsblatt und Lernzielkontrolle zusammen'

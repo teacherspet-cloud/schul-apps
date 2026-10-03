@@ -805,3 +805,18 @@ img.home-illustration {
   animation: none !important;
   transition: none !important;
 }
+
+/* Gruppen der Leiste (03.10.2026): die Apps einer offenen Gruppe eingerückt mit Linie */
+.leiste-gruppe + .leiste-gruppe {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+.leiste-gruppe-apps {
+  margin-left: 4px;
+  padding-left: 4px;
+  border-left: 2px solid var(--mantine-color-default-border);
+}
+.app-leiste[data-breit='true'] .leiste-gruppe-apps {
+  margin-left: 10px;
+}

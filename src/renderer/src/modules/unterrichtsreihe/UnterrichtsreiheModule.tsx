@@ -6,6 +6,7 @@
  * Wissensspeicher, Abschlussprodukt, Sprechaufgabe), legt Lernziele fest (Kerncurriculum oder KI)
  * und weist sie zu. Wer einen Schritt schafft, schaltet den nächsten frei (Regeln: shared/reihe.ts).
  */
+import { create } from 'zustand'
 import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconChartDots, IconDots, IconPlus, IconRoute, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -45,8 +46,17 @@ function neueReihe(): Reihe {
   }
 }
 
+/** Sprungziel von außen (Laufende Reihen, Startseite): die Übersicht einer Zuweisung öffnen */
+export const useReihenZiel = create<{ zid: string | null; setze: (zid: string | null) => void }>((set) => ({ zid: null, setze: (zid) => set({ zid }) }))
+
 export default function UnterrichtsreiheModule(): React.JSX.Element {
   const [ansicht, setAnsicht] = useState<{ art: 'liste' } | { art: 'editor'; reihe: Reihe } | { art: 'uebersicht'; zid: string }>({ art: 'liste' })
+  const ziel = useReihenZiel((z) => z.zid)
+  useEffect(() => {
+    if (!ziel) return
+    setAnsicht({ art: 'uebersicht', zid: ziel })
+    useReihenZiel.getState().setze(null)
+  }, [ziel])
   const [liste, setListe] = useState<ReiheKurz[] | null>(null)
   const laden = useCallback(
     () =>
@@ -180,7 +190,7 @@ interface EingangEintrag {
  * Korrektur-Eingang über alle Reihen (03.10.2026, Idee aus LearningView): was zu bestätigen, zu
  * beantworten, abzuhaken oder freizugeben ist – eine Liste statt Suchen im Raster.
  */
-function Eingang({ oeffnen }: { oeffnen: (zid: string) => void }): React.JSX.Element | null {
+export function Eingang({ oeffnen }: { oeffnen: (zid: string) => void }): React.JSX.Element | null {
   const [liste, setListe] = useState<EingangEintrag[] | null>(null)
   const [antwort, setAntwort] = useState<Record<number, string>>({})
   const laden = useCallback(

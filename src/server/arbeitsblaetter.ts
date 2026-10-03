@@ -20,7 +20,17 @@
  */
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { randomBytes } from 'node:crypto'
-import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import {
+  alleNutzer,
+  datenbank,
+  nutzerAnlegen,
+  nutzerNachBenutzer,
+  nutzerNachId,
+  protokolliereServer,
+  sitzungAnlegen,
+  SITZUNG_MS,
+  type NutzerInfo
+} from './datenbank'
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
@@ -414,6 +424,11 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             id: z.id,
             titel: z.titel,
             status: z.status,
+            erstellt: z.erstellt,
+            fach: (z as Zeile & { fach?: string }).fach ?? '',
+            // Letzte Aktivität der Lernenden (für „neu eingereicht" auf der Startseite)
+            zuletzt:
+              (db().prepare('SELECT MAX(aktualisiert) AS t FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0').get(z.id) as { t: number | null }).t ?? 0,
             lerngruppe: (z.lerngruppe_id ? lerngruppe(z.lerngruppe_id)?.name : '') ?? '',
             schueler: json_(z.schueler, [] as string[]).length,
             einstellungen: einstellungenVon(z),
@@ -485,6 +500,14 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       protokolliereServer('arbeitsblatt', 'Arbeitsblatt für Lernende freigegeben', ich.id)
       return (json(res, 200, { id, ...(code ? { code, link: link(code) } : {}) }), true)
     }
+    if (req.method === 'POST' && teile[0] === 'pdf') {
+      const html = String(((await k.koerper()) as Record<string, unknown>).html ?? '')
+      if (!html.includes('ws-page') || html.length > 30 * 1024 * 1024) return (json(res, 400, { fehler: 'Das Blatt konnte nicht vorbereitet werden.' }), true)
+      const pdf = await pdfOhneSkripte(html)
+      res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'no-store', 'content-length': pdf.byteLength })
+      res.end(Buffer.from(pdf))
+      return true
+    }
     const z = teile[0] ? freigabe(teile[0]) : null
     if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
@@ -499,6 +522,33 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         })
       )
       return (json(res, 200, { id: z.id, titel: z.titel, status: z.status, rueckmeldungId: z.rueckmeldung_id, abgaben }), true)
+    }
+    /*
+     * Lehrkraft: das ausgefüllte Blatt einer Person ansehen (App „Freigegebene Blätter", 03.10.2026) –
+     * dieselbe Form wie für die Lernenden, nur zum Ansehen, mit dem vollständigen Bogen.
+     */
+    if (req.method === 'GET' && teile[1] === 'abgabe') {
+      const person = nutzerNachBenutzer(String(url.searchParams.get('schueler') ?? ''))
+      const a = person ? abgabeVon(z.id, person.id) : null
+      if (!person || !a) return (json(res, 404, { fehler: 'Diese Person hat das Blatt noch nicht bearbeitet.' }), true)
+      const e = einstellungenVon(z)
+      return (
+        json(res, 200, {
+          id: z.id,
+          titel: `${z.titel} – ${person.name || person.benutzer}`,
+          offen: false,
+          feedback: e.feedback,
+          runden: e.runden,
+          genutzt: a.abgaben,
+          html: z.html,
+          einstellungen: e,
+          antworten: json_(a.antworten, {}),
+          tinte: json_(a.tinte ?? '{}', {}),
+          aufgabenFeedback: json_(a.aufgaben_feedback ?? '{}', {}),
+          fassungen: blattFassungen(z.rueckmeldung_id, person.id).map(({ volleBogen: _v, ...rest }) => rest)
+        }),
+        true
+      )
     }
     if (req.method === 'POST' && teile[1] === 'status') {
       const k0 = (await k.koerper()) as Record<string, unknown>

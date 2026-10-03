@@ -40,14 +40,26 @@ try {
   await s.goto(`${A}/s/`)
   await s.locator('[data-code-scannen]').waitFor({ timeout: 15000 })
   pruefe(!s.url().includes('/anmelden'), '/s/ ohne Anmeldung: Code eingeben oder scannen')
-  pruefe(await s.locator('link[rel=manifest][href="/s/manifest.webmanifest"]').count() === 1 && (await s.locator('link[rel=apple-touch-icon]').count()) === 1, 'Seite verweist auf Manifest und Home-Bildschirm-Symbol')
+  pruefe(
+    (await s.locator('link[rel=manifest][href="/s/manifest.webmanifest"]').count()) === 1 && (await s.locator('link[rel=apple-touch-icon]').count()) === 1,
+    'Seite verweist auf Manifest und Home-Bildschirm-Symbol'
+  )
   pruefe(await s.locator('[data-home-tipp]').isVisible(), 'iPad in Safari: Tipp „Zum Home-Bildschirm"')
   await s.locator('[data-code-scannen]').click()
   await s.locator('[data-code-scanner] video').waitFor({ timeout: 10000 })
-  const laeuft = await s.waitForFunction(() => {
-    const v = document.querySelector('[data-code-scanner] video')
-    return v && v.readyState >= 2 && v.videoWidth > 0
-  }, null, { timeout: 15000 }).then(() => true, () => false)
+  const laeuft = await s
+    .waitForFunction(
+      () => {
+        const v = document.querySelector('[data-code-scanner] video')
+        return v && v.readyState >= 2 && v.videoWidth > 0
+      },
+      null,
+      { timeout: 15000 }
+    )
+    .then(
+      () => true,
+      () => false
+    )
   pruefe(laeuft, 'Scanner: Kamera läuft in der Seite')
   await s.screenshot({ path: join(out, '1-scanner.png') })
   await s.keyboard.press('Escape')
@@ -72,7 +84,7 @@ try {
   await p.waitForTimeout(3000)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
-  await p.locator('.home-tile').first().waitFor({ timeout: 10000 })
+  await p.locator('[data-schnellzugriff-raster]').first().waitFor({ timeout: 10000 })
   pruefe((await p.locator('[data-eigenes-fenster]').count()) === 0, 'Lehrkraft als Web-App: kein „In eigenem Fenster öffnen"')
   const lb = await browser.newContext({ viewport: { width: 1180, height: 820 } })
   await anmelden(lb, lehrer.benutzer, lehrer.passwort)
@@ -81,7 +93,17 @@ try {
   await b.waitForTimeout(3000)
   const sp2 = b.getByRole('button', { name: 'Später einrichten' })
   if (await sp2.isVisible().catch(() => false)) await sp2.click()
-  pruefe(await b.locator('[data-eigenes-fenster]').first().waitFor({ state: 'attached', timeout: 10000 }).then(() => true, () => false), 'im Browser am PC: Pop-up-Symbole vorhanden')
+  pruefe(
+    await b
+      .locator('[data-eigenes-fenster]')
+      .first()
+      .waitFor({ state: 'attached', timeout: 10000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'im Browser am PC: Pop-up-Symbole vorhanden'
+  )
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n')[0]}`)
 } finally {

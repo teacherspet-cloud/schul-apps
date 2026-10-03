@@ -46,6 +46,8 @@ export type ProgrammSymbolForm =
   | 'onlinetest'
   | 'verwaltung'
   | 'unterrichtsreihe'
+  | 'freigaben'
+  | 'laufendereihen'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
@@ -197,6 +199,26 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
       { d: 'M16 2V9', art: 'strich', breite: 1.75 },
       { d: 'M16 2.5H21.5L20 4.5L21.5 6.5H16Z', art: 'akzent' }
     ]
+  },
+  // Freigegebene Blätter (03.10.2026): Blatt mit Pfeil nach außen – verteilt an die Lernenden
+  freigaben: {
+    aussparen: 'M14 15H22M18 11L22 15L18 19',
+    aussparenBreite: 3,
+    hinten: [
+      { d: heft(3, 2, 13, 18), art: 'strich' },
+      { d: 'M6 7H13M6 10.5H13M6 14H10', art: 'strich', breite: 1.5 }
+    ],
+    vorn: [{ d: 'M14 15H22M18 11L22 15L18 19', art: 'strich', breite: 2 }]
+  },
+  // Laufende Reihen (03.10.2026): drei Fortschrittsbalken unterschiedlicher Länge mit Zielfahne
+  laufendereihen: {
+    hinten: [
+      { d: 'M3 6H17M3 12H13M3 18H20', art: 'strich' },
+      { d: 'M3 4.5H11V7.5H3Z', art: 'akzent' },
+      { d: 'M3 10.5H8V13.5H3Z', art: 'akzent' },
+      { d: 'M3 16.5H16V19.5H3Z', art: 'akzent' }
+    ],
+    vorn: [{ d: 'M20 3V9M20 3.5H23L22 5L23 6.5H20', art: 'strich', breite: 1.5 }]
   },
   // Verwaltung (02.10.2026, Server, nur Admin): Schieberegler
   verwaltung: {

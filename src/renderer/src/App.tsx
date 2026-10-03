@@ -3,9 +3,14 @@ import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
 import {
+  IconApps,
+  IconChalkboard,
   IconChevronsLeft,
+  IconClipboardCheck,
   IconExternalLink,
+  IconFolders,
   IconHome,
+  IconListDetails,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconLogout,
@@ -15,7 +20,7 @@ import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
 import { useMaskottchen } from './shared/maskottchenStore'
-import { modules } from './modules/registry'
+import { modules, MODUL_GRUPPEN } from './modules/registry'
 import Home from './shell/Home'
 import SettingsPage from './shell/SettingsPage'
 import Themenuebersicht from './shell/Themenuebersicht'
@@ -71,6 +76,23 @@ export default function App(): React.JSX.Element {
   const current = modules.find((m) => m.id === active)
   // Nur die Programme zu den eigenen Fächern (Paket 12) – geladen bleiben trotzdem alle
   const sichtbar = useSichtbareProgramme()
+  // Zugeklappte Gruppen der Leiste (je Gerät; beim ersten Start alle offen)
+  const [zuGruppen, setZuGruppen] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('leiste-gruppen-zu') ?? '[]') as string[]
+    } catch {
+      return []
+    }
+  })
+  const gruppeUmschalten = (id: string, offen: boolean): void => {
+    const neu = offen ? [...new Set([...zuGruppen, id])] : zuGruppen.filter((x) => x !== id)
+    setZuGruppen(neu)
+    try {
+      localStorage.setItem('leiste-gruppen-zu', JSON.stringify(neu))
+    } catch {
+      // ohne Speicher nur für diese Sitzung
+    }
+  }
   // Der Tastenhorcher (unten) bleibt stehen; die aktuelle Liste liest er hier
   const sichtbarRef = useRef(sichtbar)
   sichtbarRef.current = sichtbar
@@ -244,20 +266,67 @@ export default function App(): React.JSX.Element {
           Einstellungs-Symbol stehen blieb.
         */}
           <AppShell.Section grow className="leiste-liste" mt="md">
-            {sichtbar.map((m) => (
-              <NavIcon
-                key={m.id}
-                label={m.name}
-                breit={breit}
-                active={active === m.id}
-                badge={laufpunkte[m.id]}
-                bild={m.leistenbild}
-                onClick={() => openModule(m.id)}
-                fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
-              >
-                <m.icon size={22} />
-              </NavIcon>
-            ))}
+            {/*
+              Gruppen (03.10.2026, Entscheidung der Lehrkraft): Unterricht, Unterrichtsplanung,
+              Leistungsüberprüfungen, Verwaltung. Ein Klick auf die Gruppe klappt ihre Apps auf oder zu;
+              die Leiste merkt sich das. Die Gruppe der offenen App bleibt immer aufgeklappt.
+            */}
+            {MODUL_GRUPPEN.map((g) => {
+              // In der Reihenfolge der Gruppe (wie abgestimmt), nicht der Registrierung
+              const apps = g.apps.flatMap((id) => sichtbar.filter((m) => m.id === id))
+              if (!apps.length) return null
+              const hatAktive = apps.some((m) => m.id === active)
+              const offen = !zuGruppen.includes(g.id) || hatAktive
+              const Symbol = GRUPPEN_SYMBOL[g.id] ?? IconApps
+              return (
+                <div key={g.id} className="leiste-gruppe" data-gruppe={g.id} data-offen={offen}>
+                  <NavIcon
+                    label={g.name}
+                    breit={breit}
+                    active={hatAktive && !offen}
+                    badge={!offen && apps.some((m) => laufpunkte[m.id])}
+                    onClick={() => gruppeUmschalten(g.id, offen)}
+                  >
+                    <Symbol size={22} />
+                  </NavIcon>
+                  {offen && (
+                    <div className="leiste-gruppe-apps">
+                      {apps.map((m) => (
+                        <NavIcon
+                          key={m.id}
+                          label={m.name}
+                          breit={breit}
+                          active={active === m.id}
+                          badge={laufpunkte[m.id]}
+                          bild={m.leistenbild}
+                          onClick={() => openModule(m.id)}
+                          fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
+                        >
+                          <m.icon size={22} />
+                        </NavIcon>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {/* Apps ohne Gruppe (falls es künftig welche gibt) */}
+            {sichtbar
+              .filter((m) => !MODUL_GRUPPEN.some((g) => g.apps.includes(m.id)))
+              .map((m) => (
+                <NavIcon
+                  key={m.id}
+                  label={m.name}
+                  breit={breit}
+                  active={active === m.id}
+                  badge={laufpunkte[m.id]}
+                  bild={m.leistenbild}
+                  onClick={() => openModule(m.id)}
+                  fenster={eigeneFensterMoeglich() ? () => inEigenemFenster(m.id) : undefined}
+                >
+                  <m.icon size={22} />
+                </NavIcon>
+              ))}
           </AppShell.Section>
           <AppShell.Section>
             {!schmalerBildschirm && (
@@ -360,6 +429,14 @@ export default function App(): React.JSX.Element {
  * der farbigen Leiste weiß), die ruhenden Knöpfe bleiben ohne Fläche. Ohne Bild gilt das
  * Vektorsymbol wie bisher.
  */
+/** Symbole der Gruppen in der Leiste */
+const GRUPPEN_SYMBOL: Record<string, typeof IconApps> = {
+  unterricht: IconChalkboard,
+  planung: IconListDetails,
+  pruefung: IconClipboardCheck,
+  verwaltung: IconFolders
+}
+
 function NavIcon(props: {
   label: string
   active: boolean

@@ -84,13 +84,12 @@ pruefe(await page.getByText('Noch keine Sicherung', { exact: true }).isVisible()
 await page.waitForTimeout(400)
 await page.screenshot({ path: join(out, 'paket2-startseite.png') })
 
-// Kacheln per Tastatur
-const kachel = page.locator('.home-tile').first()
-await kachel.focus()
+// Programme per Tastatur – seit 03.10.2026 über die Leiste (die Startseite hat keine Programmkacheln mehr)
+const eintrag = page.locator('.app-leiste [aria-label="Arbeitsblatt"]').first()
+await eintrag.focus()
 await page.keyboard.press('Enter')
 await page.waitForTimeout(300)
-// Erste Kachel seit Paket 12: Arbeitsblatt (Reihenfolge der Leiste)
-pruefe((await aktiv(page, 'Arbeitsblatt')) === 'true', 'Eine Kachel lässt sich mit der Tastatur öffnen')
+pruefe((await aktiv(page, 'Arbeitsblatt')) === 'true', 'Ein Programm lässt sich mit der Tastatur aus der Leiste öffnen')
 await page.keyboard.press('Control+0')
 await page.getByText('Zuletzt bearbeitet').waitFor()
 

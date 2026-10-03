@@ -1,4 +1,6 @@
 import type { ComponentType } from 'react'
+import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
+import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
 import { programmSymbol, type ProgrammIcon } from '../shared/components/ProgrammSymbol'
 import ArbeitsblattModule from './arbeitsblatt/ArbeitsblattModule'
 import GrammatiktestModule from './grammatiktest/GrammatiktestModule'
@@ -128,6 +130,30 @@ export const modules: SchulModule[] = [
           faecher: SPRACH_FAECHER,
           component: OnlinetestModule
         },
+        // Laufende Reihen und freigegebene Blätter (03.10.2026): Überblick über den laufenden Unterricht
+        {
+          id: 'laufendereihen',
+          name: 'Laufende Reihen',
+          description: 'Aktive Unterrichtsreihen der eigenen Lerngruppen: Fortschritt, Handlungsbedarf, Haltepunkte – mit Korrektur-Eingang.',
+          icon: programmSymbol('laufendereihen', 'violet'),
+          color: 'violet',
+          illustration: illustration('laufendereihen'),
+          leistenbild: leistenbild('laufendereihen'),
+          faecher: 'alle' as const,
+          component: LaufendeReihenModule
+        },
+        {
+          id: 'freigaben',
+          name: 'Freigegebene Blätter',
+          description:
+            'Alle für Lernende freigegebenen Arbeitsblätter: wer begonnen und eingereicht hat, jedes ausgefüllte Blatt mit Feedback ansehen und sichern.',
+          icon: programmSymbol('freigaben', 'blue'),
+          color: 'blue',
+          illustration: illustration('freigaben'),
+          leistenbild: leistenbild('freigaben'),
+          faecher: 'alle' as const,
+          component: FreigegebeneBlaetterModule
+        },
         // Unterrichtsreihe (Etappe 6, 02.10.2026): Lernpfad für Lernende mit Freischalten – alle Fächer
         {
           id: 'unterrichtsreihe',
@@ -217,4 +243,21 @@ export const modules: SchulModule[] = [
         }
       ]
     : [])
+]
+
+/**
+ * Gruppen der Seitenleiste (03.10.2026, Entscheidung der Lehrkraft): vier Übermenüs; ein Klick
+ * klappt die Apps der Gruppe auf. Apps, die es gerade nicht gibt (Exe ohne Server, kein Admin),
+ * fallen weg; eine leere Gruppe erscheint nicht.
+ */
+export interface ModulGruppe {
+  id: string
+  name: string
+  apps: string[]
+}
+export const MODUL_GRUPPEN: ModulGruppe[] = [
+  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest'] },
+  { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
+  { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
+  { id: 'verwaltung', name: 'Verwaltung', apps: ['elternbrief', 'vokabelliste', 'verwaltung'] }
 ]

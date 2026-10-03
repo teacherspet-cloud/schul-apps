@@ -79,7 +79,7 @@ interface AufgabeInfo {
   zeichnen?: boolean
 }
 
-interface BlattDaten {
+export interface BlattDaten {
   id: string
   titel: string
   offen: boolean
@@ -225,7 +225,11 @@ export default function BlattAusfuellen({ id }: { id: string }): React.JSX.Eleme
   return <Ausfuellen d={d} />
 }
 
-function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
+/**
+ * Das Blatt ausfüllen bzw. ansehen. Mit `lehrkraft` (App „Freigegebene Blätter", 03.10.2026): nur
+ * ansehen, Rückweg in die App, PDF über den Lehrkraft-Weg des Servers.
+ */
+export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zurueck: () => void } }): React.JSX.Element {
   const [antworten, setAntworten] = useState<Record<string, string>>(d.antworten)
   const [tinte, setTinte] = useState<Record<string, string>>(d.tinte)
   const [gemessen, setGemessen] = useState<{ felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[]; hoehe: number } | null>(null)
@@ -439,7 +443,7 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
     try {
       const html = blattHtml()
       if (!html) throw new Error('Das Blatt ist noch nicht geladen.')
-      const r = await fetch('/s/api/blatt/pdf', {
+      const r = await fetch(lehrkraft ? '/server/blaetter/pdf' : '/s/api/blatt/pdf', {
         method: 'POST',
         headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
         body: JSON.stringify({ id: d.id, html })
@@ -465,9 +469,15 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
 
   return (
     <Stack data-blatt-ausfuellen>
-      <Button variant="subtle" component="a" href="/s/blaetter" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
-        Arbeitsblätter
-      </Button>
+      {lehrkraft ? (
+        <Button variant="subtle" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4} onClick={lehrkraft.zurueck}>
+          Zur Übersicht
+        </Button>
+      ) : (
+        <Button variant="subtle" component="a" href="/s/blaetter" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+          Arbeitsblätter
+        </Button>
+      )}
       <Group justify="space-between" align="end">
         <div>
           <Title order={3}>{d.titel}</Title>
@@ -526,7 +536,7 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
       {letzte?.bogen && (
         <Card withBorder padding="lg" data-blatt-bogen>
           <Title order={4} mb="xs">
-            Feedback zu deiner {letzte.nr}. Einreichung
+            Feedback zu{lehrkraft ? 'r' : ' deiner'} {letzte.nr}. Einreichung
           </Title>
           <BogenAnsicht b={letzte.bogen} />
           {offen && (

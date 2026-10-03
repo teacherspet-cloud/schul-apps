@@ -609,6 +609,46 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    /*
+     * Laufende Unterrichtsreihen (03.10.2026, Wunsch der Lehrkraft): je offene Zuweisung Reihe,
+     * Lerngruppe, Fach, Fortschritt der Lernenden und Handlungsbedarf – für die App „Laufende
+     * Reihen" und die Startseite.
+     */
+    if (req.method === 'GET' && teile[0] === 'laufend') {
+      const alle = db()
+        .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+        .all(ich.id) as unknown as ZuweisungZeile[]
+      const reihen = alle.flatMap((z) => {
+        const r = reiheVon(z.reihe_id)
+        if (!r) return []
+        const { bedarf, lernende } = bedarfFuer(r, z)
+        const fortschritte = lernende.map((l) => l.weg.fortschritt)
+        const schnitt = fortschritte.length ? fortschritte.reduce((a, b) => a + b, 0) / fortschritte.length : 0
+        const halteFrei = json_(z.halte_frei, [] as string[])
+        return [
+          {
+            zid: z.id,
+            reiheId: r.id,
+            titel: r.titel,
+            fach: r.fachLabel,
+            thema: r.oberthema,
+            gruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende',
+            erstellt: z.erstellt,
+            schritte: r.schritte.length,
+            lernende: lernende.length,
+            schnitt,
+            fertig: lernende.filter((l) => l.weg.fertig).length,
+            begonnen: fortschritte.filter((f) => f > 0).length,
+            // Verteilung für die kleine Grafik: 0–25, 25–50, 50–75, 75–100 %
+            verteilung: [0, 1, 2, 3].map((k) => fortschritte.filter((f) => Math.min(3, Math.floor(f * 4)) === k).length),
+            bedarf: bedarf.length,
+            bedarfArten: [...new Set(bedarf.map((b) => b.art))],
+            halte: r.schritte.filter((s) => s.halt?.art === 'freigabe' && !halteFrei.includes(s.id)).map((s) => s.titel)
+          }
+        ]
+      })
+      return (json(res, 200, { reihen }), true)
+    }
     // Korrektur-Eingang über alle Reihen (03.10.2026, Idee aus LearningView)
     if (req.method === 'GET' && teile[0] === 'eingang') {
       const alle = db()

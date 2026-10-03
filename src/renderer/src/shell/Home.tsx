@@ -1,11 +1,9 @@
-import { FachordnerKarte } from "../shared/components/Fachordner";
-import { EigenesFensterKnopf } from "../shared/eigenesFenster";
-import { nurPcNetz } from "../shared/plattform";
+import { Schnellzugriff, SchnellzugriffTitel } from './Schnellzugriff'
+import { aufServer, nurPcNetz } from "../shared/plattform";
 import {
   Alert,
   Badge,
   Button,
-  Card,
   CloseButton,
   Container,
   Group,
@@ -27,7 +25,6 @@ import { modules } from "../modules/registry";
 import { useAppSettings } from "../shared/settingsStore";
 import {
   openDocument,
-  openModule,
   openSettings,
   openThemen,
 } from "../shared/navigation";
@@ -41,9 +38,7 @@ import {
 } from "./materialien";
 import { FachOrdnerSymbol, FachPunkt } from "../shared/components/FachFarbe";
 import { abgleichen, ladeThemen, useThemen } from "../shared/themenbereiche";
-import { AB_MATERIALIEN } from "../shared/themenVorschlag";
 import { nachfahrenVon, pfadVon, type Themenbereich } from "@shared/themen";
-import { useSichtbareProgramme } from "./programme";
 import SchulpaketKnoepfe from "./Schulpaket";
 
 /** So viele Einträge zeigt „Zuletzt bearbeitet" */
@@ -88,8 +83,6 @@ export default function Home(): React.JSX.Element {
   const [materialien, setMaterialien] = useState<Material[] | null>(null);
   const [ohneKi, setOhneKi] = useState(false);
   const [suchtext, setSuchtext] = useState("");
-  // Kacheln nur für die Programme zu den eigenen Fächern (Paket 12); „Zuletzt bearbeitet" und die Suche zeigen weiter alles
-  const programme = useSichtbareProgramme();
 
   useEffect(() => {
     let weg = false;
@@ -145,23 +138,6 @@ export default function Home(): React.JSX.Element {
       ids.has(themen.zuordnungen[`${m.moduleId}:${m.id}`]?.bereichId ?? "")
     ).length;
   };
-  /*
-   * Abschnitt „Themenbereiche": je Fach ein Knopf. Nur, wenn es Bereiche gibt oder so viel
-   * Material, dass die Vorschläge greifen – vorher wäre er nur Lärm.
-   */
-  const themenFaecher = useMemo(() => {
-    const map = new Map<string, number>();
-    // Nur die obersten Bereiche – die Unterrichtseinheiten; Unterbereiche zählen nicht extra
-    for (const b of themen.bereiche)
-      if (!b.elternId) map.set(b.fachId, (map.get(b.fachId) ?? 0) + 1);
-    return [...map.entries()].sort((a, b) =>
-      fachAnzeige(a[0]).localeCompare(fachAnzeige(b[0]), "de")
-    );
-  }, [themen]);
-  const themenZeigen =
-    themenFaecher.length > 0 ||
-    (materialien ?? []).filter((m) => m.moduleId !== "vokabelliste").length >=
-      AB_MATERIALIEN;
 
   /*
    * Erinnerung ans Sichern: nur, wenn es überhaupt Material gibt, und erst nach einem Monat.
@@ -246,8 +222,13 @@ export default function Home(): React.JSX.Element {
         </Stack>
       )}
 
-      {/* Server (02.10.2026): gemeinsame Fachordner */}
-      <FachordnerKarte />
+      {/* Server (03.10.2026): das Wichtigste auf einen Blick – Reihen, Tests, Freigaben, Termine */}
+      {aufServer() && (
+        <>
+          <SchnellzugriffTitel />
+          <Schnellzugriff />
+        </>
+      )}
 
       {!imNetz() && (
         <Group justify="flex-end" mb="xs">
@@ -329,94 +310,7 @@ export default function Home(): React.JSX.Element {
         </Stack>
       )}
 
-      {themenZeigen && !suchtAktiv && (
-        <Stack gap="sm" mb={40} data-home-themen>
-          <Group justify="space-between" align="end">
-            <Title order={3}>Themenbereiche</Title>
-            <Button
-              size="compact-sm"
-              variant="subtle"
-              onClick={() => openThemen()}
-            >
-              Alle Themenbereiche
-            </Button>
-          </Group>
-          {themenFaecher.length ? (
-            <Group gap="xs">
-              {themenFaecher.map(([fachId, n]) => (
-                <Button
-                  key={fachId}
-                  variant="default"
-                  leftSection={<FachPunkt fach={fachId} />}
-                  onClick={() => openThemen(fachId)}
-                >
-                  {fachAnzeige(fachId)} ·{" "}
-                  {n === 1 ? "1 Bereich" : `${n} Bereiche`}
-                </Button>
-              ))}
-            </Group>
-          ) : (
-            <Text size="sm" c="dimmed">
-              Materialien aller Programme lassen sich je Fach in Themenbereiche
-              ordnen – etwa „Ökologie“ mit Arbeitsblättern, Kontrollen und
-              Tests. Die Bibliotheken schlagen passende Bereiche vor.
-            </Text>
-          )}
-        </Stack>
-      )}
 
-      <Title order={3} mb="sm">
-        Programme
-      </Title>
-      <SimpleGrid cols={{ base: 2, md: 3 }} spacing="lg">
-        {programme.map((m) => (
-          // Als Knopf: mit Tab erreichbar, mit Enter oder Leertaste zu öffnen.
-          // Daneben (nicht darin – kein Knopf im Knopf) „In eigenem Fenster öffnen"
-          <div key={m.id} style={{ position: "relative" }}>
-            <div style={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
-              <EigenesFensterKnopf id={m.id} name={m.name} />
-            </div>
-            <Card
-              w="100%"
-              h="100%"
-              component="button"
-              type="button"
-              withBorder
-              padding="xl"
-              className="home-tile"
-              onClick={() => openModule(m.id)}
-            >
-              {/* Illustration, sobald eine vorliegt (registry.ts); sonst das Vektorsymbol in gleicher Größe */}
-              {m.illustration ? (
-                <img
-                  src={m.illustration}
-                  className="home-illustration"
-                  width={96}
-                  height={96}
-                  alt=""
-                  draggable={false}
-                />
-              ) : (
-                <ThemeIcon
-                  size={96}
-                  radius="lg"
-                  variant="light"
-                  color={m.color}
-                  className="home-illustration"
-                >
-                  <m.icon size={56} />
-                </ThemeIcon>
-              )}
-              <Text fw={700} size="lg">
-                {m.name}
-              </Text>
-              <Text size="sm" c="dimmed" mt={4}>
-                {m.description}
-              </Text>
-            </Card>
-          </div>
-        ))}
-      </SimpleGrid>
     </Container>
   );
 }
