@@ -66,7 +66,10 @@ export function blattRueckmeldung(ws: Worksheet, sheet: Sheet, titel: string): R
       schoolTypeId: ws.meta.schoolTypeId,
       schoolTypeName: ws.meta.schoolTypeName,
       anrede: STANDARD_ANREDE,
-      schwerpunkt: ''
+      schwerpunkt: '',
+      // Digitales Blatt: Fazit je Aufgabe, Randkommentare als Markierungen, Überarbeitungsauftrag (03.10.2026)
+      digitalesBlatt: true,
+      formen: ['schriftlich', 'tipps', 'rand', 'ueberarbeitung']
     },
     grundlage: {
       art: 'frei',

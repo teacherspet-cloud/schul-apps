@@ -18,6 +18,7 @@
  *  Lernende:   GET /s/api/blaetter · GET /s/api/blatt?id= · POST /s/api/blatt/speichern|aufgabe|abgeben
  *  Gäste:      GET /s/api/blatt/zugang?code= · POST /s/api/blatt/gast   (Seite /s/w/<CODE>)
  */
+import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { randomBytes } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer } from './kontext'
@@ -27,7 +28,7 @@ import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { PULS_MS } from '../main/services/lanServer'
-import { seitenMitTinte } from './druck'
+import { pdfOhneSkripte, seitenMitTinte } from './druck'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
 import { ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { aufgabenFeedbackAnfrage, aufgabenFeedbackAus, blattAbgabeText, type BlattAufgabe, type BlattFeld } from '../shared/blattFreigabe'
@@ -165,10 +166,32 @@ function neuerCode(): string {
 function bereinigeAntworten(roh: unknown): Record<string, string> {
   const aus: Record<string, string> = {}
   if (!roh || typeof roh !== 'object') return aus
-  for (const [k, v] of Object.entries(roh as Record<string, unknown>).slice(0, 1000))
+  for (const [k, v] of Object.entries(roh as Record<string, unknown>).slice(0, 1002))
     if (/^f\d{1,3}$/.test(k) && typeof v === 'string') aus[k] = v.slice(0, 4000)
+  // Kästchen/Linien/Punkte der Lernenden und zusätzliche Schreiblinien (digitale Fassung, 03.10.2026)
+  const r = roh as Record<string, unknown>
+  if (typeof r[OBJEKTE_SCHLUESSEL] === 'string') aus[OBJEKTE_SCHLUESSEL] = JSON.stringify(objekteAus(r[OBJEKTE_SCHLUESSEL]))
+  if (typeof r.linien === 'string') aus.linien = JSON.stringify(linienAus(r.linien))
   return aus
 }
+
+/** Zusätzliche Schreiblinien: { Ankerlinie: Anzahl } */
+function linienAus(roh: unknown): Record<string, number> {
+  const aus: Record<string, number> = {}
+  try {
+    const o = JSON.parse(String(roh)) as Record<string, unknown>
+    for (const [k, v] of Object.entries(o).slice(0, 300)) if (/^\d{1,5}$/.test(k) && Number(v) > 0) aus[k] = Math.min(60, Math.round(Number(v)))
+  } catch {
+    // ungültig – keine Zusatzlinien
+  }
+  return aus
+}
+
+/** Was außer den Stiftbildern auf die Seitenbilder gehört */
+const blattExtra = (antworten: Record<string, string>): { objekte: BlattObjekt[]; zusatz: Record<string, number> } => ({
+  objekte: objekteAus(antworten[OBJEKTE_SCHLUESSEL] ?? '[]'),
+  zusatz: linienAus(antworten.linien ?? '{}')
+})
 
 /** Stift-Seitenbilder: je Seite ein PNG (höchstens 16 Seiten, je 900 KB) */
 function bereinigeTinte(roh: unknown): Record<string, string> {
@@ -272,6 +295,19 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         )
       }
       if (req.method !== 'POST') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
+      // Ausgefülltes Blatt als PDF (speichern/drucken, 03.10.2026) – die App setzt es zusammen, der Server druckt ohne Skripte
+      if (url.pathname === '/s/api/blatt/pdf') {
+        const html = String(((await k.koerper()) as Record<string, unknown>).html ?? '')
+        if (!html.includes('ws-page') || html.length > 30 * 1024 * 1024) return (json(res, 400, { fehler: 'Das Blatt konnte nicht vorbereitet werden.' }), true)
+        try {
+          const pdf = await pdfOhneSkripte(html)
+          res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'no-store', 'content-length': pdf.byteLength })
+          res.end(Buffer.from(pdf))
+        } catch (e) {
+          json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
+        }
+        return true
+      }
       if (z.status !== 'offen') return (json(res, 409, { fehler: 'Dieses Arbeitsblatt ist abgeschlossen.' }), true)
       const k0 = (await k.koerper()) as Record<string, unknown>
       const speichern = (
@@ -323,7 +359,10 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           return (json(res, 409, { fehler: `Zu dieser Aufgabe gab es schon ${e.aufgabenRunden}× Feedback. Reiche das Blatt ein, wenn du fertig bist.` }), true)
         const seiten = [...new Set(felder.map((f) => f.seite))]
         const mitTinte = Object.fromEntries(seiten.filter((s) => tinte[String(s)]).map((s) => [String(s), tinte[String(s)]]))
-        const bilder = e.stift ? await seitenMitTinte(z.html, mitTinte).catch(() => [] as string[]) : []
+        const ex = blattExtra(antworten)
+        const bilder = e.stift
+          ? await seitenMitTinte(z.html, mitTinte, { zusatz: ex.zusatz, objekte: ex.objekte.filter((o) => seiten.includes(o.s)) }).catch(() => [] as string[])
+          : []
         // Eigene und fremde Namen im Text durch Kürzel ersetzen (wie beim Bogen); der Namensfilter greift zusätzlich
         const text = ohneNamen({ id: 'a', kuerzel: 'S1', name: ich.name, dateiname: '', text: blattAbgabeText([aufgabe], felder, antworten), bilder: [] }).text
         if (!text.trim() && !bilder.length) return (json(res, 400, { fehler: 'Bitte zuerst etwas eintragen.' }), true)
@@ -351,7 +390,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         res.on('close', () => clearInterval(puls))
         try {
           // Stift-Einträge über dem Blatt als Seitenbilder (sonst sieht die KI nur Striche ohne Zusammenhang)
-          const bilder = e.stift ? await seitenMitTinte(z.html, tinte).catch(() => [] as string[]) : []
+          const bilder = e.stift ? await seitenMitTinte(z.html, tinte, blattExtra(antworten)).catch(() => [] as string[]) : []
           const r = await blattFassung(z.rueckmeldung_id, nutzerNachId(ich.id)!, text, bilder, e.feedback, aufruf)
           res.end(JSON.stringify({ ok: !r.fehler, fehler: r.fehler, bogen: r.bogen, nr: r.nr }))
         } catch (err) {

@@ -7,6 +7,8 @@
  *
  * Drucken heißt im Browser: PDF im neuen Tab (renderer/shared/netzZugang.ts `druckeImBrowser`).
  */
+import { digitalisieren, zusatzLinien } from '../shared/blattDigital'
+import { objekteSvg, type BlattObjekt } from '../shared/blattObjekte'
 import type { Browser } from 'playwright-core'
 import type { Druckmaschine } from '../main/kanaele'
 
@@ -45,10 +47,10 @@ function leerlaufStarten(): void {
   leerlauf.unref?.()
 }
 
-async function mitSeite<T>(html: string, fn: (seite: import('playwright-core').Page) => Promise<T>): Promise<T> {
+async function mitSeite<T>(html: string, fn: (seite: import('playwright-core').Page) => Promise<T>, skripte = true): Promise<T> {
   return nacheinander(async () => {
     const b = await holeBrowser()
-    const kontext = await b.newContext({ javaScriptEnabled: true })
+    const kontext = await b.newContext({ javaScriptEnabled: skripte })
     try {
       const seite = await kontext.newPage()
       // Kein Zugriff aus dem Druck heraus ins Netz – alles Nötige steckt im HTML (data:-Adressen)
@@ -64,6 +66,12 @@ async function mitSeite<T>(html: string, fn: (seite: import('playwright-core').P
 }
 
 const PDF = { format: 'A4' as const, printBackground: true, preferCSSPageSize: true }
+
+/**
+ * PDF aus HTML, das von den Lernenden kommt (ausgefülltes Arbeitsblatt speichern/drucken,
+ * 03.10.2026): ohne Skripte und ohne Netz – nur Darstellung.
+ */
+export const pdfOhneSkripte = (html: string): Promise<Uint8Array> => mitSeite(html, async (s) => new Uint8Array(await s.pdf(PDF)), false)
 
 export const serverDruck: Druckmaschine = {
   pdf: (html) => mitSeite(html, async (s) => new Uint8Array(await s.pdf(PDF))),
@@ -90,14 +98,36 @@ export async function druckBeenden(): Promise<void> {
  * Stift-Ebene allein sagt der KI wenig – erst über dem Blatt sieht sie, was wohin geschrieben ist.
  * Nur Seiten mit Tinte; JPEG, damit die Anfrage klein bleibt.
  */
-export async function seitenMitTinte(html: string, tinte: Record<string, string>): Promise<string[]> {
-  const seiten = Object.keys(tinte)
-    .map(Number)
+export async function seitenMitTinte(
+  html: string,
+  tinte: Record<string, string>,
+  extra: { objekte?: BlattObjekt[]; zusatz?: Record<string, number>; seiten?: number[] } = {}
+): Promise<string[]> {
+  const objekte = extra.objekte ?? []
+  const seiten = [...new Set([...Object.keys(tinte).map(Number), ...objekte.map((o) => o.s), ...(extra.seiten ?? [])])]
     .filter((n) => Number.isInteger(n) && n >= 0)
     .sort((a, b) => a - b)
   if (!seiten.length) return []
   return mitSeite(html, async (s) => {
     await s.setViewportSize({ width: 900, height: 1300 })
+    // Dieselbe digitale Fassung wie bei den Lernenden (blattDigital.ts) – sonst lägen Stift und Kästchen daneben
+    await s.evaluate(`(${digitalisieren.toString()})(document)`)
+    if (extra.zusatz && Object.keys(extra.zusatz).length) await s.evaluate(`(${zusatzLinien.toString()})(document, ${JSON.stringify(extra.zusatz)})`)
+    // Kästchen, Linien und Punkte der Lernenden je Seite
+    const svg: Record<string, string> = {}
+    for (const n of seiten) {
+      const eigene = objekte.filter((o) => o.s === n)
+      if (eigene.length) svg[String(n)] = objekteSvg(eigene, 794, 1)
+    }
+    await s.evaluate((x) => {
+      const alle = [...document.querySelectorAll<HTMLElement>('.ws-page')]
+      for (const [k, inhalt] of Object.entries(x)) {
+        const seite = alle[Number(k)]
+        if (!seite) continue
+        if (getComputedStyle(seite).position === 'static') seite.style.position = 'relative'
+        seite.insertAdjacentHTML('beforeend', inhalt)
+      }
+    }, svg)
     await s.evaluate((t) => {
       const alle = [...document.querySelectorAll<HTMLElement>('.ws-page')]
       for (const [k, url] of Object.entries(t)) {

@@ -23,33 +23,14 @@ import { LANGUAGES, type TestDocument } from '../vokabeltest/model/types'
 import { fachIdVon } from '../../shared/fachfarben'
 import type { Korrekturzeichen } from '../../shared/korrekturzeichen'
 import { newId } from '../vokabeltest/model/random'
-import {
-  EINSTUFUNGEN,
-  einstufungVon,
-  gesamtEinstufen,
-  hatForm,
-  kriterienEinstufen,
-  tabellenSumme,
-  vorschlag,
-  type SkalenKontext
-} from './art'
+import { EINSTUFUNGEN, einstufungVon, gesamtEinstufen, hatForm, kriterienEinstufen, tabellenSumme, vorschlag, type SkalenKontext } from './art'
 import { klemme } from './korrekturrand'
 import { kiLandesregeln } from './laenderRegeln'
 import { ausgleichAnweisung, maxSchritte, ohneRechtschreibung } from './nachteilsausgleich'
 import { tabelleText } from './tabelle'
 import { begruendungMitDeckel, oberstufeVon, sprachRegeln, tabelleDeckeln, teileDeckeln, teileDeckelSatz, umfangBefund } from './sprachmassstab'
 import { klartext, ohneKiTest } from './abgabeTrennen'
-import type {
-  Abgabe,
-  Bogen,
-  BogenKriterium,
-  Einschaetzung,
-  Einstufungswert,
-  Grundlage,
-  GrundlageArt,
-  RandKommentar,
-  Rueckmeldung
-} from './model/types'
+import type { Abgabe, Bogen, BogenKriterium, Einschaetzung, Einstufungswert, Grundlage, GrundlageArt, RandKommentar, Rueckmeldung } from './model/types'
 
 // ---------- Grundlage aus gespeichertem Material ----------
 
@@ -291,7 +272,9 @@ export function teilRegeln(r: Rueckmeldung): string[] {
     )
   // Oberstufe (KMK 2012, IQB, NRW, BE/BB, SH): Ist Inhalt ODER Sprache ungenügend, höchstens 3 Notenpunkte für diesen Teil
   if (getrennteTeile.length && r.meta.grade >= 11)
-    regeln.push('- Oberstufe: Ist bei einem Schreib-/Sprachmittlungsteil der Inhalt ODER die Sprache ungenügend (unter 20 %), erreicht dieser Teil insgesamt höchstens 38 % (KMK: höchstens 3 Notenpunkte; die App deckelt).')
+    regeln.push(
+      '- Oberstufe: Ist bei einem Schreib-/Sprachmittlungsteil der Inhalt ODER die Sprache ungenügend (unter 20 %), erreicht dieser Teil insgesamt höchstens 38 % (KMK: höchstens 3 Notenpunkte; die App deckelt).'
+    )
   if (mitTeilen(r))
     regeln.push(
       `- Bewerte JEDEN Teil (Kennung in eckigen Klammern): ${getrennteTeile.length ? 'bei Schreiben/Sprachmittlung Erfüllungsgrad von Inhalt und Sprache getrennt, ' : ''}bei anderen Teilen den Erfüllungsgrad des Teils. Die App verrechnet daraus die Gesamtleistung.`
@@ -316,7 +299,8 @@ export function bogenSchema(r: Rueckmeldung, a: Abgabe, ctx: BogenKontext = OHNE
   const felder: Record<string, Schema> = {}
   const schriftlich = hatForm(m, 'schriftlich')
   if (schriftlich) felder.staerken = arr(str('Was schon gelingt – konkret, mit Bezug auf eine Stelle der Arbeit, ein Satz'))
-  if (hatForm(m, 'tipps')) felder.schritte = arr(str('Nächster Schritt als Handlung („Achte beim nächsten Mal darauf, …"), ein Satz, mit Beispiel aus der Arbeit'))
+  if (hatForm(m, 'tipps'))
+    felder.schritte = arr(str('Nächster Schritt als Handlung („Achte beim nächsten Mal darauf, …"), ein Satz, mit Beispiel aus der Arbeit'))
   if (schriftlich || kriterienEinstufen(m))
     felder.kriterien = arr(
       obj({
@@ -369,6 +353,15 @@ export function bogenSchema(r: Rueckmeldung, a: Abgabe, ctx: BogenKontext = OHNE
       })
     )
   }
+  if (m.digitalesBlatt)
+    felder.aufgaben = arr(
+      obj({
+        nr: int('Nummer der Aufgabe wie auf dem Blatt'),
+        gelungen: str('Was inhaltlich gelungen ist – konkret, mit kurzem Zitat; leer, wenn nichts bearbeitet ist'),
+        fehlt: str('Was fehlt oder nicht stimmt – sachlich genau benannt'),
+        schritt: str('Ein nächster Schritt mit Beispiel oder Satzanfang, ohne die Lösung vorwegzunehmen')
+      })
+    )
   if (hatForm(m, 'ueberarbeitung'))
     felder.ueberarbeitung = obj({
       zitat: str('Die Stelle, die überarbeitet werden soll, wörtlich (ein Satz oder Absatzanfang)'),
@@ -380,9 +373,24 @@ export function bogenSchema(r: Rueckmeldung, a: Abgabe, ctx: BogenKontext = OHNE
       beispiel: str('Ein Beispiel aus der Arbeit')
     })
   )
-  if (m.elternfassung) felder.eltern = str('Fassung für die Eltern: 3–5 Sätze in einfacher Sprache, Anrede „Sie“, ohne Note – was gelingt, woran gearbeitet wird, wie zu Hause geholfen werden kann')
+  if (m.elternfassung)
+    felder.eltern = str(
+      'Fassung für die Eltern: 3–5 Sätze in einfacher Sprache, Anrede „Sie“, ohne Note – was gelingt, woran gearbeitet wird, wie zu Hause geholfen werden kann'
+    )
   return obj(felder)
 }
+
+/**
+ * Digitales Arbeitsblatt (03.10.2026, Befund der Lehrkraft: Feedback „sehr rudimentär", z. B. „Deine
+ * Antwort ist als zusammenhängender Text formuliert …"): Aufgabe für Aufgabe, Inhalt vor Form,
+ * konkrete nächste Schritte mit Beispiel; Randkommentare mit wörtlichen Zitaten für die Markierung.
+ */
+export const BLATT_REGELN = [
+  '- ARBEITSBLATT, AUFGABE FÜR AUFGABE: Für JEDE Aufgabe ein Fazit (Feld „aufgaben"): „gelungen" = was inhaltlich stimmt, konkret mit kurzem Zitat; „fehlt" = was nach Aufgabenstellung und Erwartungshorizont fehlt oder nicht stimmt, sachlich genau benannt (z. B. „Die Ursache X fehlt" statt „Ergänze mehr"); „schritt" = EIN machbarer nächster Schritt mit Beispiel oder Satzanfang, der zeigt, wie es geht – ohne die Musterlösung vorwegzunehmen. Unbearbeitete Aufgaben: gelungen leer, fehlt „noch nicht bearbeitet", schritt = wie man anfängt.',
+  '- INHALT VOR FORM: Beurteile zuerst, ob der Operator erfüllt ist („nenne" = Stichpunkte genügen, „beschreibe", „erkläre", „beurteile" = Zusammenhänge und Begründungen). Bemängle die Form (Fließtext, Stichpunkte, Tabelle) NUR, wenn die Aufgabe sie ausdrücklich verlangt.',
+  '- Keine Allgemeinplätze („Achte auf Genauigkeit", „Schau noch einmal in die Quelle") ohne zu sagen, WORAUF genau; jede Aussage bezieht sich auf eine Stelle der Antwort oder des Materials.',
+  '- Randkommentare: neben den Sprachfehlern zu jeder inhaltlich bearbeiteten Aufgabe mindestens einen Kommentar an der passenden Stelle – Lob (art „lob") für Gelungenes, Hinweis (art „hinweis") für Unstimmiges oder Fehlendes; Zitat wörtlich aus der Antwort, 1–8 Wörter.'
+]
 
 export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: BogenKontext = OHNE_KONTEXT): StructuredRequest {
   const m = r.meta
@@ -410,6 +418,7 @@ export function bogenAnfrage(r: Rueckmeldung, a: Abgabe, system: string, ctx: Bo
       ? '- Überarbeitungsauftrag: EINE Stelle, deren Überarbeitung am meisten bringt, mit konkretem Auftrag – als korrekt gebildeter Imperativ, trennbare Verben mit der Vorsilbe am Satzende („Formuliere den Satz um", „Fassen Sie den Absatz zusammen", nie „Zusammenfassen Sie").'
       : '',
     '- Fehlerschwerpunkte: 1–4 wiederkehrende Fehlerarten der Arbeit (für die Übersicht der Lerngruppe); keine, wenn es keine gibt.',
+    ...(m.digitalesBlatt ? BLATT_REGELN : []),
     ...sprachRegeln(r, a, art !== 'keine'),
     ...abgabeRegeln(r, a)
   ]
@@ -555,8 +564,8 @@ function spracheAnwenden(bogen: Bogen, r: Rueckmeldung, a: Abgabe, art: ReturnTy
   if (art === 'keine') return
   const grund = `Abgabe auf Deutsch statt auf ${r.meta.subjectLabel} – Aufgabe nicht erfüllt (von der App auf 0 % gesetzt).`
   if (bogen.teile && r.grundlage.teile) {
-    bogen.teile = r.grundlage.teile.map(
-      (t): TeilWertung => (getrennt(t) ? { teilId: t.id, inhalt: 0, sprache: 0, begruendung: grund } : { teilId: t.id, anteil: 0, begruendung: grund })
+    bogen.teile = r.grundlage.teile.map((t): TeilWertung =>
+      getrennt(t) ? { teilId: t.id, inhalt: 0, sprache: 0, begruendung: grund } : { teilId: t.id, anteil: 0, begruendung: grund }
     )
   }
   if (bogen.tabelle && r.tabelle) {
@@ -646,6 +655,11 @@ export function bogenAus(daten: unknown, r?: Rueckmeldung, a?: Abgabe, ctx: Boge
       const g = (d.gesamt ?? {}) as Record<string, unknown>
       bogen.gesamt = vorschlag(art, Number(g.anteil), skala, text(g.begruendung) || undefined)
     }
+    if (m.digitalesBlatt)
+      bogen.aufgaben = objekte(d.aufgaben)
+        .map((x) => ({ nr: Math.round(Number(x.nr)) || 0, gelungen: text(x.gelungen), fehlt: text(x.fehlt), schritt: text(x.schritt) }))
+        .filter((x) => x.nr > 0 && (x.gelungen || x.fehlt || x.schritt))
+        .slice(0, 40)
     if (hatForm(m, 'rand') || scanKommentare(r, a)) {
       const erlaubt = new Set(ctx.zeichen.map((z) => z.zeichen))
       const scan = scanKommentare(r, a)

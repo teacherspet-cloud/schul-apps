@@ -29,8 +29,12 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowBackUp, IconArrowLeft, IconEraser, IconKeyboard, IconMessageCircle, IconPencil, IconSend } from '@tabler/icons-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { IconArrowBackUp, IconArrowLeft, IconDownload, IconMessageCircle, IconPrinter, IconSend } from '@tabler/icons-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { digitalisieren, zusatzLinien } from '@shared/blattDigital'
+import { objekteAus, objekteSvg, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
+import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
+import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import type { BlattFeldArt } from '@shared/blattFreigabe'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
@@ -53,6 +57,8 @@ interface Feld {
   abstand?: number
   /** Beschriftung für die Listenansicht (Text der Zeile/Option) */
   text?: string
+  /** zeilen: Nummer der letzten Originallinie (Anker für zusätzliche Linien, blattDigital.ts) */
+  anker?: number
 }
 
 interface Seite {
@@ -69,6 +75,8 @@ interface AufgabeInfo {
   x: number
   y: number
   seite: number
+  /** Aufgabe mit Diagramm, Zeitleiste, Skizze o. Ä. – wird auf dem Blatt bearbeitet */
+  zeichnen?: boolean
 }
 
 interface BlattDaten {
@@ -82,10 +90,20 @@ interface BlattDaten {
   einstellungen: { feedback: boolean; aufgabenFeedback: boolean; aufgabenRunden: number; stift: boolean }
   antworten: Record<string, string>
   tinte: Record<string, string>
-  aufgabenFeedback: Record<string, { einschaetzung: string; text: string; zeit: number }[]>
+  aufgabenFeedback: Record<string, AufgabenFb[]>
   fassungen: { nr: number; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
   /** Lösungsblatt – nur nach dem ersten Einreichen (03.10.2026) */
   loesung?: string
+}
+
+type AufgabenFb = {
+  einschaetzung: string
+  text: string
+  zeit: number
+  gelungen?: string
+  fehlt?: string
+  schritt?: string
+  markierungen?: { zitat: string; art: 'lob' | 'fehler' | 'hinweis'; text: string }[]
 }
 
 // Wie das ausfüllbare PDF, dazu die leeren Zellen von Ausfülltabellen
@@ -106,7 +124,13 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
         nr++
         const kopf = (task.querySelector('.ws-task-num') ?? task).getBoundingClientRect()
         const anweisung = (task.querySelector('.ws-task-instruction') as HTMLElement | null)?.innerText ?? ''
-        aufgaben.push({ nr, anweisung: anweisung.trim(), x: kopf.left, y: kopf.top, seite })
+        // Zeichnen, Zuordnen an Bildern: Diagramm, Raster, Skizzenfläche, Bild oder Grafik in der Aufgabe
+        const zeichnen = Boolean(
+          [...task.querySelectorAll('.ws-diagram, .ws-grid, .ws-space, .ws-workspace, .ws-protokoll-skizze, .ws-muster-skizze, svg, img')].find(
+            (x) => !x.closest('.ws-task-head, .ws-social, .ws-task-instruction')
+          )
+        )
+        aufgaben.push({ nr, anweisung: anweisung.trim(), x: kopf.left, y: kopf.top, seite, ...(zeichnen ? { zeichnen } : {}) })
       }
     }
     return nr
@@ -136,7 +160,9 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
               ? 'text'
               : 'zeilen'
       const zeile = el.closest('li, tr, .ws-mc-option, .ws-tf-row, p') as HTMLElement | null
+      const li = el.getAttribute('data-li')
       roh.push({
+        ...(li !== null ? { anker: Number(li) } : {}),
         nr: n,
         art,
         seite: i,
@@ -170,6 +196,7 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
         vorher.zeilen = n + 1
         vorher.abstand = abstand
         vorher.h = f.y + f.h - vorher.y
+        if (f.anker !== undefined) vorher.anker = f.anker
         continue
       }
     }
@@ -178,8 +205,6 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
   felder.forEach((f, i) => (f.id = `f${i}`))
   return { felder, seiten, aufgaben }
 }
-
-type Werkzeug = 'tastatur' | 'stift' | 'radierer'
 
 export default function BlattAusfuellen({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<BlattDaten | null | undefined>(undefined)
@@ -207,6 +232,8 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
   const [breite, setBreite] = useState(BREITE)
   const [ansicht, setAnsicht] = useState<'blatt' | 'liste'>(() => (window.innerWidth < 640 ? 'liste' : 'blatt'))
   const [werkzeug, setWerkzeug] = useState<Werkzeug>('tastatur')
+  const [stiftFarbe, setStiftFarbe] = useState(STIFT_FARBEN[0])
+  const [markerFarbe, setMarkerFarbe] = useState(MARKER_FARBEN[0])
   const [fassungen, setFassungen] = useState(d.fassungen)
   const [genutzt, setGenutzt] = useState(d.genutzt)
   const [aufgabenFb, setAufgabenFb] = useState(d.aufgabenFeedback)
@@ -220,6 +247,19 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
   stand.current.tinte = tinte
   const offen = d.offen && genutzt < d.runden
 
+  // Kästchen, Linien, Punkte (blattWerkzeuge.tsx) und zusätzliche Schreiblinien (blattDigital.ts) stehen bei den Antworten
+  const objekte = useMemo(() => objekteAus(antworten[OBJEKTE_SCHLUESSEL] ?? '[]'), [antworten])
+  const setObjekte = (neu: BlattObjekt[]): void => setze(OBJEKTE_SCHLUESSEL, JSON.stringify(neu))
+  const zusatz = useRef<Record<string, number>>(
+    (() => {
+      try {
+        return JSON.parse(d.antworten.linien ?? '{}') as Record<string, number>
+      } catch {
+        return {}
+      }
+    })()
+  )
+
   // Breite des Geräts → Maßstab
   useEffect(() => {
     const el = rahmen.current
@@ -229,19 +269,51 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
     setBreite(el.clientWidth)
     return () => ro.disconnect()
   }, [ansicht])
-  const massstab = Math.min(1.25, breite / BREITE)
+  /*
+   * Randkommentare (03.10.2026): aus dem letzten Bogen und dem jeweils letzten Feedback je Aufgabe,
+   * fortlaufend nummeriert. Auf breiten Bildschirmen in einer Spalte neben dem Blatt.
+   */
+  const letzteFassung = [...fassungen].reverse().find((f) => f.bogen)
+  const anmerkungen = useMemo((): Anmerkung[] => {
+    const roh = [...(letzteFassung?.bogen?.rand ?? []), ...Object.values(aufgabenFb).flatMap((l) => l.at(-1)?.markierungen ?? [])]
+    return roh.map((a, i) => {
+      const zeichen = 'zeichen' in a ? String(a.zeichen ?? '') : ''
+      return { nr: i + 1, zitat: a.zitat, art: a.art, text: a.text, ...(zeichen ? { zeichen } : {}) }
+    })
+  }, [letzteFassung, aufgabenFb])
+  const SPALTE = 250
+  const spalte = ansicht === 'blatt' && anmerkungen.length > 0 && breite >= BREITE * 0.95 + SPALTE
+  const massstab = Math.min(1.25, (breite - (spalte ? SPALTE : 0)) / BREITE)
 
+  const messe = useCallback((): void => {
+    const doc = iframe.current?.contentDocument
+    if (!doc) return
+    const hoehe = doc.documentElement.scrollHeight
+    if (iframe.current) iframe.current.style.height = `${hoehe}px`
+    setGemessen({ ...messen(doc), hoehe })
+  }, [])
   const geladen = useCallback(() => {
     const doc = iframe.current?.contentDocument
     if (!doc) return
-    const messe = (): void => {
-      const hoehe = doc.documentElement.scrollHeight
-      if (iframe.current) iframe.current.style.height = `${hoehe}px`
-      setGemessen({ ...messen(doc), hoehe })
-    }
+    // Digitale Fassung: Seiten wachsen mit, Fortsetzungen hängen an der Aufgabe (blattDigital.ts)
+    digitalisieren(doc)
+    zusatzLinien(doc, zusatz.current)
     // Schriften und Bilder abwarten, dann messen
     void (doc.fonts?.ready ?? Promise.resolve()).then(() => setTimeout(messe, 150))
-  }, [])
+  }, [messe])
+  /** Ein Schreibbereich braucht mehr Linien: anhängen (auch auf dem Server), neu messen */
+  const wachsen = useCallback(
+    (anker: number, mehr: number): void => {
+      const doc = iframe.current?.contentDocument
+      if (!doc || mehr <= 0) return
+      const k = String(anker)
+      zusatz.current = { ...zusatz.current, [k]: Math.min(60, (zusatz.current[k] ?? 0) + mehr) }
+      zusatzLinien(doc, zusatz.current)
+      setAntworten((a) => ({ ...a, linien: JSON.stringify(zusatz.current) }))
+      messe()
+    },
+    [messe]
+  )
 
   // Zwischenstände sichern (2 s nach der letzten Änderung)
   const sichern = useCallback(async (): Promise<void> => {
@@ -300,7 +372,95 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
     }
   }
 
-  const letzte = [...fassungen].reverse().find((f) => f.bogen)
+  const letzte = letzteFassung
+
+  /*
+   * Speichern und Drucken (03.10.2026, Wunsch der Lehrkraft): das Blatt in seiner digitalen Fassung
+   * mit allem, was eingetragen ist – getippter Text an seinen Linien, Stift, Kästchen und Linien.
+   * Der Server macht daraus ein PDF (ohne Skripte, ohne Netz).
+   */
+  const [pdfLaeuft, setPdfLaeuft] = useState<'speichern' | 'drucken' | null>(null)
+  const blattHtml = (): string | null => {
+    const doc = iframe.current?.contentDocument
+    if (!doc || !gemessen) return null
+    const klon = doc.documentElement.cloneNode(true) as HTMLElement
+    const seitenEl = [...klon.querySelectorAll<HTMLElement>('.ws-page')]
+    const schrift = '"Segoe Print", "Comic Sans MS", system-ui, sans-serif'
+    for (const f of gemessen.felder) {
+      const wert = (antworten[f.id] ?? '').trim()
+      const s = gemessen.seiten[f.seite]
+      const seite = seitenEl[f.seite]
+      if (!wert || !s || !seite) continue
+      const div = doc.createElement('div')
+      const abstand = f.abstand ?? 24
+      const mehrzeilig = f.art === 'zeilen' && (f.zeilen ?? 1) > 1
+      div.textContent = f.art === 'kreuz' ? '✗' : wert
+      div.style.cssText = [
+        'position:absolute',
+        `left:${f.x - s.x}px`,
+        `top:${f.y - s.y}px`,
+        `width:${f.w}px`,
+        `min-height:${f.h}px`,
+        'color:#1d4ed8',
+        `font-family:${schrift}`,
+        'white-space:pre-wrap',
+        'overflow-wrap:break-word',
+        'z-index:40',
+        f.art === 'kreuz'
+          ? `font-size:${Math.min(f.w, f.h) * 0.9}px;line-height:${f.h}px;text-align:center;font-weight:700`
+          : mehrzeilig
+            ? `font-size:${Math.max(12, Math.min(18, abstand * 0.6))}px;line-height:${abstand}px;padding:${Math.max(0, abstand * 0.2)}px 3px 0`
+            : `font-size:${Math.max(12, Math.min(18, f.h * 0.65))}px;line-height:${f.h}px;padding:0 3px`
+      ].join(';')
+      seite.appendChild(div)
+    }
+    seitenEl.forEach((seite, i) => {
+      const s = gemessen.seiten[i]
+      if (!s) return
+      if (tinte[String(i)]) {
+        const img = doc.createElement('img')
+        img.src = tinte[String(i)]
+        img.style.cssText = `position:absolute;left:0;top:0;width:${s.w}px;height:auto;z-index:50;pointer-events:none`
+        seite.appendChild(img)
+      }
+      const eigene = objekte.filter((o) => o.s === i)
+      if (eigene.length) seite.insertAdjacentHTML('beforeend', objekteSvg(eigene, s.w, 1))
+    })
+    const druck = doc.createElement('style')
+    druck.textContent =
+      '@page{size:A4;margin:0}html,body{background:#fff !important}.ws-page{break-after:page;margin:0 !important;box-shadow:none !important}.ws-page:last-child{break-after:auto}'
+    klon.querySelector('head')?.appendChild(druck)
+    return `<!doctype html>${klon.outerHTML}`
+  }
+  const pdf = async (art: 'speichern' | 'drucken'): Promise<void> => {
+    // Für „Drucken" das Fenster sofort öffnen (sonst blockiert der Browser es), dann das PDF hinein
+    const fenster = art === 'drucken' ? window.open('', '_blank') : null
+    setPdfLaeuft(art)
+    try {
+      const html = blattHtml()
+      if (!html) throw new Error('Das Blatt ist noch nicht geladen.')
+      const r = await fetch('/s/api/blatt/pdf', {
+        method: 'POST',
+        headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
+        body: JSON.stringify({ id: d.id, html })
+      })
+      if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { fehler?: string }).fehler ?? 'Das PDF konnte nicht erstellt werden.')
+      const url = URL.createObjectURL(await r.blob())
+      if (fenster) fenster.location.href = url
+      else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${d.titel.replace(/[\\/:*?"<>|]+/g, '-')}.pdf`
+        a.click()
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) {
+      fenster?.close()
+      setMeldung(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPdfLaeuft(null)
+    }
+  }
   const aufgaben = gemessen?.aufgaben ?? []
 
   return (
@@ -317,16 +477,40 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
             {!d.offen ? ' · abgeschlossen' : ''}
           </Text>
         </div>
-        <SegmentedControl
-          size="xs"
-          value={ansicht}
-          onChange={(v) => setAnsicht(v as 'blatt' | 'liste')}
-          data={[
-            { value: 'blatt', label: 'Blatt' },
-            { value: 'liste', label: 'Liste' }
-          ]}
-          data-ansicht
-        />
+        <Group gap={6}>
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconDownload size={14} />}
+            loading={pdfLaeuft === 'speichern'}
+            disabled={!gemessen}
+            onClick={() => void pdf('speichern')}
+            data-blatt-speichern
+          >
+            Speichern
+          </Button>
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconPrinter size={14} />}
+            loading={pdfLaeuft === 'drucken'}
+            disabled={!gemessen}
+            onClick={() => void pdf('drucken')}
+            data-blatt-drucken
+          >
+            Drucken
+          </Button>
+          <SegmentedControl
+            size="xs"
+            value={ansicht}
+            onChange={(v) => setAnsicht(v as 'blatt' | 'liste')}
+            data={[
+              { value: 'blatt', label: 'Blatt' },
+              { value: 'liste', label: 'Liste' }
+            ]}
+            data-ansicht
+          />
+        </Group>
       </Group>
 
       {d.loesung && (
@@ -357,24 +541,14 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
       )}
 
       {ansicht === 'blatt' && offen && d.einstellungen.stift && (
-        <Group gap="xs" data-werkzeuge>
-          <SegmentedControl
-            value={werkzeug}
-            onChange={(v) => setWerkzeug(v as Werkzeug)}
-            data={[
-              { value: 'tastatur', label: <IconKeyboard size={18} aria-label="Tastatur" /> },
-              { value: 'stift', label: <IconPencil size={18} aria-label="Stift" /> },
-              { value: 'radierer', label: <IconEraser size={18} aria-label="Radierer" /> }
-            ]}
-          />
-          <Text size="xs" c="dimmed">
-            {werkzeug === 'tastatur'
-              ? 'In die Felder tippen'
-              : werkzeug === 'stift'
-                ? 'Mit Stift oder Finger aufs Blatt schreiben'
-                : 'Über Stift-Einträge wischen'}
-          </Text>
-        </Group>
+        <Werkzeugleiste
+          werkzeug={werkzeug}
+          setWerkzeug={setWerkzeug}
+          stiftFarbe={stiftFarbe}
+          setStiftFarbe={setStiftFarbe}
+          markerFarbe={markerFarbe}
+          setMarkerFarbe={setMarkerFarbe}
+        />
       )}
 
       {/* In der Listenansicht bleibt das Blatt unsichtbar da – sonst ließen sich die Felder nicht messen */}
@@ -383,7 +557,15 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
         style={ansicht === 'blatt' ? { width: '100%' } : { width: BREITE, position: 'absolute', left: -20000, top: 0, visibility: 'hidden' }}
         aria-hidden={ansicht !== 'blatt'}
       >
-        <div style={{ width: BREITE * massstab, height: (gemessen?.hoehe ?? 1123) * massstab, position: 'relative', overflow: 'hidden', margin: '0 auto' }}>
+        <div
+          style={{
+            width: (BREITE + (spalte ? SPALTE : 0)) * massstab,
+            height: (gemessen?.hoehe ?? 1123) * massstab,
+            position: 'relative',
+            overflow: 'hidden',
+            margin: '0 auto'
+          }}
+        >
           <div style={{ width: BREITE, transform: `scale(${massstab})`, transformOrigin: 'top left', position: 'absolute', left: 0, top: 0 }}>
             <iframe
               ref={iframe}
@@ -402,6 +584,13 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
                 setze={setze}
                 gesperrt={!offen}
                 werkzeug={offen && d.einstellungen.stift ? werkzeug : 'tastatur'}
+                stiftFarbe={stiftFarbe}
+                markerFarbe={markerFarbe}
+                objekte={objekte}
+                setObjekte={setObjekte}
+                wachsen={offen ? wachsen : undefined}
+                anmerkungen={anmerkungen}
+                spalte={spalte ? { x: BREITE + 8, w: SPALTE - 16 } : null}
                 tinte={tinte}
                 setTinte={(s, url) => {
                   stand.current.tinteGeaendert = true
@@ -429,6 +618,14 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
           fb={aufgabenFb}
           runden={d.einstellungen.aufgabenRunden}
           tinte={Object.keys(tinte).length > 0}
+          zumBlatt={(a) => {
+            setAnsicht('blatt')
+            // Nach dem Umschalten zur Aufgabe rollen (Lage im Blatt × Maßstab)
+            setTimeout(() => {
+              const r = rahmen.current?.getBoundingClientRect()
+              if (r) window.scrollTo({ top: window.scrollY + r.top + a.y * massstab - 80, behavior: 'smooth' })
+            }, 120)
+          }}
         />
       )}
       {!gemessen && (
@@ -459,16 +656,44 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
   )
 }
 
-const FARBE = '#1d4ed8'
+const FARBE = STIFT_FARBEN[0]
 
 /** Feedback-Verlauf zu einer Aufgabe */
-function AufgabenFeedbackText({ liste }: { liste?: { einschaetzung: string; text: string }[] }): React.JSX.Element | null {
+function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.Element | null {
   const l = liste?.at(-1)
   if (!l) return null
   const farbe = l.einschaetzung === 'sicher' ? 'green' : l.einschaetzung === 'teilweise' ? 'yellow' : 'orange'
+  // Gegliedert seit 03.10.2026: gelungen / noch offen / nächster Schritt; ältere Antworten als Text
+  if (!l.gelungen && !l.fehlt && !l.schritt)
+    return (
+      <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback>
+        <Text size="sm">{l.text}</Text>
+      </Alert>
+    )
   return (
     <Alert color={farbe} variant="light" p="xs" data-aufgaben-feedback>
-      <Text size="sm">{l.text}</Text>
+      <Stack gap={4}>
+        {l.gelungen && (
+          <Text size="sm">
+            <b>✓ Gelungen:</b> {l.gelungen}
+          </Text>
+        )}
+        {l.fehlt && (
+          <Text size="sm">
+            <b>○ Noch offen:</b> {l.fehlt}
+          </Text>
+        )}
+        {l.schritt && (
+          <Text size="sm">
+            <b>→ Nächster Schritt:</b> {l.schritt}
+          </Text>
+        )}
+        {l.markierungen?.length ? (
+          <Text size="xs" c="dimmed">
+            Markierungen und Kommentare stehen an deinem Text.
+          </Text>
+        ) : null}
+      </Stack>
     </Alert>
   )
 }
@@ -482,6 +707,13 @@ function Ebene(p: {
   setze: (f: string, w: string) => void
   gesperrt: boolean
   werkzeug: Werkzeug
+  stiftFarbe: string
+  markerFarbe: string
+  objekte: BlattObjekt[]
+  setObjekte: (o: BlattObjekt[]) => void
+  wachsen?: (anker: number, mehr: number) => void
+  anmerkungen: Anmerkung[]
+  spalte: { x: number; w: number } | null
   tinte: Record<string, string>
   setTinte: (seite: number, url: string) => void
   pruefen?: (nr: number) => Promise<void>
@@ -491,6 +723,35 @@ function Ebene(p: {
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   const schreibt = p.werkzeug !== 'tastatur'
+  const flaechen = useRef<Map<string, HTMLTextAreaElement>>(new Map())
+  // Lage der markierten Stellen (Seitenpixel) für die Randkommentare
+  const [lagen, setLagen] = useState<Record<number, number>>({})
+  const meldeLage = useCallback((nr: number, y: number): void => setLagen((l) => (Math.abs((l[nr] ?? -1) - y) < 0.5 ? l : { ...l, [nr]: y })), [])
+  // Jede Anmerkung höchstens einmal markieren – im ersten Feld, in dem ihr Zitat steht
+  const vergeben = new Set<number>()
+  const trefferVon = (wert: string): ReturnType<typeof fundstellen> => {
+    if (!wert || !p.anmerkungen.length) return []
+    const t = fundstellen(
+      wert,
+      p.anmerkungen.filter((a) => !vergeben.has(a.nr))
+    )
+    t.forEach((x) => vergeben.add(x.a.nr))
+    return t
+  }
+  /*
+   * Mitwachsende Schreiblinien (03.10.2026): Reicht der Platz nicht, kommen Linien dazu – der Text
+   * scrollt nie in seinem Feld, sondern steht immer auf Linien, und das Blatt wird länger.
+   */
+  useLayoutEffect(() => {
+    if (!p.wachsen) return
+    for (const f of p.felder) {
+      if (f.art !== 'zeilen' || (f.zeilen ?? 1) < 2 || f.anker === undefined) continue
+      const t = flaechen.current.get(f.id)
+      if (!t) continue
+      const zuViel = t.scrollHeight - t.clientHeight
+      if (zuViel > 2) p.wachsen(f.anker, Math.ceil(zuViel / (f.abstand ?? 24)))
+    }
+  })
   return (
     <div
       style={{ position: 'absolute', left: 0, top: 0, width: BREITE, height: '100%' }}
@@ -532,7 +793,19 @@ function Ebene(p: {
           )
         if (f.art === 'luecke' || (f.art === 'zeilen' && (f.zeilen ?? 1) === 1) || f.art === 'text') {
           const hoehe = f.art === 'zeilen' ? Math.max(f.h, 22) : f.h
-          return (
+          const eingabeStil: React.CSSProperties = { ...stil, top: f.y + f.h - hoehe, height: hoehe, fontSize: Math.max(12, Math.min(18, hoehe * 0.65)) }
+          const treffer = trefferVon(wert)
+          return [
+            treffer.length ? (
+              <FeldMarkierung
+                key={`m${f.id}`}
+                wert={wert}
+                treffer={treffer}
+                stil={{ ...eingabeStil, lineHeight: `${hoehe}px` }}
+                einzeilig
+                lage={(nr, y) => meldeLage(nr, f.y + f.h - hoehe + y)}
+              />
+            ) : null,
             <input
               key={f.id}
               value={wert}
@@ -542,15 +815,31 @@ function Ebene(p: {
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
-              style={{ ...stil, top: f.y + f.h - hoehe, height: hoehe, fontSize: Math.max(12, Math.min(18, hoehe * 0.65)) }}
+              style={{ ...eingabeStil, ...(treffer.length ? { background: 'transparent' } : {}) }}
               data-feld={f.id}
             />
-          )
+          ]
         }
         const zeilenhoehe = f.abstand ?? 24
-        return (
+        const flaechenStil: React.CSSProperties = {
+          ...stil,
+          resize: 'none',
+          overflow: f.art === 'zeilen' ? 'hidden' : 'auto',
+          fontSize: Math.max(12, Math.min(18, zeilenhoehe * 0.6)),
+          lineHeight: f.art === 'zeilen' ? `${zeilenhoehe}px` : 1.4,
+          paddingTop: f.art === 'zeilen' ? Math.max(0, zeilenhoehe * 0.2) : 4
+        }
+        const treffer = trefferVon(wert)
+        return [
+          treffer.length ? (
+            <FeldMarkierung key={`m${f.id}`} wert={wert} treffer={treffer} stil={flaechenStil} einzeilig={false} lage={(nr, y) => meldeLage(nr, f.y + y)} />
+          ) : null,
           <textarea
             key={f.id}
+            ref={(el) => {
+              if (el) flaechen.current.set(f.id, el)
+              else flaechen.current.delete(f.id)
+            }}
             value={wert}
             disabled={p.gesperrt}
             onChange={(e) => p.setze(f.id, e.currentTarget.value)}
@@ -558,19 +847,38 @@ function Ebene(p: {
             autoCorrect="off"
             autoCapitalize="none"
             spellCheck={false}
-            style={{
-              ...stil,
-              resize: 'none',
-              fontSize: Math.max(12, Math.min(18, zeilenhoehe * 0.6)),
-              lineHeight: f.art === 'zeilen' ? `${zeilenhoehe}px` : 1.4,
-              paddingTop: f.art === 'zeilen' ? Math.max(0, zeilenhoehe * 0.2) : 4
-            }}
+            style={{ ...flaechenStil, ...(treffer.length ? { background: 'transparent' } : {}) }}
             data-feld={f.id}
           />
-        )
+        ]
       })}
+      <Rand
+        eintraege={p.anmerkungen.filter((a) => lagen[a.nr] !== undefined && vergeben.has(a.nr)).map((a) => ({ a, y: lagen[a.nr] }))}
+        spalte={p.spalte}
+        randX={BREITE - 30}
+      />
       {p.seiten.map((s, i) => (
-        <TintenSeite key={i} seite={i} lage={s} bild={p.tinte[String(i)]} werkzeug={p.werkzeug} setTinte={p.setTinte} />
+        <TintenSeite
+          key={i}
+          seite={i}
+          lage={s}
+          bild={p.tinte[String(i)]}
+          werkzeug={p.werkzeug}
+          farbe={p.werkzeug === 'marker' ? p.markerFarbe : p.stiftFarbe}
+          setTinte={p.setTinte}
+        />
+      ))}
+      {p.seiten.map((s, i) => (
+        <ObjektEbene
+          key={`o${i}`}
+          seite={i}
+          lage={s}
+          objekte={p.objekte}
+          aendern={p.setObjekte}
+          werkzeug={p.werkzeug}
+          farbe={p.stiftFarbe}
+          gesperrt={p.gesperrt}
+        />
       ))}
       {p.pruefen &&
         p.aufgaben.map((a) => {
@@ -621,32 +929,34 @@ function TintenSeite({
   lage,
   bild,
   werkzeug,
+  farbe,
   setTinte
 }: {
   seite: number
   lage: Seite
   bild?: string
   werkzeug: Werkzeug
+  farbe: string
   setTinte: (s: number, url: string) => void
 }): React.JSX.Element {
   const leinwand = useRef<HTMLCanvasElement>(null)
   const verlauf = useRef<string[]>([])
   const zeichnet = useRef(false)
   const AUFLOESUNG = 2
+  // Beim Laden und wenn die Seite wächst (neue Linien – die Leinwand wird dabei geleert): Bild in Originalgröße wieder einzeichnen
   useEffect(() => {
     const c = leinwand.current
     if (!c || !bild) return
     const img = new Image()
-    img.onload = () => c.getContext('2d')?.drawImage(img, 0, 0, c.width, c.height)
+    img.onload = () => c.getContext('2d')?.drawImage(img, 0, 0)
     img.src = bild
-    // nur beim ersten Laden
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [lage.w, lage.h])
   const punkt = (e: React.PointerEvent): { x: number; y: number } => {
     const r = leinwand.current!.getBoundingClientRect()
     return { x: ((e.clientX - r.left) / r.width) * leinwand.current!.width, y: ((e.clientY - r.top) / r.height) * leinwand.current!.height }
   }
-  const aktiv = werkzeug !== 'tastatur'
+  const aktiv = werkzeug === 'stift' || werkzeug === 'marker' || werkzeug === 'radierer'
   const fertig = (): void => {
     if (!zeichnet.current) return
     zeichnet.current = false
@@ -677,9 +987,10 @@ function TintenSeite({
           leinwand.current!.setPointerCapture(e.pointerId)
           const { x, y } = punkt(e)
           ctx.globalCompositeOperation = werkzeug === 'radierer' ? 'destination-out' : 'source-over'
-          ctx.strokeStyle = FARBE
-          ctx.lineWidth = (werkzeug === 'radierer' ? 22 : 2.2 * (e.pressure ? 0.6 + e.pressure : 1)) * AUFLOESUNG
-          ctx.lineCap = 'round'
+          // Textmarker: breit und durchscheinend (03.10.2026)
+          ctx.strokeStyle = werkzeug === 'marker' ? `${farbe}59` : farbe
+          ctx.lineWidth = (werkzeug === 'radierer' ? 22 : werkzeug === 'marker' ? 16 : 2.2 * (e.pressure ? 0.6 + e.pressure : 1)) * AUFLOESUNG
+          ctx.lineCap = werkzeug === 'marker' ? 'butt' : 'round'
           ctx.lineJoin = 'round'
           ctx.beginPath()
           ctx.moveTo(x, y)
@@ -735,9 +1046,11 @@ function Liste(p: {
   fb: BlattDaten['aufgabenFeedback']
   runden: number
   tinte: boolean
+  zumBlatt: (a: AufgabeInfo) => void
 }): React.JSX.Element {
   const gruppen = useMemo(() => {
-    const nummern = [...new Set(p.felder.map((f) => f.nr))].sort((a, b) => a - b)
+    // Auch Aufgaben ohne Felder, die auf dem Blatt gezeichnet werden (Diagramm, Zeitleiste …)
+    const nummern = [...new Set([...p.felder.map((f) => f.nr), ...p.aufgaben.filter((a) => a.zeichnen).map((a) => a.nr)])].sort((a, b) => a - b)
     return nummern.map((nr) => ({ nr, aufgabe: p.aufgaben.find((a) => a.nr === nr), felder: p.felder.filter((f) => f.nr === nr) }))
   }, [p.felder, p.aufgaben])
   return (
@@ -775,55 +1088,67 @@ function Liste(p: {
               )}
             </Group>
             <Stack gap={6}>
-              {g.felder.map((f, i) =>
-                f.art === 'kreuz' ? (
-                  <Checkbox
-                    key={f.id}
-                    label={f.text || `Kästchen ${i + 1}`}
-                    checked={Boolean(p.antworten[f.id])}
-                    disabled={p.gesperrt}
-                    onChange={(e) => p.setze(f.id, e.currentTarget.checked ? 'x' : '')}
-                  />
-                ) : f.art === 'zeilen' && (f.zeilen ?? 1) > 1 ? (
-                  <Textarea
-                    key={f.id}
-                    autosize
-                    minRows={Math.min(6, f.zeilen ?? 2)}
-                    label={`${i + 1}`}
-                    value={p.antworten[f.id] ?? ''}
-                    disabled={p.gesperrt}
-                    onChange={(e) => p.setze(f.id, e.currentTarget.value)}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                ) : f.art === 'flaeche' ? (
-                  <Textarea
-                    key={f.id}
-                    autosize
-                    minRows={3}
-                    label={`${i + 1}`}
-                    value={p.antworten[f.id] ?? ''}
-                    disabled={p.gesperrt}
-                    onChange={(e) => p.setze(f.id, e.currentTarget.value)}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                ) : (
-                  <TextInput
-                    key={f.id}
-                    label={`${f.art === 'luecke' ? 'Lücke' : 'Feld'} ${i + 1}`}
-                    value={p.antworten[f.id] ?? ''}
-                    disabled={p.gesperrt}
-                    onChange={(e) => p.setze(f.id, e.currentTarget.value)}
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                  />
-                )
+              {g.aufgabe?.zeichnen && (
+                <Alert variant="light" color="grape" p="xs" data-auf-dem-blatt={g.nr}>
+                  <Group justify="space-between" gap="xs">
+                    <Text size="sm">Hier wird gezeichnet, beschriftet oder zugeordnet – das geht auf dem Blatt.</Text>
+                    <Button size="xs" variant="light" color="grape" onClick={() => p.zumBlatt(g.aufgabe!)}>
+                      Auf dem Blatt bearbeiten
+                    </Button>
+                  </Group>
+                </Alert>
               )}
+              {g.felder
+                .filter((f) => !(g.aufgabe?.zeichnen && f.art === 'flaeche'))
+                .map((f, i) =>
+                  f.art === 'kreuz' ? (
+                    <Checkbox
+                      key={f.id}
+                      label={f.text || `Kästchen ${i + 1}`}
+                      checked={Boolean(p.antworten[f.id])}
+                      disabled={p.gesperrt}
+                      onChange={(e) => p.setze(f.id, e.currentTarget.checked ? 'x' : '')}
+                    />
+                  ) : f.art === 'zeilen' && (f.zeilen ?? 1) > 1 ? (
+                    <Textarea
+                      key={f.id}
+                      autosize
+                      minRows={Math.min(6, f.zeilen ?? 2)}
+                      label={`${i + 1}`}
+                      value={p.antworten[f.id] ?? ''}
+                      disabled={p.gesperrt}
+                      onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  ) : f.art === 'flaeche' ? (
+                    <Textarea
+                      key={f.id}
+                      autosize
+                      minRows={3}
+                      label={`${i + 1}`}
+                      value={p.antworten[f.id] ?? ''}
+                      disabled={p.gesperrt}
+                      onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  ) : (
+                    <TextInput
+                      key={f.id}
+                      label={`${f.art === 'luecke' ? 'Lücke' : 'Feld'} ${i + 1}`}
+                      value={p.antworten[f.id] ?? ''}
+                      disabled={p.gesperrt}
+                      onChange={(e) => p.setze(f.id, e.currentTarget.value)}
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                  )
+                )}
               <AufgabenFeedbackText liste={liste} />
               {liste?.length ? (
                 <Badge variant="light" size="sm">

@@ -140,6 +140,8 @@ export interface Bogen {
   teile?: import('../teilbewertung').TeilWertung[]
   /** Überarbeitungsauftrag zu einer Stelle */
   ueberarbeitung?: { zitat: string; auftrag: string }
+  /** Digitales Arbeitsblatt: Fazit je Aufgabe (03.10.2026) */
+  aufgaben?: AufgabenFazit[]
   fehler?: Fehlerschwerpunkt[]
   /** Fassung für die Eltern (Deutsch, einfache Sprache) und ihre Übersetzungen je Sprachcode */
   eltern?: string
@@ -151,6 +153,15 @@ export interface Bogen {
   spracheVerfehlt?: true
   /** Hinweise der App für die Lehrkraft (nicht für den Ausdruck), z. B. zur Sprache der Abgabe */
   hinweise?: string[]
+}
+
+/** Fazit zu einer Aufgabe eines digitalen Arbeitsblatts */
+export interface AufgabenFazit {
+  nr: number
+  gelungen: string
+  fehlt: string
+  /** Nächster Schritt – mit Beispiel oder Satzanfang, ohne die Lösung vorwegzunehmen */
+  schritt: string
 }
 
 /** Nachteilsausgleich bzw. Notenschutz einer Abgabe – Katalog in nachteilsausgleich.ts */
@@ -217,6 +228,11 @@ export interface Bewertungstabelle {
 }
 
 export interface RueckmeldungMeta {
+  /**
+   * Digitales Arbeitsblatt der Lernenden (03.10.2026): Fazit je Aufgabe und Randkommentare mit
+   * wörtlichen Zitaten – sie erscheinen als Markierungen auf dem Blatt der Lernenden.
+   */
+  digitalesBlatt?: boolean
   title: string
   subjectId: string
   subjectLabel: string

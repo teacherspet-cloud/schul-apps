@@ -117,7 +117,12 @@ export function bogenFuerLernende(b: Bogen | undefined): Partial<Bogen> | undefi
     schritte: b.schritte,
     kriterien: b.kriterien.map((k) => ({ kriterium: k.kriterium, einschaetzung: k.einschaetzung, ...(k.beleg ? { beleg: k.beleg } : {}) })),
     ...(b.schluss ? { schluss: b.schluss } : {}),
-    ...(b.ueberarbeitung ? { ueberarbeitung: b.ueberarbeitung } : {})
+    ...(b.ueberarbeitung ? { ueberarbeitung: b.ueberarbeitung } : {}),
+    // Für das digitale Blatt: Fazit je Aufgabe und Randkommentare (ohne Lage im Scan)
+    ...(b.aufgaben?.length ? { aufgaben: b.aufgaben } : {}),
+    ...(b.rand?.length
+      ? { rand: b.rand.map((k) => ({ id: k.id, zitat: k.zitat, text: k.text, art: k.art, ...(k.zeichen ? { zeichen: k.zeichen } : {}) })) }
+      : {})
   }
 }
 
@@ -158,6 +163,13 @@ async function bogenErzeugen(f: Freigabe, schueler: NutzerInfo, text: string, au
   const lehrkraft = nutzerNachId(f.lehrkraft_id)
   if (!lehrkraft) throw new Error('Die Lehrkraft gibt es nicht mehr.')
   const r = json_(f.vorlage, {} as Rueckmeldung)
+  // Freigegebene Arbeitsblätter (auch ältere): Fazit je Aufgabe und Randkommentare (03.10.2026)
+  if (f.art === 'blatt' && r.meta) {
+    r.meta.digitalesBlatt = true
+    const formen = new Set(r.meta.formen?.length ? r.meta.formen : ['schriftlich', 'tipps'])
+    formen.add('rand')
+    r.meta.formen = [...formen] as typeof r.meta.formen
+  }
   return imNutzer(alsNutzer(lehrkraft), async () => {
     const settings = getSettings()
     const a: Abgabe = { id: 'a', kuerzel: 'S1', name: schueler.name, dateiname: '', text, bilder: [] }

@@ -1672,6 +1672,9 @@ export interface FeedbackBogen {
   kriterien: { kriterium: string; einschaetzung: string; beleg?: string }[]
   schluss?: string
   ueberarbeitung?: { zitat: string; auftrag: string }
+  /** Digitales Arbeitsblatt: Fazit je Aufgabe und Randkommentare (03.10.2026) */
+  aufgaben?: { nr: number; gelungen: string; fehlt: string; schritt: string }[]
+  rand?: { id: string; zitat: string; text: string; art: 'lob' | 'fehler' | 'hinweis'; zeichen?: string }[]
 }
 
 interface AufgabeMitFeedback {
@@ -1734,6 +1737,47 @@ export function BogenAnsicht({ b }: { b: FeedbackBogen }): React.JSX.Element {
             </Text>
           ))}
         </div>
+      )}
+      {b.aufgaben && b.aufgaben.length > 0 && (
+        <Stack gap={6} data-aufgaben-fazit>
+          <Text fw={700}>Aufgabe für Aufgabe</Text>
+          {b.aufgaben.map((a) => (
+            <Paper key={a.nr} withBorder p="xs" radius="sm">
+              <Text size="sm" fw={700} mb={2}>
+                Aufgabe {a.nr}
+              </Text>
+              {a.gelungen && (
+                <Text size="sm">
+                  <Text span c="green" fw={600}>
+                    ✓ Gelungen:
+                  </Text>{' '}
+                  {a.gelungen}
+                </Text>
+              )}
+              {a.fehlt && (
+                <Text size="sm">
+                  <Text span c="orange" fw={600}>
+                    ○ Noch offen:
+                  </Text>{' '}
+                  {a.fehlt}
+                </Text>
+              )}
+              {a.schritt && (
+                <Text size="sm">
+                  <Text span c="blue" fw={600}>
+                    → Nächster Schritt:
+                  </Text>{' '}
+                  {a.schritt}
+                </Text>
+              )}
+            </Paper>
+          ))}
+        </Stack>
+      )}
+      {b.rand && b.rand.length > 0 && (
+        <Text size="xs" c="dimmed">
+          Die markierten Stellen und Randkommentare stehen direkt auf deinem Blatt.
+        </Text>
       )}
       {b.schritte.length > 0 && (
         <div>

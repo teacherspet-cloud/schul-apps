@@ -110,23 +110,61 @@ try {
   const texte = s.locator('input[data-feld], textarea[data-feld]')
   await texte.first().fill('My first answer')
   if ((await texte.count()) > 1) await texte.nth(1).fill('Second answer here')
-  // Stift: eine Linie auf Seite 1
-  await s.locator('[data-werkzeuge] label').nth(1).click()
+  // Stift: eine Linie auf Seite 1 (rot), Textmarker (03.10.2026: Farben)
+  await s.locator('[data-werkzeug="stift"]').click()
+  await s.locator('[data-farbe="#dc2626"]').click()
   const c = await s.locator('[data-tinte="0"]').boundingBox()
   await s.mouse.move(c.x + 120, c.y + 300)
   await s.mouse.down()
   await s.mouse.move(c.x + 220, c.y + 320, { steps: 8 })
   await s.mouse.up()
-  await s.locator('[data-werkzeuge] label').nth(0).click()
+  await s.locator('[data-werkzeug="marker"]').click()
+  await s.mouse.move(c.x + 100, c.y + 200)
+  await s.mouse.down()
+  await s.mouse.move(c.x + 300, c.y + 200, { steps: 8 })
+  await s.mouse.up()
+  // Textkästchen, Verbindungslinie, Punkt mit Wert
+  await s.locator('[data-werkzeug="text"]').click()
+  await s.mouse.click(c.x + 400, c.y + 500)
+  await s.locator('[data-kaestchen]').first().fill('1914: Kriegsbeginn')
+  await s.locator('[data-werkzeug="linie"]').click()
+  await s.mouse.move(c.x + 400, c.y + 530)
+  await s.mouse.down()
+  await s.mouse.move(c.x + 500, c.y + 600, { steps: 6 })
+  await s.mouse.up()
+  await s.locator('[data-werkzeug="punkt"]').click()
+  await s.mouse.click(c.x + 300, c.y + 650)
+  await s.waitForTimeout(300)
+  await s.keyboard.type('42')
+  await s.locator('[data-werkzeug="tastatur"]').click()
+  await s.screenshot({ path: join(out, '2b-werkzeuge.png') })
+  // Mitwachsende Linien: langer Text in einem mehrzeiligen Feld
+  const flaeche = s.locator('textarea[data-feld]').last()
+  let gewachsen = false
+  if (await flaeche.count()) {
+    await flaeche.fill(Array.from({ length: 14 }, (_, i) => `Line ${i + 1} of a long answer that keeps going on and on.`).join('\n'))
+    await s.waitForTimeout(800)
+    gewachsen = (await s.frameLocator('iframe').first().locator('[data-digital-linie]').count()) > 0
+    const hat = await flaeche.evaluate((t) => t.scrollHeight <= t.clientHeight + 2)
+    pruefe(gewachsen && hat, `Linien wachsen mit dem Text (neue Linien: ${gewachsen}, kein inneres Scrollen: ${hat})`)
+  }
   await s.waitForTimeout(2600)
   const gespeichert = await (await sm.request.get(`${A}/s/api/blatt?id=${fr.id}`, { headers: KOPF })).json()
   pruefe(Object.values(gespeichert.antworten).includes('My first answer') && Boolean(gespeichert.tinte['0']), 'Zwischenstand samt Stift-Ebene gespeichert')
+  const obj = JSON.parse(gespeichert.antworten.objekte ?? '[]')
+  pruefe(
+    obj.some((o) => o.t === 'text' && o.text === '1914: Kriegsbeginn') &&
+      obj.some((o) => o.t === 'linie') &&
+      obj.some((o) => o.t === 'punkt' && o.text === '42'),
+    `Kästchen, Linie und Punkt gespeichert (${obj.map((o) => o.t).join(', ')})`
+  )
+  if (gewachsen) pruefe(Boolean(gespeichert.antworten.linien && gespeichert.antworten.linien !== '{}'), 'Zusätzliche Linien gespeichert (auch für die KI)')
   // Feedback zu Aufgabe 1
   await s.locator('[data-aufgabe-pruefen="1"]').click()
   await s.locator('[data-aufgabe-pruefen-los]').click()
   pruefe(
     await s
-      .getByText('Lücke 2 passt schon gut')
+      .getByText('Der Anfang stimmt')
       .waitFor({ timeout: 30000 })
       .then(
         () => true,
@@ -148,6 +186,15 @@ try {
     'Nach dem Einreichen: Feedback-Bogen'
   )
   await s.screenshot({ path: join(out, '3-ipad-bogen.png'), fullPage: true })
+  // Feedback wie eine korrigierte Arbeit (03.10.2026): Fazit je Aufgabe, Markierungen, Randkommentare
+  pruefe(await s.locator('[data-aufgaben-fazit]').isVisible(), 'Fazit Aufgabe für Aufgabe im Bogen')
+  pruefe((await s.locator('[data-markierung]').count()) > 0, 'Markierungen im Text auf dem Blatt')
+  pruefe((await s.locator('[data-rand-kommentar], [data-rand-marke]').count()) > 0, 'Randkommentare auf Höhe der Stellen')
+  // Speichern als PDF
+  const [dl] = await Promise.all([s.waitForEvent('download', { timeout: 60000 }), s.locator('[data-blatt-speichern]').click()])
+  const pfad = await dl.path()
+  const kopf = pfad ? (await import('fs')).readFileSync(pfad).subarray(0, 5).toString() : ''
+  pruefe(kopf === '%PDF-', `Blatt als PDF gespeichert (${dl.suggestedFilename()})`)
   // Lösungsblatt erst nach dem ersten Einreichen (03.10.2026)
   await s.reload()
   await s.locator('[data-blatt-bogen]').waitFor({ timeout: 20000 })
