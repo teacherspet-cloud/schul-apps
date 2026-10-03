@@ -45,7 +45,18 @@ import {
   ThemeIcon,
   Title
 } from '@mantine/core'
-import { IconAlertTriangle, IconArrowLeft, IconArrowRight, IconCheck, IconClock, IconHourglass, IconLogout, IconPlayerPlay, IconX } from '@tabler/icons-react'
+import {
+  IconAlertTriangle,
+  IconArrowLeft,
+  IconArrowRight,
+  IconCheck,
+  IconClock,
+  IconHourglass,
+  IconLogout,
+  IconPlayerPlay,
+  IconSettings,
+  IconX
+} from '@tabler/icons-react'
 import bildOnlinetest from '../../assets/programme/onlinetest.webp'
 import bildRueckmeldung from '../../assets/programme/rueckmeldung.webp'
 import bildArbeitsblatt from '../../assets/programme/arbeitsblatt.webp'
@@ -69,6 +80,7 @@ import {
 import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
+import { SchuelerEinstellungen } from './SchuelerEinstellungen'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import { holen, senden } from './serverApi'
 
@@ -126,7 +138,7 @@ export default function SchuelerBereich(): React.JSX.Element {
   // Aus einer Unterrichtsreihe geöffnet (Arbeitsblatt, Aufgabe, Test): Rückweg zur Reihe
   const ausReihe = new URLSearchParams(window.location.search).get('reihe')
   const rueckblick = /^\/s\/e\/([A-Za-z0-9_-]{6,64})/.exec(pfad)?.[1]
-  const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter|reihen)\/?$/.exec(pfad)?.[1]
+  const bereich = /^\/s\/(tests|ergebnisse|aufgaben|blaetter|reihen|einstellungen)\/?$/.exec(pfad)?.[1]
   const ich = window.__schulappsServer
   // Gäste (Beitritt mit Namen) haben kein Konto zum Abmelden – sie gehören nur zu diesem Test
   const gast = !ich?.angemeldet || ich.quelle === 'gast'
@@ -144,6 +156,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <LernRaum fach={lernFach[1] ? decodeURIComponent(lernFach[1]) : undefined} />
   ) : reiheM && !gast ? (
     <ReiheWeg zid={reiheM[1]} schritt={reiheM[2]} />
+  ) : bereich === 'einstellungen' && !gast ? (
+    <SchuelerEinstellungen />
   ) : bereich === 'reihen' && !gast ? (
     <ReihenListe />
   ) : aufgabe ? (
@@ -168,9 +182,14 @@ export default function SchuelerBereich(): React.JSX.Element {
           Schul-Apps{gast ? (aufgabe || fbCode ? ' · Rückmeldung' : blatt || blattCode ? ' · Arbeitsblatt' : ' · Onlinetest') : ''}
         </Text>
         {!gast && (
-          <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
-            Abmelden
-          </Button>
+          <Group gap={4}>
+            <Button variant="subtle" size="xs" component="a" href="/s/einstellungen" leftSection={<IconSettings size={14} />} data-einstellungen-knopf>
+              Einstellungen
+            </Button>
+            <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
+              Abmelden
+            </Button>
+          </Group>
         )}
       </Group>
       {ausReihe && /^[a-f0-9]{8,32}$/.test(ausReihe) && (
@@ -232,17 +251,22 @@ function Kachel(props: {
       href={props.href}
       className="sa-kachel"
       data-kachel={props.daten}
-      style={{
-        background: `linear-gradient(140deg, var(--mantine-color-${f}-0) 0%, var(--mantine-color-${f}-1) 100%)`,
-        border: `1px solid var(--mantine-color-${f}-2)`
-      }}
+      // Farben als Variablen – im Dunkelmodus setzt app.css eine dunkle Fassung ein (03.10.2026)
+      style={
+        {
+          '--k0': `var(--mantine-color-${f}-0)`,
+          '--k1': `var(--mantine-color-${f}-1)`,
+          '--k2': `var(--mantine-color-${f}-2)`,
+          '--k9': `var(--mantine-color-${f}-9)`
+        } as React.CSSProperties
+      }
     >
       <div className="sa-blase" style={{ background: `var(--mantine-color-${f}-5)` }} />
       <Group wrap="nowrap" gap="md" align="center" style={{ position: 'relative' }}>
         {props.bild ? <Image src={props.bild} alt="" w={64} h={64} fit="contain" /> : props.symbol}
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Group gap="xs" wrap="nowrap">
-            <Text fw={800} size="lg" c={`${f}.9`} truncate>
+            <Text fw={800} size="lg" c={`var(--mantine-color-${f}-text)`} truncate>
               {props.titel}
             </Text>
             {Boolean(props.zahl) && (
@@ -519,7 +543,12 @@ const STARTSEITE_CSS = `
 .sa-puls { animation: sa-pulsieren 2.4s ease-out infinite; }
 .sa-naechstes { background: var(--mantine-color-body); }
 .sa-kachel { position: relative; overflow: hidden; display: block; text-decoration: none; color: inherit; border-radius: 22px; padding: 18px;
-  transition: transform .18s ease, box-shadow .18s ease; min-height: 128px; }
+  transition: transform .18s ease, box-shadow .18s ease; min-height: 128px;
+  background: linear-gradient(140deg, var(--k0) 0%, var(--k1) 100%); border: 1px solid var(--k2); }
+[data-mantine-color-scheme='dark'] .sa-kachel {
+  background: linear-gradient(140deg, var(--mantine-color-dark-6) 0%, color-mix(in srgb, var(--k9) 45%, var(--mantine-color-dark-6)) 100%);
+  border-color: color-mix(in srgb, var(--k9) 60%, var(--mantine-color-dark-4)); }
+[data-mantine-color-scheme='dark'] .sa-kachel:hover { box-shadow: 0 12px 26px rgba(0,0,0,0.45); }
 .sa-kachel:hover, .sa-kachel:focus-visible { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.12); }
 .sa-kachel img { transition: transform .25s ease; }
 .sa-kachel:hover img { transform: rotate(-6deg) scale(1.06); }

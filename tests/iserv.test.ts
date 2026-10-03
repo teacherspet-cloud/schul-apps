@@ -84,7 +84,13 @@ describe('Pfade und Namen', () => {
       'Unit 1',
       'Food'
     ])
-    expect(iserv.iservOrdnerFuer('Groups/Kollegium/Material', { programm: 'elternbrief' })).toEqual(['Groups', 'Kollegium', 'Material', 'Allgemein', 'Elternbriefe'])
+    expect(iserv.iservOrdnerFuer('Groups/Kollegium/Material', { programm: 'elternbrief' })).toEqual([
+      'Groups',
+      'Kollegium',
+      'Material',
+      'Allgemein',
+      'Elternbriefe'
+    ])
     // Kein Ausbruch aus dem Ziel
     expect(iserv.iservOrdnerFuer('Home/../Groups', { programm: 'x', fach: '../Geheim' })).toEqual(['Home', 'Groups', '-Geheim'])
   })
@@ -100,6 +106,18 @@ describe('Pfade und Namen', () => {
     expect(iserv.iservAnzeige(['Groups', 'Kollegium'])).toBe('IServ › Gruppen › Kollegium')
     expect(iserv.inGruppenordner(['Groups', 'Kollegium'])).toBe(true)
     expect(iserv.inGruppenordner(['Home'])).toBe(false)
+    expect(iserv.inGruppenordner(['Gruppen', '7a'])).toBe(true)
+  })
+
+  it('gleicht die oberste Ebene an die Namen des Servers an (Home ↔ Eigene, Groups ↔ Gruppen; 03.10.2026)', () => {
+    const ziel = ['Home', 'Schulmaterial', 'Englisch']
+    expect(iserv.wurzelAngleichen(ziel, ['Eigene', 'Gruppen'])).toEqual(['Eigene', 'Schulmaterial', 'Englisch'])
+    expect(iserv.wurzelAngleichen(ziel, ['Files', 'Groups'])).toEqual(['Files', 'Schulmaterial', 'Englisch'])
+    expect(iserv.wurzelAngleichen(ziel, ['Groups', 'Home'])).toEqual(ziel)
+    expect(iserv.wurzelAngleichen(ziel, ['Meins', 'Gruppen'])).toEqual(['Meins', 'Schulmaterial', 'Englisch'])
+    expect(iserv.wurzelAngleichen(['Groups', '7a'], ['Eigene', 'Gruppen'])).toEqual(['Gruppen', '7a'])
+    expect(iserv.wurzelAngleichen(['home', 'x'], ['Home', 'Groups'])).toEqual(['Home', 'x'])
+    expect(iserv.iservAnzeige(['Eigene', 'Schulmaterial'])).toBe('IServ › Eigene Dateien › Schulmaterial')
   })
 
   it('liest Multi-Status mit beliebigen Namensraum-Kürzeln, kodierten Namen und ohne den Ordner selbst', () => {
@@ -115,7 +133,8 @@ describe('Pfade und Namen', () => {
       { name: 'Arbeitsblätter.pdf', ordner: false, teile: ['Home', 'Arbeitsblätter.pdf'], groesse: 1234 }
     ])
     // Ohne Kürzel und mit /webdav davor
-    const ohne = '<multistatus xmlns="DAV:"><response><href>/webdav/Groups/</href></response><response><href>/webdav/Groups/7a/</href><propstat><prop><resourcetype><collection/></resourcetype></prop></propstat></response></multistatus>'
+    const ohne =
+      '<multistatus xmlns="DAV:"><response><href>/webdav/Groups/</href></response><response><href>/webdav/Groups/7a/</href><propstat><prop><resourcetype><collection/></resourcetype></prop></propstat></response></multistatus>'
     expect(iserv.leseMultistatus(ohne, 'https://meineschule.de/webdav/', ['Groups']).map((x) => x.name)).toEqual(['7a'])
   })
 })
@@ -217,7 +236,12 @@ describe('Dienst: verbinden, ablegen, trennen – Passwort nur im Geräte-Speich
     const r = await dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: ` ${fake.benutzer} `, passwort: fake.passwort })
     expect(r.ordner.map((e) => e.name)).toEqual(['Groups', 'Home'])
     expect(s.wert).toBe(fake.passwort)
-    expect(einstellungen.iserv).toEqual({ schule: 'meineschule.de', benutzer: fake.benutzer, basis: 'https://webdav.meineschule.de/', ziel: 'Home/Schulmaterial' })
+    expect(einstellungen.iserv).toEqual({
+      schule: 'meineschule.de',
+      benutzer: fake.benutzer,
+      basis: 'https://webdav.meineschule.de/',
+      ziel: 'Home/Schulmaterial'
+    })
     expect(JSON.stringify(einstellungen)).not.toContain(fake.passwort)
     expect(await dienst.iservStatus(g)).toMatchObject({ verbunden: true, passwortGespeichert: true })
   })
@@ -227,7 +251,9 @@ describe('Dienst: verbinden, ablegen, trennen – Passwort nur im Geräte-Speich
     const s = speicher()
     const g = { abruf: fake.abruf, passwort: s.passwort }
     await dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: fake.benutzer, passwort: fake.passwort })
-    await expect(dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: fake.benutzer, passwort: 'falsch' })).rejects.toMatchObject({ art: 'anmeldung' })
+    await expect(dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: fake.benutzer, passwort: 'falsch' })).rejects.toMatchObject({
+      art: 'anmeldung'
+    })
     expect(s.wert).toBe(fake.passwort)
     // Ohne Passwort gilt das gespeicherte
     await expect(dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: fake.benutzer })).resolves.toBeTruthy()
@@ -239,7 +265,11 @@ describe('Dienst: verbinden, ablegen, trennen – Passwort nur im Geräte-Speich
     const g = { abruf: fake.abruf, passwort: s.passwort }
     await expect(dienst.iservAblegen(g, 'a.pdf', 'x', { programm: 'vokabeltest' })).rejects.toThrow(/noch nicht verbunden/)
     await dienst.iservVerbinden(g, { schule: 'meineschule.de', benutzer: fake.benutzer, passwort: fake.passwort })
-    const pfad = await dienst.iservAblegen(g, 'Vokabeltest Unit 1.pdf', new Uint8Array([1, 2, 3]), { programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] })
+    const pfad = await dienst.iservAblegen(g, 'Vokabeltest Unit 1.pdf', new Uint8Array([1, 2, 3]), {
+      programm: 'vokabeltest',
+      fach: 'Englisch',
+      themenbereich: ['Unit 1']
+    })
     expect(pfad).toBe('iserv:Home/Schulmaterial/Englisch/Unit 1/Vokabeltest Unit 1.pdf')
     expect(fake.baum.has('/Home/Schulmaterial/Englisch/Unit 1/Vokabeltest Unit 1.pdf')).toBe(true)
     expect((await dienst.iservOrdner(g, 'Home')).map((e) => e.name)).toEqual(['Schulmaterial', 'Unterricht'])

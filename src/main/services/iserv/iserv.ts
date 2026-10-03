@@ -5,7 +5,7 @@
  * App-Einstellungen; das Passwort NIE – es kommt über `IservGeraet.passwort` aus dem
  * Schlüsselbund des iPads bzw. verschlüsselt aus secrets.json am PC.
  */
-import { ISERV_PRAEFIX, ISERV_STANDARD_ZIEL, iservAdressFehler, iservOrdnerFuer, pfadTeile, type DavEintrag } from '@shared/iserv'
+import { ISERV_PRAEFIX, ISERV_STANDARD_ZIEL, iservAdressFehler, iservOrdnerFuer, pfadTeile, wurzelAngleichen, type DavEintrag } from '@shared/iserv'
 import type { AblageZiel, IservEinstellungen } from '@shared/types'
 import { getSettings, setSettings } from '../storage/settings'
 import { herunterladen, hochladen, IservFehler, liste, verbindungFinden, type DavAbruf, type IservZugang } from './webdav'
@@ -50,7 +50,10 @@ export async function iservStatus(g: IservGeraet): Promise<IservStatus> {
  * Verbindung testen und – wenn sie klappt – merken. Ohne Passwort gilt das gespeicherte (nur
  * Benutzer/Adresse geändert). Liefert die oberste Ebene (Eigene Dateien, Gruppen).
  */
-export async function iservVerbinden(g: IservGeraet, eingabe: { schule: string; benutzer: string; passwort?: string }): Promise<{ basis: string; ordner: DavEintrag[] }> {
+export async function iservVerbinden(
+  g: IservGeraet,
+  eingabe: { schule: string; benutzer: string; passwort?: string }
+): Promise<{ basis: string; ordner: DavEintrag[] }> {
   const fehler = iservAdressFehler(eingabe.schule)
   if (fehler) throw new IservFehler('netz', `IServ: ${fehler}`)
   const passwort = eingabe.passwort || (await g.passwort.lies()) || ''
@@ -101,7 +104,11 @@ export async function iservTrennen(g: IservGeraet): Promise<void> {
  */
 export async function iservAblegen(g: IservGeraet, name: string, daten: Uint8Array | string, ziel: AblageZiel): Promise<string> {
   const z = await zugang(g)
-  const ordner = iservOrdnerFuer(einstellungen()?.ziel, ziel)
+  // Oberste Ebene so benennen, wie dieser Server sie nennt („Home" ↔ „Eigene", „Groups" ↔ „Gruppen")
+  const ordner = wurzelAngleichen(
+    iservOrdnerFuer(einstellungen()?.ziel, ziel),
+    (await liste(z, [])).filter((e) => e.ordner).map((e) => e.name)
+  )
   const bytes = typeof daten === 'string' ? new TextEncoder().encode(daten) : daten
   const teile = await hochladen(z, ordner, name, bytes)
   return ISERV_PRAEFIX + teile.join('/')

@@ -797,3 +797,11 @@ img.home-illustration {
   color: var(--mantine-color-dimmed);
   flex-shrink: 0;
 }
+
+/* Schülerbereich: „Ruhige Darstellung" (03.10.2026) – ohne Animationen und Übergänge */
+.sa-ruhig *,
+.sa-ruhig *::before,
+.sa-ruhig *::after {
+  animation: none !important;
+  transition: none !important;
+}

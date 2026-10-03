@@ -21,9 +21,29 @@ import { extname, join, normalize, sep } from 'node:path'
 import { AUFTRAGS_KANAELE, AuftragsFehler, gueltigeAuftragsId, gueltigesGeraet, kennungDesAuftrags, MAX_WARTEN_MS } from '../main/services/lanAuftraege'
 import { kennzeichne, kennzeichneAuftrag, PULS_MS } from '../main/services/lanServer'
 import { imNutzer, type Nutzer } from './kontext'
-import { nutzerAendern, passwortHashVon, protokolliereServer, sitzungAnlegen, sitzungBeenden, sitzungPruefen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import {
+  datenbank,
+  nutzerAendern,
+  passwortHashVon,
+  protokolliereServer,
+  sitzungAnlegen,
+  sitzungBeenden,
+  sitzungenDesNutzersBeenden,
+  sitzungPruefen,
+  SITZUNG_MS,
+  type NutzerInfo
+} from './datenbank'
 import { passwortHash, passwortPruefen } from './geheim'
-import { AnmeldeFehler, iservAnmeldeAdresse, iservBereit, iservRueckruf, notzugangAn, passwortAnmeldung } from './anmeldung'
+import {
+  AnmeldeFehler,
+  fehlversuch,
+  gesperrtWegenVersuchen,
+  iservAnmeldeAdresse,
+  iservBereit,
+  iservRueckruf,
+  notzugangAn,
+  passwortAnmeldung
+} from './anmeldung'
 import { auftragsRegister, buendel, oeffneStrom, sitzungVergessen } from './ereignisse'
 import { beschneideServer, SERVER_KANAELE } from './freigaben'
 import { OBERFLAECHE } from './pfade'
@@ -131,10 +151,20 @@ const TYPEN: Record<string, string> = {
 }
 
 /** Ein Nutzer als Kontext (für imNutzer) */
-export const alsNutzer = (n: NutzerInfo, kennung?: string): Nutzer => ({ id: n.id, benutzer: n.benutzer, name: n.name, rolle: n.rolle, quelle: n.quelle, sitzung: kennung })
+export const alsNutzer = (n: NutzerInfo, kennung?: string): Nutzer => ({
+  id: n.id,
+  benutzer: n.benutzer,
+  name: n.name,
+  rolle: n.rolle,
+  quelle: n.quelle,
+  sitzung: kennung
+})
 
 export function setzeSitzungsCookie(res: ServerResponse, cookie: string, maxAgeMs: number, sicher: boolean): void {
-  res.setHeader('set-cookie', `${COOKIE}=${encodeURIComponent(cookie)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAgeMs / 1000)}${sicher ? '; Secure' : ''}`)
+  res.setHeader(
+    'set-cookie',
+    `${COOKIE}=${encodeURIComponent(cookie)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAgeMs / 1000)}${sicher ? '; Secure' : ''}`
+  )
 }
 
 const loescheCookie = (res: ServerResponse, sicher: boolean): void =>
@@ -214,9 +244,11 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
   const behandle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const host = String(req.headers.host ?? '').toLowerCase()
     // Gesundheit (Docker prüft im Container über 127.0.0.1) – ohne Inhalte, vor der Adressprüfung
-    if (req.method === 'GET' && req.url === '/gesundheit' && !host.includes('gywemaviation')) return json(res, 200, { name: 'Schul-Apps', server: true, laeuft: true })
+    if (req.method === 'GET' && req.url === '/gesundheit' && !host.includes('gywemaviation'))
+      return json(res, 200, { name: 'Schul-Apps', server: true, laeuft: true })
     // Nie über die Adresse von Gywem Aviation – und nur unter den eigenen Adressen
-    if (host.includes('gywemaviation') || (hosts.size && !hosts.has(host))) return void res.writeHead(404, { 'content-type': 'text/plain' }).end('Nicht gefunden.')
+    if (host.includes('gywemaviation') || (hosts.size && !hosts.has(host)))
+      return void res.writeHead(404, { 'content-type': 'text/plain' }).end('Nicht gefunden.')
     res.setHeader('x-content-type-options', 'nosniff')
     res.setHeader('referrer-policy', 'same-origin')
     res.setHeader('x-frame-options', 'SAMEORIGIN')
@@ -251,7 +283,15 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         'cache-control': 'no-store',
         'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
       })
-      return void res.end(anmeldeSeite({ iserv: iservBereit(), notzugang: notzugangAn(), fehler: url.searchParams.get('fehler') ?? '', ziel: url.searchParams.get('ziel') ?? '/', benutzer: url.searchParams.get('benutzer') ?? '' }))
+      return void res.end(
+        anmeldeSeite({
+          iserv: iservBereit(),
+          notzugang: notzugangAn(),
+          fehler: url.searchParams.get('fehler') ?? '',
+          ziel: url.searchParams.get('ziel') ?? '/',
+          benutzer: url.searchParams.get('benutzer') ?? ''
+        })
+      )
     }
     if (req.method === 'GET' && url.pathname === '/auth/iserv') {
       try {
@@ -274,14 +314,17 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     if (req.method === 'GET' && url.pathname === '/auth/rueckruf') {
       try {
         const fehlerVonIserv = url.searchParams.get('error')
-        if (fehlerVonIserv) throw new AnmeldeFehler(fehlerVonIserv === 'access_denied' ? 'Die Anmeldung bei IServ wurde abgebrochen.' : `IServ: ${fehlerVonIserv}`)
+        if (fehlerVonIserv)
+          throw new AnmeldeFehler(fehlerVonIserv === 'access_denied' ? 'Die Anmeldung bei IServ wurde abgebrochen.' : `IServ: ${fehlerVonIserv}`)
         const { nutzer, ziel } = await iservRueckruf(rueckruf, url.searchParams.get('state') ?? '', url.searchParams.get('code') ?? '')
         const neu = sitzungAnlegen(nutzer.id, nutzer.rolle)
         setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS[nutzer.rolle], sicher)
         res.writeHead(302, { location: zielFuer(nutzer.rolle, ziel), 'cache-control': 'no-store' })
         return void res.end()
       } catch (e) {
-        res.writeHead(302, { location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Die Anmeldung bei IServ ist fehlgeschlagen.')}` })
+        res.writeHead(302, {
+          location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Die Anmeldung bei IServ ist fehlgeschlagen.')}`
+        })
         return void res.end()
       }
     }
@@ -298,7 +341,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         const weiter = zielFuer(nutzer.rolle, ziel)
         res.writeHead(303, { location: nutzer.passwortWechseln ? `/passwort?ziel=${encodeURIComponent(weiter)}` : weiter })
       } catch (e) {
-        res.writeHead(303, { location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(ziel)}` })
+        res.writeHead(303, {
+          location: `/anmelden?fehler=${encodeURIComponent(e instanceof AnmeldeFehler ? e.message : 'Anmeldung fehlgeschlagen.')}&ziel=${encodeURIComponent(ziel)}`
+        })
       }
       return void res.end()
     }
@@ -319,7 +364,13 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         'cache-control': 'no-store',
         'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'self'"
       })
-      return void res.end(passwortSeite({ name: sitzung.nutzer.name || sitzung.nutzer.benutzer, fehler: url.searchParams.get('fehler') ?? '', ziel: zielAus(url.searchParams.get('ziel')) }))
+      return void res.end(
+        passwortSeite({
+          name: sitzung.nutzer.name || sitzung.nutzer.benutzer,
+          fehler: url.searchParams.get('fehler') ?? '',
+          ziel: zielAus(url.searchParams.get('ziel'))
+        })
+      )
     }
     if (req.method === 'POST' && url.pathname === '/auth/passwort') {
       const herkunft = String(req.headers.origin ?? '')
@@ -345,6 +396,66 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       protokolliereServer('anmeldung', 'Eigenes Passwort gesetzt', sitzung.nutzer.id)
       return void res.writeHead(303, { location: sitzung.nutzer.rolle === 'schueler' && !ziel.startsWith('/s/') ? '/s/' : ziel }).end()
     }
+    // ---------- Passwort ändern aus den Einstellungen (Lehrkraft, Admin, Lernende; 03.10.2026)
+    if (req.method === 'POST' && url.pathname === '/konto/passwort') {
+      if (!mitKopf) return void res.writeHead(403).end()
+      if (!sitzung || sitzung.nutzer.quelle === 'gast') return json(res, 401, { fehler: 'Bitte zuerst anmelden.' })
+      if (sitzung.nutzer.quelle === 'iserv') return json(res, 400, { fehler: 'Dein Passwort verwaltest du in IServ.' })
+      const sperre = `pw:${sitzung.nutzer.id}`
+      if (gesperrtWegenVersuchen(sperre)) return json(res, 429, { fehler: 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.' })
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const alt = String(k0.alt ?? '')
+      const neu = String(k0.neu ?? '')
+      const hashAlt = passwortHashVon(sitzung.nutzer.benutzer)
+      if (!passwortPruefen(alt, hashAlt)) {
+        await new Promise((r) => setTimeout(r, Math.min(4000, 300 * fehlversuch(sperre))))
+        return json(res, 400, { fehler: 'Das bisherige Passwort stimmt nicht.', feld: 'alt' })
+      }
+      const fehler =
+        neu.length < 10
+          ? 'Das neue Passwort braucht mindestens 10 Zeichen.'
+          : neu !== String(k0.neu2 ?? '')
+            ? 'Die beiden neuen Passwörter stimmen nicht überein.'
+            : neu === alt
+              ? 'Das neue Passwort ist dasselbe wie das bisherige.'
+              : ''
+      if (fehler) return json(res, 400, { fehler, feld: 'neu' })
+      nutzerAendern(sitzung.nutzer.id, { passwortHash: passwortHash(neu), passwortWechseln: false })
+      // Andere Geräte abmelden (wer das Passwort ändert, will oft genau das), dieses bleibt angemeldet
+      if (k0.andereAbmelden === true) {
+        sitzungenDesNutzersBeenden(sitzung.nutzer.id)
+        const neueSitzung = sitzungAnlegen(sitzung.nutzer.id, sitzung.nutzer.rolle)
+        setzeSitzungsCookie(res, neueSitzung.cookie, SITZUNG_MS[sitzung.nutzer.rolle], sicher)
+      }
+      protokolliereServer('anmeldung', 'Passwort in den Einstellungen geändert', sitzung.nutzer.id)
+      return json(res, 200, { ok: true })
+    }
+
+    // ---------- Darstellung der Lernenden (Modus, Schrift, Farbe) – folgt dem Konto auf jedes Gerät
+    if (url.pathname === '/s/api/darstellung' && sitzung && sitzung.nutzer.quelle !== 'gast') {
+      const d = datenbank()
+      d.exec('CREATE TABLE IF NOT EXISTS nutzer_darstellung (nutzer_id TEXT PRIMARY KEY REFERENCES nutzer(id) ON DELETE CASCADE, daten TEXT NOT NULL)')
+      if (req.method === 'GET') {
+        const z = d.prepare('SELECT daten FROM nutzer_darstellung WHERE nutzer_id = ?').get(sitzung.nutzer.id) as { daten: string } | undefined
+        return json(res, 200, { darstellung: z ? (JSON.parse(z.daten) as unknown) : null })
+      }
+      if (req.method === 'POST' && mitKopf) {
+        const k0 = (await k.koerper()) as Record<string, unknown>
+        const wahl = (wert: unknown, erlaubt: string[], vorgabe: string): string => (erlaubt.includes(String(wert)) ? String(wert) : vorgabe)
+        const darstellung = {
+          modus: wahl(k0.modus, ['hell', 'dunkel', 'auto'], 'auto'),
+          schrift: wahl(k0.schrift, ['normal', 'gross', 'sehrgross'], 'normal'),
+          farbe: wahl(k0.farbe, ['blue', 'teal', 'grape', 'orange', 'pink', 'green'], 'blue'),
+          ruhig: k0.ruhig === true
+        }
+        d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
+          sitzung.nutzer.id,
+          JSON.stringify(darstellung)
+        )
+        return json(res, 200, { darstellung })
+      }
+    }
+
     // Solange das vorübergehende Passwort gilt, geht nichts anderes
     if (sitzung?.nutzer.passwortWechseln && !url.pathname.startsWith('/assets/') && url.pathname !== '/auth/abmelden') {
       if (req.method === 'GET' && !url.pathname.startsWith('/api') && !url.pathname.startsWith('/server/') && !url.pathname.startsWith('/s/api/'))
@@ -356,7 +467,15 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     if (req.method === 'GET' && url.pathname === '/server/ich.js') {
       res.writeHead(200, { 'content-type': TYPEN['.js'], 'cache-control': 'no-store' })
       const ich = sitzung
-        ? { angemeldet: true, benutzer: sitzung.nutzer.benutzer, name: sitzung.nutzer.name, rolle: sitzung.nutzer.rolle, quelle: sitzung.nutzer.quelle, eingerichtet: sitzung.nutzer.eingerichtet, adresse: opts.adresse }
+        ? {
+            angemeldet: true,
+            benutzer: sitzung.nutzer.benutzer,
+            name: sitzung.nutzer.name,
+            rolle: sitzung.nutzer.rolle,
+            quelle: sitzung.nutzer.quelle,
+            eingerichtet: sitzung.nutzer.eingerichtet,
+            adresse: opts.adresse
+          }
         : { angemeldet: false, adresse: opts.adresse }
       return void res.end(`window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};`)
     }
@@ -371,8 +490,12 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
         // Bündel (js/css) dürfen ohne Anmeldung kommen – die Anmeldeseite braucht sie nicht, schadet aber nicht
         if (datei) return statisch(res, decodeURIComponent(url.pathname))
         // Onlinetest per QR-Code: Solange IServ nicht freigeschaltet ist, reicht der Name (SchuelerBereich, src/server/onlinetest.ts)
-        if ((/^\/s\/[tfw]\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) || url.pathname === '/s/' || url.pathname === '/s') && !iservBereit()) return statisch(res, '/s/')
-        res.writeHead(302, { location: `/anmelden?ziel=${encodeURIComponent(url.pathname.startsWith('/s/') ? url.pathname : '/')}`, 'cache-control': 'no-store' })
+        if ((/^\/s\/[tfw]\/[A-Za-z0-9]{4,12}\/?$/.test(url.pathname) || url.pathname === '/s/' || url.pathname === '/s') && !iservBereit())
+          return statisch(res, '/s/')
+        res.writeHead(302, {
+          location: `/anmelden?ziel=${encodeURIComponent(url.pathname.startsWith('/s/') ? url.pathname : '/')}`,
+          'cache-control': 'no-store'
+        })
         return void res.end()
       }
       return json(res, 401, { fehler: 'Nicht angemeldet.' })
@@ -426,7 +549,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       }
       if (aktion === 'starten') {
         const kanal = String(koerper.channel ?? '')
-        if (!AUFTRAGS_KANAELE.includes(kanal) || !SERVER_KANAELE.has(kanal)) return json(res, 403, { fehler: `„${kanal}" lässt sich nicht als Auftrag starten.` })
+        if (!AUFTRAGS_KANAELE.includes(kanal) || !SERVER_KANAELE.has(kanal))
+          return json(res, 403, { fehler: `„${kanal}" lässt sich nicht als Auftrag starten.` })
         const roh = Array.isArray(koerper.args) ? (koerper.args as unknown[]) : []
         const args = kennzeichneAuftrag(kanal, beschneideServer(kanal, roh.map(auspacken)), id)
         const ich = alsNutzer(nutzer, sitzung.kennung)

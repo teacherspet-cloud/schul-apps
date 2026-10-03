@@ -18,7 +18,7 @@ export const ISERV_PRAEFIX = 'iserv:'
 export const ISERV_STANDARD_ZIEL = `Home/${SCHULMATERIAL}`
 
 /** Anzeigenamen der beiden Freigaben (so heißen sie im Web-Interface) */
-const ANZEIGE: Record<string, string> = { home: 'Eigene Dateien', groups: 'Gruppen', files: 'Dateien' }
+const ANZEIGE: Record<string, string> = { home: 'Eigene Dateien', eigene: 'Eigene Dateien', groups: 'Gruppen', files: 'Dateien' }
 
 /**
  * Die Schuladresse, wie die Lehrkraft sie einträgt („meineschule.de", „https://meineschule.de/iserv",
@@ -26,7 +26,9 @@ const ANZEIGE: Record<string, string> = { home: 'Eigene Dateien', groups: 'Grupp
  * abgelehnt (Passwort ginge im Klartext) – das meldet `iservAdressFehler`.
  */
 export function iservDomain(eingabe: string): string {
-  let s = String(eingabe ?? '').trim().toLowerCase()
+  let s = String(eingabe ?? '')
+    .trim()
+    .toLowerCase()
   if (!s || /^http:\/\//.test(s)) return ''
   s = s.replace(/^https:\/\//, '').replace(/^[a-z]+:\/\//, '')
   s = s.split(/[/?#]/)[0].replace(/:443$/, '').replace(/\.$/, '')
@@ -82,7 +84,31 @@ export function iservAnzeige(pfad: string | string[]): string {
 export const istIservPfad = (pfad: unknown): boolean => typeof pfad === 'string' && pfad.startsWith(ISERV_PRAEFIX)
 
 /** Liegt der Pfad in einem Gruppenordner (dort lesen oft viele mit)? */
-export const inGruppenordner = (teile: string[]): boolean => (teile[0] ?? '').toLowerCase() === 'groups'
+export const inGruppenordner = (teile: string[]): boolean => istGruppenWurzel(teile[0] ?? '')
+
+/**
+ * Die oberste Ebene heißt nicht überall gleich (gemeldet 03.10.2026): je nach IServ-Version und
+ * Sprache „Home"/„Groups", „Eigene"/„Gruppen" oder „Files". Gespeichert wird das Ziel mit dem
+ * Namen von damals – vor dem Ablegen wird der erste Teil auf den Namen umgestellt, den der Server
+ * gerade zeigt.
+ */
+export const istGruppenWurzel = (name: string): boolean => /^(groups|gruppen)$/i.test(name.trim())
+const istEigeneWurzel = (name: string): boolean => /^(home|eigene|eigene dateien|files|dateien)$/i.test(name.trim())
+
+/** Teile mit dem ersten Teil so, wie der Server die oberste Ebene nennt (unverändert, wenn nichts passt) */
+export function wurzelAngleichen(teile: string[], wurzel: string[]): string[] {
+  const erster = teile[0] ?? ''
+  if (!erster || wurzel.some((w) => w === erster)) return teile
+  const gleich = wurzel.find((w) => w.toLowerCase() === erster.toLowerCase())
+  const passend =
+    gleich ??
+    (istGruppenWurzel(erster)
+      ? wurzel.find(istGruppenWurzel)
+      : istEigeneWurzel(erster)
+        ? (wurzel.find(istEigeneWurzel) ?? (wurzel.length === 2 && wurzel.some(istGruppenWurzel) ? wurzel.find((w) => !istGruppenWurzel(w)) : undefined))
+        : undefined)
+  return passend ? [passend, ...teile.slice(1)] : teile
+}
 
 /** Ein Eintrag aus PROPFIND */
 export interface DavEintrag {

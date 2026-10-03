@@ -102,14 +102,15 @@ function Root(): React.JSX.Element {
  * Schülerinnen und Schüler haben auf die Programme keinen Zugriff (src/server/http.ts).
  */
 if (aufServer() && window.location.pathname.startsWith('/s/')) {
-  void import('./modules/onlinetest/SchuelerBereich').then(({ default: SchuelerBereich }) =>
-    createRoot(document.getElementById('root')!).render(
-      <StrictMode>
-        <MantineProvider>
-          <SchuelerBereich />
-        </MantineProvider>
-      </StrictMode>
-    )
+  void Promise.all([import('./modules/onlinetest/SchuelerBereich'), import('./modules/onlinetest/SchuelerEinstellungen')]).then(
+    ([{ default: SchuelerBereich }, { SchuelerRahmen }]) =>
+      createRoot(document.getElementById('root')!).render(
+        <StrictMode>
+          <SchuelerRahmen>
+            <SchuelerBereich />
+          </SchuelerRahmen>
+        </StrictMode>
+      )
   )
 } else {
   const ersterLauf = imNetz() && abgemeldet() ? Promise.resolve() : useAppSettings.getState().load()

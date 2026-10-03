@@ -9,6 +9,7 @@ import {
   Container,
   Divider,
   Group,
+  Modal,
   PasswordInput,
   ScrollArea,
   SegmentedControl,
@@ -34,11 +35,13 @@ import {
   IconPalette,
   IconPhoto,
   IconRefresh,
+  IconKey,
   IconSchool,
   IconSparkles,
   IconSun
 } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
+import { PasswortAendern } from '../shared/PasswortAendern'
 import {
   AI_PROVIDERS,
   AiAccess,
@@ -99,8 +102,12 @@ export default function SettingsPage(): React.JSX.Element {
   const { settings, update } = useAppSettings()
   const gewuenscht = useNavigation((s) => s.settingsTab)
   const setTab = useNavigation((s) => s.setSettingsTab)
+  const [passwortOffen, setPasswortOffen] = useState(false)
   // KI-Zugang, Netzwerk und Wartung gibt es nur am Rechner – vom Tablet aus gilt dann der erste Reiter
-  const tab = (imNetz() && (['netzwerk', 'wartung'].includes(gewuenscht) || (nurPcNetz() && gewuenscht === 'ki'))) || (aufIos() && gewuenscht === 'netzwerk') ? 'schule' : gewuenscht
+  const tab =
+    (imNetz() && (['netzwerk', 'wartung'].includes(gewuenscht) || (nurPcNetz() && gewuenscht === 'ki'))) || (aufIos() && gewuenscht === 'netzwerk')
+      ? 'schule'
+      : gewuenscht
 
   return (
     <Tabs
@@ -121,19 +128,31 @@ export default function SettingsPage(): React.JSX.Element {
             <Text size="sm" c="dimmed">
               Angemeldet als {serverIch()?.name || serverIch()?.benutzer} ({serverIch()?.benutzer})
             </Text>
-            <Button
-              size="xs"
-              variant="light"
-              color="gray"
-              onClick={() =>
-                void fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } })
-                  .catch(() => undefined)
-                  .then(() => window.location.assign('/anmelden'))
-              }
-            >
-              Abmelden
-            </Button>
+            <Group gap="xs">
+              {serverIch()?.quelle !== 'iserv' && (
+                <Button size="xs" variant="light" leftSection={<IconKey size={14} />} onClick={() => setPasswortOffen(true)} data-passwort-knopf>
+                  Passwort ändern
+                </Button>
+              )}
+              <Button
+                size="xs"
+                variant="light"
+                color="gray"
+                onClick={() =>
+                  void fetch('/auth/abmelden', { method: 'POST', headers: { 'x-schulapps-token': 'server' } })
+                    .catch(() => undefined)
+                    .then(() => window.location.assign('/anmelden'))
+                }
+              >
+                Abmelden
+              </Button>
+            </Group>
           </Group>
+        )}
+        {passwortOffen && (
+          <Modal opened onClose={() => setPasswortOffen(false)} title="Passwort ändern">
+            <PasswortAendern fertig={() => setPasswortOffen(false)} />
+          </Modal>
         )}
         <Tabs.List>
           <Tabs.Tab value="schule" leftSection={<IconSchool size={16} />}>
@@ -647,22 +666,22 @@ export function ImageAiCard({ settings, update }: { settings: AppSettings; updat
         {ios && <PcKiWahl settings={settings} update={update} gruppe="bilder" />}
         {ueberPc && <PcKiVerbindung settings={settings} update={update} />}
         {!ueberPc && (
-        <Select
-          label="KI für Bilder"
-          data={[
-            { value: 'openai', label: 'OpenAI (ChatGPT)' },
-            { value: 'google', label: 'Google (Gemini)' },
-            {
-              value: 'anthropic',
-              label: 'Anthropic (Claude) – zeichnet Vektorgrafiken'
-            },
-            { value: 'none', label: 'Keine KI-Bilder' }
-          ]}
-          value={ai.imageProvider}
-          onChange={(v) => v && update({ ai: { imageProvider: v as ImageProviderId } })}
-          allowDeselect={false}
-          description="Claude erzeugt keine Fotos, zeichnet aber einfache Vektorgrafiken (gut für Piktogramme)."
-        />
+          <Select
+            label="KI für Bilder"
+            data={[
+              { value: 'openai', label: 'OpenAI (ChatGPT)' },
+              { value: 'google', label: 'Google (Gemini)' },
+              {
+                value: 'anthropic',
+                label: 'Anthropic (Claude) – zeichnet Vektorgrafiken'
+              },
+              { value: 'none', label: 'Keine KI-Bilder' }
+            ]}
+            value={ai.imageProvider}
+            onChange={(v) => v && update({ ai: { imageProvider: v as ImageProviderId } })}
+            allowDeselect={false}
+            description="Claude erzeugt keine Fotos, zeichnet aber einfache Vektorgrafiken (gut für Piktogramme)."
+          />
         )}
         {imageProvider && !ueberPc && (
           <>

@@ -9,7 +9,7 @@
  * Anmeldung fehlgeschlagen (401), WebDAV nicht freigeschaltet (404/405/HTML statt Multi-Status),
  * keine Verbindung (Netz), Speicher voll (507).
  */
-import { davUrl, iservKandidaten, inhaltstyp, leseMultistatus, pfadTeile, type DavEintrag } from '@shared/iserv'
+import { davUrl, istGruppenWurzel, iservKandidaten, inhaltstyp, leseMultistatus, pfadTeile, type DavEintrag } from '@shared/iserv'
 import { freierDateiname } from '@shared/dateiname'
 
 export interface DavAnfrage {
@@ -53,8 +53,7 @@ export const MELDUNG: Record<IservFehlerArt, string> = {
   unbekannt: 'IServ: Der Server hat unerwartet geantwortet.'
 }
 
-const PROPFIND_KOERPER =
-  '<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>'
+const PROPFIND_KOERPER = '<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/></d:prop></d:propfind>'
 
 /** Basic-Anmeldung; Benutzername und Passwort als UTF-8 (Umlaute im Passwort) */
 export function basicKopf(benutzer: string, passwort: string): string {
@@ -124,7 +123,7 @@ export async function existiert(z: IservZugang, teile: string[]): Promise<boolea
  * Groups und je Gruppe) legt niemand an – deren Fehlen ist ein Fehler, kein Anlass für MKCOL.
  */
 export async function ordnerSicherstellen(z: IservZugang, teile: string[]): Promise<void> {
-  const fest = (teile[0] ?? '').toLowerCase() === 'groups' ? 2 : 1
+  const fest = istGruppenWurzel(teile[0] ?? '') ? 2 : 1
   for (let i = fest + 1; i <= teile.length; i++) {
     const r = await anfrage(z, { methode: 'MKCOL', url: davUrl(z.basis, teile.slice(0, i), true) })
     // 201 angelegt, 405 gibt es schon
@@ -172,12 +171,7 @@ export async function herunterladen(z: IservZugang, teile: string[]): Promise<Ui
  * (webdav.<domain>, <domain>/webdav). Eine 401 bricht sofort ab – die Adresse stimmt, die
  * Zugangsdaten nicht. Liefert die Basis und die oberste Ebene (Home, Groups).
  */
-export async function verbindungFinden(
-  abruf: DavAbruf,
-  schule: string,
-  benutzer: string,
-  passwort: string
-): Promise<{ basis: string; wurzel: DavEintrag[] }> {
+export async function verbindungFinden(abruf: DavAbruf, schule: string, benutzer: string, passwort: string): Promise<{ basis: string; wurzel: DavEintrag[] }> {
   const kandidaten = iservKandidaten(schule)
   if (!kandidaten.length) throw new IservFehler('netz', 'IServ: Die Adresse der Schule ist so nicht verwendbar (z. B. meineschule.de).')
   if (!benutzer.trim() || !passwort) throw new IservFehler('anmeldung', 'IServ: Benutzername und Passwort fehlen.')
