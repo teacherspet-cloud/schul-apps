@@ -289,10 +289,33 @@ export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
           {v.exampleTranslation}
         </Text>
       )}
-      <div className="vt-gelegt" style={{ minHeight: 64, width: '100%' }} data-satz-gelegt>
-        <Text size="lg" fw={600} c={urteil === 'falsch' ? 'red' : urteil === 'richtig' ? 'teal' : 'var(--vt-a-dunkel)'} ta="center">
-          {gelegt.map((k) => teile[k]).join(' ') || ' '}
-        </Text>
+      {/* Gelegte Wörter antippen nimmt sie wieder heraus (Wunsch der Lehrkraft, 03.10.2026) */}
+      <div className="vt-gelegt" style={{ minHeight: 64, width: '100%', display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }} data-satz-gelegt>
+        {gelegt.length === 0 && <Text c="dimmed">Tippe die Wörter unten in der richtigen Reihenfolge an.</Text>}
+        {gelegt.map((k) => (
+          <button
+            key={k}
+            type="button"
+            disabled={Boolean(urteil)}
+            onClick={() => setGelegt(gelegt.filter((x) => x !== k))}
+            title={urteil ? undefined : 'Antippen zum Herausnehmen'}
+            style={{
+              border: 0,
+              borderRadius: 8,
+              padding: '4px 8px',
+              font: 'inherit',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              cursor: urteil ? 'default' : 'pointer',
+              background: 'var(--vt-flaeche)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+              color: urteil === 'falsch' ? 'var(--vt-schlecht-text)' : urteil === 'richtig' ? 'var(--vt-gut-text)' : 'var(--vt-a-dunkel)'
+            }}
+            data-satz-gelegtes={k}
+          >
+            {teile[k]}
+          </button>
+        ))}
       </div>
       {urteil === 'falsch' && (
         <Text size="sm" ta="center">

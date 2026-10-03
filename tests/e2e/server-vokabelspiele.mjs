@@ -107,6 +107,13 @@ try {
 
   // Satzpuzzle: Teile in ursprünglicher Reihenfolge legen
   await s.locator('[data-spiel-wahl="satz"]').click()
+  // Ein gelegtes Wort antippen nimmt es wieder heraus
+  await s.locator('[data-satz-teil="0"]').click()
+  await s.locator('[data-satz-gelegtes="0"]').click()
+  pruefe(
+    (await s.locator('[data-satz-gelegtes]').count()) === 0 && (await s.locator('[data-satz-teil="0"]').isEnabled()),
+    'Satzpuzzle: gelegtes Wort antippen nimmt es heraus'
+  )
   for (let i = 0; i < 6 && !(await s.locator('[data-spiel-ergebnis]').isVisible()); i++) {
     const n = await s.locator('[data-satz-teil]').count()
     for (let k = 0; k < n; k++) await s.locator(`[data-satz-teil="${k}"]`).click()
