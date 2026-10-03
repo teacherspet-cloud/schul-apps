@@ -51,7 +51,24 @@ const MOTIVE = {
     'a red pen leaning against the clipboard and a small round white stopwatch.',
   'gruppe-verwaltung':
     'Tile colour: cool grey (#adb5bd to #495057). Motif: a white filing cabinet with two drawers, the top drawer slightly open showing coloured folders (blue, yellow, green), ' +
-    'and a small silver gear wheel in front.'
+    'and a small silver gear wheel in front.',
+  // 03.10.2026: Vokabelspiele („Spielen mit deinen Wörtern")
+  'spiel-memory':
+    'Tile colour: coral red (#ff8787 to #e03131). Motif: four white memory cards in a 2 by 2 grid, two of them turned face up showing a matching pair (a small sun symbol on both), two face down with a question mark.',
+  'spiel-zuordnen':
+    'Tile colour: purple (#cc5de8 to #9c36b5). Motif: two short columns of three white rounded word tiles (blank, no letters), connected left to right by two curved white lines; a small white stopwatch in the corner.',
+  'spiel-blitz':
+    'Tile colour: sunny yellow (#ffd43b to #f59f00). Motif: a big white lightning bolt in front of a round white clock face with a short orange segment, small sparkles around.',
+  'spiel-satz':
+    'Tile colour: cyan (#3bc9db to #0c8599). Motif: four white jigsaw puzzle pieces in a row, the last one slightly lifted and about to click into place, each with a short grey line suggesting a word.',
+  'spiel-wortraten':
+    'Tile colour: pink (#f783ac to #d6336c). Motif: a friendly white flower with seven petals, one petal gently falling off; below it three white letter tiles with blank spaces (no letters), like a word-guessing game.',
+  'spiel-kreuzwort':
+    'Tile colour: indigo (#748ffc to #4263eb). Motif: a white crossword grid with a few crossing rows of squares, some squares filled with small blue dots instead of letters, a yellow pencil lying diagonally.',
+  'spiel-fallend':
+    'Tile colour: teal (#38d9a9 to #099268). Motif: three white rounded word bubbles (blank) falling from the top at different heights with small motion lines, and a white keyboard key at the bottom.',
+  'spiel-suchsel':
+    'Tile colour: lime green (#a9e34b to #66a80f). Motif: a white square grid of small tiles (no letters, just light grey squares) with one diagonal row and one horizontal row highlighted in bright yellow, a small magnifying glass in front.'
 }
 
 const out = resolve(process.argv[2] ?? 'test-results/programmbilder')

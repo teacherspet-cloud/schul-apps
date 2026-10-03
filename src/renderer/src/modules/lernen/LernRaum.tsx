@@ -8,6 +8,7 @@
  *    umdrehen) und Mappen je Themenbereich (umblättern: Arbeitsblätter mit Feedback, Tafelbilder,
  *    Schreibaufgaben, Tests, Lernprodukte).
  */
+import { VokabelwegKarten } from './VokabelLeiter'
 import { ActionIcon, Alert, Badge, Button, Center, Group, Loader, Modal, Stack, Text, Title } from '@mantine/core'
 import { IconArrowLeft, IconChevronLeft, IconChevronRight, IconExternalLink } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
@@ -125,6 +126,7 @@ export default function LernRaum({ fach }: { fach?: string }): React.JSX.Element
       <Button variant="subtle" component="a" href="/s/" w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
         Startseite
       </Button>
+      <VokabelwegKarten />
       <div>
         <Title order={3}>Dein Lernraum</Title>
         <Text c="dimmed" size="sm">
@@ -190,6 +192,7 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
         Alle Türen
       </Button>
       <Title order={3}>{raum.fach}</Title>
+      <VokabelwegKarten fach={raum.fach} />
       <div className="lr-regal">
         <Text fw={700} size="sm" mb="xs">
           Karteikästen

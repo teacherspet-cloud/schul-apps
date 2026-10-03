@@ -8,6 +8,7 @@
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
 import { Spielwahl } from './spiele/Spiele'
+import { VokabelLeiter, type WegKurz } from './VokabelLeiter'
 import { besteStimme } from './stimme'
 import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
 import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
@@ -61,6 +62,8 @@ interface Liste {
   ansehen?: string[]
   /** Fachfarbe des Kopfbands (Einstellung der Lehrkraft) */
   farbe?: string | null
+  /** Vokabelweg (03.10.2026): die Freischalt-Leiter */
+  weg?: WegKurz
 }
 
 const STIMME: Record<string, string> = {
@@ -279,6 +282,7 @@ function Kasten({
               </div>
             </div>
           </div>
+          {d.weg && <VokabelLeiter weg={d.weg} />}
           <div>
             <Text size="sm" fw={700} mb={6} c="var(--vt-a-dunkel)">
               Dein Karteikasten

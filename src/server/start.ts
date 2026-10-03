@@ -10,6 +10,7 @@
  *   SCHULAPPS_SCHLUESSEL    Datei des Hauptschlüssels (Docker-Secret)
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
  */
+import { vokabelwegRoute } from './vokabelweg'
 import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
 import { registriereKanaele, type Handle } from '../main/kanaele'
@@ -101,6 +102,8 @@ async function main(): Promise<void> {
       feedbackRoute(aufruf, adresse),
       blaetterRoute(aufruf, adresse),
       reihenRoute(aufruf),
+      // Vokabelweg vor den Listen: er übernimmt die Kennungen „lb:…"
+      vokabelwegRoute(),
       vokabelRoute(adresse),
       lernenRoute(),
       schuelerRoute(aufruf),

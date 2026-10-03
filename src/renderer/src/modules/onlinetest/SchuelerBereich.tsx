@@ -138,6 +138,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokabeln = /^\/s\/v\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokCode = /^\/s\/vt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  // Vokabelweg (03.10.2026): gemeinsamer Kasten einer Lehrwerksreihe
+  const vokWeg = /^\/s\/vw\/([^/]+)/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
   const reiheM = /^\/s\/r\/([a-f0-9]{8,32})(?:\/([a-z0-9]{2,20}))?/.exec(pfad)
   // Aus einer Unterrichtsreihe geöffnet (Arbeitsblatt, Aufgabe, Test): Rückweg zur Reihe
@@ -157,6 +159,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <VokabelBeitritt code={vokCode.toUpperCase()} />
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
+  ) : vokWeg && !gast ? (
+    <VokabelTrainer id={`lb:${decodeURIComponent(vokWeg)}`} />
   ) : vokabeln ? (
     <VokabelTrainer id={vokabeln} />
   ) : lernFach && !gast ? (

@@ -40,6 +40,7 @@ export const SENSIBEL: Record<string, string[]> = {
   reihen_dateien: ['daten', 'name'],
   vok_zuweisungen: ['schueler'],
   vok_stand: ['daten'],
+  vok_laufbahn: ['daten'],
   tafel_freigaben: ['schueler']
 }
 const SPALTEN = new Set(Object.values(SENSIBEL).flat())

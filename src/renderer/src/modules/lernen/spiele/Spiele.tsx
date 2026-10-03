@@ -35,6 +35,10 @@ const SYMBOL: Record<SpielId, React.ReactNode> = {
   fallend: <IconTypography size={22} />,
   suchsel: <IconBrain size={22} />
 }
+/** KI-Bilder der Spiele (03.10.2026, über die Bild-KI der Exe erzeugt); ohne Bild das Symbol */
+const BILDER = import.meta.glob<string>('../../../assets/programme/spiel-*.webp', { eager: true, import: 'default' })
+const spielBild = (id: SpielId): string | undefined => BILDER[`../../../assets/programme/spiel-${id}.webp`]
+
 const FARBE: Record<SpielId, string> = {
   memory: 'red',
   zuordnen: 'grape',
@@ -242,9 +246,13 @@ export function Spielwahl({
                   data-spiel-wahl={s.id}
                 >
                   <Group wrap="nowrap" align="flex-start">
-                    <ThemeIcon size={44} radius="md" variant="light" color={FARBE[s.id]}>
-                      {SYMBOL[s.id]}
-                    </ThemeIcon>
+                    {spielBild(s.id) ? (
+                      <img src={spielBild(s.id)} alt="" width={56} height={56} style={{ flex: 'none', borderRadius: 14 }} data-spiel-bild={s.id} />
+                    ) : (
+                      <ThemeIcon size={44} radius="md" variant="light" color={FARBE[s.id]}>
+                        {SYMBOL[s.id]}
+                      </ThemeIcon>
+                    )}
                     <div style={{ minWidth: 0 }}>
                       <Text fw={700}>{s.name}</Text>
                       <Text size="xs" c="dimmed">

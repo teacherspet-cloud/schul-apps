@@ -16,6 +16,8 @@ export interface VokabelAuswahl {
   sprache: string
   fach: string
   woerter: Vokabel[]
+  /** Herkunft aus dem Lehrwerk – für den Vokabelweg der Lernenden (03.10.2026) */
+  quelle?: { lehrwerk: string; unit: string; abschnitte: string[] }
 }
 
 const FACH_ZU: Record<string, string> = {
@@ -99,7 +101,13 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
               ...(e.note ? { note: e.note } : {})
             }))
         )
-      wahl({ titel: [buch.name, unit, abschnitte.join(', ')].join(' - '), sprache: buch.language, fach: FACH_ZU[buch.language] ?? buch.language, woerter })
+      wahl({
+        titel: [buch.name, unit, abschnitte.join(', ')].join(' - '),
+        sprache: buch.language,
+        fach: FACH_ZU[buch.language] ?? buch.language,
+        woerter,
+        quelle: { lehrwerk: buch.id, unit, abschnitte }
+      })
     } else {
       const l = listen.find((x) => x.id === liste)
       if (!l) return wahl(null)

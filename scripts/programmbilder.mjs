@@ -46,7 +46,15 @@ const IDS = [
   'gruppe-unterricht',
   'gruppe-planung',
   'gruppe-pruefung',
-  'gruppe-verwaltung'
+  'gruppe-verwaltung',
+  'spiel-memory',
+  'spiel-zuordnen',
+  'spiel-blitz',
+  'spiel-satz',
+  'spiel-wortraten',
+  'spiel-kreuzwort',
+  'spiel-fallend',
+  'spiel-suchsel'
 ]
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320

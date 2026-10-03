@@ -70,18 +70,20 @@ CREATE TABLE IF NOT EXISTS vok_gaeste (
 );`
 
 let bereit = false
-const db = () => {
+export const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
     const spalten = new Set((d.prepare('PRAGMA table_info(vok_zuweisungen)').all() as { name: string }[]).map((x) => x.name))
     if (!spalten.has('code')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN code TEXT NOT NULL DEFAULT ''")
     if (!spalten.has('bis')) d.exec('ALTER TABLE vok_zuweisungen ADD COLUMN bis INTEGER')
+    // Herkunft aus dem Lehrwerk (Vokabelweg, 03.10.2026): {lehrwerk, unit, abschnitte}
+    if (!spalten.has('quelle')) d.exec("ALTER TABLE vok_zuweisungen ADD COLUMN quelle TEXT NOT NULL DEFAULT ''")
     bereit = true
   }
   return d
 }
-const json_ = <T>(s: string | null | undefined, r: T): T => {
+export const json_ = <T>(s: string | null | undefined, r: T): T => {
   try {
     return s ? (JSON.parse(s) as T) : r
   } catch {
@@ -89,7 +91,7 @@ const json_ = <T>(s: string | null | undefined, r: T): T => {
   }
 }
 
-interface Zeile {
+export interface Zeile {
   id: string
   lehrkraft_id: string
   lerngruppe_id: string
@@ -106,10 +108,12 @@ interface Zeile {
   code: string
   /** Lernzeitraum bis (ms); danach abgeschlossen */
   bis: number | null
+  /** Herkunft aus dem Lehrwerk (JSON), leer bei eigenen Listen */
+  quelle?: string
 }
 
 /** Offen = nicht beendet und Zeitraum nicht abgelaufen */
-const istOffen = (z: Pick<Zeile, 'status' | 'bis'>): boolean => z.status === 'offen' && !(z.bis && z.bis < Date.now())
+export const istOffen = (z: Pick<Zeile, 'status' | 'bis'>): boolean => z.status === 'offen' && !(z.bis && z.bis < Date.now())
 
 const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 function neuerCode(n = 6): string {
@@ -140,12 +144,12 @@ export interface VokStand {
   ansehen?: string[]
 }
 
-const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM vok_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
-const standVon = (zid: string, sid: string): VokStand => {
+export const zeile = (id: string): Zeile | null => (db().prepare('SELECT * FROM vok_zuweisungen WHERE id = ?').get(id) as Zeile | undefined) ?? null
+export const standVon = (zid: string, sid: string): VokStand => {
   const z = db().prepare('SELECT daten FROM vok_stand WHERE zuweisung_id = ? AND schueler_id = ?').get(zid, sid) as { daten: string } | undefined
   return json_(z?.daten, { woerter: {}, tage: [] } as VokStand)
 }
-function standSpeichern(zid: string, sid: string, s: VokStand): void {
+export function standSpeichern(zid: string, sid: string, s: VokStand): void {
   db()
     .prepare(
       'INSERT INTO vok_stand (zuweisung_id, schueler_id, daten, aktualisiert) VALUES (?, ?, ?, ?) ON CONFLICT (zuweisung_id, schueler_id) DO UPDATE SET daten = excluded.daten, aktualisiert = excluded.aktualisiert'
@@ -199,6 +203,20 @@ function bereinigeWoerter(roh: unknown): Vokabel[] {
     .filter((v) => v.term && v.translation)
 }
 
+/** Herkunft aus dem Lehrwerk prüfen (nur Kennung, Unit, Abschnittsnamen) */
+function quelleBereinigt(roh: unknown): string {
+  const q = (roh ?? {}) as Record<string, unknown>
+  if (typeof q.lehrwerk !== 'string' || !/^[a-z0-9-]{1,60}$/.test(q.lehrwerk) || typeof q.unit !== 'string' || !Array.isArray(q.abschnitte)) return ''
+  return JSON.stringify({
+    lehrwerk: q.lehrwerk,
+    unit: q.unit.slice(0, 120),
+    abschnitte: q.abschnitte
+      .map(String)
+      .slice(0, 20)
+      .map((x) => x.slice(0, 120))
+  })
+}
+
 /** Neue Zuweisung anlegen (auch für einen Schritt einer Unterrichtsreihe) */
 export function vokabelnZuweisen(e: {
   lehrkraftId: string
@@ -212,13 +230,14 @@ export function vokabelnZuweisen(e: {
   reihe?: string
   gaeste?: boolean
   bis?: number | null
+  quelle?: unknown
 }): string {
   const id = randomBytes(8).toString('hex')
   const woerter = bereinigeWoerter(e.woerter)
   if (!woerter.length) throw new Error('Die Liste hat keine Vokabeln.')
   db()
     .prepare(
-      "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?)"
+      "INSERT INTO vok_zuweisungen (id, lehrkraft_id, lerngruppe_id, schueler, titel, sprache, fach, woerter, test_termin, reihe, status, erstellt, code, bis, quelle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'offen', ?, ?, ?, ?)"
     )
     .run(
       id,
@@ -233,7 +252,8 @@ export function vokabelnZuweisen(e: {
       e.reihe ?? '',
       new Date().toISOString(),
       e.gaeste ? neuerCode() : '',
-      e.bis ?? null
+      e.bis ?? null,
+      quelleBereinigt(e.quelle)
     )
   return id
 }
@@ -269,10 +289,62 @@ export function vokabelListenFuer(
  * Fachfarbe des Kopfbands, wie die Lehrkraft sie eingestellt hat (sonst der Vorschlag des Fachs) –
  * das Vokabeltraining der Lernenden sieht aus wie ihre Arbeitsblätter (03.10.2026)
  */
-async function fachfarbeDerLehrkraft(z: Zeile): Promise<string | null> {
+export async function fachfarbeDerLehrkraft(z: Zeile): Promise<string | null> {
   const lk = nutzerNachId(z.lehrkraft_id)
   const eigene = lk ? await imNutzer(alsNutzer(lk), async () => getSettings().fachfarben).catch(() => undefined) : undefined
   return fachFarbeAus(z.fach, eigene)
+}
+
+/**
+ * Eine Abfrage auswerten und den Stand des Wortes fortschreiben – für die Liste und den Vokabelweg.
+ */
+export function abfrageAuswerten(
+  v: Vokabel,
+  k0: Record<string, unknown>,
+  stand: VokStand,
+  testTermin?: number
+): { ergebnis: { urteil: Urteil; hinweis?: string; richtig: string }; neu: WortStand } | null {
+  const uebung = String(k0.uebung ?? '') as Uebung
+  if (!UEBUNGEN.includes(uebung)) return null
+  const antwort = String(k0.antwort ?? '').slice(0, 200)
+  // Lernkarte: Selbsteinschätzung nur beim ersten Kontakt; „Stimmt das Paar?": richtig, wenn das Urteil zur gezeigten Übersetzung passt
+  const paarStimmt = uebung === 'paar' ? bewerte(String(k0.gezeigt ?? ''), v.translation, true).urteil === 'richtig' : false
+  const ergebnis: { urteil: Urteil; hinweis?: string; richtig: string } =
+    uebung === 'karte'
+      ? { urteil: k0.gewusst === true ? 'richtig' : 'falsch', richtig: v.term }
+      : uebung === 'paar'
+        ? { urteil: (antwort === 'stimmt') === paarStimmt ? 'richtig' : 'falsch', richtig: `${v.term} – ${v.translation}` }
+        : bewerte(antwort, loesungFuer(v, uebung), uebung === 'auswahlFs')
+  const jetzt = Date.now()
+  const neu = nachAbfrage(
+    stand.woerter[v.id] ?? neuerStand(),
+    uebung,
+    ergebnis.urteil,
+    // „Typische Falschantworten" nur aus eigenen Antworten – nicht aus vorgegebenen Falschschreibungen oder „stimmt nicht"
+    uebung === 'karte' || uebung === 'paar' || uebung === 'auswahlFs' ? '' : antwort,
+    jetzt,
+    testTermin
+  )
+  stand.woerter[v.id] = neu
+  // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
+  if (ergebnis.urteil === 'richtig' && stand.ansehen?.includes(v.id)) stand.ansehen = stand.ansehen.filter((x) => x !== v.id)
+  const heute = new Date(jetzt).toISOString().slice(0, 10)
+  if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
+  return { ergebnis, neu }
+}
+
+/** Spiel beendet: Rekord und „nochmal ansehen" in einen Stand eintragen */
+export function spielEintragen(stand: VokStand, k0: Record<string, unknown>, gueltig: (wortId: string) => boolean): { rekord: boolean } | null {
+  const spiel = String(k0.spiel ?? '') as SpielId
+  const wert = Number(k0.wert)
+  if (!SPIELE.some((x) => x.id === spiel) || !Number.isFinite(wert) || wert < 0 || wert > 100000) return null
+  const rekord = istRekord(spiel, wert, stand.rekorde?.[spiel])
+  if (rekord) stand.rekorde = { ...(stand.rekorde ?? {}), [spiel]: wert }
+  const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter(gueltig)
+  stand.ansehen = [...new Set([...(stand.ansehen ?? []), ...fehler])].slice(-30)
+  const heute = new Date().toISOString().slice(0, 10)
+  if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
+  return { rekord }
 }
 
 /** Was eine Übung als Lösung erwartet */
@@ -374,52 +446,19 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         )
       // Spiel beendet: Rekord und „nochmal ansehen" – der Karteikasten bleibt unverändert (abgestimmt 03.10.2026)
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/spiel') {
-        const k0 = (await k.koerper()) as Record<string, unknown>
-        const spiel = String(k0.spiel ?? '') as SpielId
-        const wert = Number(k0.wert)
-        if (!SPIELE.some((x) => x.id === spiel) || !Number.isFinite(wert) || wert < 0 || wert > 100000)
-          return (json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true)
-        const rekord = istRekord(spiel, wert, st.rekorde?.[spiel])
-        if (rekord) st.rekorde = { ...(st.rekorde ?? {}), [spiel]: wert }
-        const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter((wid) => woerter.some((w) => w.id === wid))
-        st.ansehen = [...new Set([...(st.ansehen ?? []), ...fehler])].slice(-30)
-        const heute = new Date().toISOString().slice(0, 10)
-        if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
+        const r = spielEintragen(st, (await k.koerper()) as Record<string, unknown>, (wid) => woerter.some((w) => w.id === wid))
+        if (!r) return (json(res, 400, { fehler: 'Unbekanntes Spiel.' }), true)
         standSpeichern(z.id, ich.id, st)
-        return (json(res, 200, { rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true)
+        return (json(res, 200, { rekord: r.rekord, rekorde: st.rekorde ?? {}, ansehen: st.ansehen }), true)
       }
       if (req.method === 'POST' && url.pathname === '/s/api/vokabeln/antwort') {
         if (!istOffen(z)) return (json(res, 409, { fehler: 'Diese Liste ist abgeschlossen.' }), true)
         const k0 = (await k.koerper()) as Record<string, unknown>
         const v = woerter.find((w) => w.id === k0.wortId)
-        const uebung = String(k0.uebung ?? '') as Uebung
-        if (!v || !UEBUNGEN.includes(uebung)) return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
-        const antwort = String(k0.antwort ?? '').slice(0, 200)
-        // Lernkarte: Selbsteinschätzung nur beim ersten Kontakt; alles andere wertet der Server
-        // „Stimmt das Paar?": richtig, wenn das Urteil zur gezeigten Übersetzung passt
-        const paarStimmt = uebung === 'paar' ? bewerte(String(k0.gezeigt ?? ''), v.translation, true).urteil === 'richtig' : false
-        const ergebnis: { urteil: Urteil; hinweis?: string; richtig: string } =
-          uebung === 'karte'
-            ? { urteil: k0.gewusst === true ? 'richtig' : 'falsch', richtig: v.term }
-            : uebung === 'paar'
-              ? { urteil: (antwort === 'stimmt') === paarStimmt ? 'richtig' : 'falsch', richtig: `${v.term} – ${v.translation}` }
-              : bewerte(antwort, loesungFuer(v, uebung), uebung === 'auswahlFs')
-        const jetzt = Date.now()
-        const neu = nachAbfrage(
-          st.woerter[v.id] ?? neuerStand(),
-          uebung,
-          ergebnis.urteil,
-          // „Typische Falschantworten" nur aus eigenen Antworten – nicht aus vorgegebenen Falschschreibungen oder „stimmt nicht"
-          uebung === 'karte' || uebung === 'paar' || uebung === 'auswahlFs' ? '' : antwort,
-          jetzt,
-          z.test_termin ?? undefined
-        )
-        st.woerter[v.id] = neu
-        // Richtig geübt: von der Liste „nochmal ansehen" (aus den Spielen) streichen
-        if (ergebnis.urteil === 'richtig' && st.ansehen?.includes(v.id)) st.ansehen = st.ansehen.filter((x) => x !== v.id)
-        const heute = new Date(jetzt).toISOString().slice(0, 10)
-        if (!st.tage.includes(heute)) st.tage = [...st.tage, heute].slice(-60)
+        const r = v ? abfrageAuswerten(v, k0, st, z.test_termin ?? undefined) : null
+        if (!r) return (json(res, 400, { fehler: 'Unbekannte Abfrage.' }), true)
         standSpeichern(z.id, ich.id, st)
+        const { ergebnis, neu } = r
         return (json(res, 200, { ...ergebnis, stand: neu, sicher: istSicher(neu) }), true)
       }
       return (json(res, 404, { fehler: 'Unbekannt.' }), true)
@@ -482,7 +521,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
           woerter: k0.woerter,
           testTermin: typeof k0.testTermin === 'number' ? k0.testTermin : null,
           gaeste: mitGaesten,
-          bis
+          bis,
+          quelle: k0.quelle
         })
         protokolliereServer('vokabeln', 'Vokabeln zum Lernen freigegeben', ich.id)
         return (json(res, 200, { id }), true)

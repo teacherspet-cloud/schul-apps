@@ -218,7 +218,8 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         schueler: art === 'einzeln' ? einzelne : [],
         testTermin: ausFeld(termin, '08:00:00'),
         bis: ausFeld(bis, '23:59:00'),
-        gaeste: art === 'code' || qr
+        gaeste: art === 'code' || qr,
+        ...(auswahl.quelle ? { quelle: auswahl.quelle } : {})
       })
       notifySuccess(
         art === 'code' || qr
