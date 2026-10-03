@@ -4,7 +4,7 @@
  */
 import { Badge, Button, Group, Stack, Text, TextInput } from '@mantine/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { bewerte } from '@shared/vokabeltrainer'
+import { bewerte, kernform } from '@shared/vokabeltrainer'
 import { gitterform, spielform, suchselGitter, suchselZellen } from '@shared/vokabelSpiele'
 import { buildCrossword } from '../../vokabeltest/generation/crossword'
 import { createRng, randomSeed } from '../../vokabeltest/model/random'
@@ -47,7 +47,46 @@ export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
     setI(i + 1)
     setGeraten([])
     setBlaetter(BLAETTER)
+    setEingabe('')
+    setDaneben(false)
   }
+  /*
+   * Eingabe über die Tastatur (03.10.2026, Wunsch der Lehrkraft – auch am Smartphone und Tablet): Ein
+   * Buchstabe rät den Buchstaben, ein ganzes Wort löst (falsch kostet ein Blatt). Das Feld holt am
+   * Telefon die Bildschirmtastatur; am Computer geht es auch ohne Feld direkt mit den Tasten.
+   */
+  const [eingabe, setEingabe] = useState('')
+  const [daneben, setDaneben] = useState(false)
+  const feld = useRef<HTMLInputElement>(null)
+  const loesen = (): void => {
+    const t = eingabe.trim().toLocaleLowerCase()
+    setEingabe('')
+    if (!t || fertig || verloren) return
+    if ([...t].length === 1) return raten(t)
+    if (t === klein || kernform(t) === kernform(klein)) {
+      setGeraten([...new Set([...geraten, ...[...klein].filter(istBuchstabe)])])
+      setDaneben(false)
+    } else {
+      setBlaetter((b) => b - 1)
+      setDaneben(true)
+    }
+  }
+  useEffect(() => {
+    const taste = (e: KeyboardEvent): void => {
+      const ziel = e.target as HTMLElement | null
+      if (ziel?.closest('input, textarea') || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key === 'Enter' && (fertig || verloren)) {
+        e.preventDefault()
+        return weiter()
+      }
+      if (e.key.length === 1 && istBuchstabe(e.key)) {
+        e.preventDefault()
+        raten(e.key.toLocaleLowerCase())
+      }
+    }
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  })
   return (
     <Stack data-spiel="wortraten" align="center">
       <Group justify="space-between" w="100%">
@@ -91,23 +130,54 @@ export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
           </Button>
         </Stack>
       ) : (
-        <Group gap={4} justify="center" maw={520}>
-          {tasten.map((c) => (
-            <Button
-              key={c}
-              size="compact-md"
-              w={38}
-              h={42}
-              variant={geraten.includes(c) ? (klein.includes(c) ? 'filled' : 'light') : 'default'}
-              color={geraten.includes(c) ? (klein.includes(c) ? 'teal' : 'gray') : undefined}
-              disabled={geraten.includes(c)}
-              onClick={() => raten(c)}
-              data-taste={c}
-            >
-              {c}
+        <Stack gap="sm" align="center" w="100%" maw={520}>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              loesen()
+            }}
+            style={{ display: 'flex', gap: 8, width: '100%' }}
+          >
+            <TextInput
+              ref={feld}
+              style={{ flex: 1 }}
+              size="md"
+              value={eingabe}
+              onChange={(e) => {
+                setEingabe(e.currentTarget.value)
+                setDaneben(false)
+              }}
+              placeholder="Buchstabe oder ganzes Wort tippen …"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="go"
+              error={daneben ? 'Das war es nicht – ein Blatt weniger.' : undefined}
+              data-wortraten-eingabe
+            />
+            <Button type="submit" className="vt-los" radius="xl" disabled={!eingabe.trim()} data-wortraten-loesen>
+              OK
             </Button>
-          ))}
-        </Group>
+          </form>
+          <Group gap={4} justify="center">
+            {tasten.map((c) => (
+              <Button
+                key={c}
+                size="compact-md"
+                w={38}
+                h={42}
+                variant={geraten.includes(c) ? (klein.includes(c) ? 'filled' : 'light') : 'default'}
+                color={geraten.includes(c) ? (klein.includes(c) ? 'teal' : 'gray') : undefined}
+                disabled={geraten.includes(c)}
+                onClick={() => raten(c)}
+                data-taste={c}
+              >
+                {c}
+              </Button>
+            ))}
+          </Group>
+        </Stack>
       )}
     </Stack>
   )

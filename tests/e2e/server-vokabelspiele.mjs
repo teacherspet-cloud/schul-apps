@@ -128,8 +128,19 @@ try {
   for (let i = 0; i < 8 && !(await s.locator('[data-spiel-ergebnis]').isVisible()); i++) {
     const hinweis = await s.locator('[data-spiel="wortraten"] .mantine-Text-root[data-size="lg"]').innerText()
     const wort = nachDe[hinweis.trim()] ?? ''
-    for (const c of [...new Set(wort.toLowerCase())]) await s.locator(`[data-taste="${c}"]`).click()
-    await s.locator('[data-wortraten-weiter]').click()
+    if (i === 0) {
+      // Ganzes Wort eintippen (Bildschirmtastatur am Telefon)
+      await s.locator('[data-wortraten-eingabe]').fill(wort)
+      await s.keyboard.press('Enter')
+      pruefe(await s.getByText('Erraten!').isVisible(), 'Wortraten: ganzes Wort über die Tastatur gelöst')
+    } else {
+      // Buchstaben direkt über die Tastatur, ohne Feld
+      await s.locator('[data-spiel="wortraten"]').click({ position: { x: 5, y: 5 } })
+      for (const c of [...new Set(wort.toLowerCase())]) await s.keyboard.press(c)
+      if (i === 1) pruefe(await s.getByText('Erraten!').isVisible(), 'Wortraten: Buchstaben über die Tastatur')
+    }
+    await s.keyboard.press('Enter')
+    await s.waitForTimeout(150)
   }
   pruefe(await da(s.locator('[data-spiel-ergebnis]')), 'Wortraten durchgespielt')
   await s.getByRole('button', { name: 'Andere Spiele' }).click()
