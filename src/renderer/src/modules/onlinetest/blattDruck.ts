@@ -281,7 +281,7 @@ export async function druckfassung(
       ziel.style.position = ziel.style.position || 'relative'
       const bild = klon.ownerDocument.createElement('img')
       bild.src = c.toDataURL('image/png')
-      bild.style.cssText = `position:absolute;left:0;top:0;width:${b.w}px;height:${b.h}px;z-index:50;pointer-events:none`
+      bild.style.cssText = `position:absolute;left:0;top:0;width:${b.w}px;height:${b.h}px;z-index:50;pointer-events:none;mix-blend-mode:multiply`
       ziel.appendChild(bild)
     }
   }

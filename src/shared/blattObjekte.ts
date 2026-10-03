@@ -14,8 +14,12 @@ export interface BlattObjekt {
   /** Linie: Endpunkt */
   x2?: number
   y2?: number
-  /** Textkästchen: Breite */
+  /** Textkästchen: Breite und Höhe (Höhe seit 03.10.2026 ziehbar; fehlt = nach Inhalt) */
   w?: number
+  h?: number
+  /** Linie: Anfang/Ende hängt an diesem Kästchen (wandert beim Verschieben mit) */
+  v1?: string
+  v2?: string
   /** Text des Kästchens bzw. Wert am Punkt */
   text?: string
   farbe?: string
@@ -51,7 +55,10 @@ export function objekteAus(roh: unknown): BlattObjekt[] {
         x: zahl(x.x),
         y: zahl(x.y, 20000),
         ...(t === 'linie' ? { x2: zahl(x.x2), y2: zahl(x.y2, 20000) } : {}),
+        ...(t === 'linie' && typeof x.v1 === 'string' && x.v1 ? { v1: x.v1.slice(0, 20) } : {}),
+        ...(t === 'linie' && typeof x.v2 === 'string' && x.v2 ? { v2: x.v2.slice(0, 20) } : {}),
         ...(t === 'text' ? { w: Math.max(40, Math.min(600, zahl(x.w) || 160)) } : {}),
+        ...(t === 'text' && Number(x.h) > 0 ? { h: Math.max(24, Math.min(900, zahl(x.h))) } : {}),
         ...(typeof x.text === 'string' && x.text ? { text: x.text.slice(0, 400) } : {}),
         ...(typeof x.farbe === 'string' && FARBE.test(x.farbe) ? { farbe: x.farbe } : {})
       }
@@ -79,7 +86,7 @@ export function objekteSvg(objekte: BlattObjekt[], breite: number, hoehe: number
     if (o.t === 'text') {
       const w = o.w ?? 160
       const zeilen = (o.text ?? '').split('\n').flatMap((z) => umbrechen(z, Math.max(6, Math.floor(w / 7.2))))
-      const h = Math.max(24, zeilen.length * 17 + 8)
+      const h = Math.max(o.h ?? 24, zeilen.length * 17 + 8)
       teile.push(`<rect x="${o.x}" y="${o.y}" width="${w}" height="${h}" rx="4" fill="#ffffff" fill-opacity="0.92" stroke="${f}" stroke-width="1.4"/>`)
       zeilen.forEach((z, i) => teile.push(`<text x="${o.x + 5}" y="${o.y + 17 + i * 17}" font-size="13" font-family="sans-serif" fill="${f}">${esc(z)}</text>`))
     }
@@ -101,4 +108,19 @@ function umbrechen(text: string, breite: number): string[] {
   }
   zeilen.push(z)
   return zeilen
+}
+
+/** Kästchen und Verbindungslinien als Text für die KI (03.10.2026: Aufgaben ohne Schreibfelder, z. B. Zeitleiste) */
+export function objekteText(objekte: BlattObjekt[]): string {
+  const kaestchen = objekte.filter((o) => o.t === 'text' && o.text?.trim())
+  const punkte = objekte.filter((o) => o.t === 'punkt')
+  const linien = objekte.filter((o) => o.t === 'linie')
+  if (!kaestchen.length && !punkte.length && !linien.length) return ''
+  return [
+    kaestchen.length ? `Textkästchen auf dem Blatt: ${kaestchen.map((o) => `„${o.text!.trim().replace(/\s+/g, ' ')}“`).join('; ')}` : '',
+    linien.length ? `${linien.length} Verbindungslinie(n) gezogen (Lage siehe Seitenbild)` : '',
+    punkte.length ? `${punkte.length} Punkt(e) gesetzt${punkte.some((o) => o.text) ? `: ${punkte.map((o) => o.text || '–').join(', ')}` : ''}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
 }

@@ -33,6 +33,7 @@ import { IconArrowBackUp, IconArrowLeft, IconDownload, IconMessageCircle, IconPr
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
 import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
+import type { Andock } from './blattWerkzeuge'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
@@ -67,6 +68,7 @@ interface Feld {
 }
 
 interface Seite {
+  andocken?: Andock[]
   x: number
   y: number
   w: number
@@ -114,6 +116,88 @@ type AufgabenFb = {
 // Wie das ausfüllbare PDF, dazu die leeren Zellen von Ausfülltabellen
 
 /** Felder, Seiten und Aufgaben im gezeichneten Blatt messen (Dokumentreihenfolge = Lesereihenfolge) */
+/** Dunkel genug für eine Achse (Karoraster und Hilfslinien sind hell); rgb(…) oder #rrggbb */
+function dunkel(farbe: string | null): boolean {
+  if (!farbe) return false
+  const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(farbe.trim())
+  const m = hex ? hex.slice(1).map((x) => parseInt(x, 16)) : /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(farbe)?.slice(1).map(Number)
+  if (!m) return false
+  return (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) / 255 < 0.55
+}
+
+/** Linien und Beschriftungen einer Diagramm-Grafik (SVG als Bild eingebettet) in Seitenpixeln */
+function ausDiagrammBild(img: HTMLImageElement, r: DOMRect): Andock[] {
+  const roh = img.getAttribute('src') ?? ''
+  const i = roh.indexOf(',')
+  if (!roh.startsWith('data:image/svg+xml') || i < 0) return []
+  let svg: Document
+  try {
+    svg = new DOMParser().parseFromString(decodeURIComponent(roh.slice(i + 1)), 'image/svg+xml')
+  } catch {
+    return []
+  }
+  const wurzel = svg.documentElement
+  const vb = (wurzel.getAttribute('viewBox') ?? '').split(/[\s,]+/).map(Number)
+  const b = img.getBoundingClientRect()
+  const vw = vb.length === 4 && vb[2] > 0 ? vb[2] : b.width
+  const vh = vb.length === 4 && vb[3] > 0 ? vb[3] : b.height
+  const ox = vb.length === 4 ? vb[0] : 0
+  const oy = vb.length === 4 ? vb[1] : 0
+  const kx = b.width / vw
+  const ky = b.height / vh
+  const pt = (x: number, y: number): { x: number; y: number } => ({ x: b.left - r.left + (x - ox) * kx, y: b.top - r.top + (y - oy) * ky })
+  const aus: Andock[] = []
+  wurzel.querySelectorAll('line').forEach((l) => {
+    if (!dunkel(l.getAttribute('stroke') ?? l.closest('[stroke]')?.getAttribute('stroke') ?? null)) return
+    const a = pt(Number(l.getAttribute('x1')), Number(l.getAttribute('y1')))
+    const e = pt(Number(l.getAttribute('x2')), Number(l.getAttribute('y2')))
+    const laenge = Math.hypot(e.x - a.x, e.y - a.y)
+    if (laenge > 30) aus.push({ art: 'strecke', x1: a.x, y1: a.y, x2: e.x, y2: e.y })
+    else if (laenge > 1) aus.push({ art: 'punkt', x: a.x, y: a.y }, { art: 'punkt', x: e.x, y: e.y })
+  })
+  wurzel.querySelectorAll('text').forEach((t) => {
+    const x = Number(t.getAttribute('x'))
+    const y = Number(t.getAttribute('y'))
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+    const groesse = Number(t.getAttribute('font-size')) || 3
+    const breite = (t.textContent ?? '').length * groesse * 0.55
+    const anker = t.getAttribute('text-anchor')
+    const mitte = anker === 'middle' ? x : anker === 'end' ? x - breite / 2 : x + breite / 2
+    aus.push({ art: 'punkt', ...pt(mitte, y - groesse - 0.3) }, { art: 'punkt', ...pt(mitte, y + 0.8) })
+  })
+  return aus
+}
+
+/**
+ * Andockstellen einer Seite für Verbindungslinien und Punkte (03.10.2026): Achsen (lange dunkle
+ * SVG-Linien) als Strecken, ihre Markierungen (kurze Linien) und Beschriftungen als Punkte.
+ */
+function andockstellen(seite: Element, r: DOMRect): Andock[] {
+  const aus: Andock[] = []
+  seite.querySelectorAll('svg line').forEach((el) => {
+    const l = el as SVGLineElement
+    const m = l.getScreenCTM()
+    if (!m || !dunkel(getComputedStyle(l).stroke)) return
+    const p1 = new DOMPoint(l.x1.baseVal.value, l.y1.baseVal.value).matrixTransform(m)
+    const p2 = new DOMPoint(l.x2.baseVal.value, l.y2.baseVal.value).matrixTransform(m)
+    const a = { x: p1.x - r.left, y: p1.y - r.top }
+    const b = { x: p2.x - r.left, y: p2.y - r.top }
+    const laenge = Math.hypot(b.x - a.x, b.y - a.y)
+    if (laenge > 30) aus.push({ art: 'strecke', x1: a.x, y1: a.y, x2: b.x, y2: b.y })
+    else if (laenge > 1) aus.push({ art: 'punkt', x: a.x, y: a.y }, { art: 'punkt', x: b.x, y: b.y })
+  })
+  seite.querySelectorAll<HTMLImageElement>('img.ws-diagram-img, img[src^="data:image/svg+xml"]').forEach((img) => aus.push(...ausDiagrammBild(img, r)))
+  seite.querySelectorAll('svg text').forEach((el) => {
+    const b = el.getBoundingClientRect()
+    if (b.width < 2) return
+    aus.push(
+      { art: 'punkt', x: b.left + b.width / 2 - r.left, y: b.top - 1 - r.top },
+      { art: 'punkt', x: b.left + b.width / 2 - r.left, y: b.bottom + 1 - r.top }
+    )
+  })
+  return aus.slice(0, 800)
+}
+
 function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[] } {
   const seiten: Seite[] = []
   const roh: Omit<Feld, 'id'>[] = []
@@ -143,7 +227,7 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
   doc.querySelectorAll(FELDER).forEach((el, i) => index.set(el, i))
   doc.querySelectorAll('.ws-page').forEach((p, i) => {
     const r = p.getBoundingClientRect()
-    seiten.push({ x: r.left, y: r.top, w: r.width, h: r.height })
+    seiten.push({ x: r.left, y: r.top, w: r.width, h: r.height, andocken: andockstellen(p, r) })
     // Aufgaben auch ohne Felder zählen (Nummern wie auf dem Blatt)
     const elemente = [...p.querySelectorAll('.ws-task, ' + FELDER)]
     for (const el of elemente) {
@@ -343,21 +427,31 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const felderAlsDaten = (): { id: string; nr: number; art: string; seite: number }[] =>
     (gemessen?.felder ?? []).map((f) => ({ id: f.id, nr: f.nr, art: f.art, seite: f.seite }))
 
+  const [pruefFehler, setPruefFehler] = useState<Record<string, string>>({})
   const aufgabePruefen = async (nr: number): Promise<void> => {
     setLaeuft(`a${nr}`)
     setMeldung('')
+    setPruefFehler((x) => ({ ...x, [String(nr)]: '' }))
+    // Bereich der Aufgabe auf ihrer Seite (bis zur nächsten Aufgabe): Kästchen, Linien, Stift darin zählen mit
+    const liste = gemessen?.aufgaben ?? []
+    const a = liste.find((x) => x.nr === nr)
+    const naechste = a ? liste.find((x) => x.seite === a.seite && x.y > a.y) : undefined
+    const s0 = a ? gemessen?.seiten[a.seite] : undefined
+    const bereich = a && s0 ? { seite: a.seite, von: a.y - s0.y - 10, bis: naechste ? naechste.y - s0.y - 10 : s0.h } : undefined
     try {
       const fb = await senden<{ einschaetzung: string; text: string }>('/s/api/blatt/aufgabe', {
         id: d.id,
         nr,
         antworten,
         felder: felderAlsDaten(),
+        ...(bereich ? { bereich } : {}),
         ...(stand.current.tinteGeaendert ? { tinte } : {})
       })
       stand.current.tinteGeaendert = false
       setAufgabenFb((x) => ({ ...x, [String(nr)]: [...(x[String(nr)] ?? []), { ...fb, zeit: Date.now() }] }))
     } catch (e) {
-      setMeldung(e instanceof Error ? e.message : String(e))
+      // Im Fenster der Aufgabe zeigen – unten unter dem Blatt sah man die Meldung nicht (Befund 03.10.2026)
+      setPruefFehler((x) => ({ ...x, [String(nr)]: e instanceof Error ? e.message : String(e) }))
     } finally {
       setLaeuft(null)
     }
@@ -573,6 +667,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                   setTinte((t) => ({ ...t, [String(s)]: url }))
                 }}
                 pruefen={offen && d.einstellungen.aufgabenFeedback ? aufgabePruefen : undefined}
+                pruefFehler={pruefFehler}
                 laeuft={laeuft}
                 fb={aufgabenFb}
                 runden={d.einstellungen.aufgabenRunden}
@@ -692,6 +787,7 @@ function Ebene(p: {
   tinte: Record<string, string>
   setTinte: (seite: number, url: string) => void
   pruefen?: (nr: number) => Promise<void>
+  pruefFehler: Record<string, string>
   laeuft: string | null
   fb: BlattDaten['aufgabenFeedback']
   runden: number
@@ -867,6 +963,7 @@ function Ebene(p: {
           lage={s}
           objekte={p.objekte}
           aendern={p.setObjekte}
+          andocken={s.andocken}
           werkzeug={p.werkzeug}
           farbe={p.stiftFarbe}
           gesperrt={p.gesperrt}
@@ -896,6 +993,11 @@ function Ebene(p: {
                 <Paper withBorder shadow="md" p="xs" w={300} style={{ position: 'absolute', left: 36, top: 0 }}>
                   <Stack gap={6}>
                     <AufgabenFeedbackText liste={liste} />
+                    {p.pruefFehler[String(a.nr)] && (
+                      <Alert color="red" p="xs" data-pruef-fehler>
+                        {p.pruefFehler[String(a.nr)]}
+                      </Alert>
+                    )}
                     {rest > 0 ? (
                       <Button size="xs" loading={p.laeuft === `a${a.nr}`} onClick={() => void p.pruefen!(a.nr)} data-aufgabe-pruefen-los>
                         {liste?.length ? 'Noch einmal prüfen lassen' : `Aufgabe ${a.nr} prüfen lassen`}
@@ -934,6 +1036,9 @@ function TintenSeite({
   const leinwand = useRef<HTMLCanvasElement>(null)
   const verlauf = useRef<string[]>([])
   const zeichnet = useRef(false)
+  // Textmarker (03.10.2026, Befund der Lehrkraft: „übermalen … statt semitransparent"): Stand vor dem Strich
+  const vorStrich = useRef<ImageData | null>(null)
+  const strich = useRef<{ x: number; y: number }[]>([])
   const AUFLOESUNG = 2
   // Beim Laden und wenn die Seite wächst (neue Linien – die Leinwand wird dabei geleert): Bild in Originalgröße wieder einzeichnen
   useEffect(() => {
@@ -968,7 +1073,9 @@ function TintenSeite({
           height: lage.h,
           pointerEvents: aktiv ? 'auto' : 'none',
           touchAction: aktiv ? 'none' : 'auto',
-          zIndex: 10
+          zIndex: 10,
+          // Wie ein echter Textmarker: Farbe legt sich über den Text, der Text bleibt lesbar
+          mixBlendMode: 'multiply'
         }}
         data-tinte={seite}
         onPointerDown={(e) => {
@@ -978,6 +1085,8 @@ function TintenSeite({
           zeichnet.current = true
           leinwand.current!.setPointerCapture(e.pointerId)
           const { x, y } = punkt(e)
+          vorStrich.current = werkzeug === 'marker' ? ctx.getImageData(0, 0, leinwand.current!.width, leinwand.current!.height) : null
+          strich.current = [{ x, y }]
           ctx.globalCompositeOperation = werkzeug === 'radierer' ? 'destination-out' : 'source-over'
           // Textmarker: breit und durchscheinend (03.10.2026)
           ctx.strokeStyle = werkzeug === 'marker' ? `${farbe}59` : farbe
@@ -993,6 +1102,15 @@ function TintenSeite({
           if (!zeichnet.current) return
           const ctx = leinwand.current!.getContext('2d')!
           const { x, y } = punkt(e)
+          if (vorStrich.current) {
+            // Ein Strich = eine gleichmäßig durchscheinende Spur: Stand davor herstellen, Strich einmal ziehen
+            strich.current.push({ x, y })
+            ctx.putImageData(vorStrich.current, 0, 0)
+            ctx.beginPath()
+            strich.current.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
+            ctx.stroke()
+            return
+          }
           ctx.lineTo(x, y)
           ctx.stroke()
         }}

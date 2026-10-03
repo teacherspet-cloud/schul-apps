@@ -18,7 +18,7 @@
  *  Lernende:   GET /s/api/blaetter · GET /s/api/blatt?id= · POST /s/api/blatt/speichern|aufgabe|abgeben
  *  Gäste:      GET /s/api/blatt/zugang?code= · POST /s/api/blatt/gast   (Seite /s/w/<CODE>)
  */
-import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
+import { objekteAus, objekteText, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '../shared/blattObjekte'
 import { randomBytes } from 'node:crypto'
 import {
   alleNutzer,
@@ -371,15 +371,37 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         const liste = bisher[String(nr)] ?? []
         if (liste.length >= e.aufgabenRunden)
           return (json(res, 409, { fehler: `Zu dieser Aufgabe gab es schon ${e.aufgabenRunden}× Feedback. Reiche das Blatt ein, wenn du fertig bist.` }), true)
-        const seiten = [...new Set(felder.map((f) => f.seite))]
+        // Bereich der Aufgabe (Zeitleiste & Co. ohne Schreibfelder): ihre Seite und die Objekte darin zählen mit
+        const b0 = (k0.bereich ?? {}) as { seite?: unknown; von?: unknown; bis?: unknown }
+        const bereich =
+          Number.isInteger(b0.seite) && Number(b0.seite) >= 0 && Number(b0.seite) < 60
+            ? { seite: Number(b0.seite), von: Number(b0.von) || 0, bis: Number(b0.bis) || 1e6 }
+            : null
+        const seiten = [...new Set([...felder.map((f) => f.seite), ...(bereich ? [bereich.seite] : [])])]
+        const imBereich = bereich ? blattExtra(antworten).objekte.filter((o) => o.s === bereich.seite && o.y >= bereich.von && o.y <= bereich.bis) : []
         const mitTinte = Object.fromEntries(seiten.filter((s) => tinte[String(s)]).map((s) => [String(s), tinte[String(s)]]))
         const ex = blattExtra(antworten)
         const bilder = e.stift
           ? await seitenMitTinte(z.html, mitTinte, { zusatz: ex.zusatz, objekte: ex.objekte.filter((o) => seiten.includes(o.s)) }).catch(() => [] as string[])
           : []
         // Eigene und fremde Namen im Text durch Kürzel ersetzen (wie beim Bogen); der Namensfilter greift zusätzlich
-        const text = ohneNamen({ id: 'a', kuerzel: 'S1', name: ich.name, dateiname: '', text: blattAbgabeText([aufgabe], felder, antworten), bilder: [] }).text
-        if (!text.trim() && !bilder.length) return (json(res, 400, { fehler: 'Bitte zuerst etwas eintragen.' }), true)
+        const text = ohneNamen({
+          id: 'a',
+          kuerzel: 'S1',
+          name: ich.name,
+          dateiname: '',
+          text: [blattAbgabeText([aufgabe], felder, antworten), objekteText(imBereich)].filter(Boolean).join('\n'),
+          bilder: []
+        }).text
+        if (!text.trim() && !bilder.length)
+          return (
+            json(res, 400, {
+              fehler: e.stift
+                ? 'Bitte zuerst etwas eintragen – auf dem Blatt, mit dem Stift oder mit Kästchen und Linien.'
+                : 'Bitte zuerst etwas eintragen (Text, Kästchen oder Linien).'
+            }),
+            true
+          )
         try {
           // Abgeschrieben? (03.10.2026) – nur die eigenen Einträge zählen, ohne Aufgabentext
           const eigen = felder.map((f) => antworten[f.id] ?? '').join(' ')
@@ -408,7 +430,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         const tinte = k0.tinte ? bereinigeTinte(k0.tinte) : json_(a?.tinte ?? '{}', {} as Record<string, string>)
         const felder = bereinigeFelder(k0.felder)
         speichern(antworten, k0.tinte ? tinte : null, { abgaben: genutzt + 1 })
-        const text = blattAbgabeText(aufgaben, felder, antworten)
+        // Kästchen und Linien (Zeitleiste & Co.) gehören zur Abgabe
+        const text = [blattAbgabeText(aufgaben, felder, antworten), objekteText(blattExtra(antworten).objekte)].filter(Boolean).join('\n\n')
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
         const puls = setInterval(() => res.write(' '), PULS_MS)
         res.on('close', () => clearInterval(puls))
