@@ -370,10 +370,17 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    */
   const letzteFassung = [...fassungen].reverse().find((f) => f.bogen)
   const anmerkungen = useMemo((): Anmerkung[] => {
-    const roh = [...(letzteFassung?.bogen?.rand ?? []), ...Object.values(aufgabenFb).flatMap((l) => l.at(-1)?.markierungen ?? [])]
+    /*
+     * Markierungen aus dem Feedback zu einer Aufgabe gehören nur zu ihr (Befund 03.10.2026: ein Kommentar
+     * zur Zeitleiste erschien an derselben Wendung in Aufgabe 4, für die noch kein Feedback angefordert war)
+     */
+    const roh: (Omit<Anmerkung, 'nr'> & { zeichen?: unknown })[] = [
+      ...(letzteFassung?.bogen?.rand ?? []),
+      ...Object.entries(aufgabenFb).flatMap(([nr, l]) => (l.at(-1)?.markierungen ?? []).map((m) => ({ ...m, aufgabe: Number(nr) })))
+    ]
     return roh.map((a, i) => {
       const zeichen = 'zeichen' in a ? String(a.zeichen ?? '') : ''
-      return { nr: i + 1, zitat: a.zitat, art: a.art, text: a.text, ...(zeichen ? { zeichen } : {}) }
+      return { nr: i + 1, zitat: a.zitat, art: a.art, text: a.text, ...(zeichen ? { zeichen } : {}), ...(a.aufgabe ? { aufgabe: a.aufgabe } : {}) }
     })
   }, [letzteFassung, aufgabenFb])
   // Randkommentare stehen im Korrekturrand der Seite (blattDigital.ts) – keine Spalte daneben
@@ -445,6 +452,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         antworten,
         felder: felderAlsDaten(),
         ...(bereich ? { bereich } : {}),
+        ...(a?.zeichnen ? { nurZeichenflaeche: true } : {}),
         ...(stand.current.tinteGeaendert ? { tinte } : {})
       })
       stand.current.tinteGeaendert = false
@@ -804,11 +812,11 @@ function Ebene(p: {
   )
   // Jede Anmerkung höchstens einmal markieren – im ersten Feld, in dem ihr Zitat steht
   const vergeben = new Set<number>()
-  const trefferVon = (wert: string): ReturnType<typeof fundstellen> => {
+  const trefferVon = (wert: string, aufgabe: number): ReturnType<typeof fundstellen> => {
     if (!wert || !p.anmerkungen.length) return []
     const t = fundstellen(
       wert,
-      p.anmerkungen.filter((a) => !vergeben.has(a.nr))
+      p.anmerkungen.filter((a) => !vergeben.has(a.nr) && (a.aufgabe === undefined || a.aufgabe === aufgabe))
     )
     t.forEach((x) => vergeben.add(x.a.nr))
     return t
@@ -869,7 +877,7 @@ function Ebene(p: {
         if (f.art === 'luecke' || (f.art === 'zeilen' && (f.zeilen ?? 1) === 1) || f.art === 'text') {
           const hoehe = f.art === 'zeilen' ? Math.max(f.h, 22) : f.h
           const eingabeStil: React.CSSProperties = { ...stil, top: f.y + f.h - hoehe, height: hoehe, fontSize: Math.max(12, Math.min(18, hoehe * 0.65)) }
-          const treffer = trefferVon(wert)
+          const treffer = trefferVon(wert, f.nr)
           return [
             treffer.length ? (
               <FeldMarkierung
@@ -904,7 +912,7 @@ function Ebene(p: {
           lineHeight: f.art === 'zeilen' ? `${zeilenhoehe}px` : 1.4,
           paddingTop: f.art === 'zeilen' ? Math.max(0, zeilenhoehe * 0.2) : 4
         }
-        const treffer = trefferVon(wert)
+        const treffer = trefferVon(wert, f.nr)
         return [
           treffer.length ? (
             <FeldMarkierung

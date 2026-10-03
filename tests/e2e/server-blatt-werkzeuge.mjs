@@ -269,6 +269,16 @@ try {
   const fehler = await s.locator('[data-pruef-fehler]').allInnerTexts()
   pruefe(fehler.length === 0 && (await s.getByText('Gelungen').count()) > 0, `KI-Prüfung der Zeitleisten-Aufgabe ${nr} liefert Feedback ${fehler.join(' ')}`)
   await s.screenshot({ path: join(out, '2-zeitleiste.png') })
+  // Markierungen aus dem Feedback zur Zeitleiste dürfen nicht in einer anderen Aufgabe auftauchen
+  await s.keyboard.press('Escape')
+  await s.mouse.click(5, 400)
+  const andere = s.locator('textarea[data-feld]').last()
+  await andere.scrollIntoViewIfNeeded()
+  await andere.click()
+  await s.keyboard.type('Die Marne und der Stellungskrieg veraenderte vieles.', { delay: 2 })
+  await s.waitForTimeout(800)
+  const fremd = await s.locator('[data-rand-kommentar], [data-rand-marke]').count()
+  pruefe(fremd === 0, `Kein Randkommentar aus dem Feedback einer anderen Aufgabe (${fremd})`)
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
 } finally {

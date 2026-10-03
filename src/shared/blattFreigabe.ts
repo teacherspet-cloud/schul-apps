@@ -68,6 +68,8 @@ export interface AufgabenFeedback {
 export interface FeedbackZusatz {
   zeichen?: { zeichen: string; bedeutung: string }[]
   abschrift?: AbschriftBefund
+  /** Die Aufgabe hat nur eine Zeichenfläche (Zeitleiste, Diagramm), keine Schreiblinien */
+  nurZeichenflaeche?: boolean
 }
 
 /**
@@ -93,6 +95,9 @@ export function aufgabenFeedbackAnfrage(a: BlattAufgabe, antwort: string, bilder
       '- SPRACHE WIE IN EINER KORRIGIERTEN ARBEIT: Markiere JEDEN sprachlichen Fehler einzeln (Rechtschreibung, Zeichensetzung, Grammatik, Satzbau, Ausdruck …) als eigene Markierung mit art „fehler", dem Korrekturzeichen im Feld „zeichen" und als Zitat genau das fehlerhafte Wort bzw. die kurze Wortgruppe; text = kurz, was falsch ist (z. B. „das/dass", „Komma vor dem Nebensatz"), ohne die ganze Verbesserung vorzuschreiben. Höchstens 15 Sprachmarkierungen. Inhaltliche Markierungen: „zeichen" leer oder „Inh".',
       zeichen.length ? `- Korrekturzeichen (nur diese verwenden): ${zeichen.map((z) => `${z.zeichen} = ${z.bedeutung}`).join('; ')}.` : '',
       '- EIGENE LEISTUNG: Wörtlich aus dem Material Übernommenes ist KEINE Bearbeitung von Operatoren wie „fasse zusammen", „beschreibe", „erkläre", „ordne ein", „beurteile". Lobe Abgeschriebenes nicht als gelungen; benenne es unter „fehlt" und zeige im nächsten Schritt, wie man in eigenen Worten verdichtet.',
+      zusatz.nurZeichenflaeche
+        ? '- ANTWORTFORM: Diese Aufgabe hat nur eine Zeichenfläche (z. B. Zeitleiste) und KEINE Schreiblinien. Beurteile das Eintragen/Zuordnen/Zeichnen. Verlangt die Anweisung zusätzlich eine Erklärung, bemängle deren Fehlen NICHT – dafür war kein Platz vorgesehen.'
+        : '',
       abgeschrieben
         ? `- BEFUND (automatisch gezählt, verlässlich): ${Math.round(ab.anteil * 100)} % der Antwort stehen wörtlich im Material des Blatts (längste übernommene Stelle: ${ab.laengste} Wörter). Behandle das als Abschrift: einschaetzung höchstens „teilweise", ab 70 % „noch nicht"; sage das freundlich, aber klar.`
         : '',

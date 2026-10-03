@@ -16,6 +16,8 @@ export interface Anmerkung {
   art: 'lob' | 'fehler' | 'hinweis'
   text: string
   zeichen?: string
+  /** Aus dem Feedback zu dieser Aufgabe – markiert nur in ihren Feldern (sonst irgendwo im Blatt) */
+  aufgabe?: number
 }
 
 export const ANMERKUNG_FARBE: Record<Anmerkung['art'], string> = { fehler: '#e03131', hinweis: '#f08c00', lob: '#2f9e44' }

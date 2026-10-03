@@ -22,6 +22,7 @@ const BLAU = '#1d4ed8'
 
 export interface DruckFeld {
   id: string
+  nr: number
   art: string
   seite: number
   x: number
@@ -171,7 +172,7 @@ export async function druckfassung(
     if (!el) continue
     const treffer = fundstellen(
       wert,
-      anmerkungen.filter((a) => !vergeben.has(a.nr))
+      anmerkungen.filter((a) => !vergeben.has(a.nr) && (a.aufgabe === undefined || a.aufgabe === f.nr))
     )
     treffer.forEach((t) => vergeben.add(t.a.nr))
     if (f.art === 'zeilen' && (f.zeilen ?? 1) > 1) {

@@ -409,7 +409,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           const fachId = fachAusName((z as Zeile & { fach?: string }).fach ?? '')?.id ?? ''
           // Korrekturzeichen der Lehrkraft (Einstellungen › Material), sonst die Voreinstellung des Fachs
           const einst = (await imNutzer(alsNutzer(lehrkraft), () => aufruf('settings:get', [])).catch(() => undefined)) as Parameters<typeof zeichenFuer>[1]
-          const zusatz = { zeichen: zeichenFuer(fachId, einst), ...(befund ? { abschrift: befund } : {}) }
+          const nurZeichenflaeche = k0.nurZeichenflaeche === true && !felder.some((f) => f.art === 'zeilen' || f.art === 'text')
+          const zusatz = { zeichen: zeichenFuer(fachId, einst), ...(nurZeichenflaeche ? { nurZeichenflaeche } : {}), ...(befund ? { abschrift: befund } : {}) }
           const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
             aufruf('ai:structured', [aufgabenFeedbackAnfrage(aufgabe, text, bilder, e.sprache, zusatz)])
           )

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { nurZeichenauftrag } from './zeichenauftrag'
 import { lueckentextOhneDoppelte } from '@shared/luecken'
 import { stufeAus } from '../../../shared/verstehen/stufen'
 import { newId, Rng, shuffle } from '../../vokabeltest/model/random'
@@ -329,11 +330,14 @@ export function convertBlock(
           }))
           .filter((g: { items: unknown[] }) => g.items.length)
       }
-    case 'task':
+    case 'task': {
+      const answer = convertAnswer(b.answer, rng)
+      // Zeichenfläche: nur der Zeichenauftrag – kein angehängtes „… und erkläre …" (zeichenauftrag.ts)
+      const anweisung = satzbau(text(b.instruction))
       return {
         ...base,
         type,
-        instruction: satzbau(text(b.instruction)),
+        instruction: answer?.kind === 'diagram' && !(Array.isArray(b.parts) && b.parts.length) ? nurZeichenauftrag(anweisung) : anweisung,
         operator: text(b.operator),
         afb: afbOf(b.afb),
         afbReason: text(b.afbReason),
@@ -341,7 +345,7 @@ export function convertBlock(
         minutes: Number(b.minutes) || 0,
         points: punkteOf(b.points),
         solution: text(b.solution),
-        answer: convertAnswer(b.answer, rng),
+        answer,
         parts: (Array.isArray(b.parts) ? b.parts : [])
           .filter((p: any) => text(p?.instruction))
           .map((p: any) => ({
@@ -360,6 +364,7 @@ export function convertBlock(
         ...(text(b.timecode) ? { timecode: text(b.timecode) } : {}),
         ...(b.brief ? { brief: convertBrief(b.brief) } : {})
       }
+    }
     case 'scaffold':
       return {
         ...base,

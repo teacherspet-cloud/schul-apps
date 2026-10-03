@@ -215,7 +215,14 @@ export function taskContext(meta: WorksheetMeta, profile: LearnerProfile): strin
      * Achsen hin – keine Rechenkästchen, keine Linien. Die Achsen müssen die erwarteten Werte
      * fassen; sonst zeichnen die Lernenden an den Rand.
      */
-    'ZEICHENFLÄCHEN: Soll etwas gezeichnet oder eingetragen werden (Graph, Messreihe, Schrägbild, Zeitleiste, Spannungs- oder Verlaufskurve), ist answer.kind = "diagram" mit passendem diagram.kind (koordinaten | mm | klima | schraegbild | spannung | zeitleiste) und vollständigen Achsen: Beschriftung mit Einheit, Bereich und Schrittweite so gewählt, dass alle erwarteten Werte hineinpassen. Zeitleiste: from/to/step in der Einheit (day | month | year); Stufen wie Eskalation in timeline.yLevels von unten nach oben; Ereignisse nur in timeline.events, wenn sie VORGEGEBEN sein sollen; parallele Stränge in timeline.strands; sehr lange Zeiträume als sections mit eigener Skala. Verlaufskurve: Schritte in xCategories, Stufen in yLevels. Nie Rechenkästchen oder Linien für eine Zeichnung.'
+    'ZEICHENFLÄCHEN: Soll etwas gezeichnet oder eingetragen werden (Graph, Messreihe, Schrägbild, Zeitleiste, Spannungs- oder Verlaufskurve), ist answer.kind = "diagram" mit passendem diagram.kind (koordinaten | mm | klima | schraegbild | spannung | zeitleiste) und vollständigen Achsen: Beschriftung mit Einheit, Bereich und Schrittweite so gewählt, dass alle erwarteten Werte hineinpassen. Zeitleiste: from/to/step in der Einheit (day | month | year); Stufen wie Eskalation in timeline.yLevels von unten nach oben; Ereignisse nur in timeline.events, wenn sie VORGEGEBEN sein sollen; parallele Stränge in timeline.strands; sehr lange Zeiträume als sections mit eigener Skala. Verlaufskurve: Schritte in xCategories, Stufen in yLevels. Nie Rechenkästchen oder Linien für eine Zeichnung.',
+    /*
+     * Ein Auftrag je Zeichenfläche, keine Dopplung zwischen Aufgaben (03.10.2026, Befund der
+     * Lehrkraft: „Ordne … auf der Zeitleiste und erkläre anhand ihrer Abfolge …" – die nächste Aufgabe
+     * verlangte fast dasselbe, und auf der Zeitleiste fehlte der Platz für die Erklärung)
+     */
+    'EIN AUFTRAG JE ANTWORTFORM: Eine Aufgabe mit Zeichenfläche verlangt NUR das Zeichnen, Eintragen, Ordnen oder Beschriften – kein angehängtes „und erkläre/begründe/beschreibe …", denn dafür gibt es dort keinen Platz. Braucht es die Erklärung, ist sie eine EIGENE Aufgabe mit Schreiblinien.',
+    'KEINE DOPPLUNG: Jede Aufgabe verlangt einen eigenen Denkschritt (Progression vom Wiedergeben über das Erklären zum Beurteilen). Was eine Aufgabe verlangt, verlangt keine andere noch einmal mit anderen Worten – prüfe die Aufgaben vor der Ausgabe paarweise und streiche oder ändere die Wiederholung.'
   ]
     .filter(Boolean)
     .join('\n')
