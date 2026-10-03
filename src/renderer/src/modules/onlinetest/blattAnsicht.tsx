@@ -13,20 +13,33 @@ import type { Block, TestDocument, Variant } from '../vokabeltest/model/types'
 import { RenderContext, type RenderContextValue } from '../vokabeltest/render/RenderContext'
 import { TestPage } from '../vokabeltest/render/TestPage'
 import testCss from '../vokabeltest/render/test.css?raw'
-import type { Antworten, Bewertung } from './kern'
+import type { Antworten, Bewertung, Zeichen } from './kern'
+import { useState } from 'react'
 
 /** Was der Server je Test mitliefert (Kopf und Einstellungen des Vokabeltests) */
 export type BlattKopf = Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
 
 const feldId = (block: string, item: string, teil = 'a'): string => `${block}.${item}.${teil}`
 
-/** Zeichen hinter einer Wortlücke: richtig, falsch oder noch offen */
+/**
+ * Zeichen hinter einer Wortlücke: richtig, knapp richtig, falsch, zu allgemein oder noch offen.
+ * Dahinter steht die Kennung der Einheit (⟦…⟧) – `faerbeMarken` macht daraus ein anklickbares
+ * Zeichen; die Lehrkraft kann es in der Blattansicht ändern (03.10.2026).
+ */
 function marke(b: Bewertung, einheit: string): string {
   const x = b[einheit]
   if (!x) return ''
-  if (x.status === 'richtig') return ' ✓'
-  if (x.status === 'falsch' && !(x.pruefen && x.quelle !== 'lehrkraft')) return ' ✗'
-  return ' ?'
+  const z =
+    x.status === 'richtig'
+      ? x.knapp
+        ? '(✓)'
+        : '✓'
+      : x.status === 'falsch' && x.frage
+        ? '?'
+        : x.status === 'falsch' && !(x.pruefen && x.quelle !== 'lehrkraft')
+          ? '✗'
+          : '?'
+  return ` ${z}⟦${einheit}⟧`
 }
 
 /** Die Variante mit den Antworten an den Stellen der Lösungen */
@@ -132,10 +145,14 @@ export interface Abgabe {
 
 /**
  * Haken grün, Kreuze rot, offene Fragezeichen orange (Wunsch der Lehrkraft, 02.10.2026). Die
- * Zeichen stehen als Text in den Antwortfeldern – gefärbt wird im fertigen HTML.
+ * Zeichen stehen als Text in den Antwortfeldern – gefärbt wird im fertigen HTML. Mit der Kennung
+ * der Einheit werden sie in der Ansicht anklickbar (data-einheit); im Druck bleibt nur das Zeichen.
  */
 export const faerbeMarken = (html: string): string =>
-  html.replace(/ (✓|✗|\?)(?=<)/g, (_m, z: string) => ` <span class="vt-marke ${z === '✓' ? 'vt-marke-ok' : z === '✗' ? 'vt-marke-falsch' : 'vt-marke-offen'}">${z}</span>`)
+  html.replace(/ (\(✓\)|✓|✗|\?)(?:⟦([^⟧<]*)⟧)?(?=<)/g, (_m, z: string, einheit?: string) => {
+    const art = z === '✓' ? 'vt-marke-ok' : z === '(✓)' ? 'vt-marke-ok vt-marke-knapp' : z === '✗' ? 'vt-marke-falsch' : 'vt-marke-offen'
+    return ` <span class="vt-marke ${art}"${einheit ? ` data-einheit="${einheit.replace(/"/g, '&quot;')}"` : ''}>${z}</span>`
+  })
 
 const blattHtml = (kopf: BlattKopf, variante: Variant, antworten: Antworten, bewertung: Bewertung, abgabe: Abgabe): string => {
   const v = mitAntworten(variante, antworten, bewertung)
@@ -155,18 +172,92 @@ export function AbgabeBlatt({
   variante,
   antworten,
   bewertung,
-  abgabe
+  abgabe,
+  aendern
 }: {
   kopf: BlattKopf
   variante: Variant
   antworten: Antworten
   bewertung: Bewertung
   abgabe: Abgabe
+  /** Lehrkraft: Korrekturzeichen ändern (Klick aufs Zeichen) */
+  aendern?: (einheit: string, zeichen: Zeichen) => void
 }): React.JSX.Element {
-  return <div className="editor-sheet" data-abgabe-blatt dangerouslySetInnerHTML={{ __html: blattHtml(kopf, variante, antworten, bewertung, abgabe) }} />
+  const html = blattHtml(kopf, variante, antworten, bewertung, abgabe)
+  const [menue, setMenue] = useState<{ einheit: string; x: number; y: number } | null>(null)
+  if (!aendern) return <div className="editor-sheet" data-abgabe-blatt dangerouslySetInnerHTML={{ __html: html }} />
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        className="editor-sheet vt-zeichen-aenderbar"
+        data-abgabe-blatt
+        dangerouslySetInnerHTML={{ __html: html }}
+        onClick={(e) => {
+          const el = (e.target as HTMLElement).closest('[data-einheit]') as HTMLElement | null
+          if (!el) return setMenue(null)
+          const r = el.getBoundingClientRect()
+          const basis = e.currentTarget.getBoundingClientRect()
+          setMenue({ einheit: el.dataset.einheit!, x: r.left - basis.left, y: r.bottom - basis.top + 4 })
+        }}
+      />
+      {menue && (
+        <div
+          style={{
+            position: 'absolute',
+            left: menue.x,
+            top: menue.y,
+            zIndex: 20,
+            display: 'flex',
+            gap: 4,
+            padding: 4,
+            background: 'var(--mantine-color-body)',
+            border: '1px solid var(--mantine-color-default-border)',
+            borderRadius: 8,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
+          }}
+          data-zeichen-menue
+        >
+          {(
+            [
+              ['richtig', '✓', 'richtig', '#2f9e44'],
+              ['knapp', '(✓)', 'knapp richtig – volle Punkte, aber nicht fehlerfrei', '#2f9e44'],
+              ['falsch', '✗', 'falsch', '#e03131'],
+              ['frage', '?', 'zu allgemein / unklar – keine Punkte', '#f08c00']
+            ] as const
+          ).map(([z, zeichen, titel, farbe]) => (
+            <button
+              key={z}
+              type="button"
+              title={titel}
+              aria-label={titel}
+              style={{
+                font: 'inherit',
+                fontWeight: 800,
+                color: farbe,
+                minWidth: 40,
+                height: 34,
+                borderRadius: 6,
+                border: '1px solid var(--mantine-color-default-border)',
+                background: 'var(--mantine-color-body)',
+                cursor: 'pointer'
+              }}
+              onClick={() => {
+                aendern(menue.einheit, z)
+                setMenue(null)
+              }}
+              data-zeichen={z}
+            >
+              {zeichen}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
-const dokument = (kopf: BlattKopf, variants: Variant[]): TestDocument => ({ ...kopf, variants, version: 1, vocab: [], createdAt: '' }) as unknown as TestDocument
+const dokument = (kopf: BlattKopf, variants: Variant[]): TestDocument =>
+  ({ ...kopf, variants, version: 1, vocab: [], createdAt: '' }) as unknown as TestDocument
 
 /** Druck/PDF: ein Blatt je Abgabe, jedes auf eigenen Seiten */
 export function abgabenHtml(kopf: BlattKopf, abgaben: { variante: Variant; antworten: Antworten; bewertung: Bewertung; abgabe: Abgabe }[]): string {

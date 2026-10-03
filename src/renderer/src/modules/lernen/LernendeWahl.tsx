@@ -11,40 +11,50 @@ export interface LernendeAuswahl {
   schueler: string[]
 }
 
+/**
+ * Alle Schülerkonten der Schule für „Einzelne Lernende" (03.10.2026): nach Klasse gruppiert, Klassen
+ * mit Lernenden aus eigenen Lerngruppen zuerst. Vorher nur Mitglieder eigener Lerngruppen – wer in
+ * keiner stand (z. B. ein neu angelegtes Konto), war nicht zu finden.
+ */
+export function useAlleLernenden(): { daten: { group: string; items: { value: string; label: string }[] }[]; anzahl: number; geladen: boolean } {
+  const [liste, setListe] = useState<{ benutzer: string; name: string; klasse: string; eigen: boolean }[] | null>(null)
+  useEffect(() => {
+    void holen<{ lernende: { benutzer: string; name: string; klasse: string; eigen: boolean }[] }>('/server/feedback/alle-lernenden').then(
+      (d) => setListe(d.lernende),
+      () => setListe([])
+    )
+  }, [])
+  const klassen = new Map<string, { eigen: boolean; items: { value: string; label: string }[] }>()
+  for (const n of liste ?? []) {
+    const k = n.klasse || 'ohne Klasse'
+    const e = klassen.get(k) ?? { eigen: false, items: [] }
+    e.eigen ||= n.eigen
+    e.items.push({ value: n.benutzer, label: n.name })
+    klassen.set(k, e)
+  }
+  const daten = [...klassen.entries()]
+    .sort(([a, x], [b, y]) => Number(y.eigen) - Number(x.eigen) || a.localeCompare(b, 'de', { numeric: true }))
+    .map(([k, e]) => ({ group: e.eigen ? `${k} (eigene Lerngruppe)` : k, items: e.items.sort((a, b) => a.label.localeCompare(b.label, 'de')) }))
+  return { daten, anzahl: liste?.length ?? 0, geladen: liste !== null }
+}
+
 export function LernendeWahl({ wahl }: { wahl: (a: LernendeAuswahl | null) => void }): React.JSX.Element {
   const [art, setArt] = useState<'gruppe' | 'einzeln'>('gruppe')
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const [alle, setAlle] = useState<{ gruppeId: string; benutzer: string; name: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(null)
   const [einzelne, setEinzelne] = useState<string[]>([])
   useEffect(() => {
-    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(async (d) => {
-      setGruppen(d.gruppen)
-      const l = await Promise.all(
-        d.gruppen.map((g) =>
-          holen<{ mitglieder: { benutzer: string; name: string }[] }>(`/server/feedback/mitglieder?gruppe=${encodeURIComponent(g.id)}`).then(
-            (m) => m.mitglieder.map((x) => ({ ...x, gruppeId: g.id })),
-            () => []
-          )
-        )
-      )
-      setAlle(l.flat())
-    })
+    void holen<{ gruppen: { id: string; name: string }[] }>('/server/lerngruppen').then(
+      (d) => setGruppen(d.gruppen),
+      () => setGruppen([])
+    )
   }, [])
   useEffect(() => {
     if (art === 'gruppe') wahl(gruppe ? { lerngruppeId: gruppe, schueler: [] } : null)
     else wahl(einzelne.length ? { lerngruppeId: '', schueler: einzelne } : null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [art, gruppe, einzelne])
-  const gesehen = new Set<string>()
-  const personen = gruppen
-    .map((g) => ({
-      group: g.name,
-      items: alle
-        .filter((m) => m.gruppeId === g.id && !gesehen.has(m.benutzer) && (gesehen.add(m.benutzer), true))
-        .map((m) => ({ value: m.benutzer, label: m.name }))
-    }))
-    .filter((g) => g.items.length)
+  const alleLernenden = useAlleLernenden()
   return (
     <Stack gap="xs">
       <SegmentedControl
@@ -65,7 +75,17 @@ export function LernendeWahl({ wahl }: { wahl: (a: LernendeAuswahl | null) => vo
           data-lernende-gruppe
         />
       ) : (
-        <MultiSelect label="Lernende" data={personen} value={einzelne} onChange={setEinzelne} searchable placeholder="Namen suchen …" />
+        <MultiSelect
+          label="Lernende"
+          data={alleLernenden.daten}
+          value={einzelne}
+          onChange={setEinzelne}
+          searchable
+          clearable
+          nothingFoundMessage="Kein Schülerkonto mit diesem Namen"
+          placeholder={alleLernenden.geladen && !alleLernenden.anzahl ? 'Noch keine Schülerkonten angelegt' : 'Namen suchen …'}
+          data-lernende-einzeln
+        />
       )}
     </Stack>
   )

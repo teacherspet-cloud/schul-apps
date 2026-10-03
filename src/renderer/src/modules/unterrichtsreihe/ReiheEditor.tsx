@@ -2,6 +2,7 @@
  * Eine Unterrichtsreihe bauen: Titel, Fach, Oberthema (Kerncurriculum des Landes), übergeordnete
  * Lernziele, Schritte (hinzufügen, ordnen, bearbeiten) und zuweisen.
  */
+import { useAlleLernenden } from '../lernen/LernendeWahl'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import {
   ActionIcon,
@@ -498,17 +499,8 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
     )
   }, [])
   const inGruppe = alle.filter((m) => m.gruppeId === gruppe)
-  // Gruppiert nach Lerngruppe; wer in mehreren ist, steht einmal (unter der ersten)
-  const gesehen = new Set<string>()
-  const auswahl = gruppen
-    .map((g) => ({
-      group: g.name,
-      items: alle
-        .filter((m) => m.gruppeId === g.id && !gesehen.has(m.benutzer) && (gesehen.add(m.benutzer), true))
-        .map((m) => ({ value: m.benutzer, label: m.name }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'de'))
-    }))
-    .filter((g) => g.items.length)
+  // Einzelne Lernende: alle Schülerkonten der Schule, nach Klasse (03.10.2026)
+  const alleLernenden = useAlleLernenden()
   return (
     <Modal opened onClose={schliessen} title="Reihe zuweisen" size="lg">
       <Stack>
@@ -554,13 +546,14 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
         ) : (
           <MultiSelect
             label="Lernende"
-            description="Aus allen deiner Lerngruppen – zum Beispiel für eine Förder- oder Fordergruppe."
-            data={auswahl}
+            description="Alle Schülerkonten der Schule, nach Klasse – zum Beispiel für eine Förder- oder Fordergruppe."
+            data={alleLernenden.daten}
             value={einzelne}
             onChange={setEinzelne}
             searchable
             clearable
-            placeholder={alle.length ? 'Namen suchen …' : 'noch keine Lernenden in deinen Lerngruppen'}
+            nothingFoundMessage="Kein Schülerkonto mit diesem Namen"
+            placeholder={alleLernenden.geladen && !alleLernenden.anzahl ? 'Noch keine Schülerkonten angelegt' : 'Namen suchen …'}
             data-zuweisen-einzelne
           />
         )}

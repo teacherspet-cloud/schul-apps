@@ -26,7 +26,7 @@ import type { Abgabe, Bogen, Rueckmeldung } from '../renderer/src/modules/rueckm
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
-import { gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { alleLernenden, gastName, gehoertZu, klasseVon, lerngruppe, lerngruppenVon, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { PULS_MS } from '../main/services/lanServer'
@@ -418,6 +418,16 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       const g = lerngruppe(String(url.searchParams.get('gruppe') ?? ''))
       if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannte Lerngruppe.' }), true)
       return (json(res, 200, { mitglieder: mitgliederVon(g).map((n) => ({ benutzer: n.benutzer, name: n.name || n.benutzer })) }), true)
+    }
+    // Alle Schülerkonten der Schule – für „Einzelne Lernende" ohne Lerngruppe (03.10.2026)
+    if (req.method === 'GET' && teile[0] === 'alle-lernenden') {
+      const eigene = new Set(lerngruppenVon(ich.id).flatMap((g) => mitgliederVon(g).map((n) => n.benutzer)))
+      return (
+        json(res, 200, {
+          lernende: alleLernenden().map((n) => ({ benutzer: n.benutzer, name: n.name || n.benutzer, klasse: klasseVon(n), eigen: eigene.has(n.benutzer) }))
+        }),
+        true
+      )
     }
     if (req.method === 'POST' && teile[0] === 'freigeben') {
       const k0 = (await k.koerper()) as Record<string, unknown>

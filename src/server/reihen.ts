@@ -13,7 +13,7 @@
 import { randomBytes } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage, type Aufruf } from './http'
-import { gehoertZu, lerngruppe, lerngruppenVon, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
+import { alleLernenden, gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
 import { blattFassung, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
 import { vokabelnZuweisen, vokabelStand } from './vokabeln'
@@ -762,7 +762,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
       const g = gid ? lerngruppe(gid) : null
       if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
       // Ohne Lerngruppe: einzelne Lernende aus allen eigenen Lerngruppen
-      const erlaubt = new Set((g ? [g] : lerngruppenVon(ich.id)).flatMap((x) => mitgliederVon(x).map((n) => n.benutzer)))
+      const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
       if (!g && !einzelne.length) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe oder einzelne Lernende wählen.' }), true)
       const id = neueId()

@@ -155,7 +155,15 @@ export function onlineFassung(variante: Variant): OnlineFassung {
   const loesungen: Record<string, Loesung> = {}
   for (const b of variante.blocks) {
     const ppi = ganzePunkte(b.pointsPerItem)
-    const a: OnlineAufgabe = { id: b.id, art: b.kind, titel: b.title, anweisung: b.instruction, ...(b.helpText ? { hilfe: b.helpText } : {}), eintraege: [], punkte: 0 }
+    const a: OnlineAufgabe = {
+      id: b.id,
+      art: b.kind,
+      titel: b.title,
+      anweisung: b.instruction,
+      ...(b.helpText ? { hilfe: b.helpText } : {}),
+      eintraege: [],
+      punkte: 0
+    }
     const einheit = (id: string, felder: string[], punkte = ppi): void => {
       einheiten.push({ id, aufgabe: b.id, felder, punkte })
       a.punkte += punkte
@@ -197,7 +205,8 @@ export function onlineFassung(variante: Variant): OnlineFassung {
         break
       }
       case 'gapText': {
-        if (b.wordBank) a.wortkasten = sortiertesWortkastenBild([...b.parts.flatMap((p) => (p.type === 'gap' ? [p.bankWord || p.answer] : [])), ...b.extraBankWords])
+        if (b.wordBank)
+          a.wortkasten = sortiertesWortkastenBild([...b.parts.flatMap((p) => (p.type === 'gap' ? [p.bankWord || p.answer] : [])), ...b.extraBankWords])
         // Der Text als Folge: Textstücke und Lücken in einem Eintrag je Lücke (vor = Text davor)
         let vor = ''
         let letzteEinheit: Einheit | null = null
@@ -239,7 +248,12 @@ export function onlineFassung(variante: Variant): OnlineFassung {
       case 'choice':
         for (const it of b.items) {
           const f = feldId(b.id, it.id)
-          a.eintraege.push({ einheit: f, vor: it.before, nach: it.after, felder: [{ id: f, art: 'auswahl', optionen: it.options.map((o, i) => ({ wert: String(i), text: o })) }] })
+          a.eintraege.push({
+            einheit: f,
+            vor: it.before,
+            nach: it.after,
+            felder: [{ id: f, art: 'auswahl', optionen: it.options.map((o, i) => ({ wert: String(i), text: o })) }]
+          })
           loesungen[f] = { art: 'auswahl', wert: String(it.correct) }
           einheit(f, [f])
         }
@@ -315,8 +329,17 @@ export function onlineFassung(variante: Variant): OnlineFassung {
           const zuAst = b.items.filter((i) => (ast.id === '_' ? true : i.branchId === ast.id))
           zuAst.forEach((it, n) => {
             const f = feldId(b.id, it.id)
-            a.eintraege.push({ einheit: f, ...(ast.label ? { text: ast.label } : {}), felder: [{ id: f, art: 'text', beschriftung: ast.label ? `${ast.label} ${n + 1}` : `${n + 1}` }] })
-            loesungen[f] = { art: 'menge', werte: zuAst.map((x) => x.answer), gruppe: `${b.id}.${ast.id}`, frage: frage(`Thema: ${b.topic}${ast.label ? `, Oberbegriff: ${ast.label}` : ''}`) }
+            a.eintraege.push({
+              einheit: f,
+              ...(ast.label ? { text: ast.label } : {}),
+              felder: [{ id: f, art: 'text', beschriftung: ast.label ? `${ast.label} ${n + 1}` : `${n + 1}` }]
+            })
+            loesungen[f] = {
+              art: 'menge',
+              werte: zuAst.map((x) => x.answer),
+              gruppe: `${b.id}.${ast.id}`,
+              frage: frage(`Thema: ${b.topic}${ast.label ? `, Oberbegriff: ${ast.label}` : ''}`)
+            }
             einheit(f, [f])
           })
         })
@@ -417,7 +440,14 @@ export interface EinheitBewertung {
   pruefen?: 'kleinerFehler' | 'sinnvoll'
   /** Die KI hat diese (automatisch falsche) Antwort schon auf Sinn im Zusammenhang geprüft */
   kiGeprueft?: boolean
+  /** Lehrkraft: Haken in Klammern – knapp richtig, volle Punkte, aber nicht fehlerfrei (03.10.2026) */
+  knapp?: boolean
+  /** Lehrkraft: Fragezeichen – zu allgemein bzw. unklar, keine Punkte (03.10.2026) */
+  frage?: boolean
 }
+
+/** Korrekturzeichen der Lehrkraft in der Blattansicht */
+export type Zeichen = 'richtig' | 'knapp' | 'falsch' | 'frage'
 
 export type Bewertung = Record<string, EinheitBewertung>
 

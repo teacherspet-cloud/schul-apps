@@ -1112,7 +1112,16 @@ function Durchsicht({
           </Button>
         </Group>
         <div style={{ overflowX: 'auto' }}>
-          <AbgabeBlatt kopf={test.einstellungen.blatt!} {...a} />
+          <Text size="xs" c="dimmed" mb={4}>
+            Ein Klick auf ein Zeichen ändert die Bewertung: ✓ richtig · (✓) knapp richtig · ✗ falsch · ? zu allgemein.
+          </Text>
+          <AbgabeBlatt
+            kopf={test.einstellungen.blatt!}
+            {...a}
+            aendern={(einheit, zeichen) =>
+              void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, zeichen }).then(geaendert, (e: unknown) => notifyError(e))
+            }
+          />
         </div>
       </Modal>
     )

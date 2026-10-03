@@ -14,7 +14,7 @@
 import { randomBytes } from 'node:crypto'
 import { datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
-import { gehoertZu, lerngruppe, lerngruppenVon, mitgliederVon } from './onlinetest'
+import { alleLernenden, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { blaetterFuerLernen } from './arbeitsblaetter'
 import { vokabelListenFuer } from './vokabeln'
 import { reihenFuerLernen } from './reihen'
@@ -225,7 +225,7 @@ export function lernenRoute(): (k: Anfrage) => Promise<boolean> {
     const gid = String(k0.lerngruppeId ?? '')
     const g = gid ? lerngruppe(gid) : null
     if (gid && (!g || g.lehrkraft_id !== ich.id)) return (json(res, 400, { fehler: 'Bitte eine eigene Lerngruppe wählen.' }), true)
-    const erlaubt = new Set((g ? [g] : lerngruppenVon(ich.id)).flatMap((x) => mitgliederVon(x).map((n) => n.benutzer)))
+    const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
     const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
     if (!g && !einzelne.length) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe oder einzelne Lernende wählen.' }), true)
     const bilder = (Array.isArray(k0.bilder) ? k0.bilder : [])

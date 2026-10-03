@@ -6,6 +6,7 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
+import { useAlleLernenden } from './LernendeWahl'
 import {
   Alert,
   Badge,
@@ -143,19 +144,11 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const [einzelne, setEinzelne] = useState<string[]>([])
   const [termin, setTermin] = useState('')
   const [laeuft, setLaeuft] = useState(false)
-  const { gruppen, alle } = useLerngruppen()
+  const { gruppen } = useLerngruppen()
   useEffect(() => {
     if (auswahl) setTitel(auswahl.titel)
   }, [auswahl])
-  const gesehen = new Set<string>()
-  const personen = gruppen
-    .map((g) => ({
-      group: g.name,
-      items: alle
-        .filter((m) => m.gruppeId === g.id && !gesehen.has(m.benutzer) && (gesehen.add(m.benutzer), true))
-        .map((m) => ({ value: m.benutzer, label: m.name }))
-    }))
-    .filter((g) => g.items.length)
+  const alleLernenden = useAlleLernenden()
   const los = async (): Promise<void> => {
     if (!auswahl) return
     setLaeuft(true)
@@ -206,7 +199,16 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             data-vokabel-gruppe
           />
         ) : (
-          <MultiSelect label="Lernende" data={personen} value={einzelne} onChange={setEinzelne} searchable placeholder="Namen suchen …" />
+          <MultiSelect
+            label="Lernende"
+            data={alleLernenden.daten}
+            value={einzelne}
+            onChange={setEinzelne}
+            searchable
+            clearable
+            nothingFoundMessage="Kein Schülerkonto mit diesem Namen"
+            placeholder="Namen suchen …"
+          />
         )}
         <TextInput
           type="date"

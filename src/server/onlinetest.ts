@@ -163,6 +163,18 @@ export function gehoertZu(g: Lerngruppe, n: Pick<NutzerInfo, 'benutzer' | 'grupp
   return Boolean(g.iserv_gruppe) && n.gruppen.some((x) => x.id === g.iserv_gruppe)
 }
 
+/**
+ * Alle Schülerkonten der Schule (03.10.2026): Einzelne Lernende lassen sich auch ohne eigene
+ * Lerngruppe wählen (gemeldet: „M. Mustermann" war nicht zu finden, weil er in keiner Lerngruppe
+ * der Lehrkraft stand). Gäste nicht, gesperrte Konten nicht.
+ */
+export function alleLernenden(): NutzerInfo[] {
+  return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && !n.gesperrt)
+}
+
+/** Klasse eines Schülerkontos (aus der Klassenliste bzw. IServ), sonst leer */
+export const klasseVon = (n: Pick<NutzerInfo, 'gruppen'>): string => n.gruppen.find((g) => g.id.startsWith('klasse:'))?.name ?? n.gruppen[0]?.name ?? ''
+
 export function mitgliederVon(g: Lerngruppe): NutzerInfo[] {
   return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && gehoertZu(g, n))
 }
@@ -1218,13 +1230,26 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       const e = test.fassungen[t.variante].fassung.einheiten.find((x) => x.id === k0.einheit)
       if (!e) return (json(res, 404, { fehler: 'Unbekannte Aufgabe.' }), true)
       const b = json_(t.bewertung, {} as Bewertung)
-      // Ganze Punkte zwischen 0 und dem Höchstwert der Einheit (Freitext); sonst richtig/falsch
-      const punkte = typeof k0.punkte === 'number' ? Math.max(0, Math.min(e.punkte, Math.round(k0.punkte))) : k0.richtig ? e.punkte : 0
+      // Ganze Punkte zwischen 0 und dem Höchstwert der Einheit (Freitext); sonst richtig/falsch.
+      // Korrekturzeichen aus der Blattansicht (03.10.2026): ✓, (✓) knapp richtig, ✗, ? zu allgemein
+      const zeichen = ['richtig', 'knapp', 'falsch', 'frage'].includes(String(k0.zeichen)) ? String(k0.zeichen) : null
+      const punkte =
+        typeof k0.punkte === 'number'
+          ? Math.max(0, Math.min(e.punkte, Math.round(k0.punkte)))
+          : zeichen
+            ? zeichen === 'richtig' || zeichen === 'knapp'
+              ? e.punkte
+              : 0
+            : k0.richtig
+              ? e.punkte
+              : 0
       const alt = b[e.id]
       b[e.id] = {
         status: punkte > 0 ? 'richtig' : 'falsch',
         punkte,
         quelle: 'lehrkraft',
+        ...(zeichen === 'knapp' ? { knapp: true } : {}),
+        ...(zeichen === 'frage' ? { frage: true } : {}),
         ...(alt?.pruefen ? { pruefen: alt.pruefen } : {}),
         ...(typeof k0.hinweis === 'string' && k0.hinweis ? { hinweis: k0.hinweis.slice(0, 300) } : alt?.hinweis ? { hinweis: alt.hinweis } : {})
       }

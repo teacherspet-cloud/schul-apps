@@ -737,6 +737,16 @@
 .vt-abgabe .vt-marke-offen {
   color: #f08c00;
 }
+/* Lehrkraft: Zeichen anklickbar (Blattansicht der Durchsicht, 03.10.2026) */
+.vt-zeichen-aenderbar [data-einheit] {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+.vt-zeichen-aenderbar [data-einheit]:hover {
+  background: rgba(34, 139, 230, 0.15);
+  outline: 1px solid rgba(34, 139, 230, 0.5);
+}
 .vt-abgabe .vt-aufgabe-erreicht {
   color: #1d4ed8;
   font-weight: 700;
