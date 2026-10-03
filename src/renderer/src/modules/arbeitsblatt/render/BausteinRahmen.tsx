@@ -165,7 +165,9 @@ export function BausteinRahmen({
     const t = leiste.current
     const rahmen = box.current
     if (!t || !rahmen) return
-    leisteAusrichten(t, rahmen, rahmen.closest<HTMLElement>('.ws-page'))
+    // Begrenzung ist die Inhaltsfläche (.ws-body): Sie schneidet oben und unten ab (ws.css), nicht erst
+    // der Seitenrand – sonst lief die Leiste eines Bausteins unten auf der Seite ins Abgeschnittene (03.10.2026)
+    leisteAusrichten(t, rahmen, rahmen.closest<HTMLElement>('.ws-body') ?? rahmen.closest<HTMLElement>('.ws-page'))
   }
   useEffect(() => {
     if (aktiv || ueber || block.free) ausrichten()
