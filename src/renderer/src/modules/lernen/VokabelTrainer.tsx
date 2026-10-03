@@ -9,6 +9,10 @@
  */
 import { Spielwahl } from './spiele/Spiele'
 import { besteStimme } from './stimme'
+import { useVtFarbe, VtFarbe, vtFarben } from './vtFarben'
+import { useComputedColorScheme, useMantineTheme } from '@mantine/core'
+import { useDarstellung } from '../onlinetest/SchuelerEinstellungen'
+import { fachFarbeAus } from '../../shared/fachfarben'
 import { ActionIcon, Alert, Badge, Button, Card, Center, Group, Loader, Progress, SimpleGrid, Stack, Text, TextInput, Title, Tooltip } from '@mantine/core'
 import {
   IconArrowLeft,
@@ -55,6 +59,8 @@ interface Liste {
   staende: Record<string, WortStand>
   rekorde?: Record<string, number>
   ansehen?: string[]
+  /** Fachfarbe des Kopfbands (Einstellung der Lehrkraft) */
+  farbe?: string | null
 }
 
 const STIMME: Record<string, string> = {
@@ -106,44 +112,43 @@ export function sprich(text: string, sprache: string): void {
 }
 
 const CSS = `
-.vt { --vt-orange: #f97316; --vt-orange-dunkel: #c2410c; --vt-creme: #fff7ed; --vt-tinte: #1f2937; --vt-leise: #6b7280; --vt-rand: #fed7aa; }
 .vt-kopf { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 22px 20px; color: #fff;
-  background: radial-gradient(120% 140% at 100% 0%, #fdba74 0%, #fb923c 38%, #ea580c 100%); box-shadow: 0 14px 30px rgba(234,88,12,0.28); }
+  background: radial-gradient(120% 140% at 100% 0%, var(--vt-a-zart) 0%, var(--vt-a-mittel) 38%, var(--vt-a-tief) 100%); box-shadow: 0 14px 30px var(--vt-schatten); }
 .vt-kopf::after { content: ''; position: absolute; right: -40px; bottom: -60px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.12); }
 .vt-kopf-zeile { display: flex; align-items: center; justify-content: space-between; gap: 16px; position: relative; z-index: 1; }
 .vt-ring { flex: none; width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; }
-.vt-ring-innen { width: 70px; height: 70px; border-radius: 50%; background: rgba(255,255,255,0.95); color: var(--vt-orange-dunkel); display: grid; place-items: center; text-align: center; line-height: 1.05; }
-.vt-kasten { display: flex; gap: 8px; align-items: flex-end; padding: 14px 14px 18px; border-radius: 20px; background: var(--vt-creme);
-  border: 1px solid var(--vt-rand); box-shadow: inset 0 -5px 0 #fde2c4; }
-.vt-fach { flex: 1; border-radius: 12px 12px 8px 8px; background: #fff; position: relative; overflow: hidden; min-height: 104px;
-  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; border: 1px solid #fde7d0; }
+.vt-ring-innen { width: 70px; height: 70px; border-radius: 50%; background: var(--vt-flaeche); color: var(--vt-a-dunkel); display: grid; place-items: center; text-align: center; line-height: 1.05; }
+.vt-kasten { display: flex; gap: 8px; align-items: flex-end; padding: 14px 14px 18px; border-radius: 20px; background: var(--vt-a-hell);
+  border: 1px solid var(--vt-a-rand); box-shadow: inset 0 -5px 0 var(--vt-a-rand2); }
+.vt-fach { flex: 1; border-radius: 12px 12px 8px 8px; background: var(--vt-flaeche); position: relative; overflow: hidden; min-height: 104px;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; border: 1px solid var(--vt-a-rand2); }
 .vt-fach-fuellung { position: absolute; left: 0; right: 0; bottom: 0; transition: height .6s cubic-bezier(.2,.8,.2,1); opacity: .9;
   background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0) 0 6px, rgba(255,255,255,0.45) 6px 7px); }
 .vt-fach-zahl { position: relative; font-weight: 800; font-size: 1.2rem; color: var(--vt-tinte); }
 .vt-fach-name { position: relative; font-size: .72rem; color: var(--vt-leise); }
 .vt-werte { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.vt-wert { border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #f1f5f9; box-shadow: 0 2px 10px rgba(15,23,42,0.05); }
+.vt-wert { border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; background: var(--vt-flaeche); border: 1px solid var(--vt-linie); box-shadow: 0 2px 10px rgba(15,23,42,0.05); }
 .vt-wert-symbol { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; }
-.vt-los { background: linear-gradient(90deg, #fb923c, #ea580c) !important; box-shadow: 0 10px 22px rgba(234,88,12,0.3); border: 0 !important; }
+.vt-los { background: linear-gradient(90deg, var(--vt-a-mittel), var(--vt-a-tief)) !important; color: #fff !important; box-shadow: 0 10px 22px var(--vt-schatten); border: 0 !important; }
 .vt-los:hover { filter: brightness(1.05); }
-.vt-buehne { background: #fff; border-radius: 22px; padding: 22px 16px; border: 1px solid #f1f5f9; box-shadow: 0 6px 24px rgba(15,23,42,0.06); }
-.vt-frage { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--vt-orange-dunkel); font-weight: 700; }
-.vt-option { border: 2px solid #fde7d0 !important; background: #fff !important; color: var(--vt-tinte) !important; transition: transform .12s, border-color .12s; }
-.vt-option:hover { border-color: var(--vt-orange) !important; transform: translateY(-1px); }
-.vt-option[data-zustand="richtig"] { background: #d1fae5 !important; border-color: #10b981 !important; color: #065f46 !important; }
-.vt-option[data-zustand="falsch"] { background: #ffe4e6 !important; border-color: #f43f5e !important; color: #9f1239 !important; }
+.vt-buehne { background: var(--vt-flaeche); border-radius: 22px; padding: 22px 16px; border: 1px solid var(--vt-linie); box-shadow: 0 6px 24px rgba(15,23,42,0.06); }
+.vt-frage { font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--vt-a-dunkel); font-weight: 700; }
+.vt-option { border: 2px solid var(--vt-a-rand2) !important; background: var(--vt-flaeche) !important; color: var(--vt-tinte) !important; transition: transform .12s, border-color .12s; }
+.vt-option:hover { border-color: var(--vt-a) !important; transform: translateY(-1px); }
+.vt-option[data-zustand="richtig"] { background: var(--vt-gut-bg) !important; border-color: var(--vt-gut-rand) !important; color: var(--vt-gut-text) !important; }
+.vt-option[data-zustand="falsch"] { background: var(--vt-schlecht-bg) !important; border-color: var(--vt-schlecht-rand) !important; color: var(--vt-schlecht-text) !important; }
 .vt-karte-buehne { perspective: 1200px; width: 100%; max-width: 440px; height: 260px; margin: 0 auto; touch-action: pan-y; }
 .vt-karte { position: relative; width: 100%; height: 100%; transition: transform .55s cubic-bezier(.2,.8,.2,1); transform-style: preserve-3d; cursor: grab; }
 .vt-karte.umgedreht { transform: rotateY(180deg); }
 .vt-seite { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 20px; padding: 20px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--vt-tinte);
-  background: linear-gradient(160deg, #ffffff, #fff7ed); border: 1px solid #fed7aa; box-shadow: 0 14px 30px rgba(234,88,12,0.14); }
-.vt-seite.hinten { transform: rotateY(180deg); background: linear-gradient(160deg, #ecfdf5, #d1fae5); border-color: #a7f3d0; box-shadow: 0 14px 30px rgba(16,185,129,0.14); }
-.vt-seite::before { content: ''; position: absolute; left: 0; right: 0; top: 46px; border-top: 2px solid rgba(249,115,22,0.25); }
-.vt-kachel { min-width: 42px; height: 46px; font-size: 1.2rem; font-weight: 700; border-radius: 12px !important; background: #fff7ed !important; color: var(--vt-orange-dunkel) !important;
-  border: 2px solid #fed7aa !important; box-shadow: 0 3px 0 #fdba74; }
+  background: linear-gradient(160deg, var(--vt-flaeche), var(--vt-a-hell)); border: 1px solid var(--vt-a-rand); box-shadow: 0 14px 30px var(--vt-schatten); }
+.vt-seite.hinten { transform: rotateY(180deg); background: linear-gradient(160deg, var(--vt-flaeche), var(--vt-gut-bg)); border-color: var(--vt-gut-rand); }
+.vt-seite::before { content: ''; position: absolute; left: 0; right: 0; top: 46px; border-top: 2px solid var(--vt-a-rand); }
+.vt-kachel { min-width: 42px; height: 46px; font-size: 1.2rem; font-weight: 700; border-radius: 12px !important; background: var(--vt-a-hell) !important; color: var(--vt-a-dunkel) !important;
+  border: 2px solid var(--vt-a-rand) !important; box-shadow: 0 3px 0 var(--vt-a-zart); }
 .vt-kachel:disabled { opacity: .35; box-shadow: none; }
-.vt-gelegt { border: 2px dashed #fdba74; border-radius: 16px; background: #fffbf5; min-width: 240px; min-height: 60px; display: grid; place-items: center; padding: 6px 14px; }
+.vt-gelegt { border: 2px dashed var(--vt-a-zart); border-radius: 16px; background: var(--vt-a-hell); min-width: 240px; min-height: 60px; display: grid; place-items: center; padding: 6px 14px; }
 @keyframes vt-rein { from { opacity: 0; transform: translateY(12px) scale(.98) } to { opacity: 1; transform: none } }
 .vt-rein { animation: vt-rein .35s ease-out; }
 @media (prefers-reduced-motion: reduce) { .vt-karte, .vt-fach-fuellung { transition: none } .vt-rein { animation: none } }
@@ -167,8 +172,34 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
       </Center>
     )
   if (!d) return <Alert color="orange">{fehler || 'Diese Vokabeln gibt es nicht.'}</Alert>
-  if (sitzung) return <Sitzung d={d} woerter={sitzung} fertig={(st) => (setD({ ...d, staende: st }), setSitzung(null))} />
-  return <Kasten d={d} starten={(w) => setSitzung(w)} aktualisieren={(r) => setD({ ...d, ...r })} />
+  return (
+    <TrainerFarben fach={d.fach} fachFarbe={d.farbe}>
+      {sitzung ? (
+        <Sitzung d={d} woerter={sitzung} fertig={(st) => (setD({ ...d, staende: st }), setSitzung(null))} />
+      ) : (
+        <Kasten d={d} starten={(w) => setSitzung(w)} aktualisieren={(r) => setD({ ...d, ...r })} />
+      )}
+    </TrainerFarben>
+  )
+}
+
+/**
+ * Farbhülle (03.10.2026): Fachfarbe des Kopfbands (vom Server: Einstellung der Lehrkraft) oder die eigene
+ * Farbe der Lernenden (Einstellungen › Farben im Vokabeltraining), hell oder dunkel wie eingestellt.
+ */
+function TrainerFarben({ fach, fachFarbe, children }: { fach: string; fachFarbe?: string | null; children: React.ReactNode }): React.JSX.Element {
+  const { d } = useDarstellung()
+  const theme = useMantineTheme()
+  const dunkel = useComputedColorScheme('light') === 'dark'
+  const akzent = d.design === 'eigen' ? (theme.colors[d.farbe]?.[7] ?? '#1971c2') : fachFarbe || fachFarbeAus(fach, undefined) || '#ea580c'
+  const farben = useMemo(() => vtFarben(akzent, dunkel), [akzent, dunkel])
+  return (
+    <VtFarbe.Provider value={farben}>
+      <div className="vt-farben" style={farben.variablen as React.CSSProperties} data-vt-akzent={farben.a} data-vt-dunkel={dunkel ? '' : undefined}>
+        {children}
+      </div>
+    </VtFarbe.Provider>
+  )
 }
 
 function Kasten({
@@ -180,6 +211,7 @@ function Kasten({
   starten: (w: Vokabel[]) => void
   aktualisieren: (r: { rekorde: Record<string, number>; ansehen: string[] }) => void
 }): React.JSX.Element {
+  const farbe = useVtFarbe()
   const u = uebersicht(d.woerter, d.staende)
   const heute = sitzungsWoerter(d.woerter, d.staende)
   const max = Math.max(1, ...u.faecher)
@@ -199,7 +231,7 @@ function Kasten({
   }, [d.sprache])
   const werte: { name: string; wert: string; farbe: string; symbol: React.ReactNode }[] = [
     { name: 'sicher', wert: `${u.sicher} / ${u.gesamt}`, farbe: '#14b8a6', symbol: <IconShieldCheck size={20} /> },
-    { name: 'heute fällig', wert: String(heute.length), farbe: '#f97316', symbol: <IconFlame size={20} /> },
+    { name: 'heute fällig', wert: String(heute.length), farbe: farbe.a, symbol: <IconFlame size={20} /> },
     { name: 'im Aufbau', wert: String(u.imAufbau), farbe: '#f59e0b', symbol: <IconStairsUp size={20} /> },
     {
       name: 'Test',
@@ -211,7 +243,7 @@ function Kasten({
   return (
     <Stack className="vt" data-vokabel-kasten gap="lg">
       <style>{CSS}</style>
-      <Button variant="subtle" color="orange" component="a" href={gast ? '/s/' : '/s/lernen'} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
+      <Button variant="subtle" color={farbe.a} component="a" href={gast ? '/s/' : '/s/lernen'} w="fit-content" leftSection={<IconArrowLeft size={16} />} px={4}>
         {gast ? 'Meine Materialien' : 'Lernraum'}
       </Button>
       {!spielt && (
@@ -248,14 +280,17 @@ function Kasten({
             </div>
           </div>
           <div>
-            <Text size="sm" fw={700} mb={6} c="#9a3412">
+            <Text size="sm" fw={700} mb={6} c="var(--vt-a-dunkel)">
               Dein Karteikasten
             </Text>
             <div className="vt-kasten" aria-label="Dein Karteikasten">
               {u.faecher.map((n, i) => (
                 <Tooltip key={i} label={i === 0 ? `${n} noch nicht gelernt` : i === 6 ? `${n} im Langzeitfach` : `${n} in Fach ${i}`}>
                   <div className="vt-fach" data-fach={i}>
-                    <div className="vt-fach-fuellung" style={{ height: `${n ? 18 + (n / max) * 62 : 0}%`, backgroundColor: FACH_FARBEN[i] }} />
+                    <div
+                      className="vt-fach-fuellung"
+                      style={{ height: `${n ? 18 + (n / max) * 62 : 0}%`, backgroundColor: i === 0 && farbe.dunkel ? '#4b5563' : FACH_FARBEN[i] }}
+                    />
                     <span className="vt-fach-zahl">{n}</span>
                     <span className="vt-fach-name">{i === 0 ? 'neu' : i === 6 ? '∞' : `Fach ${FACH_NAMEN[i]}`}</span>
                   </div>
@@ -273,7 +308,7 @@ function Kasten({
                   <Text size="xs" c="dimmed">
                     {w.name}
                   </Text>
-                  <Text fw={800} size="lg" lh={1.2} c="#1f2937">
+                  <Text fw={800} size="lg" lh={1.2} c="var(--vt-tinte)">
                     {w.wert}
                   </Text>
                 </div>
@@ -329,6 +364,7 @@ interface Ergebnis {
 }
 
 function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig: (st: Record<string, WortStand>) => void }): React.JSX.Element {
+  const farbe = useVtFarbe()
   const [warteschlange, setWarteschlange] = useState<Vokabel[]>(woerter)
   const [staende, setStaende] = useState<Record<string, WortStand>>(d.staende)
   const [ergebnis, setErgebnis] = useState<Ergebnis | null>(null)
@@ -388,7 +424,10 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
     return (
       <Stack align="center" py="xl" className="vt vt-rein" data-sitzung-fertig>
         <style>{CSS}</style>
-        <div className="vt-ring" style={{ background: `conic-gradient(#f97316 ${(zaehler.richtig / Math.max(1, zaehler.gesamt)) * 360}deg, #fed7aa 0deg)` }}>
+        <div
+          className="vt-ring"
+          style={{ background: `conic-gradient(var(--vt-a) ${(zaehler.richtig / Math.max(1, zaehler.gesamt)) * 360}deg, var(--vt-a-rand) 0deg)` }}
+        >
           <div className="vt-ring-innen">
             <IconCheck size={30} />
           </div>
@@ -407,14 +446,14 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
     <Stack className="vt" data-sitzung>
       <style>{CSS}</style>
       <Group justify="space-between">
-        <Button variant="subtle" color="orange" leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4}>
+        <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} onClick={() => fertig(staende)} px={4}>
           Beenden
         </Button>
-        <Badge variant="light" color="orange" size="lg" radius="sm">
+        <Badge variant="light" color={farbe.a} size="lg" radius="sm">
           {st!.fach === 0 ? 'neues Wort' : st!.fach >= 6 ? 'Langzeitfach' : `Fach ${FACH_NAMEN[st!.fach]}`}
         </Badge>
       </Group>
-      <Progress value={fortschritt} radius="xl" size="lg" color="orange" />
+      <Progress value={fortschritt} radius="xl" size="lg" color={farbe.a} />
       <div key={`${v.id}-${frage}`} className="vt-rein vt-buehne">
         {uebung === 'karte' ? (
           <Karte v={v} sprache={d.sprache} gewusst={(g) => void antworten({ gewusst: g })} gesperrt={Boolean(ergebnis) || laeuft} />
@@ -470,6 +509,7 @@ function Rueckmeldung({ e, v, sprache }: { e: Ergebnis; v: Vokabel; sprache: str
 
 /** Lernkarte: umdrehen per Tippen, Wischen oder Ziehen; Aussprache; Nachsprechen */
 function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string; gewusst: (g: boolean) => void; gesperrt: boolean }): React.JSX.Element {
+  const farbe = useVtFarbe()
   const [um, setUm] = useState(false)
   const [zug, setZug] = useState(0)
   const start = useRef<number | null>(null)
@@ -564,7 +604,7 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
       )}
       {um && (
         <Group className="vt-rein">
-          <Button color="orange" variant="light" size="md" radius="xl" disabled={gesperrt} onClick={() => gewusst(false)} data-karte-nicht>
+          <Button color={farbe.a} variant="light" size="md" radius="xl" disabled={gesperrt} onClick={() => gewusst(false)} data-karte-nicht>
             Noch nicht gewusst
           </Button>
           <Button color="green" size="md" radius="xl" disabled={gesperrt} onClick={() => gewusst(true)} data-karte-gewusst>
@@ -600,6 +640,7 @@ function Auswahl({
   waehle: (a: string) => void
   ergebnis: Ergebnis | null
 }): React.JSX.Element {
+  const farbe = useVtFarbe()
   const optionen = useMemo(() => auswahlOptionen(v, liste, 'de'), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   useEffect(() => {
@@ -609,11 +650,11 @@ function Auswahl({
     <Stack align="center">
       <Text className="vt-frage">{hoeren ? 'Hör zu: Was bedeutet das Wort?' : 'Was bedeutet das Wort?'}</Text>
       {hoeren ? (
-        <ActionIcon size={72} radius="xl" variant="light" color="orange" onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">
+        <ActionIcon size={72} radius="xl" variant="light" color={farbe.a} onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">
           <IconVolume size={36} />
         </ActionIcon>
       ) : (
-        <Text fw={800} size="2rem" ta="center" c="#1f2937">
+        <Text fw={800} size="2rem" ta="center" c="var(--vt-tinte)">
           {v.term}
         </Text>
       )}
@@ -676,7 +717,7 @@ function AuswahlFs({
       <Text className="vt-frage">{mitFehlern ? 'Welche Schreibweise ist richtig?' : 'Welches Wort ist gemeint?'}</Text>
       <Group gap="xs">
         {v.bild && <img src={v.bild} alt="" style={{ width: 44, height: 44 }} />}
-        <Text fw={800} size="1.8rem" c="#1f2937">
+        <Text fw={800} size="1.8rem" c="var(--vt-tinte)">
           {v.translation}
         </Text>
       </Group>
@@ -729,15 +770,20 @@ function Paar({
   return (
     <Stack align="center">
       <Text className="vt-frage">Stimmt das?</Text>
-      <Card radius="xl" padding="lg" withBorder style={{ borderColor: '#fed7aa', background: 'linear-gradient(160deg, #fff, #fff7ed)', minWidth: 280 }}>
+      <Card
+        radius="xl"
+        padding="lg"
+        withBorder
+        style={{ borderColor: 'var(--vt-a-rand)', background: 'linear-gradient(160deg, var(--vt-flaeche), var(--vt-a-hell))', minWidth: 280 }}
+      >
         <Stack gap={4} align="center">
-          <Text fw={800} size="1.7rem" c="#1f2937">
+          <Text fw={800} size="1.7rem" c="var(--vt-tinte)">
             {v.term}
           </Text>
           <Text size="sm" c="dimmed">
             bedeutet
           </Text>
-          <Text fw={700} size="1.4rem" c="#c2410c">
+          <Text fw={700} size="1.4rem" c="var(--vt-a-dunkel)">
             {gezeigt}
           </Text>
         </Stack>
@@ -778,11 +824,11 @@ function Buchstaben({ v, pruefen, gesperrt }: { v: Vokabel; pruefen: (a: string)
   return (
     <Stack align="center">
       <Text className="vt-frage">Lege das Wort aus den Buchstaben</Text>
-      <Text fw={800} size="1.6rem" c="#1f2937">
+      <Text fw={800} size="1.6rem" c="var(--vt-tinte)">
         {v.translation}
       </Text>
       <div className="vt-gelegt" data-gelegt>
-        <Text size="1.6rem" fw={700} style={{ letterSpacing: 3 }} c="#c2410c">
+        <Text size="1.6rem" fw={700} style={{ letterSpacing: 3 }} c="var(--vt-a-dunkel)">
           {wort || ' '}
         </Text>
       </div>
@@ -826,6 +872,7 @@ function Schreiben({
   pruefen: (a: string) => void
   gesperrt: boolean
 }): React.JSX.Element {
+  const farbe = useVtFarbe()
   const [text, setText] = useState('')
   const feld = useRef<HTMLInputElement>(null)
   const luecke = uebung === 'luecke' && v.example ? satzMitLuecke(v.example, v.term) : null
@@ -853,12 +900,12 @@ function Schreiben({
               : 'Schreib das Wort in der Fremdsprache'}
       </Text>
       {uebung === 'diktat' ? (
-        <ActionIcon size={72} radius="xl" variant="light" color="orange" onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">
+        <ActionIcon size={72} radius="xl" variant="light" color={farbe.a} onClick={() => sprich(v.term, sprache)} aria-label="Noch einmal anhören">
           <IconVolume size={36} />
         </ActionIcon>
       ) : muster ? (
         <Stack gap={4} align="center">
-          <Text fw={800} size="2rem" c="#c2410c" style={{ letterSpacing: 6, fontFamily: 'ui-monospace, monospace' }} data-luecken-muster>
+          <Text fw={800} size="2rem" c="var(--vt-a-dunkel)" style={{ letterSpacing: 6, fontFamily: 'ui-monospace, monospace' }} data-luecken-muster>
             {muster}
           </Text>
           <Text size="md" c="dimmed">

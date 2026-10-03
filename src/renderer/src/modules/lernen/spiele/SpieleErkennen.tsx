@@ -7,6 +7,7 @@ import { Badge, Button, Group, Progress, SimpleGrid, Stack, Text } from '@mantin
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { auswahlOptionen, type Vokabel } from '@shared/vokabeltrainer'
 import { satzTeile, spielform } from '@shared/vokabelSpiele'
+import { useVtFarbe } from '../vtFarben'
 
 export interface SpielProps {
   woerter: Vokabel[]
@@ -30,6 +31,7 @@ export function useSekunden(laeuft = true): number {
 // ---------------------------------------------------------------- Memory
 
 export function Memory({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const karten = useMemo(() => {
     const w = gemischt(woerter).slice(0, 6)
     return gemischt(
@@ -62,7 +64,7 @@ export function Memory({ woerter, ende }: SpielProps): React.JSX.Element {
         <Text c="dimmed" size="sm">
           Finde die Paare: Wort und Übersetzung.
         </Text>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {zuege} Züge
         </Badge>
       </Group>
@@ -93,6 +95,7 @@ export function Memory({ woerter, ende }: SpielProps): React.JSX.Element {
 // ---------------------------------------------------------------- Zuordnen gegen die Uhr
 
 export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const vorrat = useMemo(() => gemischt(woerter).slice(0, 10), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [naechster, setNaechster] = useState(Math.min(5, vorrat.length))
   const [links, setLinks] = useState(() => vorrat.slice(0, 5).map((v) => v.id))
@@ -155,7 +158,7 @@ export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
         <Text c="dimmed" size="sm">
           Tippe ein Wort und seine Übersetzung.
         </Text>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {sek} s · {geschafft}/{vorrat.length}
         </Badge>
       </Group>
@@ -170,6 +173,7 @@ export function Zuordnen({ woerter, ende }: SpielProps): React.JSX.Element {
 // ---------------------------------------------------------------- Blitzrunde (60 Sekunden)
 
 export function Blitzrunde({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const DAUER = 60
   const [frage, setFrage] = useState(() => gemischt(woerter)[0])
   const [optionen, setOptionen] = useState(() => auswahlOptionen(frage, woerter, 'de'))
@@ -206,15 +210,21 @@ export function Blitzrunde({ woerter, ende }: SpielProps): React.JSX.Element {
   return (
     <Stack data-spiel="blitz" align="center">
       <Group justify="space-between" w="100%">
-        <Badge color={rest <= 10 ? 'red' : 'orange'} variant="filled" size="xl">
+        <Badge color={rest <= 10 ? 'red' : farbe.a} variant="filled" size="xl">
           {Math.max(0, rest)} s
         </Badge>
         <Badge color="teal" variant="light" size="xl">
           {treffer} richtig
         </Badge>
       </Group>
-      <Progress value={(Math.max(0, rest) / DAUER) * 100} color="orange" w="100%" radius="xl" />
-      <Text fw={800} size="2rem" ta="center" c={blitz === 'gut' ? 'teal' : blitz === 'schlecht' ? 'red' : '#1f2937'} style={{ transition: 'color .15s' }}>
+      <Progress value={(Math.max(0, rest) / DAUER) * 100} color={farbe.a} w="100%" radius="xl" />
+      <Text
+        fw={800}
+        size="2rem"
+        ta="center"
+        c={blitz === 'gut' ? 'teal' : blitz === 'schlecht' ? 'red' : 'var(--vt-tinte)'}
+        style={{ transition: 'color .15s' }}
+      >
         {spielform(frage.term)}
       </Text>
       <SimpleGrid cols={2} w="100%" maw={520} spacing="xs">
@@ -241,6 +251,7 @@ export function Blitzrunde({ woerter, ende }: SpielProps): React.JSX.Element {
 // ---------------------------------------------------------------- Satzpuzzle
 
 export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const saetze = useMemo(() => gemischt(woerter.filter((w) => w.example && satzTeile(w.example).length >= 3)).slice(0, 5), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [i, setI] = useState(0)
   const [gelegt, setGelegt] = useState<number[]>([])
@@ -269,7 +280,7 @@ export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
         <Text c="dimmed" size="sm">
           Satz {i + 1} von {saetze.length} · mit „{spielform(v.term)}“
         </Text>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {geloest} gelöst
         </Badge>
       </Group>
@@ -279,7 +290,7 @@ export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
         </Text>
       )}
       <div className="vt-gelegt" style={{ minHeight: 64, width: '100%' }} data-satz-gelegt>
-        <Text size="lg" fw={600} c={urteil === 'falsch' ? 'red' : urteil === 'richtig' ? 'teal' : '#c2410c'} ta="center">
+        <Text size="lg" fw={600} c={urteil === 'falsch' ? 'red' : urteil === 'richtig' ? 'teal' : 'var(--vt-a-dunkel)'} ta="center">
           {gelegt.map((k) => teile[k]).join(' ') || ' '}
         </Text>
       </div>
@@ -303,7 +314,7 @@ export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
         ))}
       </Group>
       <Group>
-        <Button variant="subtle" color="orange" disabled={!gelegt.length || Boolean(urteil)} onClick={() => setGelegt(gelegt.slice(0, -1))}>
+        <Button variant="subtle" color={farbe.a} disabled={!gelegt.length || Boolean(urteil)} onClick={() => setGelegt(gelegt.slice(0, -1))}>
           Zurück
         </Button>
         {urteil ? (

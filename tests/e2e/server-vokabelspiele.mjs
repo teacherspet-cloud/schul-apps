@@ -170,6 +170,46 @@ try {
   pruefe(await s.getByText(/\d+ richtig/).isVisible(), 'Blitzrunde läuft')
   await s.getByRole('button', { name: 'Beenden' }).click()
 
+  // Farbschema des Fachs (Kopfband): Englisch Dunkelblau, Französisch Violett; Hell/Dunkel; eigenes Design
+  const akzent = () => s.locator('[data-vt-akzent]').first().getAttribute('data-vt-akzent')
+  pruefe((await akzent()) === '#1d4e89', `Englisch in der Fachfarbe Dunkelblau (${await akzent()})`)
+  const fr = await (
+    await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+      headers: KOPF,
+      data: { lerngruppeId: g.id, titel: 'Le temps', sprache: 'fr', fach: 'Französisch', woerter: [{ id: 'f1', term: 'le soleil', translation: 'die Sonne' }] }
+    })
+  ).json()
+  await s.goto(`${A}/s/v/${fr.id}`)
+  await s.locator('[data-vokabel-kasten]').waitFor()
+  pruefe((await akzent()) === '#5f3dc4', `Französisch in der Fachfarbe Violett (${await akzent()})`)
+  await s.screenshot({ path: join(out, '5-franzoesisch-hell.png'), fullPage: true })
+  await s.locator('[data-modus-knopf]').click()
+  await s.waitForTimeout(300)
+  pruefe((await s.locator('[data-vt-dunkel]').count()) > 0, 'Dunkle Darstellung über den Schalter in der Kopfzeile')
+  await s.screenshot({ path: join(out, '6-franzoesisch-dunkel.png'), fullPage: true })
+  await s.goto(`${A}/s/einstellungen`)
+  await s.locator('[data-design]').getByText('Meine Farbe').click()
+  await s.getByText(/gespeichert/).waitFor({ timeout: 8000 })
+  await s.goto(`${A}/s/v/${fr.id}`)
+  await s.locator('[data-vokabel-kasten]').waitFor()
+  const eigen = await akzent()
+  pruefe(
+    eigen !== '#5f3dc4' && eigen !== '#8c73d5' && (await s.locator('[data-vt-dunkel]').count()) > 0,
+    `Design wechselbar: eigene Farbe (${eigen}), dunkel bleibt`
+  )
+  await s.screenshot({ path: join(out, '7-eigene-farbe-dunkel.png'), fullPage: true })
+  await s.goto(`${A}/s/einstellungen`)
+  await s.locator('[data-design]').getByText('Farbe des Fachs').click()
+  await s.locator('[data-modus]').getByText('Hell').click()
+  await s.getByText(/gespeichert/).waitFor({ timeout: 8000 })
+  // Gäste haben den Schalter auch
+  const gc = await browser.newContext()
+  const gp = await gc.newPage()
+  await gp.goto(`${A}/s/`)
+  pruefe(await da(gp.locator('[data-modus-knopf]')), 'Hell/Dunkel-Schalter auch ohne Konto')
+  await gc.close()
+  await lk.request.post(`${A}/server/vokabeln/${fr.id}/loeschen`, { headers: KOPF, data: {} })
+
   // Kasten unverändert, Rekorde gespeichert
   const nachher = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()
   pruefe(JSON.stringify(nachher.staende) === vorher, 'Karteikasten durch die Spiele unverändert')

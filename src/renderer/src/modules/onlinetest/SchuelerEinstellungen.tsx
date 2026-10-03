@@ -1,5 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, ColorSwatch, Group, MantineProvider, SegmentedControl, Stack, Switch, Text, Title } from '@mantine/core'
+import {
+  ActionIcon,
+  Button,
+  Card,
+  ColorSwatch,
+  Group,
+  MantineProvider,
+  SegmentedControl,
+  Stack,
+  Switch,
+  Text,
+  Title,
+  Tooltip,
+  useComputedColorScheme
+} from '@mantine/core'
 import { IconArrowLeft, IconCheck, IconDeviceDesktop, IconMoon, IconSun } from '@tabler/icons-react'
 import { create } from 'zustand'
 import { holen, senden } from './serverApi'
@@ -15,9 +29,11 @@ export interface Darstellung {
   schrift: 'normal' | 'gross' | 'sehrgross'
   farbe: 'blue' | 'teal' | 'grape' | 'orange' | 'pink' | 'green'
   ruhig: boolean
+  /** Lernbereiche (Vokabeltraining): Farbe des Fachs wie im Kopfband der Arbeitsblätter, oder die eigene Farbe */
+  design: 'fach' | 'eigen'
 }
 
-const VORGABE: Darstellung = { modus: 'auto', schrift: 'normal', farbe: 'blue', ruhig: false }
+const VORGABE: Darstellung = { modus: 'auto', schrift: 'normal', farbe: 'blue', ruhig: false, design: 'fach' }
 const SPEICHER = 'schulapps-darstellung'
 
 const ausSpeicher = (): Darstellung => {
@@ -28,7 +44,7 @@ const ausSpeicher = (): Darstellung => {
   }
 }
 
-const useDarstellung = create<{ d: Darstellung; setze: (d: Darstellung) => void }>((set) => ({
+export const useDarstellung = create<{ d: Darstellung; setze: (d: Darstellung) => void }>((set) => ({
   d: ausSpeicher(),
   setze: (d) => {
     try {
@@ -83,6 +99,27 @@ const FARBEN: { wert: Darstellung['farbe']; name: string }[] = [
   { wert: 'orange', name: 'Orange' }
 ]
 
+/**
+ * Schneller Wechsel Hell/Dunkel in der Kopfzeile (03.10.2026, Wunsch der Lehrkraft: „auch Schüler in den
+ * Darkmode wechseln können") – für Lernende mit Konto und für Gäste.
+ */
+export function ModusKnopf(): React.JSX.Element {
+  const { d, setze } = useDarstellung()
+  const dunkel = useComputedColorScheme('light') === 'dark'
+  const umschalten = (): void => {
+    const neu: Darstellung = { ...d, modus: dunkel ? 'hell' : 'dunkel' }
+    setze(neu)
+    if (mitKonto()) void senden('/s/api/darstellung', neu).catch(() => undefined)
+  }
+  return (
+    <Tooltip label={dunkel ? 'Hell' : 'Dunkel'}>
+      <ActionIcon variant="subtle" size="lg" onClick={umschalten} aria-label={dunkel ? 'Helle Darstellung' : 'Dunkle Darstellung'} data-modus-knopf>
+        {dunkel ? <IconSun size={18} /> : <IconMoon size={18} />}
+      </ActionIcon>
+    </Tooltip>
+  )
+}
+
 /** /s/einstellungen */
 export function SchuelerEinstellungen(): React.JSX.Element {
   const { d, setze } = useDarstellung()
@@ -91,6 +128,8 @@ export function SchuelerEinstellungen(): React.JSX.Element {
     const neu = { ...d, ...teil }
     setze(neu)
     setGespeichert(false)
+    // Gäste (per QR-Code): nur auf diesem Gerät, kein Konto zum Speichern
+    if (!mitKonto()) return
     void senden('/s/api/darstellung', neu).then(
       () => setGespeichert(true),
       () => undefined
@@ -145,6 +184,21 @@ export function SchuelerEinstellungen(): React.JSX.Element {
             />
           </div>
           <div>
+            <Text size="sm" fw={500} mb={4}>
+              Farben im Vokabeltraining
+            </Text>
+            <SegmentedControl
+              fullWidth
+              value={d.design}
+              onChange={(v) => aendern({ design: v as Darstellung['design'] })}
+              data={[
+                { value: 'fach', label: 'Farbe des Fachs' },
+                { value: 'eigen', label: 'Meine Farbe' }
+              ]}
+              data-design
+            />
+          </div>
+          <div>
             <Text size="sm" fw={500} mb={6}>
               Farbe
             </Text>
@@ -175,12 +229,14 @@ export function SchuelerEinstellungen(): React.JSX.Element {
           />
         </Stack>
       </Card>
-      <Card withBorder padding="lg" radius="md">
-        <Title order={4} mb="md">
-          Passwort
-        </Title>
-        <PasswortAendern />
-      </Card>
+      {mitKonto() && (
+        <Card withBorder padding="lg" radius="md">
+          <Title order={4} mb="md">
+            Passwort
+          </Title>
+          <PasswortAendern />
+        </Card>
+      )}
     </Stack>
   )
 }

@@ -22,6 +22,7 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import { fachFarbeAus } from '../../shared/fachfarben'
 import VokabelBeitritt from '../lernen/VokabelBeitritt'
 import {
   Alert,
@@ -82,7 +83,7 @@ import {
 import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
-import { SchuelerEinstellungen } from './SchuelerEinstellungen'
+import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
 import { amPcGeraet, fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import { holen, senden } from './serverApi'
@@ -162,7 +163,7 @@ export default function SchuelerBereich(): React.JSX.Element {
     <LernRaum fach={lernFach[1] ? decodeURIComponent(lernFach[1]) : undefined} />
   ) : reiheM && !gast ? (
     <ReiheWeg zid={reiheM[1]} schritt={reiheM[2]} />
-  ) : bereich === 'einstellungen' && !gast ? (
+  ) : bereich === 'einstellungen' && (!gast || ich?.angemeldet) ? (
     <SchuelerEinstellungen />
   ) : bereich === 'reihen' && !gast ? (
     <ReihenListe />
@@ -201,16 +202,19 @@ export default function SchuelerBereich(): React.JSX.Element {
                     : ''
             : ''}
         </Text>
-        {!gast && (
-          <Group gap={4}>
+        <Group gap={4}>
+          <ModusKnopf />
+          {(!gast || ich?.angemeldet) && (
             <Button variant="subtle" size="xs" component="a" href="/s/einstellungen" leftSection={<IconSettings size={14} />} data-einstellungen-knopf>
               Einstellungen
             </Button>
+          )}
+          {!gast && (
             <Button variant="subtle" size="xs" leftSection={<IconLogout size={14} />} onClick={() => void abmelden()}>
               Abmelden
             </Button>
-          </Group>
-        )}
+          )}
+        </Group>
       </Group>
       {ausReihe && /^[a-f0-9]{8,32}$/.test(ausReihe) && (
         <Button variant="light" component="a" href={`/s/r/${ausReihe}`} mb="sm" leftSection={<IconArrowLeft size={16} />} data-zur-reihe>
@@ -868,7 +872,7 @@ function GastStart(): React.JSX.Element {
           radius="lg"
           component="a"
           href={`/s/v/${v.id}`}
-          style={{ textDecoration: 'none', borderLeft: '4px solid #f97316' }}
+          style={{ textDecoration: 'none', borderLeft: `4px solid ${fachFarbeAus(v.fach, undefined) ?? '#ea580c'}` }}
           data-gast-vokabeln
         >
           <Group justify="space-between" wrap="nowrap">
@@ -881,7 +885,7 @@ function GastStart(): React.JSX.Element {
                 {v.uebersicht.sicher} von {v.uebersicht.gesamt} sicher{v.uebersicht.faellig ? ` · ${v.uebersicht.faellig} heute fällig` : ''}
               </Text>
             </div>
-            <Button color="orange" radius="xl" component="span">
+            <Button color={fachFarbeAus(v.fach, undefined) ?? 'orange'} radius="xl" component="span">
               Üben
             </Button>
           </Group>

@@ -446,7 +446,9 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           modus: wahl(k0.modus, ['hell', 'dunkel', 'auto'], 'auto'),
           schrift: wahl(k0.schrift, ['normal', 'gross', 'sehrgross'], 'normal'),
           farbe: wahl(k0.farbe, ['blue', 'teal', 'grape', 'orange', 'pink', 'green'], 'blue'),
-          ruhig: k0.ruhig === true
+          ruhig: k0.ruhig === true,
+          // Vokabeltraining: Fachfarbe oder eigene Farbe (03.10.2026)
+          design: wahl(k0.design, ['fach', 'eigen'], 'fach')
         }
         d.prepare('INSERT INTO nutzer_darstellung (nutzer_id, daten) VALUES (?, ?) ON CONFLICT(nutzer_id) DO UPDATE SET daten = excluded.daten').run(
           sitzung.nutzer.id,

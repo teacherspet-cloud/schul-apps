@@ -18,7 +18,10 @@
 import { istRekord, SPIELE, type SpielId } from '../shared/vokabelSpiele'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
-import { json, setzeSitzungsCookie, type Anfrage } from './http'
+import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
+import { imNutzer } from './kontext'
+import { getSettings } from '../main/services/storage/settings'
+import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
@@ -262,6 +265,16 @@ export function vokabelListenFuer(
     }))
 }
 
+/**
+ * Fachfarbe des Kopfbands, wie die Lehrkraft sie eingestellt hat (sonst der Vorschlag des Fachs) –
+ * das Vokabeltraining der Lernenden sieht aus wie ihre Arbeitsblätter (03.10.2026)
+ */
+async function fachfarbeDerLehrkraft(z: Zeile): Promise<string | null> {
+  const lk = nutzerNachId(z.lehrkraft_id)
+  const eigene = lk ? await imNutzer(alsNutzer(lk), async () => getSettings().fachfarben).catch(() => undefined) : undefined
+  return fachFarbeAus(z.fach, eigene)
+}
+
 /** Was eine Übung als Lösung erwartet */
 function loesungFuer(v: Vokabel, uebung: Uebung): string {
   if (uebung === 'auswahl' || uebung === 'hoeren') return v.translation
@@ -353,6 +366,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             testTermin: z.test_termin,
             woerter,
             staende: st.woerter,
+            farbe: await fachfarbeDerLehrkraft(z),
             rekorde: st.rekorde ?? {},
             ansehen: st.ansehen ?? []
           }),

@@ -21,6 +21,7 @@ import { useCallback, useState } from 'react'
 import type { Vokabel, WortStand } from '@shared/vokabeltrainer'
 import { istRekord, SPIELE, spielWoerter, type SpielId } from '@shared/vokabelSpiele'
 import { senden } from '../../onlinetest/serverApi'
+import { useVtFarbe } from '../vtFarben'
 import { Blitzrunde, Memory, Satzpuzzle, Zuordnen } from './SpieleErkennen'
 import { FallendeWoerter, Kreuzwort, Suchsel, Wortraten } from './SpieleSchreiben'
 
@@ -35,7 +36,7 @@ const SYMBOL: Record<SpielId, React.ReactNode> = {
   suchsel: <IconBrain size={22} />
 }
 const FARBE: Record<SpielId, string> = {
-  memory: 'orange',
+  memory: 'red',
   zuordnen: 'grape',
   blitz: 'yellow',
   satz: 'cyan',
@@ -51,25 +52,25 @@ export const SPIELE_CSS = `
 .vt-memory.auf .vt-memory-innen { transform: rotateY(180deg); }
 .vt-memory-zu, .vt-memory-auf { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   font-weight: 700; padding: 6px; text-align: center; font-size: .95rem; }
-.vt-memory-zu { background: linear-gradient(135deg, #fb923c, #ea580c); color: #fff; font-size: 1.6rem; box-shadow: 0 4px 0 #c2410c; }
-.vt-memory-auf { transform: rotateY(180deg); background: #fff; border: 2px solid #fed7aa; color: #1f2937; }
-.vt-memory-auf.de { background: #fff7ed; }
-.vt-memory.gefunden .vt-memory-auf { background: #d1fae5; border-color: #10b981; color: #065f46; }
-.vt-option[data-zustand="gewaehlt"] { border-color: #f97316 !important; background: #fff7ed !important; }
+.vt-memory-zu { background: linear-gradient(135deg, var(--vt-a-mittel), var(--vt-a-tief)); color: #fff; font-size: 1.6rem; box-shadow: 0 4px 0 var(--vt-a-dunkel); }
+.vt-memory-auf { transform: rotateY(180deg); background: var(--vt-flaeche); border: 2px solid var(--vt-a-rand); color: var(--vt-tinte); }
+.vt-memory-auf.de { background: var(--vt-a-hell); }
+.vt-memory.gefunden .vt-memory-auf { background: var(--vt-gut-bg); border-color: var(--vt-gut-rand); color: var(--vt-gut-text); }
+.vt-option[data-zustand="gewaehlt"] { border-color: var(--vt-a) !important; background: var(--vt-a-hell) !important; }
 .vt-blume { position: relative; width: 90px; height: 90px; }
 .vt-blatt { position: absolute; left: 36px; top: 30px; width: 18px; height: 30px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: #f472b6;
   transform-origin: 9px 15px; transition: opacity .4s, background .4s; }
 .vt-blatt.weg { opacity: .12; background: #cbd5e1; }
-.vt-bluete { position: absolute; left: 33px; top: 33px; width: 24px; height: 24px; border-radius: 50%; background: #facc15; box-shadow: 0 0 0 3px #fff; }
-.vt-raten-feld { display: inline-grid; place-items: center; width: 30px; height: 38px; border-bottom: 3px solid #fb923c; font-size: 1.4rem; font-weight: 800; color: #c2410c; }
-.vt-fallfeld { position: relative; height: 340px; border-radius: 20px; overflow: hidden; background: linear-gradient(180deg, #fff7ed, #ffedd5); border: 1px solid #fed7aa; }
-.vt-fallfeld::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: repeating-linear-gradient(90deg, #fb923c 0 12px, #fdba74 12px 24px); }
-.vt-fallwort { position: absolute; padding: 4px 10px; border-radius: 999px; background: #fff; border: 2px solid #fdba74; font-weight: 700; color: #9a3412; white-space: nowrap;
+.vt-bluete { position: absolute; left: 33px; top: 33px; width: 24px; height: 24px; border-radius: 50%; background: #facc15; box-shadow: 0 0 0 3px var(--vt-flaeche); }
+.vt-raten-feld { display: inline-grid; place-items: center; width: 30px; height: 38px; border-bottom: 3px solid var(--vt-a-mittel); font-size: 1.4rem; font-weight: 800; color: var(--vt-a-dunkel); }
+.vt-fallfeld { position: relative; height: 340px; border-radius: 20px; overflow: hidden; background: linear-gradient(180deg, var(--vt-a-hell), var(--vt-a-hell2)); border: 1px solid var(--vt-a-rand); }
+.vt-fallfeld::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: repeating-linear-gradient(90deg, var(--vt-a-mittel) 0 12px, var(--vt-a-zart) 12px 24px); }
+.vt-fallwort { position: absolute; padding: 4px 10px; border-radius: 999px; background: var(--vt-flaeche); border: 2px solid var(--vt-a-zart); font-weight: 700; color: var(--vt-a-dunkel); white-space: nowrap;
   box-shadow: 0 3px 8px rgba(234,88,12,0.15); }
-.vt-such { aspect-ratio: 1; border: 1px solid #fde7d0; border-radius: 6px; background: #fff; font-weight: 700; color: #374151; cursor: pointer; padding: 0; font-size: .95rem; }
-.vt-such.gefunden { background: #ccfbf1; border-color: #14b8a6; color: #115e59; }
-.vt-such.start { background: #fed7aa; border-color: #f97316; }
-.vt-such.daneben { background: #ffe4e6; border-color: #f43f5e; }
+.vt-such { aspect-ratio: 1; border: 1px solid var(--vt-a-rand2); border-radius: 6px; background: var(--vt-flaeche); font-weight: 700; color: var(--vt-tinte); cursor: pointer; padding: 0; font-size: .95rem; }
+.vt-such.gefunden { background: var(--vt-gut-bg); border-color: var(--vt-gut-rand); color: var(--vt-gut-text); }
+.vt-such.start { background: var(--vt-a-rand); border-color: var(--vt-a); }
+.vt-such.daneben { background: var(--vt-schlecht-bg); border-color: var(--vt-schlecht-rand); }
 `
 
 export function Spielwahl({
@@ -92,6 +93,7 @@ export function Spielwahl({
   /** Spiel läuft (Kasten ausblenden) */
   spielt?: (an: boolean) => void
 }): React.JSX.Element {
+  const farbe = useVtFarbe()
   const [spiel, setSpielRoh] = useState<SpielId | null>(null)
   const setSpiel = (s: SpielId | null): void => {
     setSpielRoh(s)
@@ -124,7 +126,7 @@ export function Spielwahl({
       <Stack data-spiel-laeuft={spiel}>
         <style>{SPIELE_CSS}</style>
         <Group justify="space-between">
-          <Button variant="subtle" color="orange" leftSection={<IconX size={16} />} px={4} onClick={() => setSpiel(null)}>
+          <Button variant="subtle" color={farbe.a} leftSection={<IconX size={16} />} px={4} onClick={() => setSpiel(null)}>
             Beenden
           </Button>
           <Text fw={800}>{info(spiel).name}</Text>
@@ -156,7 +158,7 @@ export function Spielwahl({
     const i = info(ergebnis.spiel)
     return (
       <Stack align="center" className="vt-rein" data-spiel-ergebnis>
-        <ThemeIcon size={72} radius="xl" color={ergebnis.rekord ? 'yellow' : 'orange'} variant={ergebnis.rekord ? 'filled' : 'light'}>
+        <ThemeIcon size={72} radius="xl" color={ergebnis.rekord ? 'yellow' : farbe.a} variant={ergebnis.rekord ? 'filled' : 'light'}>
           <IconTrophy size={40} />
         </ThemeIcon>
         <Title order={3}>{ergebnis.rekord ? 'Neuer Rekord!' : 'Geschafft!'}</Title>
@@ -194,7 +196,7 @@ export function Spielwahl({
     <Stack data-spielwahl>
       <style>{SPIELE_CSS}</style>
       <div>
-        <Title order={3} c="#9a3412">
+        <Title order={3} c="var(--vt-a-dunkel)">
           Spielen mit deinen Wörtern
         </Title>
         <Text size="sm" c="dimmed">
@@ -202,7 +204,7 @@ export function Spielwahl({
         </Text>
       </div>
       {ansehen.length > 0 && (
-        <Card radius="lg" withBorder style={{ borderColor: '#fed7aa', background: '#fff7ed' }} data-nochmal-ansehen>
+        <Card radius="lg" withBorder style={{ borderColor: 'var(--vt-a-rand)', background: 'var(--vt-a-hell)' }} data-nochmal-ansehen>
           <Text fw={700} size="sm" mb={6}>
             Nochmal ansehen
           </Text>
@@ -211,7 +213,7 @@ export function Spielwahl({
               .map((id) => woerter.find((w) => w.id === id))
               .filter((w): w is Vokabel => Boolean(w))
               .map((w) => (
-                <Badge key={w.id} variant="white" color="orange" size="lg" tt="none">
+                <Badge key={w.id} variant="white" color={farbe.a} size="lg" tt="none">
                   {w.term} – {w.translation}
                 </Badge>
               ))}
@@ -220,7 +222,7 @@ export function Spielwahl({
       )}
       {(['erkennen', 'schreiben'] as const).map((art) => (
         <div key={art}>
-          <Text fw={700} size="sm" mb={6} c="#9a3412">
+          <Text fw={700} size="sm" mb={6} c="var(--vt-a-dunkel)">
             {art === 'erkennen' ? 'Erkennen' : 'Schreiben'}
           </Text>
           <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">

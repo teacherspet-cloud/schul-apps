@@ -9,12 +9,14 @@ import { gitterform, spielform, suchselGitter, suchselZellen } from '@shared/vok
 import { buildCrossword } from '../../vokabeltest/generation/crossword'
 import { createRng, randomSeed } from '../../vokabeltest/model/random'
 import { gemischt, useSekunden, type SpielProps } from './SpieleErkennen'
+import { useVtFarbe } from '../vtFarben'
 
 // ---------------------------------------------------------------- Wortraten
 
 const BLAETTER = 7
 
 export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const reihe = useMemo(() => gemischt(woerter).slice(0, 6), []) // eslint-disable-line react-hooks/exhaustive-deps
   const [i, setI] = useState(0)
   const [geraten, setGeraten] = useState<string[]>([])
@@ -52,7 +54,7 @@ export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
         <Text c="dimmed" size="sm">
           Wort {i + 1} von {reihe.length}
         </Text>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {geloest} erraten
         </Badge>
       </Group>
@@ -114,6 +116,7 @@ export function Wortraten({ woerter, ende }: SpielProps): React.JSX.Element {
 // ---------------------------------------------------------------- Kreuzworträtsel
 
 export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const raetsel = useMemo(() => {
     const kandidaten = gemischt(woerter)
       .map((v) => ({ id: v.id, word: gitterform(v.term) }))
@@ -159,7 +162,7 @@ export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
         <Text c="dimmed" size="sm">
           Trage die Wörter in der Fremdsprache ein.
         </Text>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {sek} s
         </Badge>
       </Group>
@@ -174,7 +177,7 @@ export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
             const rot = geprueft && wert.toLocaleUpperCase() !== c.loesung
             return (
               <span key={n} style={{ position: 'relative', width: zelle, height: zelle }}>
-                {c.nummer && <span style={{ position: 'absolute', left: 2, top: 0, fontSize: 9, color: '#9a3412', zIndex: 1 }}>{c.nummer}</span>}
+                {c.nummer && <span style={{ position: 'absolute', left: 2, top: 0, fontSize: 9, color: 'var(--vt-a-dunkel)', zIndex: 1 }}>{c.nummer}</span>}
                 <input
                   value={wert}
                   maxLength={1}
@@ -194,9 +197,10 @@ export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
                     textTransform: 'uppercase',
                     fontWeight: 700,
                     fontSize: 15,
-                    border: `1.5px solid ${rot ? '#f43f5e' : '#fdba74'}`,
+                    border: `1.5px solid ${rot ? 'var(--vt-schlecht-rand)' : 'var(--vt-a-zart)'}`,
                     borderRadius: 4,
-                    background: rot ? '#ffe4e6' : '#fff',
+                    background: rot ? 'var(--vt-schlecht-bg)' : 'var(--vt-flaeche)',
+                    color: 'var(--vt-tinte)',
                     padding: 0
                   }}
                 />
@@ -208,7 +212,7 @@ export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
       <Stack gap={2} w="100%" maw={560}>
         {(['across', 'down'] as const).map((dir) => (
           <div key={dir}>
-            <Text fw={700} size="sm" c="#9a3412">
+            <Text fw={700} size="sm" c="var(--vt-a-dunkel)">
               {dir === 'across' ? 'Waagerecht' : 'Senkrecht'}
             </Text>
             {raetsel.placed
@@ -240,6 +244,7 @@ interface Fallend {
 }
 
 export function FallendeWoerter({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const [fallen, setFallen] = useState<Fallend[]>([])
   const [leben, setLeben] = useState(3)
   const [geschafft, setGeschafft] = useState(0)
@@ -298,7 +303,7 @@ export function FallendeWoerter({ woerter, ende }: SpielProps): React.JSX.Elemen
         <Badge color="red" variant="light" size="lg">
           {'♥'.repeat(Math.max(0, leben))}
         </Badge>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {geschafft} geschafft
         </Badge>
       </Group>
@@ -328,6 +333,7 @@ export function FallendeWoerter({ woerter, ende }: SpielProps): React.JSX.Elemen
 // ---------------------------------------------------------------- Buchstabensalat (Suchsel)
 
 export function Suchsel({ woerter, ende }: SpielProps): React.JSX.Element {
+  const farbe = useVtFarbe()
   const gitter = useMemo(
     () =>
       suchselGitter(
@@ -366,7 +372,7 @@ export function Suchsel({ woerter, ende }: SpielProps): React.JSX.Element {
         <Text c="dimmed" size="sm">
           Tippe den ersten und den letzten Buchstaben eines Wortes.
         </Text>
-        <Badge color="orange" variant="light" size="lg">
+        <Badge color={farbe.a} variant="light" size="lg">
           {sek} s · {gefunden.length}/{gitter.woerter.length}
         </Badge>
       </Group>
@@ -385,7 +391,7 @@ export function Suchsel({ woerter, ende }: SpielProps): React.JSX.Element {
       </div>
       <Group gap={6} justify="center" maw={560}>
         {gitter.woerter.map((w) => (
-          <Badge key={w.id} size="lg" variant={gefunden.includes(w.id) ? 'filled' : 'light'} color={gefunden.includes(w.id) ? 'teal' : 'orange'} tt="none">
+          <Badge key={w.id} size="lg" variant={gefunden.includes(w.id) ? 'filled' : 'light'} color={gefunden.includes(w.id) ? 'teal' : farbe.a} tt="none">
             {gefunden.includes(w.id) ? `${v(w.id).translation} = ${spielform(v(w.id).term)}` : v(w.id).translation}
           </Badge>
         ))}
