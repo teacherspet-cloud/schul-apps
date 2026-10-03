@@ -41,6 +41,7 @@ import {
 import type { PrinterInfo, PrintOptions } from '@shared/apiShape'
 import { createCliProvider, subscriptionModels, subscriptionStatus } from './services/ai/cli'
 import { generateSvgImage } from './services/ai/svg'
+import { bildWege, mitErsatz, weg } from './services/ai/bildErsatz'
 import { KiPlaetze } from './services/ai/kiPlaetze'
 import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche, attrappeQuelleLaden, attrappeQuellensuche } from './services/ai/attrappe'
 import { istAbbruch } from '@shared/abbruch'
@@ -72,7 +73,7 @@ import { deleteKurztest, getKurztest, listKurztests, saveKurztest } from './serv
 import { deleteDesign, listDesigns, saveDesign, setDefaultDesign } from './services/storage/designs'
 import { getCefrTable } from './services/storage/cefr'
 import { deleteTest, getTest, listTests, saveTest } from './services/storage/vocabTests'
-import { deleteVocabList, getSecret, getSettings, listVocabLists, saveVocabList, setSecret, setSettings } from './services/storage/settings'
+import { datenordnerKennung, deleteVocabList, getSecret, getSettings, listVocabLists, saveVocabList, setSecret, setSettings } from './services/storage/settings'
 import {
   leseThemen,
   themenAutomatik,
@@ -646,12 +647,12 @@ function aiStatus(): AiStatus {
     img === 'none'
       ? ''
       : img === 'anthropic'
-      ? imageAccess === 'subscription'
-        ? ai.subscriptionModels.anthropic
-        : ai.textModels.anthropic
-      : imageAccess === 'subscription'
-      ? ''
-      : ai.imageModels[img]
+        ? imageAccess === 'subscription'
+          ? ai.subscriptionModels.anthropic
+          : ai.textModels.anthropic
+        : imageAccess === 'subscription'
+          ? ''
+          : ai.imageModels[img]
   return {
     textProvider: ai.textProvider,
     textModel: ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionModels[ai.textProvider] : ai.textModels[ai.textProvider],
@@ -681,22 +682,47 @@ function textOptions(ai: AppSettings['ai']): AiStatus['textOptions'] {
   })
 }
 
-/** Bild erzeugen – über API-Schlüssel oder Abo; Claude zeichnet in beiden Fällen eine Vektorgrafik. */
+/**
+ * Bild erzeugen – über API-Schlüssel oder Abo; Claude zeichnet in beiden Fällen eine Vektorgrafik.
+ * Scheitert der eingestellte Weg (Abo ohne Bilder, Kontingent erschöpft …), übernimmt der nächste
+ * eingerichtete (bildErsatz.ts, 03.10.2026).
+ */
 async function generateImage(prompt: string, signal?: AbortSignal): Promise<string> {
   // Oberflächentests mit Attrappe: hinterlegtes Bild statt Bild-KI (nie im Betrieb)
   if (attrappeBild()) return attrappeBildErzeugen(prompt)
   const { ai } = getSettings()
+  if (ai.imageProvider === 'none') throw new Error('Es ist keine KI für Bilder ausgewählt (Einstellungen).')
   const img = ai.imageProvider
-  if (img === 'none') throw new Error('Es ist keine KI für Bilder ausgewählt (Einstellungen).')
-  if (ai.imageAccess[img] === 'subscription') {
-    if (!ai.subscriptionAccepted[img]) {
-      throw new Error('Der Abo-Zugang für Bilder ist noch nicht freigegeben. Bitte in den Einstellungen den Hinweis bestätigen.')
-    }
-    const cli = createCliProvider(img)
-    return cli.generateImage!(prompt, ai.subscriptionModels[img], signal)
+  if (ai.imageAccess[img] === 'subscription' && !ai.subscriptionAccepted[img]) {
+    throw new Error('Der Abo-Zugang für Bilder ist noch nicht freigegeben. Bitte in den Einstellungen den Hinweis bestätigen.')
   }
-  if (img === 'anthropic') return generateSvgImage(createProvider('anthropic'), ai.textModels.anthropic, prompt, signal)
-  const provider = createProvider(img)
-  if (!provider.generateImage) throw new Error('Dieser Anbieter kann keine Bilder erzeugen.')
-  return provider.generateImage(prompt, ai.imageModels[img], signal)
+  const wege = bildWege(ai, (p) => Boolean(getSecret(p)))
+  const {
+    bild,
+    weg: genutzt,
+    fehler
+  } = await mitErsatz(
+    wege,
+    datenordnerKennung(),
+    (w) => {
+      if (w.zugang === 'abo') return createCliProvider(w.provider).generateImage!(prompt, ai.subscriptionModels[w.provider], signal)
+      if (w.provider === 'anthropic') return generateSvgImage(createProvider('anthropic'), ai.textModels.anthropic, prompt, signal)
+      const provider = createProvider(w.provider)
+      if (!provider.generateImage) throw new Error('Dieser Anbieter kann keine Bilder erzeugen.')
+      return provider.generateImage(prompt, ai.imageModels[w.provider], signal)
+    },
+    istAbbruch
+  )
+  if (fehler.length) {
+    protokolliere(
+      'warnung',
+      'bild',
+      `Bild über Ersatzweg ${weg(genutzt)} erzeugt – ${fehler
+        .map((f) => `${weg(f.weg)}: ${f.text}`)
+        .join(' | ')
+        .slice(0, 400)}`
+    )
+    merkeVerbrauch(genutzt.provider, '', { bilder: 1 })
+  }
+  return bild
 }

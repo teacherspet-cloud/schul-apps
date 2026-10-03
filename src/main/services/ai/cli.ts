@@ -762,14 +762,42 @@ function describeClaudeError(res: RunResult, result?: ClaudeResult): string {
   return `Claude Code meldet einen Fehler: ${lastLines(text) || `Exitcode ${res.code}`}`
 }
 
-async function claudeStatus(exe: string): Promise<Pick<SubscriptionStatus, 'loggedIn' | 'account' | 'detail'>> {
+const TARIF_NAME: Record<string, string> = {
+  free: 'kostenlos',
+  plus: 'Plus',
+  pro: 'Pro',
+  team: 'Business',
+  business: 'Business',
+  enterprise: 'Enterprise',
+  edu: 'Edu'
+}
+
+/** Tarif des angemeldeten ChatGPT-Kontos aus der Anmeldung von Codex (nur der Tarif wird gelesen, 03.10.2026) */
+export function chatgptTarif(datei = join(codexHome(), 'auth.json')): string | undefined {
+  try {
+    const auth = JSON.parse(readFileSync(datei, 'utf8')) as { tokens?: { id_token?: string } }
+    const teil = String(auth.tokens?.id_token ?? '').split('.')[1]
+    if (!teil) return undefined
+    const daten = JSON.parse(Buffer.from(teil, 'base64url').toString('utf8')) as Record<string, { chatgpt_plan_type?: string } | undefined>
+    return daten['https://api.openai.com/auth']?.chatgpt_plan_type?.toLowerCase() || undefined
+  } catch {
+    return undefined
+  }
+}
+
+async function claudeStatus(exe: string): Promise<Pick<SubscriptionStatus, 'loggedIn' | 'account' | 'detail' | 'tarif' | 'warnung'>> {
   const res = await withWorkDir((cwd) => run(exe, ['auth', 'status'], { cwd, timeoutMs: 30_000 }))
   try {
     const json = JSON.parse(res.stdout) as { loggedIn?: boolean; authMethod?: string; subscriptionType?: string; email?: string }
     const viaSubscription = json.authMethod === 'claude.ai'
+    const tarif = json.subscriptionType?.toLowerCase()
     return {
       loggedIn: Boolean(json.loggedIn) && viaSubscription,
       account: json.email ? `${json.email}${json.subscriptionType ? ` (${json.subscriptionType})` : ''}` : undefined,
+      ...(tarif ? { tarif } : {}),
+      ...(tarif === 'free'
+        ? { warnung: 'Dieses Claude-Konto nutzt den kostenlosen Tarif – Claude Code ist darin nicht oder nur stark begrenzt nutzbar.' }
+        : {}),
       detail: json.loggedIn && !viaSubscription ? 'Claude Code ist nicht mit einem Claude-Abo, sondern anders angemeldet (z. B. API-Schlüssel).' : undefined
     }
   } catch {
@@ -882,13 +910,21 @@ export async function subscriptionStatus(provider: AiProviderId): Promise<Subscr
       const res = await withWorkDir((cwd) => run(path, ['login', 'status'], { cwd, timeoutMs: 30_000 }))
       const text = `${res.stdout} ${res.stderr}`
       const chatgpt = /chatgpt/i.test(text)
+      const tarif = res.code === 0 && chatgpt ? chatgptTarif() : undefined
       return {
         provider,
         path,
         managed,
         version,
         loggedIn: res.code === 0 && chatgpt,
-        account: res.code === 0 && chatgpt ? 'Mit ChatGPT-Konto angemeldet' : undefined,
+        account: res.code === 0 && chatgpt ? `Mit ChatGPT-Konto angemeldet${tarif ? ` (${TARIF_NAME[tarif] ?? tarif})` : ''}` : undefined,
+        ...(tarif ? { tarif } : {}),
+        ...(tarif === 'free'
+          ? {
+              warnung:
+                'Dieses ChatGPT-Konto nutzt den kostenlosen Tarif: Codex bietet damit nur Ersatzmodelle und erzeugt keine Bilder. Für die App ein Konto mit Plus, Pro, Business oder Edu anmelden („Anderes Konto").'
+            }
+          : {}),
         detail: res.code === 0 && !chatgpt ? 'Codex ist nicht mit ChatGPT, sondern z. B. mit einem API-Schlüssel angemeldet.' : undefined
       }
     }

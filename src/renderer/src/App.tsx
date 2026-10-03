@@ -1,8 +1,16 @@
-import { ActionIcon, AppShell, Button, Indicator, Menu, Tooltip } from '@mantine/core'
-import { aufServer, hatClient, serverIch } from './shared/plattform'
+import { ActionIcon, Anchor, AppShell, Button, Indicator, Menu, Tooltip } from '@mantine/core'
+import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
-import { IconChevronsLeft, IconExternalLink, IconHome, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconSettings } from '@tabler/icons-react'
+import {
+  IconChevronsLeft,
+  IconExternalLink,
+  IconHome,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
+  IconLogout,
+  IconSettings
+} from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppSettings } from './shared/settingsStore'
@@ -17,7 +25,7 @@ import AuftragsLayer from './shell/AuftragsLayer'
 import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
-import { druckeAktives, openModule, useNavigation } from './shared/navigation'
+import { druckeAktives, openModule, openSettings, useNavigation } from './shared/navigation'
 import { faecherAusIservUebernehmen } from './shared/iservAbgleich'
 import { AktuellesProgramm, eigeneFensterMoeglich, einzelnesProgramm, inEigenemFenster } from './shared/eigenesFenster'
 import { useTelefon, useTouch } from './shared/touch/touchModus'
@@ -168,6 +176,41 @@ export default function App(): React.JSX.Element {
       }),
     []
   )
+
+  /*
+   * Warnung bei einem kostenlosen ChatGPT-Konto im Abo (03.10.2026): Codex bietet damit nur
+   * Ersatzmodelle und keine Bilder – auf dem Server fiel das lange nicht auf. Einmal je Sitzung,
+   * etwas verzögert, damit der Start nicht wartet.
+   */
+  useEffect(() => {
+    if (!angemeldet || nurPcNetz()) return
+    const t = setTimeout(() => {
+      const ai = useAppSettings.getState().settings.ai
+      const perAbo = ai.subscriptionAccepted.openai && (ai.access.openai === 'subscription' || ai.imageAccess.openai === 'subscription')
+      if (!perAbo) return
+      void window.api.ai
+        .subscriptionStatus('openai')
+        .then((s) => {
+          if (!s.warnung) return
+          notifications.show({
+            id: 'abo-tarif',
+            color: 'orange',
+            title: 'ChatGPT-Konto im kostenlosen Tarif',
+            message: (
+              <>
+                {s.warnung}{' '}
+                <Anchor component="button" size="sm" onClick={() => (notifications.hide('abo-tarif'), openSettings('ki'))}>
+                  Zu den Einstellungen
+                </Anchor>
+              </>
+            ),
+            autoClose: false
+          })
+        })
+        .catch(() => undefined)
+    }, 4000)
+    return () => clearTimeout(t)
+  }, [angemeldet])
 
   /*
    * Nach der Anmeldung die Einstellungen holen – VOR dem ersten Zeichnen der Oberflaeche.
@@ -330,7 +373,11 @@ function NavIcon(props: {
 }): React.JSX.Element {
   const knopf = <NavKnopf {...props} />
   if (!props.fenster) return knopf
-  return <MitFensterMenue label={props.label} fenster={props.fenster}>{knopf}</MitFensterMenue>
+  return (
+    <MitFensterMenue label={props.label} fenster={props.fenster}>
+      {knopf}
+    </MitFensterMenue>
+  )
 }
 
 /** Rechtsklick (bzw. langes Drücken) auf einen Eintrag der Leiste öffnet ein kleines Menü */
@@ -358,7 +405,15 @@ function MitFensterMenue({ label, fenster, children }: { label: string; fenster:
   )
 }
 
-function NavKnopf(props: { label: string; active: boolean; breit: boolean; badge?: boolean; bild?: string; onClick: () => void; children: React.ReactNode }): React.JSX.Element {
+function NavKnopf(props: {
+  label: string
+  active: boolean
+  breit: boolean
+  badge?: boolean
+  bild?: string
+  onClick: () => void
+  children: React.ReactNode
+}): React.JSX.Element {
   // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
   const variant = props.active ? 'filled' : props.bild ? 'subtle' : 'light'
   const color = props.active ? undefined : 'gray'

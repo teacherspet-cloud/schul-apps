@@ -139,6 +139,10 @@ export interface SubscriptionStatus {
   loggedIn: boolean | null
   account?: string
   detail?: string
+  /** Tarif des angemeldeten Kontos (z. B. „free", „plus", „pro", „max"), soweit lesbar (03.10.2026) */
+  tarif?: string
+  /** Deutliche Warnung, z. B. bei einem kostenlosen Konto (keine Bilder, nur Ersatzmodelle) */
+  warnung?: string
 }
 
 export interface ModelOption {

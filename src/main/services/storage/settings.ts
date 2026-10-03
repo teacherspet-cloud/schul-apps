@@ -10,6 +10,9 @@ function dataDir(): string {
   return dir
 }
 
+/** Kennung des Datenordners – auf dem Server je Nutzer verschieden (für Zwischenspeicher je Nutzer) */
+export const datenordnerKennung = (): string => app.getPath('userData')
+
 export function readJson<T>(file: string, fallback: T): T {
   try {
     return JSON.parse(readFileSync(join(dataDir(), file), 'utf8')) as T
@@ -50,7 +53,9 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
     },
     appearance: { ...base.appearance, ...stored.appearance },
     // iPad: Adresse, PIN und Auswahl getrennt änderbar (30.09.2026)
-    ...(base.pcKi || stored.pcKi ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } } : {}),
+    ...(base.pcKi || stored.pcKi
+      ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } }
+      : {}),
     // Netzzugang: Einzelne Felder (Port, PIN, Autostart) ändern, ohne die übrigen zu verlieren (30.09.2026)
     ...(base.lan || stored.lan ? { lan: { port: 8420, pin: '', ...base.lan, ...(stored.lan as object) } } : {}),
     // IServ: Ziel ändern, ohne Adresse und Benutzer zu verlieren (01.10.2026)

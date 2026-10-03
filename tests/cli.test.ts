@@ -8,7 +8,7 @@ vi.mock('../src/main/services/storage/settings', () => ({
   getSettings: () => ({ ai: { cliPaths: { openai: '', anthropic: '', google: '' } } })
 }))
 
-const { parseJsonText, resolveShim } = await import('../src/main/services/ai/cli')
+const { chatgptTarif, parseJsonText, resolveShim } = await import('../src/main/services/ai/cli')
 
 /*
  * Angelegte Ordner werden am Ende entfernt. Bis 25.09.2026 blieb bei jedem Lauf einer liegen –
@@ -116,5 +116,27 @@ describe('Werkzeuge von Codex', () => {
      * „under development … may behave unpredictably" – und er war nicht noetig.
      */
     expect(await args({ webSearch: true })).not.toContain('standalone_web_search')
+  })
+})
+
+describe('Tarif des ChatGPT-Kontos (03.10.2026)', () => {
+  const jwt = (inhalt: unknown): string => `kopf.${Buffer.from(JSON.stringify(inhalt)).toString('base64url')}.signatur`
+  it('liest den Tarif aus der Anmeldung von Codex – ohne Tokens weiterzugeben', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'schulapps-codex-'))
+    angelegt.push(dir)
+    const datei = join(dir, 'auth.json')
+    writeFileSync(
+      datei,
+      JSON.stringify({
+        auth_mode: 'chatgpt',
+        tokens: { id_token: jwt({ 'https://api.openai.com/auth': { chatgpt_plan_type: 'Free' } }), access_token: 'geheim' }
+      })
+    )
+    expect(chatgptTarif(datei)).toBe('free')
+    writeFileSync(datei, JSON.stringify({ tokens: { id_token: jwt({ 'https://api.openai.com/auth': { chatgpt_plan_type: 'plus' } }) } }))
+    expect(chatgptTarif(datei)).toBe('plus')
+    writeFileSync(datei, '{kaputt')
+    expect(chatgptTarif(datei)).toBeUndefined()
+    expect(chatgptTarif(join(dir, 'fehlt.json'))).toBeUndefined()
   })
 })

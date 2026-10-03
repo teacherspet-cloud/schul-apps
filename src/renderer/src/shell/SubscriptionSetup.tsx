@@ -285,7 +285,12 @@ export default function SubscriptionSetup({
                         Anmeldeseite öffnen
                       </Button>
                     ) : (
-                      <Button variant="light" size="xs" leftSection={<IconExternalLink size={14} />} onClick={() => void window.api.ai.openLoginPage(phase.url!)}>
+                      <Button
+                        variant="light"
+                        size="xs"
+                        leftSection={<IconExternalLink size={14} />}
+                        onClick={() => void window.api.ai.openLoginPage(phase.url!)}
+                      >
                         Anmeldeseite erneut öffnen
                       </Button>
                     ))}
@@ -295,14 +300,21 @@ export default function SubscriptionSetup({
                 </Group>
               </Stack>
             ) : loggedIn ? (
-              <Group gap="xs">
-                <Text size="sm" c="dimmed">
-                  {status?.account ?? 'angemeldet'}
-                </Text>
-                <Button variant="subtle" size="compact-xs" disabled={busy} onClick={() => void login()}>
-                  Anderes Konto
-                </Button>
-              </Group>
+              <Stack gap={6}>
+                <Group gap="xs">
+                  <Text size="sm" c="dimmed">
+                    {status?.account ?? 'angemeldet'}
+                  </Text>
+                  <Button variant="subtle" size="compact-xs" disabled={busy} onClick={() => void login()}>
+                    Anderes Konto
+                  </Button>
+                </Group>
+                {status?.warnung && (
+                  <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} title="Kostenloser Tarif" data-abo-warnung>
+                    {status.warnung}
+                  </Alert>
+                )}
+              </Stack>
             ) : (
               <Stack gap={6} align="flex-start">
                 <Text size="sm" c="dimmed">
