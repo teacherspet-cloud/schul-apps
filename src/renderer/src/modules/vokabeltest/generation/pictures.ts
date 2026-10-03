@@ -14,7 +14,8 @@ export interface PictureDeps {
   generateImage?: (prompt: string) => Promise<string>
 }
 
-export type PictureFinder = (items: PictureItem[], vocab: VocabEntry[], settings: TestSettings) => Promise<string[]>
+/** `ersatz`: Vokabeln, die statt eines Wortes ohne Bild eintreten dürfen (Vorgabe: `vocab`) */
+export type PictureFinder = (items: PictureItem[], vocab: VocabEntry[], settings: TestSettings, ersatz?: VocabEntry[]) => Promise<string[]>
 
 export function pictureRules(items: PictureItem[], settings: TestSettings): string {
   const language = LANGUAGES.find((l) => l.value === settings.targetLanguage)?.label ?? settings.targetLanguage
@@ -60,9 +61,17 @@ export function vocabClipartPrompt(item: PictureItem, entry: VocabEntry | undefi
  * Sucht für alle Bilder einer Aufgabe gemeinsam passende Bilder (eine KI-Prüfung für alle Kandidaten).
  * Liefert Hinweise für die Lehrkraft.
  */
-export async function findVocabPictures(items: PictureItem[], vocab: VocabEntry[], settings: TestSettings, deps: PictureDeps): Promise<string[]> {
+export async function findVocabPictures(
+  items: PictureItem[],
+  vocab: VocabEntry[],
+  settings: TestSettings,
+  deps: PictureDeps,
+  ersatz: VocabEntry[] = vocab
+): Promise<string[]> {
   const notes: string[] = []
   const entries = new Map(vocab.map((v) => [v.id, v]))
+  // Warum ein erzeugtes Bild verworfen wurde – steht sonst nirgends
+  const verworfen = new Map<string, string>()
   const todo = items.filter((i) => !i.image)
   const gathered = await Promise.all(
     todo.map(async (item) => {
@@ -115,7 +124,7 @@ export async function findVocabPictures(items: PictureItem[], vocab: VocabEntry[
         if (c?.candidate && c.fit !== 'ungeeignet') {
           g.item.image = { dataUrl: await candidate.load(), source: 'ai', credit: 'KI-generiert' }
           if (c.fit === 'brauchbar') notes.push(`Bild zu „${g.item.answer}“ ist nicht ganz eindeutig (${c.reason}) – bitte prüfen.`)
-        }
+        } else if (c?.reason) verworfen.set(g.need.id, c.reason)
       }
     }
   }
@@ -125,7 +134,7 @@ export async function findVocabPictures(items: PictureItem[], vocab: VocabEntry[
   const open = missing.filter((g) => !g.item.image)
   if (open.length) {
     const used = new Set(items.map((i) => i.vocabId).filter((id): id is string => Boolean(id)))
-    const pool = vocab.filter((v) => v.term.trim() && !used.has(v.id) && v.depictable !== false)
+    const pool = ersatz.filter((v) => v.term.trim() && !used.has(v.id) && v.depictable !== false)
     for (const g of open) {
       const before = g.item.answer
       for (let tries = 0; tries < 3 && pool.length; tries++) {
@@ -142,7 +151,10 @@ export async function findVocabPictures(items: PictureItem[], vocab: VocabEntry[
         break
       }
       if (!g.item.image) {
-        notes.push(`Kein eindeutiges Bild für „${g.item.answer}“ gefunden (${choices.get(g.need.id)?.reason ?? 'keine Treffer'}) – bitte im Editor auswählen.`)
+        const ki = verworfen.get(g.need.id)
+        notes.push(
+          `Kein eindeutiges Bild für „${g.item.answer}“ gefunden (${choices.get(g.need.id)?.reason ?? 'keine Treffer'}${ki ? `; KI-Bild verworfen: ${ki}` : ''}) – bitte im Editor auswählen.`
+        )
       }
     }
   }

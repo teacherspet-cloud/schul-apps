@@ -26,6 +26,8 @@ export interface GenContext {
   variantVocab?: VocabEntry[]
   /** Wortschatz, den die Klasse laut Lehrwerk schon kennt */
   known?: KnownVocab
+  /** Kennungen der Vokabeln, die in dieser Variante schon in anderen Aufgaben stehen (Ersatzwörter im Bild-Teil) */
+  belegt?: string[]
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -92,7 +94,8 @@ function base(def: Pick<TaskTypeDef, 'id' | 'defaultTitle' | 'defaultInstruction
     id: newId(ctx.rng),
     taskType: def.id,
     title: fest?.title ?? def.defaultTitle,
-    instruction: (fest && FESTE_ANWEISUNG.has(sprache) ? fest.instruction : '') || ki || fest?.instruction || (sie ? def.defaultInstructionSie! : def.defaultInstruction),
+    instruction:
+      (fest && FESTE_ANWEISUNG.has(sprache) ? fest.instruction : '') || ki || fest?.instruction || (sie ? def.defaultInstructionSie! : def.defaultInstruction),
     pointsPerItem: points
   }
 }
@@ -436,7 +439,9 @@ const defs: TaskTypeDef[] = [
       return {
         ...base(this, data, ctx),
         instruction:
-          aufgabenText('pictureLabel', ctx.settings.targetLanguage)?.instruction ?? PICTURE_INSTRUCTIONS[ctx.settings.targetLanguage] ?? PICTURE_INSTRUCTIONS.en,
+          aufgabenText('pictureLabel', ctx.settings.targetLanguage)?.instruction ??
+          PICTURE_INSTRUCTIONS[ctx.settings.targetLanguage] ??
+          PICTURE_INSTRUCTIONS.en,
         kind: 'picture',
         items: vocab.map((v) => ({ id: newId(ctx.rng), vocabId: v.id, answer: v.term, imageKeywords: v.imageKeywords ?? [v.term] })),
         // Wortkasten nur, wenn die Lehrkraft ihn will: Die Wörter wären sonst eine Hilfe,
@@ -807,7 +812,10 @@ ${vocabLines(vocab)}`,
         ...b,
         instruction: ohneBeispielHinweis(b.instruction) || this.defaultInstruction,
         kind: 'open',
-        items: openItems(vocab, data, ctx, 2).map((it: { vocabId?: string; prompt: string }) => ({ ...it, prompt: findVocab(vocab, it.vocabId ?? '')?.term ?? it.prompt }))
+        items: openItems(vocab, data, ctx, 2).map((it: { vocabId?: string; prompt: string }) => ({
+          ...it,
+          prompt: findVocab(vocab, it.vocabId ?? '')?.term ?? it.prompt
+        }))
       }
     }
   },
@@ -1148,7 +1156,8 @@ ${vocabLines(vocab)}`,
   {
     id: 'readingForms',
     label: 'Zeichen: Lesung und Bedeutung',
-    description: 'Das Wort steht in Schriftzeichen da; ergänzt werden die Lesung (Pinyin bzw. Hiragana) und die deutsche Bedeutung – wie die drei Spalten im Lehrwerk.',
+    description:
+      'Das Wort steht in Schriftzeichen da; ergänzt werden die Lesung (Pinyin bzw. Hiragana) und die deutsche Bedeutung – wie die drei Spalten im Lehrwerk.',
     kind: 'latinForms',
     minLevel: 'Pre-A1',
     usesVocab: true,
@@ -1212,10 +1221,18 @@ ${vocabLines(vocab)}`,
         ctx.rng
       ).slice(0, 2)
       const right = shuffle(
-        [...woerter.map((v) => ({ id: newId(ctx.rng), text: rechts(v), vocabId: v.id as string | undefined })), ...extra.map((v) => ({ id: newId(ctx.rng), text: rechts(v), vocabId: undefined }))],
+        [
+          ...woerter.map((v) => ({ id: newId(ctx.rng), text: rechts(v), vocabId: v.id as string | undefined })),
+          ...extra.map((v) => ({ id: newId(ctx.rng), text: rechts(v), vocabId: undefined }))
+        ],
         ctx.rng
       )
-      const left = shuffle(woerter, ctx.rng).map((v) => ({ id: newId(ctx.rng), vocabId: v.id, text: v.term, answerId: right.find((r) => r.vocabId === v.id)!.id }))
+      const left = shuffle(woerter, ctx.rng).map((v) => ({
+        id: newId(ctx.rng),
+        vocabId: v.id,
+        text: v.term,
+        answerId: right.find((r) => r.vocabId === v.id)!.id
+      }))
       return {
         ...base(this, data, ctx),
         kind: 'match',
@@ -1254,7 +1271,18 @@ ${vocabLines(vocab)}`,
         items: (data.items ?? []).flatMap((it: any) => {
           const v = findVocab(vocab, it.vocabId)
           const partner = String(it.partner ?? '').trim()
-          return v && partner ? [{ id: newId(ctx.rng), vocabId: v.id, term: v.term, formLabel: ASPEKT_LABEL[sprache] ?? 'Aspect partner:', form: partner, meanings: v.translation }] : []
+          return v && partner
+            ? [
+                {
+                  id: newId(ctx.rng),
+                  vocabId: v.id,
+                  term: v.term,
+                  formLabel: ASPEKT_LABEL[sprache] ?? 'Aspect partner:',
+                  form: partner,
+                  meanings: v.translation
+                }
+              ]
+            : []
         })
       }
     }
@@ -1262,7 +1290,8 @@ ${vocabLines(vocab)}`,
   {
     id: 'caseForms',
     label: 'Kasus im Satz',
-    description: 'Das Wort in Klammern wird in den Fall gesetzt, den der Satz verlangt (Russisch, Polnisch, Tschechisch, Türkisch mit Vokalharmonie, Neugriechisch).',
+    description:
+      'Das Wort in Klammern wird in den Fall gesetzt, den der Satz verlangt (Russisch, Polnisch, Tschechisch, Türkisch mit Vokalharmonie, Neugriechisch).',
     kind: 'gap',
     minLevel: 'A1+',
     usesVocab: true,
@@ -1279,7 +1308,9 @@ ${vocabLines(vocab)}`,
     }),
     prompt: (vocab, ctx) =>
       'Task type: cases. For each noun (or adjective/pronoun) write one sentence with a gap. The gap needs the tested word in a case OTHER than the dictionary form, clearly required by a preposition, verb or construction in the sentence, so that exactly one form is correct. "base" is the dictionary form shown in brackets, "answer" the correct inflected form' +
-      (ctx.settings.targetLanguage === 'tr' ? ' (Turkish: case suffix with vowel harmony and consonant changes, e.g. ev → evde, kitap → kitabı; the suffix is written together with the word, after a proper name with an apostrophe)' : '') +
+      (ctx.settings.targetLanguage === 'tr'
+        ? ' (Turkish: case suffix with vowel harmony and consonant changes, e.g. ev → evde, kitap → kitabı; the suffix is written together with the word, after a proper name with an apostrophe)'
+        : '') +
       '. Use only cases the class already knows (see VORWISSEN DER KLASSE); in early learning years prefer the most frequent cases (e.g. prepositional/locative, accusative).\n' +
       `${GAP_RULES}\n\nWords:\n${vocabLines(vocab)}`,
     build(vocab, data, ctx) {

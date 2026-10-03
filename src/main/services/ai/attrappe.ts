@@ -206,7 +206,14 @@ export class AttrappeProvider implements AiProvider {
       try {
         appendFileSync(
           datei.protokoll,
-          `${JSON.stringify({ schemaName: req.schemaName, system: req.system, user: req.user, bilder: req.images?.length ?? 0 })}\n`
+          `${JSON.stringify({
+            schemaName: req.schemaName,
+            system: req.system,
+            user: req.user,
+            bilder: req.images?.length ?? 0,
+            // Anfang und Länge je Bild – zeigt, ob die Bilder unversehrt ankommen (03.10.2026)
+            bildKoepfe: (req.images ?? []).map((b) => `${String(b).slice(0, 48)}…(${String(b).length})`)
+          })}\n`
         )
       } catch {
         // Nur für Tests – ein fehlendes Protokoll darf die Antwort nicht verhindern

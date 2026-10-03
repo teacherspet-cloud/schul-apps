@@ -73,7 +73,8 @@ export async function searchOnline(query: string, source: OnlineImageSource, pix
   if (source === 'openverse' || source === 'clipart') {
     // Cliparts: gemeinfreie Illustrationen (v. a. rawpixel und svgsilh) – klar, freigestellt, ohne Lizenzauflagen
     const filter = source === 'clipart' ? '&category=illustration&source=rawpixel,svgsilh,wikimedia&license=cc0,pdm' : ''
-    const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=${source === 'clipart' ? 20 : 30}&mature=false${filter}`
+    // Ohne Konto erlaubt Openverse höchstens 20 Treffer je Anfrage (sonst 401, festgestellt 03.10.2026)
+    const url = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=20&mature=false${filter}`
     const res = await politeFetch(url, { headers: { 'User-Agent': WIKIMEDIA_UA } })
     if (!res.ok) throw new Error(`Openverse-Suche fehlgeschlagen (${res.status}).`)
     const json = (await res.json()) as {

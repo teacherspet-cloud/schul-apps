@@ -25,11 +25,17 @@ export async function pictureOptions(
     return { findImage: async (item) => generateAiImage(vocabClipartPrompt(item, undefined), undefined, auftrag?.bild) }
   }
   return {
-    findImages: (items, vocab, settings) =>
-      findVocabPictures(items, vocab, settings, {
-        ai: auftrag?.ai ?? aiCall,
-        services: browserImageServices(),
-        generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt, undefined, auftrag?.bild)).dataUrl : undefined
-      })
+    findImages: (items, vocab, settings, ersatz) =>
+      findVocabPictures(
+        items,
+        vocab,
+        settings,
+        {
+          ai: auftrag?.ai ?? aiCall,
+          services: browserImageServices(),
+          generateImage: canGenerate ? async (prompt) => (await generateAiImage(prompt, undefined, auftrag?.bild)).dataUrl : undefined
+        },
+        ersatz
+      )
   }
 }

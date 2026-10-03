@@ -111,6 +111,25 @@ describe('Vokabeltest: Bilder beschriften', () => {
     expect(list.every((i) => !i.image)).toBe(true) // „brauchbar“ reicht im Vokabeltest nicht
     expect(notes[0]).toContain('Kein eindeutiges Bild')
   })
+
+  it('setzt ein Ersatzwort aus der ganzen Liste ein, wenn es zu einem Wort kein Bild gibt (03.10.2026)', async () => {
+    const list = items()
+    const weitere: VocabEntry[] = [{ id: 'v3', term: 'apple', translation: 'Apfel', imageKeywords: ['apple'], depictable: true }]
+    // „bat“ ist nie eindeutig; erzeugen lässt sich nichts
+    const ai = fakeAi('eindeutig', [], (subject) => !subject.includes('bat'))
+    const notes = await findVocabPictures(list, vocab, settings, { ai, services: fakeServices() }, [...vocab, ...weitere])
+    expect(list[1].answer).toBe('apple')
+    expect(list[1].image).toBeTruthy()
+    expect(notes[0]).toContain('Statt „bat“ steht jetzt „apple“')
+  })
+
+  it('nennt den Grund, wenn auch das erzeugte Bild verworfen wird', async () => {
+    const list = items()
+    const ai = fakeAi('eindeutig', [], (subject) => !subject.includes('bat'))
+    const notes = await findVocabPictures(list, vocab, settings, { ai, services: fakeServices(), generateImage: async () => 'data:image/png;base64,KI' })
+    expect(list[1].image).toBeUndefined()
+    expect(notes[0]).toContain('KI-Bild verworfen: mehrdeutig')
+  })
 })
 
 describe('Arbeitsblatt: Bilder für alle Fächer', () => {

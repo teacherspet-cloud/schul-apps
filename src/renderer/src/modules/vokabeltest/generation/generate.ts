@@ -168,7 +168,11 @@ async function finishBlock(
   if (block.kind === 'picture' && opts.findImages) {
     let notes: string[] = []
     try {
-      notes = await opts.findImages(block.items, vocab, ctx.settings)
+      // Ersatzwörter aus der ganzen Liste – nicht nur aus den Wörtern dieser Aufgabe (03.10.2026: dort gab
+      // es nie Ersatz) und ohne Wörter, die in der Variante schon in anderen Aufgaben stehen
+      const belegt = new Set([...(ctx.belegt ?? []), ...(ctx.variantVocab ?? []).map((v) => v.id)])
+      const ersatz = ctx.allVocab.filter((v) => !belegt.has(v.id))
+      notes = await opts.findImages(block.items, vocab, ctx.settings, ersatz)
     } catch (e) {
       notes = [`Bilder konnten nicht automatisch gewählt werden: ${e instanceof Error ? e.message : String(e)}`]
     }
@@ -190,7 +194,12 @@ async function finishBlock(
     }
     issues = checkBlock(block, vocab)
   }
-  block.warnings = [...issues.map(formatIssue), ...anredeHinweise(block, ctx.settings), ...formHinweise(block, vocab, ctx), ...lesungHinweise(block, vocab, ctx.settings)]
+  block.warnings = [
+    ...issues.map(formatIssue),
+    ...anredeHinweise(block, ctx.settings),
+    ...formHinweise(block, vocab, ctx),
+    ...lesungHinweise(block, vocab, ctx.settings)
+  ]
   return block
 }
 
@@ -296,7 +305,12 @@ export async function generateVariantCombined(
  * Prüft alle Aufgaben eines Tests in einer einzigen Anfrage.
  * Gedacht für den Sparmodus, in dem die Einzelprüfung je Aufgabe entfällt.
  */
-export async function reviewVariant(blocks: Block[], settings: TestSettings, ai: AiCall, known?: KnownVocab): Promise<{ taskNumber: number; problem: string }[]> {
+export async function reviewVariant(
+  blocks: Block[],
+  settings: TestSettings,
+  ai: AiCall,
+  known?: KnownVocab
+): Promise<{ taskNumber: number; problem: string }[]> {
   if (!blocks.length) return []
   const res = await ai<{ problems: { taskNumber: number; problem: string }[] }>({
     system: systemPrompt(settings, undefined, known),

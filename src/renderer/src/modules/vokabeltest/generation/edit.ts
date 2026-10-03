@@ -107,6 +107,6 @@ export async function createAdditionalBlock(
     ...doc.settings,
     tasks: [...doc.settings.tasks.filter((t) => t.type !== type), { type, count, pointsPerItem: def.defaultPoints }]
   }
-  const block = await generateBlock(type, picked, { ...ctx, settings }, { ai, review: false, ...images }, variantLabel(doc, variant))
+  const block = await generateBlock(type, picked, { ...ctx, settings, belegt: [...used] }, { ai, review: false, ...images }, variantLabel(doc, variant))
   return { block, vocab }
 }
