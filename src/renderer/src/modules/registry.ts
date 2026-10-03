@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import DatenverwaltungModule from './datenverwaltung/DatenverwaltungModule'
 import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
 import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
 import { programmSymbol, type ProgrammIcon } from '../shared/components/ProgrammSymbol'
@@ -227,6 +228,18 @@ export const modules: SchulModule[] = [
     faecher: PROGRAMM_FAECHER.vokabelliste,
     component: VokabellisteModule
   },
+  // Datenverwaltung (03.10.2026): Fachschaftsfreigaben, Themenbereiche, Sicherung – für alle
+  {
+    id: 'datenverwaltung',
+    name: 'Datenverwaltung',
+    description: 'Freigaben der Fachschaften, Themenbereiche über alle Programme und die Sicherung des eigenen Materials.',
+    icon: programmSymbol('datenverwaltung', 'gray'),
+    color: 'gray',
+    illustration: illustration('datenverwaltung'),
+    leistenbild: leistenbild('datenverwaltung'),
+    faecher: 'alle' as const,
+    component: DatenverwaltungModule
+  },
   // Nur für Admins auf dem Server: die Verwaltung
   ...(aufServer() && serverIch()?.rolle === 'admin'
     ? [
@@ -259,5 +272,5 @@ export const MODUL_GRUPPEN: ModulGruppe[] = [
   { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest'] },
   { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Verwaltung', apps: ['elternbrief', 'vokabelliste', 'verwaltung'] }
+  { id: 'verwaltung', name: 'Verwaltung', apps: ['elternbrief', 'vokabelliste', 'datenverwaltung', 'verwaltung'] }
 ]

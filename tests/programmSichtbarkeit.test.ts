@@ -27,7 +27,8 @@ describe('Reihenfolge der Programme', () => {
   it('die Leiste (registry.ts) folgt derselben Reihenfolge', () => {
     const quelle = readFileSync('src/renderer/src/modules/registry.ts', 'utf8')
     const liste = quelle.slice(quelle.indexOf('export const modules'))
-    const reihenfolge = [...liste.matchAll(/^ {4}id: '(\w+)'/gm)].map((m) => m[1])
+    // Die Datenverwaltung (03.10.2026) gehört zu keinem Fach – sie steht für alle in der Leiste
+    const reihenfolge = [...liste.matchAll(/^ {4}id: '(\w+)'/gm)].map((m) => m[1]).filter((id) => id !== 'datenverwaltung')
     expect(reihenfolge).toEqual(PROGRAMM_REIHENFOLGE)
     // Jedes Programm trägt seine Fächer aus der zentralen Zuordnung
     for (const id of reihenfolge) expect(liste).toContain(`faecher: PROGRAMM_FAECHER.${id}`)
@@ -52,7 +53,14 @@ describe('Programme nach eigenen Fächern', () => {
   })
 
   it('Mathematik allein: mit Klassenarbeit (seit 29.09.2026 alle Fächer), ohne Vokabel- und Grammatikprogramme', () => {
-    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual(['arbeitsblatt', 'lernzielkontrolle', 'klassenarbeit', 'rueckmeldung', 'tafelbild', 'elternbrief'])
+    expect(ids(sichtbareProgramme(PROGRAMME, ['mathematik'], {}))).toEqual([
+      'arbeitsblatt',
+      'lernzielkontrolle',
+      'klassenarbeit',
+      'rueckmeldung',
+      'tafelbild',
+      'elternbrief'
+    ])
   })
 
   it('Latein und DaZ zählen zu den Sprachfächern; Latein seit 29.09.2026, DaZ seit 30.09.2026 auch mit Klassenarbeiten', () => {

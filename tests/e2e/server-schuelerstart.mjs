@@ -27,8 +27,34 @@ const KLASSE = `9z${Date.now() % 1000}`
 
 const TEST = {
   version: 1,
-  header: { title: 'Weather Test', showName: true, showDate: true, showClass: false, showSchool: false, schoolName: '', showVariant: true, showPoints: true, showGrade: true, subtitle: '' },
-  settings: { targetLanguage: 'en', level: 'A2', stateId: 'NI', schoolTypeId: 'gymnasium', languageOrder: 1, grade: 9, vocabCount: 2, variantCount: 1, variantMode: 'sameVocab', tasks: [], topic: 'Weather', pictureSource: 'none', answerKey: true, seed: 1 },
+  header: {
+    title: 'Weather Test',
+    showName: true,
+    showDate: true,
+    showClass: false,
+    showSchool: false,
+    schoolName: '',
+    showVariant: true,
+    showPoints: true,
+    showGrade: true,
+    subtitle: ''
+  },
+  settings: {
+    targetLanguage: 'en',
+    level: 'A2',
+    stateId: 'NI',
+    schoolTypeId: 'gymnasium',
+    languageOrder: 1,
+    grade: 9,
+    vocabCount: 2,
+    variantCount: 1,
+    variantMode: 'sameVocab',
+    tasks: [],
+    topic: 'Weather',
+    pictureSource: 'none',
+    answerKey: true,
+    seed: 1
+  },
   vocab: [],
   variants: [
     {
@@ -63,7 +89,9 @@ const verwaltung = await browser.newContext()
 const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
-  const lehrer = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })).json()
+  const lehrer = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })
+  ).json()
   zuLoeschen.push(lehrer.id)
 
   // ---------- Klassenliste (Excel-Tab und „Nachname, Vorname")
@@ -72,8 +100,13 @@ try {
   ).json()
   const mia = liste.angelegt?.find((k) => k.name === 'Mia Probe')
   pruefe(mia?.benutzer === 'mia.probe' || /^mia\.probe\d*$/.test(mia?.benutzer ?? ''), `Konto aus Excel-Zeile: ${mia?.benutzer}`)
-  pruefe(liste.angelegt?.some((k) => /^jan\.oeztuerk\d*$/.test(k.benutzer)), 'Umlaute umgeschrieben, nur erster Vorname (jan.oeztuerk)')
-  const nochmal = await (await verwaltung.request.post(`${A}/server/verwaltung/klassenliste`, { headers: KOPF, data: { klasse: KLASSE, namen: 'Mia Probe' } })).json()
+  pruefe(
+    liste.angelegt?.some((k) => /^jan\.oeztuerk\d*$/.test(k.benutzer)),
+    'Umlaute umgeschrieben, nur erster Vorname (jan.oeztuerk)'
+  )
+  const nochmal = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/klassenliste`, { headers: KOPF, data: { klasse: KLASSE, namen: 'Mia Probe' } })
+  ).json()
   pruefe(nochmal.angelegt?.[0]?.schonDa === true, 'Zweites Einfügen legt kein doppeltes Konto an')
   const u0 = await (await verwaltung.request.get(`${A}/server/verwaltung/uebersicht`, { headers: KOPF })).json()
   for (const n of u0.nutzer ?? []) if ((liste.angelegt ?? []).some((k) => k.benutzer === n.benutzer)) zuLoeschen.push(n.id)
@@ -84,8 +117,15 @@ try {
   const gr = await (await lk.request.get(`${A}/server/lerngruppen`, { headers: KOPF })).json()
   const klasse = (gr.iservGruppen ?? []).find((g) => g.id === `klasse:${KLASSE}`)
   pruefe(Boolean(klasse), `Klasse ${KLASSE} steht bei den Gruppen zur Auswahl (${klasse?.name})`)
-  const gruppe = await (await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })).json()
-  const neu = await (await lk.request.post(`${A}/server/onlinetest/erstellen`, { headers: KOPF, data: { titel: 'Weather Test', test: TEST, lerngruppeId: gruppe.id, zeitMin: 10 } })).json()
+  const gruppe = await (
+    await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })
+  ).json()
+  const neu = await (
+    await lk.request.post(`${A}/server/onlinetest/erstellen`, {
+      headers: KOPF,
+      data: { titel: 'Weather Test', test: TEST, lerngruppeId: gruppe.id, zeitMin: 10 }
+    })
+  ).json()
 
   // ---------- Lernende: QR-Link der Zugangskarte, Passwortwechsel
   const s = await browser.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true })
@@ -132,9 +172,18 @@ try {
   await felder.nth(1).fill('not only')
   await felder.nth(2).fill('but')
   await p.screenshot({ path: join(out, '2-test.png') })
-  await p.getByRole('button', { name: /Abgeben/ }).first().click()
+  await p
+    .getByRole('button', { name: /Abgeben/ })
+    .first()
+    .click()
   const bestaetigen = p.getByRole('button', { name: /Endgültig abgeben|Ja, abgeben/ })
-  if (await bestaetigen.first().isVisible({ timeout: 3000 }).catch(() => false)) await bestaetigen.first().click()
+  if (
+    await bestaetigen
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)
+  )
+    await bestaetigen.first().click()
   await p.waitForTimeout(1500)
 
   // ---------- Meine Ergebnisse
@@ -147,9 +196,23 @@ try {
   pruefe(await p.getByText(/Abgegeben am/).isVisible(), 'Früheres Ergebnis mit Datum und Antworten')
   await p.screenshot({ path: join(out, '3-ergebnis.png') })
   await p.goto(`${A}/s/aufgaben`)
-  pruefe(await p.getByText(/keine Aufgabe mit Feedback/).isVisible({ timeout: 10000 }), 'Rückmeldung: leere Liste mit Hinweis')
+  pruefe(
+    await p
+      .getByText(/keine Aufgabe mit Feedback/)
+      .waitFor({ timeout: 10000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'Rückmeldung: leere Liste mit Hinweis'
+  )
   await p.goto(`${A}/s/`)
   await p.locator('[data-startseite]').waitFor()
+  // Die Zahl kommt nach dem Laden der Liste – kurz darauf warten
+  await p
+    .locator('[data-kachel="ergebnisse"]', { hasText: /1 Test/ })
+    .waitFor({ timeout: 10000 })
+    .catch(() => undefined)
   const ergText = await p.locator('[data-kachel="ergebnisse"]').textContent()
   pruefe(/1 Test/.test(ergText), `Ergebnis-Kachel: ${ergText}`)
   await lk.request.post(`${A}/server/onlinetest/${neu.id}/status`, { headers: KOPF, data: { status: 'beendet' } })
@@ -184,7 +247,11 @@ try {
   for (const n of u1.nutzer ?? []) if (n.quelle === 'gast' && n.name === 'Gina G.') zuLoeschen.push(n.id)
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n')[0]}`)
-  for (const [i, seite] of browser.contexts().flatMap((c) => c.pages()).entries()) await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
+  for (const [i, seite] of browser
+    .contexts()
+    .flatMap((c) => c.pages())
+    .entries())
+    await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Konten samt Daten gelöscht (${zuLoeschen.length})`)

@@ -22,8 +22,34 @@ const pruefe = (ok, text) => {
 const KOPF = { 'x-schulapps-token': 'server' }
 const DOC = {
   version: 1,
-  header: { title: 'Vocabulary Test', showName: true, showDate: true, showClass: false, showSchool: false, schoolName: '', showVariant: true, showPoints: true, showGrade: true, subtitle: '' },
-  settings: { targetLanguage: 'en', level: 'A2', stateId: 'NI', schoolTypeId: 'gymnasium', languageOrder: 1, grade: 7, vocabCount: 0, variantCount: 1, variantMode: 'sameVocab', tasks: [], topic: 'Weather', pictureSource: 'none', answerKey: true, seed: 1 },
+  header: {
+    title: 'Vocabulary Test',
+    showName: true,
+    showDate: true,
+    showClass: false,
+    showSchool: false,
+    schoolName: '',
+    showVariant: true,
+    showPoints: true,
+    showGrade: true,
+    subtitle: ''
+  },
+  settings: {
+    targetLanguage: 'en',
+    level: 'A2',
+    stateId: 'NI',
+    schoolTypeId: 'gymnasium',
+    languageOrder: 1,
+    grade: 7,
+    vocabCount: 0,
+    variantCount: 1,
+    variantMode: 'sameVocab',
+    tasks: [],
+    topic: 'Weather',
+    pictureSource: 'none',
+    answerKey: true,
+    seed: 1
+  },
   vocab: [],
   variants: [{ id: 'A', label: 'A', blocks: [] }],
   fontSize: 12,
@@ -73,15 +99,31 @@ try {
   await ben.api('tests:save', { id: auf.id, name: geladen.name, stats: STATS, payload: geladen.payload })
   pruefe((await ben.api('tests:list')).length === 0, 'Speichern ohne Änderung legt keine Kopie an')
   // ---------- Ben ändert
-  await ben.api('tests:save', { id: auf.id, name: geladen.name, stats: STATS, payload: { ...geladen.payload, settings: { ...geladen.payload.settings, topic: 'Weather – Ben' } } })
+  await ben.api('tests:save', {
+    id: auf.id,
+    name: geladen.name,
+    stats: STATS,
+    payload: { ...geladen.payload, settings: { ...geladen.payload.settings, topic: 'Weather – Ben' } }
+  })
   const bens = await ben.api('tests:list')
   pruefe(bens.length === 1 && bens[0].name === 'Weather Unit 1 – Kopie Ben Englisch', `erste Änderung → eigene Kopie: „${bens[0]?.name}"`)
   // Nächstes Speichern unter dem alten Namen (so sendet es die Oberfläche): bleibt die Kopie
-  await ben.api('tests:save', { id: auf.id, name: geladen.name, stats: STATS, payload: { ...geladen.payload, settings: { ...geladen.payload.settings, topic: 'Weather – Ben 2' } } })
-  pruefe((await ben.api('tests:list'))[0]?.name === 'Weather Unit 1 – Kopie Ben Englisch', 'weiteres Speichern unter altem Namen: bleibt „… – Kopie Ben Englisch"')
+  await ben.api('tests:save', {
+    id: auf.id,
+    name: geladen.name,
+    stats: STATS,
+    payload: { ...geladen.payload, settings: { ...geladen.payload.settings, topic: 'Weather – Ben 2' } }
+  })
+  pruefe(
+    (await ben.api('tests:list'))[0]?.name === 'Weather Unit 1 – Kopie Ben Englisch',
+    'weiteres Speichern unter altem Namen: bleibt „… – Kopie Ben Englisch"'
+  )
   const original = await lea.api('tests:get', 'fs-test-1')
   pruefe(original.payload.settings.topic === 'Weather', 'Leas Original bleibt unverändert')
-  pruefe((await liste(lea)).filter((e) => !e.eigen).length === 0 && (await liste(mia)).length === 1, 'Bens Kopie sieht die Fachschaft nicht (nicht freigegeben)')
+  pruefe(
+    (await liste(lea)).filter((e) => !e.eigen).length === 0 && (await liste(mia)).length === 1,
+    'Bens Kopie sieht die Fachschaft nicht (nicht freigegeben)'
+  )
 
   // ---------- Oberfläche bei Ben
   const p = await ben.ctx.newPage()
@@ -89,11 +131,33 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
-  pruefe(await p.locator('[data-fachordner] [data-freigabe]').first().waitFor({ timeout: 10000 }).then(() => true, () => false), 'Startseite: Karte „Fachschaft" mit der Freigabe')
+  // Seit 03.10.2026 nicht mehr auf der Startseite, sondern in der App „Datenverwaltung"
+  await p.locator('.app-leiste [aria-label="Datenverwaltung"]').click()
+  pruefe(
+    await p
+      .locator('[data-fachordner] [data-freigabe]')
+      .first()
+      .waitFor({ timeout: 10000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'Datenverwaltung: Karte „Fachschaft" mit der Freigabe'
+  )
   await p.locator('.app-leiste [aria-label="Vokabeltest"]').click()
-  await p.getByRole('button', { name: /Meine Vokabeltests/ }).first().click().catch(() => undefined)
+  await p
+    .getByRole('button', { name: /Meine Vokabeltests/ })
+    .first()
+    .click()
+    .catch(() => undefined)
   const fl = p.locator('[data-fachschaftsliste]').filter({ visible: true })
-  pruefe(await fl.waitFor({ timeout: 10000 }).then(() => true, () => false), 'Bibliothek: „Von der Fachschaft"')
+  pruefe(
+    await fl.waitFor({ timeout: 10000 }).then(
+      () => true,
+      () => false
+    ),
+    'Bibliothek: „Von der Fachschaft"'
+  )
   await p.screenshot({ path: join(out, '1-bibliothek.png') })
   // ⋯ an Bens Kopie: freigeben
   const eintrag = p.getByText('Weather Unit 1 – Kopie Ben Englisch').first()
@@ -111,7 +175,11 @@ try {
   pruefe((await liste(ben)).length === 0, 'Zurücknehmen: Ben sieht die Freigabe nicht mehr')
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n')[0]}`)
-  for (const [i, seite] of browser.contexts().flatMap((c) => c.pages()).entries()) await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
+  for (const [i, seite] of browser
+    .contexts()
+    .flatMap((c) => c.pages())
+    .entries())
+    await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Konten samt Daten gelöscht (${zuLoeschen.length})`)
