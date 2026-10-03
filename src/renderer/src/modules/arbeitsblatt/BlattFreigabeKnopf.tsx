@@ -35,6 +35,23 @@ export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
   })
 }
 
+/** Merkkästen des Blattes (für die Karteikästen der Lern-App) */
+/**
+ * Lösungsblatt für Lernende (03.10.2026): ohne alles, was nur für die Lehrkraft ist – Hinweise mit
+ * AFB/Operator/Begründung, Video-Notizen samt Rechtlichem, Lehrerseiten. Entfernt, nicht versteckt:
+ * es soll gar nicht erst beim Schülergerät ankommen.
+ */
+export function loesungFuerLernende(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  doc.querySelectorAll('.ws-teacher-page').forEach((e) => (e.closest('.ws-page') ?? e).remove())
+  doc.querySelectorAll('.ws-teacher-note, .ws-video-note, .ws-teacher-hint').forEach((e) => e.remove())
+  return `<!doctype html>${doc.documentElement.outerHTML}`
+}
+
+export function blattMerkkaesten(sheet: Sheet): { titel: string; text: string }[] {
+  return sheet.blocks.flatMap((b) => (b.type === 'infoBox' && plainText(b.body).trim() ? [{ titel: b.title || 'Merkkasten', text: plainText(b.body) }] : []))
+}
+
 /** Verknüpfte Rückmeldung: Aufgaben als Aufgabenstellung, das ganze Blatt samt Lösungen als Erwartung */
 export function blattRueckmeldung(ws: Worksheet, sheet: Sheet, titel: string): Rueckmeldung {
   const aufgaben = blattAufgaben(sheet)
@@ -116,6 +133,8 @@ function Dialog({
   const [aufgabenFeedback, setAufgabenFeedback] = useState(true)
   const [runden, setRunden] = useState(2)
   const [stift, setStift] = useState(true)
+  // Lösungsblatt nach dem ersten Einreichen (03.10.2026, Idee aus LearningView)
+  const [loesungZeigen, setLoesungZeigen] = useState(true)
   const [laeuft, setLaeuft] = useState(false)
   const [liste, setListe] = useState<Freigegeben[]>([])
   const [qr, setQr] = useState<{ titel: string; code: string; link: string } | null>(null)
@@ -148,11 +167,18 @@ function Dialog({
     try {
       // Schülerfassung: nur dieses Blatt, OHNE Lösungsteil
       const html = buildWorksheetHtml(ws, layouts, { sheetIds: [sheet.id], includeKey: false }, logo, schoolName)
+      const loesung = loesungZeigen
+        ? loesungFuerLernende(buildWorksheetHtml(ws, layouts, { sheetIds: [sheet.id], includeKey: false, keyOnly: true }, logo, schoolName))
+        : ''
       const r = await senden<{ id: string; code?: string; link?: string }>('/server/blaetter/freigeben', {
         titel,
         html,
         aufgaben: blattAufgaben(sheet),
         rueckmeldung: blattRueckmeldung(ws, sheet, titel),
+        fach: ws.meta.subjectLabel,
+        thema: ws.meta.topic,
+        merk: blattMerkkaesten(sheet),
+        ...(loesung ? { loesung } : {}),
         lerngruppeId: gruppe ?? '',
         schueler: einzelne,
         gaeste,
@@ -231,6 +257,12 @@ function Dialog({
           </Group>
         )}
         <Checkbox label="Stift erlauben (Handschriftliches geht als Bild an die KI)" checked={stift} onChange={(e) => setStift(e.currentTarget.checked)} />
+        <Checkbox
+          label="Lösungsblatt nach dem ersten Einreichen zeigen"
+          checked={loesungZeigen}
+          onChange={(e) => setLoesungZeigen(e.currentTarget.checked)}
+          data-blatt-loesung
+        />
         {aufgabenZahl === 0 && <Alert color="orange">Dieses Blatt hat keine Aufgaben zum Ausfüllen.</Alert>}
         <Group justify="flex-end">
           <Button loading={laeuft} disabled={(!gruppe && !gaeste) || !aufgabenZahl || !titel.trim()} onClick={() => void freigeben()} data-blatt-freigeben>

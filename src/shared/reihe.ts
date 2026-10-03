@@ -19,10 +19,26 @@
  */
 
 export type SchrittArt =
-  'arbeitsblatt' | 'rueckmeldung' | 'onlinetest' | 'aufgabe' | 'lernkarten' | 'reflexion' | 'praesenz' | 'diagnose' | 'hefter' | 'abschluss' | 'sprechen'
+  | 'arbeitsblatt'
+  | 'rueckmeldung'
+  | 'onlinetest'
+  | 'aufgabe'
+  | 'lernkarten'
+  | 'reflexion'
+  | 'praesenz'
+  | 'diagnose'
+  | 'hefter'
+  | 'abschluss'
+  | 'sprechen'
+  | 'vokabeln'
 
 export const SCHRITT_ARTEN: { id: SchrittArt; label: string; text: string }[] = [
   { id: 'arbeitsblatt', label: 'Arbeitsblatt', text: 'Ein fertiges Arbeitsblatt ausfüllen – mit KI-Feedback je Aufgabe und nach dem Einreichen.' },
+  {
+    id: 'vokabeln',
+    label: 'Vokabeln lernen',
+    text: 'Vokabeln aus dem Lehrwerk oder einer Liste im Karteikasten der Lern-App – geschafft, wenn genug Wörter eingeübt sind.'
+  },
   { id: 'onlinetest', label: 'Test (Onlinetest)', text: 'Vokabeltest als Onlinetest im eigenen Tempo, Ergebnis sofort.' },
   { id: 'rueckmeldung', label: 'Schreibaufgabe mit Feedback', text: 'Aufgabe aus der Rückmeldungs-App: schreiben, Feedback, überarbeiten.' },
   { id: 'aufgabe', label: 'Zwischenaufgabe', text: 'Kurzer Auftrag mit Antwortfeld oder Foto, auch zu einem Lese-/Hörtext oder Video mit Kontrollfragen.' },
@@ -66,6 +82,18 @@ export type SchrittInhalt =
       vorlage: unknown
       runden: number
       stift: boolean
+      /** Lösungsblatt – sehen die Lernenden erst nach dem ersten Einreichen (03.10.2026) */
+      loesung?: string
+      merk?: { titel: string; text: string }[]
+      /** Niveaustufen (Basis/Standard/Plus …): die Blätter eines differenzierten Arbeitsblatts */
+      varianten?: {
+        label: string
+        html: string
+        aufgaben: { nr: number; anweisung: string; erwartung: string }[]
+        vorlage: unknown
+        loesung?: string
+        merk?: { titel: string; text: string }[]
+      }[]
     }
   | { art: 'rueckmeldung'; vorlage: unknown; runden: number }
   | { art: 'onlinetest'; test: unknown; zeitMin: number }
@@ -78,14 +106,24 @@ export type SchrittInhalt =
       antwort: 'text' | 'foto' | 'beides'
       erwartung: string
       feedback: boolean
+      /** Musterlösung – sehen die Lernenden nach dem Abgeben (03.10.2026) */
+      musterloesung?: string
     }
   | { art: 'lernkarten'; karten: { vorne: string; hinten: string }[] }
   | { art: 'reflexion'; frage: string }
   | { art: 'praesenz'; anweisung: string }
-  | { art: 'diagnose'; fragen: DiagnoseFrage[]; schwelle: number; ueberspringen: string[] }
+  | {
+      art: 'diagnose'
+      fragen: DiagnoseFrage[]
+      schwelle: number
+      ueberspringen: string[]
+      /** Erneut möglich nach … Minuten (0 = nur einmal) – gegen Durchprobieren */
+      wiederholbarNachMin?: number
+    }
   | { art: 'hefter'; text: string }
   | { art: 'abschluss'; anweisung: string; raster: string[] }
   | { art: 'sprechen'; anweisung: string; minuten: number }
+  | { art: 'vokabeln'; titel: string; sprache: string; fach: string; woerter: unknown[] }
 
 export interface Schritt {
   id: string
@@ -153,11 +191,30 @@ export interface SchrittStand {
   diagnose?: { prozent: number; zeit: number }
   praesenz?: boolean
   zeit?: number
+  /**
+   * Zur Überarbeitung zurückgeschickt (03.10.2026, Idee aus LearningView): Der Schritt ist wieder offen,
+   * bis neu eingereicht wird (`bei` = Zahl der Einreichungen zu diesem Zeitpunkt). Der Kommentar steht beim Schritt.
+   */
+  ueberarbeiten?: { text: string; zeit: number; bei: number }
+  /** Gewählte Niveaustufe (Index der Variante), z. B. 0 = Basis */
+  niveau?: number
+}
+
+/** Frage einer/eines Lernenden an einen Schritt („Haftnotiz") und die Antwort der Lehrkraft */
+export interface Frage {
+  schritt: string
+  text: string
+  zeit: number
+  antwort?: string
+  antwortZeit?: number
 }
 
 export interface Stand {
   schritte: Record<string, SchrittStand>
   hilfe?: { zeit: number; schritt?: string; text?: string } | null
+  fragen?: Frage[]
+  /** Einschätzung der Lehrkraft je Lernziel (Zählung wie `alleLernziele`) – neben der Ich-kann-Ampel */
+  lehrkraftAmpel?: Record<string, 'gruen' | 'gelb' | 'rot'>
 }
 
 /** Stand verknüpfter Aufgaben (Arbeitsblatt, Rückmeldung, Onlinetest) – vom Server ermittelt */
@@ -199,7 +256,12 @@ export function einzelStatus(
   ex: Extern | undefined
 ): { status: Exclude<Status, 'gesperrt' | 'uebersprungen'>; wartet?: boolean } {
   if (st?.hand === 'geschafft') return { status: 'geschafft' }
-  const verknuepft = s.inhalt.art === 'arbeitsblatt' || s.inhalt.art === 'rueckmeldung' || s.inhalt.art === 'onlinetest'
+  // Zur Überarbeitung zurückgeschickt: offen, bis neu eingereicht ist
+  if (st?.ueberarbeiten) {
+    const jetztEingereicht = ['arbeitsblatt', 'rueckmeldung', 'onlinetest', 'vokabeln'].includes(s.inhalt.art) ? (ex?.eingereicht ?? 0) : (st.eingereicht ?? 0)
+    if (jetztEingereicht <= st.ueberarbeiten.bei) return { status: 'offen' }
+  }
+  const verknuepft = s.inhalt.art === 'arbeitsblatt' || s.inhalt.art === 'rueckmeldung' || s.inhalt.art === 'onlinetest' || s.inhalt.art === 'vokabeln'
   const eingereicht = verknuepft ? (ex?.eingereicht ?? 0) : (st?.eingereicht ?? 0)
   switch (s.inhalt.art) {
     case 'lernkarten':
@@ -275,7 +337,12 @@ export function berechneWeg(r: Reihe, stand: Stand, extern: Record<string, Exter
     if ((blockiert || halt) && !vonHand && (ein.status !== 'geschafft' || s.inhalt.art === 'hefter') && st?.hand !== 'geschafft') {
       lage.set(s.id, { id: s.id, status: 'gesperrt', hinweis: halt ?? blockiert! })
     } else {
-      lage.set(s.id, { id: s.id, status: ein.status, ...(ein.wartet ? { wartet: true } : {}) })
+      lage.set(s.id, {
+        id: s.id,
+        status: ein.status,
+        ...(ein.wartet ? { wartet: true } : {}),
+        ...(st?.ueberarbeiten && ein.status === 'offen' ? { hinweis: `Zur Überarbeitung: ${st.ueberarbeiten.text || 'bitte noch einmal ansehen'}` } : {})
+      })
     }
     const l = lage.get(s.id)!
     const fertig = l.status === 'geschafft' || l.status === 'uebersprungen'
@@ -331,14 +398,25 @@ export function diagnoseProzent(fragen: DiagnoseFrage[], antworten: Record<strin
 export function inhaltFuerLernende(i: SchrittInhalt): Record<string, unknown> {
   switch (i.art) {
     case 'arbeitsblatt':
-      return { art: i.art, titel: i.titel }
+      return { art: i.art, titel: i.titel, varianten: (i.varianten ?? []).map((v) => v.label) }
     case 'rueckmeldung':
     case 'onlinetest':
       return { art: i.art }
+    case 'vokabeln':
+      return { art: i.art, titel: i.titel, woerter: i.woerter.length }
     case 'aufgabe':
-      return { art: i.art, anweisung: i.anweisung, material: i.material, link: i.link, fragen: i.fragen, antwort: i.antwort, feedback: i.feedback }
+      return {
+        art: i.art,
+        anweisung: i.anweisung,
+        material: i.material,
+        link: i.link,
+        fragen: i.fragen,
+        antwort: i.antwort,
+        feedback: i.feedback,
+        hatMusterloesung: Boolean(i.musterloesung?.trim())
+      }
     case 'diagnose':
-      return { art: i.art, fragen: i.fragen.map((f) => ({ frage: f.frage, optionen: f.optionen })) }
+      return { art: i.art, fragen: i.fragen.map((f) => ({ frage: f.frage, optionen: f.optionen })), wiederholbarNachMin: i.wiederholbarNachMin ?? 0 }
     default:
       return { ...i }
   }
@@ -354,6 +432,8 @@ export function leererInhalt(art: SchrittArt): SchrittInhalt {
       return { art, vorlage: null, runden: 2 }
     case 'onlinetest':
       return { art, test: null, zeitMin: 20 }
+    case 'vokabeln':
+      return { art, titel: '', sprache: '', fach: '', woerter: [] }
     case 'aufgabe':
       return { art, anweisung: '', material: '', link: '', fragen: [], antwort: 'text', erwartung: '', feedback: true }
     case 'lernkarten':
@@ -381,6 +461,8 @@ export function standardErfolg(art: SchrittArt): Erfolg {
       return { art: 'ki', schwelle: 'teilweise' }
     case 'onlinetest':
       return { art: 'punkte', prozent: 60 }
+    case 'vokabeln':
+      return { art: 'punkte', prozent: 80 }
     case 'abschluss':
     case 'sprechen':
     case 'praesenz':
@@ -388,4 +470,25 @@ export function standardErfolg(art: SchrittArt): Erfolg {
     default:
       return { art: 'abgabe' }
   }
+}
+
+/** Niveau-Empfehlung aus der Eingangsdiagnose: unter 50 % Basis, unter 80 % Standard, sonst die oberste Stufe */
+export function niveauEmpfehlung(r: Reihe, stand: Stand, anzahl: number): number | null {
+  const d = r.schritte.find((s) => s.inhalt.art === 'diagnose' && stand.schritte[s.id]?.diagnose)
+  const p = d ? stand.schritte[d.id]!.diagnose!.prozent : null
+  if (p === null || anzahl < 2) return null
+  return p < 50 ? 0 : p < 80 ? Math.min(1, anzahl - 1) : anzahl - 1
+}
+
+/** Lernziele in fester Zählung (Reihe, dann Schritte) – für Ampeln von Lernenden und Lehrkraft */
+export const alleLernziele = (r: Pick<Reihe, 'lernziele' | 'schritte'>): Lernziel[] => [...r.lernziele, ...r.schritte.flatMap((s) => s.lernziele)]
+
+/** Weicht die Selbsteinschätzung deutlich von der Lehrkraft ab (grün ↔ rot)? */
+export function ampelAbweichungen(stand: Stand): number[] {
+  const selbst: Record<string, string> = {}
+  for (const st of Object.values(stand.schritte)) Object.assign(selbst, st.ampel ?? {})
+  const lk: Record<string, string> = { ...(stand.lehrkraftAmpel ?? {}) }
+  return Object.keys(lk)
+    .filter((k) => selbst[k] && ((selbst[k] === 'gruen' && lk[k] === 'rot') || (selbst[k] === 'rot' && lk[k] === 'gruen')))
+    .map(Number)
 }

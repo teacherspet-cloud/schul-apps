@@ -13,6 +13,7 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
+import VokabelTraining from '../lernen/VokabelTraining'
 import { FAECHER } from '@shared/faecher'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { useDokumentOeffner } from '../../shared/navigation'
@@ -67,7 +68,8 @@ import {
   IconTrash,
   IconUsersGroup,
   IconX,
-  IconPlus
+  IconPlus,
+  IconCards
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
@@ -144,7 +146,8 @@ interface TestDetail {
   teilnahmen: Teilnahme[]
 }
 
-export const PRUEF_HINWEIS = 'Die Auswertung ist ein Vorschlag – bitte die Abgaben trotzdem prüfen, besonders die von der KI bewerteten und markierten Antworten.'
+export const PRUEF_HINWEIS =
+  'Die Auswertung ist ein Vorschlag – bitte die Abgaben trotzdem prüfen, besonders die von der KI bewerteten und markierten Antworten.'
 
 const datum = (s: string | number): string => new Date(s).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
 const STATUS_TEXT: Record<TestListe['status'], string> = { wartend: 'wartet auf Start', offen: 'läuft', beendet: 'beendet' }
@@ -182,6 +185,9 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
           <Tabs.Tab value="gruppen" leftSection={<IconUsersGroup size={16} />}>
             Lerngruppen
           </Tabs.Tab>
+          <Tabs.Tab value="vokabeln" leftSection={<IconCards size={16} />} data-reiter-vokabeltraining>
+            Vokabeltraining
+          </Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="tests">
           <Tests ziel={ziel} zielErledigt={() => setZiel(null)} />
@@ -189,6 +195,7 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
         <Tabs.Panel value="gruppen">
           <Lerngruppen />
         </Tabs.Panel>
+        <Tabs.Panel value="vokabeln">{reiter === 'vokabeln' && <VokabelTraining />}</Tabs.Panel>
       </Tabs>
     </Container>
   )
@@ -201,7 +208,17 @@ type Filter = Partial<Record<Spalte, string>>
 const FILTER_TEXT: Record<Spalte, string> = { name: 'Test', lerngruppe: 'Klasse', art: 'Testart', datum: 'ab', abgaben: 'Abgaben', status: 'Status' }
 
 const wertFuer = (t: TestListe, s: Spalte): string | number =>
-  s === 'name' ? anzeigeName(t).toLowerCase() : s === 'lerngruppe' ? t.lerngruppe.toLowerCase() : s === 'art' ? t.art : s === 'datum' ? t.erstellt : s === 'abgaben' ? t.abgegeben : t.status
+  s === 'name'
+    ? anzeigeName(t).toLowerCase()
+    : s === 'lerngruppe'
+      ? t.lerngruppe.toLowerCase()
+      : s === 'art'
+        ? t.art
+        : s === 'datum'
+          ? t.erstellt
+          : s === 'abgaben'
+            ? t.abgegeben
+            : t.status
 
 function SpaltenKopf({
   label,
@@ -230,13 +247,25 @@ function SpaltenKopf({
           {label}
         </Text>
         <Tooltip label={aktiv ? (sort.ab ? 'absteigend – umkehren' : 'aufsteigend – umkehren') : 'sortieren'}>
-          <ActionIcon size="sm" variant={aktiv ? 'light' : 'subtle'} color={aktiv ? undefined : 'gray'} onClick={() => setSort({ spalte, ab: aktiv ? !sort.ab : spalte === 'datum' })} aria-label={`nach ${label} sortieren`}>
+          <ActionIcon
+            size="sm"
+            variant={aktiv ? 'light' : 'subtle'}
+            color={aktiv ? undefined : 'gray'}
+            onClick={() => setSort({ spalte, ab: aktiv ? !sort.ab : spalte === 'datum' })}
+            aria-label={`nach ${label} sortieren`}
+          >
             {aktiv ? sort.ab ? <IconArrowDown size={14} /> : <IconArrowUp size={14} /> : <IconArrowsSort size={14} />}
           </ActionIcon>
         </Tooltip>
         <Popover position="bottom-start" shadow="md" withArrow>
           <Popover.Target>
-            <ActionIcon size="sm" variant={gefiltert ? 'filled' : 'subtle'} color={gefiltert ? undefined : 'gray'} aria-label={`nach ${label} filtern`} data-filter={spalte}>
+            <ActionIcon
+              size="sm"
+              variant={gefiltert ? 'filled' : 'subtle'}
+              color={gefiltert ? undefined : 'gray'}
+              aria-label={`nach ${label} filtern`}
+              data-filter={spalte}
+            >
               <IconFilter size={13} />
             </ActionIcon>
           </Popover.Target>
@@ -253,9 +282,21 @@ function SpaltenKopf({
                 w={220}
               />
             ) : spalte === 'datum' ? (
-              <TextInput label="Datum ab" type="date" value={filter.datum ?? ''} onChange={(e) => setFilter({ ...filter, datum: e.currentTarget.value || undefined })} w={220} />
+              <TextInput
+                label="Datum ab"
+                type="date"
+                value={filter.datum ?? ''}
+                onChange={(e) => setFilter({ ...filter, datum: e.currentTarget.value || undefined })}
+                w={220}
+              />
             ) : (
-              <TextInput label={`${label} enthält`} value={filter[spalte] ?? ''} onChange={(e) => setFilter({ ...filter, [spalte]: e.currentTarget.value || undefined })} w={220} autoFocus />
+              <TextInput
+                label={`${label} enthält`}
+                value={filter[spalte] ?? ''}
+                onChange={(e) => setFilter({ ...filter, [spalte]: e.currentTarget.value || undefined })}
+                w={220}
+                autoFocus
+              />
             )}
           </Popover.Dropdown>
         </Popover>
@@ -300,7 +341,9 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
   }, [liste, sort, filter])
   if (gewaehlt) return <TestAnsicht id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
   const werte = (s: Spalte, f: (t: TestListe) => string): { value: string; label: string }[] =>
-    [...new Set((liste ?? []).map(f).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')).map((v) => ({ value: v, label: s === 'status' ? STATUS_TEXT[v as TestListe['status']] : v }))
+    [...new Set((liste ?? []).map(f).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'de'))
+      .map((v) => ({ value: v, label: s === 'status' ? STATUS_TEXT[v as TestListe['status']] : v }))
   const kopf = { sort, setSort, filter, setFilter }
   return (
     <Stack>
@@ -323,7 +366,8 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
                   </ActionIcon>
                 }
               >
-                {FILTER_TEXT[k]}: {k === 'status' ? STATUS_TEXT[v as TestListe['status']] : k === 'abgaben' ? (v === 'offen' ? 'noch zu prüfen' : 'alles geprüft') : v}
+                {FILTER_TEXT[k]}:{' '}
+                {k === 'status' ? STATUS_TEXT[v as TestListe['status']] : k === 'abgaben' ? (v === 'offen' ? 'noch zu prüfen' : 'alles geprüft') : v}
               </Badge>
             ))}
           <Button variant="subtle" size="xs" onClick={() => setFilter({})}>
@@ -408,7 +452,11 @@ export function Zugang({ code, link }: { code: string; link: string }): React.JS
         </Text>
         <Group gap={4}>
           <Text size="sm">{link}</Text>
-          <ActionIcon variant="subtle" onClick={() => void navigator.clipboard?.writeText(link).then(() => notifySuccess('Link kopiert.'))} aria-label="Link kopieren">
+          <ActionIcon
+            variant="subtle"
+            onClick={() => void navigator.clipboard?.writeText(link).then(() => notifySuccess('Link kopiert.'))}
+            aria-label="Link kopieren"
+          >
             <IconCopy size={16} />
           </ActionIcon>
         </Group>
@@ -447,11 +495,21 @@ function ergebnisDaten(d: TestDetail): ErgebnisDaten {
     schwellen: d.einstellungen.schwellen,
     zeilen: d.teilnahmen
       .filter((t) => t.beginn > 0)
-      .map((t) => ({ name: t.name, fassung: t.variante, punkte: t.punkte, max: t.max, note: t.note, abgabe: t.abgabe, verlassen: t.verlassen, offen: t.offen + t.zuEntscheiden }))
+      .map((t) => ({
+        name: t.name,
+        fassung: t.variante,
+        punkte: t.punkte,
+        max: t.max,
+        note: t.note,
+        abgabe: t.abgabe,
+        verlassen: t.verlassen,
+        offen: t.offen + t.zuEntscheiden
+      }))
   }
 }
 
-const dateiName = (d: TestDetail): string => `Ergebnisse ${anzeigeName({ titel: d.titel, thema: d.einstellungen.thema })}${d.lerngruppe ? ` ${d.lerngruppe.name}` : ''}`.replace(/[\\/:*?"<>|]/g, '-')
+const dateiName = (d: TestDetail): string =>
+  `Ergebnisse ${anzeigeName({ titel: d.titel, thema: d.einstellungen.thema })}${d.lerngruppe ? ` ${d.lerngruppe.name}` : ''}`.replace(/[\\/:*?"<>|]/g, '-')
 
 /** Abgabe als Blatt: geht nur mit Kopf und Originalfassung (Tests ab 02.10.2026 abends) */
 const blattMoeglich = (d: TestDetail, t: Teilnahme): boolean => Boolean(d.einstellungen.blatt && d.fassungen[t.varianteNr]?.original && t.beginn > 0)
@@ -469,7 +527,10 @@ const abgabeVon = (d: TestDetail, t: Teilnahme, name: string) => ({
     jeAufgabe: Object.fromEntries(
       d.fassungen[t.varianteNr].aufgaben.map((a) => [
         a.id,
-        { erreicht: d.fassungen[t.varianteNr].einheiten.filter((e) => e.aufgabe === a.id).reduce((s, e) => s + (t.bewertung[e.id]?.punkte ?? 0), 0), max: a.punkte }
+        {
+          erreicht: d.fassungen[t.varianteNr].einheiten.filter((e) => e.aufgabe === a.id).reduce((s, e) => s + (t.bewertung[e.id]?.punkte ?? 0), 0),
+          max: a.punkte
+        }
       ])
     )
   }
@@ -509,10 +570,15 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
           </Button>
         </Menu.Target>
         <Menu.Dropdown>
-          <Menu.Item leftSection={<IconPrinter size={14} />} onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format)).catch((e: unknown) => notifyError(e))}>
+          <Menu.Item
+            leftSection={<IconPrinter size={14} />}
+            onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format)).catch((e: unknown) => notifyError(e))}
+          >
             Drucken
           </Menu.Item>
-          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>PDF</Menu.Item>
+          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format), `${dateiName(d)}.pdf`).catch((e: unknown) => notifyError(e))}>
+            PDF
+          </Menu.Item>
           <Menu.Item onClick={() => void speichern('xlsx', 'Excel', ergebnisXlsx(daten, format))}>Excel (.xlsx)</Menu.Item>
           <Menu.Item onClick={() => void ergebnisDocx(daten, format).then((b) => speichern('docx', 'Word', b))}>Word (.docx)</Menu.Item>
           {d.einstellungen.blatt && d.teilnahmen.some((t) => blattMoeglich(d, t)) && (
@@ -523,7 +589,12 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
                 leftSection={<IconPrinter size={14} />}
                 onClick={() =>
                   void window.api.exporter
-                    .print(abgabenHtml(d.einstellungen.blatt!, d.teilnahmen.filter((t) => blattMoeglich(d, t)).map((t) => abgabeVon(d, t, t.name))))
+                    .print(
+                      abgabenHtml(
+                        d.einstellungen.blatt!,
+                        d.teilnahmen.filter((t) => blattMoeglich(d, t)).map((t) => abgabeVon(d, t, t.name))
+                      )
+                    )
                     .catch((e: unknown) => notifyError(e))
                 }
               >
@@ -532,7 +603,13 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
               <Menu.Item
                 onClick={() =>
                   void window.api.exporter
-                    .pdf(abgabenHtml(d.einstellungen.blatt!, d.teilnahmen.filter((t) => blattMoeglich(d, t)).map((t) => abgabeVon(d, t, t.name))), `${dateiName(d)} Abgaben.pdf`)
+                    .pdf(
+                      abgabenHtml(
+                        d.einstellungen.blatt!,
+                        d.teilnahmen.filter((t) => blattMoeglich(d, t)).map((t) => abgabeVon(d, t, t.name))
+                      ),
+                      `${dateiName(d)} Abgaben.pdf`
+                    )
                     .catch((e: unknown) => notifyError(e))
                 }
                 data-alle-blaetter
@@ -543,11 +620,21 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
           )}
           <Menu.Divider />
           <Menu.Label>TeacherTool</Menu.Label>
-          <Menu.Item onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format, true)).catch((e: unknown) => notifyError(e))}>Abschreibliste drucken</Menu.Item>
-          <Menu.Item onClick={() => void window.api.exporter.pdf(ergebnisHtml(daten, format, true), `${dateiName(d)} Abschreibliste.pdf`).catch((e: unknown) => notifyError(e))}>
+          <Menu.Item onClick={() => void window.api.exporter.print(ergebnisHtml(daten, format, true)).catch((e: unknown) => notifyError(e))}>
+            Abschreibliste drucken
+          </Menu.Item>
+          <Menu.Item
+            onClick={() =>
+              void window.api.exporter.pdf(ergebnisHtml(daten, format, true), `${dateiName(d)} Abschreibliste.pdf`).catch((e: unknown) => notifyError(e))
+            }
+          >
             Abschreibliste als PDF
           </Menu.Item>
-          <Menu.Item onClick={() => void navigator.clipboard?.writeText(notenSpalte(daten, format)).then(() => notifySuccess('Notenspalte kopiert (Reihenfolge: Nachname, Vorname).'))}>
+          <Menu.Item
+            onClick={() =>
+              void navigator.clipboard?.writeText(notenSpalte(daten, format)).then(() => notifySuccess('Notenspalte kopiert (Reihenfolge: Nachname, Vorname).'))
+            }
+          >
             Notenspalte kopieren
           </Menu.Item>
           <Menu.Item onClick={() => void speichern('csv', 'CSV', teachertoolCsv(daten))}>CSV für neuen Kurs (Vorname, Name, Klasse)</Menu.Item>
@@ -647,12 +734,16 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
           </Tooltip>
         </Group>
         <Text c="dimmed" mb="sm">
-          {[d.lerngruppe?.name, `${d.einstellungen.zeitMin} Minuten`, ...d.fassungen.map((f) => `Fassung ${f.label}: ${f.punkte} P.`)].filter(Boolean).join(' · ')}
+          {[d.lerngruppe?.name, `${d.einstellungen.zeitMin} Minuten`, ...d.fassungen.map((f) => `Fassung ${f.label}: ${f.punkte} P.`)]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
         {d.status !== 'beendet' && <Zugang code={d.code} link={d.link} />}
         {d.status === 'wartend' && (
           <Alert mt="sm" color="yellow" variant="light">
-            {d.ohneIserv ? 'Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstabe ein. ' : 'Die Lernenden scannen den QR-Code und melden sich mit IServ an. '}
+            {d.ohneIserv
+              ? 'Die Lernenden scannen den QR-Code und geben Vorname + Anfangsbuchstabe ein. '
+              : 'Die Lernenden scannen den QR-Code und melden sich mit IServ an. '}
             Sie sehen einen Wartebildschirm, bis der Test gestartet wird. Bereit: {wartend.length}
           </Alert>
         )}
@@ -729,7 +820,12 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
               <Text size="sm" c="dimmed">
                 {d.ergebnisSichtbar ? 'Ergebnisse für die Lernenden sichtbar' : 'Ergebnisse erscheinen, wenn alle abgegeben haben'}
               </Text>
-              <Button size="xs" variant="light" onClick={() => void status(d.einstellungen.ergebnisFrei ? 'zurueckhalten' : 'freigeben')} data-ergebnis-freigeben>
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => void status(d.einstellungen.ergebnisFrei ? 'zurueckhalten' : 'freigeben')}
+                data-ergebnis-freigeben
+              >
                 {d.einstellungen.ergebnisFrei ? 'Freigabe zurücknehmen' : 'Ergebnisse jetzt freigeben'}
               </Button>
             </Group>
@@ -737,7 +833,12 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
         </Stack>
       </Card>
       <Group justify="space-between">
-        <Button variant="subtle" leftSection={listeOffen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />} onClick={() => setListeOffen(!listeOffen)} data-namensliste-knopf>
+        <Button
+          variant="subtle"
+          leftSection={listeOffen ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+          onClick={() => setListeOffen(!listeOffen)}
+          data-namensliste-knopf
+        >
           Teilnehmende ({d.teilnahmen.length})
         </Button>
         <Group gap="xs">
@@ -783,7 +884,9 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                       <Badge color="red">verlassen {new Date(t.abgabe).toLocaleTimeString('de-DE', { timeStyle: 'short' })}</Badge>
                     </Tooltip>
                   ) : (
-                    <Badge color={t.grund === 'zeit' ? 'orange' : 'green'}>{t.grund === 'zeit' ? 'Zeit abgelaufen' : t.grund === 'lehrkraft' ? 'beendet' : 'abgegeben'}</Badge>
+                    <Badge color={t.grund === 'zeit' ? 'orange' : 'green'}>
+                      {t.grund === 'zeit' ? 'Zeit abgelaufen' : t.grund === 'lehrkraft' ? 'beendet' : 'abgegeben'}
+                    </Badge>
                   )}
                 </Table.Td>
                 <Table.Td>
@@ -906,7 +1009,11 @@ function EinheitZeile({
               .flatMap((id) => tinte?.[id] ?? [])
               .map((x, i) => (
                 <Tooltip key={i} label={`erkannt als: ${x.text || '—'}${x.unsicher ? ' (unsicher)' : ''}`}>
-                  <img src={x.bild} alt={`Handschrift: ${x.text}`} style={{ height: 34, background: '#fff', border: `1px solid ${x.unsicher ? '#f08c00' : '#ced4da'}`, borderRadius: 4 }} />
+                  <img
+                    src={x.bild}
+                    alt={`Handschrift: ${x.text}`}
+                    style={{ height: 34, background: '#fff', border: `1px solid ${x.unsicher ? '#f08c00' : '#ced4da'}`, borderRadius: 4 }}
+                  />
                 </Tooltip>
               ))}
             <Text size="xs" c="dimmed">
@@ -928,7 +1035,15 @@ function EinheitZeile({
         )}
       </Stack>
       {e.punkte > 1 && f.loesungen[e.felder[0]]?.art === 'lehrkraft' ? (
-        <NumberInput size="xs" w={80} min={0} max={e.punkte} step={1} defaultValue={b?.punkte ?? 0} onBlur={(ev) => urteil(e.id, true, Number(ev.currentTarget.value))} />
+        <NumberInput
+          size="xs"
+          w={80}
+          min={0}
+          max={e.punkte}
+          step={1}
+          defaultValue={b?.punkte ?? 0}
+          onBlur={(ev) => urteil(e.id, true, Number(ev.currentTarget.value))}
+        />
       ) : (
         <Group gap={2} wrap="nowrap">
           <Tooltip label={offen ? 'Akzeptieren (ganzer Punkt)' : 'richtig'}>
@@ -947,7 +1062,19 @@ function EinheitZeile({
   )
 }
 
-function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail; t: Teilnahme; name: string; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
+function Durchsicht({
+  test,
+  t,
+  name,
+  schliessen,
+  geaendert
+}: {
+  test: TestDetail
+  t: Teilnahme
+  name: string
+  schliessen: () => void
+  geaendert: () => void
+}): React.JSX.Element {
   const f = test.fassungen[t.varianteNr]
   const [blatt, setBlatt] = useState(false)
   const [tinte, setTinte] = useState<Tinte>({})
@@ -968,12 +1095,18 @@ function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail
           <Button variant="subtle" onClick={() => setBlatt(false)}>
             ← Zur Durchsicht
           </Button>
-          <Button variant="light" leftSection={<IconPrinter size={14} />} onClick={() => void window.api.exporter.print(abgabenHtml(test.einstellungen.blatt!, [a])).catch((e: unknown) => notifyError(e))}>
+          <Button
+            variant="light"
+            leftSection={<IconPrinter size={14} />}
+            onClick={() => void window.api.exporter.print(abgabenHtml(test.einstellungen.blatt!, [a])).catch((e: unknown) => notifyError(e))}
+          >
             Drucken
           </Button>
           <Button
             variant="light"
-            onClick={() => void window.api.exporter.pdf(abgabenHtml(test.einstellungen.blatt!, [a]), `${dateiName(test)} ${name}.pdf`).catch((e: unknown) => notifyError(e))}
+            onClick={() =>
+              void window.api.exporter.pdf(abgabenHtml(test.einstellungen.blatt!, [a]), `${dateiName(test)} ${name}.pdf`).catch((e: unknown) => notifyError(e))
+            }
           >
             PDF
           </Button>
@@ -985,7 +1118,10 @@ function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail
     )
   }
   const urteil = (einheit: string, richtig: boolean, punkte?: number): void =>
-    void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig, ...(punkte != null ? { punkte } : {}) }).then(geaendert, (e: unknown) => notifyError(e))
+    void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig, ...(punkte != null ? { punkte } : {}) }).then(
+      geaendert,
+      (e: unknown) => notifyError(e)
+    )
   return (
     <Modal opened onClose={schliessen} title={`${name} · Fassung ${t.variante} · ${t.punkte}/${t.max} Punkte`} size="xl">
       <Stack>
@@ -1002,7 +1138,11 @@ function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail
           <Text size="xs" c="dimmed">
             Jede Antwort lässt sich nachträglich umentscheiden – auch nach dem Ende des Tests: ✓ gibt den ganzen Punkt, ✗ nimmt ihn.
           </Text>
-          <Tooltip label={blattMoeglich(test, t) ? 'Der ganze Test als DIN-A4-Blatt mit den Eingaben' : 'Nur für Onlinetests, die ab dem 02.10.2026 abends angelegt wurden'}>
+          <Tooltip
+            label={
+              blattMoeglich(test, t) ? 'Der ganze Test als DIN-A4-Blatt mit den Eingaben' : 'Nur für Onlinetests, die ab dem 02.10.2026 abends angelegt wurden'
+            }
+          >
             <Button size="xs" variant="light" disabled={!blattMoeglich(test, t)} onClick={() => setBlatt(true)} data-als-blatt>
               Als Blatt ansehen
             </Button>
@@ -1028,7 +1168,17 @@ function Durchsicht({ test, t, name, schliessen, geaendert }: { test: TestDetail
 }
 
 /** Alle von der KI markierten Antworten aller Lernenden auf einen Blick */
-function Entscheidungen({ test, verdeckt, schliessen, geaendert }: { test: TestDetail; verdeckt: boolean; schliessen: () => void; geaendert: () => void }): React.JSX.Element {
+function Entscheidungen({
+  test,
+  verdeckt,
+  schliessen,
+  geaendert
+}: {
+  test: TestDetail
+  verdeckt: boolean
+  schliessen: () => void
+  geaendert: () => void
+}): React.JSX.Element {
   const [alle, setAlle] = useState(false)
   const faelle = test.teilnahmen.flatMap((t, i) =>
     test.fassungen[t.varianteNr].einheiten
@@ -1057,7 +1207,9 @@ function Entscheidungen({ test, verdeckt, schliessen, geaendert }: { test: TestD
               test={test}
               t={t}
               e={e}
-              urteil={(einheit, richtig) => void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig }).then(geaendert, (er: unknown) => notifyError(er))}
+              urteil={(einheit, richtig) =>
+                void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig }).then(geaendert, (er: unknown) => notifyError(er))
+              }
             />
           </Card>
         ))}
@@ -1106,7 +1258,12 @@ function IservGruppenUebernehmen({ vorhanden, fertig }: { vorhanden: string[]; f
   useEffect(() => {
     iservGruppenordner()
       .then((o) => {
-        if (!o) return setFehler(hatClient() ? 'IServ ist in der Exe noch nicht verbunden (Einstellungen › Material › IServ).' : 'Die IServ-Ordner kann nur die Exe „Schul-Apps Online“ lesen – das IServ-Passwort bleibt am PC.')
+        if (!o)
+          return setFehler(
+            hatClient()
+              ? 'IServ ist in der Exe noch nicht verbunden (Einstellungen › Material › IServ).'
+              : 'Die IServ-Ordner kann nur die Exe „Schul-Apps Online“ lesen – das IServ-Passwort bleibt am PC.'
+          )
         setOrdner(o)
         setWahl(new Set(o.filter((n) => KLASSE_ODER_KURS.test(n) && !vorhanden.includes(lerngruppenName(n).toLowerCase()))))
       })
@@ -1125,7 +1282,8 @@ function IservGruppenUebernehmen({ vorhanden, fertig }: { vorhanden: string[]; f
     <Modal opened onClose={fertig} title="Gruppen aus IServ übernehmen" size="lg">
       <Stack>
         <Text size="sm" c="dimmed">
-          Aus dem IServ-Ordner „Gruppen“: Jeder Gruppenordner zeigt eine Mitgliedschaft (z. B. „Klasse 10b“ → Lerngruppe „10b“). Klassen und Kurse sind vorausgewählt.
+          Aus dem IServ-Ordner „Gruppen“: Jeder Gruppenordner zeigt eine Mitgliedschaft (z. B. „Klasse 10b“ → Lerngruppe „10b“). Klassen und Kurse sind
+          vorausgewählt.
         </Text>
         {fehler && <Alert color="orange">{fehler}</Alert>}
         {!ordner && !fehler && <Loader />}
@@ -1242,7 +1400,9 @@ function NeueGruppe({ iservGruppen, fertig }: { iservGruppen: { id: string; name
           }}
           searchable
           clearable
-          nothingFoundMessage={iservGruppen.length ? 'Nicht gefunden' : 'Keine Gruppen – Anmeldung über IServ oder die Exe „Schul-Apps Online“ mit verbundenem IServ'}
+          nothingFoundMessage={
+            iservGruppen.length ? 'Nicht gefunden' : 'Keine Gruppen – Anmeldung über IServ oder die Exe „Schul-Apps Online“ mit verbundenem IServ'
+          }
         />
         <TextInput label="Name" value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="z. B. 8b Englisch" />
         <HaeufigSelect
@@ -1284,7 +1444,15 @@ function Verteilung({ werte }: { werte: number[] }): React.JSX.Element {
       {werte.map((n, i) => (
         <Tooltip key={i} label={`Note ${i + 1}: ${n}`}>
           <Stack gap={0} align="center">
-            <div style={{ width: 14, height: Math.max(2, (n / max) * 26), background: 'var(--mantine-primary-color-filled)', borderRadius: 2, opacity: n ? 1 : 0.25 }} />
+            <div
+              style={{
+                width: 14,
+                height: Math.max(2, (n / max) * 26),
+                background: 'var(--mantine-primary-color-filled)',
+                borderRadius: 2,
+                opacity: n ? 1 : 0.25
+              }}
+            />
             <Text size="9px">{i + 1}</Text>
           </Stack>
         </Tooltip>

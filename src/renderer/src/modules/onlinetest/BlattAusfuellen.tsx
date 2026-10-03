@@ -19,12 +19,13 @@ import {
   Checkbox,
   Group,
   Loader,
+  Modal,
   Paper,
   SegmentedControl,
   Stack,
   Text,
-  Textarea,
   TextInput,
+  Textarea,
   Title,
   Tooltip
 } from '@mantine/core'
@@ -83,6 +84,8 @@ interface BlattDaten {
   tinte: Record<string, string>
   aufgabenFeedback: Record<string, { einschaetzung: string; text: string; zeit: number }[]>
   fassungen: { nr: number; zeit: string; bogen?: FeedbackBogen; fehler?: string }[]
+  /** Lösungsblatt – nur nach dem ersten Einreichen (03.10.2026) */
+  loesung?: string
 }
 
 // Wie das ausfüllbare PDF, dazu die leeren Zellen von Ausfülltabellen
@@ -209,6 +212,7 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
   const [aufgabenFb, setAufgabenFb] = useState(d.aufgabenFeedback)
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
+  const [loesungOffen, setLoesungOffen] = useState(false)
   const rahmen = useRef<HTMLDivElement>(null)
   const iframe = useRef<HTMLIFrameElement>(null)
   const stand = useRef({ antworten, tinte, tinteGeaendert: false })
@@ -325,6 +329,16 @@ function Ausfuellen({ d }: { d: BlattDaten }): React.JSX.Element {
         />
       </Group>
 
+      {d.loesung && (
+        <Button variant="light" color="green" w="fit-content" onClick={() => setLoesungOffen(true)} data-loesung-knopf>
+          Lösung ansehen
+        </Button>
+      )}
+      {loesungOffen && d.loesung && (
+        <Modal opened onClose={() => setLoesungOffen(false)} title="Lösung" size="xl">
+          <iframe title="Lösung" srcDoc={d.loesung} sandbox="" style={{ width: '100%', height: '75vh', border: 0, background: '#fff' }} />
+        </Modal>
+      )}
       {letzte?.bogen && (
         <Card withBorder padding="lg" data-blatt-bogen>
           <Title order={4} mb="xs">

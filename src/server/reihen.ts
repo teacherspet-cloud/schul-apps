@@ -14,8 +14,9 @@ import { randomBytes } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage, type Aufruf } from './http'
 import { gehoertZu, lerngruppe, lerngruppenVon, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
-import { blattFassung, feedbackStand, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
-import { blattStand, reihenBlattAnlegen } from './arbeitsblaetter'
+import { blattFassung, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
+import { blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
+import { vokabelnZuweisen, vokabelStand } from './vokabeln'
 import { PULS_MS } from '../main/services/lanServer'
 import type { Rueckmeldung } from '../renderer/src/modules/rueckmeldung/model/types'
 import type { TestDocument } from '../renderer/src/modules/vokabeltest/model/types'
@@ -28,7 +29,10 @@ import {
   type Schritt,
   type SchrittStand,
   type Stand,
-  type Weg
+  type Weg,
+  alleLernziele,
+  ampelAbweichungen,
+  niveauEmpfehlung
 } from '../shared/reihe'
 import type { BlattAufgabe } from '../shared/blattFreigabe'
 
@@ -185,7 +189,28 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
     if (v[s.id]) continue
     const i = s.inhalt
     try {
-      if (i.art === 'arbeitsblatt' && i.html)
+      if (i.art === 'arbeitsblatt' && (i.varianten?.length ?? 0) > 1) {
+        // Niveaustufen: je Stufe ein eigenes Blatt; die Lernenden wählen (03.10.2026)
+        i.varianten!.forEach((va, k) => {
+          v[`${s.id}:${k}`] = reihenBlattAnlegen({
+            lehrkraftId: z.lehrkraft_id,
+            lerngruppeId: z.lerngruppe_id,
+            schueler,
+            titel: `${s.titel || i.titel} (${va.label})`,
+            html: va.html,
+            aufgaben: va.aufgaben as BlattAufgabe[],
+            vorlage: va.vorlage as Rueckmeldung,
+            runden: i.runden,
+            stift: i.stift,
+            reiheId: r.id,
+            fach: r.fachLabel,
+            thema: r.oberthema,
+            merk: va.merk ?? [],
+            loesung: va.loesung
+          })
+        })
+        v[s.id] = '*'
+      } else if (i.art === 'arbeitsblatt' && i.html)
         v[s.id] = reihenBlattAnlegen({
           lehrkraftId: z.lehrkraft_id,
           lerngruppeId: z.lerngruppe_id,
@@ -196,7 +221,11 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
           vorlage: i.vorlage as Rueckmeldung,
           runden: i.runden,
           stift: i.stift,
-          reiheId: r.id
+          reiheId: r.id,
+          fach: r.fachLabel,
+          thema: r.oberthema,
+          merk: i.merk ?? [],
+          loesung: i.loesung
         })
       else if (i.art === 'rueckmeldung' && i.vorlage)
         v[s.id] = verknuepfteFreigabeAnlegen({
@@ -210,6 +239,17 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
         })
       else if (i.art === 'onlinetest' && i.test)
         v[s.id] = reihenTestAnlegen(z.lehrkraft_id, { titel: s.titel, test: i.test as TestDocument, lerngruppeId: z.lerngruppe_id, zeitMin: i.zeitMin })
+      else if (i.art === 'vokabeln' && i.woerter.length)
+        v[s.id] = vokabelnZuweisen({
+          lehrkraftId: z.lehrkraft_id,
+          lerngruppeId: z.lerngruppe_id,
+          schueler,
+          titel: s.titel || i.titel,
+          sprache: i.sprache,
+          fach: i.fach,
+          woerter: i.woerter,
+          reihe: r.id
+        })
       else if (i.art === 'aufgabe' && i.feedback)
         v[s.id] = verknuepfteFreigabeAnlegen({
           lehrkraftId: z.lehrkraft_id,
@@ -232,12 +272,19 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
   }
 }
 
-/** Stand der verknüpften Aufgaben einer Person */
-function externVon(r: Reihe, z: ZuweisungZeile, sid: string): Record<string, Extern> {
+/** Kennung der verknüpften Aufgabe – bei Niveaustufen die der gewählten Stufe */
+function verknuepfteId(s: Schritt, z: ZuweisungZeile, stand: Stand): string | undefined {
   const v = json_(z.verknuepft, {} as Record<string, string>)
+  if (v[s.id] !== '*') return v[s.id]
+  const n = stand.schritte[s.id]?.niveau
+  return n === undefined ? undefined : v[`${s.id}:${n}`]
+}
+
+/** Stand der verknüpften Aufgaben einer Person */
+function externVon(r: Reihe, z: ZuweisungZeile, sid: string, stand = standVon(z.id, sid)): Record<string, Extern> {
   const aus: Record<string, Extern> = {}
   for (const s of r.schritte) {
-    const id = v[s.id]
+    const id = verknuepfteId(s, z, stand)
     if (!id) continue
     const e =
       s.inhalt.art === 'arbeitsblatt'
@@ -246,22 +293,25 @@ function externVon(r: Reihe, z: ZuweisungZeile, sid: string): Record<string, Ext
           ? feedbackStand(id, sid)
           : s.inhalt.art === 'onlinetest'
             ? onlinetestStand(id, sid)
-            : null
+            : s.inhalt.art === 'vokabeln'
+              ? vokabelStand(id, sid)
+              : null
     if (e) aus[s.id] = e
   }
   return aus
 }
 
 function wegVon(r: Reihe, z: ZuweisungZeile, sid: string, stand = standVon(z.id, sid)): Weg {
-  return berechneWeg(r, stand, externVon(r, z, sid), json_(z.halte_frei, [] as string[]))
+  return berechneWeg(r, stand, externVon(r, z, sid, stand), json_(z.halte_frei, [] as string[]))
 }
 
 /** Link zu einer verknüpften Aufgabe (für die Lernenden) */
-function linkFuer(s: Schritt, z: ZuweisungZeile): string | undefined {
-  const id = json_(z.verknuepft, {} as Record<string, string>)[s.id]
+function linkFuer(s: Schritt, z: ZuweisungZeile, stand: Stand): string | undefined {
+  const id = verknuepfteId(s, z, stand)
   if (!id) return undefined
   if (s.inhalt.art === 'arbeitsblatt') return `/s/b/${id}`
   if (s.inhalt.art === 'rueckmeldung') return `/s/a/${id}`
+  if (s.inhalt.art === 'vokabeln') return `/s/v/${id}`
   if (s.inhalt.art === 'onlinetest') {
     const code = reihenTestCode(id)
     return code ? `/s/t/${code}` : undefined
@@ -328,7 +378,18 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
               lernziele: s.lernziele.map((l) => ({ ichKann: l.ichKann || l.text })),
               // Inhalt erst, wenn der Schritt erreichbar ist (Hefter erst nach seinem Schritt)
               ...(lage.get(s.id)?.status !== 'gesperrt' && (s.inhalt.art !== 'hefter' || sichtbar(s))
-                ? { inhalt: inhaltFuerLernende(s.inhalt), link: linkFuer(s, z) }
+                ? {
+                    inhalt: inhaltFuerLernende(s.inhalt),
+                    link: linkFuer(s, z, stand),
+                    // Niveaustufen: Empfehlung aus der Eingangsdiagnose
+                    ...(s.inhalt.art === 'arbeitsblatt' && (s.inhalt.varianten?.length ?? 0) > 1
+                      ? { empfehlung: niveauEmpfehlung(r, stand, s.inhalt.varianten!.length) }
+                      : {}),
+                    // Musterlösung erst nach dem Abgeben
+                    ...(s.inhalt.art === 'aufgabe' && s.inhalt.musterloesung && (stand.schritte[s.id]?.eingereicht ?? 0) > 0
+                      ? { musterloesung: s.inhalt.musterloesung }
+                      : {})
+                  }
                 : {})
             })),
             weg,
@@ -381,6 +442,27 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         )
       }
 
+      if (aktion === 'niveau') {
+        const s0 = s.inhalt
+        const n = Number(k0.niveau)
+        if (s0.art !== 'arbeitsblatt' || !s0.varianten || !Number.isInteger(n) || n < 0 || n >= s0.varianten.length)
+          return (json(res, 400, { fehler: 'Unbekannte Stufe.' }), true)
+        if (st.niveau !== undefined && st.niveau !== n && (externVon(r, z, ich.id, stand)[s.id]?.eingereicht ?? 0) > 0)
+          return (json(res, 409, { fehler: 'Du hast auf dieser Stufe schon eingereicht.' }), true)
+        st.niveau = n
+        standSpeichern(z.id, ich.id, stand)
+        return (json(res, 200, { ok: true, link: linkFuer(s, z, stand) }), true)
+      }
+      if (aktion === 'frage') {
+        const text = String(k0.text ?? '')
+          .trim()
+          .slice(0, 600)
+        if (!text) return (json(res, 400, { fehler: 'Bitte die Frage aufschreiben.' }), true)
+        stand.fragen = [...(stand.fragen ?? []), { schritt: s.id, text, zeit: Date.now() }].slice(-40)
+        standSpeichern(z.id, ich.id, stand)
+        protokolliereServer('reihe', 'Frage an einen Schritt gestellt', ich.id)
+        return (json(res, 200, { ok: true }), true)
+      }
       if (aktion === 'datei') {
         const roh = String(k0.daten ?? '')
         const m = /^data:([a-z0-9.+/-]+);base64,(.*)$/i.exec(roh)
@@ -418,7 +500,16 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         return (json(res, 200, { ok: true }), true)
       }
       if (aktion === 'diagnose' && s.inhalt.art === 'diagnose') {
-        if (st.diagnose) return (json(res, 409, { fehler: 'Die Diagnose ist schon ausgewertet.' }), true)
+        const warten = (s.inhalt.wiederholbarNachMin ?? 0) * 60_000
+        if (st.diagnose && (!warten || Date.now() - st.diagnose.zeit < warten))
+          return (
+            json(res, 409, {
+              fehler: warten
+                ? `Noch einmal möglich ab ${new Date(st.diagnose.zeit + warten).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.`
+                : 'Die Diagnose ist schon ausgewertet.'
+            }),
+            true
+          )
         st.antworten = antworten()
         st.diagnose = { prozent: diagnoseProzent(s.inhalt.fragen, st.antworten), zeit: Date.now() }
         standSpeichern(z.id, ich.id, stand)
@@ -518,6 +609,19 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         true
       )
     }
+    // Korrektur-Eingang über alle Reihen (03.10.2026, Idee aus LearningView)
+    if (req.method === 'GET' && teile[0] === 'eingang') {
+      const alle = db()
+        .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+        .all(ich.id) as unknown as ZuweisungZeile[]
+      const eintraege = alle.flatMap((z) => {
+        const r = reiheVon(z.reihe_id)
+        if (!r) return []
+        const gruppe = z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende'
+        return bedarfFuer(r, z).bedarf.map((b) => ({ ...b, zid: z.id, reihe: r.titel, gruppe }))
+      })
+      return (json(res, 200, { eintraege }), true)
+    }
     if (req.method === 'POST' && teile[0] === 'speichern') {
       const k0 = (await k.koerper()) as Record<string, unknown>
       const r = k0.reihe as Reihe | undefined
@@ -547,35 +651,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
       if (req.method === 'GET' && teile.length === 2) {
         verknuepfe(z, r)
         const halteFrei = json_(z.halte_frei, [] as string[])
-        const bedarf: { art: string; schueler?: string; name?: string; schritt?: string; text: string }[] = []
-        const lernende = lernendeVon(z).map((n) => {
-          const stand = standVon(z.id, n.id)
-          const weg = wegVon(r, z, n.id, stand)
-          for (const l of weg.schritte) {
-            const s = r.schritte.find((x) => x.id === l.id)!
-            if (l.wartet && l.status === 'eingereicht')
-              bedarf.push({ art: 'bewerten', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: eingereicht – bitte ansehen und bestätigen` })
-            if (s.inhalt.art === 'praesenz' && l.status === 'offen')
-              bedarf.push({ art: 'praesenz', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: im Unterricht abhaken` })
-            if (l.status === 'nicht_geschafft' && !r.schritte.some((f) => f.rolle === 'foerder' && f.foerderFuer === s.id))
-              bedarf.push({ art: 'hilfe', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: nicht geschafft – braucht Hilfe` })
-          }
-          if (stand.hilfe)
-            bedarf.push({
-              art: 'hilferuf',
-              schueler: n.id,
-              name: n.name,
-              schritt: stand.hilfe.schritt,
-              text: `bittet um Hilfe${stand.hilfe.text ? `: „${stand.hilfe.text}“` : ''}`
-            })
-          return { id: n.id, name: n.name, benutzer: n.benutzer, weg, stand: standKurz(stand) }
-        })
-        // Haltepunkte, an denen schon jemand wartet
-        for (const s of r.schritte)
-          if (s.halt?.art === 'freigabe' && !halteFrei.includes(s.id)) {
-            const wartend = lernende.filter((l) => l.weg.schritte.find((x) => x.id === s.id)?.hinweis?.startsWith('Wartet auf die gemeinsame')).length
-            if (wartend) bedarf.push({ art: 'halt', schritt: s.id, text: `Haltepunkt vor „${s.titel}“: ${wartend} warten auf die Besprechung` })
-          }
+        const { bedarf, lernende } = bedarfFuer(r, z)
         return (
           json(res, 200, {
             reihe: r,
@@ -623,6 +699,23 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         const n = lernendeVon(z).find((x) => x.id === k0.schueler)
         if (!n) return (json(res, 400, { fehler: 'Unbekannte Person.' }), true)
         const stand = standVon(z.id, n.id)
+        if (art === 'antworten') {
+          const i = Number(k0.frage)
+          const f = stand.fragen?.[i]
+          if (!f) return (json(res, 400, { fehler: 'Unbekannte Frage.' }), true)
+          f.antwort = String(k0.text ?? '').slice(0, 1200)
+          f.antwortZeit = Date.now()
+          standSpeichern(z.id, n.id, stand)
+          return (json(res, 200, { ok: true }), true)
+        }
+        if (art === 'lehrkraft-ampel') {
+          const farbe = String(k0.farbe ?? '')
+          stand.lehrkraftAmpel = { ...(stand.lehrkraftAmpel ?? {}) }
+          if (farbe === 'gruen' || farbe === 'gelb' || farbe === 'rot') stand.lehrkraftAmpel[String(Number(k0.ziel))] = farbe
+          else delete stand.lehrkraftAmpel[String(Number(k0.ziel))]
+          standSpeichern(z.id, n.id, stand)
+          return (json(res, 200, { ok: true }), true)
+        }
         if (art === 'hilfe-erledigt') {
           stand.hilfe = null
           standSpeichern(z.id, n.id, stand)
@@ -638,8 +731,19 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
           delete st.bewertung
           delete st.praesenz
         } else if (art === 'praesenz') st.praesenz = k0.erledigt !== false
-        else if (art === 'bewerten') st.bewertung = { text: String(k0.text ?? '').slice(0, 2000), geschafft: k0.geschafft !== false, zeit: Date.now() }
-        else return (json(res, 400, { fehler: 'Unbekannte Aktion.' }), true)
+        else if (art === 'bewerten') {
+          st.bewertung = { text: String(k0.text ?? '').slice(0, 2000), geschafft: k0.geschafft !== false, zeit: Date.now() }
+          delete st.ueberarbeiten
+        } else if (art === 'ueberarbeiten') {
+          // Zur Überarbeitung zurück: wieder offen bis zur nächsten Einreichung, mit einer zusätzlichen Runde
+          const id = verknuepfteId(s, z, stand)
+          const ex = externVon(r, z, n.id, stand)[s.id]
+          st.ueberarbeiten = { text: String(k0.text ?? '').slice(0, 2000), zeit: Date.now(), bei: ex ? ex.eingereicht : (st.eingereicht ?? 0) }
+          delete st.bewertung
+          if (st.hand === 'geschafft') delete st.hand
+          if (id && s.inhalt.art === 'arbeitsblatt') blattZusatzrunde(id, n.id)
+          if (id && (s.inhalt.art === 'rueckmeldung' || s.inhalt.art === 'aufgabe')) feedbackZusatzrunde(id, n.id)
+        } else return (json(res, 400, { fehler: 'Unbekannte Aktion.' }), true)
         stand.schritte[s.id] = st
         standSpeichern(z.id, n.id, stand)
         return (json(res, 200, { ok: true }), true)
@@ -677,4 +781,97 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
     }
     return (json(res, 404, { fehler: 'Unbekannt.' }), true)
   }
+}
+
+/**
+ * Für die Lern-App (03.10.2026): je zugewiesener Reihe die freigeschalteten Merkzettel (Wissensspeicher)
+ * und die hochgeladenen Lernprodukte (Bilder als data:-Adresse, höchstens 4 je Reihe).
+ */
+export function reihenFuerLernen(ich: NutzerInfo): {
+  id: string
+  titel: string
+  fach: string
+  oberthema: string
+  hefter: { titel: string; text: string }[]
+  produkte: { titel: string; datum: number; bild?: string }[]
+}[] {
+  const alle = (db().prepare('SELECT * FROM reihen_zuweisungen ORDER BY erstellt DESC').all() as unknown as ZuweisungZeile[]).filter((z) => istFuer(z, ich))
+  return alle.flatMap((z) => {
+    const r = reiheVon(z.reihe_id)
+    if (!r) return []
+    const stand = standVon(z.id, ich.id)
+    const weg = wegVon(r, z, ich.id, stand)
+    const lage = new Map(weg.schritte.map((l) => [l.id, l]))
+    const sichtbar = (s: Schritt): boolean =>
+      lage.get(s.id)?.status !== 'gesperrt' && (!s.nach || ['geschafft', 'uebersprungen'].includes(lage.get(s.nach)?.status ?? ''))
+    const hefter = r.schritte
+      .filter((s) => s.inhalt.art === 'hefter' && sichtbar(s))
+      .map((s) => ({ titel: s.titel, text: (s.inhalt as { text: string }).text }))
+    const produkte = r.schritte
+      .filter((s) => s.inhalt.art === 'abschluss')
+      .flatMap((s) =>
+        (stand.schritte[s.id]?.dateien ?? []).slice(0, 4).map((d) => {
+          const z0 = d.typ.startsWith('image/')
+            ? (db().prepare('SELECT typ, daten, erstellt FROM reihen_dateien WHERE id = ?').get(d.id) as
+                { typ: string; daten: Uint8Array; erstellt: number } | undefined)
+            : undefined
+          return {
+            titel: `${s.titel}: ${d.name}`,
+            datum: z0?.erstellt ?? stand.schritte[s.id]?.zeit ?? 0,
+            ...(z0 ? { bild: `data:${z0.typ};base64,${Buffer.from(z0.daten).toString('base64')}` } : {})
+          }
+        })
+      )
+    return [{ id: z.id, titel: r.titel, fach: r.fachLabel, oberthema: r.oberthema, hefter, produkte }]
+  })
+}
+
+type Bedarf = { art: string; schueler?: string; name?: string; schritt?: string; text: string; frage?: number }
+
+/** Handlungsbedarf einer Zuweisung (Übersicht und Korrektur-Eingang) */
+function bedarfFuer(r: Reihe, z: ZuweisungZeile): { bedarf: Bedarf[]; lernende: { id: string; name: string; benutzer: string; weg: Weg; stand: Stand }[] } {
+  verknuepfe(z, r)
+  const halteFrei = json_(z.halte_frei, [] as string[])
+  const bedarf: Bedarf[] = []
+  const lernende = lernendeVon(z).map((n) => {
+    const stand = standVon(z.id, n.id)
+    const weg = wegVon(r, z, n.id, stand)
+    for (const l of weg.schritte) {
+      const s = r.schritte.find((x) => x.id === l.id)!
+      if (l.wartet && l.status === 'eingereicht')
+        bedarf.push({ art: 'bewerten', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: eingereicht – bitte ansehen und bestätigen` })
+      if (s.inhalt.art === 'praesenz' && l.status === 'offen')
+        bedarf.push({ art: 'praesenz', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: im Unterricht abhaken` })
+      if (l.status === 'nicht_geschafft' && !r.schritte.some((f) => f.rolle === 'foerder' && f.foerderFuer === s.id))
+        bedarf.push({ art: 'hilfe', schueler: n.id, name: n.name, schritt: s.id, text: `${s.titel}: nicht geschafft – braucht Hilfe` })
+    }
+    if (stand.hilfe)
+      bedarf.push({
+        art: 'hilferuf',
+        schueler: n.id,
+        name: n.name,
+        schritt: stand.hilfe.schritt,
+        text: `bittet um Hilfe${stand.hilfe.text ? `: „${stand.hilfe.text}“` : ''}`
+      })
+    ;(stand.fragen ?? []).forEach((f, i) => {
+      if (f.antwort) return
+      const s = r.schritte.find((x) => x.id === f.schritt)
+      bedarf.push({ art: 'frage', schueler: n.id, name: n.name, schritt: f.schritt, frage: i, text: `fragt${s ? ` zu „${s.titel}“` : ''}: „${f.text}“` })
+    })
+    const ziele = alleLernziele(r)
+    for (const k of ampelAbweichungen(stand))
+      bedarf.push({
+        art: 'abweichung',
+        schueler: n.id,
+        name: n.name,
+        text: `schätzt „${ziele[k]?.ichKann || ziele[k]?.text || 'ein Lernziel'}“ deutlich anders ein als du`
+      })
+    return { id: n.id, name: n.name, benutzer: n.benutzer, weg, stand: standKurz(stand) }
+  })
+  for (const s of r.schritte)
+    if (s.halt?.art === 'freigabe' && !halteFrei.includes(s.id)) {
+      const wartend = lernende.filter((l) => l.weg.schritte.find((x) => x.id === s.id)?.hinweis?.startsWith('Wartet auf die gemeinsame')).length
+      if (wartend) bedarf.push({ art: 'halt', schritt: s.id, text: `Haltepunkt vor „${s.titel}“: ${wartend} warten auf die Besprechung` })
+    }
+  return { bedarf, lernende }
 }

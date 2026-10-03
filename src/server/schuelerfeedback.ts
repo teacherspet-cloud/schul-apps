@@ -68,6 +68,8 @@ const db = () => {
     if (!spalten.has('code')) d.exec('ALTER TABLE feedback_freigaben ADD COLUMN code TEXT')
     // Etappe 5: verknüpfte Rückmeldung eines freigegebenen Arbeitsblatts (art 'blatt') – erscheint nicht in der Aufgabenliste der Lernenden
     if (!spalten.has('art')) d.exec("ALTER TABLE feedback_freigaben ADD COLUMN art TEXT NOT NULL DEFAULT ''")
+    const sp2 = new Set((d.prepare('PRAGMA table_info(feedback_abgaben)').all() as { name: string }[]).map((x) => x.name))
+    if (!sp2.has('extra')) d.exec('ALTER TABLE feedback_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
     bereit = true
   }
   return d
@@ -331,7 +333,8 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         return (
           json(res, 200, {
             aufgaben: alle.map((f) => {
-              const ab = db().prepare('SELECT fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as { fassungen: string } | undefined
+              const ab = db().prepare('SELECT fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as
+                { fassungen: string } | undefined
               const fassungen = json_(ab?.fassungen ?? '[]', [] as Fassung[])
               const v = json_(f.vorlage, {} as Rueckmeldung)
               return {
@@ -358,9 +361,11 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           .trim()
           .slice(0, 20000)
         if (text.length < 20) return (json(res, 400, { fehler: 'Bitte zuerst etwas schreiben (mindestens ein paar Sätze).' }), true)
-        const zeile = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as { id: string; fassungen: string } | undefined
+        const zeile = db().prepare('SELECT id, fassungen FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(f.id, ich.id) as
+          { id: string; fassungen: string } | undefined
         const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
-        if (fassungen.filter((x) => x.bogen).length >= f.runden) return (json(res, 409, { fehler: `Alle ${f.runden} Feedback-Runden sind genutzt. Die Arbeit ist gespeichert – deine Lehrkraft sieht sie.` }), true)
+        if (fassungen.filter((x) => x.bogen).length >= f.runden + feedbackExtra(f.id, ich.id))
+          return (json(res, 409, { fehler: `Alle ${f.runden} Feedback-Runden sind genutzt. Die Arbeit ist gespeichert – deine Lehrkraft sieht sie.` }), true)
         const neu: Fassung = { nr: fassungen.length + 1, text, zeit: new Date().toISOString() }
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
         const puls = setInterval(() => res.write(' '), PULS_MS)
@@ -374,7 +379,10 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         }
         const alle = [...fassungen, neu]
         if (zeile) db().prepare('UPDATE feedback_abgaben SET fassungen = ?, aktualisiert = ? WHERE id = ?').run(JSON.stringify(alle), neu.zeit, zeile.id)
-        else db().prepare('INSERT INTO feedback_abgaben (id, freigabe_id, schueler_id, fassungen, aktualisiert) VALUES (?, ?, ?, ?, ?)').run(randomBytes(8).toString('hex'), f.id, ich.id, JSON.stringify(alle), neu.zeit)
+        else
+          db()
+            .prepare('INSERT INTO feedback_abgaben (id, freigabe_id, schueler_id, fassungen, aktualisiert) VALUES (?, ?, ?, ?, ?)')
+            .run(randomBytes(8).toString('hex'), f.id, ich.id, JSON.stringify(alle), neu.zeit)
         protokolliereServer('feedback', neu.bogen ? 'Feedback für eine Abgabe erzeugt' : 'Feedback fehlgeschlagen', ich.id)
         res.end(JSON.stringify({ ok: !neu.fehler, fehler: neu.fehler, bogen: bogenFuerLernende(neu.bogen), nr: neu.nr }))
         return true
@@ -450,14 +458,25 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (!f || f.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
       const namen = new Map(alleNutzer().map((n) => [n.id, n]))
-      const abgaben = (db().prepare('SELECT * FROM feedback_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(f.id) as unknown as { schueler_id: string; fassungen: string; aktualisiert: string }[]).map(
-        (a) => ({ name: namen.get(a.schueler_id)?.name ?? '', benutzer: namen.get(a.schueler_id)?.benutzer ?? '', aktualisiert: a.aktualisiert, fassungen: json_(a.fassungen, [] as Fassung[]) })
-      )
+      const abgaben = (
+        db().prepare('SELECT * FROM feedback_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(f.id) as unknown as {
+          schueler_id: string
+          fassungen: string
+          aktualisiert: string
+        }[]
+      ).map((a) => ({
+        name: namen.get(a.schueler_id)?.name ?? '',
+        benutzer: namen.get(a.schueler_id)?.benutzer ?? '',
+        aktualisiert: a.aktualisiert,
+        fassungen: json_(a.fassungen, [] as Fassung[])
+      }))
       return (json(res, 200, { id: f.id, titel: f.titel, status: f.status, runden: f.runden, bis: f.bis, abgaben }), true)
     }
     if (req.method === 'POST' && teile[1] === 'status') {
       const k0 = (await k.koerper()) as Record<string, unknown>
-      db().prepare('UPDATE feedback_freigaben SET status = ? WHERE id = ?').run(k0.status === 'beendet' ? 'beendet' : 'offen', f.id)
+      db()
+        .prepare('UPDATE feedback_freigaben SET status = ? WHERE id = ?')
+        .run(k0.status === 'beendet' ? 'beendet' : 'offen', f.id)
       return (json(res, 200, { ok: true }), true)
     }
     if (req.method === 'POST' && teile[1] === 'loeschen') {
@@ -477,5 +496,17 @@ export function feedbackStand(freigabeId: string, schuelerId: string): { eingere
   const fassungen = json_(zeile?.fassungen ?? '[]', [] as Fassung[])
   const mitBogen = fassungen.filter((x) => x.bogen)
   const letzte = mitBogen[mitBogen.length - 1]
-  return { eingereicht: mitBogen.length, runden: f.runden, ...(letzte?.bogen ? { kriterien: letzte.bogen.kriterien.map((k) => k.einschaetzung) } : {}) }
+  return {
+    eingereicht: mitBogen.length,
+    runden: f.runden + feedbackExtra(f.id, schuelerId),
+    ...(letzte?.bogen ? { kriterien: letzte.bogen.kriterien.map((k) => k.einschaetzung) } : {})
+  }
+}
+
+const feedbackExtra = (fid: string, sid: string): number =>
+  (db().prepare('SELECT extra FROM feedback_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(fid, sid) as { extra: number } | undefined)?.extra ?? 0
+
+/** „Zur Überarbeitung" (Unterrichtsreihe): eine zusätzliche Feedback-Runde erlauben */
+export function feedbackZusatzrunde(fid: string, sid: string): void {
+  db().prepare('UPDATE feedback_abgaben SET extra = extra + 1 WHERE freigabe_id = ? AND schueler_id = ?').run(fid, sid)
 }

@@ -14,6 +14,7 @@ import {
   MultiSelect,
   NumberInput,
   Paper,
+  Progress,
   SegmentedControl,
   Select,
   Stack,
@@ -27,6 +28,7 @@ import {
   IconArrowUp,
   IconCopy,
   IconDeviceFloppy,
+  IconEye,
   IconFolderPlus,
   IconGripVertical,
   IconMedal,
@@ -36,7 +38,20 @@ import {
   IconTrash
 } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
-import { leererInhalt, neueSchrittId, ordneNachTeilen, SCHRITT_ARTEN, standardErfolg, teileVon, type Reihe, type Schritt, type SchrittArt } from '@shared/reihe'
+import {
+  berechneWeg,
+  leererInhalt,
+  neueSchrittId,
+  ordneNachTeilen,
+  SCHRITT_ARTEN,
+  standardErfolg,
+  teileVon,
+  type Extern,
+  type Reihe,
+  type Schritt,
+  type SchrittArt,
+  type Stand
+} from '@shared/reihe'
 import { FAECHER } from '@shared/faecher'
 import { lehrplanSchulform } from '@shared/lehrplan'
 import { katalogBaum, ladeLehrplan, type KatalogKnoten } from '../../shared/themenKatalog'
@@ -63,6 +78,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
   const [geaendert, setGeaendert] = useState(false)
   const [bearbeiten, setBearbeiten] = useState<Schritt | null>(null)
   const [zuweisen, setZuweisen] = useState(false)
+  const [vorschau, setVorschau] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
   const [kc, setKc] = useState<KatalogKnoten[]>([])
   const setze = (teil: Partial<Reihe>): void => {
@@ -195,6 +211,9 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
             data-reihe-speichern
           >
             Speichern{geaendert ? ' *' : ''}
+          </Button>
+          <Button variant="default" leftSection={<IconEye size={16} />} disabled={!r.schritte.length} onClick={() => setVorschau(true)} data-schuelervorschau>
+            Als Schüler ansehen
           </Button>
           <Button
             leftSection={<IconSend size={16} />}
@@ -448,6 +467,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
         />
       )}
       {zuweisen && r.id && <Zuweisen reiheId={r.id} schliessen={() => setZuweisen(false)} />}
+      {vorschau && <Vorschau reihe={r} schliessen={() => setVorschau(false)} />}
     </Stack>
   )
 }
@@ -638,5 +658,85 @@ function TeilKopf(p: {
         </Tooltip>
       </Group>
     </Group>
+  )
+}
+
+/**
+ * „Als Schüler ansehen" (03.10.2026, Idee aus LearningView): der Weg, wie ihn Lernende sehen – mit
+ * simulierten Ergebnissen, um Freischaltung, Haltepunkte, Wahl- und Förderschritte zu prüfen.
+ * Nichts wird gespeichert.
+ */
+function Vorschau({ reihe, schliessen }: { reihe: Reihe; schliessen: () => void }): React.JSX.Element {
+  const [stand, setStand] = useState<Stand>({ schritte: {} })
+  const [extern, setExtern] = useState<Record<string, Extern>>({})
+  const [frei, setFrei] = useState<string[]>([])
+  const weg = berechneWeg(reihe, stand, extern, frei)
+  const simuliere = (s: Schritt, ok: boolean): void => {
+    const verknuepft = ['arbeitsblatt', 'rueckmeldung', 'onlinetest', 'vokabeln'].includes(s.inhalt.art)
+    if (verknuepft) setExtern({ ...extern, [s.id]: { eingereicht: 9, runden: 9, kriterien: [ok ? 'sicher' : 'noch nicht'], prozent: ok ? 100 : 0 } })
+    else
+      setStand({
+        ...stand,
+        schritte: { ...stand.schritte, [s.id]: ok ? { hand: 'geschafft' } : { eingereicht: 9, bewertung: { text: '', geschafft: false, zeit: 0 } } }
+      })
+  }
+  return (
+    <Modal opened onClose={schliessen} title={`Vorschau: ${reihe.titel}`} size="lg">
+      <Stack gap="xs" data-vorschau>
+        <Text size="sm" c="dimmed">
+          So sieht der Weg für Lernende aus. Mit den Knöpfen simulierst du Ergebnisse – gespeichert wird nichts.
+        </Text>
+        <Progress value={weg.fortschritt * 100} size="lg" radius="xl" />
+        {reihe.lernziele.length > 0 && (
+          <Text size="sm">
+            <b>Am Ende der Reihe:</b> {reihe.lernziele.map((l) => l.ichKann || l.text).join(' · ')}
+          </Text>
+        )}
+        {reihe.schritte.map((s, i) => {
+          const l = weg.schritte[i]
+          if (s.rolle === 'foerder' && l.status === 'gesperrt') return null
+          return (
+            <Paper key={s.id} withBorder p="xs" radius="md" style={{ opacity: l.status === 'gesperrt' ? 0.6 : 1 }} data-vorschau-station={l.status}>
+              <Group justify="space-between" wrap="nowrap">
+                <div style={{ minWidth: 0 }}>
+                  <Text fw={600} size="sm">
+                    {l.status === 'geschafft' ? '✓ ' : l.status === 'gesperrt' ? '🔒 ' : l.status === 'uebersprungen' ? '» ' : `${i + 1}. `}
+                    {s.titel}
+                    {s.rolle === 'foerder' ? ' (Übung)' : s.rolle === 'forder' ? ' ★' : s.rolle === 'wahl' ? ' (Wahl)' : ''}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {l.status}
+                    {l.hinweis ? ` – ${l.hinweis}` : ''}
+                  </Text>
+                </div>
+                <Group gap={4} wrap="nowrap">
+                  {s.halt?.art === 'freigabe' && !frei.includes(s.id) && (
+                    <Button size="compact-xs" variant="light" onClick={() => setFrei([...frei, s.id])}>
+                      Haltepunkt frei
+                    </Button>
+                  )}
+                  {l.status !== 'gesperrt' && l.status !== 'geschafft' && (
+                    <>
+                      <Button size="compact-xs" color="green" onClick={() => simuliere(s, true)} data-vorschau-geschafft>
+                        geschafft
+                      </Button>
+                      <Button size="compact-xs" color="orange" variant="light" onClick={() => simuliere(s, false)}>
+                        nicht geschafft
+                      </Button>
+                    </>
+                  )}
+                </Group>
+              </Group>
+            </Paper>
+          )
+        })}
+        <Group justify="space-between">
+          <Text size="sm">{weg.abzeichen.length ? `Abzeichen: ${weg.abzeichen.join(', ')}` : ''}</Text>
+          <Button variant="subtle" onClick={() => (setStand({ schritte: {} }), setExtern({}), setFrei([]))}>
+            Zurücksetzen
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
   )
 }

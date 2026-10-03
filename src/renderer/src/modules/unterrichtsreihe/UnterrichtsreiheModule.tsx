@@ -6,7 +6,7 @@
  * Wissensspeicher, Abschlussprodukt, Sprechaufgabe), legt Lernziele fest (Kerncurriculum oder KI)
  * und weist sie zu. Wer einen Schritt schafft, schaltet den nächsten frei (Regeln: shared/reihe.ts).
  */
-import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, Title } from '@mantine/core'
+import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
 import { IconChartDots, IconDots, IconPlus, IconRoute, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { Reihe } from '@shared/reihe'
@@ -90,6 +90,7 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
             Neue Reihe
           </Button>
         </Group>
+        <Eingang oeffnen={(zid) => setAnsicht({ art: 'uebersicht', zid })} />
         {!liste && <Loader size="sm" />}
         {liste?.length === 0 && (
           <Text c="dimmed">
@@ -161,4 +162,104 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
 
 function Rahmen({ children }: { children: React.ReactNode }): React.JSX.Element {
   return <div style={{ padding: 'var(--mantine-spacing-lg)', maxWidth: 1400, margin: '0 auto', width: '100%' }}>{children}</div>
+}
+
+interface EingangEintrag {
+  art: string
+  schueler?: string
+  name?: string
+  schritt?: string
+  text: string
+  frage?: number
+  zid: string
+  reihe: string
+  gruppe: string
+}
+
+/**
+ * Korrektur-Eingang über alle Reihen (03.10.2026, Idee aus LearningView): was zu bestätigen, zu
+ * beantworten, abzuhaken oder freizugeben ist – eine Liste statt Suchen im Raster.
+ */
+function Eingang({ oeffnen }: { oeffnen: (zid: string) => void }): React.JSX.Element | null {
+  const [liste, setListe] = useState<EingangEintrag[] | null>(null)
+  const [antwort, setAntwort] = useState<Record<number, string>>({})
+  const laden = useCallback(
+    () =>
+      void holen<{ eintraege: EingangEintrag[] }>('/server/reihen/eingang').then(
+        (d) => setListe(d.eintraege),
+        () => setListe([])
+      ),
+    []
+  )
+  useEffect(() => {
+    laden()
+    const t = setInterval(laden, 30000)
+    return () => clearInterval(t)
+  }, [laden])
+  if (!liste?.length) return null
+  const aktion = (e: EingangEintrag, k: Record<string, unknown>): void =>
+    void senden(`/server/reihen/z/${e.zid}/aktion`, { schueler: e.schueler, schritt: e.schritt, ...k }).then(laden, (x: unknown) => notifyError(x))
+  return (
+    <Card withBorder data-eingang>
+      <Group gap="xs" mb="xs">
+        <Text fw={700}>Korrekturen &amp; Fragen</Text>
+        <Badge color="red">{liste.length}</Badge>
+      </Group>
+      <Stack gap={6}>
+        {liste.slice(0, 30).map((e, i) => (
+          <Group key={i} justify="space-between" wrap="nowrap" align="start">
+            <div style={{ minWidth: 0 }}>
+              <Text size="sm">
+                {e.name ? <b>{e.name}: </b> : null}
+                {e.text}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {e.reihe} · {e.gruppe}
+              </Text>
+            </div>
+            <Group gap={4} wrap="nowrap">
+              {e.art === 'frage' && (
+                <>
+                  <TextInput
+                    size="xs"
+                    placeholder="Antwort …"
+                    value={antwort[i] ?? ''}
+                    onChange={(x) => setAntwort({ ...antwort, [i]: x.currentTarget.value })}
+                    w={200}
+                    data-eingang-antwort
+                  />
+                  <Button
+                    size="xs"
+                    disabled={!(antwort[i] ?? '').trim()}
+                    onClick={() => aktion(e, { art: 'antworten', frage: e.frage, text: antwort[i] })}
+                    data-eingang-antworten
+                  >
+                    Senden
+                  </Button>
+                </>
+              )}
+              {e.art === 'praesenz' && (
+                <Button size="xs" onClick={() => aktion(e, { art: 'praesenz' })}>
+                  Abhaken
+                </Button>
+              )}
+              {e.art === 'halt' && (
+                <Button size="xs" onClick={() => aktion(e, { art: 'halt' })}>
+                  Weiter freigeben
+                </Button>
+              )}
+              {e.art === 'hilferuf' && (
+                <Button size="xs" variant="light" onClick={() => aktion(e, { art: 'hilfe-erledigt' })}>
+                  Erledigt
+                </Button>
+              )}
+              <Button size="xs" variant="subtle" onClick={() => oeffnen(e.zid)}>
+                Zur Übersicht
+              </Button>
+            </Group>
+          </Group>
+        ))}
+      </Stack>
+    </Card>
+  )
 }

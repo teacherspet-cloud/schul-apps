@@ -2,6 +2,7 @@
  * Einen Schritt der Unterrichtsreihe bearbeiten: Inhalt je Art, Rolle (Pflicht/Wahl/Förder/Forder),
  * Erfolg, Haltepunkt, Abschnitt und Lernziele des Schritts.
  */
+import { mitBildern, VokabelQuelle } from '../lernen/VokabelQuelle'
 import {
   Alert,
   Button,
@@ -25,7 +26,7 @@ import { notifyError } from '../../shared/util'
 import { useAppSettings } from '../../shared/settingsStore'
 import type { Worksheet } from '../arbeitsblatt/model/types'
 import { buildWorksheetHtml } from '../arbeitsblatt/render/printHtml'
-import { blattAufgaben, blattRueckmeldung } from '../arbeitsblatt/BlattFreigabeKnopf'
+import { blattAufgaben, blattMerkkaesten, blattRueckmeldung, loesungFuerLernende } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { LernzieleFeld } from './Lernziele'
 import { schrittLernziele } from './lernzieleKi'
 
@@ -83,6 +84,7 @@ export function SchrittBearbeiten({
   const erfolgWahl: { value: Erfolg['art']; label: string }[] = [
     ...(['arbeitsblatt', 'rueckmeldung', 'aufgabe'].includes(s.inhalt.art) ? [{ value: 'ki' as const, label: 'KI-Rückmeldung' }] : []),
     ...(s.inhalt.art === 'onlinetest' ? [{ value: 'punkte' as const, label: 'Mindestpunkte' }] : []),
+    ...(s.inhalt.art === 'vokabeln' ? [{ value: 'punkte' as const, label: 'Anteil eingeübter Wörter' }] : []),
     { value: 'lehrkraft', label: 'Lehrkraft bestätigt' },
     { value: 'abgabe', label: 'Abgegeben genügt' }
   ]
@@ -283,14 +285,52 @@ function Inhalt({
               const titel = ws.meta.title || ws.meta.topic || w.name
               // Schülerfassung ohne Lösungen; Lösungen und Erwartungen nur für den Server
               const html = buildWorksheetHtml(ws, new Map(), { sheetIds: [sheet.id], includeKey: false }, logoDataUrl ?? null, settings.schoolName ?? '')
-              setzeInhalt({ quelle: id, titel, html, aufgaben: blattAufgaben(sheet), vorlage: blattRueckmeldung(ws, sheet, titel) })
+              // Lösungsblatt (sehen die Lernenden nach dem ersten Einreichen) und Niveaustufen aus den Blättern
+              const loesung = (sid: string): string =>
+                loesungFuerLernende(
+                  buildWorksheetHtml(ws, new Map(), { sheetIds: [sid], includeKey: false, keyOnly: true }, logoDataUrl ?? null, settings.schoolName ?? '')
+                )
+              const varianten =
+                ws.sheets.length > 1
+                  ? ws.sheets.map((sh, k) => ({
+                      label: sh.label || ['Basis', 'Standard', 'Plus'][k] || `Stufe ${k + 1}`,
+                      html: buildWorksheetHtml(ws, new Map(), { sheetIds: [sh.id], includeKey: false }, logoDataUrl ?? null, settings.schoolName ?? ''),
+                      aufgaben: blattAufgaben(sh),
+                      vorlage: blattRueckmeldung(ws, sh, titel),
+                      loesung: loesung(sh.id),
+                      merk: blattMerkkaesten(sh)
+                    }))
+                  : undefined
+              setzeInhalt({
+                quelle: id,
+                titel,
+                html,
+                aufgaben: blattAufgaben(sheet),
+                vorlage: blattRueckmeldung(ws, sheet, titel),
+                merk: blattMerkkaesten(sheet),
+                loesung: loesung(sheet.id),
+                varianten
+              })
               setze({ ...(s.titel ? {} : { titel }), ...(s.lernziele.length ? {} : { lernziele: blattLernziele(ws, sheet.id) }) })
             }}
           />
           <Group>
             <NumberInput label="Einreichungen je Person" min={1} max={5} value={i.runden} onChange={(v) => setzeInhalt({ runden: Number(v) || 2 })} w={200} />
             <Checkbox mt="lg" label="Stift erlauben" checked={i.stift} onChange={(e) => setzeInhalt({ stift: e.currentTarget.checked })} />
+            <Checkbox
+              mt="lg"
+              label="Lösung nach dem Einreichen"
+              checked={Boolean(i.loesung)}
+              onChange={(e) => setzeInhalt({ loesung: e.currentTarget.checked ? i.loesung || ' ' : '' })}
+            />
           </Group>
+          {(i.varianten?.length ?? 0) > 1 && (
+            <Alert variant="light" color="grape">
+              Niveaustufen: {i.varianten!.map((v) => v.label).join(' · ')} – die Lernenden wählen selbst; nach einer Eingangsdiagnose schlägt die App eine Stufe
+              vor.
+              <Checkbox mt="xs" label="Niveaustufen anbieten" checked onChange={(e) => !e.currentTarget.checked && setzeInhalt({ varianten: undefined })} />
+            </Alert>
+          )}
           <Text size="xs" c="dimmed">
             Ausfüllen auf dem Blatt (Telefon: Liste), KI-Feedback je Aufgabe und nach dem Einreichen. Änderungen am Blatt danach gelten nur für neue
             Zuweisungen.
@@ -381,6 +421,13 @@ function Inhalt({
             />
             <Checkbox label="KI-Feedback" checked={i.feedback} onChange={(e) => setzeInhalt({ feedback: e.currentTarget.checked })} />
           </Group>
+          <Textarea
+            label="Musterlösung (sehen die Lernenden nach dem Abgeben)"
+            autosize
+            minRows={2}
+            value={i.musterloesung ?? ''}
+            onChange={(e) => setzeInhalt({ musterloesung: e.currentTarget.value })}
+          />
           {i.feedback && (
             <Textarea
               label="Erwartung (nur für die KI)"
@@ -459,6 +506,15 @@ function Inhalt({
           />
           <Group align="end">
             <NumberInput label="Bestanden ab (%)" min={1} max={100} value={i.schwelle} onChange={(v) => setzeInhalt({ schwelle: Number(v) || 80 })} w={160} />
+            <NumberInput
+              label="Erneut nach (Min.)"
+              description="0 = nur einmal"
+              min={0}
+              max={10080}
+              value={i.wiederholbarNachMin ?? 0}
+              onChange={(v) => setzeInhalt({ wiederholbarNachMin: Number(v) || 0 })}
+              w={150}
+            />
             <MultiSelect
               style={{ flex: 1 }}
               label="Wer bestanden hat, überspringt"
@@ -514,6 +570,28 @@ function Inhalt({
             }
           />
           <Alert variant="light">Die Lernenden laden eine Datei oder ein Foto hoch; du bewertest in der Übersicht.</Alert>
+        </Stack>
+      )
+    case 'vokabeln':
+      return (
+        <Stack gap="xs">
+          <VokabelQuelle
+            wahl={(a) => {
+              if (!a) return
+              setzeInhalt({ titel: a.titel, sprache: a.sprache, fach: a.fach, woerter: a.woerter })
+              if (!s.titel) setze({ titel: a.titel })
+              // Symbole zu greifbaren Wörtern im Hintergrund ergänzen
+              void mitBildern(a).then((m) => setzeInhalt({ woerter: m.woerter }))
+            }}
+          />
+          {i.woerter.length > 0 && (
+            <Text size="sm" c="dimmed">
+              {i.woerter.length} Wörter gewählt: {i.titel}
+            </Text>
+          )}
+          <Text size="xs" c="dimmed">
+            Geschafft, wenn der eingestellte Anteil der Wörter eingeübt ist (mindestens Fach 2 im Karteikasten). Geübt wird in der Lern-App weiter, auch danach.
+          </Text>
         </Stack>
       )
     case 'sprechen':

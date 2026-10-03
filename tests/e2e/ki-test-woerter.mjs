@@ -104,7 +104,7 @@ pruefe(satz.startsWith('Formale Vorgabe'), 'Der Satz sieht aus wie eine Vorgabe 
  * stufte die alte Fassung („Dies ist ein KI-Test …") als Fremdanweisung ein und befolgte sie
  * ausdrücklich nicht.
  */
-pruefe(!/KI-Test/.test(satz), 'Er nennt sich nicht selbst einen Test')
+pruefe(!/\bKI-Test\b/.test(satz), 'Er nennt sich nicht selbst einen Test')
 pruefe((await hakenStatus()) === true, 'Der Schalter steht danach auf ein')
 
 await page.screenshot({ path: join(out, 'ki-test.png') })

@@ -1,12 +1,16 @@
 import { Button, Checkbox, Group, Modal, Stack, Text } from '@mantine/core'
-import { IconFileTypePdf, IconPhoto, IconPresentation, IconPrinter } from '@tabler/icons-react'
+import { aufServer } from '../../../shared/plattform'
+import { senden } from '../../onlinetest/serverApi'
+import { LernendeWahl, type LernendeAuswahl } from '../../lernen/LernendeWahl'
+import { tafelSvg } from '../svg'
+import { IconFileTypePdf, IconPhoto, IconPresentation, IconPrinter, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { ablageZiel } from '../../../shared/export/ablageZiel'
 import { speichereAusgabe, type AusgabeDatei } from '../../../shared/export/ausgabe'
 import PrintPreview from '../../../shared/components/PrintPreview'
 import { SeitenWahlSchalter } from '../../../shared/components/SeitenAuswahl'
 import { useAppSettings } from '../../../shared/settingsStore'
-import { notifyError, safeFileName } from '../../../shared/util'
+import { notifyError, notifySuccess, safeFileName } from '../../../shared/util'
 import { pdfHtml, pngFuer, pptxFuer, standardPdfWahl, type PdfWahl } from '../ausgabe'
 import { formatInfo } from '../formate'
 import { standardName, type Tafelbild } from '../model'
@@ -18,7 +22,17 @@ export const PPTX_FILTER = [{ name: 'PowerPoint', extensions: ['pptx'] }]
  * Ausgabe des Tafelbilds: PDF (Druck, je Format eine Seite, Lückenfassung, Niveaus, Planungshilfe),
  * PNG in hoher Auflösung, PowerPoint mit schrittweisem Aufbau, Drucken.
  */
-export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafelbild; docId: string; offen: boolean; schliessen: () => void }): React.JSX.Element {
+export default function AusgabeDialog({
+  t,
+  docId,
+  offen,
+  schliessen
+}: {
+  t: Tafelbild
+  docId: string
+  offen: boolean
+  schliessen: () => void
+}): React.JSX.Element {
   const [w, setW] = useState<PdfWahl>(() => standardPdfWahl(t))
   const [laeuft, setLaeuft] = useState<string | null>(null)
   /** Druckvorschau mit Seitenauswahl (01.10.2026) – vorher öffnete „Drucken" gleich den Dialog von Windows */
@@ -44,7 +58,8 @@ export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafe
     }
   }
 
-  const pdf = (): Promise<void> => los('pdf', async () => void (await speichereAusgabe([{ name: `${name}.pdf`, html: pdfHtml(t, w, schule) }], 'Tafelbild als PDF gespeichert.', ziel())))
+  const pdf = (): Promise<void> =>
+    los('pdf', async () => void (await speichereAusgabe([{ name: `${name}.pdf`, html: pdfHtml(t, w, schule) }], 'Tafelbild als PDF gespeichert.', ziel())))
   const drucken = (): Promise<void> => los('druck', async () => setDruck(pdfHtml(t, w, schule)))
   const png = (): Promise<void> =>
     los('png', async () => {
@@ -59,7 +74,11 @@ export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafe
     })
   const pptx = (): Promise<void> =>
     los('pptx', async () => {
-      await speichereAusgabe([{ name: `${name}.pptx`, filter: PPTX_FILTER, daten: () => pptxFuer(t, w.formate, w.luecke) }], 'PowerPoint-Datei gespeichert.', ziel())
+      await speichereAusgabe(
+        [{ name: `${name}.pptx`, filter: PPTX_FILTER, daten: () => pptxFuer(t, w.formate, w.luecke) }],
+        'PowerPoint-Datei gespeichert.',
+        ziel()
+      )
     })
 
   const schalter = (feld: keyof Omit<PdfWahl, 'formate'>, label: string, aus?: boolean): React.JSX.Element => (
@@ -102,18 +121,86 @@ export default function AusgabeDialog({ t, docId, offen, schliessen }: { t: Tafe
             <Button leftSection={<IconFileTypePdf size={16} />} loading={laeuft === 'pdf'} disabled={!tafeln.length} onClick={() => void pdf()} data-tb-pdf>
               PDF
             </Button>
-            <Button variant="light" leftSection={<IconPhoto size={16} />} loading={laeuft === 'png'} disabled={!tafeln.length} onClick={() => void png()} data-tb-png>
+            <Button
+              variant="light"
+              leftSection={<IconPhoto size={16} />}
+              loading={laeuft === 'png'}
+              disabled={!tafeln.length}
+              onClick={() => void png()}
+              data-tb-png
+            >
               PNG
             </Button>
-            <Button variant="light" leftSection={<IconPresentation size={16} />} loading={laeuft === 'pptx'} disabled={!tafeln.length} onClick={() => void pptx()} data-tb-pptx>
+            <Button
+              variant="light"
+              leftSection={<IconPresentation size={16} />}
+              loading={laeuft === 'pptx'}
+              disabled={!tafeln.length}
+              onClick={() => void pptx()}
+              data-tb-pptx
+            >
               PowerPoint
             </Button>
-            <Button variant="default" leftSection={<IconPrinter size={16} />} loading={laeuft === 'druck'} disabled={!tafeln.length} onClick={() => void drucken()}>
+            <Button
+              variant="default"
+              leftSection={<IconPrinter size={16} />}
+              loading={laeuft === 'druck'}
+              disabled={!tafeln.length}
+              onClick={() => void drucken()}
+            >
               Drucken
             </Button>
           </Group>
+          {/* Lern-App (03.10.2026): Tafelbild in die Mappen der Lernenden (nur mit Server) */}
+          {aufServer() && <TafelFreigabe t={t} />}
         </Stack>
       </Modal>
     </>
+  )
+}
+
+function TafelFreigabe({ t }: { t: Tafelbild }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const [wer, setWer] = useState<LernendeAuswahl | null>(null)
+  const [laeuft, setLaeuft] = useState(false)
+  if (!offen)
+    return (
+      <Button variant="subtle" leftSection={<IconUsersGroup size={16} />} onClick={() => setOffen(true)} w="fit-content" data-tb-freigeben>
+        Für Lernende freigeben (Mappe in der Lern-App)
+      </Button>
+    )
+  return (
+    <Stack gap="xs" mt="xs">
+      <Text size="sm" fw={600}>
+        Für Lernende freigeben
+      </Text>
+      <LernendeWahl wahl={setWer} />
+      <Group>
+        <Button
+          loading={laeuft}
+          disabled={!wer}
+          onClick={() => {
+            setLaeuft(true)
+            const bilder = t.tafeln.map((x) => tafelSvg(x, { ohneKorn: true }))
+            void senden('/server/tafeln/freigeben', {
+              ...wer,
+              titel: t.inhalt?.titel || t.meta.title || 'Tafelbild',
+              fach: t.meta.subjectLabel,
+              thema: t.meta.thema,
+              bilder
+            })
+              .then(() => (notifySuccess('Freigegeben – das Tafelbild liegt jetzt in der Mappe der Lernenden.'), setOffen(false)))
+              .catch((e: unknown) => notifyError(e))
+              .finally(() => setLaeuft(false))
+          }}
+          data-tb-freigeben-los
+        >
+          Freigeben
+        </Button>
+        <Button variant="subtle" color="gray" onClick={() => setOffen(false)}>
+          Abbrechen
+        </Button>
+      </Group>
+    </Stack>
   )
 }

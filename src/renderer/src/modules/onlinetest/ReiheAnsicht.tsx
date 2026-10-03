@@ -59,6 +59,9 @@ interface SchrittSicht {
   lernziele: { ichKann: string }[]
   inhalt?: Record<string, unknown> & { art: string }
   link?: string
+  /** Niveaustufen: empfohlene Stufe aus der Eingangsdiagnose */
+  empfehlung?: number | null
+  musterloesung?: string
 }
 
 interface ReiheDaten {
@@ -91,7 +94,7 @@ const TEXT: Record<Status, string> = {
 }
 
 /** Schülerfassung als Satz: „Ich kann …", „I can …" usw. bleiben; ein Stichwort bekommt „Ich kann" davor */
-const alsSatz = (t: string): string => (/^(ich|i|je|yo|io|я)/i.test(t.trim()) ? t.trim() : `Ich kann ${t.trim()}`)
+const alsSatz = (t: string): string => (/^(ich|i|je|yo|io|я)\b/i.test(t.trim()) ? t.trim() : `Ich kann ${t.trim()}`)
 
 const mitReihe = (link: string, zid: string): string => `${link}${link.includes('?') ? '&' : '?'}reihe=${zid}`
 
@@ -394,6 +397,11 @@ function SchrittSeite({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () =
         </Card>
       )}
       {l.status === 'gesperrt' && <Alert color="gray">{l.hinweis ?? 'Dieser Schritt ist noch gesperrt.'}</Alert>}
+      {l.status === 'offen' && l.hinweis?.startsWith('Zur Überarbeitung') && (
+        <Alert color="orange" title="Bitte überarbeiten" data-ueberarbeiten-hinweis>
+          {l.hinweis.replace(/^Zur Überarbeitung:\s*/, '')}
+        </Alert>
+      )}
       {st.bewertung && (
         <Alert color={st.bewertung.geschafft ? 'green' : 'orange'} title={st.bewertung.geschafft ? 'Geschafft!' : 'Noch nicht ganz'}>
           {st.bewertung.text || (st.bewertung.geschafft ? 'Deine Lehrkraft hat den Schritt bestätigt.' : 'Sieh dir die Aufgabe noch einmal an.')}
@@ -401,6 +409,7 @@ function SchrittSeite({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () =
       )}
       {l.status === 'geschafft' && !st.bewertung && <Alert color="green">Geschafft – weiter geht es auf dem Weg.</Alert>}
       {s.inhalt && l.status !== 'gesperrt' && <Inhalt d={d} s={s} st={st} status={l.status} neu={neu} />}
+      {l.status !== 'gesperrt' && <Fragen d={d} s={s} neu={neu} />}
     </Stack>
   )
 }
@@ -410,6 +419,8 @@ function Inhalt({ d, s, st, status, neu }: { d: ReiheDaten; s: SchrittSicht; st:
   const schicke = (aktion: string, mehr: Record<string, unknown> = {}): Promise<Record<string, unknown>> =>
     senden('/s/api/reihe/schritt', { id: d.id, schritt: s.id, aktion, ...mehr })
   switch (i.art) {
+    case 'arbeitsblatt':
+      return <NiveauWahl d={d} s={s} st={st} schicke={schicke} />
     case 'aufgabe':
     case 'abschluss':
     case 'sprechen':
@@ -425,7 +436,15 @@ function Inhalt({ d, s, st, status, neu }: { d: ReiheDaten; s: SchrittSicht; st:
     case 'reflexion':
       return <Reflexion d={d} s={s} st={st} schicke={schicke} neu={neu} />
     case 'diagnose':
-      return <Diagnose fragen={(i.fragen as { frage: string; optionen: string[] }[]) ?? []} st={st} schicke={schicke} neu={neu} />
+      return (
+        <Diagnose
+          fragen={(i.fragen as { frage: string; optionen: string[] }[]) ?? []}
+          st={st}
+          schicke={schicke}
+          neu={neu}
+          wartenMin={Number(i.wiederholbarNachMin) || 0}
+        />
+      )
     case 'praesenz':
       return (
         <Card withBorder>
@@ -592,6 +611,16 @@ function Abgabe({
         </Group>
       ))}
       {fehler && <Alert color="red">{fehler}</Alert>}
+      {s.musterloesung && (
+        <Card withBorder padding="md" bg="var(--mantine-color-green-0)" data-musterloesung>
+          <Text fw={700} size="sm" mb={4}>
+            Musterlösung
+          </Text>
+          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+            {s.musterloesung}
+          </Text>
+        </Card>
+      )}
       {bogen && (
         <Card withBorder padding="lg" data-reihe-bogen>
           <Title order={4} mb="xs">
@@ -805,16 +834,35 @@ function Diagnose({
   fragen,
   st,
   schicke,
-  neu
+  neu,
+  wartenMin
 }: {
   fragen: { frage: string; optionen: string[] }[]
   st: SchrittStand
   schicke: (a: string, m?: Record<string, unknown>) => Promise<Record<string, unknown>>
   neu: () => void
+  wartenMin: number
 }): React.JSX.Element {
   const [antworten, setAntworten] = useState<Record<string, string>>({})
   const [laeuft, setLaeuft] = useState(false)
-  if (st.diagnose)
+  const [nochmal, setNochmal] = useState(false)
+  // Wiederholen erst nach der Wartezeit (gegen Durchprobieren)
+  const ab = st.diagnose && wartenMin ? st.diagnose.zeit + wartenMin * 60_000 : null
+  if (st.diagnose && nochmal && ab && Date.now() >= ab) {
+    // weiter unten das Formular
+  } else if (st.diagnose && ab)
+    return (
+      <Alert color="blue" title={`${st.diagnose.prozent} % richtig`}>
+        {Date.now() >= ab ? (
+          <Button mt="xs" variant="light" onClick={() => setNochmal(true)} data-diagnose-nochmal>
+            Noch einmal versuchen
+          </Button>
+        ) : (
+          `Noch einmal möglich ab ${new Date(ab).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr.`
+        )}
+      </Alert>
+    )
+  else if (st.diagnose)
     return (
       <Alert color="blue" title={`${st.diagnose.prozent} % richtig`}>
         Danke! Auf deinem Weg siehst du jetzt, was du schon kannst und was als Nächstes dran ist.
@@ -861,6 +909,135 @@ function Diagnose({
       >
         Auswerten
       </Button>
+    </Stack>
+  )
+}
+
+/** Arbeitsblatt mit Niveaustufen: Stufe wählen (Empfehlung aus der Eingangsdiagnose), dann ausfüllen */
+function NiveauWahl({
+  d,
+  s,
+  st,
+  schicke
+}: {
+  d: ReiheDaten
+  s: SchrittSicht
+  st: SchrittStand
+  schicke: (a: string, m?: Record<string, unknown>) => Promise<Record<string, unknown>>
+}): React.JSX.Element {
+  const stufen = (s.inhalt?.varianten as string[] | undefined) ?? []
+  const [fehler, setFehler] = useState('')
+  if (s.link && st.niveau !== undefined)
+    return (
+      <Group>
+        <Badge variant="light" color="grape" size="lg">
+          Stufe: {stufen[st.niveau] ?? st.niveau + 1}
+        </Badge>
+        <Button component="a" href={`${s.link}?reihe=${d.id}`} data-blatt-oeffnen>
+          Zum Arbeitsblatt
+        </Button>
+      </Group>
+    )
+  if (s.link)
+    return (
+      <Button component="a" href={`${s.link}?reihe=${d.id}`}>
+        Zum Arbeitsblatt
+      </Button>
+    )
+  if (!stufen.length) return <Text c="dimmed">Das Arbeitsblatt wird gerade bereitgestellt.</Text>
+  return (
+    <Card withBorder padding="lg" data-niveauwahl>
+      <Text fw={700} mb={4}>
+        Wähle deine Stufe
+      </Text>
+      <Text size="sm" c="dimmed" mb="sm">
+        Alle Stufen führen zum selben Ziel – nimm die, bei der du gut vorankommst.
+      </Text>
+      <Group>
+        {stufen.map((label, n) => (
+          <Button
+            key={n}
+            variant={s.empfehlung === n ? 'filled' : 'light'}
+            onClick={() =>
+              void schicke('niveau', { niveau: n }).then(
+                (r) => window.location.assign(`${String(r.link ?? '')}?reihe=${d.id}`),
+                (e: unknown) => setFehler(e instanceof Error ? e.message : String(e))
+              )
+            }
+            data-niveau={n}
+          >
+            {label}
+            {s.empfehlung === n ? ' (empfohlen)' : ''}
+          </Button>
+        ))}
+      </Group>
+      {s.empfehlung !== undefined && s.empfehlung !== null && (
+        <Text size="xs" c="dimmed" mt="xs">
+          Die Empfehlung kommt aus deiner Eingangsdiagnose.
+        </Text>
+      )}
+      {fehler && (
+        <Alert color="red" mt="sm">
+          {fehler}
+        </Alert>
+      )}
+    </Card>
+  )
+}
+
+/** Frage an die Lehrkraft zu diesem Schritt („Haftnotiz") – mit Antwort */
+function Fragen({ d, s, neu }: { d: ReiheDaten; s: SchrittSicht; neu: () => void }): React.JSX.Element {
+  const eigene = (d.stand.fragen ?? []).filter((f) => f.schritt === s.id)
+  const [text, setText] = useState('')
+  const [offen, setOffen] = useState(false)
+  return (
+    <Stack gap="xs" data-fragen>
+      {eigene.map((f, i) => (
+        <Paper key={i} withBorder p="sm" radius="md" bg={f.antwort ? 'var(--mantine-color-blue-0)' : 'var(--mantine-color-yellow-0)'}>
+          <Text size="sm">
+            <b>Deine Frage:</b> {f.text}
+          </Text>
+          <Text size="sm" c={f.antwort ? undefined : 'dimmed'}>
+            {f.antwort ? (
+              <>
+                <b>Antwort:</b> {f.antwort}
+              </>
+            ) : (
+              'Deine Lehrkraft hat noch nicht geantwortet.'
+            )}
+          </Text>
+        </Paper>
+      ))}
+      {offen ? (
+        <Group align="end" wrap="nowrap">
+          <Textarea
+            style={{ flex: 1 }}
+            autosize
+            minRows={1}
+            label="Deine Frage an die Lehrkraft"
+            value={text}
+            onChange={(e) => setText(e.currentTarget.value)}
+            data-frage-text
+          />
+          <Button
+            disabled={!text.trim()}
+            onClick={() =>
+              void senden('/s/api/reihe/schritt', { id: d.id, schritt: s.id, aktion: 'frage', text }).then(() => {
+                setText('')
+                setOffen(false)
+                neu()
+              })
+            }
+            data-frage-senden
+          >
+            Senden
+          </Button>
+        </Group>
+      ) : (
+        <Button variant="subtle" size="xs" w="fit-content" onClick={() => setOffen(true)} data-frage-knopf>
+          Frage zu diesem Schritt stellen
+        </Button>
+      )}
     </Stack>
   )
 }

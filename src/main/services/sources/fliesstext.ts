@@ -136,7 +136,7 @@ export function markiereUeberschriften(html: string): string {
       )
       // 3. Ein kurzer Absatz, der VOLLSTÄNDIG fett gesetzt ist
       .replace(
-        /<p[^>]*>\s*<(strong|b)[^>]*>([^<]{1,90})<\/\s*>\s*<\/p\s*>/gi,
+        /<p[^>]*>\s*<(strong|b)\b[^>]*>([^<]{1,90})<\/\1\s*>\s*<\/p\s*>/gi,
         (_t, _tag: string, inhalt: string) => `<p>${UEBERSCHRIFT}${inhalt}${UEBERSCHRIFT}</p>`
       )
   )

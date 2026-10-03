@@ -71,6 +71,14 @@ const db = () => {
     d.exec(SCHEMA)
     const spalten = new Set((d.prepare('PRAGMA table_info(blatt_freigaben)').all() as { name: string }[]).map((x) => x.name))
     if (!spalten.has('reihe')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN reihe TEXT NOT NULL DEFAULT ''")
+    // Lern-App (03.10.2026): Fach, Thema und Merkkästen des Blattes für Mappen und Karteikästen
+    if (!spalten.has('fach')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN fach TEXT NOT NULL DEFAULT ''")
+    if (!spalten.has('thema')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN thema TEXT NOT NULL DEFAULT ''")
+    if (!spalten.has('merk')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN merk TEXT NOT NULL DEFAULT '[]'")
+    // Lösungsblatt nach dem Einreichen und Zusatzrunden („zur Überarbeitung", 03.10.2026)
+    if (!spalten.has('loesung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN loesung TEXT NOT NULL DEFAULT ''")
+    const sp2 = new Set((d.prepare('PRAGMA table_info(blatt_abgaben)').all() as { name: string }[]).map((x) => x.name))
+    if (!sp2.has('extra')) d.exec('ALTER TABLE blatt_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
     bereit = true
   }
   return d
@@ -251,6 +259,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           json(res, 200, {
             ...kurz(z, ich),
             html: z.html,
+            runden: e.runden + extraVon(z.id, ich.id),
+            // Lösungsblatt erst nach dem ersten Einreichen (03.10.2026)
+            ...((a?.abgaben ?? 0) > 0 && (z as Zeile & { loesung?: string }).loesung ? { loesung: (z as Zeile & { loesung?: string }).loesung } : {}),
             einstellungen: { feedback: e.feedback, aufgabenFeedback: e.aufgabenFeedback, aufgabenRunden: e.aufgabenRunden, stift: e.stift },
             antworten: json_(a?.antworten ?? '{}', {}),
             tinte: json_(a?.tinte ?? '{}', {}),
@@ -329,7 +340,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       }
       if (url.pathname === '/s/api/blatt/abgeben') {
         const genutzt = a?.abgaben ?? 0
-        if (genutzt >= e.runden) return (json(res, 409, { fehler: `Du hast das Blatt schon ${e.runden}× eingereicht.` }), true)
+        if (genutzt >= e.runden + extraVon(z.id, ich.id)) return (json(res, 409, { fehler: `Du hast das Blatt schon ${e.runden}× eingereicht.` }), true)
         const antworten = bereinigeAntworten(k0.antworten)
         const tinte = k0.tinte ? bereinigeTinte(k0.tinte) : json_(a?.tinte ?? '{}', {} as Record<string, string>)
         const felder = bereinigeFelder(k0.felder)
@@ -429,6 +440,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           rid,
           new Date().toISOString()
         )
+      db()
+        .prepare('UPDATE blatt_freigaben SET fach = ?, thema = ?, merk = ?, loesung = ? WHERE id = ?')
+        .run(String(k0.fach ?? '').slice(0, 60), String(k0.thema ?? '').slice(0, 160), JSON.stringify(merkBereinigt(k0.merk)), loesungBereinigt(k0.loesung), id)
       protokolliereServer('arbeitsblatt', 'Arbeitsblatt für Lernende freigegeben', ich.id)
       return (json(res, 200, { id, ...(code ? { code, link: link(code) } : {}) }), true)
     }
@@ -470,7 +484,7 @@ export function blattStand(freigabeId: string, schuelerId: string): { eingereich
   const letzte = blattFassungen(z.rueckmeldung_id, schuelerId).at(-1)
   return {
     eingereicht: a?.abgaben ?? 0,
-    runden: einstellungenVon(z).runden,
+    runden: einstellungenVon(z).runden + extraVon(z.id, schuelerId),
     ...(letzte?.volleBogen ? { kriterien: letzte.volleBogen.kriterien.map((k) => k.einschaetzung) } : {})
   }
 }
@@ -489,6 +503,10 @@ export function reihenBlattAnlegen(e: {
   runden: number
   stift: boolean
   reiheId: string
+  fach?: string
+  thema?: string
+  merk?: { titel: string; text: string }[]
+  loesung?: string
 }): string {
   const einstellungen: BlattEinstellungen = {
     feedback: true,
@@ -523,5 +541,66 @@ export function reihenBlattAnlegen(e: {
       new Date().toISOString(),
       e.reiheId
     )
+  db()
+    .prepare('UPDATE blatt_freigaben SET fach = ?, thema = ?, merk = ?, loesung = ? WHERE id = ?')
+    .run((e.fach ?? '').slice(0, 60), (e.thema ?? '').slice(0, 160), JSON.stringify(merkBereinigt(e.merk)), loesungBereinigt(e.loesung), id)
   return id
+}
+
+/** Merkkästen eines Blattes (Titel + Text), begrenzt */
+function merkBereinigt(roh: unknown): { titel: string; text: string }[] {
+  return (Array.isArray(roh) ? roh : [])
+    .slice(0, 20)
+    .map((x) => x as Record<string, unknown>)
+    .map((x) => ({ titel: String(x.titel ?? '').slice(0, 160), text: String(x.text ?? '').slice(0, 4000) }))
+    .filter((x) => x.text.trim())
+}
+
+/** Für die Lern-App: Blätter, die die Person bearbeitet hat (mit Fach, Thema, Merkkästen und letztem Bogen) */
+export function blaetterFuerLernen(schuelerId: string): {
+  id: string
+  titel: string
+  fach: string
+  thema: string
+  reihe: string
+  datum: number
+  eingereicht: number
+  merk: { titel: string; text: string }[]
+  bogen?: { staerken?: string[]; schritte?: string[] }
+}[] {
+  const zeilen = db()
+    .prepare(
+      'SELECT f.*, a.abgaben AS eingereicht, a.aktualisiert AS datum FROM blatt_freigaben f JOIN blatt_abgaben a ON a.freigabe_id = f.id WHERE a.schueler_id = ? ORDER BY a.aktualisiert DESC'
+    )
+    .all(schuelerId) as unknown as (Zeile & { fach: string; thema: string; merk: string; reihe: string; eingereicht: number; datum: number })[]
+  return zeilen.map((z) => {
+    const letzte = blattFassungen(z.rueckmeldung_id, schuelerId)
+      .filter((f) => f.bogen)
+      .at(-1)
+    return {
+      id: z.id,
+      titel: z.titel,
+      fach: z.fach,
+      thema: z.thema,
+      reihe: z.reihe,
+      datum: z.datum,
+      eingereicht: z.eingereicht,
+      merk: json_(z.merk, [] as { titel: string; text: string }[]),
+      ...(letzte?.bogen ? { bogen: { staerken: letzte.bogen.staerken, schritte: letzte.bogen.schritte } } : {})
+    }
+  })
+}
+
+function loesungBereinigt(roh: unknown): string {
+  const t = typeof roh === 'string' ? roh : ''
+  return t.includes('ws-page') && t.length < 30 * 1024 * 1024 ? t : ''
+}
+
+const extraVon = (fid: string, sid: string): number =>
+  (db().prepare('SELECT extra FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(fid, sid) as { extra: number } | undefined)?.extra ?? 0
+
+/** „Zur Überarbeitung" (Unterrichtsreihe): eine zusätzliche Einreichung erlauben */
+export function blattZusatzrunde(fid: string, sid: string): void {
+  const da = db().prepare('SELECT 1 FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(fid, sid)
+  if (da) db().prepare('UPDATE blatt_abgaben SET extra = extra + 1 WHERE freigabe_id = ? AND schueler_id = ?').run(fid, sid)
 }

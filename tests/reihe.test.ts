@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { berechneWeg, diagnoseProzent, leererInhalt, standardErfolg, type Reihe, type Schritt, type SchrittArt } from '../src/shared/reihe'
+import {
+  ampelAbweichungen,
+  berechneWeg,
+  diagnoseProzent,
+  leererInhalt,
+  niveauEmpfehlung,
+  standardErfolg,
+  type Reihe,
+  type Schritt,
+  type SchrittArt
+} from '../src/shared/reihe'
 
 /* Unterrichtsreihe (02.10.2026): Freischalten, Haltepunkte, Wahl, Förderung, Diagnose, Abzeichen */
 const schritt = (id: string, art: SchrittArt, mehr: Partial<Schritt> = {}): Schritt => ({
@@ -79,5 +89,33 @@ describe('Unterrichtsreihe', () => {
     const st = { schritte: { p: { eingereicht: 1, bewertung: { text: 'gut', geschafft: true, zeit: 1 } } } }
     expect(berechneWeg(r, st, { t: { eingereicht: 1, runden: 1, prozent: 55 } }, []).schritte[1].status).toBe('nicht_geschafft')
     expect(berechneWeg(r, st, { t: { eingereicht: 1, runden: 1, prozent: 75 } }, []).fertig).toBe(true)
+  })
+})
+
+/* LearningView-Ideen (03.10.2026): Überarbeitung, Niveau-Empfehlung, Ampel-Abweichung */
+describe('Unterrichtsreihe – Überarbeitung, Niveau, Ampeln', () => {
+  it('„Zur Überarbeitung" öffnet den Schritt wieder, bis neu eingereicht ist', () => {
+    const r = reihe([schritt('a', 'aufgabe', { erfolg: { art: 'lehrkraft' } }), schritt('b', 'hefter')])
+    const offen = berechneWeg(r, { schritte: { a: { eingereicht: 1, ueberarbeiten: { text: 'Mehr Details', zeit: 1, bei: 1 } } } }, {}, [])
+    expect(offen.schritte[0].status).toBe('offen')
+    expect(offen.schritte[0].hinweis).toBe('Zur Überarbeitung: Mehr Details')
+    const neu = berechneWeg(r, { schritte: { a: { eingereicht: 2, ueberarbeiten: { text: 'Mehr Details', zeit: 1, bei: 1 } } } }, {}, [])
+    expect(neu.schritte[0].status).toBe('eingereicht')
+  })
+  it('empfiehlt die Niveaustufe nach dem Ergebnis der Eingangsdiagnose', () => {
+    const r = reihe([schritt('d', 'diagnose'), schritt('a', 'arbeitsblatt')])
+    const mit = (prozent: number) => ({ schritte: { d: { diagnose: { prozent, zeit: 1, antworten: {} } } } })
+    expect(niveauEmpfehlung(r, { schritte: {} }, 3)).toBeNull()
+    expect(niveauEmpfehlung(r, mit(30), 3)).toBe(0)
+    expect(niveauEmpfehlung(r, mit(60), 3)).toBe(1)
+    expect(niveauEmpfehlung(r, mit(95), 3)).toBe(2)
+    expect(niveauEmpfehlung(r, mit(60), 2)).toBe(1)
+  })
+  it('meldet nur deutliche Abweichungen zwischen Selbst- und Lehrkraft-Ampel', () => {
+    const stand = {
+      schritte: { x: { ampel: { '0': 'gruen' as const, '1': 'gelb' as const, '2': 'rot' as const } } },
+      lehrkraftAmpel: { '0': 'rot' as const, '1': 'rot' as const, '2': 'gruen' as const }
+    }
+    expect(ampelAbweichungen(stand)).toEqual([0, 2])
   })
 })

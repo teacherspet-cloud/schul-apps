@@ -16,9 +16,11 @@ import {
   Menu,
   Modal,
   ScrollArea,
+  SegmentedControl,
   Stack,
   Table,
   Text,
+  TextInput,
   Textarea,
   Title,
   Tooltip,
@@ -34,7 +36,7 @@ interface Daten {
   reihe: Reihe
   zuweisung: { id: string; lerngruppe: string; status: string; halteFrei: string[] }
   lernende: { id: string; name: string; benutzer: string; weg: Weg; stand: Stand }[]
-  bedarf: { art: string; schueler?: string; name?: string; schritt?: string; text: string }[]
+  bedarf: { art: string; schueler?: string; name?: string; schritt?: string; text: string; frage?: number }[]
 }
 
 export const STATUS: Record<Status, { zeichen: string; farbe: string; text: string }> = {
@@ -129,6 +131,21 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
                 )}
                 {(b.art === 'bewerten' || b.art === 'hilfe') && b.schueler && b.schritt && (
                   <Button size="xs" variant="light" onClick={() => setDetail({ schueler: b.schueler!, schritt: b.schritt! })} data-bedarf-ansehen>
+                    Ansehen
+                  </Button>
+                )}
+                {b.art === 'frage' && b.schueler !== undefined && b.frage !== undefined && (
+                  <AntwortKnopf antworten={(t) => aktion({ art: 'antworten', schueler: b.schueler, frage: b.frage, text: t })} />
+                )}
+                {b.art === 'abweichung' && b.schueler && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={() => {
+                      const ref = d.reihe.schritte.find((x) => x.inhalt.art === 'reflexion') ?? d.reihe.schritte[0]
+                      if (ref) setDetail({ schueler: b.schueler!, schritt: ref.id })
+                    }}
+                  >
                     Ansehen
                   </Button>
                 )}
@@ -257,6 +274,8 @@ function Detail({
   const st = l.stand.schritte[schrittId] ?? {}
   const lage = l.weg.schritte.find((x) => x.id === schrittId)!
   const [text, setText] = useState(st.bewertung?.text ?? '')
+  const [lkAmpel, setLkAmpel] = useState<Record<string, 'gruen' | 'gelb' | 'rot'>>(l.stand.lehrkraftAmpel ?? {})
+  const eigeneFragen = (l.stand.fragen ?? []).map((f, i) => ({ f, i })).filter(({ f }) => f.schritt === schrittId)
   const ziele = [...reihe.lernziele, ...reihe.schritte.flatMap((x) => x.lernziele)]
   const fragen = s.inhalt.art === 'aufgabe' ? s.inhalt.fragen : []
   return (
@@ -299,17 +318,44 @@ function Detail({
         )}
         {st.diagnose && <Text size="sm">Diagnose: {st.diagnose.prozent} % richtig</Text>}
         {st.ampel && (
-          <Stack gap={2}>
+          <Stack gap={4} data-ampeln>
             <Text fw={600} size="sm">
-              Selbsteinschätzung
+              Selbsteinschätzung – und deine Einschätzung daneben
             </Text>
             {Object.entries(st.ampel).map(([k, v]) => (
-              <Text key={k} size="sm">
-                {AMPEL[v]} {ziele[Number(k)]?.ichKann || ziele[Number(k)]?.text || k}
-              </Text>
+              <Group key={k} justify="space-between" wrap="nowrap" gap="xs">
+                <Text size="sm" style={{ flex: 1 }}>
+                  {AMPEL[v]} {ziele[Number(k)]?.ichKann || ziele[Number(k)]?.text || k}
+                </Text>
+                <SegmentedControl
+                  size="xs"
+                  value={lkAmpel[k] ?? ''}
+                  onChange={(farbe) => {
+                    setLkAmpel({ ...lkAmpel, [k]: farbe as 'gruen' | 'gelb' | 'rot' })
+                    aktion({ art: 'lehrkraft-ampel', ziel: Number(k), farbe })
+                  }}
+                  data={[
+                    { value: 'rot', label: '🔴' },
+                    { value: 'gelb', label: '🟡' },
+                    { value: 'gruen', label: '🟢' }
+                  ]}
+                />
+              </Group>
             ))}
           </Stack>
         )}
+        {eigeneFragen.map(({ f, i }) => (
+          <Alert key={i} color={f.antwort ? 'gray' : 'blue'} variant="light" title="Frage">
+            <Text size="sm">„{f.text}“</Text>
+            {f.antwort ? (
+              <Text size="sm" mt={4}>
+                <b>Deine Antwort:</b> {f.antwort}
+              </Text>
+            ) : (
+              <AntwortKnopf antworten={(t) => aktion({ art: 'antworten', frage: i, text: t })} />
+            )}
+          </Alert>
+        ))}
         {st.tagebuch && (
           <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
             <b>Lerntagebuch:</b> {st.tagebuch}
@@ -322,9 +368,16 @@ function Detail({
         )}
         <Textarea label="Rückmeldung an die Lernenden (optional)" autosize minRows={2} value={text} onChange={(e) => setText(e.currentTarget.value)} />
         <Group justify="space-between">
-          <Button variant="subtle" color="red" onClick={() => (aktion({ art: 'bewerten', geschafft: false, text }), schliessen())}>
-            Noch nicht geschafft
-          </Button>
+          <Group gap="xs">
+            <Button variant="subtle" color="red" onClick={() => (aktion({ art: 'bewerten', geschafft: false, text }), schliessen())}>
+              Noch nicht geschafft
+            </Button>
+            <Tooltip label="Der Schritt ist wieder offen (mit einer zusätzlichen Einreichung), bis neu eingereicht ist; dein Kommentar steht dabei.">
+              <Button variant="light" color="orange" onClick={() => (aktion({ art: 'ueberarbeiten', text }), schliessen())} data-ueberarbeiten>
+                Zur Überarbeitung
+              </Button>
+            </Tooltip>
+          </Group>
           <Button
             leftSection={<IconCheck size={16} />}
             onClick={() => (aktion({ art: 'bewerten', geschafft: true, text }), schliessen())}
@@ -335,5 +388,32 @@ function Detail({
         </Group>
       </Stack>
     </Modal>
+  )
+}
+
+/** Kurz antworten (Frage an einen Schritt) */
+function AntwortKnopf({ antworten }: { antworten: (t: string) => void }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const [t, setT] = useState('')
+  if (!offen)
+    return (
+      <Button size="xs" variant="light" onClick={() => setOffen(true)} data-antworten>
+        Antworten
+      </Button>
+    )
+  return (
+    <Group gap={4} wrap="nowrap" mt={4}>
+      <TextInput
+        size="xs"
+        value={t}
+        onChange={(e) => setT(e.currentTarget.value)}
+        placeholder="Antwort …"
+        style={{ flex: 1, minWidth: 180 }}
+        data-antwort-text
+      />
+      <Button size="xs" disabled={!t.trim()} onClick={() => (antworten(t), setOffen(false))} data-antwort-senden>
+        Senden
+      </Button>
+    </Group>
   )
 }

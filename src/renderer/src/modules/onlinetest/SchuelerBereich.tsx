@@ -68,6 +68,8 @@ import {
 } from './kern'
 import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
+import LernRaum from '../lernen/LernRaum'
+import VokabelTrainer from '../lernen/VokabelTrainer'
 import { holen, senden } from './serverApi'
 
 interface Beitritt {
@@ -118,6 +120,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const fbCode = /^\/s\/f\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blattCode = /^\/s\/w\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const vokabeln = /^\/s\/v\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
   const reiheM = /^\/s\/r\/([a-f0-9]{8,32})(?:\/([a-z0-9]{2,20}))?/.exec(pfad)
   // Aus einer Unterrichtsreihe geöffnet (Arbeitsblatt, Aufgabe, Test): Rückweg zur Reihe
   const ausReihe = new URLSearchParams(window.location.search).get('reihe')
@@ -134,6 +138,10 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Beitritt code={blattCode.toUpperCase()} art="blatt" />
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
+  ) : vokabeln && !gast ? (
+    <VokabelTrainer id={vokabeln} />
+  ) : lernFach && !gast ? (
+    <LernRaum fach={lernFach[1] ? decodeURIComponent(lernFach[1]) : undefined} />
   ) : reiheM && !gast ? (
     <ReiheWeg zid={reiheM[1]} schritt={reiheM[2]} />
   ) : bereich === 'reihen' && !gast ? (
@@ -266,7 +274,12 @@ function Startseite(): React.JSX.Element {
   const [aufgaben, setAufgaben] = useState<AufgabeMitFeedback[] | null>(null)
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
   const [reihen, setReihen] = useState<{ id: string; titel: string; fortschritt: number; fertig: boolean }[] | null>(null)
+  const [vok, setVok] = useState<{ id: string; titel: string; uebersicht: { faellig: number; sicher: number; gesamt: number } }[] | null>(null)
   useEffect(() => {
+    void holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
+      (d) => setVok(d.listen ?? []),
+      () => setVok([])
+    )
     void holen<{ tests: NonNullable<typeof tests> }>('/s/api/tests').then(
       (d) => setTests(d.tests ?? []),
       () => setTests([])
@@ -292,6 +305,8 @@ function Startseite(): React.JSX.Element {
   const offeneAufgaben = aufgaben?.filter((a) => a.offen !== false && a.genutzt < a.runden) ?? []
   const offeneBlaetter = blaetter?.filter((b) => b.offen && b.genutzt < b.runden) ?? []
   const offeneReihen = reihen?.filter((r) => !r.fertig) ?? []
+  const faelligeVok = vok?.filter((v) => v.uebersicht.faellig > 0) ?? []
+  const faelligGesamt = faelligeVok.reduce((n, v) => n + v.uebersicht.faellig, 0)
   const vorname = (ich?.name ?? '').split(/\s+/)[0]
   const stunde = new Date().getHours()
   const gruss = stunde < 11 ? 'Guten Morgen' : stunde < 17 ? 'Hallo' : 'Guten Abend'
@@ -314,23 +329,31 @@ function Startseite(): React.JSX.Element {
           knopf: 'Weitermachen',
           farbe: 'indigo'
         }
-      : offeneBlaetter[0]
+      : faelligeVok[0]
         ? {
-            titel: offeneBlaetter[0].titel,
-            text: offeneBlaetter[0].begonnen ? 'Dein Arbeitsblatt ist angefangen.' : 'Ein neues Arbeitsblatt wartet auf dich.',
-            href: `/s/b/${offeneBlaetter[0].id}`,
-            knopf: offeneBlaetter[0].begonnen ? 'Weiter ausfüllen' : 'Öffnen',
-            farbe: 'blue'
+            titel: faelligeVok[0].titel,
+            text: `${faelligeVok[0].uebersicht.faellig} Vokabeln sind heute dran – ein paar Minuten genügen.`,
+            href: `/s/v/${faelligeVok[0].id}`,
+            knopf: 'Vokabeln üben',
+            farbe: 'grape'
           }
-        : offeneAufgaben[0]
+        : offeneBlaetter[0]
           ? {
-              titel: offeneAufgaben[0].titel,
-              text: 'Eine Aufgabe mit Feedback ist offen.',
-              href: `/s/a/${offeneAufgaben[0].id}`,
-              knopf: 'Öffnen',
-              farbe: 'green'
+              titel: offeneBlaetter[0].titel,
+              text: offeneBlaetter[0].begonnen ? 'Dein Arbeitsblatt ist angefangen.' : 'Ein neues Arbeitsblatt wartet auf dich.',
+              href: `/s/b/${offeneBlaetter[0].id}`,
+              knopf: offeneBlaetter[0].begonnen ? 'Weiter ausfüllen' : 'Öffnen',
+              farbe: 'blue'
             }
-          : null
+          : offeneAufgaben[0]
+            ? {
+                titel: offeneAufgaben[0].titel,
+                text: 'Eine Aufgabe mit Feedback ist offen.',
+                href: `/s/a/${offeneAufgaben[0].id}`,
+                knopf: 'Öffnen',
+                farbe: 'green'
+              }
+            : null
   return (
     <Stack data-startseite gap="lg">
       <style>{STARTSEITE_CSS}</style>
@@ -390,6 +413,21 @@ function Startseite(): React.JSX.Element {
         </Paper>
       )}
 
+      <a href="/s/lernen" className="sa-lernraum" data-kachel="lernen">
+        <div className="sa-tueren" aria-hidden>
+          <span style={{ background: 'linear-gradient(160deg,#4c6ef5,#364fc7)' }} />
+          <span style={{ background: 'linear-gradient(160deg,#12b886,#087f5b)' }} />
+          <span style={{ background: 'linear-gradient(160deg,#f76707,#d9480f)' }} />
+        </div>
+        <div style={{ position: 'relative' }}>
+          <Text fw={800} size="xl" c="white">
+            Mein Lernraum
+          </Text>
+          <Text size="sm" c="white" style={{ opacity: 0.9 }}>
+            Karteikästen und Mappen für jedes Fach{faelligGesamt ? ` · ${faelligGesamt} Vokabeln fällig` : ''}
+          </Text>
+        </div>
+      </a>
       <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="md">
         <Kachel
           href="/s/tests"
@@ -485,6 +523,14 @@ const STARTSEITE_CSS = `
 .sa-kachel:hover, .sa-kachel:focus-visible { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(0,0,0,0.12); }
 .sa-kachel img { transition: transform .25s ease; }
 .sa-kachel:hover img { transform: rotate(-6deg) scale(1.06); }
+.sa-lernraum { position: relative; display: flex; align-items: center; gap: 18px; padding: 18px 22px; border-radius: 22px; text-decoration: none; overflow: hidden;
+  background: linear-gradient(120deg, #343a40 0%, #495057 100%); box-shadow: 0 10px 24px rgba(0,0,0,0.18); transition: transform .18s ease; }
+.sa-lernraum:hover { transform: translateY(-3px); }
+.sa-tueren { display: flex; gap: 8px; perspective: 400px; }
+.sa-tueren span { width: 30px; height: 50px; border-radius: 4px 4px 1px 1px; transform-origin: left center; transition: transform .5s ease; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.15); }
+.sa-lernraum:hover .sa-tueren span:nth-child(1) { transform: rotateY(-35deg); }
+.sa-lernraum:hover .sa-tueren span:nth-child(2) { transform: rotateY(-25deg); transition-delay: .05s; }
+.sa-lernraum:hover .sa-tueren span:nth-child(3) { transform: rotateY(-15deg); transition-delay: .1s; }
 .sa-blase { position: absolute; right: -30px; bottom: -40px; width: 140px; height: 140px; border-radius: 50%; opacity: 0.18; }
 @media (prefers-reduced-motion: reduce) { .sa-schwebt, .sa-schwebt2, .sa-puls { animation: none } .sa-kachel, .sa-kachel img { transition: none } }
 `
@@ -764,7 +810,8 @@ function Uebersicht(): React.JSX.Element {
       </Card>
       {aufAppleMobil() && !alsWebApp() && (
         <Alert variant="light" color="blue" data-home-tipp>
-          Tipp: Über „Teilen“ › „Zum Home-Bildschirm“ wird der Onlinetest zur App. Dort dann „QR-Code scannen“ nutzen – die Kamera-App öffnet sonst immer Safari.
+          Tipp: Über „Teilen“ › „Zum Home-Bildschirm“ wird der Onlinetest zur App. Dort dann „QR-Code scannen“ nutzen – die Kamera-App öffnet sonst immer
+          Safari.
         </Alert>
       )}
       {angemeldet && <Title order={4}>Offene Tests</Title>}
@@ -843,7 +890,16 @@ function NameEingeben({ code, fertig }: { code: string; fertig: () => void }): R
           if (gueltig && !laeuft) void weiter()
         }}
       >
-        <TextInput size="lg" value={name} onChange={(e) => setName(e.currentTarget.value)} placeholder="Anna K." autoComplete="off" autoCorrect="off" spellCheck={false} data-gastname />
+        <TextInput
+          size="lg"
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+          placeholder="Anna K."
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          data-gastname
+        />
         {fehler && (
           <Alert color="red" mt="sm">
             {fehler}
@@ -864,7 +920,12 @@ interface HandKontext {
   umschalten: (feld: string, stift: boolean) => void
   erkenne: (feld: string) => (segment: string, png: string) => Promise<Erkennung>
 }
-const Handschrift = createContext<HandKontext>({ an: false, stift: () => false, umschalten: () => undefined, erkenne: () => () => Promise.reject(new Error('aus')) })
+const Handschrift = createContext<HandKontext>({
+  an: false,
+  stift: () => false,
+  umschalten: () => undefined,
+  erkenne: () => () => Promise.reject(new Error('aus'))
+})
 
 type Phase = 'name' | 'laden' | 'warten' | 'regeln' | 'laeuft' | 'abgegeben' | 'fehler'
 
@@ -1296,7 +1357,8 @@ function FeldEingabe({ feld, wert, setze }: { feld: Feld; wert: string; setze: (
       />
     )
   }
-  if (feld.art === 'langtext') return <Textarea autosize minRows={3} value={wert} onChange={(e) => setze(feld.id, e.currentTarget.value)} label={feld.beschriftung} {...KEINE_HILFE} />
+  if (feld.art === 'langtext')
+    return <Textarea autosize minRows={3} value={wert} onChange={(e) => setze(feld.id, e.currentTarget.value)} label={feld.beschriftung} {...KEINE_HILFE} />
   if (feld.art === 'wahr')
     return (
       <SegmentedControl
@@ -1318,7 +1380,15 @@ function FeldEingabe({ feld, wert, setze }: { feld: Feld; wert: string; setze: (
           </Group>
         </Radio.Group>
       )
-    return <NativeSelect value={wert} onChange={(e) => setze(feld.id, e.currentTarget.value)} data={[{ value: '', label: '– wählen –' }, ...optionen.map((o) => ({ value: o.wert, label: o.text }))]} label={feld.beschriftung} size="md" />
+    return (
+      <NativeSelect
+        value={wert}
+        onChange={(e) => setze(feld.id, e.currentTarget.value)}
+        data={[{ value: '', label: '– wählen –' }, ...optionen.map((o) => ({ value: o.wert, label: o.text }))]}
+        label={feld.beschriftung}
+        size="md"
+      />
+    )
   }
   return (
     <TextInput
@@ -1362,14 +1432,28 @@ function EintragZeile({ e, antworten, setze }: { e: OnlineEintrag; antworten: An
         )}
         {e.text && <Text fw={500}>{e.text}</Text>}
         {e.woerter && !e.felder.some((f) => f.art === 'auswahl') && <Text c="dimmed">{e.woerter.map((w) => w || '…').join(' · ')}</Text>}
-        {e.hinweis && <Text size="sm" c="dimmed">({e.hinweis})</Text>}
+        {e.hinweis && (
+          <Text size="sm" c="dimmed">
+            ({e.hinweis})
+          </Text>
+        )}
         {felder}
       </Stack>
     </Paper>
   )
 }
 
-function AufgabeKarte({ nr, aufgabe, antworten, setze }: { nr: number; aufgabe: OnlineAufgabe; antworten: Antworten; setze: (f: string, w: string) => void }): React.JSX.Element {
+function AufgabeKarte({
+  nr,
+  aufgabe,
+  antworten,
+  setze
+}: {
+  nr: number
+  aufgabe: OnlineAufgabe
+  antworten: Antworten
+  setze: (f: string, w: string) => void
+}): React.JSX.Element {
   const rechts = useMemo(() => (aufgabe.art === 'match' ? aufgabe.rechts : null), [aufgabe])
   return (
     <Card withBorder padding="md" radius="md">
@@ -1440,7 +1524,10 @@ interface AufgabeMitFeedback {
 function AufgabenListe({ leer }: { leer: string }): React.JSX.Element | null {
   const [liste, setListe] = useState<AufgabeMitFeedback[] | null>(null)
   useEffect(() => {
-    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then((d) => setListe(d.aufgaben), () => setListe([]))
+    void holen<{ aufgaben: AufgabeMitFeedback[] }>('/s/api/aufgaben').then(
+      (d) => setListe(d.aufgaben),
+      () => setListe([])
+    )
   }, [])
   if (!liste) return <Loader />
   if (!liste.length) return <Text c="dimmed">{leer}</Text>
@@ -1511,7 +1598,11 @@ export function BogenAnsicht({ b }: { b: FeedbackBogen }): React.JSX.Element {
           „{b.ueberarbeitung.zitat}“ – {b.ueberarbeitung.auftrag}
         </Alert>
       )}
-      {b.schluss && <Text size="sm" fs="italic">{b.schluss}</Text>}
+      {b.schluss && (
+        <Text size="sm" fs="italic">
+          {b.schluss}
+        </Text>
+      )}
     </Stack>
   )
 }
