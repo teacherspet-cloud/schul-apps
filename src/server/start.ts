@@ -5,6 +5,8 @@
  *   SCHULAPPS_PORT          8443
  *   SCHULAPPS_ADRESSE       öffentliche Adresse, z. B. https://217.154.120.64:8443
  *   SCHULAPPS_HOSTS         erlaubte Host-Kopfzeilen, kommagetrennt (Vorgabe: Host der Adresse)
+ *   SCHULAPPS_TLS_DOMAIN_NAMEN, SCHULAPPS_TLS_DOMAIN_CERT, SCHULAPPS_TLS_DOMAIN_KEY
+ *                           eigene Domain mit eigenem Zertifikat (SNI), z. B. www.meineschulapps.de
  *   SCHULAPPS_TLS_CERT/KEY  Zertifikat (fehlt es, läuft der Server ohne TLS – nur für Tests)
  *   SCHULAPPS_DATEN         Datenordner (Docker-Volume)
  *   SCHULAPPS_SCHLUESSEL    Datei des Hauptschlüssels (Docker-Secret)
@@ -93,7 +95,16 @@ async function main(): Promise<void> {
     .filter(Boolean)
   const cert = env.SCHULAPPS_TLS_CERT
   const key = env.SCHULAPPS_TLS_KEY
-  const tls = cert && key && existsSync(cert) && existsSync(key) ? { cert, key } : undefined
+  // Eigene Domain (05.10.2026): zweites Zertifikat, gewählt nach dem Namen (SNI) – die IP-Adresse behält ihres
+  const domainNamen = (env.SCHULAPPS_TLS_DOMAIN_NAMEN || '')
+    .split(',')
+    .map((n) => n.trim())
+    .filter(Boolean)
+  const domain =
+    domainNamen.length && env.SCHULAPPS_TLS_DOMAIN_CERT && env.SCHULAPPS_TLS_DOMAIN_KEY
+      ? { namen: domainNamen, cert: env.SCHULAPPS_TLS_DOMAIN_CERT, key: env.SCHULAPPS_TLS_DOMAIN_KEY }
+      : undefined
+  const tls = cert && key && existsSync(cert) && existsSync(key) ? { cert, key, ...(domain ? { domain } : {}) } : undefined
 
   await starteServer({
     port,

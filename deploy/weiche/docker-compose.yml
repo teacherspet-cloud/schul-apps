@@ -1,0 +1,20 @@
+# Weiche auf Port 443/80 (05.10.2026) – eigenes Compose-Projekt in /opt/schul-weiche.
+# Gywem Aviation gibt dafür 443 und 80 ab (docker-compose.override.yml: 8788 nur noch auf 127.0.0.1);
+# sein Code bleibt unverändert. Siehe nginx.conf.
+name: schul-weiche
+services:
+  weiche:
+    image: nginx:1.27-alpine
+    container_name: schul-weiche
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # ACME-Challenges (certbot --webroot) aus Gywems acme-Ordner – nur lesend
+      - /var/lib/docker/volumes/gywem-aviation-data/_data/acme:/acme:ro
+    mem_limit: 64m
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '2'

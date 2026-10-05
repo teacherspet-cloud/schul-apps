@@ -15,9 +15,13 @@ services:
       - '8443:8443'
     environment:
       SCHULAPPS_ADRESSE: https://217.154.120.64:8443
-      SCHULAPPS_HOSTS: 217.154.120.64:8443
+      # Eigene Domain (05.10.2026) über die Weiche auf 443 (deploy/weiche); die IP:8443 bleibt erreichbar
+      SCHULAPPS_HOSTS: 217.154.120.64:8443,www.meineschulapps.de,meineschulapps.de
       SCHULAPPS_TLS_CERT: /daten/tls/le.crt
       SCHULAPPS_TLS_KEY: /daten/tls/le.key
+      SCHULAPPS_TLS_DOMAIN_NAMEN: www.meineschulapps.de,meineschulapps.de
+      SCHULAPPS_TLS_DOMAIN_CERT: /daten/tls/domain.crt
+      SCHULAPPS_TLS_DOMAIN_KEY: /daten/tls/domain.key
       # Nur beim ersten Start bzw. zum Zurücksetzen setzen, danach wieder entfernen:
       # SCHULAPPS_NOTZUGANG_PASSWORT: …
     env_file:

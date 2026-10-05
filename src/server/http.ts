@@ -16,6 +16,7 @@
  */
 import { createServer as createHttpServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
+import { createSecureContext, type SecureContext } from 'node:tls'
 import { createReadStream, existsSync, readFileSync, statSync, watchFile } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
 import { AUFTRAGS_KANAELE, AuftragsFehler, gueltigeAuftragsId, gueltigesGeraet, kennungDesAuftrags, MAX_WARTEN_MS } from '../main/services/lanAuftraege'
@@ -71,7 +72,11 @@ export interface ServerOptionen {
   /** erlaubte Host-Kopfzeilen, z. B. ["217.154.120.64:8443"] */
   hosts: string[]
   aufruf: Aufruf
-  tls?: { cert: string; key: string }
+  /**
+   * Zertifikat; `domain` (05.10.2026): weiteres Zertifikat für eigene Namen (www.meineschulapps.de) –
+   * gewählt nach dem Namen beim Verbindungsaufbau (SNI), sonst gilt `cert`/`key` (IP-Zertifikat).
+   */
+  tls?: { cert: string; key: string; domain?: { namen: string[]; cert: string; key: string } }
   routen?: Zusatzroute[]
 }
 
@@ -601,13 +606,33 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     res.writeHead(405).end('nicht erlaubt')
   }
 
+  // Zertifikat nach Namen (SNI): eigene Domain → ihr Zertifikat, sonst das der IP-Adresse
+  let domainKontext: SecureContext | null = null
+  const domainLaden = (): void => {
+    const d = opts.tls?.domain
+    if (!d || !existsSync(d.cert) || !existsSync(d.key)) return void (domainKontext = null)
+    try {
+      domainKontext = createSecureContext({ cert: readFileSync(d.cert), key: readFileSync(d.key) })
+    } catch (e) {
+      console.error('TLS: Domain-Zertifikat nicht lesbar', e)
+    }
+  }
+  domainLaden()
+  const domainNamen = new Set((opts.tls?.domain?.namen ?? []).map((n) => n.toLowerCase()))
   const server = opts.tls
-    ? createHttpsServer({ cert: readFileSync(opts.tls.cert), key: readFileSync(opts.tls.key) }, (req, res) => {
-        behandle(req, res).catch((e: unknown) => {
-          if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
-          else res.end()
-        })
-      })
+    ? createHttpsServer(
+        {
+          cert: readFileSync(opts.tls.cert),
+          key: readFileSync(opts.tls.key),
+          SNICallback: (name, fertig) => fertig(null, domainKontext && domainNamen.has(String(name).toLowerCase()) ? domainKontext : undefined)
+        },
+        (req, res) => {
+          behandle(req, res).catch((e: unknown) => {
+            if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
+            else res.end()
+          })
+        }
+      )
     : createHttpServer((req, res) => {
         behandle(req, res).catch((e: unknown) => {
           if (!res.headersSent) json(res, 500, { fehler: e instanceof Error ? e.message : String(e) })
@@ -630,6 +655,7 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
       }
     }
     watchFile(tls.cert, { interval: 60_000 }, neuLaden)
+    if (tls.domain) watchFile(tls.domain.cert, { interval: 60_000 }, () => (domainLaden(), console.log('TLS: Domain-Zertifikat übernommen')))
   }
 
   return new Promise((ok, fehler) => {
