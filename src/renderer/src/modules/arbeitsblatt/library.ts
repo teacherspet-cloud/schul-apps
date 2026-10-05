@@ -1,5 +1,6 @@
 // Arbeitsblätter in der App speichern (wie die Vokabeltests) – mit Vorschaubild der ersten Seite.
 import { useAppSettings } from '../../shared/settingsStore'
+import { newId } from '../vokabeltest/model/random'
 import { cleanImageBackground } from '../../shared/imageCleanup'
 import * as pdfjs from 'pdfjs-dist'
 import { useRef } from 'react'
@@ -95,7 +96,8 @@ export async function saveCurrentWorksheet(
   if (istGeloescht(id)) return
   const name = opts.name?.trim() || dokumentName(id, state.docName, defaultWorksheetName(ws))
   // Ohne gemessene Seiten (Editor nicht offen): Ersatz-Aufteilung – für das kleine Bild reicht sie
-  const thumb = opts.withThumb === false || !ws.sheets.length ? undefined : await worksheetThumb(ws, opts.layouts ?? new Map(), opts.logo ?? null, opts.schoolName ?? '')
+  const thumb =
+    opts.withThumb === false || !ws.sheets.length ? undefined : await worksheetThumb(ws, opts.layouts ?? new Map(), opts.logo ?? null, opts.schoolName ?? '')
   const meta = await window.api.sheets.save({ id, name, stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
   useArbeitsblatt.getState().markSaved(meta.id, meta.updatedAt, meta.name)
   // Sofort in die Themenbereiche einsortieren – nicht erst beim nächsten Besuch der Startseite (27.09.2026)
@@ -289,4 +291,14 @@ export async function vorschauenNachtragen(eintraege: { id: string; thumb?: stri
     }
   }
   return etwas
+}
+
+/**
+ * Ein außerhalb des Editors erzeugtes Blatt als NEUES Dokument ablegen (05.10.2026, Platzhalter der
+ * Unterrichtsreihe) – das offene Blatt bleibt unberührt. Liefert die Kennung.
+ */
+export async function speichereNeuesArbeitsblatt(ws: Worksheet, logo: string | null, schoolName: string): Promise<string> {
+  const thumb = ws.sheets.length ? await worksheetThumb(ws, new Map(), logo, schoolName).catch(() => undefined) : undefined
+  const meta = await window.api.sheets.save({ id: newId(), name: defaultWorksheetName(ws), stats: worksheetStats(ws), thumb, payload: withoutAudioData(ws) })
+  return meta.id
 }

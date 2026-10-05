@@ -105,9 +105,15 @@ interface ZuweisungZeile {
   erstellt: string
 }
 
-const reiheVon = (id: string): (Reihe & { lehrkraftId: string }) | null => {
+/**
+ * Reihe aus der Datenbank. Platzhalter der KI-Planung (05.10.2026) sind noch leer – für Lernende,
+ * Fortschritt und Auswertung gibt es sie nicht; nur der Editor (`roh`) sieht sie.
+ */
+const reiheVon = (id: string, roh = false): (Reihe & { lehrkraftId: string }) | null => {
   const z = db().prepare('SELECT * FROM reihen WHERE id = ?').get(id) as { daten: string; lehrkraft_id: string } | undefined
-  return z ? { ...json_(z.daten, {} as Reihe), id, lehrkraftId: z.lehrkraft_id } : null
+  if (!z) return null
+  const r = { ...json_(z.daten, {} as Reihe), id, lehrkraftId: z.lehrkraft_id }
+  return roh ? r : { ...r, schritte: (r.schritte ?? []).filter((s) => !s.platzhalter) }
 }
 const zuweisung = (id: string): ZuweisungZeile | null =>
   (db().prepare('SELECT * FROM reihen_zuweisungen WHERE id = ?').get(id) as ZuweisungZeile | undefined) ?? null
@@ -673,7 +679,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
       const roh = JSON.stringify(r)
       if (roh.length > 40 * 1024 * 1024) return (json(res, 413, { fehler: 'Die Reihe ist zu groß.' }), true)
       const jetzt = new Date().toISOString()
-      const alt = r.id ? reiheVon(r.id) : null
+      const alt = r.id ? reiheVon(r.id, true) : null
       if (alt && alt.lehrkraftId !== ich.id) return (json(res, 403, { fehler: 'Diese Reihe gehört einer anderen Lehrkraft.' }), true)
       const id = alt ? alt.id : neueId()
       const neu = { ...r, id, geaendert: jetzt }
@@ -684,7 +690,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
           .run(id, ich.id, r.titel.slice(0, 200), JSON.stringify(neu), jetzt, jetzt)
       // Neue Schritte auch in bestehenden Zuweisungen bereitstellen
       for (const z of db().prepare("SELECT * FROM reihen_zuweisungen WHERE reihe_id = ? AND status = 'offen'").all(id) as unknown as ZuweisungZeile[])
-        verknuepfe(z, neu)
+        verknuepfe(z, { ...neu, schritte: neu.schritte.filter((s) => !s.platzhalter) })
       return (json(res, 200, { id, geaendert: jetzt }), true)
     }
     if (teile[0] === 'z' && teile[1]) {
@@ -794,7 +800,7 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
       }
       return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     }
-    const r = teile[0] ? reiheVon(teile[0]) : null
+    const r = teile[0] ? reiheVon(teile[0], true) : null
     if (!r || r.lehrkraftId !== ich.id) return (json(res, 404, { fehler: 'Unbekannte Reihe.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
       const { lehrkraftId: _l, ...rein } = r

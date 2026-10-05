@@ -95,6 +95,11 @@ export interface ImageLabel {
 interface BaseBlock {
   id: string
   /**
+   * Feste Materialnummer (05.10.2026, Unterrichtsreihe): Blendet ein Schritt Materialien aus, behalten
+   * die übrigen ihre Nummer aus dem Original – Aufgabentexte verweisen auf sie.
+   */
+  festeNummer?: string
+  /**
    * Kennung eines MATERIALS für Verweise (27.09.2026): Die KI wählt sie selbst („zeitleiste",
    * „karte", der eingesetzte Ausgangstext heißt „quelle"); fehlt sie, gilt die Kennung des
    * Bausteins. GESPEICHERT wird in Aufgaben „M{zeitleiste}"; die Nummer (M1, M2 …) vergibt die
@@ -548,6 +553,8 @@ export interface TaskBrief {
 
 export interface TaskBlock extends BaseBlock {
   type: 'task'
+  /** Freiwillig in einem Reihen-Schritt (05.10.2026): sichtbar, mit Feedback, zählt nicht für den Erfolg */
+  freiwillig?: boolean
   instruction: string
   operator: string
   afb?: Afb

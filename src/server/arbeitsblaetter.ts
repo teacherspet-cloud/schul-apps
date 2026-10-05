@@ -259,7 +259,9 @@ function kurz(z: Zeile, ich: NutzerInfo) {
     ? (() => {
         const verlauf = json_(a?.aufgaben_feedback ?? '{}', {} as AufgabenVerlauf)
         const frei = json_(a?.freigeschaltet ?? '[]', [] as number[])
-        const ampeln = json_(z.aufgaben, [] as BlattAufgabe[]).map((x) => ampelVon(verlauf[String(x.nr)], frei.includes(x.nr)))
+        const ampeln = json_(z.aufgaben, [] as BlattAufgabe[])
+          .filter((x) => !x.freiwillig)
+          .map((x) => ampelVon(verlauf[String(x.nr)], frei.includes(x.nr)))
         return { gruen: ampeln.filter((x) => x === 'gruen').length, gelb: ampeln.filter((x) => x === 'gelb').length, aufgaben: ampeln.length }
       })()
     : undefined
@@ -427,7 +429,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           e.schrittweise &&
           nr >
             sichtbarBis(
-              aufgaben.map((x) => x.nr),
+              aufgaben.filter((x) => !x.freiwillig).map((x) => x.nr),
               bisher,
               json_(a?.freigeschaltet ?? '[]', [] as number[]),
               true
@@ -572,7 +574,12 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       if (!html.includes('ws-page') || html.length > 30 * 1024 * 1024) return (json(res, 400, { fehler: 'Das Blatt fehlt oder ist zu groß.' }), true)
       const aufgaben = (Array.isArray(k0.aufgaben) ? k0.aufgaben : []).slice(0, 80).map((x) => {
         const y = x as Record<string, unknown>
-        return { nr: Number(y.nr) || 0, anweisung: String(y.anweisung ?? '').slice(0, 4000), erwartung: String(y.erwartung ?? '').slice(0, 8000) }
+        return {
+          nr: Number(y.nr) || 0,
+          anweisung: String(y.anweisung ?? '').slice(0, 4000),
+          erwartung: String(y.erwartung ?? '').slice(0, 8000),
+          ...(y.freiwillig === true ? { freiwillig: true } : {})
+        }
       })
       const vorlage = k0.rueckmeldung as Rueckmeldung | undefined
       if (!vorlage?.grundlage) return (json(res, 400, { fehler: 'Die Erwartung fehlt.' }), true)

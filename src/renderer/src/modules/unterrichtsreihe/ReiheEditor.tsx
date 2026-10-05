@@ -61,6 +61,10 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { LernzieleFeld, type KcAuszug } from './Lernziele'
 import { ichKannFormulieren, reihenLernziele } from './lernzieleKi'
 import { SchrittBearbeiten } from './SchrittBearbeiten'
+import { DruckMenue, PlanenFenster, PlatzhalterKnopf, StundenLeiste } from './ReiheKi'
+import { horcheReihe } from './platzhalterAuftrag'
+import type { ReihenPlan } from './reihePlanungKi'
+import { IconSparkles } from '@tabler/icons-react'
 
 const ki = <T,>(req: Parameters<typeof window.api.ai.structured>[0]): Promise<T> => window.api.ai.structured<T>(req)
 
@@ -82,6 +86,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
   const [vorschau, setVorschau] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
   const [kc, setKc] = useState<KatalogKnoten[]>([])
+  const [planen, setPlanen] = useState(false)
   const setze = (teil: Partial<Reihe>): void => {
     setR((x) => ({ ...x, ...teil }))
     setGeaendert(true)
@@ -119,6 +124,25 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
     } finally {
       setLaeuft(false)
     }
+  }
+  // Fertige Platzhalter aus dem Hintergrund übernehmen, solange die Reihe hier offen ist (05.10.2026)
+  useEffect(() => {
+    if (!r.id) return
+    return horcheReihe(r.id, (schrittId, patch) => {
+      setR((x) => ({ ...x, schritte: x.schritte.map((s) => (s.id === schrittId ? { ...s, ...patch } : s)) }))
+      setGeaendert(true)
+    })
+  }, [r.id])
+  const schrittAendern = (id: string, patch: Partial<Schritt>): void => {
+    setR((x) => ({ ...x, schritte: x.schritte.map((s) => (s.id === id ? { ...s, ...patch } : s)) }))
+    setGeaendert(true)
+  }
+  /** KI-Plan übernehmen: ersetzen oder an die vorhandenen Schritte anhängen */
+  const planUebernehmen = (plan: ReihenPlan, ersetzen: boolean): void => {
+    const alteTeile = ersetzen ? [] : teileVon(r)
+    const neueTeile = [...alteTeile, ...plan.teile.filter((t) => !alteTeile.includes(t))]
+    setzeSchritte([...(ersetzen ? [] : r.schritte), ...plan.schritte], neueTeile)
+    notifySuccess(`${plan.schritte.length} Schritte übernommen – Platzhalter lassen sich einzeln mit „Mit KI erstellen" füllen.`)
   }
   // Teile (03.10.2026): angelegte Teile + an Schritten genannte; Schritte stehen immer in der Reihenfolge der Teile
   const teile = teileVon(r)
@@ -213,6 +237,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
           >
             Speichern{geaendert ? ' *' : ''}
           </Button>
+          {r.schritte.length > 0 && <DruckMenue reihe={r} />}
           <Button variant="default" leftSection={<IconEye size={16} />} disabled={!r.schritte.length} onClick={() => setVorschau(true)} data-schuelervorschau>
             Als Schüler ansehen
           </Button>
@@ -269,12 +294,16 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
             vorschlagen={() => reihenLernziele(r, { auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }, ki)}
             ichKann={(z) => ichKannFormulieren(r, z, ki)}
           />
+          <StundenLeiste stunden={r.stunden ?? []} setze={(stunden) => setze({ stunden })} />
         </Stack>
       </Card>
 
       <Group justify="space-between">
         <Text fw={700}>Schritte</Text>
         <Group gap="xs">
+          <Button variant="light" color="grape" leftSection={<IconSparkles size={16} />} onClick={() => setPlanen(true)} data-reihe-planen>
+            Mit KI planen
+          </Button>
           <Button variant="light" leftSection={<IconFolderPlus size={16} />} onClick={teilAnlegen} data-teil-neu>
             Teil hinzufügen
           </Button>
@@ -393,9 +422,30 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
                                 {ROLLE[s.rolle].label}
                                 {s.rolle === 'wahl' && s.wahlGruppe ? ` ${s.wahlGruppe} (${s.wahlMindestens ?? 1})` : ''}
                               </Badge>
+                              {s.stunde !== undefined && (r.stunden?.length ?? 0) > 0 && (
+                                <Badge size="xs" variant="outline" color="gray">
+                                  Std. {s.stunde + 1}
+                                  {s.minuten ? ` · ${s.minuten} min` : ''}
+                                </Badge>
+                              )}
+                              {s.platzhalter && (
+                                <Badge size="xs" variant="light" color="orange" data-platzhalter>
+                                  Platzhalter
+                                </Badge>
+                              )}
+                              <PlatzhalterKnopf
+                                reihe={r}
+                                s={s}
+                                setze={(p) => schrittAendern(s.id, p)}
+                                speichernVorher={async () => (geaendert || !r.id ? await speichern() : r)}
+                              />
                             </Group>
                             <Text size="xs" c="dimmed" truncate>
-                              {s.lernziele.length ? s.lernziele.map((l) => l.ichKann || l.text).join(' · ') : 'ohne Lernziele'}
+                              {s.platzhalter
+                                ? s.platzhalter.beschreibung
+                                : s.lernziele.length
+                                  ? s.lernziele.map((l) => l.ichKann || l.text).join(' · ')
+                                  : 'ohne Lernziele'}
                             </Text>
                           </div>
                         </Group>
@@ -406,6 +456,7 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
                           <ActionIcon variant="subtle" onClick={() => verschiebe(s.id, 1)} disabled={imTeil === schritte.length - 1} aria-label="nach unten">
                             <IconArrowDown size={16} />
                           </ActionIcon>
+                          {!s.platzhalter && <DruckMenue schritt={s} />}
                           <Tooltip label="Bearbeiten">
                             <ActionIcon variant="subtle" onClick={() => setBearbeiten(s)} aria-label="bearbeiten" data-schritt-bearbeiten>
                               <IconPencil size={16} />
@@ -468,6 +519,14 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
         />
       )}
       {zuweisen && r.id && <Zuweisen reiheId={r.id} schliessen={() => setZuweisen(false)} />}
+      {planen && (
+        <PlanenFenster
+          reihe={r}
+          kc={{ auszug: auszug?.zeilen ?? [], quelle: auszug?.quelle ?? '' }}
+          schliessen={() => setPlanen(false)}
+          uebernehmen={planUebernehmen}
+        />
+      )}
       {vorschau && <Vorschau reihe={r} schliessen={() => setVorschau(false)} />}
     </Stack>
   )

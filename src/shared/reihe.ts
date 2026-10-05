@@ -87,6 +87,15 @@ export type SchrittInhalt =
       merkAmEnde?: boolean
       /** Lösungsblatt – sehen die Lernenden erst nach dem ersten Einreichen (03.10.2026) */
       loesung?: string
+      /**
+       * Auswahl für diesen Schritt (05.10.2026): Bausteine/Teilaufgaben (Schlüssel `blockId` bzw.
+       * `blockId/teilId`) freiwillig oder ausgeblendet – das Original bleibt unverändert.
+       */
+      auswahl?: Record<string, 'frei' | 'aus'>
+      /** Korrekturrand für das KI-Feedback (05.10.2026) – Vorgabe an; `false` = aus */
+      korrekturrand?: boolean
+      /** Vorschlag der KI zur Auswahl – erst nach Bestätigung durch die Lehrkraft wirksam */
+      auswahlVorschlag?: { auswahl: Record<string, 'frei' | 'aus'>; gruende: Record<string, string>; minuten: number; hinweis: string }
       merk?: { titel: string; text: string }[]
       /** Niveaustufen (Basis/Standard/Plus …): die Blätter eines differenzierten Arbeitsblatts */
       varianten?: {
@@ -147,7 +156,21 @@ export interface Schritt {
   /** Wissensspeicher: erst nach diesem Schritt sichtbar (leer = sobald der Weg dort ist) */
   nach?: string
   inhalt: SchrittInhalt
+  /** Stunde der Reihe (0-basiert, siehe `Reihe.stunden`), in der der Schritt liegt (05.10.2026) */
+  stunde?: number
+  /** Geplante Bearbeitungszeit in Minuten (KI-Planung) – Maßstab für die Auswahl der Aufgaben */
+  minuten?: number
+  /**
+   * Platzhalter aus der KI-Planung (05.10.2026): Was hier entstehen soll – erzeugt per Knopf
+   * „Mit KI erstellen"; danach entfällt die Marke.
+   */
+  platzhalter?: { beschreibung: string; begruendung?: string }
+  /** Begründung der KI, warum vorhandenes Material an dieser Stelle steht */
+  begruendung?: string
 }
+
+export type StundenArt = 'einzel' | 'doppel'
+export const STUNDEN_MINUTEN: Record<StundenArt, number> = { einzel: 45, doppel: 90 }
 
 export interface Reihe {
   id: string
@@ -167,6 +190,8 @@ export interface Reihe {
    */
   teile?: string[]
   geaendert?: string
+  /** Stundenraster (05.10.2026): Einzel- (45 min) und Doppelstunden in ihrer Reihenfolge */
+  stunden?: StundenArt[]
 }
 
 /** Teile der Reihe: die angelegten, dazu die nur an Schritten genannten */

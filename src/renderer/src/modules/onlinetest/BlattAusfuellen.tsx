@@ -87,6 +87,8 @@ interface AufgabeInfo {
   seite: number
   /** Aufgabe mit Diagramm, Zeitleiste, Skizze o. Ä. – wird auf dem Blatt bearbeitet */
   zeichnen?: boolean
+  /** Freiwillig (Reihen-Schritt, 05.10.2026): hält das Freischalten nicht auf, zählt nicht für „vollständig" */
+  freiwillig?: boolean
 }
 
 export interface BlattDaten {
@@ -232,7 +234,16 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
             (x) => !x.closest('.ws-task-head, .ws-social, .ws-task-instruction')
           )
         )
-        aufgaben.push({ nr, anweisung: anweisung.trim(), x: kopf.left, y: kopf.top, seite, ...(zeichnen ? { zeichnen } : {}) })
+        const freiwillig = task.hasAttribute('data-freiwillig')
+        aufgaben.push({
+          nr,
+          anweisung: anweisung.trim(),
+          x: kopf.left,
+          y: kopf.top,
+          seite,
+          ...(zeichnen ? { zeichnen } : {}),
+          ...(freiwillig ? { freiwillig } : {})
+        })
       }
     }
     return nr
@@ -592,7 +603,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    * Lehrkraft den Stift nicht freigegeben hat (dann ohne Textmarker).
    */
   const werkzeugeDa = d.einstellungen.stift || alleAufgaben.some((a) => a.zeichnen)
-  const nummern = alleAufgaben.map((a) => a.nr)
+  // Freiwillige Aufgaben halten weder das Freischalten auf noch zählen sie für „vollständig bearbeitet"
+  const nummern = alleAufgaben.filter((a) => !a.freiwillig).map((a) => a.nr)
   const frei = d.freigeschaltet ?? []
   const bis = lehrkraftSicht ? Number.POSITIVE_INFINITY : sichtbarBis(nummern, aufgabenFb, frei, Boolean(d.einstellungen.schrittweise))
   const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei)

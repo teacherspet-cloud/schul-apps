@@ -288,7 +288,8 @@ export function verschluesseleBaustein(draft: WsBlock, dokument: WsBlock[]): voi
 export function materialNummern(blocks: WsBlock[]): Map<string, string> {
   const map = new Map<string, string>()
   let n = 0
-  for (const block of blocks) if (isMaterial(block)) map.set(block.id, `M${++n}`)
+  // Feste Nummer: ein Reihen-Schritt hat Materialien davor ausgeblendet (05.10.2026)
+  for (const block of blocks) if (isMaterial(block)) map.set(block.id, (++n, block.festeNummer ?? `M${n}`))
   return map
 }
 

@@ -18,6 +18,8 @@ export interface BlattAufgabe {
   anweisung: string
   /** Erwartung und Lösung – nur für die KI, nie an die Lernenden */
   erwartung: string
+  /** Freiwillig (Reihen-Schritt, 05.10.2026): zählt nicht für Freischalten, Fortschritt und Erfolg */
+  freiwillig?: boolean
 }
 
 export type BlattFeldArt = 'text' | 'zeilen' | 'luecke' | 'flaeche' | 'kreuz'
@@ -214,7 +216,8 @@ export function sichtbarBis(nummern: number[], verlauf: AufgabenVerlauf, freiges
   for (let i = 0; i < liste.length - 1; i++) {
     if (ampelVon(verlauf[String(liste[i])], freigeschaltet.includes(liste[i])) === 'rot') return liste[i]
   }
-  return liste[liste.length - 1]
+  // Keine offene mehr: alles sichtbar (auch freiwillige Aufgaben nach der letzten, die hier nicht mitzählen)
+  return Number.POSITIVE_INFINITY
 }
 
 /**

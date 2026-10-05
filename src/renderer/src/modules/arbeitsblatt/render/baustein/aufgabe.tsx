@@ -65,7 +65,14 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    * Jetzt gibt es die Einheit in beiden Fassungen – ohne Höhe; der Platzhalter liegt rechts über
    * der Zeile davor und nimmt keinen Platz ein.
    */
-  const loesungsKnoten = (wert: string | undefined, onChange: ((v: string) => void) | undefined, platzhalter: string, k: string, einheit: boolean, label?: string): React.JSX.Element | null => {
+  const loesungsKnoten = (
+    wert: string | undefined,
+    onChange: ((v: string) => void) | undefined,
+    platzhalter: string,
+    k: string,
+    einheit: boolean,
+    label?: string
+  ): React.JSX.Element | null => {
     const u = einheit ? { 'data-unit': '' } : {}
     if (String(wert ?? '').trim())
       return (
@@ -157,7 +164,14 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
                           />
                         </div>
                         <McOptions answer={eintrag.part.answer} onChange={onAnswer((d) => d.parts[eintrag.i].answer)} />
-                        {key && loesungsKnoten(eintrag.part.solution, set((d, v) => ((d as TaskBlock).parts[eintrag.i].solution = v)), 'Lösung', 'loesung', false)}
+                        {key &&
+                          loesungsKnoten(
+                            eintrag.part.solution,
+                            set((d, v) => ((d as TaskBlock).parts[eintrag.i].solution = v)),
+                            'Lösung',
+                            'loesung',
+                            false
+                          )}
                       </>
                     )}
                   </td>
@@ -169,8 +183,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
       )
     }
   }
-  const mcZeilenAbschnitte = (): Abschnitt[] =>
-    Array.from({ length: Math.ceil(mcAlle.length / mcS) }, (_, z) => ({ node: <></>, gruppe: mcGruppe, zeile: z }))
+  const mcZeilenAbschnitte = (): Abschnitt[] => Array.from({ length: Math.ceil(mcAlle.length / mcS) }, (_, z) => ({ node: <></>, gruppe: mcGruppe, zeile: z }))
 
   /*
    * TEILBARE ANTWORTFORMEN (Zuordnung, Richtig/Falsch, Reihenfolge, Beschriftung,
@@ -352,8 +365,21 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    */
   const teilaufgabe = (part: TaskPart, i: number): Abschnitt[] => {
     // Teilbare Antwortform: ihre Zeilen folgen dem Kopf als eigene Einheiten (in der Lösungsansicht mit Musterlösung statt Fläche wie bisher)
-    const zeilen = antwortZeilen(part.answer, onAnswer((d) => d.parts[i].answer), `teil-${part.id}`, i)
-    const schluss = key ? loesungsKnoten(part.solution, set((d, v) => ((d as TaskBlock).parts[i].solution = v)), 'Lösung', `${part.id}-loesung`, true) : null
+    const zeilen = antwortZeilen(
+      part.answer,
+      onAnswer((d) => d.parts[i].answer),
+      `teil-${part.id}`,
+      i
+    )
+    const schluss = key
+      ? loesungsKnoten(
+          part.solution,
+          set((d, v) => ((d as TaskBlock).parts[i].solution = v)),
+          'Lösung',
+          `${part.id}-loesung`,
+          true
+        )
+      : null
     // Schreiblinien werden ohnehin zerlegt; alle anderen Antwortformen ohne Zeilen bleiben im Kopf
     const linien = part.answer.kind === 'lines' && !key ? linienAbschnitte(part.answer.count).map((n) => ({ node: n, teil: i, teilWeiter: true })) : []
     const muster = key
@@ -396,7 +422,13 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    */
   // Der Mustertext steht oben auf den Linien – dann nicht noch einmal am Ende
   const mustertextGezeigt = Boolean(key && block.answer.kind === 'lines' && !block.parts.length && block.brief?.model)
-  const hauptZeilen = block.parts.length ? null : antwortZeilen(block.answer, onAnswer((d) => d.answer), 'antwort')
+  const hauptZeilen = block.parts.length
+    ? null
+    : antwortZeilen(
+        block.answer,
+        onAnswer((d) => d.answer),
+        'antwort'
+      )
   const abschnitte: Abschnitt[] = []
   for (const teil of briefAbschnitte({ block, edit, set, wordLimit, ohneHilfen: ohneSchreibhilfen, ohneLernhilfen })) abschnitte.push({ node: teil })
   if (block.example) abschnitte.push({ node: beispielKnoten })
@@ -434,7 +466,16 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
    * Mustertext, der mitten im Satz abbrach. Als Einheiten brechen sie sauber um.
    */
   if (key) {
-    abschnitte.push({ node: loesungsKnoten(block.solution, set((d, v) => ((d as TaskBlock).solution = v)), 'Lösung / Erwartungshorizont', 'loesung', true, 'Lösung:')! })
+    abschnitte.push({
+      node: loesungsKnoten(
+        block.solution,
+        set((d, v) => ((d as TaskBlock).solution = v)),
+        'Lösung / Erwartungshorizont',
+        'loesung',
+        true,
+        'Lösung:'
+      )!
+    })
     if (block.brief) {
       for (const n of erwartungsAbschnitte({ block, edit: keyEdit, set, mitMustertext: !mustertextGezeigt, ohneLernhilfen })) abschnitte.push({ node: n })
     }
@@ -482,7 +523,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
   const sichtbar = gruppiereTeilaufgaben(gruppiereAntworten(abschnitte.slice(von, bis)))
 
   return (
-    <div className={`ws-block ws-task ${placed?.continued ? 'ws-continued' : ''}`}>
+    <div className={`ws-block ws-task ${placed?.continued ? 'ws-continued' : ''}`} data-freiwillig={block.freiwillig ? '' : undefined}>
       {phase && zeigtKopf && <div className="ws-phase">{phase.label}</div>}
       {/*
        * Auf dem Folgestück steht statt der Arbeitsanweisung ein knapper Hinweis. Ohne ihn
@@ -496,6 +537,7 @@ export function TaskView({ block, placed }: { block: TaskBlock; placed?: PlacedI
           {block.observerGroup && <span className="ws-group">Gruppe {block.observerGroup}</span>}
           {block.timecode && showTimecodes && <span className="ws-timecode">{block.timecode}</span>}
           {showStars && block.stars && <span className="ws-stars">{stars(block.stars)}</span>}
+          {block.freiwillig && <span className="ws-freiwillig">★ freiwillig</span>}
           {taskStyle.showSocialFormIcons &&
             // Derselbe Symbolsatz wie bei den Arbeitsanweisungen – damit eine selbst gestaltete
             // Fassung auch hier gilt und nicht zwei Sätze nebeneinanderlaufen

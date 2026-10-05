@@ -23,10 +23,8 @@ import { useEffect, useState } from 'react'
 import type { Erfolg, Reihe, Schritt, SchrittInhalt } from '@shared/reihe'
 import { SCHRITT_ARTEN } from '@shared/reihe'
 import { notifyError } from '../../shared/util'
-import { useAppSettings } from '../../shared/settingsStore'
-import type { Worksheet } from '../arbeitsblatt/model/types'
-import { buildWorksheetHtml } from '../arbeitsblatt/render/printHtml'
-import { blattAufgaben, blattMerkkaesten, blattRueckmeldung, loesungFuerLernende } from '../arbeitsblatt/BlattFreigabeKnopf'
+import { ladeBlattAlsSchritt } from './schrittAusBlatt'
+import { AuswahlFeld } from './AuswahlFeld'
 import { LernzieleFeld } from './Lernziele'
 import { schrittLernziele } from './lernzieleKi'
 
@@ -55,13 +53,6 @@ function beschreibung(i: SchrittInhalt): string {
   }
 }
 
-/** Lernziele eines Arbeitsblatts (Baustein „Lernziele") */
-function blattLernziele(ws: Worksheet, sheetId: string): { text: string; ichKann: string }[] {
-  const sheet = ws.sheets.find((s) => s.id === sheetId)
-  const block = sheet?.blocks.find((b) => b.type === 'learningGoals') as { goals?: string[] } | undefined
-  return (block?.goals ?? []).map((g) => ({ text: g, ichKann: g }))
-}
-
 export function SchrittBearbeiten({
   reihe,
   schritt,
@@ -79,6 +70,12 @@ export function SchrittBearbeiten({
   const [s, setS] = useState<Schritt>(schritt)
   const setze = (teil: Partial<Schritt>): void => setS((x) => ({ ...x, ...teil }))
   const setzeInhalt = (teil: Record<string, unknown>): void => setS((x) => ({ ...x, inhalt: { ...x.inhalt, ...teil } as SchrittInhalt }))
+  // Seiten werden gerade neu gesetzt und gemessen (Auswahl, Korrekturrand, Blattwahl) – so lange nicht übernehmen
+  const [setzt, setSetzt] = useState(0)
+  const beschaeftigt = <T,>(p: Promise<T>): Promise<T> => {
+    setSetzt((n) => n + 1)
+    return p.finally(() => setSetzt((n) => n - 1))
+  }
   const art = SCHRITT_ARTEN.find((a) => a.id === s.inhalt.art)
   const andere = reihe.schritte.filter((x) => x.id !== s.id)
   const erfolgWahl: { value: Erfolg['art']; label: string }[] = [
@@ -92,7 +89,7 @@ export function SchrittBearbeiten({
     <Modal opened onClose={schliessen} title={`${art?.label ?? 'Schritt'} bearbeiten`} size="xl">
       <Stack>
         <TextInput label="Titel (sehen die Lernenden)" value={s.titel} onChange={(e) => setze({ titel: e.currentTarget.value })} data-schritt-titel />
-        <Inhalt s={s} setzeInhalt={setzeInhalt} setze={setze} reihe={reihe} />
+        <Inhalt s={s} setzeInhalt={setzeInhalt} setze={setze} reihe={reihe} beschaeftigt={beschaeftigt} />
         <Divider />
         <LernzieleFeld
           titel="Lernziele dieses Schritts"
@@ -212,7 +209,7 @@ export function SchrittBearbeiten({
           <Button variant="default" onClick={schliessen}>
             Abbrechen
           </Button>
-          <Button onClick={() => speichern(s)} disabled={!s.titel.trim()} data-schritt-speichern>
+          <Button onClick={() => speichern(s)} disabled={!s.titel.trim() || setzt > 0} loading={setzt > 0} data-schritt-speichern>
             Übernehmen
           </Button>
         </Group>
@@ -260,15 +257,17 @@ function Inhalt({
   s,
   setzeInhalt,
   setze,
-  reihe
+  reihe,
+  beschaeftigt
 }: {
   s: Schritt
   setzeInhalt: (t: Record<string, unknown>) => void
   setze: (t: Partial<Schritt>) => void
   reihe: Reihe
+  /** Läuft, solange Seiten neu gesetzt werden – „Übernehmen" wartet */
+  beschaeftigt: <T>(p: Promise<T>) => Promise<T>
 }): React.JSX.Element {
   const i = s.inhalt
-  const { logoDataUrl, settings } = useAppSettings.getState()
   switch (i.art) {
     case 'arbeitsblatt':
       return (
@@ -278,45 +277,33 @@ function Inhalt({
             aktuell={i.titel}
             laden={async () => (await window.api.sheets.list()).map((m) => ({ id: m.id, name: m.name }))}
             gewaehlt={async (id) => {
-              const w = await window.api.sheets.get(id)
-              const ws = w.payload as Worksheet
-              const sheet = ws.sheets[0]
-              if (!sheet) throw new Error('Das Arbeitsblatt ist leer.')
-              const titel = ws.meta.title || ws.meta.topic || w.name
-              // Schülerfassung ohne Lösungen; Lösungen und Erwartungen nur für den Server
-              const html = buildWorksheetHtml(ws, new Map(), { sheetIds: [sheet.id], includeKey: false }, logoDataUrl ?? null, settings.schoolName ?? '')
-              // Lösungsblatt (sehen die Lernenden nach dem ersten Einreichen) und Niveaustufen aus den Blättern
-              const loesung = (sid: string): string =>
-                loesungFuerLernende(
-                  buildWorksheetHtml(ws, new Map(), { sheetIds: [sid], includeKey: false, keyOnly: true }, logoDataUrl ?? null, settings.schoolName ?? '')
-                )
-              const varianten =
-                ws.sheets.length > 1
-                  ? ws.sheets.map((sh, k) => ({
-                      label: sh.label || ['Basis', 'Standard', 'Plus'][k] || `Stufe ${k + 1}`,
-                      html: buildWorksheetHtml(ws, new Map(), { sheetIds: [sh.id], includeKey: false }, logoDataUrl ?? null, settings.schoolName ?? ''),
-                      aufgaben: blattAufgaben(sh),
-                      vorlage: blattRueckmeldung(ws, sh, titel),
-                      loesung: loesung(sh.id),
-                      merk: blattMerkkaesten(sh)
-                    }))
-                  : undefined
-              setzeInhalt({
-                quelle: id,
-                titel,
-                html,
-                aufgaben: blattAufgaben(sheet),
-                vorlage: blattRueckmeldung(ws, sheet, titel),
-                merk: blattMerkkaesten(sheet),
-                loesung: loesung(sheet.id),
-                varianten
-              })
-              setze({ ...(s.titel ? {} : { titel }), ...(s.lernziele.length ? {} : { lernziele: blattLernziele(ws, sheet.id) }) })
+              const b = await beschaeftigt(ladeBlattAlsSchritt(id, undefined, i.korrekturrand !== false))
+              setzeInhalt({ ...b.inhalt, auswahl: undefined, auswahlVorschlag: undefined })
+              setze({ ...(s.titel ? {} : { titel: b.titel }), ...(s.lernziele.length ? {} : { lernziele: b.lernziele }), platzhalter: undefined })
             }}
           />
+          {/* Aufgaben/Bausteine für diesen Schritt ausblenden oder freiwillig machen (05.10.2026) */}
+          <AuswahlFeld reihe={reihe} schritt={s} inhalt={i} setzeInhalt={(t) => setzeInhalt(t as Record<string, unknown>)} beschaeftigt={beschaeftigt} />
           <Group>
             <NumberInput label="Einreichungen je Person" min={1} max={5} value={i.runden} onChange={(v) => setzeInhalt({ runden: Number(v) || 2 })} w={200} />
             <Checkbox mt="lg" label="Stift erlauben" checked={i.stift} onChange={(e) => setzeInhalt({ stift: e.currentTarget.checked })} />
+            {/* Korrekturrand (05.10.2026): Vorgabe an – dort steht das KI-Feedback; Seiten werden neu gesetzt */}
+            <Checkbox
+              mt="lg"
+              label="Korrekturrand"
+              title="Rand neben Linien und Feldern für das KI-Feedback (und auf Ausdrucken für Korrekturen)"
+              checked={i.korrekturrand !== false}
+              disabled={!i.quelle}
+              onChange={(e) => {
+                const an = e.currentTarget.checked
+                setzeInhalt({ korrekturrand: an })
+                void beschaeftigt(ladeBlattAlsSchritt(i.quelle, i.auswahl, an)).then(
+                  (b) => setzeInhalt({ ...b.inhalt, titel: i.titel || b.inhalt.titel, korrekturrand: an }),
+                  notifyError
+                )
+              }}
+              data-schritt-korrekturrand
+            />
             <Checkbox
               mt="lg"
               label="Aufgaben schrittweise freischalten"

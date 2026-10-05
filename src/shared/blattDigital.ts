@@ -29,6 +29,9 @@ export function digitalisieren(doc: Document): number {
     '.ws-body{overflow:visible !important}' +
     // Korrekturrand: Zahl wie KORREKTURRAND_MM (der Server übergibt nur den Quelltext dieser Funktion)
     '.ws-lines{margin-right:34mm !important}' +
+    // Gedruckter Korrekturrand (Blattoption, 05.10.2026 Vorgabe für freigegebene Blätter): digital steht das Feedback
+    // im Kommentarrand oben – Linien nicht doppelt kürzen, Trennstrich weg
+    '.ws-lines-rand .ws-line{width:100% !important}.ws-lines-rand::after{display:none !important}' +
     '.ws-content{position:relative !important;left:auto !important;right:auto !important;top:auto !important;bottom:auto !important}'
   doc.head.appendChild(stil)
   /*

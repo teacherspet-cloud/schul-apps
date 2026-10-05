@@ -3250,3 +3250,14 @@ html[data-griff-zug] * {
   font-size: 0.88em;
   margin-bottom: 1mm;
 }
+
+/* Freiwillige Aufgabe in einem Reihen-Schritt (05.10.2026) */
+.ws-freiwillig {
+  font-size: 0.78em;
+  font-weight: 600;
+  padding: 0 1.5mm;
+  border: 0.3mm solid currentColor;
+  border-radius: 1mm;
+  opacity: 0.8;
+  white-space: nowrap;
+}

@@ -22,6 +22,7 @@ import { describeBlock, describeSheet } from './generation/describe'
 import type { Sheet, Worksheet } from './model/types'
 import type { PagePlan } from './render/paginate'
 import { buildWorksheetHtml } from './render/printHtml'
+import { messeSeiten } from './render/seitenMessen'
 import { taskNumbersFor } from './render/SheetPages'
 
 /** Aufgaben eines Blattes für den Server: Anweisung (wie gedruckt) und Erwartung samt Lösung */
@@ -31,7 +32,7 @@ export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
     if (b.type !== 'task') return []
     const nr = nummern.get(b.id) ?? 0
     const teile = b.parts.map((p, i) => `${String.fromCharCode(97 + i)}) ${plainText(p.instruction)}`)
-    return [{ nr, anweisung: [plainText(b.instruction), ...teile].join(' '), erwartung: describeBlock(b) }]
+    return [{ nr, anweisung: [plainText(b.instruction), ...teile].join(' '), erwartung: describeBlock(b), ...(b.freiwillig ? { freiwillig: true } : {}) }]
   })
 }
 
@@ -74,7 +75,12 @@ export function blattRueckmeldung(ws: Worksheet, sheet: Sheet, titel: string): R
     grundlage: {
       art: 'frei',
       titel,
-      aufgaben: `Arbeitsblatt „${titel}“. Die Abgabe nennt die Einträge je Aufgabe.\n${aufgaben.map((a) => `Aufgabe ${a.nr}: ${a.anweisung}`).join('\n')}`,
+      aufgaben: `Arbeitsblatt „${titel}“. Die Abgabe nennt die Einträge je Aufgabe.\n${aufgaben
+        .map(
+          (a) =>
+            `Aufgabe ${a.nr}${a.freiwillig ? ' (FREIWILLIG – zählt nicht für die Gesamteinschätzung; fehlt sie, ist das kein Mangel)' : ''}: ${a.anweisung}`
+        )
+        .join('\n')}`,
       erwartung: describeSheet(sheet)
     },
     abgaben: [],
@@ -148,6 +154,8 @@ export function BlattFreigabeDialog({
   const [aufgabenFeedback, setAufgabenFeedback] = useState(true)
   const [runden, setRunden] = useState(2)
   const [stift, setStift] = useState(true)
+  // Korrekturrand (05.10.2026): Vorgabe an – digital steht dort das KI-Feedback, gedruckt bleibt er leer
+  const [korrekturrand, setKorrekturrand] = useState(true)
   // Lösungsblatt nach dem ersten Einreichen (03.10.2026, Idee aus LearningView)
   const [loesungZeigen, setLoesungZeigen] = useState(true)
   // Schrittweise Freischaltung und Merkkästen am Ende (05.10.2026)
@@ -183,10 +191,13 @@ export function BlattFreigabeDialog({
     if (!sheet) return
     setLaeuft(true)
     try {
+      // Fassung mit Korrekturrand nach Wahl; weicht sie vom Original ab oder fehlt die Messung, neu messen (wie im Editor)
+      const fassung = korrekturrand === Boolean(ws.meta.correctionMargin) ? ws : { ...ws, meta: { ...ws.meta, correctionMargin: korrekturrand } }
+      const plaene = fassung === ws && layouts.size ? layouts : await messeSeiten(fassung, logo, schoolName)
       // Schülerfassung: nur dieses Blatt, OHNE Lösungsteil
-      const html = buildWorksheetHtml(ws, layouts, { sheetIds: [sheet.id], includeKey: false }, logo, schoolName)
+      const html = buildWorksheetHtml(fassung, plaene, { sheetIds: [sheet.id], includeKey: false }, logo, schoolName)
       const loesung = loesungZeigen
-        ? loesungFuerLernende(buildWorksheetHtml(ws, layouts, { sheetIds: [sheet.id], includeKey: false, keyOnly: true }, logo, schoolName))
+        ? loesungFuerLernende(buildWorksheetHtml(fassung, plaene, { sheetIds: [sheet.id], includeKey: false, keyOnly: true }, logo, schoolName))
         : ''
       const r = await senden<{ id: string; code?: string; link?: string }>('/server/blaetter/freigeben', {
         titel,
@@ -287,6 +298,13 @@ export function BlattFreigabeDialog({
           </Group>
         )}
         <Checkbox label="Stift erlauben (Handschriftliches geht als Bild an die KI)" checked={stift} onChange={(e) => setStift(e.currentTarget.checked)} />
+        <Checkbox
+          label="Korrekturrand"
+          description="Rand neben den Schreiblinien – auf Ausdrucken leer für Korrekturen; digital stehen dort die KI-Kommentare. Das Original bleibt unverändert."
+          checked={korrekturrand}
+          onChange={(e) => setKorrekturrand(e.currentTarget.checked)}
+          data-freigabe-korrekturrand
+        />
         <Checkbox
           label="Aufgaben schrittweise freischalten"
           description="Die nächste Aufgabe erscheint erst, wenn die vorige mindestens teilweise treffend gelöst ist (KI-Feedback je Aufgabe oder Freischaltung durch die Lehrkraft). Links neben jeder Aufgabe steht eine Ampel."

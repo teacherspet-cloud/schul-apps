@@ -12,7 +12,7 @@ describe('Schrittweise Freischaltung und Ampel (05.10.2026)', () => {
   it('nächste Aufgabe erst, wenn die vorige mindestens gelb ist', () => {
     expect(sichtbarBis([1, 2, 3], {}, [], true)).toBe(1)
     expect(sichtbarBis([1, 2, 3], { '1': [{ einschaetzung: 'teilweise' }] }, [], true)).toBe(2)
-    expect(sichtbarBis([1, 2, 3], { '1': [{ einschaetzung: 'sicher' }] }, [2], true)).toBe(3)
+    expect(sichtbarBis([1, 2, 3], { '1': [{ einschaetzung: 'sicher' }] }, [2], true)).toBe(Number.POSITIVE_INFINITY)
     expect(sichtbarBis([1, 2, 3], {}, [], false)).toBe(Number.POSITIVE_INFINITY)
   })
   it('vollständig bearbeitet: alle mindestens gelb – Einreichen allein genügt nicht', () => {
