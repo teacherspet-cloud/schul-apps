@@ -34,7 +34,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowLeft, IconBooks, IconCalendarEvent, IconPlus, IconQrcode, IconTrash, IconUser } from '@tabler/icons-react'
+import { IconArrowLeft, IconBooks, IconCalendarEvent, IconPlus, IconQrcode, IconTrash, IconUser, IconUserMinus } from '@tabler/icons-react'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import { useCallback, useEffect, useState } from 'react'
@@ -332,7 +332,7 @@ interface Lernstanddaten {
   link?: string
   lerngruppe: string
   woerter: { id: string; term: string; translation: string }[]
-  lernende: { id: string; name: string; gast?: boolean; uebersicht: Uebersicht; tage7: number }[]
+  lernende: { id: string; name: string; gast?: boolean; perCode?: boolean; uebersicht: Uebersicht; tage7: number }[]
   gesamt: Uebersicht
   problem: { id: string; term: string; translation: string; versuche: number; falsch: number; quote: number; typisch: string[] }[]
 }
@@ -341,6 +341,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
   const [d, setD] = useState<Lernstanddaten | null>(null)
   const [qr, setQr] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
+  const [entfernen, setEntfernen] = useState<Lernstanddaten['lernende'][number] | null>(null)
   const laden = useCallback(() => void holen<Lernstanddaten>(`/server/vokabeln/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
   useEffect(laden, [laden])
   if (!d) return <Loader size="sm" />
@@ -506,6 +507,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
               <Table.Th>sicher</Table.Th>
               <Table.Th>fällig</Table.Th>
               <Table.Th>geübt (7 Tage)</Table.Th>
+              <Table.Th />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -527,6 +529,15 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
                 </Table.Td>
                 <Table.Td>{l.uebersicht.faellig}</Table.Td>
                 <Table.Td>{l.tage7 ? `an ${l.tage7} Tag${l.tage7 === 1 ? '' : 'en'}` : <Text c="dimmed">noch nicht</Text>}</Table.Td>
+                <Table.Td>
+                  {l.perCode && (
+                    <Tooltip label="Aus dieser Freigabe entfernen">
+                      <ActionIcon variant="subtle" color="red" onClick={() => setEntfernen(l)} aria-label={`${l.name} entfernen`} data-gast-entfernen={l.name}>
+                        <IconUserMinus size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -536,6 +547,24 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
           geschrieben im Abstand von mindestens einer Woche. Keine Rangliste – sortiert nach Namen.
         </Text>
       </Card>
+      <Modal opened={Boolean(entfernen)} onClose={() => setEntfernen(null)} title="Aus dieser Freigabe entfernen?">
+        {entfernen && (
+          <Stack gap="sm">
+            <Text size="sm">
+              „{entfernen.name}“ verliert sofort den Zugang zu diesen Vokabeln; der Lernstand dazu wird gelöscht.
+              {entfernen.gast ? ' Das Gastkonto wird ganz gelöscht.' : ' Das IServ-Konto selbst bleibt bestehen.'}
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setEntfernen(null)}>
+                Abbrechen
+              </Button>
+              <Button color="red" data-gast-entfernen-bestaetigen onClick={() => (aendern('gast-entfernen', { id: entfernen.id }), setEntfernen(null))}>
+                Entfernen
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       {lernende.length === 0 && <Alert>{d.code ? 'Noch niemand dabei – den QR-Code zeigen oder den Code nennen.' : 'Noch niemand in der Lerngruppe.'}</Alert>}
     </Stack>
   )

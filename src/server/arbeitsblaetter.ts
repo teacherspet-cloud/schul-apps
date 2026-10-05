@@ -35,6 +35,7 @@ import {
 import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
+import { gastEntfernen } from './gaeste'
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
@@ -564,15 +565,29 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
     if (!z || z.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
     if (req.method === 'GET' && teile.length === 1) {
       const namen = new Map(alleNutzer().map((n) => [n.id, n]))
-      const abgaben = (db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(z.id) as unknown as Abgabe[]).map(
-        (a) => ({
-          name: namen.get(a.schueler_id)?.name ?? '',
-          benutzer: namen.get(a.schueler_id)?.benutzer ?? '',
-          eingereicht: a.abgaben,
-          aktualisiert: a.aktualisiert,
-          fassungen: blattFassungen(z.rueckmeldung_id, a.schueler_id).map((f) => ({ nr: f.nr, zeit: f.zeit, bogen: f.volleBogen, fehler: f.fehler }))
-        })
+      // Per Code beigetreten (Gäste mit Namen, auch IServ-Konten) – entfernbar (05.10.2026)
+      const perCode = new Set(
+        (db().prepare('SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
       )
+      const zeilen = db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(z.id) as unknown as Abgabe[]
+      const abgaben = zeilen.map((a) => ({
+        id: a.schueler_id,
+        name: namen.get(a.schueler_id)?.name ?? '',
+        benutzer: namen.get(a.schueler_id)?.benutzer ?? '',
+        gast: namen.get(a.schueler_id)?.quelle === 'gast',
+        perCode: perCode.has(a.schueler_id),
+        eingereicht: a.abgaben,
+        aktualisiert: a.aktualisiert,
+        fassungen: blattFassungen(z.rueckmeldung_id, a.schueler_id).map((f) => ({ nr: f.nr, zeit: f.zeit, bogen: f.volleBogen, fehler: f.fehler }))
+      }))
+      // Beigetreten, aber noch nichts bearbeitet: auch sie stehen in der Liste
+      const begonnen = new Set(zeilen.map((a) => a.schueler_id))
+      for (const id of perCode) {
+        if (begonnen.has(id)) continue
+        const n = namen.get(id)
+        if (n)
+          abgaben.push({ id, name: n.name, benutzer: n.benutzer, gast: n.quelle === 'gast', perCode: true, eingereicht: 0, aktualisiert: 0, fassungen: [] })
+      }
       return (json(res, 200, { id: z.id, titel: z.titel, status: z.status, rueckmeldungId: z.rueckmeldung_id, abgaben }), true)
     }
     /*
@@ -608,6 +623,15 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       db().prepare('UPDATE blatt_freigaben SET status = ? WHERE id = ?').run(status, z.id)
       verknuepfteFreigabeStatus(z.rueckmeldung_id, status)
       return (json(res, 200, { ok: true }), true)
+    }
+    if (req.method === 'POST' && teile[1] === 'gast-entfernen') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const ok = gastEntfernen(
+        { tabelle: 'blatt_gaeste', spalte: 'freigabe_id', freigabeId: z.id, stand: [{ tabelle: 'blatt_abgaben', spalte: 'freigabe_id' }] },
+        String(k0.id ?? ''),
+        ich.id
+      )
+      return ok ? (json(res, 200, { ok: true }), true) : (json(res, 404, { fehler: 'Diese Person ist nicht per Code beigetreten.' }), true)
     }
     if (req.method === 'POST' && teile[1] === 'loeschen') {
       freigabeLoeschen(z)

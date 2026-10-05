@@ -24,6 +24,7 @@ import { getSettings } from '../main/services/storage/settings'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
+import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import {
   bewerte,
@@ -536,12 +537,17 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
       const woerter = json_(z.woerter, [] as Vokabel[])
       const jetzt = Date.now()
       const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
+      // Per Code/QR beigetreten – lässt sich wieder entfernen (05.10.2026)
+      const perCode = new Set(
+        (db().prepare('SELECT nutzer_id FROM vok_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
+      )
       const lernende = lernendeVon(z).map((n) => {
         const st = standVon(z.id, n.id)
         return {
           id: n.id,
           name: n.name || n.benutzer,
           gast: n.quelle === 'gast',
+          perCode: perCode.has(n.id),
           uebersicht: uebersicht(woerter, st.woerter, jetzt),
           tage7: st.tage.filter((t) => t >= vor7).length,
           stand: st.woerter
@@ -625,6 +631,14 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
         // Wieder öffnen nach abgelaufenem Zeitraum: Zeitraum aufheben
         if (auf && z.bis && z.bis < Date.now()) db().prepare('UPDATE vok_zuweisungen SET bis = NULL WHERE id = ?').run(z.id)
         return (json(res, 200, { ok: true }), true)
+      }
+      if (teile[1] === 'gast-entfernen') {
+        const ok = gastEntfernen(
+          { tabelle: 'vok_gaeste', spalte: 'zuweisung_id', freigabeId: z.id, stand: [{ tabelle: 'vok_stand', spalte: 'zuweisung_id' }] },
+          String(k0.id ?? ''),
+          ich.id
+        )
+        return ok ? (json(res, 200, { ok: true }), true) : (json(res, 404, { fehler: 'Diese Person ist nicht per Code beigetreten.' }), true)
       }
       if (teile[1] === 'loeschen') {
         // Gastkonten, die nur für dieses Training angelegt wurden, gehen mit

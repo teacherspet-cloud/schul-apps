@@ -5,7 +5,7 @@
  * Kästchen, Markierungen und Randkommentaren, wie die Lernenden es sehen – und als PDF sichern.
  */
 import { Badge, Button, Card, Center, Container, Group, Loader, Modal, SegmentedControl, Stack, Table, Text, TextInput, Title } from '@mantine/core'
-import { IconArrowLeft, IconEye, IconQrcode, IconSearch, IconTrash, IconUsersGroup } from '@tabler/icons-react'
+import { IconArrowLeft, IconEye, IconQrcode, IconSearch, IconTrash, IconUserMinus, IconUsersGroup } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
 import { Zugang } from '../onlinetest/OnlinetestModule'
@@ -32,7 +32,19 @@ interface Detail {
   id: string
   titel: string
   status: string
-  abgaben: { name: string; benutzer: string; eingereicht: number; aktualisiert: number; fassungen: { nr: number; zeit: string; fehler?: string }[] }[]
+  abgaben: {
+    /** Konto-Kennung (zum Entfernen) */
+    id: string
+    name: string
+    benutzer: string
+    /** Gast ohne IServ-Konto */
+    gast?: boolean
+    /** Per Code/QR beigetreten – lässt sich aus dieser Freigabe entfernen (05.10.2026) */
+    perCode?: boolean
+    eingereicht: number
+    aktualisiert: number
+    fassungen: { nr: number; zeit: string; fehler?: string }[]
+  }[]
 }
 
 export function useFreigaben(active = true): { liste: Freigabe[] | null; laden: () => void } {
@@ -202,6 +214,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
   const [kurz, setKurz] = useState<Freigabe | null>(null)
   const [blatt, setBlatt] = useState<BlattDaten | null>(null)
   const [qr, setQr] = useState(false)
+  const [entfernen, setEntfernen] = useState<Detail['abgaben'][number] | null>(null)
   const laden = useCallback(() => {
     void holen<Detail>(`/server/blaetter/${id}`).then(setD, (e: unknown) => notifyError(e))
     void holen<{ blaetter: Freigabe[] }>('/server/blaetter').then((x) => setKurz(x.blaetter.find((f) => f.id === id) ?? null))
@@ -264,14 +277,25 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
           <Table.Tbody>
             {d.abgaben.map((a) => (
               <Table.Tr key={a.benutzer || a.name}>
-                <Table.Td>{a.name || a.benutzer}</Table.Td>
+                <Table.Td>
+                  {a.name || a.benutzer}
+                  {a.perCode && (
+                    <Badge size="xs" variant="outline" color="gray" ml={6}>
+                      {a.gast ? 'Gast per QR' : 'per Code'}
+                    </Badge>
+                  )}
+                </Table.Td>
                 <Table.Td>
                   {a.eingereicht ? (
                     <Badge color="green" variant="light">
                       {a.eingereicht}× eingereicht
                     </Badge>
-                  ) : (
+                  ) : a.aktualisiert ? (
                     <Badge variant="light">in Arbeit</Badge>
+                  ) : (
+                    <Badge variant="light" color="gray">
+                      beigetreten
+                    </Badge>
                   )}
                   {a.fassungen.at(-1)?.fehler ? (
                     <Badge color="orange" variant="light" ml={4}>
@@ -286,17 +310,57 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                     variant="light"
                     leftSection={<IconEye size={14} />}
                     onClick={() => ansehen(a.benutzer)}
-                    disabled={!a.benutzer}
+                    disabled={!a.benutzer || !a.aktualisiert}
                     data-blatt-ansehen
                   >
                     Blatt ansehen
                   </Button>
+                  {a.perCode && (
+                    <Button
+                      size="xs"
+                      variant="subtle"
+                      color="red"
+                      leftSection={<IconUserMinus size={14} />}
+                      ml={4}
+                      onClick={() => setEntfernen(a)}
+                      data-gast-entfernen={a.name}
+                    >
+                      Entfernen
+                    </Button>
+                  )}
                 </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
         </Table>
       )}
+      <Modal opened={Boolean(entfernen)} onClose={() => setEntfernen(null)} title="Aus dieser Freigabe entfernen?">
+        {entfernen && (
+          <Stack gap="sm">
+            <Text size="sm">
+              „{entfernen.name || entfernen.benutzer}“ verliert sofort den Zugang zu diesem Blatt; die Einträge auf dem Blatt werden gelöscht.
+              {entfernen.gast ? ' Das Gastkonto wird ganz gelöscht.' : ' Das IServ-Konto selbst bleibt bestehen.'}
+            </Text>
+            <Group justify="flex-end">
+              <Button variant="default" onClick={() => setEntfernen(null)}>
+                Abbrechen
+              </Button>
+              <Button
+                color="red"
+                data-gast-entfernen-bestaetigen
+                onClick={() =>
+                  void senden(`/server/blaetter/${id}/gast-entfernen`, { id: entfernen.id }).then(
+                    () => (setEntfernen(null), laden()),
+                    (e: unknown) => notifyError(e)
+                  )
+                }
+              >
+                Entfernen
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       {qr && kurz?.code && kurz.link && (
         <Modal opened onClose={() => setQr(false)} title={d.titel} size="lg">
           <Zugang code={kurz.code} link={kurz.link} />
