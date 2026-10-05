@@ -11,7 +11,7 @@ import { getSettings } from './services/storage/settings'
 import { starteAutoSicherung } from './services/storage/autoSicherung'
 import { aktualisiereModelle, registriereKanaele } from './kanaele'
 import { electronUmgebung } from './umgebung'
-import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, STANDARD_GROESSE } from './fensterStand'
+import { begrenzeStand, FensterStand, leseStand, MINDEST_GROESSE, startGroesse } from './fensterStand'
 // Kopiert electron-vite beim Bauen nach out/ und liefert den Pfad (liegt damit auch in der .exe)
 import fensterSymbol from '../../build/icon.ico?asset'
 
@@ -149,7 +149,7 @@ function schuetzeSchliessen(win: BrowserWindow, haupt: boolean): void {
 function createWindow(): void {
   const stand = ladeFensterStand()
   mainWindow = new BrowserWindow({
-    ...(stand ? stand.bounds : STANDARD_GROESSE),
+    ...(stand ? stand.bounds : startGroesse(screen.getPrimaryDisplay().workArea)),
     minWidth: MINDEST_GROESSE.width,
     minHeight: MINDEST_GROESSE.height,
     show: false,
@@ -163,7 +163,7 @@ function createWindow(): void {
     }
   })
   mainWindow.on('ready-to-show', () => {
-    if (stand?.maximiert) mainWindow?.maximize()
+    // Immer als Fenster öffnen, auch wenn es zuletzt maximiert war (05.10.2026) – Größe und Lage bleiben gemerkt
     mainWindow?.show()
   })
 
@@ -292,9 +292,12 @@ if (!gotLock) {
         void Promise.resolve(start?.())
           .then((stand) => {
             const s = stand as { port?: number; wunschPort?: number } | undefined
-            if (s?.port && s.wunschPort && s.port !== s.wunschPort) protokolliere('warnung', 'netz', `Port ${s.wunschPort} belegt – Netzzugang läuft auf ${s.port}`)
+            if (s?.port && s.wunschPort && s.port !== s.wunschPort)
+              protokolliere('warnung', 'netz', `Port ${s.wunschPort} belegt – Netzzugang läuft auf ${s.port}`)
           })
-          .catch((e: unknown) => protokolliere('fehler', 'netz', `Netzzugang ließ sich beim Start nicht einschalten: ${e instanceof Error ? e.message : String(e)}`))
+          .catch((e: unknown) =>
+            protokolliere('fehler', 'netz', `Netzzugang ließ sich beim Start nicht einschalten: ${e instanceof Error ? e.message : String(e)}`)
+          )
       }
     } catch {
       // Der Start des Programms hängt nie am Netzzugang

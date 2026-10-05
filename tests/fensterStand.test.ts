@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { begrenzeStand, leseStand } from '../src/main/fensterStand'
+import { begrenzeStand, leseStand, startGroesse } from '../src/main/fensterStand'
 
 /*
  * Fenstergröße und -lage werden gemerkt – aber nie so wiederhergestellt, dass das Fenster
@@ -37,5 +37,15 @@ describe('Fensterstand', () => {
       bounds: { x: 1, y: 2, width: 1200, height: 800 },
       maximiert: false
     })
+  })
+})
+
+describe('startGroesse (05.10.2026: als Fenster, nicht bildschirmfüllend)', () => {
+  it('kleiner Bildschirm: höchstens 85 %, mittig', () => {
+    const r = startGroesse({ x: 0, y: 0, width: 1366, height: 728 })
+    expect(r).toEqual({ x: 103, y: 55, width: 1161, height: 619 })
+  })
+  it('großer Bildschirm: Standardgröße, mittig', () => {
+    expect(startGroesse({ x: 0, y: 0, width: 2560, height: 1400 })).toEqual({ x: 580, y: 250, width: 1400, height: 900 })
   })
 })

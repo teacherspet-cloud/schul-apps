@@ -30,6 +30,18 @@ export interface FensterStand {
 export const STANDARD_GROESSE = { width: 1400, height: 900 }
 export const MINDEST_GROESSE = { width: 1000, height: 700 }
 
+/**
+ * Erste Größe ohne gemerkten Stand (05.10.2026, Wunsch der Lehrkraft: „Lass sie sich als Fenster öffnen,
+ * das nicht den ganzen Bildschirm belegt"): höchstens 85 % der Arbeitsfläche, mittig. Auf einem kleinen
+ * Laptop-Bildschirm füllte 1400 × 900 sonst praktisch alles aus.
+ */
+export function startGroesse(flaeche: Rechteck | undefined): Rechteck | typeof STANDARD_GROESSE {
+  if (!flaeche) return STANDARD_GROESSE
+  const width = Math.round(Math.min(STANDARD_GROESSE.width, flaeche.width * 0.85))
+  const height = Math.round(Math.min(STANDARD_GROESSE.height, flaeche.height * 0.85))
+  return { x: Math.round(flaeche.x + (flaeche.width - width) / 2), y: Math.round(flaeche.y + (flaeche.height - height) / 2), width, height }
+}
+
 /** Liest einen gespeicherten Stand; alles Unplausible gilt als „nichts gemerkt". */
 export function leseStand(roh: unknown): FensterStand | null {
   if (!roh || typeof roh !== 'object') return null

@@ -13,10 +13,20 @@
  *    Die Oberfläche ruft das über `window.__schulappsClient.iserv` auf (preload.ts).
  *  - Ohne Verbindung: eine Hinweisseite mit „Erneut versuchen".
  */
-import { app, BrowserWindow, ipcMain, Menu, safeStorage, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, safeStorage, screen, session, shell } from 'electron'
+import { begrenzeStand, leseStand, startGroesse, type FensterStand } from '../main/fensterStand'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { iservAblegen, iservEintraege, iservLaden, iservOrdner, iservStatus, iservTrennen, iservVerbinden, type IservGeraet } from '../main/services/iserv/iserv'
+import {
+  iservAblegen,
+  iservEintraege,
+  iservLaden,
+  iservOrdner,
+  iservStatus,
+  iservTrennen,
+  iservVerbinden,
+  type IservGeraet
+} from '../main/services/iserv/iserv'
 import type { DavAbruf } from '../main/services/iserv/webdav'
 import type { AblageZiel } from '@shared/types'
 import { getSettings, setSettings } from '../main/services/storage/settings'
@@ -113,7 +123,8 @@ function lokaleMaskottchen(): { id: string; name: string; beschreibung: string; 
     try {
       const meta = JSON.parse(readFileSync(metaDatei, 'utf8')) as { name?: string; beschreibung?: string; quelle?: string }
       const posen: Record<string, string> = {}
-      for (const f of readdirSync(ordner)) if (f.endsWith('.png') && f !== 'vorlage.png' && /^[a-z0-9-]+\.png$/i.test(f)) posen[f.slice(0, -4)] = png(join(ordner, f))
+      for (const f of readdirSync(ordner))
+        if (f.endsWith('.png') && f !== 'vorlage.png' && /^[a-z0-9-]+\.png$/i.test(f)) posen[f.slice(0, -4)] = png(join(ordner, f))
       out.push({
         id,
         name: meta.name ?? id,
@@ -139,9 +150,20 @@ const OFFLINE = (adresse: string, fehler: string): string =>
 function fenster(): void {
   const adresse = serverAdresse()
   const ursprung = new URL(adresse).origin
+  // Größe und Lage merken, aber als Fenster öffnen – nicht mehr maximiert (05.10.2026, Wunsch der Lehrkraft)
+  const standDatei = join(app.getPath('userData'), 'fenster.json')
+  let stand: FensterStand | null = null
+  try {
+    if (existsSync(standDatei))
+      stand = begrenzeStand(
+        leseStand(JSON.parse(readFileSync(standDatei, 'utf-8'))),
+        screen.getAllDisplays().map((d) => d.workArea)
+      )
+  } catch {
+    stand = null
+  }
   const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    ...(stand ? stand.bounds : startGroesse(screen.getPrimaryDisplay().workArea)),
     minWidth: 900,
     minHeight: 600,
     title: 'Schul-Apps Online',
@@ -155,7 +177,13 @@ function fenster(): void {
       spellcheck: true
     }
   })
-  win.maximize()
+  win.on('close', () => {
+    try {
+      writeFileSync(standDatei, JSON.stringify({ bounds: win.getNormalBounds(), maximiert: win.isMaximized() } satisfies FensterStand))
+    } catch {
+      // Merken ist Komfort
+    }
+  })
   win.webContents.session.setSpellCheckerLanguages(['de-DE'])
 
   // Nur Server und IServ-Anmeldung im Fenster; alles andere im Browser des Systems
