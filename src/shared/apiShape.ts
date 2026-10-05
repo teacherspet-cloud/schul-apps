@@ -10,6 +10,7 @@
  * WELCHE Aufrufe aus dem Netz überhaupt erlaubt sind, steht NICHT hier, sondern im Server
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
+import type { MedienBild, MedienKandidat, MedienSicht, MedienTon, TonArt } from './medienbank'
 import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
 import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
@@ -478,6 +479,22 @@ export function buildApi(call: Call, extras: ApiExtras) {
       delete: (id: string) => call<MaskottchenInfo[]>('maskottchen:delete', id)
     },
     /** Hörtexte vertonen (ElevenLabs) */
+    /** Medienbank der Vokabeln (05.10.2026, shared/medienbank.ts) – ändern am Server nur Admins */
+    medien: {
+      eintraege: (sprache: string, woerter: string[]) => call<Record<string, MedienSicht>>('medien:eintraege', sprache, woerter),
+      /** Datei als data-URL (Ton, Bild in voller Größe); null, wenn es sie nicht mehr gibt */
+      datei: (datei: string) => call<string | null>('medien:datei', datei),
+      stimmen: () => call<Record<string, string>>('medien:stimmen'),
+      stimmeSetzen: (sprache: string, stimme: string) => call<Record<string, string>>('medien:stimme-setzen', sprache, stimme),
+      bildSetzen: (sprache: string, wort: string, b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] }) =>
+        call<MedienBild>('medien:bild-setzen', sprache, wort, b),
+      bildLoeschen: (sprache: string, wort: string) => call<void>('medien:bild-loeschen', sprache, wort),
+      tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }) =>
+        call<MedienTon>('medien:ton-setzen', sprache, wort, art, t),
+      tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string) => call<void>('medien:ton-loeschen', sprache, wort, art, satz),
+      /** Darf diese Person die Medienbank (und gemeinsame Lehrwerke) bearbeiten? */
+      admin: () => call<boolean>('medien:admin')
+    },
     audio: {
       voices: () => call<TtsVoice[]>('audio:voices'),
       speak: (req: TtsRequest) => call<TtsResult>('audio:speak', req),

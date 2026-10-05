@@ -70,7 +70,9 @@ const MATERIAL = [
   'bewertungstabellen',
   'nachteilsausgleiche',
   'piktogramme',
-  'hoertexte'
+  'hoertexte',
+  // Medienbank der Vokabeln: Beispielbilder und Aussprache (05.10.2026) – haben KI-Kontingent gekostet
+  'medienbank'
 ]
 
 /**

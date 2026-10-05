@@ -14,6 +14,8 @@ import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/Voka
 import type { VocabRow } from './VocabRow'
 import { istVerbSprache } from '@shared/verben'
 import VerbListeDialog from '../../../shared/verben/VerbListeDialog'
+import { aufServer } from '../../../shared/plattform'
+import { MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
 
 /** Zeile in einen Lehrwerks-Eintrag überführen: getrimmt und ohne leere Felder. */
 function clean(row: Omit<VocabRow, 'id'>): TextbookEntry {
@@ -50,6 +52,17 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
   const [verbenOffen, setVerbenOffen] = useState(false)
   // Alle Lehrwerke – Vorschlagslisten für Reihe, Verlag, Landesausgabe, Ausgabe
   const [alle, setAlle] = useState<TextbookMeta[]>([])
+  /*
+   * Gemeinsame Datenbank (05.10.2026, main/services/storage/textbooks.ts): Am Server sind die mitgelieferten
+   * Lehrwerke gemeinsam – Admins bearbeiten sie für alle, Lehrkräfte sehen sie nur an.
+   */
+  const admin = useMedienAdmin()
+  const gemeinsam = aufServer() && Boolean(book?.builtIn)
+  const gesperrt = gemeinsam && !admin
+  const medien = useMedienbank(
+    book?.language,
+    rows.map((r) => r.term)
+  )
   useEffect(() => {
     window.api.textbooks
       .list()
@@ -88,7 +101,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
   }, [geladen, unit, section])
 
   const save = async (vonHand = false): Promise<void> => {
-    if (!book) return
+    if (!book || gesperrt) return
     const gesichert = stand.current
     setSaving(true)
     try {
@@ -126,6 +139,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
   }
   const sicherung = useVerzoegertesSichern(() => save())
   const geaendert = (): void => {
+    if (gesperrt) return
     stand.current++
     setDirty(true)
     sicherung.plane(1200)
@@ -150,7 +164,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
       const fresh = await window.api.textbooks.get(book.id)
       setBook(fresh)
       setGeladen((n) => n + 1)
-      notifySuccess('Die eigenen Änderungen wurden verworfen.')
+      notifySuccess(gemeinsam ? 'Die Änderungen am gemeinsamen Lehrwerk wurden verworfen.' : 'Die eigenen Änderungen wurden verworfen.')
     } catch (e) {
       notifyError(e)
     }
@@ -166,7 +180,11 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
         <div style={{ minWidth: 0 }}>
           <Group gap="xs">
             <Title order={3}>{book.name}</Title>
-            {book.builtIn ? (
+            {gemeinsam ? (
+              <Badge variant="light" color="violet" data-gemeinsam>
+                gemeinsam
+              </Badge>
+            ) : book.builtIn ? (
               <Badge variant="light">mitgeliefert</Badge>
             ) : (
               <Badge variant="light" color="teal">
@@ -175,7 +193,7 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
             )}
           </Group>
           <Text c="dimmed" size="sm">
-            Unit und Abschnitt wählen, dann die Vokabeln ändern oder ergänzen.
+            {gesperrt ? 'Unit und Abschnitt wählen, um die Vokabeln anzusehen.' : 'Unit und Abschnitt wählen, dann die Vokabeln ändern oder ergänzen.'}
           </Text>
         </div>
         <Group wrap="nowrap">
@@ -187,21 +205,23 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
               Unregelmäßige Verben
             </Button>
           )}
-          {!book.builtIn && (
+          {(!book.builtIn || (gemeinsam && admin)) && (
             <Button variant="subtle" color="red" onClick={() => setConfirmReset(true)}>
               Änderungen verwerfen
             </Button>
           )}
           {/* Zeigt den Stand; ein Klick sichert sofort, statt die kurze Wartezeit abzuwarten */}
-          <Button
-            variant={dirty ? 'filled' : 'light'}
-            leftSection={dirty ? <IconDeviceFloppy size={16} /> : <IconCheck size={16} />}
-            disabled={!dirty}
-            loading={saving}
-            onClick={() => void sicherung.sofort().then(() => save(true))}
-          >
-            {dirty ? 'Speichern' : 'Gesichert'}
-          </Button>
+          {!gesperrt && (
+            <Button
+              variant={dirty ? 'filled' : 'light'}
+              leftSection={dirty ? <IconDeviceFloppy size={16} /> : <IconCheck size={16} />}
+              disabled={!dirty}
+              loading={saving}
+              onClick={() => void sicherung.sofort().then(() => save(true))}
+            >
+              {dirty ? 'Speichern' : 'Gesichert'}
+            </Button>
+          )}
         </Group>
       </Group>
 
@@ -213,7 +233,11 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
       {confirmReset && (
         <Alert color="red" p="xs">
           <Group justify="space-between">
-            <Text size="sm">Alle eigenen Änderungen an diesem Lehrwerk verwerfen? Danach gilt wieder die mitgelieferte Fassung.</Text>
+            <Text size="sm">
+              {gemeinsam
+                ? 'Alle Änderungen am gemeinsamen Lehrwerk verwerfen – für alle Lehrkräfte? Danach gilt wieder die mitgelieferte Fassung.'
+                : 'Alle eigenen Änderungen an diesem Lehrwerk verwerfen? Danach gilt wieder die mitgelieferte Fassung.'}
+            </Text>
             <Group gap="xs" wrap="nowrap">
               <Button size="xs" variant="default" onClick={() => setConfirmReset(false)}>
                 Abbrechen
@@ -301,9 +325,13 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
       </Card>
 
       {book.builtIn && (
-        <Alert color="gray" p="xs">
+        <Alert color={gemeinsam ? 'violet' : 'gray'} p="xs" data-lehrwerk-hinweis>
           <Text size="xs">
-            Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die sich jederzeit wieder verwerfen lässt.
+            {gesperrt
+              ? 'Gemeinsames Lehrwerk der Schule – nur Admins können es bearbeiten. Für eigene Änderungen eine eigene Vokabelliste anlegen.'
+              : gemeinsam
+                ? 'Gemeinsames Lehrwerk der Schule: Änderungen gelten sofort für alle Lehrkräfte und Lernenden. „Änderungen verwerfen" stellt die mitgelieferte Fassung wieder her.'
+                : 'Das mitgelieferte Lehrwerk bleibt erhalten: Beim Speichern legt die App eine eigene Fassung an, die sich jederzeit wieder verwerfen lässt.'}
           </Text>
         </Alert>
       )}
@@ -320,20 +348,32 @@ export default function BookEditor({ bookId, onBack, aktiv = true }: { bookId: s
               </Badge>
             )}
           </Group>
-          <UndoRedoButtons
-            size="sm"
-            canUndo={verlauf.kannUndo}
-            canRedo={verlauf.kannRedo}
-            onUndo={() => verlauf.undo() && geaendert()}
-            onRedo={() => verlauf.redo() && geaendert()}
-          />
+          {!gesperrt && (
+            <UndoRedoButtons
+              size="sm"
+              canUndo={verlauf.kannUndo}
+              canRedo={verlauf.kannRedo}
+              onUndo={() => verlauf.undo() && geaendert()}
+              onRedo={() => verlauf.redo() && geaendert()}
+            />
+          )}
         </Group>
+        {admin && (
+          <MedienLeiste
+            sprache={book.language}
+            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation, example: r.example }))}
+            daten={medien.daten}
+            neuLaden={medien.laden}
+          />
+        )}
         {/* Schulbücher führen den Beispielsatz in einem eigenen Feld, nicht im Hinweis */}
         <VokabelTabelle
           zeilen={rows}
           mitBeispiel
           mitVerlauf
           sprache={book.language}
+          nurLesen={gesperrt}
+          medien={{ sprache: book.language, daten: medien.daten, admin, neuLaden: medien.laden }}
           onChange={(r, gruppe) => {
             verlauf.setze(r, gruppe)
             geaendert()

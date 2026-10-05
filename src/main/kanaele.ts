@@ -10,6 +10,9 @@
  *
  * Electron-Fassung der Umgebung: main/umgebung.ts. iPad-Fassung: mobil/umgebung.ts.
  */
+import { bildLoeschen, bildSetzen, medienDatei, medienFuer, stimmeSetzen, stimmenLesen, tonLoeschen, tonSetzen } from './services/storage/medienbank'
+import type { TonArt } from '@shared/medienbank'
+import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
@@ -505,6 +508,31 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('maskottchen:pose', (id: string, pose: string, dataUrl: string) => savePose(id, pose, dataUrl))
   handle('maskottchen:delete-pose', (id: string, pose: string) => deletePose(id, pose))
   handle('maskottchen:delete', (id: string) => deleteMaskottchen(id))
+
+  /*
+   * Medienbank der Vokabeln (05.10.2026, storage/medienbank.ts): Beispielbild, Aussprache von Wort und
+   * Beispielsatz – einmal je Sprache und Wort. Ändern am Server nur Admins (rolle.ts).
+   */
+  handle('medien:eintraege', (sprache: string, woerter: string[]) =>
+    medienFuer(sprache, Array.isArray(woerter) ? woerter.map(String) : [], { mitBildern: true })
+  )
+  handle('medien:datei', (datei: string) => medienDatei(String(datei)))
+  handle('medien:stimmen', () => stimmenLesen())
+  handle('medien:stimme-setzen', (sprache: string, stimme: string) => (nurAdmin('Die Standardstimmen'), stimmeSetzen(sprache, stimme)))
+  handle(
+    'medien:bild-setzen',
+    (sprache: string, wort: string, b: Parameters<typeof bildSetzen>[2]) => (nurAdmin('Die Beispielbilder'), bildSetzen(sprache, wort, b))
+  )
+  handle('medien:bild-loeschen', (sprache: string, wort: string) => (nurAdmin('Die Beispielbilder'), bildLoeschen(sprache, wort)))
+  handle(
+    'medien:ton-setzen',
+    (sprache: string, wort: string, art: TonArt, t: Parameters<typeof tonSetzen>[3]) => (nurAdmin('Die Aussprache'), tonSetzen(sprache, wort, art, t))
+  )
+  handle(
+    'medien:ton-loeschen',
+    (sprache: string, wort: string, art: TonArt, satz?: string) => (nurAdmin('Die Aussprache'), tonLoeschen(sprache, wort, art, satz))
+  )
+  handle('medien:admin', () => istAdmin())
 
   handle('audio:voices', () => listVoices())
   handle('audio:speak', (req: TtsRequest) => speak(req))

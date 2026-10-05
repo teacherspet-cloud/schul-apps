@@ -1,3 +1,6 @@
+import { satzSchluessel, sprachKurz, type MedienSicht, type TonArt } from '@shared/medienbank'
+import { BildDialog, BildZelle, TonZelle } from '../../../shared/medien/MedienUi'
+import { tonErzeugen } from '../../../shared/medien/medienbank'
 import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, TextInput, Tooltip } from '@mantine/core'
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
@@ -83,7 +86,9 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   mitBeispiel = false,
   mitVerlauf = false,
   bereinige,
-  sprache
+  sprache,
+  nurLesen = false,
+  medien
 }: {
   zeilen: T[]
   /** Neue Zeilen; `gruppe` fasst fortlaufendes Tippen im selben Feld zu EINEM Verlaufsschritt */
@@ -98,6 +103,10 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   bereinige?: (zeile: T, patch: Partial<T>) => Partial<T>
   /** Sprachcode der Wörter (Schrift, Sonderzeichen, Spaltennamen) – fehlt = ohne Besonderheiten */
   sprache?: string
+  /** Nur ansehen (gemeinsames Lehrwerk für Lehrkräfte, 05.10.2026) */
+  nurLesen?: boolean
+  /** Medienbank: Spalten Beispielbild, Aussprache, Satz-Aussprache (05.10.2026, shared/medien) */
+  medien?: { sprache: string; daten: Record<string, MedienSicht>; admin: boolean; neuLaden: () => void }
 }): React.JSX.Element {
   // Stabile Rückrufe: Sonst zeichnet die Tabelle (oft weit über hundert Zeilen) bei jedem
   // Tastendruck ALLE Zeilen neu, und das Tippen wird spürbar zäh.
@@ -105,6 +114,27 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   aktuell.current = { zeilen, onChange, bereinige }
   const [fokus, setFokus] = useState<{ id: string; feld: Feld } | null>(null)
   const tabelle = useRef<HTMLTableElement>(null)
+  // Medienbank: offenes Bild-Pop-up und Standardstimme der Sprache (für einzelne Aussprachen)
+  const [bildOffen, setBildOffen] = useState<TabellenZeile | null>(null)
+  const [stimme, setStimme] = useState('')
+  const medienSprache = medien ? sprachKurz(medien.sprache) : ''
+  const medienAdmin = Boolean(medien?.admin)
+  const neuLaden = medien?.neuLaden
+  useEffect(() => {
+    if (medienAdmin && medienSprache)
+      void window.api.medien.stimmen().then(
+        (s) => setStimme(s[medienSprache] ?? ''),
+        () => setStimme('')
+      )
+  }, [medienAdmin, medienSprache])
+  const tonErzeugenFuer = useCallback(
+    async (wort: string, art: TonArt, text: string): Promise<void> => {
+      if (!stimme) throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte).')
+      await tonErzeugen(medienSprache, wort, art, text, stimme)
+      neuLaden?.()
+    },
+    [stimme, medienSprache, neuLaden]
+  )
 
   useEffect(() => {
     if (!fokus) return
@@ -182,7 +212,14 @@ export default function VokabelTabelle<T extends TabellenZeile>({
                 </Table.Th>
               )}
               <Table.Th>{mitBeispiel ? 'Hinweis' : 'Beispiel / Hinweis'}</Table.Th>
-              <Table.Th w={72} />
+              {medien && (
+                <>
+                  <Table.Th w={64}>Beispielbild</Table.Th>
+                  <Table.Th w={72}>Aussprache</Table.Th>
+                  {mitBeispiel && <Table.Th w={72}>Satz-Aussprache</Table.Th>}
+                </>
+              )}
+              {!nurLesen && <Table.Th w={72} />}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -200,14 +237,32 @@ export default function VokabelTabelle<T extends TabellenZeile>({
                 weiter={weiter}
                 neueZeile={neueZeile}
                 sprache={sprache}
+                nurLesen={nurLesen}
+                medienAn={Boolean(medien)}
+                sicht={medien?.daten[z.term]}
+                medienAdmin={medienAdmin}
+                bildOeffnen={setBildOffen}
+                tonErzeugen={tonErzeugenFuer}
               />
             ))}
           </Table.Tbody>
         </Table>
       </Box>
-      <Button variant="subtle" leftSection={<IconPlus size={16} />} mt="xs" onClick={() => neueZeile()}>
-        Zeile hinzufügen
-      </Button>
+      {!nurLesen && (
+        <Button variant="subtle" leftSection={<IconPlus size={16} />} mt="xs" onClick={() => neueZeile()}>
+          Zeile hinzufügen
+        </Button>
+      )}
+      {medien && bildOffen && (
+        <BildDialog
+          sprache={medienSprache}
+          v={{ term: bildOffen.term, translation: bildOffen.translation, example: bildOffen.example }}
+          sicht={medien.daten[bildOffen.term]}
+          admin={medienAdmin}
+          schliessen={() => setBildOffen(null)}
+          geaendert={() => medien.neuLaden()}
+        />
+      )}
     </>
   )
 }
@@ -224,6 +279,13 @@ interface ZeilenProps {
   weiter: (id: string, feld: Feld) => void
   neueZeile: (nach?: string) => void
   sprache?: string
+  nurLesen: boolean
+  /** Spalten der Medienbank zeigen – einzelne Werte statt eines Objekts, damit `memo` greift */
+  medienAn: boolean
+  sicht?: MedienSicht
+  medienAdmin: boolean
+  bildOeffnen: (z: TabellenZeile) => void
+  tonErzeugen: (wort: string, art: TonArt, text: string) => Promise<void>
 }
 
 const Zeile = memo(function Zeile({
@@ -237,7 +299,13 @@ const Zeile = memo(function Zeile({
   loeschen,
   weiter,
   neueZeile,
-  sprache
+  sprache,
+  nurLesen,
+  medienAn,
+  sicht,
+  medienAdmin,
+  bildOeffnen,
+  tonErzeugen: tonFuer
 }: ZeilenProps): React.JSX.Element {
   const name = v.term.trim() || `Zeile ${nr}`
   const abgefragt = v.include !== false
@@ -246,39 +314,46 @@ const Zeile = memo(function Zeile({
   const feld = (f: Feld, label: string, placeholder?: string, letztesFeld = false): React.JSX.Element => {
     const attr = zielsprachig(f) ? sprachAttribute(sprache) : {}
     return (
-    <TextInput
-      variant="unstyled"
-      aria-label={`${label} in Zeile ${nr}`}
-      placeholder={placeholder}
-      value={(v[f] as string | undefined) ?? ''}
-      data-zeile={v.id}
-      data-feld={f}
-      lang={attr.lang}
-      dir={attr.dir}
-      styles={{
-        input: {
-          ...(f === 'term' && v.grey ? { color: 'var(--mantine-color-dimmed)' } : {}),
-          ...(attr.style ?? {})
-        }
-      }}
-      onChange={(e) => aendern(v.id, { [f]: e.currentTarget.value }, `zeile:${v.id}:${f}`)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          weiter(v.id, f)
-        } else if (e.key === 'Tab' && !e.shiftKey && letzte && letztesFeld) {
-          e.preventDefault()
-          neueZeile()
-        }
-      }}
-    />
+      <TextInput
+        variant="unstyled"
+        aria-label={`${label} in Zeile ${nr}`}
+        placeholder={placeholder}
+        value={(v[f] as string | undefined) ?? ''}
+        readOnly={nurLesen}
+        data-zeile={v.id}
+        data-feld={f}
+        lang={attr.lang}
+        dir={attr.dir}
+        styles={{
+          input: {
+            ...(f === 'term' && v.grey ? { color: 'var(--mantine-color-dimmed)' } : {}),
+            ...(attr.style ?? {})
+          }
+        }}
+        onChange={(e) => aendern(v.id, { [f]: e.currentTarget.value }, `zeile:${v.id}:${f}`)}
+        onKeyDown={(e) => {
+          if (nurLesen) return
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            weiter(v.id, f)
+          } else if (e.key === 'Tab' && !e.shiftKey && letzte && letztesFeld) {
+            e.preventDefault()
+            neueZeile()
+          }
+        }}
+      />
     )
   }
   return (
     <Table.Tr data-zusatz={v.grey ? '' : undefined} style={abfragen && !abgefragt ? { opacity: 0.6 } : undefined}>
       {abfragen && (
         <Table.Td>
-          <Checkbox aria-label={`„${name}“ abfragen`} checked={abgefragt} onChange={(e) => aendern(v.id, { include: e.currentTarget.checked })} />
+          <Checkbox
+            aria-label={`„${name}“ abfragen`}
+            checked={abgefragt}
+            disabled={nurLesen}
+            onChange={(e) => aendern(v.id, { include: e.currentTarget.checked })}
+          />
         </Table.Td>
       )}
       <Table.Td>
@@ -317,38 +392,62 @@ const Zeile = memo(function Zeile({
             placeholder="Übersetzung des Beispielsatzes"
             aria-label={`Übersetzung des Beispielsatzes in Zeile ${nr}`}
             value={v.exampleTranslation ?? ''}
+            readOnly={nurLesen}
             onChange={(e) => aendern(v.id, { exampleTranslation: e.currentTarget.value }, `zeile:${v.id}:exampleTranslation`)}
           />
         </Table.Td>
       )}
       <Table.Td>{feld('note', mitBeispiel ? 'Hinweis' : 'Beispiel oder Hinweis', undefined, true)}</Table.Td>
-      <Table.Td>
-        <Group gap={2} wrap="nowrap" justify="flex-end">
-          <Menu position="bottom-end" withinPortal>
-            <Menu.Target>
-              <ActionIcon variant="subtle" color="gray" aria-label={`Weitere Aktionen für „${name}“`}>
-                <IconDots size={16} />
+      {medienAn && (
+        <>
+          <Table.Td>
+            <BildZelle sicht={sicht} wort={v.term} onOeffnen={() => bildOeffnen(v)} />
+          </Table.Td>
+          <Table.Td>
+            <TonZelle ton={sicht?.ton} text={v.term} art="wort" admin={medienAdmin} erzeugen={() => tonFuer(v.term, 'wort', v.term)} />
+          </Table.Td>
+          {mitBeispiel && (
+            <Table.Td>
+              <TonZelle
+                ton={v.example ? sicht?.saetze?.[satzSchluessel(v.example)] : undefined}
+                text={v.example ?? ''}
+                art="satz"
+                admin={medienAdmin}
+                erzeugen={() => tonFuer(v.term, 'satz', v.example ?? '')}
+              />
+            </Table.Td>
+          )}
+        </>
+      )}
+      {!nurLesen && (
+        <Table.Td>
+          <Group gap={2} wrap="nowrap" justify="flex-end">
+            <Menu position="bottom-end" withinPortal>
+              <Menu.Target>
+                <ActionIcon variant="subtle" color="gray" aria-label={`Weitere Aktionen für „${name}“`}>
+                  <IconDots size={16} />
+                </ActionIcon>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={() => aendern(v.id, { grey: !v.grey })}>
+                  {v.grey ? `Nicht mehr als ${ZUSATZ} kennzeichnen` : `Als ${ZUSATZ} kennzeichnen`}
+                </Menu.Item>
+                <Menu.Item onClick={() => aendern(v.id, { inBox: !v.inBox })}>
+                  {v.inBox ? 'Nicht mehr als Kasten-Wort kennzeichnen' : 'Als Kasten-Wort kennzeichnen'}
+                </Menu.Item>
+                <Menu.Item leftSection={<IconPlus size={14} />} onClick={() => neueZeile(v.id)}>
+                  Zeile darunter einfügen
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+            <Tooltip label={mitVerlauf ? 'Zeile löschen (Strg+Z holt sie zurück)' : 'Zeile löschen'}>
+              <ActionIcon variant="subtle" color="gray" aria-label={`Zeile ${nr} löschen („${name}“)`} onClick={() => loeschen(v.id)}>
+                <IconTrash size={16} />
               </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item onClick={() => aendern(v.id, { grey: !v.grey })}>
-                {v.grey ? `Nicht mehr als ${ZUSATZ} kennzeichnen` : `Als ${ZUSATZ} kennzeichnen`}
-              </Menu.Item>
-              <Menu.Item onClick={() => aendern(v.id, { inBox: !v.inBox })}>
-                {v.inBox ? 'Nicht mehr als Kasten-Wort kennzeichnen' : 'Als Kasten-Wort kennzeichnen'}
-              </Menu.Item>
-              <Menu.Item leftSection={<IconPlus size={14} />} onClick={() => neueZeile(v.id)}>
-                Zeile darunter einfügen
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-          <Tooltip label={mitVerlauf ? 'Zeile löschen (Strg+Z holt sie zurück)' : 'Zeile löschen'}>
-            <ActionIcon variant="subtle" color="gray" aria-label={`Zeile ${nr} löschen („${name}“)`} onClick={() => loeschen(v.id)}>
-              <IconTrash size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-      </Table.Td>
+            </Tooltip>
+          </Group>
+        </Table.Td>
+      )}
     </Table.Tr>
   )
 })

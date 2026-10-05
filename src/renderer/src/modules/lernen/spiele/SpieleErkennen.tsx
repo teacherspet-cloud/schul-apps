@@ -3,6 +3,8 @@
  * Satzpuzzle. Jedes Spiel meldet am Ende seinen Wert (Züge, Sekunden, Treffer) und die Wörter, die
  * danebengingen – der Karteikasten bleibt unverändert.
  */
+import { hatSatzAufnahme } from '../medienCache'
+import { HoerKnopf } from './SpieleMedien'
 import { Badge, Button, Group, Progress, SimpleGrid, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { auswahlOptionen, type Vokabel } from '@shared/vokabeltrainer'
@@ -250,9 +252,16 @@ export function Blitzrunde({ woerter, ende }: SpielProps): React.JSX.Element {
 
 // ---------------------------------------------------------------- Satzpuzzle
 
-export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
+/**
+ * Satzpuzzle; `hoeren` (Satz-Diktat, 05.10.2026): nur Sätze mit Aufnahme, statt der Übersetzung erklingt der
+ * Satz (Medienbank) – ordnen nach Gehör.
+ */
+export function Satzpuzzle({ woerter, ende, hoeren = false }: SpielProps & { hoeren?: boolean }): React.JSX.Element {
   const farbe = useVtFarbe()
-  const saetze = useMemo(() => gemischt(woerter.filter((w) => w.example && satzTeile(w.example).length >= 3)).slice(0, 5), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const saetze = useMemo(
+    () => gemischt(woerter.filter((w) => w.example && satzTeile(w.example).length >= 3 && (!hoeren || hatSatzAufnahme(w.example)))).slice(0, 5),
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  )
   const [i, setI] = useState(0)
   const [gelegt, setGelegt] = useState<number[]>([])
   const [geloest, setGeloest] = useState(0)
@@ -275,7 +284,7 @@ export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
     setUrteil(null)
   }
   return (
-    <Stack data-spiel="satz" align="center">
+    <Stack data-spiel={hoeren ? 'satzhoeren' : 'satz'} align="center">
       <Group justify="space-between" w="100%">
         <Text c="dimmed" size="sm">
           Satz {i + 1} von {saetze.length} · mit „{spielform(v.term)}“
@@ -284,10 +293,14 @@ export function Satzpuzzle({ woerter, ende }: SpielProps): React.JSX.Element {
           {geloest} gelöst
         </Badge>
       </Group>
-      {v.exampleTranslation && (
-        <Text size="sm" c="dimmed" fs="italic" ta="center">
-          {v.exampleTranslation}
-        </Text>
+      {hoeren ? (
+        <HoerKnopf key={v.id} text={v.example!} farbe={farbe.a} />
+      ) : (
+        v.exampleTranslation && (
+          <Text size="sm" c="dimmed" fs="italic" ta="center">
+            {v.exampleTranslation}
+          </Text>
+        )
       )}
       {/* Gelegte Wörter antippen nimmt sie wieder heraus (Wunsch der Lehrkraft, 03.10.2026) */}
       <div className="vt-gelegt" style={{ minHeight: 64, width: '100%', display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }} data-satz-gelegt>

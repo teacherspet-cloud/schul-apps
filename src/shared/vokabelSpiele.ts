@@ -8,7 +8,7 @@
  */
 import { ohneAngaben, varianten, type Vokabel, type WortStand } from './vokabeltrainer'
 
-export type SpielId = 'memory' | 'zuordnen' | 'blitz' | 'satz' | 'wortraten' | 'kreuzwort' | 'fallend' | 'suchsel'
+export type SpielId = 'memory' | 'zuordnen' | 'blitz' | 'satz' | 'wortraten' | 'kreuzwort' | 'fallend' | 'suchsel' | 'bildwort' | 'hoeren' | 'satzhoeren'
 
 export interface SpielInfo {
   id: SpielId
@@ -50,7 +50,18 @@ export const SPIELE: SpielInfo[] = [
     kleinerBesser: false,
     beschreibung: 'Die Übersetzung tippen, bevor das Wort unten ankommt.'
   },
-  { id: 'suchsel', name: 'Buchstabensalat', art: 'schreiben', einheit: 's', kleinerBesser: true, beschreibung: 'Die Wörter im Buchstabengitter finden.' }
+  { id: 'suchsel', name: 'Buchstabensalat', art: 'schreiben', einheit: 's', kleinerBesser: true, beschreibung: 'Die Wörter im Buchstabengitter finden.' },
+  // Mit Bildern und Aussprache der Medienbank (05.10.2026)
+  { id: 'bildwort', name: 'Bilderrätsel', art: 'erkennen', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Zum Bild das passende Wort finden.' },
+  { id: 'hoeren', name: 'Hörquiz', art: 'erkennen', einheit: 'richtig', kleinerBesser: false, beschreibung: 'Hinhören und die richtige Schreibweise wählen.' },
+  {
+    id: 'satzhoeren',
+    name: 'Satz-Diktat',
+    art: 'erkennen',
+    einheit: 'Sätze',
+    kleinerBesser: false,
+    beschreibung: 'Den Beispielsatz hören und die Wörter ordnen.'
+  }
 ]
 
 /** Schreibweise eines Wortes im Spiel: erste Variante, ohne Angaben */

@@ -110,6 +110,11 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'maskottchen:list',
   'ai:websuche',
   'audio:voices',
+  // Medienbank der Vokabeln: lesen (05.10.2026)
+  'medien:eintraege',
+  'medien:datei',
+  'medien:stimmen',
+  'medien:admin',
   'audio:speak',
   'audio:preview',
   'audio:read',
@@ -460,7 +465,8 @@ function weitereAdressen(port: number): LanWeitereAdresse[] {
   const tailscale = alle.filter((a) => a.art === 'tailscale')
   if (magicDns && tailscale.length) out.push({ adresse: `http://${magicDns}:${port}`, art: 'tailscale', schnittstelle: tailscale[0].schnittstelle })
   for (const a of alle) {
-    if (a.ip !== haupt) out.push({ adresse: `http://${a.ip}:${port}`, art: a.art, schnittstelle: a.schnittstelle, ...(a.art === 'tailscale' ? { nurBrowser: true } : {}) })
+    if (a.ip !== haupt)
+      out.push({ adresse: `http://${a.ip}:${port}`, art: a.art, schnittstelle: a.schnittstelle, ...(a.art === 'tailscale' ? { nurBrowser: true } : {}) })
   }
   return out
 }

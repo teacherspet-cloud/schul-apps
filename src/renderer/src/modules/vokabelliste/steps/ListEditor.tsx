@@ -17,6 +17,7 @@ import { TextbookPicker } from '../../vokabeltest/steps/TextbookPicker'
 import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
 import { EinfuegenFenster, PruefFenster } from '../../vokabeltest/steps/VokabelUebernahme'
 import type { VocabRow } from './VocabRow'
+import { MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
 
 /** Eine leere Liste bekommt gleich eine Zeile zum Eintippen */
 const toRows = (list: SavedVocabList): VocabRow[] => {
@@ -53,6 +54,12 @@ export default function ListEditor({
   const rows = verlauf.stand
   const [name, setName] = useState(list.name)
   const [language, setLanguage] = useState(list.language ?? 'en')
+  // Medienbank (05.10.2026): Bild und Aussprache je Wort, gemeinsam für alle Listen und Lehrwerke
+  const medienAdmin = useMedienAdmin()
+  const medien = useMedienbank(
+    language,
+    rows.map((r) => r.term)
+  )
   const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
   const [dirty, setDirty] = useState(false)
   const [importing, setImporting] = useState<string | null>(null)
@@ -259,7 +266,21 @@ export default function ListEditor({
             onRedo={() => verlauf.redo() && geaendert()}
           />
         </Group>
-        <VokabelTabelle zeilen={rows} onChange={setRows} mitVerlauf sprache={language} />
+        {medienAdmin && (
+          <MedienLeiste
+            sprache={language}
+            vokabeln={rows.map((r) => ({ term: r.term, translation: r.translation }))}
+            daten={medien.daten}
+            neuLaden={medien.laden}
+          />
+        )}
+        <VokabelTabelle
+          zeilen={rows}
+          onChange={setRows}
+          mitVerlauf
+          sprache={language}
+          medien={{ sprache: language, daten: medien.daten, admin: medienAdmin, neuLaden: medien.laden }}
+        />
       </Card>
 
       <PruefFenster

@@ -9,9 +9,12 @@ import {
   IconBolt,
   IconBrain,
   IconCards,
+  IconEar,
   IconFlower,
   IconGridDots,
   IconLayoutGrid,
+  IconMessage2,
+  IconPhoto,
   IconPuzzle,
   IconTrophy,
   IconTypography,
@@ -24,6 +27,8 @@ import { senden } from '../../onlinetest/serverApi'
 import { useVtFarbe } from '../vtFarben'
 import { Blitzrunde, Memory, Satzpuzzle, Zuordnen } from './SpieleErkennen'
 import { FallendeWoerter, Kreuzwort, Suchsel, Wortraten } from './SpieleSchreiben'
+import { BildRaetsel, hatWortAufnahme, HoerQuiz } from './SpieleMedien'
+import { hatSatzAufnahme } from '../medienCache'
 
 const SYMBOL: Record<SpielId, React.ReactNode> = {
   memory: <IconCards size={22} />,
@@ -33,7 +38,10 @@ const SYMBOL: Record<SpielId, React.ReactNode> = {
   wortraten: <IconFlower size={22} />,
   kreuzwort: <IconGridDots size={22} />,
   fallend: <IconTypography size={22} />,
-  suchsel: <IconBrain size={22} />
+  suchsel: <IconBrain size={22} />,
+  bildwort: <IconPhoto size={22} />,
+  hoeren: <IconEar size={22} />,
+  satzhoeren: <IconMessage2 size={22} />
 }
 /** KI-Bilder der Spiele (03.10.2026, über die Bild-KI der Exe erzeugt); ohne Bild das Symbol */
 const BILDER = import.meta.glob<string>('../../../assets/programme/spiel-*.webp', { eager: true, import: 'default' })
@@ -47,7 +55,10 @@ const FARBE: Record<SpielId, string> = {
   wortraten: 'pink',
   kreuzwort: 'indigo',
   fallend: 'teal',
-  suchsel: 'lime'
+  suchsel: 'lime',
+  bildwort: 'orange',
+  hoeren: 'blue',
+  satzhoeren: 'violet'
 }
 
 export const SPIELE_CSS = `
@@ -108,6 +119,10 @@ export function Spielwahl({
   const [ergebnis, setErgebnis] = useState<{ spiel: SpielId; wert: number; rekord: boolean; fehler: number } | null>(null)
   const pool = spielWoerter(woerter, staende)
   const mitSatz = pool.filter((w) => w.example && w.example.split(/\s+/).length >= 3).length
+  // Medienbank (05.10.2026): Bilder und Aufnahmen – aus allen Wörtern der Liste, nicht nur den gelernten
+  const mitBild = woerter.filter((w) => w.bild).length
+  const mitTon = woerter.filter(hatWortAufnahme).length
+  const mitSatzTon = woerter.filter((w) => w.example && w.example.split(/\s+/).length >= 3 && hatSatzAufnahme(w.example)).length
   const ende = useCallback(
     (wert: number, fehler: string[]) => {
       if (!spiel) return
@@ -150,6 +165,12 @@ export function Spielwahl({
             <Kreuzwort {...props} />
           ) : spiel === 'fallend' ? (
             <FallendeWoerter {...props} />
+          ) : spiel === 'bildwort' ? (
+            <BildRaetsel {...props} woerter={woerter} />
+          ) : spiel === 'hoeren' ? (
+            <HoerQuiz {...props} woerter={woerter} />
+          ) : spiel === 'satzhoeren' ? (
+            <Satzpuzzle {...props} woerter={woerter} hoeren />
           ) : (
             <Suchsel {...props} />
           )}
@@ -231,7 +252,18 @@ export function Spielwahl({
           </Text>
           <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
             {SPIELE.filter((s) => s.art === art).map((s) => {
-              const gesperrt = s.id === 'satz' ? mitSatz < 1 : pool.length < 4
+              const gesperrt =
+                s.id === 'satz'
+                  ? mitSatz < 1
+                  : s.id === 'bildwort'
+                    ? mitBild < 4
+                    : s.id === 'hoeren'
+                      ? mitTon < 4 || woerter.length < 4
+                      : s.id === 'satzhoeren'
+                        ? mitSatzTon < 1
+                        : pool.length < 4
+              // Spiele der Medienbank erst zeigen, wenn es Bilder bzw. Aufnahmen gibt
+              if (gesperrt && (s.id === 'bildwort' || s.id === 'hoeren' || s.id === 'satzhoeren')) return null
               return (
                 <Card
                   key={s.id}

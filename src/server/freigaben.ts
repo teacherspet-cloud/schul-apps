@@ -11,7 +11,18 @@
  */
 import { ERLAUBTE_KANAELE } from '../main/services/lanServer'
 
-const MATERIAL = ['sheets', 'exams', 'tests', 'kurztests', 'grammarTests', 'rueckmeldungen', 'elternbriefe', 'tafelbilder', 'bewertungstabellen', 'nachteilsausgleiche']
+const MATERIAL = [
+  'sheets',
+  'exams',
+  'tests',
+  'kurztests',
+  'grammarTests',
+  'rueckmeldungen',
+  'elternbriefe',
+  'tafelbilder',
+  'bewertungstabellen',
+  'nachteilsausgleiche'
+]
 
 export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   ...ERLAUBTE_KANAELE,
@@ -48,7 +59,13 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'lan:status',
   'lan:freigabe-status',
   'iserv:status',
-  'protokoll:melden'
+  'protokoll:melden',
+  // Medienbank der Vokabeln: ändern (nur Admins – prüft der Dienst selbst, main/services/rolle.ts)
+  'medien:stimme-setzen',
+  'medien:bild-setzen',
+  'medien:bild-loeschen',
+  'medien:ton-setzen',
+  'medien:ton-loeschen'
 ])
 
 /** Einstellungen, die eine Lehrkraft auf dem Server nicht setzen darf */
@@ -69,4 +86,5 @@ export function beschneideEinstellungen(patch: unknown): unknown {
   return rest
 }
 
-export const beschneideServer = (kanal: string, args: unknown[]): unknown[] => (kanal === 'settings:set' ? [beschneideEinstellungen(args[0]), ...args.slice(1)] : args)
+export const beschneideServer = (kanal: string, args: unknown[]): unknown[] =>
+  kanal === 'settings:set' ? [beschneideEinstellungen(args[0]), ...args.slice(1)] : args

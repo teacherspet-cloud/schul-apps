@@ -1,4 +1,15 @@
-// Schulbuch-Vokabeln: mitgelieferte Lehrwerke (resources/lehrwerke) und von der Lehrkraft importierte (userData/lehrwerke).
+/*
+ * Schulbuch-Vokabeln: mitgelieferte Lehrwerke (resources/lehrwerke) und von der Lehrkraft importierte (userData/lehrwerke).
+ *
+ * Gemeinsame Datenbank am Server (05.10.2026, Wunsch der Lehrkraft): „Die Green-Line-Lehrwerke, die schon
+ * vorhanden sind, sollen als eine gemeinsame Datenbank dienen. Lehrkräfte sollen diese nicht bearbeiten
+ * können (nur Admins)." Am Server gilt deshalb:
+ *  - Mitgelieferte Lehrwerke sind GEMEINSAM. Was ein Admin daran ändert, liegt EINMAL für alle in
+ *    <DATEN>/lehrwerke und ersetzt die mitgelieferte Fassung; „Änderungen verwerfen" (löschen) stellt sie wieder her.
+ *  - Lehrkräfte lesen sie nur; eigene Fassungen gemeinsamer Lehrwerke (aus der Zeit davor) zählen nicht mehr.
+ *  - Selbst importierte Lehrwerke bleiben die eigenen und frei bearbeitbar.
+ * In der Exe bleibt es wie bisher (eine Person, eigene Fassung im eigenen Ordner).
+ */
 import { app } from 'electron'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -7,6 +18,14 @@ import type { Textbook, TextbookMeta } from '@shared/types'
 import { resourcePath } from './paths'
 import { loescheDatei } from './atomar'
 import { mitReihe } from '@shared/lehrwerkReihe'
+import { aufServer, istAdmin } from '../rolle'
+
+/** Gemeinsame (vom Admin bearbeitete) Fassungen am Server */
+function gemeinsamDir(): string {
+  const d = join(process.env.SCHULAPPS_DATEN || './server-daten', 'lehrwerke')
+  if (!existsSync(d)) mkdirSync(d, { recursive: true })
+  return d
+}
 
 function userDir(): string {
   const d = join(app.getPath('userData'), 'lehrwerke')
@@ -34,12 +53,32 @@ function readBooks(dir: string, builtIn: boolean): Textbook[] {
   return books
 }
 
-/** Eigene Importe ersetzen mitgelieferte Lehrwerke mit derselben ID. */
-function allBooks(): Textbook[] {
-  const own = readBooks(userDir(), false)
-  const ownIds = new Set(own.map((b) => b.id))
-  return [...readBooks(resourcePath('lehrwerke'), true).filter((b) => !ownIds.has(b.id)), ...own]
+/** Mitgelieferte, am Server mit den gemeinsamen Fassungen des Admins */
+function gemeinsameBooks(): Textbook[] {
+  const mit = readBooks(resourcePath('lehrwerke'), true)
+  if (!aufServer()) return mit
+  const geaendert = readBooks(gemeinsamDir(), true)
+  const ids = new Set(geaendert.map((b) => b.id))
+  return [...mit.filter((b) => !ids.has(b.id)), ...geaendert]
 }
+
+/**
+ * Exe: eigene Importe ersetzen mitgelieferte Lehrwerke mit derselben ID. Server: gemeinsame Lehrwerke haben
+ * Vorrang – eigene Fassungen mit ihrer ID werden nicht mehr gelesen.
+ */
+function allBooks(): Textbook[] {
+  const gemeinsam = gemeinsameBooks()
+  const own = readBooks(userDir(), false)
+  if (aufServer()) {
+    const ids = new Set(gemeinsam.map((b) => b.id))
+    return [...gemeinsam, ...own.filter((b) => !ids.has(b.id))]
+  }
+  const ownIds = new Set(own.map((b) => b.id))
+  return [...gemeinsam.filter((b) => !ownIds.has(b.id)), ...own]
+}
+
+/** Ist das ein gemeinsames Lehrwerk (am Server nur für Admins änderbar)? */
+const istGemeinsam = (id: string): boolean => aufServer() && gemeinsameBooks().some((b) => b.id === id)
 
 export function toMeta(b: Textbook): TextbookMeta {
   return {
@@ -83,10 +122,12 @@ export function getTextbook(id: string): Textbook {
   return book
 }
 
-/** Speichert importierte Lehrwerke (gleiche ID wird ersetzt). */
+/** Speichert importierte Lehrwerke (gleiche ID wird ersetzt); gemeinsame am Server nur als Admin, für alle. */
 export function saveTextbooks(books: Textbook[]): TextbookMeta[] {
   for (const b of books) {
-    const file = join(userDir(), `${checkId(b.id)}.json`)
+    const gemeinsam = istGemeinsam(checkId(b.id))
+    if (gemeinsam && !istAdmin()) throw new Error('Die gemeinsamen Lehrwerke dürfen nur Admins bearbeiten.')
+    const file = join(gemeinsam ? gemeinsamDir() : userDir(), `${checkId(b.id)}.json`)
     const { builtIn: _ignored, ...data } = b
     void _ignored
     writeFileSync(`${file}.tmp`, JSON.stringify(data), 'utf8')
@@ -96,6 +137,12 @@ export function saveTextbooks(books: Textbook[]): TextbookMeta[] {
 }
 
 export function deleteTextbook(id: string): TextbookMeta[] {
+  if (istGemeinsam(checkId(id))) {
+    // Gemeinsam: die Änderungen des Admins verwerfen → wieder die mitgelieferte Fassung
+    if (!istAdmin()) throw new Error('Die gemeinsamen Lehrwerke dürfen nur Admins bearbeiten.')
+    loescheDatei(join(gemeinsamDir(), `${id}.json`))
+    return listTextbooks()
+  }
   loescheDatei(join(userDir(), `${checkId(id)}.json`))
   return listTextbooks()
 }

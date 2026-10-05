@@ -15,6 +15,7 @@ import { existsSync } from 'node:fs'
 import { ablageVerschluesseln } from './shims/fs'
 import { registriereKanaele, type Handle } from '../main/kanaele'
 import { setzeGeheimRueckfall } from '../main/services/storage/settings'
+import { setzeRolleQuelle } from '../main/services/rolle'
 import { cleanupWorkDirs } from '../main/services/ai/cli'
 import { abgelaufeneSitzungenEntfernen, datenbank, nutzerAendern, nutzerAnlegen, nutzerNachBenutzer, protokolliereServer } from './datenbank'
 import { hauptschluessel, passwortHash } from './geheim'
@@ -26,6 +27,7 @@ import { freigegebenerSchluessel, verwaltungsRoute } from './verwaltung'
 import { druckBeenden } from './druck'
 import { mitNamensschutz } from './namensschutz'
 import { hoertextRoute, mitFreigabe } from './hoertexte'
+import { medienRoute } from './medien'
 import { lehrkraftRoute, schuelerRoute } from './onlinetest'
 import { fachschaftRoute, mitFachschaft, setzeEntferner } from './fachschaft'
 import { fachordnerRoute } from './fachordner'
@@ -54,6 +56,8 @@ async function main(): Promise<void> {
 
   // Vom Admin für alle freigegebene Schlüssel – nur, wenn der Nutzer keinen eigenen hat
   setzeGeheimRueckfall(freigegebenerSchluessel)
+  // Gemeinsame Lehrwerke und Medienbank: bearbeiten nur Admins (main/services/rolle.ts)
+  setzeRolleQuelle(() => aktuellerNutzer()?.rolle)
 
   const port = Number(env.SCHULAPPS_PORT || 8443)
   const adresse = (env.SCHULAPPS_ADRESSE || `http://localhost:${port}`).replace(/\/$/, '')
@@ -99,6 +103,8 @@ async function main(): Promise<void> {
     tls,
     routen: [
       hoertextRoute,
+      // Medienbank der Vokabeln für Lernende (05.10.2026)
+      medienRoute,
       feedbackRoute(aufruf, adresse),
       blaetterRoute(aufruf, adresse),
       reihenRoute(aufruf),

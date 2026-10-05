@@ -1,3 +1,4 @@
+import { VokabelStimmenCard } from '../shared/medien/VokabelStimmen'
 import {
   ActionIcon,
   Anchor,
@@ -315,6 +316,8 @@ export default function SettingsPage(): React.JSX.Element {
               </Card>
 
               <HoertextCard settings={settings} update={update} />
+              {/* Standardstimme je Sprache für die Vokabel-Aussprache (05.10.2026) */}
+              <VokabelStimmenCard />
             </Stack>
           </Tabs.Panel>
 

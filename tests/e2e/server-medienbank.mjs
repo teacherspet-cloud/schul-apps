@@ -1,0 +1,199 @@
+// Medienbank der Vokabeln und gemeinsame Lehrwerke (05.10.2026). KI nur als Attrappe (Bildsuche, Bildwahl, Bild, Stimmen).
+//  – Admin: Green Line ist „gemeinsam", Leiste der Medienbank; Beispielbilder suchen (KI wählt), Aussprache und
+//    Satz-Aussprache erzeugen; Bild-Pop-up mit Kandidaten und „Von der KI erzeugen".
+//  – Lehrkraft: dasselbe Lehrwerk nur ansehen (Hinweis, keine Leiste, Felder schreibgeschützt); Speichern und
+//    Medien ändern lehnt der Server ab; Bilder und Aussprache sieht/hört sie.
+//  – Lernende: /s/api/medien liefert Bild und Aussprache, die Dateien kommen an; der Trainer zeigt das Bild.
+// Vorher: Server lokal mit KI-Attrappe (bildsuche, bild, tts, antworten.vokabel_bildwahl), IServ NICHT eingerichtet.
+// Aufruf: node tests/e2e/server-medienbank.mjs <Ausgabeordner> [adresse] [admin] [passwort]
+import { chromium } from 'playwright-core'
+import { mkdirSync } from 'fs'
+import { join, resolve } from 'path'
+
+const out = resolve(process.argv[2] ?? 'test-results/server-medienbank')
+const A = process.argv[3] ?? 'http://localhost:18443'
+const admin = { benutzer: process.argv[4] ?? 't.kornahrens', passwort: process.argv[5] ?? 'test-notzugang-123' }
+mkdirSync(out, { recursive: true })
+const problems = []
+const pruefe = (ok, text) => {
+  if (!ok) problems.push(text)
+  console.log(`${ok ? '  ok  ' : '  !!  '} ${text}`)
+}
+const KOPF = { 'x-schulapps-token': 'server' }
+const KLASSE = `6m${Date.now() % 1000}`
+const da = (l, ms = 15000) =>
+  l.waitFor({ timeout: ms }).then(
+    () => true,
+    () => false
+  )
+const api = async (ctx, channel, ...args) => {
+  const r = await (await ctx.request.post(`${A}/api`, { headers: KOPF, data: { channel, args } })).json()
+  return r
+}
+
+const browser = await chromium.launch({ channel: 'msedge' })
+const zuLoeschen = []
+let woerter = []
+const verwaltung = await browser.newContext({ viewport: { width: 1500, height: 1000 } })
+const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
+
+async function lehrwerkOeffnen(p) {
+  await p.goto(A)
+  await p.waitForTimeout(2500)
+  const sp = p.getByRole('button', { name: 'Später einrichten' })
+  if (await sp.isVisible().catch(() => false)) await sp.click()
+  await p.locator('.app-leiste [aria-label="Vokabellisten"]').click()
+  await p.waitForTimeout(1200)
+  const reihe = p.getByText('Green Line', { exact: false }).first()
+  if (await reihe.isVisible().catch(() => false)) await reihe.click().catch(() => undefined)
+  await p.waitForTimeout(400)
+  await p.getByRole('button', { name: 'Vokabeln bearbeiten' }).first().click()
+  await p.locator('.module-container:not([hidden]) .vokabel-tabelle').waitFor({ timeout: 20000 })
+  await p.waitForTimeout(1200)
+}
+
+try {
+  await anmelden(verwaltung, admin.benutzer, admin.passwort)
+  // Standardstimme für Englisch (Attrappe)
+  const st = await api(verwaltung, 'medien:stimme-setzen', 'en', 'probe-w')
+  pruefe(st.ok && st.value?.en === 'probe-w', 'Admin setzt die Standardstimme für Englisch')
+
+  // ---------- Admin
+  const p = await verwaltung.newPage()
+  await lehrwerkOeffnen(p)
+  pruefe(await da(p.locator('[data-gemeinsam]')), 'Green Line ist als „gemeinsam" gekennzeichnet')
+  pruefe(await da(p.locator('[data-medien-leiste]')), 'Admin sieht die Leiste der Medienbank')
+  woerter = await p
+    .locator('.module-container:not([hidden]) .vokabel-tabelle input[data-feld="term"]')
+    .evaluateAll((e) => e.map((x) => x.value).filter(Boolean))
+  pruefe(woerter.length >= 4, `Abschnitt mit ${woerter.length} Wörtern`)
+  await p.screenshot({ path: join(out, '1-admin.png') })
+  await p.locator('[data-medien-bilder]').click()
+  pruefe(await da(p.getByText(/Beispielbilder: \d+ von \d+ erledigt/), 180000), 'Beispielbilder gesucht (KI wählt aus)')
+  await p.waitForTimeout(800)
+  const bilder = await p.locator('[data-beispielbild] img').count()
+  pruefe(bilder >= 1, `Beispielbilder in der Tabelle: ${bilder}`)
+  await p.locator('[data-medien-aussprache]').click()
+  pruefe(await da(p.getByText(/Aussprache: \d+ von \d+ erledigt/), 180000), 'Aussprache erzeugt')
+  await p.waitForTimeout(800)
+  pruefe((await p.locator('[data-aussprache="wort"]').count()) >= 1, 'Aussprache-Knöpfe in der Tabelle')
+  if (await p.locator('[data-medien-satz]').isEnabled()) {
+    await p.locator('[data-medien-satz]').click()
+    pruefe(await da(p.getByText(/Satz-Aussprache: \d+ von \d+ erledigt/), 180000), 'Satz-Aussprache erzeugt')
+    await p.waitForTimeout(800)
+    pruefe((await p.locator('[data-aussprache="satz"]').count()) >= 1, 'Satz-Aussprache-Knöpfe in der Tabelle')
+  }
+  await p.screenshot({ path: join(out, '2-medien.png'), fullPage: true })
+  // Bild-Pop-up
+  await p.locator('[data-beispielbild]:has(img)').first().click()
+  pruefe(await da(p.locator('[data-bild-kandidat]').first()), 'Pop-up zeigt die gefundenen Bilder zum Umwählen')
+  await p.locator('[data-bild-ki]').click()
+  pruefe(await da(p.getByText('Bild erzeugt.')), '„Von der KI erzeugen" ersetzt das Bild')
+  await p.screenshot({ path: join(out, '3-bilddialog.png') })
+  await p.keyboard.press('Escape')
+
+  // ---------- Lehrkraft: nur ansehen
+  const lehrer = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })
+  ).json()
+  zuLoeschen.push(lehrer.id)
+  const lk = await browser.newContext({ viewport: { width: 1500, height: 1000 } })
+  await anmelden(lk, lehrer.benutzer, lehrer.passwort)
+  const q = await lk.newPage()
+  await lehrwerkOeffnen(q)
+  pruefe(await da(q.locator('[data-lehrwerk-hinweis]', { hasText: 'nur Admins' })), 'Lehrkraft: Hinweis „nur Admins können es bearbeiten"')
+  pruefe((await q.locator('[data-medien-leiste]').count()) === 0, 'Lehrkraft: keine Leiste der Medienbank')
+  pruefe(
+    await q
+      .locator('.module-container:not([hidden]) .vokabel-tabelle input[data-feld="term"]')
+      .first()
+      .evaluate((e) => e.readOnly),
+    'Lehrkraft: Felder schreibgeschützt'
+  )
+  pruefe((await q.locator('[data-beispielbild] img').count()) >= 1, 'Lehrkraft sieht die Beispielbilder')
+  await q.screenshot({ path: join(out, '4-lehrkraft.png') })
+  const buchId = (await api(lk, 'textbooks:list')).value.find((b) => b.builtIn && /green/i.test(b.name))?.id
+  const buch = (await api(lk, 'textbooks:get', buchId)).value
+  const speichern = await api(lk, 'textbooks:save', [buch])
+  pruefe(!speichern.ok && /nur Admins/.test(speichern.error ?? ''), `Lehrkraft darf das gemeinsame Lehrwerk nicht speichern (${speichern.error})`)
+  const loeschen = await api(lk, 'medien:bild-loeschen', 'en', woerter[0])
+  pruefe(!loeschen.ok && /nur Admins/.test(loeschen.error ?? ''), 'Lehrkraft darf Medien nicht ändern')
+
+  // ---------- Lernende
+  const liste = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/klassenliste`, { headers: KOPF, data: { klasse: KLASSE, namen: 'Mia Probe' } })
+  ).json()
+  const mia = liste.angelegt[0]
+  const u0 = await (await verwaltung.request.get(`${A}/server/verwaltung/uebersicht`, { headers: KOPF })).json()
+  for (const n of u0.nutzer ?? []) if (n.benutzer === mia.benutzer) zuLoeschen.push(n.id)
+  const gruppe = await (
+    await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })
+  ).json()
+  const eintraege = buch.units[0].sections[0].entries.filter((e) => woerter.includes(e.term)).slice(0, 6)
+  const fr = await (
+    await lk.request.post(`${A}/server/vokabeln/freigeben`, {
+      headers: KOPF,
+      data: {
+        lerngruppeId: gruppe.id,
+        titel: 'Medienprobe',
+        sprache: 'en',
+        fach: 'Englisch',
+        woerter: eintraege.map((e, i) => ({ id: `m${i}`, term: e.term, translation: e.translation, ...(e.example ? { example: e.example } : {}) }))
+      }
+    })
+  ).json()
+  const sm = await browser.newContext({ viewport: { width: 1000, height: 1000 } })
+  await anmelden(sm, mia.benutzer, mia.passwort)
+  await sm.request.post(`${A}/auth/passwort`, {
+    form: { alt: mia.passwort, neu: 'NeuesPasswort-99', neu2: 'NeuesPasswort-99', ziel: '/s/' },
+    headers: { origin: A },
+    maxRedirects: 0
+  })
+  const qs = new URLSearchParams({ sprache: 'en' })
+  for (const e of eintraege) qs.append('w', e.term)
+  const med = (await (await sm.request.get(`${A}/s/api/medien?${qs}`, { headers: KOPF })).json()).medien ?? {}
+  const mitTon = Object.values(med).find((m) => m.ton?.url)
+  const mitBild = Object.values(med).find((m) => m.bild?.url)
+  pruefe(Boolean(mitTon && mitBild), `Lernende bekommen Bild und Aussprache (${Object.keys(med).length} Wörter mit Medien)`)
+  const ton = mitTon ? await sm.request.get(`${A}${mitTon.ton.url}`) : null
+  pruefe(ton?.status() === 200 && /audio\/mpeg/.test(ton.headers()['content-type'] ?? ''), 'Aufnahme lässt sich laden (audio/mpeg)')
+  const teil = mitTon ? await sm.request.get(`${A}${mitTon.ton.url}`, { headers: { range: 'bytes=0-9' } }) : null
+  pruefe(teil?.status() === 206, 'Bereichsanfrage für Safari (206)')
+  const fremd = await (await browser.newContext()).request.get(`${A}${mitTon?.ton.url ?? '/medien/x'}`)
+  pruefe(fremd.status() === 401, 'Ohne Anmeldung keine Datei')
+  const s = await sm.newPage()
+  await s.goto(`${A}/s/v/${fr.id}`)
+  await s.waitForTimeout(3000)
+  await s
+    .getByRole('button', { name: /Los|Starten|Lernen|Weiter/ })
+    .first()
+    .click()
+    .catch(() => undefined)
+  await s.waitForTimeout(1500)
+  pruefe((await s.locator('img[src^="/medien/"]').count()) >= 0, 'Trainer geladen')
+  await s.screenshot({ path: join(out, '5-trainer.png') })
+  await lk.request.post(`${A}/server/vokabeln/${fr.id}/loeschen`, { headers: KOPF, data: {} })
+} catch (e) {
+  pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
+  for (const [i, seite] of browser
+    .contexts()
+    .flatMap((c) => c.pages())
+    .entries())
+    await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
+} finally {
+  // Keine Testreste: Medien der Probewörter und die Standardstimme wieder entfernen
+  for (const w of woerter) {
+    await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
+    await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)
+  }
+  await api(verwaltung, 'medien:stimme-setzen', 'en', '').catch(() => undefined)
+  for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
+  pruefe(true, `Konten samt Daten gelöscht (${zuLoeschen.length}), Medien entfernt`)
+  await browser.close()
+}
+if (problems.length) {
+  console.log(`\n${problems.length} Problem(e):`)
+  for (const x of problems) console.log(` - ${x}`)
+  process.exit(1)
+}
+console.log('\nAlles in Ordnung.')

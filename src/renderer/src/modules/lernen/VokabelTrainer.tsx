@@ -7,6 +7,7 @@
  * legen, frei schreiben (mit Akzentleiste), Diktat, Lückensatz. Falsches kommt in der Sitzung wieder.
  * Ruhig motivierend: keine Streaks, keine Bestenlisten.
  */
+import { aufnahmeSpielen, hatSatzAufnahme, medienLaden } from './medienCache'
 import { Spielwahl } from './spiele/Spiele'
 import { VokabelLeiter, type WegKurz } from './VokabelLeiter'
 import { besteStimme } from './stimme'
@@ -113,8 +114,12 @@ const AKZENTE: Record<string, string[]> = {
  */
 const FACH_FARBEN = ['#cbd5e1', '#fb923c', '#fbbf24', '#facc15', '#a3e635', '#34d399', '#14b8a6']
 
-/** Vorlesen mit der Stimme des Geräts (kostenlos, ohne Server) */
+/**
+ * Vorlesen: zuerst die Aufnahme aus der Medienbank (Sprach-KI, 05.10.2026, medienCache.ts), sonst mit der
+ * Stimme des Geräts (kostenlos, ohne Server).
+ */
 export function sprich(text: string, sprache: string): void {
+  if (aufnahmeSpielen(text)) return
   try {
     if (!('speechSynthesis' in window) || !STIMME[sprache]) return
     window.speechSynthesis.cancel()
@@ -192,10 +197,20 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
   const [sitzung, setSitzung] = useState<Vokabel[] | null>(null)
   const [vorher, setVorher] = useState<Record<string, WortStand> | null>(null)
   const laden = useCallback(() => {
-    void holen<Liste>(`/s/api/vokabeln/liste?id=${encodeURIComponent(id)}`).then(setD, (e: unknown) => {
-      setFehler(e instanceof Error ? e.message : String(e))
-      setD(null)
-    })
+    void holen<Liste>(`/s/api/vokabeln/liste?id=${encodeURIComponent(id)}`).then(
+      async (liste) => {
+        // Medienbank: Aussprache und Beispielbilder (05.10.2026) – ein fehlendes Bild kommt aus der Medienbank
+        const m = await medienLaden(
+          liste.sprache,
+          liste.woerter.map((w) => w.term)
+        )
+        setD({ ...liste, woerter: liste.woerter.map((w) => (w.bild || !m[w.term]?.bild?.url ? w : { ...w, bild: m[w.term]!.bild!.url })) })
+      },
+      (e: unknown) => {
+        setFehler(e instanceof Error ? e.message : String(e))
+        setD(null)
+      }
+    )
   }, [id])
   useEffect(laden, [laden])
   if (d === undefined)
@@ -665,6 +680,20 @@ function Karte({ v, sprache, gewusst, gesperrt }: { v: Vokabel; sprache: string;
             {v.example && (
               <Text size="sm" mt="sm" fs="italic">
                 {v.example}
+                {hatSatzAufnahme(v.example) && (
+                  <ActionIcon
+                    size="sm"
+                    variant="subtle"
+                    ml={4}
+                    aria-label="Beispielsatz anhören"
+                    data-satz-anhoeren
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    onClick={(e) => (e.stopPropagation(), aufnahmeSpielen(v.example!))}
+                  >
+                    <IconVolume size={14} />
+                  </ActionIcon>
+                )}
               </Text>
             )}
             {v.exampleTranslation && (
