@@ -31,14 +31,20 @@ export interface Darstellung {
   ruhig: boolean
   /** Lernbereiche (Vokabeltraining): Farbe des Fachs wie im Kopfband der Arbeitsblätter, oder die eigene Farbe */
   design: 'fach' | 'eigen'
+  /** Dunkel als Vorgabe übernommen (05.10.2026) – fehlt sie, wird „automatisch" einmalig zu „dunkel" */
+  dunkelVorgabe?: boolean
 }
 
-const VORGABE: Darstellung = { modus: 'auto', schrift: 'normal', farbe: 'blue', ruhig: false, design: 'fach' }
+/** Dunkel als Vorgabe (05.10.2026): ältere gespeicherte Darstellung mit „automatisch" einmalig auf „dunkel" */
+const mitDunkelVorgabe = (d: Darstellung): Darstellung => (d.dunkelVorgabe ? d : { ...d, modus: d.modus === 'auto' ? 'dunkel' : d.modus, dunkelVorgabe: true })
+
+const VORGABE: Darstellung = { modus: 'dunkel', schrift: 'normal', farbe: 'blue', ruhig: false, design: 'fach', dunkelVorgabe: true }
 const SPEICHER = 'schulapps-darstellung'
 
 const ausSpeicher = (): Darstellung => {
   try {
-    return { ...VORGABE, ...(JSON.parse(localStorage.getItem(SPEICHER) ?? '{}') as Partial<Darstellung>) }
+    const roh = JSON.parse(localStorage.getItem(SPEICHER) ?? '{}') as Partial<Darstellung>
+    return mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, ...roh, ...(Object.keys(roh).length ? {} : { dunkelVorgabe: true }) })
   } catch {
     return VORGABE
   }
@@ -70,7 +76,7 @@ export function SchuelerRahmen({ children }: { children: React.ReactNode }): Rea
   useEffect(() => {
     if (mitKonto())
       void holen<{ darstellung: Darstellung | null }>('/s/api/darstellung').then(
-        (r) => r.darstellung && setze({ ...VORGABE, ...r.darstellung }),
+        (r) => r.darstellung && setze(mitDunkelVorgabe({ ...VORGABE, dunkelVorgabe: false, ...r.darstellung })),
         () => undefined
       )
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)')

@@ -51,7 +51,13 @@ function mergeSettings(base: AppSettings, stored: DeepPartial<AppSettings> & { a
       // Blindprobe für Ankreuzfragen (01.10.2026): fehlt der Wert, ist sie an
       ...((v) => (typeof v === 'boolean' ? { mcBlindprobe: v } : {}))(ai.mcBlindprobe ?? base.ai.mcBlindprobe)
     },
-    appearance: { ...base.appearance, ...stored.appearance },
+    // Dunkel als Vorgabe (05.10.2026): Wer noch auf „automatisch" stand, bekommt einmalig „dunkel";
+    // eine danach getroffene Wahl (auch „automatisch") bleibt, weil die Marke dann gespeichert ist.
+    appearance: ((a) => (a.dunkelVorgabe ? a : { ...a, colorScheme: a.colorScheme === 'auto' ? 'dark' : a.colorScheme, dunkelVorgabe: true }))({
+      ...base.appearance,
+      ...stored.appearance,
+      dunkelVorgabe: Boolean(stored.appearance?.dunkelVorgabe)
+    }),
     // iPad: Adresse, PIN und Auswahl getrennt änderbar (30.09.2026)
     ...(base.pcKi || stored.pcKi
       ? { pcKi: { adresse: '', pin: '', texte: false, bilder: false, hoertexte: false, ...base.pcKi, ...(stored.pcKi as object) } }

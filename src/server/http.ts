@@ -500,7 +500,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
        */
       const frueh =
         "(function(){try{if(location.pathname.indexOf('/s/')!==0)return;var d=JSON.parse(localStorage.getItem('schulapps-darstellung')||'{}');" +
-        "var m=d.modus||'auto';var dk=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);" +
+        // Dunkel als Vorgabe (05.10.2026): ohne gespeicherte Wahl bzw. ältere „automatisch" → dunkel
+        "var m=d.modus||'dunkel';if(m==='auto'&&!d.dunkelVorgabe)m='dunkel';var dk=m==='dunkel'||(m==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);" +
         "var s=document.createElement('style');s.id='sa-frueh';s.textContent=dk?':where(html,body){background:#242424;color-scheme:dark}':':where(html,body){background:#fff}';" +
         'document.head.appendChild(s)}catch(e){}})();'
       return void res.end(`window.__schulappsServer=${JSON.stringify(ich).replace(/</g, '\\u003c')};${frueh}`)

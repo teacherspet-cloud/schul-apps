@@ -7,15 +7,15 @@
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
 const STIL = `
-:root { color-scheme: light dark; --grund: #f3f6f8; --karte: #fff; --text: #1d2a33; --leise: #5b6b76; --akzent: #0f7b6c; --rand: #d5dde3; --fehler: #b42318; }
-@media (prefers-color-scheme: dark) { :root { --grund: #11181d; --karte: #1b252c; --text: #e6edf1; --leise: #9fb0bb; --akzent: #34b39f; --rand: #2c3a43; --fehler: #ff8a80; } }
+/* Dunkel als Vorgabe (05.10.2026) */
+:root { color-scheme: dark; --grund: #11181d; --karte: #1b252c; --text: #e6edf1; --leise: #9fb0bb; --akzent: #34b39f; --rand: #2c3a43; --fehler: #ff8a80; }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--grund); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 main { width: 100%; max-width: 420px; background: var(--karte); border: 1px solid var(--rand); border-radius: 16px; padding: 28px 24px; box-shadow: 0 8px 30px rgba(0,0,0,.06); }
 h1 { margin: 0 0 4px; font-size: 1.6rem; }
 p.leise { margin: 0 0 22px; color: var(--leise); }
 a.knopf, button { display: block; width: 100%; text-align: center; padding: 14px 16px; border-radius: 10px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
-a.knopf { background: var(--akzent); color: #fff; border: 0; }
+a.knopf { background: var(--akzent); color: #08201c; border: 0; }
 button { background: transparent; color: var(--akzent); border: 1.5px solid var(--akzent); margin-top: 12px; }
 label { display: block; font-size: .9rem; color: var(--leise); margin: 12px 0 4px; }
 input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--rand); background: transparent; color: var(--text); font: inherit; }

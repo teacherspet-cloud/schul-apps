@@ -195,6 +195,8 @@ export interface AppSettings {
   appearance: {
     colorScheme: ColorSchemeSetting
     theme: string
+    /** Dunkel als Vorgabe übernommen (05.10.2026): einmalig „automatisch" → „dunkel", danach gilt die eigene Wahl */
+    dunkelVorgabe?: boolean
   }
   schoolName: string
   defaults: {
@@ -510,7 +512,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     cliPaths: { openai: '', anthropic: '', google: '' },
     economy: 'auto'
   },
-  appearance: { colorScheme: 'auto', theme: 'teal' },
+  // Dunkel als Vorgabe (05.10.2026, Wunsch der Lehrkraft)
+  appearance: { colorScheme: 'dark', theme: 'teal', dunkelVorgabe: true },
   schoolName: '',
   defaults: { stateId: 'NI', schoolTypeId: 'gymnasium', targetLanguage: 'en' },
   audio: { voices: {} },

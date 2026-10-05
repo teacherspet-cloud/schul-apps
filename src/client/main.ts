@@ -145,7 +145,7 @@ function lokaleMaskottchen(): { id: string; name: string; beschreibung: string; 
 
 const OFFLINE = (adresse: string, fehler: string): string =>
   `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Schul-Apps Online</title>
-<style>body{font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f3f6f8;color:#1d2a33}main{max-width:460px;background:#fff;border:1px solid #d5dde3;border-radius:14px;padding:28px;text-align:center}button{margin-top:16px;padding:12px 18px;border-radius:10px;border:0;background:#0f7b6c;color:#fff;font:inherit;font-weight:600;cursor:pointer}small{color:#5b6b76}</style></head>
+<style>body{font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#11181d;color:#e6edf1;color-scheme:dark}main{max-width:460px;background:#1b252c;border:1px solid #2c3a43;border-radius:14px;padding:28px;text-align:center}button{margin-top:16px;padding:12px 18px;border-radius:10px;border:0;background:#0f7b6c;color:#fff;font:inherit;font-weight:600;cursor:pointer}small{color:#9fb0bb}</style></head>
 <body><main><h2>Der Schul-Apps-Server ist nicht erreichbar</h2><p>Bitte die Internetverbindung prüfen.</p><small>${adresse.replace(/</g, '&lt;')} · ${fehler.replace(/</g, '&lt;')}</small><br><button onclick="location.href='${adresse}'">Erneut versuchen</button></main></body></html>`)}`
 
 function fenster(): void {
@@ -169,7 +169,7 @@ function fenster(): void {
     minHeight: 600,
     title: 'Schul-Apps Online',
     autoHideMenuBar: true,
-    backgroundColor: '#f3f6f8',
+    backgroundColor: '#242424',
     webPreferences: {
       partition: PARTITION,
       preload: join(__dirname, 'preload.cjs'),
@@ -212,7 +212,7 @@ function fenster(): void {
             width: 1280,
             height: 860,
             autoHideMenuBar: true,
-            backgroundColor: '#f3f6f8',
+            backgroundColor: '#242424',
             webPreferences: { partition: PARTITION, preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, spellcheck: true }
           }
         }
