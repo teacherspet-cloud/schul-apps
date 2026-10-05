@@ -31,7 +31,8 @@ import type { DavAbruf } from '../main/services/iserv/webdav'
 import type { AblageZiel } from '@shared/types'
 import { getSettings, setSettings } from '../main/services/storage/settings'
 
-const STANDARD_SERVER = 'https://217.154.120.64:8443'
+// Eigene Domain seit 05.10.2026 (das Schulnetz sperrt die IP-Adresse); https://217.154.120.64:8443 geht weiter
+const STANDARD_SERVER = 'https://www.meineschulapps.de'
 const PARTITION = 'persist:schulapps-online'
 
 /** Server-Adresse: --server=… oder Datei server.txt im Datenordner, sonst die Schul-Adresse */
