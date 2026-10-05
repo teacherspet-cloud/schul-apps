@@ -4,7 +4,24 @@
  * Stand, je Freigabe die Lernenden; jedes ausgefüllte Blatt lässt sich ansehen – mit Stift,
  * Kästchen, Markierungen und Randkommentaren, wie die Lernenden es sehen – und als PDF sichern.
  */
-import { Badge, Button, Card, Center, Container, Group, Loader, Modal, SegmentedControl, Stack, Table, Text, TextInput, Title } from '@mantine/core'
+import {
+  Badge,
+  Button,
+  Card,
+  Center,
+  Container,
+  Group,
+  Loader,
+  Modal,
+  SegmentedControl,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Title,
+  Tooltip,
+  UnstyledButton
+} from '@mantine/core'
 import { IconArrowLeft, IconEye, IconQrcode, IconSearch, IconTrash, IconUserMinus, IconUsersGroup } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -12,6 +29,7 @@ import { Zugang } from '../onlinetest/OnlinetestModule'
 import { Ausfuellen, type BlattDaten } from '../onlinetest/BlattAusfuellen'
 import { notifyError } from '../../shared/util'
 import { BlattWaehlenKnopf } from './BlattWaehlen'
+import type { Ampel } from '@shared/blattFreigabe'
 
 export interface Freigabe {
   id: string
@@ -32,7 +50,12 @@ interface Detail {
   id: string
   titel: string
   status: string
+  /** Aufgabennummern in Blattreihenfolge */
+  aufgaben?: number[]
+  einstellungen?: { schrittweise?: boolean; merkAmEnde?: boolean; aufgabenFeedback?: boolean }
   abgaben: {
+    /** Ampel je Aufgabe (05.10.2026) */
+    ampeln?: Record<string, Ampel>
     /** Konto-Kennung (zum Entfernen) */
     id: string
     name: string
@@ -270,6 +293,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
             <Table.Tr>
               <Table.Th>Name</Table.Th>
               <Table.Th>Stand</Table.Th>
+              {(d.aufgaben?.length ?? 0) > 0 && d.einstellungen?.aufgabenFeedback && <Table.Th>Aufgaben</Table.Th>}
               <Table.Th>Zuletzt</Table.Th>
               <Table.Th />
             </Table.Tr>
@@ -303,6 +327,19 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                     </Badge>
                   ) : null}
                 </Table.Td>
+                {(d.aufgaben?.length ?? 0) > 0 && d.einstellungen?.aufgabenFeedback && (
+                  <Table.Td>
+                    <AmpelReihe
+                      nummern={d.aufgaben ?? []}
+                      ampeln={a.ampeln ?? {}}
+                      freischalten={
+                        d.einstellungen?.schrittweise
+                          ? (nr, weg) => void senden(`/server/blaetter/${id}/freischalten`, { id: a.id, nr, weg }).then(laden, (e: unknown) => notifyError(e))
+                          : undefined
+                      }
+                    />
+                  </Table.Td>
+                )}
                 <Table.Td>{a.aktualisiert ? new Date(a.aktualisiert).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' }) : '–'}</Table.Td>
                 <Table.Td>
                   <Button
@@ -367,5 +404,58 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
         </Modal>
       )}
     </Container>
+  )
+}
+
+const AMPEL_FARBE: Record<Ampel, string> = { rot: 'var(--mantine-color-red-6)', gelb: 'var(--mantine-color-yellow-6)', gruen: 'var(--mantine-color-green-7)' }
+const AMPEL_TEXT: Record<Ampel, string> = { rot: 'noch nicht', gelb: 'teilweise treffend', gruen: 'treffend' }
+
+/**
+ * Ampel je Aufgabe einer Person (05.10.2026). Bei schrittweiser Freischaltung: Klick auf eine rote Aufgabe
+ * schaltet die nächste frei (zählt wie „teilweise"); Klick auf eine so freigeschaltete nimmt es zurück.
+ */
+function AmpelReihe({
+  nummern,
+  ampeln,
+  freischalten
+}: {
+  nummern: number[]
+  ampeln: Record<string, Ampel>
+  freischalten?: (nr: number, weg: boolean) => void
+}): React.JSX.Element {
+  return (
+    <Group gap={4} wrap="nowrap" data-ampel-reihe>
+      {nummern.map((nr) => {
+        const stand = ampeln[String(nr)] ?? 'rot'
+        const klick = freischalten && stand !== 'gruen' ? () => freischalten(nr, stand === 'gelb') : undefined
+        return (
+          <Tooltip
+            key={nr}
+            label={`Aufgabe ${nr}: ${AMPEL_TEXT[stand]}${klick ? (stand === 'rot' ? ' – Klick: als erledigt freischalten' : ' – Klick: Freischaltung zurücknehmen') : ''}`}
+          >
+            <UnstyledButton
+              onClick={klick}
+              disabled={!klick}
+              data-ampel-aufgabe={nr}
+              data-ampel={stand}
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: AMPEL_FARBE[stand],
+                color: stand === 'gelb' ? '#1a1b1e' : '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'grid',
+                placeItems: 'center',
+                cursor: klick ? 'pointer' : 'default'
+              }}
+            >
+              {nr}
+            </UnstyledButton>
+          </Tooltip>
+        )
+      })}
+    </Group>
   )
 }

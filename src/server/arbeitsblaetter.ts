@@ -46,7 +46,17 @@ import { ohneNamen } from '../renderer/src/modules/rueckmeldung/generation'
 import { abschrift, abschriftZaehlt, blattText, deckeln } from '../shared/abschrift'
 import { fachAusName } from '../shared/faecher'
 import { zeichenFuer } from '../renderer/src/shared/korrekturzeichen'
-import { aufgabenFeedbackAnfrage, aufgabenFeedbackAus, blattAbgabeText, type BlattAufgabe, type BlattFeld } from '../shared/blattFreigabe'
+import {
+  ampelVon,
+  aufgabenFeedbackAnfrage,
+  aufgabenFeedbackAus,
+  blattAbgabeText,
+  sichtbarBis,
+  type Ampel,
+  type AufgabenVerlauf,
+  type BlattAufgabe,
+  type BlattFeld
+} from '../shared/blattFreigabe'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS blatt_freigaben (
@@ -95,6 +105,8 @@ const db = () => {
     if (!spalten.has('loesung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN loesung TEXT NOT NULL DEFAULT ''")
     const sp2 = new Set((d.prepare('PRAGMA table_info(blatt_abgaben)').all() as { name: string }[]).map((x) => x.name))
     if (!sp2.has('extra')) d.exec('ALTER TABLE blatt_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
+    // Von der Lehrkraft freigeschaltete Aufgaben (schrittweise Freischaltung, 05.10.2026)
+    if (!sp2.has('freigeschaltet')) d.exec("ALTER TABLE blatt_abgaben ADD COLUMN freigeschaltet TEXT NOT NULL DEFAULT '[]'")
     bereit = true
   }
   return d
@@ -122,6 +134,10 @@ export interface BlattEinstellungen {
   stift: boolean
   /** Zielsprache des Blattes (Fremdsprachen) – für die Ansprache im Feedback */
   sprache?: string
+  /** Aufgaben schrittweise freischalten: die nächste erst, wenn die vorige mindestens „teilweise" ist (05.10.2026) */
+  schrittweise?: boolean
+  /** Merkkästen erst nach vollständiger Bearbeitung zeigen (05.10.2026) */
+  merkAmEnde?: boolean
 }
 
 interface Zeile {
@@ -147,6 +163,8 @@ interface Abgabe {
   aufgaben_feedback: string
   abgaben: number
   aktualisiert: number
+  /** JSON: Nummern der Aufgaben, die die Lehrkraft als erledigt freigeschaltet hat */
+  freigeschaltet?: string
 }
 
 const freigabe = (id: string): Zeile | null => (db().prepare('SELECT * FROM blatt_freigaben WHERE id = ?').get(id) as Zeile | undefined) ?? null
@@ -300,7 +318,15 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             runden: e.runden + extraVon(z.id, ich.id),
             // Lösungsblatt erst nach dem ersten Einreichen (03.10.2026)
             ...((a?.abgaben ?? 0) > 0 && (z as Zeile & { loesung?: string }).loesung ? { loesung: (z as Zeile & { loesung?: string }).loesung } : {}),
-            einstellungen: { feedback: e.feedback, aufgabenFeedback: e.aufgabenFeedback, aufgabenRunden: e.aufgabenRunden, stift: e.stift },
+            einstellungen: {
+              feedback: e.feedback,
+              aufgabenFeedback: e.aufgabenFeedback,
+              aufgabenRunden: e.aufgabenRunden,
+              stift: e.stift,
+              ...(e.schrittweise ? { schrittweise: true } : {}),
+              ...(e.merkAmEnde ? { merkAmEnde: true } : {})
+            },
+            freigeschaltet: json_(a?.freigeschaltet ?? '[]', [] as number[]),
             antworten: json_(a?.antworten ?? '{}', {}),
             tinte: json_(a?.tinte ?? '{}', {}),
             aufgabenFeedback: json_(a?.aufgaben_feedback ?? '{}', {}),
@@ -370,6 +396,18 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         const tinte = k0.tinte ? bereinigeTinte(k0.tinte) : json_(a?.tinte ?? '{}', {} as Record<string, string>)
         const bisher = json_(a?.aufgaben_feedback ?? '{}', {} as Record<string, { text: string; einschaetzung: string; zeit: number }[]>)
         const liste = bisher[String(nr)] ?? []
+        // Schrittweise (05.10.2026): Feedback nur zu freigeschalteten Aufgaben
+        if (
+          e.schrittweise &&
+          nr >
+            sichtbarBis(
+              aufgaben.map((x) => x.nr),
+              bisher,
+              json_(a?.freigeschaltet ?? '[]', [] as number[]),
+              true
+            )
+        )
+          return (json(res, 403, { fehler: 'Diese Aufgabe ist noch nicht freigeschaltet.' }), true)
         if (liste.length >= e.aufgabenRunden)
           return (json(res, 409, { fehler: `Zu dieser Aufgabe gab es schon ${e.aufgabenRunden}× Feedback. Reiche das Blatt ein, wenn du fertig bist.` }), true)
         // Bereich der Aufgabe (Zeitleiste & Co. ohne Schreibfelder): ihre Seite und die Objekte darin zählen mit
@@ -517,8 +555,12 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         runden: Math.max(1, Math.min(5, Math.round(Number(e0.runden) || 2))),
         aufgabenRunden: Math.max(1, Math.min(5, Math.round(Number(e0.aufgabenRunden) || 2))),
         stift: e0.stift !== false,
-        ...(typeof e0.sprache === 'string' ? { sprache: e0.sprache.slice(0, 8) } : {})
+        ...(typeof e0.sprache === 'string' ? { sprache: e0.sprache.slice(0, 8) } : {}),
+        ...(e0.schrittweise === true ? { schrittweise: true } : {}),
+        ...(e0.merkAmEnde === true ? { merkAmEnde: true } : {})
       }
+      // Schrittweise braucht das Urteil je Aufgabe
+      if (einstellungen.schrittweise) einstellungen.aufgabenFeedback = true
       const titel = String(k0.titel ?? 'Arbeitsblatt').slice(0, 160)
       const rid = verknuepfteFreigabeAnlegen({
         lehrkraftId: ich.id,
@@ -570,7 +612,15 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         (db().prepare('SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
       )
       const zeilen = db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ? ORDER BY aktualisiert DESC').all(z.id) as unknown as Abgabe[]
+      const nummern = json_(z.aufgaben, [] as BlattAufgabe[]).map((x) => x.nr)
+      // Ampel je Aufgabe und Person (05.10.2026)
+      const ampeln = (a: Abgabe): Record<string, Ampel> => {
+        const verlauf = json_(a.aufgaben_feedback ?? '{}', {} as AufgabenVerlauf)
+        const frei = json_(a.freigeschaltet ?? '[]', [] as number[])
+        return Object.fromEntries(nummern.map((nr) => [String(nr), ampelVon(verlauf[String(nr)], frei.includes(nr))]))
+      }
       const abgaben = zeilen.map((a) => ({
+        ampeln: ampeln(a),
         id: a.schueler_id,
         name: namen.get(a.schueler_id)?.name ?? '',
         benutzer: namen.get(a.schueler_id)?.benutzer ?? '',
@@ -586,9 +636,30 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         if (begonnen.has(id)) continue
         const n = namen.get(id)
         if (n)
-          abgaben.push({ id, name: n.name, benutzer: n.benutzer, gast: n.quelle === 'gast', perCode: true, eingereicht: 0, aktualisiert: 0, fassungen: [] })
+          abgaben.push({
+            ampeln: Object.fromEntries(nummern.map((nr) => [String(nr), 'rot' as Ampel])),
+            id,
+            name: n.name,
+            benutzer: n.benutzer,
+            gast: n.quelle === 'gast',
+            perCode: true,
+            eingereicht: 0,
+            aktualisiert: 0,
+            fassungen: []
+          })
       }
-      return (json(res, 200, { id: z.id, titel: z.titel, status: z.status, rueckmeldungId: z.rueckmeldung_id, abgaben }), true)
+      return (
+        json(res, 200, {
+          id: z.id,
+          titel: z.titel,
+          status: z.status,
+          rueckmeldungId: z.rueckmeldung_id,
+          aufgaben: nummern,
+          einstellungen: einstellungenVon(z),
+          abgaben
+        }),
+        true
+      )
     }
     /*
      * Lehrkraft: das ausgefüllte Blatt einer Person ansehen (App „Freigegebene Blätter", 03.10.2026) –
@@ -622,6 +693,26 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       const status = k0.status === 'beendet' ? 'beendet' : 'offen'
       db().prepare('UPDATE blatt_freigaben SET status = ? WHERE id = ?').run(status, z.id)
       verknuepfteFreigabeStatus(z.rueckmeldung_id, status)
+      return (json(res, 200, { ok: true }), true)
+    }
+    // Lehrkraft schaltet eine Aufgabe für eine Person frei – zählt wie „teilweise" (05.10.2026)
+    if (req.method === 'POST' && teile[1] === 'freischalten') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const person = nutzerNachId(String(k0.id ?? ''))
+      const nr = Number(k0.nr)
+      if (!person || !blattIstFuer(z, person) || !json_(z.aufgaben, [] as BlattAufgabe[]).some((x) => x.nr === nr))
+        return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      db()
+        .prepare(
+          "INSERT OR IGNORE INTO blatt_abgaben (freigabe_id, schueler_id, antworten, tinte, aufgaben_feedback, abgaben, aktualisiert) VALUES (?, ?, '{}', '{}', '{}', 0, ?)"
+        )
+        .run(z.id, person.id, Date.now())
+      const frei = new Set(json_(abgabeVon(z.id, person.id)?.freigeschaltet ?? '[]', [] as number[]))
+      if (k0.weg === true) frei.delete(nr)
+      else frei.add(nr)
+      db()
+        .prepare('UPDATE blatt_abgaben SET freigeschaltet = ? WHERE freigabe_id = ? AND schueler_id = ?')
+        .run(JSON.stringify([...frei]), z.id, person.id)
       return (json(res, 200, { ok: true }), true)
     }
     if (req.method === 'POST' && teile[1] === 'gast-entfernen') {
@@ -685,13 +776,18 @@ export function reihenBlattAnlegen(e: {
   thema?: string
   merk?: { titel: string; text: string }[]
   loesung?: string
+  /** Schrittweise Freischaltung, Merkkästen am Ende (05.10.2026) */
+  schrittweise?: boolean
+  merkAmEnde?: boolean
 }): string {
   const einstellungen: BlattEinstellungen = {
     feedback: true,
     aufgabenFeedback: true,
     runden: Math.max(1, Math.min(5, e.runden)),
     aufgabenRunden: 2,
-    stift: e.stift
+    stift: e.stift,
+    ...(e.schrittweise ? { schrittweise: true } : {}),
+    ...(e.merkAmEnde ? { merkAmEnde: true } : {})
   }
   const rid = verknuepfteFreigabeAnlegen({
     lehrkraftId: e.lehrkraftId,

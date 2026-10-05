@@ -319,6 +319,23 @@ function Inhalt({
             <Checkbox mt="lg" label="Stift erlauben" checked={i.stift} onChange={(e) => setzeInhalt({ stift: e.currentTarget.checked })} />
             <Checkbox
               mt="lg"
+              label="Aufgaben schrittweise freischalten"
+              title="Die nächste Aufgabe erscheint erst, wenn die vorige mindestens teilweise treffend gelöst ist; Ampel neben jeder Aufgabe"
+              checked={Boolean(i.schrittweise)}
+              onChange={(e) => setzeInhalt({ schrittweise: e.currentTarget.checked })}
+              data-schritt-schrittweise
+            />
+            {(i.merk?.length ?? 0) > 0 && (
+              <Checkbox
+                mt="lg"
+                label="Merkkästen erst am Ende"
+                title="Merkkästen erst nach vollständiger Bearbeitung des Blatts zeigen"
+                checked={Boolean(i.merkAmEnde)}
+                onChange={(e) => setzeInhalt({ merkAmEnde: e.currentTarget.checked })}
+              />
+            )}
+            <Checkbox
+              mt="lg"
               label="Lösung nach dem Einreichen"
               checked={Boolean(i.loesung)}
               onChange={(e) => setzeInhalt({ loesung: e.currentTarget.checked ? i.loesung || ' ' : '' })}

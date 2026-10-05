@@ -183,3 +183,42 @@ export function aufgabenFeedbackAus(roh: unknown): AufgabenFeedback {
     ...(markierungen.length ? { markierungen } : {})
   }
 }
+
+/*
+ * Schrittweise Freischaltung und Ampel (05.10.2026, Wunsch der Lehrkraft): „Erst wenn ein Schüler eine
+ * Aufgabe teilweise treffend erledigt hat (KI-Feedback oder Lehrerfreigabe), wird die nächste Aufgabe
+ * angezeigt. Für Schüler ist links neben der Aufgabe eine Ampel (rot = nicht bearbeitet, gelb = teilweise
+ * treffend erledigt, grün = treffend erledigt)." Merkkästen auf Wunsch erst nach vollständiger Bearbeitung.
+ * Server (Sperre, Lehrkraft-Ansicht) und Schüleransicht rechnen mit denselben Funktionen.
+ */
+export type Ampel = 'rot' | 'gelb' | 'gruen'
+
+/** Feedback-Verlauf je Aufgabe, wie er gespeichert wird */
+export type AufgabenVerlauf = Record<string, { einschaetzung: string }[] | undefined>
+
+/** Ampel einer Aufgabe: das BESTE Urteil zählt (Fortschritt geht nicht verloren); Freigabe der Lehrkraft = mindestens gelb */
+export function ampelVon(verlauf: { einschaetzung: string }[] | undefined, vonLehrkraft = false): Ampel {
+  const urteile = (verlauf ?? []).map((v) => v.einschaetzung)
+  if (urteile.includes('sicher')) return 'gruen'
+  if (urteile.includes('teilweise') || vonLehrkraft) return 'gelb'
+  return 'rot'
+}
+
+/**
+ * Bis zu welcher Aufgabe (Nummer, einschließlich) ist das Blatt sichtbar? Die erste immer; jede weitere,
+ * sobald die vorige mindestens gelb ist. `nummern` in Blattreihenfolge. Ohne Schrittweise: alle.
+ */
+export function sichtbarBis(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[], schrittweise: boolean): number {
+  const liste = [...nummern].sort((a, b) => a - b)
+  if (!schrittweise || !liste.length) return Number.POSITIVE_INFINITY
+  for (let i = 0; i < liste.length - 1; i++) {
+    if (ampelVon(verlauf[String(liste[i])], freigeschaltet.includes(liste[i])) === 'rot') return liste[i]
+  }
+  return liste[liste.length - 1]
+}
+
+/** Alle Aufgaben mindestens gelb – „vollständig bearbeitet" (Merkkästen erscheinen) – oder schon eingereicht */
+export function vollstaendigBearbeitet(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[], eingereicht: boolean): boolean {
+  if (eingereicht) return true
+  return nummern.length > 0 && nummern.every((nr) => ampelVon(verlauf[String(nr)], freigeschaltet.includes(nr)) !== 'rot')
+}

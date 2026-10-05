@@ -82,6 +82,9 @@ export type SchrittInhalt =
       vorlage: unknown
       runden: number
       stift: boolean
+      /** Aufgaben schrittweise freischalten / Merkkästen erst am Ende (05.10.2026, shared/blattFreigabe.ts) */
+      schrittweise?: boolean
+      merkAmEnde?: boolean
       /** Lösungsblatt – sehen die Lernenden erst nach dem ersten Einreichen (03.10.2026) */
       loesung?: string
       merk?: { titel: string; text: string }[]

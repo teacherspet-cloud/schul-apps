@@ -150,6 +150,9 @@ export function BlattFreigabeDialog({
   const [stift, setStift] = useState(true)
   // Lösungsblatt nach dem ersten Einreichen (03.10.2026, Idee aus LearningView)
   const [loesungZeigen, setLoesungZeigen] = useState(true)
+  // Schrittweise Freischaltung und Merkkästen am Ende (05.10.2026)
+  const [schrittweise, setSchrittweise] = useState(false)
+  const [merkAmEnde, setMerkAmEnde] = useState(false)
   const [laeuft, setLaeuft] = useState(false)
   const [liste, setListe] = useState<Freigegeben[]>([])
   const [qr, setQr] = useState<{ titel: string; code: string; link: string } | null>(null)
@@ -197,7 +200,16 @@ export function BlattFreigabeDialog({
         lerngruppeId: gruppe ?? '',
         schueler: einzelne,
         gaeste,
-        einstellungen: { feedback, aufgabenFeedback: feedback && aufgabenFeedback, runden, aufgabenRunden: 2, stift }
+        einstellungen: {
+          feedback,
+          // Schrittweise braucht das Urteil je Aufgabe
+          aufgabenFeedback: schrittweise || (feedback && aufgabenFeedback),
+          runden,
+          aufgabenRunden: 2,
+          stift,
+          ...(schrittweise ? { schrittweise: true } : {}),
+          ...(merkAmEnde ? { merkAmEnde: true } : {})
+        }
       })
       notifySuccess('Freigegeben – die Lernenden finden das Blatt im Schülerbereich unter „Arbeitsblätter“.')
       if (r.code && r.link) setQr({ titel, code: r.code, link: r.link })
@@ -275,6 +287,21 @@ export function BlattFreigabeDialog({
           </Group>
         )}
         <Checkbox label="Stift erlauben (Handschriftliches geht als Bild an die KI)" checked={stift} onChange={(e) => setStift(e.currentTarget.checked)} />
+        <Checkbox
+          label="Aufgaben schrittweise freischalten"
+          description="Die nächste Aufgabe erscheint erst, wenn die vorige mindestens teilweise treffend gelöst ist (KI-Feedback je Aufgabe oder Freischaltung durch die Lehrkraft). Links neben jeder Aufgabe steht eine Ampel."
+          checked={schrittweise}
+          onChange={(e) => setSchrittweise(e.currentTarget.checked)}
+          data-blatt-schrittweise
+        />
+        {aufgabenZahl > 0 && sheet && sheet.blocks.some((b) => b.type === 'infoBox') && (
+          <Checkbox
+            label="Merkkästen erst nach vollständiger Bearbeitung zeigen"
+            checked={merkAmEnde}
+            onChange={(e) => setMerkAmEnde(e.currentTarget.checked)}
+            data-blatt-merk-am-ende
+          />
+        )}
         <Checkbox
           label="Lösungsblatt nach dem ersten Einreichen zeigen"
           checked={loesungZeigen}

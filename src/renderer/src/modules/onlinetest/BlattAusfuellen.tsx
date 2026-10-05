@@ -38,7 +38,7 @@ import { materialMitZeilen } from './materialZeilen'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
-import type { BlattFeldArt } from '@shared/blattFreigabe'
+import { ampelVon, sichtbarBis, vollstaendigBearbeitet, type Ampel, type BlattFeldArt } from '@shared/blattFreigabe'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 
@@ -95,7 +95,18 @@ export interface BlattDaten {
   runden: number
   genutzt: number
   html: string
-  einstellungen: { feedback: boolean; aufgabenFeedback: boolean; aufgabenRunden: number; stift: boolean }
+  einstellungen: {
+    feedback: boolean
+    aufgabenFeedback: boolean
+    aufgabenRunden: number
+    stift: boolean
+    /** Aufgaben schrittweise freischalten (05.10.2026) */
+    schrittweise?: boolean
+    /** Merkkästen erst nach vollständiger Bearbeitung */
+    merkAmEnde?: boolean
+  }
+  /** Von der Lehrkraft freigeschaltete Aufgaben (zählen wie „teilweise") */
+  freigeschaltet?: number[]
   antworten: Record<string, string>
   tinte: Record<string, string>
   aufgabenFeedback: Record<string, AufgabenFb[]>
@@ -543,7 +554,27 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       setPdfLaeuft(null)
     }
   }
-  const aufgaben = gemessen?.aufgaben ?? []
+  const lehrkraftSicht = Boolean(lehrkraft)
+  /*
+   * Schrittweise Freischaltung und Merkkästen am Ende (05.10.2026, shared/blattFreigabe.ts): Gesperrte
+   * Aufgaben stehen unsichtbar im Blatt (die Seiten behalten ihre Maße), mit einem Hinweis darüber;
+   * ihre Felder und Knöpfe fehlen. Die Lehrkraft sieht alles.
+   */
+  const alleAufgaben = gemessen?.aufgaben ?? []
+  const nummern = alleAufgaben.map((a) => a.nr)
+  const frei = d.freigeschaltet ?? []
+  const bis = lehrkraftSicht ? Number.POSITIVE_INFINITY : sichtbarBis(nummern, aufgabenFb, frei, Boolean(d.einstellungen.schrittweise))
+  const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei, genutzt > 0)
+  const aufgaben = alleAufgaben.filter((a) => a.nr <= bis)
+  const felderSichtbar = (gemessen?.felder ?? []).filter((f) => f.nr <= bis)
+  const ampeln = d.einstellungen.aufgabenFeedback
+    ? Object.fromEntries(alleAufgaben.map((a) => [a.nr, ampelVon(aufgabenFb[String(a.nr)], frei.includes(a.nr))]))
+    : null
+  useEffect(() => {
+    const doc = iframe.current?.contentDocument
+    if (!doc || !gemessen) return
+    sperrenAnwenden(doc, bis, merkZeigen)
+  }, [gemessen, bis, merkZeigen])
 
   return (
     <Stack data-blatt-ausfuellen>
@@ -665,7 +696,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
             />
             {gemessen && (
               <Ebene
-                felder={gemessen.felder}
+                felder={felderSichtbar}
+                ampeln={ampeln}
                 seiten={gemessen.seiten}
                 aufgaben={aufgaben}
                 antworten={antworten}
@@ -696,7 +728,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
 
       {ansicht === 'liste' && gemessen && (
         <Liste
-          felder={gemessen.felder}
+          felder={felderSichtbar}
           aufgaben={aufgaben}
           antworten={antworten}
           setze={setze}
@@ -808,6 +840,8 @@ function Ebene(p: {
   laeuft: string | null
   fb: BlattDaten['aufgabenFeedback']
   runden: number
+  /** Ampel je Aufgabe (nur mit Feedback je Aufgabe) */
+  ampeln?: Record<number, Ampel> | null
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   const schreibt = p.werkzeug !== 'tastatur'
@@ -998,6 +1032,11 @@ function Ebene(p: {
           gesperrt={p.gesperrt}
         />
       ))}
+      {/* Ampel links neben der Aufgabe (05.10.2026): rot = noch nicht, gelb = teilweise, grün = treffend */}
+      {p.ampeln &&
+        p.aufgaben.map((a) => (
+          <AmpelZeichen key={`ampel-${a.nr}`} stand={p.ampeln![a.nr] ?? 'rot'} x={Math.max(0, a.x - (p.pruefen ? 34 : 4) - 16)} y={a.y - 1} nr={a.nr} />
+        ))}
       {p.pruefen &&
         p.aufgaben.map((a) => {
           const liste = p.fb[String(a.nr)]
@@ -1300,4 +1339,75 @@ function Liste(p: {
       })}
     </Stack>
   )
+}
+
+const AMPEL_TEXT: Record<Ampel, string> = {
+  rot: 'Noch nicht (treffend) bearbeitet',
+  gelb: 'Teilweise treffend erledigt',
+  gruen: 'Treffend erledigt'
+}
+
+/** Kleine Ampel neben der Aufgabe – drei Lichter, das zutreffende leuchtet */
+function AmpelZeichen({ stand, x, y, nr }: { stand: Ampel; x: number; y: number; nr: number }): React.JSX.Element {
+  const licht = (farbe: Ampel, an: string): React.JSX.Element => (
+    <span
+      style={{
+        display: 'block',
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: stand === farbe ? an : '#d0d4d9',
+        boxShadow: stand === farbe ? `0 0 4px ${an}` : 'none'
+      }}
+    />
+  )
+  return (
+    <Tooltip label={`Aufgabe ${nr}: ${AMPEL_TEXT[stand]}`}>
+      <div
+        data-ampel={stand}
+        data-ampel-nr={nr}
+        aria-label={`Aufgabe ${nr}: ${AMPEL_TEXT[stand]}`}
+        style={{
+          position: 'absolute',
+          left: x,
+          top: y,
+          zIndex: 19,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          padding: 2,
+          borderRadius: 6,
+          background: '#2b2f33'
+        }}
+      >
+        {licht('rot', '#e03131')}
+        {licht('gelb', '#f59f00')}
+        {licht('gruen', '#2f9e44')}
+      </div>
+    </Tooltip>
+  )
+}
+
+/** Gesperrte Aufgaben und (noch) verborgene Merkkästen im Blatt ausblenden – Platz bleibt, ein Hinweis steht darauf */
+function sperrenAnwenden(doc: Document, bis: number, merkZeigen: boolean): void {
+  if (!doc.getElementById('sa-sperre-stil')) {
+    const st = doc.createElement('style')
+    st.id = 'sa-sperre-stil'
+    st.textContent = `.sa-gesperrt{position:relative;visibility:hidden}
+.sa-gesperrt::before{content:attr(data-sperre);visibility:visible;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:4mm;border:0.4mm dashed #adb5bd;border-radius:2mm;background:#f8f9fa;color:#495057;font-size:0.9em;z-index:2}`
+    doc.head.appendChild(st)
+  }
+  let nr = 0
+  for (const t of Array.from(doc.querySelectorAll<HTMLElement>('.ws-task'))) {
+    if (!t.classList.contains('ws-continued')) nr++
+    const zu = nr > bis
+    t.classList.toggle('sa-gesperrt', zu)
+    if (zu) t.setAttribute('data-sperre', `Aufgabe ${nr} wird freigeschaltet, sobald Aufgabe ${bis} mindestens teilweise gelöst ist.`)
+    else t.removeAttribute('data-sperre')
+  }
+  for (const m of Array.from(doc.querySelectorAll<HTMLElement>('.ws-info'))) {
+    m.classList.toggle('sa-gesperrt', !merkZeigen)
+    if (!merkZeigen) m.setAttribute('data-sperre', 'Dieser Merkkasten erscheint, wenn alle Aufgaben bearbeitet sind.')
+    else m.removeAttribute('data-sperre')
+  }
 }

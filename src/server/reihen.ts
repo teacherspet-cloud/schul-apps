@@ -206,7 +206,9 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
             fach: r.fachLabel,
             thema: r.oberthema,
             merk: va.merk ?? [],
-            loesung: va.loesung
+            loesung: va.loesung,
+            schrittweise: i.schrittweise,
+            merkAmEnde: i.merkAmEnde
           })
         })
         v[s.id] = '*'
@@ -225,7 +227,9 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
           fach: r.fachLabel,
           thema: r.oberthema,
           merk: i.merk ?? [],
-          loesung: i.loesung
+          loesung: i.loesung,
+          schrittweise: i.schrittweise,
+          merkAmEnde: i.merkAmEnde
         })
       else if (i.art === 'rueckmeldung' && i.vorlage)
         v[s.id] = verknuepfteFreigabeAnlegen({
