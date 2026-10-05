@@ -19,6 +19,8 @@
 import { buildApi } from '@shared/apiShape'
 import { AbbruchFehler, istAbbruch } from '@shared/abbruch'
 import { pdfMitSeiten } from '@shared/seitenPdf'
+import type { AblageZiel } from '@shared/types'
+import { vorhandenName } from '@shared/vorhanden'
 import { AuftragUnterbrochen, fuehreAuftragAus, kennungIn, REGISTER_KANAELE } from './netzAuftrag'
 import { AnmeldungAbgelaufen, netzVerbindung, OhneAuftragsregister } from './netzVerbindung'
 
@@ -54,17 +56,19 @@ const serverSpeicher = {
 /** Die Verbindung zum PC – Adresse ist die eigene Herkunft, die Anmeldung liegt im localStorage */
 const verbindung = netzVerbindung({
   basis: '',
-  speicher: aufDemServer ? serverSpeicher : {
-    lies: () => {
-      try {
-        return localStorage.getItem(SCHLUESSEL) ?? ''
-      } catch {
-        return ''
-      }
-    },
-    schreibe: (t) => localStorage.setItem(SCHLUESSEL, t),
-    loesche: () => localStorage.removeItem(SCHLUESSEL)
-  },
+  speicher: aufDemServer
+    ? serverSpeicher
+    : {
+        lies: () => {
+          try {
+            return localStorage.getItem(SCHLUESSEL) ?? ''
+          } catch {
+            return ''
+          }
+        },
+        schreibe: (t) => localStorage.setItem(SCHLUESSEL, t),
+        loesche: () => localStorage.removeItem(SCHLUESSEL)
+      },
   geraet: imBrowserGestartet ? geraetKennung() : undefined
 })
 
@@ -356,7 +360,9 @@ export function netzZugangEinrichten(): void {
       verbinden: async (eingabe) => {
         const r = await iserv.verbinden(eingabe)
         const alt = (await api.settings.get()).iserv
-        await api.settings.set({ iserv: { schule: eingabe.schule.trim(), benutzer: eingabe.benutzer.trim(), basis: r.basis, ziel: alt?.ziel || 'Home/Schulmaterial' } })
+        await api.settings.set({
+          iserv: { schule: eingabe.schule.trim(), benutzer: eingabe.benutzer.trim(), basis: r.basis, ziel: alt?.ziel || 'Home/Schulmaterial' }
+        })
         return r as Awaited<ReturnType<typeof api.iserv.verbinden>>
       },
       trennen: async () => {
@@ -366,8 +372,19 @@ export function netzZugangEinrichten(): void {
       }
     }
   }
-  const aufIservAblegen = async (name: string, daten: Uint8Array | string, ziel: unknown): Promise<string> =>
-    client!.iserv.ablegen(name, daten, ziel, (await api.settings.get()).iserv?.ziel)
+  // Gibt es den Namen auf IServ schon: fragen und mit der Antwort erneut ablegen (05.10.2026, shared/vorhanden.ts)
+  const aufIservAblegen = async (name: string, daten: Uint8Array | string, ziel: AblageZiel): Promise<string | null> => {
+    const standard = (await api.settings.get()).iserv?.ziel
+    try {
+      return await client!.iserv.ablegen(name, daten, ziel, standard)
+    } catch (e) {
+      const vorhanden = vorhandenName(e)
+      const frage = api.vermittlung.aktuell().vorhandenWahl
+      if (!vorhanden || !frage || ziel.beiVorhanden) throw e
+      const wahl = await frage(vorhanden, 'IServ')
+      return wahl ? client!.iserv.ablegen(name, daten, { ...ziel, beiVorhanden: wahl }, standard) : null
+    }
+  }
 
   api.files.save = async (defaultName, _filters, daten, ziel) => {
     // Rückfrage „Wohin?" (shared/export/ausgabeOrt.tsx) – mit der Exe auch IServ

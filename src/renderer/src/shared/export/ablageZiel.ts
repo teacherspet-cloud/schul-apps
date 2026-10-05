@@ -12,12 +12,21 @@ import { themenbereichVon, useThemen } from '../themenbereiche'
  * Der Themenbereich kommt aus derselben Zuordnung wie in der Bibliothek (themenbereiche.tsx),
  * mit Unterbereichen von oben nach unten. Fehlt das Fach am Material, gilt das Fach des Bereichs.
  */
-export function ablageZiel(programm: string, docId?: string | null, fach?: string): AblageZiel {
+export function ablageZiel(programm: string, docId?: string | null, fach?: string, mehr: { jahrgang?: number; thema?: string } = {}): AblageZiel {
   const daten = useThemen.getState().daten
   const bereich = docId ? themenbereichVon(programm, docId, daten) : null
   const name = fachAnzeige(fach) || (bereich ? fachAnzeige(bereich.fachId) : '')
   const pfad = bereich ? pfadVon(daten, bereich.id).map((b) => b.name) : []
-  return { programm, ...(name ? { fach: name } : {}), ...(pfad.length ? { themenbereich: pfad } : {}) }
+  // Jahrgang und Thema (05.10.2026): Ordner Fach / Jahrgang / Thema / Materialart (shared/schulmaterial.ts)
+  const jahrgang = Number(mehr.jahrgang) || 0
+  const thema = String(mehr.thema ?? '').trim()
+  return {
+    programm,
+    ...(name ? { fach: name } : {}),
+    ...(pfad.length ? { themenbereich: pfad } : {}),
+    ...(jahrgang ? { jahrgang } : {}),
+    ...(thema ? { thema } : {})
+  }
 }
 
 /** Anzeigename des Fachs aus Kennung, Namen oder Sprachcode; Unbekanntes bleibt, wie es ist */

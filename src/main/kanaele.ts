@@ -47,6 +47,7 @@ import { attrappeAktiv, attrappeBild, attrappeBildErzeugen, attrappeBildsuche, a
 import { istAbbruch } from '@shared/abbruch'
 import { pdfMitSeiten } from '@shared/seitenPdf'
 import { freierDateiname } from '@shared/dateiname'
+import { vorhandenFehler, type BeiVorhanden } from '@shared/vorhanden'
 import { cancelLogin, installCli, reopenLoginPage, startLogin, submitLoginCode } from './services/ai/setup'
 import { createProvider, createTextProvider, getModelList, healModelSelection, refreshProvider } from './services/ai/models'
 import { mitPdfMetadaten } from './services/export/pdfMetadaten'
@@ -559,23 +560,23 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    * Mehrere Dateien in EINEN Ordner (Anlass 25.09.2026): Beim Arbeitsblatt entstanden Blatt,
    * Lösungen, Tafelbild und Hörtexte – mit je einem Speichern-Dialog, bis zu fünf
    * hintereinander. Jetzt wird einmal ein Ordner gewählt und alles dort abgelegt. Ohne den
-   * Dialog von Windows fehlt dessen Rückfrage „Ersetzen?"; vorhandene Dateien bekommen
-   * deshalb nie einen stummen Nachfolger, sondern der neue Name ein „(2)" (shared/dateiname.ts).
+   * Dialog von Windows fehlt dessen Rückfrage „Ersetzen?" – die App fragt deshalb selbst
+   * (05.10.2026, shared/vorhanden.ts): überschreiben oder als „Name (2)" (shared/dateiname.ts).
    *
    * Nicht in der Freigabe des Netzzugangs: Ein Ordner auf DIESEM Rechner hat für ein Tablet
    * keinen Sinn, dort wird weiter heruntergeladen (renderer/shared/netzZugang.ts).
    */
   handle('files:choose-folder', (title?: string) => u.ordnerWaehlen(title))
-  const inOrdnerSchreiben = (ordner: string, name: string, daten: Buffer | string): string => {
-    const ziel = join(
-      ordner,
-      freierDateiname(basename(name), (n) => existsSync(join(ordner, n)))
-    )
+  // Gibt es den Namen schon (05.10.2026): ohne Entscheidung fragt die Oberfläche (shared/vorhanden.ts)
+  const inOrdnerSchreiben = (ordner: string, name: string, daten: Buffer | string, beiVorhanden?: BeiVorhanden): string => {
+    const gewuenscht = basename(name)
+    if (existsSync(join(ordner, gewuenscht)) && !beiVorhanden) throw vorhandenFehler(gewuenscht)
+    const ziel = join(ordner, beiVorhanden === 'ersetzen' ? gewuenscht : freierDateiname(gewuenscht, (n) => existsSync(join(ordner, n))))
     writeFileSync(ziel, daten)
     return ziel
   }
-  handle('files:save-in-folder', (ordner: string, name: string, data: Uint8Array | string) =>
-    inOrdnerSchreiben(ordner, name, typeof data === 'string' ? data : Buffer.from(data))
+  handle('files:save-in-folder', (ordner: string, name: string, data: Uint8Array | string, beiVorhanden?: BeiVorhanden) =>
+    inOrdnerSchreiben(ordner, name, typeof data === 'string' ? data : Buffer.from(data), beiVorhanden)
   )
   handle('files:open-folder', (ordner: string) => u.ordnerZeigen(ordner))
 
@@ -619,9 +620,11 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
     ausgeben(defaultName, [{ name: 'PDF', extensions: ['pdf'] }], () => pdfBytes(html, opts), ziel)
   )
   /** Dasselbe PDF ohne Dialog in einen schon gewählten Ordner (siehe `files:choose-folder`) */
-  handle('export:pdf-in-folder', async (ordner: string, html: string, name: string, opts?: PdfExtras) =>
-    inOrdnerSchreiben(ordner, name, await pdfBytes(html, opts))
-  )
+  handle('export:pdf-in-folder', async (ordner: string, html: string, name: string, opts?: PdfExtras, beiVorhanden?: BeiVorhanden) => {
+    // Vor dem Umrechnen prüfen – sonst wird das PDF für eine Rückfrage umsonst gebaut
+    if (!beiVorhanden && existsSync(join(ordner, basename(name)))) throw vorhandenFehler(basename(name))
+    return inOrdnerSchreiben(ordner, name, await pdfBytes(html, opts), beiVorhanden ?? 'neu')
+  })
   handle('export:print', (html: string, options?: PrintOptions) => u.druck.drucken(html, options))
   /** Druckvorschau: PDF-Daten zum Anzeigen der Seiten */
   handle('export:preview', async (html: string) => new Uint8Array(await u.druck.pdf(html)))

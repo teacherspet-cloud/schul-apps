@@ -12,6 +12,8 @@ import { renderPages } from '../components/PrintPreview'
 import { seitenMarken, waehleSeitenImHtml, type SeitenMarke } from './seitenAuswahl'
 import { istIservPfad, iservAnzeige } from '@shared/iserv'
 import { mitOrt } from './ausgabeOrt'
+import { frageVorhanden, vorhandenRunde } from './vorhandenFrage'
+import { vorhandenName, type BeiVorhanden } from '@shared/vorhanden'
 
 /**
  * Dateien ausgeben – eine mit dem gewohnten Speichern-Dialog, mehrere in EINEN Ordner.
@@ -75,9 +77,21 @@ async function einzeln(d: AusgabeDatei, ziel?: AblageZiel): Promise<string | nul
   return window.api.files.save(d.name, d.filter, await datenVon(d), ziel)
 }
 
-async function inOrdner(ordner: string, d: AusgabeDatei): Promise<string> {
-  if ('html' in d) return window.api.exporter.pdfInFolder(ordner, d.html, d.name, d.pdf)
-  return window.api.files.saveInFolder(ordner, d.name, await datenVon(d))
+async function inOrdner(ordner: string, d: AusgabeDatei, beiVorhanden?: BeiVorhanden): Promise<string> {
+  if ('html' in d) return window.api.exporter.pdfInFolder(ordner, d.html, d.name, d.pdf, beiVorhanden)
+  return window.api.files.saveInFolder(ordner, d.name, await datenVon(d), beiVorhanden)
+}
+
+/** In den Ordner – gibt es den Namen schon, wird gefragt (05.10.2026); null = diese Datei nicht speichern */
+async function inOrdnerMitFrage(ordner: string, d: AusgabeDatei, mehrere: boolean): Promise<string | null> {
+  try {
+    return await inOrdner(ordner, d)
+  } catch (e) {
+    const name = vorhandenName(e)
+    if (!name) throw e
+    const wahl = await frageVorhanden(name, 'Ordner', mehrere)
+    return wahl ? inOrdner(ordner, d, wahl) : null
+  }
 }
 
 const dateiname = (pfad: string): string => pfad.split(/[\\/]/).pop() ?? pfad
@@ -196,7 +210,8 @@ async function mitSeitenWahl(dateien: AusgabeDatei[]): Promise<AusgabeDatei[] | 
           if (!seiten.length) ergebnis[i] = null
           // Passen Marken und Seiten nicht zusammen (Überlauf), lässt sich nichts zuordnen – dann die ganze Datei
           else if ((marken.length && marken.length !== anzahl) || seiten.length === anzahl) ergebnis[i] = d
-          else ergebnis[i] = { name: d.name, filter: d.filter, daten: () => q.mitAuswahl(seiten, marken.length ? seiten.map((s) => marken[s - 1]) : [], anzahl) }
+          else
+            ergebnis[i] = { name: d.name, filter: d.filter, daten: () => q.mitAuswahl(seiten, marken.length ? seiten.map((s) => marken[s - 1]) : [], anzahl) }
         }
       })
     }
@@ -262,12 +277,25 @@ export async function speichereAusgabe(alle: AusgabeDatei[], meldung: string, zi
   const ordner = await window.api.files.chooseFolder(`Ordner für ${dateien.length} Dateien wählen`)
   if (!ordner) return 0
   const pfade: string[] = []
-  for (const d of dateien) pfade.push(await inOrdner(ordner, d))
+  const gespeichert: AusgabeDatei[] = []
+  vorhandenRunde()
+  try {
+    for (const [i, d] of dateien.entries()) {
+      const pfad = await inOrdnerMitFrage(ordner, d, i < dateien.length - 1)
+      if (pfad) {
+        pfade.push(pfad)
+        gespeichert.push(d)
+      }
+    }
+  } finally {
+    vorhandenRunde()
+  }
+  if (!pfade.length) return 0
   const ios = aufIos()
   // iPad: gleich alle Dateien zum Teilen anbieten (AirDrop, Mail, „In Dateien sichern" …)
   if (ios) void window.api.files.openFolder(ordner).catch((e: unknown) => notifyError(e, 'Die Dateien ließen sich nicht teilen'))
   // Hat eine Datei einen anderen Namen bekommen, weil es den gewünschten schon gab? Dann sagen, warum.
-  const umbenannt = pfade.filter((p, i) => dateiname(p) !== dateien[i].name.replace(/[\\/]/g, ''))
+  const umbenannt = pfade.filter((p, i) => dateiname(p) !== gespeichert[i].name.replace(/[\\/]/g, ''))
   notifications.show({
     title: meldung,
     autoClose: 15000,

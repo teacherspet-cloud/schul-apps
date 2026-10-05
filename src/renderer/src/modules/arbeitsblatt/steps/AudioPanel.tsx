@@ -1,4 +1,21 @@
-import { ActionIcon, Alert, Badge, Button, Card, Chip, FileButton, Group, Select, Stack, Switch, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Chip,
+  FileButton,
+  Group,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import { aufServer } from '../../../shared/plattform'
 import {
   IconDownload,
@@ -83,7 +100,9 @@ export function AudioPanel({
   onVertont?: (audioId: string, sekunden: number) => void
 }): React.JSX.Element {
   const updateSheet = useArbeitsblatt((s) => s.update)
-  const ziel = (): AblageZiel => ablage ?? ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
+  const ziel = (): AblageZiel =>
+    ablage ??
+    ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId, { jahrgang: ws.meta.grade, thema: ws.meta.topic })
   const update = onUpdate ?? updateSheet
   const settings = useAppSettings((s) => s.settings)
   const [voices, setVoices] = useState<TtsVoice[]>([])

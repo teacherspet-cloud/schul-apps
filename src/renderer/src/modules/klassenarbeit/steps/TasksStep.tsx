@@ -224,7 +224,9 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     return [
       b.fehlend.length ? `Ohne amtliche Definition in der Operatorenliste (${b.liste.quelle}): ${b.fehlend.join(', ')}.` : '',
       ohne.length ? `Ohne Erläuterung und Beispiel in der Sprache der Liste, daher nicht in der Liste auf dem Blatt: ${ohne.join(', ')}.` : '',
-      nurBeispiel.length ? `In der Liste auf dem Blatt nur mit dem Aufgabenbeispiel der Liste (keine Erläuterung in ihrer Sprache): ${nurBeispiel.join(', ')}.` : '',
+      nurBeispiel.length
+        ? `In der Liste auf dem Blatt nur mit dem Aufgabenbeispiel der Liste (keine Erläuterung in ihrer Sprache): ${nurBeispiel.join(', ')}.`
+        : '',
       ...operatorenVorbemerkungen(b).map((v) => `Vorbemerkung der Liste${v.bereich ? ` (${v.bereich})` : ''}, nur für die Lehrkraft: ${v.text}`)
     ]
       .filter(Boolean)
@@ -244,7 +246,9 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
   }, [layouts])
   // Seitenrand-Wache: Druck-HTML mit Erwartungshorizont, so wie der Export es baut
   useDruckFuerWachen(
-    hasContent ? () => buildWorksheetHtml(worksheet, layouts, { sheetIds: worksheet.sheets.map((s) => s.id), includeKey: true }, logo, settings.schoolName) : null,
+    hasContent
+      ? () => buildWorksheetHtml(worksheet, layouts, { sheetIds: worksheet.sheets.map((s) => s.id), includeKey: true }, logo, settings.schoolName)
+      : null,
     [hasContent, worksheet, layouts, logo, settings.schoolName]
   )
   // Strg+P öffnet denselben Druckdialog wie der Knopf „Drucken" – sobald es etwas zu drucken gibt
@@ -391,7 +395,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
     logo,
     schoolName: settings.schoolName,
     begriff: 'Erwartungshorizont',
-    ziel: ablageZiel('klassenarbeit', useKlassenarbeit.getState().docId, meta.subjectLabel || meta.subjectId)
+    ziel: ablageZiel('klassenarbeit', useKlassenarbeit.getState().docId, meta.subjectLabel || meta.subjectId, { jahrgang: meta.grade, thema: meta.topic })
   })
   const starte = (was: AusgabeModus): void => {
     setAlleAusgeben(true)

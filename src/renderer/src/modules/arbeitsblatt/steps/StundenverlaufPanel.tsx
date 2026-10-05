@@ -1,19 +1,4 @@
-import {
-  ActionIcon,
-  Alert,
-  Button,
-  Card,
-  Group,
-  SegmentedControl,
-  Select,
-  Stack,
-  Table,
-  Text,
-  Textarea,
-  TextInput,
-  Title,
-  Tooltip
-} from '@mantine/core'
+import { ActionIcon, Alert, Button, Card, Group, SegmentedControl, Select, Stack, Table, Text, Textarea, TextInput, Title, Tooltip } from '@mantine/core'
 import ZahlFeld from '../../../shared/components/ZahlFeld'
 import { IconArrowDown, IconArrowUp, IconFileTypeDocx, IconFileTypePdf, IconListDetails, IconPlus, IconSparkles, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
@@ -99,7 +84,7 @@ export function StundenverlaufPanel({ ws, profile }: { ws: Worksheet; profile: L
         ? [{ name: `${name}.docx`, filter: WORD_FILTER, daten: () => verlaufDocx(v, titel, untertitel, ws.meta.ki) }]
         : [{ name: `${name}.pdf`, html: verlaufHtml(v, titel, untertitel, ws.meta.ki) }],
       'Stundenverlauf gespeichert.',
-      ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
+      ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId, { jahrgang: ws.meta.grade, thema: ws.meta.topic })
     ).catch(notifyError)
   }
 

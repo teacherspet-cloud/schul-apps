@@ -11,6 +11,7 @@
  */
 import { davUrl, istGruppenWurzel, iservKandidaten, inhaltstyp, leseMultistatus, pfadTeile, type DavEintrag } from '@shared/iserv'
 import { freierDateiname } from '@shared/dateiname'
+import { vorhandenFehler, type BeiVorhanden } from '@shared/vorhanden'
 
 export interface DavAnfrage {
   methode: 'PROPFIND' | 'MKCOL' | 'PUT' | 'GET'
@@ -134,13 +135,25 @@ export async function ordnerSicherstellen(z: IservZugang, teile: string[]): Prom
 }
 
 /**
- * Datei hochladen – nie überschreiben: Gibt es den Namen schon, wird es „Name (2).pdf" usw.
- * Liefert den Pfad (Teile) der gespeicherten Datei.
+ * Datei hochladen. Gibt es den Namen schon (05.10.2026): ohne Entscheidung Fehler „VORHANDEN:" – die
+ * Oberfläche fragt (shared/vorhanden.ts); `ersetzen` schreibt über die vorhandene Datei, `neu` legt
+ * „Name (2).pdf" usw. an. Liefert den Pfad (Teile) der gespeicherten Datei.
  */
-export async function hochladen(z: IservZugang, ordner: string[], name: string, daten: Uint8Array): Promise<string[]> {
+export async function hochladen(z: IservZugang, ordner: string[], name: string, daten: Uint8Array, beiVorhanden?: BeiVorhanden): Promise<string[]> {
   await ordnerSicherstellen(z, ordner)
-  const vorhanden = new Set((await liste(z, ordner)).map((e) => e.name.toLowerCase()))
+  const eintraege = await liste(z, ordner)
+  const vorhanden = new Set(eintraege.map((e) => e.name.toLowerCase()))
   const sauber = name.replace(/[\\/:*?"<>|]/g, '-').trim() || 'Datei'
+  const gleich = vorhanden.has(sauber.toLowerCase()) || (await existiert(z, [...ordner, sauber]))
+  if (gleich && !beiVorhanden) throw vorhandenFehler(sauber)
+  if (gleich && beiVorhanden === 'ersetzen') {
+    // Schreibweise des vorhandenen Eintrags übernehmen (IServ unterscheidet Groß/klein nicht überall)
+    const alt = eintraege.find((e) => e.name.toLowerCase() === sauber.toLowerCase())?.name ?? sauber
+    const ziel = [...ordner, alt]
+    const r = await anfrage(z, { methode: 'PUT', url: davUrl(z.basis, ziel), kopf: { 'Content-Type': inhaltstyp(alt) }, koerper: daten })
+    if (r.status !== 201 && r.status !== 204 && r.status !== 200) throw fehlerAus(r.status)
+    return ziel
+  }
   let frei = freierDateiname(sauber, (x) => vorhanden.has(x.toLowerCase()))
   // Sicherheitshalber noch einmal einzeln fragen (die Liste kann gekürzt sein)
   for (let n = 0; n < 50 && (await existiert(z, [...ordner, frei])); n++) {

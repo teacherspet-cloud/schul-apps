@@ -17,7 +17,8 @@ import type { Rueckmeldung } from '../model/types'
  */
 export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Element {
   // iPad: Ablage unter Schulmaterial/<Fach>/<Themenbereich> (shared/export/ablageZiel.ts)
-  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('rueckmeldung', useRueckmeldung.getState().docId, r.meta.subjectId)
+  const ablage = (): ReturnType<typeof ablageZiel> =>
+    ablageZiel('rueckmeldung', useRueckmeldung.getState().docId, r.meta.subjectId, { jahrgang: r.meta.grade, thema: r.meta.title })
   const zeilen = uebersichtZeilen(r)
   const profil = fehlerprofil(r)
   const [gewaehlt, setGewaehlt] = useState<string[]>([])
@@ -35,7 +36,9 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
       learningGoals: liste.map((f) => `Die Lernenden vermeiden Fehler im Bereich „${f.kategorie}".`).join('\n'),
       priorKnowledge: [
         `Fehlerschwerpunkte aus der Rückmeldung zu „${r.grundlage.titel || r.meta.title || 'der letzten Arbeit'}":`,
-        ...liste.map((f) => `- ${f.kategorie} (bei ${f.anzahl} von ${r.abgaben.length})${f.beispiele.length ? `, z. B. ${f.beispiele.map(ohneKuerzel).join('; ')}` : ''}`)
+        ...liste.map(
+          (f) => `- ${f.kategorie} (bei ${f.anzahl} von ${r.abgaben.length})${f.beispiele.length ? `, z. B. ${f.beispiele.map(ohneKuerzel).join('; ')}` : ''}`
+        )
       ].join('\n'),
       grade: r.meta.grade
     })
@@ -52,7 +55,9 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
               size="xs"
               variant="light"
               leftSection={<IconFileTypePdf size={14} />}
-              onClick={() => void speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.', ablage()).catch(notifyError)}
+              onClick={() =>
+                void speichereAusgabe([{ name: `${basis}.pdf`, html: uebersichtHtml(r) }], 'Notenübersicht gespeichert.', ablage()).catch(notifyError)
+              }
             >
               PDF
             </Button>

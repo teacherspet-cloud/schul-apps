@@ -23,6 +23,7 @@ import { Notifications } from '@mantine/notifications'
 import { SeitenWahlHost } from './shared/components/SeitenAuswahl'
 import { AusgabeOrtDialog, installiereOrtWahl } from './shared/export/ausgabeOrt'
 import { EingabeOrtDialog, installiereDateiWahl } from './shared/export/eingabeOrt'
+import { installiereVorhandenFrage, VorhandenDialog } from './shared/export/vorhandenFrage'
 import { installiereTabellenAuswahl, TabellenKreismenue } from './modules/arbeitsblatt/render/tabellenAuswahl'
 import { beobachteTrennung, htmlMitTrennung } from './shared/silbentrennung'
 import { aufServer, hatClient } from './shared/plattform'
@@ -54,6 +55,8 @@ if (!imNetz() || hatClient()) {
   installiereOrtWahl()
   installiereDateiWahl()
 }
+// Gleichnamiges Material am Speicherort: überschreiben oder neue Version? (05.10.2026)
+installiereVorhandenFrage()
 
 if (new URLSearchParams(location.search).has('selftest')) void import('./selftest').then((m) => m.installSelftest())
 
@@ -75,6 +78,8 @@ function Root(): React.JSX.Element {
       <AusgabeOrtDialog />
       {/* Datei öffnen: dieses Gerät oder IServ (shared/export/eingabeOrt.tsx) */}
       <EingabeOrtDialog />
+      {/* Gibt es schon – überschreiben oder neue Version (shared/export/vorhandenFrage.tsx) */}
+      <VorhandenDialog />
       {/* Markierte Tabellenzellen angleichen (modules/arbeitsblatt/render/tabellenAuswahl.tsx) */}
       <TabellenKreismenue />
       <App />

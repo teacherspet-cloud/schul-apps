@@ -198,7 +198,8 @@ function handle<A extends unknown[], R>(channel: string, fn: (...args: A) => R |
     } catch (err) {
       const meldung = err instanceof Error ? err.message : String(err)
       // Ins Protokoll: Kanal und Meldung, keine Nutzdaten; Abbrüche durch die Lehrkraft sind kein Fehler
-      if (!/abgebrochen|aborted/i.test(meldung)) protokolliere('fehler', `ipc ${channel}`, meldung)
+      // „VORHANDEN:“ ist eine Rückfrage (shared/vorhanden.ts), kein Fehler
+      if (!/abgebrochen|aborted|^VORHANDEN:/i.test(meldung)) protokolliere('fehler', `ipc ${channel}`, meldung)
       return { ok: false, error: meldung }
     }
   })

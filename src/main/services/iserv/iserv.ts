@@ -110,6 +110,6 @@ export async function iservAblegen(g: IservGeraet, name: string, daten: Uint8Arr
     (await liste(z, [])).filter((e) => e.ordner).map((e) => e.name)
   )
   const bytes = typeof daten === 'string' ? new TextEncoder().encode(daten) : daten
-  const teile = await hochladen(z, ordner, name, bytes)
+  const teile = await hochladen(z, ordner, name, bytes, ziel.beiVorhanden)
   return ISERV_PRAEFIX + teile.join('/')
 }

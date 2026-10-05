@@ -67,7 +67,8 @@ import Uebersicht from './Uebersicht'
 import WeitereAbgabe from './WeitereAbgabe'
 
 /** Hinweise der Prüfung am Bogen (z. B. Sprache verfehlt) – nur für die Lehrkraft, nicht im Ausdruck */
-const hinweiseVon = (b: Bogen | undefined): string[] => (Array.isArray(b?.hinweise) ? b.hinweise.filter((h): h is string => typeof h === 'string' && Boolean(h.trim())) : [])
+const hinweiseVon = (b: Bogen | undefined): string[] =>
+  Array.isArray(b?.hinweise) ? b.hinweise.filter((h): h is string => typeof h === 'string' && Boolean(h.trim())) : []
 
 /**
  * Schritt 2 der Rückmeldung (Großprogramm 0.4, F3): die Bögen durchsehen, bearbeiten und als
@@ -147,7 +148,7 @@ export default function Boegen(): React.JSX.Element | null {
   const fertige = r.abgaben.filter((a) => a.bogen)
   const zeichen = zeichenFuer(m.subjectId, settings)
   // iPad: Ablage unter Schulmaterial/<Fach>/<Themenbereich> (shared/export/ablageZiel.ts)
-  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('rueckmeldung', docId, m.subjectId)
+  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('rueckmeldung', docId, m.subjectId, { jahrgang: m.grade, thema: m.title })
   const skala: SkalenKontext = { meta: m, schwellen: thresholdsForSubject(settings.gradeScale, m.subjectId) }
   const sichtbar = r.abgaben.filter((a) => passtZurSuche(a, suche))
   const umschalten = (id: string): void => setOffen((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]))
@@ -170,7 +171,9 @@ export default function Boegen(): React.JSX.Element | null {
       const f = frisch(ids)
       if (!f?.liste.length) return
       const { d, liste } = f
-      const basis = safeFileName(`${d.meta.title || d.grundlage.titel || 'Rückmeldung'}${liste.length === 1 ? ` - ${liste[0].name.trim() || liste[0].kuerzel}` : ''}`)
+      const basis = safeFileName(
+        `${d.meta.title || d.grundlage.titel || 'Rückmeldung'}${liste.length === 1 ? ` - ${liste[0].name.trim() || liste[0].kuerzel}` : ''}`
+      )
       void (async () => {
         // PDF: Seiten gemessen wie in der Ansicht (auch für Bögen, die gerade zugeklappt sind)
         // Word mit Seitenauswahl (01.10.2026): gewählt wird an den Seiten des PDFs, Word bekommt die Bögen dieser Seiten
@@ -290,10 +293,23 @@ export default function Boegen(): React.JSX.Element | null {
                 Fehlende Bögen schreiben
               </Button>
             )}
-            <Button size="xs" variant="light" leftSection={<IconFileTypePdf size={14} />} disabled={!fertige.length} onClick={() => speichern(alleIds, 'pdf')} data-rm-alle-pdf>
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconFileTypePdf size={14} />}
+              disabled={!fertige.length}
+              onClick={() => speichern(alleIds, 'pdf')}
+              data-rm-alle-pdf
+            >
               Alle als PDF
             </Button>
-            <Button size="xs" variant="light" leftSection={<IconFileTypeDocx size={14} />} disabled={!fertige.length} onClick={() => speichern(alleIds, 'docx')}>
+            <Button
+              size="xs"
+              variant="light"
+              leftSection={<IconFileTypeDocx size={14} />}
+              disabled={!fertige.length}
+              onClick={() => speichern(alleIds, 'docx')}
+            >
               Alle als Word
             </Button>
             {/* Seitenauswahl (01.10.2026) für die nächste Ausgabe */}
@@ -301,14 +317,33 @@ export default function Boegen(): React.JSX.Element | null {
             {m.elternfassung && (
               <>
                 {uebersetzungOffen && (
-                  <Button size="xs" variant="light" color="yellow" leftSection={<IconLanguage size={14} />} onClick={() => elternUebersetzen(r, docId)} data-rm-uebersetzen>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="yellow"
+                    leftSection={<IconLanguage size={14} />}
+                    onClick={() => elternUebersetzen(r, docId)}
+                    data-rm-uebersetzen
+                  >
                     Elternfassungen übersetzen
                   </Button>
                 )}
-                <Button size="xs" variant="default" leftSection={<IconFileTypePdf size={14} />} disabled={!fertige.some((a) => a.bogen?.eltern)} onClick={() => elternSpeichern('pdf')}>
+                <Button
+                  size="xs"
+                  variant="default"
+                  leftSection={<IconFileTypePdf size={14} />}
+                  disabled={!fertige.some((a) => a.bogen?.eltern)}
+                  onClick={() => elternSpeichern('pdf')}
+                >
                   Elternfassung PDF
                 </Button>
-                <Button size="xs" variant="default" leftSection={<IconFileTypeDocx size={14} />} disabled={!fertige.some((a) => a.bogen?.eltern)} onClick={() => elternSpeichern('docx')}>
+                <Button
+                  size="xs"
+                  variant="default"
+                  leftSection={<IconFileTypeDocx size={14} />}
+                  disabled={!fertige.some((a) => a.bogen?.eltern)}
+                  onClick={() => elternSpeichern('docx')}
+                >
                   Elternfassung Word
                 </Button>
               </>
@@ -495,7 +530,9 @@ function BogenKopf({ r, a, auf, umschalten }: { r: Rueckmeldung; a: Abgabe; auf:
             <Tooltip label={g.bestaetigt ? 'Einstufung bestätigt' : 'Vorschlag der KI – noch zu bestätigen'}>
               <Badge size="sm" variant={g.bestaetigt ? 'light' : 'outline'} color={g.bestaetigt ? 'red' : 'gray'} data-rm-zeile-einstufung>
                 {art === 'ampel' ? (
-                  <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: AMPEL_FARBE[g.wert] ?? '#999', verticalAlign: -1 }} />
+                  <span
+                    style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: AMPEL_FARBE[g.wert] ?? '#999', verticalAlign: -1 }}
+                  />
                 ) : (
                   wertText(art, g.wert)
                 )}
@@ -664,8 +701,8 @@ function BogenInhalt({ a, x }: { a: Abgabe; x: BogenAktionen }): React.JSX.Eleme
         </Alert>
       ) : null}
       <Text size="xs" c="dimmed">
-        Texte direkt auf dem Blatt ändern · Nummer einer Randnotiz: Art, Zeichen, Textstelle · Textstelle im Schülertext markieren: neue Notiz · Zauberstab: neu erzeugen
-        oder überarbeiten
+        Texte direkt auf dem Blatt ändern · Nummer einer Randnotiz: Art, Zeichen, Textstelle · Textstelle im Schülertext markieren: neue Notiz · Zauberstab: neu
+        erzeugen oder überarbeiten
       </Text>
       <Blatt
         r={r}

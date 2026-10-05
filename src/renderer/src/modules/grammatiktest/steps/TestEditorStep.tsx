@@ -119,7 +119,7 @@ export default function TestEditorStep(): React.JSX.Element {
     logo,
     schoolName: settings.schoolName,
     begriff: 'Lösungen',
-    ziel: ablageZiel('grammatiktest', docId, ws.meta.subjectLabel || ws.meta.subjectId)
+    ziel: ablageZiel('grammatiktest', docId, ws.meta.subjectLabel || ws.meta.subjectId, { jahrgang: ws.meta.grade, thema: ws.meta.topic })
   }
 
   /*
@@ -189,7 +189,12 @@ export default function TestEditorStep(): React.JSX.Element {
         undo={{ canUndo: verlauf.past.length > 0, canRedo: verlauf.future.length > 0, onUndo: undo, onRedo: redo }}
         fassungen={
           ws.sheets.length > 1
-            ? { value: String(fassung), onChange: (v) => setFassung(Number(v)), data: ws.sheets.map((s, i) => ({ value: String(i), label: s.label })), ariaLabel: 'Gruppe' }
+            ? {
+                value: String(fassung),
+                onChange: (v) => setFassung(Number(v)),
+                data: ws.sheets.map((s, i) => ({ value: String(i), label: s.label })),
+                ariaLabel: 'Gruppe'
+              }
             : null
         }
         ansichten={{

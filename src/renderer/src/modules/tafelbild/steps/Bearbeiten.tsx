@@ -87,11 +87,40 @@ function neuesElement(typ: ElementTyp, format: FormatId, extra: Partial<TbElemen
 }
 
 const DIAGRAMM_VORLAGEN: { label: string; d: Diagramm }[] = [
-  { label: 'Zeitstrahl', d: { art: 'zeitstrahl', eintraege: [{ label: 'Beginn', wert: '1900', x: 0 }, { label: 'Ende', wert: '1950', x: 1 }] } },
+  {
+    label: 'Zeitstrahl',
+    d: {
+      art: 'zeitstrahl',
+      eintraege: [
+        { label: 'Beginn', wert: '1900', x: 0 },
+        { label: 'Ende', wert: '1950', x: 1 }
+      ]
+    }
+  },
   { label: 'Koordinatensystem', d: { art: 'koordinatensystem', eintraege: [], funktionen: ['x^2'], bereich: { xMin: -4, xMax: 4, yMin: -2, yMax: 8 } } },
-  { label: 'Tabelle', d: { art: 'tabelle', eintraege: [], spalten: ['', 'A', 'B'], zeilen: [['Aspekt 1', '', ''], ['Aspekt 2', '', '']] } },
+  {
+    label: 'Tabelle',
+    d: {
+      art: 'tabelle',
+      eintraege: [],
+      spalten: ['', 'A', 'B'],
+      zeilen: [
+        ['Aspekt 1', '', ''],
+        ['Aspekt 2', '', '']
+      ]
+    }
+  },
   { label: 'Kreislauf', d: { art: 'kreislauf', eintraege: [{ label: 'Station 1' }, { label: 'Station 2' }, { label: 'Station 3' }, { label: 'Station 4' }] } },
-  { label: 'Kartenskizze', d: { art: 'kartenskizze', eintraege: [{ label: 'Ort A', x: 0.35, y: 0.4 }, { label: 'Ort B', x: 0.65, y: 0.6 }] } },
+  {
+    label: 'Kartenskizze',
+    d: {
+      art: 'kartenskizze',
+      eintraege: [
+        { label: 'Ort A', x: 0.35, y: 0.4 },
+        { label: 'Ort B', x: 0.65, y: 0.6 }
+      ]
+    }
+  },
   {
     label: 'Schaltplan',
     d: {
@@ -148,7 +177,14 @@ export default function Bearbeiten(): React.JSX.Element | null {
 
   const tafel: TbTafel | undefined = t?.tafeln.find((x) => x.format === formatWahl) ?? t?.tafeln[0]
   const befunde = useMemo(
-    () => (t ? pruefeAlle(t.tafeln, { grade: t.meta.grade, regler: t.meta.regler, inhalt: t.inhalt, lernziel: t.meta.lernziel }, (t.pruefung ?? []).filter((b) => b.art === 'bild')) : []),
+    () =>
+      t
+        ? pruefeAlle(
+            t.tafeln,
+            { grade: t.meta.grade, regler: t.meta.regler, inhalt: t.inhalt, lernziel: t.meta.lernziel },
+            (t.pruefung ?? []).filter((b) => b.art === 'bild')
+          )
+        : [],
     [t]
   )
   const markiert = useMemo(() => befunde.filter((b) => b.format === tafel?.format && b.schwer && b.element).map((b) => b.element!), [befunde, tafel?.format])
@@ -245,7 +281,12 @@ export default function Bearbeiten(): React.JSX.Element | null {
 
   const dateiSpeichern = async (): Promise<void> => {
     try {
-      const pfad = await window.api.files.save(`${safeFileName(standardName(t))}.tafelbild`, projektDatei.filter, projektDatei.serialisiere(t), ablageZiel('tafelbild', docId, t.meta.subjectId))
+      const pfad = await window.api.files.save(
+        `${safeFileName(standardName(t))}.tafelbild`,
+        projektDatei.filter,
+        projektDatei.serialisiere(t),
+        ablageZiel('tafelbild', docId, t.meta.subjectId, { jahrgang: t.meta.grade, thema: t.meta.thema || t.meta.title })
+      )
       if (pfad) notifySuccess('Als Datei gespeichert.')
     } catch (e) {
       notifyError(e)
@@ -254,7 +295,13 @@ export default function Bearbeiten(): React.JSX.Element | null {
 
   const werkzeugKnopf = (w: Werkzeug, label: string, icon: React.ReactNode): React.JSX.Element => (
     <Tooltip label={label}>
-      <ActionIcon variant={werkzeug === w ? 'filled' : 'default'} size="lg" aria-label={label} onClick={() => setWerkzeug(werkzeug === w ? 'auswahl' : w)} data-tb-werkzeug={w}>
+      <ActionIcon
+        variant={werkzeug === w ? 'filled' : 'default'}
+        size="lg"
+        aria-label={label}
+        onClick={() => setWerkzeug(werkzeug === w ? 'auswahl' : w)}
+        data-tb-werkzeug={w}
+      >
         {icon}
       </ActionIcon>
     </Tooltip>
@@ -342,7 +389,14 @@ export default function Bearbeiten(): React.JSX.Element | null {
         <Text size="xs" c="dimmed">
           {schrittZahl(tafel)} Schritte
         </Text>
-        <TextInput size="xs" w={200} aria-label="Name in der App" placeholder={standardName(t)} value={docName} onChange={(e) => setDocName(e.currentTarget.value)} />
+        <TextInput
+          size="xs"
+          w={200}
+          aria-label="Name in der App"
+          placeholder={standardName(t)}
+          value={docName}
+          onChange={(e) => setDocName(e.currentTarget.value)}
+        />
         <Text size="xs" c="dimmed" w={104} data-testid="gesichert">
           {savedAt ? `gesichert ${new Date(savedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : 'wird gesichert …'}
         </Text>
@@ -407,12 +461,22 @@ export default function Bearbeiten(): React.JSX.Element | null {
             )}
             <Divider orientation="vertical" />
             <Tooltip label="Raster ein/aus">
-              <ActionIcon variant={tafel.raster ? 'filled' : 'default'} size="lg" aria-label="Raster" onClick={() => aendernTafel((x) => (x.raster = !x.raster))} data-tb-raster>
+              <ActionIcon
+                variant={tafel.raster ? 'filled' : 'default'}
+                size="lg"
+                aria-label="Raster"
+                onClick={() => aendernTafel((x) => (x.raster = !x.raster))}
+                data-tb-raster
+              >
                 <IconGrid4x4 size={18} />
               </ActionIcon>
             </Tooltip>
             {mitFinger && (
-              <Tooltip label={fingerZeichnet ? 'Der Finger zeichnet und verschiebt – Rollen und Zoomen mit zwei Fingern' : 'Stift zeichnet, der Finger rollt und zoomt'}>
+              <Tooltip
+                label={
+                  fingerZeichnet ? 'Der Finger zeichnet und verschiebt – Rollen und Zoomen mit zwei Fingern' : 'Stift zeichnet, der Finger rollt und zoomt'
+                }
+              >
                 <ActionIcon
                   variant={fingerZeichnet ? 'filled' : 'default'}
                   size="lg"
@@ -517,4 +581,3 @@ export default function Bearbeiten(): React.JSX.Element | null {
     </Box>
   )
 }
-

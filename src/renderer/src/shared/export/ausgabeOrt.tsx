@@ -73,7 +73,7 @@ function beschreibung(ort: AusgabeOrt, ziel: AblageZiel): string {
   if (ort === 'dateien') return 'Ort in der Dateien-App frei wählen (iCloud Drive, eingebundene Anbieter …)'
   if (ort === 'teilen') return 'AirDrop, Mail, Drucken, „In Dateien sichern“'
   if (!aufIos()) return 'Ort im Speichern-Dialog von Windows wählen'
-  return s.schulmaterialAblage === false ? 'Ordner „Ausgaben“ in der Dateien-App' : 'Dateien-App › Schulmaterial › Fach › Themenbereich'
+  return s.schulmaterialAblage === false ? 'Ordner „Ausgaben“ in der Dateien-App' : 'Dateien-App › Schulmaterial › Fach › Jahrgang › Thema › Materialart'
 }
 
 /** Der Dialog – einmal in der Oberfläche eingehängt (main.tsx) */
@@ -90,7 +90,13 @@ export function AusgabeOrtDialog(): React.JSX.Element | null {
   const ziel = useAppSettings.getState().settings.iserv?.ziel
   const schuelerdaten = ['rueckmeldung'].includes(offen.ziel.programm) && inGruppenordner(pfadTeile(ziel))
   return (
-    <Modal opened onClose={() => schliessen(null)} title={offen.anzahl > 1 ? `Wohin mit ${offen.anzahl} Dateien?` : 'Wohin speichern?'} centered data-ausgabe-ort>
+    <Modal
+      opened
+      onClose={() => schliessen(null)}
+      title={offen.anzahl > 1 ? `Wohin mit ${offen.anzahl} Dateien?` : 'Wohin speichern?'}
+      centered
+      data-ausgabe-ort
+    >
       <Stack gap="xs">
         {orte.map((ort) => (
           <Button

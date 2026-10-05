@@ -16,7 +16,7 @@
 //  3. Lernzielkontrolle „Drucken" mit „Lösungen separat drucken": Druckvorschau mit eigenem
 //     Lösungsteil und eigener Exemplarzahl (gedruckt wird nicht).
 import { _electron as electron } from 'playwright-core'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 import { warteAufOberflaeche } from './warten.mjs'
@@ -152,6 +152,17 @@ try {
   pruefe(await dialog.getByRole('radio', { name: 'Lösungen als eigene Datei' }).isChecked(), 'Lösungswahl steht auf „als eigene Datei"')
   await shot('loesungsdialog')
   await dialog.getByRole('button', { name: 'Speichern …' }).click()
+  // Gibt es schon (05.10.2026): Rückfrage – hier „Als neue Version speichern"
+  const frage = page.locator('.mantine-Modal-content', { hasText: 'Datei gibt es schon' })
+  pruefe(
+    await frage.waitFor({ timeout: 60000 }).then(
+      () => true,
+      () => false
+    ),
+    'Rückfrage „Datei gibt es schon“ erscheint'
+  )
+  await shot('vorhanden-frage')
+  await page.locator('[data-vorhanden="neu"]').click()
   await page.waitForSelector('text=PDF gespeichert', { timeout: 60000 })
   await shot('ordner-hinweis')
   const dateien = readdirSync(exportOrdner).sort()
@@ -162,6 +173,22 @@ try {
     'Die vorhandene Datei bleibt erhalten, die neue heißt „… (2)"'
   )
   pruefe((await page.getByRole('button', { name: 'Ordner öffnen' }).count()) > 0, 'Der Hinweis bietet „Ordner öffnen" an')
+
+  // ---------- 2b) Noch einmal – jetzt beide vorhanden: „Überschreiben" für alle weiteren Dateien
+  await page.waitForTimeout(800)
+  await sichtbar(page.getByRole('button', { name: 'PDF', exact: true })).click()
+  await page.waitForTimeout(500)
+  await page.locator('.mantine-Modal-content', { hasText: 'Als PDF speichern' }).getByRole('button', { name: 'Speichern …' }).click()
+  await frage.waitFor({ timeout: 60000 })
+  await frage.getByLabel('Für alle weiteren Dateien').check()
+  await page.locator('[data-vorhanden="ersetzen"]').click()
+  await page.waitForSelector('text=PDF gespeichert', { timeout: 60000 })
+  await page.waitForTimeout(500)
+  const nachher = readdirSync(exportOrdner).sort()
+  console.log('   Ordner:', nachher.join(', '))
+  pruefe(nachher.length === 3, `Überschreiben legt keine weiteren Dateien an (${nachher.length})`)
+  pruefe(statSync(join(exportOrdner, 'Potenzgesetze.pdf')).size > 1000, 'Die alte Datei „Potenzgesetze.pdf" wurde durch das neue PDF ersetzt')
+  pruefe((await frage.count()) === 0, 'Für die Lösungen wurde nicht noch einmal gefragt („Für alle weiteren Dateien")')
 
   // ---------- 3) Drucken mit „Lösungen separat drucken"
   await page.waitForTimeout(500)

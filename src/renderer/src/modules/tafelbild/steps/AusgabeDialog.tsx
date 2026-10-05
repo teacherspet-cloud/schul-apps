@@ -43,7 +43,8 @@ export default function AusgabeDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offen])
   const name = safeFileName(standardName(t))
-  const ziel = (): ReturnType<typeof ablageZiel> => ablageZiel('tafelbild', docId, t.meta.subjectId)
+  const ziel = (): ReturnType<typeof ablageZiel> =>
+    ablageZiel('tafelbild', docId, t.meta.subjectId, { jahrgang: t.meta.grade, thema: t.meta.thema || t.meta.title })
   const tafeln = t.tafeln.filter((x) => w.formate.includes(x.format))
   const hatLuecken = t.tafeln.some((x) => x.elemente.some((e) => e.lueckenWoerter?.length || e.luecke))
 

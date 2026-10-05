@@ -200,7 +200,7 @@ export default function EditorStep(): React.JSX.Element {
       logo,
       schoolName: settings.schoolName,
       begriff: 'Lösungen',
-      ziel: ablageZiel('lernzielkontrolle', docId, a.ws.meta.subjectLabel || a.ws.meta.subjectId)
+      ziel: ablageZiel('lernzielkontrolle', docId, a.ws.meta.subjectLabel || a.ws.meta.subjectId, { jahrgang: a.ws.meta.grade, thema: a.ws.meta.topic })
     }
   }
 

@@ -150,7 +150,12 @@ export function EditorStep(): React.JSX.Element {
     if (w.__selftest) w.__selftest.layouts = layouts
   }, [layouts])
   // Seitenrand-Wache: Druck-HTML mit Lösungen, so wie der Export es baut
-  useDruckFuerWachen(ws ? () => buildWorksheetHtml(ws, layouts, { sheetIds: ws.sheets.map((s) => s.id), includeKey: true }, logo, schoolName) : null, [ws, layouts, logo, schoolName])
+  useDruckFuerWachen(ws ? () => buildWorksheetHtml(ws, layouts, { sheetIds: ws.sheets.map((s) => s.id), includeKey: true }, logo, schoolName) : null, [
+    ws,
+    layouts,
+    logo,
+    schoolName
+  ])
 
   useEffect(() => {
     window.api.designs.list().then(setDesigns).catch(notifyError)
@@ -222,7 +227,8 @@ export function EditorStep(): React.JSX.Element {
   const abweichungsSchluessel = `${sheet.id}:${gezaehlteSeiten}`
   const baseName = safeFileName(`${ws.meta.subjectLabel} - ${ws.meta.title || ws.meta.topic}`)
   // iPad: Ablage unter Schulmaterial/<Fach>/<Themenbereich> (shared/export/ablageZiel.ts)
-  const ablage = (): ReturnType<typeof ablageZiel> => ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId)
+  const ablage = (): ReturnType<typeof ablageZiel> =>
+    ablageZiel('arbeitsblatt', useArbeitsblatt.getState().docId, ws.meta.subjectLabel || ws.meta.subjectId, { jahrgang: ws.meta.grade, thema: ws.meta.topic })
   // Seiten für das Deckblatt – dieselben, die Druck und Word nehmen (render/deckblattVorschau.tsx)
   const deckblatt = ws.meta.coverPage ? deckblattVorschau(ws, layouts, logo, schoolName, citationStyle) : null
 
@@ -262,21 +268,21 @@ export function EditorStep(): React.JSX.Element {
     block.type === 'audio'
       ? hoertextWunschAuftrag(ws, docId, block.id, art, instruction, profile)
       : bausteinAuftrag(ws, docId, art === 'neu' ? 'Baustein neu erzeugen' : 'Baustein überarbeiten', block.id, block.id, async (w, k) => {
-      const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
-      const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction, art)
-      await completeOriginalSources([fresh], browserSourceServices())
-      // Neuer Bild-Entwurf: passendes Bild suchen (auch bei „selbst wählen“, weil die Lehrkraft den Entwurf ausdrücklich anfordert)
-      if (fresh.type === 'image')
-        await completeWorksheetImages(
-          [fresh],
-          {
-            ...w.meta,
-            imageSource: w.meta.imageSource === 'placeholder' ? 'auto' : w.meta.imageSource
-          },
-          await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild })
-        )
-      return (current) => addVersion(current, fresh)
-    })
+          const blatt = w.sheets.find((s) => s.id === sheet.id) ?? sheet
+          const fresh = await regenerateBlock(w, blatt, block.id, profile, k.ai, '', instruction, art)
+          await completeOriginalSources([fresh], browserSourceServices())
+          // Neuer Bild-Entwurf: passendes Bild suchen (auch bei „selbst wählen“, weil die Lehrkraft den Entwurf ausdrücklich anfordert)
+          if (fresh.type === 'image')
+            await completeWorksheetImages(
+              [fresh],
+              {
+                ...w.meta,
+                imageSource: w.meta.imageSource === 'placeholder' ? 'auto' : w.meta.imageSource
+              },
+              await browserWorksheetImageDeps({ ai: k.ai, bild: k.bild })
+            )
+          return (current) => addVersion(current, fresh)
+        })
   /**
    * Vorschläge aus dem Hinweis zur Seitenzahl umsetzen (Paket 7; „Vorschlag der App umsetzen",
    * 30.09.2026). Lokale Vorschläge – Hilfen auf die Hilfekarten, Schreibraum und Bilder eine Stufe
@@ -861,7 +867,9 @@ export function EditorStep(): React.JSX.Element {
                 {Object.entries(BLOCK_LABELS).map(([type, label]) => (
                   <Menu.Item
                     key={type}
-                    onClick={() => update((d) => d.sheets.find((s) => s.id === sheet.id)!.blocks.push(newBlock(type as WsBlockType, anredeFuerMeta(d.meta), d.meta)))}
+                    onClick={() =>
+                      update((d) => d.sheets.find((s) => s.id === sheet.id)!.blocks.push(newBlock(type as WsBlockType, anredeFuerMeta(d.meta), d.meta)))
+                    }
                   >
                     {label}
                   </Menu.Item>
@@ -1026,12 +1034,21 @@ export function EditorStep(): React.JSX.Element {
                   { ...deps, deckblatt: ws.meta.coverPage ? await deckblattBilder(ws, layouts, logo, schoolName, citationStyle) : undefined }
                 ),
               // Seitenauswahl (01.10.2026, export/wordSeiten.ts): Word bekommt die Inhalte der gewählten Seiten
-              seiten: wordSeitenQuelle(ws, layouts, { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument }, logo, schoolName, async (seiten) =>
-                buildWorksheetDocx(
-                  ws,
-                  { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument, seiten },
-                  { ...deps, deckblatt: ws.meta.coverPage && seiten.deckblatt ? await deckblattBilder(ws, layouts, logo, schoolName, citationStyle) : undefined }
-                )
+              seiten: wordSeitenQuelle(
+                ws,
+                layouts,
+                { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument },
+                logo,
+                schoolName,
+                async (seiten) =>
+                  buildWorksheetDocx(
+                    ws,
+                    { sheetIds, includeKey: keyMode === 'append', includeBoard: tafel.hauptdokument, seiten },
+                    {
+                      ...deps,
+                      deckblatt: ws.meta.coverPage && seiten.deckblatt ? await deckblattBilder(ws, layouts, logo, schoolName, citationStyle) : undefined
+                    }
+                  )
               )
             })
             if (keyMode === 'separate')
@@ -1039,8 +1056,13 @@ export function EditorStep(): React.JSX.Element {
                 name: `${baseName}${suffix} - Lösungen.docx`,
                 filter: WORD_FILTER,
                 daten: () => buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, deps),
-                seiten: wordSeitenQuelle(ws, layouts, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei }, logo, schoolName, (seiten) =>
-                  buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei, seiten }, deps)
+                seiten: wordSeitenQuelle(
+                  ws,
+                  layouts,
+                  { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei },
+                  logo,
+                  schoolName,
+                  (seiten) => buildWorksheetDocx(ws, { sheetIds, includeKey: false, keyOnly: true, includeBoard: tafel.loesungsdatei, seiten }, deps)
                 )
               })
             if (tafel.eigeneDatei)

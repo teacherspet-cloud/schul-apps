@@ -82,7 +82,8 @@ describe('Pfade und Namen', () => {
       'Schulmaterial',
       'Englisch',
       'Unit 1',
-      'Food'
+      'Food',
+      'Vokabeltests'
     ])
     expect(iserv.iservOrdnerFuer('Groups/Kollegium/Material', { programm: 'elternbrief' })).toEqual([
       'Groups',
@@ -194,14 +195,21 @@ describe('WebDAV gegen den nachgebauten IServ', () => {
     expect(mkcol).toEqual(['/Home/Schulmaterial', '/Home/Schulmaterial/Englisch', '/Home/Schulmaterial/Englisch/Unit 1'])
   })
 
-  it('überschreibt nie: zweite Datei gleichen Namens wird „(2)", auch bei anderer Schreibweise', async () => {
+  it('gleicher Name (05.10.2026): ohne Entscheidung Rückfrage, „neu" → „(2)", „ersetzen" überschreibt – auch bei anderer Schreibweise', async () => {
     const z = ZUGANG(fake)
     await dav.hochladen(z, ['Home', 'Unterricht'], 'Blatt.pdf', new Uint8Array([1]))
-    const zwei = await dav.hochladen(z, ['Home', 'Unterricht'], 'Blatt.pdf', new Uint8Array([2]))
-    const drei = await dav.hochladen(z, ['Home', 'Unterricht'], 'blatt.pdf', new Uint8Array([3]))
+    await expect(dav.hochladen(z, ['Home', 'Unterricht'], 'Blatt.pdf', new Uint8Array([2]))).rejects.toThrow(/^VORHANDEN:Blatt\.pdf$/)
+    await expect(dav.hochladen(z, ['Home', 'Unterricht'], 'blatt.pdf', new Uint8Array([2]))).rejects.toThrow(/^VORHANDEN:/)
+    expect([...fake.baum.get('/Home/Unterricht/Blatt.pdf')!.daten!]).toEqual([1])
+    const zwei = await dav.hochladen(z, ['Home', 'Unterricht'], 'Blatt.pdf', new Uint8Array([2]), 'neu')
+    const drei = await dav.hochladen(z, ['Home', 'Unterricht'], 'blatt.pdf', new Uint8Array([3]), 'neu')
     expect(zwei.at(-1)).toBe('Blatt (2).pdf')
     expect(drei.at(-1)).toBe('blatt (3).pdf')
     expect([...fake.baum.get('/Home/Unterricht/Blatt.pdf')!.daten!]).toEqual([1])
+    // Ersetzen schreibt in die vorhandene Datei (deren Schreibweise), legt nichts Neues an
+    const ersetzt = await dav.hochladen(z, ['Home', 'Unterricht'], 'blatt.pdf', new Uint8Array([9]), 'ersetzen')
+    expect(ersetzt.at(-1)).toBe('Blatt.pdf')
+    expect([...fake.baum.get('/Home/Unterricht/Blatt.pdf')!.daten!]).toEqual([9])
   })
 
   it('Gruppenordner: die Gruppe selbst wird nie angelegt', async () => {
@@ -270,8 +278,8 @@ describe('Dienst: verbinden, ablegen, trennen – Passwort nur im Geräte-Speich
       fach: 'Englisch',
       themenbereich: ['Unit 1']
     })
-    expect(pfad).toBe('iserv:Home/Schulmaterial/Englisch/Unit 1/Vokabeltest Unit 1.pdf')
-    expect(fake.baum.has('/Home/Schulmaterial/Englisch/Unit 1/Vokabeltest Unit 1.pdf')).toBe(true)
+    expect(pfad).toBe('iserv:Home/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest Unit 1.pdf')
+    expect(fake.baum.has('/Home/Schulmaterial/Englisch/Unit 1/Vokabeltests/Vokabeltest Unit 1.pdf')).toBe(true)
     expect((await dienst.iservOrdner(g, 'Home')).map((e) => e.name)).toEqual(['Schulmaterial', 'Unterricht'])
     await dienst.iservTrennen(g)
     expect(s.wert).toBeNull()
@@ -334,7 +342,7 @@ describe('Kanäle: files:save und export:pdf mit Ziel „IServ"', () => {
     registriereKanaele((k, fn) => void kanaele.set(k, fn as (...a: unknown[]) => unknown), u)
     await kanaele.get('iserv:verbinden')!({ schule: 'meineschule.de', benutzer: fake.benutzer, passwort: fake.passwort })
     const pfad = await kanaele.get('files:save')!('Blatt.docx', [], new Uint8Array([7]), { programm: 'arbeitsblatt', fach: 'Biologie', ort: 'iserv' })
-    expect(pfad).toBe('iserv:Home/Schulmaterial/Biologie/Blatt.docx')
+    expect(pfad).toBe('iserv:Home/Schulmaterial/Biologie/Arbeitsblätter/Blatt.docx')
     expect(geraet).not.toHaveBeenCalled()
     // Ohne Ort wie bisher aufs Gerät
     await kanaele.get('files:save')!('Blatt.docx', [], new Uint8Array([7]), { programm: 'arbeitsblatt', fach: 'Biologie' })

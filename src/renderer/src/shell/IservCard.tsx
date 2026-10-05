@@ -1,4 +1,21 @@
-import { Alert, Anchor, Badge, Breadcrumbs, Button, Card, Checkbox, Group, Loader, PasswordInput, Select, Stack, Text, TextInput, Title, UnstyledButton } from '@mantine/core'
+import {
+  Alert,
+  Anchor,
+  Badge,
+  Breadcrumbs,
+  Button,
+  Card,
+  Checkbox,
+  Group,
+  Loader,
+  PasswordInput,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+  UnstyledButton
+} from '@mantine/core'
 import { IconCloudUpload, IconFolder, IconLock, IconPlugConnected, IconUnlink } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { anzeigeTeil, inGruppenordner, iservAdressFehler, iservAnzeige, ISERV_STANDARD_ZIEL, pfadTeile, type DavEintrag } from '@shared/iserv'
@@ -85,7 +102,7 @@ export default function IservCard({
       </Group>
       <Text size="sm" c="dimmed" mb="md">
         Mit dem IServ-Zugang der Schule speichert die App Material direkt in die Ordner auf IServ – in „Eigene Dateien“ oder einen Gruppenordner, geordnet nach
-        Fach und Themenbereich – und öffnet Dateien aus diesen Ordnern. Voraussetzung: Die Schule hat das IServ-Modul „WebDAV“ freigeschaltet.
+        Fach, Jahrgang, Thema und Materialart – und öffnet Dateien aus diesen Ordnern. Voraussetzung: Die Schule hat das IServ-Modul „WebDAV“ freigeschaltet.
       </Text>
       <Stack gap="xs">
         <TextInput
@@ -153,7 +170,7 @@ export default function IservCard({
               Ziel auf IServ
             </Text>
             <Text size="sm" data-iserv-ziel>
-              {iservAnzeige(ziel)} › Fach › Themenbereich
+              {iservAnzeige(ziel)} › Fach › Jahrgang › Thema › Materialart
             </Text>
             <Group gap="xs">
               <Button variant="light" size="xs" leftSection={<IconFolder size={14} />} onClick={() => setWaehlen((w) => !w)} data-iserv-ordner-waehlen>
@@ -172,8 +189,8 @@ export default function IservCard({
             {inGruppenordner(pfadTeile(ziel)) && (
               <Alert color="orange" p="xs">
                 <Text size="xs">
-                  Ein Gruppenordner ist für alle Mitglieder der Gruppe sichtbar. Material mit Namen von Schülerinnen und Schülern (Rückmeldungen, Listen) gehört in „Eigene
-                  Dateien“ oder einen geschützten Ordner.
+                  Ein Gruppenordner ist für alle Mitglieder der Gruppe sichtbar. Material mit Namen von Schülerinnen und Schülern (Rückmeldungen, Listen) gehört
+                  in „Eigene Dateien“ oder einen geschützten Ordner.
                 </Text>
               </Alert>
             )}

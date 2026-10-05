@@ -11,7 +11,13 @@ import type { AppSettings, DeepPartial } from '@shared/types'
  * mobil/umgebung.ts). Ausgeschaltet gilt das frühere Verhalten: Ordner „Ausgaben" und sofort das
  * Teilen-Menü.
  */
-export default function AblageCard({ settings, update }: { settings: AppSettings; update: (patch: DeepPartial<AppSettings>) => Promise<void> }): React.JSX.Element {
+export default function AblageCard({
+  settings,
+  update
+}: {
+  settings: AppSettings
+  update: (patch: DeepPartial<AppSettings>) => Promise<void>
+}): React.JSX.Element {
   const an = settings.schulmaterialAblage !== false
   return (
     <Card withBorder padding="lg">
@@ -19,8 +25,8 @@ export default function AblageCard({ settings, update }: { settings: AppSettings
         Ablage auf dem iPad
       </Title>
       <Text size="sm" c="dimmed" mb="md">
-        Erstelltes Material – PDF, Word, Hördateien, Lernplattform-Dateien – kann geordnet auf dem iPad liegen und ist dann in der Dateien-App jederzeit
-        wieder da, auch ohne Netz.
+        Erstelltes Material – PDF, Word, Hördateien, Lernplattform-Dateien – kann geordnet auf dem iPad liegen und ist dann in der Dateien-App jederzeit wieder
+        da, auch ohne Netz.
       </Text>
       <Switch
         checked={an}
@@ -34,8 +40,8 @@ export default function AblageCard({ settings, update }: { settings: AppSettings
       />
       {an && (
         <List size="xs" c="dimmed" spacing={2} mt="md" icon={<IconFolder size={13} />}>
-          <List.Item>Auf meinem iPad › Schul-Apps › Schulmaterial › Fach › Themenbereich</List.Item>
-          <List.Item>Ohne Themenbereich direkt im Ordner des Fachs, ohne Fach unter „Allgemein“ (je Programm ein Ordner).</List.Item>
+          <List.Item>Auf meinem iPad › Schul-Apps › Schulmaterial › Fach › Jahrgang › Thema › Materialart</List.Item>
+          <List.Item>Fehlt eine Angabe, entfällt die Ebene; ohne Fach unter „Allgemein“ › Materialart.</List.Item>
           <List.Item>Vorhandene Dateien bleiben erhalten – eine neue gleichen Namens bekommt ein „(2)“.</List.Item>
         </List>
       )}

@@ -294,7 +294,10 @@ export default function EditorStep(): React.JSX.Element {
                 `${baseName}.vokabeltest`,
                 PROJECT_FILTER,
                 serializeProject(doc),
-                ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage)
+                ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, {
+                  jahrgang: doc.settings.grade,
+                  thema: doc.settings.topic
+                })
               )
               if (path) meldeAblage(path, 'Datei gespeichert.')
             } catch (e) {
@@ -307,8 +310,17 @@ export default function EditorStep(): React.JSX.Element {
           <>
             <LmsExport
               titel={doc.header.title}
-              bericht={() => fragenAusVokabeln(doc.vocab, LANGUAGES.find((l) => l.value === doc.settings.targetLanguage)?.label ?? 'Zielsprache')}
-              ziel={ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage)}
+              bericht={() =>
+                fragenAusVokabeln(
+                  doc.vocab,
+                  LANGUAGES.find((l) => l.value === doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })?.label ??
+                    'Zielsprache'
+                )
+              }
+              ziel={ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, {
+                jahrgang: doc.settings.grade,
+                thema: doc.settings.topic
+              })}
             />
             <RueckmeldungKnopf art="vokabeltest" docId={useVokabeltest.getState().testId} />
             {/* Onlinetest (02.10.2026) – nur mit dem Schul-Apps-Server */}
@@ -771,7 +783,11 @@ function ExportModal({
         const dateien: AusgabeDatei[] = [{ name: `${baseName}${suffix}.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: key === 'append' }, layouts) }]
         if (key === 'separate')
           dateien.push({ name: `${baseName}${suffix} - Lösungen.pdf`, html: buildPrintHtml(doc, { variantIds, includeKey: false, keyOnly: true }, layouts) })
-        await speichereAusgabe(dateien, 'PDF gespeichert.', ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage))
+        await speichereAusgabe(
+          dateien,
+          'PDF gespeichert.',
+          ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })
+        )
       } else {
         const dateien: AusgabeDatei[] = [
           {
@@ -797,7 +813,11 @@ function ExportModal({
                 buildDocx(doc, { variantIds, includeKey: false, keyOnly: true, credits, layouts, auswahl: vtWordAuswahl(doc, layouts, marken) }, imageSize)
             }
           })
-        await speichereAusgabe(dateien, 'Word-Dokument gespeichert.', ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage))
+        await speichereAusgabe(
+          dateien,
+          'Word-Dokument gespeichert.',
+          ablageZiel('vokabeltest', useVokabeltest.getState().testId, doc.settings.targetLanguage, { jahrgang: doc.settings.grade, thema: doc.settings.topic })
+        )
       }
       onClose()
     } catch (e) {

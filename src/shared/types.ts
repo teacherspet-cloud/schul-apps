@@ -355,8 +355,14 @@ export interface AblageZiel {
   fach?: string
   /** Themenbereich von oben nach unten (mit Unterbereichen) */
   themenbereich?: string[]
+  /** Jahrgang des Materials (05.10.2026: Ordner „Jahrgang 7") */
+  jahrgang?: number
+  /** Thema des Materials – Ordner, wenn kein Themenbereich zugeordnet ist */
+  thema?: string
   /** Wohin (01.10.2026) – fehlt = aufs Gerät wie bisher */
   ort?: AusgabeOrt
+  /** Gibt es den Namen dort schon: ersetzen oder neue Version (shared/vorhanden.ts); fehlt = nachfragen */
+  beiVorhanden?: 'ersetzen' | 'neu'
 }
 
 /** iPad: was über den PC läuft und wie er erreichbar ist */

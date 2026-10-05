@@ -15,7 +15,7 @@ import type { AblageZiel } from './types'
 export const SCHULMATERIAL = 'Schulmaterial'
 export const ALLGEMEIN = 'Allgemein'
 
-/** Ordnernamen der Programme – nur unter „Allgemein" (Material ohne Fach) */
+/** Ordnernamen der Programme – die Materialart, unterste Ebene (05.10.2026; vorher nur unter „Allgemein") */
 export const PROGRAMM_ORDNER: Record<string, string> = {
   arbeitsblatt: 'Arbeitsblätter',
   vokabeltest: 'Vokabeltests',
@@ -49,15 +49,20 @@ export function ordnerName(teil: string | undefined): string {
   return s
 }
 
-/** Die Ordner unterhalb von Schulmaterial, von oben nach unten */
+/**
+ * Die Ordner unterhalb von Schulmaterial, von oben nach unten (05.10.2026, Wunsch der Lehrkraft):
+ * Fach / Jahrgang / Thema / Materialart – z. B. Geschichte › Jahrgang 8 › Der Erste Weltkrieg ›
+ * Arbeitsblätter. Thema ist der Themenbereich der Bibliothek (mit Unterbereichen), sonst das Thema
+ * des Materials; was fehlt, entfällt als Ebene. Ohne Fach: Allgemein › Materialart.
+ */
 export function schulmaterialTeile(ziel: AblageZiel): string[] {
   const fach = ordnerName(ziel.fach)
-  if (!fach) {
-    const programm = PROGRAMM_ORDNER[ziel.programm]
-    return programm ? [ALLGEMEIN, programm] : [ALLGEMEIN]
-  }
+  const art = PROGRAMM_ORDNER[ziel.programm]
+  if (!fach) return art ? [ALLGEMEIN, art] : [ALLGEMEIN]
+  const jahrgang = ziel.jahrgang && ziel.jahrgang >= 1 && ziel.jahrgang <= 13 ? `Jahrgang ${Math.round(ziel.jahrgang)}` : ''
   const bereiche = (ziel.themenbereich ?? []).map(ordnerName).filter(Boolean).slice(0, MAX_EBENEN)
-  return [fach, ...bereiche]
+  const thema = bereiche.length ? bereiche : [ordnerName(ziel.thema)].filter(Boolean)
+  return [fach, ...(jahrgang ? [jahrgang] : []), ...thema, ...(art ? [art] : [])]
 }
 
 /** Der Ordner für eine Datei, z. B. /documents/Schulmaterial/Englisch/Unit 1 */
@@ -70,5 +75,12 @@ export const schulmaterialOrdner = (dokumente: string, ziel: AblageZiel): string
 export function anzeigeOrt(pfad: string): string | null {
   const i = pfad.indexOf(`/${SCHULMATERIAL}/`)
   if (i < 0) return null
-  return ['Auf meinem iPad', 'Schul-Apps', ...pfad.slice(i + 1).split('/').filter(Boolean)].join(' › ')
+  return [
+    'Auf meinem iPad',
+    'Schul-Apps',
+    ...pfad
+      .slice(i + 1)
+      .split('/')
+      .filter(Boolean)
+  ].join(' › ')
 }

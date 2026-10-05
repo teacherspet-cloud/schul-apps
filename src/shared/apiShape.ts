@@ -10,6 +10,7 @@
  * WELCHE Aufrufe aus dem Netz überhaupt erlaubt sind, steht NICHT hier, sondern im Server
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
+import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
 import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
 import type { VerbListe, VerbListeMeta } from './verben'
@@ -140,6 +141,22 @@ export type HtmlVorbereitenFn = (html: string) => Promise<string>
 
 export function buildApi(call: Call, extras: ApiExtras) {
   let ortWahl: OrtWahlFn | null = null
+  let vorhandenWahl: VorhandenWahlFn | null = null
+  /**
+   * Gibt es den Namen am Ziel schon (05.10.2026, shared/vorhanden.ts): fragen und mit der Antwort
+   * erneut speichern. Ohne angemeldete Rückfrage oder mit schon getroffener Wahl bleibt der Fehler.
+   */
+  const mitRueckfrage = async (z: AblageZiel | undefined, speichern: (z: AblageZiel | undefined) => Promise<string | null>): Promise<string | null> => {
+    try {
+      return await speichern(z)
+    } catch (e) {
+      const name = vorhandenName(e)
+      if (!name || !vorhandenWahl || !z || z.beiVorhanden) throw e
+      const wahl = await vorhandenWahl(name, z.ort === 'iserv' ? 'IServ' : 'am Speicherort')
+      if (!wahl) return null
+      return speichern({ ...z, beiVorhanden: wahl })
+    }
+  }
   let dateiWahl: DateiWahlFn | null = null
   let htmlVorbereiten: HtmlVorbereitenFn | null = null
   const vorbereitet = async (html: string): Promise<string> => (htmlVorbereiten ? htmlVorbereiten(html).catch(() => html) : html)
@@ -177,7 +194,8 @@ export function buildApi(call: Call, extras: ApiExtras) {
      */
     iserv: {
       status: () => call<IservStatus>('iserv:status'),
-      verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) => call<{ basis: string; ordner: DavEintrag[] }>('iserv:verbinden', eingabe),
+      verbinden: (eingabe: { schule: string; benutzer: string; passwort?: string }) =>
+        call<{ basis: string; ordner: DavEintrag[] }>('iserv:verbinden', eingabe),
       ordner: (pfad: string) => call<DavEintrag[]>('iserv:ordner', pfad),
       trennen: () => call<void>('iserv:trennen'),
       /** Ordner UND Dateien eines Ordners (02.10.2026) */
@@ -196,8 +214,12 @@ export function buildApi(call: Call, extras: ApiExtras) {
       htmlVorbereiten: (fn: HtmlVorbereitenFn | null) => {
         htmlVorbereiten = fn
       },
+      /** Rückfrage „Gibt es schon – ersetzen oder neue Version?" (05.10.2026, shared/vorhanden.ts) */
+      vorhandenWahl: (fn: VorhandenWahlFn | null) => {
+        vorhandenWahl = fn
+      },
       /** Die angemeldeten Rückfragen – für die Browser-Fassung, die files.save/open selbst ersetzt (netzZugang.ts) */
-      aktuell: () => ({ ortWahl, dateiWahl })
+      aktuell: () => ({ ortWahl, dateiWahl, vorhandenWahl })
     },
     settings: {
       get: () => call<AppSettings>('settings:get'),
@@ -473,7 +495,7 @@ export function buildApi(call: Call, extras: ApiExtras) {
       save: async (defaultName: string, filters: FileFilter[], data: Uint8Array | string, ziel?: AblageZiel) => {
         const z = ortWahl ? await ortWahl(ziel) : ziel
         if (z === null) return null
-        return call<string | null>('files:save', defaultName, filters, data, z)
+        return mitRueckfrage(z, (zz) => call<string | null>('files:save', defaultName, filters, data, zz))
       },
       open: async (filters: FileFilter[]) => {
         const gewaehlt = dateiWahl ? await dateiWahl(filters) : undefined
@@ -485,8 +507,12 @@ export function buildApi(call: Call, extras: ApiExtras) {
       showInFolder: (path: string | string[]) => call<void>('files:show', path),
       /** Ordner wählen, in den mehrere Dateien auf einmal gehen; null bei Abbruch */
       chooseFolder: (title?: string) => call<string | null>('files:choose-folder', title),
-      /** Datei in den gewählten Ordner legen – vorhandene werden nicht überschrieben („… (2)"); liefert den Pfad */
-      saveInFolder: (folder: string, name: string, data: Uint8Array | string) => call<string>('files:save-in-folder', folder, name, data),
+      /**
+       * Datei in den gewählten Ordner legen; liefert den Pfad. Gibt es den Namen schon: ohne `beiVorhanden`
+       * Fehler „VORHANDEN:" (shared/vorhanden.ts), sonst ersetzen bzw. „… (2)".
+       */
+      saveInFolder: (folder: string, name: string, data: Uint8Array | string, beiVorhanden?: BeiVorhanden) =>
+        call<string>('files:save-in-folder', folder, name, data, beiVorhanden),
       openFolder: (folder: string) => call<void>('files:open-folder', folder),
       pathOf: (file: File) => extras.pathOf(file)
     },
@@ -506,15 +532,17 @@ export function buildApi(call: Call, extras: ApiExtras) {
       ) => {
         const z = ortWahl ? await ortWahl(ziel) : ziel
         if (z === null) return null
-        return call<string | null>('export:pdf', await vorbereitet(html), defaultName, opts, z)
+        const fertig = await vorbereitet(html)
+        return mitRueckfrage(z, (zz) => call<string | null>('export:pdf', fertig, defaultName, opts, zz))
       },
       /** Wie `pdf`, aber ohne Dialog in einen schon gewählten Ordner (siehe files.chooseFolder) */
       pdfInFolder: (
         folder: string,
         html: string,
         name: string,
-        opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[]; seiten?: number[] }
-      ) => vorbereitet(html).then((h) => call<string>('export:pdf-in-folder', folder, h, name, opts)),
+        opts?: { fillable?: boolean; audio?: { id: string; fileName: string; title: string; base64: string }[]; seiten?: number[] },
+        beiVorhanden?: BeiVorhanden
+      ) => vorbereitet(html).then((h) => call<string>('export:pdf-in-folder', folder, h, name, opts, beiVorhanden)),
       fillablePreview: (html: string, audio?: { id: string; fileName: string; title: string; base64: string }[]) =>
         vorbereitet(html).then((h) => call<Uint8Array>('export:fillable-preview', h, audio)),
       /** Ohne Optionen: Druckdialog von Windows; mit Optionen: direkt drucken (aus der Druckvorschau) */

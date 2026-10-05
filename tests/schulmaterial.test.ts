@@ -47,16 +47,20 @@ describe('Ordnernamen', () => {
 
 describe('Ordner je Material', () => {
   it('Fach und Themenbereich – mit Unterbereichen', () => {
-    expect(schulmaterialTeile({ programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] })).toEqual(['Englisch', 'Unit 1'])
-    expect(
-      schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Geschichte', themenbereich: ['Der Erste Weltkrieg', 'Ursachen', 'Der Balkan'] })
-    ).toEqual(['Geschichte', 'Der Erste Weltkrieg', 'Ursachen', 'Der Balkan'])
+    expect(schulmaterialTeile({ programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] })).toEqual(['Englisch', 'Unit 1', 'Vokabeltests'])
+    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Geschichte', themenbereich: ['Der Erste Weltkrieg', 'Ursachen', 'Der Balkan'] })).toEqual([
+      'Geschichte',
+      'Der Erste Weltkrieg',
+      'Ursachen',
+      'Der Balkan',
+      'Arbeitsblätter'
+    ])
   })
 
   it('ohne Themenbereich direkt im Fachordner', () => {
-    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Biologie' })).toEqual(['Biologie'])
+    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Biologie' })).toEqual(['Biologie', 'Arbeitsblätter'])
     // Ein leerer Bereichsname verschwindet statt einen leeren Ordner zu erzeugen
-    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Biologie', themenbereich: ['..', ''] })).toEqual(['Biologie'])
+    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Biologie', themenbereich: ['..', ''] })).toEqual(['Biologie', 'Arbeitsblätter'])
   })
 
   it('ohne Fach unter „Allgemein" – je Programm ein Ordner', () => {
@@ -65,21 +69,42 @@ describe('Ordner je Material', () => {
     expect(schulmaterialTeile({ programm: 'unbekannt' })).toEqual(['Allgemein'])
   })
 
+  it('Fach / Jahrgang / Thema / Materialart (05.10.2026)', () => {
+    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Geschichte', jahrgang: 8, thema: 'Julikrise 1914' })).toEqual([
+      'Geschichte',
+      'Jahrgang 8',
+      'Julikrise 1914',
+      'Arbeitsblätter'
+    ])
+    // Ein zugeordneter Themenbereich hat Vorrang vor dem Thema des Materials
+    expect(schulmaterialTeile({ programm: 'klassenarbeit', fach: 'Geschichte', jahrgang: 8, thema: 'Julikrise', themenbereich: ['Erster Weltkrieg'] })).toEqual(
+      ['Geschichte', 'Jahrgang 8', 'Erster Weltkrieg', 'Klassenarbeiten']
+    )
+    // Unplausibler Jahrgang entfällt
+    expect(schulmaterialTeile({ programm: 'vokabeltest', fach: 'Englisch', jahrgang: 99 })).toEqual(['Englisch', 'Vokabeltests'])
+  })
+
   it('höchstens vier Ebenen Themenbereich', () => {
-    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Physik', themenbereich: ['a', 'b', 'c', 'd', 'e', 'f'] })).toEqual(['Physik', 'a', 'b', 'c', 'd'])
+    expect(schulmaterialTeile({ programm: 'arbeitsblatt', fach: 'Physik', themenbereich: ['a', 'b', 'c', 'd', 'e', 'f'] })).toEqual([
+      'Physik',
+      'a',
+      'b',
+      'c',
+      'd',
+      'Arbeitsblätter'
+    ])
   })
 
   it('Pfad und Anzeige in der Dateien-App', () => {
     const ordner = schulmaterialOrdner('/documents', { programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] })
-    expect(ordner).toBe('/documents/Schulmaterial/Englisch/Unit 1')
-    expect(anzeigeOrt(`${ordner}/Test.pdf`)).toBe('Auf meinem iPad › Schul-Apps › Schulmaterial › Englisch › Unit 1 › Test.pdf')
+    expect(ordner).toBe('/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests')
+    expect(anzeigeOrt(`${ordner}/Test.pdf`)).toBe('Auf meinem iPad › Schul-Apps › Schulmaterial › Englisch › Unit 1 › Vokabeltests › Test.pdf')
     expect(anzeigeOrt('/documents/Ausgaben/Test.pdf')).toBeNull()
     expect(anzeigeOrt('C:\\Users\\x\\Test.pdf')).toBeNull()
   })
 })
 
 describe('Ausgabe auf dem iPad', () => {
-
   beforeEach(() => {
     vfs.zuruecksetzen()
     vfs.einhaengen({ wurzel: '/documents' })
@@ -91,10 +116,10 @@ describe('Ausgabe auf dem iPad', () => {
     const u = mobilUmgebung()
     const ziel = { programm: 'vokabeltest', fach: 'Englisch', themenbereich: ['Unit 1'] }
     const a = await u.dateiAusgeben('Test.pdf', [], new Uint8Array([1, 2, 3]), ziel)
-    expect(a).toBe('/documents/Schulmaterial/Englisch/Unit 1/Test.pdf')
+    expect(a).toBe('/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests/Test.pdf')
     expect([...vfs.lies(a!)]).toEqual([1, 2, 3])
     const b = await u.dateiAusgeben('Test.pdf', [], async () => 'zweite', ziel)
-    expect(b).toBe('/documents/Schulmaterial/Englisch/Unit 1/Test (2).pdf')
+    expect(b).toBe('/documents/Schulmaterial/Englisch/Unit 1/Vokabeltests/Test (2).pdf')
     expect(new TextDecoder().decode(vfs.lies(b!))).toBe('zweite')
     // Die erste ist unverändert
     expect([...vfs.lies(a!)]).toEqual([1, 2, 3])
@@ -105,6 +130,8 @@ describe('Ausgabe auf dem iPad', () => {
     expect(await u.dateiAusgeben('Brief: Klasse 7/8.docx', [], 'x', { programm: 'elternbrief' })).toBe(
       '/documents/Schulmaterial/Allgemein/Elternbriefe/Brief- Klasse 7-8.docx'
     )
-    expect(await u.dateiAusgeben('Blatt.pdf', [], 'x', { programm: 'arbeitsblatt', fach: 'Mathematik' })).toBe('/documents/Schulmaterial/Mathematik/Blatt.pdf')
+    expect(await u.dateiAusgeben('Blatt.pdf', [], 'x', { programm: 'arbeitsblatt', fach: 'Mathematik' })).toBe(
+      '/documents/Schulmaterial/Mathematik/Arbeitsblätter/Blatt.pdf'
+    )
   })
 })
