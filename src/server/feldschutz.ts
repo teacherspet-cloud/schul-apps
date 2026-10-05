@@ -32,7 +32,7 @@ export const SENSIBEL: Record<string, string[]> = {
   onlinetest_tinte: ['png', 'text'],
   feedback_freigaben: ['schueler'],
   feedback_abgaben: ['fassungen'],
-  blatt_freigaben: ['schueler'],
+  blatt_freigaben: ['schueler', 'auswertung'],
   blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback'],
   fach_kopien: ['titel'],
   reihen_zuweisungen: ['schueler'],

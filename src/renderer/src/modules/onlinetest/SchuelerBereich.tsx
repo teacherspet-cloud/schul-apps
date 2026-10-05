@@ -22,6 +22,7 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import { FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
 import { tuerKlick } from '../lernen/tuer'
 import { fachFarbeAus } from '../../shared/fachfarben'
 import VokabelBeitritt from '../lernen/VokabelBeitritt'
@@ -516,6 +517,12 @@ function Startseite(): React.JSX.Element {
           titel="Arbeitsblätter"
           daten="blaetter"
           zahl={offeneBlaetter.length}
+          fortschritt={(() => {
+            // Anteil der (mindestens teilweise) erledigten Aufgaben in den offenen Blättern
+            const mit = offeneBlaetter.filter((b) => b.stand?.aufgaben)
+            const alle = mit.reduce((s, b) => s + (b.stand?.aufgaben ?? 0), 0)
+            return alle ? mit.reduce((s, b) => s + (b.stand?.gruen ?? 0) + (b.stand?.gelb ?? 0), 0) / alle : undefined
+          })()}
           text={
             blaetter === null
               ? '…'
@@ -681,6 +688,24 @@ interface BlattKurz {
   runden: number
   genutzt: number
   begonnen: boolean
+  /** Ampeln der Aufgaben (mit Feedback je Aufgabe, 05.10.2026) */
+  stand?: { gruen: number; gelb: number; aufgaben: number }
+}
+
+/** Balken der eigenen Aufgaben: treffend (grün), teilweise (gelb), noch offen (rot) */
+function AufgabenBalken({ stand }: { stand: NonNullable<BlattKurz['stand']> }): React.JSX.Element | null {
+  if (!stand.aufgaben) return null
+  return (
+    <FortschrittsBalken
+      gesamt={stand.aufgaben}
+      hoehe={14}
+      teile={[
+        { wert: stand.gruen, farbe: 'green', wort: 'treffend' },
+        { wert: stand.gelb, farbe: 'yellow', wort: 'teilweise' },
+        { wert: Math.max(0, stand.aufgaben - stand.gruen - stand.gelb), farbe: 'red', wort: 'noch offen' }
+      ]}
+    />
+  )
 }
 
 /** Freigegebene Arbeitsblätter (Etappe 5) */
@@ -707,6 +732,11 @@ function BlaetterSeite(): React.JSX.Element {
                 {!b.offen ? 'abgeschlossen' : b.genutzt ? `${b.genutzt}× eingereicht` : b.begonnen ? 'angefangen' : 'neu'}
                 {b.feedback ? ' · mit Feedback' : ''}
               </Text>
+              {b.stand && (
+                <div style={{ maxWidth: 320, marginTop: 4 }}>
+                  <AufgabenBalken stand={b.stand} />
+                </div>
+              )}
             </div>
             <Button component="a" href={`/s/b/${b.id}`} variant={!b.offen || b.genutzt >= b.runden ? 'light' : 'filled'} data-blatt-oeffnen>
               {!b.offen || b.genutzt >= b.runden ? 'Ansehen' : b.begonnen ? 'Weiter' : 'Öffnen'}

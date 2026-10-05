@@ -39,6 +39,7 @@ import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattO
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import { ampelVon, sichtbarBis, vollstaendigBearbeitet, type Ampel, type BlattFeldArt } from '@shared/blattFreigabe'
+import { eingabenAus, eingabeVerbuchen, PLAUS_SCHLUESSEL, ZUORDNUNG_SCHLUESSEL } from '@shared/blattAuswertung'
 import { holen, senden } from './serverApi'
 import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 
@@ -442,7 +443,28 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
     return () => clearTimeout(t)
   }, [antworten, tinte, offen, sichern])
 
-  const setze = (f: string, w: string): void => setAntworten((a) => ({ ...a, [f]: w }))
+  /*
+   * Plausibilität (05.10.2026, shared/blattAuswertung.ts): je Feld getippte und auf einmal eingefügte
+   * Zeichen und die aktive Zeit – nur Zählwerte, kein Text. Dazu die Zuordnung Feld → Aufgabe. Beides
+   * geht mit den Antworten zum Server; die Lehrkraft sieht daraus Hinweise, kein Urteil.
+   */
+  const zuletzt = useRef<Record<string, number>>({})
+  const setze = (f: string, w: string): void =>
+    setAntworten((a) => {
+      if (!/^f\d+$/.test(f) || lehrkraft) return { ...a, [f]: w }
+      const jetzt = Date.now()
+      const seit = zuletzt.current[f] ? jetzt - zuletzt.current[f] : 0
+      zuletzt.current[f] = jetzt
+      const eingaben = eingabenAus(a[PLAUS_SCHLUESSEL])
+      eingaben[f] = eingabeVerbuchen(eingaben[f], a[f] ?? '', w, seit)
+      return { ...a, [f]: w, [PLAUS_SCHLUESSEL]: JSON.stringify(eingaben) }
+    })
+  // Zuordnung Feld → Aufgabe, sobald gemessen
+  useEffect(() => {
+    if (!gemessen || lehrkraft) return
+    const zuordnung = JSON.stringify(Object.fromEntries(gemessen.felder.filter((f) => f.nr > 0).map((f) => [f.id, f.nr])))
+    setAntworten((a) => (a[ZUORDNUNG_SCHLUESSEL] === zuordnung ? a : { ...a, [ZUORDNUNG_SCHLUESSEL]: zuordnung }))
+  }, [gemessen, lehrkraft])
   const felderAlsDaten = (): { id: string; nr: number; art: string; seite: number }[] =>
     (gemessen?.felder ?? []).map((f) => ({ id: f.id, nr: f.nr, art: f.art, seite: f.seite }))
 

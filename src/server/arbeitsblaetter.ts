@@ -36,6 +36,8 @@ import { imNutzer } from './kontext'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
 import { gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { gastEntfernen } from './gaeste'
+import { auswerten, mitarbeitAnfrage, mitarbeitAus, type AuswertungsKontext, type MitarbeitVorschlag, type PersonRoh } from './blattAuswertung'
+import type { Strenge } from '../shared/blattAuswertung'
 import { iservBereit } from './anmeldung'
 import { registerVergessen } from './namensschutz'
 import { blattFassung, blattFassungen, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
@@ -57,6 +59,7 @@ import {
   type BlattAufgabe,
   type BlattFeld
 } from '../shared/blattFreigabe'
+import { eingabenAus, PLAUS_SCHLUESSEL, zuordnungAus, ZUORDNUNG_SCHLUESSEL } from '../shared/blattAuswertung'
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS blatt_freigaben (
@@ -103,6 +106,8 @@ const db = () => {
     if (!spalten.has('merk')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN merk TEXT NOT NULL DEFAULT '[]'")
     // Lösungsblatt nach dem Einreichen und Zusatzrunden („zur Überarbeitung", 03.10.2026)
     if (!spalten.has('loesung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN loesung TEXT NOT NULL DEFAULT ''")
+    // Mitarbeitsvorschläge und Hilfen der KI samt Strenge (05.10.2026; verschlüsselt, feldschutz.ts)
+    if (!spalten.has('auswertung')) d.exec("ALTER TABLE blatt_freigaben ADD COLUMN auswertung TEXT NOT NULL DEFAULT '{}'")
     const sp2 = new Set((d.prepare('PRAGMA table_info(blatt_abgaben)').all() as { name: string }[]).map((x) => x.name))
     if (!sp2.has('extra')) d.exec('ALTER TABLE blatt_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
     // Von der Lehrkraft freigeschaltete Aufgaben (schrittweise Freischaltung, 05.10.2026)
@@ -205,6 +210,9 @@ function bereinigeAntworten(roh: unknown): Record<string, string> {
   const r = roh as Record<string, unknown>
   if (typeof r[OBJEKTE_SCHLUESSEL] === 'string') aus[OBJEKTE_SCHLUESSEL] = JSON.stringify(objekteAus(r[OBJEKTE_SCHLUESSEL]))
   if (typeof r.linien === 'string') aus.linien = JSON.stringify(linienAus(r.linien))
+  // Eingabeverhalten und Zuordnung Feld → Aufgabe (Plausibilität, 05.10.2026) – nur Zahlen
+  if (typeof r[PLAUS_SCHLUESSEL] === 'string') aus[PLAUS_SCHLUESSEL] = JSON.stringify(eingabenAus(r[PLAUS_SCHLUESSEL]))
+  if (typeof r[ZUORDNUNG_SCHLUESSEL] === 'string') aus[ZUORDNUNG_SCHLUESSEL] = JSON.stringify(zuordnungAus(r[ZUORDNUNG_SCHLUESSEL]))
   return aus
 }
 
@@ -246,7 +254,25 @@ const bereinigeFelder = (roh: unknown): BlattFeld[] =>
 function kurz(z: Zeile, ich: NutzerInfo) {
   const e = einstellungenVon(z)
   const a = abgabeVon(z.id, ich.id)
-  return { id: z.id, titel: z.titel, offen: z.status === 'offen', feedback: e.feedback, runden: e.runden, genutzt: a?.abgaben ?? 0, begonnen: Boolean(a) }
+  // Stand der Aufgaben für den Fortschrittsbalken der Lernenden (05.10.2026) – nur mit Feedback je Aufgabe
+  const stand = e.aufgabenFeedback
+    ? (() => {
+        const verlauf = json_(a?.aufgaben_feedback ?? '{}', {} as AufgabenVerlauf)
+        const frei = json_(a?.freigeschaltet ?? '[]', [] as number[])
+        const ampeln = json_(z.aufgaben, [] as BlattAufgabe[]).map((x) => ampelVon(verlauf[String(x.nr)], frei.includes(x.nr)))
+        return { gruen: ampeln.filter((x) => x === 'gruen').length, gelb: ampeln.filter((x) => x === 'gelb').length, aufgaben: ampeln.length }
+      })()
+    : undefined
+  return {
+    id: z.id,
+    titel: z.titel,
+    offen: z.status === 'offen',
+    feedback: e.feedback,
+    runden: e.runden,
+    genutzt: a?.abgaben ?? 0,
+    begonnen: Boolean(a && a.aktualisiert > 0),
+    ...(stand ? { stand } : {})
+  }
 }
 
 export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promise<boolean> {
@@ -518,7 +544,9 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             einstellungen: einstellungenVon(z),
             ...(z.code ? { code: z.code, link: link(z.code) } : {}),
             abgaben: (db().prepare('SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND abgaben > 0').get(z.id) as { n: number }).n,
-            begonnen: (db().prepare('SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ?').get(z.id) as { n: number }).n
+            begonnen: (db().prepare('SELECT COUNT(*) AS n FROM blatt_abgaben WHERE freigabe_id = ? AND aktualisiert > 0').get(z.id) as { n: number }).n,
+            // Für wie viele Personen (Fortschrittsbalken, 05.10.2026)
+            gesamt: gesamtVon(z)
           }))
         }),
         true
@@ -695,6 +723,45 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       verknuepfteFreigabeStatus(z.rueckmeldung_id, status)
       return (json(res, 200, { ok: true }), true)
     }
+    /*
+     * Auswertung je Person (05.10.2026, blattAuswertung.ts): Ampeln, Hinweise zur Eigenständigkeit, gleiche
+     * Abgaben je Aufgabe und – falls schon erstellt – die Vorschläge zu Mitarbeit und Hilfen.
+     */
+    if (req.method === 'GET' && teile[1] === 'auswertung') {
+      const { aufgaben, roh } = auswertungsDaten(z)
+      const erg = auswerten(aufgaben, roh, blattText(z.html))
+      const gespeichert = json_((z as Zeile & { auswertung?: string }).auswertung ?? '{}', {} as GespeicherteAuswertung)
+      return (
+        json(res, 200, {
+          ...erg,
+          aufgaben: aufgaben.map((a) => ({ nr: a.nr, anweisung: a.anweisung })),
+          strenge: gespeichert.strenge ?? 'normal',
+          mitarbeit: gespeichert.personen ?? {},
+          erstellt: gespeichert.zeit ?? 0
+        }),
+        true
+      )
+    }
+    if (req.method === 'POST' && teile[1] === 'mitarbeit') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const strenge: Strenge = k0.strenge === 'milde' || k0.strenge === 'streng' ? k0.strenge : 'normal'
+      const { aufgaben, roh } = auswertungsDaten(z)
+      const erg = auswerten(aufgaben, roh, blattText(z.html))
+      const mitDaten = erg.personen.filter((p) => p.aufgaben.some((a) => a.text.trim() || a.ampel))
+      if (!mitDaten.length) return (json(res, 400, { fehler: 'Noch hat niemand etwas bearbeitet.' }), true)
+      const lehrkraft = nutzerNachId(z.lehrkraft_id)
+      if (!lehrkraft) return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      try {
+        const antwort = await imNutzer(alsNutzer(lehrkraft), () => aufruf('ai:structured', [mitarbeitAnfrage(kontextVon(z), aufgaben, mitDaten, strenge)]))
+        const personen = mitarbeitAus(antwort, mitDaten)
+        const neu: GespeicherteAuswertung = { strenge, zeit: Date.now(), personen }
+        db().prepare('UPDATE blatt_freigaben SET auswertung = ? WHERE id = ?').run(JSON.stringify(neu), z.id)
+        protokolliereServer('arbeitsblatt', 'Mitarbeit und Hilfen eingeschätzt', ich.id)
+        return (json(res, 200, { strenge, mitarbeit: personen, erstellt: neu.zeit }), true)
+      } catch (err) {
+        return (json(res, 503, { fehler: err instanceof Error ? err.message : String(err) }), true)
+      }
+    }
     // Lehrkraft schaltet eine Aufgabe für eine Person frei – zählt wie „teilweise" (05.10.2026)
     if (req.method === 'POST' && teile[1] === 'freischalten') {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -703,10 +770,11 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       if (!person || !blattIstFuer(z, person) || !json_(z.aufgaben, [] as BlattAufgabe[]).some((x) => x.nr === nr))
         return (json(res, 404, { fehler: 'Unbekannt.' }), true)
       db()
+        // aktualisiert = 0: nur freigeschaltet, noch nicht begonnen (zählt nicht als „begonnen")
         .prepare(
-          "INSERT OR IGNORE INTO blatt_abgaben (freigabe_id, schueler_id, antworten, tinte, aufgaben_feedback, abgaben, aktualisiert) VALUES (?, ?, '{}', '{}', '{}', 0, ?)"
+          "INSERT OR IGNORE INTO blatt_abgaben (freigabe_id, schueler_id, antworten, tinte, aufgaben_feedback, abgaben, aktualisiert) VALUES (?, ?, '{}', '{}', '{}', 0, 0)"
         )
-        .run(z.id, person.id, Date.now())
+        .run(z.id, person.id)
       const frei = new Set(json_(abgabeVon(z.id, person.id)?.freigeschaltet ?? '[]', [] as number[]))
       if (k0.weg === true) frei.delete(nr)
       else frei.add(nr)
@@ -743,6 +811,72 @@ function freigabeLoeschen(z: Zeile): void {
   db().prepare('DELETE FROM blatt_freigaben WHERE id = ?').run(z.id)
   if (z.rueckmeldung_id) db().prepare("DELETE FROM feedback_freigaben WHERE id = ? AND art != ''").run(z.rueckmeldung_id)
   for (const g of gaeste) nutzerLoeschen(g.id)
+}
+
+interface GespeicherteAuswertung {
+  strenge?: Strenge
+  zeit?: number
+  personen?: Record<string, MitarbeitVorschlag>
+}
+
+/** Alles, was die Auswertung je Person braucht – aus Abgaben, Feedback und Bogen */
+function auswertungsDaten(z: Zeile): { aufgaben: BlattAufgabe[]; roh: PersonRoh[] } {
+  const aufgaben = json_(z.aufgaben, [] as BlattAufgabe[])
+  const namen = new Map(alleNutzer().map((n) => [n.id, n.name || n.benutzer]))
+  const zeilen = db().prepare('SELECT * FROM blatt_abgaben WHERE freigabe_id = ?').all(z.id) as unknown as Abgabe[]
+  const roh = zeilen
+    .map((a): PersonRoh => {
+      const verlauf = json_(a.aufgaben_feedback ?? '{}', {} as Record<string, { einschaetzung: string; gelungen?: string; fehlt?: string; schritt?: string }[]>)
+      const bogen = blattFassungen(z.rueckmeldung_id, a.schueler_id)
+        .map((f) => f.volleBogen)
+        .filter(Boolean)
+        .at(-1)
+      return {
+        id: a.schueler_id,
+        name: namen.get(a.schueler_id) ?? '',
+        antworten: json_(a.antworten ?? '{}', {} as Record<string, string>),
+        verlauf,
+        freigeschaltet: json_(a.freigeschaltet ?? '[]', [] as number[]),
+        eingereicht: a.abgaben,
+        kriterien: (bogen?.kriterien ?? []).map((k) => k.einschaetzung),
+        letzte: Object.fromEntries(
+          Object.entries(verlauf).map(([nr, l]) => {
+            const x = l.at(-1)
+            return [nr, x ? { gelungen: x.gelungen, fehlt: x.fehlt, schritt: x.schritt } : undefined]
+          })
+        ),
+        staerken: bogen?.staerken ?? [],
+        schritte: bogen?.schritte ?? []
+      }
+    })
+    .sort((x, y) => x.name.localeCompare(y.name, 'de'))
+  return { aufgaben, roh }
+}
+
+/** Fach, Jahrgang, Schulform aus der verknüpften Rückmeldung (dort steht das Material-Meta) */
+function kontextVon(z: Zeile): AuswertungsKontext {
+  const v = db().prepare('SELECT vorlage FROM feedback_freigaben WHERE id = ?').get(z.rueckmeldung_id) as { vorlage?: string } | undefined
+  const meta = json_(v?.vorlage ?? '{}', {} as { meta?: { subjectLabel?: string; grade?: number; schoolTypeName?: string; stateId?: string } }).meta ?? {}
+  return {
+    titel: z.titel,
+    fach: meta.subjectLabel || ((z as Zeile & { fach?: string }).fach ?? ''),
+    ...(meta.grade ? { jahrgang: meta.grade } : {}),
+    ...(meta.schoolTypeName ? { schulform: meta.schoolTypeName } : {}),
+    ...(meta.stateId ? { land: meta.stateId } : {})
+  }
+}
+
+/** Wie viele Personen das Blatt bearbeiten sollen: Ausgewählte bzw. die Lerngruppe, dazu per Code Beigetretene */
+function gesamtVon(z: Zeile): number {
+  const nur = json_(z.schueler, [] as string[])
+  const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+  const ids = new Set<string>()
+  if (nur.length) for (const n of alleNutzer()) if (nur.includes(n.benutzer)) ids.add(n.id)
+  if (!nur.length && g) for (const n of mitgliederVon(g)) ids.add(n.id)
+  for (const x of db().prepare('SELECT nutzer_id FROM blatt_gaeste WHERE freigabe_id = ?').all(z.id) as { nutzer_id: string }[]) ids.add(x.nutzer_id)
+  // Wer schon dabei ist, zählt immer mit (z. B. später aus der Gruppe genommen)
+  for (const x of db().prepare('SELECT schueler_id FROM blatt_abgaben WHERE freigabe_id = ?').all(z.id) as { schueler_id: string }[]) ids.add(x.schueler_id)
+  return ids.size
 }
 
 /** Für die Unterrichtsreihe: Stand einer Person bei einem freigegebenen Blatt */

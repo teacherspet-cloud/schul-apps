@@ -29,6 +29,8 @@ import { Zugang } from '../onlinetest/OnlinetestModule'
 import { Ausfuellen, type BlattDaten } from '../onlinetest/BlattAusfuellen'
 import { notifyError } from '../../shared/util'
 import { BlattWaehlenKnopf } from './BlattWaehlen'
+import { abgabeTeile, FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
+import { AuswertungKnopf, AuswertungLeiste, AuswertungModal, useAuswertung, type PersonA } from './Auswertung'
 import type { Ampel } from '@shared/blattFreigabe'
 
 export interface Freigabe {
@@ -44,6 +46,8 @@ export interface Freigabe {
   link?: string
   abgaben: number
   begonnen: number
+  /** Für wie viele Personen (Fortschrittsbalken, 05.10.2026) */
+  gesamt?: number
 }
 
 interface Detail {
@@ -81,7 +85,21 @@ export function useFreigaben(active = true): { liste: Freigabe[] | null; laden: 
     []
   )
   useEffect(() => {
-    if (active) laden()
+    if (!active) return
+    laden()
+    // Aktuell halten (05.10.2026): Fortschritt ändert sich, während die Liste offen ist – jede Minute und
+    // sobald das Fenster wieder vorn ist
+    const zeit = setInterval(laden, 60_000)
+    const vorn = (): void => {
+      if (document.visibilityState === 'visible') laden()
+    }
+    window.addEventListener('focus', vorn)
+    document.addEventListener('visibilitychange', vorn)
+    return () => {
+      clearInterval(zeit)
+      window.removeEventListener('focus', vorn)
+      document.removeEventListener('visibilitychange', vorn)
+    }
   }, [active, laden])
   return { liste, laden }
 }
@@ -212,10 +230,18 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
                         </Text>
                       </div>
                       <Group gap="xs" wrap="nowrap">
-                        <Badge variant="light">{f.begonnen} begonnen</Badge>
-                        <Badge variant="light" color="green">
-                          {f.abgaben} eingereicht
-                        </Badge>
+                        {f.gesamt ? (
+                          <div style={{ width: 220 }}>
+                            <FortschrittsBalken gesamt={f.gesamt} teile={abgabeTeile(f.gesamt, f.begonnen, f.abgaben)} />
+                          </div>
+                        ) : (
+                          <>
+                            <Badge variant="light">{f.begonnen} begonnen</Badge>
+                            <Badge variant="light" color="green">
+                              {f.abgaben} eingereicht
+                            </Badge>
+                          </>
+                        )}
                         <Button size="xs" onClick={() => setGewaehlt(f.id)} data-freigabe-oeffnen>
                           Öffnen
                         </Button>
@@ -238,6 +264,12 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
   const [blatt, setBlatt] = useState<BlattDaten | null>(null)
   const [qr, setQr] = useState(false)
   const [entfernen, setEntfernen] = useState<Detail['abgaben'][number] | null>(null)
+  // Auswertung je Person (05.10.2026, Auswertung.tsx)
+  const auswertung = useAuswertung(id)
+  const [auswahl, setAuswahl] = useState<PersonA | null>(null)
+  const auswertungLaden = auswertung.laden
+  // Mit jedem Neuladen der Liste (Freischalten, Entfernen …) auch die Auswertung
+  useEffect(() => auswertungLaden(), [d, auswertungLaden])
   const laden = useCallback(() => {
     void holen<Detail>(`/server/blaetter/${id}`).then(setD, (e: unknown) => notifyError(e))
     void holen<{ blaetter: Freigabe[] }>('/server/blaetter').then((x) => setKurz(x.blaetter.find((f) => f.id === id) ?? null))
@@ -285,6 +317,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
           </Button>
         </Group>
       </Group>
+      {auswertung.daten && d.abgaben.length > 0 && <AuswertungLeiste id={id} titel={d.titel} daten={auswertung.daten} setDaten={auswertung.setDaten} />}
       {!d.abgaben.length ? (
         <Text c="dimmed">Noch hat niemand begonnen.</Text>
       ) : (
@@ -293,6 +326,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
             <Table.Tr>
               <Table.Th>Name</Table.Th>
               <Table.Th>Stand</Table.Th>
+              <Table.Th>Auswertung</Table.Th>
               {(d.aufgaben?.length ?? 0) > 0 && d.einstellungen?.aufgabenFeedback && <Table.Th>Aufgaben</Table.Th>}
               <Table.Th>Zuletzt</Table.Th>
               <Table.Th />
@@ -308,6 +342,12 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
                       {a.gast ? 'Gast per QR' : 'per Code'}
                     </Badge>
                   )}
+                </Table.Td>
+                <Table.Td>
+                  {(() => {
+                    const p = auswertung.daten?.personen.find((x) => x.id === a.id)
+                    return p ? <AuswertungKnopf p={p} note={auswertung.daten?.mitarbeit[p.id]?.note} onClick={() => setAuswahl(p)} /> : null
+                  })()}
                 </Table.Td>
                 <Table.Td>
                   {a.eingereicht ? (
@@ -398,6 +438,18 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
           </Stack>
         )}
       </Modal>
+      {auswahl && (
+        <AuswertungModal
+          p={auswahl}
+          vorschlag={auswertung.daten?.mitarbeit[auswahl.id]}
+          schliessen={() => setAuswahl(null)}
+          ansehen={() => {
+            const b = d.abgaben.find((x) => x.id === auswahl.id)?.benutzer
+            setAuswahl(null)
+            if (b) ansehen(b)
+          }}
+        />
+      )}
       {qr && kurz?.code && kurz.link && (
         <Modal opened onClose={() => setQr(false)} title={d.titel} size="lg">
           <Zugang code={kurz.code} link={kurz.link} />

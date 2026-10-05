@@ -14,6 +14,7 @@ import { holen } from '../modules/onlinetest/serverApi'
 import { openDocument, openModule } from '../shared/navigation'
 import { oeffneReihe, ReiheKarte, useLaufendeReihen } from '../modules/unterrichtsreihe/LaufendeReihenModule'
 import { oeffneFreigabe, useFreigaben } from '../modules/freigaben/FreigegebeneBlaetterModule'
+import { abgabeTeile, FortschrittsBalken } from '../shared/components/FortschrittsBalken'
 
 interface TestKurz {
   id: string
@@ -33,6 +34,8 @@ interface RueckmeldungKurz {
   art?: string
   lerngruppe: string
   abgaben: number
+  /** Für wie viele Personen (Fortschrittsbalken) */
+  gesamt?: number
 }
 interface VokabelKurz {
   id: string
@@ -175,14 +178,31 @@ export function Schnellzugriff(): React.JSX.Element {
           <Zeile
             key={b.id}
             titel={b.titel}
-            unter={`${b.lerngruppe || 'Gäste'} · ${b.begonnen} begonnen · ${b.abgaben} eingereicht`}
+            unter={`${b.lerngruppe || 'Gäste'}${b.gesamt ? ` · ${b.gesamt} Lernende` : ''}`}
             onClick={() => (oeffneFreigabe(b.id), openModule('freigaben'))}
+            unten={b.gesamt ? <FortschrittsBalken gesamt={b.gesamt} teile={abgabeTeile(b.gesamt, b.begonnen, b.abgaben)} /> : undefined}
           >
             {b.zuletzt > jetzt - 2 * 864e5 && b.abgaben > 0 ? <Badge color="green">neu</Badge> : <Badge variant="light">Arbeitsblatt</Badge>}
           </Zeile>
         ))}
         {rueckOffen.slice(0, 4).map((r) => (
-          <Zeile key={r.id} titel={r.titel} unter={`${r.lerngruppe || 'Gäste'} · ${r.abgaben} Abgaben`} onClick={() => openModule('rueckmeldung')}>
+          <Zeile
+            key={r.id}
+            titel={r.titel}
+            unter={`${r.lerngruppe || 'Gäste'} · ${r.abgaben} Abgaben`}
+            onClick={() => openModule('rueckmeldung')}
+            unten={
+              r.gesamt ? (
+                <FortschrittsBalken
+                  gesamt={r.gesamt}
+                  teile={[
+                    { wert: Math.min(r.abgaben, r.gesamt), farbe: 'green', wort: 'eingereicht' },
+                    { wert: Math.max(0, r.gesamt - r.abgaben), farbe: 'red', wort: 'noch offen' }
+                  ]}
+                />
+              ) : undefined
+            }
+          >
             <Badge variant="light" color="green">
               Rückmeldung
             </Badge>
@@ -225,7 +245,7 @@ export function Schnellzugriff(): React.JSX.Element {
   )
 }
 
-function Zeile(p: { titel: string; unter: string; onClick: () => void; children?: React.ReactNode }): React.JSX.Element {
+function Zeile(p: { titel: string; unter: string; onClick: () => void; children?: React.ReactNode; unten?: React.ReactNode }): React.JSX.Element {
   return (
     <Card
       withBorder
@@ -247,6 +267,7 @@ function Zeile(p: { titel: string; unter: string; onClick: () => void; children?
         </div>
         {p.children}
       </Group>
+      {p.unten && <div style={{ marginTop: 6 }}>{p.unten}</div>}
     </Card>
   )
 }

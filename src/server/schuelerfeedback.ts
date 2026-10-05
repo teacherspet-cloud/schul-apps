@@ -130,6 +130,18 @@ const freigabe = (id: string): Freigabe | null => (db().prepare('SELECT * FROM f
 
 const schuelerVon = (f: Freigabe): string[] => json_(f.schueler ?? '[]', [] as string[])
 
+/** Wie viele Personen abgeben sollen: Ausgewählte bzw. die Lerngruppe, dazu per Code Beigetretene */
+function gesamtVon(f: Freigabe): number {
+  const nur = schuelerVon(f)
+  const g = f.lerngruppe_id ? lerngruppe(f.lerngruppe_id) : null
+  const ids = new Set<string>()
+  if (nur.length) for (const n of alleNutzer()) if (nur.includes(n.benutzer)) ids.add(n.id)
+  if (!nur.length && g) for (const n of mitgliederVon(g)) ids.add(n.id)
+  for (const x of db().prepare('SELECT nutzer_id FROM feedback_gaeste WHERE freigabe_id = ?').all(f.id) as { nutzer_id: string }[]) ids.add(x.nutzer_id)
+  for (const x of db().prepare('SELECT schueler_id FROM feedback_abgaben WHERE freigabe_id = ?').all(f.id) as { schueler_id: string }[]) ids.add(x.schueler_id)
+  return ids.size
+}
+
 /** Gehört die Aufgabe dieser Person? Lerngruppe (ggf. nur ausgewählte) oder als Gast beigetreten */
 function istFuer(f: Freigabe, ich: NutzerInfo): boolean {
   // Per Code beigetreten (Gast oder Konto)?
@@ -423,7 +435,9 @@ export function feedbackRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
             lerngruppe: (f.lerngruppe_id ? lerngruppe(f.lerngruppe_id)?.name : '') ?? '',
             schueler: schuelerVon(f).length,
             ...(f.code ? { code: f.code, link: link(f.code) } : {}),
-            abgaben: (db().prepare('SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ?').get(f.id) as { n: number }).n
+            abgaben: (db().prepare('SELECT COUNT(*) AS n FROM feedback_abgaben WHERE freigabe_id = ?').get(f.id) as { n: number }).n,
+            // Für wie viele Personen (Fortschrittsbalken, 05.10.2026)
+            gesamt: gesamtVon(f)
           }))
         }),
         true
