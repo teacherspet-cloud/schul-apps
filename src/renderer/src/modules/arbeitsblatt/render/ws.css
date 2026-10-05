@@ -3236,3 +3236,17 @@ html[data-griff-zug] * {
   flex: 0 0 42mm;
   margin-left: auto;
 }
+
+/* Quellenanhang „Quellen und Urheberrecht" (05.10.2026) */
+.ws-quellen-anhang h3 {
+  font-size: 1em;
+  margin: 4mm 0 1mm;
+}
+.ws-quellen-anhang ul {
+  margin: 0;
+  padding-left: 5mm;
+}
+.ws-quellen-anhang li {
+  font-size: 0.88em;
+  margin-bottom: 1mm;
+}

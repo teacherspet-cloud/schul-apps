@@ -1,3 +1,4 @@
+import { quellenAnhang } from '../../render/quellenAnhang'
 import {
   AlignmentType,
   Document,
@@ -67,7 +68,8 @@ export async function buildWorksheetDocx(ws: Worksheet, opts: WorksheetDocxOptio
   if (opts.includeKey || opts.keyOnly) await add(true)
   // Je gewähltem Tafelformat ein eigener Abschnitt
   if (opts.includeBoard)
-    for (const [b, board] of boardList(ws).entries()) if (!opts.seiten || opts.seiten.tafeln.has(b + 1)) sections.push(await boardSection(ws, board, deps.raster))
+    for (const [b, board] of boardList(ws).entries())
+      if (!opts.seiten || opts.seiten.tafeln.has(b + 1)) sections.push(await boardSection(ws, board, deps.raster))
   // Ganz ohne Inhalt würde Word die Datei nicht öffnen
   if (!sections.length) sections.push({ children: [new Paragraph('')] })
 
@@ -442,7 +444,24 @@ export async function sheetSections(
 
   // Bildnachweise auf einer eigenen Schlussseite – das Blatt selbst bleibt frei davon
   const credits = key || !zusatzGewaehlt('nachweise') ? [] : imageCredits(sheet)
-  if (credits.length) {
+  // Quellenanhang (05.10.2026): dieselben Abschnitte wie im Druck
+  const anhang = !key && zusatzGewaehlt('nachweise') && ctx.ws.meta.quellenanhang ? quellenAnhang(ctx.ws, sheet, deps.schoolName) : null
+  if (anhang) {
+    children = [
+      new Paragraph({ spacing: { after: 160 }, children: [run('Quellen und Urheberrecht', { bold: true, size: ctx.size + 4 })] }),
+      ...anhang.flatMap((a) => [
+        new Paragraph({ spacing: { before: 120, after: 60 }, children: [run(a.titel, { bold: true, size: ctx.size })] }),
+        ...a.zeilen.map(
+          (z) =>
+            new Paragraph({
+              spacing: { after: 60 },
+              children: [run(`${z.label}${z.text ? ': ' : ''}`, { bold: true, size: ctx.size - 2 }), run(z.text, { size: ctx.size - 2 })]
+            })
+        )
+      ])
+    ]
+    flush(false)
+  } else if (credits.length) {
     children = [
       new Paragraph({ spacing: { after: 160 }, children: [run('Bildnachweise', { bold: true, size: ctx.size + 4 })] }),
       ...credits.map(

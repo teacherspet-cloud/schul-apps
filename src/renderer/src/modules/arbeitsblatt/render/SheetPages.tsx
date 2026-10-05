@@ -1,3 +1,4 @@
+import { quellenAnhang } from './quellenAnhang'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { hoerablaufFuer, hoerStufe } from '../didactics/hoerablauf'
 import { needsLargeType } from '../didactics/language'
@@ -324,6 +325,8 @@ export function SheetPages({
   // Es gehört den Lernenden und steht deshalb auch im Lösungsteil nicht – dort hilft es niemandem.
   const phraseSheet = !isKey && ownPhrasePage ? sheet.blocks.filter(isPhraseSheet) : []
   const credits = isKey ? [] : imageCredits(sheet, info.citationStyle)
+  // Quellenanhang statt der reinen Bildnachweise (05.10.2026)
+  const anhang = !isKey && ws.meta.quellenanhang ? quellenAnhang(ws, sheet, info.schoolName) : null
   // Notenschlüssel und Fehlerprofil gehören zur Lehrkraft, nicht aufs Schülerblatt
   const scaleGroups = isKey ? (ws.meta.gradeScale?.groups ?? []).filter((g) => g.points > 0) : []
   const errorRows = isKey ? errorProfileRows(sheet) : []
@@ -333,7 +336,7 @@ export function SheetPages({
     ...(phraseSheet.length ? ['hilfsblatt' as const] : []),
     ...(helpCards.length ? ['hilfekarten' as const] : []),
     ...(hasTeacherPage ? ['lehrkraft' as const] : []),
-    ...(credits.length ? ['nachweise' as const] : [])
+    ...(credits.length || anhang ? ['nachweise' as const] : [])
   ]
   const total = pages.length + zusatz.length
   // Seitenzahl einer Schlussseite; bis Paket 11 trugen alle Schlussseiten dieselbe Nummer
@@ -526,7 +529,27 @@ export function SheetPages({
           </div>
         </PageFrame>
       )}
-      {credits.length > 0 && zeige(nr('nachweise')) && (
+      {anhang && zeige(nr('nachweise')) && (
+        <PageFrame info={info} page={nr('nachweise')} pages={total}>
+          <div className="ws-credits-page ws-quellen-anhang" data-quellen-anhang>
+            <h2>Quellen und Urheberrecht</h2>
+            {anhang.map((a) => (
+              <section key={a.titel}>
+                <h3>{a.titel}</h3>
+                <ul>
+                  {a.zeilen.map((z, i) => (
+                    <li key={i}>
+                      <b>{z.label}</b>
+                      {z.text ? `: ${z.text}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        </PageFrame>
+      )}
+      {!anhang && credits.length > 0 && zeige(nr('nachweise')) && (
         <PageFrame info={info} page={nr('nachweise')} pages={total}>
           <div className="ws-credits-page">
             <h2>Bildnachweise</h2>
@@ -572,7 +595,7 @@ export function zusatzSeiten(ws: Worksheet, sheet: Sheet, isKey: boolean): Zusat
   if (!isKey && phraseSheetModus(ws.meta) === 'blatt' && sheet.blocks.some(isPhraseSheet)) aus.push('hilfsblatt')
   if (!isKey && sheet.blocks.some(isHelpCard)) aus.push('hilfekarten')
   if (isKey && ((ws.meta.gradeScale?.groups ?? []).some((g) => g.points > 0) || errorProfileRows(sheet).length > 0)) aus.push('lehrkraft')
-  if (!isKey && imageCredits(sheet).length > 0) aus.push('nachweise')
+  if (!isKey && (ws.meta.quellenanhang || imageCredits(sheet).length > 0)) aus.push('nachweise')
   return aus
 }
 

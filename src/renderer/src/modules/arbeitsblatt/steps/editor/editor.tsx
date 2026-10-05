@@ -664,15 +664,26 @@ export function EditorStep(): React.JSX.Element {
             designId={ws.design.id}
             onDesign={(d) => update((w) => (w.design = structuredClone(d)))}
             nachDesign={
-              ws.meta.differentiation.levels > 1 && (
+              <>
+                {/* Quellenanhang (05.10.2026): letzte Seite „Quellen und Urheberrecht" im eduki-Stil */}
                 <Checkbox
                   size="sm"
-                  label="Sternchen zeigen"
-                  description="Niveaustufe (★/★★/★★★) auf den Blättern anzeigen"
-                  checked={ws.meta.showLevelMarks !== false}
-                  onChange={(e) => update((w) => (w.meta.showLevelMarks = e.currentTarget.checked))}
+                  label="Quellenanhang"
+                  description="Letzte Seite „Quellen und Urheberrecht“: Bilder, Texte, Medien, Schrift, KI-Hinweis, Nutzungshinweis"
+                  checked={Boolean(ws.meta.quellenanhang)}
+                  onChange={(e) => update((w) => (w.meta.quellenanhang = e.currentTarget.checked))}
+                  data-quellenanhang
                 />
-              )
+                {ws.meta.differentiation.levels > 1 && (
+                  <Checkbox
+                    size="sm"
+                    label="Sternchen zeigen"
+                    description="Niveaustufe (★/★★/★★★) auf den Blättern anzeigen"
+                    checked={ws.meta.showLevelMarks !== false}
+                    onChange={(e) => update((w) => (w.meta.showLevelMarks = e.currentTarget.checked))}
+                  />
+                )}
+              </>
             }
             kiVermerk={{ wert: ws.meta.kiVermerk, ki: ws.meta.ki, onChange: (v) => update((w) => (w.meta.kiVermerk = v)) }}
             schulangaben={{ checked: ws.meta.showSchool !== false, onChange: (an) => update((w) => (w.meta.showSchool = an)) }}

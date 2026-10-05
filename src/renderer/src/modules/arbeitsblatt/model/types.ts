@@ -929,16 +929,7 @@ export interface SeitenVorschlag {
    * vertiefung/sicherung/transfer (Aufgabe anfügen und von der KI schreiben lassen), sonstiges (nur Text),
    * schreibraumKnapper/bilderKleiner (lokal, 30.09.2026: Schreibraum bzw. Bilder um eine Stufe verringern).
    */
-  art:
-    | 'hilfenAufKarten'
-    | 'zusammenlegen'
-    | 'materialKuerzen'
-    | 'vertiefung'
-    | 'sicherung'
-    | 'transfer'
-    | 'schreibraumKnapper'
-    | 'bilderKleiner'
-    | 'sonstiges'
+  art: 'hilfenAufKarten' | 'zusammenlegen' | 'materialKuerzen' | 'vertiefung' | 'sicherung' | 'transfer' | 'schreibraumKnapper' | 'bilderKleiner' | 'sonstiges'
   text: string
   /** Betroffener Baustein (Kennung) – bei Kürzen und Zusammenlegen */
   blockId?: string
@@ -1248,6 +1239,8 @@ export interface WorksheetMeta {
    * am Ende des Materials (didactics/anmerkungen.ts).
    */
   anmerkungen?: 'fussnoten' | 'endnoten'
+  /** Quellenanhang „Quellen und Urheberrecht" als letzte Seite (05.10.2026, render/quellenAnhang.ts) */
+  quellenanhang?: boolean
   /**
    * Illustrationen (Maskottchen) auf diesem Blatt (26.09.2026): `an` ausdrücklich gewählt,
    * sonst nach dem Jahrgang (Einstellung „bis Klasse"); `maskottchenId` = Figur, sonst Standard.
