@@ -9,11 +9,16 @@
  *  - Lernende sehen nie Lösungen, Erwartungen oder die richtigen Antworten der Diagnose.
  *
  *  Lehrkraft: /server/reihen …   Lernende: /s/api/reihen, /s/api/reihe …
+ *  Gäste (05.10.2026): GET /s/api/reihe/zugang?code= · POST /s/api/reihe/gast (Seite /s/rq/<CODE>) – ein Gast
+ *  bekommt Zugang zur Reihe UND zu allen verknüpften Blättern, Aufgaben und Vokabeln (auch später ergänzten).
  */
 import { randomBytes } from 'node:crypto'
-import { alleNutzer, datenbank, nutzerNachId, protokolliereServer, type NutzerInfo } from './datenbank'
-import { json, type Anfrage, type Aufruf } from './http'
-import { alleLernenden, gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
+import { alleNutzer, datenbank, nutzerAnlegen, nutzerNachId, protokolliereServer, sitzungAnlegen, SITZUNG_MS, type NutzerInfo } from './datenbank'
+import { json, setzeSitzungsCookie, type Anfrage, type Aufruf } from './http'
+import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon, onlinetestStand, reihenTestAnlegen, reihenTestCode } from './onlinetest'
+import { iservBereit } from './anmeldung'
+import { registerVergessen } from './namensschutz'
+import { gastEntfernen } from './gaeste'
 import { blattFassung, feedbackStand, feedbackZusatzrunde, verknuepfteFreigabeAnlegen, verknuepfteFreigabeStatus } from './schuelerfeedback'
 import { blattStand, blattZusatzrunde, reihenBlattAnlegen } from './arbeitsblaetter'
 import { vokabelnZuweisen, vokabelStand } from './vokabeln'
@@ -79,9 +84,61 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    // Gäste per QR-Code (05.10.2026)
+    try {
+      d.exec('ALTER TABLE reihen_zuweisungen ADD COLUMN code TEXT')
+    } catch {
+      /* schon da */
+    }
+    d.exec(
+      'CREATE TABLE IF NOT EXISTS reihe_gaeste (zuweisung_id TEXT NOT NULL REFERENCES reihen_zuweisungen(id) ON DELETE CASCADE, nutzer_id TEXT NOT NULL REFERENCES nutzer(id) ON DELETE CASCADE, PRIMARY KEY (zuweisung_id, nutzer_id))'
+    )
     bereit = true
   }
   return d
+}
+
+const CODE_ZEICHEN = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function neuerCode(): string {
+  for (;;) {
+    const c = Array.from(randomBytes(6), (b) => CODE_ZEICHEN[b % CODE_ZEICHEN.length]).join('')
+    // Ein Code für alles (Blätter, Tests, Aufgaben …): Die Code-Eingabe probiert die Arten nacheinander
+    if (!db().prepare('SELECT 1 FROM reihen_zuweisungen WHERE code = ?').get(c)) return c
+  }
+}
+const nachCode = (code: string): ZuweisungZeile | null =>
+  /^[A-Z0-9]{4,12}$/.test(code) ? ((db().prepare('SELECT * FROM reihen_zuweisungen WHERE code = ?').get(code) as ZuweisungZeile | undefined) ?? null) : null
+
+/**
+ * Gäste einer Zuweisung in alle verknüpften Freigaben eintragen (Blätter, Aufgaben/Rückmeldungen, Vokabeln) –
+ * nach dem Beitritt und wenn neue Schritte verknüpft werden. Onlinetests laufen über ihren eigenen Code.
+ */
+function gaesteNachziehen(z: ZuweisungZeile, r: Reihe, nur?: string): void {
+  const gaeste = nur
+    ? [nur]
+    : (db().prepare('SELECT nutzer_id FROM reihe_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
+  if (!gaeste.length) return
+  const v = json_(z.verknuepft, {} as Record<string, string>)
+  const art = new Map(r.schritte.map((s) => [s.id, s.inhalt.art]))
+  for (const [schluessel, ziel] of Object.entries(v)) {
+    if (!ziel || ziel === '*') continue
+    const a = art.get(schluessel.split(':')[0])
+    const tabelle =
+      a === 'arbeitsblatt'
+        ? 'INSERT OR IGNORE INTO blatt_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)'
+        : a === 'rueckmeldung' || a === 'aufgabe'
+          ? 'INSERT OR IGNORE INTO feedback_gaeste (freigabe_id, nutzer_id) VALUES (?, ?)'
+          : a === 'vokabeln'
+            ? "INSERT OR IGNORE INTO vok_gaeste (zuweisung_id, nutzer_id, wieder) VALUES (?, ?, '')"
+            : null
+    if (!tabelle) continue
+    for (const g of gaeste)
+      try {
+        db().prepare(tabelle).run(ziel, g)
+      } catch {
+        /* Freigabe inzwischen gelöscht */
+      }
+  }
 }
 
 const json_ = <T>(s: string | null | undefined, r: T): T => {
@@ -103,6 +160,8 @@ interface ZuweisungZeile {
   verknuepft: string
   status: 'offen' | 'beendet'
   erstellt: string
+  /** QR-Code für Gäste (05.10.2026) */
+  code?: string | null
 }
 
 /**
@@ -118,8 +177,9 @@ const reiheVon = (id: string, roh = false): (Reihe & { lehrkraftId: string }) | 
 const zuweisung = (id: string): ZuweisungZeile | null =>
   (db().prepare('SELECT * FROM reihen_zuweisungen WHERE id = ?').get(id) as ZuweisungZeile | undefined) ?? null
 
-/** Gehört die Zuweisung dieser Person? (Lerngruppe, ggf. nur Ausgewählte) */
+/** Gehört die Zuweisung dieser Person? (Lerngruppe, ggf. nur Ausgewählte, oder per Code beigetreten) */
 function istFuer(z: ZuweisungZeile, ich: NutzerInfo): boolean {
+  if (db().prepare('SELECT 1 FROM reihe_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?').get(z.id, ich.id)) return true
   if (ich.quelle === 'gast') return false
   // Einzelnen Lernenden zugewiesen, ohne Lerngruppe (03.10.2026)
   if (!z.lerngruppe_id) return ich.rolle === 'schueler' && json_(z.schueler, [] as string[]).includes(ich.benutzer)
@@ -130,14 +190,22 @@ function istFuer(z: ZuweisungZeile, ich: NutzerInfo): boolean {
 }
 
 function lernendeVon(z: ZuweisungZeile): NutzerInfo[] {
+  // Per QR-Code beigetreten (Gäste und Konten, 05.10.2026)
+  const perCode = new Set(
+    (db().prepare('SELECT nutzer_id FROM reihe_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]).map((x) => x.nutzer_id)
+  )
+  const dazu = (liste: NutzerInfo[]): NutzerInfo[] => {
+    const da = new Set(liste.map((n) => n.id))
+    return [...liste, ...alleNutzer().filter((n) => perCode.has(n.id) && !da.has(n.id))]
+  }
   if (!z.lerngruppe_id) {
     const nur = new Set(json_(z.schueler, [] as string[]))
-    return alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.has(n.benutzer))
+    return dazu(alleNutzer().filter((n) => n.rolle === 'schueler' && n.quelle !== 'gast' && nur.has(n.benutzer)))
   }
   const g = lerngruppe(z.lerngruppe_id)
-  if (!g) return []
+  if (!g) return dazu([])
   const nur = json_(z.schueler, [] as string[])
-  return mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer))
+  return dazu(mitgliederVon(g).filter((n) => !nur.length || nur.includes(n.benutzer)))
 }
 
 const standVon = (zid: string, sid: string): Stand => {
@@ -279,6 +347,7 @@ function verknuepfe(z: ZuweisungZeile, r: Reihe): void {
   if (neu) {
     db().prepare('UPDATE reihen_zuweisungen SET verknuepft = ? WHERE id = ?').run(JSON.stringify(v), z.id)
     z.verknuepft = JSON.stringify(v)
+    gaesteNachziehen(z, r)
   }
 }
 
@@ -334,15 +403,54 @@ const standKurz = (s: Stand): Stand => ({ ...s, schritte: Object.fromEntries(Obj
 
 const MAX_DATEI = 12 * 1024 * 1024
 
-export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
+export function reihenRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Promise<boolean> {
+  const reiheLink = (code: string): string => `${adresse.replace(/\/$/, '')}/s/rq/${code}`
   return async (k) => {
     const { url, req, res, sitzung } = k
     const schueler = url.pathname === '/s/api/reihen' || url.pathname === '/s/api/reihe' || url.pathname.startsWith('/s/api/reihe/')
     const lehrer = url.pathname === '/server/reihen' || url.pathname.startsWith('/server/reihen/')
     if (!schueler && !lehrer) return false
+    const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
+
+    // ---------- Gäste per Code (vor der Anmeldeprüfung, 05.10.2026)
+    if (req.method === 'GET' && url.pathname === '/s/api/reihe/zugang') {
+      const z = nachCode(String(url.searchParams.get('code') ?? '').toUpperCase())
+      const r = z && z.status === 'offen' ? reiheVon(z.reihe_id) : null
+      if (!z || !r) return (json(res, 404, { fehler: 'Diese Unterrichtsreihe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      return (json(res, 200, { id: z.id, titel: r.titel, gaeste: !iservBereit(), dabei: Boolean(sitzung && istFuer(z, sitzung.nutzer)) }), true)
+    }
+    if (req.method === 'POST' && url.pathname === '/s/api/reihe/gast') {
+      if (!mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const z = nachCode(String(k0.code ?? '').toUpperCase())
+      const r = z && z.status === 'offen' ? reiheVon(z.reihe_id) : null
+      if (!z || !r) return (json(res, 404, { fehler: 'Diese Unterrichtsreihe gibt es nicht (mehr). Bitte den Code prüfen.' }), true)
+      if (sitzung && istFuer(z, sitzung.nutzer)) return (json(res, 200, { ok: true, id: z.id }), true)
+      if (sitzung && sitzung.nutzer.quelle !== 'gast' && sitzung.nutzer.rolle === 'schueler') {
+        db().prepare('INSERT OR IGNORE INTO reihe_gaeste (zuweisung_id, nutzer_id) VALUES (?, ?)').run(z.id, sitzung.nutzer.id)
+        gaesteNachziehen(z, r, sitzung.nutzer.id)
+        return (json(res, 200, { ok: true, id: z.id }), true)
+      }
+      if (iservBereit()) return (json(res, 403, { fehler: 'Bitte mit IServ anmelden.' }), true)
+      const name = gastName(k0.name)
+      if (!name) return (json(res, 400, { fehler: 'Bitte Vorname und Anfangsbuchstaben des Nachnamens eingeben, z. B. „Anna K.“' }), true)
+      const gaeste = db().prepare('SELECT nutzer_id FROM reihe_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]
+      const namen = new Map(alleNutzer().map((n) => [n.id, n.name.toLowerCase()]))
+      if (gaeste.some((x) => namen.get(x.nutzer_id) === name.toLowerCase()))
+        return (json(res, 409, { fehler: `„${name}“ ist schon dabei. Bitte einen zweiten Buchstaben des Nachnamens dazunehmen, z. B. „Anna Ko.“` }), true)
+      if (gaeste.length >= 80) return (json(res, 429, { fehler: 'Für diese Reihe sind schon zu viele Gäste angemeldet.' }), true)
+      const gast = nutzerAnlegen({ benutzer: `gast-${randomBytes(6).toString('hex')}`, name, rolle: 'schueler', quelle: 'gast' })
+      registerVergessen()
+      db().prepare('INSERT INTO reihe_gaeste (zuweisung_id, nutzer_id) VALUES (?, ?)').run(z.id, gast.id)
+      gaesteNachziehen(z, r, gast.id)
+      const neu = sitzungAnlegen(gast.id, 'schueler')
+      setzeSitzungsCookie(res, neu.cookie, SITZUNG_MS.schueler, Boolean((req.socket as { encrypted?: boolean }).encrypted))
+      protokolliereServer('reihe', 'Beitritt mit Namen (ohne IServ)', gast.id)
+      return (json(res, 200, { ok: true, id: z.id }), true)
+    }
+
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     const ich = sitzung.nutzer
-    const mitKopf = typeof req.headers['x-schulapps-token'] === 'string'
     if (req.method === 'POST' && !mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
 
     // ---------------------------------------------------------------- Lernende
@@ -609,9 +717,14 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
               geaendert: x.geaendert,
               zuweisungen: zw.map((z) => ({
                 id: z.id,
-                lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende',
+                lerngruppe: z.lerngruppe_id
+                  ? (lerngruppe(z.lerngruppe_id)?.name ?? '')
+                  : z.code && !json_(z.schueler, [] as string[]).length
+                    ? 'Gäste per QR-Code'
+                    : 'Einzelne Lernende',
                 schueler: json_(z.schueler, [] as string[]).length,
-                status: z.status
+                status: z.status,
+                ...(z.code ? { code: z.code, link: reiheLink(z.code) } : {})
               }))
             }
           })
@@ -705,12 +818,42 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
         return (
           json(res, 200, {
             reihe: r,
-            zuweisung: { id: z.id, lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende', status: z.status, halteFrei },
+            zuweisung: {
+              id: z.id,
+              lerngruppe: z.lerngruppe_id ? (lerngruppe(z.lerngruppe_id)?.name ?? '') : 'Einzelne Lernende',
+              status: z.status,
+              halteFrei,
+              ...(z.code ? { code: z.code, link: reiheLink(z.code) } : {}),
+              // Per Code beigetreten – entfernbar
+              perCode: (db().prepare('SELECT nutzer_id FROM reihe_gaeste WHERE zuweisung_id = ?').all(z.id) as { nutzer_id: string }[]).map((g) => g.nutzer_id)
+            },
             lernende,
             bedarf
           }),
           true
         )
+      }
+      // Gast entfernen (05.10.2026): Zugang zur Reihe und zu allen verknüpften Freigaben, Konto ggf. ganz
+      if (req.method === 'POST' && teile[2] === 'gast-entfernen') {
+        const nid = String(((await k.koerper()) as Record<string, unknown>).nutzer ?? '')
+        const v = Object.values(json_(z.verknuepft, {} as Record<string, string>)).filter((x) => x && x !== '*')
+        for (const fid of v)
+          for (const t of [
+            'DELETE FROM blatt_gaeste WHERE freigabe_id = ? AND nutzer_id = ?',
+            'DELETE FROM feedback_gaeste WHERE freigabe_id = ? AND nutzer_id = ?',
+            'DELETE FROM vok_gaeste WHERE zuweisung_id = ? AND nutzer_id = ?'
+          ])
+            try {
+              db().prepare(t).run(fid, nid)
+            } catch {
+              /* Tabelle fehlt */
+            }
+        const ok = gastEntfernen(
+          { tabelle: 'reihe_gaeste', spalte: 'zuweisung_id', freigabeId: z.id, stand: [{ tabelle: 'reihen_stand', spalte: 'zuweisung_id' }] },
+          nid,
+          ich.id
+        )
+        return (json(res, ok ? 200 : 404, ok ? { ok: true } : { fehler: 'Diese Person ist nicht per Code beigetreten.' }), true)
       }
       if (req.method === 'GET' && teile[2] === 'datei') {
         const d = db()
@@ -814,16 +957,20 @@ export function reihenRoute(aufruf: Aufruf): (k: Anfrage) => Promise<boolean> {
       // Ohne Lerngruppe: einzelne Lernende aus allen eigenen Lerngruppen
       const erlaubt = new Set((g ? mitgliederVon(g) : alleLernenden()).map((n) => n.benutzer))
       const einzelne = Array.isArray(k0.schueler) ? [...new Set((k0.schueler as unknown[]).map(String).filter((b) => erlaubt.has(b)))] : []
-      if (!g && !einzelne.length) return (json(res, 400, { fehler: 'Bitte eine Lerngruppe oder einzelne Lernende wählen.' }), true)
+      // Gäste per QR-Code (05.10.2026): auch ohne Lerngruppe; mit IServ melden sich alle dort an
+      const mitGaesten = k0.gaeste === true
+      if (!g && !einzelne.length && !mitGaesten)
+        return (json(res, 400, { fehler: 'Bitte eine Lerngruppe, einzelne Lernende oder Gäste per QR-Code wählen.' }), true)
       const id = neueId()
+      const code = mitGaesten ? neuerCode() : null
       db()
         .prepare(
-          'INSERT INTO reihen_zuweisungen (id, reihe_id, lehrkraft_id, lerngruppe_id, schueler, halte_frei, verknuepft, status, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT INTO reihen_zuweisungen (id, reihe_id, lehrkraft_id, lerngruppe_id, schueler, halte_frei, verknuepft, status, erstellt, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
-        .run(id, r.id, ich.id, g?.id ?? '', JSON.stringify(einzelne), '[]', '{}', 'offen', new Date().toISOString())
+        .run(id, r.id, ich.id, g?.id ?? '', JSON.stringify(einzelne), '[]', '{}', 'offen', new Date().toISOString(), code)
       verknuepfe(zuweisung(id)!, r)
       protokolliereServer('reihe', 'Unterrichtsreihe zugewiesen', ich.id)
-      return (json(res, 200, { id }), true)
+      return (json(res, 200, { id, ...(code ? { code, link: reiheLink(code) } : {}) }), true)
     }
     if (req.method === 'POST' && teile[1] === 'loeschen') {
       db().prepare('DELETE FROM reihen WHERE id = ?').run(r.id)

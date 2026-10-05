@@ -139,6 +139,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const aufgabe = /^\/s\/a\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const fbCode = /^\/s\/f\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blattCode = /^\/s\/w\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  // Unterrichtsreihe per QR-Code (05.10.2026)
+  const reiheCode = /^\/s\/rq\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokabeln = /^\/s\/v\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokCode = /^\/s\/vt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
@@ -159,6 +161,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Beitritt code={fbCode.toUpperCase()} art="aufgabe" />
   ) : blattCode ? (
     <Beitritt code={blattCode.toUpperCase()} art="blatt" />
+  ) : reiheCode ? (
+    <Beitritt code={reiheCode.toUpperCase()} art="reihe" />
   ) : vokCode ? (
     <VokabelBeitritt code={vokCode.toUpperCase()} />
   ) : blatt ? (
@@ -756,6 +760,8 @@ async function oeffneCode(code: string): Promise<void> {
   if (aufgabe?.id) return window.location.assign(`/s/f/${code}`)
   const blatt = await holen<{ id: string }>(`/s/api/blatt/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
   if (blatt?.id) return window.location.assign(`/s/w/${code}`)
+  const reihe = await holen<{ id: string }>(`/s/api/reihe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  if (reihe?.id) return window.location.assign(`/s/rq/${code}`)
   const vok = await holen<{ id: string }>(`/s/api/vokabeln/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
   window.location.assign(vok?.id ? `/s/vt/${code}` : `/s/t/${code}`)
 }
@@ -776,6 +782,14 @@ const BEITRITT = {
     seite: (c: string) => `/s/w/${c}`,
     art: 'Arbeitsblatt',
     fehlt: 'Dieses Arbeitsblatt'
+  },
+  reihe: {
+    zugang: '/s/api/reihe/zugang',
+    gast: '/s/api/reihe/gast',
+    ziel: (id: string) => `/s/r/${id}`,
+    seite: (c: string) => `/s/rq/${c}`,
+    art: 'Unterrichtsreihe',
+    fehlt: 'Diese Unterrichtsreihe'
   }
 }
 
@@ -836,8 +850,9 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
       </Title>
       {lehrkraft && (
         <Alert color="blue" mb="md" data-lehrkraft-hinweis>
-          Mit einem Lehrkraft-Konto angemeldet. Die Abgaben stehen in der App „{art === 'blatt' ? 'Freigegebene Blätter' : 'Rückmeldung'}". Zum Ausprobieren wie
-          ein Gast einen Namen eingeben – das Gerät ist danach als Gast angemeldet, die Anmeldung als Lehrkraft endet hier.
+          Mit einem Lehrkraft-Konto angemeldet. Die Abgaben stehen in der App „
+          {art === 'blatt' ? 'Freigegebene Blätter' : art === 'reihe' ? 'Laufende Unterrichtsreihen' : 'Rückmeldung'}". Zum Ausprobieren wie ein Gast einen
+          Namen eingeben – das Gerät ist danach als Gast angemeldet, die Anmeldung als Lehrkraft endet hier.
         </Alert>
       )}
       <form

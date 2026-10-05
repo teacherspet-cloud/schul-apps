@@ -9,6 +9,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Group,
   Menu,
   Modal,
@@ -61,6 +62,7 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { LernzieleFeld, type KcAuszug } from './Lernziele'
 import { ichKannFormulieren, reihenLernziele } from './lernzieleKi'
 import { SchrittBearbeiten } from './SchrittBearbeiten'
+import { Zugang } from '../onlinetest/OnlinetestModule'
 import { DruckMenue, PlanenFenster, PlatzhalterKnopf, StundenLeiste } from './ReiheKi'
 import { horcheReihe } from './platzhalterAuftrag'
 import type { ReihenPlan } from './reihePlanungKi'
@@ -533,7 +535,10 @@ export function ReiheEditor({ start, zurueck }: { start: Reihe; zurueck: () => v
 }
 
 function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => void }): React.JSX.Element {
-  const [art, setArt] = useState<'gruppe' | 'einzeln'>('gruppe')
+  const [art, setArt] = useState<'gruppe' | 'einzeln' | 'gaeste'>('gruppe')
+  // Gäste per QR-Code (05.10.2026): zusätzlich zu Lerngruppe/Einzelnen oder allein
+  const [mitGaesten, setMitGaesten] = useState(false)
+  const [qr, setQr] = useState<{ code: string; link: string } | null>(null)
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
   const [gruppe, setGruppe] = useState<string | null>(null)
   // Mitglieder aller eigenen Lerngruppen (für „einzelne Lernende" – auch aus verschiedenen Gruppen)
@@ -560,6 +565,19 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
   const inGruppe = alle.filter((m) => m.gruppeId === gruppe)
   // Einzelne Lernende: alle Schülerkonten der Schule, nach Klasse (03.10.2026)
   const alleLernenden = useAlleLernenden()
+  if (qr)
+    return (
+      <Modal opened onClose={schliessen} title="Reihe für Gäste – QR-Code" size="lg">
+        <Stack>
+          <Text size="sm" c="dimmed">
+            Gäste scannen den Code, geben Vorname und Anfangsbuchstaben ein und bearbeiten die Reihe digital – alle Arbeitsblätter und Aufgaben der Reihe sind
+            für sie mit freigegeben. Lernende mit Konto kommen über denselben Code hinein.
+          </Text>
+          <Zugang code={qr.code} link={qr.link} />
+        </Stack>
+      </Modal>
+    )
+  const gaesteAn = art === 'gaeste' || mitGaesten
   return (
     <Modal opened onClose={schliessen} title="Reihe zuweisen" size="lg">
       <Stack>
@@ -570,12 +588,13 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
         <SegmentedControl
           value={art}
           onChange={(v) => {
-            setArt(v as 'gruppe' | 'einzeln')
+            setArt(v as 'gruppe' | 'einzeln' | 'gaeste')
             setEinzelne([])
           }}
           data={[
             { value: 'gruppe', label: 'Lerngruppe' },
-            { value: 'einzeln', label: 'Einzelne Lernende' }
+            { value: 'einzeln', label: 'Einzelne Lernende' },
+            { value: 'gaeste', label: 'Gäste per QR-Code' }
           ]}
           data-zuweisen-art
         />
@@ -602,6 +621,11 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
               />
             )}
           </>
+        ) : art === 'gaeste' ? (
+          <Text size="sm">
+            Nach dem Zuweisen erscheint ein QR-Code mit Link. Gäste geben nur Vorname und Anfangsbuchstaben des Nachnamens ein; Lernende mit Konto kommen über
+            denselben Code dazu.
+          </Text>
         ) : (
           <MultiSelect
             label="Lernende"
@@ -616,16 +640,29 @@ function Zuweisen({ reiheId, schliessen }: { reiheId: string; schliessen: () => 
             data-zuweisen-einzelne
           />
         )}
+        {art !== 'gaeste' && (
+          <Checkbox
+            label="Zusätzlich Gäste per QR-Code zulassen"
+            checked={mitGaesten}
+            onChange={(e) => setMitGaesten(e.currentTarget.checked)}
+            data-zuweisen-gaeste
+          />
+        )}
         <Group justify="flex-end">
           <Button
             loading={laeuft}
-            disabled={art === 'gruppe' ? !gruppe : !einzelne.length}
+            disabled={art === 'gaeste' ? false : art === 'gruppe' ? !gruppe : !einzelne.length}
             onClick={() => {
               setLaeuft(true)
-              void senden(`/server/reihen/${reiheId}/zuweisen`, { lerngruppeId: art === 'gruppe' ? gruppe : '', schueler: einzelne })
-                .then(() => {
+              void senden<{ id: string; code?: string; link?: string }>(`/server/reihen/${reiheId}/zuweisen`, {
+                lerngruppeId: art === 'gruppe' ? gruppe : '',
+                schueler: art === 'gaeste' ? [] : einzelne,
+                gaeste: gaesteAn
+              })
+                .then((r) => {
                   notifySuccess('Zugewiesen.')
-                  schliessen()
+                  if (r.code && r.link) setQr({ code: r.code, link: r.link })
+                  else schliessen()
                 })
                 .catch((e: unknown) => notifyError(e))
                 .finally(() => setLaeuft(false))

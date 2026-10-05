@@ -6,6 +6,7 @@
  * Keine Rangliste – sortiert wird nach Namen.
  */
 import {
+  ActionIcon,
   Alert,
   Anchor,
   Badge,
@@ -26,7 +27,8 @@ import {
   Tooltip,
   UnstyledButton
 } from '@mantine/core'
-import { IconArrowLeft, IconCheck, IconDownload, IconHandStop, IconLock, IconPlayerPlay, IconRefresh } from '@tabler/icons-react'
+import { IconArrowLeft, IconCheck, IconDownload, IconHandStop, IconLock, IconPlayerPlay, IconQrcode, IconRefresh, IconUserMinus } from '@tabler/icons-react'
+import { Zugang } from '../onlinetest/OnlinetestModule'
 import { useCallback, useEffect, useState } from 'react'
 import type { Reihe, SchrittLage, Stand, Status, Weg } from '@shared/reihe'
 import { notifyError } from '../../shared/util'
@@ -34,7 +36,7 @@ import { holen, senden } from '../onlinetest/serverApi'
 
 interface Daten {
   reihe: Reihe
-  zuweisung: { id: string; lerngruppe: string; status: string; halteFrei: string[] }
+  zuweisung: { id: string; lerngruppe: string; status: string; halteFrei: string[]; code?: string; link?: string; perCode?: string[] }
   lernende: { id: string; name: string; benutzer: string; weg: Weg; stand: Stand }[]
   bedarf: { art: string; schueler?: string; name?: string; schritt?: string; text: string; frage?: number }[]
 }
@@ -51,6 +53,7 @@ export const STATUS: Record<Status, { zeichen: string; farbe: string; text: stri
 export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void }): React.JSX.Element {
   const [d, setD] = useState<Daten | null>(null)
   const [detail, setDetail] = useState<{ schueler: string; schritt: string } | null>(null)
+  const [qr, setQr] = useState(false)
   const laden = useCallback(() => {
     void holen<Daten>(`/server/reihen/z/${zid}`).then(setD, (e: unknown) => notifyError(e))
   }, [zid])
@@ -87,6 +90,11 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
           <Button variant="subtle" leftSection={<IconRefresh size={16} />} onClick={laden}>
             Aktualisieren
           </Button>
+          {d.zuweisung.code && d.zuweisung.link && (
+            <Button variant="light" leftSection={<IconQrcode size={16} />} onClick={() => setQr(true)} data-reihe-qr>
+              QR-Code {d.zuweisung.code}
+            </Button>
+          )}
           <Button variant="light" leftSection={<IconDownload size={16} />} onClick={csv}>
             Export (CSV)
           </Button>
@@ -182,10 +190,30 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
             {lernende.map((l) => (
               <Table.Tr key={l.id}>
                 <Table.Td>
-                  <Text size="sm" fw={500}>
-                    {l.name}
-                    {l.stand.hilfe ? ' ✋' : ''}
-                  </Text>
+                  <Group gap={4} wrap="nowrap">
+                    <Text size="sm" fw={500}>
+                      {l.name}
+                      {l.stand.hilfe ? ' ✋' : ''}
+                    </Text>
+                    {/* Per QR-Code beigetreten (05.10.2026): entfernbar */}
+                    {d.zuweisung.perCode?.includes(l.id) && (
+                      <Tooltip label="Per Code beigetreten – aus der Reihe entfernen">
+                        <ActionIcon
+                          size="xs"
+                          variant="subtle"
+                          color="red"
+                          aria-label="Gast entfernen"
+                          data-gast-entfernen={l.id}
+                          onClick={() => {
+                            if (!window.confirm(`${l.name} aus der Reihe entfernen? Der Stand geht verloren.`)) return
+                            void senden(`/server/reihen/z/${zid}/gast-entfernen`, { nutzer: l.id }).then(laden, (e: unknown) => notifyError(e))
+                          }}
+                        >
+                          <IconUserMinus size={12} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Table.Td>
                 {l.weg.schritte.map((x: SchrittLage) => (
                   <Table.Td key={x.id} style={{ textAlign: 'center', padding: 2 }}>
@@ -220,6 +248,11 @@ export function Uebersicht({ zid, zurueck }: { zid: string; zurueck: () => void 
           schliessen={() => setDetail(null)}
           aktion={(k) => aktion({ ...k, schueler: det.l.id, schritt: det.s.id })}
         />
+      )}
+      {qr && d.zuweisung.code && d.zuweisung.link && (
+        <Modal opened onClose={() => setQr(false)} title={`${d.reihe.titel} – für Gäste`} size="lg">
+          <Zugang code={d.zuweisung.code} link={d.zuweisung.link} />
+        </Modal>
       )}
     </Stack>
   )

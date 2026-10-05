@@ -228,6 +228,39 @@ try {
   const sicht = await (await sb.request.get(`${A}/s/api/reihe?id=${zid}`)).json()
   pruefe((sicht.schritte ?? []).length === 2, `Lernende: 2 Schritte ohne Platzhalter (${(sicht.schritte ?? []).length})`)
   await sb.close()
+
+  // Gäste per QR-Code (05.10.2026): Beitritt mit Namen, Zugang zur Reihe UND zum verknüpften Blatt, entfernbar
+  const zq = await (
+    await lk.request.post(`${A}/server/reihen/${gesp.id}/zuweisen`, { headers: KOPF, data: { lerngruppeId: '', schueler: [], gaeste: true } })
+  ).json()
+  pruefe(Boolean(zq.code && zq.link?.includes('/s/rq/')), `Zuweisung für Gäste mit Code (${zq.code}, ${zq.link})`)
+  const gast = await browser.newContext()
+  const zugang = await (await gast.request.get(`${A}/s/api/reihe/zugang?code=${zq.code}`)).json()
+  pruefe(zugang.titel === 'KI-Reihe Probe' && zugang.gaeste === true, 'Zugang per Code: Titel, Gäste erlaubt')
+  const bei = await gast.request.post(`${A}/s/api/reihe/gast`, { headers: { ...KOPF, origin: A }, data: { code: zq.code, name: 'Lia T.' } })
+  pruefe(bei.ok(), `Gast „Lia T.“ beigetreten (${bei.status()})`)
+  // Der Blatt-Schritt ist noch gesperrt (erst die Zwischenaufgabe): Lehrkraft schaltet ihn für den Gast frei
+  const lz0 = await (await lk.request.get(`${A}/server/reihen/z/${zq.id}`, { headers: KOPF })).json()
+  const gastId0 = lz0.zuweisung?.perCode?.[0]
+  const blattSchrittId = lz0.reihe.schritte.find((x) => x.inhalt?.art === 'arbeitsblatt' && !x.platzhalter)?.id
+  await lk.request.post(`${A}/server/reihen/z/${zq.id}/aktion`, { headers: KOPF, data: { art: 'freischalten', schueler: gastId0, schritt: blattSchrittId } })
+  const gsicht = await (await gast.request.get(`${A}/s/api/reihe?id=${zq.id}`)).json()
+  const blattLink = (gsicht.schritte ?? []).map((x) => x.link).find((l) => String(l ?? '').startsWith('/s/b/'))
+  pruefe((gsicht.schritte ?? []).length === 2 && Boolean(blattLink), `Gast sieht die Reihe mit Blatt-Link (${blattLink})`)
+  const gblatt = await gast.request.get(`${A}/s/api/blatt?id=${String(blattLink).slice(5)}`)
+  pruefe(gblatt.ok(), `Gast öffnet das verknüpfte Arbeitsblatt (${gblatt.status()})`)
+  const seite = await gast.newPage()
+  await seite.goto(`${A}/s/rq/${zq.code}`)
+  await seite.waitForURL(/\/s\/r\//, { timeout: 15000 }).catch(() => undefined)
+  pruefe(seite.url().includes(`/s/r/${zq.id}`), 'QR-Link führt angemeldete Gäste direkt in die Reihe')
+  const lzq = await (await lk.request.get(`${A}/server/reihen/z/${zq.id}`, { headers: KOPF })).json()
+  const gastId = lzq.zuweisung?.perCode?.[0]
+  pruefe(Boolean(gastId) && lzq.lernende.some((l) => l.id === gastId), 'Lehrkraft sieht den Gast in der Übersicht')
+  const weg = await lk.request.post(`${A}/server/reihen/z/${zq.id}/gast-entfernen`, { headers: KOPF, data: { nutzer: gastId } })
+  pruefe(weg.ok(), 'Gast entfernt')
+  const danach = await gast.request.get(`${A}/s/api/reihe?id=${zq.id}`)
+  pruefe(!danach.ok(), `Entfernter Gast hat keinen Zugang mehr (${danach.status()})`)
+  await gast.close()
 } catch (e) {
   problems.push(String(e?.stack ?? e))
   console.log(e)

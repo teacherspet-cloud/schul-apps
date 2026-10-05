@@ -120,7 +120,7 @@ async function main(): Promise<void> {
       medienRoute,
       feedbackRoute(aufruf, adresse),
       blaetterRoute(aufruf, adresse),
-      reihenRoute(aufruf),
+      reihenRoute(aufruf, adresse),
       // Vokabelweg vor den Listen: er übernimmt die Kennungen „lb:…"
       vokabelwegRoute(),
       vokabelRoute(adresse),
