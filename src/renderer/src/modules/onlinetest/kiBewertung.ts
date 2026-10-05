@@ -36,11 +36,17 @@ export interface KiUrteil {
   begruendung: string
 }
 
-export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[]): StructuredRequest {
+/**
+ * `andere` (05.10.2026): Grammatiktest oder Lernzielkontrolle – dann zählt, ob die Antwort die Aufgabe inhaltlich
+ * trifft (Fachbegriffe, Zusammenhänge), nicht die Wortgenauigkeit eines Vokabeltests.
+ */
+export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[], andere?: { art: string; fach: string }): StructuredRequest {
   return {
     schemaName: 'onlinetest_bewertung',
     system: [
-      `Du bewertest Antworten aus einem Vokabeltest (Zielsprache: ${zielsprache}, Niveau ${niveau}) für eine Lehrkraft.`,
+      andere
+        ? `Du bewertest Antworten aus einem Onlinetest (${andere.art}, Fach ${andere.fach}) für eine Lehrkraft. Maßstab ist, ob die Antwort die Aufgabe fachlich trifft – andere Formulierungen sind richtig, wenn sie dasselbe leisten; bei Fremdsprachen (Grammatik) zählt zusätzlich die sprachliche Richtigkeit.`
+        : `Du bewertest Antworten aus einem Vokabeltest (Zielsprache: ${zielsprache}, Niveau ${niveau}) für eine Lehrkraft.`,
       'Jede Antwort ist entweder RICHTIG (volle Punkte) oder FALSCH (0 Punkte) – Teilpunkte gibt es nicht.',
       'RICHTIG, wenn die Antwort die Aufgabe erfüllt (z. B. das vorgegebene Wort tatsächlich benutzt), inhaltlich zur Aufgabe passt und sprachlich korrekt ist (Rechtschreibung des geprüften Wortes, Grammatik).',
       'Die Erwartung ist EINE mögliche Lösung: Andere Formulierungen sind richtig, wenn sie dasselbe leisten. Sei fair, aber nicht großzügig: Ein falsch geschriebenes Zielwort oder ein falscher Satzbau ist falsch.',
@@ -55,7 +61,10 @@ export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[])
       'begruendung: ein kurzer Satz auf Deutsch für die Lehrkraft, warum (bei falsch: was fehlt oder falsch ist; bei kleinerFehler: welcher Fehler).'
     ].join('\n'),
     user: faelle
-      .map((f) => `${f.id}${f.wortloesung ? ' (Wortlösung)' : ''}\nAufgabe: ${f.frage}\n${f.wortloesung ? 'Lösung' : 'Erwartung (Beispiel)'}: ${f.erwartung || '–'}\nAntwort: ${f.antwort.trim() || '(leer)'}`)
+      .map(
+        (f) =>
+          `${f.id}${f.wortloesung ? ' (Wortlösung)' : ''}\nAufgabe: ${f.frage}\n${f.wortloesung ? 'Lösung' : 'Erwartung (Beispiel)'}: ${f.erwartung || '–'}\nAntwort: ${f.antwort.trim() || '(leer)'}`
+      )
       .join('\n\n'),
     schema: {
       type: 'object',
@@ -64,7 +73,11 @@ export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[])
           type: 'array',
           items: {
             type: 'object',
-            properties: { id: { type: 'string' }, urteil: { type: 'string', enum: ['richtig', 'kleinerFehler', 'vertretbar', 'falsch'] }, begruendung: { type: 'string' } },
+            properties: {
+              id: { type: 'string' },
+              urteil: { type: 'string', enum: ['richtig', 'kleinerFehler', 'vertretbar', 'falsch'] },
+              begruendung: { type: 'string' }
+            },
             required: ['id', 'urteil', 'begruendung'],
             additionalProperties: false
           }
@@ -86,7 +99,13 @@ export function urteileAus(antwort: unknown, faelle: KiFall[]): Map<string, KiUr
   for (const u of liste as Partial<KiUrteil>[]) {
     if (typeof u?.id !== 'string' || !bekannt.has(u.id) || out.has(u.id)) continue
     // Ältere Form (richtig: boolean) bleibt lesbar
-    let urteil: KiUrteilArt | null = ['richtig', 'kleinerFehler', 'vertretbar', 'falsch'].includes(String(u.urteil)) ? (u.urteil as KiUrteilArt) : typeof u.richtig === 'boolean' ? (u.richtig ? 'richtig' : 'falsch') : null
+    let urteil: KiUrteilArt | null = ['richtig', 'kleinerFehler', 'vertretbar', 'falsch'].includes(String(u.urteil))
+      ? (u.urteil as KiUrteilArt)
+      : typeof u.richtig === 'boolean'
+        ? u.richtig
+          ? 'richtig'
+          : 'falsch'
+        : null
     if (!urteil) continue
     // Eine Wortlösung, die nicht genau stimmt, gibt die KI nie selbst frei – das entscheidet die Lehrkraft
     if (urteil === 'richtig' && wort.has(u.id)) urteil = 'vertretbar'

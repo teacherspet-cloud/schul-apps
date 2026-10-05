@@ -2,6 +2,8 @@ import { Accordion, Alert, Badge, Card, Container, Group, Radio, Stack, Text, To
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
+import { BlattOnlinetestKnopf } from '../../onlinetest/OnlinetestKnopf'
+import { fassungenAusBlatt } from '../../onlinetest/blattOnline'
 import { IconAlertTriangle, IconCircleCheck, IconInfoCircle } from '@tabler/icons-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
@@ -327,6 +329,20 @@ export default function EditorStep(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="lernzielkontrolle" docId={docId} />
+            {/* Als Onlinetest (05.10.2026): alle Fassungen, dieselbe Durchführung wie beim Vokabeltest */}
+            <BlattOnlinetestKnopf
+              quelle={() => {
+                const alle = kurztestToWorksheetAlle(test, schwellen)
+                return {
+                  art: 'Lernzielkontrolle',
+                  fach: test.meta.subjectLabel,
+                  titel: test.meta.title || test.meta.thema || 'Lernzielkontrolle',
+                  thema: test.meta.thema || '',
+                  varianten: alle.sheets.map((s, i) => s.label || String.fromCharCode(65 + i)),
+                  fassungen: () => fassungenAusBlatt(alle, logo, settings.schoolName)
+                }
+              }}
+            />
             <LmsExport
               titel={test.meta.title || test.meta.thema}
               bericht={() => fragenAusBlatt(kurztestToWorksheet(test, variante))}

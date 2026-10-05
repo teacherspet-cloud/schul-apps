@@ -50,7 +50,10 @@ export interface OnlineEintrag {
 
 export interface OnlineAufgabe {
   id: string
-  art: Block['kind']
+  /** `material`: Text/Bild/Tabelle des Blatts zum Lesen (Grammatiktest, Lernzielkontrolle, 05.10.2026) */
+  art: Block['kind'] | 'material'
+  /** Material: gedrucktes HTML (ohne Lösungen) – gezeigt in einem abgeschotteten Rahmen mit `OnlineFassung.stil` */
+  html?: string
   titel: string
   anweisung: string
   hilfe?: string
@@ -82,6 +85,8 @@ export interface Einheit {
 }
 
 export interface OnlineFassung {
+  /** Stilregeln der Druckfassung für Material-Karten (Grammatiktest, Lernzielkontrolle) */
+  stil?: string
   aufgaben: OnlineAufgabe[]
   einheiten: Einheit[]
   loesungen: Record<string, Loesung>

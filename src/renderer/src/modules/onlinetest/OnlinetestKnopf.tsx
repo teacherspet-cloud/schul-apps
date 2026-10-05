@@ -15,6 +15,7 @@ import { abschnitteAusName } from '../../shared/ueberthema'
 import { maskottchenBild, useMaskottchen } from '../../shared/maskottchenStore'
 import { vokabeltestFigur } from '../vokabeltest/render/maskottchen'
 import { holen, senden } from './serverApi'
+import type { OnlineFassung } from './kern'
 import { PRUEF_HINWEIS, Zugang } from './OnlinetestModule'
 
 /** Thema des Tests (Unit, Themenbereich, Thema) – macht gleichnamige Tests unterscheidbar */
@@ -56,6 +57,51 @@ export function testNameVorschlag(doc: Pick<TestDocument, 'header' | 'settings'>
   return /^(vocabulary test|vokabeltest|test|vocab test)$/i.test(titel) ? `Vokabeltest ${thema}` : `${titel} – ${thema}`
 }
 
+/**
+ * Grammatiktest oder Lernzielkontrolle als Onlinetest (05.10.2026): Die Quelle liefert die Fassungen schon
+ * übersetzt (kernBlatt.ts); der Dialog ist derselbe wie beim Vokabeltest.
+ */
+export interface BlattQuelleOnline {
+  art: 'Grammatiktest' | 'Lernzielkontrolle'
+  fach: string
+  titel: string
+  thema: string
+  /** Bezeichnungen der Fassungen (A, B …) */
+  varianten: string[]
+  fassungen: () => { label: string; fassung: OnlineFassung }[]
+}
+
+/** Name: „10b 05.10.2026 - Lernzielkontrolle Potenzgesetze" */
+const blattTestName = (q: BlattQuelleOnline, gruppe: string): string =>
+  [
+    [gruppe.trim(), new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })].filter(Boolean).join(' '),
+    q.titel || q.art
+  ].join(' - ')
+
+export function BlattOnlinetestKnopf({ quelle }: { quelle: () => BlattQuelleOnline }): React.JSX.Element | null {
+  const [offen, setOffen] = useState<BlattQuelleOnline | null>(null)
+  if (!aufServer()) return null
+  return (
+    <>
+      <Button
+        variant="light"
+        leftSection={<IconDeviceLaptop size={16} />}
+        onClick={() => {
+          try {
+            setOffen(quelle())
+          } catch (e) {
+            notifyError(e, 'Onlinetest nicht möglich')
+          }
+        }}
+        data-onlinetest-knopf
+      >
+        Onlinetest
+      </Button>
+      {offen && <Erstellen blatt={offen} schliessen={() => setOffen(null)} />}
+    </>
+  )
+}
+
 export default function OnlinetestKnopf({ doc, listName }: { doc: TestDocument; listName?: string }): React.JSX.Element | null {
   const [offen, setOffen] = useState(false)
   if (!aufServer()) return null
@@ -69,18 +115,29 @@ export default function OnlinetestKnopf({ doc, listName }: { doc: TestDocument; 
   )
 }
 
-export function Erstellen({ doc, listName = '', schliessen }: { doc: TestDocument; listName?: string; schliessen: () => void }): React.JSX.Element {
+export function Erstellen({
+  doc,
+  blatt,
+  listName = '',
+  schliessen
+}: {
+  doc?: TestDocument
+  blatt?: BlattQuelleOnline
+  listName?: string
+  schliessen: () => void
+}): React.JSX.Element {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const [titel, setTitel] = useState(() => onlinetestName(doc, '', undefined, listName))
+  const nameFuer = (gruppe: string): string => (doc ? onlinetestName(doc, gruppe, undefined, listName) : blattTestName(blatt!, gruppe))
+  const [titel, setTitel] = useState(() => nameFuer(''))
   // Solange der Name nicht von Hand geändert ist, folgt er der gewählten Lerngruppe
   const [titelVonHand, setTitelVonHand] = useState(false)
-  const figurWahl = vokabeltestFigur(doc)
+  const figurWahl = doc ? vokabeltestFigur(doc) : null
   const maskottchenGeladen = useMaskottchen((s) => s.geladen)
   useEffect(() => {
     if (!maskottchenGeladen) void useMaskottchen.getState().lade()
   }, [maskottchenGeladen])
-  const winkend = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'winkend')
-  const jubelnd = maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'jubelnd')
+  const winkend = doc ? maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'winkend') : undefined
+  const jubelnd = doc ? maskottchenBild(figurWahl?.maskottchenId ?? doc.header.illustrationen?.maskottchenId, 'jubelnd') : undefined
   const [mitFigur, setMitFigur] = useState(Boolean(figurWahl))
   const [handschrift, setHandschrift] = useState(true)
   // Etappe 3 (02.10.2026): nur mit Schülerkonto oder auch Gäste mit Namen
@@ -101,8 +158,7 @@ export function Erstellen({ doc, listName = '', schliessen }: { doc: TestDocumen
     try {
       const r = await senden<{ id: string; code: string; link: string }>('/server/onlinetest/erstellen', {
         titel,
-        thema: testThema(doc),
-        test: doc,
+        ...(doc ? { thema: testThema(doc), test: doc } : { thema: blatt!.thema, blatt: { art: blatt!.art, fach: blatt!.fach, fassungen: blatt!.fassungen() } }),
         lerngruppeId: gruppe ?? '',
         ...(mitFigur && winkend ? { figur: { winkend, ...(jubelnd ? { jubelnd } : {}) } } : {}),
         handschrift,
@@ -158,7 +214,7 @@ export function Erstellen({ doc, listName = '', schliessen }: { doc: TestDocumen
             value={gruppe}
             onChange={(g) => {
               setGruppe(g)
-              if (!titelVonHand) setTitel(onlinetestName(doc, gruppen.find((x) => x.id === g)?.name ?? '', undefined, listName))
+              if (!titelVonHand) setTitel(nameFuer(gruppen.find((x) => x.id === g)?.name ?? ''))
             }}
             clearable
             placeholder={gruppen.length ? 'wählen …' : 'noch keine – in der App „Onlinetest“ anlegen'}
@@ -175,13 +231,13 @@ export function Erstellen({ doc, listName = '', schliessen }: { doc: TestDocumen
             </Group>
           </Radio.Group>
           <NumberInput label="Zeitlimit (Minuten)" min={1} max={240} value={zeit} onChange={(v) => setZeit(Number(v) || 20)} />
-          {doc.variants.length > 1 && (
+          {(doc ? doc.variants.length : blatt!.varianten.length) > 1 && (
             <Select
               label="Fassungen verteilen"
               data={[
                 { value: 'abwechselnd', label: 'abwechselnd (A, B, A, B … nach Reihenfolge des Startens)' },
                 { value: 'zufall', label: 'zufällig' },
-                ...doc.variants.map((v, i) => ({ value: String(i), label: `alle Fassung ${v.label}` }))
+                ...(doc ? doc.variants.map((v) => v.label) : blatt!.varianten).map((l, i) => ({ value: String(i), label: `alle Fassung ${l}` }))
               ]}
               value={zuteilung}
               onChange={(v) => v && setZuteilung(v)}

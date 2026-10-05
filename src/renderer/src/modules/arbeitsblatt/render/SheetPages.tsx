@@ -395,7 +395,8 @@ export function SheetPages({
                     {wrapBlock(block, placed, content)}
                   </div>
                 ) : (
-                  <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow">
+                  // Auch im Druck mit Kennung: der Onlinetest schneidet daraus das Material aus (onlinetest/kernBlatt.ts, 05.10.2026)
+                  <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow" data-fluss={placed.id}>
                     {content}
                   </div>
                 )

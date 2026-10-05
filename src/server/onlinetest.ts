@@ -270,11 +270,52 @@ function pngAus(dataUrl: unknown): Buffer | null {
   return b.length > 0 && b.length <= 3 * 1024 * 1024 ? b : null
 }
 
+/**
+ * Onlinefassung aus Grammatiktest/Lernzielkontrolle (05.10.2026): von der Oberfläche der Lehrkraft gebaut
+ * (renderer/modules/onlinetest/kernBlatt.ts). Form und Längen prüfen; Material-HTML ohne Skripte und
+ * Ereignis-Attribute (es steht später abgeschottet im Rahmen ohne Skripte – doppelt hält besser).
+ */
+export function bereinigeFassung(roh: unknown): OnlineFassung {
+  const f = (roh ?? {}) as Partial<OnlineFassung>
+  const html = (x: unknown): string =>
+    String(x ?? '')
+      .slice(0, 400_000)
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/javascript:/gi, '')
+  const aufgaben = (Array.isArray(f.aufgaben) ? f.aufgaben : []).slice(0, 80).map((a) => ({ ...a, ...(a.html ? { html: html(a.html) } : {}) }))
+  const einheiten = (Array.isArray(f.einheiten) ? f.einheiten : [])
+    .slice(0, 800)
+    .map((e) => ({
+      id: String(e.id),
+      aufgabe: String(e.aufgabe),
+      felder: (e.felder ?? []).map(String).slice(0, 60),
+      punkte: Math.max(1, Math.min(100, Math.round(Number(e.punkte) || 1)))
+    }))
+  const loesungen = Object.fromEntries(Object.entries(f.loesungen ?? {}).slice(0, 4000)) as OnlineFassung['loesungen']
+  if (JSON.stringify(aufgaben).length > 6_000_000) throw new Error('Der Test ist zu groß für einen Onlinetest.')
+  return {
+    aufgaben,
+    einheiten,
+    loesungen,
+    punkte: einheiten.reduce((s, e) => s + e.punkte, 0),
+    ...(f.stil
+      ? {
+          stil: String(f.stil)
+            .slice(0, 600_000)
+            .replace(/<\/?style[^>]*>/gi, '')
+        }
+      : {})
+  }
+}
+
 export function testErstellen(
   lehrkraft: NutzerInfo,
   e: {
     titel: string
-    test: TestDocument
+    /** Vokabeltest – ODER `blatt`: Grammatiktest/Lernzielkontrolle als fertige Onlinefassungen (05.10.2026) */
+    test?: TestDocument
+    blatt?: { art: string; fach: string; fassungen: { label: string; fassung: OnlineFassung }[] }
     lerngruppeId?: string
     zeitMin?: number
     zuteilung?: Einstellungen['zuteilung']
@@ -285,12 +326,12 @@ export function testErstellen(
     gaeste?: boolean
   }
 ): Test {
-  if (!e.test?.variants?.length) throw new Error('Der Test hat keine Variante.')
+  if (!e.test?.variants?.length && !e.blatt?.fassungen?.length) throw new Error('Der Test hat keine Variante.')
   if (e.lerngruppeId) {
     const g = lerngruppe(e.lerngruppeId)
     if (!g || g.lehrkraft_id !== lehrkraft.id) throw new Error('Unbekannte Lerngruppe.')
   }
-  const fach = fachZuSprache(e.test.settings.targetLanguage)
+  const fach = e.test ? fachZuSprache(e.test.settings.targetLanguage) : String(e.blatt!.fach || 'Allgemein').slice(0, 60)
   // Notenschlüssel der Lehrkraft (Einstellungen › Material) – in ihrem Kontext gelesen
   const schwellen = imNutzer(alsNutzer(lehrkraft), () => thresholdsForSubject(getSettings().gradeScale, fach))
   const figuren = Object.entries(e.figur ?? {})
@@ -300,18 +341,22 @@ export function testErstellen(
     zeitMin: Math.max(1, Math.min(240, Math.round(e.zeitMin ?? 20))),
     zuteilung: e.zuteilung ?? 'zufall',
     fach,
-    zielsprache: e.test.settings.targetLanguage,
-    niveau: e.test.settings.level,
+    zielsprache: e.test?.settings.targetLanguage ?? '',
+    niveau: e.test?.settings.level ?? '',
     schwellen,
-    art: 'Vokabeltest',
+    art: e.test ? 'Vokabeltest' : ['Grammatiktest', 'Lernzielkontrolle'].includes(e.blatt!.art) ? e.blatt!.art : 'Test',
     ...(e.thema ? { thema: e.thema.slice(0, 120) } : {}),
     ...(e.hinweis ? { hinweis: e.hinweis.slice(0, 500) } : {}),
     ...(figuren.length ? { figur: true } : {}),
     handschrift: e.handschrift !== false,
     gaeste: e.gaeste !== false,
-    blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize }
+    ...(e.test ? { blatt: { header: { ...e.test.header, illustrationen: { an: false } }, settings: e.test.settings, fontSize: e.test.fontSize } } : {})
   }
-  const fassungen = e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v), original: v }))
+  const fassungen = e.test
+    ? e.test.variants.map((v) => ({ label: v.label, fassung: onlineFassung(v), original: v }))
+    : e
+        .blatt!.fassungen.slice(0, 4)
+        .map((f, i) => ({ label: String(f.label || String.fromCharCode(65 + i)).slice(0, 20), fassung: bereinigeFassung(f.fassung) }))
   const id = neueId()
   const code = neuerCode()
   db()
@@ -322,7 +367,7 @@ export function testErstellen(
       id,
       lehrkraft.id,
       e.lerngruppeId ?? null,
-      e.titel.trim().slice(0, 160) || e.test.header.title || 'Onlinetest',
+      e.titel.trim().slice(0, 160) || e.test?.header.title || 'Onlinetest',
       code,
       JSON.stringify(fassungen),
       JSON.stringify(einstellungen),
@@ -540,7 +585,14 @@ async function kiAuswerten(test: Test, lehrkraft: NutzerInfo, aufruf: Aufruf): P
       for (let i = 0; i < faelle.length; i += 40) {
         const paket = faelle.slice(i, i + 40)
         const antwort = await imNutzer(alsNutzer(lehrkraft), () =>
-          aufruf('ai:structured', [kiAnfrage(test.einstellungen.zielsprache, test.einstellungen.niveau, paket)])
+          aufruf('ai:structured', [
+            kiAnfrage(
+              test.einstellungen.zielsprache,
+              test.einstellungen.niveau,
+              paket,
+              test.einstellungen.art === 'Vokabeltest' || !test.einstellungen.art ? undefined : { art: test.einstellungen.art, fach: test.einstellungen.fach }
+            )
+          ])
         )
         anfragen++
         bewertet += einarbeiten(fassung, paket, urteileAus(antwort, paket))
@@ -897,6 +949,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
           handschrift: Boolean(test.einstellungen.handschrift),
           // NUR die Schülerfassung – die Lösungen bleiben hier (bis zum Ergebnis)
           aufgaben: t.abgabe || wartet ? [] : fassung.aufgaben,
+          ...(fassung.stil && !(t.abgabe || wartet) ? { stil: fassung.stil } : {}),
           antworten: t.abgabe || wartet ? {} : json_(t.antworten, {})
         }),
         true
@@ -1090,7 +1143,9 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       try {
         const t = testErstellen(ich, {
           titel: String(k0.titel ?? ''),
-          test: k0.test as TestDocument,
+          ...(k0.blatt && typeof k0.blatt === 'object'
+            ? { blatt: k0.blatt as { art: string; fach: string; fassungen: { label: string; fassung: OnlineFassung }[] } }
+            : { test: k0.test as TestDocument }),
           lerngruppeId: typeof k0.lerngruppeId === 'string' && k0.lerngruppeId ? k0.lerngruppeId : undefined,
           zeitMin: Number(k0.zeitMin) || 20,
           zuteilung: k0.zuteilung === 'zufall' ? 'zufall' : typeof k0.zuteilung === 'number' ? k0.zuteilung : 'abwechselnd',

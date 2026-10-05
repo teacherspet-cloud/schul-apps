@@ -107,6 +107,8 @@ interface Beitritt {
   /** Handschrift erlaubt (Schreibfläche mit Erkennung) */
   handschrift?: boolean
   aufgaben: OnlineAufgabe[]
+  /** Stilregeln für Material-Karten (Grammatiktest, Lernzielkontrolle) */
+  stil?: string
   antworten: Antworten
 }
 
@@ -1464,9 +1466,19 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
         )}
       </Paper>
       <Handschrift.Provider value={hand}>
-        {t.aufgaben.map((a, i) => (
-          <AufgabeKarte key={a.id} nr={i + 1} aufgabe={a} antworten={antworten} setze={setze} />
-        ))}
+        {t.aufgaben.map((a, i) =>
+          a.art === 'material' ? (
+            <MaterialKarte key={a.id} html={a.html ?? ''} stil={t.stil ?? ''} />
+          ) : (
+            <AufgabeKarte
+              key={a.id}
+              nr={t.aufgaben.slice(0, i + 1).filter((x) => x.art !== 'material').length}
+              aufgabe={a}
+              antworten={antworten}
+              setze={setze}
+            />
+          )
+        )}
       </Handschrift.Provider>
       <Button size="lg" color="green" onClick={() => window.confirm('Test jetzt endgültig abgeben?') && void abgeben('selbst')}>
         Abgeben
@@ -1773,6 +1785,34 @@ function FliessText({ aufgabe, antworten, setze }: { aufgabe: OnlineAufgabe; ant
   )
 }
 
+/**
+ * Material eines Grammatiktests/einer Lernzielkontrolle (05.10.2026): wie auf dem Papierblatt gezeichnet, in
+ * einem abgeschotteten Rahmen ohne Skripte; die Höhe richtet sich nach dem Inhalt.
+ */
+function MaterialKarte({ html, stil }: { html: string; stil: string }): React.JSX.Element {
+  const rahmen = useRef<HTMLIFrameElement>(null)
+  const [hoehe, setHoehe] = useState(200)
+  const messen = (): void => {
+    const d = rahmen.current?.contentDocument
+    if (d) setHoehe(Math.min(4000, d.documentElement.scrollHeight + 4))
+  }
+  return (
+    <Card withBorder padding={4} radius="md" data-material-karte>
+      <iframe
+        ref={rahmen}
+        title="Material"
+        sandbox="allow-same-origin"
+        srcDoc={`<!doctype html><html lang="de"><head><meta charset="utf-8"><style>${stil}\nhtml,body{margin:0;background:#fff}.ws-online-material{box-shadow:none!important;margin:0!important}</style></head><body>${html}</body></html>`}
+        onLoad={() => {
+          messen()
+          setTimeout(messen, 300)
+        }}
+        style={{ width: '100%', height: hoehe, border: 0, display: 'block' }}
+      />
+    </Card>
+  )
+}
+
 function AufgabeKarte({
   nr,
   aufgabe,
@@ -1788,9 +1828,7 @@ function AufgabeKarte({
   return (
     <Card withBorder padding="md" radius="md">
       <Group justify="space-between" mb={4}>
-        <Text fw={700}>
-          {nr}. {aufgabe.titel}
-        </Text>
+        <Text fw={700}>{/^Aufgabe \d+$/.test(aufgabe.titel) ? aufgabe.titel : `${nr}. ${aufgabe.titel}`}</Text>
         <Badge variant="light">{aufgabe.punkte} P.</Badge>
       </Group>
       <Text mb="xs">{aufgabe.anweisung}</Text>

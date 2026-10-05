@@ -2,6 +2,8 @@ import { Button, Container, Stack, Box, ScrollArea } from '@mantine/core'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
+import { BlattOnlinetestKnopf } from '../../onlinetest/OnlinetestKnopf'
+import { fassungenAusBlatt } from '../../onlinetest/blattOnline'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FitToWidth from '../../../shared/render/FitToWidth'
 import { useAppSettings } from '../../../shared/settingsStore'
@@ -257,6 +259,17 @@ export default function TestEditorStep(): React.JSX.Element {
         extras={
           <>
             <RueckmeldungKnopf art="grammatiktest" docId={docId} />
+            {/* Als Onlinetest (05.10.2026): dieselbe Durchführung wie beim Vokabeltest */}
+            <BlattOnlinetestKnopf
+              quelle={() => ({
+                art: 'Grammatiktest',
+                fach: test.meta.subjectLabel,
+                titel: test.meta.title || 'Grammatiktest',
+                thema: test.meta.title || '',
+                varianten: testToWorksheet(test).sheets.map((s, i) => s.label || String.fromCharCode(65 + i)),
+                fassungen: () => fassungenAusBlatt(testToWorksheet(test), logo, settings.schoolName)
+              })}
+            />
             <LmsExport titel={test.meta.title || 'Grammatiktest'} bericht={() => fragenAusBlatt(testToWorksheet(test))} ziel={quelle.ziel} />
           </>
         }
