@@ -270,6 +270,12 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
   ]
     .filter(Boolean)
     .join(" · ");
+  /*
+   * Nur das Datum: Es steht rechts in der Zeile UNTER dem Titel (Fach · Klasse), nicht als eigene Spalte
+   * neben ihm (05.10.2026, Befund der Lehrkraft) – sonst hielt die Spalte auch ohne Sternchen/AB-Nummer
+   * darüber ihre Breite frei, und der Titel brach mitten im freien Platz um.
+   */
+  const datumUnten = dateInTitleRow(info) && h.layout !== "centered";
   const meta = (
     <div className="ws-head-text">
       {h.showSchoolName && info.schoolName && (
@@ -286,12 +292,17 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
           />
         </div>
       )}
-      {(subjectLine || h.customText) && (
-        <div
-          className="ws-subject"
-          data-ueberthema={u.stil === "path" && u.ueber ? u.ueber : undefined}
-        >
-          {[subjectLine, h.customText].filter(Boolean).join(" · ")}
+      {(subjectLine || h.customText || datumUnten) && (
+        <div className="ws-subject-zeile">
+          {(subjectLine || h.customText) && (
+            <div
+              className="ws-subject"
+              data-ueberthema={u.stil === "path" && u.ueber ? u.ueber : undefined}
+            >
+              {[subjectLine, h.customText].filter(Boolean).join(" · ")}
+            </div>
+          )}
+          {datumUnten && <DateField info={info} />}
         </div>
       )}
     </div>
@@ -321,7 +332,6 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
           {meta}
           {block}
           {badge}
-          {dateInTitleRow(info) && <DateField info={info} />}
         </div>
         <Fields info={info} />
       </header>
@@ -350,7 +360,6 @@ function FullHeader({ info }: { info: PageInfo }): React.JSX.Element {
         {meta}
         {block}
         {badge}
-        {dateInTitleRow(info) && <DateField info={info} />}
       </div>
       <Fields info={info} />
     </header>

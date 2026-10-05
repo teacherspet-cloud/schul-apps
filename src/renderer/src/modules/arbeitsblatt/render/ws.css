@@ -3236,3 +3236,15 @@ html[data-griff-zug] * {
   color: #555;
   margin: 0.2mm 0 0.8mm 0;
 }
+
+/* Zeile unter dem Titel: Fach · Klasse links, das Datum rechts (05.10.2026) – der Titel nutzt die ganze Breite */
+.ws-subject-zeile {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4mm;
+}
+.ws-subject-zeile .ws-field-date {
+  flex: 0 0 42mm;
+  margin-left: auto;
+}
