@@ -104,7 +104,9 @@ export function materialText(sources: SourceMaterial[]): string {
   const used = sources.filter((s) => s.useAsBasis)
   if (!used.length) return ''
   return [
-    'MATERIAL DER LEHRKRAFT (als Grundlage nutzen; längere Passagen nicht wörtlich übernehmen, sondern altersgerecht bearbeiten und die Quelle angeben):',
+    used.some((s) => s.schulbuch)
+      ? 'MATERIAL DER LEHRKRAFT (als Grundlage nutzen; längere Passagen nicht wörtlich übernehmen, sondern altersgerecht bearbeiten und die Quelle angeben – AUSSER Schulbuch-Abschnitten, die ausdrücklich zum wörtlichen Übernehmen markiert sind; auf Abschnitte zum Verweisen nur verweisen):'
+      : 'MATERIAL DER LEHRKRAFT (als Grundlage nutzen; längere Passagen nicht wörtlich übernehmen, sondern altersgerecht bearbeiten und die Quelle angeben):',
     ...used.map((s, i) =>
       s.text
         ? `--- Material ${i + 1}: ${s.fileName}${s.format === 'html' ? ' (als HTML)' : ''}${

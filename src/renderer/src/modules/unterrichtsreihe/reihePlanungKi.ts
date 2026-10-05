@@ -170,7 +170,9 @@ export async function planeReihe(
   kc: { auszug: string[]; quelle: string },
   materialien: MaterialKandidat[],
   ki: Ki,
-  wunsch = ''
+  wunsch = '',
+  /** Schulbuchseiten als Grundlage (Phase 6b): Text aus `schulbuchText` – verweisen/übernehmen */
+  schulbuch = ''
 ): Promise<ReihenPlan> {
   const stunden = r.stunden ?? []
   const d = await ki<PlanRoh>({
@@ -191,6 +193,9 @@ export async function planeReihe(
             .join('\n\n')}`
         : 'Keine vorhandenen Materialien.',
       wunsch.trim() ? `WÜNSCHE DER LEHRKRAFT: ${wunsch.trim()}` : '',
+      schulbuch.trim()
+        ? `${schulbuch.trim()}\nIn der Planung: Schritte zu diesen Buchabschnitten verweisen in ihrer "beschreibung" ausdrücklich auf sie (z. B. „Lies VT1 auf S. 39 …"); übernommene Texte werden dort Material.`
+        : '',
       'SCHRITTARTEN:',
       ...KI_ARTEN.map((a) => `- ${a}: ${ARTEN_TEXT[a]}`),
       'REGELN:',

@@ -39,7 +39,7 @@ const pruefe = (ok, text) => {
 /** Alle sichtbaren, beschrifteten Knöpfe der obersten Leiste. */
 const knoepfe = async () =>
   page.evaluate(() =>
-    [...document.querySelectorAll('.app-toolbar button')]
+    [...document.querySelectorAll('.app-kopf button, .app-toolbar button')]
       .filter((b) => b.getBoundingClientRect().width > 0)
       .map((b) => b.textContent?.trim() ?? '')
       .filter(Boolean)
@@ -65,7 +65,7 @@ for (const { modul, aufbau, knopf } of faelle) {
 
   // Und er muss auch wirklich zur Übersicht führen
   await page.evaluate((k) => {
-    const b = [...document.querySelectorAll('.app-toolbar button')].find((x) => x.textContent?.trim() === k)
+    const b = [...document.querySelectorAll('.app-kopf button, .app-toolbar button')].find((x) => x.textContent?.trim() === k)
     b?.click()
   }, knopf)
   await page.waitForTimeout(1500)

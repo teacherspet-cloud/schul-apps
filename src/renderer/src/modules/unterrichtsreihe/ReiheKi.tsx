@@ -2,6 +2,9 @@
  * Oberfläche der KI-Planung (05.10.2026, reihePlanungKi.ts): Stundenraster, Planungsfenster mit
  * Vorschau und Übernahme, Knopf „Mit KI erstellen" an Platzhaltern.
  */
+import { MATERIAL_ACCEPT } from '../../shared/files/extractContent'
+import DropZone from '../../shared/components/DropZone'
+import { schulbuchAusDateien } from '../../shared/schulbuch/SchulbuchDialog'
 import {
   ActionIcon,
   Alert,
@@ -19,7 +22,7 @@ import {
   Textarea,
   Tooltip
 } from '@mantine/core'
-import { IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
+import { IconBook, IconPlus, IconPrinter, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import { SCHRITT_ARTEN, STUNDEN_MINUTEN, type Reihe, type Schritt, type StundenArt } from '@shared/reihe'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -84,6 +87,9 @@ export function PlanenFenster({
   const [wunsch, setWunsch] = useState('')
   const [laeuft, setLaeuft] = useState(false)
   const [plan, setPlan] = useState<ReihenPlan | null>(null)
+  // Schulbuchseiten als Grundlage (Phase 6b)
+  const [buch, setBuch] = useState<{ text: string; titel: string; abschnitte: number }[]>([])
+  const [liest, setLiest] = useState<string | null>(null)
   const [modus, setModus] = useState<'ersetzen' | 'anhaengen'>(reihe.schritte.length ? 'anhaengen' : 'ersetzen')
   useEffect(() => {
     void materialKandidaten(reihe).then(setMaterial, () => setMaterial([]))
@@ -114,6 +120,42 @@ export function PlanenFenster({
                 'Keine eigenen Arbeitsblätter dieses Fachs und Jahrgangs – alles wird geplant.'
               )}
             </Text>
+            <DropZone
+              onFiles={async (f) => {
+                try {
+                  const r = await schulbuchAusDateien(f, setLiest)
+                  if (r)
+                    setBuch((b) => [
+                      ...b,
+                      {
+                        text: r.text,
+                        titel: [r.schulbuch.titel || 'Schulbuch', r.schulbuch.seiten && `S. ${r.schulbuch.seiten}`].filter(Boolean).join(', '),
+                        abschnitte: r.schulbuch.abschnitte.filter((a) => a.wahl !== 'weg').length
+                      }
+                    ])
+                } catch (e) {
+                  notifyError(e, 'Schulbuchseiten nicht übernommen')
+                } finally {
+                  setLiest(null)
+                }
+              }}
+              accept={MATERIAL_ACCEPT}
+              title={liest ?? 'Schulbuchseiten als Grundlage hierher ziehen (optional)'}
+              hint="Fotos oder PDF – die KI erkennt VT1, M1 … und plant Schritte, die darauf verweisen"
+              loading={Boolean(liest)}
+              minHeight={60}
+            />
+            {buch.map((b, i) => (
+              <Group key={i} gap="xs">
+                <Badge variant="light" leftSection={<IconBook size={12} />}>
+                  {b.titel}
+                </Badge>
+                <Text size="xs" c="dimmed">
+                  {b.abschnitte} Abschnitte
+                </Text>
+                <CloseButton size="xs" aria-label="entfernen" onClick={() => setBuch((x) => x.filter((_, k) => k !== i))} />
+              </Group>
+            ))}
             <Textarea
               label="Besondere Wünsche (optional)"
               placeholder="z. B. Stationenlernen im zweiten Teil, Schwerpunkt Quellenarbeit, Abschluss mit Plakat …"
@@ -130,7 +172,7 @@ export function PlanenFenster({
                 onClick={async () => {
                   setLaeuft(true)
                   try {
-                    setPlan(await planeReihe(reihe, kc, material ?? [], ki, wunsch))
+                    setPlan(await planeReihe(reihe, kc, material ?? [], ki, wunsch, buch.map((b) => b.text).join('\n\n')))
                   } catch (e) {
                     notifyError(e, 'Keine Planung')
                   } finally {

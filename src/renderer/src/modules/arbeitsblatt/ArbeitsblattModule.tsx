@@ -1,5 +1,5 @@
-import { Box, Button, Group, SegmentedControl, Stepper } from '@mantine/core'
-import { IconFolder, IconPlus } from '@tabler/icons-react'
+import { AppKopf } from '../../shared/components/AppKopf'
+import { Box, Group, SegmentedControl, Stepper } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import { notifyError } from '../../shared/util'
 import DesignManager from './design/DesignManager'
@@ -27,7 +27,6 @@ import { MaterialVorschau, ZwischenstandsBlatt } from './render/BlattVorschau'
 import type { OriginalMaterialAblage, Worksheet } from './model/types'
 import QuellenAuswahl from './steps/QuellenAuswahl'
 import { QUELLENAUSWAHL, type QuellenFrage } from './auftraege'
-import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 export default function ArbeitsblattModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, worksheet, loadWorksheet, undo, redo, docId, docName } = useArbeitsblatt()
@@ -105,39 +104,50 @@ export default function ArbeitsblattModule({ active }: { active: boolean }): Rea
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Group px="lg" py="sm" className="app-toolbar" wrap="nowrap">
-        <SegmentedControl
-          value={area}
-          onChange={(v) => setArea(v as 'create' | 'designs')}
-          data={[
-            { value: 'create', label: 'Arbeitsblatt' },
-            { value: 'designs', label: 'Designvorlagen' }
-          ]}
-        />
-        {area === 'create' && !showLibrary && (
-          <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
-            <Stepper.Step label="Thema & Lerngruppe" description="Jahrgang, Schulform, Material" />
-            <Stepper.Step label="Gliederung" description="Lernziele und Bausteine" allowStepSelect={Boolean(worksheet?.outline)} />
-            <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(worksheet?.sheets.length)} />
-          </Stepper>
-        )}
-        {/*
-          Zurueck zur Uebersicht – beschriftet und immer an derselben Stelle.
-          Vorher gab es nur ein kleines Ordnersymbol in der Editorleiste; wer es nicht kannte,
-          kam aus einem geoeffneten Blatt nicht mehr heraus.
-        */}
-        {area !== 'designs' && !showLibrary && (
-          <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
-            Meine Arbeitsblätter
-          </Button>
-        )}
-        {area !== 'designs' && !showLibrary && (
-          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
-            Neues Arbeitsblatt
-          </Button>
-        )}
-        <EigenesFensterKnopf />
-      </Group>
+      {/*
+        Gemeinsamer Kopf (Phase 6a). Reiter „Arbeitsblatt / Designvorlagen" und die Schritte darunter links;
+        „Meine Arbeitsblätter" (zurück zur Übersicht, immer an derselben Stelle) und „Neues Arbeitsblatt" rechts.
+        In der Bibliothek trägt deren Kopf Titel und Knöpfe – hier dann nur die Reiter.
+      */}
+      {(() => {
+        const reiter = (
+          <SegmentedControl
+            value={area}
+            onChange={(v) => setArea(v as 'create' | 'designs')}
+            data={[
+              { value: 'create', label: 'Arbeitsblatt' },
+              { value: 'designs', label: 'Designvorlagen' }
+            ]}
+          />
+        )
+        if (area === 'create' && showLibrary)
+          return (
+            <Box px="lg" pt="sm">
+              {reiter}
+            </Box>
+          )
+        return (
+          <Box px="lg" pt="sm" pb={area === 'create' && step === 2 ? 'xs' : 0}>
+            <AppKopf
+              kompakt={area === 'create' && step === 2}
+              meine={area === 'create' ? { label: 'Meine Arbeitsblätter', onClick: () => setLibrary(true), kennung: 'arbeitsblatt' } : undefined}
+              neu={area === 'create' ? { label: 'Neues Arbeitsblatt', onClick: startNew, kennung: 'arbeitsblatt' } : undefined}
+              links={
+                <Group gap="lg" wrap="nowrap" align="center">
+                  {reiter}
+                  {area === 'create' && (
+                    <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
+                      <Stepper.Step label="Thema & Lerngruppe" description="Jahrgang, Schulform, Material" />
+                      <Stepper.Step label="Gliederung" description="Lernziele und Bausteine" allowStepSelect={Boolean(worksheet?.outline)} />
+                      <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(worksheet?.sheets.length)} />
+                    </Stepper>
+                  )}
+                </Group>
+              }
+            />
+          </Box>
+        )
+      })()}
       <Box style={{ flex: 1, minHeight: 0 }}>
         {area === 'designs' ? (
           <DesignManager />

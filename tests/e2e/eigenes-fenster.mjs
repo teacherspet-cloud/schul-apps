@@ -28,10 +28,19 @@ try {
   }
   await haupt.waitForTimeout(1500)
   const spaeter = haupt.getByRole('button', { name: /Später/ })
-  if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
-  const knopf = haupt.locator('[data-eigenes-fenster="vokabeltest"]:visible').first()
+  // Der Assistent erscheint erst nach dem Laden der Einstellungen – darauf warten
+  if (
+    await spaeter.waitFor({ timeout: 6000 }).then(
+      () => true,
+      () => false
+    )
+  )
+    await spaeter.click()
+  // Die Startseite hat seit dem 03.10.2026 keine Programmkacheln mehr – der Weg führt über die Leiste (Rechtsklick)
+  await haupt.locator('.app-leiste [aria-label="Vokabeltest"]').click({ button: 'right' })
+  const knopf = haupt.locator('[data-leiste-eigenes-fenster]').first()
   await knopf.waitFor({ timeout: 15000 })
-  pruefe(true, 'Kachel hat das Symbol „In eigenem Fenster öffnen"')
+  pruefe(true, 'Leiste: „In eigenem Fenster öffnen" für den Vokabeltest')
   const [neu] = await Promise.all([app.waitForEvent('window', { timeout: 15000 }), knopf.click()])
   await neu.waitForLoadState('domcontentloaded')
   await neu.waitForFunction(() => document.title.includes('Vokabeltest'), null, { timeout: 15000 })
@@ -43,11 +52,29 @@ try {
   await neu.screenshot({ path: join(out, '1-einzelfenster.png') })
   // Rechtsklick in der Leiste
   await haupt.locator('.app-leiste [aria-label="Arbeitsblatt"]').click({ button: 'right' })
-  pruefe(await haupt.locator('[data-leiste-eigenes-fenster]').waitFor({ timeout: 5000 }).then(() => true, () => false), 'Rechtsklick in der Leiste: „In eigenem Fenster öffnen"')
+  pruefe(
+    await haupt
+      .locator('[data-leiste-eigenes-fenster]')
+      .waitFor({ timeout: 5000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'Rechtsklick in der Leiste: „In eigenem Fenster öffnen"'
+  )
   await haupt.keyboard.press('Escape')
   // Symbol im Kopf des Programms
   await haupt.locator('.app-leiste [aria-label="Arbeitsblatt"]').click()
-  pruefe(await haupt.locator('.app-toolbar [data-eigenes-fenster="arbeitsblatt"]').waitFor({ timeout: 10000 }).then(() => true, () => false), 'Symbol im Kopf des Programms')
+  pruefe(
+    await haupt
+      .locator('.app-kopf [data-eigenes-fenster="arbeitsblatt"]')
+      .waitFor({ timeout: 10000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'Symbol im Kopf des Programms'
+  )
   await haupt.screenshot({ path: join(out, '2-hauptfenster.png') })
   // Zweites Fenster schließen: Sichern-Rückmeldung je Fenster, Hauptfenster bleibt
   const t0 = Date.now()

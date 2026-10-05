@@ -2,12 +2,16 @@
  * Einen Schritt der Unterrichtsreihe bearbeiten: Inhalt je Art, Rolle (Pflicht/Wahl/Förder/Forder),
  * Erfolg, Haltepunkt, Abschnitt und Lernziele des Schritts.
  */
+import { IconBook } from '@tabler/icons-react'
+import { quelleVon } from '../../shared/schulbuch/schulbuch'
+import { schulbuchAusDateien } from '../../shared/schulbuch/SchulbuchDialog'
 import { mitBildern, VokabelQuelle } from '../lernen/VokabelQuelle'
 import {
   Alert,
   Button,
   Checkbox,
   Divider,
+  FileButton,
   Group,
   Modal,
   MultiSelect,
@@ -398,6 +402,39 @@ function Inhalt({
             value={i.material}
             onChange={(e) => setzeInhalt({ material: e.currentTarget.value })}
           />
+          {/* Schulbuchseite einbinden (Phase 6b): verweisen → Leseauftrag vor dem Auftrag, übernehmen → Material mit Quelle */}
+          <FileButton
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/heic,application/pdf"
+            onChange={(dateien) =>
+              void beschaeftigt(schulbuchAusDateien(dateien))
+                .then((r) => {
+                  if (!r) return
+                  const sb = r.schulbuch
+                  const verweise = sb.abschnitte.filter((a) => a.wahl === 'verweis')
+                  const texte = sb.abschnitte.filter((a) => a.wahl === 'text')
+                  const lesen = verweise.length
+                    ? `Lies ${verweise
+                        .map((a) => `${a.kennung}${a.seite ? ` (S. ${a.seite})` : ''}`)
+                        .join(', ')
+                        .replace(/, ([^,]*)$/, ' und $1')} in deinem Schulbuch${sb.titel ? ` „${sb.titel}“` : ''}.`
+                    : ''
+                  setzeInhalt({
+                    anweisung: [lesen, i.anweisung].filter((x) => x.trim()).join(' '),
+                    material: [i.material, ...texte.map((a) => `${a.kennung}${a.titel ? `: ${a.titel}` : ''}\n${a.text}\n(Quelle: ${quelleVon(sb, a)})`)]
+                      .filter((x) => x.trim())
+                      .join('\n\n')
+                  })
+                })
+                .catch((e: unknown) => notifyError(e, 'Schulbuchseite nicht eingebunden'))
+            }
+          >
+            {(props) => (
+              <Button {...props} variant="light" size="xs" leftSection={<IconBook size={14} />} w="fit-content" data-aufgabe-schulbuch>
+                Schulbuchseite einbinden
+              </Button>
+            )}
+          </FileButton>
           <TextInput label="Link (Video, Hörtext, Webseite)" value={i.link} onChange={(e) => setzeInhalt({ link: e.currentTarget.value })} />
           <Textarea
             label="Kontrollfragen (eine je Zeile)"

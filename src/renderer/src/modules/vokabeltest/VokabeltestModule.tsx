@@ -1,5 +1,5 @@
-import { Box, Button, Group, Stepper } from '@mantine/core'
-import { IconFolder, IconPlus } from '@tabler/icons-react'
+import { AppKopf } from '../../shared/components/AppKopf'
+import { Box, Stepper } from '@mantine/core'
 import { cleanTestImages } from './library'
 import { useEffect, useState } from 'react'
 import { notifyError } from '../../shared/util'
@@ -17,7 +17,6 @@ import { useDokumentOeffner, useNeuAnleger } from '../../shared/navigation'
 import { useSperrenderAuftrag } from '../../shared/auftraege'
 import AuftragsHinweis from '../../shared/components/AuftragsHinweis'
 import { TestVorschau } from './render/TestVorschau'
-import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 export default function VokabeltestModule({ active }: { active: boolean }): React.JSX.Element {
   const { step, setStep, doc, vocab, settings, loadDocument, newTest, undo, redo, undoVocab, redoVocab, testId, listName, lastSavedAt } = useVokabeltest()
@@ -80,37 +79,30 @@ export default function VokabeltestModule({ active }: { active: boolean }): Reac
 
   return (
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Group px="lg" py="sm" className="app-toolbar" display={libraryOpen ? 'none' : undefined}>
-        <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
-          <Stepper.Step
-            label="Vokabelliste"
-            description={
-              vocab.some((v) => v.term.trim())
-                ? `${includedVocab(vocab).length} von ${vocab.filter((v) => v.term.trim()).length} werden abgefragt`
-                : 'eingeben oder importieren'
-            }
-          />
-          <Stepper.Step label="Test einstellen" description="Niveau, Aufgaben, Varianten" allowStepSelect={includedVocab(vocab).length > 1} />
-          <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(doc && settings)} />
-        </Stepper>
-        {/*
-          Zurueck zur Uebersicht. Diesen Weg gab es im Vokabeltest bisher GAR NICHT: Die
-          Bibliothek liess sich nur in Schritt 1 oeffnen – aus einem fertigen Test kam man
-          nicht mehr an die gespeicherten heran.
-        */}
-        <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibraryOpen(true)}>
-          Meine Vokabeltests
-        </Button>
-        {/*
-          Nach dem letzten Schritt: ohne Umweg über die Bibliothek von vorn beginnen. Der
-          bisherige Test wird vorher gesichert – vorher ging hier ungespeicherte Arbeit verloren,
-          anders als beim gleichnamigen Knopf in der Bibliothek.
-        */}
-        <Button variant="light" leftSection={<IconPlus size={16} />} onClick={() => newTestSafely().catch(notifyError)}>
-          Neuer Vokabeltest
-        </Button>
-        <EigenesFensterKnopf />
-      </Group>
+      {/* Gemeinsamer Kopf (Phase 6a); in der Bibliothek trägt deren Kopf Titel und Knöpfe */}
+      <Box px="lg" pt="sm" pb={step === 2 ? 'xs' : 0} display={libraryOpen ? 'none' : undefined}>
+        <AppKopf
+          kompakt={step === 2}
+          // Zurück zur Übersicht – vorher ließ sich die Bibliothek nur in Schritt 1 öffnen
+          meine={{ label: 'Meine Vokabeltests', onClick: () => setLibraryOpen(true), kennung: 'vokabeltest' }}
+          // Von vorn beginnen; der bisherige Test wird vorher gesichert
+          neu={{ label: 'Neuer Vokabeltest', onClick: () => void newTestSafely().catch(notifyError), kennung: 'vokabeltest' }}
+          links={
+            <Stepper active={step} onStepClick={setStep} size="sm" allowNextStepsSelect={false}>
+              <Stepper.Step
+                label="Vokabelliste"
+                description={
+                  vocab.some((v) => v.term.trim())
+                    ? `${includedVocab(vocab).length} von ${vocab.filter((v) => v.term.trim()).length} werden abgefragt`
+                    : 'eingeben oder importieren'
+                }
+              />
+              <Stepper.Step label="Test einstellen" description="Niveau, Aufgaben, Varianten" allowStepSelect={includedVocab(vocab).length > 1} />
+              <Stepper.Step label="Bearbeiten & Export" description="Word, PDF, Drucken" allowStepSelect={Boolean(doc && settings)} />
+            </Stepper>
+          }
+        />
+      </Box>
       <Box style={{ flex: 1, minHeight: 0 }}>
         {libraryOpen ? (
           <TestLibrary

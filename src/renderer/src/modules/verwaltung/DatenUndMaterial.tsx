@@ -4,7 +4,8 @@
  * „Kombiniere das Menü Verwaltung mit dem Menü Datenverwaltung" Teil der App „Verwaltung": für
  * Lehrkräfte die ganze App, für Admins der erste Reiter neben Nutzern, KI-Zugängen usw.
  */
-import { Button, Card, Container, Group, Stack, Text, Title } from '@mantine/core'
+import { AppKopf } from '../../shared/components/AppKopf'
+import { Button, Card, Container, Group, Stack, Text } from '@mantine/core'
 import { IconDeviceFloppy, IconFolders } from '@tabler/icons-react'
 import { FachordnerKarte } from '../../shared/components/Fachordner'
 import { openSettings, openThemen } from '../../shared/navigation'
@@ -14,9 +15,8 @@ import { imNetz } from '../../shared/netzZugang'
 export default function VerwaltungLehrkraft(): React.JSX.Element {
   return (
     <Container size="lg" py="lg">
-      <Title order={2} mb="md">
-        Verwaltung
-      </Title>
+      {/* Gemeinsamer Kopf (Phase 6a) */}
+      <AppKopf />
       <DatenUndMaterial />
     </Container>
   )

@@ -1,3 +1,4 @@
+import { ProgrammInfo } from './shared/components/AppKopf'
 import { ActionIcon, Anchor, AppShell, Button, Indicator, Menu, Tooltip } from '@mantine/core'
 import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
@@ -392,7 +393,10 @@ export default function App(): React.JSX.Element {
               {/* Zoom der Blätter je Programm (shared/touch/zoom.tsx); Programm für „In eigenem Fenster" */}
               <ZoomProgramm.Provider value={m.id}>
                 <AktuellesProgramm.Provider value={m.id}>
-                  <m.component active={m.id === current?.id} />
+                  {/* Gemeinsamer Kopf (Phase 6a): Name, Beschreibung, Farbe und Bild aus der Registry */}
+                  <ProgrammInfo.Provider value={{ name: m.name, description: m.description, color: m.color, icon: m.icon, bild: m.leistenbild }}>
+                    <m.component active={m.id === current?.id} />
+                  </ProgrammInfo.Provider>
                 </AktuellesProgramm.Provider>
               </ZoomProgramm.Provider>
             </div>

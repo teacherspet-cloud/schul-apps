@@ -1,3 +1,4 @@
+import { SchulbuchDialog } from './shared/schulbuch/SchulbuchDialog'
 import '@mantine/core/styles.css'
 import '@mantine/dropzone/styles.css'
 import '@mantine/notifications/styles.css'
@@ -80,6 +81,8 @@ function Root(): React.JSX.Element {
       <EingabeOrtDialog />
       {/* Gibt es schon – überschreiben oder neue Version (shared/export/vorhandenFrage.tsx) */}
       <VorhandenDialog />
+      {/* Schulbuchseiten erkannt (Phase 6b) */}
+      <SchulbuchDialog />
       {/* Markierte Tabellenzellen angleichen (modules/arbeitsblatt/render/tabellenAuswahl.tsx) */}
       <TabellenKreismenue />
       <App />

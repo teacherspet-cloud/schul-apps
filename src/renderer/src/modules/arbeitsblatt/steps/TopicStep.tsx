@@ -1,3 +1,4 @@
+import { schulbuchAusSeiten } from '../../../shared/schulbuch/SchulbuchDialog'
 import InterkulturSchalter from './InterkulturSchalter'
 import VideoTranskript, { videoMaterialArt } from './VideoTranskript'
 import { sehtextQuelle } from '../didactics/sehtext'
@@ -100,6 +101,7 @@ import type {
   VocabWorkMode,
   WorksheetImageSource,
   SocialForm,
+  SourceMaterial,
   Worksheet,
   WorksheetMeta
 } from '../model/types'
@@ -307,8 +309,15 @@ export default function TopicStep(): React.JSX.Element {
       }
       setReading(null)
       // Datenschutz (Großprogramm 0.4): Hinweis und Namen ersetzen, bevor etwas zur KI geht
-      const neu = await pruefeHochladen(added.slice(worksheet.sources.length))
-      if (!neu) return
+      const geprueft = await pruefeHochladen(added.slice(worksheet.sources.length))
+      if (!geprueft) return
+      // Schulbuchseiten (Phase 6b): erkennen, je Abschnitt verweisen/übernehmen – nie als Bild aufs Blatt
+      const neu: SourceMaterial[] = []
+      for (const q of geprueft) {
+        const sb = q.pageImages.length ? await schulbuchAusSeiten(q.pageImages, '', (t) => setReading(`${q.fileName}: ${t}`)) : null
+        neu.push(sb ? { ...q, text: sb.text, format: 'plain', pageImages: [], embedImage: false, schulbuch: sb.schulbuch } : q)
+      }
+      setReading(null)
       setWorksheet({ ...worksheet, sources: [...worksheet.sources, ...neu] })
     } catch (e) {
       notifyError(e, 'Datei konnte nicht gelesen werden')
@@ -488,7 +497,11 @@ export default function TopicStep(): React.JSX.Element {
                     )}
                     {/* Interkulturelle Kompetenz (02.10.2026): eigener Schwerpunkt (nur Teilbereiche) oder Zusatzschalter */}
                     {subject.foreignLanguage && (
-                      <InterkulturSchalter meta={meta} nurBereiche={meta.skillFocus === 'interkulturell'} onChange={(interkulturell) => patch({ interkulturell })} />
+                      <InterkulturSchalter
+                        meta={meta}
+                        nurBereiche={meta.skillFocus === 'interkulturell'}
+                        onChange={(interkulturell) => patch({ interkulturell })}
+                      />
                     )}
                     {/* Sprechen (01.10.2026): Teile des Vorbereitungsblatts, voreingestellt alle vier (didactics/sprechen.ts) */}
                     {istSprechblatt(meta) && (
@@ -545,8 +558,8 @@ export default function TopicStep(): React.JSX.Element {
                     )}
                     {meta.skillFocus === 'listening' && sehtextQuelle(meta, worksheet.sources) && (
                       <Text size="xs" c="dimmed" data-sehtext-hinweis>
-                        Hör-/Sehtext ist das Video „{sehtextQuelle(meta, worksheet.sources)!.fileName}“ aus dem Material – es entsteht kein eigener Hörtext; Link und
-                        QR-Code kommen auf das Blatt.
+                        Hör-/Sehtext ist das Video „{sehtextQuelle(meta, worksheet.sources)!.fileName}“ aus dem Material – es entsteht kein eigener Hörtext;
+                        Link und QR-Code kommen auf das Blatt.
                       </Text>
                     )}
                     {meta.skillFocus === 'grammar' && <GrammarPicker meta={meta} onChange={patch} />}

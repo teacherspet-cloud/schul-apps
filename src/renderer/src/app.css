@@ -820,3 +820,61 @@ img.home-illustration {
 .app-leiste[data-breit='true'] .leiste-gruppe-apps {
   margin-left: 10px;
 }
+
+/* Gemeinsamer Programmkopf (Phase 6a, 05.10.2026 – shared/components/AppKopf.tsx) */
+.app-kopf {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.app-kopf-bild {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--mantine-color-body);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.app-kopf-bild img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+.app-kopf-titel {
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.app-kopf-beschreibung {
+  max-width: 70ch;
+}
+.app-kopf-zeile {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+/* Telefon: Knöpfe unter den Titel, volle Breite */
+@media (max-width: 640px) {
+  .app-kopf-bild {
+    width: 40px;
+    height: 40px;
+  }
+  .app-kopf-bild img {
+    width: 36px;
+    height: 36px;
+  }
+  .app-kopf-titel {
+    font-size: 1.2rem;
+  }
+}
+.app-kopf-kompakt .app-kopf-bild {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.app-kopf-kompakt .app-kopf-bild img {
+  width: 32px;
+  height: 32px;
+}
+.app-kopf-kompakt .app-kopf-titel {
+  font-size: 1.15rem;
+}

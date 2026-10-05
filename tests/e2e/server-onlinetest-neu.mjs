@@ -105,7 +105,7 @@ try {
   if (await sp.isVisible().catch(() => false)) await sp.click()
   await p.locator('.app-leiste [aria-label="Onlinetest"]').click()
   await p.mouse.move(800, 600)
-  await p.locator('[data-onlinetest-neu]').click()
+  await p.locator('[data-app-neu="onlinetest"]').click()
   await p.locator('[data-onlinetest-wahl]').click()
   await p.getByRole('option', { name: 'Green Line 6 Unit 1' }).click()
   await p.locator('[data-onlinetest-name]').waitFor({ timeout: 10000 })

@@ -6,8 +6,9 @@
  * Wissensspeicher, Abschlussprodukt, Sprechaufgabe), legt Lernziele fest (Kerncurriculum oder KI)
  * und weist sie zu. Wer einen Schritt schafft, schaltet den nächsten frei (Regeln: shared/reihe.ts).
  */
+import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { create } from 'zustand'
-import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Badge, Button, Card, Group, Loader, Menu, SimpleGrid, Stack, Text, TextInput } from '@mantine/core'
 import { IconChartDots, IconDots, IconPlus, IconRoute, IconTrash } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { Reihe } from '@shared/reihe'
@@ -58,6 +59,7 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
     useReihenZiel.getState().setze(null)
   }, [ziel])
   const [liste, setListe] = useState<ReiheKurz[] | null>(null)
+  const farbe = useProgrammFarbe()
   const laden = useCallback(
     () =>
       void holen<{ reihen: ReiheKurz[] }>('/server/reihen').then(
@@ -89,17 +91,21 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
   return (
     <Rahmen>
       <Stack data-reihen-liste>
-        <Group justify="space-between">
-          <div>
-            <Title order={2}>Unterrichtsreihen</Title>
-            <Text c="dimmed" size="sm">
-              Lernpfade für Lernende: Schritt für Schritt freischalten, mit Lernzielen aus dem Kerncurriculum, eigenem Tempo und Haltepunkten.
-            </Text>
-          </div>
-          <Button leftSection={<IconPlus size={16} />} onClick={() => setAnsicht({ art: 'editor', reihe: neueReihe() })} data-reihe-neu>
-            Neue Reihe
-          </Button>
-        </Group>
+        {/* Gemeinsamer Kopf (Phase 6a) */}
+        <AppKopf
+          beschreibung="Lernpfade für Lernende: Schritt für Schritt freischalten, mit Lernzielen aus dem Kerncurriculum, eigenem Tempo und Haltepunkten – von Hand oder mit KI geplant."
+          hauptknopf={
+            <Button
+              leftSection={<IconPlus size={16} />}
+              radius="md"
+              color={farbe}
+              onClick={() => setAnsicht({ art: 'editor', reihe: neueReihe() })}
+              data-reihe-neu
+            >
+              Neue Reihe
+            </Button>
+          }
+        />
         <Eingang oeffnen={(zid) => setAnsicht({ art: 'uebersicht', zid })} />
         {!liste && <Loader size="sm" />}
         {liste?.length === 0 && (

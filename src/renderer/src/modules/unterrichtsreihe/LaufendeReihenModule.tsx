@@ -4,7 +4,8 @@
  * Zuweisungen mit Fortschritt der Lerngruppe, Verteilung, Handlungsbedarf und Haltepunkten; oben
  * der gemeinsame Korrektur-Eingang. Ein Klick öffnet die Übersicht in der App „Unterrichtsreihe".
  */
-import { Badge, Button, Card, Center, Container, Group, Loader, Progress, SimpleGrid, Stack, Text, Title, Tooltip } from '@mantine/core'
+import { AppKopf } from '../../shared/components/AppKopf'
+import { Badge, Button, Card, Center, Container, Group, Loader, Progress, SimpleGrid, Stack, Text, Tooltip } from '@mantine/core'
 import { IconAlertCircle, IconArrowRight, IconFlag, IconRoute } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { holen } from '../onlinetest/serverApi'
@@ -145,17 +146,15 @@ export default function LaufendeReihenModule({ active }: { active: boolean }): R
   )
   return (
     <Container size="xl" py="lg" data-laufende-reihen>
-      <Group justify="space-between" mb="md">
-        <div>
-          <Title order={2}>Laufende Unterrichtsreihen</Title>
-          <Text c="dimmed" size="sm">
-            {reihen.length ? `${reihen.length} Reihe${reihen.length > 1 ? 'n' : ''} in Arbeit` : 'Gerade läuft keine Reihe.'}
-          </Text>
-        </div>
-        <Button variant="light" leftSection={<IconRoute size={16} />} onClick={() => openModule('unterrichtsreihe')}>
-          Reihen planen
-        </Button>
-      </Group>
+      {/* Gemeinsamer Kopf (Phase 6a) */}
+      <AppKopf
+        beschreibung={
+          reihen.length
+            ? `${reihen.length} Reihe${reihen.length > 1 ? 'n' : ''} in Arbeit – Fortschritt und Handlungsbedarf je Lerngruppe.`
+            : 'Gerade läuft keine Reihe.'
+        }
+        neu={{ label: 'Reihen planen', onClick: () => openModule('unterrichtsreihe'), kennung: 'laufendereihen', icon: <IconRoute size={16} /> }}
+      />
       <Stack gap="lg">
         <Eingang oeffnen={oeffneReihe} />
         {faecher.map((f) => (

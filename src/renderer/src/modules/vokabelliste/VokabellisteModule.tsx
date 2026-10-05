@@ -1,3 +1,4 @@
+import { AppKopf } from '../../shared/components/AppKopf'
 import {
   Alert,
   Badge,
@@ -17,7 +18,7 @@ import {
   UnstyledButton
 } from '@mantine/core'
 import { FachPunkt } from '../../shared/components/FachFarbe'
-import { IconBook2, IconBooks, IconChevronRight, IconFilePlus, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
+import { IconBook2, IconBooks, IconChevronRight, IconPencil, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
 import type { CefrTable, SavedVocabList, TextbookMeta } from '@shared/types'
 import { notifyError } from '../../shared/util'
@@ -36,7 +37,6 @@ import { passtZurSuche } from '../../shared/bibliothek'
 import { testAusListe } from '../vokabeltest/library'
 import { ZUSATZ } from '../vokabeltest/steps/VokabelTabelle'
 import { vokabellistenApi } from './listenApi'
-import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import {
   FILTER_FELDER,
   filterOptionen,
@@ -170,20 +170,11 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
   return (
     <ScrollArea h="100%">
       <Container size="lg" py="lg">
-        <Group justify="space-between" mb="md">
-          <div>
-            <Group gap={4}>
-              <Title order={2}>Vokabellisten</Title>
-              <EigenesFensterKnopf />
-            </Group>
-            <Text c="dimmed" size="sm">
-              Schulbuch-Vokabeln bearbeiten und eigene Listen anlegen. Sie stehen anschließend im Vokabeltest und bei den Klassenarbeiten zur Auswahl.
-            </Text>
-          </div>
-          <Button leftSection={<IconFilePlus size={16} />} onClick={() => setWizard(true)}>
-            Neue Liste
-          </Button>
-        </Group>
+        {/* Gemeinsamer Kopf (Phase 6a) */}
+        <AppKopf
+          beschreibung="Schulbuch-Vokabeln bearbeiten und eigene Listen anlegen. Sie stehen anschließend im Vokabeltest und bei den Klassenarbeiten zur Auswahl."
+          neu={{ label: 'Neue Liste', onClick: () => setWizard(true), kennung: 'vokabelliste' }}
+        />
 
         <Card withBorder mb="md">
           <Text size="sm" fw={500} mb={6}>

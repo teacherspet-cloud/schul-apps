@@ -1372,6 +1372,11 @@ export interface SourceMaterial {
   pagesRead: number[]
   useAsBasis: boolean
   embedImage: boolean
+  /**
+   * Als Schulbuchseiten erkannt (Phase 6b, 05.10.2026): `text` enthält dann nur, was verwiesen bzw.
+   * übernommen wird; Seitenbilder gehen weder an die KI noch aufs Blatt.
+   */
+  schulbuch?: import('../../../shared/schulbuch/schulbuch').Schulbuch
 }
 
 export interface OutlineItem {

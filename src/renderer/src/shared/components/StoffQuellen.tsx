@@ -1,3 +1,4 @@
+import { schulbuchAusSeiten } from '../schulbuch/SchulbuchDialog'
 import { ActionIcon, Checkbox, Group, Stack, Text } from '@mantine/core'
 import { pruefeHochladen } from '../datenschutz'
 import { IconWorld, IconMovie, IconFileText, IconPhoto, IconX } from '@tabler/icons-react'
@@ -46,7 +47,13 @@ export default function StoffQuellen({ quellen, onHinzu, onAktiv, onEntfernen, t
       // Datenschutz (Großprogramm 0.4): Hinweis und Namen ersetzen, bevor etwas zur KI geht
       const geprueft = await pruefeHochladen(neu.map((q) => ({ ...q, pageImages: q.bilder })))
       if (!geprueft) return
-      onHinzu(geprueft.map(({ pageImages: _b, ...q }) => q))
+      // Schulbuchseiten (Phase 6b): nach der Namensprüfung erkennen – verweisen/übernehmen statt Seitenbild
+      const fertig: StoffQuelle[] = []
+      for (const { pageImages: _b, ...q } of geprueft) {
+        const sb = q.bilder.length ? await schulbuchAusSeiten(q.bilder, '', (t) => setLese(`${q.fileName}: ${t}`)) : null
+        fertig.push(sb ? { ...q, text: sb.text, bilder: [] } : q)
+      }
+      onHinzu(fertig)
     } catch (e) {
       notifyError(e, 'Die Datei konnte nicht gelesen werden')
     } finally {

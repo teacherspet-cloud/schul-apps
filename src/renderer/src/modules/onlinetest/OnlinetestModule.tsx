@@ -13,11 +13,19 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
+import { useAppSettings } from '../../shared/settingsStore'
+import { thresholdsForSubject } from '../../shared/gradeScale'
+import type { Kurztest } from '../lernzielkontrolle/model/types'
+import { kurztestToWorksheetAlle } from '../lernzielkontrolle/render/kurztestWorksheet'
+import type { GrammarTest } from '../grammatiktest/model/types'
+import { testToWorksheet } from '../grammatiktest/render/testWorksheet'
+import { fassungenAusBlatt } from './blattOnline'
+import { Erstellen, type BlattQuelleOnline } from './OnlinetestKnopf'
+import { AppKopf } from '../../shared/components/AppKopf'
 import { FAECHER } from '@shared/faecher'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
 import { useDokumentOeffner } from '../../shared/navigation'
 import type { TestDocument } from '../vokabeltest/model/types'
-import { Erstellen } from './OnlinetestKnopf'
 import {
   ActionIcon,
   Alert,
@@ -33,6 +41,7 @@ import {
   Modal,
   NumberInput,
   Popover,
+  SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
@@ -66,8 +75,7 @@ import {
   IconSparkles,
   IconTrash,
   IconUsersGroup,
-  IconX,
-  IconPlus
+  IconX
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
@@ -78,7 +86,6 @@ import { hatClient } from '../../shared/plattform'
 import { AbgabeBlatt, abgabenHtml, type BlattKopf } from './blattAnsicht'
 import type { Variant } from '../vokabeltest/model/types'
 import { ergebnisDocx, ergebnisHtml, ergebnisXlsx, notenSpalte, teachertoolCsv, type ErgebnisDaten, type NotenFormat } from './ergebnisExport'
-import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 
 interface TestListe {
   id: string
@@ -167,23 +174,20 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
   if (!active) return null
   return (
     <Container size="xl" py="md">
-      <Group justify="space-between" mb="sm">
-        <Group gap={4}>
-          <Title order={2}>Onlinetest</Title>
-          <EigenesFensterKnopf />
-        </Group>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => setNeu(true)} data-onlinetest-neu>
-          Neuer Onlinetest
-        </Button>
-      </Group>
       {neu && <NeuerOnlinetest schliessen={() => setNeu(false)} />}
       <Tabs value={reiter} onChange={setReiter}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="tests">Tests</Tabs.Tab>
-          <Tabs.Tab value="gruppen" leftSection={<IconUsersGroup size={16} />}>
-            Lerngruppen
-          </Tabs.Tab>
-        </Tabs.List>
+        {/* Gemeinsamer Kopf (Phase 6a): Reiter in der zweiten Zeile */}
+        <AppKopf
+          neu={{ label: 'Neuer Onlinetest', onClick: () => setNeu(true), kennung: 'onlinetest' }}
+          links={
+            <Tabs.List style={{ borderBottom: 0 }}>
+              <Tabs.Tab value="tests">Tests</Tabs.Tab>
+              <Tabs.Tab value="gruppen" leftSection={<IconUsersGroup size={16} />}>
+                Lerngruppen
+              </Tabs.Tab>
+            </Tabs.List>
+          }
+        />
         <Tabs.Panel value="tests">
           <Tests ziel={ziel} zielErledigt={() => setZiel(null)} />
         </Tabs.Panel>
@@ -1556,43 +1560,95 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
  * „Neuer Onlinetest" oben rechts (03.10.2026, Wunsch der Lehrkraft): einen gespeicherten Vokabeltest
  * wählen, dann derselbe Dialog wie im Vokabeltest – ohne Umweg über dessen Editor.
  */
+/**
+ * „Neuer Onlinetest" (05.10.2026 erweitert): Vokabeltest, Grammatiktest oder Lernzielkontrolle aus den
+ * eigenen gespeicherten Dokumenten – dieselbe Durchführung wie über den Knopf im jeweiligen Editor.
+ */
+type NeuArt = 'vokabeltest' | 'grammatiktest' | 'lernzielkontrolle'
+const NEU_ARTEN: { value: NeuArt; label: string; app: string }[] = [
+  { value: 'vokabeltest', label: 'Vokabeltest', app: 'Vokabeltest' },
+  { value: 'grammatiktest', label: 'Grammatiktest', app: 'Grammatiktest' },
+  { value: 'lernzielkontrolle', label: 'Lernzielkontrolle', app: 'Lernzielkontrolle' }
+]
+
 function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.Element {
+  const [art, setArt] = useState<NeuArt>('vokabeltest')
   const [liste, setListe] = useState<{ id: string; name: string; updatedAt?: string }[] | null>(null)
   const [doc, setDoc] = useState<TestDocument | null>(null)
+  const [blatt, setBlatt] = useState<BlattQuelleOnline | null>(null)
   const [listName, setListName] = useState('')
+  const { logoDataUrl, settings } = useAppSettings()
   useEffect(() => {
-    void window.api.tests.list().then(
-      (l) => setListe([...l].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))),
+    setListe(null)
+    const laden = art === 'vokabeltest' ? window.api.tests.list() : art === 'grammatiktest' ? window.api.grammarTests.list() : window.api.kurztests.list()
+    void laden.then(
+      (l: { id: string; name: string; updatedAt?: string }[]) =>
+        setListe([...l].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))),
       () => setListe([])
     )
-  }, [])
+  }, [art])
   if (doc) return <Erstellen doc={doc} listName={listName} schliessen={schliessen} />
+  if (blatt) return <Erstellen blatt={blatt} schliessen={schliessen} />
+  const name = NEU_ARTEN.find((a) => a.value === art)!
+  const waehlen = async (id: string): Promise<void> => {
+    if (art === 'vokabeltest') {
+      const t = await window.api.tests.get(id)
+      // Gespeicherte Vokabeltests: { vocab, settings, doc } – ältere/Test-Dateien: das Dokument selbst
+      const p = t.payload as { doc?: TestDocument | null } & Partial<TestDocument>
+      const d = p.doc ?? (p.variants ? (p as TestDocument) : null)
+      if (!d) throw new Error('Dieser Vokabeltest ist noch nicht erstellt (nur eine Vokabelliste).')
+      setListName(t.name)
+      setDoc(d)
+      return
+    }
+    if (art === 'grammatiktest') {
+      const t = (await window.api.grammarTests.get(id)).payload as GrammarTest
+      const ws = testToWorksheet(t)
+      if (!ws.sheets.some((s) => s.blocks.some((b) => b.type === 'task'))) throw new Error('Dieser Grammatiktest hat noch keine Aufgaben.')
+      setBlatt({
+        art: 'Grammatiktest',
+        fach: t.meta.subjectLabel,
+        titel: t.meta.title || 'Grammatiktest',
+        thema: t.meta.title || '',
+        varianten: ws.sheets.map((s, i) => s.label || String.fromCharCode(65 + i)),
+        fassungen: () => fassungenAusBlatt(ws, logoDataUrl ?? null, settings.schoolName)
+      })
+      return
+    }
+    const t = (await window.api.kurztests.get(id)).payload as Kurztest
+    const ws = kurztestToWorksheetAlle(t, thresholdsForSubject(settings.gradeScale, t.meta.subjectId))
+    if (!ws.sheets.some((s) => s.blocks.some((b) => b.type === 'task'))) throw new Error('Diese Lernzielkontrolle hat noch keine Aufgaben.')
+    setBlatt({
+      art: 'Lernzielkontrolle',
+      fach: t.meta.subjectLabel,
+      titel: t.meta.title || t.meta.thema || 'Lernzielkontrolle',
+      thema: t.meta.thema || '',
+      varianten: ws.sheets.map((s, i) => s.label || String.fromCharCode(65 + i)),
+      fassungen: () => fassungenAusBlatt(ws, logoDataUrl ?? null, settings.schoolName)
+    })
+  }
   return (
     <Modal opened onClose={schliessen} title="Neuer Onlinetest" size="lg">
       <Stack>
+        <SegmentedControl
+          value={art}
+          onChange={(v) => setArt(v as NeuArt)}
+          data={NEU_ARTEN.map(({ value, label }) => ({ value, label }))}
+          data-onlinetest-art
+        />
         <Text size="sm" c="dimmed">
-          Welcher Vokabeltest soll online geschrieben werden? Neue Tests entstehen in der App „Vokabeltest“.
+          Welcher {name.label} soll online geschrieben werden? Neue entstehen in der App „{name.app}“.
         </Text>
         {!liste && <Loader size="sm" />}
-        {liste?.length === 0 && <Text c="dimmed">Noch kein Vokabeltest gespeichert.</Text>}
+        {liste?.length === 0 && <Text c="dimmed">Noch nichts gespeichert.</Text>}
         <Select
+          key={art}
           searchable
-          label="Vokabeltest"
+          label={name.label}
           placeholder="suchen …"
           data={(liste ?? []).map((t) => ({ value: t.id, label: t.name }))}
           onChange={(id) => {
-            if (!id) return
-            void window.api.tests.get(id).then(
-              (t) => {
-                // Gespeicherte Vokabeltests: { vocab, settings, doc } – ältere/Test-Dateien: das Dokument selbst
-                const p = t.payload as { doc?: TestDocument | null } & Partial<TestDocument>
-                const d = p.doc ?? (p.variants ? (p as TestDocument) : null)
-                if (!d) return notifyError(new Error('Dieser Vokabeltest ist noch nicht erstellt (nur eine Vokabelliste).'))
-                setListName(t.name)
-                setDoc(d)
-              },
-              (e: unknown) => notifyError(e)
-            )
+            if (id) void waehlen(id).catch((e: unknown) => notifyError(e))
           }}
           data-onlinetest-wahl
         />

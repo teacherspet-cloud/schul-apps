@@ -10,6 +10,7 @@
  * Abos (ChatGPT, Claude) sind bewusst NICHT teilbar: Die Nutzungsbedingungen verbieten das
  * Teilen von Konten – jede Lehrkraft meldet ihr eigenes an (Einstellungen › KI-Zugang).
  */
+import { AppKopf } from '../../shared/components/AppKopf'
 import {
   ActionIcon,
   Alert,
@@ -31,7 +32,6 @@ import {
   Tabs,
   Text,
   TextInput,
-  Title,
   Tooltip
 } from '@mantine/core'
 import { IconCheck, IconCopy, IconKey, IconLock, IconLockOpen, IconRefresh, IconTrash, IconUserPlus } from '@tabler/icons-react'
@@ -40,7 +40,6 @@ import { holen, senden } from '../onlinetest/serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { KlassenlisteKarte } from './Klassenliste'
 import { serverIch } from '../../shared/plattform'
-import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import { DatenUndMaterial } from './DatenUndMaterial'
 
 interface Uebersicht {
@@ -93,47 +92,50 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
   if (!active) return null
   return (
     <Container size="xl" py="md">
-      <Group justify="space-between" mb="sm">
-        <Group gap={4}>
-          <Title order={2}>Verwaltung</Title>
-          <EigenesFensterKnopf />
-        </Group>
-        <ActionIcon variant="subtle" onClick={laden} aria-label="Neu laden">
-          <IconRefresh size={18} />
-        </ActionIcon>
-      </Group>
-      {!d ? (
-        <Loader />
-      ) : (
-        <Tabs value={reiter} onChange={setReiter}>
-          <Tabs.List mb="md">
-            <Tabs.Tab value="daten">Daten und Material</Tabs.Tab>
-            <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
-            <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
-            <Tabs.Tab value="iserv">IServ-Anbindung</Tabs.Tab>
-            <Tabs.Tab value="hoertexte">Hörtexte</Tabs.Tab>
-            <Tabs.Tab value="server">Server</Tabs.Tab>
-          </Tabs.List>
-          <Tabs.Panel value="daten">
-            <DatenUndMaterial />
-          </Tabs.Panel>
-          <Tabs.Panel value="nutzer">
-            <Nutzer d={d} neu={laden} />
-          </Tabs.Panel>
-          <Tabs.Panel value="ki">
-            <Schluessel d={d} neu={laden} />
-          </Tabs.Panel>
-          <Tabs.Panel value="iserv">
-            <Iserv d={d} neu={laden} />
-          </Tabs.Panel>
-          <Tabs.Panel value="hoertexte">
-            <Hoertexte />
-          </Tabs.Panel>
-          <Tabs.Panel value="server">
-            <Server d={d} />
-          </Tabs.Panel>
-        </Tabs>
-      )}
+      <Tabs value={reiter} onChange={setReiter}>
+        {/* Gemeinsamer Kopf (Phase 6a): Reiter in der zweiten Zeile, Neu laden rechts */}
+        <AppKopf
+          zusaetze={
+            <ActionIcon variant="default" size="lg" radius="md" onClick={laden} aria-label="Neu laden">
+              <IconRefresh size={18} />
+            </ActionIcon>
+          }
+          links={
+            <Tabs.List style={{ borderBottom: 0 }}>
+              <Tabs.Tab value="daten">Daten und Material</Tabs.Tab>
+              <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
+              <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
+              <Tabs.Tab value="iserv">IServ-Anbindung</Tabs.Tab>
+              <Tabs.Tab value="hoertexte">Hörtexte</Tabs.Tab>
+              <Tabs.Tab value="server">Server</Tabs.Tab>
+            </Tabs.List>
+          }
+        />
+        {!d ? (
+          <Loader />
+        ) : (
+          <>
+            <Tabs.Panel value="daten">
+              <DatenUndMaterial />
+            </Tabs.Panel>
+            <Tabs.Panel value="nutzer">
+              <Nutzer d={d} neu={laden} />
+            </Tabs.Panel>
+            <Tabs.Panel value="ki">
+              <Schluessel d={d} neu={laden} />
+            </Tabs.Panel>
+            <Tabs.Panel value="iserv">
+              <Iserv d={d} neu={laden} />
+            </Tabs.Panel>
+            <Tabs.Panel value="hoertexte">
+              <Hoertexte />
+            </Tabs.Panel>
+            <Tabs.Panel value="server">
+              <Server d={d} />
+            </Tabs.Panel>
+          </>
+        )}
+      </Tabs>
     </Container>
   )
 }

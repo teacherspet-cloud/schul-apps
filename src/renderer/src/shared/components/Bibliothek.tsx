@@ -1,5 +1,5 @@
+import { AppKopf } from './AppKopf'
 import { ActionIcon, Alert, Badge, Button, Card, Group, Menu, Stack, Text, TextInput, Title } from '@mantine/core'
-import { EigenesFensterKnopf } from '../eigenesFenster'
 import { nurPcNetz } from '../plattform'
 import { FachschaftsListe, TeilenMenuePunkt } from './Fachordner'
 import { IconArrowLeft, IconCopy, IconDots, IconFolderShare, IconPencil, IconSearch, IconTrash } from '@tabler/icons-react'
@@ -161,8 +161,27 @@ export function useBibliothek<M extends BibliotheksEintrag>(
     (eintraege ?? []).filter((e) => passtZurSuche([e.name, ...felder(e)], suche))
 
   /** Liste neu holen (z. B. nach nachgetragenen Vorschaubildern) */
-  const neuLaden = (): void => void api.list().then(setEintraege).catch(() => undefined)
-  return { eintraege, suche, setSuche, treffer, umbenennen, setUmbenennen, umbenennenSpeichern, loeschen, setLoeschen, loeschenBestaetigen, kopieren, neuId, moduleId: opts.moduleId, neuLaden }
+  const neuLaden = (): void =>
+    void api
+      .list()
+      .then(setEintraege)
+      .catch(() => undefined)
+  return {
+    eintraege,
+    suche,
+    setSuche,
+    treffer,
+    umbenennen,
+    setUmbenennen,
+    umbenennenSpeichern,
+    loeschen,
+    setLoeschen,
+    loeschenBestaetigen,
+    kopieren,
+    neuId,
+    moduleId: opts.moduleId,
+    neuLaden
+  }
 }
 
 /**
@@ -190,6 +209,7 @@ export function BibliothekKopf({
   suchHinweis: string
   children?: React.ReactNode
 }): React.JSX.Element {
+  // Gemeinsamer Kopf (Phase 6a): Titel „Meine …" links, Datei öffnen und „Neu" rechts, Suche in der zweiten Zeile
   return (
     <Stack gap="sm" mb="md">
       {zurueck !== null && (
@@ -199,31 +219,26 @@ export function BibliothekKopf({
           </Button>
         </div>
       )}
-      <Group justify="space-between" wrap="nowrap" align="flex-start" className="bibliothek-kopf">
-        <div style={{ minWidth: 0 }}>
-          <Title order={2}>{titel}</Title>
-          {untertitel && (
-            <Text c="dimmed" size="sm">
-              {untertitel}
-            </Text>
-          )}
-        </div>
-        <Group gap="xs" wrap="nowrap">
-          {children}
-          <EigenesFensterKnopf name={titel} />
-        </Group>
-      </Group>
+      <AppKopf
+        titel={titel}
+        beschreibung={untertitel ?? ''}
+        hauptknopf={children}
+        rechts={
+          <TextInput
+            leftSection={<IconSearch size={16} />}
+            placeholder={`Suchen (${suchHinweis})`}
+            aria-label={`${titel} durchsuchen`}
+            value={suche}
+            onChange={(e) => onSuche(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === 'Escape' && onSuche('')}
+            w={360}
+            maw="100%"
+          />
+        }
+        links={<span />}
+      />
       {/* Server: freigegebenes Material der Fachschaft für dieses Programm */}
       <FachschaftsListe />
-      <TextInput
-        leftSection={<IconSearch size={16} />}
-        placeholder={`Suchen (${suchHinweis})`}
-        aria-label={`${titel} durchsuchen`}
-        value={suche}
-        onChange={(e) => onSuche(e.currentTarget.value)}
-        onKeyDown={(e) => e.key === 'Escape' && onSuche('')}
-        maw={480}
-      />
     </Stack>
   )
 }

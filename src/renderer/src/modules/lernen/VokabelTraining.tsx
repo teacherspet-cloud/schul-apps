@@ -10,6 +10,7 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
+import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { useAlleLernenden } from './LernendeWahl'
 import {
   ActionIcon,
@@ -36,7 +37,6 @@ import {
 } from '@mantine/core'
 import { IconArrowLeft, IconBooks, IconCalendarEvent, IconPlus, IconQrcode, IconTrash, IconUser, IconUserMinus } from '@tabler/icons-react'
 import { Zugang } from '../onlinetest/OnlinetestModule'
-import { EigenesFensterKnopf } from '../../shared/eigenesFenster'
 import { useCallback, useEffect, useState } from 'react'
 import { STUFEN, type Uebersicht } from '@shared/vokabeltrainer'
 import { notifyError, notifySuccess } from '../../shared/util'
@@ -69,10 +69,6 @@ export function VokabeltrainingModule({ active }: { active: boolean }): React.JS
   if (!active) return null
   return (
     <Container size="xl" py="md">
-      <Group gap={4} mb="sm">
-        <Title order={2}>Vokabeltraining</Title>
-        <EigenesFensterKnopf />
-      </Group>
       <VokabelTraining />
     </Container>
   )
@@ -98,6 +94,7 @@ export function Faecherbalken({ u, hoehe = 10 }: { u: Uebersicht; hoehe?: number
 }
 
 export default function VokabelTraining(): React.JSX.Element {
+  const farbe = useProgrammFarbe()
   const [liste, setListe] = useState<ZuweisungKurz[] | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
@@ -115,23 +112,24 @@ export default function VokabelTraining(): React.JSX.Element {
   const sichtbar = (liste ?? []).filter((z) => z.status === filter)
   return (
     <Stack data-vokabeltraining>
-      <Group justify="space-between">
-        <Text c="dimmed" size="sm" maw={620}>
-          Vokabeln über einen längeren Zeitraum zum Lernen freigeben – für eine Lerngruppe, einzelne Lernende oder per QR-Code. Geübt wird im Karteikasten der
-          Lern-App; hier steht der Lernstand.
-        </Text>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => setNeu(true)} data-vokabeln-freigeben>
-          Vokabeln freigeben
-        </Button>
-      </Group>
-      <SegmentedControl
-        w="fit-content"
-        value={filter}
-        onChange={(v) => setFilter(v as typeof filter)}
-        data={[
-          { value: 'offen', label: `Laufend${liste ? ` (${liste.filter((z) => z.status === 'offen').length})` : ''}` },
-          { value: 'beendet', label: `Abgeschlossen${liste ? ` (${liste.filter((z) => z.status !== 'offen').length})` : ''}` }
-        ]}
+      {/* Gemeinsamer Kopf (Phase 6a): Filter in der zweiten Zeile */}
+      <AppKopf
+        beschreibung="Vokabeln über einen längeren Zeitraum zum Lernen freigeben – für eine Lerngruppe, einzelne Lernende oder per QR-Code. Geübt wird im Karteikasten der Lern-App; hier steht der Lernstand."
+        hauptknopf={
+          <Button leftSection={<IconPlus size={16} />} radius="md" color={farbe} onClick={() => setNeu(true)} data-vokabeln-freigeben>
+            Vokabeln freigeben
+          </Button>
+        }
+        links={
+          <SegmentedControl
+            value={filter}
+            onChange={(v) => setFilter(v as typeof filter)}
+            data={[
+              { value: 'offen', label: `Laufend${liste ? ` (${liste.filter((z) => z.status === 'offen').length})` : ''}` },
+              { value: 'beendet', label: `Abgeschlossen${liste ? ` (${liste.filter((z) => z.status !== 'offen').length})` : ''}` }
+            ]}
+          />
+        }
       />
       {!liste && <Loader size="sm" />}
       {liste && sichtbar.length === 0 && <Text c="dimmed">{filter === 'offen' ? 'Gerade läuft kein Vokabeltraining.' : 'Nichts abgeschlossen.'}</Text>}

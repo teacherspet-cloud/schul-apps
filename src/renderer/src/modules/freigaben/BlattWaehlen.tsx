@@ -6,6 +6,7 @@
  * Editor (BlattFreigabeKnopf.tsx) – Lerngruppe oder einzelne Lernende, Gäste, Feedback. Ein Weg, eine
  * Rechnung: Schülerfassung, Lösungen und Rückmeldung entstehen genauso wie aus dem Editor.
  */
+import { useProgrammFarbe } from '../../shared/components/AppKopf'
 import { Button, Center, Group, Image, Loader, Modal, ScrollArea, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { IconFileText, IconPlus, IconSearch } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
@@ -22,11 +23,12 @@ const datum = (iso: string): string => {
 
 export function BlattWaehlenKnopf({ freigegeben }: { freigegeben: () => void }): React.JSX.Element {
   const [offen, setOffen] = useState(false)
+  const farbe = useProgrammFarbe()
   const [blatt, setBlatt] = useState<Worksheet | null>(null)
   const { logoDataUrl, settings } = useAppSettings()
   return (
     <>
-      <Button leftSection={<IconPlus size={16} />} onClick={() => setOffen(true)} data-blatt-waehlen-knopf>
+      <Button leftSection={<IconPlus size={16} />} radius="md" color={farbe} onClick={() => setOffen(true)} data-blatt-waehlen-knopf>
         Blatt freigeben
       </Button>
       {offen && (

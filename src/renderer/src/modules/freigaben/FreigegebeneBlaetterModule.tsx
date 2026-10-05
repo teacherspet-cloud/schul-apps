@@ -4,6 +4,7 @@
  * Stand, je Freigabe die Lernenden; jedes ausgefüllte Blatt lässt sich ansehen – mit Stift,
  * Kästchen, Markierungen und Randkommentaren, wie die Lernenden es sehen – und als PDF sichern.
  */
+import { AppKopf } from '../../shared/components/AppKopf'
 import {
   Badge,
   Button,
@@ -153,35 +154,40 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
   }
   return (
     <Container size="lg" py="lg" data-freigaben>
-      <Title order={2}>Freigegebene Arbeitsblätter</Title>
-      <Text c="dimmed" size="sm" mb="md">
-        Hier ist zu sehen, wer begonnen und eingereicht hat. Neue Blätter lassen sich direkt hier freigeben – oder im Editor der App „Arbeitsblatt" (Knopf „Für
-        Lernende").
-      </Text>
-      <Group mb="md">
-        <BlattWaehlenKnopf freigegeben={laden} />
-        <SegmentedControl
-          value={filter}
-          onChange={(v) => setFilter(v as typeof filter)}
-          data={[
-            { value: 'offen', label: 'Laufend' },
-            { value: 'beendet', label: 'Abgeschlossen' },
-            { value: 'alle', label: 'Alle' }
-          ]}
-        />
-        <TextInput
-          leftSection={<IconSearch size={14} />}
-          placeholder="Titel, Lerngruppe, Fach …"
-          value={suche}
-          onChange={(e) => setSuche(e.currentTarget.value)}
-          w={280}
-        />
-        {filter === 'beendet' && abgeschlossen > 0 && (
-          <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => setLeeren(true)} data-abgeschlossene-leeren>
-            Liste leeren
-          </Button>
-        )}
-      </Group>
+      {/* Gemeinsamer Kopf (Phase 6a): Filter links, Suche rechts */}
+      <AppKopf
+        beschreibung={
+          'Wer hat begonnen, wer eingereicht? Neue Blätter lassen sich direkt hier freigeben – oder im Editor der App „Arbeitsblatt" (Knopf „Für Lernende").'
+        }
+        hauptknopf={<BlattWaehlenKnopf freigegeben={laden} />}
+        links={
+          <SegmentedControl
+            value={filter}
+            onChange={(v) => setFilter(v as typeof filter)}
+            data={[
+              { value: 'offen', label: 'Laufend' },
+              { value: 'beendet', label: 'Abgeschlossen' },
+              { value: 'alle', label: 'Alle' }
+            ]}
+          />
+        }
+        rechts={
+          <>
+            {filter === 'beendet' && abgeschlossen > 0 && (
+              <Button variant="light" color="red" leftSection={<IconTrash size={16} />} onClick={() => setLeeren(true)} data-abgeschlossene-leeren>
+                Liste leeren
+              </Button>
+            )}
+            <TextInput
+              leftSection={<IconSearch size={14} />}
+              placeholder="Titel, Lerngruppe, Fach …"
+              value={suche}
+              onChange={(e) => setSuche(e.currentTarget.value)}
+              w={260}
+            />
+          </>
+        }
+      />
       <Modal opened={leeren} onClose={() => setLeeren(false)} title="Abgeschlossene Blätter löschen?">
         <Text size="sm" mb="md">
           {abgeschlossen === 1 ? 'Das abgeschlossene Blatt wird' : `Alle ${abgeschlossen} abgeschlossenen Blätter werden`} endgültig gelöscht – samt

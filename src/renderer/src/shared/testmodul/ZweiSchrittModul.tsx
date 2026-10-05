@@ -8,8 +8,8 @@
  * den Hinweis, solange ein Hintergrund-Auftrag das Dokument sperrt. Bis dahin stand diese Hülle
  * dreimal fast gleich im Code.
  */
-import { Box, Button, Group, ScrollArea, Stepper } from '@mantine/core'
-import { IconFolder, IconPlus } from '@tabler/icons-react'
+import { AppKopf } from '../components/AppKopf'
+import { Box, ScrollArea, Stepper } from '@mantine/core'
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import type { StoreApi, UseBoundStore } from 'zustand'
 import { useLiveAuftrag, useSperrenderAuftrag } from '../auftraege'
@@ -22,7 +22,6 @@ import { useUndoKeys } from '../useUndoKeys'
 import { notifyError } from '../util'
 import type { Bibliothek } from './bibliothek'
 import type { ProjektDatei } from './projekt'
-import { EigenesFensterKnopf } from '../eigenesFenster'
 
 export interface BibliotheksSeiteProps {
   onNew: () => void
@@ -157,23 +156,22 @@ export default function ZweiSchrittModul<D, S extends Zustand<D>>(p: ZweiSchritt
         `app-toolbar`: gleiche Leiste wie in den übrigen Programmen, samt Anpassung für schmale
         Bildschirme (auf dem Tablet sonst mehrere Zeilen hoch).
       */}
-      <Group px="lg" py="sm" align="flex-start" className="app-toolbar">
-        <Stepper active={step} onStepClick={setStep} size="sm" style={{ flex: 1 }} allowNextStepsSelect={false}>
-          <Stepper.Step label={p.schritte[0].label} description={p.schritte[0].description} />
-          <Stepper.Step label={p.schritte[1].label} description={p.schritte[1].description} disabled={!hatAufgaben} />
-        </Stepper>
-        <Group gap="xs">
-          {/* Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt) */}
-          {step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
-          <Button variant="subtle" leftSection={<IconFolder size={16} />} onClick={() => setLibrary(true)}>
-            {p.texte.meine}
-          </Button>
-          <Button variant="light" leftSection={<IconPlus size={16} />} onClick={startNew}>
-            {p.texte.neu}
-          </Button>
-        </Group>
-        <EigenesFensterKnopf />
-      </Group>
+      {/* Gemeinsamer Kopf (Phase 6a): Titel links, „Meine …" und „Neu" rechts, darunter die Schritte */}
+      <Box px="lg" pt="sm" pb={step === 1 ? 'xs' : 0}>
+        <AppKopf
+          kompakt={step === 1}
+          meine={{ label: p.texte.meine, onClick: () => setLibrary(true), kennung: p.modulId }}
+          neu={{ label: p.texte.neu, onClick: startNew, kennung: p.modulId }}
+          // Ab Schritt 2 stehen Rückgängig, Name und Sicherung in der Editor-Leiste (27.09.2026, wie beim Arbeitsblatt)
+          zusaetze={step !== 1 && <UndoRedoButtons canUndo={verlauf.past.length > 0} canRedo={verlauf.future.length > 0} onUndo={undo} onRedo={redo} />}
+          links={
+            <Stepper active={step} onStepClick={setStep} size="sm" allowNextStepsSelect={false}>
+              <Stepper.Step label={p.schritte[0].label} description={p.schritte[0].description} />
+              <Stepper.Step label={p.schritte[1].label} description={p.schritte[1].description} disabled={!hatAufgaben} />
+            </Stepper>
+          }
+        />
+      </Box>
       {/*
         Schritt 1 scrollt selbst: Sein Hauptknopf steht in einer festen Fußleiste unter dem
         scrollenden Formular (shared/components/Formularfuss.tsx, Paket 6).
