@@ -5,6 +5,7 @@
  *   SCHULAPPS_PORT          8443
  *   SCHULAPPS_ADRESSE       öffentliche Adresse, z. B. https://217.154.120.64:8443
  *   SCHULAPPS_HOSTS         erlaubte Host-Kopfzeilen, kommagetrennt (Vorgabe: Host der Adresse)
+ *   SCHULAPPS_WEICHE        '1': hinter der Weiche auf 443 – Besucheradresse aus X-Real-IP (nur von privaten Adressen)
  *   SCHULAPPS_TLS_DOMAIN_NAMEN, SCHULAPPS_TLS_DOMAIN_CERT, SCHULAPPS_TLS_DOMAIN_KEY
  *                           eigene Domain mit eigenem Zertifikat (SNI), z. B. www.meineschulapps.de
  *   SCHULAPPS_TLS_CERT/KEY  Zertifikat (fehlt es, läuft der Server ohne TLS – nur für Tests)
@@ -110,6 +111,7 @@ async function main(): Promise<void> {
     port,
     adresse,
     hosts,
+    weiche: env.SCHULAPPS_WEICHE === '1',
     aufruf,
     tls,
     routen: [

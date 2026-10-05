@@ -14,7 +14,9 @@ services:
     ports:
       - '8443:8443'
     environment:
-      SCHULAPPS_ADRESSE: https://217.154.120.64:8443
+      # Links (Onlinetest, Blätter, Hörtexte) und IServ-Rücksprung über die eigene Domain (05.10.2026)
+      SCHULAPPS_ADRESSE: https://www.meineschulapps.de
+      SCHULAPPS_WEICHE: '1'
       # Eigene Domain (05.10.2026) über die Weiche auf 443 (deploy/weiche); die IP:8443 bleibt erreichbar
       SCHULAPPS_HOSTS: 217.154.120.64:8443,www.meineschulapps.de,meineschulapps.de
       SCHULAPPS_TLS_CERT: /daten/tls/le.crt

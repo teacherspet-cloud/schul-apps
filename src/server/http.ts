@@ -71,6 +71,8 @@ export interface ServerOptionen {
   adresse: string
   /** erlaubte Host-Kopfzeilen, z. B. ["217.154.120.64:8443"] */
   hosts: string[]
+  /** Anfragen über die Weiche auf 443: X-Real-IP von lokalen/privaten Adressen übernehmen */
+  weiche?: boolean
   aufruf: Aufruf
   /**
    * Zertifikat; `domain` (05.10.2026): weiteres Zertifikat für eigene Namen (www.meineschulapps.de) –
@@ -241,6 +243,9 @@ function statisch(res: ServerResponse, pfad: string): void {
 
 // ---------------------------------------------------------------- Server
 
+/** Lokale und private Adressen (auch als ::ffff:-Form) – von dort kommt die Weiche */
+const WEICHEN_NETZ = /^(::1|(::ffff:)?(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.))/
+
 export function starteServer(opts: ServerOptionen): Promise<Server> {
   const sicher = Boolean(opts.tls)
   const rueckruf = `${opts.adresse.replace(/\/$/, '')}/auth/rueckruf`
@@ -259,7 +264,11 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
     res.setHeader('x-frame-options', 'SAMEORIGIN')
 
     const url = new URL(req.url ?? '/', 'http://x')
-    const ip = String(req.socket.remoteAddress ?? '')
+    // Hinter der Weiche (deploy/weiche, 05.10.2026) steht die echte Adresse in X-Real-IP – nur von dort
+    // geglaubt: Die Weiche erreicht den Container über eine lokale bzw. private Adresse, Besucher von außen nie.
+    const direkt = String(req.socket.remoteAddress ?? '')
+    const echt = String(req.headers['x-real-ip'] ?? '').trim()
+    const ip = opts.weiche && echt && WEICHEN_NETZ.test(direkt) ? echt : direkt
     const keks = cookies(req)[COOKIE] ?? ''
     const s = keks ? sitzungPruefen(keks) : null
     const sitzung = s ? { nutzer: s.nutzer, kennung: s.kennung } : null
