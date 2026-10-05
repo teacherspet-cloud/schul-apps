@@ -37,6 +37,7 @@ import type { Andock } from './blattWerkzeuge'
 import { materialMitZeilen } from './materialZeilen'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
+import type { FormArt } from '@shared/blattObjekte'
 import { FeldMarkierung, fundstellen, Rand, type Anmerkung } from './blattKorrektur'
 import { ampelVon, sichtbarBis, vollstaendigBearbeitet, type Ampel, type BlattFeldArt } from '@shared/blattFreigabe'
 import { eingabenAus, eingabeVerbuchen, PLAUS_SCHLUESSEL, ZUORDNUNG_SCHLUESSEL } from '@shared/blattAuswertung'
@@ -340,6 +341,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const [breite, setBreite] = useState(BREITE)
   const [ansicht, setAnsicht] = useState<'blatt' | 'liste'>(() => (window.innerWidth < 640 ? 'liste' : 'blatt'))
   const [werkzeug, setWerkzeug] = useState<Werkzeug>('tastatur')
+  // Werkzeug „Formen“ (05.10.2026): zuletzt gewählte Form
+  const [form, setForm] = useState<FormArt>('dreieck')
   const [stiftFarbe, setStiftFarbe] = useState(STIFT_FARBEN[0])
   const [markerFarbe, setMarkerFarbe] = useState(MARKER_FARBEN[0])
   const [fassungen, setFassungen] = useState(d.fassungen)
@@ -583,6 +586,12 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    * ihre Felder und Knöpfe fehlen. Die Lehrkraft sieht alles.
    */
   const alleAufgaben = gemessen?.aufgaben ?? []
+  /*
+   * Zeichenwerkzeuge (05.10.2026, Wunsch der Lehrkraft): Hat das Blatt Diagramme, Zeitleisten o. Ä. zum
+   * Zeichnen, stehen Stift, Radierer, Kästchen, Linien, Punkte und Formen auch dann bereit, wenn die
+   * Lehrkraft den Stift nicht freigegeben hat (dann ohne Textmarker).
+   */
+  const werkzeugeDa = d.einstellungen.stift || alleAufgaben.some((a) => a.zeichnen)
   const nummern = alleAufgaben.map((a) => a.nr)
   const frei = d.freigeschaltet ?? []
   const bis = lehrkraftSicht ? Number.POSITIVE_INFINITY : sichtbarBis(nummern, aufgabenFb, frei, Boolean(d.einstellungen.schrittweise))
@@ -681,8 +690,11 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         <Alert color="orange">Das Feedback konnte nicht erstellt werden: {fassungen.at(-1)!.fehler}. Deine Lehrkraft sieht dein Blatt trotzdem.</Alert>
       )}
 
-      {ansicht === 'blatt' && offen && d.einstellungen.stift && (
+      {ansicht === 'blatt' && offen && werkzeugeDa && (
         <Werkzeugleiste
+          form={form}
+          setForm={setForm}
+          nurZeichnen={!d.einstellungen.stift}
           werkzeug={werkzeug}
           setWerkzeug={setWerkzeug}
           stiftFarbe={stiftFarbe}
@@ -725,7 +737,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 antworten={antworten}
                 setze={setze}
                 gesperrt={!offen}
-                werkzeug={offen && d.einstellungen.stift ? werkzeug : 'tastatur'}
+                werkzeug={offen && werkzeugeDa ? werkzeug : 'tastatur'}
+                form={form}
                 stiftFarbe={stiftFarbe}
                 markerFarbe={markerFarbe}
                 objekte={objekte}
@@ -864,6 +877,8 @@ function Ebene(p: {
   runden: number
   /** Ampel je Aufgabe (nur mit Feedback je Aufgabe) */
   ampeln?: Record<number, Ampel> | null
+  /** Gewählte Form (Werkzeug „Formen“) */
+  form?: FormArt
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   const schreibt = p.werkzeug !== 'tastatur'
@@ -1052,6 +1067,7 @@ function Ebene(p: {
           werkzeug={p.werkzeug}
           farbe={p.stiftFarbe}
           gesperrt={p.gesperrt}
+          form={p.form}
         />
       ))}
       {/* Ampel links neben der Aufgabe (05.10.2026): rot = noch nicht, gelb = teilweise, grün = treffend */}

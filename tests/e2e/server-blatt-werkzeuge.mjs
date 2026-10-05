@@ -195,6 +195,23 @@ try {
     return l ? l.getBoundingClientRect().bottom : 0
   })
   pruefe(Math.abs(ende - ac.y) < 4, `Linienende rastet auf der Achse ein (Abweichung ${Math.round(Math.abs(ende - ac.y))} px)`)
+  // Formen (05.10.2026): aus dem Menü wählen, aufziehen; Radierer entfernt sie wieder
+  await s.locator('[data-werkzeug="form"]').click()
+  await s.locator('[data-form="kreis"]').click()
+  await s.mouse.move(b2.x + 260, b2.y + 40)
+  await s.mouse.down()
+  await s.mouse.move(b2.x + 340, b2.y + 120, { steps: 6 })
+  await s.mouse.up()
+  pruefe((await s.locator('[data-objekt-form="kreis"]').count()) === 1, 'Kreis aus dem Formen-Menü aufgezogen')
+  await s.waitForTimeout(2600)
+  const mitForm = await objekteHolen()
+  pruefe(
+    mitForm.some((o) => o.t === 'form' && o.f === 'kreis' && o.w === o.h && o.w > 40),
+    'Form gespeichert (Kreis, gleich breit wie hoch)'
+  )
+  await s.locator('[data-werkzeug="radierer"]').click()
+  await s.locator('[data-objekt-form="kreis"]').dispatchEvent('pointerdown')
+  pruefe((await s.locator('[data-objekt-form="kreis"]').count()) === 0, 'Radierer entfernt die Form')
   // Kästchen verschieben: angehängtes Linienende wandert mit
   await s.locator('[data-werkzeug="tastatur"]').click()
   const sch2 = await s.locator('[data-kasten-schieben]').last().boundingBox()

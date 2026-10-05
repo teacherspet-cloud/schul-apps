@@ -5,7 +5,8 @@
  * (Diagramme). Kästchen, Linien und Punkte sind Objekte (shared/blattObjekte.ts) – sie bleiben
  * verschieb- und änderbar und kommen auf den Seitenbildern auch bei der KI an.
  */
-import { ActionIcon, ColorSwatch, Group, Paper, Text, Tooltip } from '@mantine/core'
+import { FORMEN, formGeometrie, formMasse, type FormArt } from '@shared/blattObjekte'
+import { ActionIcon, ColorSwatch, Group, Menu, Paper, Text, Tooltip } from '@mantine/core'
 import {
   IconArrowBackUp,
   IconArrowsDiagonal2,
@@ -22,7 +23,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import type { BlattObjekt } from '@shared/blattObjekte'
 
-export type Werkzeug = 'tastatur' | 'stift' | 'marker' | 'radierer' | 'text' | 'linie' | 'punkt'
+export type Werkzeug = 'tastatur' | 'stift' | 'marker' | 'radierer' | 'text' | 'linie' | 'punkt' | 'form'
 
 export const STIFT_FARBEN = ['#1d4ed8', '#111827', '#dc2626', '#16a34a', '#9333ea']
 export const MARKER_FARBEN = ['#facc15', '#4ade80', '#f472b6', '#60a5fa', '#fb923c']
@@ -37,6 +38,23 @@ const WERKZEUGE: { w: Werkzeug; name: string; icon: React.ReactNode }[] = [
   { w: 'punkt', name: 'Punkt mit Wert (Diagramm)', icon: <IconCircleDot size={20} /> }
 ]
 
+/** Bei Zeichenaufgaben ohne erlaubten Stift (05.10.2026): nur, was zum Zeichnen und Beschriften gehört */
+const ZEICHEN_WERKZEUGE = new Set<Werkzeug>(['tastatur', 'stift', 'radierer', 'text', 'linie', 'punkt'])
+
+/** Symbol einer Form (für das Menü und den Knopf) */
+export function FormSymbol({ art, groesse = 20, farbe = 'currentColor' }: { art: FormArt; groesse?: number; farbe?: string }): React.JSX.Element {
+  const g = formGeometrie(art, 2, 3, groesse - 4, art === 'pfeil' ? groesse - 6 : groesse - 6)
+  return (
+    <svg width={groesse} height={groesse} viewBox={`0 0 ${groesse} ${groesse}`} aria-hidden>
+      {g.art === 'ellipse' ? (
+        <ellipse cx={g.cx} cy={g.cy} rx={g.rx} ry={g.ry} fill="none" stroke={farbe} strokeWidth={1.8} />
+      ) : (
+        <polygon points={g.points} fill="none" stroke={farbe} strokeWidth={1.8} strokeLinejoin="round" />
+      )}
+    </svg>
+  )
+}
+
 /** Mitwandernde Leiste: bleibt beim Scrollen oben sichtbar */
 export function Werkzeugleiste(p: {
   werkzeug: Werkzeug
@@ -46,6 +64,11 @@ export function Werkzeugleiste(p: {
   markerFarbe: string
   setMarkerFarbe: (f: string) => void
   rueckgaengig?: () => void
+  /** Gewählte Form (Werkzeug „Formen", 05.10.2026) */
+  form: FormArt
+  setForm: (f: FormArt) => void
+  /** Stift nicht erlaubt, aber das Blatt hat Zeichenaufgaben: nur die Zeichenwerkzeuge (05.10.2026) */
+  nurZeichnen?: boolean
 }): React.JSX.Element {
   const hinweis: Record<Werkzeug, string> = {
     tastatur: 'In die Felder tippen',
@@ -54,12 +77,13 @@ export function Werkzeugleiste(p: {
     radierer: 'Über Striche wischen; Kästchen und Linien antippen',
     text: 'Auf die Stelle tippen, an die das Kästchen soll',
     linie: 'Von einem Punkt zum anderen ziehen',
-    punkt: 'Auf die Stelle im Diagramm tippen, dann den Wert eintragen'
+    punkt: 'Auf die Stelle im Diagramm tippen, dann den Wert eintragen',
+    form: 'Form aufziehen (oder antippen); mit dem Radierer wieder entfernen'
   }
   return (
     <Paper withBorder shadow="sm" p={6} radius="md" style={{ position: 'sticky', top: 8, zIndex: 30 }} data-werkzeuge>
       <Group gap={4} wrap="wrap">
-        {WERKZEUGE.map((x) => {
+        {WERKZEUGE.filter((x) => !p.nurZeichnen || ZEICHEN_WERKZEUGE.has(x.w)).map((x) => {
           const aktiv = p.werkzeug === x.w
           const farbe = x.w === 'stift' ? p.stiftFarbe : x.w === 'marker' ? p.markerFarbe : undefined
           const knopf = (
@@ -81,6 +105,37 @@ export function Werkzeugleiste(p: {
             </Tooltip>
           )
         })}
+        {/* Formen: Knopf mit Ausklappmenü – Symbol der gewählten Form */}
+        <Menu position="bottom-start" withinPortal>
+          <Menu.Target>
+            <Tooltip label="Geometrische Form auf das Blatt legen">
+              <ActionIcon
+                size="lg"
+                variant={p.werkzeug === 'form' ? 'filled' : 'subtle'}
+                color={p.werkzeug === 'form' ? 'blue' : 'gray'}
+                aria-label="Formen"
+                data-werkzeug="form"
+              >
+                <FormSymbol art={p.form} />
+              </ActionIcon>
+            </Tooltip>
+          </Menu.Target>
+          <Menu.Dropdown data-formen-menue>
+            {FORMEN.map((f) => (
+              <Menu.Item
+                key={f.art}
+                leftSection={<FormSymbol art={f.art} />}
+                onClick={() => {
+                  p.setForm(f.art)
+                  p.setWerkzeug('form')
+                }}
+                data-form={f.art}
+              >
+                {f.name}
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
         {(p.werkzeug === 'stift' || p.werkzeug === 'marker') && (
           <Group gap={5} ml={4} data-farben>
             {(p.werkzeug === 'stift' ? STIFT_FARBEN : MARKER_FARBEN).map((f) => {
@@ -213,8 +268,12 @@ export function ObjektEbene(p: {
   farbe: string
   gesperrt: boolean
   andocken?: Andock[]
+  /** Gewählte Form für das Werkzeug „Formen" */
+  form?: FormArt
 }): React.JSX.Element {
   const flaeche = useRef<HTMLDivElement>(null)
+  // Form wird aufgezogen: Anfang und aktuelle Ecke
+  const [formZug, setFormZug] = useState<{ x: number; y: number; x2: number; y2: number } | null>(null)
   const [zieht, setZieht] = useState<{ x: number; y: number; x2: number; y2: number; v1?: string; v2?: string } | null>(null)
   const [ziel, setZiel] = useState<{ x: number; y: number } | null>(null)
   const [fokus, setFokus] = useState<string | null>(null)
@@ -253,7 +312,7 @@ export function ObjektEbene(p: {
     const w = Math.min(o.w ?? 170, p.lage.w - 4)
     return { ...o, w, x: Math.max(2, Math.min(p.lage.w - w - 2, o.x)), y: Math.max(2, Math.min(p.lage.h - h - 2, o.y)) }
   }
-  const linieAktiv = !p.gesperrt && (p.werkzeug === 'linie' || p.werkzeug === 'text' || p.werkzeug === 'punkt')
+  const linieAktiv = !p.gesperrt && (p.werkzeug === 'linie' || p.werkzeug === 'text' || p.werkzeug === 'punkt' || p.werkzeug === 'form')
   const radiert = !p.gesperrt && p.werkzeug === 'radierer'
 
   // Kästchen ziehen (Verschieben oder Größe) – über das ganze Fenster, damit schnelle Bewegungen nicht abreißen
@@ -320,6 +379,11 @@ export function ObjektEbene(p: {
       onPointerDown={(e) => {
         if (!linieAktiv || (e.target as HTMLElement).closest('[data-objekt-text]')) return
         const q = punkt(e)
+        if (p.werkzeug === 'form') {
+          flaeche.current!.setPointerCapture(e.pointerId)
+          setFormZug({ x: q.x, y: q.y, x2: q.x, y2: q.y })
+          return
+        }
         if (p.werkzeug === 'text') {
           const id = neueId()
           setzeEigene([...eigene, klemmen({ id, s: p.seite, t: 'text', x: q.x, y: q.y - 12, w: 170, text: '', farbe: p.farbe }, KASTEN_MIN_H)])
@@ -342,6 +406,11 @@ export function ObjektEbene(p: {
         }
       }}
       onPointerMove={(e) => {
+        if (formZug) {
+          const q = punkt(e)
+          setFormZug({ ...formZug, x2: q.x, y2: q.y })
+          return
+        }
         if (p.werkzeug !== 'linie' || !linieAktiv) return
         const q = punkt(e)
         const r = einrasten(q, andocken, kaesten())
@@ -352,6 +421,32 @@ export function ObjektEbene(p: {
       }}
       onPointerLeave={() => !zieht && setZiel(null)}
       onPointerUp={() => {
+        if (formZug) {
+          const f = p.form ?? 'rechteck'
+          const w0 = Math.abs(formZug.x2 - formZug.x)
+          const h0 = Math.abs(formZug.y2 - formZug.y)
+          // Nur angetippt: Standardgröße, mittig um die Stelle
+          const klein = w0 < 12 && h0 < 12
+          const { w, h } = formMasse(f, klein ? 90 : Math.max(12, w0), klein ? (f === 'quadrat' || f === 'kreis' ? 90 : 64) : Math.max(12, h0))
+          const x = klein ? formZug.x - w / 2 : Math.min(formZug.x, formZug.x2)
+          const y = klein ? formZug.y - h / 2 : Math.min(formZug.y, formZug.y2)
+          setzeEigene([
+            ...eigene,
+            {
+              id: neueId(),
+              s: p.seite,
+              t: 'form',
+              f,
+              x: Math.max(1, Math.min(p.lage.w - w - 1, x)),
+              y: Math.max(1, Math.min(p.lage.h - h - 1, y)),
+              w,
+              h,
+              farbe: p.farbe
+            }
+          ])
+          setFormZug(null)
+          return
+        }
         if (!zieht) return
         if (Math.hypot(zieht.x2 - zieht.x, zieht.y2 - zieht.y) > 8) setzeEigene([...eigene, { id: neueId(), s: p.seite, t: 'linie', ...zieht, farbe: p.farbe }])
         setZieht(null)
@@ -366,6 +461,41 @@ export function ObjektEbene(p: {
             a.art === 'punkt' ? <circle key={`a${i}`} cx={a.x} cy={a.y} r={2.4} fill="none" stroke="#0ca678" strokeOpacity={0.55} strokeWidth={1} /> : null
           )}
         {ziel && <circle cx={ziel.x} cy={ziel.y} r={7} fill="rgba(12,166,120,0.18)" stroke="#0ca678" strokeWidth={2} data-andock-ziel />}
+        {/* Formen (05.10.2026): beim Radieren antippbar */}
+        {[
+          ...eigene.filter((o) => o.t === 'form'),
+          ...(formZug
+            ? [
+                {
+                  id: 'neu',
+                  s: p.seite,
+                  t: 'form' as const,
+                  f: p.form ?? 'rechteck',
+                  x: Math.min(formZug.x, formZug.x2),
+                  y: Math.min(formZug.y, formZug.y2),
+                  w: Math.max(4, Math.abs(formZug.x2 - formZug.x)),
+                  h: Math.max(4, Math.abs(formZug.y2 - formZug.y)),
+                  farbe: p.farbe
+                }
+              ]
+            : [])
+        ].map((o) => {
+          const g = formGeometrie(o.f ?? 'rechteck', o.x, o.y, o.w ?? 90, o.h ?? 70)
+          const stil = {
+            fill: radiert ? 'rgba(220,38,38,0.08)' : 'none',
+            stroke: o.farbe ?? '#1d4ed8',
+            strokeWidth: 2.2,
+            strokeLinejoin: 'round' as const,
+            ...(radiert && o.id !== 'neu' ? { pointerEvents: 'all' as const, cursor: 'pointer' } : {})
+          }
+          const weg =
+            radiert && o.id !== 'neu' ? (e: React.PointerEvent): void => (e.stopPropagation(), setzeEigene(eigene.filter((x) => x.id !== o.id))) : undefined
+          return g.art === 'ellipse' ? (
+            <ellipse key={o.id} cx={g.cx} cy={g.cy} rx={g.rx} ry={g.ry} style={stil} onPointerDown={weg} data-objekt-form={o.f} />
+          ) : (
+            <polygon key={o.id} points={g.points} style={stil} onPointerDown={weg} data-objekt-form={o.f} />
+          )
+        })}
         {[...eigene.filter((o) => o.t === 'linie'), ...(zieht ? [{ id: 'neu', s: p.seite, t: 'linie' as const, ...zieht, farbe: p.farbe }] : [])].map((o) => (
           <g key={o.id} data-objekt-linie>
             {radiert && o.id !== 'neu' && (
