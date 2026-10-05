@@ -203,7 +203,7 @@ export function BlattFreigabeDialog({
         einstellungen: {
           feedback,
           // Schrittweise braucht das Urteil je Aufgabe
-          aufgabenFeedback: schrittweise || (feedback && aufgabenFeedback),
+          aufgabenFeedback: schrittweise || merkAmEnde || (feedback && aufgabenFeedback),
           runden,
           aufgabenRunden: 2,
           stift,
@@ -297,6 +297,7 @@ export function BlattFreigabeDialog({
         {aufgabenZahl > 0 && sheet && sheet.blocks.some((b) => b.type === 'infoBox') && (
           <Checkbox
             label="Merkkästen erst nach vollständiger Bearbeitung zeigen"
+            description="Erst wenn alle Aufgaben mindestens teilweise treffend gelöst sind (Ampel gelb oder grün); Einreichen allein genügt nicht."
             checked={merkAmEnde}
             onChange={(e) => setMerkAmEnde(e.currentTarget.checked)}
             data-blatt-merk-am-ende

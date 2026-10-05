@@ -586,7 +586,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const nummern = alleAufgaben.map((a) => a.nr)
   const frei = d.freigeschaltet ?? []
   const bis = lehrkraftSicht ? Number.POSITIVE_INFINITY : sichtbarBis(nummern, aufgabenFb, frei, Boolean(d.einstellungen.schrittweise))
-  const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei, genutzt > 0)
+  const merkZeigen = lehrkraftSicht || !d.einstellungen.merkAmEnde || vollstaendigBearbeitet(nummern, aufgabenFb, frei)
   const aufgaben = alleAufgaben.filter((a) => a.nr <= bis)
   const felderSichtbar = (gemessen?.felder ?? []).filter((f) => f.nr <= bis)
   const ampeln = d.einstellungen.aufgabenFeedback

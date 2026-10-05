@@ -588,7 +588,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         ...(e0.merkAmEnde === true ? { merkAmEnde: true } : {})
       }
       // Schrittweise braucht das Urteil je Aufgabe
-      if (einstellungen.schrittweise) einstellungen.aufgabenFeedback = true
+      // Schrittweise und Merkkästen am Ende brauchen das Urteil je Aufgabe (Ampel)
+      if (einstellungen.schrittweise || einstellungen.merkAmEnde) einstellungen.aufgabenFeedback = true
       const titel = String(k0.titel ?? 'Arbeitsblatt').slice(0, 160)
       const rid = verknuepfteFreigabeAnlegen({
         lehrkraftId: ich.id,

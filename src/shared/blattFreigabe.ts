@@ -217,8 +217,10 @@ export function sichtbarBis(nummern: number[], verlauf: AufgabenVerlauf, freiges
   return liste[liste.length - 1]
 }
 
-/** Alle Aufgaben mindestens gelb – „vollständig bearbeitet" (Merkkästen erscheinen) – oder schon eingereicht */
-export function vollstaendigBearbeitet(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[], eingereicht: boolean): boolean {
-  if (eingereicht) return true
+/**
+ * „Vollständig bearbeitet" (Merkkästen erscheinen): ALLE Aufgaben mindestens gelb. Einreichen allein genügt
+ * nicht (05.10.2026, Entscheidung der Lehrkraft).
+ */
+export function vollstaendigBearbeitet(nummern: number[], verlauf: AufgabenVerlauf, freigeschaltet: number[]): boolean {
   return nummern.length > 0 && nummern.every((nr) => ampelVon(verlauf[String(nr)], freigeschaltet.includes(nr)) !== 'rot')
 }

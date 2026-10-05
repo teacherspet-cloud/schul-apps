@@ -15,9 +15,9 @@ describe('Schrittweise Freischaltung und Ampel (05.10.2026)', () => {
     expect(sichtbarBis([1, 2, 3], { '1': [{ einschaetzung: 'sicher' }] }, [2], true)).toBe(3)
     expect(sichtbarBis([1, 2, 3], {}, [], false)).toBe(Number.POSITIVE_INFINITY)
   })
-  it('vollständig bearbeitet: alle mindestens gelb oder eingereicht', () => {
-    expect(vollstaendigBearbeitet([1, 2], { '1': [{ einschaetzung: 'sicher' }] }, [], false)).toBe(false)
-    expect(vollstaendigBearbeitet([1, 2], { '1': [{ einschaetzung: 'sicher' }] }, [2], false)).toBe(true)
-    expect(vollstaendigBearbeitet([1, 2], {}, [], true)).toBe(true)
+  it('vollständig bearbeitet: alle mindestens gelb – Einreichen allein genügt nicht', () => {
+    expect(vollstaendigBearbeitet([1, 2], { '1': [{ einschaetzung: 'sicher' }] }, [])).toBe(false)
+    expect(vollstaendigBearbeitet([1, 2], { '1': [{ einschaetzung: 'sicher' }] }, [2])).toBe(true)
+    expect(vollstaendigBearbeitet([1, 2], { '1': [{ einschaetzung: 'noch nicht' }], '2': [{ einschaetzung: 'teilweise' }] }, [])).toBe(false)
   })
 })
