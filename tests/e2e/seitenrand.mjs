@@ -125,7 +125,10 @@ const beschreibe = (u) =>
 
 const sichtbareSeiten = (seitenSel) =>
   page.evaluate(
-    (s) => [...document.querySelectorAll(s)].filter((x) => !x.closest('.ws-measure, .vt-measure') && !x.parentElement.closest(s) && x.getBoundingClientRect().height > 0).length,
+    (s) =>
+      [...document.querySelectorAll(s)].filter(
+        (x) => !x.closest('.ws-measure, .vt-measure') && !x.parentElement.closest(s) && x.getBoundingClientRect().height > 0
+      ).length,
     seitenSel
   )
 
@@ -145,7 +148,10 @@ async function warteSeiten(seitenSel) {
 async function ansichtPruefen(name, seitenSel, flaecheSel) {
   const n = await warteSeiten(seitenSel)
   const m = await page.evaluate(([mess, s, f]) => eval(mess)(s, f), [MESSUNG, seitenSel, flaecheSel])
-  pruefe(m.ueberlauf.length === 0, `${name} – Ansicht: ${n} Seiten, nichts ragt über den Satzspiegel${m.ueberlauf.length ? ` → ${beschreibe(m.ueberlauf)}` : ''}`)
+  pruefe(
+    m.ueberlauf.length === 0,
+    `${name} – Ansicht: ${n} Seiten, nichts ragt über den Satzspiegel${m.ueberlauf.length ? ` → ${beschreibe(m.ueberlauf)}` : ''}`
+  )
   if (m.ueberlauf.length) {
     await page.evaluate(
       ([s, nr]) =>
@@ -164,7 +170,8 @@ const datei = (name) => name.replace(/[^\w-]+/g, '_')
 
 /** Druck-HTML der Ansicht in einem unsichtbaren Fenster mit Druckmedien messen und als PDF ausgeben */
 async function druckPruefen(name, seitenSel, flaecheSel) {
-  const html = await page.evaluate(() => window.__selftest.druckHtmlJetzt())
+  // Mit Silbentrennung wie der echte Export (05.10.2026)
+  const html = await page.evaluate(() => (window.__selftest.druckHtmlGetrennt ?? window.__selftest.druckHtmlJetzt)())
   const pfad = join(userData, `${datei(name)}.html`)
   writeFileSync(pfad, html, 'utf8')
   const erg = await app.evaluate(
@@ -188,7 +195,10 @@ async function druckPruefen(name, seitenSel, flaecheSel) {
   writeFileSync(join(out, `${datei(name)}.pdf`), pdf)
   const pdfSeiten = (await PDFDocument.load(pdf)).getPageCount()
   const d = erg.druck
-  pruefe(d.ueberlauf.length === 0, `${name} – Druck: ${d.seiten} Seiten, nichts ragt über den Satzspiegel${d.ueberlauf.length ? ` → ${beschreibe(d.ueberlauf)}` : ''}`)
+  pruefe(
+    d.ueberlauf.length === 0,
+    `${name} – Druck: ${d.seiten} Seiten, nichts ragt über den Satzspiegel${d.ueberlauf.length ? ` → ${beschreibe(d.ueberlauf)}` : ''}`
+  )
   pruefe(pdfSeiten === d.seiten, `${name} – PDF hat ${pdfSeiten} Seiten wie das Druck-HTML (${d.seiten})`)
   return { ...d, pdfSeiten }
 }

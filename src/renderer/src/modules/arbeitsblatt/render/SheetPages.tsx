@@ -966,10 +966,21 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       const el = root.querySelector<HTMLElement>(`[data-layout="${layoutKey(sheet.id, key)}"]`)
       if (!el) continue
       const bodies = el.querySelectorAll<HTMLElement>('.ws-page .ws-body')
+      /*
+       * Puffer am Seitenende (05.10.2026, Befund der Lehrkraft: „Als PDF gespeichert, sind gelegentlich die
+       * untersten Zeilen vom Fußbereich abgeschnitten"). Gemessen wird hier mit dem Schriftsatz des
+       * Bildschirms (Windows-Skalierung, Hinting); das PDF setzt ohne – eine Zeile kann dort anders
+       * umbrechen. Eine halbe Zeile Luft fängt das ab; in Bildschirmpunkten, also samt Zoom des Editors.
+       */
+      const puffer = (body: HTMLElement): number => {
+        const st = getComputedStyle(body)
+        const massstab = body.offsetHeight ? body.getBoundingClientRect().height / body.offsetHeight : 1
+        return 0.5 * (parseFloat(st.fontSize) || 16) * massstab
+      }
       const available = (body?: HTMLElement): number => {
         if (!body) return 1000
         const pad = parseFloat(getComputedStyle(body).paddingTop) || 0
-        return body.getBoundingClientRect().height - pad
+        return body.getBoundingClientRect().height - pad - puffer(body)
       }
       const firstHeight = available(bodies[0])
       const otherHeight = available(bodies[1])
@@ -1112,7 +1123,8 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
              */
             unitLines:
               block?.type === 'text' && block.lineNumbers
-                ? (zeilen?.lines ?? unitEls.map((u) => {
+                ? (zeilen?.lines ??
+                  unitEls.map((u) => {
                     if (u.classList.contains('ws-glossary')) return 0
                     const zeile = parseFloat(getComputedStyle(u).lineHeight) || fontPx * 1.5
                     // Die Höhe des Absatzes selbst – `units` enthält den Abstand zum nächsten mit

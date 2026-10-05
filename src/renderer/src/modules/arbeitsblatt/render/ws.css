@@ -344,7 +344,8 @@
 
 /* ---------- Bausteine ---------- */
 .ws-block {
-  margin: 0 0 4mm;
+  /* Eine Leerzeile (einfacher Zeilenabstand der Blattschrift) zwischen Bausteinen – Wunsch der Lehrkraft, 05.10.2026 */
+  margin: 0 0 var(--ws-leerzeile, 4mm);
   break-inside: avoid;
 }
 /* Nur im Lösungsteil (Editor): gestrichelt umrandet mit Vermerk – gedruckt wird er nur auf den Lösungen */
@@ -394,7 +395,7 @@
 .ws-goals ul {
   margin: 1mm 0 0;
   padding-left: 1.3em;
-  list-style: "✓  ";
+  list-style: '✓  ';
 }
 
 .ws-info {
@@ -787,7 +788,7 @@
   width: calc(100% - 45mm - var(--rand-abstand, 3mm));
 }
 .ws-lines-rand::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   bottom: 0;
@@ -806,8 +807,7 @@
 }
 .ws-grid {
   margin-top: 1.5mm;
-  background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm),
-    linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);
+  background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm), linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);
   background-size: 5mm 5mm;
   border: 0.2mm solid #b8c4cc;
 }
@@ -935,7 +935,10 @@
 }
 /* Markierte Zellen (render/tabellenAuswahl.tsx): Rechtsklick → Kreismenü „angleichen" – nur im Editor */
 .ws-table-ziehbar .ws-zelle-markiert {
-  background-image: linear-gradient(color-mix(in srgb, var(--mantine-primary-color-filled, #228be6) 22%, transparent), color-mix(in srgb, var(--mantine-primary-color-filled, #228be6) 22%, transparent));
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--mantine-primary-color-filled, #228be6) 22%, transparent),
+    color-mix(in srgb, var(--mantine-primary-color-filled, #228be6) 22%, transparent)
+  );
   outline: 1.5px solid var(--mantine-primary-color-filled, #228be6);
   outline-offset: -1.5px;
 }
@@ -982,7 +985,7 @@
  */
 .ws-spalten-griff::after,
 .ws-zeilen-griff::after {
-  content: "";
+  content: '';
   position: absolute;
   border-radius: 2px;
   background: color-mix(in srgb, var(--ws-accent) 70%, transparent);
@@ -1125,16 +1128,11 @@
 .ws-workspace-lines {
   border: none;
   border-radius: 0;
-  background-image: linear-gradient(
-    to bottom,
-    transparent calc(var(--ws-linie, 8.5mm) - 0.25mm),
-    #666 calc(var(--ws-linie, 8.5mm) - 0.25mm)
-  );
+  background-image: linear-gradient(to bottom, transparent calc(var(--ws-linie, 8.5mm) - 0.25mm), #666 calc(var(--ws-linie, 8.5mm) - 0.25mm));
   background-size: 100% var(--ws-linie, 8.5mm);
 }
 .ws-workspace-grid {
-  background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm),
-    linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);
+  background-image: linear-gradient(to right, #b8c4cc 0.2mm, transparent 0.2mm), linear-gradient(to bottom, #b8c4cc 0.2mm, transparent 0.2mm);
   background-size: 5mm 5mm;
 }
 
@@ -1430,6 +1428,13 @@
     page-break-after: always;
     break-after: page;
   }
+  /*
+   * Im Druck/PDF nichts abschneiden (05.10.2026): Bricht dort eine Zeile anders um als auf dem Bildschirm,
+   * rückt sie lieber in den unteren Rand, als zu verschwinden. Der Seitenumbruch hält dafür Luft frei.
+   */
+  .ws-body {
+    overflow: visible;
+  }
 }
 
 /*
@@ -1502,7 +1507,7 @@
   border-radius: 1.5mm;
 }
 .ws-board-section.ws-board-copy .ws-board-heading::after {
-  content: " ✎";
+  content: ' ✎';
   color: #868e96;
   font-size: 0.85em;
 }
@@ -1614,15 +1619,7 @@
  * Rahmen des Überthemas (er nimmt `currentColor`, deshalb nur die Füllfarbe der Schrift
  * ausblenden, nicht `color`). Word setzt die Texte als echten Text darüber.
  */
-.ws-cover-nur-grund
-  :is(
-    .ws-cover-title,
-    .ws-cover-facts,
-    .ws-cover-kicker,
-    .ws-cover-ueberthema,
-    .ws-cover-blurb,
-    .ws-cover-badge
-  ) {
+.ws-cover-nur-grund :is(.ws-cover-title, .ws-cover-facts, .ws-cover-kicker, .ws-cover-ueberthema, .ws-cover-blurb, .ws-cover-badge) {
   -webkit-text-fill-color: transparent;
 }
 .ws-cover-nur-grund :is(.ws-cover-title, .ws-cover-blurb) :is(svg, img) {
@@ -1720,12 +1717,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    circle at 50% 55%,
-    #ffffff 0%,
-    var(--cover-light) 55%,
-    var(--cover-mid) 100%
-  );
+  background: radial-gradient(circle at 50% 55%, #ffffff 0%, var(--cover-light) 55%, var(--cover-mid) 100%);
 }
 .ws-cover-kopf-titelbild .ws-cover-fox {
   width: 72mm;
@@ -1800,11 +1792,7 @@
   top: 0;
   transform: translate(-50%, -35%);
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 35% 35%,
-    #ffffff 0 18%,
-    var(--cover-dark) 22% 100%
-  );
+  background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, var(--cover-dark) 22% 100%);
   box-shadow: 0.4mm 0.6mm 0.8mm rgba(0, 0, 0, 0.3);
 }
 .ws-cover-thumb-inner {
@@ -1818,7 +1806,7 @@
 }
 
 /* ---- Griffe: nur im Editor, nie im Druck ---- */
-.ws-cover-thumb[role="button"] {
+.ws-cover-thumb[role='button'] {
   cursor: move;
   touch-action: none;
 }
@@ -1845,7 +1833,7 @@
   cursor: grab;
 }
 .ws-cover-griff-drehen::after {
-  content: "";
+  content: '';
   position: absolute;
   left: 50%;
   top: 100%;
@@ -2685,7 +2673,7 @@ html[data-griff-zug] * {
   margin-bottom: 0;
 }
 .ws-notizrand .ws-paragraph::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   bottom: 0;
@@ -2818,7 +2806,7 @@ html[data-griff-zug] * {
   pointer-events: auto;
 }
 .ws-illu-bubble::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 4mm;
   width: 0;

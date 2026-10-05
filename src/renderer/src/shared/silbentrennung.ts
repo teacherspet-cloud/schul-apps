@@ -62,7 +62,12 @@ export function trennerLaden(sprache: TrennSprache): Promise<Trenner | null> {
         geladen.set(sprache, t)
         return t
       })
-      .catch(() => null)
+      .catch(() => {
+        // Nicht für die ganze Sitzung merken (05.10.2026): Ohne Trennmuster bricht das PDF anders um als
+        // die Ansicht – der nächste Druck soll es erneut versuchen
+        laden.delete(sprache)
+        return null
+      })
     laden.set(sprache, p)
   }
   return p
@@ -98,8 +103,12 @@ export function spracheAusCode(code: string | null | undefined): TrennSprache | 
 // ---------------------------------------------------------------- Sprache erkennen (Faustregel)
 
 const HAEUFIG: Partial<Record<TrennSprache, string[]>> = {
-  de: 'der die das und ist nicht ein eine einen mit sich auf für von dem den des zu im ich du wir sie es wie was auch noch nach bei aus oder aber wenn dass werden wird sind haben hat schreibe lies ergänze ordne beantworte'.split(' '),
-  en: 'the and is are not a an of to in that it with for on as was were be have has this you your they their what which who how do does write read complete answer use find'.split(' '),
+  de: 'der die das und ist nicht ein eine einen mit sich auf für von dem den des zu im ich du wir sie es wie was auch noch nach bei aus oder aber wenn dass werden wird sind haben hat schreibe lies ergänze ordne beantworte'.split(
+    ' '
+  ),
+  en: 'the and is are not a an of to in that it with for on as was were be have has this you your they their what which who how do does write read complete answer use find'.split(
+    ' '
+  ),
   fr: 'le la les et est une un des du de pas que qui dans pour sur avec il elle ils nous vous ce cette sont au aux écris lis complète'.split(' '),
   es: 'el la los las y es una un del de no que en por con para se lo su sus como más pero está son escribe lee completa'.split(' '),
   it: 'il lo la gli le e è una un di che non per con del della sono come anche ma'.split(' '),

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { htmlMitTrennung } from '../silbentrennung'
 
 /**
  * Für die Wachen (nur im Selbsttest, `window.__selftest`): das Druck-HTML des gerade bearbeiteten
@@ -14,6 +15,12 @@ export function useDruckFuerWachen(bauen: (() => string) | null, abhaengig: read
     const w = window as unknown as { __selftest?: Record<string, unknown> }
     if (!w.__selftest || !bauen) return
     w.__selftest.druckHtmlJetzt = bauen
+    /*
+     * Wie es wirklich ins PDF geht (05.10.2026): mit den weichen Trennstrichen, die window.api vor dem
+     * Umrechnen einsetzt (silbentrennung.ts). Ohne sie brechen Tabellenzellen anders um als in der
+     * Ansicht – die Wache maß dann ein Blatt, das es so nie gibt.
+     */
+    w.__selftest.druckHtmlGetrennt = () => htmlMitTrennung(bauen())
     // Neu gesetzt wird nur, wenn sich Dokument oder Seitenaufteilung ändern
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, abhaengig)
