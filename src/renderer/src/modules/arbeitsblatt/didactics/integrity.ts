@@ -172,7 +172,7 @@ export const refOf = (b: WsBlock): string => b.ref ?? b.id
 const KEINE_TEXTE = new Set(['id', 'ref', 'dataUrl', 'aiPrompt', 'url'])
 
 /** Wendet `fn` auf alle Texte eines Wertes an; unveränderte Teile bleiben dasselbe Objekt. */
-function wandleTexte(wert: unknown, fn: (s: string) => string): unknown {
+export function wandleTexte(wert: unknown, fn: (s: string) => string): unknown {
   if (typeof wert === 'string') return fn(wert)
   if (Array.isArray(wert)) {
     let geaendert = false

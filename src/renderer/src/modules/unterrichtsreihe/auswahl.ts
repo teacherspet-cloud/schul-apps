@@ -12,7 +12,7 @@ import type { StructuredRequest } from '@shared/types'
 import type { Reihe, Schritt } from '@shared/reihe'
 import { plainText } from '../../shared/richtext/parse'
 import type { Sheet, TaskBlock, Worksheet, WsBlock } from '../arbeitsblatt/model/types'
-import { isMaterial, loeseMaterialverweise, materialNummern } from '../arbeitsblatt/didactics/integrity'
+import { isMaterial, loeseMaterialverweise, materialNummern, wandleTexte } from '../arbeitsblatt/didactics/integrity'
 import { BLOCK_LABELS } from '../arbeitsblatt/model/factory'
 import { describeBlock } from '../arbeitsblatt/generation/describe'
 
@@ -69,19 +69,118 @@ export function auswahlEintraege(sheet: Sheet): AuswahlEintrag[] {
   })
 }
 
+// ---------------------------------------------------------------- Aufgabennummern in Texten (05.10.2026)
+/*
+ * Befund der Lehrkraft: Freie Texte im gekürzten Material („Optional help cards for task 4", „Nutze deine
+ * Ergebnisse aus Aufgabe 2") behielten die alte Nummer, obwohl die Aufgaben neu durchgezählt werden. Jetzt
+ * werden Verweise in ALLEN sichtbaren Texten (Hilfen, Hinweise, Aufgaben, Lösungen) auf die neue Zählung
+ * umgeschrieben; Bausteine, die nur ausgeblendete Aufgaben betreffen, fallen mit weg.
+ */
+const AUFGABE_WORT = String.raw`(?:Aufgaben?|Aufg\.|Teilaufgaben?|[Tt]asks?|[Ee]xercises?|[Ee]xercices?|[Tt]âches?|[Ee]jercicios?|[Tt]areas?|[Ee]sercizi|[Ee]sercizio)`
+const NR = String.raw`\d{1,2}[a-h]?`
+const VERBINDER = String.raw`\s*(?:,|und|and|et|y|e|bis|to|à|–|-|/|&)\s*`
+const VERWEIS = new RegExp(String.raw`(\b${AUFGABE_WORT}\s+)(${NR}(?:${VERBINDER}${NR})*)(?![\d])`, 'g')
+const EINZELNR = /(\d{1,2})([a-h]?)/g
+
+/** Alle Aufgabennummern, auf die ein Text verweist */
+export function aufgabenVerweise(text: string): number[] {
+  const aus: number[] = []
+  for (const m of text.matchAll(VERWEIS)) for (const n of m[2].matchAll(EINZELNR)) aus.push(Number(n[1]))
+  return aus
+}
+
+/**
+ * Verweise umschreiben: `nummern` alt → neu; `buchstaben` je alter Nummer: alte → neue Teilaufgabe („4c" → „3b").
+ * Verweist ein sichtbarer Text auf eine ausgeblendete Aufgabe, wird sie als „(entfällt)" gekennzeichnet – nach dem
+ * Neuzählen trüge sonst eine ANDERE Aufgabe diese Nummer. Die Lehrkraft bekommt dazu eine Warnung.
+ */
+export function verweiseUmschreiben(text: string, nummern: Map<number, number | null>, buchstaben: Map<number, Map<string, string>> = new Map()): string {
+  if (!/\d/.test(text)) return text
+  return text.replace(
+    VERWEIS,
+    (_ganz, wort: string, liste: string) =>
+      wort +
+      liste.replace(EINZELNR, (nr: string, z: string, b: string) => {
+        const alt = Number(z)
+        const neu = nummern.get(alt)
+        if (neu === undefined) return nr
+        if (neu === null) return `${nr} (entfällt)`
+        return `${neu}${b ? (buchstaben.get(alt)?.get(b) ?? b) : ''}`
+      })
+  )
+}
+
+/** Teilaufgaben-Verweise innerhalb einer Aufgabe („aus b)", „Teilaufgabe c") auf die neuen Buchstaben */
+function buchstabenUmschreiben(text: string, karte: Map<string, string>): string {
+  if (!karte.size) return text
+  return text
+    .replace(/(^|[^\p{L}\d])([a-h])\)/gu, (ganz, vor: string, b: string) => (karte.has(b) ? `${vor}${karte.get(b)})` : ganz))
+    .replace(/\b(Teilaufgabe|part|partie|parte)\s+([a-h])\b/g, (ganz, wort: string, b: string) => (karte.has(b) ? `${wort} ${karte.get(b)}` : ganz))
+}
+
+/** Texte eines Bausteins (für die Verweissuche) */
+function texteVon(b: WsBlock): string {
+  const t: string[] = []
+  wandleTexte(b, (x) => (t.push(x), x))
+  return t.join('\n')
+}
+
+/** Nummerierung alt → neu (null: ausgeblendet) und Buchstabenkarten je Aufgabe */
+function zaehlung(bloecke: WsBlock[], a: Auswahl): { nummern: Map<number, number | null>; buchstaben: Map<number, Map<string, string>> } {
+  const nummern = new Map<number, number | null>()
+  const buchstaben = new Map<number, Map<string, string>>()
+  let alt = 0
+  let neu = 0
+  for (const b of bloecke) {
+    if (b.type !== 'task') continue
+    alt++
+    const weg = stufeVon(a, b.id) === 'aus'
+    nummern.set(alt, weg ? null : ++neu)
+    const karte = new Map<string, string>()
+    let k = 0
+    b.parts.forEach((p, i) => {
+      if (stufeVon(a, teilSchluessel(b.id, p.id)) === 'aus') return
+      karte.set(String.fromCharCode(97 + i), String.fromCharCode(97 + k++))
+    })
+    if ([...karte].some(([x, y]) => x !== y)) buchstaben.set(alt, karte)
+  }
+  return { nummern, buchstaben }
+}
+
+/**
+ * Bausteine (keine Aufgaben, kein Material), die AUSSCHLIESSLICH auf ausgeblendete Aufgaben verweisen –
+ * z. B. „Hilfekarten zu Aufgabe 4", wenn Aufgabe 4 ausgeblendet ist. Sie fallen mit weg.
+ */
+export function automatischAus(sheet: Sheet, a: Auswahl | undefined): string[] {
+  if (!a || !Object.keys(a).length) return []
+  const { nummern } = zaehlung(sheet.blocks, a)
+  return sheet.blocks
+    .filter((b) => b.type !== 'task' && !isMaterial(b) && stufeVon(a, b.id) !== 'aus')
+    .filter((b) => {
+      const v = aufgabenVerweise(texteVon(b))
+      return v.length > 0 && v.every((n) => nummern.get(n) === null)
+    })
+    .map((b) => b.id)
+}
+
 /** Das Blatt, wie die Lernenden es in diesem Schritt sehen – das Original bleibt unverändert */
 export function blattMitAuswahl(sheet: Sheet, a: Auswahl | undefined): Sheet {
   if (!a || !Object.keys(a).length) return sheet
   // Verweise „M{kennung}" vorher auflösen und Nummern festhalten – sonst rückten sie nach
   const bloecke = loeseMaterialverweise(sheet.blocks)
   const nummern = materialNummern(bloecke)
+  const { nummern: aufgaben, buchstaben } = zaehlung(bloecke, a)
+  const mitWeg = new Set(automatischAus(sheet, a))
   const neu: WsBlock[] = []
+  let alt = 0
   for (const b of bloecke) {
+    const altNr = b.type === 'task' ? ++alt : 0
     const stufe = stufeVon(a, b.id)
-    if (stufe === 'aus') continue
+    if (stufe === 'aus' || mitWeg.has(b.id)) continue
     const m = nummern.get(b.id)
     let x: WsBlock = m ? { ...b, festeNummer: m } : b
     if (x.type === 'task') {
+      const karte = buchstaben.get(altNr) ?? new Map<string, string>()
       const t: TaskBlock = {
         ...x,
         parts: x.parts
@@ -89,8 +188,11 @@ export function blattMitAuswahl(sheet: Sheet, a: Auswahl | undefined): Sheet {
           .map((p) => (stufeVon(a, teilSchluessel(b.id, p.id)) === 'frei' ? { ...p, instruction: `★ freiwillig: ${p.instruction}` } : p)),
         ...(stufe === 'frei' ? { freiwillig: true } : {})
       }
-      x = t
+      // Teilaufgaben-Verweise innerhalb der Aufgabe („aus c)" → „aus b)")
+      x = karte.size ? (wandleTexte(t, (s) => buchstabenUmschreiben(s, karte)) as TaskBlock) : t
     }
+    // Aufgabennummern in allen Texten auf die neue Zählung
+    x = wandleTexte(x, (s) => verweiseUmschreiben(s, aufgaben, buchstaben)) as WsBlock
     neu.push(x)
   }
   return { ...sheet, blocks: neu }
@@ -120,6 +222,23 @@ export function auswahlWarnungen(sheet: Sheet, a: Auswahl | undefined): string[]
     }
   if (!sichtbareAufgaben.some((t) => stufeVon(a, t.id) === 'pflicht'))
     aus.push('Es bleibt keine Pflichtaufgabe – der Schritt ließe sich ohne Arbeit abschließen.')
+  // Sichtbare Texte, die auf ausgeblendete Aufgaben verweisen (dort steht dann „(entfällt)")
+  const { nummern: zaehl } = zaehlung(sheet.blocks, a)
+  const mitWeg = new Set(automatischAus(sheet, a))
+  let nr = 0
+  for (const b of sheet.blocks) {
+    if (b.type === 'task') nr++
+    if (stufeVon(a, b.id) === 'aus' || mitWeg.has(b.id)) continue
+    const weg = [...new Set(aufgabenVerweise(texteVon(b)).filter((n) => zaehl.get(n) === null))]
+    if (weg.length)
+      aus.push(
+        `${b.type === 'task' ? `Aufgabe ${nr}` : `„${BLOCK_LABELS[b.type] ?? b.type}"`} verweist auf die ausgeblendete Aufgabe ${weg.join(', ')} – dort steht „(entfällt)". Besser freiwillig statt ausgeblendet.`
+      )
+  }
+  for (const id of automatischAus(sheet, a)) {
+    const b = sheet.blocks.find((x) => x.id === id)!
+    aus.push(`„${BLOCK_LABELS[b.type] ?? b.type}" wird mit ausgeblendet – er gehört nur zu ausgeblendeten Aufgaben.`)
+  }
   return [...new Set(aus)]
 }
 

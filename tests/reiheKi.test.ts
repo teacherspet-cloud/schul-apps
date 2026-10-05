@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { emptyAnswer, newBlock } from '../src/renderer/src/modules/arbeitsblatt/model/factory'
 import type { Sheet, TaskBlock, TextBlock } from '../src/renderer/src/modules/arbeitsblatt/model/types'
 import { materialNummern } from '../src/renderer/src/modules/arbeitsblatt/didactics/integrity'
-import { auswahlEintraege, auswahlWarnungen, blattMitAuswahl, pflichtMinuten, teilSchluessel } from '../src/renderer/src/modules/unterrichtsreihe/auswahl'
+import {
+  aufgabenVerweise,
+  automatischAus,
+  auswahlEintraege,
+  auswahlWarnungen,
+  blattMitAuswahl,
+  pflichtMinuten,
+  teilSchluessel
+} from '../src/renderer/src/modules/unterrichtsreihe/auswahl'
 import { planUebernehmen } from '../src/renderer/src/modules/unterrichtsreihe/reihePlanungKi'
 import { sichtbarBis, vollstaendigBearbeitet } from '../src/shared/blattFreigabe'
 
@@ -112,5 +120,51 @@ describe('KI-Plan übernehmen', () => {
     expect(plan.schritte[2].rolle).toBe('forder')
     expect(plan.materialEingesetzt).toBe(0)
     expect(plan.hinweis).toBe('Plenum nicht vergessen.')
+  })
+})
+
+describe('Aufgabennummern in gekürzten Materialien (05.10.2026)', () => {
+  const hilfe = (id: string, title: string, items: string[]) => ({ ...(newBlock('scaffold') as object), id, title, items }) as never
+  const blattMitHilfen = (): Sheet => ({
+    id: 's',
+    label: '',
+    stars: 1,
+    blocks: [
+      aufgabe('t1', 'Lies M1.', 5),
+      aufgabe('t2', 'Fasse zusammen.', 5),
+      aufgabe('t3', 'Vergleiche deine Ergebnisse aus Aufgabe 1 und Aufgabe 2.', 5, ['Nenne Unterschiede.', 'Bewerte.', 'Nutze dein Ergebnis aus c).']),
+      aufgabe('t4', 'Beurteile mithilfe von Task 3 und tasks 1–3.', 5),
+      hilfe('h2', 'Optional help cards for task 2', ['Tipp zu Aufgabe 2']),
+      hilfe('h4', 'Help cards for task 4', ['Tipp zu Aufgabe 4, nicht zu M2 oder Seite 4'])
+    ]
+  })
+  it('Verweise folgen der neuen Zählung, auch in Listen und anderen Sprachen; Material und Seiten bleiben', () => {
+    const neu = blattMitAuswahl(blattMitHilfen(), { t2: 'aus' })
+    const t3 = neu.blocks.find((b) => b.id === 't3') as TaskBlock
+    const t4 = neu.blocks.find((b) => b.id === 't4') as TaskBlock
+    // Aufgabe 2 fällt weg: alte 3 → 2, alte 4 → 3; der Verweis auf die ausgeblendete 2 wird gekennzeichnet
+    expect(t3.instruction).toBe('Vergleiche deine Ergebnisse aus Aufgabe 1 und Aufgabe 2 (entfällt).')
+    expect(auswahlWarnungen(blattMitHilfen(), { t2: 'aus' }).join(' ')).toContain('Aufgabe 3 verweist auf die ausgeblendete Aufgabe 2')
+    expect(t4.instruction).toBe('Beurteile mithilfe von Task 2 und tasks 1–2.')
+    const h4 = neu.blocks.find((b) => b.id === 'h4') as unknown as { title: string; items: string[] }
+    expect(h4.title).toBe('Help cards for task 3')
+    expect(h4.items[0]).toBe('Tipp zu Aufgabe 3, nicht zu M2 oder Seite 4')
+  })
+  it('Bausteine nur zu ausgeblendeten Aufgaben fallen mit weg – mit Hinweis', () => {
+    const neu = blattMitAuswahl(blattMitHilfen(), { t2: 'aus' })
+    expect(neu.blocks.some((b) => b.id === 'h2')).toBe(false)
+    expect(automatischAus(blattMitHilfen(), { t2: 'aus' })).toEqual(['h2'])
+    expect(auswahlWarnungen(blattMitHilfen(), { t2: 'aus' }).join(' ')).toContain('mit ausgeblendet')
+  })
+  it('Teilaufgaben rücken nach – Verweise innerhalb der Aufgabe und „Aufgabe 3c" von außen', () => {
+    const b = blattMitHilfen()
+    ;(b.blocks[3] as TaskBlock).instruction = 'Greife Aufgabe 3c auf.'
+    const neu = blattMitAuswahl(b, { [teilSchluessel('t3', 't3p1')]: 'aus' })
+    const t3 = neu.blocks.find((x) => x.id === 't3') as TaskBlock
+    expect(t3.parts.map((p) => p.instruction)).toEqual(['Nenne Unterschiede.', 'Nutze dein Ergebnis aus b).'])
+    expect((neu.blocks.find((x) => x.id === 't4') as TaskBlock).instruction).toBe('Greife Aufgabe 3b auf.')
+  })
+  it('Erkennung der Verweise', () => {
+    expect(aufgabenVerweise('Aufgaben 2, 3 und 5; exercice 4; ejercicio 1 – nicht M3 oder S. 39')).toEqual([2, 3, 5, 4, 1])
   })
 })
