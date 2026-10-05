@@ -39,6 +39,12 @@ const ANSWER_OPTIONS: { value: AnswerKind; label: string }[] = [
 
 /** Einstellungen eines Gitternetzes: Art, Höhe und – beim Koordinatensystem – die Achsen. */
 function GridSettings({ block, update }: { block: GridBlock; update: (fn: (d: WsBlock) => void) => void }): React.JSX.Element {
+  /*
+   * Baustein mit eigener Zeichenfläche (Zeitleiste, Klimadiagramm …): Gezeichnet wird nach `diagram` –
+   * das Höhenfeld des Rasters darunter wirkte dort nicht (05.10.2026, Befund der Lehrkraft: „Die Höhe
+   * von Zeitleisten lässt sich nicht erhöhen oder verringern"). Hier also die Einstellungen der Zeichenfläche.
+   */
+  if (block.diagram) return <DiagramSettings answer={block} onChange={(fn) => update((d) => d.type === 'grid' && fn(d))} />
   const axis = (key: keyof GridAxes, label: string, step = 1): React.JSX.Element => (
     <ZahlFeld
       size="xs"
@@ -236,7 +242,14 @@ function ImageLabelSettings({ block, update }: { block: ImageBlock; update: (fn:
  * Textfeld; Ereignisse als „Datum | Text | Strang | Stufe", Abschnitte als
  * „von | bis | Einheit | Schritt".
  */
-function DiagramSettings({ answer, onChange }: { answer: Answer; onChange: (fn: (a: Answer) => void) => void }): React.JSX.Element {
+function DiagramSettings({
+  answer,
+  onChange
+}: {
+  /** Antwortform „Zeichenfläche" ODER Baustein mit eigener Zeichenfläche (Zeitleiste, Diagramm) */
+  answer: { diagram?: DiagramSpec }
+  onChange: (fn: (a: { diagram?: DiagramSpec }) => void) => void
+}): React.JSX.Element {
   const d = answer.diagram ?? defaultDiagram('koordinaten')
   const set = (fn: (spec: DiagramSpec) => void): void =>
     onChange((a) => {
