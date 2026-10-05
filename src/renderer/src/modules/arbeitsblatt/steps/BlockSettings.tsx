@@ -256,8 +256,12 @@ function DiagramSettings({
       if (!a.diagram) a.diagram = defaultDiagram('koordinaten')
       fn(a.diagram)
     })
+  /*
+   * `schreiben` setzt selbst über `set` – hier NICHT noch einmal in `set` verpacken (05.10.2026, Befund der Lehrkraft:
+   * „Höhe springt von 70 mm immer wieder auf 70 mm zurück"). Die äußere Änderung lief leer und überschrieb die innere.
+   */
   const zahl = (label: string, wert: number, schreiben: (v: number) => void, step = 1): React.JSX.Element => (
-    <ZahlFeld size="xs" label={label} value={wert} step={step} onChange={(v) => set(() => schreiben(Number(v) || 0))} />
+    <ZahlFeld size="xs" label={label} value={wert} step={step} onChange={(v) => schreiben(Number(v) || 0)} />
   )
   const t = d.timeline
   const kartesisch = d.kind === 'koordinaten' || d.kind === 'mm' || d.kind === 'spannung' || d.kind === 'schraegbild'
@@ -282,7 +286,17 @@ function DiagramSettings({
         }
         allowDeselect={false}
       />
-      {zahl('Höhe (mm)', d.heightMm, (v) => set((spec) => (spec.heightMm = Math.max(30, Math.min(200, v)))), 5)}
+      {zahl('Höhe (mm)', d.heightMm, (v) => set((spec) => (spec.heightMm = Math.max(30, Math.min(250, v)))), 5)}
+      {/* Zeitleiste mit Strängen: Schreibraum zwischen den Linien direkt einstellen (05.10.2026) – setzt die Höhe passend */}
+      {d.kind === 'zeitleiste' &&
+        t.strands.length > 1 &&
+        zahl(
+          'Abstand der Linien (mm)',
+          Math.round((d.heightMm - (t.yLabel ? 11 : 7) - 11) / t.strands.length),
+          (v) =>
+            set((spec) => (spec.heightMm = Math.max(30, Math.min(250, Math.max(12, v) * spec.timeline.strands.length + (spec.timeline.yLabel ? 11 : 7) + 11)))),
+          5
+        )}
       {kartesisch && (
         <>
           <Group grow gap={6}>

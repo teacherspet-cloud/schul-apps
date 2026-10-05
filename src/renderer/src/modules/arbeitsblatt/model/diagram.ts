@@ -35,7 +35,18 @@ export function defaultDiagram(kind: DiagramKind = 'koordinaten'): DiagramSpec {
       : kind === 'mm'
         ? { ...defaultAxes('koordinaten'), xMin: 0, xMax: 10, xStep: 1, yMin: 0, yMax: 10, yStep: 1 }
         : kind === 'spannung'
-          ? { ...defaultAxes('koordinaten'), xLabel: 'Handlung', yLabel: 'Spannung', xMin: 0, xMax: 6, xStep: 1, yMin: 0, yMax: 5, yStep: 1, showNumbers: false }
+          ? {
+              ...defaultAxes('koordinaten'),
+              xLabel: 'Handlung',
+              yLabel: 'Spannung',
+              xMin: 0,
+              xMax: 6,
+              xStep: 1,
+              yMin: 0,
+              yMax: 5,
+              yStep: 1,
+              showNumbers: false
+            }
           : kind === 'schraegbild'
             ? { ...defaultAxes('koordinaten'), xLabel: 'x₂', yLabel: 'x₃', xMin: 0, xMax: 8, xStep: 1, yMin: 0, yMax: 6, yStep: 1 }
             : defaultAxes('koordinaten')
@@ -84,7 +95,10 @@ export function datumText(wert: number, unit: TimelineUnit, mitJahr = false): st
     const betrag = Math.abs(j)
     // Erdgeschichte: „vor 4,6 Mrd. J." statt zehnstelliger Zahlen
     if (betrag >= 1e6) {
-      const zahl = betrag >= 1e9 ? `${(betrag / 1e9).toLocaleString('de-DE', { maximumFractionDigits: 1 })} Mrd.` : `${(betrag / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 0 })} Mio.`
+      const zahl =
+        betrag >= 1e9
+          ? `${(betrag / 1e9).toLocaleString('de-DE', { maximumFractionDigits: 1 })} Mrd.`
+          : `${(betrag / 1e6).toLocaleString('de-DE', { maximumFractionDigits: 0 })} Mio.`
       return j < 0 ? `vor ${zahl} J.` : `${zahl} J.`
     }
     if (j === 0 && betrag === 0) return 'heute'
@@ -159,7 +173,7 @@ export function sanitizeDiagram(d: Partial<DiagramSpec> | undefined): DiagramSpe
   if (z.step <= 0 || (z.max - z.min) / z.step > 20) z.step = (z.max - z.min) / 6
   const xCategories = strings(d?.xCategories).slice(0, 12)
   const yLevels = strings(d?.yLevels).slice(0, 8)
-  let heightMm = Math.max(30, Math.min(200, Math.round(num(d?.heightMm, base.heightMm))))
+  let heightMm = Math.max(30, Math.min(250, Math.round(num(d?.heightMm, base.heightMm))))
   const timeline = sanitizeTimeline(d?.timeline)
   if (kind === 'zeitleiste') {
     // Genug Platz je Strang bzw. für die Stufen
