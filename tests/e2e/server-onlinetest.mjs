@@ -373,7 +373,15 @@ try {
     console.log('GRUPPEN', JSON.stringify(gruppen))
     pruefe(gruppen.length >= 1 && gruppen[0][0] === 'rechtschreibung', `„dgo" statt „dog" unter Rechtschreibung gebündelt (${JSON.stringify(gruppen)})`)
     await p0.screenshot({ path: join(out, '3b-entscheiden.png') })
-    await modal.locator('[data-alle-akzeptieren^="g:rechtschreibung"]').click()
+    // „Im Test ansehen": Blatt der Abgabe, Stelle wie mit Textmarker, direkt entscheiden
+    await modal.locator('[data-im-test-ansehen]').first().click()
+    const blattModal = p0.locator('.mantine-Modal-content', { hasText: 'im Test' })
+    await blattModal.locator('.vt-fokus').first().waitFor({ timeout: 8000 })
+    const markiert = await blattModal.locator('.vt-fokus').first().textContent()
+    pruefe(/dgo/.test(markiert ?? '') && (markiert ?? '').length < 260, `Im Test: nur die Stelle hervorgehoben („${(markiert ?? '').trim().slice(0, 80)}")`)
+    pruefe(await blattModal.locator('[data-fokus-entscheiden]').isVisible(), 'Im Test: ✓/✗ direkt an der Stelle')
+    await p0.screenshot({ path: join(out, '3c-im-test.png') })
+    await blattModal.locator('[data-fokus-ja]').click()
     await warteBis(async () => ((await detail()).teilnahmen.find((t) => t.id === kim.id).punkte === 5 ? true : null), 10000)
     await p0.close()
   }

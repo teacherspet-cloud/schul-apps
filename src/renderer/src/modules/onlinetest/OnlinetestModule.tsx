@@ -67,6 +67,7 @@ import {
   IconDownload,
   IconEye,
   IconEyeOff,
+  IconFileText,
   IconFilter,
   IconFolders,
   IconPencil,
@@ -1196,6 +1197,8 @@ function Entscheidungen({
   const [ansicht, setAnsicht] = useState<'fehler' | 'personen'>('fehler')
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [offen, setOffen] = useState<Set<string>>(new Set())
+  // „Im Test ansehen": Abgabe als Blatt, die Stelle hervorgehoben (06.10.2026)
+  const [imBlatt, setImBlatt] = useState<{ teilnahme: string; einheit: string } | null>(null)
   const faelle: Fall<{ t: Teilnahme; e: Einheit; name: string }>[] = test.teilnahmen.flatMap((t, i) => {
     const f = test.fassungen[t.varianteNr]
     const felder = felderVon(f)
@@ -1263,11 +1266,28 @@ function Entscheidungen({
   )
   const zeile = (f: (typeof faelle)[number], mitName = true): React.JSX.Element => (
     <Card key={f.schluessel} withBorder padding="xs">
-      {mitName && (
-        <Text size="xs" c="dimmed" mb={4}>
-          {f.daten.name} · {test.fassungen[f.daten.t.varianteNr].aufgaben.find((a) => a.id === f.daten.e.aufgabe)?.titel}
-        </Text>
-      )}
+      <Group justify="space-between" wrap="nowrap" mb={mitName ? 4 : 0}>
+        {mitName ? (
+          <Text size="xs" c="dimmed">
+            {f.daten.name} · {test.fassungen[f.daten.t.varianteNr].aufgaben.find((a) => a.id === f.daten.e.aufgabe)?.titel}
+          </Text>
+        ) : (
+          <span />
+        )}
+        {blattMoeglich(test, f.daten.t) && (
+          <Tooltip label="Im Test ansehen">
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              onClick={() => setImBlatt({ teilnahme: f.daten.t.id, einheit: f.daten.e.id })}
+              aria-label="Im Test ansehen"
+              data-im-test-ansehen
+            >
+              <IconFileText size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
       <EinheitZeile
         test={test}
         t={f.daten.t}
@@ -1283,6 +1303,41 @@ function Entscheidungen({
       else n.add(k)
       return n
     })
+  const blattT = imBlatt ? test.teilnahmen.find((x) => x.id === imBlatt.teilnahme) : undefined
+  if (imBlatt && blattT) {
+    const nr = test.teilnahmen.indexOf(blattT)
+    const name = verdeckt ? `Person ${nr + 1}` : blattT.name
+    const entschieden = blattT.bewertung[imBlatt.einheit]?.quelle === 'lehrkraft'
+    return (
+      <Modal opened onClose={schliessen} title={`${name} · im Test`} size="auto" data-blatt-fokus>
+        <Group mb="sm" gap="xs" justify="space-between">
+          <Button variant="subtle" onClick={() => setImBlatt(null)} data-zurueck-entscheiden>
+            ← Zurück zu „Zu entscheiden"
+          </Button>
+          <Text size="sm" c="dimmed">
+            {entschieden ? 'Entschieden – das Zeichen steht im Blatt.' : 'Die markierte Stelle: ✓ gibt den Punkt, ✗ nicht.'}
+          </Text>
+        </Group>
+        <div style={{ overflowX: 'auto' }}>
+          <AbgabeBlatt
+            kopf={test.einstellungen.blatt!}
+            {...abgabeVon(test, blattT, name)}
+            fokus={imBlatt.einheit}
+            entscheiden={(richtig) =>
+              void urteil(blattT, imBlatt.einheit, richtig).then(
+                () => {
+                  geaendert()
+                  // Zurück zur Liste – die nächste Entscheidung wartet
+                  setImBlatt(null)
+                },
+                (er: unknown) => notifyError(er)
+              )
+            }
+          />
+        </div>
+      </Modal>
+    )
+  }
   return (
     <Modal opened onClose={schliessen} title="Zu entscheiden" size="xl">
       <Stack>

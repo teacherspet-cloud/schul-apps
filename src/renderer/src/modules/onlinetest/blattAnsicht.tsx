@@ -14,7 +14,7 @@ import { RenderContext, type RenderContextValue } from '../vokabeltest/render/Re
 import { TestPage } from '../vokabeltest/render/TestPage'
 import testCss from '../vokabeltest/render/test.css?raw'
 import type { Antworten, Bewertung, Zeichen } from './kern'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 /** Was der Server je Test mitliefert (Kopf und Einstellungen des Vokabeltests) */
 export type BlattKopf = Pick<TestDocument, 'header' | 'settings' | 'fontSize'>
@@ -86,13 +86,14 @@ export function mitAntworten(v: Variant, a: Antworten, b: Bewertung = {}): Varia
         k.items.forEach((it) => {
           const w = feldId(k.id, it.id, 'w')
           it.isTrue = a[w] === 'true'
-          it.correction = (a[feldId(k.id, it.id, 'k')] ?? '').trim()
+          // Mit Zeichen der Einheit (06.10.2026) – so lässt sich die Korrektur im Blatt finden und entscheiden
+          it.correction = text(feldId(k.id, it.id, 'k'), w)
         })
         break
       case 'oddOneOut':
         k.items.forEach((it) => {
           it.answer = a[feldId(k.id, it.id, 'w')] ?? ''
-          it.reason = (a[feldId(k.id, it.id, 'r')] ?? '').trim()
+          it.reason = text(feldId(k.id, it.id, 'r'), feldId(k.id, it.id, 'w'))
         })
         break
       case 'categorize':
@@ -173,7 +174,9 @@ export function AbgabeBlatt({
   antworten,
   bewertung,
   abgabe,
-  aendern
+  aendern,
+  fokus,
+  entscheiden
 }: {
   kopf: BlattKopf
   variante: Variant
@@ -182,17 +185,89 @@ export function AbgabeBlatt({
   abgabe: Abgabe
   /** Lehrkraft: Korrekturzeichen ändern (Klick aufs Zeichen) */
   aendern?: (einheit: string, zeichen: Zeichen) => void
+  /**
+   * „Im Test ansehen" aus dem Pop-up „Zu entscheiden" (06.10.2026): diese Einheit wie mit Textmarker hervorheben –
+   * den Satz bzw. die Aussage, bei langen Texten nur die Lücke –, hinrollen und daneben ✓/✗ anbieten.
+   */
+  fokus?: string
+  entscheiden?: (richtig: boolean) => void
 }): React.JSX.Element {
   const html = blattHtml(kopf, variante, antworten, bewertung, abgabe)
   const [menue, setMenue] = useState<{ einheit: string; x: number; y: number } | null>(null)
-  if (!aendern) return <div className="editor-sheet" data-abgabe-blatt dangerouslySetInnerHTML={{ __html: html }} />
+  const huelle = useRef<HTMLDivElement>(null)
+  const [fokusLage, setFokusLage] = useState<{ x: number; y: number } | null>(null)
+  useLayoutEffect(() => {
+    const root = huelle.current
+    if (!root || !fokus) return
+    root.querySelectorAll('.vt-fokus, .vt-fokus-luecke').forEach((x) => x.classList.remove('vt-fokus', 'vt-fokus-luecke'))
+    const marke = root.querySelector<HTMLElement>(`[data-einheit="${CSS.escape(fokus)}"]`)
+    if (!marke) return setFokusLage(null)
+    // Satz/Aussage (eine Einheit des Blatts); ist sie ein langer Text, nur die Lücke selbst
+    const satz = marke.closest<HTMLElement>('[data-unit]')
+    const luecke = marke.parentElement
+    const bereich = satz && (satz.textContent ?? '').length <= 260 ? satz : (luecke ?? marke)
+    bereich.classList.add('vt-fokus')
+    if (luecke && luecke !== bereich) luecke.classList.add('vt-fokus-luecke')
+    const r = bereich.getBoundingClientRect()
+    const basis = root.getBoundingClientRect()
+    // Rechts neben der Stelle – passt die Leiste dort nicht mehr ins Blatt, rechtsbündig darunter
+    const leiste = 116
+    const rechts = r.right - basis.left + 8
+    setFokusLage(
+      rechts + leiste <= root.clientWidth
+        ? { x: rechts, y: r.top - basis.top }
+        : { x: Math.max(0, r.right - basis.left - leiste), y: r.bottom - basis.top + 10 }
+    )
+    bereich.scrollIntoView({ block: 'center' })
+  }, [html, fokus])
+  if (!aendern && !fokus) return <div className="editor-sheet" data-abgabe-blatt dangerouslySetInnerHTML={{ __html: html }} />
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }} ref={huelle}>
+      {fokus && entscheiden && fokusLage && (
+        <div
+          style={{
+            position: 'absolute',
+            left: fokusLage.x,
+            top: Math.max(0, fokusLage.y - 6),
+            zIndex: 21,
+            display: 'flex',
+            gap: 6,
+            padding: 5,
+            background: 'var(--mantine-color-body)',
+            border: '2px solid #fcc419',
+            borderRadius: 10,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.2)'
+          }}
+          data-fokus-entscheiden
+        >
+          <button
+            type="button"
+            title="Punkt geben"
+            aria-label="Punkt geben"
+            style={ENTSCHEIDEN_KNOPF('#2f9e44')}
+            onClick={() => entscheiden(true)}
+            data-fokus-ja
+          >
+            ✓
+          </button>
+          <button
+            type="button"
+            title="Keinen Punkt"
+            aria-label="Keinen Punkt"
+            style={ENTSCHEIDEN_KNOPF('#e03131')}
+            onClick={() => entscheiden(false)}
+            data-fokus-nein
+          >
+            ✗
+          </button>
+        </div>
+      )}
       <div
-        className="editor-sheet vt-zeichen-aenderbar"
+        className={aendern ? 'editor-sheet vt-zeichen-aenderbar' : 'editor-sheet'}
         data-abgabe-blatt
         dangerouslySetInnerHTML={{ __html: html }}
         onClick={(e) => {
+          if (!aendern) return
           const el = (e.target as HTMLElement).closest('[data-einheit]') as HTMLElement | null
           if (!el) return setMenue(null)
           const r = el.getBoundingClientRect()
@@ -242,7 +317,7 @@ export function AbgabeBlatt({
                 cursor: 'pointer'
               }}
               onClick={() => {
-                aendern(menue.einheit, z)
+                aendern?.(menue.einheit, z)
                 setMenue(null)
               }}
               data-zeichen={z}
@@ -255,6 +330,19 @@ export function AbgabeBlatt({
     </div>
   )
 }
+
+const ENTSCHEIDEN_KNOPF = (farbe: string): React.CSSProperties => ({
+  font: 'inherit',
+  fontSize: 20,
+  fontWeight: 800,
+  color: '#fff',
+  background: farbe,
+  minWidth: 46,
+  height: 40,
+  borderRadius: 8,
+  border: 0,
+  cursor: 'pointer'
+})
 
 const dokument = (kopf: BlattKopf, variants: Variant[]): TestDocument =>
   ({ ...kopf, variants, version: 1, vocab: [], createdAt: '' }) as unknown as TestDocument
