@@ -20,6 +20,8 @@ export interface BlattAufgabe {
   erwartung: string
   /** Freiwillig (Reihen-Schritt, 05.10.2026): zählt nicht für Freischalten, Fortschritt und Erfolg */
   freiwillig?: boolean
+  /** Zahl der Hilfekarten zu dieser Aufgabe (06.10.2026) – digital über das ?-Symbol */
+  hilfekarten?: number
 }
 
 export type BlattFeldArt = 'text' | 'zeilen' | 'luecke' | 'flaeche' | 'kreuz'

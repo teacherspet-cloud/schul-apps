@@ -33,7 +33,7 @@ export const SENSIBEL: Record<string, string[]> = {
   feedback_freigaben: ['schueler'],
   feedback_abgaben: ['fassungen'],
   blatt_freigaben: ['schueler', 'auswertung'],
-  blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback'],
+  blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback', 'hilfen'],
   fach_kopien: ['titel'],
   reihen_zuweisungen: ['schueler'],
   reihen_stand: ['daten'],

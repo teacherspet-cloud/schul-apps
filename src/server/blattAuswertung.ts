@@ -35,6 +35,8 @@ export interface PersonRoh {
   antworten: Record<string, string>
   verlauf: AufgabenVerlauf
   freigeschaltet: number[]
+  /** Geöffnete Hilfekarten je Aufgabe (06.10.2026) */
+  hilfen?: Record<string, number>
   eingereicht: number
   /** Kriterien des letzten Bogens (nach dem Einreichen) */
   kriterien: string[]
@@ -53,6 +55,8 @@ export interface AufgabeAuswertung {
   /** Namen der Personen mit gleicher/ähnlicher Antwort */
   gleichMit: { name: string; gleich: boolean }[]
   rueckmeldung?: { gelungen?: string; fehlt?: string; schritt?: string }
+  /** Geöffnete Hilfekarten zu dieser Aufgabe (06.10.2026) */
+  hilfekarten?: number
 }
 
 export interface PersonAuswertung {
@@ -63,6 +67,8 @@ export interface PersonAuswertung {
   eigen: number
   wert: number | null
   aufgaben: AufgabeAuswertung[]
+  /** Geöffnete Hilfekarten insgesamt (06.10.2026) */
+  hilfekarten: number
   staerken: string[]
   schritte: string[]
 }
@@ -129,7 +135,16 @@ export function auswerten(
         const k = p.kriterien[Math.min(i, p.kriterien.length - 1)]
         ampel = k === 'sicher' ? 'gruen' : k === 'teilweise' ? 'gelb' : 'rot'
       }
-      return { nr: a.nr, ampel, text, auffaellig, gleichMit: andere, ...(p.letzte[String(a.nr)] ? { rueckmeldung: p.letzte[String(a.nr)] } : {}) }
+      const hk = p.hilfen?.[String(a.nr)] ?? 0
+      return {
+        nr: a.nr,
+        ampel,
+        text,
+        auffaellig,
+        gleichMit: andere,
+        ...(p.letzte[String(a.nr)] ? { rueckmeldung: p.letzte[String(a.nr)] } : {}),
+        ...(hk ? { hilfekarten: hk } : {})
+      }
     })
     const korrekt = korrektheit(liste.map((l) => l.ampel))
     const eigen = eigenstaendigkeit(
@@ -137,6 +152,7 @@ export function auswerten(
       liste.filter((l) => l.text.trim()).length || 1
     )
     return {
+      hilfekarten: liste.reduce((n, l) => n + (l.hilfekarten ?? 0), 0),
       id: p.id,
       name: p.name,
       eingereicht: p.eingereicht,

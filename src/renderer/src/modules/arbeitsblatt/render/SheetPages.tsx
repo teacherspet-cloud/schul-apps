@@ -1,3 +1,4 @@
+import { hilfenZuordnung } from '../didactics/aufgabenVerweise'
 import { quellenAnhang } from './quellenAnhang'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { hoerablaufFuer, hoerStufe } from '../didactics/hoerablauf'
@@ -157,6 +158,7 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
     // Schreiblinien und Ausfüllzellen nach Jahrgang (02.10.2026) – dieselbe Regel wie `--ws-linie` in PageFrame
     schreibRegel: schreibRegelFuerMeta(ws.meta),
     taskNumbers: taskNumbersFor(sheet),
+    hilfeFuer: hilfenZuordnung(sheet),
     materialNumbers: materialNumbersFor(sheet),
     phaseStarts: viewingPhaseStarts(sheet),
     showTimecodes: Boolean(ws.meta.video?.timecodesOnSheet),

@@ -10,7 +10,7 @@
  *  - „Gleiche Abgaben": je Aufgabe, wer gleiche oder sehr ähnliche Antworten abgegeben hat.
  */
 import { Alert, Badge, Button, Group, List, Menu, Modal, SegmentedControl, Stack, Table, Text, UnstyledButton } from '@mantine/core'
-import { IconAlertTriangle, IconCopy, IconEye, IconPrinter, IconSparkles, IconDownload } from '@tabler/icons-react'
+import { IconAlertTriangle, IconBulb, IconCopy, IconEye, IconPrinter, IconSparkles, IconDownload } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
 import { farbeFuer, type MitarbeitNote, type Strenge } from '@shared/blattAuswertung'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -25,6 +25,8 @@ interface AufgabeA {
   auffaellig: { art: string; text: string }[]
   gleichMit: { name: string; gleich: boolean }[]
   rueckmeldung?: { gelungen?: string; fehlt?: string; schritt?: string }
+  /** Geöffnete Hilfekarten (06.10.2026) */
+  hilfekarten?: number
 }
 export interface PersonA {
   id: string
@@ -34,13 +36,15 @@ export interface PersonA {
   eigen: number
   wert: number | null
   aufgaben: AufgabeA[]
+  /** Geöffnete Hilfekarten insgesamt (06.10.2026) */
+  hilfekarten?: number
   staerken: string[]
   schritte: string[]
 }
 export interface AuswertungDaten {
   personen: PersonA[]
   gleich: { nr: number; gruppen: { namen: string[]; gleich: boolean }[] }[]
-  aufgaben: { nr: number; anweisung: string }[]
+  aufgaben: { nr: number; anweisung: string; hilfekarten?: number }[]
   strenge: Strenge
   mitarbeit: Record<string, { note: MitarbeitNote; begruendung: string; hilfen: string[] }>
   erstellt: number
@@ -92,12 +96,15 @@ export function AuswertungModal({
   p,
   vorschlag,
   schliessen,
-  ansehen
+  ansehen,
+  karten = {}
 }: {
   p: PersonA
   vorschlag?: { note: MitarbeitNote; begruendung: string; hilfen: string[] }
   schliessen: () => void
   ansehen: () => void
+  /** Vorhandene Hilfekarten je Aufgabe (06.10.2026) */
+  karten?: Record<number, number>
 }): React.JSX.Element {
   return (
     <Modal opened onClose={schliessen} title={`Auswertung – ${p.name}`} size="lg" data-auswertung-modal>
@@ -109,6 +116,11 @@ export function AuswertungModal({
           <Text size="sm" c="dimmed">
             {p.eingereicht ? `${p.eingereicht}× eingereicht` : 'nicht eingereicht'}
           </Text>
+          {Object.keys(karten).length > 0 && (
+            <Badge variant="light" color="yellow" leftSection={<IconBulb size={12} />} data-hilfekarten-person>
+              {p.hilfekarten ? `${p.hilfekarten} Hilfekarte${p.hilfekarten === 1 ? '' : 'n'} geöffnet` : 'keine Hilfekarten geöffnet'}
+            </Badge>
+          )}
         </Group>
         {vorschlag && (
           <Alert color="blue" title={`Vorschlag Mitarbeit: ${vorschlag.note}`} icon={<IconSparkles size={16} />}>
@@ -136,6 +148,11 @@ export function AuswertungModal({
               Aufgabe {a.nr}:{' '}
               {!a.text.trim() && (!a.ampel || a.ampel === 'rot') ? 'nicht bearbeitet' : a.ampel ? AMPEL_WORT[a.ampel] : 'bearbeitet, noch nicht eingeschätzt'}
             </Text>
+            {karten[a.nr] ? (
+              <Text size="xs" c={a.hilfekarten ? 'yellow.8' : 'dimmed'} data-hilfekarten-aufgabe={a.nr}>
+                💡 {a.hilfekarten ? `${a.hilfekarten} von ${karten[a.nr]} Hilfekarten geöffnet` : `keine der ${karten[a.nr]} Hilfekarten geöffnet`}
+              </Text>
+            ) : null}
             {a.rueckmeldung?.gelungen && <Text size="sm">✓ {a.rueckmeldung.gelungen}</Text>}
             {a.rueckmeldung?.fehlt && <Text size="sm">○ {a.rueckmeldung.fehlt}</Text>}
             {a.auffaellig.map((x, i) => (
@@ -205,6 +222,13 @@ export function AuswertungLeiste({
     }
   }
   const gleichAnzahl = daten.gleich.reduce((s, g) => s + g.gruppen.length, 0)
+  // Hilfekarten (06.10.2026): je Aufgabe wie viele Lernende wie viele Karten geöffnet haben
+  const mitKarten = daten.aufgaben.filter((a) => a.hilfekarten)
+  const karten = mitKarten.map((a) => {
+    const nutzer = daten.personen.map((p) => p.aufgaben.find((x) => x.nr === a.nr)?.hilfekarten ?? 0).filter((n) => n > 0)
+    return { nr: a.nr, vorhanden: a.hilfekarten!, lernende: nutzer.length, geoeffnet: nutzer.reduce((s, n) => s + n, 0) }
+  })
+  const kartenGesamt = karten.reduce((s, k) => s + k.geoeffnet, 0)
   const vorhanden = Object.keys(daten.mitarbeit).length > 0
   return (
     <Group gap="xs" wrap="wrap" mb="sm" data-auswertung-leiste>
@@ -252,6 +276,28 @@ export function AuswertungLeiste({
           ))}
         </Menu.Dropdown>
       </Menu>
+      {karten.length > 0 && (
+        <Menu position="bottom-start" withinPortal>
+          <Menu.Target>
+            <Button size="xs" variant="light" color="yellow" leftSection={<IconBulb size={14} />} data-hilfekarten-summe>
+              Hilfekarten: {kartenGesamt} geöffnet
+            </Button>
+          </Menu.Target>
+          <Menu.Dropdown maw={420}>
+            <Menu.Label>Geöffnete Hilfekarten je Aufgabe</Menu.Label>
+            {karten.map((k) => (
+              <Menu.Item key={k.nr} closeMenuOnClick={false} data-hilfekarten-zeile={k.nr}>
+                <Text size="sm">
+                  Aufgabe {k.nr}: {k.lernende ? `${k.lernende} Lernende, ${k.geoeffnet} Karte${k.geoeffnet === 1 ? '' : 'n'}` : 'nicht genutzt'}{' '}
+                  <Text span size="xs" c="dimmed">
+                    (von {k.vorhanden} je Person)
+                  </Text>
+                </Text>
+              </Menu.Item>
+            ))}
+          </Menu.Dropdown>
+        </Menu>
+      )}
       {daten.erstellt > 0 && (
         <Text size="xs" c="dimmed">
           Vorschläge vom {new Date(daten.erstellt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} (
@@ -271,13 +317,13 @@ function hilfenHtml(titel: string, d: AuswertungDaten): string {
     .filter((p) => d.mitarbeit[p.id])
     .map((p) => {
       const m = d.mitarbeit[p.id]
-      return `<tr><td><b>${esc(p.name)}</b></td><td class="note">${esc(m.note)}</td><td>${m.hilfen.length ? `<ul>${m.hilfen.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : '–'}</td><td class="klein">${esc(m.begruendung)}</td></tr>`
+      return `<tr><td><b>${esc(p.name)}</b></td><td class="note">${esc(m.note)}</td><td>${m.hilfen.length ? `<ul>${m.hilfen.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : '–'}</td><td class="note">${p.hilfekarten ?? 0}</td><td class="klein">${esc(m.begruendung)}</td></tr>`
     })
     .join('')
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Hilfestellungen – ${esc(titel)}</title>
 <style>@page{size:A4;margin:16mm}body{font:11pt/1.4 system-ui,sans-serif;color:#111}h1{font-size:15pt;margin:0 0 2mm}p{margin:0 0 4mm;color:#555}table{width:100%;border-collapse:collapse}th,td{border:0.3mm solid #999;padding:2mm;vertical-align:top;text-align:left}th{background:#eee}.note{text-align:center;font-weight:700;width:14mm}.klein{font-size:9pt;color:#444;width:55mm}ul{margin:0;padding-left:4mm}</style></head>
 <body><h1>Hilfestellungen – ${esc(titel)}</h1><p>Stand ${new Date(d.erstellt || Date.now()).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} · Strenge: ${esc(STRENGE.find((s) => s.value === d.strenge)?.label ?? '')} · Vorschläge der KI, von der Lehrkraft zu prüfen</p>
-<table><thead><tr><th>Name</th><th>Mitarbeit</th><th>Hilfestellungen</th><th>Begründung</th></tr></thead><tbody>${zeilen}</tbody></table></body></html>`
+<table><thead><tr><th>Name</th><th>Mitarbeit</th><th>Hilfestellungen</th><th>Hilfe-karten</th><th>Begründung</th></tr></thead><tbody>${zeilen}</tbody></table></body></html>`
 }
 
 function HilfenUebersicht({ titel, daten, schliessen }: { titel: string; daten: AuswertungDaten; schliessen: () => void }): React.JSX.Element {

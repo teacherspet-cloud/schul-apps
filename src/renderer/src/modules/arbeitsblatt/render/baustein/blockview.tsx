@@ -310,7 +310,12 @@ export function BlockInhalt({ block, placed }: { block: WsBlock; placed?: Placed
       // Listen (Tipps, Satzanfänge) teilbar zwischen zwei Punkten (01.10.2026); Wortspeicher und Hilfekarten nicht
       const [von, bis] = stueck(placed, block.items.length)
       return (
-        <div className={`ws-block ws-scaffold ws-scaffold-${block.variant} ${placed?.continued ? 'ws-continued' : ''}`}>
+        <div
+          className={`ws-block ws-scaffold ws-scaffold-${block.variant} ${placed?.continued ? 'ws-continued' : ''}`}
+          // Zu welcher Aufgabe die Hilfe gehört (06.10.2026): gesperrt bis zur Freischaltung, Hilfekarten digital am ?-Symbol
+          data-hilfe-fuer={ctx.hilfeFuer?.get(block.id)}
+          data-hilfe-block={block.id}
+        >
           {von === 0 ? (
             <div className="ws-scaffold-title">
               <Feld value={block.title} editable={schreiben} onChange={set((d, v) => ((d as typeof block).title = v))} />

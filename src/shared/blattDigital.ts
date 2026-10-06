@@ -76,6 +76,24 @@ export function digitalisieren(doc: Document): number {
   seiten.forEach((s, i) => {
     if (i > 0 && !s.querySelector('.ws-block, .ws-task, .ws-text, .ws-material, img, table')) s.remove()
   })
+  /*
+   * Hilfekarten digital am ?-Symbol neben der Aufgabe (06.10.2026): Gehören alle Karten zu einer Aufgabe, entfällt die
+   * Schlussseite „Tipp- und Hilfekarten". Die Karten wandern in eine unsichtbare Ablage AUSSERHALB der Seiten (von dort
+   * liest sie das Hilfefenster), die leere Seite wird entfernt – so zählen Browser und Server dieselben Seiten.
+   */
+  const hk = Array.from(doc.querySelectorAll('.ws-scaffold-hilfekarten'))
+  if (hk.length && hk.every((k) => k.hasAttribute('data-hilfe-fuer'))) {
+    const ablage = doc.createElement('div')
+    ablage.id = 'sa-hilfekarten'
+    ablage.setAttribute('hidden', '')
+    ablage.style.display = 'none'
+    for (const k of hk) ablage.appendChild(k)
+    doc.body.appendChild(ablage)
+    doc.querySelectorAll('.ws-helpcards-page').forEach((e) => {
+      const seite = e.closest('.ws-page')
+      if (seite && seite.parentNode) seite.parentNode.removeChild(seite)
+    })
+  }
   return verschoben
 }
 

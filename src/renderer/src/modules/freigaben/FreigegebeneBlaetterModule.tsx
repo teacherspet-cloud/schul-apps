@@ -448,6 +448,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
         <AuswertungModal
           p={auswahl}
           vorschlag={auswertung.daten?.mitarbeit[auswahl.id]}
+          karten={Object.fromEntries((auswertung.daten?.aufgaben ?? []).filter((x) => x.hilfekarten).map((x) => [x.nr, x.hilfekarten!]))}
           schliessen={() => setAuswahl(null)}
           ansehen={() => {
             const b = d.abgaben.find((x) => x.id === auswahl.id)?.benutzer

@@ -14,6 +14,8 @@ import { plainText } from '../../shared/richtext/parse'
 import type { Sheet, TaskBlock, Worksheet, WsBlock } from '../arbeitsblatt/model/types'
 import { isMaterial, loeseMaterialverweise, materialNummern, wandleTexte } from '../arbeitsblatt/didactics/integrity'
 import { BLOCK_LABELS } from '../arbeitsblatt/model/factory'
+import { aufgabenVerweise, verweiseUmschreiben } from '../arbeitsblatt/didactics/aufgabenVerweise'
+export { aufgabenVerweise, verweiseUmschreiben }
 import { describeBlock } from '../arbeitsblatt/generation/describe'
 
 type Ki = <T>(req: StructuredRequest) => Promise<T>
@@ -76,40 +78,6 @@ export function auswahlEintraege(sheet: Sheet): AuswahlEintrag[] {
  * werden Verweise in ALLEN sichtbaren Texten (Hilfen, Hinweise, Aufgaben, Lösungen) auf die neue Zählung
  * umgeschrieben; Bausteine, die nur ausgeblendete Aufgaben betreffen, fallen mit weg.
  */
-const AUFGABE_WORT = String.raw`(?:Aufgaben?|Aufg\.|Teilaufgaben?|[Tt]asks?|[Ee]xercises?|[Ee]xercices?|[Tt]âches?|[Ee]jercicios?|[Tt]areas?|[Ee]sercizi|[Ee]sercizio)`
-const NR = String.raw`\d{1,2}[a-h]?`
-const VERBINDER = String.raw`\s*(?:,|und|and|et|y|e|bis|to|à|–|-|/|&)\s*`
-const VERWEIS = new RegExp(String.raw`(\b${AUFGABE_WORT}\s+)(${NR}(?:${VERBINDER}${NR})*)(?![\d])`, 'g')
-const EINZELNR = /(\d{1,2})([a-h]?)/g
-
-/** Alle Aufgabennummern, auf die ein Text verweist */
-export function aufgabenVerweise(text: string): number[] {
-  const aus: number[] = []
-  for (const m of text.matchAll(VERWEIS)) for (const n of m[2].matchAll(EINZELNR)) aus.push(Number(n[1]))
-  return aus
-}
-
-/**
- * Verweise umschreiben: `nummern` alt → neu; `buchstaben` je alter Nummer: alte → neue Teilaufgabe („4c" → „3b").
- * Verweist ein sichtbarer Text auf eine ausgeblendete Aufgabe, wird sie als „(entfällt)" gekennzeichnet – nach dem
- * Neuzählen trüge sonst eine ANDERE Aufgabe diese Nummer. Die Lehrkraft bekommt dazu eine Warnung.
- */
-export function verweiseUmschreiben(text: string, nummern: Map<number, number | null>, buchstaben: Map<number, Map<string, string>> = new Map()): string {
-  if (!/\d/.test(text)) return text
-  return text.replace(
-    VERWEIS,
-    (_ganz, wort: string, liste: string) =>
-      wort +
-      liste.replace(EINZELNR, (nr: string, z: string, b: string) => {
-        const alt = Number(z)
-        const neu = nummern.get(alt)
-        if (neu === undefined) return nr
-        if (neu === null) return `${nr} (entfällt)`
-        return `${neu}${b ? (buchstaben.get(alt)?.get(b) ?? b) : ''}`
-      })
-  )
-}
-
 /** Teilaufgaben-Verweise innerhalb einer Aufgabe („aus b)", „Teilaufgabe c") auf die neuen Buchstaben */
 function buchstabenUmschreiben(text: string, karte: Map<string, string>): string {
   if (!karte.size) return text

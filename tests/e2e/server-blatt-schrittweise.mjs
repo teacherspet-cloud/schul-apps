@@ -35,7 +35,7 @@ const vorlage = readdirSync(ordner)
 // Einstiegskasten vor der ersten Aufgabe und Merkkasten am Ende – nur der Merkkasten wartet aufs Ende (06.10.2026)
 const mitKaesten = (payload) => {
   const p = structuredClone(payload)
-  const bloecke = p.sheets[0].blocks.filter((b) => b.type !== 'infoBox')
+  const bloecke = p.sheets[0].blocks.filter((b) => b.type !== 'infoBox' && b.type !== 'scaffold')
   const kasten = (id, variant, title, body) => ({ id, type: 'infoBox', variant, title, body, stars: 1 })
   const erste = bloecke.findIndex((b) => b.type === 'task')
   bloecke.splice(erste, 0, kasten('einstieg', 'wissen', 'Einstieg', 'Worum es heute geht.'))
@@ -50,6 +50,16 @@ const mitKaesten = (payload) => {
     lineNumbers: false,
     source: '',
     glossary: []
+  })
+  // Hilfekarten zu Aufgabe 1 (am ?-Symbol), Satzanfänge hinter Aufgabe 2 (gesperrt bis zur Freischaltung)
+  const aufgabenIdx = bloecke.map((b, i) => (b.type === 'task' ? i : -1)).filter((i) => i >= 0)
+  bloecke.splice(aufgabenIdx[1] + 1, 0, { id: 'satz2', type: 'scaffold', variant: 'satzanfaenge', title: 'Satzanfänge', items: ['Zunächst …', 'Außerdem …'] })
+  bloecke.splice(aufgabenIdx[0] + 1, 0, {
+    id: 'karten1',
+    type: 'scaffold',
+    variant: 'hilfekarten',
+    title: 'Hilfekarten zu Aufgabe 1',
+    items: ['Erste Hilfe', 'Zweite Hilfe', 'Dritte Hilfe']
   })
   p.sheets[0].blocks = bloecke
   return p
@@ -132,6 +142,27 @@ try {
     kaesten.some(([k, g]) => k === 'merk' && g),
     'Merkkasten am Ende wartet, bis alle Aufgaben bearbeitet sind'
   )
+  // Hilfen (06.10.2026): Satzanfänge zu Aufgabe 2 gesperrt, Hilfekarten-Seite weg, ?-Symbol an Aufgabe 1
+  const satz = await blatt
+    .locator('[data-hilfe-block="satz2"]')
+    .first()
+    .evaluate((e) => [e.classList.contains('sa-gesperrt'), e.getAttribute('data-sperre') ?? ''])
+  pruefe(satz[0] && /Aufgabe 2/.test(satz[1]), `Satzanfänge zu Aufgabe 2 anfangs gesperrt („${satz[1]}")`)
+  const kartenSeite = await blatt.locator('.ws-helpcards-page').count()
+  const abgelegt = await blatt.locator('#sa-hilfekarten .ws-scaffold-hilfekarten').count()
+  pruefe(kartenSeite === 0 && abgelegt === 1, `Seite „Tipp- und Hilfekarten" digital entfernt, Karten abgelegt (${kartenSeite}/${abgelegt})`)
+  pruefe((await s.locator('[data-hilfe-nr="1"]').count()) === 1, '?-Symbol rechts neben Aufgabe 1')
+  const [fenster] = await Promise.all([s.waitForEvent('popup', { timeout: 10000 }), s.locator('[data-hilfe-nr="1"]').click()])
+  await fenster.waitForLoadState()
+  pruefe(
+    (await fenster.locator('[data-karte]').count()) === 1 && (await fenster.locator('[data-karte="1"]').innerText()).includes('Erste Hilfe'),
+    'Eigenes Fenster: zuerst nur Hilfe 1'
+  )
+  await fenster.locator('#weiter').click()
+  pruefe((await fenster.locator('[data-karte]').count()) === 2, 'Nächste Hilfe öffnet Karte 2')
+  await fenster.screenshot({ path: join(out, '2b-hilfefenster.png') })
+  await fenster.close()
+  await s.waitForTimeout(800)
   const spaet = await blatt
     .locator('.ws-flow[data-fluss="spaetmat"] > .ws-block')
     .first()
@@ -174,6 +205,14 @@ try {
   pruefe(gesperrt2 === Math.max(0, alle - 3), `Nach der Freischaltung ist Aufgabe 3 sichtbar (${alle - gesperrt2} sichtbar)`)
   await s.screenshot({ path: join(out, '5-aufgabe-3-frei.png') })
   pruefe(Boolean(miaId), 'Konto von Mia gefunden')
+  // Lehrkraft: Hilfekarten in der Auswertung (je Person und je Aufgabe)
+  const aw = await (await lk.request.get(`${A}/server/blaetter/${fr.id}/auswertung`, { headers: KOPF })).json()
+  const miaA = (aw.personen ?? []).find((x) => x.id === miaId)
+  pruefe(
+    miaA?.hilfekarten === 2 && miaA.aufgaben.find((x) => x.nr === 1)?.hilfekarten === 2,
+    `Auswertung: Mia hat 2 Hilfekarten geöffnet (${miaA?.hilfekarten})`
+  )
+  pruefe((aw.aufgaben ?? []).find((x) => x.nr === 1)?.hilfekarten === 3, 'Auswertung kennt die 3 Hilfekarten zu Aufgabe 1')
   await lk.request.post(`${A}/server/blaetter/${fr.id}/loeschen`, { headers: KOPF, data: {} })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)

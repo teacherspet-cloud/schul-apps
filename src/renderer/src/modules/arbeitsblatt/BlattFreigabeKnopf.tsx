@@ -7,6 +7,7 @@
  * Server – nur für die KI, nie an die Lernenden. Dazu die verknüpfte Rückmeldung (Aufgaben +
  * Lösungsblatt als Erwartungshorizont), in der alle Abgaben landen.
  */
+import { hilfenZuordnung } from './didactics/aufgabenVerweise'
 import { Alert, Badge, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core'
 import { IconQrcode, IconUsersGroup } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
@@ -28,11 +29,25 @@ import { taskNumbersFor } from './render/SheetPages'
 /** Aufgaben eines Blattes für den Server: Anweisung (wie gedruckt) und Erwartung samt Lösung */
 export function blattAufgaben(sheet: Sheet): BlattAufgabe[] {
   const nummern = taskNumbersFor(sheet)
+  // Hilfekarten je Aufgabe (06.10.2026): digital am ?-Symbol neben der Aufgabe
+  const zuordnung = hilfenZuordnung(sheet)
+  const karten = new Map<number, number>()
+  for (const b of sheet.blocks)
+    if (b.type === 'scaffold' && b.variant === 'hilfekarten' && zuordnung.has(b.id))
+      karten.set(zuordnung.get(b.id)!, (karten.get(zuordnung.get(b.id)!) ?? 0) + b.items.filter((x) => x.trim()).length)
   return sheet.blocks.flatMap((b) => {
     if (b.type !== 'task') return []
     const nr = nummern.get(b.id) ?? 0
     const teile = b.parts.map((p, i) => `${String.fromCharCode(97 + i)}) ${plainText(p.instruction)}`)
-    return [{ nr, anweisung: [plainText(b.instruction), ...teile].join(' '), erwartung: describeBlock(b), ...(b.freiwillig ? { freiwillig: true } : {}) }]
+    return [
+      {
+        nr,
+        anweisung: [plainText(b.instruction), ...teile].join(' '),
+        erwartung: describeBlock(b),
+        ...(b.freiwillig ? { freiwillig: true } : {}),
+        ...(karten.get(nr) ? { hilfekarten: karten.get(nr) } : {})
+      }
+    ]
   })
 }
 

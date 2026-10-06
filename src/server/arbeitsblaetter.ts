@@ -112,6 +112,8 @@ const db = () => {
     if (!sp2.has('extra')) d.exec('ALTER TABLE blatt_abgaben ADD COLUMN extra INTEGER NOT NULL DEFAULT 0')
     // Von der Lehrkraft freigeschaltete Aufgaben (schrittweise Freischaltung, 05.10.2026)
     if (!sp2.has('freigeschaltet')) d.exec("ALTER TABLE blatt_abgaben ADD COLUMN freigeschaltet TEXT NOT NULL DEFAULT '[]'")
+    // Geöffnete Hilfekarten je Aufgabe (06.10.2026; verschlüsselt, feldschutz.ts)
+    if (!sp2.has('hilfen')) d.exec("ALTER TABLE blatt_abgaben ADD COLUMN hilfen TEXT NOT NULL DEFAULT '{}'")
     bereit = true
   }
   return d
@@ -170,6 +172,8 @@ interface Abgabe {
   aktualisiert: number
   /** JSON: Nummern der Aufgaben, die die Lehrkraft als erledigt freigeschaltet hat */
   freigeschaltet?: string
+  /** JSON: Aufgabe → Zahl der geöffneten Hilfekarten (06.10.2026) */
+  hilfen?: string
 }
 
 const freigabe = (id: string): Zeile | null => (db().prepare('SELECT * FROM blatt_freigaben WHERE id = ?').get(id) as Zeile | undefined) ?? null
@@ -355,6 +359,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               ...(e.merkAmEnde ? { merkAmEnde: true } : {})
             },
             freigeschaltet: json_(a?.freigeschaltet ?? '[]', [] as number[]),
+            hilfen: json_(a?.hilfen ?? '{}', {} as Record<string, number>),
             antworten: json_(a?.antworten ?? '{}', {}),
             tinte: json_(a?.tinte ?? '{}', {}),
             aufgabenFeedback: json_(a?.aufgaben_feedback ?? '{}', {}),
@@ -406,6 +411,23 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
               z.id,
               ich.id
             )
+      }
+      // Hilfekarte geöffnet (06.10.2026): je Aufgabe die höchste Zahl geöffneter Karten
+      if (url.pathname === '/s/api/blatt/hilfe') {
+        const nr = Number(k0.nr)
+        const karten = Math.max(0, Math.min(20, Math.round(Number(k0.karten) || 0)))
+        if (!json_(z.aufgaben, [] as BlattAufgabe[]).some((x) => x.nr === nr) || !karten) return (json(res, 400, { fehler: 'Unbekannte Aufgabe.' }), true)
+        db()
+          .prepare(
+            "INSERT OR IGNORE INTO blatt_abgaben (freigabe_id, schueler_id, antworten, tinte, aufgaben_feedback, abgaben, aktualisiert) VALUES (?, ?, '{}', '{}', '{}', 0, 0)"
+          )
+          .run(z.id, ich.id)
+        const bisher = json_(abgabeVon(z.id, ich.id)?.hilfen ?? '{}', {} as Record<string, number>)
+        if ((bisher[String(nr)] ?? 0) < karten) {
+          bisher[String(nr)] = karten
+          db().prepare('UPDATE blatt_abgaben SET hilfen = ? WHERE freigabe_id = ? AND schueler_id = ?').run(JSON.stringify(bisher), z.id, ich.id)
+        }
+        return (json(res, 200, { ok: true, hilfen: bisher }), true)
       }
       if (url.pathname === '/s/api/blatt/speichern') {
         speichern(bereinigeAntworten(k0.antworten), k0.tinte ? bereinigeTinte(k0.tinte) : null)
@@ -578,7 +600,8 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
           nr: Number(y.nr) || 0,
           anweisung: String(y.anweisung ?? '').slice(0, 4000),
           erwartung: String(y.erwartung ?? '').slice(0, 8000),
-          ...(y.freiwillig === true ? { freiwillig: true } : {})
+          ...(y.freiwillig === true ? { freiwillig: true } : {}),
+          ...(Number(y.hilfekarten) > 0 ? { hilfekarten: Math.min(20, Math.round(Number(y.hilfekarten))) } : {})
         }
       })
       const vorlage = k0.rueckmeldung as Rueckmeldung | undefined
@@ -744,7 +767,7 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
       return (
         json(res, 200, {
           ...erg,
-          aufgaben: aufgaben.map((a) => ({ nr: a.nr, anweisung: a.anweisung })),
+          aufgaben: aufgaben.map((a) => ({ nr: a.nr, anweisung: a.anweisung, ...(a.hilfekarten ? { hilfekarten: a.hilfekarten } : {}) })),
           strenge: gespeichert.strenge ?? 'normal',
           mitarbeit: gespeichert.personen ?? {},
           erstellt: gespeichert.zeit ?? 0
@@ -847,6 +870,7 @@ function auswertungsDaten(z: Zeile): { aufgaben: BlattAufgabe[]; roh: PersonRoh[
         antworten: json_(a.antworten ?? '{}', {} as Record<string, string>),
         verlauf,
         freigeschaltet: json_(a.freigeschaltet ?? '[]', [] as number[]),
+        hilfen: json_(a.hilfen ?? '{}', {} as Record<string, number>),
         eingereicht: a.abgaben,
         kriterien: (bogen?.kriterien ?? []).map((k) => k.einschaetzung),
         letzte: Object.fromEntries(

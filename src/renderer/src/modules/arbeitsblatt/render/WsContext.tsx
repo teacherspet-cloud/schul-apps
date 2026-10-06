@@ -19,6 +19,8 @@ export interface WsContextValue {
   actions?: WsActions
   /** Aufgabennummern je Baustein-ID */
   taskNumbers: Map<string, number>
+  /** Hilfen (Tipps, Satzanfänge, Wortspeicher, Hilfekarten) → Nummer ihrer Aufgabe (06.10.2026, didactics/aufgabenVerweise.ts) */
+  hilfeFuer?: Map<string, number>
   /** Materialnummern (M1, M2 …) je Baustein-ID – von der App vergeben */
   materialNumbers?: Map<string, string>
   /** Blatt enthält ★-markierte Aufgaben (gemeinsames Blatt) */

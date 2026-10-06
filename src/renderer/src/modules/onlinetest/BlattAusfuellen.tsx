@@ -9,6 +9,7 @@
  * Das Blatt steht in einem iframe ohne Skripte (sandbox, nur same-origin zum Messen); darüber
  * liegen die Eingabefelder, beides gemeinsam auf die Breite des Geräts skaliert.
  */
+import { HilfeModal, hilfekartenAus, oeffneHilfeFenster, type Hilfekarten } from './hilfeFenster'
 import {
   ActionIcon,
   Alert,
@@ -29,7 +30,7 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowBackUp, IconArrowLeft, IconDownload, IconMessageCircle, IconPrinter, IconSend } from '@tabler/icons-react'
+import { IconArrowBackUp, IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
 import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
@@ -89,6 +90,8 @@ interface AufgabeInfo {
   zeichnen?: boolean
   /** Freiwillig (Reihen-Schritt, 05.10.2026): hält das Freischalten nicht auf, zählt nicht für „vollständig" */
   freiwillig?: boolean
+  /** Hilfekarten zu dieser Aufgabe (06.10.2026) – digital am ?-Symbol rechts */
+  hilfe?: Hilfekarten
 }
 
 export interface BlattDaten {
@@ -111,6 +114,8 @@ export interface BlattDaten {
   }
   /** Von der Lehrkraft freigeschaltete Aufgaben (zählen wie „teilweise") */
   freigeschaltet?: number[]
+  /** Geöffnete Hilfekarten je Aufgabe (06.10.2026) */
+  hilfen?: Record<string, number>
   antworten: Record<string, string>
   tinte: Record<string, string>
   aufgabenFeedback: Record<string, AufgabenFb[]>
@@ -319,6 +324,12 @@ function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: Auf
     felder.push({ ...f, id: '', ...(f.art === 'zeilen' ? { zeilen: 1, abstand: f.h } : {}) })
   }
   felder.forEach((f, i) => (f.id = `f${i}`))
+  // Hilfekarten je Aufgabe (06.10.2026): am ?-Symbol statt auf der Schlussseite
+  const hilfen = hilfekartenAus(doc)
+  for (const a of aufgaben) {
+    const h = hilfen.get(a.nr)
+    if (h) a.hilfe = h
+  }
   return { felder, seiten, aufgaben }
 }
 
@@ -359,6 +370,22 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const [fassungen, setFassungen] = useState(d.fassungen)
   const [genutzt, setGenutzt] = useState(d.genutzt)
   const [aufgabenFb, setAufgabenFb] = useState(d.aufgabenFeedback)
+  // Geöffnete Hilfekarten je Aufgabe (06.10.2026) – Fenster bzw. Pop-up als Rückfall
+  const [hilfen, setHilfen] = useState<Record<string, number>>(d.hilfen ?? {})
+  const [hilfeModal, setHilfeModal] = useState<Hilfekarten | null>(null)
+  const hilfeGezeigt = useCallback(
+    (nr: number, karten: number): void => {
+      setHilfen((h) => ({ ...h, [String(nr)]: Math.max(h[String(nr)] ?? 0, karten) }))
+      // Die Lehrkraft-Ansicht zählt nicht mit
+      if (!lehrkraft) void senden('/s/api/blatt/hilfe', { id: d.id, nr, karten }).catch(() => undefined)
+    },
+    [d.id, lehrkraft]
+  )
+  const hilfeOeffnen = (a: AufgabeInfo): void => {
+    if (!a.hilfe) return
+    const offen = hilfen[String(a.nr)] ?? 0
+    if (!oeffneHilfeFenster(a.hilfe, offen, (k) => hilfeGezeigt(a.nr, k))) setHilfeModal(a.hilfe)
+  }
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [meldung, setMeldung] = useState('')
   const [loesungOffen, setLoesungOffen] = useState(false)
@@ -767,6 +794,16 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 laeuft={laeuft}
                 fb={aufgabenFb}
                 runden={d.einstellungen.aufgabenRunden}
+                hilfen={hilfen}
+                hilfeOeffnen={hilfeOeffnen}
+              />
+            )}
+            {hilfeModal && (
+              <HilfeModal
+                h={hilfeModal}
+                offen={hilfen[String(hilfeModal.nr)] ?? 0}
+                gezeigt={(k) => hilfeGezeigt(hilfeModal.nr, k)}
+                schliessen={() => setHilfeModal(null)}
               />
             )}
           </div>
@@ -785,6 +822,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           fb={aufgabenFb}
           runden={d.einstellungen.aufgabenRunden}
           tinte={Object.keys(tinte).length > 0}
+          hilfeOeffnen={hilfeOeffnen}
           zumBlatt={(a) => {
             setAnsicht('blatt')
             // Nach dem Umschalten zur Aufgabe rollen (Lage im Blatt × Maßstab)
@@ -891,6 +929,9 @@ function Ebene(p: {
   ampeln?: Record<number, Ampel> | null
   /** Gewählte Form (Werkzeug „Formen“) */
   form?: FormArt
+  /** Geöffnete Hilfekarten je Aufgabe und Öffnen des Hilfefensters (06.10.2026) */
+  hilfen?: Record<string, number>
+  hilfeOeffnen?: (a: AufgabeInfo) => void
 }): React.JSX.Element {
   const [offenesFb, setOffenesFb] = useState<number | null>(null)
   const schreibt = p.werkzeug !== 'tastatur'
@@ -1082,6 +1123,34 @@ function Ebene(p: {
           form={p.form}
         />
       ))}
+      {/* Hilfekarten rechts neben der Aufgabe (06.10.2026): eigenes kleines Fenster, Karten schrittweise */}
+      {p.hilfeOeffnen &&
+        p.aufgaben
+          .filter((a) => a.hilfe)
+          .map((a) => {
+            const s = p.seiten[a.seite]
+            if (!s) return null
+            const genutzt = p.hilfen?.[String(a.nr)] ?? 0
+            return (
+              <Tooltip
+                key={`hilfe-${a.nr}`}
+                label={`Hilfekarten zu Aufgabe ${a.nr} (${genutzt ? `${genutzt} von ${a.hilfe!.karten.length} geöffnet` : `${a.hilfe!.karten.length} Karten`})`}
+              >
+                <ActionIcon
+                  variant="filled"
+                  color="yellow"
+                  radius="xl"
+                  size="lg"
+                  style={{ position: 'absolute', left: s.x + s.w - 46, top: a.y - 4, zIndex: 20, boxShadow: '0 1px 4px rgba(0,0,0,.18)' }}
+                  onClick={() => p.hilfeOeffnen!(a)}
+                  aria-label={`Hilfe zu Aufgabe ${a.nr}`}
+                  data-hilfe-nr={a.nr}
+                >
+                  <IconHelp size={20} />
+                </ActionIcon>
+              </Tooltip>
+            )
+          })}
       {/* Ampel links neben der Aufgabe (05.10.2026): rot = noch nicht, gelb = teilweise, grün = treffend */}
       {p.ampeln &&
         p.aufgaben.map((a) => (
@@ -1275,6 +1344,8 @@ function Liste(p: {
   runden: number
   tinte: boolean
   zumBlatt: (a: AufgabeInfo) => void
+  /** Hilfekarten öffnen (06.10.2026) */
+  hilfeOeffnen?: (a: AufgabeInfo) => void
 }): React.JSX.Element {
   const gruppen = useMemo(() => {
     // Auch Aufgaben ohne Felder, die auf dem Blatt gezeichnet werden (Diagramm, Zeitleiste …)
@@ -1303,6 +1374,18 @@ function Liste(p: {
                   </Text>
                 ) : null}
               </Text>
+              {g.aufgabe?.hilfe && p.hilfeOeffnen && (
+                <Button
+                  size="xs"
+                  variant="light"
+                  color="yellow"
+                  leftSection={<IconHelp size={14} />}
+                  onClick={() => p.hilfeOeffnen!(g.aufgabe!)}
+                  data-hilfe-nr={g.nr}
+                >
+                  Hilfe
+                </Button>
+              )}
               {p.pruefen && g.nr > 0 && rest > 0 && (
                 <Button
                   size="xs"
@@ -1500,6 +1583,15 @@ function sperrenAnwenden(doc: Document, bis: number, merkZeigen: boolean): void 
     else t.removeAttribute('data-sperre')
   }
   materialSperren(doc, bis)
+  // Tipps, Satzanfänge, Wortspeicher zu gesperrten Aufgaben (06.10.2026)
+  for (const h of Array.from(doc.querySelectorAll<HTMLElement>('[data-hilfe-fuer]'))) {
+    if (h.classList.contains('ws-scaffold-hilfekarten')) continue
+    const fuer = Number(h.dataset.hilfeFuer)
+    const zu = fuer > bis
+    h.classList.toggle('sa-gesperrt', zu)
+    if (zu) h.setAttribute('data-sperre', `Diese Hilfe erscheint mit Aufgabe ${fuer}.`)
+    else h.removeAttribute('data-sperre')
+  }
   /*
    * Nur Kästen NACH der ersten Aufgabe warten aufs Ende (06.10.2026, Befund der Lehrkraft: auch der Einstiegskasten
    * zu Beginn des Blatts verschwand). Was vor der ersten Aufgabe steht – Einstieg, Vorwissen – braucht man zum Arbeiten.
