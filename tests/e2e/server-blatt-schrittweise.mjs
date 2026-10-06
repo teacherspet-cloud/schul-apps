@@ -40,6 +40,17 @@ const mitKaesten = (payload) => {
   const erste = bloecke.findIndex((b) => b.type === 'task')
   bloecke.splice(erste, 0, kasten('einstieg', 'wissen', 'Einstieg', 'Worum es heute geht.'))
   bloecke.push(kasten('merk', 'merke', 'Merke', 'Das Wichtigste zum Schluss.'))
+  // Material direkt hinter Aufgabe 1, auf das keine Aufgabe verweist: erscheint mit Aufgabe 2
+  const nachErster = bloecke.findIndex((b) => b.type === 'task') + 1
+  bloecke.splice(nachErster, 0, {
+    id: 'spaetmat',
+    type: 'text',
+    title: 'Spätes Material',
+    body: 'Erst für die zweite Aufgabe.',
+    lineNumbers: false,
+    source: '',
+    glossary: []
+  })
   p.sheets[0].blocks = bloecke
   return p
 }
@@ -121,6 +132,11 @@ try {
     kaesten.some(([k, g]) => k === 'merk' && g),
     'Merkkasten am Ende wartet, bis alle Aufgaben bearbeitet sind'
   )
+  const spaet = await blatt
+    .locator('.ws-flow[data-fluss="spaetmat"] > .ws-block')
+    .first()
+    .evaluate((e) => [e.classList.contains('sa-gesperrt'), e.getAttribute('data-sperre') ?? ''])
+  pruefe(spaet[0] && /erscheint mit Aufgabe 2/.test(spaet[1]), `Material für Aufgabe 2 ist anfangs gesperrt („${spaet[1]}")`)
   // Gesperrte Aufgabe: Server lehnt Feedback ab
   const gesperrt = await sm.request.post(`${A}/s/api/blatt/aufgabe`, { headers: KOPF, data: { id: fr.id, nr: 3, antworten: {}, felder: [] } })
   pruefe(gesperrt.status() === 403, `Feedback zu gesperrter Aufgabe 3 abgelehnt (${gesperrt.status()})`)
@@ -132,6 +148,13 @@ try {
   await s.waitForTimeout(600)
   const gesperrt1 = await blatt.locator('.ws-task.sa-gesperrt:not(.ws-continued)').count()
   pruefe(gesperrt1 === alle - 2, `Aufgabe 2 ist jetzt freigeschaltet (${alle - gesperrt1} sichtbar)`)
+  pruefe(
+    !(await blatt
+      .locator('.ws-flow[data-fluss="spaetmat"] > .ws-block')
+      .first()
+      .evaluate((e) => e.classList.contains('sa-gesperrt'))),
+    'Mit Aufgabe 2 erscheint auch ihr Material'
+  )
   pruefe((await s.locator('[data-ampel-nr="2"][data-ampel="rot"]').count()) === 1, 'Aufgabe 2 hat eine rote Ampel')
   await s.keyboard.press('Escape').catch(() => undefined)
   await s.screenshot({ path: join(out, '3-aufgabe-2-frei.png') })

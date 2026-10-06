@@ -3261,3 +3261,30 @@ html[data-griff-zug] * {
   opacity: 0.8;
   white-space: nowrap;
 }
+
+/*
+ * Tabellenrahmen ohne zusammengelegte Ränder (06.10.2026, Befund der Lehrkraft: „der untere Rand von Tabellen ist auf
+ * gedruckten, gespeicherten und freigegebenen Materialien nicht sichtbar"). Bei `border-collapse: collapse` liegt der
+ * äußere Rand zur Hälfte AUSSERHALB der Tabelle; verkleinert gedruckt, im PDF-Betrachter oder auf dem Tablet gezoomt
+ * rundet die Darstellung diese halbe Linie weg – meist die untere. Jetzt zeichnet jede Zelle rechts und unten, die
+ * Tabelle oben und links: jede Linie genau einmal und ganz innerhalb der Tabelle. Optisch dasselbe.
+ */
+.ws-table,
+.ws-tf,
+.ws-selfcheck table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-top: 0.25mm solid #444;
+  border-left: 0.25mm solid #444;
+}
+.ws-table th,
+.ws-table td,
+.ws-tf th,
+.ws-tf td,
+.ws-selfcheck th,
+.ws-selfcheck td {
+  border-top: 0;
+  border-left: 0;
+  border-right: 0.25mm solid #444;
+  border-bottom: 0.25mm solid #444;
+}

@@ -1439,6 +1439,50 @@ function AmpelZeichen({ stand, x, y, nr }: { stand: Ampel; x: number; y: number;
 }
 
 /** Gesperrte Aufgaben und (noch) verborgene Merkkästen im Blatt ausblenden – Platz bleibt, ein Hinweis steht darauf */
+/**
+ * Materialien zu gesperrten Aufgaben (06.10.2026, Befund der Lehrkraft: „das Material für spätere Aufgaben ist von Anfang
+ * an sichtbar"). Ein Material erscheint mit der ersten Aufgabe, die es nennt („M2"); nennt keine es, mit der nächsten
+ * Aufgabe danach. Grundlage sind die Bausteinmarken des Blatts (`.ws-flow[data-fluss]`, auch für Fortsetzungsstücke).
+ */
+export function materialSperren(doc: Document, bis: number): void {
+  const eintraege = new Map<string, { nr?: number; mat?: string; bloecke: HTMLElement[]; text: string }>()
+  const reihenfolge: string[] = []
+  let nr = 0
+  for (const f of Array.from(doc.querySelectorAll<HTMLElement>('.ws-flow[data-fluss]'))) {
+    const id = f.dataset.fluss ?? ''
+    let e = eintraege.get(id)
+    if (!e) {
+      e = { bloecke: [], text: '' }
+      eintraege.set(id, e)
+      reihenfolge.push(id)
+    }
+    const block = (f.firstElementChild as HTMLElement | null) ?? f
+    e.bloecke.push(block)
+    e.text += ` ${f.textContent ?? ''}`
+    if (block.classList.contains('ws-task') && !block.classList.contains('ws-continued') && e.nr === undefined) e.nr = ++nr
+    const marke = f.querySelector('.ws-material-no')?.textContent?.trim()
+    if (marke && !e.mat) e.mat = marke
+  }
+  const aufgaben = reihenfolge.map((id) => eintraege.get(id)!).filter((e) => e.nr !== undefined)
+  reihenfolge.forEach((id, i) => {
+    const e = eintraege.get(id)!
+    if (!e.mat || e.nr !== undefined) return
+    const muster = new RegExp(`\\b${e.mat}\\b`)
+    const nennen = aufgaben.filter((a) => muster.test(a.text)).map((a) => a.nr!)
+    const naechste = reihenfolge
+      .slice(i + 1)
+      .map((x) => eintraege.get(x)!.nr)
+      .find((n) => n !== undefined)
+    const ab = nennen.length ? Math.min(...nennen) : (naechste ?? 1)
+    const zu = ab > bis
+    for (const b of e.bloecke) {
+      b.classList.toggle('sa-gesperrt', zu)
+      if (zu) b.setAttribute('data-sperre', `${e.mat} erscheint mit Aufgabe ${ab}.`)
+      else b.removeAttribute('data-sperre')
+    }
+  })
+}
+
 function sperrenAnwenden(doc: Document, bis: number, merkZeigen: boolean): void {
   if (!doc.getElementById('sa-sperre-stil')) {
     const st = doc.createElement('style')
@@ -1455,6 +1499,7 @@ function sperrenAnwenden(doc: Document, bis: number, merkZeigen: boolean): void 
     if (zu) t.setAttribute('data-sperre', `Aufgabe ${nr} wird freigeschaltet, sobald Aufgabe ${bis} mindestens teilweise gelöst ist.`)
     else t.removeAttribute('data-sperre')
   }
+  materialSperren(doc, bis)
   /*
    * Nur Kästen NACH der ersten Aufgabe warten aufs Ende (06.10.2026, Befund der Lehrkraft: auch der Einstiegskasten
    * zu Beginn des Blatts verschwand). Was vor der ersten Aufgabe steht – Einstieg, Vorwissen – braucht man zum Arbeiten.
