@@ -195,6 +195,103 @@ try {
     return l ? l.getBoundingClientRect().bottom : 0
   })
   pruefe(Math.abs(ende - ac.y) < 4, `Linienende rastet auf der Achse ein (Abweichung ${Math.round(Math.abs(ende - ac.y))} px)`)
+  // ---------- 06.10.2026: Jahr an der Linie, jahresgenaues Einrasten mit Blase, Optionsmenü, Lösch-Rückfrage
+  pruefe(Boolean(linie?.jahr2) && !linie.jahr1, `Linie kennt das Jahr am Ende auf der Zeitleiste (${linie?.jahr2})`)
+  const jahrText = await s
+    .locator('[data-objekt-linie] [data-jahr]')
+    .first()
+    .textContent()
+    .catch(() => '')
+  const jahrDreh = await s
+    .locator('[data-objekt-linie] [data-jahr]')
+    .first()
+    .getAttribute('transform')
+    .catch(() => '')
+  pruefe(jahrText === linie?.jahr2 && /rotate\(/.test(jahrDreh ?? ''), `Jahreszahl steht entlang der Linie (${jahrText}, ${jahrDreh})`)
+  // Skala der Achse: Pixel je Jahr
+  const skala = await s.evaluate(() => {
+    const f = document.querySelector('iframe')
+    const fr = f.getBoundingClientRect()
+    const k = fr.width / f.contentDocument.documentElement.clientWidth
+    for (const img of f.contentDocument.querySelectorAll('img.ws-diagram-img')) {
+      const src = decodeURIComponent(img.getAttribute('src').split(',').slice(1).join(','))
+      const svg = new DOMParser().parseFromString(src, 'image/svg+xml').documentElement
+      const l = svg.querySelector('line[data-skala]')
+      if (!l) continue
+      const vb = svg
+        .getAttribute('viewBox')
+        .split(/[\s,]+/)
+        .map(Number)
+      const b = img.getBoundingClientRect()
+      const [a, z] = l.getAttribute('data-skala').split('|').map(Number)
+      const x1 = fr.left + (b.left + ((+l.getAttribute('x1') - vb[0]) / vb[2]) * b.width) * k
+      const x2 = fr.left + (b.left + ((+l.getAttribute('x2') - vb[0]) / vb[2]) * b.width) * k
+      return { a, z, x1, x2, proJahr: (x2 - x1) / (z - a) }
+    }
+    return null
+  })
+  pruefe(Boolean(skala), `Achse trägt ihre Skala (${skala?.a}–${skala?.z}, ${skala?.proJahr?.toFixed(1)} px je Einheit)`)
+  if (skala) {
+    await s.locator('[data-werkzeug="linie"]').click()
+    await s.mouse.move(ac.x + 200, ac.y - 90)
+    await s.mouse.down()
+    const xa = skala.x1 + (Math.floor((skala.z - skala.a) / 2) + 0.1) * skala.proJahr
+    await s.mouse.move(xa, ac.y + 3, { steps: 6 })
+    const j1 = await s.locator('[data-jahr-blase]').getAttribute('data-jahr-blase')
+    await s.mouse.move(xa + skala.proJahr, ac.y + 3, { steps: 3 })
+    const j2 = await s.locator('[data-jahr-blase]').getAttribute('data-jahr-blase')
+    await s.screenshot({ path: join(out, '1b-jahr-blase.png') })
+    pruefe(Number.parseInt(j2) - Number.parseInt(j1) === 1, `Jahresgenau: eine Einheit weiter = nächstes Jahr (${j1} → ${j2})`)
+    await s.mouse.up()
+  }
+  // Rechtsklick aufs Kästchen: Optionen
+  const kb = await s.locator('[data-kasten]').first().boundingBox()
+  await s.mouse.click(kb.x + kb.width / 2, kb.y + kb.height / 2, { button: 'right' })
+  pruefe(await da(s.locator('[data-kontextmenue] [data-optionen="text"]'), 4000), 'Rechtsklick aufs Kästchen öffnet die Optionen')
+  await s.locator('[data-kontextmenue] [data-farbe="#fef9c3"]').click()
+  await s.locator('[data-kontextmenue] [data-linienart] label').nth(1).click()
+  await s.locator('[data-kontextmenue] [data-fett]').click()
+  await s.screenshot({ path: join(out, '1c-optionen.png') })
+  await s.keyboard.press('Escape')
+  // Rechtsklick auf die Linie: Pfeil am Ende
+  const lm = await s.evaluate(() => {
+    const l = [...document.querySelectorAll('[data-objekt-linie] line')].find((x) => x.getAttribute('stroke') !== 'transparent')
+    const r = l.getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  })
+  await s.mouse.click(lm.x, lm.y, { button: 'right' })
+  pruefe(await da(s.locator('[data-kontextmenue] [data-optionen="linie"]'), 4000), 'Rechtsklick auf die Linie öffnet ihre Optionen')
+  await s.locator('[data-kontextmenue] [data-pfeil] label').nth(1).click()
+  await s.keyboard.press('Escape')
+  await s.waitForTimeout(2600)
+  const mitOptionen = await objekteHolen()
+  const k2 = mitOptionen.find((o) => o.t === 'text')
+  const l3 = mitOptionen.find((o) => o.t === 'linie')
+  pruefe(
+    k2?.fuellung === '#fef9c3' && k2.linienArt === 'strich' && k2.fett === true,
+    `Kästchen: Füllung, gestrichelter Rand, fett gespeichert (${JSON.stringify([k2?.fuellung, k2?.linienArt, k2?.fett])})`
+  )
+  pruefe(l3?.pfeil === 'ende' && (await s.locator('[data-objekt-linie] polygon').count()) >= 1, 'Linie mit Pfeilspitze')
+  // Radierer auf beschriftetes Kästchen: Rückfrage; „Behalten" lässt es stehen
+  await s.locator('[data-werkzeug="radierer"]').click()
+  await s.locator('[data-kasten]').first().dispatchEvent('pointerdown')
+  pruefe(await da(s.locator('.mantine-Modal-content', { hasText: 'Textkästchen löschen?' }), 4000), 'Radierer auf beschriftetes Kästchen: Rückfrage')
+  await s.locator('[data-loesch-nein]').click()
+  pruefe((await s.locator('[data-kasten]').count()) >= 1, '„Behalten" lässt das Kästchen stehen')
+  // Leeres Kästchen: sofort weg
+  await s.locator('[data-werkzeug="text"]').click()
+  await s.mouse.click(ac.x + 420, ac.y - 200)
+  const vorLeer = await s.locator('[data-kasten]').count()
+  await s.locator('[data-werkzeug="radierer"]').click()
+  await s.locator('[data-kasten]').last().dispatchEvent('pointerdown')
+  pruefe(
+    (await s.locator('[data-kasten]').count()) === vorLeer - 1 && !(await s.locator('[data-loesch-frage]').count()),
+    'Leeres Kästchen verschwindet ohne Rückfrage'
+  )
+  // Werkzeug-Optionen: Rechtsklick auf den Stift
+  await s.locator('[data-werkzeug="stift"]').click({ button: 'right' })
+  pruefe(await da(s.locator('[data-kontextmenue] [data-optionen="stift"]'), 4000), 'Rechtsklick auf den Stift: Farbe, Linienart, Stärke')
+  await s.keyboard.press('Escape')
   // Formen (05.10.2026): aus dem Menü wählen, aufziehen; Radierer entfernt sie wieder
   await s.locator('[data-werkzeug="form"]').click()
   await s.locator('[data-form="kreis"]').click()

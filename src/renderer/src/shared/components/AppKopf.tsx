@@ -13,9 +13,9 @@
  * Vorher hatte jedes Programm seinen eigenen Kopf – mal mit Titel, mal nur Schritte, „Neu" mal hell,
  * mal gefüllt, „Eigenes Fenster" mal da, mal nicht.
  */
-import { Button, Group, Paper, Text, Title } from '@mantine/core'
-import { IconFolder, IconPlus } from '@tabler/icons-react'
-import { createContext, useContext } from 'react'
+import { ActionIcon, Button, Group, Paper, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
+import { IconChevronDown, IconChevronUp, IconFolder, IconPlus } from '@tabler/icons-react'
+import { createContext, useContext, useState } from 'react'
 import { EigenesFensterKnopf } from '../eigenesFenster'
 import type { ProgrammIcon } from './ProgrammSymbol'
 
@@ -68,6 +68,58 @@ export function AppKopf({
   const text = beschreibung ?? info?.description ?? ''
   const farbe = info?.color ?? 'blue'
   const Symbol = info?.icon
+  /*
+   * Ein- und ausblendbar (06.10.2026, Wunsch der Lehrkraft): eingeklappt bleibt nur eine schmale Leiste mit Name und
+   * Pfeil – mehr Platz für Blatt und Editor. Gemerkt je Programm (nur in diesem Browser).
+   */
+  const merkName = `schulapps-kopf-zu:${name}`
+  const [zu, setZu] = useState(() => {
+    try {
+      return localStorage.getItem(merkName) === '1'
+    } catch {
+      return false
+    }
+  })
+  const umschalten = (): void => {
+    setZu(!zu)
+    try {
+      localStorage.setItem(merkName, zu ? '0' : '1')
+    } catch {
+      // ohne Browserspeicher: nur für diese Sitzung
+    }
+  }
+  if (zu)
+    return (
+      <UnstyledButton
+        onClick={umschalten}
+        className="app-kopf app-kopf-zu"
+        aria-expanded={false}
+        aria-label="Kopfbereich einblenden"
+        title="Kopfbereich einblenden"
+        data-app-kopf
+        data-app-kopf-zu
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '4px 12px',
+          marginBottom: 8,
+          borderRadius: 'var(--mantine-radius-md)',
+          border: '1px solid var(--mantine-color-default-border)',
+          background: `linear-gradient(90deg, var(--mantine-color-${farbe}-light) 0%, transparent 60%)`
+        }}
+      >
+        {Symbol ? <Symbol size={20} /> : info?.bild ? <img src={info.bild} alt="" width={20} height={20} /> : null}
+        <Text fw={600} size="sm" style={{ flex: 1, minWidth: 0 }} truncate>
+          {name}
+        </Text>
+        <Text size="xs" c="dimmed">
+          Kopfbereich einblenden
+        </Text>
+        <IconChevronDown size={16} />
+      </UnstyledButton>
+    )
   return (
     <Paper
       radius="lg"
@@ -137,6 +189,20 @@ export function AppKopf({
             </Button>
           )}
           {hauptknopf}
+          <Tooltip label="Kopfbereich ausblenden (mehr Platz)">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              radius="md"
+              size="lg"
+              onClick={umschalten}
+              aria-label="Kopfbereich ausblenden"
+              aria-expanded
+              data-app-kopf-umschalten
+            >
+              <IconChevronUp size={18} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Group>
       {(links || rechts) && (

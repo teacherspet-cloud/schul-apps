@@ -279,6 +279,14 @@ function zeitleiste(spec: DiagramSpec, widthMm: number, raster = true, extraTop 
       const x0 = segLeft[s]
       const x1 = x0 + breiten[s]
       parts.push(line(x0, by, s === abschnitte.length - 1 ? x1 + 3 : x1, by, AXIS, 0.45))
+      /*
+       * Skala für das freigegebene Blatt (06.10.2026): Verbindungslinien rasten jahresgenau ein und zeigen das Jahr
+       * (onlinetest/BlattAusfuellen.tsx). Unsichtbar – Wert am Anfang|am Ende|Einheit|mit Jahr.
+       */
+      // Jede Grundlinie (auch jeder Strang) bekommt die Skala
+      parts.push(
+        `<line x1="${round(x0)}" y1="${round(by)}" x2="${round(x1)}" y2="${round(by)}" stroke="none" data-skala="${info.a}|${info.b}|${a.unit}|${a.unit === 'day' && Math.abs(info.b - info.a) > 300 ? 1 : 0}"/>`
+      )
       if (s === abschnitte.length - 1) parts.push(`<path d="M ${round(x1 + 3)} ${round(by)} l -1.8 -1.1 v 2.2 z" fill="${AXIS}"/>`)
       // Bruchzeichen zwischen den Abschnitten
       if (s > 0) {

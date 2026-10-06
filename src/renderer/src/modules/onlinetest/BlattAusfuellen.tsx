@@ -9,6 +9,7 @@
  * Das Blatt steht in einem iframe ohne Skripte (sandbox, nur same-origin zum Messen); darüber
  * liegen die Eingabefelder, beides gemeinsam auf die Breite des Geräts skaliert.
  */
+import type { Stil } from './objektOptionen'
 import { HilfeModal, hilfekartenAus, oeffneHilfeFenster, type Hilfekarten } from './hilfeFenster'
 import {
   ActionIcon,
@@ -30,11 +31,11 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconArrowBackUp, IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend } from '@tabler/icons-react'
+import { IconArrowBackUp, IconArrowLeft, IconDownload, IconHelp, IconMessageCircle, IconPrinter, IconSend, IconShare } from '@tabler/icons-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { digitalisieren, KORREKTURRAND_MM, zusatzLinien } from '@shared/blattDigital'
 import { druckenImRahmen, druckfassung, FELDER } from './blattDruck'
-import type { Andock } from './blattWerkzeuge'
+import type { Andock, Vorgaben, VorgabeArt } from './blattWerkzeuge'
 import { materialMitZeilen } from './materialZeilen'
 import { objekteAus, OBJEKTE_SCHLUESSEL, type BlattObjekt } from '@shared/blattObjekte'
 import { MARKER_FARBEN, ObjektEbene, STIFT_FARBEN, Werkzeugleiste, type Werkzeug } from './blattWerkzeuge'
@@ -168,7 +169,15 @@ function ausDiagrammBild(img: HTMLImageElement, r: DOMRect): Andock[] {
   const ky = b.height / vh
   const pt = (x: number, y: number): { x: number; y: number } => ({ x: b.left - r.left + (x - ox) * kx, y: b.top - r.top + (y - oy) * ky })
   const aus: Andock[] = []
+  // Zeitleiste: Skala der Achse (06.10.2026, render/diagramSvg.ts)
+  wurzel.querySelectorAll('line[data-skala]').forEach((l) => {
+    const a = pt(Number(l.getAttribute('x1')), Number(l.getAttribute('y1')))
+    const e = pt(Number(l.getAttribute('x2')), Number(l.getAttribute('y2')))
+    const s = skalaAus(l.getAttribute('data-skala'), a, e)
+    if (s) aus.push(s)
+  })
   wurzel.querySelectorAll('line').forEach((l) => {
+    if (l.hasAttribute('data-skala')) return
     if (!dunkel(l.getAttribute('stroke') ?? l.closest('[stroke]')?.getAttribute('stroke') ?? null)) return
     const a = pt(Number(l.getAttribute('x1')), Number(l.getAttribute('y1')))
     const e = pt(Number(l.getAttribute('x2')), Number(l.getAttribute('y2')))
@@ -198,6 +207,13 @@ function andockstellen(seite: Element, r: DOMRect): Andock[] {
   seite.querySelectorAll('svg line').forEach((el) => {
     const l = el as SVGLineElement
     const m = l.getScreenCTM()
+    if (m && l.hasAttribute('data-skala')) {
+      const p1 = new DOMPoint(l.x1.baseVal.value, l.y1.baseVal.value).matrixTransform(m)
+      const p2 = new DOMPoint(l.x2.baseVal.value, l.y2.baseVal.value).matrixTransform(m)
+      const s = skalaAus(l.getAttribute('data-skala'), { x: p1.x - r.left, y: p1.y - r.top }, { x: p2.x - r.left, y: p2.y - r.top })
+      if (s) aus.push(s)
+      return
+    }
     if (!m || !dunkel(getComputedStyle(l).stroke)) return
     const p1 = new DOMPoint(l.x1.baseVal.value, l.y1.baseVal.value).matrixTransform(m)
     const p2 = new DOMPoint(l.x2.baseVal.value, l.y2.baseVal.value).matrixTransform(m)
@@ -216,7 +232,35 @@ function andockstellen(seite: Element, r: DOMRect): Andock[] {
       { art: 'punkt', x: b.left + b.width / 2 - r.left, y: b.bottom + 1 - r.top }
     )
   })
-  return aus.slice(0, 800)
+  // Skalen zuerst – sie dürfen der Obergrenze nicht zum Opfer fallen
+  const alle = ohneFangNebenSkala(aus)
+  return [...alle.filter((a) => a.art === 'skala'), ...alle.filter((a) => a.art !== 'skala')].slice(0, 800)
+}
+
+/** Skala einer Zeitleisten-Achse aus `data-skala` („Anfang|Ende|Einheit|mit Jahr") */
+function skalaAus(roh: string | null, a: { x: number; y: number }, e: { x: number; y: number }): Andock | null {
+  const [va, vb, einheit, jahr] = (roh ?? '').split('|')
+  const wa = Number(va)
+  const wb = Number(vb)
+  if (!Number.isFinite(wa) || !Number.isFinite(wb) || wa === wb || !['year', 'month', 'day'].includes(einheit)) return null
+  return { art: 'skala', x1: a.x, y1: a.y, x2: e.x, y2: e.y, a: wa, b: wb, einheit: einheit as 'year' | 'month' | 'day', mitJahr: jahr === '1' }
+}
+
+/**
+ * Marken und Beschriftungen einer Zeitleiste fangen nicht mehr selbst (06.10.2026, Befund der Lehrkraft: bei eng
+ * liegenden Marken wie 475 und 476 sprang die Linie) – auf der Achse rastet sie jahresgenau ein.
+ */
+function ohneFangNebenSkala(aus: Andock[]): Andock[] {
+  const skalen = aus.filter((a): a is Extract<Andock, { art: 'skala' }> => a.art === 'skala')
+  if (!skalen.length) return aus
+  const nahe = (x: number, y: number): boolean =>
+    skalen.some((s) => {
+      const links = Math.min(s.x1, s.x2) - 8
+      const rechts = Math.max(s.x1, s.x2) + 8
+      const my = (s.y1 + s.y2) / 2
+      return x >= links && x <= rechts && Math.abs(y - my) < 28
+    })
+  return aus.filter((a) => (a.art === 'punkt' ? !nahe(a.x, a.y) : a.art === 'strecke' ? !(nahe(a.x1, a.y1) && nahe(a.x2, a.y2)) : true))
 }
 
 function messen(doc: Document): { felder: Feld[]; seiten: Seite[]; aufgaben: AufgabeInfo[] } {
@@ -367,6 +411,14 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   const [form, setForm] = useState<FormArt>('dreieck')
   const [stiftFarbe, setStiftFarbe] = useState(STIFT_FARBEN[0])
   const [markerFarbe, setMarkerFarbe] = useState(MARKER_FARBEN[0])
+  // Vorgaben je Werkzeug (Rechtsklick aufs Werkzeug, 06.10.2026)
+  const [vorgaben, setVorgaben] = useState<Vorgaben>({})
+  const setVorgabe = (art: VorgabeArt, patch: Partial<Stil>): void =>
+    setVorgaben((v) => {
+      const neu = { ...v[art], ...patch } as Stil & Record<string, unknown>
+      for (const k of Object.keys(patch)) if (neu[k] === undefined) delete neu[k]
+      return { ...v, [art]: neu }
+    })
   const [fassungen, setFassungen] = useState(d.fassungen)
   const [genutzt, setGenutzt] = useState(d.genutzt)
   const [aufgabenFb, setAufgabenFb] = useState(d.aufgabenFeedback)
@@ -576,13 +628,37 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
    * mit allem, was eingetragen ist – getippter Text an seinen Linien, Stift, Kästchen und Linien.
    * Der Server macht daraus ein PDF (ohne Skripte, ohne Netz).
    */
-  const [pdfLaeuft, setPdfLaeuft] = useState<'speichern' | 'drucken' | null>(null)
+  const [pdfLaeuft, setPdfLaeuft] = useState<'speichern' | 'drucken' | 'teilen' | null>(null)
+  /*
+   * Exportieren (06.10.2026, Wunsch der Lehrkraft): das PDF ins Teilen-Menü des Systems – OneNote, GoodNotes,
+   * Notability, Dateien, Mail … Nur, wo das System Dateien teilen kann. Hat der Browser die Klick-Erlaubnis
+   * nach dem Erstellen verbraucht (Safari), steht das fertige PDF in einem kleinen Fenster zum Teilen bereit.
+   */
+  const [teilBereit, setTeilBereit] = useState<File | null>(null)
+  const kannTeilen = useMemo(() => {
+    try {
+      return typeof navigator.share === 'function' && navigator.canShare?.({ files: [new File(['%PDF'], 'probe.pdf', { type: 'application/pdf' })] }) === true
+    } catch {
+      return false
+    }
+  }, [])
+  const teilen = async (datei: File): Promise<void> => {
+    try {
+      await navigator.share({ files: [datei], title: d.titel })
+      setTeilBereit(null)
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return setTeilBereit(null)
+      if (e instanceof Error && e.name === 'NotAllowedError') return setTeilBereit(datei)
+      setTeilBereit(null)
+      setMeldung(e instanceof Error ? e.message : String(e))
+    }
+  }
   const blattHtml = async (): Promise<string | null> => {
     const doc = iframe.current?.contentDocument
     if (!doc || !gemessen) return null
     return druckfassung(doc, gemessen, antworten, tinte, objekte, anmerkungen)
   }
-  const pdf = async (art: 'speichern' | 'drucken'): Promise<void> => {
+  const pdf = async (art: 'speichern' | 'drucken' | 'teilen'): Promise<void> => {
     setPdfLaeuft(art)
     // iPad/iPhone drucken ein verstecktes Fenster nicht zuverlässig: dort das PDF öffnen (Teilen › Drucken)
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
@@ -601,7 +677,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         body: JSON.stringify({ id: d.id, html })
       })
       if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { fehler?: string }).fehler ?? 'Das PDF konnte nicht erstellt werden.')
-      const url = URL.createObjectURL(await r.blob())
+      const blob = await r.blob()
+      if (art === 'teilen') return void (await teilen(new File([blob], `${d.titel.replace(/[\/:*?"<>|]+/g, '-')}.pdf`, { type: 'application/pdf' })))
+      const url = URL.createObjectURL(blob)
       if (fenster) fenster.location.href = url
       else {
         const a = document.createElement('a')
@@ -678,6 +756,19 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           >
             Speichern
           </Button>
+          {kannTeilen && (
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<IconShare size={14} />}
+              loading={pdfLaeuft === 'teilen'}
+              disabled={!gemessen}
+              onClick={() => void pdf('teilen')}
+              data-blatt-exportieren
+            >
+              Exportieren
+            </Button>
+          )}
           <Button
             size="xs"
             variant="default"
@@ -702,6 +793,16 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
         </Group>
       </Group>
 
+      {teilBereit && (
+        <Modal opened onClose={() => setTeilBereit(null)} title="PDF ist fertig" size="sm" centered>
+          <Stack gap="sm">
+            <Text size="sm">Das Blatt kann jetzt an eine andere App gegeben werden, z. B. OneNote oder GoodNotes.</Text>
+            <Button leftSection={<IconShare size={16} />} onClick={() => void teilen(teilBereit)} data-teilen-jetzt>
+              Exportieren
+            </Button>
+          </Stack>
+        </Modal>
+      )}
       {d.loesung && (
         <Button variant="light" color="green" w="fit-content" onClick={() => setLoesungOffen(true)} data-loesung-knopf>
           Lösung ansehen
@@ -740,6 +841,8 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
           setStiftFarbe={setStiftFarbe}
           markerFarbe={markerFarbe}
           setMarkerFarbe={setMarkerFarbe}
+          vorgaben={vorgaben}
+          setVorgabe={setVorgabe}
         />
       )}
 
@@ -780,6 +883,7 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
                 form={form}
                 stiftFarbe={stiftFarbe}
                 markerFarbe={markerFarbe}
+                vorgaben={vorgaben}
                 objekte={objekte}
                 setObjekte={setObjekte}
                 wachsen={wachsen}
@@ -914,6 +1018,7 @@ function Ebene(p: {
   werkzeug: Werkzeug
   stiftFarbe: string
   markerFarbe: string
+  vorgaben?: Vorgaben
   objekte: BlattObjekt[]
   setObjekte: (o: BlattObjekt[]) => void
   wachsen?: (anker: number, mehr: number) => void
@@ -1106,6 +1211,7 @@ function Ebene(p: {
           bild={p.tinte[String(i)]}
           werkzeug={p.werkzeug}
           farbe={p.werkzeug === 'marker' ? p.markerFarbe : p.stiftFarbe}
+          stil={p.werkzeug === 'marker' ? p.vorgaben?.marker : p.vorgaben?.stift}
           setTinte={p.setTinte}
         />
       ))}
@@ -1121,6 +1227,7 @@ function Ebene(p: {
           farbe={p.stiftFarbe}
           gesperrt={p.gesperrt}
           form={p.form}
+          vorgabe={p.vorgaben}
         />
       ))}
       {/* Hilfekarten rechts neben der Aufgabe (06.10.2026): eigenes kleines Fenster, Karten schrittweise */}
@@ -1211,6 +1318,7 @@ function TintenSeite({
   bild,
   werkzeug,
   farbe,
+  stil,
   setTinte
 }: {
   seite: number
@@ -1218,6 +1326,8 @@ function TintenSeite({
   bild?: string
   werkzeug: Werkzeug
   farbe: string
+  /** Stärke und Linienart der nächsten Striche (Rechtsklick aufs Werkzeug, 06.10.2026) */
+  stil?: Stil
   setTinte: (s: number, url: string) => void
 }): React.JSX.Element {
   const leinwand = useRef<HTMLCanvasElement>(null)
@@ -1277,8 +1387,18 @@ function TintenSeite({
           ctx.globalCompositeOperation = werkzeug === 'radierer' ? 'destination-out' : 'source-over'
           // Textmarker: breit und durchscheinend (03.10.2026)
           ctx.strokeStyle = werkzeug === 'marker' ? `${farbe}59` : farbe
-          ctx.lineWidth = (werkzeug === 'radierer' ? 22 : werkzeug === 'marker' ? 16 : 2.2 * (e.pressure ? 0.6 + e.pressure : 1)) * AUFLOESUNG
+          const faktor = stil?.staerke === 1 ? 0.6 : stil?.staerke === 3 ? 1.7 : 1
+          ctx.lineWidth = (werkzeug === 'radierer' ? 22 : werkzeug === 'marker' ? 16 * faktor : 2.2 * faktor * (e.pressure ? 0.6 + e.pressure : 1)) * AUFLOESUNG
           ctx.lineCap = werkzeug === 'marker' ? 'butt' : 'round'
+          // Gestrichelt/gepunktet nur beim Stift
+          const w = 2.2 * faktor * AUFLOESUNG
+          ctx.setLineDash(
+            werkzeug === 'stift' && stil?.linienArt === 'strich'
+              ? [w * 3.2, w * 2.4]
+              : werkzeug === 'stift' && stil?.linienArt === 'punkt'
+                ? [0.1, w * 2.3]
+                : []
+          )
           ctx.lineJoin = 'round'
           ctx.beginPath()
           ctx.moveTo(x, y)
