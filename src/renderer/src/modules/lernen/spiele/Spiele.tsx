@@ -1,7 +1,7 @@
 /**
  * Spielauswahl nach geschaffter Tagesrunde (03.10.2026, abgestimmt mit der Lehrkraft): acht Spiele mit
- * den schon gelernten Wörtern, je Spiel der eigene Rekord – keine Ranglisten. Der Karteikasten bleibt
- * unverändert; Wörter, die im Spiel danebengingen, landen auf „nochmal ansehen".
+ * den schon gelernten Wörtern, je Spiel der eigene Rekord – keine Ranglisten. Wörter, die im Spiel danebengingen,
+ * landen auf „nochmal ansehen" und (seit 06.10.2026) wackelig im Kasten; Treffer befördern nichts.
  */
 import { Badge, Button, Card, Group, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core'
 import {
@@ -20,7 +20,7 @@ import {
   IconTypography,
   IconX
 } from '@tabler/icons-react'
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { Vokabel, WortStand } from '@shared/vokabeltrainer'
 import { istRekord, SPIELE, spielWoerter, type SpielId } from '@shared/vokabelSpiele'
 import { senden } from '../../onlinetest/serverApi'
@@ -28,6 +28,7 @@ import { useVtFarbe } from '../vtFarben'
 import { Blitzrunde, Memory, Satzpuzzle, Zuordnen } from './SpieleErkennen'
 import { FallendeWoerter, Kreuzwort, Suchsel, Wortraten } from './SpieleSchreiben'
 import { BildRaetsel, hatWortAufnahme, HoerQuiz } from './SpieleMedien'
+import { HoerenSchreiben, mitSatzLuecke, SatzLuecke, Wortduell } from './SpieleNeu'
 import { hatSatzAufnahme } from '../medienCache'
 
 const SYMBOL: Record<SpielId, React.ReactNode> = {
@@ -41,7 +42,10 @@ const SYMBOL: Record<SpielId, React.ReactNode> = {
   suchsel: <IconBrain size={22} />,
   bildwort: <IconPhoto size={22} />,
   hoeren: <IconEar size={22} />,
-  satzhoeren: <IconMessage2 size={22} />
+  satzhoeren: <IconMessage2 size={22} />,
+  diktat: <IconEar size={22} />,
+  satzluecke: <IconMessage2 size={22} />,
+  duell: <IconBolt size={22} />
 }
 /** KI-Bilder der Spiele (03.10.2026, über die Bild-KI der Exe erzeugt); ohne Bild das Symbol */
 const BILDER = import.meta.glob<string>('../../../assets/programme/spiel-*.webp', { eager: true, import: 'default' })
@@ -58,7 +62,10 @@ const FARBE: Record<SpielId, string> = {
   suchsel: 'lime',
   bildwort: 'orange',
   hoeren: 'blue',
-  satzhoeren: 'violet'
+  satzhoeren: 'violet',
+  diktat: 'blue',
+  satzluecke: 'cyan',
+  duell: 'orange'
 }
 
 export const SPIELE_CSS = `
@@ -117,7 +124,8 @@ export function Spielwahl({
   }
   const [runde, setRunde] = useState(0)
   const [ergebnis, setErgebnis] = useState<{ spiel: SpielId; wert: number; rekord: boolean; fehler: number } | null>(null)
-  const pool = spielWoerter(woerter, staende)
+  // Je Spielstart einmal gemischt (06.10.2026: Mischung aus fälligen, wackeligen und sicheren Wörtern ist zufällig)
+  const pool = useMemo(() => spielWoerter(woerter, staende), [woerter, staende, spiel, runde]) // eslint-disable-line react-hooks/exhaustive-deps
   const mitSatz = pool.filter((w) => w.example && w.example.split(/\s+/).length >= 3).length
   // Medienbank (05.10.2026): Bilder und Aufnahmen – aus allen Wörtern der Liste, nicht nur den gelernten
   const mitBild = woerter.filter((w) => w.bild).length
@@ -171,6 +179,12 @@ export function Spielwahl({
             <HoerQuiz {...props} woerter={woerter} />
           ) : spiel === 'satzhoeren' ? (
             <Satzpuzzle {...props} woerter={woerter} hoeren />
+          ) : spiel === 'diktat' ? (
+            <HoerenSchreiben {...props} />
+          ) : spiel === 'satzluecke' ? (
+            <SatzLuecke {...props} woerter={mitSatzLuecke(pool).length >= 3 ? pool : woerter} />
+          ) : spiel === 'duell' ? (
+            <Wortduell {...props} />
           ) : (
             <Suchsel {...props} />
           )}
@@ -225,7 +239,8 @@ export function Spielwahl({
           Spielen mit deinen Wörtern
         </Title>
         <Text size="sm" c="dimmed">
-          Für heute ist alles geübt. Die Spiele verändern deinen Karteikasten nicht – sie machen die Wörter nur noch vertrauter.
+          Für heute ist alles geübt. Gespielt wird mit fälligen, wackeligen und ein paar sicheren Wörtern. Was im Spiel danebengeht, kommt im Karteikasten bald
+          wieder dran.
         </Text>
       </div>
       {ansehen.length > 0 && (
@@ -253,15 +268,17 @@ export function Spielwahl({
           <SimpleGrid cols={{ base: 1, xs: 2 }} spacing="sm">
             {SPIELE.filter((s) => s.art === art).map((s) => {
               const gesperrt =
-                s.id === 'satz'
-                  ? mitSatz < 1
-                  : s.id === 'bildwort'
-                    ? mitBild < 4
-                    : s.id === 'hoeren'
-                      ? mitTon < 4 || woerter.length < 4
-                      : s.id === 'satzhoeren'
-                        ? mitSatzTon < 1
-                        : pool.length < 4
+                s.id === 'satzluecke'
+                  ? mitSatzLuecke(woerter).length < 3
+                  : s.id === 'satz'
+                    ? mitSatz < 1
+                    : s.id === 'bildwort'
+                      ? mitBild < 4
+                      : s.id === 'hoeren'
+                        ? mitTon < 4 || woerter.length < 4
+                        : s.id === 'satzhoeren'
+                          ? mitSatzTon < 1
+                          : pool.length < 4
               // Spiele der Medienbank erst zeigen, wenn es Bilder bzw. Aufnahmen gibt
               if (gesperrt && (s.id === 'bildwort' || s.id === 'hoeren' || s.id === 'satzhoeren')) return null
               return (
@@ -288,7 +305,11 @@ export function Spielwahl({
                     <div style={{ minWidth: 0 }}>
                       <Text fw={700}>{s.name}</Text>
                       <Text size="xs" c="dimmed">
-                        {gesperrt ? (s.id === 'satz' ? 'Braucht Wörter mit Beispielsatz.' : 'Braucht mindestens vier Wörter.') : s.beschreibung}
+                        {gesperrt
+                          ? s.id === 'satz' || s.id === 'satzluecke'
+                            ? 'Braucht Wörter mit Beispielsatz.'
+                            : 'Braucht mindestens vier Wörter.'
+                          : s.beschreibung}
                       </Text>
                       {rekorde[s.id] !== undefined && (
                         <Badge mt={6} size="sm" variant="light" color="yellow" leftSection={<IconTrophy size={10} />}>

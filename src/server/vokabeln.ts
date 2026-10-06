@@ -15,7 +15,7 @@
  *             GET /s/api/vokabeln/zugang?code= · POST /s/api/vokabeln/gast {code, name} → persönlicher
  *             Wiedereinstiegs-Code · POST /s/api/vokabeln/wieder {code, name, wieder}
  */
-import { istRekord, SPIELE, type SpielId } from '../shared/vokabelSpiele'
+import { istRekord, nachSpielfehler, SPIELE, type SpielId } from '../shared/vokabelSpiele'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { alleNutzer, datenbank, nutzerAnlegen, nutzerLoeschen, nutzerNachId, protokolliereServer, sitzungAnlegen, type NutzerInfo } from './datenbank'
 import { alsNutzer, json, setzeSitzungsCookie, type Anfrage } from './http'
@@ -343,6 +343,9 @@ export function spielEintragen(stand: VokStand, k0: Record<string, unknown>, gue
   if (rekord) stand.rekorde = { ...(stand.rekorde ?? {}), [spiel]: wert }
   const fehler = (Array.isArray(k0.fehler) ? k0.fehler : []).map(String).filter(gueltig)
   stand.ansehen = [...new Set([...(stand.ansehen ?? []), ...fehler])].slice(-30)
+  // Fehler im Spiel wirken auf den Kasten (06.10.2026): wackelig, gleich wieder dran; sicher → ein Fach zurück
+  const jetzt = Date.now()
+  for (const id of new Set(fehler)) if (stand.woerter[id]) stand.woerter[id] = nachSpielfehler(stand.woerter[id], jetzt)
   const heute = new Date().toISOString().slice(0, 10)
   if (!stand.tage.includes(heute)) stand.tage = [...stand.tage, heute].slice(-60)
   return { rekord }

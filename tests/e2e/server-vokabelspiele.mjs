@@ -74,7 +74,11 @@ try {
   const s = await sm.newPage()
   await s.goto(`${A}/s/v/${vok.id}`)
   pruefe(await da(s.locator('[data-spielwahl]')), 'Tagesrunde geschafft: Spielauswahl erscheint')
-  pruefe((await s.locator('[data-spiel-wahl]').count()) === 8, 'Acht Spiele zur Auswahl')
+  const spielzahl = await s.locator('[data-spiel-wahl]').count()
+  pruefe(
+    spielzahl >= 10 && (await s.locator('[data-spiel-wahl="duell"]').count()) === 1 && (await s.locator('[data-spiel-wahl="diktat"]').count()) === 1,
+    `Spiele zur Auswahl, mit Wortduell und Hören & Schreiben (${spielzahl})`
+  )
   await s.screenshot({ path: join(out, '1-spielwahl.png'), fullPage: true })
 
   // Memory: Paare nacheinander aufdecken
@@ -188,7 +192,36 @@ try {
   pruefe(await s.getByText(/\d+ richtig/).isVisible(), 'Blitzrunde läuft')
   await s.getByRole('button', { name: 'Beenden' }).click()
 
-  // Farbschema des Fachs (Kopfband): Englisch Dunkelblau, Französisch Violett; Hell/Dunkel; eigenes Design
+  // Neue Spiele (06.10.2026)
+  const termZu = (deutsch) => WOERTER.find((w) => w.translation === deutsch.trim())?.term ?? ''
+  await s.locator('[data-spiel-wahl="duell"]').click()
+  for (let i = 0; i < 20; i++) await s.locator('[data-duell-passt]').click()
+  pruefe((await da(s.locator('[data-spiel-ergebnis]'))) && (await s.getByText(/Wortduell: \d+ s/).isVisible()), 'Wortduell: 20 Runden, Zeit als Ergebnis')
+  await s.getByRole('button', { name: 'Andere Spiele' }).click()
+  await s.locator('[data-spiel-wahl="diktat"]').click()
+  const bedeutung = (await s.getByText(/^Bedeutung: /).innerText()).replace('Bedeutung: ', '')
+  await s.locator('[data-diktat-eingabe]').fill(termZu(bedeutung))
+  await s.locator('[data-pruefen]').click()
+  pruefe(await da(s.getByText('Richtig!'), 3000), `Hören & Schreiben: Wort geschrieben (${termZu(bedeutung)})`)
+  await s.screenshot({ path: join(out, '4b-diktat.png') })
+  await s.getByRole('button', { name: 'Beenden' }).click()
+  if (await s.locator('[data-spiel-wahl="satzluecke"]:not([disabled])').count()) {
+    await s.locator('[data-spiel-wahl="satzluecke"]').click()
+    const gesucht = (await s.getByText(/^Gesucht: /).innerText()).replace('Gesucht: ', '')
+    await s.locator('[data-luecke-eingabe]').fill(termZu(gesucht).replace(/^to /, ''))
+    await s.locator('[data-pruefen]').click()
+    pruefe(await da(s.getByText(/Richtig!|Richtig wäre/), 3000), 'Satz-Lücke: Wort im Beispielsatz eingesetzt')
+    await s.screenshot({ path: join(out, '4c-satzluecke.png') })
+    await s.getByRole('button', { name: 'Beenden' }).click()
+  }
+
+  // Farbschema des Fachs (Kopfband): Englisch Dunkelblau, Französisch Violett; Hell/Dunkel; eigenes Design.
+  // Seit der Dunkel-Vorgabe (05.10.2026) zuerst ausdrücklich „Hell" wählen – die Prüfungen beziehen sich auf hell
+  await s.goto(`${A}/s/einstellungen`)
+  await s.locator('[data-modus]').getByText('Hell').click()
+  await s.getByText(/gespeichert/).waitFor({ timeout: 8000 })
+  await s.goto(`${A}/s/v/${vok.id}`)
+  await s.locator('[data-vokabel-kasten]').waitFor()
   const akzent = () => s.locator('[data-vt-akzent]').first().getAttribute('data-vt-akzent')
   pruefe((await akzent()) === '#1d4e89', `Englisch in der Fachfarbe Dunkelblau (${await akzent()})`)
   const fr = await (
@@ -232,7 +265,15 @@ try {
 
   // Kasten unverändert, Rekorde gespeichert
   const nachher = await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()
-  pruefe(JSON.stringify(nachher.staende) === vorher, 'Karteikasten durch die Spiele unverändert')
+  // Seit 06.10.2026: Treffer befördern nichts; Fehler machen das Wort fällig (sichere ein Fach zurück)
+  const alt = JSON.parse(vorher)
+  const befoerdert = Object.keys(nachher.staende).filter((id) => (nachher.staende[id]?.fach ?? 0) > (alt[id]?.fach ?? 0))
+  const fehlerWoerter = (nachher.ansehen ?? []).filter((id) => alt[id]?.fach >= 1)
+  pruefe(befoerdert.length === 0, `Spiele befördern kein Wort im Kasten (${befoerdert.length})`)
+  pruefe(
+    fehlerWoerter.every((id) => nachher.staende[id].faellig <= Date.now()),
+    `Fehler im Spiel: Wort kommt gleich wieder dran (${fehlerWoerter.length} Wörter)`
+  )
   pruefe(
     ['memory', 'zuordnen', 'satz', 'wortraten', 'suchsel'].every((k) => nachher.rekorde[k] !== undefined),
     `Rekorde gespeichert (${Object.keys(nachher.rekorde).join(', ')})`

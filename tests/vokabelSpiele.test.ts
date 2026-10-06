@@ -23,10 +23,12 @@ describe('Vokabelspiele (03.10.2026)', () => {
     const liste = Array.from({ length: 8 }, (_, i) => ({ id: `w${i}`, term: `t${i}`, translation: `u${i}` }))
     const gelernt = { w0: { ...neuerStand(), fach: 2 }, w1: { ...neuerStand(), fach: 1 } }
     expect(spielWoerter(liste, gelernt).length).toBe(6)
+    // Seit 06.10.2026 gemischt – die gelernten sind auf jeden Fall dabei
     expect(
       spielWoerter(liste, gelernt)
-        .slice(0, 2)
         .map((v) => v.id)
+        .filter((id) => id === 'w0' || id === 'w1')
+        .sort()
     ).toEqual(['w0', 'w1'])
   })
   it('Rekord: Züge/Sekunden kleiner, Treffer größer', () => {
