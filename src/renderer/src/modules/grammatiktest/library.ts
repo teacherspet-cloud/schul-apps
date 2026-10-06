@@ -32,6 +32,7 @@ export function testStats(test: GrammarTest): SavedGrammarTestStats {
     points: testPoints(test),
     minutes: test.meta.minutes,
     graded: test.meta.graded,
+    varianten: test.blocksB?.length ? 2 : 1,
     stateId: test.meta.stateId,
     schoolTypeId: test.meta.schoolTypeId,
     ...(ueberthemaVon(test.meta) ? { ueberthema: ueberthemaVon(test.meta) } : {})

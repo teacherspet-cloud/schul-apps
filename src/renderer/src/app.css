@@ -1013,3 +1013,21 @@ img.home-illustration {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Vorlagen im „Neuer Onlinetest" (06.10.2026): Karten mit Kennzahlen */
+.vorlage-karte {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 10px;
+  transition: background 0.12s, border-color 0.12s;
+}
+.vorlage-karte:hover:not(:disabled) {
+  background: var(--mantine-color-default-hover);
+  border-color: var(--mantine-primary-color-filled);
+}
+.vorlage-karte:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

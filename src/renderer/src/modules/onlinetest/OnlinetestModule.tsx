@@ -13,6 +13,7 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
+import type { SavedGrammarTestStats, SavedKurztestStats, SavedTestStats } from '@shared/types'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { eigeneFensterMoeglich, inEigenemFenster } from '../../shared/eigenesFenster'
 import { buendeln, type Fall } from './entscheidungBuendeln'
@@ -44,6 +45,7 @@ import {
   Modal,
   NumberInput,
   Popover,
+  ScrollArea,
   SegmentedControl,
   Select,
   SimpleGrid,
@@ -55,7 +57,8 @@ import {
   TextInput,
   Textarea,
   Title,
-  Tooltip
+  Tooltip,
+  UnstyledButton
 } from '@mantine/core'
 import {
   IconAlertTriangle,
@@ -78,6 +81,7 @@ import {
   IconPlayerPlay,
   IconPlayerStop,
   IconPrinter,
+  IconSearch,
   IconSparkles,
   IconTrash,
   IconUsersGroup,
@@ -1878,9 +1882,123 @@ const NEU_ARTEN: { value: NeuArt; label: string; app: string }[] = [
   { value: 'lernzielkontrolle', label: 'Lernzielkontrolle', app: 'Lernzielkontrolle' }
 ]
 
+/** Gespeicherte Vokabeltests, Grammatiktests und Lernzielkontrollen mit ihren Kennzahlen (06.10.2026) */
+type VorlageMeta = { id: string; name: string; updatedAt?: string } & Partial<SavedTestStats & SavedGrammarTestStats & SavedKurztestStats>
+
+const kurzDatum = (iso?: string): string => (iso ? new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '')
+
+/**
+ * Übersichtliche Auswahl (06.10.2026, Wunsch der Lehrkraft: statt einer langen Liste „ein paar Infos zum Test" – optionale
+ * Vokabeln, Fassungen, Punkte auf wie vielen Vokabeln …): Suche, Fach-Filter und Karten mit den Kennzahlen.
+ */
+function VorlagenWahl({ art, liste, waehlen }: { art: NeuArt; liste: VorlageMeta[]; waehlen: (id: string) => void }): React.JSX.Element {
+  const [suche, setSuche] = useState('')
+  const [fach, setFach] = useState('alle')
+  const faecher = [...new Set(liste.map((t) => t.subjectLabel).filter((x): x is string => Boolean(x)))].sort((a, b) => a.localeCompare(b, 'de'))
+  const q = suche.trim().toLowerCase()
+  const sichtbar = liste.filter(
+    (t) =>
+      (fach === 'alle' || t.subjectLabel === fach) &&
+      (!q || [t.name, t.subjectLabel, t.topics, t.thema, t.bezeichnung].filter(Boolean).join(' ').toLowerCase().includes(q))
+  )
+  const chip = (text: string, farbe = 'gray', titel?: string): React.JSX.Element => (
+    <Badge key={text} size="sm" variant="light" color={farbe} title={titel} style={{ textTransform: 'none' }}>
+      {text}
+    </Badge>
+  )
+  const fassungen = (n?: number): string | null => (n && n > 1 ? `Fassungen ${'ABCDEF'.slice(0, n).split('').join(', ')}` : n === 1 ? 'eine Fassung' : null)
+  const infos = (t: VorlageMeta): React.JSX.Element[] => {
+    const aus: (React.JSX.Element | null)[] = []
+    if (art === 'vokabeltest') {
+      aus.push(
+        t.hasTest === false ? chip('noch kein Test erstellt', 'red') : null,
+        t.includedCount != null ? chip(`${t.totalPoints ?? 0} P. auf ${t.includedCount} von ${t.vocabCount ?? t.includedCount} Vokabeln`, 'blue') : null,
+        fassungen(t.variantCount) ? chip(fassungen(t.variantCount)!) : null,
+        t.taskCount ? chip(`${t.taskCount} Aufgabe${t.taskCount === 1 ? '' : 'n'}`) : null,
+        t.optionalCount
+          ? t.optionalIncluded
+            ? chip(`${t.optionalIncluded} optionale mitgeprüft`, 'orange', 'Grau bzw. im Kasten gedruckte Vokabeln werden mit abgefragt')
+            : chip('ohne optionale Vokabeln', 'teal', `${t.optionalCount} optionale Vokabeln werden nicht abgefragt`)
+          : null,
+        t.grade ? chip(`Klasse ${t.grade}`) : null
+      )
+    } else if (art === 'grammatiktest') {
+      aus.push(
+        t.topics ? chip(t.topics.length > 60 ? `${t.topics.slice(0, 58)} …` : t.topics, 'blue', t.topics) : null,
+        t.taskCount != null ? chip(`${t.taskCount} Aufgabe${t.taskCount === 1 ? '' : 'n'} · ${t.points ?? 0} P.`) : null,
+        t.minutes ? chip(`${t.minutes} Min.`) : null,
+        fassungen(t.varianten) ? chip(fassungen(t.varianten)!) : null,
+        t.graded === false ? chip('unbenotet', 'teal') : null,
+        t.grade ? chip(`Klasse ${t.grade}`) : null
+      )
+    } else {
+      aus.push(
+        t.bezeichnung ? chip(t.bezeichnung, 'blue') : null,
+        t.thema ? chip(t.thema.length > 50 ? `${t.thema.slice(0, 48)} …` : t.thema, 'gray', t.thema) : null,
+        t.taskCount != null ? chip(`${t.taskCount} Aufgabe${t.taskCount === 1 ? '' : 'n'} · ${t.points ?? 0} P.`) : null,
+        t.minutes ? chip(`${t.minutes} Min.`) : null,
+        fassungen(t.varianten) ? chip(fassungen(t.varianten)!) : null,
+        t.grade ? chip(`Klasse ${t.grade}`) : null
+      )
+    }
+    return aus.filter((x): x is React.JSX.Element => Boolean(x))
+  }
+  return (
+    <Stack gap="xs">
+      <Group gap="xs" wrap="nowrap">
+        <TextInput
+          style={{ flex: 1 }}
+          leftSection={<IconSearch size={14} />}
+          placeholder="Name, Thema, Fach …"
+          value={suche}
+          onChange={(e) => setSuche(e.currentTarget.value)}
+          data-vorlage-suche
+        />
+        {faecher.length > 1 && (
+          <Select
+            w={170}
+            data={[{ value: 'alle', label: 'Alle Fächer' }, ...faecher.map((f) => ({ value: f, label: f }))]}
+            value={fach}
+            onChange={(v) => setFach(v ?? 'alle')}
+            allowDeselect={false}
+          />
+        )}
+      </Group>
+      <ScrollArea.Autosize mah="55vh" type="auto">
+        <Stack gap={6} pr={6} data-onlinetest-wahl>
+          {sichtbar.length === 0 && (
+            <Text c="dimmed" size="sm">
+              Nichts gefunden.
+            </Text>
+          )}
+          {sichtbar.map((t) => (
+            <UnstyledButton
+              key={t.id}
+              onClick={() => waehlen(t.id)}
+              disabled={art === 'vokabeltest' && t.hasTest === false}
+              className="vorlage-karte"
+              data-vorlage={t.id}
+            >
+              <Group justify="space-between" wrap="nowrap" gap="xs" mb={4}>
+                <Text fw={600} size="sm" truncate>
+                  {t.name}
+                </Text>
+                <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+                  {[t.subjectLabel, kurzDatum(t.updatedAt)].filter(Boolean).join(' · ')}
+                </Text>
+              </Group>
+              <Group gap={4}>{infos(t)}</Group>
+            </UnstyledButton>
+          ))}
+        </Stack>
+      </ScrollArea.Autosize>
+    </Stack>
+  )
+}
+
 function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.Element {
   const [art, setArt] = useState<NeuArt>('vokabeltest')
-  const [liste, setListe] = useState<{ id: string; name: string; updatedAt?: string }[] | null>(null)
+  const [liste, setListe] = useState<VorlageMeta[] | null>(null)
   const [doc, setDoc] = useState<TestDocument | null>(null)
   const [blatt, setBlatt] = useState<BlattQuelleOnline | null>(null)
   const [listName, setListName] = useState('')
@@ -1889,8 +2007,7 @@ function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.
     setListe(null)
     const laden = art === 'vokabeltest' ? window.api.tests.list() : art === 'grammatiktest' ? window.api.grammarTests.list() : window.api.kurztests.list()
     void laden.then(
-      (l: { id: string; name: string; updatedAt?: string }[]) =>
-        setListe([...l].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))),
+      (l: VorlageMeta[]) => setListe([...l].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))),
       () => setListe([])
     )
   }, [art])
@@ -1948,17 +2065,9 @@ function NeuerOnlinetest({ schliessen }: { schliessen: () => void }): React.JSX.
         </Text>
         {!liste && <Loader size="sm" />}
         {liste?.length === 0 && <Text c="dimmed">Noch nichts gespeichert.</Text>}
-        <Select
-          key={art}
-          searchable
-          label={name.label}
-          placeholder="suchen …"
-          data={(liste ?? []).map((t) => ({ value: t.id, label: t.name }))}
-          onChange={(id) => {
-            if (id) void waehlen(id).catch((e: unknown) => notifyError(e))
-          }}
-          data-onlinetest-wahl
-        />
+        {liste && liste.length > 0 && (
+          <VorlagenWahl key={art} art={art} liste={liste} waehlen={(id) => void waehlen(id).catch((e: unknown) => notifyError(e))} />
+        )}
       </Stack>
     </Modal>
   )

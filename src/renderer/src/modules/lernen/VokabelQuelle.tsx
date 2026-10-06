@@ -4,9 +4,10 @@
  * Wörter sucht sie passende OpenMoji-Symbole (ohne Kosten, nur bei eindeutigem Treffer).
  * Genutzt von „Zum Lernen freigeben" und vom Reihen-Schritt „Vokabeln".
  */
+import { useAppSettings } from '../../shared/settingsStore'
 import { Group, Loader, MultiSelect, SegmentedControl, Select, Stack, Text } from '@mantine/core'
 import { useEffect, useMemo, useState } from 'react'
-import type { Textbook } from '@shared/types'
+import type { Textbook, TextbookMeta } from '@shared/types'
 import type { Vokabel } from '@shared/vokabeltrainer'
 import { kernform } from '@shared/vokabeltrainer'
 import { notifyError } from '../../shared/util'
@@ -63,7 +64,15 @@ export async function mitBildern(a: VokabelAuswahl): Promise<VokabelAuswahl> {
 
 export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => void }): React.JSX.Element {
   const [art, setArt] = useState<'buch' | 'liste'>('buch')
-  const [buecher, setBuecher] = useState<{ id: string; name: string }[]>([])
+  const [buecher, setBuecher] = useState<TextbookMeta[]>([])
+  /*
+   * Fach → Lehrwerk → Band (06.10.2026, Wunsch der Lehrkraft): erst die Fremdsprache (nur, wenn in den Einstellungen
+   * mehr als eine hinterlegt ist), dann die Reihe (Green Line), dann der Band (Green Line 1).
+   */
+  const eigeneFaecher = useAppSettings((x) => x.settings.eigeneFaecher)
+  const [sprache, setSprache] = useState<string | null>(null)
+  const [reihe, setReihe] = useState<string | null>(null)
+  const [bandId, setBandId] = useState<string | null>(null)
   const [buch, setBuch] = useState<Textbook | null>(null)
   const [unit, setUnit] = useState<string | null>(null)
   const [abschnitte, setAbschnitte] = useState<string[]>([])
@@ -74,11 +83,33 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
   const [laeuft, setLaeuft] = useState(false)
   useEffect(() => {
     void window.api.textbooks.list().then(
-      (l) => setBuecher(l.map((b) => ({ id: b.id, name: b.name }))),
+      (l) => setBuecher(l),
       () => setBuecher([])
     )
     void window.api.library.list().then(setListen, () => setListen([]))
   }, [])
+  // Fremdsprachen der Lehrkraft, für die es Lehrwerke gibt (ohne Angabe: alle mit Lehrwerk)
+  const vorhanden = [...new Set(buecher.map((b) => b.language))]
+  const eigene = vorhanden.filter((code) => (eigeneFaecher ?? []).some((f) => f.toLowerCase() === (FACH_ZU[code] ?? code).toLowerCase()))
+  const sprachen = (eigene.length ? eigene : vorhanden).sort((a, b) => (FACH_ZU[a] ?? a).localeCompare(FACH_ZU[b] ?? b, 'de'))
+  const spracheJetzt = sprache && sprachen.includes(sprache) ? sprache : sprachen.length === 1 ? sprachen[0] : null
+  const reiheVon = (b: TextbookMeta): string => b.reihe || b.name.replace(/\s*\d+\s*$/, '') || b.name
+  const reihen = [...new Set(buecher.filter((b) => b.language === spracheJetzt).map(reiheVon))].sort((a, b) => a.localeCompare(b, 'de'))
+  const baende = buecher
+    .filter((b) => b.language === spracheJetzt && reiheVon(b) === reihe)
+    .sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
+  const mehrereAusgaben = new Set(baende.map((b) => b.ausgabe ?? '')).size > 1
+  const bandWaehlen = (id: string | null): void => {
+    setBandId(id)
+    setUnit(null)
+    setAbschnitte([])
+    if (!id) return setBuch(null)
+    setLaeuft(true)
+    void window.api.textbooks
+      .get(id)
+      .then(setBuch, (e: unknown) => notifyError(e))
+      .finally(() => setLaeuft(false))
+  }
   const units = buch?.units ?? []
   const sections = useMemo(() => units.find((u) => u.name === unit)?.sections ?? [], [units, unit])
 
@@ -135,23 +166,45 @@ export function VokabelQuelle({ wahl }: { wahl: (a: VokabelAuswahl | null) => vo
       />
       {art === 'buch' ? (
         <>
+          {sprachen.length > 1 && (
+            <Select
+              label="Fach"
+              data={sprachen.map((c) => ({ value: c, label: FACH_ZU[c] ?? c }))}
+              value={spracheJetzt}
+              onChange={(c) => {
+                setSprache(c)
+                setReihe(null)
+                bandWaehlen(null)
+              }}
+              placeholder="Fremdsprache wählen …"
+              data-vokabel-fach
+            />
+          )}
           <Group grow align="end">
             <Select
               label="Lehrwerk"
               searchable
-              data={buecher.map((b) => ({ value: b.id, label: b.name }))}
-              onChange={(id) => {
-                setUnit(null)
-                setAbschnitte([])
-                if (!id) return setBuch(null)
-                setLaeuft(true)
-                void window.api.textbooks
-                  .get(id)
-                  .then(setBuch, (e: unknown) => notifyError(e))
-                  .finally(() => setLaeuft(false))
+              data={reihen}
+              value={reihe}
+              onChange={(x) => {
+                setReihe(x)
+                bandWaehlen(null)
               }}
+              disabled={!spracheJetzt}
+              placeholder={spracheJetzt ? 'z. B. Green Line' : 'zuerst das Fach'}
               data-vokabel-buch
             />
+            <Select
+              label="Band"
+              data={baende.map((b) => ({ value: b.id, label: mehrereAusgaben && b.ausgabe ? `${b.name} (${b.ausgabe})` : b.name }))}
+              value={bandId}
+              onChange={bandWaehlen}
+              disabled={!reihe}
+              placeholder="z. B. Green Line 1"
+              data-vokabel-band
+            />
+          </Group>
+          <Group grow align="end">
             <Select
               label="Unit"
               data={units.map((u) => u.name)}

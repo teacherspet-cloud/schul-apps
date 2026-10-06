@@ -90,7 +90,7 @@ try {
         {
           id: 'greenline6-unit1',
           name: 'Green Line 6 Unit 1',
-          stats: { vocabCount: 1, variantCount: 1, language: 'en', level: 'A2', taskCount: 1 },
+          stats: { vocabCount: 1, includedCount: 1, hasTest: true, totalPoints: 1, variantCount: 1, language: 'en', level: 'A2', taskCount: 1 },
           payload: TEST
         }
       ]
@@ -106,8 +106,16 @@ try {
   await p.locator('.app-leiste [aria-label="Onlinetest"]').click()
   await p.mouse.move(800, 600)
   await p.locator('[data-app-neu="onlinetest"]').click()
-  await p.locator('[data-onlinetest-wahl]').click()
-  await p.getByRole('option', { name: 'Green Line 6 Unit 1' }).click()
+  // Auswahl als Karten mit Kennzahlen (06.10.2026)
+  const karte = p.locator('[data-onlinetest-wahl] [data-vorlage]', { hasText: 'Green Line 6 Unit 1' })
+  await karte.waitFor({ timeout: 10000 })
+  const kennzahlen = await karte.innerText()
+  console.log('KARTE', JSON.stringify(kennzahlen))
+  pruefe(/P\. auf \d+ von \d+ Vokabeln/.test(kennzahlen), `Karte mit Punkten und Vokabelzahl („${kennzahlen.replace(/\s+/g, ' ').slice(0, 120)}")`)
+  await p.locator('[data-vorlage-suche]').fill('gibt-es-nicht')
+  pruefe((await p.locator('[data-onlinetest-wahl] [data-vorlage]').count()) === 0, 'Suche in der Auswahl filtert')
+  await p.locator('[data-vorlage-suche]').fill('Green Line 6')
+  await karte.click()
   await p.locator('[data-onlinetest-name]').waitFor({ timeout: 10000 })
   await p
     .getByRole('dialog')

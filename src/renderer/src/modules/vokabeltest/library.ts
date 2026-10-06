@@ -35,6 +35,10 @@ export function statsVon(payload: TestPayload, herkunft?: VocabListContext | nul
     hasTest: Boolean(doc),
     variantCount: doc?.variants.length ?? 0,
     totalPoints: doc?.variants[0] ? variantPoints(doc.variants[0]) : 0,
+    // Für die Auswahl im Onlinetest (06.10.2026)
+    optionalCount: vocab.filter((v) => v.term.trim() && (v.grey || v.inBox)).length,
+    optionalIncluded: includedVocab(vocab).filter((v) => v.grey || v.inBox).length,
+    ...(doc?.variants[0] ? { taskCount: doc.variants[0].blocks.length } : {}),
     ...(language ? { language, subjectLabel: LANGUAGES.find((l) => l.value === language)?.label ?? language } : {}),
     ...(grade ? { grade } : {})
   }

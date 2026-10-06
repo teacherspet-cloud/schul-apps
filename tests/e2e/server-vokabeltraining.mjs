@@ -71,6 +71,35 @@ try {
   await p.locator('.app-leiste [aria-label="Vokabeltraining"]').click()
   pruefe(await da(p.locator('[data-vokabel-zuweisung]', { hasText: 'Weather words' })), 'App „Vokabeltraining" mit der Freigabe')
   await p.screenshot({ path: join(out, '1-app.png') })
+  // Vokabeln wählen (06.10.2026): Fach (bei mehreren Fremdsprachen) → Lehrwerk → Band
+  await p.locator('[data-vokabeln-freigeben]').click()
+  const lehrwerk = p.locator('[data-vokabel-buch]')
+  await lehrwerk.waitFor({ timeout: 8000 })
+  if (await p.locator('[data-vokabel-fach]').count()) {
+    await p.locator('[data-vokabel-fach]').click()
+    await p.getByRole('option', { name: 'Englisch' }).click()
+  }
+  await lehrwerk.click()
+  const reihenNamen = await p.getByRole('option').allInnerTexts()
+  pruefe(
+    reihenNamen.some((x) => /^Green Line$/.test(x.trim())),
+    `Lehrwerk als Reihe („${reihenNamen.slice(0, 4).join('", "')}")`
+  )
+  await p.getByRole('option', { name: 'Green Line', exact: true }).click()
+  await p.locator('[data-vokabel-band]').click()
+  const baende = await p.getByRole('option').allInnerTexts()
+  pruefe(
+    baende.some((x) => /Green Line 1/.test(x)),
+    `Danach der Band („${baende.slice(0, 3).join('", "')}")`
+  )
+  await p
+    .getByRole('option', { name: /Green Line 1/ })
+    .first()
+    .click()
+  pruefe(await da(p.locator('[data-vokabel-unit]')), 'Danach die Unit')
+  await p.screenshot({ path: join(out, '1b-lehrwerk.png') })
+  await p.keyboard.press('Escape')
+  await p.keyboard.press('Escape')
 
   // ---------- Gast am Handy: Name → persönlicher Code → Trainer
   const g1 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })

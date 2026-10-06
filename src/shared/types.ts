@@ -784,6 +784,11 @@ export interface SavedTestStats {
   hasTest: boolean
   variantCount: number
   totalPoints: number
+  /** Optionale Vokabeln (grau bzw. im Kasten gedruckt): wie viele es gibt und wie viele mitgeprüft werden (06.10.2026) */
+  optionalCount?: number
+  optionalIncluded?: number
+  /** Zahl der Aufgaben im Test (Fassung A) */
+  taskCount?: number
   /**
    * Sprache, Fach und Jahrgang (Paket 7) – für Suche und „Zuletzt bearbeitet". Ältere Tests
    * haben sie nicht; dort bleiben die Felder leer.
@@ -1013,6 +1018,8 @@ export interface SavedGrammarTestStats {
   minutes: number
   /** Wird der Test benotet? */
   graded: boolean
+  /** Zahl der Fassungen (A/B), 06.10.2026 */
+  varianten?: number
   /**
    * Bundesland und Schulform des Materials (Paket 13) – damit die Themenbereiche nur den
    * Lehrplan des passenden Landes anwenden. Ältere Einträge haben sie nicht; dann gelten die
