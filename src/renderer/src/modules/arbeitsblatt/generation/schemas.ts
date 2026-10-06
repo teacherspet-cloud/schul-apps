@@ -37,6 +37,14 @@ export const ANSWER_KINDS = [
 export const DIAGRAM_KIND_IDS = ['koordinaten', 'mm', 'klima', 'schraegbild', 'spannung', 'zeitleiste']
 export const TIMELINE_UNIT_IDS = ['day', 'month', 'year']
 export const BLOCK_SIDES = ['auto', 'none', 'left', 'right']
+/** Seitenformat ab einem Baustein (06.10.2026): gleich wie davor, quer, hoch */
+export const PAGE_FORMATS = ['same', 'landscape', 'portrait']
+/** Feld samt Regel – dieselbe Beschreibung in allen Schemata mit Bausteinen (Arbeitsblatt, Klassenarbeit, LZK, Grammatiktest) */
+export const PAGE_FORMAT_FIELD = {
+  ...enumOf(PAGE_FORMATS),
+  description:
+    'pageFormat: SEITENFORMAT ab diesem Baustein. "same" (Standard) = wie davor. "landscape" am ERSTEN Baustein eines Abschnitts, der quer besser lesbar ist: Zeitleiste mit vielen Daten, Abschnitten oder Strängen, sehr breites Bild/Gemälde/Panorama, Karte im Querformat, Tabelle ab sechs Spalten, Diagramm mit langer x-Achse – gehört eine Aufgabe dazu, steht sie im selben Abschnitt. "portrait" am ersten Baustein danach, der wieder hoch stehen soll (längere Texte, hohe Bilder, viele Schreiblinien). Jeder Wechsel beginnt eine neue Seite: sparsam, nie für reinen Fließtext.'
+}
 export const SOCIAL_FORMS = ['EA', 'PA', 'GA', 'Plenum', 'Rollenspiel']
 export const AFBS = ['', 'I', 'II', 'III']
 export const GRID_KIND_IDS = ['karo', 'mm', 'koordinaten', 'klima']
@@ -195,6 +203,7 @@ export const FLAT_BLOCK = obj({
   ),
   imageRole: enumOf(IMAGE_ROLES),
   blockSide: enumOf(BLOCK_SIDES),
+  pageFormat: PAGE_FORMAT_FIELD,
   imageFunction: enumOf(IMAGE_FUNCTION_IDS),
   imageLabels: arr(
     obj({

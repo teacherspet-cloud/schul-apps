@@ -1,4 +1,6 @@
 import { Accordion, Alert, Badge, Card, Container, Group, Radio, Stack, Text, Tooltip, Box, ScrollArea } from '@mantine/core'
+import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
+import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
@@ -469,7 +471,7 @@ export default function EditorStep(): React.JSX.Element {
           )}
 
           <Stack>
-            <FitToWidth className="ws-editor-pages">
+            <FitToWidth className="ws-editor-pages" widthPx={blattBreitePx(layouts.get(`${sheet.id}:${loesung ? 'key' : 'print'}`))}>
               <SheetPages
                 ws={ws}
                 sheet={sheet}
@@ -490,6 +492,19 @@ export default function EditorStep(): React.JSX.Element {
                     })
                 })}
                 wrapBlock={wrapBlock}
+                seitenWerkzeug={
+                  loesung
+                    ? undefined
+                    : seitenFormatWerkzeug(
+                        sheet,
+                        (blockId, fn) =>
+                          update((d) => {
+                            const block = d.varianten[variante]?.blocks.find((b) => b.id === blockId)
+                            if (block) fn(block)
+                          }),
+                        querBausteine(sheet.blocks)
+                      )
+                }
               />
             </FitToWidth>
           </Stack>

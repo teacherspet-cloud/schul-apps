@@ -10,6 +10,7 @@
  * - **Jede Aufgabe zielt auf eine benannte Stolperstelle** und trägt sie mit. Daraus entsteht
  *   das Fehlerprofil im Lösungsteil.
  */
+import { PAGE_FORMAT_FIELD } from '../../arbeitsblatt/generation/schemas'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import type { AiCall } from '../../../shared/imageChoice'
 import { createRng, newId } from '../../vokabeltest/model/random'
@@ -171,7 +172,8 @@ export const TEST_SCHEMA = obj({
       solution: str('task: die richtige Lösung, bei mehreren Möglichkeiten alle'),
       minutes: int('task: geschätzte Bearbeitungszeit'),
       grammarTopicId: str('task: Kennung der geprüften Form; bei Material leer'),
-      grammarError: str('task: Stolperstelle im Wortlaut der Vorgabe; bei Material leer')
+      grammarError: str('task: Stolperstelle im Wortlaut der Vorgabe; bei Material leer'),
+      pageFormat: PAGE_FORMAT_FIELD
     })
   )
 })

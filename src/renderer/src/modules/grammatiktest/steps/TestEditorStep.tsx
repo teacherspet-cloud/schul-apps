@@ -1,4 +1,6 @@
 import { Button, Container, Stack, Box, ScrollArea } from '@mantine/core'
+import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
+import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
@@ -323,7 +325,7 @@ export default function TestEditorStep(): React.JSX.Element {
                 })
               }
             />
-            <FitToWidth className="ws-editor-pages">
+            <FitToWidth className="ws-editor-pages" widthPx={blattBreitePx(layouts.get(`${sheet.id}:${key ? 'key' : 'print'}`))}>
               <SheetPages
                 ws={ws}
                 sheet={sheet}
@@ -341,6 +343,7 @@ export default function TestEditorStep(): React.JSX.Element {
                     })
                 })}
                 wrapBlock={wrapBlock}
+                seitenWerkzeug={key ? undefined : seitenFormatWerkzeug(sheet, aendere, querBausteine(sheet.blocks))}
               />
             </FitToWidth>
           </Stack>

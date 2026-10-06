@@ -224,7 +224,9 @@ export function convertBlock(
         .replace(/[^a-z0-9-]+/g, '-')
         .replace(/^-+|-+$/g, '')
     : ''
-  const base = { id, ...(stars ? { stars } : {}), ...(ref ? { ref } : {}) }
+  // Seitenformat ab diesem Baustein (06.10.2026) – die Prüfung nach Maßen (model/seitenformat.ts) korrigiert offensichtliche Fehlgriffe
+  const seitenFormat = b?.pageFormat === 'landscape' ? 'quer' : b?.pageFormat === 'portrait' ? 'hoch' : undefined
+  const base = { id, ...(stars ? { stars } : {}), ...(ref ? { ref } : {}), ...(seitenFormat ? { seitenFormat: seitenFormat as 'quer' | 'hoch' } : {}) }
   switch (type) {
     case 'learningGoals':
       return { ...base, type, title: text(b.title) || anredeText('lernziele', anrede), goals: strings(b.items) }

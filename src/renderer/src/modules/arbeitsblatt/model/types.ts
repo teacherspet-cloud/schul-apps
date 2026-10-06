@@ -92,6 +92,9 @@ export interface ImageLabel {
   ursprung?: { x: number; y: number }
 }
 
+/** Hoch- oder Querformat einer Seite (06.10.2026) */
+export type SeitenFormat = 'hoch' | 'quer'
+
 interface BaseBlock {
   id: string
   /**
@@ -128,6 +131,14 @@ interface BaseBlock {
    * stehen dann vorn auf einer eigenen Seite, das Material auf den folgenden.
    */
   pageBreakBefore?: boolean
+  /**
+   * SEITENFORMAT ab diesem Baustein (06.10.2026, abgestimmt mit der Lehrkraft): Von hier bis zum nächsten Baustein
+   * mit eigenem Format stehen die Seiten hoch bzw. quer; was überläuft, bleibt im Format. Der Wechsel beginnt eine
+   * neue Seite. Verankert am Inhalt, nicht an der Seitennummer – beim Verschieben wandert das Format mit.
+   */
+  seitenFormat?: SeitenFormat
+  /** Format von der Lehrkraft gewählt – die automatische Prüfung (seitenformat.ts) lässt es stehen */
+  seitenFormatFest?: boolean
   /** Niveau bei „ein Blatt mit ★-Aufgaben" (leer = für alle) */
   stars?: Stars
   /** Hinweise aus Prüfungen, nur im Editor sichtbar */

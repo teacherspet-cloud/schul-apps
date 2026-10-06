@@ -48,6 +48,8 @@ import { BogenAnsicht, type FeedbackBogen } from './SchuelerBereich'
 
 /** Breite einer A4-Seite in CSS-Pixeln (210 mm bei 96 dpi) */
 const BREITE = 794
+/** Blatt mit Querseiten (06.10.2026): so breit wie eine Querseite – Hochseiten stehen darin wie gewohnt */
+const QUER_BREITE = 1123
 /** Korrekturrand in Pixeln (34 mm bei 96 dpi) */
 const RAND_PX = Math.round((KORREKTURRAND_MM * 96) / 25.4)
 
@@ -492,7 +494,9 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
   // Randkommentare stehen im Korrekturrand der Seite (blattDigital.ts) – keine Spalte daneben
   const spalte = false
   const SPALTE = 0
-  const massstab = Math.min(1.25, breite / BREITE)
+  // Eine echte Querseite (Klassenattribut) – nicht die CSS-Regel, die in jedem Blatt steht
+  const dokBreite = /class="ws-page ws-page-quer"/.test(d.html) ? QUER_BREITE : BREITE
+  const massstab = Math.min(1.25, breite / dokBreite)
 
   const messe = useCallback((): void => {
     const doc = iframe.current?.contentDocument
@@ -849,29 +853,30 @@ export function Ausfuellen({ d, lehrkraft }: { d: BlattDaten; lehrkraft?: { zuru
       {/* In der Listenansicht bleibt das Blatt unsichtbar da – sonst ließen sich die Felder nicht messen */}
       <div
         ref={rahmen}
-        style={ansicht === 'blatt' ? { width: '100%' } : { width: BREITE, position: 'absolute', left: -20000, top: 0, visibility: 'hidden' }}
+        style={ansicht === 'blatt' ? { width: '100%' } : { width: dokBreite, position: 'absolute', left: -20000, top: 0, visibility: 'hidden' }}
         aria-hidden={ansicht !== 'blatt'}
       >
         <div
           style={{
-            width: (BREITE + (spalte ? SPALTE : 0)) * massstab,
+            width: (dokBreite + (spalte ? SPALTE : 0)) * massstab,
             height: (gemessen?.hoehe ?? 1123) * massstab,
             position: 'relative',
             overflow: 'hidden',
             margin: '0 auto'
           }}
         >
-          <div style={{ width: BREITE, transform: `scale(${massstab})`, transformOrigin: 'top left', position: 'absolute', left: 0, top: 0 }}>
+          <div style={{ width: dokBreite, transform: `scale(${massstab})`, transformOrigin: 'top left', position: 'absolute', left: 0, top: 0 }}>
             <iframe
               ref={iframe}
               title={d.titel}
               srcDoc={d.html}
               sandbox="allow-same-origin"
               onLoad={geladen}
-              style={{ width: BREITE, height: 1123, border: 0, display: 'block', pointerEvents: 'none', background: '#fff' }}
+              style={{ width: dokBreite, height: 1123, border: 0, display: 'block', pointerEvents: 'none', background: '#fff' }}
             />
             {gemessen && (
               <Ebene
+                breite={dokBreite}
                 felder={felderSichtbar}
                 ampeln={ampeln}
                 seiten={gemessen.seiten}
@@ -1009,6 +1014,8 @@ function AufgabenFeedbackText({ liste }: { liste?: AufgabenFb[] }): React.JSX.El
 
 /** Eingabefelder und Stift-Ebene über dem Blatt */
 function Ebene(p: {
+  /** Breite des Dokuments (mit Querseiten 1123 px) */
+  breite?: number
   felder: Feld[]
   seiten: Seite[]
   aufgaben: AufgabeInfo[]
@@ -1081,7 +1088,7 @@ function Ebene(p: {
   })
   return (
     <div
-      style={{ position: 'absolute', left: 0, top: 0, width: BREITE, height: '100%' }}
+      style={{ position: 'absolute', left: 0, top: 0, width: p.breite ?? BREITE, height: '100%' }}
       onPointerDown={(e) => {
         // Klick neben das Feedback-Fenster schließt es
         if (offenesFb !== null && !(e.target as HTMLElement).closest('[data-fb-fenster]')) setOffenesFb(null)
@@ -1199,7 +1206,7 @@ function Ebene(p: {
               ? { a, y: l.y, x: f.x + f.w + 6, w: Math.max(80, RAND_PX - 12), ende: l.ende, feldRechts: f.x + f.w }
               : { a, y: l.y }
           })}
-        randX={BREITE - 30}
+        randX={(p.breite ?? BREITE) - 30}
         aktiv={aktivAnm}
         setAktiv={setAktivAnm}
       />

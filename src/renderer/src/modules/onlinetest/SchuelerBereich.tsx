@@ -199,7 +199,8 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Startseite />
   )
   return (
-    <Container size="sm" py="md" px="md" style={{ minHeight: '100vh' }}>
+    // Arbeitsblätter breiter (06.10.2026): Querseiten passen so ohne starkes Verkleinern; am Tablet ohnehin volle Breite
+    <Container size={blatt || reiheM ? 'lg' : 'sm'} py="md" px="md" style={{ minHeight: '100vh' }}>
       <Group justify="space-between" mb="md">
         <Text fw={700} size="lg" component="a" href="/s/" style={{ color: 'inherit', textDecoration: 'none' }}>
           Schul-Apps

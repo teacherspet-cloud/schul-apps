@@ -24,7 +24,18 @@ import { COMBINED_RULES, DIFFERENTIATION_PRINCIPLES, STAR_LABELS, Stars } from '
 import { fassungsLabel, istMittel, profilFuerStufe, stufeFuer, stufenRegeln, stufeText } from '../didactics/schwierigkeit'
 import { lesbarkeitAngleichen } from './lesbarkeit'
 import type { LearnerProfile } from '../didactics/profile'
-import type { OriginalMaterialAblage, Outline, OutlineItem, Sheet, SourceMaterial, Worksheet, WorksheetMeta, WsBlock, WsBlockType } from '../model/types'
+import type {
+  OriginalMaterialAblage,
+  Outline,
+  OutlineItem,
+  SeitenFormat,
+  Sheet,
+  SourceMaterial,
+  Worksheet,
+  WorksheetMeta,
+  WsBlock,
+  WsBlockType
+} from '../model/types'
 import { BLOCK_LABELS } from '../model/factory'
 import { vollstaendigeElemente } from '../../../shared/teilJson'
 import { convertBlock, convertOutline } from './convert'
@@ -229,7 +240,9 @@ export async function generateSheet(
         if (roh.length <= bisher) return
         bisher = roh.length
         try {
-          const geliefert = new Set<number>(roh.map((b: unknown) => Number((b as { outlineIndex?: unknown }).outlineIndex)).filter((n: number) => Number.isInteger(n) && n >= 0))
+          const geliefert = new Set<number>(
+            roh.map((b: unknown) => Number((b as { outlineIndex?: unknown }).outlineIndex)).filter((n: number) => Number.isInteger(n) && n >= 0)
+          )
           teil(buildSheet({ blocks: roh }, level, images, anredeFuerMeta(meta)), geliefert)
         } catch {
           // Ein Zwischenstand, der sich nicht bauen lässt, wird übersprungen – das fertige Blatt kommt ohnehin
@@ -475,7 +488,9 @@ export async function regenerateBlock(
       taskContext(ws.meta, profile),
       originalSourceRules(ws.meta, sheet.stars ?? null),
       `Gesamtes Arbeitsblatt:\n${describeSheet(sheet)}`,
-      art === 'neu' ? `Bisheriger Baustein (nur zur Orientierung, nicht übernehmen):\n${describeBlock(old)}` : `Zu überarbeitender Baustein:\n${describeBlock(old)}`,
+      art === 'neu'
+        ? `Bisheriger Baustein (nur zur Orientierung, nicht übernehmen):\n${describeBlock(old)}`
+        : `Zu überarbeitender Baustein:\n${describeBlock(old)}`,
       'Für nicht benötigte Felder leere Werte verwenden.',
       materialText(ws.sources)
     ]
@@ -491,7 +506,7 @@ export async function regenerateBlock(
     old.type === 'task' ? old.points : 0
   )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  const neu = { ...block, id: old.id, stars: old.stars }
+  const neu = { ...block, id: old.id, stars: old.stars, ...layoutBehalten(old, block) }
   // Nummern, die die KI schreibt, werden zu Kennungen – gezählt über das ganze Blatt; der neue Baustein steht an der Stelle des alten
   const [aufgeloest] = verschluesseleMaterialverweise(
     [neu],
@@ -557,7 +572,7 @@ ${describeSheet(sheet)}`,
     old.type === 'task' ? old.points : 0
   )
   if (!block) throw new Error('Die KI hat keinen Baustein geliefert.')
-  const neu = { ...block, id: old.id, stars: old.stars }
+  const neu = { ...block, id: old.id, stars: old.stars, ...layoutBehalten(old, block) }
   // Nummern, die die KI schreibt, werden zu Kennungen – gezählt über das ganze Blatt; der neue Baustein steht an der Stelle des alten
   const [aufgeloest] = verschluesseleMaterialverweise(
     [neu],
@@ -743,7 +758,8 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
     return { ...meta, teacherNote: [meta.teacherNote, kopf, ...m.protokoll].filter(Boolean).join('\n') }
   }
 
-  if (opts.zwischenstand && ws.outline?.items.length) levels.forEach((_, i) => zeige(i, platzhalterBlatt(i, null, new Set()), 'Gliederung steht – die KI formuliert aus'))
+  if (opts.zwischenstand && ws.outline?.items.length)
+    levels.forEach((_, i) => zeige(i, platzhalterBlatt(i, null, new Set()), 'Gliederung steht – die KI formuliert aus'))
 
   // Der Hörtext entsteht zuerst und in einer eigenen Anfrage – auf Wunsch mit einem stärkeren
   // Modell. Erst danach werden die Aufgaben dazu geschrieben. Bei mehreren Niveaustufen hören
@@ -798,7 +814,10 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
       }),
       3
     )
-    return mitHoerVokabular(await mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai), opts.ai)
+    return mitHoerVokabular(
+      await mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai),
+      opts.ai
+    )
   }
 
   const sheets = await runLimited(
@@ -860,7 +879,10 @@ export async function generateWorksheet(ws: Worksheet, profile: LearnerProfile, 
   )
 
   // Nachbesserungen erzeugen Bausteine neu – die Adresse des Videos geht dabei wieder verloren
-  return mitHoerVokabular(await mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai), opts.ai)
+  return mitHoerVokabular(
+    await mitVerbAufgabe({ ...ws, meta: metaMitProtokoll(), sheets: expandObserverGroups(sheets.map((s) => setzeVideoAdresse(s, meta))) }, opts.ai),
+    opts.ai
+  )
 }
 
 /**
@@ -913,4 +935,17 @@ export async function suggestOutlineItem(
     schema: obj({ purpose: str('Was dieser Baustein enthält bzw. verlangt (1–2 Sätze)'), operator: str('Operator der Aufgabe, sonst leer') })
   })
   return { purpose: String(data?.purpose ?? '').trim(), operator: String(data?.operator ?? '').trim() }
+}
+
+/**
+ * Was am Platz des Bausteins hängt, bleibt beim Neu-Erzeugen erhalten (06.10.2026): das Seitenformat (von der
+ * Lehrkraft gewählt immer, sonst nur, wenn die KI keins vorschlägt) und der erzwungene Seitenumbruch.
+ */
+export function layoutBehalten(old: WsBlock, neu: WsBlock): { seitenFormat?: SeitenFormat; seitenFormatFest?: boolean; pageBreakBefore?: boolean } {
+  const format = old.seitenFormatFest ? old.seitenFormat : (neu.seitenFormat ?? old.seitenFormat)
+  return {
+    ...(format ? { seitenFormat: format } : {}),
+    ...(old.seitenFormatFest ? { seitenFormatFest: true } : {}),
+    ...(old.pageBreakBefore ? { pageBreakBefore: true } : {})
+  }
 }

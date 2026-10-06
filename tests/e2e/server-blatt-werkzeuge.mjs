@@ -34,6 +34,19 @@ const vorlage = readdirSync(ordner)
   .map((f) => JSON.parse(readFileSync(f, 'utf8')))
   .find((w) => JSON.stringify(w).includes('"zeitleiste"'))
 
+/*
+ * QUER=1 (06.10.2026): die Zeitleisten-Aufgabe steht auf einer Querseite – derselbe Ablauf auf dem quer gesetzten Blatt
+ * (Andocken, Jahr, Optionen, Stift …).
+ */
+if (process.env.QUER && vorlage) {
+  for (const blatt of vorlage.payload?.sheets ?? []) {
+    const i = blatt.blocks.findIndex((b) => JSON.stringify(b.answer?.diagram ?? b.diagram ?? {}).includes('"zeitleiste"'))
+    if (i < 0) continue
+    blatt.blocks[i].seitenFormat = 'quer'
+    if (blatt.blocks[i + 1]) blatt.blocks[i + 1].seitenFormat = 'hoch'
+  }
+}
+
 const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
 const verwaltung = await browser.newContext()
@@ -146,6 +159,12 @@ try {
     })
   const a0 = await achseSuchen()
   pruefe(Boolean(a0), 'Zeitleiste mit Achse auf dem Blatt')
+  if (process.env.QUER) {
+    const quer = await s.evaluate(() =>
+      [...document.querySelector('iframe').contentDocument.querySelectorAll('.ws-page')].map((x) => (x.classList.contains('ws-page-quer') ? 'Q' : 'H')).join('')
+    )
+    pruefe(quer.includes('Q') && quer.includes('H'), `Digitales Blatt mit Querseite (${quer})`)
+  }
   await s.evaluate((y) => window.scrollTo(0, window.scrollY + y - 450), a0.y)
   await s.waitForTimeout(400)
   const ac = await achseSuchen()
@@ -280,7 +299,9 @@ try {
   pruefe((await s.locator('[data-kasten]').count()) >= 1, '„Behalten" lässt das Kästchen stehen')
   // Leeres Kästchen: sofort weg
   await s.locator('[data-werkzeug="text"]').click()
-  await s.mouse.click(ac.x + 420, ac.y - 200)
+  // Rechts neben dem ersten Kästchen – auf Hoch- wie Querseiten im Blatt
+  const kb2 = await s.locator('[data-kasten]').first().boundingBox()
+  await s.mouse.click(kb2.x + kb2.width + 40, kb2.y + 4)
   const vorLeer = await s.locator('[data-kasten]').count()
   await s.locator('[data-werkzeug="radierer"]').click()
   await s.locator('[data-kasten]').last().dispatchEvent('pointerdown')
@@ -322,11 +343,11 @@ try {
     l2.x > linie.x + 20 && Math.abs(l2.x2 - linie.x2) < 1,
     `Angehängtes Linienende wandert mit, das Ende an der Achse bleibt (${Math.round(linie.x)} → ${Math.round(l2.x)})`
   )
-  // Stift-Strich, dann radieren
+  // Stift-Strich, dann radieren – links neben der Verbindungslinie (deren Radier-Fläche fängt sonst den Radierer)
   await s.locator('[data-werkzeug="stift"]').click()
-  await s.mouse.move(ac.x + 300, ac.y - 60)
+  await s.mouse.move(ac.x + 20, ac.y - 60)
   await s.mouse.down()
-  await s.mouse.move(ac.x + 420, ac.y - 60, { steps: 8 })
+  await s.mouse.move(ac.x + 140, ac.y - 60, { steps: 8 })
   await s.mouse.up()
   const tinte = async () =>
     s.locator('[data-tinte]').evaluateAll((cs) =>
@@ -339,9 +360,9 @@ try {
     )
   const vor = await tinte()
   await s.locator('[data-werkzeug="radierer"]').click()
-  await s.mouse.move(ac.x + 290, ac.y - 60)
+  await s.mouse.move(ac.x + 10, ac.y - 60)
   await s.mouse.down()
-  await s.mouse.move(ac.x + 430, ac.y - 60, { steps: 10 })
+  await s.mouse.move(ac.x + 150, ac.y - 60, { steps: 10 })
   await s.mouse.up()
   const nach = await tinte()
   pruefe(vor > 100 && nach < vor * 0.2, `Radierer entfernt Stift-Striche (${vor} → ${nach} Pixel)`)

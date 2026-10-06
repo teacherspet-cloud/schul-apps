@@ -1,11 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { MeasuredItem, PagePlan, paginate, paginateSpread } from '../../../shared/render/paginate'
+import { MeasuredItem, PagePlan, paginate, paginateSpread, type Seitenhoehen } from '../../../shared/render/paginate'
+import { querNachAnkern } from '../../arbeitsblatt/model/seitenformat'
 import type { PageLimit, TestDocument } from '../model/types'
 import { RenderContext } from './RenderContext'
 import { BlockView, PageLayout, SPLITTABLE_KINDS, TestHeader } from './TestPage'
 
 const PX_PER_MM = 96 / 25.4
 const PAGE_HEIGHT_MM = 297
+/** Querseite (06.10.2026) */
+const QUER_HOEHE_MM = 210
 /** Platz unten für Seitenzahl und Bildnachweis sowie ein kleiner Sicherheitsabstand für Druck/PDF */
 const FOOTER_RESERVE_MM = 3
 const MIN_FONT_PT = 10
@@ -106,19 +109,24 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
     if (root.getBoundingClientRect().width === 0) return
     const limit = pageLimitOf(doc)
 
-    const measureVariant = (variantId: string, key: boolean): { items: MeasuredItem[]; first: number; other: number } | null => {
+    const measureVariant = (variantId: string, key: boolean): { items: MeasuredItem[]; first: number; other: number; quer?: Seitenhoehen } | null => {
       const page = root.querySelector<HTMLElement>(`[data-layout="${variantId}-${key ? 'key' : 'student'}"]`)
       if (!page) return null
       const style = getComputedStyle(page)
       const inner = PAGE_HEIGHT_MM * PX_PER_MM - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0) - FOOTER_RESERVE_MM * PX_PER_MM
+      // Querseiten: ihre Aufgaben in der Breite der Querseite gemessen
+      const querSeite = root.querySelector<HTMLElement>(`[data-layout-quer="${variantId}-${key ? 'key' : 'student'}"]`)
+      const querIds = querNachAnkern(doc.variants.find((v) => v.id === variantId)?.blocks ?? [])
+      const querInner = QUER_HOEHE_MM * PX_PER_MM - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0) - FOOTER_RESERVE_MM * PX_PER_MM
       const header = page.querySelector<HTMLElement>('[data-measure-header]')?.getBoundingClientRect().height ?? 0
       // Hinweis „Aufgabe N (Fortsetzung)" auf jedem Folgestück (01.10.2026) – mit dem Abstand darunter
       const probe = page.querySelector<HTMLElement>('[data-continued-probe]')
       const fortsetzung = probe ? probe.getBoundingClientRect().height + (parseFloat(getComputedStyle(probe).marginBottom) || 0) : 0
       const variant = doc.variants.find((v) => v.id === variantId)
       const items: MeasuredItem[] = []
-      page.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((wrap) => {
-        const id = wrap.dataset.measureBlock!
+      page.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((hochWrap) => {
+        const id = hochWrap.dataset.measureBlock!
+        const wrap = (querIds.has(id) && querSeite?.querySelector<HTMLElement>(`[data-measure-quer="${CSS.escape(id)}"]`)) || hochWrap
         const height = wrap.getBoundingClientRect().height
         const block = variant?.blocks.find((b) => b.id === id)
         const unitEls = Array.from(wrap.querySelectorAll<HTMLElement>('[data-unit]'))
@@ -130,18 +138,19 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
           items.push({ id, height })
         }
       })
-      return { items, first: inner - header, other: inner }
+      for (const it of items) if (querIds.has(it.id)) it.quer = true
+      return { items, first: inner - header, other: inner, ...(querIds.size ? { quer: { erste: querInner - header, weitere: querInner } } : {}) }
     }
 
     const student = new Map<string, PageLayout>()
     const keyLayouts = new Map<string, PageLayout>()
     let tooLong = false
-    const measured = new Map<string, { items: MeasuredItem[]; first: number; other: number }>()
+    const measured = new Map<string, { items: MeasuredItem[]; first: number; other: number; quer?: Seitenhoehen }>()
     for (const v of doc.variants) {
       const m = measureVariant(v.id, false)
       if (!m) return
       measured.set(v.id, m)
-      const pages = paginate(m.items, m.first, m.other)
+      const pages = paginate(m.items, m.first, m.other, [], m.quer)
       if (limit.mode !== 'auto' && pages.length > limit.pages) tooLong = true
       student.set(v.id, { ...candidate, pages })
     }
@@ -159,13 +168,13 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
       for (const v of doc.variants) {
         if (limit.mode === 'range' && student.get(v.id)!.pages.length >= ziel) continue
         const m = measured.get(v.id)!
-        const spread: PagePlan[] | null = paginateSpread(m.items, m.first, m.other, ziel)
+        const spread: PagePlan[] | null = paginateSpread(m.items, m.first, m.other, ziel, m.quer)
         if (spread) student.set(v.id, { ...candidate, pages: spread })
       }
     }
     for (const v of doc.variants) {
       const m = measureVariant(v.id, true)
-      if (m) keyLayouts.set(v.id, { ...candidate, pages: paginate(m.items, m.first, m.other) })
+      if (m) keyLayouts.set(v.id, { ...candidate, pages: paginate(m.items, m.first, m.other, [], m.quer) })
     }
     const pageCount = Math.max(...[...student.values()].map((l) => l.pages.length), 1)
     const fits = pageLimitFits(
@@ -202,6 +211,22 @@ export function useTestLayout(doc: TestDocument | null): { layouts: TestLayouts 
                   </div>
                 ))}
               </div>
+              {/* Querseiten (06.10.2026): ihre Aufgaben in der Breite der Querseite */}
+              {querNachAnkern(v.blocks).size > 0 && (
+                <div
+                  data-layout-quer={`${v.id}-${key ? 'key' : 'student'}`}
+                  className={`vt-page vt-page-quer ${key ? 'vt-key' : ''} ${candidate.compact ? 'vt-compact' : ''}`}
+                  style={{ fontSize: `${candidate.fontSize}pt` }}
+                >
+                  {v.blocks.map((b, bi) =>
+                    querNachAnkern(v.blocks).has(b.id) ? (
+                      <div key={b.id} data-measure-quer={b.id} style={{ display: 'flow-root' }}>
+                        <BlockView block={b} number={bi + 1} lang={doc.settings.targetLanguage} />
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
             </RenderContext.Provider>
           ))
         )}

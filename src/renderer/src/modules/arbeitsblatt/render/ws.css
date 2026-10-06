@@ -18,6 +18,11 @@
   color: #111;
   --ws-accent: #2b6cb0;
 }
+.ws-page.ws-page-quer {
+  width: 297mm;
+  height: 210mm;
+  page: quer;
+}
 .ws-page *,
 .ws-measure * {
   box-sizing: border-box;
@@ -79,6 +84,27 @@
 .ws-editor-pages .ws-page {
   overflow: visible;
   clip-path: inset(0 -150mm);
+}
+/*
+ * Hoch/Quer umschalten (06.10.2026): Symbol oben links im Seitenrand – innerhalb des Blatts, damit es bei jedem Zoom
+ * sichtbar bleibt, aber außerhalb des Satzspiegels. Zart, bis man über die Seite fährt.
+ */
+.ws-seitenformat-knopf {
+  position: absolute !important;
+  left: 3mm;
+  top: 3mm;
+  z-index: 4;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.ws-page:hover .ws-seitenformat-knopf,
+.ws-seitenformat-knopf:focus-visible {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .ws-seitenformat-knopf {
+    opacity: 0.9;
+  }
 }
 /* Die Seite mit dem gewählten Baustein liegt oben – bei der Doppelseite reicht die Leiste über die Nachbarseite */
 .ws-editor-pages .ws-page:has(.editor-block-aktiv, .editor-block[data-angetippt], .editor-block:hover) {
@@ -535,6 +561,14 @@
 }
 .ws-side-image .ws-image img {
   max-height: 55mm;
+}
+/* Querseite (06.10.2026): Material links in fast halber Breite, die Aufgabe rechts daneben */
+.ws-side-image.ws-side-quer {
+  width: 47%;
+  margin-right: 6mm;
+}
+.ws-side-quer .ws-image img {
+  max-height: 120mm;
 }
 
 .ws-gallery {
@@ -1420,6 +1454,14 @@
  * Mit einer benannten Seite bleibt das Querformat auf das Tafelbild beschränkt.
  */
 @page tafelbild {
+  size: A4 landscape;
+  margin: 0;
+}
+/*
+ * QUERFORMAT EINZELNER SEITEN (06.10.2026): eine benannte Seite wie beim Tafelbild – so bleibt das Querformat auf
+ * genau diese Seiten beschränkt, und Chromium verkleinert die übrigen nicht.
+ */
+@page quer {
   size: A4 landscape;
   margin: 0;
 }

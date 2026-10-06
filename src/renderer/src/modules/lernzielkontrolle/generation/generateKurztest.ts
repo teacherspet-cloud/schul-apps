@@ -11,6 +11,7 @@
  * werden gebraucht, weil sich die KI nicht zuverlässig an den Auftrag hält – die
  * Lernzielkontrolle, die den Anlass für dieses Programm gab, war selbst KI-erzeugt.
  */
+import { PAGE_FORMAT_FIELD } from '../../arbeitsblatt/generation/schemas'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import { pruefungsVersuchRegeln, setzeProtokollInPruefung } from '../../arbeitsblatt/didactics/protokoll'
 import { vokabelnFuerFassungen } from '../../arbeitsblatt/generation/hoerVokabular'
@@ -66,13 +67,16 @@ export const KURZTEST_SCHEMA = obj({
       body: str('text: der Materialtext; bei Aufgaben und Tabellen leer'),
       headers: arr(str(), 'table: Spaltenköpfe des Materials'),
       rows: arr(arr(str()), 'table: Zeilen des Materials'),
-      instruction: str('task: PFLICHT, nie leer. Arbeitsanweisung, beginnt mit GENAU EINEM Operator als korrekt gebildetem Imperativ (trennbare Verben: „Fasse … zusammen", „Gib … an"). Auch wenn es Teilaufgaben gibt.'),
+      instruction: str(
+        'task: PFLICHT, nie leer. Arbeitsanweisung, beginnt mit GENAU EINEM Operator als korrekt gebildetem Imperativ (trennbare Verben: „Fasse … zusammen", „Gib … an"). Auch wenn es Teilaufgaben gibt.'
+      ),
       operator: str('task: der verwendete Operator im Infinitiv, z. B. „berechnen"'),
       answer: ANSWER,
       parts: arr(obj({ instruction: str(), answer: ANSWER, solution: str() }), 'task: Teilaufgaben oder leer'),
       solution: str('task: die erwartete Lösung; bei mehreren Möglichkeiten alle'),
       minutes: int('task: geschätzte Bearbeitungszeit in Minuten'),
-      points: int('task: Punkte für diese Aufgabe')
+      points: int('task: Punkte für diese Aufgabe'),
+      pageFormat: PAGE_FORMAT_FIELD
     })
   )
 })

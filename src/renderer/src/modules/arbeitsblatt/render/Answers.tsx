@@ -201,14 +201,22 @@ export function McOptions({
  * Zahl nimmt `generation/solution.ts` für die Skizze, damit Musterlösung und Fläche
  * deckungsgleich sind.
  */
-export const diagramWidthMm = (contentWidthMm: number | undefined): number => Math.min(160, (contentWidthMm ?? 170) - 8.5)
+export const diagramWidthMm = (contentWidthMm: number | undefined): number =>
+  // Querseite (06.10.2026): breiter Satzspiegel – die Zeichenfläche nutzt ihn (sonst blieben 100 mm leer)
+  (contentWidthMm ?? 170) > 200 ? (contentWidthMm ?? 170) - 8.5 : Math.min(160, (contentWidthMm ?? 170) - 8.5)
 
 /** Zeichenfläche mit Achsen (Diagramm-Antwortform); `sketch` = Musterlösung als SVG darüber (Lösungsansicht). */
 export function DiagramView({ spec, widthMm, sketch }: { spec: DiagramSpec | undefined; widthMm: number; sketch?: string }): React.JSX.Element {
-  const drawing = diagramDrawing(spec, widthMm)
+  // Die Skizze der Musterlösung ist für 160 mm gezeichnet – mit ihr bleibt die Fläche so breit (auch auf Querseiten)
+  const drawing = diagramDrawing(spec, sketch ? Math.min(160, widthMm) : widthMm)
   return (
     <div className="ws-diagram" style={{ width: `${drawing.widthMm}mm`, height: `${drawing.heightMm}mm` }}>
-      <img className="ws-diagram-img" src={diagramDataUrl(drawing)} alt="Zeichenfläche mit Achsen" style={{ width: `${drawing.widthMm}mm`, height: `${drawing.heightMm}mm` }} />
+      <img
+        className="ws-diagram-img"
+        src={diagramDataUrl(drawing)}
+        alt="Zeichenfläche mit Achsen"
+        style={{ width: `${drawing.widthMm}mm`, height: `${drawing.heightMm}mm` }}
+      />
       {sketch && <div className="ws-muster-skizze" dangerouslySetInnerHTML={{ __html: sketch }} />}
     </div>
   )

@@ -7,6 +7,7 @@
  * Operatoren, geprüfte Form) – sie nehmen `bausteinNachWunsch`, das den Systemauftrag des
  * Programms mitnimmt, statt ihn durch den des Arbeitsblatts zu ersetzen.
  */
+import { layoutBehalten } from './generate'
 import type { StructuredRequest } from '@shared/types'
 import { obj } from '../../../shared/aiSchema'
 import type { Anrede } from '../../../shared/anrede'
@@ -86,7 +87,9 @@ export function wunschNutzerauftrag(a: WunschAnfrage): string {
     `Typ (${alt?.type ?? '?'}) und Stelle im Material bleiben; Punkte vergibt die App.`,
     ...a.zusammenhang,
     `Material, nummeriert:\n${a.bloecke.map((b, k) => `(${k + 1}) ${describeBlock(b)}`).join('\n\n')}`,
-    a.art === 'neu' ? `Bisheriger Baustein (nur zur Orientierung, nicht übernehmen):\n${alt ? describeBlock(alt) : ''}` : `Zu überarbeitender Baustein:\n${alt ? describeBlock(alt) : ''}`,
+    a.art === 'neu'
+      ? `Bisheriger Baustein (nur zur Orientierung, nicht übernehmen):\n${alt ? describeBlock(alt) : ''}`
+      : `Zu überarbeitender Baustein:\n${alt ? describeBlock(alt) : ''}`,
     'Liefere den Baustein VOLLSTÄNDIG. Für nicht benötigte Felder leere Werte verwenden.'
   ]
     .filter(Boolean)
@@ -110,7 +113,13 @@ export async function bausteinNachWunsch(a: WunschAnfrage, ai: AiCall): Promise<
   const roh = convertBlock({ ...data?.block, type: alt.type }, createRng(randomSeed()), [], a.anrede)
   if (!roh) throw new Error('Die KI hat keinen Baustein geliefert.')
   const punkte = alt.type === 'task' && roh.type === 'task' ? (a.punkteBehalten ? alt.points : Math.max(0, Math.round(roh.points ?? 0))) : undefined
-  const neu: WsBlock = { ...roh, id: alt.id, ...(alt.stars ? { stars: alt.stars } : {}), ...(punkte !== undefined ? { points: punkte } : {}) } as WsBlock
+  const neu: WsBlock = {
+    ...roh,
+    id: alt.id,
+    ...(alt.stars ? { stars: alt.stars } : {}),
+    ...(punkte !== undefined ? { points: punkte } : {}),
+    ...layoutBehalten(alt, roh)
+  } as WsBlock
   const [aufgeloest] = verschluesseleMaterialverweise(
     [neu],
     a.bloecke.map((b) => (b.id === alt.id ? neu : b))

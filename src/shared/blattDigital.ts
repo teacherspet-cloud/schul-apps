@@ -26,6 +26,8 @@ export function digitalisieren(doc: Document): number {
   const stil = doc.createElement('style')
   stil.textContent =
     '.ws-page{height:auto !important;min-height:297mm;overflow:visible !important;display:flow-root}' +
+    // Querseiten (06.10.2026): A4 quer als Mindesthöhe
+    '.ws-page.ws-page-quer{min-height:210mm}' +
     '.ws-body{overflow:visible !important}' +
     // Korrekturrand: Zahl wie KORREKTURRAND_MM (der Server übergibt nur den Quelltext dieser Funktion)
     '.ws-lines{margin-right:34mm !important}' +
@@ -44,7 +46,8 @@ export function digitalisieren(doc: Document): number {
     const oben = st.top || '0mm'
     const unten = st.bottom || '0mm'
     st.margin = oben + ' ' + (st.right || '0mm') + ' ' + unten + ' ' + (st.left || '0mm')
-    st.minHeight = 'calc(297mm - ' + oben + ' - ' + unten + ')'
+    const quer = c.closest('.ws-page-quer') ? '210mm' : '297mm'
+    st.minHeight = 'calc(' + quer + ' - ' + oben + ' - ' + unten + ')'
   })
   let verschoben = 0
   const aufgaben = Array.from(doc.querySelectorAll('.ws-task'))

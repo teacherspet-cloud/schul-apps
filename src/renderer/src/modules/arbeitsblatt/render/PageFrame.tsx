@@ -306,13 +306,19 @@ export function PageFrame({
   info,
   page,
   pages,
-  children
+  children,
+  quer,
+  rand
 }: {
   info: PageInfo
   /** 1-basiert */
   page: number
   pages: number
   children?: React.ReactNode
+  /** Querformat (06.10.2026) */
+  quer?: boolean
+  /** Werkzeug am Seitenrand (Editor: Hoch/Quer umschalten) – steht außerhalb des Satzspiegels */
+  rand?: React.ReactNode
 }): React.JSX.Element {
   const d = info.design
   const insets = contentInsets(d)
@@ -345,7 +351,8 @@ export function PageFrame({
   } as React.CSSProperties
 
   return (
-    <div className="ws-page" style={style}>
+    <div className={quer ? 'ws-page ws-page-quer' : 'ws-page'} style={style} data-seite-format={quer ? 'quer' : 'hoch'}>
+      {rand}
       {/*
         Unsichtbarer KI-Test: für Lernende auf Papier und am Bildschirm nicht zu sehen,
         beim Kopieren des PDF-Textes aber enthalten. Steht nur auf dem Schülerblatt.

@@ -13,6 +13,27 @@
   position: relative;
 }
 
+/* Querseite (06.10.2026): A4 quer, benannte Druckseite */
+.vt-page.vt-page-quer {
+  width: 297mm;
+  min-height: 210mm;
+  page: quer;
+}
+.vt-page-fixed.vt-page-quer {
+  height: 210mm;
+}
+/* Hoch/Quer umschalten im Editor – oben links im Seitenrand */
+.vt-page .ws-seitenformat-knopf {
+  position: absolute !important;
+  left: 3mm;
+  top: 3mm;
+  z-index: 4;
+  opacity: 0.55;
+}
+.vt-page:hover .ws-seitenformat-knopf {
+  opacity: 1;
+}
+
 /* Aufgeteilte Seiten: genau A4 */
 .vt-page-fixed {
   height: 297mm;
@@ -566,6 +587,10 @@
 /* ---------- Druck ---------- */
 @page {
   size: A4;
+  margin: 0;
+}
+@page quer {
+  size: A4 landscape;
   margin: 0;
 }
 @media print {

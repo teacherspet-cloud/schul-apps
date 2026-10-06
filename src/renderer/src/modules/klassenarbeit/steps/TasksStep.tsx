@@ -19,6 +19,8 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
+import { querBausteine } from '../../arbeitsblatt/model/seitenformat'
+import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../shared/export/lms/fragen'
 import LmsExport from '../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../rueckmeldung/RueckmeldungKnopf'
@@ -1042,7 +1044,10 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                   ? 'Lösungen und Erwartungshorizont lassen sich direkt im Blatt ändern.'
                   : 'Texte, Aufgaben und der Kopfkasten lassen sich direkt im Blatt ändern; Strg+Z nimmt Änderungen zurück.'}
               </Text>
-              <FitToWidth className={`ws-editor-pages ${loesung ? 'editor-sheet-key' : ''}`}>
+              <FitToWidth
+                className={`ws-editor-pages ${loesung ? 'editor-sheet-key' : ''}`}
+                widthPx={blattBreitePx(layouts.get(`${sheet.id}:${loesung ? 'key' : 'print'}`))}
+              >
                 <SheetPages
                   ws={worksheet}
                   sheet={sheet}
@@ -1050,6 +1055,7 @@ export default function TasksStep({ exam }: { exam: Exam }): React.JSX.Element {
                   info={pageInfo}
                   context={editContext}
                   wrapBlock={wrapBlock}
+                  seitenWerkzeug={!loesung && editContext.update ? seitenFormatWerkzeug(sheet, editContext.update, querBausteine(sheet.blocks)) : undefined}
                 />
               </FitToWidth>
             </>

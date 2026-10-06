@@ -1,4 +1,5 @@
 import { anweisungFuer } from '../model/blocks'
+import { querNachAnkern } from '../../arbeitsblatt/model/seitenformat'
 import {
   AlignmentType,
   BorderStyle,
@@ -15,7 +16,9 @@ import {
   TabStopType,
   TextRun,
   VerticalAlign,
-  WidthType
+  WidthType,
+  PageOrientation,
+  SectionType
 } from 'docx'
 import { teileVon } from '@shared/luecken'
 import type { IParagraphOptions, ITableOptions } from 'docx'
@@ -162,7 +165,29 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
       // Seitenauswahl: nur Varianten mit gewählten Seiten, davon nur deren Aufgaben
       const gewaehlt = opts.auswahl?.get(vtSeitenGruppe(v.id, mode === 'key'))
       if (opts.auswahl && !gewaehlt) continue
-      const children: (Paragraph | Table)[] = [...(mode === 'print' ? await figurAbsatz(ctx, 'winkend') : []), ...header(ctx, v, mode)]
+      let children: (Paragraph | Table)[] = [...(mode === 'print' ? await figurAbsatz(ctx, 'winkend') : []), ...header(ctx, v, mode)]
+      /*
+       * QUERFORMAT (06.10.2026): Aufgaben eines Querabschnitts in einem eigenen Word-Abschnitt im Querformat; ein Wechsel
+       * beginnt eine neue Seite. Die Breiten der Tabellen bleiben die der Hochseite.
+       */
+      const querIds = querNachAnkern(v.blocks)
+      let querJetzt = false
+      let ersterAbschnitt = true
+      const abschliessen = (): void => {
+        if (!children.length) return
+        sections.push({
+          properties: {
+            ...(ersterAbschnitt ? {} : { type: SectionType.NEXT_PAGE }),
+            page: {
+              size: querJetzt ? { width: PAGE_WIDTH, height: 16838, orientation: PageOrientation.LANDSCAPE } : { width: PAGE_WIDTH, height: 16838 },
+              margin: MARGINS
+            }
+          },
+          children
+        })
+        ersterAbschnitt = false
+        children = []
+      }
       const layout = (mode === 'key' ? opts.layouts?.key : opts.layouts?.student)?.get(v.id)
       // Aufgaben, die im Editor oben auf einer neuen Seite beginnen
       const pageStarts = new Set(
@@ -173,6 +198,10 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
       )
       for (let i = 0; i < v.blocks.length; i++) {
         if (gewaehlt && !gewaehlt.has(v.blocks[i].id)) continue
+        if (querIds.has(v.blocks[i].id) !== querJetzt) {
+          abschliessen()
+          querJetzt = !querJetzt
+        }
         children.push(...(await blockContent(ctx, v.blocks[i], i + 1, mode, pageStarts.has(v.blocks[i].id))))
       }
       if (mode === 'print') children.push(...(await figurAbsatz(ctx, 'jubelnd')))
@@ -189,10 +218,7 @@ async function baueDocx(doc: TestDocument, opts: DocxOptions, sizer: ImageSizer)
           })
         )
       }
-      sections.push({
-        properties: { page: { size: { width: PAGE_WIDTH, height: 16838 }, margin: MARGINS } },
-        children
-      })
+      abschliessen()
     }
   }
   if (!opts.keyOnly) await addSections('print')

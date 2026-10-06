@@ -57,11 +57,14 @@ export function TestPage({
   variant,
   layout,
   wrapBlock,
-  footer
+  footer,
+  seitenWerkzeug
 }: {
   doc: TestDocument
   variant: Variant
   layout?: PageLayout
+  /** Editor: Hoch/Quer am Seitenrand (06.10.2026) */
+  seitenWerkzeug?: (seite: number, plan: PagePlan) => React.ReactNode
   /** Im Editor: Rahmen mit Werkzeugleiste um jede Aufgabe */
   wrapBlock?: (block: Block, index: number, content: React.JSX.Element) => React.ReactNode
   /** Erscheint am Ende der letzten Seite */
@@ -89,12 +92,13 @@ export function TestPage({
       {pages.map((plan, pi) => (
         <div
           key={pi}
-          className={pageClass}
+          className={plan.quer ? `${pageClass} vt-page-quer` : pageClass}
           lang={sprache || undefined}
           dir={rtl ? 'rtl' : undefined}
           style={{ fontSize: `${fontSize}pt`, ...(schrift ? { fontFamily: schrift } : {}), ...(akzent ? { ['--vt-accent' as string]: akzent } : {}) }}
           data-page={pi + 1}
         >
+          {seitenWerkzeug?.(pi, plan)}
           {pi === 0 && <TestHeader doc={doc} variant={variant} />}
           {plan.items.map((placed) => {
             const index = variant.blocks.findIndex((b) => b.id === placed.id)

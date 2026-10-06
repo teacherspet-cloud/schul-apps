@@ -1,4 +1,6 @@
 import { ActionIcon, Box, Button, Checkbox, Menu, ScrollArea, Stack, Text, Tooltip } from '@mantine/core'
+import { querBausteine } from '../../model/seitenformat'
+import { blattBreitePx, seitenFormatWerkzeug } from '../../render/SeitenFormatKnopf'
 import { fragenAusBlatt } from '../../../../shared/export/lms/fragen'
 import LmsExport from '../../../../shared/export/lms/LmsExport'
 import RueckmeldungKnopf from '../../../rueckmeldung/RueckmeldungKnopf'
@@ -841,7 +843,7 @@ export function EditorStep(): React.JSX.Element {
             />
           )}
           {view !== 'board' && view !== 'verlauf' && view !== 'audio' && (
-            <FitToWidth className={`ws-editor-pages ${key ? 'editor-sheet-key' : ''}`}>
+            <FitToWidth className={`ws-editor-pages ${key ? 'editor-sheet-key' : ''}`} widthPx={blattBreitePx(plans)}>
               <SheetPages
                 ws={ws}
                 sheet={sheet}
@@ -864,6 +866,9 @@ export function EditorStep(): React.JSX.Element {
                   }
                 })}
                 wrapBlock={wrapBlock}
+                seitenWerkzeug={
+                  view === 'student' && !key ? seitenFormatWerkzeug(sheet, (id, fn) => updateBlock(sheet.id, id, fn), querBausteine(sheet.blocks)) : undefined
+                }
               />
             </FitToWidth>
           )}

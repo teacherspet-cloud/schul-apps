@@ -1,4 +1,5 @@
 import OnlinetestKnopf from '../../onlinetest/OnlinetestKnopf'
+import { blattBreitePx, seitenFormatWerkzeug } from '../../arbeitsblatt/render/SeitenFormatKnopf'
 import {
   ActionIcon,
   Alert,
@@ -332,7 +333,7 @@ export default function EditorStep(): React.JSX.Element {
       {measure}
       <ScrollArea style={{ flex: 1 }} className="editor-canvas">
         {layouts && <PageLimitNotice layouts={layouts} />}
-        <FitToWidth>
+        <FitToWidth widthPx={blattBreitePx((view === 'key' ? layouts?.key : layouts?.student)?.get(variant.id)?.pages)}>
           <Box py="xl" style={{ display: 'flex', justifyContent: 'center' }}>
             <Box className={`editor-sheet ${view === 'key' ? 'editor-sheet-key' : ''}`}>
               <RenderContext.Provider value={renderValue}>
@@ -341,6 +342,7 @@ export default function EditorStep(): React.JSX.Element {
                   variant={variant}
                   layout={(view === 'key' ? layouts?.key : layouts?.student)?.get(variant.id)}
                   wrapBlock={view === 'key' ? undefined : wrapBlock}
+                  seitenWerkzeug={view === 'key' ? undefined : seitenFormatWerkzeug(variant, (id, fn) => updateBlock(variant.id, id, fn))}
                   footer={
                     view === 'key' ? null : (
                       <Group justify="center" mt="xl" className="editor-add">

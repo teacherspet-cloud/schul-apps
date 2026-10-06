@@ -1,4 +1,5 @@
 import { quellenAnhang } from '../../render/quellenAnhang'
+import { querBausteine } from '../../model/seitenformat'
 import {
   AlignmentType,
   Document,
@@ -21,7 +22,8 @@ import {
   TextRun,
   TextWrappingType,
   VerticalPositionRelativeFrom,
-  WidthType
+  WidthType,
+  PageOrientation
 } from 'docx'
 import { kiWordEigenschaften } from '@shared/kiKennzeichnung'
 import { gradeScaleRows } from '../../../../shared/gradeScale'
@@ -289,6 +291,20 @@ export async function sheetSections(
 
   const headers = { first: await headerFor(ctx, true), default: await headerFor(ctx, false) }
   const footers = { first: footerFor(ctx), default: footerFor(ctx) }
+  /*
+   * QUERFORMAT (06.10.2026): Bausteine eines Querabschnitts stehen in einem eigenen Word-Abschnitt im Querformat, mit
+   * der breiteren Inhaltsfläche (Bilder, Tabellen, Zeichenflächen). Ein Formatwechsel beginnt eine neue Seite.
+   */
+  const querIds = querBausteine(sheet.blocks)
+  const ctxQuer: Ctx = { ...ctx, contentWidth: Math.round(A4_HEIGHT - (insets.left + insets.right) * MM) }
+  let querJetzt = false
+  let letzteQuer = false
+  const seitenProps = (quer: boolean) => ({
+    page: {
+      ...pageProps.page,
+      size: quer ? { width: A4_WIDTH, height: A4_HEIGHT, orientation: PageOrientation.LANDSCAPE } : pageProps.page.size
+    }
+  })
   const pageProps = {
     page: {
       // Jedes Blatt zählt seine Seiten selbst (wie die Vorschau) – vorher nannte Word die Seiten des ganzen Dokuments
@@ -319,10 +335,13 @@ export async function sheetSections(
   const flush = (lineNumbers: boolean): void => {
     if (!children.length) return
     const first = sections.length === 0
+    // Formatwechsel: neue Seite; sonst läuft der Abschnitt auf derselben Seite weiter
+    const wechsel = !first && querJetzt !== letzteQuer
+    letzteQuer = querJetzt
     sections.push({
       properties: {
-        ...pageProps,
-        ...(first ? { titlePage: true } : { type: SectionType.CONTINUOUS }),
+        ...seitenProps(querJetzt),
+        ...(first ? { titlePage: true } : { type: wechsel ? SectionType.NEXT_PAGE : SectionType.CONTINUOUS }),
         ...(lineNumbers ? { lineNumbers: { countBy: 5, restart: LineNumberRestartFormat.NEW_SECTION } } : {})
       },
       headers,
@@ -337,7 +356,12 @@ export async function sheetSections(
   // `true`: auch die frei platzierten Bausteine – siehe `blockLayout`, sie gingen sonst verloren
   for (const { block, side, sideAt } of blockLayout(sheet.blocks, ownPhrasePage, true)) {
     if (!zeigt(block, side)) continue
-    const main = await blockContent(ctx, block, numbers)
+    const quer = querIds.has(block.id)
+    if (quer !== querJetzt) {
+      flush(false)
+      querJetzt = quer
+    }
+    const main = await blockContent(quer ? ctxQuer : ctx, block, numbers)
     if (!main.length) continue
     /*
      * Bild oder Tabelle DANEBEN – als schwebender Behälter, nicht mehr als zweite Spalte.
@@ -362,12 +386,16 @@ export async function sheetSections(
      * gebundener Baustein landete dort irgendwo. Textgebunden wandert er dagegen mit seinem
      * Absatz mit – die waagerechte Lage und der Umfluss stimmen, die Seite ist eine Näherung.
      */
-    const content = side
-      ? [await schwebenderBehaelter(ctx, side, sideAt ?? 'right', numbers), ...(main as Paragraph[])]
-      : block.free
-        ? // Der Baustein SELBST kommt in den Behälter – `main` wäre sonst doppelt auf dem Blatt
-          [await schwebenderBehaelter(ctx, block, block.free, numbers)]
-        : main
+    const content =
+      side && side.type === 'text'
+        ? // Text neben der Aufgabe (Querseite) – in Word schlicht davor
+          [...((await blockContent(quer ? ctxQuer : ctx, side, numbers)) as Paragraph[]), ...(main as Paragraph[])]
+        : side
+          ? [await schwebenderBehaelter(quer ? ctxQuer : ctx, side, sideAt ?? 'right', numbers), ...(main as Paragraph[])]
+          : block.free
+            ? // Der Baustein SELBST kommt in den Behälter – `main` wäre sonst doppelt auf dem Blatt
+              [await schwebenderBehaelter(ctx, block, block.free, numbers)]
+            : main
     if (block.type === 'text' && block.lineNumbers) {
       flush(false)
       children = content
@@ -378,6 +406,8 @@ export async function sheetSections(
   }
   if (!children.length && !sections.length) children.push(new Paragraph(''))
   flush(false)
+  // Schlussseiten stehen hoch
+  querJetzt = false
 
   // Hilfsblatt mit nützlichen Ausdrücken auf einer eigenen Schlussseite, wenn so gewählt
   const phraseBlocks = !key && ownPhrasePage && zusatzGewaehlt('hilfsblatt') ? sheet.blocks.filter(isPhraseSheet) : []

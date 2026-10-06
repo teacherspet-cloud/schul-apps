@@ -1,4 +1,5 @@
 import { hilfenZuordnung } from '../didactics/aufgabenVerweise'
+import { inhaltsForm, querBausteine, SEITE_MM } from '../model/seitenformat'
 import { quellenAnhang } from './quellenAnhang'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { hoerablaufFuer, hoerStufe } from '../didactics/hoerablauf'
@@ -210,6 +211,12 @@ export function contextFor(ws: Worksheet, sheet: Sheet, mode: WsMode, extra: Par
   }
 }
 
+/** Kontext einer Querseite: breitere Inhaltsfläche – Bilder, Zeitleisten, Tabellen nutzen sie (06.10.2026) */
+export function querKontext(ws: Worksheet, ctx: WsContextValue): WsContextValue {
+  const insets = contentInsets(ws.design)
+  return { ...ctx, contentWidthMm: SEITE_MM.quer.b - insets.left - insets.right }
+}
+
 /** Ohne Messung (z. B. vor dem ersten Messen): alles auf eine Seite. */
 const fallbackPlan = (sheet: Sheet, ownPhrasePage = false): PagePlan[] => [
   {
@@ -267,21 +274,45 @@ export const istFrei = (b: WsBlock): boolean => Boolean(b.free)
  * Baustein zu verlieren, steht er in der Word-Datei im Fluss an seiner Listenstelle.
  * Bildschirm, PDF und Druck zeigen ihn an der gezogenen Stelle.
  */
-export function blockLayout(blocks: WsBlock[], ownPhrasePage = false, mitFreien = false): { block: WsBlock; side?: WsBlock; sideAt?: 'left' | 'right' }[] {
-  const out: { block: WsBlock; side?: WsBlock; sideAt?: 'left' | 'right' }[] = []
+export function blockLayout(
+  blocks: WsBlock[],
+  ownPhrasePage = false,
+  mitFreien = false
+): { block: WsBlock; side?: WsBlock; sideAt?: 'left' | 'right'; quer?: boolean }[] {
+  const out: { block: WsBlock; side?: WsBlock; sideAt?: 'left' | 'right'; quer?: boolean }[] = []
+  const querIds = querBausteine(blocks)
   blocks = blocks.filter((b) => !isHelpCard(b) && !(ownPhrasePage && isPhraseSheet(b)) && (mitFreien || !istFrei(b)))
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]
     const next = blocks[i + 1]
     const sideAt = seiteVon(b)
     if (sideAt && next && NIMMT_SEITE.includes(next.type)) {
-      out.push({ block: next, side: b, sideAt })
+      out.push({ block: next, side: b, sideAt, ...(querIds.has(b.id) ? { quer: true } : {}) })
+      i++
+      continue
+    }
+    // Querseite (06.10.2026, abgestimmt): kurzes Material links, die Aufgabe dazu rechts daneben
+    if (next && querIds.has(b.id) && querIds.has(next.id) && neben(b, next)) {
+      out.push({ block: next, side: b, sideAt: 'left', quer: true })
       i++
       continue
     }
     out.push({ block: b })
   }
   return out
+}
+
+/**
+ * Darf Material `b` auf einer Querseite neben der Aufgabe `next` stehen? Kurzer Text (ohne eigenes Format-Ende davor),
+ * ein Einzelbild oder eine schmale Tabelle; nicht, was selbst die volle Breite braucht (breiter Inhalt, Bildreihe).
+ */
+function neben(b: WsBlock, next: WsBlock): boolean {
+  if (next.type !== 'task' || next.seitenFormat || b.free || next.free) return false
+  if (inhaltsForm(b) === 'breit' || inhaltsForm(next) === 'breit') return false
+  if (b.type === 'text') return b.body.length <= 1400 && !b.illustration
+  if (b.type === 'image') return !b.items?.length && b.side !== 'none'
+  if (b.type === 'table') return b.side !== 'none' && b.headers.length <= 4
+  return false
 }
 
 /** Seiten eines Blattes nach berechneter Aufteilung. */
@@ -292,13 +323,16 @@ export function SheetPages({
   info,
   context,
   wrapBlock,
-  nurSeite
+  nurSeite,
+  seitenWerkzeug
 }: {
   ws: Worksheet
   sheet: Sheet
   plans?: PagePlan[]
   info: PageInfo
   context: WsContextValue
+  /** Werkzeug am Rand jeder Inhaltsseite (Editor: Hoch/Quer, 06.10.2026) */
+  seitenWerkzeug?: (seite: number, plan: PagePlan) => React.ReactNode
   wrapBlock?: (block: WsBlock, placed: PlacedItem, content: React.ReactNode) => React.ReactNode
   /**
    * Nur diese eine Seite zeigen (0-basiert, Schlussseiten mitgezählt) – für die Vorschauen auf
@@ -314,7 +348,7 @@ export function SheetPages({
   const sides = new Map(
     blockLayout(sheet.blocks, ownPhrasePage)
       .filter((e) => e.side)
-      .map((e) => [e.block.id, { block: e.side!, at: e.sideAt ?? 'right' }])
+      .map((e) => [e.block.id, { block: e.side!, at: e.sideAt ?? 'right', quer: Boolean(e.quer) }])
   )
   void ws
   // Schlussseiten: Hilfekarten und Bildnachweise stehen nicht zwischen den Aufgaben.
@@ -344,70 +378,73 @@ export function SheetPages({
   // Seitenzahl einer Schlussseite; bis Paket 11 trugen alle Schlussseiten dieselbe Nummer
   const nr = (art: ZusatzSeite): number => pages.length + zusatz.indexOf(art) + 1
   const zeige = (seite: number): boolean => nurSeite === undefined || nurSeite === seite - 1
+  const querCtx = pages.some((p) => p.quer) ? querKontext(ws, context) : context
   return (
     <WsContext.Provider value={context}>
       {pages.map(
         (page, i) =>
           zeige(i + 1) && (
-            <PageFrame key={i} info={info} page={i + 1} pages={total}>
-              {/*
+            <PageFrame key={i} info={info} page={i + 1} pages={total} quer={page.quer} rand={seitenWerkzeug?.(i, page)}>
+              <WsContext.Provider value={page.quer ? querCtx : context}>
+                {/*
             Frei platzierte Bausteine liegen ÜBER dem Fluss, auf ihrer eigenen Seite.
             Zuerst gezeichnet, damit der fließende Inhalt sie bei gleicher Lage überdeckt –
             ein versehentlich abgelegter Baustein verdeckt so nicht die Aufgabenstellung.
             Gibt es die gemerkte Seite nicht mehr, rutscht er auf die letzte.
           */}
-              {freie
-                .filter((b) => Math.min(b.free!.page, pages.length) === i + 1)
-                .map((b) => {
-                  const inhalt = <BlockView block={b} />
-                  const box = (
-                    <div
-                      className="ws-free"
-                      style={{
-                        left: `${b.free!.x}%`,
-                        top: `${b.free!.y}%`,
-                        width: `${b.free!.width}%`
-                      }}
-                      data-free-block={b.id}
-                    >
-                      {wrapBlock ? wrapBlock(b, { id: b.id }, inhalt) : inhalt}
-                    </div>
-                  )
-                  return <div key={`frei-${b.id}`}>{box}</div>
-                })}
-              {page.items.map((placed) => {
-                const block = byId.get(placed.id)
-                if (!block) return null
-                const side = placed.continued ? undefined : sides.get(placed.id)
-                const content = (
-                  <>
-                    {side && (
-                      <div className={`ws-side-image ${side.at === 'left' ? 'ws-side-left' : ''}`}>
-                        {/*
+                {freie
+                  .filter((b) => Math.min(b.free!.page, pages.length) === i + 1)
+                  .map((b) => {
+                    const inhalt = <BlockView block={b} />
+                    const box = (
+                      <div
+                        className="ws-free"
+                        style={{
+                          left: `${b.free!.x}%`,
+                          top: `${b.free!.y}%`,
+                          width: `${b.free!.width}%`
+                        }}
+                        data-free-block={b.id}
+                      >
+                        {wrapBlock ? wrapBlock(b, { id: b.id }, inhalt) : inhalt}
+                      </div>
+                    )
+                    return <div key={`frei-${b.id}`}>{box}</div>
+                  })}
+                {page.items.map((placed) => {
+                  const block = byId.get(placed.id)
+                  if (!block) return null
+                  const side = placed.continued ? undefined : sides.get(placed.id)
+                  const content = (
+                    <>
+                      {side && (
+                        <div className={`ws-side-image ${side.at === 'left' ? 'ws-side-left' : ''}${side.quer ? ' ws-side-quer' : ''}`}>
+                          {/*
                       Auch der seitlich stehende Baustein braucht seinen eigenen Griff – sonst
                       ließe sich ausgerechnet das Bild bzw. die Tabelle neben der Aufgabe als
                       Einziges nicht anfassen.
                     */}
-                        {wrapBlock ? wrapBlock(side.block, { id: side.block.id }, <BlockView block={side.block} />) : <BlockView block={side.block} />}
-                      </div>
-                    )}
-                    <BlockView block={block} placed={placed} />
-                  </>
-                )
-                // `data-fluss`: Stücke im Satz – Ziel beim Verschieben im Fluss (BausteinRahmen `imFluss`)
-                return wrapBlock ? (
-                  <div key={`${placed.id}-${placed.from ?? 0}`} data-fluss={placed.id} data-fortsetzung={placed.continued ? '' : undefined}>
-                    {wrapBlock(block, placed, content)}
-                  </div>
-                ) : (
-                  // Auch im Druck mit Kennung: der Onlinetest schneidet daraus das Material aus (onlinetest/kernBlatt.ts, 05.10.2026)
-                  <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow" data-fluss={placed.id}>
-                    {content}
-                  </div>
-                )
-              })}
-              {/* Fußnoten dieser Seite (Blattoptionen „Fußnoten", 01.10.2026) – nur die Anmerkungen der Wörter auf ihr */}
-              {context.anmerkungsArt === 'fussnoten' && <SeitenFussnoten gruppen={fussnotenDerSeite(page, byId)} />}
+                          {wrapBlock ? wrapBlock(side.block, { id: side.block.id }, <BlockView block={side.block} />) : <BlockView block={side.block} />}
+                        </div>
+                      )}
+                      <BlockView block={block} placed={placed} />
+                    </>
+                  )
+                  // `data-fluss`: Stücke im Satz – Ziel beim Verschieben im Fluss (BausteinRahmen `imFluss`)
+                  return wrapBlock ? (
+                    <div key={`${placed.id}-${placed.from ?? 0}`} data-fluss={placed.id} data-fortsetzung={placed.continued ? '' : undefined}>
+                      {wrapBlock(block, placed, content)}
+                    </div>
+                  ) : (
+                    // Auch im Druck mit Kennung: der Onlinetest schneidet daraus das Material aus (onlinetest/kernBlatt.ts, 05.10.2026)
+                    <div key={`${placed.id}-${placed.from ?? 0}`} className="ws-flow" data-fluss={placed.id}>
+                      {content}
+                    </div>
+                  )
+                })}
+                {/* Fußnoten dieser Seite (Blattoptionen „Fußnoten", 01.10.2026) – nur die Anmerkungen der Wörter auf ihr */}
+                {context.anmerkungsArt === 'fussnoten' && <SeitenFussnoten gruppen={fussnotenDerSeite(page, byId)} />}
+              </WsContext.Provider>
             </PageFrame>
           )
       )}
@@ -720,8 +757,7 @@ function linienAuffuellen(
   plaene: PagePlan[],
   items: MeasuredItem[],
   sheet: Sheet,
-  ersteHoehe: number,
-  weitereHoehe: number,
+  hoehe: (seite: number, quer: boolean) => number,
   abzug: readonly number[] = [],
   LINIEN_HOEHE = linienHoehePx(undefined)
 ): PagePlan[] {
@@ -768,7 +804,7 @@ function linienAuffuellen(
       return m?.noteUnits ? summe + notenHoehe(m, it.from ?? 0, it.to ?? m.noteUnits.length) : summe
     }, 0)
     const linie = noten > 0 ? Math.max(0, ...plan.items.map((it) => hoehen.get(it.id)?.noteRule ?? 0)) : 0
-    const rest = (seite === 0 ? ersteHoehe : weitereHoehe) - (abzug[seite] ?? 0) - genutzt - noten - linie
+    const rest = hoehe(seite, Boolean(plan.quer)) - (abzug[seite] ?? 0) - genutzt - noten - linie
     // Ein Drittel Zeilenhöhe Reserve gegen Rundung – lieber eine Linie weniger als Überlauf
     const zusaetzlich = Math.floor((rest - LINIEN_HOEHE / 3) / LINIEN_HOEHE)
     if (zusaetzlich < 1) return plan
@@ -971,7 +1007,7 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
       }
       if (geaendert) setTick((t) => t + 1)
     })
-    root.querySelectorAll('[data-measure-block]').forEach((el) => bausteine.observe(el))
+    root.querySelectorAll('[data-measure-block], [data-measure-quer]').forEach((el) => bausteine.observe(el))
     let aktiv = true
     document.fonts?.ready.then(() => aktiv && setTick((t) => t + 1)).catch(() => undefined)
     return () => {
@@ -991,7 +1027,10 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
     for (const { sheet, key } of variants) {
       const el = root.querySelector<HTMLElement>(`[data-layout="${layoutKey(sheet.id, key)}"]`)
       if (!el) continue
-      const bodies = el.querySelectorAll<HTMLElement>('.ws-page .ws-body')
+      const bodies = el.querySelectorAll<HTMLElement>('.ws-page:not(.ws-page-quer) .ws-body')
+      // Querseiten (06.10.2026): eigene Höhen, Bausteine in der Querseite gemessen
+      const querBodies = el.querySelectorAll<HTMLElement>('.ws-page-quer .ws-body')
+      const querIds = querBausteine(sheet.blocks)
       /*
        * Puffer am Seitenende (05.10.2026, Befund der Lehrkraft: „Als PDF gespeichert, sind gelegentlich die
        * untersten Zeilen vom Fußbereich abgeschnitten"). Gemessen wird hier mit dem Schriftsatz des
@@ -1058,8 +1097,9 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
           return hier + (k === unitEls.length - 1 ? summe(je.rest) : 0)
         })
       }
-      el.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((wrap) => {
-        const id = wrap.dataset.measureBlock!
+      el.querySelectorAll<HTMLElement>('[data-measure-block]').forEach((hochWrap) => {
+        const id = hochWrap.dataset.measureBlock!
+        const wrap = (querIds.has(id) && el.querySelector<HTMLElement>(`[data-measure-quer="${CSS.escape(id)}"]`)) || hochWrap
         const rahmen = wrap.getBoundingClientRect()
         const height = rahmen.height
         const block = sheet.blocks.find((b) => b.id === id)
@@ -1179,14 +1219,15 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
           })
         }
       })
+      for (const it of items) if (querIds.has(it.id)) it.quer = true
+      const querHoehen = querBodies.length >= 2 ? { erste: available(querBodies[0]), weitere: available(querBodies[1]) } : undefined
       const k = layoutKey(sheet.id, key)
       const abzugHier = abzug.get(k) ?? []
       const plaene = linienAuffuellen(
-        paginate(items, firstHeight, otherHeight, abzugHier),
+        paginate(items, firstHeight, otherHeight, abzugHier, querHoehen),
         items,
         sheet,
-        firstHeight,
-        otherHeight,
+        (seite, quer) => (quer && querHoehen ? (seite === 0 ? querHoehen.erste : querHoehen.weitere) : seite === 0 ? firstHeight : otherHeight),
         abzugHier,
         linienHoehePx(ws.meta)
       )
@@ -1230,6 +1271,8 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layouts])
 
+  // Querbausteine je Blatt – einmal gerechnet (die Prüfung nach Maßen sieht sich die Bilder an)
+  const querJe = new Map((ws?.sheets ?? []).map((sh) => [sh.id, querBausteine(sh.blocks)]))
   const measure =
     ws && variants.length ? (
       <div className="ws-measure" ref={ref} onLoadCapture={() => setTick((t) => t + 1)} aria-hidden>
@@ -1256,10 +1299,10 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
                       ausdrückliche Wahl – bei Übungsklausuren in Fremdsprachen stand das Hilfsblatt
                       dann in der Messung, auf dem Blatt aber auf einer eigenen Seite.
                     */}
-                    {blockLayout(sheet.blocks, phraseSheetModus(ws.meta) === 'blatt').map(({ block, side, sideAt }) => (
+                    {blockLayout(sheet.blocks, phraseSheetModus(ws.meta) === 'blatt').map(({ block, side, sideAt, quer }) => (
                       <div key={block.id} data-measure-block={block.id} style={{ display: 'flow-root' }}>
                         {side && (
-                          <div className={`ws-side-image ${sideAt === 'left' ? 'ws-side-left' : ''}`}>
+                          <div className={`ws-side-image ${sideAt === 'left' ? 'ws-side-left' : ''}${quer ? ' ws-side-quer' : ''}`}>
                             <BlockView block={side} />
                           </div>
                         )}
@@ -1279,6 +1322,28 @@ export function useSheetLayouts(ws: Worksheet | null, logo: string | null, schoo
                   </div>
                 </PageFrame>
               </WsContext.Provider>
+              {/* Querseiten (06.10.2026): ihre Bausteine in der Breite der Querseite messen */}
+              {querJe.get(sheet.id)?.size ? (
+                <WsContext.Provider value={querKontext(ws, ctx)}>
+                  <PageFrame info={info} page={1} pages={2} quer />
+                  <PageFrame info={info} page={2} pages={2} quer>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
+                      {blockLayout(sheet.blocks, phraseSheetModus(ws.meta) === 'blatt')
+                        .filter(({ block }) => querJe.get(sheet.id)!.has(block.id))
+                        .map(({ block, side, sideAt, quer }) => (
+                          <div key={block.id} data-measure-quer={block.id} style={{ display: 'flow-root' }}>
+                            {side && (
+                              <div className={`ws-side-image ${sideAt === 'left' ? 'ws-side-left' : ''}${quer ? ' ws-side-quer' : ''}`}>
+                                <BlockView block={side} />
+                              </div>
+                            )}
+                            <BlockView block={block} />
+                          </div>
+                        ))}
+                    </div>
+                  </PageFrame>
+                </WsContext.Provider>
+              ) : null}
               {/* Die berechneten Seiten, wirklich gesetzt – Grundlage der Prüfung nach dem Setzen */}
               {layouts.get(layoutKey(sheet.id, key)) && (
                 <div data-pruefung={layoutKey(sheet.id, key)}>

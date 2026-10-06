@@ -68,6 +68,17 @@ export interface MeasuredItem {
    * blaettert er staendig.
    */
   pageBreakBefore?: boolean
+  /**
+   * Steht im QUERFORMAT (06.10.2026, Wunsch der Lehrkraft: einzelne Seiten quer). Wechselt das Format, beginnt eine
+   * neue Seite; die Höhen des Bausteins sind dann in der Querseite gemessen.
+   */
+  quer?: boolean
+}
+
+/** Nutzbare Höhe der ersten und der weiteren Seiten eines Formats */
+export interface Seitenhoehen {
+  erste: number
+  weitere: number
 }
 
 export interface PlacedItem {
@@ -115,6 +126,8 @@ export interface PagePlan {
   items: PlacedItem[]
   /** Ein Baustein ist größer als die Seite */
   overflow: boolean
+  /** Seite im Querformat (06.10.2026) */
+  quer?: boolean
 }
 
 const EPS = 0.5
@@ -137,17 +150,31 @@ const KEEP_TOGETHER_MAX_GAP = 0.5
  * Satzspiegel lief – beim nächsten Durchgang wandert dann das Überstehende auf die Folgeseite,
  * statt abgeschnitten zu werden (30.09.2026).
  */
-export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPageHeight: number, abzug: readonly number[] = []): PagePlan[] {
-  const pages: PagePlan[] = [{ items: [], overflow: false }]
-  let remaining = firstPageHeight - (abzug[0] ?? 0)
+export function paginate(
+  items: MeasuredItem[],
+  firstPageHeight: number,
+  otherPageHeight: number,
+  abzug: readonly number[] = [],
+  /** Höhen der Querseiten – ohne sie bleibt alles hoch */
+  querHoehen?: Seitenhoehen
+): PagePlan[] {
+  const istQuer = (it: MeasuredItem | undefined): boolean => Boolean(querHoehen && it?.quer)
+  /** Platz einer Seite (0-basiert) im jeweiligen Format */
+  const hoehe = (index: number, quer: boolean): number =>
+    quer && querHoehen ? (index === 0 ? querHoehen.erste : querHoehen.weitere) : index === 0 ? firstPageHeight : otherPageHeight
+  let querJetzt = istQuer(items[0])
+  const pages: PagePlan[] = [{ items: [], overflow: false, ...(querJetzt ? { quer: true } : {}) }]
+  let remaining = hoehe(0, querJetzt) - (abzug[0] ?? 0)
   /** Steht auf der laufenden Seite schon eine Fußnote? Dann ist ihre Linie schon bezahlt */
   let notenAufSeite = false
   const page = (): PagePlan => pages[pages.length - 1]
   const newPage = (): void => {
-    pages.push({ items: [], overflow: false })
-    remaining = otherPageHeight - (abzug[pages.length - 1] ?? 0)
+    pages.push({ items: [], overflow: false, ...(querJetzt ? { quer: true } : {}) })
+    remaining = hoehe(pages.length - 1, querJetzt) - (abzug[pages.length - 1] ?? 0)
     notenAufSeite = false
   }
+  // Höhe der weiteren Seiten im laufenden Format
+  const weitere = (): number => hoehe(1, querJetzt)
   /** Platz für die Fußnoten der Einheiten [von, bis) auf der laufenden Seite – samt Linie, wenn sie die ersten sind */
   const noten = (it: MeasuredItem, von: number, bis: number): number => {
     const h = notenHoehe(it, von, bis)
@@ -172,6 +199,16 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
 
   items.forEach((item, index) => {
     const next = items[index + 1]
+    // Formatwechsel: neue Seite im neuen Format (bzw. die leere laufende Seite wechselt ihr Format)
+    if (istQuer(item) !== querJetzt) {
+      querJetzt = istQuer(item)
+      if (page().items.length > 0) newPage()
+      else {
+        if (querJetzt) page().quer = true
+        else delete page().quer
+        remaining = hoehe(pages.length - 1, querJetzt) - (abzug[pages.length - 1] ?? 0)
+      }
+    }
     // Erzwungener Umbruch: Das Stueck beginnt oben auf einer neuen Seite
     if (item.pageBreakBefore && page().items.length > 0) newPage()
 
@@ -200,12 +237,12 @@ export function paginate(items: MeasuredItem[], firstPageHeight: number, otherPa
 
     // Zusammengehöriges Material passt auf eine neue Seite und würde erst in der unteren Seitenhälfte beginnen → nicht teilen
     // Maßgeblich ist der Platz der NÄCHSTEN Seite – mit ihrem Abzug aus der Prüfung
-    const naechste = otherPageHeight - (abzug[pages.length] ?? 0)
+    const naechste = weitere() - (abzug[pages.length] ?? 0)
     if (
       item.keepTogether &&
       page().items.length > 0 &&
       item.height + notenHoehe(item, 0, item.noteUnits?.length ?? 0) + (item.noteRule ?? 0) <= naechste + EPS &&
-      remaining < otherPageHeight * KEEP_TOGETHER_MAX_GAP
+      remaining < weitere() * KEEP_TOGETHER_MAX_GAP
     ) {
       newPage()
       const h = gesamt(item)
@@ -313,8 +350,15 @@ export function notenHoehe(it: Pick<MeasuredItem, 'noteUnits'>, von: number, bis
  * Dazu wird die nutzbare Seitenhöhe so weit verkleinert, wie es die Zielseitenzahl zulässt.
  * Liefert null, wenn der Inhalt schon bei voller Seitenhöhe mehr Seiten braucht.
  */
-export function paginateSpread(items: MeasuredItem[], firstPageHeight: number, otherPageHeight: number, targetPages: number): PagePlan[] | null {
-  const full = paginate(items, firstPageHeight, otherPageHeight)
+export function paginateSpread(
+  items: MeasuredItem[],
+  firstPageHeight: number,
+  otherPageHeight: number,
+  targetPages: number,
+  querHoehen?: Seitenhoehen
+): PagePlan[] | null {
+  const quer = (k: number): Seitenhoehen | undefined => (querHoehen ? { erste: querHoehen.erste * k, weitere: querHoehen.weitere * k } : undefined)
+  const full = paginate(items, firstPageHeight, otherPageHeight, [], querHoehen)
   if (full.length > targetPages) return null
   if (full.length === targetPages || items.length <= 1) return full
   // Kleinsten Füllgrad suchen, bei dem der Inhalt noch auf targetPages Seiten passt → gleichmäßig verteilt
@@ -323,7 +367,7 @@ export function paginateSpread(items: MeasuredItem[], firstPageHeight: number, o
   let best = full
   for (let i = 0; i < 24; i++) {
     const mid = (low + high) / 2
-    const plan = paginate(items, firstPageHeight * mid, otherPageHeight * mid)
+    const plan = paginate(items, firstPageHeight * mid, otherPageHeight * mid, [], quer(mid))
     const overflow = plan.some((p) => p.overflow)
     if (plan.length <= targetPages && !overflow) {
       best = plan

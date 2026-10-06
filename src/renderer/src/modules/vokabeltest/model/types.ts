@@ -88,6 +88,10 @@ export type TaskTypeId =
 
 interface BlockBase {
   id: string
+  /** Seitenformat ab dieser Aufgabe (06.10.2026, wie beim Arbeitsblatt – arbeitsblatt/model/seitenformat.ts) */
+  seitenFormat?: 'hoch' | 'quer'
+  /** Von der Lehrkraft gewählt */
+  seitenFormatFest?: boolean
   taskType: TaskTypeId
   title: string
   instruction: string
