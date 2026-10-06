@@ -256,7 +256,15 @@ function zeitleiste(spec: DiagramSpec, widthMm: number, raster = true, extraTop 
   // Grundlinien: je Strang eine, sonst eine unten (mit Stufen darüber)
   const lanes = straenge.length ? straenge.length : 1
   const laneH = availH / lanes
-  const baseline = (i: number): number => (straenge.length ? padTop + (i + 1) * laneH - 9 : padTop + availH - (stufen.length ? 4 : Math.max(4, availH / 2 - 8)))
+  /*
+   * Auf den Gitternetzlinien (06.10.2026, Befund der Lehrkraft: nach dem Ändern von Höhe oder Abstand lag eine
+   * Leiste auf einer Linie, die andere dazwischen). Das Raster beginnt bei 0,5 mm und hat 5 mm Kästchen – jede
+   * Grundlinie rastet auf die nächste Gitterlinie ein, Stufen darüber in ganzen Kästchen.
+   */
+  const amRaster = (y: number): number => 0.5 + Math.round((y - 0.5) / 5) * 5
+  const baseline = (i: number): number =>
+    amRaster(straenge.length ? padTop + (i + 1) * laneH - 9 : padTop + availH - (stufen.length ? 4 : Math.max(4, availH / 2 - 8)))
+  const kaestchen = (h: number): number => Math.max(5, Math.floor(h / 5) * 5)
   const xVon = (wert: number, seg: number): number => {
     const i = infos[seg]
     return segLeft[seg] + ((wert - i.a) / Math.max(1e-9, i.b - i.a)) * breiten[seg]
@@ -306,7 +314,7 @@ function zeitleiste(spec: DiagramSpec, widthMm: number, raster = true, extraTop 
   // Stufen der y-Achse (Eskalation): gestrichelte Linien über der Grundlinie, Achse mit Pfeil
   if (stufen.length || t.yLabel) {
     const by = baseline(0)
-    const bandH = stufen.length ? Math.min(12, (by - padTop - 2) / stufen.length) : 0
+    const bandH = stufen.length ? kaestchen(Math.min(12, (by - padTop - 2) / stufen.length)) : 0
     parts.push(line(padLeft, by, padLeft, padTop - 1, AXIS, 0.4), `<path d="M ${round(padLeft)} ${round(padTop - 1)} l -1.1 1.8 h 2.2 z" fill="${AXIS}"/>`)
     stufen.forEach((s, i) => {
       const cy = by - (i + 1) * bandH
@@ -321,7 +329,7 @@ function zeitleiste(spec: DiagramSpec, widthMm: number, raster = true, extraTop 
   // Vorgegebene Ereignisse
   const stufenY = (level: number | undefined, by: number): number => {
     if (level === undefined || !stufen.length) return by
-    const bandH = Math.min(12, (by - padTop - 2) / stufen.length)
+    const bandH = kaestchen(Math.min(12, (by - padTop - 2) / stufen.length))
     return by - (level + 1) * bandH
   }
   /*
