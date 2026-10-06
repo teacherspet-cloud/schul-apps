@@ -28,7 +28,7 @@ import { entschluessle, hauptschluessel, verschluessle } from './geheim'
 export const SENSIBEL: Record<string, string[]> = {
   nutzer: ['name', 'gruppen', 'benutzer_v', 'iserv_sub'],
   lerngruppen: ['mitglieder'],
-  teilnahmen: ['antworten', 'bewertung'],
+  teilnahmen: ['antworten', 'bewertung', 'vorfaelle'],
   onlinetest_tinte: ['png', 'text'],
   feedback_freigaben: ['schueler'],
   feedback_abgaben: ['fassungen'],

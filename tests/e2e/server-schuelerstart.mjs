@@ -172,6 +172,8 @@ try {
   await felder.nth(1).fill('not only')
   await felder.nth(2).fill('but')
   await p.screenshot({ path: join(out, '2-test.png') })
+  // Rückfrage bestätigen (bis 06.10.2026 gab das Wegnavigieren ab – heute wird es nur protokolliert)
+  p.once('dialog', (dlg) => void dlg.accept())
   await p
     .getByRole('button', { name: /Abgeben/ })
     .first()

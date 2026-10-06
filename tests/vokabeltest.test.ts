@@ -87,10 +87,16 @@ describe('Verteilung auf Varianten', () => {
     expect(b.filter((id) => !a.has(id)).length).toBeGreaterThanOrEqual(4)
   })
 
-  it('nutzt bei „gleiche Vokabeln" dieselbe Auswahl in allen Varianten', () => {
+  it('nutzt bei „gleiche Vokabeln" dieselben Wörter – aber in anderen Aufgaben (06.10.2026)', () => {
     const plans = planVariants(vocab, settings())
-    const ids = (i: number) => plans[i].assignments.map((a) => a.vocab.map((v) => v.id).sort())
-    expect(ids(1)).toEqual(ids(0))
+    const alle = (i: number) => plans[i].assignments.flatMap((a) => a.vocab.map((v) => v.id)).sort()
+    expect(alle(1)).toEqual(alle(0))
+    // Aufgabe je Wort in A und B: die meisten Wörter wechseln die Aufgabe
+    const aufgabe = (i: number) => new Map(plans[i].assignments.flatMap((a, k) => a.vocab.map((v) => [v.id, k] as const)))
+    const a = aufgabe(0)
+    const b = aufgabe(1)
+    const gewechselt = [...b].filter(([id, k]) => a.get(id) !== k).length
+    if (plans[0].assignments.filter((x) => x.vocab.length).length > 1) expect(gewechselt).toBeGreaterThan(b.size / 2)
   })
 
   it('ist mit gleichem Seed reproduzierbar', () => {

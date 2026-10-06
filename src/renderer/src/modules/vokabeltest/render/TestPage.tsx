@@ -1,7 +1,7 @@
 import type { PagePlan } from '../../../shared/render/paginate'
 import { teileVon } from '@shared/luecken'
 import { kiVermerkText, vermerkSichtbar } from '@shared/kiKennzeichnung'
-import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor } from '../model/blocks'
+import { blockPoints, firstLetterOf, formatPoints, letter, variantPoints, wordBankFor, anweisungFuer } from '../model/blocks'
 import type { Block, TestDocument, Variant } from '../model/types'
 import { blockHelp, errechneteHilfe } from './helpTexts'
 import { isEditable, showsAnswers, T, useRender } from './RenderContext'
@@ -184,7 +184,8 @@ export function TestHeader({ doc, variant }: { doc: TestDocument; variant: Varia
         <div className="vt-score">
           {h.showPoints && (
             <span>
-              {k.punkte} {key ? '' : <span className="vt-score-blank">{abgabe ? formatPoints(abgabe.punkte) : null}</span>} / {formatPoints(abgabe?.max ?? total)}
+              {k.punkte} {key ? '' : <span className="vt-score-blank">{abgabe ? formatPoints(abgabe.punkte) : null}</span>} /{' '}
+              {formatPoints(abgabe?.max ?? total)}
             </span>
           )}
           {h.showGrade && !key && (
@@ -234,7 +235,7 @@ export function BlockView({ block, number, lang = 'en', range }: { block: Block;
             )}
           </div>
           {(block.instruction || isEditable(mode)) && (
-            <T className="vt-instruction" value={block.instruction} onChange={set('instruction')} block placeholder="Arbeitsanweisung" />
+            <T className="vt-instruction" value={anweisungFuer(block)} onChange={set('instruction')} block placeholder="Arbeitsanweisung" />
           )}
           {/*
            * Hinweiszeile (ⓘ) – seit 30.09.2026 im Editor bearbeitbar wie die Arbeitsanweisung.
@@ -589,33 +590,35 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
       return (
         <table className="vt-match">
           <tbody>
-            {Array.from({ length: Math.max(block.left.length, block.right.length) }, (_, row) => row).slice(range?.from ?? 0, range?.to).map((row) => {
-              const l = block.left[row]
-              const r = block.right[row]
-              const answerIndex = l ? block.right.findIndex((x) => x.id === l.answerId) : -1
-              return (
-                <tr key={row} data-unit>
-                  <td className="vt-match-box">{l && <span className="vt-box">{answers ? letter(answerIndex) : ''}</span>}</td>
-                  <td className="vt-match-left">
-                    {l && (
-                      <>
-                        <span className="vt-match-num">{row + 1}</span>
-                        <T value={l.text} onChange={set((d, v) => ((d as typeof block).left[row].text = v))} />
-                        <ItemControls blockId={block.id} itemId={l.id} canRegenerate={false} />
-                      </>
-                    )}
-                  </td>
-                  <td className="vt-match-right">
-                    {r && (
-                      <>
-                        <span className="vt-match-letter">{letter(row)})</span>
-                        <T value={r.text} onChange={set((d, v) => ((d as typeof block).right[row].text = v))} />
-                      </>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
+            {Array.from({ length: Math.max(block.left.length, block.right.length) }, (_, row) => row)
+              .slice(range?.from ?? 0, range?.to)
+              .map((row) => {
+                const l = block.left[row]
+                const r = block.right[row]
+                const answerIndex = l ? block.right.findIndex((x) => x.id === l.answerId) : -1
+                return (
+                  <tr key={row} data-unit>
+                    <td className="vt-match-box">{l && <span className="vt-box">{answers ? letter(answerIndex) : ''}</span>}</td>
+                    <td className="vt-match-left">
+                      {l && (
+                        <>
+                          <span className="vt-match-num">{row + 1}</span>
+                          <T value={l.text} onChange={set((d, v) => ((d as typeof block).left[row].text = v))} />
+                          <ItemControls blockId={block.id} itemId={l.id} canRegenerate={false} />
+                        </>
+                      )}
+                    </td>
+                    <td className="vt-match-right">
+                      {r && (
+                        <>
+                          <span className="vt-match-letter">{letter(row)})</span>
+                          <T value={r.text} onChange={set((d, v) => ((d as typeof block).right[row].text = v))} />
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
           </tbody>
         </table>
       )
@@ -760,7 +763,9 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
                       </td>
                     ) : (
                       <td key={c} className="vt-verb-blank">
-                        {answers && <T className="vt-key-text" value={r.solution[c] ?? ''} onChange={set((d, v) => ((d as typeof block).rows[idx].solution[c] = v))} />}
+                        {answers && (
+                          <T className="vt-key-text" value={r.solution[c] ?? ''} onChange={set((d, v) => ((d as typeof block).rows[idx].solution[c] = v))} />
+                        )}
                       </td>
                     )
                   )}
@@ -864,7 +869,6 @@ function BlockBody({ block, range }: { block: Block; range?: BlockRange }): Reac
     case 'mindmap':
       // Echte Mindmap (02.10.2026): Thema in der Mitte, Äste mit Oberbegriffen oder offen – render/MindmapBild.tsx
       return <MindmapBild block={block} />
-
 
     case 'picture':
       return (

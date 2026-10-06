@@ -218,11 +218,51 @@ export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
     falsch.forEach((p) => fehlerWoerter.current.add(p.id))
     if (!falsch.length) setTimeout(() => ende(sek, [...fehlerWoerter.current]), 600)
   }
+  /*
+   * Schreibrichtung (06.10.2026, Befund der Lehrkraft: Beim senkrechten Wort sprang der Cursor an einer Kreuzung ins
+   * waagerechte Wort): Die Richtung des angefangenen Worts bleibt, bis ein anderes Feld angetippt wird; ein zweites
+   * Antippen derselben Kreuzung wechselt sie. Rücktaste löscht und geht zurück – mehrere Buchstaben nacheinander.
+   */
+  const richtung = useRef<'across' | 'down'>('across')
+  const zuletzt = useRef<string | null>(null)
+  const da = (z: number, s: number): boolean => zellen.has(`${z}-${s}`)
+  const waagerecht = (z: number, s: number): boolean => da(z, s - 1) || da(z, s + 1)
+  const senkrecht = (z: number, s: number): boolean => da(z - 1, s) || da(z + 1, s)
+  const feld = (z: number, s: number): HTMLInputElement | null => document.querySelector<HTMLInputElement>(`[data-kreuz="${z}-${s}"]`)
+  const schritt = (z: number, s: number, d: 1 | -1): [number, number] => (richtung.current === 'across' ? [z, s + d] : [z + d, s])
+  const angetippt = (z: number, s: number): void => {
+    const key = `${z}-${s}`
+    const beide = waagerecht(z, s) && senkrecht(z, s)
+    if (beide && zuletzt.current === key) richtung.current = richtung.current === 'across' ? 'down' : 'across'
+    else if (!beide) richtung.current = waagerecht(z, s) ? 'across' : 'down'
+    zuletzt.current = key
+  }
   const fokus = (z: number, s: number): void => {
-    // Nach einem Buchstaben ins nächste Feld (rechts, sonst unten)
-    const naechste =
-      document.querySelector<HTMLInputElement>(`[data-kreuz="${z}-${s + 1}"]`) ?? document.querySelector<HTMLInputElement>(`[data-kreuz="${z + 1}-${s}"]`)
-    naechste?.focus()
+    // Nach einem Buchstaben ins nächste Feld DESSELBEN Worts; am Wortende bleibt der Cursor stehen
+    const [nz, ns] = schritt(z, s, 1)
+    if (da(nz, ns)) {
+      zuletzt.current = `${nz}-${ns}`
+      feld(nz, ns)?.focus()
+    }
+  }
+  const taste = (e: React.KeyboardEvent<HTMLInputElement>, z: number, s: number): void => {
+    const key = `${z}-${s}`
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault()
+      setGeprueft(false)
+      if (eingabe[key]) return setEingabe((x) => ({ ...x, [key]: '' }))
+      // Leeres Feld: zurück und dort löschen
+      const [vz, vs] = schritt(z, s, -1)
+      if (!da(vz, vs)) return
+      setEingabe((x) => ({ ...x, [`${vz}-${vs}`]: '' }))
+      zuletzt.current = `${vz}-${vs}`
+      feld(vz, vs)?.focus()
+    } else if (e.key === ' ') {
+      e.preventDefault()
+      setGeprueft(false)
+      setEingabe((x) => ({ ...x, [key]: '' }))
+      fokus(z, s)
+    }
   }
   if (!raetsel.placed.length) return <Text c="dimmed">Für ein Kreuzworträtsel braucht es mehr Wörter.</Text>
   const zelle = 30
@@ -256,6 +296,8 @@ export function Kreuzwort({ woerter, ende }: SpielProps): React.JSX.Element {
                     setEingabe({ ...eingabe, [`${z}-${s}`]: e.currentTarget.value.slice(-1) })
                     if (e.currentTarget.value) fokus(z, s)
                   }}
+                  onPointerDown={() => angetippt(z, s)}
+                  onKeyDown={(e) => taste(e, z, s)}
                   autoCapitalize="characters"
                   autoCorrect="off"
                   spellCheck={false}

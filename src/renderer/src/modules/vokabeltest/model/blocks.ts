@@ -53,6 +53,35 @@ export function formatPoints(p: number): string {
   return Number.isInteger(p) ? String(p) : p.toFixed(1).replace('.', ',')
 }
 
+/**
+ * Arbeitsanweisung passend zum Blatt (06.10.2026, Befund der Lehrkraft: „with words and phrases from the box", obwohl
+ * kein Kasten auf dem Blatt steht). Die Anweisung stammt oft von der KI oder einer Vorlage mit Kasten; ob er gedruckt
+ * wird, entscheidet `wordBank` (Niveau, Einstellung der Lehrkraft). Ohne Kasten fällt der Verweis darauf weg –
+ * in allen Testsprachen.
+ */
+const KASTEN_VERWEISE: RegExp[] = [
+  /\s*\((?:see|use)\s+the\s+box\)/gi,
+  /\s+(?:from|in|using)\s+the\s+(?:word\s+)?box/gi,
+  /\s+(?:aus\s+dem|im|mit\s+dem)\s+(?:Wort)?kasten/gi,
+  /\s+(?:de|dans)\s+(?:l['’]encadré|la\s+boîte|la\s+liste)/gi,
+  /\s+(?:del|en\s+el)\s+(?:recuadro|cuadro)/gi,
+  /\s+(?:dal|nel)\s+riquadro/gi
+]
+export function hatWortkasten(block: Block): boolean {
+  if (!('wordBank' in block)) return true
+  return Boolean(block.wordBank) && wordBankFor(block).length > 0
+}
+export function anweisungFuer(block: Block): string {
+  const a = block.instruction ?? ''
+  if (!a || hatWortkasten(block)) return a
+  let s = a
+  for (const r of KASTEN_VERWEISE) s = s.replace(r, '')
+  return s
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .trim()
+}
+
 /** Alphabetisch sortierter Wortkasten (keine Reihenfolge-Hinweise auf die Lösung). */
 export function wordBankFor(block: Block): string[] {
   let words: string[] = []

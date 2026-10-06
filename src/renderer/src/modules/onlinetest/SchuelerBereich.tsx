@@ -22,6 +22,7 @@
  * ein; die Lehrkraft startet den Test für alle gemeinsam (bis dahin Wartebildschirm); nach der
  * Abgabe erscheint das Ergebnis, sobald alle abgegeben haben oder die Lehrkraft es freigibt.
  */
+import { useAufsicht, useZeitraum, vorfallSender } from './aufsicht'
 import { FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
 import { tuerKlick } from '../lernen/tuer'
 import { fachFarbeAus } from '../../shared/fachfarben'
@@ -86,7 +87,7 @@ import BlattAusfuellen from './BlattAusfuellen'
 import { ReihenListe, ReiheWeg } from './ReiheAnsicht'
 import LernRaum from '../lernen/LernRaum'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
-import { amPcGeraet, fensterLage, vollbild } from './fensterWaechter'
+import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
 import { holen, senden } from './serverApi'
 
@@ -1208,17 +1209,13 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
     if (phase === 'laeuft') laeuft.current = true
   }, [phase])
 
-  /** Endgültig abgeben – per sendBeacon, wenn die Seite gerade verlassen wird */
+  /** Endgültig abgeben (selbst oder Zeit um) – Verlassen der Seite gibt seit 06.10.2026 nicht mehr ab (aufsicht.ts) */
   const abgeben = useCallback(
-    async (warum: 'selbst' | 'zeit' | 'verlassen'): Promise<void> => {
+    async (warum: 'selbst' | 'zeit'): Promise<void> => {
       if (!t?.geheim || !laeuft.current) return
       laeuft.current = false
       const koerper = JSON.stringify({ id: t.id, geheim: t.geheim, antworten: stand.current, grund: warum })
-      if (warum === 'verlassen' && navigator.sendBeacon) {
-        navigator.sendBeacon('/s/api/verlassen', new Blob([koerper], { type: 'text/plain' }))
-      } else {
-        await fetch(warum === 'verlassen' ? '/s/api/verlassen' : '/s/api/abgeben', { method: 'POST', body: koerper, keepalive: true }).catch(() => undefined)
-      }
+      await fetch('/s/api/abgeben', { method: 'POST', body: koerper, keepalive: true }).catch(() => undefined)
       try {
         localStorage.removeItem(`onlinetest-${t.id}`)
       } catch {
@@ -1244,66 +1241,37 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   }, [phase, t, abgeben])
 
   /*
-   * Seite verlassen → sofort abgeben.
-   *  - Anderer Tab, andere App, Startbildschirm, Bildschirmsperre: die Seite wird unsichtbar.
-   *  - Anderes FENSTER daneben (Wörterbuch im zweiten Browserfenster, geteilte Ansicht am iPad):
-   *    Die Seite bleibt sichtbar, verliert aber den Fokus (Befund der Lehrkraft, 02.10.2026 – das
-   *    ging bis dahin durch). Darum ein Fokus-Wächter: länger als ~1,5 s ohne Fokus = verlassen.
-   *    Die kurze Frist fängt Kurzes ab, das kein Verlassen ist (Bestätigungsfrage beim Abgeben).
+   * Aufsicht (aufsicht.ts, 06.10.2026): Verlassen, Fokuswechsel, Fenster daneben, Vollbild aus, Übersetzen,
+   * Kopieren/Einfügen werden protokolliert – nichts davon gibt mehr ab (ausgeschaltetes iPad!).
    */
-  useEffect(() => {
-    if (phase !== 'laeuft') return
-    const weg = (): void => {
-      if (document.visibilityState === 'hidden') void abgeben('verlassen')
-    }
-    const raus = (): void => void abgeben('verlassen')
-    let ohneFokus = 0
-    /*
-     * Nur am PC (Maus, kein Touch – 03.10.2026): Am Handy meldet document.hasFocus() auch auf der
-     * aktiven Seite zeitweise „kein Fokus" (Befund der Lehrkraft: Abgabe kurz nach dem Start, obwohl
-     * die Seite offen war). Dort genügt das Verlassen über Tab- oder App-Wechsel (visibilitychange).
-     */
-    const amPc = amPcGeraet()
-    const fokus = setInterval(() => {
-      if (!amPc || document.hasFocus()) ohneFokus = 0
-      else if (++ohneFokus >= 3) void abgeben('verlassen')
-    }, 500)
-    document.addEventListener('visibilitychange', weg)
-    window.addEventListener('pagehide', raus)
-    return () => {
-      clearInterval(fokus)
-      document.removeEventListener('visibilitychange', weg)
-      window.removeEventListener('pagehide', raus)
-    }
-  }, [phase, abgeben])
+  const melden = useMemo(() => (t?.geheim ? vorfallSender(t.id, t.geheim) : null), [t])
+  const eigenerDialog = useRef(false)
+  useAufsicht(phase === 'laeuft', melden, eigenerDialog)
 
   /*
-   * Kein zweites Fenster daneben (fensterWaechter.ts, 03.10.2026): Vor dem Start gesperrt mit
-   * Warnung; im Test verdeckt eine Meldung den Test, und nach 10 s gilt es als Verlassen.
+   * Kein zweites Fenster daneben (fensterWaechter.ts, 03.10.2026): Vor dem Start mit Warnung. Im Test verdeckt eine
+   * Sperre den Test, solange etwas daneben Platz hat bzw. am PC das Vollbild fehlt (Pflicht seit 06.10.2026).
    */
   const [fenster, setFenster] = useState(fensterLage)
-  const [geteiltSeit, setGeteiltSeit] = useState<number | null>(null)
   useEffect(() => {
     const neu = (): void => setFenster(fensterLage())
     window.addEventListener('resize', neu)
     window.addEventListener('orientationchange', neu)
     document.addEventListener('fullscreenchange', neu)
+    document.addEventListener('webkitfullscreenchange', neu)
     const i = setInterval(neu, 1000)
     return () => {
       window.removeEventListener('resize', neu)
       window.removeEventListener('orientationchange', neu)
       document.removeEventListener('fullscreenchange', neu)
+      document.removeEventListener('webkitfullscreenchange', neu)
       clearInterval(i)
     }
   }, [])
-  useEffect(() => {
-    if (phase !== 'laeuft' || !fenster.geteilt) return setGeteiltSeit(null)
-    setGeteiltSeit((x) => x ?? Date.now())
-  }, [phase, fenster.geteilt])
-  const geteiltRest = geteiltSeit ? Math.max(0, 10 - Math.floor((Date.now() - geteiltSeit) / 1000)) : null
-  useEffect(() => {
-    if (phase === 'laeuft' && geteiltSeit && Date.now() - geteiltSeit >= 10_000) void abgeben('verlassen')
-  }, [phase, geteiltSeit, fenster, abgeben])
+  const ohneVollbild = fenster.amPc && !fenster.vollbild
+  const sperre = phase === 'laeuft' && (ohneVollbild || fenster.geteilt)
+  useZeitraum(phase === 'laeuft', fenster.amPc ? ohneVollbild || fenster.geteilt : false, 'vollbild', melden)
+  useZeitraum(phase === 'laeuft', fenster.amPc ? false : fenster.geteilt, 'geteilt', melden)
 
   // Zwischenstand: 2 s nach der letzten Eingabe an den Server
   useEffect(() => {
@@ -1343,10 +1311,13 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
       <Stack gap={4}>
         <Text size="sm">Bleib auf dieser Seite, bis du abgegeben hast.</Text>
         <Text size="sm" fw={700}>
-          Wenn du die Seite verlässt – anderer Tab, anderes Fenster, andere App, Startbildschirm –, wird dein Test sofort endgültig abgegeben.
+          Deine Lehrkraft sieht mit Uhrzeit und Dauer, wenn du die Seite verlässt (anderer Tab, andere App, Startbildschirm), ein anderes Fenster benutzt, die
+          Seite übersetzen lässt oder Text kopierst oder einfügst.
         </Text>
         <Text size="sm" fw={700}>
-          Neben dem Test darf kein anderes Fenster zu sehen sein (kein zweites Browserfenster, keine geteilte Ansicht am Tablet).
+          {fenster.amPc
+            ? 'Der Test läuft im Vollbild. Verlässt du das Vollbild, wird der Test verdeckt, bis du es wieder einschaltest.'
+            : 'Neben dem Test darf keine andere App zu sehen sein (keine geteilte Ansicht, kein Fenster darüber).'}
         </Text>
         <Text size="sm">Du hast {t.zeitMin} Minuten. Deine Eingaben werden laufend gesichert.</Text>
       </Stack>
@@ -1410,7 +1381,17 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
         )}
         {fensterWarnung}
         {regeln}
-        <Button size="lg" fullWidth disabled={fenster.geteilt} onClick={() => setPhase('laeuft')} data-test-beginnen>
+        <Button
+          size="lg"
+          fullWidth
+          disabled={!fenster.amPc && fenster.geteilt}
+          onClick={() => {
+            // Am PC startet der Test im Vollbild (Pflicht, 06.10.2026) – der Klick ist die nötige Nutzergeste
+            if (fenster.amPc) void vollbild()
+            setPhase('laeuft')
+          }}
+          data-test-beginnen
+        >
           Test beginnen
         </Button>
       </Card>
@@ -1419,8 +1400,10 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
   const minuten = Math.floor(rest / 60)
   const sekunden = rest % 60
   return (
-    <Stack gap="md" pb={120} translate="no">
-      {geteiltRest !== null && (
+    <Stack gap="md" pb={120} translate="no" data-onlinetest-blatt>
+      {/* Aufgabentext nicht markierbar (kein „Übersetzen"/„Nachschlagen" im Auswahlmenü) – Eingabefelder schon */}
+      <style>{`[data-onlinetest-blatt]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}[data-onlinetest-blatt] :is(input,textarea,[contenteditable="true"]){-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}`}</style>
+      {sperre && (
         <div
           style={{
             position: 'fixed',
@@ -1437,15 +1420,15 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
         >
           <Stack align="center" gap="sm" maw={460} ta="center">
             <IconAlertTriangle size={48} />
-            <Title order={2}>Bitte nur den Test zeigen</Title>
+            <Title order={2}>{fenster.amPc ? 'Bitte das Vollbild einschalten' : 'Bitte nur den Test zeigen'}</Title>
             <Text>
               {fenster.amPc
-                ? 'Das Testfenster ist verkleinert – daneben ist Platz für ein anderes Fenster.'
-                : 'Der Test teilt sich den Bildschirm mit einer anderen App.'}{' '}
-              Stelle das Vollbild wieder her, sonst wird dein Test in <b>{geteiltRest} s</b> automatisch abgegeben.
+                ? 'Der Test läuft nur im Vollbild weiter. Deine Antworten bleiben erhalten.'
+                : 'Der Test teilt sich den Bildschirm mit einer anderen App. Schließe die andere App, dann geht es weiter.'}{' '}
+              Deine Lehrkraft sieht, wie lange der Test verdeckt war.
             </Text>
             {fenster.amPc && (
-              <Button variant="white" color="red" onClick={() => void vollbild()}>
+              <Button variant="white" color="red" size="lg" onClick={() => void vollbild()} data-vollbild>
                 Vollbild einschalten
               </Button>
             )}
@@ -1495,7 +1478,17 @@ function TestAblauf({ code }: { code: string }): React.JSX.Element {
           )
         )}
       </Handschrift.Provider>
-      <Button size="lg" color="green" onClick={() => window.confirm('Test jetzt endgültig abgeben?') && void abgeben('selbst')}>
+      <Button
+        size="lg"
+        color="green"
+        onClick={() => {
+          // Die eigene Rückfrage nimmt der Seite kurz den Fokus – das ist kein Vorfall
+          eigenerDialog.current = true
+          const ja = window.confirm('Test jetzt endgültig abgeben?')
+          setTimeout(() => (eigenerDialog.current = false), 500)
+          if (ja) void abgeben('selbst')
+        }}
+      >
         Abgeben
       </Button>
     </Stack>
@@ -1817,7 +1810,7 @@ function MaterialKarte({ html, stil }: { html: string; stil: string }): React.JS
         ref={rahmen}
         title="Material"
         sandbox="allow-same-origin"
-        srcDoc={`<!doctype html><html lang="de"><head><meta charset="utf-8"><style>${stil}\nhtml,body{margin:0;background:#fff}.ws-online-material{box-shadow:none!important;margin:0!important}</style></head><body>${html}</body></html>`}
+        srcDoc={`<!doctype html><html lang="de" translate="no"><head><meta charset="utf-8"><meta name="google" content="notranslate"><style>${stil}\nhtml,body{margin:0;background:#fff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.ws-online-material{box-shadow:none!important;margin:0!important}</style></head><body>${html}</body></html>`}
         onLoad={() => {
           messen()
           setTimeout(messen, 300)

@@ -1,3 +1,4 @@
+import { einmalNeuLaden, Fehlergrenze, nachladeFehlerAbfangen } from './shared/components/Fehlergrenze'
 import { SchulbuchDialog } from './shared/schulbuch/SchulbuchDialog'
 import '@mantine/core/styles.css'
 import '@mantine/dropzone/styles.css'
@@ -109,23 +110,33 @@ function Root(): React.JSX.Element {
  * Server: Der Schülerbereich (/s/…, Onlinetest) braucht weder Programme noch Einstellungen –
  * Schülerinnen und Schüler haben auf die Programme keinen Zugriff (src/server/http.ts).
  */
+// Nie mehr leere Seite (06.10.2026): Nachladefehler nach Updates → einmal neu laden; Zeichenfehler → Hinweis
+nachladeFehlerAbfangen()
 if (aufServer() && window.location.pathname.startsWith('/s/')) {
   void Promise.all([import('./modules/onlinetest/SchuelerBereich'), import('./modules/onlinetest/SchuelerEinstellungen')]).then(
     ([{ default: SchuelerBereich }, { SchuelerRahmen }]) =>
       createRoot(document.getElementById('root')!).render(
         <StrictMode>
-          <SchuelerRahmen>
-            <SchuelerBereich />
-          </SchuelerRahmen>
+          <Fehlergrenze>
+            <SchuelerRahmen>
+              <SchuelerBereich />
+            </SchuelerRahmen>
+          </Fehlergrenze>
         </StrictMode>
-      )
+      ),
+    (e: unknown) => {
+      // Schon das Laden des Schülerbereichs scheitert (Update dazwischen): neu laden statt leer bleiben
+      if (!einmalNeuLaden()) document.getElementById('root')!.textContent = `Die Seite konnte nicht geladen werden – bitte neu laden. (${String(e)})`
+    }
   )
 } else {
   const ersterLauf = imNetz() && abgemeldet() ? Promise.resolve() : useAppSettings.getState().load()
   ersterLauf.finally(() => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
-        <Root />
+        <Fehlergrenze>
+          <Root />
+        </Fehlergrenze>
       </StrictMode>
     )
   })

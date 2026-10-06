@@ -378,6 +378,23 @@ export function lueckenMuster(term: string, zufall: () => number = Math.random):
 }
 
 /** Buchstaben des Wortes (Kernform) gemischt, für „Buchstaben legen" */
+/**
+ * Leerzeichen der Lösung automatisch einsetzen (06.10.2026, Befund der Lehrkraft: „to bring about" ergab beim Legen
+ * „bringabout" und galt als falsch). Die Kacheln enthalten keine Leerzeichen; sie stehen hier an ihrer Stelle, sobald
+ * die Buchstaben davor gelegt sind.
+ */
+export function mitLeerzeichen(term: string, gelegt: string): string {
+  const kern = kernform(varianten(term)[0] ?? term)
+  let aus = ''
+  let i = 0
+  for (const c of kern) {
+    if (i >= gelegt.length) break
+    if (c === ' ') aus += ' '
+    else aus += gelegt[i++]
+  }
+  return aus + gelegt.slice(i)
+}
+
 export function buchstaben(term: string, zufall: () => number = Math.random): string[] {
   const kern = kernform(varianten(term)[0] ?? term)
   return kern

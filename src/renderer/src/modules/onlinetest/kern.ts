@@ -14,6 +14,7 @@
  *  - die LÖSUNGEN je Feld (bleiben auf dem Server): genau (mit Normalisierung), Auswahl, KI
  *    (Erwartung für die Plausibilitätsprüfung) oder Lehrkraft (freies Schreiben).
  */
+import { anweisungFuer } from '../vokabeltest/model/blocks'
 import { mitOptionalem, teileVon } from '@shared/luecken'
 import type { Block, Variant } from '../vokabeltest/model/types'
 
@@ -164,7 +165,7 @@ export function onlineFassung(variante: Variant): OnlineFassung {
       id: b.id,
       art: b.kind,
       titel: b.title,
-      anweisung: b.instruction,
+      anweisung: anweisungFuer(b),
       ...(b.helpText ? { hilfe: b.helpText } : {}),
       eintraege: [],
       punkte: 0
@@ -173,7 +174,7 @@ export function onlineFassung(variante: Variant): OnlineFassung {
       einheiten.push({ id, aufgabe: b.id, felder, punkte })
       a.punkte += punkte
     }
-    const frage = (...teile: (string | undefined)[]): string => [b.instruction, ...teile].filter(Boolean).join(' – ')
+    const frage = (...teile: (string | undefined)[]): string => [anweisungFuer(b), ...teile].filter(Boolean).join(' – ')
     switch (b.kind) {
       case 'gap': {
         if (b.wordBank) a.wortkasten = sortiertesWortkastenBild([...b.items.map((i) => i.bankWord || i.answer), ...b.extraBankWords])

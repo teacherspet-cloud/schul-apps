@@ -32,17 +32,80 @@ const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
 
 const TEST = {
   version: 1,
-  header: { title: 'Vocabulary Test', showName: true, showDate: true, showClass: false, showSchool: false, schoolName: '', showVariant: true, showPoints: true, showGrade: true, subtitle: '', ueberthema: 'Unit 1' },
-  settings: { targetLanguage: 'en', level: 'A2', stateId: 'NI', schoolTypeId: 'gymnasium', languageOrder: 1, grade: 7, vocabCount: 2, variantCount: 1, variantMode: 'sameVocab', tasks: [], topic: 'Weather', pictureSource: 'none', answerKey: true, seed: 1 },
+  header: {
+    title: 'Vocabulary Test',
+    showName: true,
+    showDate: true,
+    showClass: false,
+    showSchool: false,
+    schoolName: '',
+    showVariant: true,
+    showPoints: true,
+    showGrade: true,
+    subtitle: '',
+    ueberthema: 'Unit 1'
+  },
+  settings: {
+    targetLanguage: 'en',
+    level: 'A2',
+    stateId: 'NI',
+    schoolTypeId: 'gymnasium',
+    languageOrder: 1,
+    grade: 7,
+    vocabCount: 2,
+    variantCount: 1,
+    variantMode: 'sameVocab',
+    tasks: [],
+    topic: 'Weather',
+    pictureSource: 'none',
+    answerKey: true,
+    seed: 1
+  },
   vocab: [],
   variants: [
     {
       id: 'A',
       label: 'A',
       blocks: [
-        { id: 'g', kind: 'gap', taskType: 'gapSentences', title: 'Gaps', instruction: 'Fill in the gaps.', pointsPerItem: 1, wordBank: false, firstLetterHint: true, extraBankWords: [], items: [{ id: 'g1', sentences: [{ before: 'I go to', after: 'every day.' }], answer: 'school' }, { id: 'g2', sentences: [{ before: 'My', after: 'is called Rex.' }], answer: 'dog' }] },
-        { id: 'm', kind: 'match', taskType: 'wordPartners', title: 'Word partners', instruction: 'Match.', pointsPerItem: 1, leftLabel: 'Words', rightLabel: 'Partners', left: [{ id: 'l1', text: 'heat', answerId: 'r1x9q' }], right: [{ id: 'r1x9q', text: 'heatwave' }, { id: 'r2k7p', text: 'storm' }] },
-        { id: 'o', kind: 'open', taskType: 'mediation', title: 'Say it in English', instruction: 'Express the sentence in English. Use the word in brackets.', pointsPerItem: 2, items: [{ id: 'o1', prompt: 'Neue Schüler integrieren sich leichter. (to integrate)', modelAnswer: 'New students integrate more easily.', lines: 2 }] }
+        {
+          id: 'g',
+          kind: 'gap',
+          taskType: 'gapSentences',
+          title: 'Gaps',
+          instruction: 'Fill in the gaps.',
+          pointsPerItem: 1,
+          wordBank: false,
+          firstLetterHint: true,
+          extraBankWords: [],
+          items: [
+            { id: 'g1', sentences: [{ before: 'I go to', after: 'every day.' }], answer: 'school' },
+            { id: 'g2', sentences: [{ before: 'My', after: 'is called Rex.' }], answer: 'dog' }
+          ]
+        },
+        {
+          id: 'm',
+          kind: 'match',
+          taskType: 'wordPartners',
+          title: 'Word partners',
+          instruction: 'Match.',
+          pointsPerItem: 1,
+          leftLabel: 'Words',
+          rightLabel: 'Partners',
+          left: [{ id: 'l1', text: 'heat', answerId: 'r1x9q' }],
+          right: [
+            { id: 'r1x9q', text: 'heatwave' },
+            { id: 'r2k7p', text: 'storm' }
+          ]
+        },
+        {
+          id: 'o',
+          kind: 'open',
+          taskType: 'mediation',
+          title: 'Say it in English',
+          instruction: 'Express the sentence in English. Use the word in brackets.',
+          pointsPerItem: 2,
+          items: [{ id: 'o1', prompt: 'Neue Schüler integrieren sich leichter. (to integrate)', modelAnswer: 'New students integrate more easily.', lines: 2 }]
+        }
       ]
     }
   ],
@@ -54,6 +117,11 @@ const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
 const verwaltung = await browser.newContext()
 const anmelden = (ctx, b, p) => ctx.request.post(`${A}/auth/lokal`, { form: { benutzer: b, passwort: p, ziel: '/' }, headers: { origin: A }, maxRedirects: 0 })
+const da = (l, ms = 15000) =>
+  l.waitFor({ timeout: ms }).then(
+    () => true,
+    () => false
+  )
 const warteBis = async (fn, ms = 30000) => {
   const ende = Date.now() + ms
   for (;;) {
@@ -64,7 +132,9 @@ const warteBis = async (fn, ms = 30000) => {
 }
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
-  const lehrer = await (await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })).json()
+  const lehrer = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })
+  ).json()
   zuLoeschen.push(lehrer.id)
 
   // ---------- Lehrkraft: Lerngruppe und Test (mit Figur)
@@ -72,7 +142,10 @@ try {
   await anmelden(lk, lehrer.benutzer, lehrer.passwort)
   const gruppe = await (await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: '7a', fach: 'Englisch' } })).json()
   const neu = await (
-    await lk.request.post(`${A}/server/onlinetest/erstellen`, { headers: KOPF, data: { titel: 'Vocabulary Test', thema: 'Unit 1 – Weather', test: TEST, lerngruppeId: gruppe.id, zeitMin: 10, figur: { winkend: PNG, jubelnd: PNG } } })
+    await lk.request.post(`${A}/server/onlinetest/erstellen`, {
+      headers: KOPF,
+      data: { titel: 'Vocabulary Test', thema: 'Unit 1 – Weather', test: TEST, lerngruppeId: gruppe.id, zeitMin: 10, figur: { winkend: PNG, jubelnd: PNG } }
+    })
   ).json()
   const detail = async () => (await lk.request.get(`${A}/server/onlinetest/${neu.id}`, { headers: KOPF })).json()
   pruefe((await detail()).status === 'wartend', `Onlinetest angelegt (Code ${neu.code}) und wartet auf den Start`)
@@ -106,7 +179,19 @@ try {
   await s3.locator('[data-wartebildschirm]').waitFor({ timeout: 15000 })
   let d = await detail()
   pruefe(d.teilnahmen.length === 3 && d.teilnahmen.every((t) => t.beginn === 0), 'Lehrkraft sieht drei Wartende')
-  const vorStart = await s1.evaluate(async (code) => JSON.stringify(await (await fetch('/s/api/beitreten', { method: 'POST', headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' }, body: JSON.stringify({ code }) })).json()), neu.code)
+  const vorStart = await s1.evaluate(
+    async (code) =>
+      JSON.stringify(
+        await (
+          await fetch('/s/api/beitreten', {
+            method: 'POST',
+            headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
+            body: JSON.stringify({ code })
+          })
+        ).json()
+      ),
+    neu.code
+  )
   pruefe(!vorStart.includes('Fill in the gaps'), 'vor dem Start keine Aufgaben am Gerät')
 
   // ---------- Gemeinsamer Start
@@ -116,16 +201,95 @@ try {
   pruefe(true, 'nach dem Start der Lehrkraft erscheint der Test auf beiden Geräten')
   // Anderes Fenster daneben: Die Seite bleibt sichtbar, verliert aber den Fokus
   await s3.getByText('Fill in the gaps.').waitFor({ timeout: 10000 })
-  await s3.evaluate(() => {
-    document.hasFocus = () => false
-  })
-  pruefe(await s3.getByText('automatisch abgegeben').waitFor({ timeout: 5000 }).then(() => true, () => false), 'anderes Fenster (Fokus weg, Seite sichtbar) → sofort abgegeben')
-  const quelltext = await s1.evaluate(async (code) => JSON.stringify(await (await fetch('/s/api/beitreten', { method: 'POST', headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' }, body: JSON.stringify({ code }) })).json()), neu.code)
-  pruefe(!quelltext.includes('school') && !quelltext.includes('integrate more easily') && !quelltext.includes('"answer"') && !quelltext.includes('answerId'), 'Das Gerät bekommt keine Lösungen')
+  // Seit 06.10.2026: Fokus weg → protokolliert (mit Dauer), nicht abgegeben; am PC Vollbild Pflicht
+  const lage = await s3.evaluate(() => ({
+    pc: matchMedia('(pointer: fine)').matches && navigator.maxTouchPoints === 0,
+    voll: Boolean(document.fullscreenElement)
+  }))
+  console.log('PC-LAGE', JSON.stringify(lage))
+  if (lage.pc && !lage.voll) {
+    pruefe(await da(s3.locator('[data-fenster-sperre]'), 5000), 'PC ohne Vollbild: Sperre verdeckt den Test')
+    await s3.locator('[data-fenster-sperre] [data-vollbild]').click()
+    await s3.waitForTimeout(1500)
+    pruefe(
+      !(await s3.locator('[data-fenster-sperre]').isVisible()),
+      `Vollbild eingeschaltet → Sperre weg (${await s3.evaluate(() => Boolean(document.fullscreenElement))})`
+    )
+  }
+  await s3.evaluate(() => window.dispatchEvent(new Event('blur')))
+  await s3.waitForTimeout(2200)
+  await s3.evaluate(() => window.dispatchEvent(new Event('focus')))
+  const ole = await warteBis(async () => {
+    const x = (await detail()).teilnahmen.find((t) => t.name === 'Ole F.')
+    return x?.vorfaelle?.some((v) => v.art === 'fokus' && v.dauer >= 2) ? x : null
+  }, 10000)
+  pruefe(
+    Boolean(ole) && !ole.abgabe && !(await s3.getByText('automatisch abgegeben').count()),
+    `anderes Fenster (Fokus weg) → protokolliert mit Dauer, nicht abgegeben (${JSON.stringify(ole?.vorfaelle)})`
+  )
+  s3.once('dialog', (dlg) => void dlg.accept())
+  await s3.getByRole('button', { name: 'Abgeben' }).click()
+  await s3.locator('[data-ergebnis-wartet], [data-ergebnis]').first().waitFor({ timeout: 10000 })
+  const ole2 = (await detail()).teilnahmen.find((t) => t.name === 'Ole F.')
+  pruefe(!ole2?.vorfaelle?.some((v) => v.art === 'fokus' && v.dauer === undefined), 'Eigene Rückfrage beim Abgeben ist kein Vorfall')
+  const quelltext = await s1.evaluate(
+    async (code) =>
+      JSON.stringify(
+        await (
+          await fetch('/s/api/beitreten', {
+            method: 'POST',
+            headers: { 'x-schulapps-token': 'server', 'content-type': 'application/json' },
+            body: JSON.stringify({ code })
+          })
+        ).json()
+      ),
+    neu.code
+  )
+  pruefe(
+    !quelltext.includes('school') && !quelltext.includes('integrate more easily') && !quelltext.includes('"answer"') && !quelltext.includes('answerId'),
+    'Das Gerät bekommt keine Lösungen'
+  )
+  // Strenger (06.10.2026): keine Lösung bei ihrem eigenen Feld (Lückensatz, Hinweis, Wortliste, Anfangsbuchstabe …)
+  {
+    const schueler = JSON.parse(quelltext)
+    const dd = await detail()
+    const variante =
+      dd.fassungen.find((x) => JSON.stringify(x.aufgaben.map((a) => a.id)) === JSON.stringify(schueler.aufgaben.map((a) => a.id))) ?? dd.fassungen[0]
+    const lecks = []
+    let geprueft = 0
+    for (const a of schueler.aufgaben ?? [])
+      for (const e of a.eintraege ?? [])
+        for (const f of e.felder ?? [])
+          for (const w of variante.loesungen?.[f.id]?.werte ?? []) {
+            if (String(w).trim().length < 3) continue
+            geprueft++
+            const umgebung = JSON.stringify({
+              vor: e.vor,
+              nach: e.nach,
+              text: e.text,
+              saetze: e.saetze,
+              woerter: e.woerter,
+              hinweis: e.hinweis,
+              anfang: f.anfang
+            })
+            const woerter = ` ${umgebung.toLowerCase().replace(/[^\p{L}\p{N}']+/gu, ' ')} `
+            const gesucht = ` ${String(w)
+              .toLowerCase()
+              .replace(/[^\p{L}\p{N}']+/gu, ' ')
+              .trim()} `
+            if (woerter.includes(gesucht)) lecks.push(`${f.id}: ${w}`)
+          }
+    console.log('LÖSUNGEN GEPRÜFT', geprueft, 'Lecks:', JSON.stringify(lecks.slice(0, 8)))
+    pruefe(geprueft > 0 && lecks.length === 0, `Keine Lösung steht bei ihrem eigenen Feld (${lecks.length} von ${geprueft})`)
+  }
   const felder = s1.locator('input:not([type=radio]):not([type=hidden]), textarea')
   await felder.nth(0).fill('school')
   await felder.nth(1).fill('dgo')
-  await s1.locator('select').first().selectOption({ label: 'a) heatwave' }).catch(async () => s1.getByLabel('a) heatwave').check())
+  await s1
+    .locator('select')
+    .first()
+    .selectOption({ label: 'a) heatwave' })
+    .catch(async () => s1.getByLabel('a) heatwave').check())
   await felder.nth(2).fill('New pupils integrate more easily.')
   await s1.waitForTimeout(2600)
   await s1.screenshot({ path: join(out, '2-test.png') })
@@ -133,13 +297,41 @@ try {
   await s1.getByRole('button', { name: 'Abgeben' }).click()
   await s1.locator('[data-ergebnis-wartet]').waitFor({ timeout: 10000 })
   pruefe(true, 'abgegeben – Ergebnis wartet, bis alle abgegeben haben')
-  // Zweite Person verlässt die Seite
+  // Zweite Person verlässt die Seite (z. B. iPad ausgeschaltet) – seit 06.10.2026 nur protokolliert, nicht abgegeben
+  if (await s2.locator('[data-fenster-sperre]').isVisible()) await s2.locator('[data-fenster-sperre] [data-vollbild]').click()
+  await s2.waitForTimeout(1200)
+  pruefe(!(await s2.locator('[data-fenster-sperre]').isVisible()), 'PC: Test läuft im Vollbild (keine Sperre)')
   await s2.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
     document.dispatchEvent(new Event('visibilitychange'))
   })
-  await s2.getByText('automatisch abgegeben').waitFor({ timeout: 10000 })
-  pruefe(true, 'Seite verlassen → sofort abgegeben')
+  await s2.waitForTimeout(1500)
+  await s2.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+  // Kopieren und Seitenübersetzung (Chrome setzt eine Klasse an <html>)
+  await s2.evaluate(() => {
+    document.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true }))
+    document.documentElement.classList.add('translated-ltr')
+  })
+  const markierbar = await s2.evaluate(() => getComputedStyle(document.querySelector('[data-onlinetest-blatt]')).userSelect)
+  pruefe(markierbar === 'none', `Aufgabentext nicht markierbar (user-select: ${markierbar})`)
+  const ben = await warteBis(async () => {
+    const x = (await detail()).teilnahmen.find((t) => t.name !== 'Kim T.')
+    const arten = (x?.vorfaelle ?? []).map((v) => v.art)
+    return arten.includes('verlassen') && arten.includes('kopieren') && arten.includes('uebersetzt') ? x : null
+  }, 15000)
+  pruefe(
+    Boolean(ben) && !ben.abgabe,
+    `Seite verlassen → protokolliert, nicht abgegeben (${JSON.stringify(ben?.vorfaelle?.map((v) => [v.art, v.dauer, v.info]))})`
+  )
+  pruefe(ben?.vorfaelle?.find((v) => v.art === 'verlassen')?.dauer >= 1, 'Verlassen mit Dauer, ein Eintrag')
+  await s2.evaluate(() => document.documentElement.classList.remove('translated-ltr'))
+  s2.once('dialog', (dlg) => void dlg.accept())
+  await s2.getByRole('button', { name: 'Abgeben' }).click()
+  await s2.locator('[data-ergebnis-wartet], [data-ergebnis]').first().waitFor({ timeout: 10000 })
+  pruefe(true, 'Zweite Person gibt danach selbst ab')
 
   // ---------- KI wertet automatisch aus
   d = await warteBis(async () => {
@@ -172,7 +364,10 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
-  await p.getByRole('button', { name: /Onlinetest/ }).first().click()
+  await p
+    .getByRole('button', { name: /Onlinetest/ })
+    .first()
+    .click()
   await p.locator('[data-testliste]').waitFor({ timeout: 10000 })
   pruefe(await p.getByText('Unit 1 – Weather').first().isVisible(), 'Testliste: Thema statt „Vocabulary Test"')
   pruefe((await p.locator('[data-filter]').count()) === 6, 'Testliste: Filter- und Sortierknöpfe an allen sechs Spalten')
@@ -199,7 +394,11 @@ try {
   await p.locator('[data-abgabe-blatt] .vt-page').first().waitFor({ timeout: 10000 })
   const blatt = await p.locator('[data-abgabe-blatt]').innerText()
   pruefe(blatt.includes('school') && blatt.includes('dgo'), 'Als Blatt: die Eingaben stehen in den Lücken')
-  pruefe((await p.locator('[data-abgabe-blatt] .vt-marke-ok').count()) > 0 && (await p.locator('[data-abgabe-blatt] .vt-marke-falsch, [data-abgabe-blatt] .vt-marke-ok').count()) >= 2, 'Haken grün, Kreuze rot markiert')
+  pruefe(
+    (await p.locator('[data-abgabe-blatt] .vt-marke-ok').count()) > 0 &&
+      (await p.locator('[data-abgabe-blatt] .vt-marke-falsch, [data-abgabe-blatt] .vt-marke-ok').count()) >= 2,
+    'Haken grün, Kreuze rot markiert'
+  )
   pruefe(!blatt.includes('Lösung'), 'Kopf ohne „Lösung“, mit Name und Punkten')
   await p.screenshot({ path: join(out, '4b-als-blatt.png') })
   await p.keyboard.press('Escape')
@@ -213,14 +412,29 @@ try {
   await lk.request.post(`${A}/server/onlinetest/${neu.id}/korrektur`, { headers: KOPF, data: { teilnahme: kimId, einheit: g1.id, richtig: true } })
   pruefe(await p.locator('[data-export]').isEnabled(), 'Export-Menü (PDF, Excel, Word, Drucken, TeacherTool) bereit')
   await p.locator('[data-export]').click()
-  pruefe(await p.getByText('Abschreibliste drucken').waitFor({ timeout: 5000 }).then(() => true, () => false), 'TeacherTool-Abschreibliste im Menü')
+  pruefe(
+    await p
+      .getByText('Abschreibliste drucken')
+      .waitFor({ timeout: 5000 })
+      .then(
+        () => true,
+        () => false
+      ),
+    'TeacherTool-Abschreibliste im Menü'
+  )
   await p.screenshot({ path: join(out, '5-lehrkraft.png') })
   for (const [eintrag, endung] of [
     ['Excel (.xlsx)', '.xlsx'],
     ['PDF', '.pdf'],
     ['CSV für neuen Kurs (Vorname, Name, Klasse)', '.csv']
   ]) {
-    if (!(await p.getByRole('menuitem', { name: eintrag }).isVisible().catch(() => false))) await p.locator('[data-export]').click()
+    if (
+      !(await p
+        .getByRole('menuitem', { name: eintrag })
+        .isVisible()
+        .catch(() => false))
+    )
+      await p.locator('[data-export]').click()
     const [datei] = await Promise.all([p.waitForEvent('download', { timeout: 60000 }), p.getByRole('menuitem', { name: eintrag, exact: true }).click()])
     const pfad = join(out, `export${endung}`)
     await datei.saveAs(pfad)
@@ -231,7 +445,11 @@ try {
   }
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n')[0]}`)
-  for (const [i, seite] of browser.contexts().flatMap((c) => c.pages()).entries()) await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
+  for (const [i, seite] of browser
+    .contexts()
+    .flatMap((c) => c.pages())
+    .entries())
+    await seite.screenshot({ path: join(out, `fehler-${i}.png`) }).catch(() => undefined)
 } finally {
   // Gäste dieses Laufs und die Lehrkraft samt Daten löschen
   const u = await (await verwaltung.request.get(`${A}/server/verwaltung/uebersicht`, { headers: KOPF })).json().catch(() => ({ nutzer: [] }))

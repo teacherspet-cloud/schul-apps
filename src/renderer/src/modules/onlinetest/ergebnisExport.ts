@@ -25,6 +25,8 @@ export interface ErgebnisZeile {
   note: number | null
   abgabe: number | null
   verlassen: boolean
+  /** Aufsicht: Kurzfassung der Vorfälle (06.10.2026) */
+  aufsicht?: string
   /** Noch offene bzw. zu entscheidende Antworten */
   offen: number
 }
@@ -96,7 +98,7 @@ export function ergebnisHtml(d: ErgebnisDaten, format: NotenFormat = 'ganz', abs
   const zeile = (z: ErgebnisZeile, i: number): string =>
     abschreibliste
       ? `<tr><td>${i + 1}</td><td>${esc(namensTeile(z.name).nachname)}</td><td>${esc(namensTeile(z.name).vorname)}</td><td class="note">${esc(noteAlsText(z, format, d.schwellen))}</td><td class="r">${z.punkte}/${z.max}</td></tr>`
-      : `<tr><td>${i + 1}</td><td>${esc(z.name)}</td><td>${esc(z.fassung)}</td><td class="r">${z.abgabe ? `${z.punkte}/${z.max}` : '–'}</td><td class="r">${z.abgabe ? `${prozent(z)} %` : ''}</td><td class="note">${esc(noteAlsText(z, format, d.schwellen))}</td><td>${z.verlassen ? 'Seite verlassen' : z.offen ? `${z.offen} offen` : ''}</td></tr>`
+      : `<tr><td>${i + 1}</td><td>${esc(z.name)}</td><td>${esc(z.fassung)}</td><td class="r">${z.abgabe ? `${z.punkte}/${z.max}` : '–'}</td><td class="r">${z.abgabe ? `${prozent(z)} %` : ''}</td><td class="note">${esc(noteAlsText(z, format, d.schwellen))}</td><td>${esc([z.aufsicht || (z.verlassen ? 'Seite verlassen' : ''), z.offen ? `${z.offen} offen` : ''].filter(Boolean).join('; '))}</td></tr>`
   return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${esc(d.titel)}</title><style>
 @page { size: A4; margin: 18mm 16mm; }
 body { font: 11pt/1.4 "Segoe UI", Arial, sans-serif; color: #111; }
@@ -130,7 +132,9 @@ export function xlsx(blatt: string, zeilen: (string | number | null)[][]): Uint8
             const ref = `${spalte(c)}${r + 1}`
             const stil = r === 0 ? ' s="1"' : ''
             if (w == null || w === '') return `<c r="${ref}"${stil}/>`
-            return typeof w === 'number' ? `<c r="${ref}"${stil}><v>${w}</v></c>` : `<c r="${ref}" t="inlineStr"${stil}><is><t xml:space="preserve">${xmlEsc(w)}</t></is></c>`
+            return typeof w === 'number'
+              ? `<c r="${ref}"${stil}><v>${w}</v></c>`
+              : `<c r="${ref}" t="inlineStr"${stil}><is><t xml:space="preserve">${xmlEsc(w)}</t></is></c>`
           })
           .join('')}</row>`
     )
@@ -164,7 +168,16 @@ export function ergebnisXlsx(d: ErgebnisDaten, format: NotenFormat): Uint8Array 
   const zeilen = nachKursliste(d.zeilen).map((z) => {
     const n = namensTeile(z.name)
     const note = noteAlsText(z, format, d.schwellen)
-    return [n.nachname, n.vorname, z.fassung, z.abgabe ? z.punkte : null, z.max, z.abgabe ? prozent(z) : null, /^\d+$/.test(note) ? Number(note) : note, z.verlassen ? 'Seite verlassen' : z.offen ? `${z.offen} offen` : '']
+    return [
+      n.nachname,
+      n.vorname,
+      z.fassung,
+      z.abgabe ? z.punkte : null,
+      z.max,
+      z.abgabe ? prozent(z) : null,
+      /^\d+$/.test(note) ? Number(note) : note,
+      [z.aufsicht || (z.verlassen ? 'Seite verlassen' : ''), z.offen ? `${z.offen} offen` : ''].filter(Boolean).join('; ')
+    ]
   })
   return xlsx(d.titel, [kopf, ...zeilen])
 }
@@ -174,7 +187,9 @@ export function ergebnisXlsx(d: ErgebnisDaten, format: NotenFormat): Uint8Array 
 export async function ergebnisDocx(d: ErgebnisDaten, format: NotenFormat): Promise<Uint8Array> {
   const { verteilung, schnitt } = kennzahlen(d)
   const zelle = (t: string, fett = false, mitte = false): TableCell =>
-    new TableCell({ children: [new Paragraph({ alignment: mitte ? AlignmentType.CENTER : AlignmentType.LEFT, children: [new TextRun({ text: t, bold: fett })] })] })
+    new TableCell({
+      children: [new Paragraph({ alignment: mitte ? AlignmentType.CENTER : AlignmentType.LEFT, children: [new TextRun({ text: t, bold: fett })] })]
+    })
   const kopf = ['Nr.', 'Name', 'Fassung', 'Punkte', '%', 'Note']
   const tabelle = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -202,7 +217,10 @@ export async function ergebnisDocx(d: ErgebnisDaten, format: NotenFormat): Promi
           new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun(d.titel)] }),
           new Paragraph({ children: [new TextRun({ text: [d.lerngruppe, d.datum].filter(Boolean).join(' · '), color: '555555' })] }),
           tabelle,
-          new Paragraph({ spacing: { before: 240 }, children: [new TextRun(`Notenverteilung: ${verteilung.map((n, i) => `${i + 1}: ${n}`).join(' · ')} · Durchschnitt: ${schnitt}`)] })
+          new Paragraph({
+            spacing: { before: 240 },
+            children: [new TextRun(`Notenverteilung: ${verteilung.map((n, i) => `${i + 1}: ${n}`).join(' · ')} · Durchschnitt: ${schnitt}`)]
+          })
         ]
       }
     ]

@@ -80,6 +80,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { qrSvg } from '../arbeitsblatt/render/qr'
 import { antwortAlsText, felderVon, loesungAlsText, type Antworten, type Bewertung, type Einheit, type Loesung, type OnlineAufgabe } from './kern'
+import { auffaellig, VorfallAbzeichen, vorfallKurz, type Vorfall } from './VorfallAnzeige'
 import { holen, senden } from './serverApi'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { hatClient } from '../../shared/plattform'
@@ -116,6 +117,7 @@ interface Teilnahme {
   abgabe: number | null
   grund: string | null
   verlassen: boolean
+  vorfaelle?: Vorfall[]
   punkte: number
   max: number
   offen: number
@@ -501,6 +503,7 @@ function ergebnisDaten(d: TestDetail): ErgebnisDaten {
         note: t.note,
         abgabe: t.abgabe,
         verlassen: t.verlassen,
+        aufsicht: vorfallKurz(t.vorfaelle),
         offen: t.offen + t.zuEntscheiden
       }))
   }
@@ -751,7 +754,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
           ['warten', wartend.length, 'yellow'],
           ['schreiben', schreibend.length, 'blue'],
           ['abgegeben', abgegeben.length, 'green'],
-          ['Seite verlassen', d.teilnahmen.filter((t) => t.verlassen).length, 'red']
+          ['mit Auffälligkeiten', d.teilnahmen.filter((t) => auffaellig(t.vorfaelle).length > 0 || (t.verlassen && !t.vorfaelle?.length)).length, 'red']
         ].map(([k, n, c]) => (
           <Card key={k} withBorder padding="sm">
             <Text size="xl" fw={800} c={`${c}.7`}>
@@ -877,7 +880,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                     <Badge color="yellow">wartet</Badge>
                   ) : !t.abgabe ? (
                     <Badge color="blue">schreibt</Badge>
-                  ) : t.verlassen ? (
+                  ) : t.grund === 'verlassen' ? (
                     <Tooltip label="Hat die Seite verlassen – automatisch abgegeben">
                       <Badge color="red">verlassen {new Date(t.abgabe).toLocaleTimeString('de-DE', { timeStyle: 'short' })}</Badge>
                     </Tooltip>
@@ -886,6 +889,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
                       {t.grund === 'zeit' ? 'Zeit abgelaufen' : t.grund === 'lehrkraft' ? 'beendet' : 'abgegeben'}
                     </Badge>
                   )}
+                  <VorfallAbzeichen vorfaelle={t.vorfaelle} />
                 </Table.Td>
                 <Table.Td>
                   {t.abgabe ? `${t.punkte}/${t.max}` : '–'}

@@ -53,6 +53,7 @@ import {
   auswahlFsOptionen,
   auswahlOptionen,
   buchstaben,
+  mitLeerzeichen,
   lueckenMuster,
   paarFuer,
   istSicher,
@@ -941,7 +942,8 @@ function Paar({
 function Buchstaben({ v, pruefen, gesperrt }: { v: Vokabel; pruefen: (a: string) => void; gesperrt: boolean }): React.JSX.Element {
   const kacheln = useMemo(() => buchstaben(v.term).map((b, i) => ({ b, i })), [v.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const [gelegt, setGelegt] = useState<number[]>([])
-  const wort = gelegt.map((i) => kacheln.find((k) => k.i === i)!.b).join('')
+  // Leerzeichen stehen von selbst an ihrer Stelle („bring about", 06.10.2026)
+  const wort = mitLeerzeichen(v.term, gelegt.map((i) => kacheln.find((k) => k.i === i)!.b).join(''))
   return (
     <Stack align="center">
       <Text className="vt-frage">Lege das Wort aus den Buchstaben</Text>

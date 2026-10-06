@@ -113,6 +113,9 @@ const db = () => {
   const d = datenbank()
   if (!bereit) {
     d.exec(SCHEMA)
+    // Aufsicht (06.10.2026): Vorfälle je Teilnahme (Seite verlassen, Fenster daneben, Übersetzen …), verschlüsselt
+    const sp = new Set((d.prepare('PRAGMA table_info(teilnahmen)').all() as { name: string }[]).map((x) => x.name))
+    if (!sp.has('vorfaelle')) d.exec("ALTER TABLE teilnahmen ADD COLUMN vorfaelle TEXT NOT NULL DEFAULT '[]'")
     bereit = true
   }
   return d
@@ -284,14 +287,12 @@ export function bereinigeFassung(roh: unknown): OnlineFassung {
       .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
       .replace(/javascript:/gi, '')
   const aufgaben = (Array.isArray(f.aufgaben) ? f.aufgaben : []).slice(0, 80).map((a) => ({ ...a, ...(a.html ? { html: html(a.html) } : {}) }))
-  const einheiten = (Array.isArray(f.einheiten) ? f.einheiten : [])
-    .slice(0, 800)
-    .map((e) => ({
-      id: String(e.id),
-      aufgabe: String(e.aufgabe),
-      felder: (e.felder ?? []).map(String).slice(0, 60),
-      punkte: Math.max(1, Math.min(100, Math.round(Number(e.punkte) || 1)))
-    }))
+  const einheiten = (Array.isArray(f.einheiten) ? f.einheiten : []).slice(0, 800).map((e) => ({
+    id: String(e.id),
+    aufgabe: String(e.aufgabe),
+    felder: (e.felder ?? []).map(String).slice(0, 60),
+    punkte: Math.max(1, Math.min(100, Math.round(Number(e.punkte) || 1)))
+  }))
   const loesungen = Object.fromEntries(Object.entries(f.loesungen ?? {}).slice(0, 4000)) as OnlineFassung['loesungen']
   if (JSON.stringify(aufgaben).length > 6_000_000) throw new Error('Der Test ist zu groß für einen Onlinetest.')
   return {
@@ -398,6 +399,43 @@ interface TeilnahmeZeile {
   antworten: string
   bewertung: string
   verlassen: number
+  vorfaelle?: string
+}
+
+/**
+ * Aufsicht im Onlinetest (06.10.2026, abgestimmt mit der Lehrkraft): Verlassen der Seite gibt NICHT mehr ab
+ * (ausgeschaltetes iPad galt sonst als Abgabe), sondern wird wie alles andere protokolliert – mit Uhrzeit und Dauer.
+ */
+export const VORFALL_ARTEN = ['verlassen', 'fokus', 'geteilt', 'vollbild', 'uebersetzt', 'kopieren', 'einfuegen', 'markieren'] as const
+export type VorfallArt = (typeof VORFALL_ARTEN)[number]
+export interface Vorfall {
+  art: VorfallArt
+  /** Beginn (Serverzeit, ms) */
+  zeit: number
+  /** Dauer in Sekunden (wenn bekannt) */
+  dauer?: number
+  /** Kurzer Zusatz (z. B. erkannte Sprache), höchstens 60 Zeichen */
+  info?: string
+}
+const MAX_VORFAELLE = 300
+
+function vorfallAus(roh: unknown, jetzt: number): Vorfall | null {
+  if (!roh || typeof roh !== 'object') return null
+  const r = roh as Record<string, unknown>
+  const art = String(r.art ?? '') as VorfallArt
+  if (!VORFALL_ARTEN.includes(art)) return null
+  const vorSek = Math.max(0, Math.min(6 * 3600, Number(r.vorSek) || 0))
+  const dauer = Number(r.dauer)
+  return {
+    art,
+    zeit: jetzt - Math.round(vorSek * 1000),
+    ...(Number.isFinite(dauer) && dauer > 0 ? { dauer: Math.min(6 * 3600, Math.round(dauer)) } : {}),
+    ...(r.info ? { info: String(r.info).slice(0, 60) } : {})
+  }
+}
+
+function vorfaelleVon(t: TeilnahmeZeile): Vorfall[] {
+  return json_(t.vorfaelle ?? '[]', [] as Vorfall[])
 }
 
 const NACHFRIST_MS = 30_000
@@ -418,7 +456,7 @@ function abschliessen(t: TeilnahmeZeile, test: Test, antworten: Antworten, grund
   const bewertung = bewerte(fassung, antworten, json_(t.bewertung, {} as Bewertung))
   db()
     .prepare('UPDATE teilnahmen SET abgabe = ?, grund = ?, antworten = ?, bewertung = ?, verlassen = ? WHERE id = ? AND abgabe IS NULL')
-    .run(Date.now(), grund, JSON.stringify(antworten), JSON.stringify(bewertung), grund === 'verlassen' ? 1 : t.verlassen, t.id)
+    .run(Date.now(), grund, JSON.stringify(antworten), JSON.stringify(bewertung), t.verlassen, t.id)
   kiPlanen(test.id)
 }
 
@@ -486,6 +524,7 @@ function ueberblick(test: Test, t: TeilnahmeZeile, namen: Map<string, NutzerInfo
     abgabe: t.abgabe,
     grund: t.grund,
     verlassen: Boolean(t.verlassen),
+    vorfaelle: vorfaelleVon(t),
     punkte,
     max,
     offen: offeneEinheiten(b),
@@ -991,7 +1030,50 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       }
     }
 
-    if (was === 'speichern' || was === 'abgeben' || was === 'verlassen') {
+    /*
+     * Vorfall melden (Aufsicht, 06.10.2026). Auch per sendBeacon (Seite wird gerade unsichtbar) – geschützt durch das
+     * Geheimnis der Teilnahme. `verlassen` alter Seiten (vor 0.4.63 noch im Browser) landet ebenfalls hier: Verlassen
+     * gibt nicht mehr ab.
+     */
+    if (was === 'vorfall') {
+      const k0 = await koerperRoh(k)
+      const t = teilnahme(String(k0.id ?? ''))
+      if (!t || t.schueler_id !== ich.id || t.geheim !== String(k0.geheim ?? '')) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
+      if (t.abgabe || t.beginn === 0) return (json(res, 200, { ok: true }), true)
+      const jetzt = Date.now()
+      const roh = (Array.isArray(k0.vorfaelle) ? k0.vorfaelle : [k0]) as Record<string, unknown>[]
+      const liste = vorfaelleVon(t)
+      let gueltig = 0
+      for (const r of roh) {
+        const v = vorfallAus(r, jetzt)
+        if (!v) continue
+        gueltig++
+        // Ende eines Zeitraums: den offenen Vorfall derselben Art abschließen (sonst neu, rückdatiert um die Dauer)
+        const offen = r.ende ? [...liste].reverse().find((x) => x.art === v.art && x.dauer === undefined) : undefined
+        if (offen) offen.dauer = v.dauer ?? Math.max(1, Math.round((jetzt - offen.zeit) / 1000))
+        else liste.push(r.ende && v.dauer ? { ...v, zeit: jetzt - v.dauer * 1000 } : v)
+      }
+      if (!gueltig) return (json(res, 400, { fehler: 'Unbekannter Vorfall.' }), true)
+      liste.splice(0, Math.max(0, liste.length - MAX_VORFAELLE))
+      db()
+        .prepare('UPDATE teilnahmen SET vorfaelle = ?, verlassen = ? WHERE id = ? AND abgabe IS NULL')
+        .run(JSON.stringify(liste), liste.some((x) => x.art !== 'einfuegen') ? 1 : 0, t.id)
+      return (json(res, 200, { ok: true }), true)
+    }
+
+    if (was === 'verlassen') {
+      // Alte Seiten: Verlassen nur noch protokollieren, nicht mehr abgeben
+      const k0 = await koerperRoh(k)
+      const t = teilnahme(String(k0.id ?? ''))
+      if (!t || t.schueler_id !== ich.id || t.geheim !== String(k0.geheim ?? '')) return (json(res, 404, { fehler: 'Unbekannte Teilnahme.' }), true)
+      if (!t.abgabe && t.beginn > 0) {
+        const liste = [...vorfaelleVon(t), { art: 'verlassen' as const, zeit: Date.now() }].slice(-MAX_VORFAELLE)
+        db().prepare('UPDATE teilnahmen SET vorfaelle = ?, verlassen = 1 WHERE id = ? AND abgabe IS NULL').run(JSON.stringify(liste), t.id)
+      }
+      return (json(res, 200, { ok: true }), true)
+    }
+
+    if (was === 'speichern' || was === 'abgeben') {
       // Abgeben geht auch per sendBeacon (keine Kopfzeile) – geschützt durch das Geheimnis der Teilnahme
       if (was === 'speichern' && !mitKopf) return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
       const k0 = await koerperRoh(k)
@@ -1008,7 +1090,7 @@ export function schuelerRoute(aufruf?: Aufruf): (k: Anfrage) => Promise<boolean>
       }
       // Nach Ablauf zählen die zuletzt (rechtzeitig) gespeicherten Antworten
       const gueltig = zuSpaet ? json_(t.antworten, {}) : antworten
-      const grund = zuSpaet ? 'zeit' : was === 'verlassen' ? 'verlassen' : String(k0.grund ?? 'selbst') === 'zeit' ? 'zeit' : 'selbst'
+      const grund = zuSpaet ? 'zeit' : String(k0.grund ?? 'selbst') === 'zeit' ? 'zeit' : 'selbst'
       abschliessen(t, test, gueltig, grund)
       return (json(res, 200, { abgegeben: true }), true)
     }

@@ -1,3 +1,4 @@
+import { anweisungFuer } from '../model/blocks'
 import {
   AlignmentType,
   BorderStyle,
@@ -392,7 +393,7 @@ async function blockContent(ctx: Ctx, block: Block, n: number, mode: Mode, pageB
     })
   )
   if (block.instruction) {
-    out.push(new Paragraph({ keepNext: true, spacing: { after: 60 }, children: [run(block.instruction, { italics: true })] }))
+    out.push(new Paragraph({ keepNext: true, spacing: { after: 60 }, children: [run(anweisungFuer(block), { italics: true })] }))
   }
   const help = mode === 'print' ? blockHelp(block, ctx.doc.settings.targetLanguage) : []
   if (help.length) {

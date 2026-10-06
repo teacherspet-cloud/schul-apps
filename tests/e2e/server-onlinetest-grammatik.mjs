@@ -103,6 +103,39 @@ try {
     t.code
   )
   pruefe(!quelltext.includes('"loesungen"') && !quelltext.includes('"erwartung"'), 'Das Gerät bekommt keine Lösungen')
+  // Strenger (06.10.2026): Keine Lösung steht im SELBEN Eintrag wie ihr Feld (Lückensatz, Aussage, Wortliste …).
+  // Material und andere Sätze dürfen die Formen enthalten – dort sind sie Lesestoff, kein Verrat.
+  const schueler = JSON.parse(quelltext)
+  const variante = d0.fassungen.find((x) => JSON.stringify(x.aufgaben.map((a) => a.id)) === JSON.stringify(schueler.aufgaben.map((a) => a.id))) ?? f0
+  const lecks = []
+  let geprueft = 0
+  for (const a of schueler.aufgaben ?? [])
+    for (const e of a.eintraege ?? [])
+      for (const f of e.felder ?? []) {
+        const l = variante.loesungen?.[f.id]
+        for (const w of l?.werte ?? []) {
+          if (String(w).trim().length < 3) continue
+          geprueft++
+          const umgebung = JSON.stringify({
+            vor: e.vor,
+            nach: e.nach,
+            text: e.text,
+            saetze: e.saetze,
+            woerter: e.woerter,
+            hinweis: e.hinweis,
+            anfang: f.anfang
+          })
+          // Als ganzes Wort (bzw. Wortgruppe) in der Umgebung des Felds?
+          const woerter = ` ${umgebung.toLowerCase().replace(/[^\p{L}\p{N}']+/gu, ' ')} `
+          const gesucht = ` ${String(w)
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}']+/gu, ' ')
+            .trim()} `
+          if (woerter.includes(gesucht)) lecks.push(`${f.id}: ${w}`)
+        }
+      }
+  console.log('LÖSUNGEN GEPRÜFT', geprueft, 'Lecks:', JSON.stringify(lecks.slice(0, 8)))
+  pruefe(geprueft > 0 && lecks.length === 0, `Keine Lösung steht bei ihrem eigenen Feld (${lecks.length} von ${geprueft})`)
   const felder = s.locator('input:not([type=radio]):not([type=hidden]), textarea')
   const n = await felder.count()
   pruefe(n > 0, `Eingabefelder: ${n}`)

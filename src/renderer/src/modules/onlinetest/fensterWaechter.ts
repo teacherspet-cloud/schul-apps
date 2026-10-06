@@ -14,6 +14,8 @@
 export interface FensterLage {
   geteilt: boolean
   amPc: boolean
+  /** Vollbild aktiv (am PC Pflicht im laufenden Test, 06.10.2026) */
+  vollbild: boolean
 }
 
 export function amPcGeraet(): boolean {
@@ -49,7 +51,11 @@ export function fensterLage(): FensterLage {
     bildHoehe: amPc ? screen.availHeight : screen.height,
     quer: window.matchMedia?.('(orientation: landscape)').matches === true
   })
-  return { geteilt, amPc }
+  return {
+    geteilt,
+    amPc,
+    vollbild: Boolean(document.fullscreenElement ?? (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement)
+  }
 }
 
 /** Auf dem PC: Vollbild anbieten (der einfachste Weg zu „nichts daneben") */

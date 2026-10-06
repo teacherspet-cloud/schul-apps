@@ -131,9 +131,24 @@ try {
   await voll.locator('[data-fliesstext] input').first().fill('classroom')
   await voll.screenshot({ path: join(out, '2-dialog.png'), fullPage: true })
 
-  pruefe(await da(geteilt.locator('[data-fenster-sperre]')), 'Geteilte Ansicht im Test: Sperre mit Countdown')
+  pruefe(await da(geteilt.locator('[data-fenster-sperre]')), 'Geteilte Ansicht im Test: Sperre verdeckt den Test')
   await geteilt.screenshot({ path: join(out, '3-sperre.png') })
-  pruefe(await da(geteilt.getByText(/automatisch abgegeben/), 20000), 'Nach 10 s ohne volles Fenster: abgegeben')
+  // Seit 06.10.2026: nicht abgeben, sondern sofort protokollieren – Ende mit Dauer, sobald die Ansicht wieder voll ist
+  await geteilt.waitForTimeout(12000)
+  pruefe(!(await geteilt.getByText(/automatisch abgegeben/).count()), 'Nach 12 s geteilt: NICHT abgegeben')
+  await geteilt.setViewportSize({ width: 820, height: 1180 })
+  pruefe(
+    !(await geteilt
+      .locator('[data-fenster-sperre]')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)) || (await geteilt.waitForTimeout(2000), !(await geteilt.locator('[data-fenster-sperre]').isVisible())),
+    'Volle Breite: Sperre weg'
+  )
+  await geteilt.waitForTimeout(1500)
+  const d = await (await lk.request.get(`${A}/server/onlinetest/${neu.id}`, { headers: KOPF })).json()
+  const benT = d.teilnahmen.find((x) => x.name === 'Ben G.')
+  const g1 = benT?.vorfaelle?.find((v) => v.art === 'geteilt')
+  pruefe(Boolean(g1) && g1.dauer >= 10 && !benT.abgabe, `Protokoll: geteilte Ansicht ${g1?.dauer} s, Test läuft weiter`)
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser
