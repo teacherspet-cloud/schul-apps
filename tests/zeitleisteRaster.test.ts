@@ -14,7 +14,7 @@ const aufGitter = (y: number): boolean => Math.abs(((y - 0.5) % 5) + 5) % 5 < 0.
 
 describe('Zeitleiste auf dem Raster', () => {
   for (const straenge of [['A', 'B'], ['A', 'B', 'C'], ['A', 'B', 'C', 'D'], []])
-    for (const hoehe of [60, 70, 83, 97, 102, 137, 180, 233]) {
+    for (const hoehe of [60, 70, 83, 97, 98, 102, 137, 180, 233]) {
       it(`${straenge.length || 1} Leiste(n), ${hoehe} mm: alle Grundlinien auf Gitterlinien`, () => {
         const d = defaultDiagram('zeitleiste')
         d.heightMm = hoehe
