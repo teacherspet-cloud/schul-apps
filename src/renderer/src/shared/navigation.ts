@@ -103,6 +103,15 @@ useAuftraege.subscribe((s, prev) => {
   if (!gleich) useNavigation.setState({ laufpunkte: punkte })
 })
 
+/**
+ * Dokument öffnen, sobald sein Programm bereit ist (eigenes Fenster mit `&dok=`, 06.10.2026): Das Programm meldet
+ * seinen Öffner erst beim ersten Zeichnen an – bis dahin kurz warten (höchstens ~5 s).
+ */
+export async function dokumentOeffnenWennBereit(moduleId: string, docId: string): Promise<void> {
+  for (let i = 0; i < 40 && !oeffner.has(moduleId); i++) await new Promise((r) => setTimeout(r, 125))
+  await useNavigation.getState().openDocument(moduleId, docId)
+}
+
 /** Kurzformen für Stellen außerhalb von React (und für Knöpfe, die nur auslösen) */
 export const openModule = (id: string): void => useNavigation.getState().openModule(id)
 export const openSettings = (tab?: SettingsTab): void => useNavigation.getState().openSettings(tab)

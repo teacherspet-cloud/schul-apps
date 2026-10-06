@@ -31,13 +31,19 @@ const alsWebApp = (): boolean =>
 export const eigeneFensterMoeglich = (): boolean =>
   typeof window !== 'undefined' && typeof window.open === 'function' && !aufIos() && !einzelnesProgramm() && !alsWebApp()
 
-export function inEigenemFenster(id: string): void {
+/** Dokument, das das Fenster gleich öffnen soll (`&dok=`, z. B. ein Onlinetest aus der Liste, 06.10.2026) */
+export function einzelnesDokument(): string | null {
+  if (typeof window === 'undefined') return null
+  return new URLSearchParams(window.location.search).get('dok')
+}
+
+export function inEigenemFenster(id: string, dok?: string): void {
   const u = new URL(window.location.href)
-  u.search = `?einzeln=${encodeURIComponent(id)}`
+  u.search = `?einzeln=${encodeURIComponent(id)}${dok ? `&dok=${encodeURIComponent(dok)}` : ''}`
   u.hash = ''
   // Auf dem Server liegt die Oberfläche unter „/" (nicht unter einem tieferen Pfad)
   if (aufServer()) u.pathname = '/'
-  window.open(u.toString(), `schulapps-${id}`, 'popup,width=1280,height=860')
+  window.open(u.toString(), `schulapps-${id}${dok ? `-${dok}` : ''}`, 'popup,width=1280,height=860')
 }
 
 /** Das Programm, in dessen Bereich eine Komponente steht (App.tsx setzt es je Programm) */

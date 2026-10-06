@@ -204,6 +204,8 @@ export interface Einstellungen {
   gestartet?: number
   /** Ergebnisse für die Lernenden freigegeben (sonst erst, wenn alle abgegeben haben) */
   ergebnisFrei?: boolean
+  /** In der Liste der Lehrkraft ausgeblendet (06.10.2026) – nur beendete Tests */
+  ausgeblendet?: boolean
   /** Figur (Maskottchen) auf Wartebildschirm, im Kopf und beim Ergebnis */
   figur?: boolean
   /** Handschrift erlaubt (Schreibfläche mit Erkennung, renderer/modules/onlinetest/handschrift.ts) */
@@ -1216,12 +1218,35 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
               teilnehmer: ts.length,
               abgegeben: ts.filter((x) => x.abgabe).length,
               offen: bs.reduce((s, b) => s + offeneEinheiten(b), 0),
-              zuEntscheiden: bs.reduce((s, b) => s + zuEntscheiden(b), 0)
+              zuEntscheiden: bs.reduce((s, b) => s + zuEntscheiden(b), 0),
+              beendet: t.beendet ?? null,
+              ausgeblendet: Boolean(t.einstellungen.ausgeblendet)
             }
           })
         }),
         true
       )
+    }
+    /*
+     * Alte Tests ausblenden (06.10.2026): beendete Tests, die älter als N Monate sind (Ende bzw. Erstellung). Laufende und
+     * wartende Tests bleiben immer sichtbar.
+     */
+    if (req.method === 'POST' && teile[0] === 'ausblenden-aelter') {
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      const monate = [1, 3, 6, 12].includes(Number(k0.monate)) ? Number(k0.monate) : 0
+      if (!monate) return (json(res, 400, { fehler: 'Bitte 1, 3, 6 oder 12 Monate wählen.' }), true)
+      const grenze = new Date()
+      grenze.setMonth(grenze.getMonth() - monate)
+      let n = 0
+      for (const t of (db().prepare("SELECT * FROM onlinetests WHERE lehrkraft_id = ? AND status = 'beendet'").all(ich.id) as unknown as TestZeile[]).map(
+        alsTest
+      )) {
+        if (t.einstellungen.ausgeblendet) continue
+        if (new Date(t.beendet ?? t.erstellt).getTime() >= grenze.getTime()) continue
+        einstellungenSetzen(t, { ausgeblendet: true })
+        n++
+      }
+      return (json(res, 200, { ausgeblendet: n }), true)
     }
     if (req.method === 'POST' && teile[0] === 'erstellen') {
       const k0 = (await k.koerper()) as Record<string, unknown>
@@ -1307,6 +1332,12 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
       }
       if (k0.status === 'freigeben' || k0.status === 'zurueckhalten') {
         einstellungenSetzen(test, { ergebnisFrei: k0.status === 'freigeben' })
+        return (json(res, 200, { ok: true }), true)
+      }
+      // Ausblenden (06.10.2026): nur beendete Tests; Einblenden immer
+      if (k0.status === 'ausblenden' || k0.status === 'einblenden') {
+        if (k0.status === 'ausblenden' && test.status !== 'beendet') return (json(res, 409, { fehler: 'Nur beendete Tests lassen sich ausblenden.' }), true)
+        einstellungenSetzen(test, { ausgeblendet: k0.status === 'ausblenden' })
         return (json(res, 200, { ok: true }), true)
       }
       const status: TestStatus = k0.status === 'beendet' ? 'beendet' : test.einstellungen.gestartet ? 'offen' : 'wartend'

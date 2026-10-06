@@ -10,6 +10,7 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
+import { ListenSuche } from '../../shared/components/AppSuche'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { useAlleLernenden } from './LernendeWahl'
 import {
@@ -99,6 +100,7 @@ export default function VokabelTraining(): React.JSX.Element {
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
   const [filter, setFilter] = useState<'offen' | 'beendet'>('offen')
+  const [suche, setSuche] = useState('')
   const laden = useCallback(
     () =>
       void holen<{ zuweisungen: ZuweisungKurz[] }>('/server/vokabeln').then(
@@ -109,12 +111,14 @@ export default function VokabelTraining(): React.JSX.Element {
   )
   useEffect(laden, [laden])
   if (gewaehlt) return <Lernstand id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
-  const sichtbar = (liste ?? []).filter((z) => z.status === filter)
+  const q = suche.trim().toLowerCase()
+  const sichtbar = (liste ?? []).filter((z) => z.status === filter && (!q || `${z.titel} ${z.fach} ${z.lerngruppe}`.toLowerCase().includes(q)))
   return (
     <Stack data-vokabeltraining>
       {/* Gemeinsamer Kopf (Phase 6a): Filter in der zweiten Zeile */}
       <AppKopf
         beschreibung="Vokabeln über einen längeren Zeitraum zum Lernen freigeben – für eine Lerngruppe, einzelne Lernende oder per QR-Code. Geübt wird im Karteikasten der Lern-App; hier steht der Lernstand."
+        suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Titel, Fach, Lerngruppe …" />}
         hauptknopf={
           <Button leftSection={<IconPlus size={16} />} radius="md" color={farbe} onClick={() => setNeu(true)} data-vokabeln-freigeben>
             Vokabeln freigeben

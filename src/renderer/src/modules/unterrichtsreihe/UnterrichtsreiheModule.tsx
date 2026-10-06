@@ -93,6 +93,7 @@ export default function UnterrichtsreiheModule(): React.JSX.Element {
       <Stack data-reihen-liste>
         {/* Gemeinsamer Kopf (Phase 6a) */}
         <AppKopf
+          suche={false}
           beschreibung="Lernpfade für Lernende: Schritt für Schritt freischalten, mit Lernzielen aus dem Kerncurriculum, eigenem Tempo und Haltepunkten – von Hand oder mit KI geplant."
           hauptknopf={
             <Button

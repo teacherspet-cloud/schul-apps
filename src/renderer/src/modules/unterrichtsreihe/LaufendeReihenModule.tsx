@@ -4,6 +4,7 @@
  * Zuweisungen mit Fortschritt der Lerngruppe, Verteilung, Handlungsbedarf und Haltepunkten; oben
  * der gemeinsame Korrektur-Eingang. Ein Klick öffnet die Übersicht in der App „Unterrichtsreihe".
  */
+import { ListenSuche } from '../../shared/components/AppSuche'
 import { AppKopf } from '../../shared/components/AppKopf'
 import { Badge, Button, Card, Center, Container, Group, Loader, Progress, SimpleGrid, Stack, Text, Tooltip } from '@mantine/core'
 import { IconAlertCircle, IconArrowRight, IconFlag, IconRoute } from '@tabler/icons-react'
@@ -133,13 +134,16 @@ export default function LaufendeReihenModule({ active }: { active: boolean }): R
   // Rohwert wählen und erst danach ergänzen – ein neues [] im Wähler ließe React endlos neu zeichnen
   const eigeneRoh = useAppSettings((s) => s.settings.eigeneFaecher)
   const eigene = eigeneRoh ?? []
+  const [suche, setSuche] = useState('')
   if (!reihen)
     return (
       <Center h="60vh">
         <Loader />
       </Center>
     )
-  const faecher = [...new Set(reihen.map((r) => r.fach || 'Ohne Fach'))].sort(
+  const q = suche.trim().toLowerCase()
+  const gefunden = reihen.filter((r) => !q || `${r.titel} ${r.thema} ${r.gruppe} ${r.fach}`.toLowerCase().includes(q))
+  const faecher = [...new Set(gefunden.map((r) => r.fach || 'Ohne Fach'))].sort(
     (a, b) =>
       Number(eigene.some((e) => e.toLowerCase() === b.toLowerCase())) - Number(eigene.some((e) => e.toLowerCase() === a.toLowerCase())) ||
       a.localeCompare(b, 'de')
@@ -154,6 +158,7 @@ export default function LaufendeReihenModule({ active }: { active: boolean }): R
             : 'Gerade läuft keine Reihe.'
         }
         neu={{ label: 'Reihen planen', onClick: () => openModule('unterrichtsreihe'), kennung: 'laufendereihen', icon: <IconRoute size={16} /> }}
+        suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Reihe, Thema, Lerngruppe …" />}
       />
       <Stack gap="lg">
         <Eingang oeffnen={oeffneReihe} />
@@ -163,7 +168,7 @@ export default function LaufendeReihenModule({ active }: { active: boolean }): R
               {f}
             </Text>
             <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-              {reihen
+              {gefunden
                 .filter((r) => (r.fach || 'Ohne Fach') === f)
                 .map((r) => (
                   <ReiheKarte key={r.zid} r={r} />

@@ -36,12 +36,11 @@ try {
     )
   )
     await spaeter.click()
-  // Die Startseite hat seit dem 03.10.2026 keine Programmkacheln mehr – der Weg führt über die Leiste (Rechtsklick)
-  await haupt.locator('.app-leiste [aria-label="Vokabeltest"]').click({ button: 'right' })
-  const knopf = haupt.locator('[data-leiste-eigenes-fenster]').first()
-  await knopf.waitFor({ timeout: 15000 })
-  pruefe(true, 'Leiste: „In eigenem Fenster öffnen" für den Vokabeltest')
-  const [neu] = await Promise.all([app.waitForEvent('window', { timeout: 15000 }), knopf.click()])
+  // Die Startseite hat seit dem 03.10.2026 keine Programmkacheln mehr – seit 06.10.2026: Doppelklick in der Leiste
+  const vt = haupt.locator('.app-leiste [aria-label="Vokabeltest"]')
+  await vt.waitFor({ timeout: 15000 })
+  pruefe((await vt.getAttribute('data-doppelklick-fenster')) !== null, 'Leiste: Vokabeltest per Doppelklick im eigenen Fenster')
+  const [neu] = await Promise.all([app.waitForEvent('window', { timeout: 15000 }), vt.dblclick()])
   await neu.waitForLoadState('domcontentloaded')
   await neu.waitForFunction(() => document.title.includes('Vokabeltest'), null, { timeout: 15000 })
   pruefe(neu.url().includes('einzeln=vokabeltest'), `zweites Fenster mit nur diesem Programm (${neu.url().split('?')[1]})`)
@@ -50,19 +49,10 @@ try {
   await neu.waitForTimeout(1500)
   pruefe((await neu.locator('[data-eigenes-fenster]').count()) === 0, 'im Einzelfenster kein weiteres Pop-up-Symbol')
   await neu.screenshot({ path: join(out, '1-einzelfenster.png') })
-  // Rechtsklick in der Leiste
-  await haupt.locator('.app-leiste [aria-label="Arbeitsblatt"]').click({ button: 'right' })
-  pruefe(
-    await haupt
-      .locator('[data-leiste-eigenes-fenster]')
-      .waitFor({ timeout: 5000 })
-      .then(
-        () => true,
-        () => false
-      ),
-    'Rechtsklick in der Leiste: „In eigenem Fenster öffnen"'
-  )
-  await haupt.keyboard.press('Escape')
+  // Einfacher Klick: KEIN Menü mehr, das offen stehen bleibt (06.10.2026)
+  await haupt.locator('.app-leiste [aria-label="Arbeitsblatt"]').click()
+  await haupt.waitForTimeout(500)
+  pruefe((await haupt.locator('[data-leiste-eigenes-fenster]').count()) === 0, 'Klick in der Leiste: kein Menü bleibt offen')
   // Symbol im Kopf des Programms
   await haupt.locator('.app-leiste [aria-label="Arbeitsblatt"]').click()
   pruefe(

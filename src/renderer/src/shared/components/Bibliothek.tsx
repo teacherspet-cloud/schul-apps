@@ -220,6 +220,7 @@ export function BibliothekKopf({
         </div>
       )}
       <AppKopf
+        suche={false}
         titel={titel}
         beschreibung={untertitel ?? ''}
         hauptknopf={children}

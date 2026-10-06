@@ -10,6 +10,7 @@
  * Abos (ChatGPT, Claude) sind bewusst NICHT teilbar: Die Nutzungsbedingungen verbieten das
  * Teilen von Konten – jede Lehrkraft meldet ihr eigenes an (Einstellungen › KI-Zugang).
  */
+import { DokumentSuche } from '../../shared/components/AppSuche'
 import { AppKopf } from '../../shared/components/AppKopf'
 import {
   ActionIcon,
@@ -95,6 +96,7 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
       <Tabs value={reiter} onChange={setReiter}>
         {/* Gemeinsamer Kopf (Phase 6a): Reiter in der zweiten Zeile, Neu laden rechts */}
         <AppKopf
+          suche={<DokumentSuche alle platzhalter="Alle Materialien durchsuchen …" />}
           zusaetze={
             <ActionIcon variant="default" size="lg" radius="md" onClick={laden} aria-label="Neu laden">
               <IconRefresh size={18} />

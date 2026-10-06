@@ -994,3 +994,22 @@ img.home-illustration {
 .app-kopf-kompakt .app-kopf-titel {
   font-size: 1.15rem;
 }
+
+/* Freigegebene Blätter (06.10.2026): der Titel ist ein Knopf zum Öffnen */
+.freigabe-titel {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+  user-select: none;
+}
+.freigabe-titel:hover {
+  color: var(--mantine-primary-color-filled);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

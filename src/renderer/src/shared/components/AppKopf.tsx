@@ -13,6 +13,7 @@
  * Vorher hatte jedes Programm seinen eigenen Kopf – mal mit Titel, mal nur Schritte, „Neu" mal hell,
  * mal gefüllt, „Eigenes Fenster" mal da, mal nicht.
  */
+import { DokumentSuche } from './AppSuche'
 import { ActionIcon, Button, Group, Paper, Text, Title, Tooltip, UnstyledButton } from '@mantine/core'
 import { IconChevronDown, IconChevronUp, IconFolder, IconPlus } from '@tabler/icons-react'
 import { createContext, useContext, useState } from 'react'
@@ -40,7 +41,8 @@ export function AppKopf({
   links,
   rechts,
   ohneBeschreibung,
-  kompakt
+  kompakt,
+  suche
 }: {
   /** Ohne Angabe: Name aus der Registry */
   titel?: string
@@ -62,6 +64,11 @@ export function AppKopf({
   ohneBeschreibung?: boolean
   /** Über einem Editor: knapp (kleines Bild, ohne Beschreibung, wenig Abstand) – das Blatt braucht die Höhe */
   kompakt?: boolean
+  /**
+   * Suchfeld (06.10.2026: in JEDER App): ohne Angabe die Suche in den gespeicherten Dokumenten dieser App; eine eigene
+   * (`ListenSuche`) filtert die angezeigte Liste; `false`, wenn die App schon an anderer Stelle sucht.
+   */
+  suche?: React.ReactNode | false
 }): React.JSX.Element {
   const info = useContext(ProgrammInfo)
   const name = titel ?? info?.name ?? ''
@@ -163,6 +170,7 @@ export function AppKopf({
           </div>
         </Group>
         <Group gap="xs" wrap="wrap" justify="flex-end">
+          {suche === false ? null : (suche ?? <DokumentSuche />)}
           {zusaetze}
           {meine && (
             <Button

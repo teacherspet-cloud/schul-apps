@@ -4,6 +4,7 @@
  * „Kombiniere das Menü Verwaltung mit dem Menü Datenverwaltung" Teil der App „Verwaltung": für
  * Lehrkräfte die ganze App, für Admins der erste Reiter neben Nutzern, KI-Zugängen usw.
  */
+import { DokumentSuche } from '../../shared/components/AppSuche'
 import { AppKopf } from '../../shared/components/AppKopf'
 import { Button, Card, Container, Group, Stack, Text } from '@mantine/core'
 import { IconDeviceFloppy, IconFolders } from '@tabler/icons-react'
@@ -16,7 +17,7 @@ export default function VerwaltungLehrkraft(): React.JSX.Element {
   return (
     <Container size="lg" py="lg">
       {/* Gemeinsamer Kopf (Phase 6a) */}
-      <AppKopf />
+      <AppKopf suche={<DokumentSuche alle platzhalter="Alle Materialien durchsuchen …" />} />
       <DatenUndMaterial />
     </Container>
   )

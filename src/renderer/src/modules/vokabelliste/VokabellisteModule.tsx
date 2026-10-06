@@ -172,6 +172,7 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
       <Container size="lg" py="lg">
         {/* Gemeinsamer Kopf (Phase 6a) */}
         <AppKopf
+          suche={false}
           beschreibung="Schulbuch-Vokabeln bearbeiten und eigene Listen anlegen. Sie stehen anschließend im Vokabeltest und bei den Klassenarbeiten zur Auswahl."
           neu={{ label: 'Neue Liste', onClick: () => setWizard(true), kennung: 'vokabelliste' }}
         />

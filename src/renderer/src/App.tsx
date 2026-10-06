@@ -1,5 +1,5 @@
 import { ProgrammInfo } from './shared/components/AppKopf'
-import { ActionIcon, Anchor, AppShell, Button, Indicator, Menu, Tooltip, UnstyledButton } from '@mantine/core'
+import { ActionIcon, Anchor, AppShell, Button, Indicator, Tooltip, UnstyledButton } from '@mantine/core'
 import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
@@ -10,7 +10,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconClipboardCheck,
-  IconExternalLink,
   IconFolders,
   IconHome,
   IconLayoutSidebarLeftCollapse,
@@ -33,9 +32,9 @@ import AuftragsLayer from './shell/AuftragsLayer'
 import { useSichtbareProgramme } from './shell/programme'
 import { abgemeldet, imNetz } from './shared/netzZugang'
 import { sichereAlles } from './shared/autosave'
-import { druckeAktives, openModule, openSettings, useNavigation } from './shared/navigation'
+import { dokumentOeffnenWennBereit, druckeAktives, openModule, openSettings, useNavigation } from './shared/navigation'
 import { faecherAusIservUebernehmen } from './shared/iservAbgleich'
-import { AktuellesProgramm, eigeneFensterMoeglich, einzelnesProgramm, inEigenemFenster } from './shared/eigenesFenster'
+import { AktuellesProgramm, eigeneFensterMoeglich, einzelnesDokument, einzelnesProgramm, inEigenemFenster } from './shared/eigenesFenster'
 import { useTelefon, useTouch } from './shared/touch/touchModus'
 import { ZoomProgramm } from './shared/touch/zoom'
 import { LeistenGriff, MobilTabs, ProgrammSchublade, useRandWischen, type NavigationsDaten } from './shared/touch/MobilNavigation'
@@ -147,6 +146,9 @@ export default function App(): React.JSX.Element {
     if (!m) return
     openModule(m.id)
     document.title = `${m.name} – Schul-Apps`
+    // Mit Dokument (z. B. ein Onlinetest aus der Liste): gleich öffnen
+    const dok = einzelnesDokument()
+    if (dok) void dokumentOeffnenWennBereit(m.id, dok)
   }, [einzeln])
 
   /*
@@ -453,42 +455,14 @@ function NavIcon(props: {
   badge?: boolean
   bild?: string
   onClick: () => void
-  /** Rechtsklick: „In eigenem Fenster öffnen" (02.10.2026) */
+  /**
+   * Doppelklick: „In eigenem Fenster öffnen" (06.10.2026, Wunsch der Lehrkraft). Vorher öffnete ein Rechtsklick ein
+   * kleines Menü – das blieb nach einem Klick auf die App offen stehen.
+   */
   fenster?: () => void
   children: React.ReactNode
 }): React.JSX.Element {
-  const knopf = <NavKnopf {...props} />
-  if (!props.fenster) return knopf
-  return (
-    <MitFensterMenue label={props.label} fenster={props.fenster}>
-      {knopf}
-    </MitFensterMenue>
-  )
-}
-
-/** Rechtsklick (bzw. langes Drücken) auf einen Eintrag der Leiste öffnet ein kleines Menü */
-function MitFensterMenue({ label, fenster, children }: { label: string; fenster: () => void; children: React.ReactNode }): React.JSX.Element {
-  const [offen, setOffen] = useState(false)
-  return (
-    <Menu opened={offen} onChange={setOffen} position="right-start" withArrow shadow="md">
-      <Menu.Target>
-        <div
-          onContextMenu={(e) => {
-            e.preventDefault()
-            setOffen(true)
-          }}
-        >
-          {children}
-        </div>
-      </Menu.Target>
-      <Menu.Dropdown>
-        <Menu.Label>{label}</Menu.Label>
-        <Menu.Item leftSection={<IconExternalLink size={14} />} onClick={fenster} data-leiste-eigenes-fenster>
-          In eigenem Fenster öffnen
-        </Menu.Item>
-      </Menu.Dropdown>
-    </Menu>
-  )
+  return <NavKnopf {...props} />
 }
 
 /**
@@ -546,8 +520,10 @@ function NavKnopf(props: {
   badge?: boolean
   bild?: string
   onClick: () => void
+  fenster?: () => void
   children: React.ReactNode
 }): React.JSX.Element {
+  const doppel = props.fenster ? { onDoubleClick: props.fenster, 'data-doppelklick-fenster': '' } : {}
   // Farben kommen aus dem gewählten Thema (bei farbiger Leiste per app.css)
   const variant = props.active ? 'filled' : props.bild ? 'subtle' : 'light'
   const color = props.active ? undefined : 'gray'
@@ -564,6 +540,8 @@ function NavKnopf(props: {
     return (
       <Button
         onClick={props.onClick}
+        {...doppel}
+        title={props.fenster ? 'Doppelklick: in eigenem Fenster öffnen' : undefined}
         aria-label={props.label}
         className="nav-icon nav-breit"
         data-active={props.active}
@@ -581,9 +559,24 @@ function NavKnopf(props: {
       </Button>
     )
   return (
-    <Tooltip label={props.label} position="right" withArrow>
+    <Tooltip
+      label={
+        props.fenster ? (
+          <>
+            {props.label}
+            <br />
+            <span style={{ opacity: 0.7, fontSize: 11 }}>Doppelklick: eigenes Fenster</span>
+          </>
+        ) : (
+          props.label
+        )
+      }
+      position="right"
+      withArrow
+    >
       <ActionIcon
         onClick={props.onClick}
+        {...doppel}
         aria-label={props.label}
         className="nav-icon"
         data-active={props.active}

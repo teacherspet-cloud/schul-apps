@@ -156,6 +156,7 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
     <Container size="lg" py="lg" data-freigaben>
       {/* Gemeinsamer Kopf (Phase 6a): Filter links, Suche rechts */}
       <AppKopf
+        suche={false}
         beschreibung={
           'Wer hat begonnen, wer eingereicht? Neue Blätter lassen sich direkt hier freigeben – oder im Editor der App „Arbeitsblatt" (Knopf „Für Lernende").'
         }
@@ -222,7 +223,17 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
                     <Group justify="space-between" wrap="nowrap">
                       <div style={{ minWidth: 0 }}>
                         <Group gap={6}>
-                          <Text fw={700} truncate>
+                          {/* Titel öffnet das Blatt (06.10.2026) – vorher nur markierbarer Text */}
+                          <Text
+                            fw={700}
+                            truncate
+                            component="button"
+                            type="button"
+                            onClick={() => setGewaehlt(f.id)}
+                            className="freigabe-titel"
+                            title="Blatt öffnen"
+                            data-freigabe-titel
+                          >
                             {f.titel}
                           </Text>
                           {f.status !== 'offen' && (

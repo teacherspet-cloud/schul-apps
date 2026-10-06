@@ -13,6 +13,8 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
+import { ListenSuche } from '../../shared/components/AppSuche'
+import { eigeneFensterMoeglich, inEigenemFenster } from '../../shared/eigenesFenster'
 import { buendeln, type Fall } from './entscheidungBuendeln'
 import { useAppSettings } from '../../shared/settingsStore'
 import { thresholdsForSubject } from '../../shared/gradeScale'
@@ -57,6 +59,7 @@ import {
 } from '@mantine/core'
 import {
   IconAlertTriangle,
+  IconArchive,
   IconArrowDown,
   IconArrowUp,
   IconArrowsSort,
@@ -65,6 +68,7 @@ import {
   IconChevronRight,
   IconCopy,
   IconDownload,
+  IconExternalLink,
   IconEye,
   IconEyeOff,
   IconFileText,
@@ -105,6 +109,8 @@ interface TestListe {
   abgegeben: number
   offen: number
   zuEntscheiden: number
+  beendet?: string | null
+  ausgeblendet?: boolean
 }
 
 interface Teilnahme {
@@ -171,6 +177,22 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
   // Von außen geöffnet (nach dem Erstellen): Detailansicht dieses Tests
   const [ziel, setZiel] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
+  // Nach „Alte Tests ausblenden" die Listen neu laden
+  const [stand, setStand] = useState(0)
+  const [suche, setSuche] = useState('')
+  const alteAusblenden = async (monate: number): Promise<void> => {
+    try {
+      const r = await senden<{ ausgeblendet: number }>('/server/onlinetest/ausblenden-aelter', { monate })
+      notifySuccess(
+        r.ausgeblendet
+          ? `${r.ausgeblendet} beendete${r.ausgeblendet === 1 ? 'r Test' : ' Tests'} ausgeblendet – zu finden unter „Ausgeblendete Tests".`
+          : `Keine beendeten Tests, die älter als ${monate === 1 ? 'einen Monat' : `${monate} Monate`} sind.`
+      )
+      setStand((n) => n + 1)
+    } catch (e) {
+      notifyError(e)
+    }
+  }
   useDokumentOeffner('onlinetest', async (id) => {
     setReiter('tests')
     setZiel(id)
@@ -183,17 +205,43 @@ export default function OnlinetestModule({ active }: { active: boolean }): React
         {/* Gemeinsamer Kopf (Phase 6a): Reiter in der zweiten Zeile */}
         <AppKopf
           neu={{ label: 'Neuer Onlinetest', onClick: () => setNeu(true), kennung: 'onlinetest' }}
+          suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Test, Code, Lerngruppe …" />}
           links={
             <Tabs.List style={{ borderBottom: 0 }}>
               <Tabs.Tab value="tests">Tests</Tabs.Tab>
               <Tabs.Tab value="gruppen" leftSection={<IconUsersGroup size={16} />}>
                 Lerngruppen
               </Tabs.Tab>
+              <Tabs.Tab value="ausgeblendet" leftSection={<IconEyeOff size={16} />} data-reiter-ausgeblendet>
+                Ausgeblendete Tests
+              </Tabs.Tab>
             </Tabs.List>
+          }
+          rechts={
+            reiter === 'tests' ? (
+              <Menu position="bottom-end" withinPortal>
+                <Menu.Target>
+                  <Button size="xs" variant="light" leftSection={<IconArchive size={14} />} rightSection={<IconChevronDown size={12} />} data-alte-ausblenden>
+                    Alte Tests ausblenden
+                  </Button>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Label>Beendete Tests ausblenden, älter als …</Menu.Label>
+                  {[1, 3, 6, 12].map((m) => (
+                    <Menu.Item key={m} onClick={() => void alteAusblenden(m)} data-aelter-als={m}>
+                      {m === 1 ? '1 Monat' : `${m} Monate`}
+                    </Menu.Item>
+                  ))}
+                </Menu.Dropdown>
+              </Menu>
+            ) : undefined
           }
         />
         <Tabs.Panel value="tests">
-          <Tests ziel={ziel} zielErledigt={() => setZiel(null)} />
+          <Tests key={`t${stand}`} ziel={ziel} zielErledigt={() => setZiel(null)} suche={suche} />
+        </Tabs.Panel>
+        <Tabs.Panel value="ausgeblendet">
+          {reiter === 'ausgeblendet' && <Tests key={`a${stand}`} ziel={null} zielErledigt={() => undefined} ausgeblendete suche={suche} />}
         </Tabs.Panel>
         <Tabs.Panel value="gruppen">
           <Lerngruppen />
@@ -307,7 +355,19 @@ function SpaltenKopf({
   )
 }
 
-function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () => void }): React.JSX.Element {
+function Tests({
+  ziel,
+  zielErledigt,
+  ausgeblendete = false,
+  suche = ''
+}: {
+  ziel: string | null
+  zielErledigt: () => void
+  /** Suchfeld im Kopf (06.10.2026) */
+  suche?: string
+  /** Reiter „Ausgeblendete Tests" (06.10.2026): nur die ausgeblendeten, sonst nur die sichtbaren */
+  ausgeblendete?: boolean
+}): React.JSX.Element {
   const [liste, setListe] = useState<TestListe[] | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   useEffect(() => {
@@ -327,6 +387,8 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
     if (!liste) return []
     const f = liste.filter(
       (t) =>
+        Boolean(t.ausgeblendet) === ausgeblendete &&
+        (!suche.trim() || `${t.titel} ${t.thema} ${t.code} ${t.lerngruppe} ${t.art}`.toLowerCase().includes(suche.trim().toLowerCase())) &&
         (!filter.name || `${t.titel} ${t.thema} ${t.code}`.toLowerCase().includes(filter.name.toLowerCase())) &&
         (!filter.lerngruppe || t.lerngruppe === filter.lerngruppe) &&
         (!filter.art || t.art === filter.art) &&
@@ -340,7 +402,9 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
       const v = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de')
       return sort.ab ? -v : v
     })
-  }, [liste, sort, filter])
+  }, [liste, sort, filter, ausgeblendete, suche])
+  const ausblenden = (t: TestListe, aus: boolean): void =>
+    void senden(`/server/onlinetest/${t.id}/status`, { status: aus ? 'ausblenden' : 'einblenden' }).then(laden, (e: unknown) => notifyError(e))
   if (gewaehlt) return <TestAnsicht id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
   const werte = (s: Spalte, f: (t: TestListe) => string): { value: string; label: string }[] =>
     [...new Set((liste ?? []).map(f).filter(Boolean))]
@@ -351,6 +415,9 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
     <Stack>
       {!liste && <Loader />}
       {liste?.length === 0 && <Text c="dimmed">Noch keine Onlinetests.</Text>}
+      {ausgeblendete && liste && liste.length > 0 && !liste.some((t) => t.ausgeblendet) && (
+        <Text c="dimmed">Keine ausgeblendeten Tests. Beendete Tests lassen sich in der Liste mit dem Augensymbol ausblenden.</Text>
+      )}
       {Object.values(filter).some(Boolean) && (
         <Group gap="xs" data-aktive-filter>
           <Text size="sm" c="dimmed">
@@ -395,6 +462,7 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
                 {...kopf}
               />
               <SpaltenKopf label="Status" spalte="status" auswahl={werte('status', (t) => t.status)} {...kopf} />
+              <Table.Th w={80} />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -419,6 +487,37 @@ function Tests({ ziel, zielErledigt }: { ziel: string | null; zielErledigt: () =
                 </Table.Td>
                 <Table.Td>
                   <Badge color={STATUS_FARBE[t.status]}>{STATUS_TEXT[t.status]}</Badge>
+                </Table.Td>
+                {/* Eigenes Fenster und Ausblenden (06.10.2026) – ohne die Zeile zu öffnen */}
+                <Table.Td onClick={(e) => e.stopPropagation()}>
+                  <Group gap={2} wrap="nowrap" justify="flex-end">
+                    {t.status === 'beendet' && (
+                      <Tooltip label={t.ausgeblendet ? 'Wieder einblenden' : 'Ausblenden'}>
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          onClick={() => ausblenden(t, !t.ausgeblendet)}
+                          aria-label={t.ausgeblendet ? 'Wieder einblenden' : 'Ausblenden'}
+                          data-test-ausblenden={t.ausgeblendet ? 'ein' : 'aus'}
+                        >
+                          {t.ausgeblendet ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                    {eigeneFensterMoeglich() && (
+                      <Tooltip label="In eigenem Fenster öffnen">
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          onClick={() => inEigenemFenster('onlinetest', t.id)}
+                          aria-label="In eigenem Fenster öffnen"
+                          data-test-fenster
+                        >
+                          <IconExternalLink size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
                 </Table.Td>
               </Table.Tr>
             ))}
