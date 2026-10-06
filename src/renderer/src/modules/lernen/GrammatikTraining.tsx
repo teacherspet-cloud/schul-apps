@@ -7,6 +7,7 @@
  *    freigeben. Freigegeben wird nie ungesehen.
  *  - Lernstand je Person (sicher / heute fällig / aktiv in den letzten 7 Tagen), Problemaufgaben, Regelkarten.
  */
+import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import {
   ActionIcon,
   Alert,
@@ -122,6 +123,8 @@ export function GrammatiktrainingModule({ active }: { active: boolean }): React.
   const [liste, setListe] = useState<Zuweisung[] | null>(null)
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
+  // openDocument('grammatiktraining', id) – z. B. aus „Meine Klassen" (06.10.2026)
+  useDokumentOeffner('grammatiktraining', async (id) => setGewaehlt(id))
   const [suche, setSuche] = useState('')
   const [ansehen, setAnsehen] = useState<Entwurf | null>(null)
   const [qr, setQr] = useState<Zuweisung | null>(null)
@@ -521,6 +524,7 @@ interface Lernstanddaten {
 }
 
 function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
+  const rueck = useRueckweg('grammatiktraining', zurueck, 'Alle Grammatiktrainings')
   const [d, setD] = useState<Lernstanddaten | null>(null)
   const [loeschen, setLoeschen] = useState(false)
   const laden = useCallback(() => void holen<Lernstanddaten>(`/server/grammatik/${id}`).then(setD, (e: unknown) => notifyError(e)), [id])
@@ -534,8 +538,8 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
   return (
     <Stack data-grammatik-lernstand>
       <Group justify="space-between">
-        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={zurueck}>
-          Alle Grammatiktrainings
+        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={rueck.los} data-zurueck={rueck.aus ? 'meineklassen' : undefined}>
+          {rueck.name}
         </Button>
         <Group gap="xs">
           <Button

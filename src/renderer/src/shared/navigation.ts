@@ -44,6 +44,12 @@ interface NavigationState {
   setSettingsTab: (tab: SettingsTab) => void
   openDocument: (moduleId: string, docId: string) => Promise<void>
   openThemen: (fachId?: string, bereichId?: string) => void
+  /**
+   * Rückweg (06.10.2026, Meine Klassen): Wer aus „Meine Klassen" einen Test, ein Blatt oder ein Training öffnet, kommt mit
+   * dem Zurück-Knopf dort wieder an (`fuer` = geöffnetes Programm, `nach` = zurück dorthin). Verfällt beim Wechsel woandershin.
+   */
+  rueckweg: { fuer: string; nach: string; name: string } | null
+  setRueckweg: (r: { fuer: string; nach: string; name: string } | null) => void
 }
 
 type Oeffner = (docId: string) => Promise<void>
@@ -57,7 +63,12 @@ export const useNavigation = create<NavigationState>((set, get) => ({
   settingsTab: 'schule',
   themenZiel: { n: 0 },
   laufpunkte: {},
+  rueckweg: null,
+  setRueckweg: (r) => set({ rueckweg: r }),
   openModule: (id) => {
+    // Rückweg verfällt, sobald man anderswohin wechselt
+    const r = get().rueckweg
+    if (r && id !== r.fuer) set({ rueckweg: null })
     /*
      * Beim Wechsel des Programms anstehende Sicherungen sofort ausführen. Die Programme bleiben
      * zwar im Hintergrund erhalten – aber wer danach das Fenster schließt oder der Rechner
@@ -257,5 +268,23 @@ export async function geheZuDokument(moduleId: string, docId: string, schonOffen
     el.setAttribute('data-aufgerufen', '')
     window.setTimeout(() => el.removeAttribute('data-aufgerufen'), 1800)
     return
+  }
+}
+
+/**
+ * Zurück-Knopf eines Programms mit Rückweg (z. B. „← Alle Tests"): Kam man aus „Meine Klassen", heißt er so und führt
+ * dorthin zurück; `zurueck` räumt vorher die eigene Ansicht auf.
+ */
+export function useRueckweg(modul: string, zurueck: () => void, name: string): { name: string; aus: boolean; los: () => void } {
+  const r = useNavigation((s) => s.rueckweg)
+  if (!r || r.fuer !== modul) return { name, aus: false, los: zurueck }
+  return {
+    name: r.name,
+    aus: true,
+    los: () => {
+      zurueck()
+      useNavigation.getState().setRueckweg(null)
+      useNavigation.getState().openModule(r.nach)
+    }
   }
 }

@@ -68,6 +68,8 @@ export function davUrl(basis: string, teile: string[], ordner = false): string {
 
 /** Ordner für eine Datei: Standardziel + Fach + Themenbereich (wie die Ablage auf dem iPad) */
 export function iservOrdnerFuer(standardZiel: string | undefined, ziel: AblageZiel): string[] {
+  // Fester Ordner (Ablagestruktur der Verwaltung aus „Meine Klassen")
+  if (ziel.iservPfad?.length) return pfadTeile(ziel.iservPfad)
   const basis = pfadTeile(standardZiel || ISERV_STANDARD_ZIEL)
   return [...basis, ...schulmaterialTeile(ziel)]
 }

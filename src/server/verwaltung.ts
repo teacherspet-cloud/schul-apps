@@ -39,6 +39,7 @@ import type { Rolle } from './kontext'
 import { benutzerFuer, klassenGruppe, nameAusZeile, startPasswort } from './klassenliste'
 import { registerVergessen } from './namensschutz'
 import { alleFreigaben, freigabeWiderrufen } from './hoertexte'
+import { ABLAGE_STANDARD, ablageMuster } from './klassen'
 
 /** Schlüssel, die der Admin für alle freigeben kann */
 export const TEILBARE_SCHLUESSEL: SecretName[] = ['openai', 'anthropic', 'google', 'elevenlabs', 'pixabay']
@@ -85,6 +86,8 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
           schluessel: TEILBARE_SCHLUESSEL.map((name) => ({ name, hinterlegt: verdeckt(serverGeheimnis(`schluessel:${name}`)), fuerAlle: Boolean(freigaben[name]) })),
           iserv: { ...iserv, geheimnis: Boolean(serverGeheimnis('iserv-client')) },
           notzugang: serverWert('notzugang', true),
+          // Meine Klassen (06.10.2026): Ordnerstruktur für „In IServ ablegen"
+          ablage: { muster: ablageMuster(), standard: ABLAGE_STANDARD },
           server: {
             speicher: { frei: freemem(), gesamt: totalmem(), prozess: process.memoryUsage().rss },
             last: loadavg(),
@@ -226,6 +229,19 @@ export async function verwaltungsRoute(k: Anfrage): Promise<boolean> {
     const ok = freigabeWiderrufen(String(k0.kennung ?? ''))
     if (ok) protokolliereServer('verwaltung', 'Hörtext-Freigabe widerrufen', ich)
     return (json(res, 200, { ok }), true)
+  }
+  if (was === 'iserv-ablage') {
+    // Platzhalter {Klasse}, {Fach}, {Schuljahr}; leer = Standard
+    const muster = String(k0.muster ?? '')
+      .replace(/\\/g, '/')
+      .split('/')
+      .map((t) => t.trim().replace(/[<>:"|?*]/g, ''))
+      .filter(Boolean)
+      .join('/')
+      .slice(0, 200)
+    setzeServerWert('iserv-ablage', muster || ABLAGE_STANDARD)
+    protokolliereServer('verwaltung', 'IServ-Ablagestruktur geändert', ich)
+    return (json(res, 200, { muster: muster || ABLAGE_STANDARD }), true)
   }
   if (was === 'notzugang') {
     setzeServerWert('notzugang', Boolean(k0.an))

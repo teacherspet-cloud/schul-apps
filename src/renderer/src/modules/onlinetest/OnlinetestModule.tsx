@@ -28,7 +28,7 @@ import { Erstellen, type BlattQuelleOnline } from './OnlinetestKnopf'
 import { AppKopf } from '../../shared/components/AppKopf'
 import { FAECHER } from '@shared/faecher'
 import HaeufigSelect from '../../shared/components/HaeufigSelect'
-import { useDokumentOeffner } from '../../shared/navigation'
+import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import type { TestDocument } from '../vokabeltest/model/types'
 import {
   ActionIcon,
@@ -751,6 +751,8 @@ function Export({ d }: { d: TestDetail }): React.JSX.Element {
 }
 
 function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
+  // Aus „Meine Klassen" geöffnet: der Knopf führt dorthin zurück (06.10.2026)
+  const rueck = useRueckweg('onlinetest', zurueck, 'Alle Tests')
   const [d, setD] = useState<TestDetail | null>(null)
   const [laeuft, setLaeuft] = useState(false)
   const [durchsicht, setDurchsicht] = useState<string | null>(null)
@@ -804,8 +806,8 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
   return (
     <Stack>
       <Group justify="space-between">
-        <Button variant="subtle" onClick={zurueck}>
-          ← Alle Tests
+        <Button variant="subtle" onClick={rueck.los} data-zurueck={rueck.aus ? 'meineklassen' : undefined}>
+          ← {rueck.name}
         </Button>
         <Group gap="xs">
           {d.status === 'wartend' && (

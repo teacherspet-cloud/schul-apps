@@ -19,6 +19,14 @@ const KOPF = { 'x-schulapps-token': 'server' }
 const N = Date.now() % 1000
 const K5 = `5k${N}`
 const K10 = `10k${N}`
+const K7 = `7k${N}`
+const VORLAGE = {
+  version: 1,
+  meta: { title: 'Probe', subjectId: 'englisch', subjectLabel: 'Englisch', grade: 5, anrede: 'du', schwerpunkt: '' },
+  grundlage: { art: 'frei', titel: 'Probe', aufgaben: 'Aufgabe 1: Schreibe.', erwartung: 'Ein Satz.' },
+  abgaben: [],
+  createdAt: new Date().toISOString()
+}
 const WOERTER = ['weather', 'sunny', 'cloud', 'rain', 'wind', 'snow', 'storm'].map((t, i) => ({
   id: `w${i}`,
   term: t,
@@ -52,14 +60,33 @@ try {
   const g10 = await neu(K10, 'Englisch')
   const gGe = await neu(K5, 'Geschichte')
   const gEn = await neu(K5, 'Englisch')
+  const gOhne = await neu(K7, '')
   void g10
-  void gGe
+  void gOhne
   const vok = await (
     await lk.request.post(`${A}/server/vokabeln/freigeben`, {
       headers: KOPF,
       data: { lerngruppeId: gEn.id, titel: 'Weather', sprache: 'en', fach: 'Englisch', woerter: WOERTER }
     })
   ).json()
+  // Zwei Blätter: eins mit Frist (morgen), eins ohne – Standard: offene mit Frist zuerst
+  const blatt = async (titel, bis) =>
+    (
+      await lk.request.post(`${A}/server/blaetter/freigeben`, {
+        headers: KOPF,
+        data: {
+          titel,
+          html: `<!doctype html><html><body><div class="ws-page"><p>${titel}</p></div></body></html>`,
+          aufgaben: [{ nr: 1, anweisung: 'Schreibe.', erwartung: 'Ein Satz.' }],
+          rueckmeldung: { ...VORLAGE, meta: { ...VORLAGE.meta, title: titel }, grundlage: { ...VORLAGE.grundlage, titel } },
+          lerngruppeId: gEn.id,
+          schueler: [],
+          einstellungen: { feedback: false, ...(bis ? { bis } : {}) }
+        }
+      })
+    ).json()
+  await blatt('Ohne Frist', null)
+  await blatt('Mit Frist', Date.now() + 86_400_000)
   // Mia übt: alle Wörter kennengelernt, fünf davon dreimal falsch geschrieben → wackelig
   const mia = liste.angelegt[0]
   const sm = await browser.newContext()
@@ -75,16 +102,25 @@ try {
     for (let i = 0; i < 3; i++)
       await sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId: w.id, uebung: 'frei', antwort: 'xyz' } })
 
-  // ---------- Schnittstelle
+  // ---------- Schnittstelle: eine Karte je Klasse, Fächer darunter
   const uebersicht = await (await lk.request.get(`${A}/server/klassen`, { headers: KOPF })).json()
-  const titel = uebersicht.klassen.map((k) => k.titel)
+  const namen = uebersicht.klassen.map((k) => `${k.name}:${k.faecher.map((f) => f.fach).join('+')}`)
   pruefe(
-    JSON.stringify(titel) === JSON.stringify([`${K5} – Englisch`, `${K5} – Geschichte`, `${K10} – Englisch`]),
-    `Alphabetisch, Klasse – Fach (${titel.join(' · ')})`
+    JSON.stringify(namen) === JSON.stringify([`${K5}:Englisch+Geschichte`, `${K7}:`, `${K10}:Englisch`]),
+    `Eine Karte je Klasse, Zahlen natürlich (${namen.join(' · ')})`
   )
   const d = await (await lk.request.get(`${A}/server/klassen/${gEn.id}`, { headers: KOPF })).json()
   pruefe(d.lernende.length === 2 && d.lernende.some((l) => l.vokabelnSicher !== null), `Lernende mit Lernstand (${d.lernende.length})`)
   pruefe(d.wackelig.length >= 5, `Wackelige Wörter der Klasse (${d.wackelig.length})`)
+  pruefe(d.sprachfach === true && d.ablageMuster === 'Gruppen/Klasse {Klasse}/{Fach}', `Sprachfach, Ablagestruktur (${d.ablageMuster})`)
+  pruefe(
+    d.vokabeln[0]?.woerter === 7 && d.vokabeln[0]?.probleme.length >= 1,
+    `Vokabel-Details: Umfang, schwierigste Wörter (${d.vokabeln[0]?.probleme.length})`
+  )
+  pruefe(
+    d.blaetter.some((b) => b.bis && b.nichtBegonnen.length === 2),
+    'Blatt-Details: Frist, wer noch nicht begonnen hat'
+  )
   pruefe(
     d.bedarf.some((b) => b.art === 'inaktiv' || b.art === 'foerdern'),
     `Handlungsbedarf erkannt (${d.bedarf.map((b) => b.art).join(', ')})`
@@ -93,6 +129,8 @@ try {
     d.vorschlaege.some((v) => v.art === 'vokabeln'),
     'Vorschlag: Vokabeltraining „Wackelige Wörter“'
   )
+  const dGe = await (await lk.request.get(`${A}/server/klassen/${gGe.id}`, { headers: KOPF })).json()
+  pruefe(dGe.sprachfach === false, 'Geschichte ist kein Sprachfach')
 
   // ---------- Oberfläche
   const p = await lk.newPage()
@@ -103,13 +141,104 @@ try {
   await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
   await p.locator('[data-klassen-liste]').waitFor({ timeout: 10000 })
   const karten = await p.locator('[data-klasse]').evaluateAll((e) => e.map((x) => x.getAttribute('data-klasse')))
-  pruefe(karten[0] === `${K5} – Englisch` && karten.length === 3, `Karten in der App (${karten.join(' · ')})`)
+  pruefe(JSON.stringify(karten) === JSON.stringify([K5, K7, K10]), `Karten je Klasse in der App (${karten.join(' · ')})`)
+  // Gleiche Ausrichtung: Karten gleich hoch, Inhalt der Karte ohne Fach nicht nach oben gerutscht
+  const lage = await p.locator('[data-klasse]').evaluateAll((e) =>
+    e.map((x) => {
+      const r = x.getBoundingClientRect()
+      const k = x.firstElementChild.getBoundingClientRect()
+      return { h: Math.round(r.height), oben: Math.round(k.top - r.top) }
+    })
+  )
+  pruefe(new Set(lage.map((l) => l.h)).size === 1 && lage.every((l) => l.oben >= 14), `Karten gleich hoch, Inhalt ausgerichtet (${JSON.stringify(lage)})`)
   await p.screenshot({ path: join(out, '1-uebersicht.png') })
-  await p.locator(`[data-klasse="${K5} – Englisch"]`).click()
+
+  // Klasse ohne Fach: nur „+ Fach hinzufügen"
+  await p.locator(`[data-klasse="${K7}"]`).click()
+  pruefe(await da(p.locator('[data-ohne-fach]')), 'Klasse ohne Fach: Hinweis und „+ Fach hinzufügen“')
+  pruefe((await p.locator('[data-fach-leiste] [data-fach]').count()) === 0, 'Noch keine Fach-Reiter')
+  await p.screenshot({ path: join(out, '2-ohne-fach.png') })
+  await p.locator('[data-fach-hinzufuegen]').click()
+  await p.locator('[data-fach-wahl]').click()
+  await p.getByRole('option', { name: 'Französisch', exact: true }).click()
+  pruefe(await da(p.locator('[data-fach-leiste] [data-fach="Französisch"]')), 'Fach hinzugefügt: Reiter „Französisch“')
+  pruefe(await da(p.locator('[data-handlungsbedarf]')), 'Danach Handlungsbedarf und Reiter des Fachs')
+  await p.screenshot({ path: join(out, '2b-fach-neu.png') })
+  await p.getByRole('button', { name: 'Alle Klassen' }).click()
+
+  // Klasse mit zwei Fächern
+  await p.locator(`[data-klasse="${K5}"]`).click()
+  await p.locator('[data-fach-leiste] [data-fach]').first().waitFor({ timeout: 10000 })
+  const faecher = await p.locator('[data-fach-leiste] [data-fach]').evaluateAll((e) => e.map((x) => x.getAttribute('data-fach')))
+  pruefe(JSON.stringify(faecher) === JSON.stringify(['Englisch', 'Geschichte']), `Fach-Leiste (${faecher.join(' | ')})`)
   await p.locator('[data-handlungsbedarf]').waitFor({ timeout: 10000 })
-  pruefe((await p.locator('[data-bedarf]').count()) >= 1, 'Handlungsbedarf oben')
-  pruefe(await p.locator('[data-lernende-tabelle]').isVisible(), 'Lernende mit Vokabeln, Tests, Blättern')
-  await p.screenshot({ path: join(out, '2-klasse.png'), fullPage: true })
+  const leisteOben = await p.locator('[data-fach-leiste]').boundingBox()
+  const bedarfOben = await p.locator('[data-handlungsbedarf]').boundingBox()
+  pruefe(leisteOben.y < bedarfOben.y, 'Fach-Leiste steht über „Handlungsbedarf“')
+  // Fach-Reiter (mit Bedarfszahl) zählen nicht
+  const reiter = (await p.locator('[data-klasse-detail] [role="tab"]').allInnerTexts()).map((r) => r.trim())
+  pruefe(
+    /^Unterrichtsreihen & Blätter/.test(reiter[0]) &&
+      /^Vokabeln & Grammatik/.test(reiter[1]) &&
+      /^Tests & Noten/.test(reiter[2]) &&
+      /^Lernende/.test(reiter[3]),
+    `Reiter-Reihenfolge (${reiter.join(' | ')})`
+  )
+  // Reihen & Blätter: Standard offen + Frist zuerst; Pfeile sortieren, Rechtsklick filtert
+  const titelFolge = async () =>
+    p.locator('[data-material-liste] [data-material-titel]').evaluateAll((e) => e.map((x) => x.getAttribute('data-material-titel')))
+  const vorher = await titelFolge()
+  pruefe(vorher[0] === 'Mit Frist' && vorher[1] === 'Ohne Frist', `Standard: mit Frist zuerst (${vorher.join(', ')})`)
+  await p.locator('[data-sortieren="titel-ab"]').first().click()
+  const nachher = await titelFolge()
+  pruefe(nachher[0] === 'Ohne Frist', `Pfeil: nach Titel absteigend (${nachher.join(', ')})`)
+  await p.locator('[data-sortieren="frist-auf"]').first().click({ button: 'right' })
+  pruefe(await da(p.locator('[data-filter-menue="frist"]')), 'Rechtsklick auf den Pfeil: Filter „Frist“')
+  await p.locator('[data-filter-menue="frist"] [data-filter-wert="ohne Frist"]').click()
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(300)
+  const gefiltert = await titelFolge()
+  pruefe(gefiltert.length === 1 && gefiltert[0] === 'Ohne Frist', `Gefiltert: nur „ohne Frist“ (${gefiltert.join(', ')})`)
+  await p.locator('[data-sortierung-standard]').click()
+  pruefe((await titelFolge()).length === 2, 'Standard stellt alles wieder her')
+  const karte = p.locator('[data-material-titel="Mit Frist"]')
+  await karte.locator('[data-details-auf]').click()
+  pruefe(await da(karte.locator('[data-details]').getByText('Noch nicht begonnen')), 'Details: wer noch nicht begonnen hat')
+  pruefe((await karte.locator('[data-ampel]').getAttribute('data-ampel')) === 'red', 'Balken in Ampelfarbe (0 % → rot)')
+  await karte.locator('[data-ablegen]').click()
+  pruefe(await da(p.locator('[data-ablegen-menue]')), 'Ablegen ▾: Menü')
+  const arten = await p
+    .locator('[data-ablegen-menue] [data-ablegen-art]')
+    .evaluateAll((e) => e.map((x) => `${x.getAttribute('data-ablegen-art')}${x.hasAttribute('data-disabled') || x.disabled ? '(aus)' : ''}`))
+  pruefe(arten.join(',') === 'pdf,word(aus),drucken,iserv(aus)', `PDF, Word (ohne Original aus), Drucken, IServ (im Browser aus): ${arten.join(', ')}`)
+  await p.screenshot({ path: join(out, '3-reihen-blaetter.png'), fullPage: true })
+  await p.keyboard.press('Escape')
+  await p.getByRole('tab', { name: /^Vokabeln & Grammatik/ }).click()
+  pruefe(await da(p.locator('[data-material-titel="Weather"]')), 'Vokabeltraining mit Details')
+  pruefe((await p.locator('[data-material-titel="Weather"] [data-ampel]').count()) === 1, 'Vokabel-Balken in Ampelfarbe')
+  await p.screenshot({ path: join(out, '4-vokabeln.png'), fullPage: true })
+  // Ablegen ▾ → Als PDF speichern (im Browser: Download)
+  await p.locator('[data-material-titel="Weather"] [data-ablegen]').click()
+  const [laden] = await Promise.all([
+    p.waitForEvent('download', { timeout: 30000 }).catch(() => null),
+    p.locator('[data-ablegen-menue] [data-ablegen-art="pdf"]').click()
+  ])
+  const datei = laden?.suggestedFilename() ?? ''
+  pruefe(/Wortliste Weather\.pdf$/.test(datei), `Wortliste als PDF gespeichert (${datei || 'kein Download'})`)
+  // Geschichte: kein Reiter „Vokabeln & Grammatik"
+  await p.locator('[data-fach-leiste] [data-fach="Geschichte"]').click()
+  await p.locator(`[data-klasse-detail="${K5} – Geschichte"]`).waitFor({ timeout: 10000 })
+  pruefe((await p.getByRole('tab', { name: /^Vokabeln & Grammatik/ }).count()) === 0, 'Geschichte: ohne „Vokabeln & Grammatik“')
+  await p.locator('[data-fach-leiste] [data-fach="Englisch"]').click()
+  await p.locator(`[data-klasse-detail="${K5} – Englisch"]`).waitFor({ timeout: 10000 })
+
+  // Rückweg: Blatt öffnen → „Meine Klassen" führt zurück in dieselbe Klasse
+  await p.getByRole('tab', { name: /^Unterrichtsreihen/ }).click()
+  await p.locator('[data-material-titel="Mit Frist"] [data-material-oeffnen]').click()
+  pruefe(await da(p.locator('[data-zurueck="meineklassen"]')), 'Im geöffneten Blatt heißt der Zurück-Knopf „Meine Klassen“')
+  await p.locator('[data-zurueck="meineklassen"]').click()
+  pruefe(await da(p.locator(`[data-klasse-detail="${K5} – Englisch"]`)), 'Zurück in derselben Klasse und demselben Fach')
+
   await p.locator('[data-vorschlag="vokabeln"] [data-vorschlag-ansehen]').click()
   await p.locator('[data-vokabeln-freischalten]').click()
   pruefe(await da(p.getByText(/ist für .* freigeschaltet/), 8000), 'Vorschlag nach Sichtung freigeschaltet')
@@ -117,6 +246,15 @@ try {
   const neuVt = (vt.zuweisungen ?? vt.liste ?? []).find((z) => /Wackelige Wörter/.test(z.titel))
   pruefe(Boolean(neuVt), `Neues Vokabeltraining „${neuVt?.titel}“ für die Klasse`)
   for (const z of vt.zuweisungen ?? vt.liste ?? []) await lk.request.post(`${A}/server/vokabeln/${z.id}/loeschen`, { headers: KOPF, data: {} })
+
+  // ---------- Verwaltung: Ablagestruktur ändern und zurücksetzen
+  const neuMuster = await (
+    await verwaltung.request.post(`${A}/server/verwaltung/iserv-ablage`, { headers: KOPF, data: { muster: 'Gruppen\\{Klasse}\\{Fach}\\{Schuljahr}' } })
+  ).json()
+  pruefe(neuMuster.muster === 'Gruppen/{Klasse}/{Fach}/{Schuljahr}', `Admin: Ablagestruktur gespeichert (${neuMuster.muster})`)
+  const d2 = await (await lk.request.get(`${A}/server/klassen/${gEn.id}`, { headers: KOPF })).json()
+  pruefe(d2.ablageMuster === neuMuster.muster, 'Lehrkraft bekommt die Struktur der Verwaltung')
+  await verwaltung.request.post(`${A}/server/verwaltung/iserv-ablage`, { headers: KOPF, data: { muster: '' } })
 } catch (e) {
   pruefe(false, `Ablauf abgebrochen – ${e.message.split('\n').slice(0, 6).join(' | ')}`)
   for (const [i, seite] of browser

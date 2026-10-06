@@ -23,6 +23,7 @@ import { describeBlock, describeSheet } from './generation/describe'
 import type { Sheet, Worksheet } from './model/types'
 import type { PagePlan } from './render/paginate'
 import { buildWorksheetHtml } from './render/printHtml'
+import { useArbeitsblatt } from './store'
 import { messeSeiten } from './render/seitenMessen'
 import { taskNumbersFor } from './render/SheetPages'
 
@@ -147,7 +148,8 @@ export function BlattFreigabeDialog({
   schliessen,
   ohneListe,
   freigegeben,
-  gruppeVorwahl
+  gruppeVorwahl,
+  docId
 }: {
   ws: Worksheet
   layouts: Map<string, PagePlan[]>
@@ -160,7 +162,13 @@ export function BlattFreigabeDialog({
   freigegeben?: () => void
   /** Lerngruppe schon gewählt (aus „Meine Klassen", 06.10.2026) */
   gruppeVorwahl?: string
+  /** Kennung des Arbeitsblatts in der eigenen Bibliothek – „Meine Klassen" kann es dann als Word ablegen */
+  docId?: string
 }): React.JSX.Element {
+  const eigeneId = useArbeitsblatt((s) => s.docId)
+  const quelleId = docId ?? eigeneId
+  // Frist (optional) für „Meine Klassen" (06.10.2026)
+  const [bis, setBis] = useState('')
   const [titel, setTitel] = useState(ws.meta.title || ws.meta.topic || 'Arbeitsblatt')
   const [blatt, setBlatt] = useState(ws.sheets[0]?.id ?? '')
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
@@ -237,7 +245,9 @@ export function BlattFreigabeDialog({
           aufgabenRunden: 2,
           stift,
           ...(schrittweise ? { schrittweise: true } : {}),
-          ...(merkAmEnde ? { merkAmEnde: true } : {})
+          ...(merkAmEnde ? { merkAmEnde: true } : {}),
+          ...(bis ? { bis: new Date(`${bis}T23:59:00`).getTime() } : {}),
+          ...(quelleId ? { quelle: { docId: quelleId, sheetId: sheet.id } } : {})
         }
       })
       notifySuccess('Freigegeben – die Lernenden finden das Blatt im Schülerbereich unter „Arbeitsblätter“.')
@@ -316,6 +326,15 @@ export function BlattFreigabeDialog({
           </Group>
         )}
         <Checkbox label="Stift erlauben (Handschriftliches geht als Bild an die KI)" checked={stift} onChange={(e) => setStift(e.currentTarget.checked)} />
+        <TextInput
+          type="date"
+          label="Bearbeiten bis (optional)"
+          description="Frist für die Lernenden – erscheint in „Meine Klassen“; danach meldet der Handlungsbedarf, wer noch nicht eingereicht hat."
+          value={bis}
+          onChange={(e) => setBis(e.currentTarget.value)}
+          maw={260}
+          data-blatt-frist
+        />
         <Checkbox
           label="Korrekturrand"
           description="Rand neben den Schreiblinien – auf Ausdrucken leer für Korrekturen; digital stehen dort die KI-Kommentare. Das Original bleibt unverändert."

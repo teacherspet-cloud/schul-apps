@@ -1519,6 +1519,99 @@ export function historie(g: Lerngruppe) {
   }
 }
 
+/**
+ * „Meine Klassen", Runde 2 (06.10.2026): Details je Test einer Lerngruppe – Art und Thema, Versionen, Punkte,
+ * Notenschlüssel (Schwellen), Zeit, wer nicht teilgenommen hat, Fehlerschwerpunkte (Fehlerart der KI-Bündelung) und
+ * die beste bzw. schwächste Aufgabe (Anteil richtig, ab 3 Bewertungen).
+ */
+export function testDetailsDerGruppe(g: Lerngruppe): Record<
+  string,
+  {
+    art: string
+    thema: string
+    versionen: string[]
+    punkte: number
+    schwellen: number[]
+    zeitMin: number
+    fehlende: string[]
+    schwerpunkte: string[]
+    beste: { titel: string; quote: number } | null
+    schwaechste: { titel: string; quote: number } | null
+    /** Vokabeltest mit Original der Varianten – dann geht „Als Word speichern" */
+    mitOriginal: boolean
+  }
+> {
+  const mitglieder = mitgliederVon(g)
+  const tests = (db().prepare('SELECT * FROM onlinetests WHERE lerngruppe_id = ? ORDER BY erstellt').all(g.id) as unknown as TestZeile[]).map(alsTest)
+  const aus: ReturnType<typeof testDetailsDerGruppe> = {}
+  for (const test of tests) {
+    const ts = teilnahmenVon(test.id).filter((x) => x.abgabe)
+    const jeAufgabe = new Map<string, { titel: string; richtig: number; gesamt: number }>()
+    const jeArt = new Map<string, number>()
+    for (const x of ts) {
+      const f = test.fassungen[x.variante]?.fassung
+      if (!f) continue
+      const b = json_(x.bewertung, {} as Bewertung)
+      for (const e of f.einheiten) {
+        const be = b[e.id]
+        if (!be) continue
+        const a = f.aufgaben.find((y) => y.id === e.aufgabe)
+        const k = a?.titel || e.aufgabe
+        const z = jeAufgabe.get(k) ?? { titel: [a?.titel, a?.anweisung].filter(Boolean).join(': ').slice(0, 120), richtig: 0, gesamt: 0 }
+        z.gesamt++
+        if (be.status === 'richtig') z.richtig++
+        else if (be.fehlerArt || be.fehlerGruppe)
+          jeArt.set(be.fehlerArt || String(be.fehlerGruppe), (jeArt.get(be.fehlerArt || String(be.fehlerGruppe)) ?? 0) + 1)
+        jeAufgabe.set(k, z)
+      }
+    }
+    const bewertet = [...jeAufgabe.values()].filter((z) => z.gesamt >= 3).map((z) => ({ titel: z.titel, quote: z.richtig / z.gesamt }))
+    bewertet.sort((a, b) => b.quote - a.quote)
+    const e = test.einstellungen
+    aus[test.id] = {
+      art: e.art ?? '',
+      thema: e.thema ?? '',
+      versionen: test.fassungen.map((f) => f.label),
+      punkte: Math.max(0, ...test.fassungen.map((f) => f.fassung.punkte ?? 0)),
+      schwellen: Array.isArray(e.schwellen) ? e.schwellen : [],
+      zeitMin: e.zeitMin ?? 0,
+      fehlende: test.status === 'wartend' ? [] : mitglieder.filter((m) => !ts.some((t) => t.schueler_id === m.id)).map((m) => m.name || m.benutzer),
+      schwerpunkte: [...jeArt]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([art, n]) => `${art} (${n}×)`),
+      beste: bewertet.length >= 2 ? bewertet[0] : null,
+      schwaechste: bewertet.length >= 2 ? bewertet[bewertet.length - 1] : null,
+      mitOriginal: Boolean(e.blatt && test.fassungen.length && test.fassungen.every((f) => f.original))
+    }
+  }
+  return aus
+}
+
+/**
+ * „Meine Klassen", Runde 2 (06.10.2026): einer Klasse ein Fach hinzufügen. Hat die Lerngruppe noch kein Fach, bekommt sie
+ * es; sonst entsteht eine Lerngruppe gleichen Namens mit denselben Lernenden (IServ-Gruppe, Mitglieder) und diesem Fach.
+ * Liefert die Kennung der Lerngruppe für das Fach (vorhandene bei Dopplung).
+ */
+export function fachHinzufuegen(lehrkraftId: string, gruppeId: string, fach: string): string {
+  const g = lerngruppe(gruppeId)
+  if (!g || g.lehrkraft_id !== lehrkraftId) throw new Error('Diese Lerngruppe gibt es nicht.')
+  const f = fach.trim().slice(0, 40)
+  if (!f) throw new Error('Bitte ein Fach wählen.')
+  const name = g.name.trim().toLowerCase()
+  const gleich = lerngruppenVon(lehrkraftId).find((x) => x.name.trim().toLowerCase() === name && x.fach.trim().toLowerCase() === f.toLowerCase())
+  if (gleich) return gleich.id
+  if (!g.fach.trim()) {
+    db().prepare('UPDATE lerngruppen SET fach = ? WHERE id = ?').run(f, g.id)
+    return g.id
+  }
+  const id = neueId()
+  db()
+    .prepare('INSERT INTO lerngruppen (id, lehrkraft_id, name, fach, iserv_gruppe, mitglieder, erstellt) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, lehrkraftId, g.name, f, g.iserv_gruppe, JSON.stringify(g.mitglieder), new Date().toISOString())
+  return id
+}
+
 export type { Nutzer }
 
 // ---------------------------------------------------------------- Unterrichtsreihe (Etappe 6)

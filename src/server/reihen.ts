@@ -1087,15 +1087,29 @@ export function reihenDerGruppe(
   fertig: number
   lernende: { id: string; fortschritt: number }[]
   bedarf: string[]
+  /** Runde 2 von „Meine Klassen" (06.10.2026) */
+  status: 'offen' | 'beendet'
+  erstellt: string
+  oberthema: string
+  schritte: number
+  nichtBegonnen: string[]
+  lernziele: { text: string; erreicht: number }[]
 }[] {
   const alle = db()
-    .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+    .prepare('SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC')
     .all(lehrkraftId, lerngruppeId) as unknown as ZuweisungZeile[]
   return alle.flatMap((z) => {
     const r = reiheVon(z.reihe_id)
     if (!r) return []
     const { bedarf, lernende } = bedarfFuer(r, z)
     const f = lernende.map((l) => l.weg.fortschritt)
+    // Stand je Lernziel: Anteil der Lernenden, die alle Schritte mit diesem Ziel geschafft haben
+    const lernziele = r.lernziele.map((lz) => {
+      const ids = r.schritte.filter((s) => s.lernziele.some((x) => x.text === lz.text)).map((s) => s.id)
+      if (!ids.length || !lernende.length) return { text: lz.ichKann || lz.text, erreicht: 0 }
+      const geschafft = lernende.filter((l) => ids.every((id) => l.weg.schritte.find((s) => s.id === id)?.status === 'geschafft')).length
+      return { text: lz.ichKann || lz.text, erreicht: geschafft / lernende.length }
+    })
     return [
       {
         zid: z.id,
@@ -1103,7 +1117,13 @@ export function reihenDerGruppe(
         schnitt: f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0,
         fertig: lernende.filter((l) => l.weg.fertig).length,
         lernende: lernende.map((l) => ({ id: l.id, fortschritt: l.weg.fortschritt })),
-        bedarf: bedarf.map((b) => b.text).slice(0, 8)
+        bedarf: z.status === 'offen' ? bedarf.map((b) => b.text).slice(0, 8) : [],
+        status: z.status === 'offen' ? ('offen' as const) : ('beendet' as const),
+        erstellt: z.erstellt,
+        oberthema: r.oberthema,
+        schritte: r.schritte.length,
+        nichtBegonnen: lernende.filter((l) => l.weg.fortschritt === 0).map((l) => l.name || l.benutzer),
+        lernziele
       }
     ]
   })

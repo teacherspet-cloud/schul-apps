@@ -145,6 +145,10 @@ export interface BlattEinstellungen {
   schrittweise?: boolean
   /** Merkkästen erst nach vollständiger Bearbeitung zeigen (05.10.2026) */
   merkAmEnde?: boolean
+  /** Bearbeiten bis (ms) – Frist für „Meine Klassen" (06.10.2026) */
+  bis?: number
+  /** Original in der Bibliothek der Lehrkraft (Word-Export aus „Meine Klassen") */
+  quelle?: { docId: string; sheetId?: string }
 }
 
 interface Zeile {
@@ -617,7 +621,19 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
         stift: e0.stift !== false,
         ...(typeof e0.sprache === 'string' ? { sprache: e0.sprache.slice(0, 8) } : {}),
         ...(e0.schrittweise === true ? { schrittweise: true } : {}),
-        ...(e0.merkAmEnde === true ? { merkAmEnde: true } : {})
+        ...(e0.merkAmEnde === true ? { merkAmEnde: true } : {}),
+        // Meine Klassen (06.10.2026): Frist und Verweis aufs Original (Word-Export aus der Bibliothek)
+        ...(typeof e0.bis === 'number' && e0.bis > 0 ? { bis: e0.bis } : {}),
+        ...(e0.quelle && typeof (e0.quelle as { docId?: unknown }).docId === 'string'
+          ? {
+              quelle: {
+                docId: String((e0.quelle as { docId: string }).docId).slice(0, 80),
+                ...(typeof (e0.quelle as { sheetId?: unknown }).sheetId === 'string'
+                  ? { sheetId: String((e0.quelle as { sheetId: string }).sheetId).slice(0, 80) }
+                  : {})
+              }
+            }
+          : {})
       }
       // Schrittweise braucht das Urteil je Aufgabe
       // Schrittweise und Merkkästen am Ende brauchen das Urteil je Aufgabe (Ampel)
@@ -726,6 +742,17 @@ export function blaetterRoute(aufruf: Aufruf, adresse = ''): (k: Anfrage) => Pro
      * Lehrkraft: das ausgefüllte Blatt einer Person ansehen (App „Freigegebene Blätter", 03.10.2026) –
      * dieselbe Form wie für die Lernenden, nur zum Ansehen, mit dem vollständigen Bogen.
      */
+    // Meine Klassen (06.10.2026): Blatt und Lösung zum Speichern, Drucken, Ablegen in IServ
+    if (req.method === 'GET' && teile[1] === 'druck')
+      return (
+        json(res, 200, {
+          titel: z.titel,
+          html: z.html,
+          loesung: (z as Zeile & { loesung?: string }).loesung ?? '',
+          quelle: einstellungenVon(z).quelle ?? null
+        }),
+        true
+      )
     if (req.method === 'GET' && teile[1] === 'abgabe') {
       const person = nutzerNachBenutzer(String(url.searchParams.get('schueler') ?? ''))
       const a = person ? abgabeVon(z.id, person.id) : null
@@ -1047,27 +1074,89 @@ export function blattZusatzrunde(fid: string, sid: string): void {
   if (da) db().prepare('UPDATE blatt_abgaben SET extra = extra + 1 WHERE freigabe_id = ? AND schueler_id = ?').run(fid, sid)
 }
 
-/** „Meine Klassen" (06.10.2026): offene Blätter einer Lerngruppe – wer hat begonnen, wer eingereicht */
+/**
+ * „Meine Klassen": Blätter einer Lerngruppe (ohne Reihen-Schritte). Runde 2 (06.10.2026): auch beendete, mit Frist,
+ * Thema, Umfang (Seiten, Aufgaben, Lösung), wer noch nicht begonnen bzw. eingereicht hat, Ergebnis (Anteil grüner
+ * Aufgaben der Einreichungen, sofern Kurz-Feedback lief) und die schwierigste Aufgabe.
+ */
 export function blaetterDerGruppe(
   lehrkraftId: string,
   lerngruppeId: string
-): { id: string; titel: string; gesamt: number; begonnen: number; eingereicht: number; eingereichtVon: string[] }[] {
+): {
+  id: string
+  titel: string
+  status: 'offen' | 'beendet'
+  erstellt: string
+  bis: number | null
+  fach: string
+  thema: string
+  gesamt: number
+  begonnen: number
+  eingereicht: number
+  eingereichtVon: string[]
+  nichtBegonnen: string[]
+  nichtEingereicht: string[]
+  aufgaben: number
+  seiten: number
+  loesung: boolean
+  ergebnis: number | null
+  schwierigste: { nr: number; anweisung: string; rot: number } | null
+  quelle: { docId: string; sheetId?: string } | null
+}[] {
   const zeilen = db()
-    .prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' AND status = 'offen' ORDER BY erstellt DESC")
+    .prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
     .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  const g = lerngruppe(lerngruppeId)
+  const mitglieder = g ? mitgliederVon(g) : []
   return zeilen.map((z) => {
-    const abgaben = db().prepare('SELECT schueler_id, abgaben, aktualisiert FROM blatt_abgaben WHERE freigabe_id = ?').all(z.id) as {
+    const abgaben = db()
+      .prepare('SELECT schueler_id, abgaben, aktualisiert, aufgaben_feedback, freigeschaltet FROM blatt_abgaben WHERE freigabe_id = ?')
+      .all(z.id) as {
       schueler_id: string
       abgaben: number
       aktualisiert: number
+      aufgaben_feedback: string
+      freigeschaltet: string
     }[]
+    const e = einstellungenVon(z)
+    const aufgaben = json_(z.aufgaben, [] as BlattAufgabe[]).filter((a) => !a.freiwillig)
+    const begonnen = new Set(abgaben.filter((a) => a.aktualisiert > 0).map((a) => a.schueler_id))
+    const eingereicht = abgaben.filter((a) => a.abgaben > 0)
+    // Ergebnis: Ampel je Aufgabe (nur mit Kurz-Feedback je Aufgabe aussagekräftig)
+    const rot = new Map<number, number>()
+    const anteile: number[] = []
+    if (e.aufgabenFeedback && aufgaben.length)
+      for (const a of eingereicht) {
+        const verlauf = json_(a.aufgaben_feedback, {} as AufgabenVerlauf)
+        const frei = json_(a.freigeschaltet, [] as number[])
+        const ampeln = aufgaben.map((x) => ampelVon(verlauf[String(x.nr)], frei.includes(x.nr)))
+        anteile.push(ampeln.filter((x) => x === 'gruen').length / aufgaben.length)
+        ampeln.forEach((x, i) => x === 'rot' && rot.set(aufgaben[i].nr, (rot.get(aufgaben[i].nr) ?? 0) + 1))
+      }
+    const [schwerNr, schwerRot] = [...rot.entries()].sort((a, b) => b[1] - a[1])[0] ?? [0, 0]
+    const schwer = aufgaben.find((a) => a.nr === schwerNr)
+    const quelle = (e as BlattEinstellungen & { quelle?: { docId?: string; sheetId?: string } }).quelle
     return {
       id: z.id,
       titel: z.titel,
+      status: z.status === 'offen' ? ('offen' as const) : ('beendet' as const),
+      erstellt: z.erstellt,
+      bis: e.bis ?? null,
+      fach: (z as Zeile & { fach?: string }).fach ?? '',
+      thema: (z as Zeile & { thema?: string }).thema ?? '',
       gesamt: gesamtVon(z),
-      begonnen: abgaben.filter((a) => a.aktualisiert > 0).length,
-      eingereicht: abgaben.filter((a) => a.abgaben > 0).length,
-      eingereichtVon: abgaben.filter((a) => a.abgaben > 0).map((a) => a.schueler_id)
+      begonnen: begonnen.size,
+      eingereicht: eingereicht.length,
+      eingereichtVon: eingereicht.map((a) => a.schueler_id),
+      nichtBegonnen: mitglieder.filter((n) => !begonnen.has(n.id)).map((n) => n.name || n.benutzer),
+      nichtEingereicht: mitglieder.filter((n) => begonnen.has(n.id) && !eingereicht.some((a) => a.schueler_id === n.id)).map((n) => n.name || n.benutzer),
+      aufgaben: aufgaben.length,
+      seiten: Math.max(1, (z.html.match(/class="ws-page[ "]/g) ?? []).length),
+      loesung: Boolean((z as Zeile & { loesung?: string }).loesung),
+      ergebnis: anteile.length ? anteile.reduce((a, b) => a + b, 0) / anteile.length : null,
+      schwierigste:
+        schwer && schwerRot > 0 ? { nr: schwer.nr, anweisung: schwer.anweisung.slice(0, 160), rot: schwerRot / Math.max(1, eingereicht.length) } : null,
+      quelle: quelle?.docId ? { docId: String(quelle.docId).slice(0, 80), ...(quelle.sheetId ? { sheetId: String(quelle.sheetId).slice(0, 80) } : {}) } : null
     }
   })
 }

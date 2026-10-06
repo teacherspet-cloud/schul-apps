@@ -1,15 +1,18 @@
 /**
  * „Meine Klassen" (06.10.2026, abgestimmt mit der Lehrkraft) – Gruppe Verwaltung, nur mit dem Schul-Apps-Server.
  *
- *  - Übersicht: je Lerngruppe und Fach eine Karte („5b – Englisch", alphabetisch) mit Lernstand, Testschnitt und
- *    Handlungsbedarf.
- *  - Klasse: oben der Handlungsbedarf (zu prüfen, Förderbedarf, lange nicht geübt, Testtermine, Reihen, Blätter), darunter
- *    Vorschläge für Material aus dem Lernstand, dann Lernende, Tests & Noten, Reihen & Blätter, Vokabeln.
+ *  - Übersicht (Runde 2): EINE Karte je Klasse („5b", „10b" – alphabetisch, Zahlen natürlich) mit ihren Fächern,
+ *    Lernenden und Handlungsbedarf. Lerngruppen gleichen Namens sind die Fächer der Klasse (server/klassen.ts).
+ *  - Klasse: oben die Fach-Leiste (Englisch | Geschichte | + Fach hinzufügen – ohne Fach nur „+ Fach hinzufügen"), darunter
+ *    für das gewählte Fach Handlungsbedarf, Vorschläge für Material, dann die Reiter Unterrichtsreihen & Blätter,
+ *    Vokabeln & Grammatik (nur Sprachfächer), Tests & Noten, Lernende.
+ *  - Materialien: sortier- und filterbar (MaterialListe.tsx), mit Details und „Ablegen ▾" (PDF, Word, Drucken, IServ in der
+ *    Ablagestruktur der Verwaltung, klassenAblage.ts). Was von hier geöffnet wird, führt mit „Zurück" wieder hierher.
  *  - Vorschläge: „Wackelige Wörter" als Vokabeltraining (Vorschau → „Jetzt freischalten"); „Übungsblatt zu den Fehlern
- *    des letzten Tests" entsteht im Hintergrund (KI-Zugang der Lehrkraft), ist es fertig, erscheint es hier zum
- *    Ansehen und Freischalten – nach kurzer Sichtung, nicht automatisch.
+ *    des letzten Tests" entsteht im Hintergrund (KI-Zugang der Lehrkraft) und erscheint fertig zum Ansehen und Freischalten.
  */
 import {
+  ActionIcon,
   Alert,
   Badge,
   Button,
@@ -19,7 +22,9 @@ import {
   Group,
   Loader,
   Modal,
+  Popover,
   Progress,
+  Select,
   SimpleGrid,
   Stack,
   Table,
@@ -38,8 +43,11 @@ import {
   IconCheck,
   IconChevronRight,
   IconClipboardCheck,
+  IconExternalLink,
   IconFileText,
+  IconLanguage,
   IconLock,
+  IconPlus,
   IconRoute,
   IconSparkles,
   IconUserExclamation,
@@ -47,28 +55,39 @@ import {
   IconZzz
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AppKopf } from '../../shared/components/AppKopf'
+import { create } from 'zustand'
+import { FAECHER } from '@shared/faecher'
+import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { ListenSuche } from '../../shared/components/AppSuche'
-import { openDocument, openModule } from '../../shared/navigation'
+import { openDocument, openModule, useNavigation } from '../../shared/navigation'
 import { notifyError, notifySuccess } from '../../shared/util'
 import { holen, senden } from '../onlinetest/serverApi'
 import { blattFuerKlasse, useFertigeBlaetter, type FertigesBlatt } from './klassenMaterial'
 import { BlattFreigabeDialog } from '../arbeitsblatt/BlattFreigabeKnopf'
 import { useAppSettings } from '../../shared/settingsStore'
+import { ampel, DetailZeile, MaterialKarte, MaterialListe, type Eintrag } from './MaterialListe'
+import { AblegenKnopf } from './AblegenKnopf'
+import { blattQuelle, grammatikQuelle, testQuelle, vokabelQuelle } from './klassenAblage'
 
-interface KlasseKurz {
+interface FachKurz {
   id: string
-  name: string
   fach: string
-  titel: string
-  lernende: number
+  bedarf: number
+  vorschlaege: number
   vokabelnSicher: number | null
   testSchnitt: number | null
   tests: number
   reihen: number
   blaetter: number
+}
+interface KlasseKurz {
+  schluessel: string
+  name: string
+  gruppen: string[]
+  lernende: number
   bedarf: number
   vorschlaege: number
+  faecher: FachKurz[]
 }
 
 type Bedarf = { art: 'entscheiden' | 'foerdern' | 'inaktiv' | 'termin' | 'reihe' | 'blatt'; text: string; ziel?: { modul: string; id?: string } }
@@ -81,6 +100,8 @@ interface KlasseDetail {
   name: string
   fach: string
   titel: string
+  sprachfach: boolean
+  ablageMuster: string
   lernende: {
     id: string
     name: string
@@ -93,19 +114,113 @@ interface KlasseDetail {
     reihenFortschritt: number | null
     blaetterEingereicht: number
   }[]
-  tests: { id: string; titel: string; datum: string; status: string; teilnehmer: number; offen: number; durchschnitt: number | null; verteilung: number[] }[]
-  vokabeln: { id: string; titel: string; testTermin: number | null; sicherSchnitt: number }[]
-  grammatik?: { id: string; titel: string; sicherSchnitt: number }[]
+  tests: {
+    id: string
+    titel: string
+    datum: string
+    status: string
+    teilnehmer: number
+    offen: number
+    durchschnitt: number | null
+    verteilung: number[]
+    art?: string
+    thema?: string
+    versionen?: string[]
+    punkte?: number
+    schwellen?: number[]
+    zeitMin?: number
+    fehlende?: string[]
+    schwerpunkte?: string[]
+    beste?: { titel: string; quote: number } | null
+    schwaechste?: { titel: string; quote: number } | null
+    mitOriginal?: boolean
+  }[]
+  vokabeln: {
+    id: string
+    titel: string
+    testTermin: number | null
+    sicherSchnitt: number
+    status: 'offen' | 'beendet'
+    erstellt: string
+    bis: number | null
+    woerter: number
+    quelle: string
+    lernende: number
+    aktiv7: number
+    probleme: { term: string; translation: string; quote: number; typisch: string[] }[]
+  }[]
+  grammatik: {
+    id: string
+    titel: string
+    sicherSchnitt: number
+    status: 'offen' | 'beendet'
+    erstellt: string
+    bis: number | null
+    thema: string
+    aufgaben: number
+    regeln: number
+    lernende: number
+    aktiv7: number
+    probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
+  }[]
   wackelig: { term: string; translation: string; quote: number }[]
-  reihen: { zid: string; titel: string; schnitt: number; fertig: number; lernende: number }[]
-  blaetter: { id: string; titel: string; gesamt: number; begonnen: number; eingereicht: number }[]
+  reihen: {
+    zid: string
+    titel: string
+    schnitt: number
+    fertig: number
+    lernende: number
+    status: 'offen' | 'beendet'
+    erstellt: string
+    oberthema: string
+    schritte: number
+    nichtBegonnen: string[]
+    lernziele: { text: string; erreicht: number }[]
+  }[]
+  blaetter: {
+    id: string
+    titel: string
+    status: 'offen' | 'beendet'
+    erstellt: string
+    bis: number | null
+    fach: string
+    thema: string
+    gesamt: number
+    begonnen: number
+    eingereicht: number
+    nichtBegonnen: string[]
+    nichtEingereicht: string[]
+    aufgaben: number
+    seiten: number
+    loesung: boolean
+    ergebnis: number | null
+    schwierigste: { nr: number; anweisung: string; rot: number } | null
+    quelle: { docId: string } | null
+  }[]
   bedarf: Bedarf[]
   vorschlaege: Vorschlag[]
 }
 
+/** Wo man in „Meine Klassen" steht – bleibt beim Ausflug in einen Test erhalten (Rückweg) */
+const useSicht = create<{
+  klasse: string | null
+  gruppe: string | null
+  reiter: string
+  setze: (p: Partial<{ klasse: string | null; gruppe: string | null; reiter: string }>) => void
+}>((set) => ({ klasse: null, gruppe: null, reiter: 'reihen', setze: (p) => set(p) }))
+
 const prozent = (x: number | null): string => (x === null ? '–' : `${Math.round(x * 100)} %`)
 const note = (x: number | null): string => (x === null ? '–' : x.toLocaleString('de-DE', { maximumFractionDigits: 1, minimumFractionDigits: 1 }))
-const tag = (iso: string | null): string => (iso ? new Date(iso).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '–')
+const tag = (x: string | number | null | undefined): string => (x ? new Date(x).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '–')
+const ms = (iso: string): number => Date.parse(iso) || 0
+const namen = (l: string[], max = 12): string => (l.length > max ? `${l.slice(0, max).join(', ')} und ${l.length - max} weitere` : l.join(', '))
+
+/** Aus „Meine Klassen" öffnen – „Zurück" führt wieder hierher */
+function oeffneMitRueckweg(modul: string, id?: string): void {
+  useNavigation.getState().setRueckweg({ fuer: modul, nach: 'meineklassen', name: 'Meine Klassen' })
+  if (id) void openDocument(modul, id)
+  else openModule(modul)
+}
 
 const BEDARF_SYMBOL: Record<Bedarf['art'], React.ReactNode> = {
   entscheiden: <IconClipboardCheck size={16} />,
@@ -119,7 +234,7 @@ const BEDARF_FARBE: Record<Bedarf['art'], string> = { entscheiden: 'orange', foe
 
 export default function MeineKlassenModule({ active }: { active: boolean }): React.JSX.Element | null {
   const [klassen, setKlassen] = useState<KlasseKurz[] | null>(null)
-  const [gewaehlt, setGewaehlt] = useState<string | null>(null)
+  const { klasse, setze } = useSicht()
   const [suche, setSuche] = useState('')
   const laden = useCallback(() => {
     void holen<{ klassen: KlasseKurz[] }>('/server/klassen').then(
@@ -132,15 +247,16 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
   }, [active, laden])
   if (!active) return null
   const q = suche.trim().toLowerCase()
-  const sichtbar = (klassen ?? []).filter((k) => !q || k.titel.toLowerCase().includes(q))
+  const sichtbar = (klassen ?? []).filter((k) => !q || `${k.name} ${k.faecher.map((f) => f.fach).join(' ')}`.toLowerCase().includes(q))
+  const gewaehlt = klassen?.find((k) => k.schluessel === klasse)
   return (
     <Container size="xl" py="lg" data-meine-klassen>
       <AppKopf
         beschreibung="Lernstand, Tests und Handlungsbedarf je Klasse und Fach – und passendes Material mit einem Klick."
         suche={<ListenSuche wert={suche} setzen={setSuche} platzhalter="Klasse, Fach …" />}
       />
-      {gewaehlt ? (
-        <KlasseAnsicht id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
+      {klasse && gewaehlt ? (
+        <KlasseAnsicht k={gewaehlt} neu={laden} zurueck={() => (setze({ klasse: null, gruppe: null }), laden())} />
       ) : !klassen ? (
         <Center h="40vh">
           <Loader />
@@ -152,51 +268,77 @@ export default function MeineKlassenModule({ active }: { active: boolean }): Rea
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} data-klassen-liste>
           {sichtbar.map((k) => (
-            <UnstyledButton key={k.id} onClick={() => setGewaehlt(k.id)} className="vorlage-karte" style={{ padding: 14 }} data-klasse={k.titel}>
-              <Group justify="space-between" wrap="nowrap" mb={8}>
-                <Text fw={800} size="lg">
-                  {k.titel}
-                </Text>
-                {k.bedarf > 0 ? (
-                  <Badge color="orange" leftSection={<IconAlertTriangle size={12} />}>
-                    {k.bedarf}
-                  </Badge>
-                ) : (
-                  <Badge color="teal" variant="light" leftSection={<IconCheck size={12} />}>
-                    alles ruhig
-                  </Badge>
-                )}
-              </Group>
-              <Group gap="lg" mb={6}>
-                <Kennzahl wert={String(k.lernende)} text="Lernende" />
-                <Kennzahl wert={prozent(k.vokabelnSicher)} text="Vokabeln sicher" />
-                <Kennzahl wert={note(k.testSchnitt)} text={`Testschnitt (${k.tests})`} />
-              </Group>
-              {k.vokabelnSicher !== null && (
-                <Progress value={k.vokabelnSicher * 100} size="sm" radius="xl" color={k.vokabelnSicher < 0.4 ? 'orange' : 'teal'} />
-              )}
-              <Group gap={6} mt={8}>
-                {k.reihen > 0 && (
-                  <Badge variant="light">
-                    {k.reihen} Reihe{k.reihen === 1 ? '' : 'n'}
-                  </Badge>
-                )}
-                {k.blaetter > 0 && (
-                  <Badge variant="light">
-                    {k.blaetter} Blatt{k.blaetter === 1 ? '' : 'er'}
-                  </Badge>
-                )}
-                {k.vorschlaege > 0 && (
-                  <Badge variant="light" color="grape" leftSection={<IconSparkles size={12} />}>
-                    {k.vorschlaege} Vorschlag{k.vorschlaege === 1 ? '' : 'e'}
-                  </Badge>
-                )}
-              </Group>
-            </UnstyledButton>
+            <KlassenKarte key={k.schluessel} k={k} waehlen={() => setze({ klasse: k.schluessel, gruppe: k.faecher[0]?.id ?? null, reiter: 'reihen' })} />
           ))}
         </SimpleGrid>
       )}
     </Container>
+  )
+}
+
+/** Karte je Klasse – einheitlich aufgebaut, auch ohne Fach oder Material (Befund: Text rutschte sonst nach oben) */
+function KlassenKarte({ k, waehlen }: { k: KlasseKurz; waehlen: () => void }): React.JSX.Element {
+  return (
+    <UnstyledButton
+      onClick={waehlen}
+      className="vorlage-karte"
+      style={{ padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 168 }}
+      data-klasse={k.name}
+    >
+      <Group justify="space-between" wrap="nowrap" mb={8}>
+        <Text fw={800} size="lg">
+          {/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}
+        </Text>
+        {k.bedarf > 0 ? (
+          <Badge color="orange" leftSection={<IconAlertTriangle size={12} />}>
+            {k.bedarf}
+          </Badge>
+        ) : (
+          <Badge color="teal" variant="light" leftSection={<IconCheck size={12} />}>
+            alles ruhig
+          </Badge>
+        )}
+      </Group>
+      <Group gap="lg" mb={8}>
+        <Kennzahl wert={String(k.lernende)} text="Lernende" />
+        <Kennzahl wert={String(k.faecher.length)} text={k.faecher.length === 1 ? 'Fach' : 'Fächer'} />
+        {k.vorschlaege > 0 && <Kennzahl wert={String(k.vorschlaege)} text={k.vorschlaege === 1 ? 'Vorschlag' : 'Vorschläge'} />}
+      </Group>
+      <Stack gap={4} mih={44} justify="center">
+        {k.faecher.length === 0 ? (
+          <Text size="sm" c="dimmed">
+            Noch kein Fach – in der Klasse mit „+ Fach hinzufügen“ anlegen.
+          </Text>
+        ) : (
+          k.faecher.map((f) => (
+            <Group key={f.id} gap={6} wrap="nowrap" data-klasse-fach={f.fach}>
+              <Badge variant="light" style={{ flexShrink: 0 }}>
+                {f.fach}
+              </Badge>
+              {f.vokabelnSicher !== null && (
+                <Tooltip label={`Vokabeln ${prozent(f.vokabelnSicher)} sicher`}>
+                  <Progress value={f.vokabelnSicher * 100} size="sm" radius="xl" color={ampel(f.vokabelnSicher)} w={60} />
+                </Tooltip>
+              )}
+              <Text size="xs" c="dimmed" truncate>
+                {[
+                  f.testSchnitt !== null && `Ø ${note(f.testSchnitt)}`,
+                  f.reihen && `${f.reihen} Reihe${f.reihen === 1 ? '' : 'n'}`,
+                  f.blaetter && `${f.blaetter} Bl.`
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+              {f.bedarf > 0 && (
+                <Badge size="xs" color="orange" variant="light" style={{ flexShrink: 0 }}>
+                  {f.bedarf}
+                </Badge>
+              )}
+            </Group>
+          ))
+        )}
+      </Stack>
+    </UnstyledButton>
   )
 }
 
@@ -213,10 +355,113 @@ function Kennzahl({ wert, text }: { wert: string; text: string }): React.JSX.Ele
   )
 }
 
-function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
+/** „+ Fach hinzufügen": eigene Fächer zuerst, dann alle; legt das Fach mit denselben Lernenden an */
+function FachHinzufuegen({ k, fertig }: { k: KlasseKurz; fertig: (id: string) => void }): React.JSX.Element {
+  const [offen, setOffen] = useState(false)
+  const eigene = useAppSettings((s) => s.settings.eigeneFaecher) ?? []
+  const vorhanden = new Set(k.faecher.map((f) => f.fach.toLowerCase()))
+  const farbe = useProgrammFarbe()
+  const data = useMemo(() => {
+    const alle = FAECHER.map((f) => f.label).filter((l) => !vorhanden.has(l.toLowerCase()))
+    const meine = eigene.filter((l) => !vorhanden.has(l.toLowerCase()))
+    return [...(meine.length ? [{ group: 'Eigene Fächer', items: meine }] : []), { group: 'Alle Fächer', items: alle.filter((l) => !meine.includes(l)) }]
+  }, [eigene, k.faecher]) // eslint-disable-line react-hooks/exhaustive-deps
+  const waehlen = async (fach: string | null): Promise<void> => {
+    if (!fach) return
+    // Lerngruppe ohne Fach bekommt es; sonst entsteht eine neue mit denselben Lernenden
+    try {
+      const r = await senden<{ id: string }>(`/server/klassen/${k.gruppen[0]}/fach`, { fach })
+      notifySuccess(`${fach} ist jetzt ein Fach der Klasse ${k.name}.`)
+      setOffen(false)
+      fertig(r.id)
+    } catch (e) {
+      notifyError(e)
+    }
+  }
+  return (
+    <Popover opened={offen} onChange={setOffen} position="bottom-start" withinPortal trapFocus>
+      <Popover.Target>
+        <Button variant="light" color={farbe} radius="xl" leftSection={<IconPlus size={16} />} onClick={() => setOffen((o) => !o)} data-fach-hinzufuegen>
+          Fach hinzufügen
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <Select
+          label="Fach"
+          placeholder="Fach wählen …"
+          searchable
+          data={data}
+          onChange={(v) => void waehlen(v)}
+          comboboxProps={{ withinPortal: false }}
+          w={260}
+          data-fach-wahl
+        />
+      </Popover.Dropdown>
+    </Popover>
+  )
+}
+
+function KlasseAnsicht({ k, neu, zurueck }: { k: KlasseKurz; neu: () => void; zurueck: () => void }): React.JSX.Element {
+  const { gruppe, setze } = useSicht()
+  const farbe = useProgrammFarbe()
+  const aktiv = k.faecher.find((f) => f.id === gruppe) ?? k.faecher[0]
+  return (
+    <Stack data-klasse-ansicht={k.name}>
+      <Group justify="space-between">
+        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={zurueck}>
+          Alle Klassen
+        </Button>
+      </Group>
+      <Title order={2}>{/^\d/.test(k.name) ? `Klasse ${k.name}` : k.name}</Title>
+
+      {/* ---------- Fach-Leiste über dem Handlungsbedarf */}
+      <Group gap="xs" className="mk-faecher" data-fach-leiste>
+        {k.faecher.length > 0 && (
+          <Tabs value={aktiv?.id ?? null} onChange={(v) => setze({ gruppe: v })} variant="pills" radius="xl" color={farbe}>
+            <Tabs.List>
+              {k.faecher.map((f) => (
+                <Tabs.Tab
+                  key={f.id}
+                  value={f.id}
+                  rightSection={
+                    f.bedarf > 0 ? (
+                      <Badge size="xs" color="orange" circle>
+                        {f.bedarf}
+                      </Badge>
+                    ) : undefined
+                  }
+                  data-fach={f.fach}
+                >
+                  {f.fach}
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
+          </Tabs>
+        )}
+        <FachHinzufuegen k={k} fertig={(id) => (setze({ gruppe: id }), neu())} />
+      </Group>
+
+      {!aktiv ? (
+        <Card withBorder radius="md" padding="xl" data-ohne-fach>
+          <Center>
+            <Text c="dimmed" ta="center" maw={460}>
+              Für diese Klasse ist noch kein Fach angelegt. Mit „+ Fach hinzufügen“ das unterrichtete Fach wählen – danach stehen hier Lernstand, Material,
+              Tests und die Lernenden.
+            </Text>
+          </Center>
+        </Card>
+      ) : (
+        <FachAnsicht key={aktiv.id} id={aktiv.id} />
+      )}
+    </Stack>
+  )
+}
+
+function FachAnsicht({ id }: { id: string }): React.JSX.Element {
   const [d, setD] = useState<KlasseDetail | null>(null)
   const [vorschau, setVorschau] = useState<Extract<Vorschlag, { art: 'vokabeln' }> | null>(null)
   const [freigabe, setFreigabe] = useState<FertigesBlatt | null>(null)
+  const { reiter, setze } = useSicht()
   const laden = useCallback(() => {
     void holen<KlasseDetail>(`/server/klassen/${id}`).then(setD, (e: unknown) => notifyError(e))
   }, [id])
@@ -225,15 +470,11 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
   const { logoDataUrl, settings } = useAppSettings()
   if (!d)
     return (
-      <Center h="40vh">
+      <Center h="30vh">
         <Loader />
       </Center>
     )
-  const oeffne = (z?: { modul: string; id?: string }): void => {
-    if (!z) return
-    if (z.id) void openDocument(z.modul, z.id)
-    else openModule(z.modul)
-  }
+  const ort = { klasse: d.name, fach: d.fach, muster: d.ablageMuster }
   const vokabelnFreischalten = async (v: Extract<Vorschlag, { art: 'vokabeln' }>): Promise<void> => {
     try {
       await senden('/server/vokabeln/freigeben', { lerngruppeId: d.id, titel: v.titel, sprache: v.sprache, fach: v.fach, woerter: v.woerter })
@@ -244,15 +485,10 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
       notifyError(e)
     }
   }
+  // Reiter: ohne Sprachfach kein „Vokabeln & Grammatik"
+  const aktiverReiter = reiter === 'vokabeln' && !d.sprachfach ? 'reihen' : reiter
   return (
     <Stack data-klasse-detail={d.titel}>
-      <Group justify="space-between">
-        <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={zurueck}>
-          Alle Klassen
-        </Button>
-      </Group>
-      <Title order={2}>{d.titel}</Title>
-
       {/* ---------- Handlungsbedarf */}
       <Card withBorder radius="md" padding="md" data-handlungsbedarf>
         <Group gap={6} mb="xs">
@@ -266,7 +502,7 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
         ) : (
           <Stack gap={4}>
             {d.bedarf.map((b, i) => (
-              <UnstyledButton key={i} onClick={() => oeffne(b.ziel)} className="klassen-bedarf" data-bedarf={b.art}>
+              <UnstyledButton key={i} onClick={() => b.ziel && oeffneMitRueckweg(b.ziel.modul, b.ziel.id)} className="klassen-bedarf" data-bedarf={b.art}>
                 <Group gap="xs" wrap="nowrap">
                   <ThemeIcon size="sm" variant="light" color={BEDARF_FARBE[b.art]}>
                     {BEDARF_SYMBOL[b.art]}
@@ -344,120 +580,47 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
         </div>
       )}
 
-      <Tabs defaultValue="lernende" keepMounted={false}>
+      {/* ---------- Reiter (Runde 2): Reihen & Blätter, Vokabeln & Grammatik (Sprachfach), Tests & Noten, Lernende */}
+      <Tabs value={aktiverReiter} onChange={(v) => v && setze({ reiter: v })} keepMounted={false}>
         <Tabs.List>
-          <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
+          <Tabs.Tab value="reihen">Unterrichtsreihen & Blätter ({d.reihen.length + d.blaetter.length})</Tabs.Tab>
+          {d.sprachfach && <Tabs.Tab value="vokabeln">Vokabeln & Grammatik ({d.vokabeln.length + d.grammatik.length})</Tabs.Tab>}
           <Tabs.Tab value="tests">Tests & Noten ({d.tests.length})</Tabs.Tab>
-          <Tabs.Tab value="reihen">Reihen & Blätter ({d.reihen.length + d.blaetter.length})</Tabs.Tab>
-          <Tabs.Tab value="vokabeln">Vokabeln & Grammatik ({d.vokabeln.length + (d.grammatik?.length ?? 0)})</Tabs.Tab>
+          <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
         </Tabs.List>
+        <Tabs.Panel value="reihen" pt="sm">
+          <MaterialListe eintraege={reihenEintraege(d, ort)} leer="Noch keine Unterrichtsreihen oder Blätter in dieser Lerngruppe." />
+        </Tabs.Panel>
+        {d.sprachfach && (
+          <Tabs.Panel value="vokabeln" pt="sm">
+            <Stack gap="xs">
+              <MaterialListe eintraege={vokabelEintraege(d, ort)} leer="Noch kein Vokabel- oder Grammatiktraining in dieser Lerngruppe." />
+              {d.wackelig.length > 0 && (
+                <Card withBorder padding="sm" radius="md">
+                  <Text fw={700} size="sm" mb={6}>
+                    Am häufigsten daneben (alle laufenden Trainings)
+                  </Text>
+                  <Group gap={6}>
+                    {d.wackelig.map((w) => (
+                      <Badge key={w.term} variant="light" color={ampel(1 - w.quote)} tt="none">
+                        {w.term} – {w.translation} · {Math.round(w.quote * 100)} %
+                      </Badge>
+                    ))}
+                  </Group>
+                </Card>
+              )}
+            </Stack>
+          </Tabs.Panel>
+        )}
+        <Tabs.Panel value="tests" pt="sm">
+          <MaterialListe
+            eintraege={testEintraege(d, ort)}
+            kategorien={['status', 'datum', 'art', 'titel', 'wert']}
+            leer="Noch keine Onlinetests in dieser Lerngruppe."
+          />
+        </Tabs.Panel>
         <Tabs.Panel value="lernende" pt="sm">
           <LernendeTabelle d={d} />
-        </Tabs.Panel>
-        <Tabs.Panel value="tests" pt="sm">
-          {d.tests.length === 0 ? (
-            <Text c="dimmed">Noch keine Onlinetests in dieser Lerngruppe.</Text>
-          ) : (
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Test</Table.Th>
-                  <Table.Th>Datum</Table.Th>
-                  <Table.Th>Teilnahmen</Table.Th>
-                  <Table.Th>Schnitt</Table.Th>
-                  <Table.Th>Noten 1–6</Table.Th>
-                  <Table.Th />
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {[...d.tests].reverse().map((t) => (
-                  <Table.Tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => void openDocument('onlinetest', t.id)}>
-                    <Table.Td>{t.titel}</Table.Td>
-                    <Table.Td>{tag(t.datum)}</Table.Td>
-                    <Table.Td>{t.teilnehmer}</Table.Td>
-                    <Table.Td fw={700}>{note(t.durchschnitt)}</Table.Td>
-                    <Table.Td>
-                      <Verteilung werte={t.verteilung} />
-                    </Table.Td>
-                    <Table.Td>{t.offen > 0 && <Badge color="orange">{t.offen} zu prüfen</Badge>}</Table.Td>
-                  </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          )}
-        </Tabs.Panel>
-        <Tabs.Panel value="reihen" pt="sm">
-          <Stack gap="xs">
-            {d.reihen.length + d.blaetter.length === 0 && <Text c="dimmed">Gerade keine laufenden Reihen oder Blätter.</Text>}
-            {d.reihen.map((r) => (
-              <Card key={r.zid} withBorder padding="sm" radius="md">
-                <Group justify="space-between">
-                  <Group gap={6}>
-                    <IconRoute size={16} />
-                    <Text fw={600}>{r.titel}</Text>
-                  </Group>
-                  <Text size="sm" c="dimmed">
-                    {r.fertig} von {r.lernende} fertig
-                  </Text>
-                </Group>
-                <Progress mt={6} value={r.schnitt * 100} radius="xl" />
-              </Card>
-            ))}
-            {d.blaetter.map((b) => (
-              <Card key={b.id} withBorder padding="sm" radius="md" style={{ cursor: 'pointer' }} onClick={() => void openDocument('freigaben', b.id)}>
-                <Group justify="space-between">
-                  <Group gap={6}>
-                    <IconFileText size={16} />
-                    <Text fw={600}>{b.titel}</Text>
-                  </Group>
-                  <Text size="sm" c="dimmed">
-                    {b.begonnen} begonnen · {b.eingereicht} von {b.gesamt} eingereicht
-                  </Text>
-                </Group>
-                <Progress mt={6} value={b.gesamt ? (b.eingereicht / b.gesamt) * 100 : 0} radius="xl" color="cyan" />
-              </Card>
-            ))}
-          </Stack>
-        </Tabs.Panel>
-        <Tabs.Panel value="vokabeln" pt="sm">
-          <Stack gap="xs">
-            {d.vokabeln.length === 0 && !d.grammatik?.length && <Text c="dimmed">Gerade kein Vokabel- oder Grammatiktraining in dieser Lerngruppe.</Text>}
-            {(d.grammatik ?? []).map((g) => (
-              <Card key={g.id} withBorder padding="sm" radius="md">
-                <Group justify="space-between">
-                  <Text fw={600}>Grammatik: {g.titel}</Text>
-                  <Text size="sm">{prozent(g.sicherSchnitt)} sicher</Text>
-                </Group>
-                <Progress mt={6} value={g.sicherSchnitt * 100} radius="xl" color="grape" />
-              </Card>
-            ))}
-            {d.vokabeln.map((v) => (
-              <Card key={v.id} withBorder padding="sm" radius="md">
-                <Group justify="space-between">
-                  <Text fw={600}>{v.titel}</Text>
-                  <Group gap={6}>
-                    {v.testTermin && <Badge variant="light">Test {tag(new Date(v.testTermin).toISOString())}</Badge>}
-                    <Text size="sm">{prozent(v.sicherSchnitt)} sicher</Text>
-                  </Group>
-                </Group>
-                <Progress mt={6} value={v.sicherSchnitt * 100} radius="xl" color={v.sicherSchnitt < 0.4 ? 'orange' : 'teal'} />
-              </Card>
-            ))}
-            {d.wackelig.length > 0 && (
-              <Card withBorder padding="sm" radius="md">
-                <Text fw={700} size="sm" mb={6}>
-                  Am häufigsten daneben
-                </Text>
-                <Group gap={6}>
-                  {d.wackelig.map((w) => (
-                    <Badge key={w.term} variant="light" color="orange" tt="none">
-                      {w.term} – {w.translation} · {Math.round(w.quote * 100)} %
-                    </Badge>
-                  ))}
-                </Group>
-              </Card>
-            )}
-          </Stack>
         </Tabs.Panel>
       </Tabs>
 
@@ -497,6 +660,7 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
           schliessen={() => setFreigabe(null)}
           ohneListe
           gruppeVorwahl={d.id}
+          docId={freigabe.docId}
           freigegeben={() => {
             freigabe.erledigt()
             setFreigabe(null)
@@ -506,6 +670,278 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
       )}
     </Stack>
   )
+}
+
+type Ort = { klasse: string; fach: string; muster: string }
+
+const oeffnenKnopf = (titel: string, los: () => void): React.JSX.Element => (
+  <Tooltip label={`„${titel}" öffnen`}>
+    <ActionIcon variant="subtle" onClick={los} aria-label="Öffnen">
+      <IconExternalLink size={16} />
+    </ActionIcon>
+  </Tooltip>
+)
+
+function reihenEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
+  const reihen: Eintrag[] = d.reihen.map((r) => ({
+    key: `r${r.zid}`,
+    art: 'Reihe',
+    titel: r.titel,
+    status: r.status,
+    datum: ms(r.erstellt),
+    frist: null,
+    wert: r.schnitt,
+    inhalt: (
+      <MaterialKarte
+        symbol={<IconRoute size={16} />}
+        titel={r.titel}
+        art="Reihe"
+        status={r.status}
+        angaben={[`seit ${tag(r.erstellt)}`, r.oberthema, `${r.schritte} Schritte`, `${r.fertig} von ${r.lernende} fertig`]}
+        wert={r.schnitt}
+        wertText={`Ø ${prozent(r.schnitt)}`}
+        oeffnen={() => oeffneMitRueckweg('laufendereihen')}
+        aktionen={oeffnenKnopf(r.titel, () => oeffneMitRueckweg('laufendereihen'))}
+        details={
+          <>
+            {r.lernziele.length > 0 && (
+              <Stack gap={3}>
+                <Text size="xs" fw={700}>
+                  Lernziele (Anteil, der alle Schritte dazu geschafft hat)
+                </Text>
+                {r.lernziele.map((z) => (
+                  <Group key={z.text} gap={6} wrap="nowrap">
+                    <Progress value={z.erreicht * 100} w={70} size="sm" color={ampel(z.erreicht)} style={{ flexShrink: 0 }} />
+                    <Text size="xs">
+                      {prozent(z.erreicht)} – {z.text}
+                    </Text>
+                  </Group>
+                ))}
+              </Stack>
+            )}
+            {r.nichtBegonnen.length > 0 && <DetailZeile name="Noch nicht begonnen">{namen(r.nichtBegonnen)}</DetailZeile>}
+          </>
+        }
+      />
+    )
+  }))
+  const blaetter: Eintrag[] = d.blaetter.map((b) => {
+    const abgegeben = b.gesamt ? b.eingereicht / b.gesamt : 0
+    return {
+      key: `b${b.id}`,
+      art: 'Blatt',
+      titel: b.titel,
+      status: b.status,
+      datum: ms(b.erstellt),
+      frist: b.bis,
+      wert: b.ergebnis ?? abgegeben,
+      inhalt: (
+        <MaterialKarte
+          symbol={<IconFileText size={16} />}
+          titel={b.titel}
+          art="Blatt"
+          status={b.status}
+          angaben={[
+            `freigegeben ${tag(b.erstellt)}`,
+            b.bis ? `bis ${tag(b.bis)}${b.bis < Date.now() && b.status === 'offen' ? ' (vorbei)' : ''}` : 'ohne Frist',
+            b.thema,
+            `${b.eingereicht} von ${b.gesamt} eingereicht`,
+            `${b.begonnen} begonnen`
+          ]}
+          wert={abgegeben}
+          wertText={b.ergebnis != null ? `Ergebnis ${prozent(b.ergebnis)}` : `${prozent(abgegeben)} abgegeben`}
+          oeffnen={() => oeffneMitRueckweg('freigaben', b.id)}
+          aktionen={
+            <>
+              <AblegenKnopf quelle={blattQuelle(b.id, b.titel, Boolean(b.quelle))} {...ort} programm="arbeitsblatt" klein />
+              {oeffnenKnopf(b.titel, () => oeffneMitRueckweg('freigaben', b.id))}
+            </>
+          }
+          details={
+            <>
+              <DetailZeile name="Umfang">
+                {b.seiten} Seite{b.seiten === 1 ? '' : 'n'}, {b.aufgaben} Aufgabe{b.aufgaben === 1 ? '' : 'n'}
+                {b.loesung ? ', mit Lösung für die Lernenden' : ''}
+              </DetailZeile>
+              {b.ergebnis != null && <DetailZeile name="Ergebnis">{prozent(b.ergebnis)} der Aufgaben im Schnitt grün (Kurz-Feedback der KI)</DetailZeile>}
+              {b.schwierigste && (
+                <DetailZeile name="Schwierigste Aufgabe">
+                  Nr. {b.schwierigste.nr} ({prozent(b.schwierigste.rot)} rot) – {b.schwierigste.anweisung}
+                </DetailZeile>
+              )}
+              {b.nichtBegonnen.length > 0 && <DetailZeile name="Noch nicht begonnen">{namen(b.nichtBegonnen)}</DetailZeile>}
+              {b.nichtEingereicht.length > 0 && <DetailZeile name="Begonnen, nicht eingereicht">{namen(b.nichtEingereicht)}</DetailZeile>}
+            </>
+          }
+        />
+      )
+    }
+  })
+  return [...reihen, ...blaetter]
+}
+
+function vokabelEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
+  const vok: Eintrag[] = d.vokabeln.map((v) => ({
+    key: `v${v.id}`,
+    art: 'Vokabeln',
+    titel: v.titel,
+    status: v.status,
+    datum: ms(v.erstellt),
+    frist: v.bis ?? v.testTermin,
+    wert: v.sicherSchnitt,
+    inhalt: (
+      <MaterialKarte
+        symbol={<IconLanguage size={16} />}
+        titel={v.titel}
+        art="Vokabeln"
+        status={v.status}
+        angaben={[
+          `seit ${tag(v.erstellt)}`,
+          v.bis ? `bis ${tag(v.bis)}` : 'ohne Ende',
+          v.testTermin ? `Test ${tag(v.testTermin)}` : '',
+          `${v.woerter} Wörter`,
+          `${v.aktiv7} von ${v.lernende} aktiv (7 Tage)`
+        ]}
+        wert={v.sicherSchnitt}
+        wertText={`${prozent(v.sicherSchnitt)} sicher`}
+        oeffnen={() => oeffneMitRueckweg('vokabeltraining', v.id)}
+        aktionen={
+          <>
+            <AblegenKnopf quelle={vokabelQuelle(v.id, v.titel)} {...ort} programm="vokabelliste" klein />
+            {oeffnenKnopf(v.titel, () => oeffneMitRueckweg('vokabeltraining', v.id))}
+          </>
+        }
+        details={
+          <>
+            {v.quelle && <DetailZeile name="Lehrwerk">{v.quelle}</DetailZeile>}
+            <DetailZeile name="Umfang">
+              {v.woerter} Wörter für {v.lernende} Lernende
+            </DetailZeile>
+            {v.probleme.length > 0 && (
+              <DetailZeile name="Schwierigste Wörter">
+                {v.probleme
+                  .map((p) => `${p.term} – ${p.translation} (${prozent(p.quote)} falsch${p.typisch.length ? `, oft „${p.typisch.join('“, „')}“` : ''})`)
+                  .join('; ')}
+              </DetailZeile>
+            )}
+          </>
+        }
+      />
+    )
+  }))
+  const gram: Eintrag[] = d.grammatik.map((g) => ({
+    key: `g${g.id}`,
+    art: 'Grammatik',
+    titel: g.titel,
+    status: g.status,
+    datum: ms(g.erstellt),
+    frist: g.bis,
+    wert: g.sicherSchnitt,
+    inhalt: (
+      <MaterialKarte
+        symbol={<IconBook2 size={16} />}
+        titel={g.titel}
+        art="Grammatik"
+        status={g.status}
+        angaben={[
+          `seit ${tag(g.erstellt)}`,
+          g.bis ? `bis ${tag(g.bis)}` : 'ohne Ende',
+          `${g.aufgaben} Aufgaben`,
+          `${g.aktiv7} von ${g.lernende} aktiv (7 Tage)`
+        ]}
+        wert={g.sicherSchnitt}
+        wertText={`${prozent(g.sicherSchnitt)} sicher`}
+        oeffnen={() => oeffneMitRueckweg('grammatiktraining', g.id)}
+        aktionen={
+          <>
+            <AblegenKnopf quelle={grammatikQuelle(g.id, g.titel)} {...ort} programm="grammatiktest" klein />
+            {oeffnenKnopf(g.titel, () => oeffneMitRueckweg('grammatiktraining', g.id))}
+          </>
+        }
+        details={
+          <>
+            {g.thema && <DetailZeile name="Thema">{g.thema}</DetailZeile>}
+            <DetailZeile name="Umfang">
+              {g.regeln} Regelkarten, {g.aufgaben} Aufgaben
+            </DetailZeile>
+            {g.probleme.length > 0 && (
+              <DetailZeile name="Schwierigste Aufgaben">
+                {g.probleme
+                  .map((p) => `${p.satz} → ${p.loesung} (${prozent(p.quote)} falsch${p.typisch.length ? `, oft „${p.typisch.join('“, „')}“` : ''})`)
+                  .join('; ')}
+              </DetailZeile>
+            )}
+          </>
+        }
+      />
+    )
+  }))
+  return [...vok, ...gram]
+}
+
+function testEintraege(d: KlasseDetail, ort: Ort): Eintrag[] {
+  return d.tests.map((t) => {
+    const art = t.art || 'Test'
+    const status: 'offen' | 'beendet' = t.status === 'beendet' ? 'beendet' : 'offen'
+    // Stand: Schnittnote auf 0–1 (1,0 = 1, 6,0 = 0)
+    const wert = t.durchschnitt == null ? null : Math.max(0, Math.min(1, (6 - t.durchschnitt) / 5))
+    return {
+      key: `t${t.id}`,
+      art,
+      titel: t.titel,
+      status,
+      datum: ms(t.datum),
+      frist: null,
+      wert,
+      inhalt: (
+        <MaterialKarte
+          symbol={<IconClipboardCheck size={16} />}
+          titel={t.titel}
+          art={art}
+          status={status}
+          angaben={[
+            tag(t.datum),
+            t.thema,
+            t.versionen?.length ? `Version${t.versionen.length === 1 ? '' : 'en'} ${t.versionen.join(', ')}` : '',
+            t.punkte ? `${t.punkte} Punkte` : '',
+            `${t.teilnehmer} Teilnahmen`
+          ]}
+          wert={null}
+          wertText={t.durchschnitt != null ? `Ø ${note(t.durchschnitt)}` : status === 'offen' ? 'läuft' : '–'}
+          oeffnen={() => oeffneMitRueckweg('onlinetest', t.id)}
+          aktionen={
+            <>
+              {t.offen > 0 && (
+                <Badge color="orange" size="sm">
+                  {t.offen} zu prüfen
+                </Badge>
+              )}
+              <AblegenKnopf quelle={testQuelle(t.id, t.titel, Boolean(t.mitOriginal))} {...ort} programm="vokabeltest" klein />
+              {oeffnenKnopf(t.titel, () => oeffneMitRueckweg('onlinetest', t.id))}
+            </>
+          }
+          zusatz={
+            t.teilnehmer > 0 ? (
+              <Group gap="xs" mt={6}>
+                <Verteilung werte={t.verteilung} />
+                {wert != null && <Progress value={wert * 100} radius="xl" color={ampel(wert)} style={{ flex: 1 }} data-ampel={ampel(wert)} />}
+              </Group>
+            ) : undefined
+          }
+          details={
+            <>
+              {t.zeitMin ? <DetailZeile name="Bearbeitungszeit">{t.zeitMin} Minuten</DetailZeile> : null}
+              {t.schwellen?.length ? <DetailZeile name="Notenschlüssel">{t.schwellen.map((s, i) => `${i + 1}: ab ${s} %`).join(' · ')}</DetailZeile> : null}
+              {t.schwerpunkte?.length ? <DetailZeile name="Fehlerschwerpunkte">{t.schwerpunkte.join(', ')}</DetailZeile> : null}
+              {t.beste && <DetailZeile name="Am besten gelöst">{`${t.beste.titel} (${prozent(t.beste.quote)} richtig)`}</DetailZeile>}
+              {t.schwaechste && <DetailZeile name="Am schwächsten">{`${t.schwaechste.titel} (${prozent(t.schwaechste.quote)} richtig)`}</DetailZeile>}
+              {t.fehlende?.length ? <DetailZeile name="Nicht teilgenommen">{namen(t.fehlende)}</DetailZeile> : null}
+            </>
+          }
+        />
+      )
+    }
+  })
 }
 
 function Verteilung({ werte }: { werte: number[] }): React.JSX.Element {
@@ -524,6 +960,16 @@ function Verteilung({ werte }: { werte: number[] }): React.JSX.Element {
           />
         </Tooltip>
       ))}
+    </Group>
+  )
+}
+
+function Anteil({ x }: { x: number | null | undefined }): React.JSX.Element {
+  if (x == null) return <>–</>
+  return (
+    <Group gap={6} wrap="nowrap">
+      <Progress value={x * 100} w={70} size="sm" color={ampel(x)} />
+      <Text size="xs">{prozent(x)}</Text>
     </Group>
   )
 }
@@ -553,25 +999,21 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
             <Table.Td fw={600}>{l.name}</Table.Td>
             {zeigtVokabeln && (
               <Table.Td>
-                {l.vokabelnSicher === null ? (
-                  '–'
-                ) : (
-                  <Group gap={6} wrap="nowrap">
-                    <Progress
-                      value={l.vokabelnSicher * 100}
-                      w={70}
-                      size="sm"
-                      color={l.vokabelnSicher < 0.3 ? 'red' : l.vokabelnSicher < 0.6 ? 'yellow' : 'teal'}
-                    />
-                    <Text size="xs">{prozent(l.vokabelnSicher)}</Text>
-                  </Group>
-                )}
+                <Anteil x={l.vokabelnSicher} />
               </Table.Td>
             )}
             {zeigtVokabeln && <Table.Td>{tag(l.zuletztGeuebt)}</Table.Td>}
-            {zeigtGrammatik && <Table.Td>{prozent(l.grammatikSicher ?? null)}</Table.Td>}
+            {zeigtGrammatik && (
+              <Table.Td>
+                <Anteil x={l.grammatikSicher} />
+              </Table.Td>
+            )}
             <Table.Td>{l.tests ? note(l.testSchnitt) : '–'}</Table.Td>
-            {zeigtReihen && <Table.Td>{prozent(l.reihenFortschritt)}</Table.Td>}
+            {zeigtReihen && (
+              <Table.Td>
+                <Anteil x={l.reihenFortschritt} />
+              </Table.Td>
+            )}
             <Table.Td>{l.blaetterEingereicht}</Table.Td>
           </Table.Tr>
         ))}

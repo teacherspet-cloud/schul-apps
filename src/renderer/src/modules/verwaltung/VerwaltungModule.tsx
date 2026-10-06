@@ -59,6 +59,7 @@ interface Uebersicht {
   schluessel: { name: string; hinterlegt: string; fuerAlle: boolean }[]
   iserv: { aussteller: string; clientId: string; scopes: string; geheimnis: boolean }
   notzugang: boolean
+  ablage?: { muster: string; standard: string }
   server: {
     speicher: { frei: number; gesamt: number; prozess: number }
     last: number[]
@@ -460,6 +461,7 @@ function Iserv({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Elemen
           Anmeldung testen
         </Button>
       </Group>
+      <AblageStruktur d={d} neu={neu} />
       <Switch
         mt="md"
         label="Notzugang (Anmeldung des Admins mit Passwort) erlauben"
@@ -545,5 +547,49 @@ function Server({ d }: { d: Uebersicht }): React.JSX.Element {
         </Card>
       ))}
     </SimpleGrid>
+  )
+}
+
+/**
+ * Ordnerstruktur für „In IServ ablegen" aus „Meine Klassen" (06.10.2026): gilt für alle Lehrkräfte. Platzhalter {Klasse},
+ * {Fach}, {Schuljahr}; Standard „Gruppen/Klasse {Klasse}/{Fach}".
+ */
+function AblageStruktur({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Element {
+  const standard = d.ablage?.standard ?? 'Gruppen/Klasse {Klasse}/{Fach}'
+  const [muster, setMuster] = useState(d.ablage?.muster ?? standard)
+  const beispiel = muster
+    .replace(/\{Klasse\}/g, '10b')
+    .replace(/\{Fach\}/g, 'Englisch')
+    .replace(/\{Schuljahr\}/g, '2026-27')
+  return (
+    <Stack gap={4} mt="md" data-ablage-struktur>
+      <TextInput
+        label="Ablage in IServ (aus „Meine Klassen“)"
+        description="Ordner für „In IServ ablegen“. Platzhalter: {Klasse}, {Fach}, {Schuljahr}. Gilt für alle Lehrkräfte."
+        value={muster}
+        onChange={(e) => setMuster(e.currentTarget.value)}
+        data-ablage-muster
+      />
+      <Text size="xs" c="dimmed">
+        Beispiel: {beispiel.split('/').join(' › ')}
+      </Text>
+      <Group gap="xs">
+        <Button
+          size="xs"
+          onClick={() =>
+            void senden('/server/verwaltung/iserv-ablage', { muster }).then(
+              () => (notifySuccess('Ablagestruktur gespeichert.'), neu()),
+              (e: unknown) => notifyError(e)
+            )
+          }
+          data-ablage-speichern
+        >
+          Speichern
+        </Button>
+        <Button size="xs" variant="subtle" onClick={() => setMuster(standard)}>
+          Standard
+        </Button>
+      </Group>
+    </Stack>
   )
 }

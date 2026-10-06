@@ -33,6 +33,7 @@ import { BlattWaehlenKnopf } from './BlattWaehlen'
 import { abgabeTeile, FortschrittsBalken } from '../../shared/components/FortschrittsBalken'
 import { AuswertungKnopf, AuswertungLeiste, AuswertungModal, useAuswertung, type PersonA } from './Auswertung'
 import type { Ampel } from '@shared/blattFreigabe'
+import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 
 export interface Freigabe {
   id: string
@@ -128,6 +129,8 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
     window.addEventListener('freigabe-oeffnen', auf)
     return () => window.removeEventListener('freigabe-oeffnen', auf)
   }, [])
+  // openDocument('freigaben', id) – z. B. aus „Meine Klassen" (06.10.2026)
+  useDokumentOeffner('freigaben', async (id) => setGewaehlt(id))
   if (gewaehlt) return <FreigabeDetail id={gewaehlt} zurueck={() => (setGewaehlt(null), laden())} />
   if (!liste)
     return (
@@ -276,6 +279,7 @@ export default function FreigegebeneBlaetterModule({ active }: { active: boolean
 }
 
 function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
+  const rueck = useRueckweg('freigaben', zurueck, 'Alle Freigaben')
   const [d, setD] = useState<Detail | null>(null)
   const [kurz, setKurz] = useState<Freigabe | null>(null)
   const [blatt, setBlatt] = useState<BlattDaten | null>(null)
@@ -308,8 +312,15 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
     void holen<BlattDaten>(`/server/blaetter/${id}/abgabe?schueler=${encodeURIComponent(benutzer)}`).then(setBlatt, (e: unknown) => notifyError(e))
   return (
     <Container size="lg" py="lg" data-freigabe-detail>
-      <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} px={4} onClick={zurueck} mb="xs">
-        Alle Freigaben
+      <Button
+        variant="subtle"
+        leftSection={<IconArrowLeft size={16} />}
+        px={4}
+        onClick={rueck.los}
+        mb="xs"
+        data-zurueck={rueck.aus ? 'meineklassen' : undefined}
+      >
+        {rueck.name}
       </Button>
       <Group justify="space-between" mb="md">
         <div>

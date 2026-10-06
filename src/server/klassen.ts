@@ -1,21 +1,31 @@
 /**
- * „Meine Klassen" (06.10.2026, abgestimmt mit der Lehrkraft): je Lerngruppe – angezeigt als „5b – Englisch", alphabetisch –
- * der Lernstand (Vokabeln und Grammatik), Tests und Noten, laufende Reihen und Blätter,
- * oben der Handlungsbedarf, dazu Vorschläge für Material aus dem Lernstand.
+ * „Meine Klassen" (06.10.2026, abgestimmt mit der Lehrkraft): je Lerngruppe der Lernstand (Vokabeln und Grammatik),
+ * Tests und Noten, Reihen und Blätter, oben der Handlungsbedarf, dazu Vorschläge für Material aus dem Lernstand.
  *
- *   GET /server/klassen          Übersicht aller eigenen Lerngruppen (knapp)
- *   GET /server/klassen/<id>     eine Lerngruppe im Detail
+ * Runde 2 (06.10.2026): EINE Karte je Klasse – Lerngruppen gleichen Namens („5b" mit Englisch, Geschichte …) sind die
+ * Fächer der Klasse; in der Klasse eine Fach-Leiste mit „+ Fach hinzufügen" (gleiche Lernenden, onlinetest.ts
+ * `fachHinzufuegen`). Materialien mit mehr Details (auch beendete) und der vom Admin hinterlegten IServ-Ablagestruktur.
+ *
+ *   GET  /server/klassen               Übersicht: Klassen mit ihren Fächern
+ *   GET  /server/klassen/<id>          eine Lerngruppe (Klasse + Fach) im Detail
+ *   POST /server/klassen/<id>/fach     {fach} → Fach hinzufügen, liefert {id}
  *
  * Nur für Lehrkräfte; nur die eigenen Lerngruppen. Namen der Lernenden gehen nur an die Lehrkraft selbst.
  */
+import { fachAusName, SPRACHFAECHER } from '../shared/faecher'
 import { blaetterDerGruppe } from './arbeitsblaetter'
+import { serverWert } from './datenbank'
 import { alsNutzer, json, type Anfrage } from './http'
-import { fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, type Lerngruppe } from './onlinetest'
+import { fachHinzufuegen, fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, testDetailsDerGruppe, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
 import { vokabelnDerGruppe } from './vokabeln'
 import { grammatikDerGruppe } from './grammatik'
 
 const TAG = 86_400_000
+
+/** Standard der IServ-Ablage (Verwaltung › IServ-Anbindung kann es ändern): Platzhalter {Klasse}, {Fach}, {Schuljahr} */
+export const ABLAGE_STANDARD = 'Gruppen/Klasse {Klasse}/{Fach}'
+export const ablageMuster = (): string => serverWert<string>('iserv-ablage', ABLAGE_STANDARD) || ABLAGE_STANDARD
 
 /** „5b – Englisch"; ohne Fach nur der Name */
 export const klassenTitel = (g: Pick<Lerngruppe, 'name' | 'fach'>): string => (g.fach ? `${g.name} – ${g.fach}` : g.name)
@@ -23,6 +33,15 @@ export const klassenTitel = (g: Pick<Lerngruppe, 'name' | 'fach'>): string => (g
 /** Alphabetisch, Zahlen natürlich („5b" vor „10a"), dann das Fach */
 export const nachKlasse = (a: Pick<Lerngruppe, 'name' | 'fach'>, b: Pick<Lerngruppe, 'name' | 'fach'>): number =>
   a.name.localeCompare(b.name, 'de', { numeric: true }) || a.fach.localeCompare(b.fach, 'de')
+
+/** Lerngruppen gleichen Namens bilden eine Klasse */
+export const klassenSchluessel = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, ' ')
+
+/** Fremdsprache (oder alte Sprache, DaZ): dann gibt es den Reiter „Vokabeln & Grammatik" */
+export const istSprachfach = (fach: string): boolean => {
+  const f = fachAusName(fach)
+  return Boolean(f && SPRACHFAECHER.includes(f.id))
+}
 
 interface Bedarf {
   art: 'entscheiden' | 'foerdern' | 'inaktiv' | 'termin' | 'reihe' | 'blatt'
@@ -34,18 +53,20 @@ interface Bedarf {
 function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   const mitglieder = mitgliederVon(g)
   const h = historie(g)
+  const testDetails = testDetailsDerGruppe(g)
   const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt)
   const gram = grammatikDerGruppe(lehrkraftId, g.id, jetzt)
   const reihen = reihenDerGruppe(lehrkraftId, g.id)
   const blaetter = blaetterDerGruppe(lehrkraftId, g.id)
   const fehler = fehlerSchwerpunkte(g)
+  const offeneVok = vok.trainings.filter((t) => t.status === 'offen')
 
   const lernende = mitglieder
     .map((n) => {
       const v = vok.jePerson[n.id]
       const gr = gram.jePerson[n.id]
       const t = h.schueler.find((s) => s.benutzer === n.benutzer)
-      const r = reihen.flatMap((x) => x.lernende.filter((l) => l.id === n.id).map((l) => l.fortschritt))
+      const r = reihen.filter((x) => x.status === 'offen').flatMap((x) => x.lernende.filter((l) => l.id === n.id).map((l) => l.fortschritt))
       return {
         id: n.id,
         name: n.name,
@@ -61,7 +82,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'de'))
 
-  // ---------- Handlungsbedarf
+  // ---------- Handlungsbedarf (nur Laufendes)
   const bedarf: Bedarf[] = []
   for (const t of h.tests)
     if (t.offen > 0)
@@ -70,7 +91,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
         text: `„${t.titel}": ${t.offen} Antwort${t.offen === 1 ? '' : 'en'} zu prüfen`,
         ziel: { modul: 'onlinetest', id: t.id }
       })
-  if (vok.trainings.length) {
+  if (offeneVok.length) {
     const schwach = lernende.filter((l) => l.vokabelnSicher !== null && l.vokabelnSicher < 0.3)
     if (schwach.length)
       bedarf.push({ art: 'foerdern', text: `Vokabeln unter 30 % sicher: ${schwach.map((l) => l.name).join(', ')}`, ziel: { modul: 'vokabeltraining' } })
@@ -78,7 +99,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     const inaktiv = lernende.filter((l) => l.vokabelnSicher !== null && (!l.zuletztGeuebt || l.zuletztGeuebt < grenze))
     if (inaktiv.length)
       bedarf.push({ art: 'inaktiv', text: `Seit einer Woche nicht geübt: ${inaktiv.map((l) => l.name).join(', ')}`, ziel: { modul: 'vokabeltraining' } })
-    for (const t of vok.trainings)
+    for (const t of offeneVok)
       if (t.testTermin && t.testTermin > jetzt && t.testTermin - jetzt < 8 * TAG)
         bedarf.push({
           art: 'termin',
@@ -87,9 +108,17 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
         })
   }
   for (const r of reihen) for (const b of r.bedarf.slice(0, 3)) bedarf.push({ art: 'reihe', text: `${r.titel}: ${b}`, ziel: { modul: 'laufendereihen' } })
-  for (const b of blaetter)
+  for (const b of blaetter) {
+    if (b.status !== 'offen') continue
     if (b.gesamt && b.eingereicht < b.gesamt && b.begonnen < b.gesamt / 2)
       bedarf.push({ art: 'blatt', text: `Blatt „${b.titel}": erst ${b.begonnen} von ${b.gesamt} haben begonnen`, ziel: { modul: 'freigaben', id: b.id } })
+    else if (b.bis && b.bis < jetzt && b.eingereicht < b.gesamt)
+      bedarf.push({
+        art: 'blatt',
+        text: `Blatt „${b.titel}": Frist vorbei, ${b.gesamt - b.eingereicht} noch nicht eingereicht`,
+        ziel: { modul: 'freigaben', id: b.id }
+      })
+  }
 
   // ---------- Vorschläge für Material aus dem Lernstand
   const vorschlaege: (
@@ -121,6 +150,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
     name: g.name,
     fach: g.fach,
     titel: klassenTitel(g),
+    sprachfach: istSprachfach(g.fach),
     lernende,
     tests: h.tests.map((t) => ({
       id: t.id,
@@ -130,13 +160,14 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
       teilnehmer: t.teilnehmer,
       offen: t.offen,
       durchschnitt: t.durchschnitt,
-      verteilung: t.verteilung
+      verteilung: t.verteilung,
+      ...(testDetails[t.id] ?? {})
     })),
     vokabeln: vok.trainings,
     grammatik: gram.trainings,
     wackelig: vok.wackelig,
-    reihen: reihen.map(({ zid, titel, schnitt, fertig, lernende: l }) => ({ zid, titel, schnitt, fertig, lernende: l.length })),
-    blaetter: blaetter.map(({ id, titel, gesamt, begonnen, eingereicht }) => ({ id, titel, gesamt, begonnen, eingereicht })),
+    reihen: reihen.map(({ lernende: l, bedarf: _b, ...rest }) => ({ ...rest, lernende: l.length })),
+    blaetter: blaetter.map(({ eingereichtVon: _e, ...rest }) => rest),
     bedarf,
     vorschlaege
   }
@@ -149,34 +180,79 @@ export function klassenRoute(): (k: Anfrage) => Promise<boolean> {
     if (!sitzung) return (json(res, 401, { fehler: 'Nicht angemeldet.' }), true)
     if (sitzung.nutzer.rolle === 'schueler') return (json(res, 403, { fehler: 'Nur für Lehrkräfte.' }), true)
     const ich = alsNutzer(sitzung.nutzer, sitzung.kennung)
-    if (req.method !== 'GET') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
     const teile = url.pathname.split('/').filter(Boolean).slice(2)
+
+    if (req.method === 'POST') {
+      if (typeof req.headers['x-schulapps-token'] !== 'string') return (json(res, 403, { fehler: 'Nur aus der App.' }), true)
+      if (teile.length !== 2 || teile[1] !== 'fach') return (json(res, 404, { fehler: 'Unbekannt.' }), true)
+      const k0 = (await k.koerper()) as Record<string, unknown>
+      try {
+        return (json(res, 200, { id: fachHinzufuegen(ich.id, teile[0], String(k0.fach ?? '')) }), true)
+      } catch (e) {
+        return (json(res, 400, { fehler: e instanceof Error ? e.message : String(e) }), true)
+      }
+    }
+    if (req.method !== 'GET') return (json(res, 405, { fehler: 'Nicht erlaubt.' }), true)
+
     if (!teile.length) {
-      const klassen = lerngruppenVon(ich.id)
-        .sort(nachKlasse)
-        .map((g) => {
-          const d = detail(g, ich.id)
-          const mitWert = (f: (l: (typeof d.lernende)[number]) => number | null): number[] => d.lernende.map(f).filter((x): x is number => x !== null)
-          const schnitt = (l: number[]): number | null => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : null)
-          return {
-            id: d.id,
-            name: d.name,
-            fach: d.fach,
-            titel: d.titel,
-            lernende: d.lernende.length,
-            vokabelnSicher: schnitt(mitWert((l) => l.vokabelnSicher)),
-            testSchnitt: schnitt(d.tests.map((t) => t.durchschnitt).filter((x): x is number => x !== null)),
-            tests: d.tests.length,
-            reihen: d.reihen.length,
-            blaetter: d.blaetter.length,
-            bedarf: d.bedarf.length,
-            vorschlaege: d.vorschlaege.length
-          }
+      // Je Klasse (Name) ihre Fächer – Lerngruppen ohne Fach zählen als Klasse ohne Fach
+      const klassen = new Map<
+        string,
+        {
+          schluessel: string
+          name: string
+          gruppen: string[]
+          lernende: Set<string>
+          bedarf: number
+          vorschlaege: number
+          faecher: {
+            id: string
+            fach: string
+            bedarf: number
+            vorschlaege: number
+            vokabelnSicher: number | null
+            testSchnitt: number | null
+            tests: number
+            reihen: number
+            blaetter: number
+          }[]
+        }
+      >()
+      for (const g of lerngruppenVon(ich.id).sort(nachKlasse)) {
+        const s = klassenSchluessel(g.name)
+        const kl = klassen.get(s) ?? { schluessel: s, name: g.name.trim(), gruppen: [], lernende: new Set<string>(), bedarf: 0, vorschlaege: 0, faecher: [] }
+        klassen.set(s, kl)
+        kl.gruppen.push(g.id)
+        const d = detail(g, ich.id)
+        for (const l of d.lernende) kl.lernende.add(l.id)
+        kl.bedarf += d.bedarf.length
+        kl.vorschlaege += d.vorschlaege.length
+        if (!g.fach.trim()) continue
+        const werte = d.lernende.map((l) => l.vokabelnSicher).filter((x): x is number => x !== null)
+        const noten = d.tests.map((t) => t.durchschnitt).filter((x): x is number => x !== null)
+        kl.faecher.push({
+          id: g.id,
+          fach: g.fach,
+          bedarf: d.bedarf.length,
+          vorschlaege: d.vorschlaege.length,
+          vokabelnSicher: werte.length ? werte.reduce((a, b) => a + b, 0) / werte.length : null,
+          testSchnitt: noten.length ? noten.reduce((a, b) => a + b, 0) / noten.length : null,
+          tests: d.tests.length,
+          reihen: d.reihen.filter((r) => r.status === 'offen').length,
+          blaetter: d.blaetter.filter((b) => b.status === 'offen').length
         })
-      return (json(res, 200, { klassen }), true)
+      }
+      return (
+        json(res, 200, {
+          klassen: [...klassen.values()]
+            .sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }))
+            .map(({ lernende, ...rest }) => ({ ...rest, lernende: lernende.size }))
+        }),
+        true
+      )
     }
     const g = lerngruppe(teile[0])
     if (!g || g.lehrkraft_id !== ich.id) return (json(res, 404, { fehler: 'Diese Lerngruppe gibt es nicht.' }), true)
-    return (json(res, 200, detail(g, ich.id)), true)
+    return (json(res, 200, { ...detail(g, ich.id), ablageMuster: ablageMuster() }), true)
   }
 }

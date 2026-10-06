@@ -169,26 +169,91 @@ export function grammatikFuer(ich: NutzerInfo): { id: string; titel: string; fac
     .map((z) => ({ id: z.id, titel: z.titel, fach: z.fach, uebersicht: uebersicht(karten(paketVon(z)), standVon(z.id, ich.id).aufgaben) }))
 }
 
-/** „Meine Klassen": Grammatiktrainings einer Lerngruppe – Anteil sicherer Aufgaben je Person */
+/**
+ * „Meine Klassen": Grammatiktrainings einer Lerngruppe – Anteil sicherer Aufgaben je Person (nur laufende), dazu je
+ * Training Status, Zeitraum, Umfang, aktive Lernende der letzten 7 Tage und die schwierigsten Aufgaben (Runde 2, 06.10.2026).
+ */
 export function grammatikDerGruppe(
   lehrkraftId: string,
   lerngruppeId: string,
   jetzt = Date.now()
-): { trainings: { id: string; titel: string; sicherSchnitt: number }[]; jePerson: Record<string, { sicher: number; gesamt: number }> } {
+): {
+  trainings: {
+    id: string
+    titel: string
+    sicherSchnitt: number
+    status: 'offen' | 'beendet'
+    erstellt: string
+    bis: number | null
+    thema: string
+    aufgaben: number
+    regeln: number
+    lernende: number
+    aktiv7: number
+    probleme: { satz: string; loesung: string; quote: number; typisch: string[] }[]
+  }[]
+  jePerson: Record<string, { sicher: number; gesamt: number }>
+} {
   const zs = db()
-    .prepare("SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+    .prepare('SELECT * FROM gram_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? ORDER BY erstellt DESC')
     .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
   const jePerson: Record<string, { sicher: number; gesamt: number }> = {}
+  const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
   const trainings = zs.map((z) => {
-    const k = karten(paketVon(z))
-    const anteile = lernendeVon(z).map((n) => {
-      const u = uebersicht(k, standVon(z.id, n.id).aufgaben, jetzt)
-      const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0 })
-      p.sicher += u.sicher
-      p.gesamt += u.gesamt
+    const offen = istOffen(z)
+    const p = paketVon(z)
+    const k = karten(p)
+    const lernende = lernendeVon(z)
+    let aktiv7 = 0
+    const jeAufgabe = new Map<string, { versuche: number; falsch: number; texte: Map<string, number> }>()
+    const anteile = lernende.map((n) => {
+      const st = standVon(z.id, n.id)
+      const u = uebersicht(k, st.aufgaben, jetzt)
+      if (st.tage.some((t) => t >= vor7)) aktiv7++
+      for (const [id, s] of Object.entries(st.aufgaben)) {
+        if (!s.versuche) continue
+        const j = jeAufgabe.get(id) ?? { versuche: 0, falsch: 0, texte: new Map<string, number>() }
+        j.versuche += s.versuche
+        j.falsch += s.falsch
+        for (const t of s.fehlerTexte ?? []) j.texte.set(t, (j.texte.get(t) ?? 0) + 1)
+        jeAufgabe.set(id, j)
+      }
+      if (offen) {
+        const q = (jePerson[n.id] ??= { sicher: 0, gesamt: 0 })
+        q.sicher += u.sicher
+        q.gesamt += u.gesamt
+      }
       return u.gesamt ? u.sicher / u.gesamt : 0
     })
-    return { id: z.id, titel: z.titel, sicherSchnitt: anteile.length ? anteile.reduce((a, b) => a + b, 0) / anteile.length : 0 }
+    return {
+      id: z.id,
+      titel: z.titel,
+      sicherSchnitt: anteile.length ? anteile.reduce((a, b) => a + b, 0) / anteile.length : 0,
+      status: offen ? ('offen' as const) : ('beendet' as const),
+      erstellt: z.erstellt,
+      bis: z.bis ?? null,
+      thema: z.thema,
+      aufgaben: p.aufgaben.length,
+      regeln: p.regeln.length,
+      lernende: lernende.length,
+      aktiv7,
+      probleme: p.aufgaben
+        .map((a) => ({ a, j: jeAufgabe.get(a.id) }))
+        .filter((x): x is { a: (typeof p.aufgaben)[number]; j: { versuche: number; falsch: number; texte: Map<string, number> } } =>
+          Boolean(x.j && x.j.versuche >= 3 && x.j.falsch > 0)
+        )
+        .sort((x, y) => y.j.falsch / y.j.versuche - x.j.falsch / x.j.versuche)
+        .slice(0, 5)
+        .map(({ a, j }) => ({
+          satz: a.satz || (a.teile ?? []).join(' / '),
+          loesung: a.loesungen[0] ?? '',
+          quote: j.falsch / j.versuche,
+          typisch: [...j.texte.entries()]
+            .sort((x, y) => y[1] - x[1])
+            .slice(0, 2)
+            .map(([t]) => t)
+        }))
+    }
   })
   return { trainings, jePerson }
 }

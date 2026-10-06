@@ -10,6 +10,7 @@
  * Verteilung auf die Fächer des Karteikastens, Erkennen vs. selbst schreiben, Aktivität der letzten
  * 7 Tage, Problemwörter mit typischen Falschantworten, Prognose zum Testtermin.
  */
+import { useDokumentOeffner, useRueckweg } from '../../shared/navigation'
 import { ListenSuche } from '../../shared/components/AppSuche'
 import { AppKopf, useProgrammFarbe } from '../../shared/components/AppKopf'
 import { useAlleLernenden } from './LernendeWahl'
@@ -100,6 +101,8 @@ export default function VokabelTraining(): React.JSX.Element {
   const [gewaehlt, setGewaehlt] = useState<string | null>(null)
   const [neu, setNeu] = useState(false)
   const [filter, setFilter] = useState<'offen' | 'beendet'>('offen')
+  // openDocument('vokabeltraining', id) – z. B. aus „Meine Klassen" (06.10.2026)
+  useDokumentOeffner('vokabeltraining', async (id) => setGewaehlt(id))
   const [suche, setSuche] = useState('')
   const laden = useCallback(
     () =>
@@ -340,6 +343,7 @@ interface Lernstanddaten {
 }
 
 function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.JSX.Element {
+  const rueck = useRueckweg('vokabeltraining', zurueck, 'Alle Freigaben')
   const [d, setD] = useState<Lernstanddaten | null>(null)
   const [qr, setQr] = useState(false)
   const [loeschen, setLoeschen] = useState(false)
@@ -355,8 +359,14 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
   const anteilGeuebt = d.gesamt.gesamt ? (d.gesamt.gesamt - d.gesamt.neu) / d.gesamt.gesamt : 0
   return (
     <Stack data-lernstand>
-      <Button variant="subtle" leftSection={<IconArrowLeft size={16} />} onClick={zurueck} w="fit-content">
-        Alle Freigaben
+      <Button
+        variant="subtle"
+        leftSection={<IconArrowLeft size={16} />}
+        onClick={rueck.los}
+        w="fit-content"
+        data-zurueck={rueck.aus ? 'meineklassen' : undefined}
+      >
+        {rueck.name}
       </Button>
       <Group justify="space-between" align="flex-start">
         <div>

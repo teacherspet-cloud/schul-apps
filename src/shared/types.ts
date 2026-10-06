@@ -365,6 +365,8 @@ export interface AblageZiel {
   ort?: AusgabeOrt
   /** Gibt es den Namen dort schon: ersetzen oder neue Version (shared/vorhanden.ts); fehlt = nachfragen */
   beiVorhanden?: 'ersetzen' | 'neu'
+  /** Fester Ordner in IServ statt Standardziel + Fach (Meine Klassen, 06.10.2026: „Gruppen/Klasse 10b/Englisch") */
+  iservPfad?: string[]
 }
 
 /** iPad: was über den PC läuft und wie er erreichbar ist */

@@ -658,36 +658,68 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
 /**
  * „Meine Klassen" (06.10.2026): Vokabeltrainings einer Lerngruppe – Anteil sicherer Wörter je Person, letzter Übungstag,
  * Testtermin und die wackeligsten Wörter der ganzen Gruppe (Grundlage für den Vorschlag „Wackelige Wörter").
+ * Runde 2 (06.10.2026): auch beendete Trainings (Status), Umfang, Zeitraum, Lehrwerk, aktive Lernende der letzten
+ * 7 Tage und die schwierigsten Wörter je Training mit typischer Falschantwort. Lernstand je Person und „wackelig"
+ * nur aus den laufenden Trainings (Handlungsbedarf).
  */
 export function vokabelnDerGruppe(
   lehrkraftId: string,
   lerngruppeId: string,
   jetzt = Date.now()
 ): {
-  trainings: { id: string; titel: string; sprache: string; fach: string; testTermin: number | null; sicherSchnitt: number }[]
+  trainings: {
+    id: string
+    titel: string
+    sprache: string
+    fach: string
+    testTermin: number | null
+    sicherSchnitt: number
+    status: 'offen' | 'beendet'
+    erstellt: string
+    bis: number | null
+    woerter: number
+    quelle: string
+    lernende: number
+    aktiv7: number
+    probleme: { term: string; translation: string; quote: number; typisch: string[] }[]
+  }[]
   jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null }>
   wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string }[]
 } {
   const zs = db()
-    .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' AND status = 'offen' ORDER BY erstellt DESC")
+    .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' ORDER BY erstellt DESC")
     .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
   const jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null }> = {}
   const woerterFehler = new Map<string, { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string }>()
+  const vor7 = new Date(jetzt - 7 * TAG).toISOString().slice(0, 10)
   const trainings = zs.map((z) => {
+    const offen = istOffen(z)
     const woerter = json_(z.woerter, [] as Vokabel[])
     const anteile: number[] = []
-    for (const n of lernendeVon(z)) {
+    let aktiv7 = 0
+    const jeWort = new Map<string, { v: Vokabel; versuche: number; falsch: number; texte: Map<string, number> }>()
+    const lernende = lernendeVon(z)
+    for (const n of lernende) {
       const st = standVon(z.id, n.id)
       const u = uebersicht(woerter, st.woerter, jetzt)
       anteile.push(u.gesamt ? u.sicher / u.gesamt : 0)
-      const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null })
-      p.sicher += u.sicher
-      p.gesamt += u.gesamt
-      const letzter = st.tage[st.tage.length - 1] ?? null
-      if (letzter && (!p.zuletzt || letzter > p.zuletzt)) p.zuletzt = letzter
+      if (st.tage.some((t) => t >= vor7)) aktiv7++
+      if (offen) {
+        const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null })
+        p.sicher += u.sicher
+        p.gesamt += u.gesamt
+        const letzter = st.tage[st.tage.length - 1] ?? null
+        if (letzter && (!p.zuletzt || letzter > p.zuletzt)) p.zuletzt = letzter
+      }
       for (const v of woerter) {
         const w = st.woerter[v.id]
         if (!w || !w.versuche) continue
+        const j = jeWort.get(v.id) ?? { v, versuche: 0, falsch: 0, texte: new Map<string, number>() }
+        j.versuche += w.versuche
+        j.falsch += w.falsch
+        for (const t of w.fehlerTexte ?? []) j.texte.set(t, (j.texte.get(t) ?? 0) + 1)
+        jeWort.set(v.id, j)
+        if (!offen) continue
         const k = `${z.sprache}|${v.term}`
         const e = woerterFehler.get(k) ?? { v, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach }
         e.versuche += w.versuche
@@ -695,13 +727,34 @@ export function vokabelnDerGruppe(
         woerterFehler.set(k, e)
       }
     }
+    const q = json_(z.quelle || '{}', {} as { lehrwerk?: string; unit?: string; abschnitte?: string[] })
     return {
       id: z.id,
       titel: z.titel,
       sprache: z.sprache,
       fach: z.fach,
       testTermin: z.test_termin ?? null,
-      sicherSchnitt: anteile.length ? anteile.reduce((a, b) => a + b, 0) / anteile.length : 0
+      sicherSchnitt: anteile.length ? anteile.reduce((a, b) => a + b, 0) / anteile.length : 0,
+      status: offen ? ('offen' as const) : ('beendet' as const),
+      erstellt: z.erstellt,
+      bis: z.bis ?? null,
+      woerter: woerter.length,
+      quelle: [q.lehrwerk, q.unit, q.abschnitte?.length ? q.abschnitte.join(', ') : ''].filter(Boolean).join(' · '),
+      lernende: lernende.length,
+      aktiv7,
+      probleme: [...jeWort.values()]
+        .filter((e) => e.versuche >= 3 && e.falsch > 0)
+        .sort((a, b) => b.falsch / b.versuche - a.falsch / a.versuche)
+        .slice(0, 5)
+        .map((e) => ({
+          term: e.v.term,
+          translation: e.v.translation,
+          quote: e.falsch / e.versuche,
+          typisch: [...e.texte.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 2)
+            .map(([t]) => t)
+        }))
     }
   })
   const wackelig = [...woerterFehler.values()]
