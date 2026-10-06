@@ -1031,3 +1031,14 @@ img.home-illustration {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Meine Klassen (06.10.2026): Zeilen im Handlungsbedarf */
+.klassen-bedarf {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.klassen-bedarf:hover {
+  background: var(--mantine-color-default-hover);
+}

@@ -52,6 +52,10 @@ const MOTIVE = {
   'gruppe-verwaltung':
     'Tile colour: cool grey (#adb5bd to #495057). Motif: a white filing cabinet with two drawers, the top drawer slightly open showing coloured folders (blue, yellow, green), ' +
     'and a small silver gear wheel in front.',
+  // 06.10.2026: „Meine Klassen" (Verwaltung) – Lernstand der eigenen Klassen auf einen Blick
+  meineklassen:
+    'Tile colour: emerald to ocean blue (#20c997 to #1c7ed6). Motif: three simple white person silhouettes (head and shoulders) of different heights standing side by side in front of ' +
+    'a white board with a small bar chart of three rising bars (green, yellow, green); a small round golden badge with a white check mark at the upper right of the board.',
   // 03.10.2026: Vokabelspiele („Spielen mit deinen Wörtern")
   'spiel-memory':
     'Tile colour: coral red (#ff8787 to #e03131). Motif: four white memory cards in a 2 by 2 grid, two of them turned face up showing a matching pair (a small sun symbol on both), two face down with a question mark.',

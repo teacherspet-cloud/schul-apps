@@ -54,7 +54,8 @@ const IDS = [
   'spiel-wortraten',
   'spiel-kreuzwort',
   'spiel-fallend',
-  'spiel-suchsel'
+  'spiel-suchsel',
+  'meineklassen'
 ]
 const ZIEL = resolve('src/renderer/src/assets/programme')
 const KANTE = 320

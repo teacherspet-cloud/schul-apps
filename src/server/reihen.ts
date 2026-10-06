@@ -150,7 +150,7 @@ const json_ = <T>(s: string | null | undefined, r: T): T => {
 }
 const neueId = (): string => randomBytes(8).toString('hex')
 
-interface ZuweisungZeile {
+export interface ZuweisungZeile {
   id: string
   reihe_id: string
   lehrkraft_id: string
@@ -1026,7 +1026,10 @@ export function reihenFuerLernen(ich: NutzerInfo): {
 type Bedarf = { art: string; schueler?: string; name?: string; schritt?: string; text: string; frage?: number }
 
 /** Handlungsbedarf einer Zuweisung (Übersicht und Korrektur-Eingang) */
-function bedarfFuer(r: Reihe, z: ZuweisungZeile): { bedarf: Bedarf[]; lernende: { id: string; name: string; benutzer: string; weg: Weg; stand: Stand }[] } {
+export function bedarfFuer(
+  r: Reihe,
+  z: ZuweisungZeile
+): { bedarf: Bedarf[]; lernende: { id: string; name: string; benutzer: string; weg: Weg; stand: Stand }[] } {
   verknuepfe(z, r)
   const halteFrei = json_(z.halte_frei, [] as string[])
   const bedarf: Bedarf[] = []
@@ -1071,4 +1074,37 @@ function bedarfFuer(r: Reihe, z: ZuweisungZeile): { bedarf: Bedarf[]; lernende: 
       if (wartend) bedarf.push({ art: 'halt', schritt: s.id, text: `Haltepunkt vor „${s.titel}“: ${wartend} warten auf die Besprechung` })
     }
   return { bedarf, lernende }
+}
+
+/** „Meine Klassen" (06.10.2026): laufende Reihen einer Lerngruppe mit Fortschritt je Person und Handlungsbedarf */
+export function reihenDerGruppe(
+  lehrkraftId: string,
+  lerngruppeId: string
+): {
+  zid: string
+  titel: string
+  schnitt: number
+  fertig: number
+  lernende: { id: string; fortschritt: number }[]
+  bedarf: string[]
+}[] {
+  const alle = db()
+    .prepare("SELECT * FROM reihen_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND status = 'offen' ORDER BY erstellt DESC")
+    .all(lehrkraftId, lerngruppeId) as unknown as ZuweisungZeile[]
+  return alle.flatMap((z) => {
+    const r = reiheVon(z.reihe_id)
+    if (!r) return []
+    const { bedarf, lernende } = bedarfFuer(r, z)
+    const f = lernende.map((l) => l.weg.fortschritt)
+    return [
+      {
+        zid: z.id,
+        titel: r.titel,
+        schnitt: f.length ? f.reduce((a, b) => a + b, 0) / f.length : 0,
+        fertig: lernende.filter((l) => l.weg.fertig).length,
+        lernende: lernende.map((l) => ({ id: l.id, fortschritt: l.weg.fortschritt })),
+        bedarf: bedarf.map((b) => b.text).slice(0, 8)
+      }
+    ]
+  })
 }

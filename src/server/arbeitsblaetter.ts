@@ -1046,3 +1046,28 @@ export function blattZusatzrunde(fid: string, sid: string): void {
   const da = db().prepare('SELECT 1 FROM blatt_abgaben WHERE freigabe_id = ? AND schueler_id = ?').get(fid, sid)
   if (da) db().prepare('UPDATE blatt_abgaben SET extra = extra + 1 WHERE freigabe_id = ? AND schueler_id = ?').run(fid, sid)
 }
+
+/** „Meine Klassen" (06.10.2026): offene Blätter einer Lerngruppe – wer hat begonnen, wer eingereicht */
+export function blaetterDerGruppe(
+  lehrkraftId: string,
+  lerngruppeId: string
+): { id: string; titel: string; gesamt: number; begonnen: number; eingereicht: number; eingereichtVon: string[] }[] {
+  const zeilen = db()
+    .prepare("SELECT * FROM blatt_freigaben WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' AND status = 'offen' ORDER BY erstellt DESC")
+    .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  return zeilen.map((z) => {
+    const abgaben = db().prepare('SELECT schueler_id, abgaben, aktualisiert FROM blatt_abgaben WHERE freigabe_id = ?').all(z.id) as {
+      schueler_id: string
+      abgaben: number
+      aktualisiert: number
+    }[]
+    return {
+      id: z.id,
+      titel: z.titel,
+      gesamt: gesamtVon(z),
+      begonnen: abgaben.filter((a) => a.aktualisiert > 0).length,
+      eingereicht: abgaben.filter((a) => a.abgaben > 0).length,
+      eingereichtVon: abgaben.filter((a) => a.abgaben > 0).map((a) => a.schueler_id)
+    }
+  })
+}

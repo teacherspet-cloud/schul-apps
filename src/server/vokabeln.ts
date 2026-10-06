@@ -170,7 +170,7 @@ export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'> & { id?:
   return !nur.length || nur.includes(ich.benutzer)
 }
 
-function lernendeVon(z: Zeile): NutzerInfo[] {
+export function lernendeVon(z: Zeile): NutzerInfo[] {
   const nur = json_(z.schueler, [] as string[])
   const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
   const feste = !z.lerngruppe_id
@@ -653,4 +653,68 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
     }
     return (json(res, 404, { fehler: 'Unbekannt.' }), true)
   }
+}
+
+/**
+ * „Meine Klassen" (06.10.2026): Vokabeltrainings einer Lerngruppe – Anteil sicherer Wörter je Person, letzter Übungstag,
+ * Testtermin und die wackeligsten Wörter der ganzen Gruppe (Grundlage für den Vorschlag „Wackelige Wörter").
+ */
+export function vokabelnDerGruppe(
+  lehrkraftId: string,
+  lerngruppeId: string,
+  jetzt = Date.now()
+): {
+  trainings: { id: string; titel: string; sprache: string; fach: string; testTermin: number | null; sicherSchnitt: number }[]
+  jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null }>
+  wackelig: { term: string; translation: string; example?: string; quote: number; sprache: string; fach: string }[]
+} {
+  const zs = db()
+    .prepare("SELECT * FROM vok_zuweisungen WHERE lehrkraft_id = ? AND lerngruppe_id = ? AND reihe = '' AND status = 'offen' ORDER BY erstellt DESC")
+    .all(lehrkraftId, lerngruppeId) as unknown as Zeile[]
+  const jePerson: Record<string, { sicher: number; gesamt: number; zuletzt: string | null }> = {}
+  const woerterFehler = new Map<string, { v: Vokabel; versuche: number; falsch: number; sprache: string; fach: string }>()
+  const trainings = zs.map((z) => {
+    const woerter = json_(z.woerter, [] as Vokabel[])
+    const anteile: number[] = []
+    for (const n of lernendeVon(z)) {
+      const st = standVon(z.id, n.id)
+      const u = uebersicht(woerter, st.woerter, jetzt)
+      anteile.push(u.gesamt ? u.sicher / u.gesamt : 0)
+      const p = (jePerson[n.id] ??= { sicher: 0, gesamt: 0, zuletzt: null })
+      p.sicher += u.sicher
+      p.gesamt += u.gesamt
+      const letzter = st.tage[st.tage.length - 1] ?? null
+      if (letzter && (!p.zuletzt || letzter > p.zuletzt)) p.zuletzt = letzter
+      for (const v of woerter) {
+        const w = st.woerter[v.id]
+        if (!w || !w.versuche) continue
+        const k = `${z.sprache}|${v.term}`
+        const e = woerterFehler.get(k) ?? { v, versuche: 0, falsch: 0, sprache: z.sprache, fach: z.fach }
+        e.versuche += w.versuche
+        e.falsch += w.falsch
+        woerterFehler.set(k, e)
+      }
+    }
+    return {
+      id: z.id,
+      titel: z.titel,
+      sprache: z.sprache,
+      fach: z.fach,
+      testTermin: z.test_termin ?? null,
+      sicherSchnitt: anteile.length ? anteile.reduce((a, b) => a + b, 0) / anteile.length : 0
+    }
+  })
+  const wackelig = [...woerterFehler.values()]
+    .filter((e) => e.versuche >= 3 && e.falsch > 0)
+    .map((e) => ({
+      term: e.v.term,
+      translation: e.v.translation,
+      ...(e.v.example ? { example: e.v.example } : {}),
+      quote: e.falsch / e.versuche,
+      sprache: e.sprache,
+      fach: e.fach
+    }))
+    .sort((a, b) => b.quote - a.quote)
+    .slice(0, 15)
+  return { trainings, jePerson, wackelig }
 }

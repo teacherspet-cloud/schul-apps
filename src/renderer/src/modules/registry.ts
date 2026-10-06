@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import MeineKlassenModule from './meineklassen/MeineKlassenModule'
 import { VokabeltrainingModule } from './lernen/VokabelTraining'
 import VerwaltungLehrkraft from './verwaltung/DatenUndMaterial'
 import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
@@ -181,6 +182,18 @@ export const modules: SchulModule[] = [
           leistenbild: leistenbild('unterrichtsreihe'),
           faecher: 'alle' as const,
           component: UnterrichtsreiheModule
+        },
+        // „Meine Klassen" (06.10.2026): Lernstand, Tests und Handlungsbedarf je Lerngruppe – Gruppe Verwaltung
+        {
+          id: 'meineklassen',
+          name: 'Meine Klassen',
+          description: 'Lernstand, Tests und Handlungsbedarf je Klasse und Fach – mit passendem Material auf einen Klick.',
+          icon: programmSymbol('verwaltung', 'cyan'),
+          color: 'cyan',
+          illustration: illustration('meineklassen'),
+          leistenbild: leistenbild('meineklassen'),
+          faecher: 'alle' as const,
+          component: MeineKlassenModule
         }
       ]
     : []),
@@ -274,5 +287,5 @@ export const MODUL_GRUPPEN: ModulGruppe[] = [
   { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'vokabeltraining'] },
   { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
-  { id: 'verwaltung', name: 'Verwaltung', apps: ['elternbrief', 'vokabelliste', 'verwaltung'] }
+  { id: 'verwaltung', name: 'Verwaltung', apps: ['meineklassen', 'elternbrief', 'vokabelliste', 'verwaltung'] }
 ]

@@ -146,7 +146,8 @@ export function BlattFreigabeDialog({
   schoolName,
   schliessen,
   ohneListe,
-  freigegeben
+  freigegeben,
+  gruppeVorwahl
 }: {
   ws: Worksheet
   layouts: Map<string, PagePlan[]>
@@ -157,11 +158,13 @@ export function BlattFreigabeDialog({
   ohneListe?: boolean
   /** Nach jeder Freigabe */
   freigegeben?: () => void
+  /** Lerngruppe schon gewählt (aus „Meine Klassen", 06.10.2026) */
+  gruppeVorwahl?: string
 }): React.JSX.Element {
   const [titel, setTitel] = useState(ws.meta.title || ws.meta.topic || 'Arbeitsblatt')
   const [blatt, setBlatt] = useState(ws.sheets[0]?.id ?? '')
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
-  const [gruppe, setGruppe] = useState<string | null>(null)
+  const [gruppe, setGruppe] = useState<string | null>(gruppeVorwahl ?? null)
   const [mitglieder, setMitglieder] = useState<{ benutzer: string; name: string }[]>([])
   const [einzelne, setEinzelne] = useState<string[]>([])
   const [gaeste, setGaeste] = useState(false)

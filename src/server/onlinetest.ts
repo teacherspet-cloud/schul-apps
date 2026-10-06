@@ -1545,3 +1545,65 @@ export function onlinetestStand(testId: string, schuelerId: string): { eingereic
   const punkte = summe(json_(t.bewertung, {} as Bewertung))
   return { eingereicht: 1, runden: 1, ...(max ? { prozent: Math.round((punkte / max) * 100) } : {}) }
 }
+
+/**
+ * „Meine Klassen" (06.10.2026): Fehlerschwerpunkte des letzten beendeten Onlinetests einer Lerngruppe – Grundlage für den
+ * Vorschlag „Übungsblatt zu den Fehlern". Gezählt werden falsche und zu entscheidende Antworten: nach Aufgabe und nach
+ * Fehlerart (KI, kiBewertung.ts). Ohne Namen.
+ */
+export function fehlerSchwerpunkte(
+  g: Lerngruppe
+): { testId: string; titel: string; thema: string; art: string; zielsprache: string; datum: string; schwerpunkte: string[]; quote: number } | null {
+  const t = db().prepare("SELECT * FROM onlinetests WHERE lerngruppe_id = ? AND status = 'beendet' ORDER BY beendet DESC LIMIT 1").get(g.id) as
+    TestZeile | undefined
+  if (!t) return null
+  const test = alsTest(t)
+  const ts = teilnahmenVon(test.id).filter((x) => x.abgabe)
+  if (!ts.length) return null
+  const jeAufgabe = new Map<string, { titel: string; falsch: number; gesamt: number }>()
+  const jeArt = new Map<string, number>()
+  let falsch = 0
+  let gesamt = 0
+  for (const x of ts) {
+    const f = test.fassungen[x.variante]?.fassung
+    if (!f) continue
+    const b = json_(x.bewertung, {} as Bewertung)
+    for (const e of f.einheiten) {
+      const be = b[e.id]
+      if (!be) continue
+      gesamt++
+      const a = f.aufgaben.find((y) => y.id === e.aufgabe)
+      const k = a?.titel || e.aufgabe
+      const z = jeAufgabe.get(k) ?? { titel: [a?.titel, a?.anweisung].filter(Boolean).join(': ').slice(0, 120), falsch: 0, gesamt: 0 }
+      z.gesamt++
+      const daneben = be.status === 'falsch' || Boolean(be.pruefen && be.quelle !== 'lehrkraft')
+      if (daneben) {
+        z.falsch++
+        falsch++
+        if (be.fehlerArt || be.fehlerGruppe) jeArt.set(be.fehlerArt || String(be.fehlerGruppe), (jeArt.get(be.fehlerArt || String(be.fehlerGruppe)) ?? 0) + 1)
+      }
+      jeAufgabe.set(k, z)
+    }
+  }
+  const schwerpunkte = [
+    ...[...jeArt]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([art, n]) => `${art} (${n}×)`),
+    ...[...jeAufgabe.values()]
+      .filter((z) => z.gesamt >= 3 && z.falsch / z.gesamt >= 0.3)
+      .sort((a, b) => b.falsch / b.gesamt - a.falsch / a.gesamt)
+      .slice(0, 4)
+      .map((z) => `${z.titel} – ${Math.round((z.falsch / z.gesamt) * 100)} % falsch`)
+  ]
+  return {
+    testId: test.id,
+    titel: test.titel,
+    thema: test.einstellungen.thema ?? '',
+    art: test.einstellungen.art ?? 'Vokabeltest',
+    zielsprache: test.einstellungen.zielsprache,
+    datum: test.beendet ?? test.erstellt,
+    schwerpunkte,
+    quote: gesamt ? falsch / gesamt : 0
+  }
+}
