@@ -32,6 +32,17 @@ const vorlage = readdirSync(ordner)
   .map((f) => JSON.parse(readFileSync(f, 'utf8')))
   .find((w) => (w.payload?.sheets?.[0]?.blocks ?? []).filter((b) => b.type === 'task').length >= 3)
 
+// Einstiegskasten vor der ersten Aufgabe und Merkkasten am Ende – nur der Merkkasten wartet aufs Ende (06.10.2026)
+const mitKaesten = (payload) => {
+  const p = structuredClone(payload)
+  const bloecke = p.sheets[0].blocks.filter((b) => b.type !== 'infoBox')
+  const kasten = (id, variant, title, body) => ({ id, type: 'infoBox', variant, title, body, stars: 1 })
+  const erste = bloecke.findIndex((b) => b.type === 'task')
+  bloecke.splice(erste, 0, kasten('einstieg', 'wissen', 'Einstieg', 'Worum es heute geht.'))
+  bloecke.push(kasten('merk', 'merke', 'Merke', 'Das Wichtigste zum Schluss.'))
+  p.sheets[0].blocks = bloecke
+  return p
+}
 const browser = await chromium.launch({ channel: 'msedge' })
 const zuLoeschen = []
 const verwaltung = await browser.newContext()
@@ -56,7 +67,7 @@ try {
   await anmelden(lk, lehrer.benutzer, lehrer.passwort)
   await lk.request.post(`${A}/api`, {
     headers: KOPF,
-    data: { channel: 'sheets:save', args: [{ id: 'blatt-schritt', name: 'Blatt-Schritt', stats: { sheetCount: 1 }, payload: vorlage.payload }] }
+    data: { channel: 'sheets:save', args: [{ id: 'blatt-schritt', name: 'Blatt-Schritt', stats: { sheetCount: 1 }, payload: mitKaesten(vorlage.payload) }] }
   })
   await lk.request.post(`${A}/server/lerngruppen/anlegen`, { headers: KOPF, data: { name: KLASSE, fach: 'Englisch', iservGruppe: `klasse:${KLASSE}` } })
   const p = await lk.newPage()
@@ -71,6 +82,7 @@ try {
   await dlg.getByPlaceholder('wählen …').click()
   await p.getByRole('option', { name: KLASSE }).click()
   await dlg.locator('[data-blatt-schrittweise]').check()
+  await dlg.getByLabel('Merkkästen erst nach vollständiger Bearbeitung zeigen').check()
   await p.screenshot({ path: join(out, '1-freigabe.png') })
   await dlg.locator('[data-blatt-freigeben]').click()
   await dlg.waitFor({ state: 'hidden', timeout: 20000 })
@@ -98,6 +110,17 @@ try {
   pruefe((await s.locator('[data-ampel-nr="1"][data-ampel="rot"]').count()) === 1, 'Ampel von Aufgabe 1 steht auf Rot')
   pruefe((await s.locator('[data-ampel-nr="2"]').count()) === 0, 'Gesperrte Aufgaben haben weder Ampel noch Prüfen-Knopf')
   await s.screenshot({ path: join(out, '2-nur-aufgabe-1.png') })
+  const kaesten = await blatt
+    .locator('.ws-info')
+    .evaluateAll((e) => e.map((x) => [x.textContent?.includes('Einstieg') ? 'einstieg' : 'merk', x.classList.contains('sa-gesperrt')]))
+  pruefe(
+    kaesten.some(([k, g]) => k === 'einstieg' && !g),
+    `Einstiegskasten vor der ersten Aufgabe bleibt sichtbar (${JSON.stringify(kaesten)})`
+  )
+  pruefe(
+    kaesten.some(([k, g]) => k === 'merk' && g),
+    'Merkkasten am Ende wartet, bis alle Aufgaben bearbeitet sind'
+  )
   // Gesperrte Aufgabe: Server lehnt Feedback ab
   const gesperrt = await sm.request.post(`${A}/s/api/blatt/aufgabe`, { headers: KOPF, data: { id: fr.id, nr: 3, antworten: {}, felder: [] } })
   pruefe(gesperrt.status() === 403, `Feedback zu gesperrter Aufgabe 3 abgelehnt (${gesperrt.status()})`)

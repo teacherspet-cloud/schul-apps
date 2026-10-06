@@ -1455,9 +1455,19 @@ function sperrenAnwenden(doc: Document, bis: number, merkZeigen: boolean): void 
     if (zu) t.setAttribute('data-sperre', `Aufgabe ${nr} wird freigeschaltet, sobald Aufgabe ${bis} mindestens teilweise gelöst ist.`)
     else t.removeAttribute('data-sperre')
   }
-  for (const m of Array.from(doc.querySelectorAll<HTMLElement>('.ws-info'))) {
-    m.classList.toggle('sa-gesperrt', !merkZeigen)
-    if (!merkZeigen) m.setAttribute('data-sperre', 'Dieser Merkkasten erscheint, wenn alle Aufgaben bearbeitet sind.')
+  /*
+   * Nur Kästen NACH der ersten Aufgabe warten aufs Ende (06.10.2026, Befund der Lehrkraft: auch der Einstiegskasten
+   * zu Beginn des Blatts verschwand). Was vor der ersten Aufgabe steht – Einstieg, Vorwissen – braucht man zum Arbeiten.
+   */
+  let nachAufgabe = false
+  for (const m of Array.from(doc.querySelectorAll<HTMLElement>('.ws-task, .ws-info'))) {
+    if (m.classList.contains('ws-task')) {
+      nachAufgabe = true
+      continue
+    }
+    const zu = nachAufgabe && !merkZeigen
+    m.classList.toggle('sa-gesperrt', zu)
+    if (zu) m.setAttribute('data-sperre', 'Dieser Merkkasten erscheint, wenn alle Aufgaben bearbeitet sind.')
     else m.removeAttribute('data-sperre')
   }
 }
