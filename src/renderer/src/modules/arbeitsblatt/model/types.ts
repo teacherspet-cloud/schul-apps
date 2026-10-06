@@ -1119,6 +1119,8 @@ export interface WorksheetMeta {
   grammarTopic?: string
   /** Gewählte Grammatikthemen (Kennungen aus grammarTopics.ts) */
   grammarTopics?: string[]
+  /** Gewählte Teilformen „thema/teilform" (Recherche 06.10.2026); leer = alle, die zur Lerngruppe passen */
+  grammarTeilformen?: string[]
   /**
    * Unregelmäßige Verben (30.09.2026): Aufgaben aus der Verbliste des Lehrwerks bzw. der
    * Standardliste, die die App nach dem Ausformulieren anhängt (shared/verben). Fehlt = keine.

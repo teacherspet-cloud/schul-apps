@@ -41,7 +41,8 @@ describe('Grammatikthemen nach Niveau', () => {
     expect(ohne.some((t) => /^A2|B1/.test(t.level))).toBe(true)
     expect(mit.length).toBeGreaterThan(10)
     expect(mit.filter((t) => ueberNiveau(t, 'A1'))).toEqual([])
-    expect(mit.map((t) => t.level).every((l) => l.startsWith('A1'))).toBe(true)
+    // Recherche 06.10.2026: auch „Pre-A1“ (darunter) kommt vor
+    expect(mit.map((t) => t.level).every((l) => /^(Pre-A1|A1)/.test(l))).toBe(true)
   })
 
   it('Klasse 6 (A1+) behält Perfekt und Steigerung, Klasse 7 (A2) keine B1-Themen', () => {

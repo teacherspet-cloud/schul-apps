@@ -116,6 +116,7 @@ export default function SetupStep(): React.JSX.Element {
   const patchFromPicker = (p: Partial<WorksheetMeta>): void => {
     const next: Partial<GrammarTestMeta> = {}
     if (p.grammarTopics) next.topics = p.grammarTopics
+    if (p.grammarTeilformen) next.teilformen = p.grammarTeilformen
     if (p.lateStartLanguage !== undefined) next.lateStartLanguage = p.lateStartLanguage
     if (p.acquisitionStage !== undefined) next.acquisitionStage = p.acquisitionStage
     const merged = { ...meta, ...next }
@@ -298,7 +299,10 @@ export default function SetupStep(): React.JSX.Element {
                       </Group>
                     </Stack>
                   ) : (
-                    <GrammarPicker meta={{ ...meta, grammarTopics: meta.topics } as unknown as WorksheetMeta} onChange={patchFromPicker} />
+                    <GrammarPicker
+                      meta={{ ...meta, grammarTopics: meta.topics, grammarTeilformen: meta.teilformen } as unknown as WorksheetMeta}
+                      onChange={patchFromPicker}
+                    />
                   )}
                 </Card>
               </Stack>

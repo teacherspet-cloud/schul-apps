@@ -1,9 +1,12 @@
 import { Alert, Badge, Checkbox, Group, ScrollArea, Select, Stack, Switch, Text, TextInput } from '@mantine/core'
 import { useState } from 'react'
 import {
+  abweichungsHinweis,
   GRAMMAR_TOPICS,
   grammarFormatLabel,
+  grammarQueryForMeta,
   grammarTopicsForMeta,
+  teilformenFuer,
   LANGUAGE_SEQUENCES,
   learningYear,
   sequenceOf,
@@ -44,7 +47,16 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
   for (const t of visible) groups.set(t.area, [...(groups.get(t.area) ?? []), t])
   for (const list of groups.values()) list.sort((a, b) => a.from - b.from || a.label.localeCompare(b.label))
 
-  const toggle = (id: string): void => onChange({ grammarTopics: chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id] })
+  const toggle = (id: string): void =>
+    onChange({
+      grammarTopics: chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id],
+      // Teilformen eines abgewählten Themas fallen mit weg
+      ...(chosen.includes(id) ? { grammarTeilformen: teilWahl.filter((x) => !x.startsWith(`${id}/`)) } : {})
+    })
+  // Teilformen (Recherche 06.10.2026): keine gewählt = alle, die zur Lerngruppe passen
+  const teilWahl = meta.grammarTeilformen ?? []
+  const query = grammarQueryForMeta(meta)
+  const teilUmschalten = (key: string): void => onChange({ grammarTeilformen: teilWahl.includes(key) ? teilWahl.filter((x) => x !== key) : [...teilWahl, key] })
 
   const picked = chosen.map((id) => GRAMMAR_TOPICS.find((t) => t.id === id)).filter((t): t is GrammarTopic => Boolean(t))
   const year = learningYear(meta.grade, sequence, meta.stateId)
@@ -162,6 +174,16 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
                           Quellen uneins
                         </Badge>
                       )}
+                      {abweichungsHinweis(t, query) && (
+                        <Badge size="xs" variant="light" color="grape" title={abweichungsHinweis(t, query)} data-land-abweichung>
+                          {meta.stateId}
+                        </Badge>
+                      )}
+                      {(t.teilformen?.length ?? 0) > 0 && (
+                        <Text size="xs" span c="dimmed">
+                          · {t.teilformen!.length} Teilformen
+                        </Text>
+                      )}
                     </Group>
                   }
                 />
@@ -216,9 +238,95 @@ export default function GrammarPicker({ meta, onChange }: { meta: WorksheetMeta;
                 Auf dieser Stufe zunächst nur erkennen, nicht selbst bilden – das Blatt sollte keine Produktionsaufgabe dazu enthalten.
               </Text>
             )}
+            {(t.erkennen || t.bilden || t.sicher) && (
+              <Text size="xs">
+                <b>GER:</b>{' '}
+                {[t.erkennen && `erkennen ${t.erkennen}`, t.bilden && `bilden ${t.bilden}`, t.sicher && `sicher ${t.sicher}`].filter(Boolean).join(' · ')}
+              </Text>
+            )}
+            {abweichungsHinweis(t, query) && (
+              <Text size="xs" c="grape">
+                Abweichung im Lehrplan: {abweichungsHinweis(t, query)}
+              </Text>
+            )}
+            <TeilformenWahl t={t} query={query} gewaehlt={teilWahl} umschalten={teilUmschalten} />
           </Stack>
         </Alert>
       ))}
     </Stack>
+  )
+}
+
+const STATUS_FARBE = { bilden: 'blue', erkennen: 'teal', spaeter: 'gray' } as const
+const STATUS_NAME = { bilden: 'bilden', erkennen: 'nur erkennen', spaeter: 'später' } as const
+
+/**
+ * Teilformen eines gewählten Themas (Recherche 06.10.2026, abgestimmt: „Thema mit Teilformen", aufklappbar). Ohne
+ * Auswahl gehen alle passenden an die KI; mit Auswahl nur diese. Jede mit Status für die Lerngruppe und GER.
+ */
+function TeilformenWahl({
+  t,
+  query,
+  gewaehlt,
+  umschalten
+}: {
+  t: GrammarTopic
+  query: ReturnType<typeof grammarQueryForMeta>
+  gewaehlt: string[]
+  umschalten: (key: string) => void
+}): React.JSX.Element | null {
+  const [offen, setOffen] = useState(false)
+  const liste = teilformenFuer(t, query)
+  if (!liste.length) return null
+  const eigene = gewaehlt.filter((g) => g.startsWith(`${t.id}/`)).length
+  return (
+    <div data-teilformen={t.id}>
+      <Text size="xs" c="blue" style={{ cursor: 'pointer' }} onClick={() => setOffen((o) => !o)} data-teilformen-auf>
+        {offen ? '▾' : '▸'} Teilformen ({eigene ? `${eigene} gewählt` : `alle ${liste.filter((x) => x.status !== 'spaeter').length} passenden`})
+      </Text>
+      {offen && (
+        <Stack gap={2} mt={4}>
+          {liste.map(({ teil, status, hinweis }) => {
+            const key = `${t.id}/${teil.id}`
+            return (
+              <Checkbox
+                key={key}
+                size="xs"
+                checked={gewaehlt.includes(key)}
+                onChange={() => umschalten(key)}
+                data-teilform={teil.id}
+                label={
+                  <Group gap={6} wrap="wrap">
+                    <Text size="xs" span c={status === 'spaeter' ? 'dimmed' : undefined}>
+                      {teil.label}
+                    </Text>
+                    {teil.term && (
+                      <Text size="xs" span c="dimmed" fs="italic">
+                        {teil.term}
+                      </Text>
+                    )}
+                    <Badge size="xs" variant="light" color={STATUS_FARBE[status]} title={hinweis}>
+                      {STATUS_NAME[status]}
+                    </Badge>
+                    {(teil.erkennen || teil.bilden) && (
+                      <Text size="10px" span c="dimmed">
+                        {[teil.erkennen && `erk. ${teil.erkennen}`, teil.bilden && `bild. ${teil.bilden}`, teil.sicher && `sicher ${teil.sicher}`]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    )}
+                    {teil.beispiele?.[0] && (
+                      <Text size="10px" span c="dimmed">
+                        „{teil.beispiele[0]}“
+                      </Text>
+                    )}
+                  </Group>
+                }
+              />
+            )
+          })}
+        </Stack>
+      )}
+    </div>
   )
 }

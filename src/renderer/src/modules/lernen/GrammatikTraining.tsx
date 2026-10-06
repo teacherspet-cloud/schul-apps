@@ -42,7 +42,7 @@ import { ListenSuche } from '../../shared/components/AppSuche'
 import { starteAuftrag } from '../../shared/auftraege'
 import { useAppSettings } from '../../shared/settingsStore'
 import { notifyError, notifySuccess } from '../../shared/util'
-import { grammarTopicsFor, hasGrammar } from '../arbeitsblatt/didactics/grammar'
+import { grammarTopicsFor, hasGrammar, teilformenAuftrag, teilformenFuer } from '../arbeitsblatt/didactics/grammar'
 import { SUBJECTS } from '../arbeitsblatt/model/subjects'
 import { Zugang } from '../onlinetest/OnlinetestModule'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -262,6 +262,11 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
     [fachId, jahrgang, settings.defaults?.schoolTypeId, settings.defaults?.stateId]
   )
   const thema = themaId === 'eigenes' ? eigenes.trim() : (themen.find((t) => t.id === themaId)?.label ?? '')
+  // Teilformen des Themas (Recherche 06.10.2026): keine gewählt = alle, die zur Klasse passen
+  const [teilWahl, setTeilWahl] = useState<string[]>([])
+  const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
+  const gewaehltesThema = themen.find((t) => t.id === themaId)
+  const teile = gewaehltesThema ? teilformenFuer(gewaehltesThema, query) : []
   const gruppenName = art === 'gruppe' ? (gruppen.find((g) => g.id === gruppe)?.name ?? '') : art === 'einzeln' ? `${einzelne.length} Lernende` : 'QR-Code'
   const bereit = Boolean(fach && thema && (art === 'gruppe' ? gruppe : art === 'einzeln' ? einzelne.length : true))
   const erstellen = (): void => {
@@ -279,7 +284,14 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
       docId: `grammatik-${Date.now()}`,
       titel,
       art: 'Grammatiktraining',
-      eingabe: { thema, fach: fach.label, sprache: fach.sprache, jahrgang, wunsch: wunsch.trim() || undefined },
+      eingabe: {
+        thema,
+        fach: fach.label,
+        sprache: fach.sprache,
+        jahrgang,
+        wunsch: wunsch.trim() || undefined,
+        teilformen: gewaehltesThema ? teilformenAuftrag([gewaehltesThema], query, teilWahl) || undefined : undefined
+      },
       sperrt: false,
       fehlerTitel: 'Aufgabenpool konnte nicht erstellt werden',
       arbeit: async (e, k) => erzeugeGrammatikPaket(e, k.ai, (t) => k.melde(t)),
@@ -319,7 +331,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
           allowDeselect={false}
           data={[...themen.map((t) => ({ value: t.id, label: t.label })), { value: 'eigenes', label: 'Eigenes Thema …' }]}
           value={themaId}
-          onChange={setThemaId}
+          onChange={(v) => (setThemaId(v), setTeilWahl([]))}
           placeholder={themen.length ? 'Thema aus dem Lehrplan wählen …' : 'Eigenes Thema …'}
           data-grammatik-thema
         />
@@ -330,6 +342,22 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             onChange={(e) => setEigenes(e.currentTarget.value)}
             placeholder="z. B. Present perfect vs. simple past"
             data-grammatik-eigenes
+          />
+        )}
+        {teile.length > 0 && (
+          <MultiSelect
+            label="Teilformen (optional)"
+            description="Ohne Auswahl übt die KI alle Teilformen, die zur Klasse passen; „nur erkennen“ kommt nur in Auswahl- und Fehleraufgaben vor."
+            data={teile.map(({ teil, status }) => ({
+              value: `${gewaehltesThema!.id}/${teil.id}`,
+              label: `${teil.label}${status === 'erkennen' ? ' (nur erkennen)' : status === 'spaeter' ? ' (eigentlich später)' : ''}`
+            }))}
+            value={teilWahl}
+            onChange={setTeilWahl}
+            searchable
+            clearable
+            placeholder="alle passenden"
+            data-grammatik-teilformen
           />
         )}
         <Textarea

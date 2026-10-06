@@ -4,7 +4,7 @@ import { istUebungsklausur } from '../abiturPrompt'
 import { istUebersetzungsfach, phrasenRegeln } from '../../didactics/phraseRules'
 import { bilingualAktiv, glossarRegeln } from '../../didactics/bilingual'
 import { vocabWorkRules } from '../../didactics/vocabWork'
-import { chosenGrammarTopics, grammarFormatLabel } from '../../didactics/grammar'
+import { chosenGrammarTopics, grammarFormatLabel, grammarQueryForMeta, teilformenAuftrag } from '../../didactics/grammar'
 import { wantedTasks } from './grundregeln'
 import { istSprechblatt, sprechRegeln } from '../../didactics/sprechen'
 import { sehverstehenMitVideo } from '../../didactics/sehtext'
@@ -354,6 +354,8 @@ export function grammarRules(meta: WorksheetMeta): string {
     receptive.length
       ? `- ${receptive.map((t) => t.label).join(', ')}: auf dieser Stufe nur ERKENNEN, nicht selbst bilden. Keine Aufgabe, die diese Form produzieren lässt.`
       : '',
+    // Teilformen mit Stufe der Lerngruppe (Recherche 06.10.2026)
+    teilformenAuftrag(picked, grammarQueryForMeta(meta), meta.grammarTeilformen),
     '- Genau EIN Grammatikthema je Blatt. Alles auf dem Blatt dient diesem Thema.',
     '- Beginne mit der SPRACHHANDLUNG, nicht mit dem Formennamen: „über Vergangenes berichten", „Bedingungen ausdrücken", „etwas vergleichen". Der Fachbegriff fällt erst bei der Systematisierung.',
     `- Einstieg: ein kurzer zusammenhängender Text, Dialog oder eine Bildergeschichte auf ${target}, in dem die Zielform mindestens sechsmal natürlich vorkommt – inhaltlich sinnvoll, nicht als Aneinanderreihung von Beispielsätzen. Hebe die Zielform im Text **fett** hervor.`,

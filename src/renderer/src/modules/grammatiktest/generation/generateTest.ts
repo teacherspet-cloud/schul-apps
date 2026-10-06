@@ -14,7 +14,7 @@ import { PAGE_FORMAT_FIELD } from '../../arbeitsblatt/generation/schemas'
 import { LUECKEN_REGELN_DE } from '@shared/luecken'
 import type { AiCall } from '../../../shared/imageChoice'
 import { createRng, newId } from '../../vokabeltest/model/random'
-import { chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf } from '../../arbeitsblatt/didactics/grammar'
+import { chosenGrammarTopics, grammarFormatLabel, learningYear, sequenceOf, teilformenAuftrag } from '../../arbeitsblatt/didactics/grammar'
 import { convertBlock } from '../../arbeitsblatt/generation/convert'
 import { verschluesseleMaterialverweise } from '../../arbeitsblatt/didactics/integrity'
 import { arr, enumOf, int, obj, str } from '../../../shared/aiSchema'
@@ -89,6 +89,20 @@ export function testPrompt(test: GrammarTest): string {
     ...topics
       .filter((t) => t.description || t.examples?.length)
       .map((t) => `- ${t.label}: ${[t.description, t.examples?.length ? `Beispiele: ${t.examples.join(' | ')}` : ''].filter(Boolean).join(' ')}`),
+    // Teilformen mit Stufe der Lerngruppe (Recherche 06.10.2026): geprüft wird nur, was gebildet bzw. erkannt werden soll
+    teilformenAuftrag(
+      topics,
+      {
+        subjectId: m.subjectId,
+        grade: m.grade,
+        stateId: m.stateId,
+        schoolTypeId: m.schoolTypeId,
+        sequence: sequenceOf(m),
+        acquisitionStage: m.acquisitionStage,
+        cefrLevel: m.cefrLevel || undefined
+      },
+      m.teilformen
+    ),
     `Umfang: ${m.minutes} Minuten, insgesamt ${m.points} Punkte.`,
     LUECKEN_REGELN_DE,
     '',

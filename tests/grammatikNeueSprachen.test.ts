@@ -39,17 +39,19 @@ describe('Neue Schulfremdsprachen im Grammatiktest', () => {
     }
   })
 
-  it('je Sprache 15–30 Themen, jedes mit Beleg oder Kennzeichnung „Faustregel"', () => {
+  it('je Sprache 15–60 Themen, jedes mit Beleg oder Kennzeichnung „Faustregel"', () => {
     for (const fach of NEUE_SCHULSPRACHEN) {
       const liste = themen(fach)
       expect(liste.length, fach).toBeGreaterThanOrEqual(15)
-      expect(liste.length, fach).toBeLessThanOrEqual(30)
+      // Recherche 06.10.2026: erweitert (Thema mit Teilformen), bis 60 Themen
+      expect(liste.length, fach).toBeLessThanOrEqual(60)
       for (const t of liste) {
         expect(t.source?.trim(), t.id).toBeTruthy()
         expect(t.scale, t.id).toBe('lernjahr')
         expect(einfuehrungsNiveau(t.level), t.id).not.toBeNull()
       }
-      expect(liste.every((t) => /Faustregel|Lehrplan|Rahmenlehrplan/.test(t.source!))).toBe(true)
+      // Seit der Recherche 06.10.2026 stehen Kurzzeichen der Lehrpläne (z. B. „KLP NW Ndl"), Referenzwerke oder „Faustregel"
+      expect(liste.every((t) => (t.source ?? '').trim().length >= 3)).toBe(true)
     }
   })
 

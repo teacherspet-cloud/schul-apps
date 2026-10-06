@@ -22,6 +22,7 @@
  */
 
 import { ERGAENZTE_GRAMMATIKTHEMEN } from './grammarTopicsErgaenzung'
+import { mitRecherche, type GrammarAbweichung, type GrammarTeilform } from './grammarRecherche'
 
 export type GrammarScale = 'lernjahr' | 'jahrgang' | 'erwerbsstufe'
 
@@ -60,6 +61,14 @@ export interface GrammarTopic {
   examples?: string[]
   /** Beleg der Einordnung, knapp (Lehrplan, Lehrwerk oder „Faustregel") */
   source?: string
+  /** Recherche 06.10.2026 (grammarRecherche.ts): GER bzw. Phase/Stufe – ab wann erkennen, selbst bilden, sicher */
+  erkennen?: string
+  bilden?: string
+  sicher?: string
+  /** Teilformen mit eigener Stufe und GER */
+  teilformen?: GrammarTeilform[]
+  /** Belegte Abweichungen je Land/Schulform/Fremdsprachenfolge von der Grundlinie */
+  abweichungen?: GrammarAbweichung[]
 }
 
 const ERZEUGTE_THEMEN: GrammarTopic[] = [
@@ -4513,6 +4522,7 @@ const ERZEUGTE_THEMEN: GrammarTopic[] = [
 /**
  * Alle Themen: die erzeugte Tabelle und die von Hand ergänzten Themen vom 30.09.2026
  * (grammarTopicsErgaenzung.ts – u. a. emphatic forms, causative have, Italienisch, Russisch,
- * Griechisch; Quellen in recherche/grammatik-themen-2026-09-30.md).
+ * Griechisch; Quellen in recherche/grammatik-themen-2026-09-30.md), darüber die Recherche vom 06.10.2026 mit
+ * Teilformen, GER erkennen/bilden/sicher und belegten Abweichungen je Land/Schulform (grammarRecherche.ts).
  */
-export const GRAMMAR_TOPICS: GrammarTopic[] = [...ERZEUGTE_THEMEN, ...ERGAENZTE_GRAMMATIKTHEMEN]
+export const GRAMMAR_TOPICS: GrammarTopic[] = mitRecherche([...ERZEUGTE_THEMEN, ...ERGAENZTE_GRAMMATIKTHEMEN])

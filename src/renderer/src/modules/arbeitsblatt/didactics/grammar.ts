@@ -21,10 +21,11 @@
  */
 import { GRAMMAR_TOPICS } from './grammarTopics'
 import type { GrammarTopic } from './grammarTopics'
+import type { GrammarAbweichung, GrammarTeilform } from './grammarRecherche'
 import type { WorksheetMeta } from '../model/types'
 import { CEFR_SCALE, cefrIndex, type CefrLevel } from '@shared/types'
 
-export type { GrammarTopic }
+export type { GrammarTopic, GrammarAbweichung, GrammarTeilform }
 export { GRAMMAR_TOPICS }
 
 /** Stellung der Sprache in der Fremdsprachenfolge – bestimmt, wann das 1. Lernjahr liegt. */
@@ -188,26 +189,158 @@ export function topicStart(topic: GrammarTopic, sequence: LanguageSequence): num
  * Fachs" ein.
  */
 export function grammarTopicsFor(query: GrammarQuery): GrammarTopic[] {
-  const { subjectId, grade, schoolTypeId = '', stateId = '' } = query
-  const sequence = query.sequence ?? defaultSequence(subjectId, grade)
-  const shift = REDUCED.includes(schoolTypeId) ? 1 : 0
+  return GRAMMAR_TOPICS.filter((t) => t.subject === query.subjectId && topicFits(t, query))
+}
 
-  return GRAMMAR_TOPICS.filter((t) => {
-    if (t.subject !== subjectId) return false
+/**
+ * Belegte Abweichung für Land, Schulform und Fremdsprachenfolge (Recherche 06.10.2026, grammarRecherche.ts) – die
+ * spezifischste gewinnt: Land UND Schulform vor nur einem von beiden, mit passender Folge vor ohne Folge. Abweichungen
+ * einzelner Teilformen zählen hier nicht.
+ */
+export function abweichungFuer(t: GrammarTopic, query: Pick<GrammarQuery, 'stateId' | 'schoolTypeId' | 'sequence' | 'grade'>): GrammarAbweichung | undefined {
+  const stateId = query.stateId ?? ''
+  const schoolTypeId = query.schoolTypeId ?? ''
+  const sequence = query.sequence ?? defaultSequence(t.subject, query.grade)
+  const passend = (t.abweichungen ?? []).filter(
+    (a) =>
+      !a.teilform &&
+      (!a.laender.length || a.laender.includes(stateId)) &&
+      (!a.schulformen.length || a.schulformen.includes(schoolTypeId)) &&
+      (!a.folge || a.folge === sequence)
+  )
+  const wert = (a: GrammarAbweichung): number => (a.laender.length ? 2 : 0) + (a.schulformen.length ? 2 : 0) + (a.folge ? 1 : 0)
+  return passend.sort((a, b) => wert(b) - wert(a))[0]
+}
 
-    // DaZ: Was mehr als eine Stufe über dem Stand liegt, ist nicht verarbeitbar – das ist
-    // eine Sperre, keine Sortierung. Ohne Diagnose zeigen wir alles.
-    if (t.scale === 'erwerbsstufe') {
-      const reached = query.acquisitionStage
-      return reached === undefined || t.from <= reached + 1
+/** Stufenfenster eines Themas für die Lerngruppe auf ihrer Skala, oder null (im Plan dieser Schulform nicht genannt) */
+function fenster(t: GrammarTopic, query: GrammarQuery, sequence: LanguageSequence): { start: number; end: number; belegt: boolean } | null {
+  const a = abweichungFuer(t, { ...query, sequence })
+  if (a?.entfaellt) return null
+  if (a && a.from !== undefined) {
+    // Mit Folge (3. FS, spät beginnend) zählt die Abweichung im Lernjahr DIESES Kurses – nicht umrechnen
+    if (a.folge || t.scale !== 'lernjahr') return { start: a.from, end: a.to ?? a.from, belegt: true }
+    return {
+      start: topicStart({ ...t, from: a.from, lateStart: undefined }, sequence),
+      end: topicStart({ ...t, from: a.to ?? a.from, lateStart: undefined }, sequence),
+      belegt: true
     }
+  }
+  const start = t.scale === 'jahrgang' ? t.from : topicStart(t, sequence)
+  const end = t.scale === 'jahrgang' ? t.to : topicStart({ ...t, from: t.to }, sequence)
+  return { start, end, belegt: false }
+}
 
-    const start = t.scale === 'jahrgang' ? t.from : topicStart(t, sequence)
-    const end = t.scale === 'jahrgang' ? t.to : topicStart({ ...t, from: t.to }, sequence)
-    const now = t.scale === 'jahrgang' ? grade : learningYear(grade, sequence, stateId)
-    if (t.scale === 'lernjahr' && ueberNiveau(t, query.cefrLevel)) return false
-    return now + 1 >= start + shift && now - 1 <= end + shift
+/** Passt ein Thema zur Lerngruppe? */
+export function topicFits(t: GrammarTopic, query: GrammarQuery): boolean {
+  const { grade, schoolTypeId = '', stateId = '' } = query
+  const sequence = query.sequence ?? defaultSequence(t.subject, grade)
+
+  // DaZ: Was mehr als eine Stufe über dem Stand liegt, ist nicht verarbeitbar – das ist
+  // eine Sperre, keine Sortierung. Ohne Diagnose zeigen wir alles.
+  if (t.scale === 'erwerbsstufe') {
+    const reached = query.acquisitionStage
+    return reached === undefined || t.from <= reached + 1
+  }
+
+  const a = abweichungFuer(t, { ...query, sequence })
+  // Nur eine GER-Stufe belegt (Hamburger Basisgrammatik): dann entscheidet das Niveau der Lerngruppe, sofern gewählt
+  if (a?.niveau && a.from === undefined && !a.entfaellt && query.cefrLevel) return !ueberNiveau({ level: a.niveau }, query.cefrLevel)
+  const f = fenster(t, query, sequence)
+  if (!f) return false
+  // Eine belegte Abweichung ersetzt die pauschale Verschiebung für Haupt-/Mittelschule
+  const shift = !f.belegt && REDUCED.includes(schoolTypeId) ? 1 : 0
+  const now = t.scale === 'jahrgang' ? grade : learningYear(grade, sequence, stateId)
+  if (t.scale === 'lernjahr' && ueberNiveau(t, query.cefrLevel)) return false
+  return now + 1 >= f.start + shift && now - 1 <= f.end + shift
+}
+
+/** Kurzer Hinweis, wenn für Land/Schulform eine belegte Abweichung gilt (Auswahl der Themen) */
+export function abweichungsHinweis(t: GrammarTopic, query: GrammarQuery): string {
+  const a = abweichungFuer(t, query)
+  if (!a) return ''
+  const wo = [a.laender.join('/'), a.folgeText].filter(Boolean).join(', ')
+  const skala = t.scale === 'jahrgang' ? 'Jg.' : 'Lernjahr'
+  const was = a.entfaellt
+    ? 'im Lehrplan dieser Schulform nicht genannt'
+    : a.from !== undefined
+      ? `dort ${skala} ${a.to === undefined || a.from === a.to ? a.from : `${a.from}–${a.to}`}`
+      : a.niveau
+        ? `dort auf ${a.niveau}`
+        : ''
+  return [wo && `${wo}:`, was, a.nurErkennen ? '(nur erkennen)' : '', a.fakultativ ? '(Wahlinhalt)' : '', a.hinweis ? `– ${a.hinweis}` : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
+export type TeilformStatus = 'bilden' | 'erkennen' | 'spaeter'
+
+/**
+ * Teilformen eines Themas für die Lerngruppe: selbst bilden, nur erkennen oder erst später. Maßstab ist das Lernjahr
+ * (bzw. der Jahrgang) – bei einer belegten Abweichung des Themas um dieselbe Spanne verschoben –, dazu das GER-Niveau
+ * der Lerngruppe (eine Teilstufe Spielraum wie bei den Themen) und Abweichungen einzelner Teilformen.
+ */
+export function teilformenFuer(t: GrammarTopic, query: GrammarQuery): { teil: GrammarTeilform; status: TeilformStatus; hinweis?: string }[] {
+  const teile = t.teilformen ?? []
+  if (!teile.length) return []
+  const sequence = query.sequence ?? defaultSequence(t.subject, query.grade)
+  if (t.scale === 'erwerbsstufe') {
+    const r = query.acquisitionStage
+    return teile.map((teil) => ({ teil, status: r === undefined || teil.from <= r + 1 ? (teil.nurErkennen ? 'erkennen' : 'bilden') : 'spaeter' }))
+  }
+  const f = fenster(t, query, sequence)
+  const basis = t.scale === 'jahrgang' ? t.from : topicStart(t, sequence)
+  const versatz = f ? f.start - basis : 0
+  const now = t.scale === 'jahrgang' ? query.grade : learningYear(query.grade, sequence, query.stateId ?? '')
+  const shift = f && !f.belegt && REDUCED.includes(query.schoolTypeId ?? '') ? 1 : 0
+  return teile.map((teil) => {
+    const eigene = (t.abweichungen ?? []).find(
+      (a) =>
+        a.teilform === teil.id &&
+        (!a.laender.length || a.laender.includes(query.stateId ?? '')) &&
+        (!a.schulformen.length || a.schulformen.includes(query.schoolTypeId ?? '')) &&
+        (!a.folge || a.folge === sequence)
+    )
+    if (eigene?.entfaellt) return { teil, status: 'spaeter' as const, hinweis: 'im Lehrplan dieser Schulform nicht genannt' }
+    const von =
+      eigene?.from !== undefined
+        ? eigene.from
+        : t.scale === 'jahrgang'
+          ? teil.from + versatz
+          : topicStart({ ...t, from: teil.from, lateStart: undefined }, sequence) + versatz
+    if (now < von + shift) return { teil, status: 'spaeter' as const }
+    const ueber = t.scale === 'lernjahr' && teil.bilden && query.cefrLevel ? ueberNiveau({ level: teil.bilden }, query.cefrLevel) : false
+    const erkennen = teil.nurErkennen || eigene?.nurErkennen || ueber
+    return { teil, status: erkennen ? ('erkennen' as const) : ('bilden' as const) }
   })
+}
+
+/**
+ * Teilformen als Auftrag an die KI (Arbeitsblatt, Grammatiktest, Grammatiktraining): was gebildet, was nur erkannt
+ * werden soll und was noch nicht vorkommt. `gewaehlt` = Kennungen „thema/teilform" der Lehrkraft; leer = alle passenden.
+ */
+export function teilformenAuftrag(topics: GrammarTopic[], query: GrammarQuery, gewaehlt: string[] = []): string {
+  const zeilen: string[] = []
+  for (const t of topics) {
+    const liste = teilformenFuer(t, query)
+    if (!liste.length) continue
+    const eigene = gewaehlt.filter((g) => g.startsWith(`${t.id}/`))
+    const im = (x: { teil: GrammarTeilform }): boolean => !eigene.length || eigene.includes(`${t.id}/${x.teil.id}`)
+    const name = (x: { teil: GrammarTeilform }): string => `${x.teil.label}${x.teil.term ? ` (${x.teil.term})` : ''}`
+    const bilden = liste.filter((x) => x.status === 'bilden' && im(x))
+    const erkennen = liste.filter((x) => x.status === 'erkennen' && im(x))
+    const spaeter = liste.filter((x) => x.status === 'spaeter' || !im(x))
+    zeilen.push(
+      `TEILFORMEN – ${t.label}${eigene.length ? ' (von der Lehrkraft ausgewählt)' : ''}:`,
+      bilden.length ? `- selbst bilden: ${bilden.map(name).join('; ')}` : '',
+      erkennen.length ? `- nur erkennen (keine Produktionsaufgabe dazu): ${erkennen.map(name).join('; ')}` : '',
+      spaeter.length ? `- NICHT verwenden (${eigene.length ? 'nicht gewählt oder ' : ''}erst später): ${spaeter.map(name).join('; ')}` : '',
+      ...[...bilden, ...erkennen]
+        .filter((x) => x.teil.fehler)
+        .slice(0, 6)
+        .map((x) => `- Stolperstelle ${x.teil.label}: ${x.teil.fehler}`)
+    )
+  }
+  return zeilen.filter(Boolean).join('\n')
 }
 
 /**
@@ -225,17 +358,19 @@ export function sequenceOf(meta: Pick<WorksheetMeta, 'languageOrder' | 'lateStar
   return 'fs1'
 }
 
+/** Lerngruppe eines Blattes als Anfrage an den Katalog */
+export const grammarQueryForMeta = (meta: WorksheetMeta): GrammarQuery => ({
+  subjectId: meta.subjectId,
+  grade: meta.grade,
+  schoolTypeId: meta.schoolTypeId,
+  stateId: meta.stateId,
+  sequence: sequenceOf(meta),
+  acquisitionStage: meta.acquisitionStage,
+  cefrLevel: meta.cefrLevel || undefined
+})
+
 /** Bequemer Aufruf aus einem Arbeitsblatt heraus. */
-export const grammarTopicsForMeta = (meta: WorksheetMeta): GrammarTopic[] =>
-  grammarTopicsFor({
-    subjectId: meta.subjectId,
-    grade: meta.grade,
-    schoolTypeId: meta.schoolTypeId,
-    stateId: meta.stateId,
-    sequence: sequenceOf(meta),
-    acquisitionStage: meta.acquisitionStage,
-    cefrLevel: meta.cefrLevel || undefined
-  })
+export const grammarTopicsForMeta = (meta: WorksheetMeta): GrammarTopic[] => grammarTopicsFor(grammarQueryForMeta(meta))
 
 /** Klammerzusätze und Mehrfachnennungen abschneiden: „simple past (regular …)" → „simple past" */
 const core = (label: string): string =>

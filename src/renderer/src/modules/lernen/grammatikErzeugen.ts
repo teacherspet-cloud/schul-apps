@@ -59,6 +59,8 @@ export interface GrammatikAuftrag {
   niveau?: string
   /** Optional: was die Lehrkraft besonders üben lassen will */
   wunsch?: string
+  /** Teilformen mit Stufe der Lerngruppe (grammar.ts teilformenAuftrag) */
+  teilformen?: string
 }
 
 export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: (t: string) => void = () => undefined): Promise<GrammatikPaket> {
@@ -76,7 +78,11 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.'
     ].join('\n'),
-    user: `Thema: ${a.thema}\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}`,
+    user: `Thema: ${a.thema}\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}${
+      a.teilformen
+        ? `\n\n${a.teilformen}\nVerteile die Aufgaben auf die Teilformen zum Bilden; Teilformen „nur erkennen" nur in Auswahl- und Fehler-Aufgaben.`
+        : ''
+    }`,
     schema: PAKET
   })
   let paket = paketBereinigt(roh, a.thema)

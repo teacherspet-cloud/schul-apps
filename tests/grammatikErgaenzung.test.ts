@@ -52,7 +52,9 @@ const PRAEFIX: Record<string, string> = {
 describe('Datenformat der ergänzten Themen', () => {
   it('sind Teil der Tabelle, ohne doppelte Kennungen', () => {
     expect(ERGAENZTE_GRAMMATIKTHEMEN.length).toBeGreaterThan(150)
-    for (const t of ERGAENZTE_GRAMMATIKTHEMEN) expect(GRAMMAR_TOPICS).toContain(t)
+    // Seit 06.10.2026 liegt die Recherche darüber (grammarRecherche.ts) – die Kennungen bleiben
+    const kennungen = new Set(GRAMMAR_TOPICS.map((t) => t.id))
+    for (const t of ERGAENZTE_GRAMMATIKTHEMEN) expect(kennungen.has(t.id), t.id).toBe(true)
     const alle = GRAMMAR_TOPICS.map((t) => t.id)
     expect(new Set(alle).size).toBe(alle.length)
   })
@@ -99,19 +101,24 @@ describe('Englisch: emphatic forms und weitere Strukturen am richtigen Ort', () 
     expect(ids({ subjectId: 'englisch', grade: 9, ...NI, sequence: 'fs1', cefrLevel: 'B1+' })).toContain('en.focus.cleft')
     const inversion = GRAMMAR_TOPICS.find((t) => t.id === 'en.focus.inversion')!
     expect(inversion.receptive).toBe(true)
-    expect(ids({ subjectId: 'englisch', grade: 9, ...NI, sequence: 'fs1' })).not.toContain('en.focus.inversion')
+    // Recherche 06.10.2026 (KLP NW Gym, LP HE/SN/TH): Inversion zum Erkennen schon im 5. Lernjahr
+    expect(ids({ subjectId: 'englisch', grade: 7, ...NI, sequence: 'fs1' })).not.toContain('en.focus.inversion')
     expect(ids({ subjectId: 'englisch', grade: 11, ...NI, sequence: 'fs1', cefrLevel: 'B2' })).toContain('en.focus.inversion')
   })
 
   it('der Niveau-Filter hält B2-Strukturen aus Klasse 8 mit A2+ heraus', () => {
     const k8 = grammarTopicsFor({ subjectId: 'englisch', grade: 8, ...NI, sequence: 'fs1', cefrLevel: 'A2+' })
-    for (const id of ['en.cond.wish', 'en.verb.causative', 'en.verb.modal_perfect', 'en.focus.cleft']) expect(k8.map((t) => t.id)).not.toContain(id)
+    // modal perfect: Recherche 06.10.2026 (LP BY RS, LP SN Gym, Core Inventory) – B1, Lernjahr 5–6, in Kl. 8 als Vorgriff dabei
+    for (const id of ['en.cond.wish', 'en.verb.causative', 'en.focus.cleft']) expect(k8.map((t) => t.id)).not.toContain(id)
     expect(k8.filter((t) => ueberNiveau(t, 'A2+'))).toEqual([])
   })
 
-  it('Klasse 7: -ed/-ing-Adjektive sind dran, used to kommt bald; verstärkende Pronomen (B1) wie die Reflexivpronomen erst ab A2+', () => {
+  it('Klasse 7: -ed/-ing-Adjektive sind dran, used to erst ab Kl. 8 (Vorgriff); verstärkende Pronomen (B1) wie die Reflexivpronomen erst ab A2+', () => {
     const k7 = ids({ subjectId: 'englisch', grade: 7, ...NI, sequence: 'fs1', cefrLevel: 'A2' })
-    expect(k7).toEqual(expect.arrayContaining(['en.adj.ed_ing', 'en.verb.used_to']))
+    // used to: Recherche 06.10.2026 (LP BY Gym, KLP NW Gym, FLP ST, Green Line BY 5) – Lernjahr 5–6, in Kl. 8 als Vorgriff
+    expect(k7).toContain('en.adj.ed_ing')
+    expect(k7).not.toContain('en.verb.used_to')
+    expect(ids({ subjectId: 'englisch', grade: 8, ...NI, sequence: 'fs1', cefrLevel: 'B1' })).toContain('en.verb.used_to')
     expect(k7).not.toContain('en.pron.emphatic')
     expect(ids({ subjectId: 'englisch', grade: 7, ...NI, sequence: 'fs1', cefrLevel: 'A2+' })).toEqual(
       expect.arrayContaining(['en.pron.emphatic', 'en.pron.reflexive'])

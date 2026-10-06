@@ -70,6 +70,8 @@ export interface GrammarTestMeta {
 
   /** Geprüfte Grammatikthemen (Kennungen aus grammarTopics.ts) */
   topics: string[]
+  /** Gewählte Teilformen „thema/teilform" (Recherche 06.10.2026); leer = alle passenden */
+  teilformen?: string[]
   /** Aufgabenformate (Kennungen aus GRAMMAR_FORMATS); vorbelegt aus den Themen */
   formats: string[]
   /** Wortschatz, den die Lerngruppe kennt – der Test führt keine neuen Wörter ein */
