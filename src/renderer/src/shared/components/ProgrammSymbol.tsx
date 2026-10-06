@@ -49,6 +49,7 @@ export type ProgrammSymbolForm =
   | 'freigaben'
   | 'laufendereihen'
   | 'vokabeltraining'
+  | 'grammatiktraining'
 
 const BLEISTIFT = 'M11 21L12 17L18.5 10.5A2.12 2.12 0 0 1 21.5 13.5L15 20Z'
 const GLOBUS = 'M6 13A4.5 4.5 0 1 0 6 22A4.5 4.5 0 1 0 6 13Z'
@@ -230,6 +231,18 @@ const FORMEN: Record<ProgrammSymbolForm, Form> = {
       { d: 'M8 14H14', art: 'strich', breite: 1.5 }
     ],
     vorn: [{ d: 'M16 17L18.5 19.5L23 14', art: 'strich', breite: 2 }]
+  },
+  // Grammatiktraining (06.10.2026): Karteikasten, vorne ein Satzbaustein mit Lücke
+  grammatiktraining: {
+    hinten: [
+      { d: 'M3 10H19V20H3Z', art: 'strich' },
+      { d: 'M5 6H17V10H5Z', art: 'akzent' },
+      { d: 'M6 15H9M11 15H16', art: 'strich', breite: 1.5 }
+    ],
+    vorn: [
+      { d: 'M15 13H23V19H15Z', art: 'akzent' },
+      { d: 'M17 16H21', art: 'strich', breite: 1.5 }
+    ]
   },
   // Verwaltung (02.10.2026, Server, nur Admin): Schieberegler
   verwaltung: {

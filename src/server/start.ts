@@ -13,6 +13,7 @@
  *   SCHULAPPS_SCHLUESSEL    Datei des Hauptschlüssels (Docker-Secret)
  *   SCHULAPPS_NOTZUGANG_PASSWORT  setzt beim Start das Passwort des Admin-Notzugangs (t.kornahrens)
  */
+import { grammatikRoute } from './grammatik'
 import { klassenRoute } from './klassen'
 import { vokabelwegRoute } from './vokabelweg'
 import { existsSync } from 'node:fs'
@@ -125,6 +126,8 @@ async function main(): Promise<void> {
       // Vokabelweg vor den Listen: er übernimmt die Kennungen „lb:…"
       vokabelwegRoute(),
       vokabelRoute(adresse),
+      // Grammatik-Lern-App (06.10.2026)
+      grammatikRoute(adresse),
       lernenRoute(),
       schuelerRoute(aufruf),
       lehrkraftRoute(aufruf, adresse),

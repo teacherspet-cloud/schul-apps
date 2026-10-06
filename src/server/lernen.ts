@@ -11,6 +11,7 @@
  *
  *  Lernende: GET /s/api/lernen · GET /s/api/tafel?id=
  */
+import { grammatikFuer } from './grammatik'
 import { randomBytes } from 'node:crypto'
 import { datenbank, protokolliereServer, type NutzerInfo } from './datenbank'
 import { json, type Anfrage } from './http'
@@ -83,7 +84,7 @@ function tafelIstFuer(z: TafelZeile, ich: NutzerInfo): boolean {
 const fachName = (f: string): string => fachVon(f)?.label ?? FAECHER.find((x) => x.label.toLowerCase() === f.toLowerCase())?.label ?? (f || 'Weitere')
 
 export interface Karteikasten {
-  art: 'vokabeln' | 'merkzettel'
+  art: 'vokabeln' | 'merkzettel' | 'grammatik'
   titel: string
   /** vokabeln: Zuweisung (Trainer), Übersicht des Kastens */
   id?: string
@@ -135,6 +136,9 @@ export function lernRaeume(ich: NutzerInfo): FachRaum[] {
   // Vokabeln
   for (const v of sicher(() => vokabelListenFuer(ich)))
     raum(v.fach).karteikaesten.push({ art: 'vokabeln', titel: v.titel, id: v.id, uebersicht: v.uebersicht, testTermin: v.testTermin })
+
+  // Grammatik (06.10.2026): eigener Karteikasten je Thema
+  for (const g of sicher(() => grammatikFuer(ich))) raum(g.fach).karteikaesten.push({ art: 'grammatik', titel: g.titel, id: g.id, uebersicht: g.uebersicht })
 
   // Arbeitsblätter: Mappe je Thema, Merkkästen als Karteikasten je Thema
   for (const b of sicher(() => blaetterFuerLernen(ich.id))) {

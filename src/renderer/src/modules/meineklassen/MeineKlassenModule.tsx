@@ -86,6 +86,7 @@ interface KlasseDetail {
     name: string
     benutzer: string
     vokabelnSicher: number | null
+    grammatikSicher?: number | null
     zuletztGeuebt: string | null
     testSchnitt: number | null
     tests: number
@@ -94,6 +95,7 @@ interface KlasseDetail {
   }[]
   tests: { id: string; titel: string; datum: string; status: string; teilnehmer: number; offen: number; durchschnitt: number | null; verteilung: number[] }[]
   vokabeln: { id: string; titel: string; testTermin: number | null; sicherSchnitt: number }[]
+  grammatik?: { id: string; titel: string; sicherSchnitt: number }[]
   wackelig: { term: string; translation: string; quote: number }[]
   reihen: { zid: string; titel: string; schnitt: number; fertig: number; lernende: number }[]
   blaetter: { id: string; titel: string; gesamt: number; begonnen: number; eingereicht: number }[]
@@ -347,7 +349,7 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
           <Tabs.Tab value="lernende">Lernende ({d.lernende.length})</Tabs.Tab>
           <Tabs.Tab value="tests">Tests & Noten ({d.tests.length})</Tabs.Tab>
           <Tabs.Tab value="reihen">Reihen & Blätter ({d.reihen.length + d.blaetter.length})</Tabs.Tab>
-          <Tabs.Tab value="vokabeln">Vokabeln ({d.vokabeln.length})</Tabs.Tab>
+          <Tabs.Tab value="vokabeln">Vokabeln & Grammatik ({d.vokabeln.length + (d.grammatik?.length ?? 0)})</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="lernende" pt="sm">
           <LernendeTabelle d={d} />
@@ -419,7 +421,16 @@ function KlasseAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Re
         </Tabs.Panel>
         <Tabs.Panel value="vokabeln" pt="sm">
           <Stack gap="xs">
-            {d.vokabeln.length === 0 && <Text c="dimmed">Gerade kein Vokabeltraining in dieser Lerngruppe.</Text>}
+            {d.vokabeln.length === 0 && !d.grammatik?.length && <Text c="dimmed">Gerade kein Vokabel- oder Grammatiktraining in dieser Lerngruppe.</Text>}
+            {(d.grammatik ?? []).map((g) => (
+              <Card key={g.id} withBorder padding="sm" radius="md">
+                <Group justify="space-between">
+                  <Text fw={600}>Grammatik: {g.titel}</Text>
+                  <Text size="sm">{prozent(g.sicherSchnitt)} sicher</Text>
+                </Group>
+                <Progress mt={6} value={g.sicherSchnitt * 100} radius="xl" color="grape" />
+              </Card>
+            ))}
             {d.vokabeln.map((v) => (
               <Card key={v.id} withBorder padding="sm" radius="md">
                 <Group justify="space-between">
@@ -522,6 +533,7 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
   if (!zeilen.length) return <Text c="dimmed">Noch keine Lernenden in dieser Lerngruppe.</Text>
   const zeigtVokabeln = zeilen.some((l) => l.vokabelnSicher !== null)
   const zeigtReihen = zeilen.some((l) => l.reihenFortschritt !== null)
+  const zeigtGrammatik = zeilen.some((l) => l.grammatikSicher != null)
   return (
     <Table striped highlightOnHover data-lernende-tabelle>
       <Table.Thead>
@@ -529,6 +541,7 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
           <Table.Th>Name</Table.Th>
           {zeigtVokabeln && <Table.Th>Vokabeln sicher</Table.Th>}
           {zeigtVokabeln && <Table.Th>zuletzt geübt</Table.Th>}
+          {zeigtGrammatik && <Table.Th>Grammatik sicher</Table.Th>}
           <Table.Th>Testschnitt</Table.Th>
           {zeigtReihen && <Table.Th>Reihen</Table.Th>}
           <Table.Th>Blätter eingereicht</Table.Th>
@@ -556,6 +569,7 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
               </Table.Td>
             )}
             {zeigtVokabeln && <Table.Td>{tag(l.zuletztGeuebt)}</Table.Td>}
+            {zeigtGrammatik && <Table.Td>{prozent(l.grammatikSicher ?? null)}</Table.Td>}
             <Table.Td>{l.tests ? note(l.testSchnitt) : '–'}</Table.Td>
             {zeigtReihen && <Table.Td>{prozent(l.reihenFortschritt)}</Table.Td>}
             <Table.Td>{l.blaetterEingereicht}</Table.Td>

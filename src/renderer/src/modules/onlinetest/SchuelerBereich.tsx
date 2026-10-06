@@ -9,6 +9,7 @@
  *  /s/w/<CODE>    Arbeitsblatt per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/b/<ID>
  *  /s/t/<CODE>    ein Test: (Name) → Warten auf den Start → Aufgaben → Abgabe → Ergebnis
  *  /s/vt/<CODE>   Vokabeltraining per QR-Code (VokabelBeitritt.tsx) → /s/v/<ID>, auch für Gäste über Wochen
+ *  /s/gt/<CODE>   Grammatiktraining per QR-Code (06.10.2026) → /s/g/<ID> (GrammatikTrainer.tsx)
  *  /s/f/<CODE>    Aufgabe mit Feedback per QR-Code: Name eingeben (Gäste) bzw. mit Konto dazu → /s/a/<ID>
  *  /s/reihen, /s/r/<ZID>[/<SID>]  Unterrichtsreihen (ReiheAnsicht.tsx)
  *  /s/a/<ID>      eine Aufgabe mit Feedback: schreiben → Feedback → überarbeiten (src/server/schuelerfeedback.ts)
@@ -89,6 +90,7 @@ import LernRaum from '../lernen/LernRaum'
 import { ModusKnopf, SchuelerEinstellungen } from './SchuelerEinstellungen'
 import { fensterLage, vollbild } from './fensterWaechter'
 import VokabelTrainer from '../lernen/VokabelTrainer'
+import GrammatikTrainer from '../lernen/GrammatikTrainer'
 import { holen, senden } from './serverApi'
 
 interface Beitritt {
@@ -145,6 +147,8 @@ export default function SchuelerBereich(): React.JSX.Element {
   const blatt = /^\/s\/b\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokabeln = /^\/s\/v\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
   const vokCode = /^\/s\/vt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
+  const grammatik = /^\/s\/g\/([a-f0-9]{8,32})/.exec(pfad)?.[1]
+  const gramCode = /^\/s\/gt\/([A-Za-z0-9]{4,12})/.exec(pfad)?.[1]
   // Vokabelweg (03.10.2026): gemeinsamer Kasten einer Lehrwerksreihe
   const vokWeg = /^\/s\/vw\/([^/]+)/.exec(pfad)?.[1]
   const lernFach = /^\/s\/lernen(?:\/([^/]+))?\/?$/.exec(pfad)
@@ -166,6 +170,10 @@ export default function SchuelerBereich(): React.JSX.Element {
     <Beitritt code={reiheCode.toUpperCase()} art="reihe" />
   ) : vokCode ? (
     <VokabelBeitritt code={vokCode.toUpperCase()} />
+  ) : gramCode ? (
+    <VokabelBeitritt code={gramCode.toUpperCase()} art="grammatik" />
+  ) : grammatik ? (
+    <GrammatikTrainer id={grammatik} />
   ) : blatt ? (
     <BlattAusfuellen id={blatt} />
   ) : vokWeg && !gast ? (
@@ -211,9 +219,11 @@ export default function SchuelerBereich(): React.JSX.Element {
                 ? ' · Arbeitsblatt'
                 : vokabeln || vokCode
                   ? ' · Vokabeltraining'
-                  : code
-                    ? ' · Onlinetest'
-                    : ''
+                  : grammatik || gramCode
+                    ? ' · Grammatiktraining'
+                    : code
+                      ? ' · Onlinetest'
+                      : ''
             : ''}
         </Text>
         <Group gap={4}>
@@ -765,6 +775,9 @@ async function oeffneCode(code: string): Promise<void> {
   const reihe = await holen<{ id: string }>(`/s/api/reihe/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
   if (reihe?.id) return window.location.assign(`/s/rq/${code}`)
   const vok = await holen<{ id: string }>(`/s/api/vokabeln/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  if (vok?.id) return window.location.assign(`/s/vt/${code}`)
+  const gram = await holen<{ id: string }>(`/s/api/grammatik/zugang?code=${encodeURIComponent(code)}`).catch(() => null)
+  if (gram?.id) return window.location.assign(`/s/gt/${code}`)
   window.location.assign(vok?.id ? `/s/vt/${code}` : `/s/t/${code}`)
 }
 
@@ -893,13 +906,22 @@ function Beitritt({ code, art }: { code: string; art: keyof typeof BEITRITT }): 
  * Zeigt Vokabeltrainings und Arbeitsblätter dieses Gastzugangs, dazu „Mit Code öffnen" und Abmelden.
  */
 function GastStart(): React.JSX.Element {
-  const [vok, setVok] = useState<{ id: string; titel: string; fach: string; uebersicht: { gesamt: number; sicher: number; faellig: number } }[] | null>(null)
+  const [vok, setVok] = useState<
+    { id: string; titel: string; fach: string; uebersicht: { gesamt: number; sicher: number; faellig: number }; g?: boolean }[] | null
+  >(null)
   const [blaetter, setBlaetter] = useState<BlattKurz[] | null>(null)
   useEffect(() => {
-    void holen<{ listen: typeof vok }>('/s/api/vokabeln').then(
-      (d) => setVok(d.listen ?? []),
-      () => setVok([])
-    )
+    // Grammatiktraining (06.10.2026) in derselben Liste – Kennzeichen g
+    void Promise.all([
+      holen<{ listen: NonNullable<typeof vok> }>('/s/api/vokabeln').then(
+        (d) => d.listen ?? [],
+        () => []
+      ),
+      holen<{ listen: NonNullable<typeof vok> }>('/s/api/grammatik').then(
+        (d) => (d.listen ?? []).map((x) => ({ ...x, g: true })),
+        () => []
+      )
+    ]).then(([v, g]) => setVok([...v, ...g]))
     void holen<{ blaetter: BlattKurz[] }>('/s/api/blaetter').then(
       (d) => setBlaetter(d.blaetter ?? []),
       () => setBlaetter([])
@@ -920,20 +942,20 @@ function GastStart(): React.JSX.Element {
       {(!vok || !blaetter) && <Loader />}
       {vok?.map((v) => (
         <Card
-          key={v.id}
+          key={`${v.g ? 'g' : 'v'}${v.id}`}
           withBorder
           padding="md"
           radius="lg"
           component="a"
-          href={`/s/v/${v.id}`}
-          onClick={tuerKlick(`/s/v/${v.id}`, fachFarbeAus(v.fach, undefined) ?? undefined)}
+          href={`${v.g ? '/s/g/' : '/s/v/'}${v.id}`}
+          onClick={tuerKlick(`${v.g ? '/s/g/' : '/s/v/'}${v.id}`, fachFarbeAus(v.fach, undefined) ?? undefined)}
           style={{ textDecoration: 'none', borderLeft: `4px solid ${fachFarbeAus(v.fach, undefined) ?? '#ea580c'}` }}
-          data-gast-vokabeln
+          data-gast-vokabeln={v.g ? 'grammatik' : ''}
         >
           <Group justify="space-between" wrap="nowrap">
             <div>
               <Text size="xs" c="dimmed">
-                Vokabeltraining · {v.fach}
+                {v.g ? 'Grammatiktraining' : 'Vokabeltraining'} · {v.fach}
               </Text>
               <Text fw={700}>{v.titel}</Text>
               <Text size="sm" c="dimmed">

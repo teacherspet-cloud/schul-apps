@@ -1,6 +1,6 @@
 /**
  * „Meine Klassen" (06.10.2026, abgestimmt mit der Lehrkraft): je Lerngruppe – angezeigt als „5b – Englisch", alphabetisch –
- * der Lernstand (Vokabeln; Grammatik folgt mit der Grammatik-Lern-App), Tests und Noten, laufende Reihen und Blätter,
+ * der Lernstand (Vokabeln und Grammatik), Tests und Noten, laufende Reihen und Blätter,
  * oben der Handlungsbedarf, dazu Vorschläge für Material aus dem Lernstand.
  *
  *   GET /server/klassen          Übersicht aller eigenen Lerngruppen (knapp)
@@ -13,6 +13,7 @@ import { alsNutzer, json, type Anfrage } from './http'
 import { fehlerSchwerpunkte, historie, lerngruppe, lerngruppenVon, mitgliederVon, type Lerngruppe } from './onlinetest'
 import { reihenDerGruppe } from './reihen'
 import { vokabelnDerGruppe } from './vokabeln'
+import { grammatikDerGruppe } from './grammatik'
 
 const TAG = 86_400_000
 
@@ -34,6 +35,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   const mitglieder = mitgliederVon(g)
   const h = historie(g)
   const vok = vokabelnDerGruppe(lehrkraftId, g.id, jetzt)
+  const gram = grammatikDerGruppe(lehrkraftId, g.id, jetzt)
   const reihen = reihenDerGruppe(lehrkraftId, g.id)
   const blaetter = blaetterDerGruppe(lehrkraftId, g.id)
   const fehler = fehlerSchwerpunkte(g)
@@ -41,6 +43,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
   const lernende = mitglieder
     .map((n) => {
       const v = vok.jePerson[n.id]
+      const gr = gram.jePerson[n.id]
       const t = h.schueler.find((s) => s.benutzer === n.benutzer)
       const r = reihen.flatMap((x) => x.lernende.filter((l) => l.id === n.id).map((l) => l.fortschritt))
       return {
@@ -48,6 +51,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
         name: n.name,
         benutzer: n.benutzer,
         vokabelnSicher: v && v.gesamt ? v.sicher / v.gesamt : null,
+        grammatikSicher: gr && gr.gesamt ? gr.sicher / gr.gesamt : null,
         zuletztGeuebt: v?.zuletzt ?? null,
         testSchnitt: t?.durchschnitt ?? null,
         tests: t?.tests ?? 0,
@@ -129,6 +133,7 @@ function detail(g: Lerngruppe, lehrkraftId: string, jetzt = Date.now()) {
       verteilung: t.verteilung
     })),
     vokabeln: vok.trainings,
+    grammatik: gram.trainings,
     wackelig: vok.wackelig,
     reihen: reihen.map(({ zid, titel, schnitt, fertig, lernende: l }) => ({ zid, titel, schnitt, fertig, lernende: l.length })),
     blaetter: blaetter.map(({ id, titel, gesamt, begonnen, eingereicht }) => ({ id, titel, gesamt, begonnen, eingereicht })),

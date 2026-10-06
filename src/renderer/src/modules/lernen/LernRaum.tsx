@@ -18,7 +18,7 @@ import type { Uebersicht } from '@shared/vokabeltrainer'
 import { holen } from '../onlinetest/serverApi'
 
 interface Karteikasten {
-  art: 'vokabeln' | 'merkzettel'
+  art: 'vokabeln' | 'merkzettel' | 'grammatik'
   titel: string
   id?: string
   uebersicht?: Uebersicht
@@ -209,7 +209,9 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
               key={i}
               type="button"
               className="lr-kasten"
-              onClick={() => (k.art === 'vokabeln' && k.id ? mitTuer(`/s/v/${k.id}`, farbe) : setKasten(k))}
+              onClick={() =>
+                k.art === 'vokabeln' && k.id ? mitTuer(`/s/v/${k.id}`, farbe) : k.art === 'grammatik' && k.id ? mitTuer(`/s/g/${k.id}`, farbe) : setKasten(k)
+              }
               aria-label={`Karteikasten: ${k.titel}`}
               data-karteikasten={k.art}
             >
@@ -218,7 +220,14 @@ function Zimmer({ raum }: { raum: Raum }): React.JSX.Element {
               <span className="karte" style={{ left: '52%' }} />
               <span
                 className="koerper"
-                style={{ background: k.art === 'vokabeln' ? `linear-gradient(180deg, ${farbe}, ${farbe}bb)` : 'linear-gradient(180deg, #ffd43b, #fab005)' }}
+                style={{
+                  background:
+                    k.art === 'vokabeln'
+                      ? `linear-gradient(180deg, ${farbe}, ${farbe}bb)`
+                      : k.art === 'grammatik'
+                        ? 'linear-gradient(180deg, #be4bdb, #9c36b5)'
+                        : 'linear-gradient(180deg, #ffd43b, #fab005)'
+                }}
               />
               <span className="etikett">{k.titel}</span>
               {k.uebersicht && k.uebersicht.faellig > 0 && (

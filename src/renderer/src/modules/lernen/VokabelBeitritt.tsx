@@ -4,7 +4,13 @@
  * Lernende mit Konto kommen direkt hinein. Gäste geben Vorname + Anfangsbuchstabe ein und bekommen
  * einen persönlichen Code – damit lernen sie an anderen Tagen und Geräten weiter („Schon dabei?").
  * Die Anmeldung als Gast hält bis zum Ende des Lernzeitraums (Server: src/server/vokabeln.ts).
+ * Seit 06.10.2026 auch für das Grammatiktraining (/s/gt/<CODE>, Server: src/server/grammatik.ts).
  */
+
+const ARTEN = {
+  vokabeln: { api: '/s/api/vokabeln', ziel: '/s/v/', seite: '/s/vt/', name: 'Vokabeltraining' },
+  grammatik: { api: '/s/api/grammatik', ziel: '/s/g/', seite: '/s/gt/', name: 'Grammatiktraining' }
+}
 import { Alert, Button, Card, Center, Code, Group, Loader, Text, TextInput, Title } from '@mantine/core'
 import { useCallback, useEffect, useState } from 'react'
 import { holen, senden } from '../onlinetest/serverApi'
@@ -19,7 +25,8 @@ interface Info {
 
 const NAME_OK = /^\p{L}[\p{L}'-]*(?: \p{L}[\p{L}'-]*)? \p{L}{1,3}\.?$/u
 
-export default function VokabelBeitritt({ code }: { code: string }): React.JSX.Element {
+export default function VokabelBeitritt({ code, art: welche = 'vokabeln' }: { code: string; art?: keyof typeof ARTEN }): React.JSX.Element {
+  const A = ARTEN[welche]
   const [info, setInfo] = useState<Info | null | undefined>(undefined)
   const [art, setArt] = useState<'neu' | 'wieder'>('neu')
   const [name, setName] = useState('')
@@ -30,10 +37,10 @@ export default function VokabelBeitritt({ code }: { code: string }): React.JSX.E
   const ich = window.__schulappsServer
   const mitKonto = Boolean(ich?.angemeldet && ich.quelle !== 'gast' && ich.rolle === 'schueler')
   const lehrkraft = Boolean(ich?.angemeldet && (ich.rolle === 'lehrkraft' || ich.rolle === 'admin'))
-  const ziel = (id: string): void => window.location.assign(`/s/v/${id}`)
+  const ziel = (id: string): void => window.location.assign(`${A.ziel}${id}`)
 
   const beitreten = useCallback(
-    async (daten: Record<string, string>, pfad = '/s/api/vokabeln/gast'): Promise<void> => {
+    async (daten: Record<string, string>, pfad = `${A.api}/gast`): Promise<void> => {
       setLaeuft(true)
       setFehler('')
       try {
@@ -46,21 +53,21 @@ export default function VokabelBeitritt({ code }: { code: string }): React.JSX.E
         setLaeuft(false)
       }
     },
-    [code]
+    [code, A.api]
   )
   useEffect(() => {
-    void holen<Info>(`/s/api/vokabeln/zugang?code=${encodeURIComponent(code)}`).then(
+    void holen<Info>(`${A.api}/zugang?code=${encodeURIComponent(code)}`).then(
       (d) => {
         if (d.dabei) return ziel(d.id)
         if (mitKonto) return void beitreten({})
-        if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(`/s/vt/${code}`)}`)
+        if (!d.gaeste) return window.location.assign(`/anmelden?ziel=${encodeURIComponent(`${A.seite}${code}`)}`)
         setInfo(d)
       },
       () => setInfo(null)
     )
   }, [code, mitKonto, beitreten])
 
-  if (info === null) return <Alert color="orange">Dieses Vokabeltraining gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
+  if (info === null) return <Alert color="orange">Dieses {A.name} gibt es nicht (mehr). Bitte den Code prüfen.</Alert>
   if (persoenlich)
     return (
       <Card withBorder padding="lg" data-persoenlicher-code>
@@ -91,22 +98,23 @@ export default function VokabelBeitritt({ code }: { code: string }): React.JSX.E
   return (
     <Card withBorder padding="lg" data-vokabel-beitritt>
       <Text c="dimmed" size="sm">
-        Vokabeltraining{info.bis ? ` · bis ${new Date(info.bis).toLocaleDateString('de-DE')}` : ''}
+        {A.name}
+        {info.bis ? ` · bis ${new Date(info.bis).toLocaleDateString('de-DE')}` : ''}
       </Text>
       <Title order={3} mb="md">
         {info.titel}
       </Title>
       {lehrkraft && (
         <Alert color="blue" mb="md">
-          Mit einem Lehrkraft-Konto angemeldet. Der Lernstand steht in der App „Vokabeltraining". Zum Ausprobieren wie ein Gast einen Namen eingeben – das Gerät
-          ist danach als Gast angemeldet.
+          Mit einem Lehrkraft-Konto angemeldet. Der Lernstand steht in der App „{A.name}". Zum Ausprobieren wie ein Gast einen Namen eingeben – das Gerät ist
+          danach als Gast angemeldet.
         </Alert>
       )}
       <form
         onSubmit={(e) => {
           e.preventDefault()
           if (!ok || laeuft) return
-          void (art === 'neu' ? beitreten({ name }) : beitreten({ name, wieder }, '/s/api/vokabeln/wieder'))
+          void (art === 'neu' ? beitreten({ name }) : beitreten({ name, wieder }, `${A.api}/wieder`))
         }}
       >
         <TextInput

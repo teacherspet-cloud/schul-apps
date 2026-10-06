@@ -138,7 +138,7 @@ export function sprich(text: string, sprache: string): void {
   }
 }
 
-const CSS = `
+export const CSS = `
 .vt-kopf { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 22px 20px; color: var(--vt-auf-a);
   background: radial-gradient(120% 140% at 100% 0%, var(--vt-a-zart) 0%, var(--vt-a-mittel) 38%, var(--vt-a-tief) 100%); box-shadow: 0 14px 30px var(--vt-schatten); }
 .vt-kopf::after { content: ''; position: absolute; right: -40px; bottom: -60px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.12); }
@@ -236,7 +236,7 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
  * Farbhülle (03.10.2026): Fachfarbe des Kopfbands (vom Server: Einstellung der Lehrkraft) oder die eigene
  * Farbe der Lernenden (Einstellungen › Farben im Vokabeltraining), hell oder dunkel wie eingestellt.
  */
-function TrainerFarben({ fach, fachFarbe, children }: { fach: string; fachFarbe?: string | null; children: React.ReactNode }): React.JSX.Element {
+export function TrainerFarben({ fach, fachFarbe, children }: { fach: string; fachFarbe?: string | null; children: React.ReactNode }): React.JSX.Element {
   const { d } = useDarstellung()
   const theme = useMantineTheme()
   const dunkel = useComputedColorScheme('light') === 'dark'

@@ -34,6 +34,9 @@ export const SENSIBEL: Record<string, string[]> = {
   feedback_abgaben: ['fassungen'],
   blatt_freigaben: ['schueler', 'auswertung'],
   blatt_abgaben: ['antworten', 'tinte', 'aufgaben_feedback', 'hilfen'],
+  // Grammatik-Lern-App (06.10.2026)
+  gram_zuweisungen: ['schueler'],
+  gram_stand: ['daten'],
   fach_kopien: ['titel'],
   reihen_zuweisungen: ['schueler'],
   reihen_stand: ['daten'],

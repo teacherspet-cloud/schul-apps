@@ -63,7 +63,7 @@ interface ZuweisungKurz {
 const tag = (ms: number): string => new Date(ms).toLocaleDateString('de-DE')
 /** Datumsfeld (JJJJ-MM-TT) ↔ Zeitpunkt: Termine morgens, Zeitraum-Ende am Abend */
 const alsFeld = (ms: number | null): string => (ms ? new Date(ms - new Date(ms).getTimezoneOffset() * 6e4).toISOString().slice(0, 10) : '')
-const ausFeld = (v: string, uhr: string): number | null => (v ? new Date(`${v}T${uhr}`).getTime() : null)
+export const ausFeld = (v: string, uhr: string): number | null => (v ? new Date(`${v}T${uhr}`).getTime() : null)
 
 /** Die App „Vokabeltraining" (Gruppe Unterricht) */
 export function VokabeltrainingModule({ active }: { active: boolean }): React.JSX.Element | null {
@@ -172,7 +172,7 @@ export default function VokabelTraining(): React.JSX.Element {
 }
 
 /** Gruppen + Mitglieder aller eigenen Lerngruppen (wie beim Zuweisen der Reihen) */
-function useLerngruppen(): { gruppen: { id: string; name: string }[]; alle: { gruppeId: string; gruppe: string; benutzer: string; name: string }[] } {
+export function useLerngruppen(): { gruppen: { id: string; name: string }[]; alle: { gruppeId: string; gruppe: string; benutzer: string; name: string }[] } {
   const [gruppen, setGruppen] = useState<{ id: string; name: string }[]>([])
   const [alle, setAlle] = useState<{ gruppeId: string; gruppe: string; benutzer: string; name: string }[]>([])
   useEffect(() => {

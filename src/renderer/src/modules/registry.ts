@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import MeineKlassenModule from './meineklassen/MeineKlassenModule'
 import { VokabeltrainingModule } from './lernen/VokabelTraining'
+import { GrammatiktrainingModule } from './lernen/GrammatikTraining'
 import VerwaltungLehrkraft from './verwaltung/DatenUndMaterial'
 import LaufendeReihenModule from './unterrichtsreihe/LaufendeReihenModule'
 import FreigegebeneBlaetterModule from './freigaben/FreigegebeneBlaetterModule'
@@ -170,6 +171,18 @@ export const modules: SchulModule[] = [
           faecher: SPRACH_FAECHER,
           component: VokabeltrainingModule
         },
+        // Grammatiktraining (06.10.2026): Grundgerüst wie Vokabeltraining – Themen-Kasten mit Regelkarten, Spiele
+        {
+          id: 'grammatiktraining',
+          name: 'Grammatiktraining',
+          description: 'Grammatikthemen im Karteikasten üben lassen – Regelkarten, rund 40 geprüfte Aufgaben und Spiele, mit Lernstand je Person.',
+          icon: programmSymbol('grammatiktraining', 'grape'),
+          color: 'grape',
+          illustration: illustration('grammatiktraining'),
+          leistenbild: leistenbild('grammatiktraining'),
+          faecher: SPRACH_FAECHER,
+          component: GrammatiktrainingModule
+        },
         // Unterrichtsreihe (Etappe 6, 02.10.2026): Lernpfad für Lernende mit Freischalten – alle Fächer
         {
           id: 'unterrichtsreihe',
@@ -284,7 +297,7 @@ export interface ModulGruppe {
   apps: string[]
 }
 export const MODUL_GRUPPEN: ModulGruppe[] = [
-  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'vokabeltraining'] },
+  { id: 'unterricht', name: 'Unterricht', apps: ['laufendereihen', 'freigaben', 'rueckmeldung', 'onlinetest', 'vokabeltraining', 'grammatiktraining'] },
   { id: 'planung', name: 'Unterrichtsplanung', apps: ['arbeitsblatt', 'unterrichtsreihe', 'tafelbild'] },
   { id: 'pruefung', name: 'Leistungsüberprüfungen', apps: ['vokabeltest', 'grammatiktest', 'lernzielkontrolle', 'klassenarbeit'] },
   { id: 'verwaltung', name: 'Verwaltung', apps: ['meineklassen', 'elternbrief', 'vokabelliste', 'verwaltung'] }

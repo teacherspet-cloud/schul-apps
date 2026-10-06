@@ -9,7 +9,7 @@
 import { datenbank, nutzerLoeschen, nutzerNachId, protokolliereServer } from './datenbank'
 
 /** Alle Tabellen, die Gäste mit einer Freigabe verbinden (Spalte `nutzer_id`) */
-const ZUORDNUNGEN = ['blatt_gaeste', 'vok_gaeste', 'feedback_gaeste', 'reihe_gaeste'] as const
+const ZUORDNUNGEN = ['blatt_gaeste', 'vok_gaeste', 'feedback_gaeste', 'reihe_gaeste', 'gram_gaeste'] as const
 
 const vorhanden = (tabelle: string): boolean => Boolean(datenbank().prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabelle))
 
