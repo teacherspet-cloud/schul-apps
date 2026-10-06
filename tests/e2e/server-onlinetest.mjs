@@ -351,8 +351,32 @@ try {
   await s1.screenshot({ path: join(out, '3-ergebnis.png'), fullPage: true })
 
   // ---------- Lehrkraft entscheidet
-  const g2 = d.fassungen[0].einheiten.find((e) => e.id.includes('g2'))
-  await lk.request.post(`${A}/server/onlinetest/${neu.id}/korrektur`, { headers: KOPF, data: { teilnahme: kim.id, einheit: g2.id, richtig: true } })
+  // Im Pop-up „Zu entscheiden", gebündelt nach Fehlerart (06.10.2026)
+  {
+    const p0 = await lk.newPage()
+    await p0.goto(A)
+    await p0.waitForTimeout(2500)
+    const sp = p0.getByRole('button', { name: 'Später einrichten' })
+    if (await sp.isVisible().catch(() => false)) await sp.click()
+    await p0
+      .getByRole('button', { name: /Onlinetest/ })
+      .first()
+      .click()
+    await p0.locator('[data-testliste]').waitFor({ timeout: 10000 })
+    await p0.locator('[data-testliste] tbody tr').first().click()
+    await p0.locator('[data-zu-entscheiden]').click()
+    const modal = p0.locator('.mantine-Modal-content', { hasText: 'Zu entscheiden' })
+    await modal.waitFor({ timeout: 8000 })
+    const gruppen = await modal
+      .locator('[data-fehlergruppe]')
+      .evaluateAll((e) => e.map((x) => [x.getAttribute('data-fehlergruppe'), x.querySelector('[data-fehlerart]')?.getAttribute('data-fehlerart')]))
+    console.log('GRUPPEN', JSON.stringify(gruppen))
+    pruefe(gruppen.length >= 1 && gruppen[0][0] === 'rechtschreibung', `„dgo" statt „dog" unter Rechtschreibung gebündelt (${JSON.stringify(gruppen)})`)
+    await p0.screenshot({ path: join(out, '3b-entscheiden.png') })
+    await modal.locator('[data-alle-akzeptieren^="g:rechtschreibung"]').click()
+    await warteBis(async () => ((await detail()).teilnahmen.find((t) => t.id === kim.id).punkte === 5 ? true : null), 10000)
+    await p0.close()
+  }
   d = await detail()
   pruefe(d.teilnahmen.find((t) => t.id === kim.id).punkte === 5, 'akzeptiert → ganzer Punkt (5/5)')
   await s1.getByText('Vorläufig').waitFor({ state: 'detached', timeout: 15000 })

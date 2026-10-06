@@ -13,6 +13,7 @@
  * Der Bildschirm wird oft an die Tafel gespiegelt: Die Namensliste ist deshalb zugeklappt und
  * die Namen lassen sich ausblenden.
  */
+import { buendeln, type Fall } from './entscheidungBuendeln'
 import { useAppSettings } from '../../shared/settingsStore'
 import { thresholdsForSubject } from '../../shared/gradeScale'
 import type { Kurztest } from '../lernzielkontrolle/model/types'
@@ -1191,39 +1192,187 @@ function Entscheidungen({
   geaendert: () => void
 }): React.JSX.Element {
   const [alle, setAlle] = useState(false)
-  const faelle = test.teilnahmen.flatMap((t, i) =>
-    test.fassungen[t.varianteNr].einheiten
+  // Gebündelt nach Fehlerart (06.10.2026, Standard) oder wie bisher der Reihe nach
+  const [ansicht, setAnsicht] = useState<'fehler' | 'personen'>('fehler')
+  const [laeuft, setLaeuft] = useState<string | null>(null)
+  const [offen, setOffen] = useState<Set<string>>(new Set())
+  const faelle: Fall<{ t: Teilnahme; e: Einheit; name: string }>[] = test.teilnahmen.flatMap((t, i) => {
+    const f = test.fassungen[t.varianteNr]
+    const felder = felderVon(f)
+    return f.einheiten
       .filter((e) => {
         const b = t.bewertung[e.id]
         return b?.pruefen && (alle || b.quelle !== 'lehrkraft')
       })
-      .map((e) => ({ t, e, name: verdeckt ? `Person ${i + 1}` : t.name }))
+      .map((e) => {
+        const b = t.bewertung[e.id]!
+        return {
+          schluessel: `${t.id}|${e.id}`,
+          antwort: e.felder.map((id) => antwortAlsText(t.antworten[id], felder.get(id)?.feld.optionen)).join(' … '),
+          loesung: e.felder.map((id) => loesungAlsText(f.loesungen[id], felder.get(id)?.feld.optionen)).join(' … '),
+          fehlerGruppe: b.fehlerGruppe,
+          fehlerArt: b.fehlerArt,
+          pruefen: b.pruefen,
+          daten: { t, e, name: verdeckt ? `Person ${i + 1}` : t.name }
+        }
+      })
+  })
+  const gruppen = useMemo(() => buendeln(faelle), [JSON.stringify(faelle.map((x) => [x.schluessel, x.antwort, x.fehlerArt]))]) // eslint-disable-line react-hooks/exhaustive-deps
+  const urteil = (t: Teilnahme, einheit: string, richtig: boolean): Promise<unknown> =>
+    senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig })
+  /** Viele auf einmal – nacheinander (dieselbe Teilnahme darf nicht gleichzeitig geschrieben werden) */
+  const alleUrteilen = async (kennung: string, liste: typeof faelle, richtig: boolean): Promise<void> => {
+    setLaeuft(kennung)
+    try {
+      for (const f of liste) await urteil(f.daten.t, f.daten.e.id, richtig)
+      notifySuccess(`${liste.length} Antwort${liste.length === 1 ? '' : 'en'} ${richtig ? 'akzeptiert' : 'nicht akzeptiert'}.`)
+    } catch (er) {
+      notifyError(er)
+    } finally {
+      setLaeuft(null)
+      geaendert()
+    }
+  }
+  const knoepfe = (kennung: string, liste: typeof faelle, klein = false): React.JSX.Element => (
+    <Group gap={4} wrap="nowrap">
+      <Button
+        size={klein ? 'compact-xs' : 'xs'}
+        color="green"
+        variant="light"
+        leftSection={<IconCheck size={14} />}
+        loading={laeuft === `${kennung}:ja`}
+        disabled={Boolean(laeuft)}
+        onClick={() => void alleUrteilen(`${kennung}:ja`, liste, true)}
+        data-alle-akzeptieren={kennung}
+      >
+        {liste.length > 1 ? `alle ${liste.length} akzeptieren` : 'akzeptieren'}
+      </Button>
+      <Button
+        size={klein ? 'compact-xs' : 'xs'}
+        color="red"
+        variant="light"
+        leftSection={<IconX size={14} />}
+        loading={laeuft === `${kennung}:nein`}
+        disabled={Boolean(laeuft)}
+        onClick={() => void alleUrteilen(`${kennung}:nein`, liste, false)}
+        data-alle-ablehnen={kennung}
+      >
+        {liste.length > 1 ? 'alle nicht' : 'nicht'}
+      </Button>
+    </Group>
   )
+  const zeile = (f: (typeof faelle)[number], mitName = true): React.JSX.Element => (
+    <Card key={f.schluessel} withBorder padding="xs">
+      {mitName && (
+        <Text size="xs" c="dimmed" mb={4}>
+          {f.daten.name} · {test.fassungen[f.daten.t.varianteNr].aufgaben.find((a) => a.id === f.daten.e.aufgabe)?.titel}
+        </Text>
+      )}
+      <EinheitZeile
+        test={test}
+        t={f.daten.t}
+        e={f.daten.e}
+        urteil={(einheit, richtig) => void urteil(f.daten.t, einheit, richtig).then(geaendert, (er: unknown) => notifyError(er))}
+      />
+    </Card>
+  )
+  const umschalten = (k: string): void =>
+    setOffen((o) => {
+      const n = new Set(o)
+      if (n.has(k)) n.delete(k)
+      else n.add(k)
+      return n
+    })
   return (
     <Modal opened onClose={schliessen} title="Zu entscheiden" size="xl">
       <Stack>
+        <Text size="sm" c="dimmed">
+          Kleine Fehler und von der Lösung abweichende, sinnvolle Antworten – bis zur Entscheidung 0 Punkte. Gebündelt nach der Art des Fehlers: gleiche Fehler
+          lassen sich gemeinsam entscheiden.
+        </Text>
         <Group justify="space-between">
-          <Text size="sm" c="dimmed">
-            Kleine Fehler und von der Lösung abweichende, sinnvolle Antworten – bis zur Entscheidung 0 Punkte.
-          </Text>
+          <SegmentedControl
+            size="xs"
+            value={ansicht}
+            onChange={(v) => setAnsicht(v as 'fehler' | 'personen')}
+            data={[
+              { value: 'fehler', label: 'Nach Fehlerart' },
+              { value: 'personen', label: 'Der Reihe nach' }
+            ]}
+            data-entscheiden-ansicht
+          />
           <Switch size="xs" label="auch schon entschiedene" checked={alle} onChange={(e) => setAlle(e.currentTarget.checked)} />
         </Group>
         {faelle.length === 0 && <Text c="dimmed">Alles entschieden.</Text>}
-        {faelle.map(({ t, e, name }) => (
-          <Card key={`${t.id}-${e.id}`} withBorder padding="xs">
-            <Text size="xs" c="dimmed" mb={4}>
-              {name} · {test.fassungen[t.varianteNr].aufgaben.find((a) => a.id === e.aufgabe)?.titel}
-            </Text>
-            <EinheitZeile
-              test={test}
-              t={t}
-              e={e}
-              urteil={(einheit, richtig) =>
-                void senden(`/server/onlinetest/${test.id}/korrektur`, { teilnahme: t.id, einheit, richtig }).then(geaendert, (er: unknown) => notifyError(er))
-              }
-            />
-          </Card>
-        ))}
+        {ansicht === 'personen'
+          ? faelle.map((f) => zeile(f))
+          : gruppen.map((g) => (
+              <Card key={g.gruppe} withBorder padding="sm" radius="md" data-fehlergruppe={g.gruppe}>
+                <Group justify="space-between" mb="xs" wrap="nowrap">
+                  <Group gap={6}>
+                    <Title order={5}>{g.name}</Title>
+                    <Badge variant="light">{g.anzahl}</Badge>
+                  </Group>
+                  {knoepfe(
+                    `g:${g.gruppe}`,
+                    g.arten.flatMap((a) => a.buendel.flatMap((b) => b.faelle))
+                  )}
+                </Group>
+                <Stack gap="xs">
+                  {g.arten.map((a) => (
+                    <Stack key={a.art} gap={6} pl="sm" style={{ borderLeft: '3px solid var(--mantine-color-orange-4)' }} data-fehlerart={a.art}>
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm" fw={600}>
+                          {a.art}{' '}
+                          <Text span size="xs" c="dimmed">
+                            ({a.anzahl})
+                          </Text>
+                        </Text>
+                        {a.buendel.length > 1 &&
+                          knoepfe(
+                            `a:${g.gruppe}:${a.art}`,
+                            a.buendel.flatMap((b) => b.faelle),
+                            true
+                          )}
+                      </Group>
+                      {a.buendel.map((b) => {
+                        const k = `b:${g.gruppe}:${a.art}:${b.titel}`
+                        if (b.faelle.length === 1) return zeile(b.faelle[0])
+                        return (
+                          <Card key={k} withBorder padding="xs" bg="var(--mantine-color-orange-light)" data-gleicher-fehler={b.faelle.length}>
+                            <Group justify="space-between" wrap="nowrap" align="start">
+                              <div style={{ minWidth: 0 }}>
+                                <Text size="sm" fw={600}>
+                                  {b.titel} · {b.faelle.length}×
+                                </Text>
+                                <Text size="xs" c="dimmed" lineClamp={2}>
+                                  {b.faelle.map((f) => f.daten.name).join(', ')}
+                                </Text>
+                                <Button
+                                  variant="subtle"
+                                  size="compact-xs"
+                                  px={0}
+                                  onClick={() => umschalten(k)}
+                                  leftSection={offen.has(k) ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+                                >
+                                  {offen.has(k) ? 'einzeln ausblenden' : 'einzeln ansehen'}
+                                </Button>
+                              </div>
+                              {knoepfe(k, b.faelle, true)}
+                            </Group>
+                            <Collapse expanded={offen.has(k)}>
+                              <Stack gap={6} mt="xs">
+                                {b.faelle.map((f) => zeile(f))}
+                              </Stack>
+                            </Collapse>
+                          </Card>
+                        )
+                      })}
+                    </Stack>
+                  ))}
+                </Stack>
+              </Card>
+            ))}
       </Stack>
     </Modal>
   )

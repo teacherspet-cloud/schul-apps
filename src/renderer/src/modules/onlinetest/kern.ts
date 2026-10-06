@@ -444,6 +444,9 @@ export interface EinheitBewertung {
    * („erst mal falsch", abgestimmt); „akzeptieren" gibt den ganzen Punkt.
    */
   pruefen?: 'kleinerFehler' | 'sinnvoll'
+  /** Fehlergruppe und -art der KI – zum Bündeln im Pop-up „Zu entscheiden" (06.10.2026, kiBewertung.ts) */
+  fehlerGruppe?: string
+  fehlerArt?: string
   /** Die KI hat diese (automatisch falsche) Antwort schon auf Sinn im Zusammenhang geprüft */
   kiGeprueft?: boolean
   /** Lehrkraft: Haken in Klammern – knapp richtig, volle Punkte, aber nicht fehlerfrei (03.10.2026) */

@@ -28,12 +28,32 @@ export interface KiFall {
 
 export type KiUrteilArt = 'richtig' | 'kleinerFehler' | 'vertretbar' | 'falsch'
 
+/**
+ * Fehlergruppen zum Bündeln im Pop-up „Zu entscheiden" (06.10.2026, Wunsch der Lehrkraft: „ähnliche Fehler bündeln –
+ * falsche Schreibweisen, falsche Grammatikphänomene usw. – und gleiche Fehler gemeinsam prüfen").
+ */
+export const FEHLER_GRUPPEN = {
+  rechtschreibung: 'Rechtschreibung',
+  grossklein: 'Groß-/Kleinschreibung',
+  endung: 'Endung / Form',
+  grammatik: 'Grammatik',
+  artikel: 'Artikel',
+  praeposition: 'Präposition',
+  wortwahl: 'Wortwahl / Synonym',
+  inhalt: 'Inhalt',
+  andere: 'Sonstiges'
+} as const
+export type FehlerGruppe = keyof typeof FEHLER_GRUPPEN
+
 export interface KiUrteil {
   id: string
   urteil: KiUrteilArt
   /** richtig = volle Punkte (nur bei urteil „richtig") */
   richtig: boolean
   begruendung: string
+  /** Bei kleinerFehler/vertretbar: Gruppe und kurze Fehlerart („Doppelkonsonant", „3. Person -s") */
+  fehlerGruppe?: FehlerGruppe
+  fehlerArt?: string
 }
 
 /**
@@ -58,7 +78,8 @@ export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[],
       '- "vertretbar": weicht von der Lösung ab, ist im Zusammenhang aber sinnvoll und korrekt (z. B. ein passendes Synonym in einer Lücke). Die Lehrkraft entscheidet.',
       '- "falsch": passt nicht, falsches Wort, sinnlos oder leer.',
       'Fälle mit „Wortlösung": Die Lösung ist vorgegeben und die Antwort wurde bereits als abweichend erkannt. Prüfe nur, ob die Abweichung ein kleiner Fehler ist oder die Antwort im Zusammenhang trotzdem sinnvoll wäre – sonst "falsch". Nie "richtig".',
-      'begruendung: ein kurzer Satz auf Deutsch für die Lehrkraft, warum (bei falsch: was fehlt oder falsch ist; bei kleinerFehler: welcher Fehler).'
+      'begruendung: ein kurzer Satz auf Deutsch für die Lehrkraft, warum (bei falsch: was fehlt oder falsch ist; bei kleinerFehler: welcher Fehler).',
+      'fehlerGruppe und fehlerArt (für die Lehrkraft, die ähnliche Fehler gebündelt entscheidet): bei "kleinerFehler" und "vertretbar" die Art der Abweichung – fehlerGruppe aus der Liste (rechtschreibung, grossklein, endung, grammatik, artikel, praeposition, wortwahl, inhalt, andere), fehlerArt als 1–4 Wörter auf Deutsch, die das Phänomen benennen, NICHT das einzelne Wort (z. B. „Doppelkonsonant", „ie/ei vertauscht", „3. Person -s fehlt", „Plural-Endung", „unbestimmter Artikel", „Synonym"). Gleiche Phänomene immer GLEICH benennen. Bei "richtig" und "falsch": fehlerGruppe "andere", fehlerArt leer.'
     ].join('\n'),
     user: faelle
       .map(
@@ -76,9 +97,11 @@ export function kiAnfrage(zielsprache: string, niveau: string, faelle: KiFall[],
             properties: {
               id: { type: 'string' },
               urteil: { type: 'string', enum: ['richtig', 'kleinerFehler', 'vertretbar', 'falsch'] },
-              begruendung: { type: 'string' }
+              begruendung: { type: 'string' },
+              fehlerGruppe: { type: 'string', enum: Object.keys(FEHLER_GRUPPEN) },
+              fehlerArt: { type: 'string' }
             },
-            required: ['id', 'urteil', 'begruendung'],
+            required: ['id', 'urteil', 'begruendung', 'fehlerGruppe', 'fehlerArt'],
             additionalProperties: false
           }
         }
@@ -109,7 +132,18 @@ export function urteileAus(antwort: unknown, faelle: KiFall[]): Map<string, KiUr
     if (!urteil) continue
     // Eine Wortlösung, die nicht genau stimmt, gibt die KI nie selbst frei – das entscheidet die Lehrkraft
     if (urteil === 'richtig' && wort.has(u.id)) urteil = 'vertretbar'
-    out.set(u.id, { id: u.id, urteil, richtig: urteil === 'richtig', begruendung: String(u.begruendung ?? '').slice(0, 300) })
+    const gruppe = String(u.fehlerGruppe ?? '') in FEHLER_GRUPPEN ? (u.fehlerGruppe as FehlerGruppe) : undefined
+    const art = String(u.fehlerArt ?? '')
+      .trim()
+      .slice(0, 40)
+    out.set(u.id, {
+      id: u.id,
+      urteil,
+      richtig: urteil === 'richtig',
+      begruendung: String(u.begruendung ?? '').slice(0, 300),
+      ...(gruppe && gruppe !== 'andere' ? { fehlerGruppe: gruppe } : {}),
+      ...(art ? { fehlerArt: art } : {})
+    })
   }
   return out
 }

@@ -663,14 +663,17 @@ function einarbeiten(fassung: OnlineFassung, paket: Fall[], urteile: Map<string,
         .filter(Boolean)
         .join(' ')
       const pruefen = us.some((u) => u!.urteil === 'kleinerFehler') ? 'kleinerFehler' : 'sinnvoll'
+      // Fehlerart zum Bündeln (06.10.2026): die der ersten abweichenden Antwort
+      const abw = us.find((u) => u!.urteil === 'kleinerFehler' || u!.urteil === 'vertretbar')
+      const fehler = { ...(abw?.fehlerGruppe ? { fehlerGruppe: abw.fehlerGruppe } : {}), ...(abw?.fehlerArt ? { fehlerArt: abw.fehlerArt } : {}) }
       if (efs[0].art === 'wort') {
         // Bleibt falsch – außer die Lehrkraft akzeptiert
         b[eid] = us.some((u) => u!.urteil === 'falsch')
           ? { ...b[eid], kiGeprueft: true, ...(hinweis ? { hinweis: [b[eid]?.hinweis, `KI: ${hinweis}`].filter(Boolean).join('; ') } : {}) }
-          : { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, kiGeprueft: true, hinweis }
+          : { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, kiGeprueft: true, hinweis, ...fehler }
       } else if (us.every((u) => u!.urteil === 'richtig')) b[eid] = { status: 'richtig', punkte: e.punkte, quelle: 'ki', hinweis }
       else if (us.some((u) => u!.urteil === 'falsch')) b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', hinweis }
-      else b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis }
+      else b[eid] = { status: 'falsch', punkte: 0, quelle: 'ki', pruefen, hinweis, ...fehler }
       bewertet++
     }
     db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), tid)
@@ -1388,6 +1391,8 @@ export function lehrkraftRoute(aufruf: Aufruf, adresse: string): (k: Anfrage) =>
         ...(zeichen === 'knapp' ? { knapp: true } : {}),
         ...(zeichen === 'frage' ? { frage: true } : {}),
         ...(alt?.pruefen ? { pruefen: alt.pruefen } : {}),
+        ...(alt?.fehlerGruppe ? { fehlerGruppe: alt.fehlerGruppe } : {}),
+        ...(alt?.fehlerArt ? { fehlerArt: alt.fehlerArt } : {}),
         ...(typeof k0.hinweis === 'string' && k0.hinweis ? { hinweis: k0.hinweis.slice(0, 300) } : alt?.hinweis ? { hinweis: alt.hinweis } : {})
       }
       db().prepare('UPDATE teilnahmen SET bewertung = ? WHERE id = ?').run(JSON.stringify(b), t.id)

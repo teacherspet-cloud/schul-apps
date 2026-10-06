@@ -1,19 +1,21 @@
 import { ProgrammInfo } from './shared/components/AppKopf'
-import { ActionIcon, Anchor, AppShell, Button, Indicator, Menu, Tooltip } from '@mantine/core'
+import { ActionIcon, Anchor, AppShell, Button, Indicator, Menu, Tooltip, UnstyledButton } from '@mantine/core'
 import { aufServer, hatClient, nurPcNetz, serverIch } from './shared/plattform'
 import { DatenschutzDialog } from './shared/datenschutz'
 import { useMediaQuery } from '@mantine/hooks'
 import {
   IconApps,
   IconChalkboard,
+  IconChevronDown,
+  IconChevronRight,
   IconChevronsLeft,
   IconClipboardCheck,
   IconExternalLink,
   IconFolders,
   IconHome,
-  IconListDetails,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
+  IconListDetails,
   IconLogout,
   IconSettings
 } from '@tabler/icons-react'
@@ -281,16 +283,18 @@ export default function App(): React.JSX.Element {
               const Symbol = GRUPPEN_SYMBOL[g.id] ?? IconApps
               return (
                 <div key={g.id} className="leiste-gruppe" data-gruppe={g.id} data-offen={offen}>
-                  <NavIcon
+                  <GruppenKopf
                     label={g.name}
                     breit={breit}
                     bild={gruppenBild(g.id)}
+                    offen={offen}
+                    anzahl={apps.length}
                     active={hatAktive && !offen}
                     badge={!offen && apps.some((m) => laufpunkte[m.id])}
                     onClick={() => gruppeUmschalten(g.id, offen)}
                   >
-                    <Symbol size={22} />
-                  </NavIcon>
+                    <Symbol size={16} />
+                  </GruppenKopf>
                   {offen && (
                     <div className="leiste-gruppe-apps">
                       {apps.map((m) => (
@@ -484,6 +488,54 @@ function MitFensterMenue({ label, fenster, children }: { label: string; fenster:
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>
+  )
+}
+
+/**
+ * Kopf einer Gruppe in der Leiste (06.10.2026, Befund der Lehrkraft: „designtechnisch nicht klar, was die Obermenüs und
+ * was die Untermenüs sind"). Bis dahin trug die Gruppe dieselbe große Bildkachel wie ihre Apps. Jetzt:
+ *  - Kopf: schmal, mit kleinem Symbol, Name in Kapitälchen-Optik und Pfeil (auf/zu) – sieht aus wie eine Überschrift,
+ *    nicht wie ein Programm. In der schmalen Leiste eine flache Pille mit Symbol und Pfeil.
+ *  - Apps darunter: die großen Kacheln in einer getönten Schale mit Akzentstreifen (app.css `.leiste-gruppe-apps`).
+ * Farben aus den Variablen des Themas – hell, dunkel und die farbige Leiste.
+ */
+function GruppenKopf(props: {
+  label: string
+  breit: boolean
+  bild?: string
+  offen: boolean
+  anzahl: number
+  active: boolean
+  badge?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}): React.JSX.Element {
+  const Pfeil = props.offen ? IconChevronDown : IconChevronRight
+  const symbol = props.bild ? <img src={props.bild} className="leiste-kopf-bild" alt="" draggable={false} /> : props.children
+  const knopf = (
+    <UnstyledButton
+      onClick={props.onClick}
+      aria-label={props.label}
+      aria-expanded={props.offen}
+      className={`leiste-kopf ${props.breit ? 'leiste-kopf-breit' : 'leiste-kopf-schmal'}`}
+      data-active={props.active}
+      data-offen={props.offen}
+      data-leiste-gruppe-kopf
+    >
+      <Indicator disabled={!props.badge} size={8} offset={2} processing color="orange" position="top-end">
+        <span className="leiste-kopf-symbol">{symbol}</span>
+      </Indicator>
+      {props.breit && <span className="leiste-kopf-text">{props.label}</span>}
+      {props.breit && !props.offen && <span className="leiste-kopf-zahl">{props.anzahl}</span>}
+      <Pfeil size={props.breit ? 14 : 12} className="leiste-kopf-pfeil" />
+    </UnstyledButton>
+  )
+  return props.breit ? (
+    knopf
+  ) : (
+    <Tooltip label={`${props.label} – ${props.offen ? 'zuklappen' : `aufklappen (${props.anzahl})`}`} position="right" withArrow>
+      {knopf}
+    </Tooltip>
   )
 }
 

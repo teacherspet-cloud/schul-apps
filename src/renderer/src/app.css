@@ -806,30 +806,132 @@ img.home-illustration {
   transition: none !important;
 }
 
-/* Gruppen der Leiste (03.10.2026): die Apps einer offenen Gruppe eingerückt mit Linie */
-.leiste-gruppe + .leiste-gruppe {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--mantine-color-default-border);
-}
-.leiste-gruppe-apps {
-  margin-left: 4px;
-  padding-left: 4px;
-  border-left: 2px solid var(--mantine-color-default-border);
-}
-.app-leiste[data-breit='true'] .leiste-gruppe-apps {
-  margin-left: 10px;
-}
 /*
- * Schmale Leiste (06.10.2026, Befund der Lehrkraft: Symbole der Untermenüs nach rechts geschoben, nicht ganz
- * sichtbar): keine Einrückung – die Apps einer Gruppe stehen mittig in einem zart getönten Block.
+ * Gruppen der Leiste (03.10.2026; neu gestaltet 06.10.2026 – Ober- und Untermenüs deutlich unterscheidbar).
+ * Kopf = Überschrift (klein, Kapitälchen-Optik, Pfeil), Apps = große Kacheln in einer getönten Schale mit
+ * Akzentstreifen. Alle Farben aus Variablen: --leiste-* je Thema; die farbige Leiste (data-app-nav="filled") weiß.
  */
+:root {
+  --leiste-kopf-text: var(--mantine-color-dimmed);
+  --leiste-kopf-hover: var(--mantine-color-default-hover);
+  --leiste-schale: color-mix(in srgb, var(--mantine-primary-color-filled) 7%, transparent);
+  --leiste-schale-rand: color-mix(in srgb, var(--mantine-primary-color-filled) 55%, transparent);
+  --leiste-trenner: var(--mantine-color-default-border);
+}
+:root[data-mantine-color-scheme='dark'] {
+  --leiste-schale: color-mix(in srgb, var(--mantine-primary-color-filled) 14%, transparent);
+  --leiste-schale-rand: color-mix(in srgb, var(--mantine-primary-color-filled) 70%, transparent);
+}
+:root[data-app-nav='filled'] {
+  --leiste-kopf-text: rgba(255, 255, 255, 0.78);
+  --leiste-kopf-hover: rgba(255, 255, 255, 0.14);
+  --leiste-schale: rgba(255, 255, 255, 0.1);
+  --leiste-schale-rand: rgba(255, 255, 255, 0.75);
+  --leiste-trenner: rgba(255, 255, 255, 0.18);
+}
+.leiste-gruppe + .leiste-gruppe {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--leiste-trenner);
+}
+/* Kopf: Überschrift statt Kachel */
+.leiste-kopf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--leiste-kopf-text);
+  border-radius: 8px;
+  transition: background 0.12s, color 0.12s;
+}
+.leiste-kopf:hover {
+  background: var(--leiste-kopf-hover);
+  color: var(--mantine-color-text);
+}
+:root[data-app-nav='filled'] .leiste-kopf:hover {
+  color: #fff;
+}
+.leiste-kopf-breit {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+.leiste-kopf-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.leiste-kopf-zahl {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--leiste-schale);
+}
+.leiste-kopf-schmal {
+  width: 56px;
+  height: 26px;
+  margin: 0 auto 4px;
+  justify-content: center;
+  gap: 3px;
+  border: 1px dashed var(--leiste-trenner);
+  border-radius: 13px;
+}
+.leiste-kopf-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+.leiste-kopf-bild {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: contain;
+  /* Die Gruppe bleibt zurückhaltend – die Farbe gehört den Apps */
+  filter: saturate(0.55);
+  opacity: 0.85;
+}
+.leiste-kopf:hover .leiste-kopf-bild {
+  filter: none;
+  opacity: 1;
+}
+.leiste-kopf-pfeil {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+/* Zugeklappt mit der offenen App darin: Akzent am Kopf */
+.leiste-kopf[data-active='true'] {
+  color: var(--mantine-primary-color-filled);
+  background: var(--leiste-schale);
+}
+:root[data-app-nav='filled'] .leiste-kopf[data-active='true'] {
+  color: #fff;
+}
+/* Apps: Kacheln in einer getönten Schale mit Akzentstreifen */
+.leiste-gruppe-apps {
+  border-radius: 14px;
+  background: var(--leiste-schale);
+  box-shadow: inset 3px 0 0 var(--leiste-schale-rand);
+  padding: 6px 4px 0 7px;
+}
 .app-leiste:not([data-breit='true']) .leiste-gruppe-apps {
-  margin-left: 0;
-  padding: 4px 0 0;
-  border-left: 0;
-  border-radius: 12px;
-  background: var(--mantine-color-default-hover);
+  /* In den Rand der Leiste (10 px) hinein – sonst wäre die Schale schmaler als die 56-px-Kacheln */
+  margin: 0 -7px;
+  padding: 6px 0 0 3px;
   display: flex;
   flex-direction: column;
   align-items: center;
