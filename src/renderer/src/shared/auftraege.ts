@@ -224,12 +224,38 @@ export const setzeFehlerMeldung = (fn: (e: unknown, titel: string) => void): voi
   meldeFehler = fn
 }
 
+/*
+ * Wartezeit je Anfrage (07.10.2026, Befund der Lehrkraft): Eine Anfrage, die 30 Minuten auf einen freien Platz gewartet
+ * hat, zeigte „noch etwa 20 Min." – die Restzeit rechnete die Wartezeit als Arbeitszeit. Gezählt wird deshalb, wie
+ * lange jede Anfrage wartete; Restzeit und gelernte Dauern rechnen nur mit der Zeit, in der wirklich gearbeitet wurde.
+ */
+const anfrageWarten = new Map<string, { summe: number; seit?: number }>()
+/** Bisherige Wartezeit einer Anfrage (ms), die laufende eingeschlossen */
+export function gewartetVon(id: string, nun = Date.now()): number {
+  const w = anfrageWarten.get(id)
+  return w ? w.summe + (w.seit !== undefined ? nun - w.seit : 0) : 0
+}
+/** Wartezustand einer Anfrage festhalten (auch für Tests) */
+export function merkeWartezustand(id: string, wartend: boolean, nun = Date.now()): void {
+  const w = anfrageWarten.get(id) ?? { summe: 0 }
+  if (wartend && w.seit === undefined) w.seit = nun
+  if (!wartend && w.seit !== undefined) {
+    w.summe += nun - w.seit
+    w.seit = undefined
+  }
+  anfrageWarten.set(id, w)
+}
+/** Aufträge hören mit, wenn eine ihrer Anfragen zu warten beginnt oder aufhört */
+const platzHoerer = new Set<() => void>()
+
 let platzAbo: (() => void) | null = null
 function horchePlatz(): void {
   if (platzAbo || typeof window === 'undefined' || !window.api?.ai.onPlatz) return
   platzAbo = window.api.ai.onPlatz(({ id, zustand, abgebrochen, abgebrocheneBilder }) => {
     if (zustand === 'wartend') wartendeAnfragen.set(id, { abgebrochen: abgebrochen ?? 0, bilder: abgebrocheneBilder ?? 0 })
     else wartendeAnfragen.delete(id)
+    if (anfrageWarten.has(id)) merkeWartezustand(id, zustand === 'wartend')
+    for (const fn of platzHoerer) fn()
     for (const [auftragId, lz] of laufzeit) if (lz.anfragen.has(id)) aendere(auftragId, (a) => ({ ...a, ...lage(lz, a) }))
   })
   // Verbindung zum PC unterbrochen bzw. wieder da (iPad-App, Browser) – die Leiste sagt es
@@ -486,16 +512,35 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     umfang: 1
   }
   const kiFuer = (art: string, req?: StructuredRequest): string => kiKennung(useAppSettings.getState().settings.ai, art === 'bild' ? 'bild' : 'text', req)
+  /*
+   * Wartezeit des ganzen Auftrags: sichtbares Warten (`pausiere`, z. B. auf andere Medienaufträge) und Zeiten, in denen
+   * alle seine Anfragen auf einen Platz warten. Sie zählt nicht als Arbeitszeit (07.10.2026).
+   */
+  const warten = { summe: 0, seit: undefined as number | undefined }
+  const pruefeWarten = (nun = Date.now()): void => {
+    const ids = [...lz.anfragen]
+    const wartet = Boolean(lz.pause) || (ids.length > 0 && ids.every((x) => wartendeAnfragen.has(x)))
+    if (wartet && warten.seit === undefined) warten.seit = nun
+    if (!wartet && warten.seit !== undefined) {
+      warten.summe += nun - warten.seit
+      warten.seit = undefined
+    }
+  }
+  const gewartet = (nun: number): number => warten.summe + (warten.seit !== undefined ? nun - warten.seit : 0)
+  /** Arbeitszeit einer Anfrage: seit ihrem Start, ohne ihre Wartezeit auf einen Platz */
+  const arbeitszeit = (anfrageId: string, l: { start: number }, nun: number): number => Math.max(0, nun - l.start - gewartetVon(anfrageId, nun))
+
   let restBis: number | undefined
   const restzeit = (): Pick<Auftrag, 'restBis' | 'restLage'> => {
     const nun = Date.now()
+    pruefeWarten(nun)
     const { sekunden, laenger } = schaetzeRest({
       art: start.art,
       umfang: buch.umfang,
-      elapsedMs: nun - jetzt,
+      elapsedMs: Math.max(0, nun - jetzt - gewartet(nun)),
       ratio: gezeigt,
       erledigt: buch.erledigt,
-      laufend: [...buch.laufend].map(([anfrageId, l]) => ({ art: l.art, ki: l.ki, elapsedMs: nun - l.start, ...tracker.stand(anfrageId) })),
+      laufend: [...buch.laufend].map(([anfrageId, l]) => ({ art: l.art, ki: l.ki, elapsedMs: arbeitszeit(anfrageId, l, nun), ...tracker.stand(anfrageId) })),
       ki: (art) => kiFuer(art)
     })
     if (laenger) {
@@ -517,6 +562,11 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
     const rest = restzeit()
     aendere(id, (a) => (laeuft(a) ? { ...a, anteil: gezeigt, meldung: meldung ?? a.meldung, ...lage(lz, a), ...rest } : a))
   }
+  // Beginnt oder endet das Warten einer Anfrage, gleich neu schätzen
+  const platzGeaendert = (): void => {
+    if (!lz.beendet && !signal.aborted) aktualisiere()
+  }
+  platzHoerer.add(platzGeaendert)
   // Ohne Zeichenstrom (Bilder, Abo-Zugang) käme sonst minutenlang keine neue Schätzung
   const takt = setInterval(() => {
     if (!lz.beendet && !signal.aborted) aktualisiere()
@@ -525,6 +575,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
   const anfrage = async <T>(art: string, senden: (anfrageId: string) => Promise<T>, req?: StructuredRequest): Promise<T> => {
     if (signal.aborted) throw new AbbruchFehler()
     const anfrageId = tracker.begin(art)
+    anfrageWarten.set(anfrageId, { summe: 0 })
     lz.anfragen.add(anfrageId)
     buch.laufend.set(anfrageId, { art, ki: kiFuer(art, req), start: Date.now() })
     // Schon jetzt schätzen: Mit Verlauf steht die Restzeit ab der ersten Sekunde da
@@ -541,8 +592,9 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       buch.laufend.delete(anfrageId)
       if (ok && lauf) {
         buch.erledigt[art] = (buch.erledigt[art] ?? 0) + 1
-        merkeAnfrage(art, lauf.ki, { ms: Date.now() - lauf.start, chars: tracker.stand(anfrageId).chars })
+        merkeAnfrage(art, lauf.ki, { ms: arbeitszeit(anfrageId, lauf, Date.now()), chars: tracker.stand(anfrageId).chars })
       }
+      anfrageWarten.delete(anfrageId)
       tracker.end(anfrageId, ok)
       lz.anfragen.delete(anfrageId)
       wartendeAnfragen.delete(anfrageId)
@@ -627,8 +679,9 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       aendere(id, (a) => ({ ...a, meldung: 'Wird abgelegt …' }))
       await start.ablegen(ergebnis, eingabe)
       const ende = Date.now()
-      // Aus diesem Lauf lernen: Dauer, Umfang und Mischung der Anfragen dieser Auftragsart
-      merkeAuftrag(start.art, { ms: ende - jetzt, umfang: buch.umfang, ki: kiFuer('text'), mix: { ...buch.erledigt } })
+      pruefeWarten(ende)
+      // Aus diesem Lauf lernen: Dauer (ohne Wartezeit), Umfang und Mischung der Anfragen dieser Auftragsart
+      merkeAuftrag(start.art, { ms: Math.max(0, ende - jetzt - gewartet(ende)), umfang: buch.umfang, ki: kiFuer('text'), mix: { ...buch.erledigt } })
       aendere(id, (a) => ({
         ...a,
         status: 'fertig',
@@ -653,6 +706,7 @@ export function starteAuftrag<I, E>(start: AuftragsStart<I, E>): Promise<E | nul
       lz.beendet = true
       vorschau.ende()
       clearInterval(takt)
+      platzHoerer.delete(platzGeaendert)
       tracker.dispose()
       vergissLaufenden(id)
     }

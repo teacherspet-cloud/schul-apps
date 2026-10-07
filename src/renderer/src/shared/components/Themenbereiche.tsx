@@ -77,6 +77,7 @@ import {
   vorschlaegeUebernehmen,
 } from "../themenbereiche";
 import { katalogFuer, ladeLehrplan } from "../themenKatalog";
+import { chronologisch, zeitpunktVon } from "../themenChronologie";
 import { useAppSettings } from "../settingsStore";
 import { useSichtbareProgramme } from "../../shell/programme";
 import type { LehrplanDatei } from "@shared/lehrplan";
@@ -376,8 +377,17 @@ export function ThemenAnsicht({
       setOrt((o) => ({ ...o, bereichId: null }));
   }, [ort.bereichId, offenerBereich]);
 
+  /*
+   * Chronologisch (07.10.2026, Wunsch der Lehrkraft): wie im Unterricht – Klasse und Stelle im Schuljahr aus Lehrwerk,
+   * Kapitel oder den Jahrgängen der Materialien, sonst alphabetisch (shared/themenChronologie.ts).
+   */
+  const baende = useBandKlassen();
+  const jahrgaengeIn = (id: string): number[] => {
+    const ids = new Set([id, ...nachfahrenVon(daten, id)]);
+    return alle.filter((m) => ids.has(zuordnung(m) ?? "") && m.grade).map((m) => m.grade!);
+  };
   const kinder = (fachId: string, elternId: string | null): Themenbereich[] =>
-    kinderVon(daten, fachId, elternId);
+    chronologisch(kinderVon(daten, fachId, elternId), (b) => zeitpunktVon(b, daten.bereiche, baende, jahrgaengeIn));
   const inBereich = (id: string | null, fachId: string): Material[] =>
     sichtbar.filter((m) =>
       id ? zuordnung(m) === id : !bereichVon(m) && fachVon(m) === fachId
@@ -1873,14 +1883,32 @@ export function FremdKarte({
   );
 }
 
-/** Alle Bereiche eines Fachs in Baumreihenfolge, mit Tiefe */
+/** Klasse je Lehrwerk-Band („Green Line 1" → 5) – für die chronologische Reihenfolge der Bereiche */
+let bandKlassen: Promise<Record<string, number>> | null = null;
+function useBandKlassen(): Record<string, number> {
+  const [k, setK] = useState<Record<string, number>>({});
+  useEffect(() => {
+    bandKlassen ??= window.api.textbooks
+      .list()
+      .then((l) => Object.fromEntries(l.filter((b) => b.grade).map((b) => [b.name, b.grade!])))
+      .catch(() => ({}));
+    let weg = false;
+    void bandKlassen.then((x) => !weg && setK(x));
+    return () => {
+      weg = true;
+    };
+  }, []);
+  return k;
+}
+
+/** Alle Bereiche eines Fachs in Baumreihenfolge, mit Tiefe – Bandreihenfolge chronologisch, sonst alphabetisch */
 function baumListe(
   daten: { bereiche: Themenbereich[] },
   fachId: string
 ): { b: Themenbereich; tiefe: number }[] {
   const out: { b: Themenbereich; tiefe: number }[] = [];
   const gehe = (elternId: string | null, tiefe: number): void => {
-    for (const b of kinderVon(daten, fachId, elternId)) {
+    for (const b of chronologisch(kinderVon(daten, fachId, elternId), () => null)) {
       out.push({ b, tiefe });
       gehe(b.id, tiefe + 1);
     }

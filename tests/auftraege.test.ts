@@ -172,6 +172,60 @@ describe('Restzeit: Der Auftrag lernt aus seinem Lauf', () => {
       vi.useRealTimers()
     }
   })
+
+  it('Wartezeit auf einen Platz zählt nicht als Arbeitszeit (Befund 07.10.2026)', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
+    try {
+      // Erster Lauf ohne Warten: 30 s Arbeit
+      const erster = starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId: 'w1',
+        titel: 'x',
+        art: 'Probe warten',
+        eingabe: {},
+        arbeit: async (_e, k) => k.ai(REQ),
+        ablegen: async () => undefined
+      })
+      await tick()
+      vi.advanceTimersByTime(30000)
+      await antworte({ ok: true })
+      await erster
+      // Zweiter Lauf: 30 Minuten in der Warteschlange, dann 5 s Arbeit
+      const zweiter = starteAuftrag({
+        moduleId: 'arbeitsblatt',
+        docId: 'w2',
+        titel: 'x',
+        art: 'Probe warten',
+        eingabe: {},
+        arbeit: async (_e, k) => k.ai(REQ),
+        ablegen: async () => undefined
+      })
+      await tick()
+      const id = [...offen.keys()].at(-1)!
+      platz!({ id, zustand: 'wartend' })
+      vi.advanceTimersByTime(30 * 60_000 + 1000)
+      await tick()
+      expect(auftrag()!.status).toBe('wartend')
+      platz!({ id, zustand: 'laufend' })
+      vi.advanceTimersByTime(5000)
+      await tick()
+      const rest = auftrag()!.restBis! - Date.now()
+      // Rest = gemerkte 30 s minus 5 s Arbeit – nicht „länger als je" und keine 20 Minuten
+      expect(auftrag()!.restLage).toBeUndefined()
+      expect(rest).toBeGreaterThan(10_000)
+      expect(rest).toBeLessThanOrEqual(30_000)
+      vi.advanceTimersByTime(5000)
+      await antworte({ ok: true })
+      await zweiter
+      // Gelernt werden nur die 10 s Arbeit, nicht die halbe Stunde Warten
+      const anfragen = Object.entries(leseVerlauf().anfragen).find(([k]) => k.startsWith('probe@'))![1]
+      expect(anfragen.map((p) => p.ms)).toEqual([30000, 10000])
+      const auftraege = leseVerlauf().auftraege['Probe warten']
+      expect(auftraege[1].ms).toBeLessThan(60_000)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('Hintergrund-Aufträge', () => {
