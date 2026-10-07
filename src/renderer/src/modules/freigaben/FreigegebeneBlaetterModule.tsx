@@ -349,7 +349,7 @@ function FreigabeDetail({ id, zurueck }: { id: string; zurueck: () => void }): R
       {!d.abgaben.length ? (
         <Text c="dimmed">Noch hat niemand begonnen.</Text>
       ) : (
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover data-karten>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Name</Table.Th>

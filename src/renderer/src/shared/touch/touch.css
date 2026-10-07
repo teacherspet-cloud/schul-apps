@@ -591,21 +591,95 @@ html[data-tastatur] .mobil-tabs {
     bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Dialoge als Vollbild – mit Abstand zu Statusleiste und App-Wechsel-Balken */
+  /*
+   * Dialoge als Blatt von unten (07.10.2026, Recherche Material 3 / Apple HIG): so hoch wie ihr Inhalt – kurze
+   * Rückfragen belegen die untere Hälfte im Daumenbereich, lange reichen bis knapp unter die Statusleiste und rollen.
+   * Vorher war jeder Dialog ein Vollbild, auch „Wirklich löschen?".
+   */
   html[data-touch] .mantine-Modal-root .mantine-Modal-inner {
     padding: 0 !important;
-    align-items: stretch !important;
+    align-items: flex-end !important;
   }
   html[data-touch] .mantine-Modal-root .mantine-Modal-content {
     flex: 1 1 100% !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 100dvh;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
+    height: auto;
+    max-height: calc(100dvh - 12px - env(safe-area-inset-top, 0px)) !important;
+    border-radius: 16px 16px 0 0 !important;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.25);
   }
   html[data-touch] .mantine-Modal-root .mantine-Modal-header {
-    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-top: 12px;
+  }
+  /*
+   * Tabellen am Telefon (07.10.2026): Übersichtstabellen (data-karten) als Kartenliste – je Zeile eine Karte, je Zelle
+   * „Spalte: Wert" (Spaltennamen setzt kartenTabellen.ts). Alle übrigen (bearbeitbare wie Vokabelliste, Paradigma)
+   * rollen waagerecht, die erste Spalte bleibt stehen.
+   */
+  html[data-touch] table[data-karten] thead {
+    display: none;
+  }
+  html[data-touch] table[data-karten],
+  html[data-touch] table[data-karten] tbody,
+  html[data-touch] table[data-karten] tr {
+    display: block;
+    width: 100%;
+  }
+  html[data-touch] table[data-karten] tr {
+    border: 1px solid var(--app-border, var(--mantine-color-default-border));
+    border-radius: 12px;
+    margin-bottom: 8px;
+    padding: 6px 12px;
+    background: var(--app-surface, var(--mantine-color-body));
+  }
+  html[data-touch] table[data-karten] td {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    align-items: center;
+    border: 0 !important;
+    padding: 4px 0 !important;
+    text-align: right;
+  }
+  html[data-touch] table[data-karten] td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    max-width: 45%;
+    text-align: left;
+    font-size: 12px;
+    color: var(--mantine-color-dimmed);
+  }
+  html[data-touch] table[data-karten] td:first-child {
+    font-weight: 700;
+    justify-content: flex-start;
+    text-align: left;
+  }
+  html[data-touch] table[data-karten] td:first-child::before,
+  html[data-touch] table[data-karten] td[data-label='']::before {
+    display: none;
+  }
+  html[data-touch] table.mantine-Table-table:not([data-karten]) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  html[data-touch] table.mantine-Table-table:not([data-karten]) :is(td, th):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--mantine-color-body);
+  }
+
+  /* Griff oben am Blatt – zeigt, dass es ein Blatt ist */
+  html[data-touch] .mantine-Modal-root .mantine-Modal-content::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 2px;
+    background: var(--mantine-color-default-border);
   }
   html[data-touch] .mantine-Modal-root .mantine-Modal-body {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));

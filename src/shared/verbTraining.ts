@@ -87,6 +87,27 @@ export function bereinigeVerbKarten(roh: unknown): VerbKarte[] {
   })
 }
 
+/**
+ * Die unregelmäßigen Verben unter Vokabeln finden („to go" → go – went – gone): erst in `pool` (Liste des Bandes),
+ * dann in `ersatz` (Standardliste). Ohne Doppelte.
+ */
+export function verbenUnterWoertern(woerter: { term: string }[], pool: VerbEintrag[], ersatz: VerbEintrag[], sprache: VerbSprache): VerbEintrag[] {
+  const quellen = [...pool, ...ersatz]
+  const schluessel = (e: VerbEintrag): string => medienSchluesselVerb(e, sprache).toLowerCase()
+  const out: VerbEintrag[] = []
+  const gesehen = new Set<string>()
+  for (const w of woerter) {
+    const k = verbSchluesselVonWort(w.term)
+    if (!k || gesehen.has(k)) continue
+    const treffer = quellen.find((e) => schluessel(e) === k)
+    if (treffer) {
+      gesehen.add(k)
+      out.push(treffer)
+    }
+  }
+  return out
+}
+
 /** Zurück zur Verbliste (für Muster und Fehlformen) */
 export const alsEintrag = (k: VerbKarte): VerbEintrag => ({ id: k.id, formen: { ...k.formen } })
 

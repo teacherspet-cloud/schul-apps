@@ -151,11 +151,24 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
     if (art === 'bestimmen') {
       a.form = text(y.form, 80)
       a.merkmale = liste(y.merkmale, 6, 40)
-      a.werte = (Array.isArray(y.werte) ? y.werte : []).slice(0, a.merkmale.length).map((w) => liste(w, 12, 40))
-      // Lesarten nur mit Werten, die es zur Auswahl gibt; doppelte weg
+      /*
+       * Praxislauf mit echter KI (07.10.2026): Die KI schreibt Werte mal ausgeschrieben, mal abgekürzt und lässt die
+       * Auswahl gelegentlich weg – vorher fiel dadurch JEDE Bestimmungsaufgabe heraus. Jetzt: fehlende Auswahl aus den
+       * üblichen Werten des Merkmals, Lesarten auf die Schreibweise der Auswahl gebracht, fehlende Werte ergänzt.
+       */
+      const roheWerte = (Array.isArray(y.werte) ? y.werte : []).map((w) => liste(w, 12, 40))
+      a.werte = a.merkmale.map((m, j) => (roheWerte[j]?.length ? roheWerte[j] : [...(STANDARDWERTE[merkmalSchluessel(m)] ?? [])]))
       const lesarten = (Array.isArray(y.lesarten) ? y.lesarten : [])
         .map((l) => liste(l, 6, 40))
-        .filter((l) => l.length === a.merkmale!.length && l.every((w, j) => a.werte![j]?.some((x) => gleich(x, w))))
+        .filter((l) => l.length === a.merkmale!.length)
+        .map((l) =>
+          l.map((w, j) => {
+            const da = a.werte![j].find((x) => wertGleich(x, w))
+            if (da) return da
+            a.werte![j] = [...a.werte![j], w]
+            return w
+          })
+        )
       a.lesarten = lesarten.filter((l, i) => lesarten.findIndex((m) => lesartGleich(l, m)) === i).slice(0, 8)
       if (!a.form || a.merkmale.length < 1 || a.werte.length !== a.merkmale.length || !a.lesarten.length) continue
       a.loesungen = a.lesarten.map((l) => l.join(' '))
@@ -169,7 +182,9 @@ export function paketBereinigt(roh: unknown, thema = ''): GrammatikPaket {
       a.spalten = liste(y.spalten, 6, 40)
       a.zeilen = (Array.isArray(y.zeilen) ? y.zeilen : []).slice(0, 12).map((z) => {
         const q = (z ?? {}) as Record<string, unknown>
-        const loes = (Array.isArray(q.loesungen) ? q.loesungen : []).slice(0, a.spalten!.length).map((x) => text(x, 80))
+        // Länge an die Spalten angleichen (die KI liefert gelegentlich eine Zelle zu viel oder zu wenig)
+        const roh = (Array.isArray(q.loesungen) ? q.loesungen : []).slice(0, a.spalten!.length).map((x) => text(x, 80))
+        const loes = [...roh, ...Array<string>(Math.max(0, a.spalten!.length - roh.length)).fill('')]
         const vorgabe = Array.isArray(q.vorgabe) ? q.vorgabe.slice(0, a.spalten!.length).map(Boolean) : []
         return { name: text(q.name, 40), loesungen: loes, ...(vorgabe.some(Boolean) ? { vorgabe } : {}) }
       })
@@ -255,6 +270,18 @@ const ausgeschrieben = (s: string): string =>
     .map((t) => KURZ[t] ?? t)
     .join(' ')
 const wertGleich = (a: string, b: string): boolean => ausgeschrieben(a) === ausgeschrieben(b)
+/** Übliche Werte je Merkmal (Abkürzungen wie in den Schulbüchern) – wenn die KI keine Auswahl mitliefert */
+const STANDARDWERTE: Record<string, string[]> = {
+  kasus: ['Nom.', 'Gen.', 'Dat.', 'Akk.', 'Abl.', 'Vok.'],
+  numerus: ['Sg.', 'Pl.'],
+  genus: ['m.', 'f.', 'n.'],
+  person: ['1.', '2.', '3.'],
+  tempus: ['Präs.', 'Impf.', 'Fut. I', 'Perf.', 'Plusqpf.', 'Fut. II'],
+  modus: ['Ind.', 'Konj.', 'Imp.'],
+  'genus verbi': ['Akt.', 'Pass.']
+}
+const merkmalSchluessel = (m: string): string => normiert(m).replace(/\./g, '').trim()
+
 const lesartGleich = (a: Lesart, b: Lesart): boolean => a.length === b.length && a.every((w, i) => wertGleich(w, b[i]))
 
 /** Antwort einer Bestimmungs-, Mehrfach- oder Tabellenaufgabe aus dem Text (JSON) lesen */

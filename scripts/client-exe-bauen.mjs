@@ -64,6 +64,8 @@ mkdirSync(join(root, 'dist'), { recursive: true })
 const ziel = join(root, 'dist', 'Schul-Apps Online.exe')
 try {
   copyFileSync(exe, ziel)
+  // Ersatz eines früheren Laufs (Datei war gesperrt) weg – keine veralteten exe in dist (07.10.2026)
+  rmSync(join(root, 'dist', 'Schul-Apps Online-neu.exe'), { force: true })
   console.log(`\nFertig: ${resolve(ziel)}`)
 } catch (e) {
   const ersatz = join(root, 'dist', 'Schul-Apps Online-neu.exe')

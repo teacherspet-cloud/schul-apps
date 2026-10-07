@@ -81,7 +81,7 @@ export default function Uebersicht({ r }: { r: Rueckmeldung }): React.JSX.Elemen
         <Text size="xs" c="dimmed" mb="xs">
           Nur für die Lehrkraft. NA = Nachteilsausgleich, NS = Notenschutz. Noch nicht bestätigte Einstufungen sind als Vorschlag markiert.
         </Text>
-        <Table withTableBorder fz="xs" striped>
+        <Table withTableBorder fz="xs" striped data-karten>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Name</Table.Th>

@@ -451,7 +451,8 @@ try {
     const seite = [...document.querySelectorAll('.ws-editor-pages .ws-page')].find(
       (p) => p.getBoundingClientRect().width > 0 && !p.classList.contains('ws-cover')
     )
-    return seite?.querySelector('.ws-header .ws-subject')?.textContent ?? ''
+    // Ohne weiche Trennstriche (Silbentrennung im Blatt)
+    return (seite?.querySelector('.ws-header .ws-subject')?.textContent ?? '').replace(/\u00ad/g, '')
   })
   pruefe(fachzeile.includes('Geschichte › Die Weimarer Republik') && !fachzeile.includes('Krisenjahre'), `Überthema ist der oberste Bereich („${fachzeile}")`)
 
@@ -465,10 +466,17 @@ try {
   await ordner('Potenzen').getByRole('button', { name: 'Themenbereich „Potenzen“ öffnen' }).click()
   await page.waitForTimeout(600)
   await shot('bereich-dunkel')
+  // Je Materialart eine Tönung: gleiche Art gleich, verschiedene Arten verschieden (wie viele Arten im Bereich liegen, ist egal)
   const flaechen = await page.evaluate(() =>
-    [...document.querySelectorAll('.material-huelle > .mantine-Card-root')].map((k) => getComputedStyle(k).backgroundColor)
+    [...document.querySelectorAll('.material-huelle')].map((h) => [h.getAttribute('data-art'), getComputedStyle(h.querySelector('.mantine-Card-root')).backgroundColor])
   )
-  pruefe(new Set(flaechen).size === 2, `Dunkel: Arbeitsblatt und Kontrolle unterschiedlich getönt (${[...new Set(flaechen)].join(' / ')})`)
+  const jeArt = new Map()
+  for (const [art, farbe] of flaechen) jeArt.set(art, new Set([...(jeArt.get(art) ?? []), farbe]))
+  const farbenJeArt = [...jeArt.values()].map((x) => [...x][0])
+  pruefe(
+    jeArt.size >= 2 && [...jeArt.values()].every((x) => x.size === 1) && new Set(farbenJeArt).size === jeArt.size,
+    `Dunkel: jede Materialart eigen getönt (${[...jeArt.entries()].map(([a, f]) => `${a}: ${[...f].join('/')}`).join(' · ')})`
+  )
 } catch (e) {
   problems.push(`Abbruch der Wache: ${e.message}`)
   await page.screenshot({ path: join(out, 'fehler.png') }).catch(() => undefined)

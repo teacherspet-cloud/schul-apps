@@ -24,8 +24,9 @@ import { getSettings } from '../main/services/storage/settings'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
-import { bereinigeVerbKarten } from '../shared/verbTraining'
-import { istVerbSprache } from '../shared/verben'
+import { bereinigeVerbKarten, verbenUnterWoertern, verbKarten, type VerbKarte } from '../shared/verbTraining'
+import { istVerbSprache, type VerbSprache } from '../shared/verben'
+import { standardListe } from '../renderer/src/shared/verben/standard'
 import { jahrgangAus } from '../shared/lernstand'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
@@ -241,6 +242,16 @@ function verbenBereinigt(roh: unknown): string {
   return karten.length ? JSON.stringify({ sprache: v.sprache, karten }) : ''
 }
 
+/**
+ * Ohne Verben der Lehrkraft (Unterrichtsreihe, Vokabelweg, ältere Freigaben): die unregelmäßigen Verben der Wörter
+ * aus der mitgelieferten Standardliste (07.10.2026).
+ */
+export function standardVerben(woerter: { term: string }[], sprache: string): { sprache: VerbSprache; karten: VerbKarte[] } | null {
+  if (!istVerbSprache(sprache)) return null
+  const karten = verbKarten(verbenUnterWoertern(woerter, [], standardListe(sprache), sprache), sprache)
+  return karten.length ? { sprache, karten } : null
+}
+
 /** Neue Zuweisung anlegen (auch für einen Schritt einer Unterrichtsreihe) */
 export function vokabelnZuweisen(e: {
   lehrkraftId: string
@@ -280,7 +291,7 @@ export function vokabelnZuweisen(e: {
       e.gaeste ? neuerCode() : '',
       e.bis ?? null,
       quelleBereinigt(e.quelle),
-      verbenBereinigt(e.verben)
+      verbenBereinigt(e.verben ?? standardVerben(woerter, e.sprache))
     )
   return id
 }
@@ -470,7 +481,7 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             staende: st.woerter,
             farbe: await fachfarbeDerLehrkraft(z),
             // Unregelmäßige Verben der Liste (07.10.2026)
-            verben: json_(z.verben, null as unknown),
+            verben: json_(z.verben, null as unknown) ?? standardVerben(woerter, z.sprache),
             // Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026): aus der Lerngruppe, sonst aus den eigenen Gruppen
             klasse: klasseFuer(z, ich),
             rekorde: st.rekorde ?? {},

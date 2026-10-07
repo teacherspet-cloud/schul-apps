@@ -196,7 +196,7 @@ export function markierungLesen(koerper: HTMLElement, x: number, y: number, zeil
   return {
     von,
     bis,
-    text: sichtbarerText(range, koerper).replace(/\s+/g, ' ').trim(),
+    text: sichtbarerText(range, koerper).replace(/\u00ad/g, '').replace(/\s+/g, ' ').trim(),
     zeilen: zeilenzaehlung ? zeilenVon(koerper, rects, zeilenHoehe) : undefined,
     x,
     y
@@ -219,7 +219,8 @@ function wortAmPunkt(x: number, y: number): boolean {
   const t = knoten.data
   let s = stelle
   let e = stelle
-  const buchstabe = /[\p{L}\p{N}'’-]/u
+  // Weicher Trennstrich (Silbentrennung im Blatt) gehört zum Wort – sonst wurde nur die erste Silbe markiert (07.10.2026)
+  const buchstabe = /[\p{L}\p{N}'’\u00ad-]/u
   while (s > 0 && buchstabe.test(t[s - 1])) s--
   while (e < t.length && buchstabe.test(t[e])) e++
   if (e <= s) return false

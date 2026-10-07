@@ -988,7 +988,7 @@ function LernendeTabelle({ d }: { d: KlasseDetail }): React.JSX.Element {
   const zeigtReihen = zeilen.some((l) => l.reihenFortschritt !== null)
   const zeigtGrammatik = zeilen.some((l) => l.grammatikSicher != null)
   return (
-    <Table striped highlightOnHover data-lernende-tabelle>
+    <Table striped highlightOnHover data-lernende-tabelle data-karten>
       <Table.Thead>
         <Table.Tr>
           <Table.Th>Name</Table.Th>

@@ -10,7 +10,8 @@
  * Deshalb hier: `electron-vite build --outDir` in einen Ordner außerhalb von Dropbox, eine
  * abgeleitete Bau-Konfiguration, die von dort verpackt (absolute Pfade), danach Kontrolle des
  * Pakets (alle von index.html verlangten Dateien im asar) – und erst dann die Kopie nach
- * `dist/`, die bisherige exe bleibt als `Schul-Apps-alt.exe` liegen.
+ * `dist/`. Keine Sicherungskopie der alten exe mehr (07.10.2026, Wunsch der Lehrkraft: keine veralteten
+ * exe-Dateien in dist) – das Paket ist vorher geprüft.
  *
  * Aufruf: node scripts/exe-bauen.mjs [Arbeitsordner]
  * Ohne Angabe: ein Ordner unter dem Temp-Verzeichnis des Benutzers.
@@ -77,10 +78,11 @@ if (!existsSync(exe)) {
 console.log('\n4/4 Nach dist kopieren …')
 mkdirSync(join(root, 'dist'), { recursive: true })
 const ziel = join(root, 'dist/Schul-Apps.exe')
-if (existsSync(ziel)) copyFileSync(ziel, join(root, 'dist/Schul-Apps-alt.exe'))
 try {
   copyFileSync(exe, ziel)
-  console.log(`\nFertig: ${ziel} (Paket geprüft, ${verlangt.length} Renderer-Dateien vorhanden). Die bisherige exe liegt als dist/Schul-Apps-alt.exe.`)
+  // Reste früherer Läufe weg (Sicherungskopie, Ersatz bei gesperrter Datei) – keine veralteten exe in dist (07.10.2026)
+  for (const alt of ['dist/Schul-Apps-alt.exe', 'dist/Schul-Apps-neu.exe']) rmSync(join(root, alt), { force: true })
+  console.log(`\nFertig: ${ziel} (Paket geprüft, ${verlangt.length} Renderer-Dateien vorhanden).`)
 } catch (e) {
   /*
    * EBUSY: Die exe in dist läuft gerade (oder Dropbox lädt sie hoch) – eine laufende exe lässt

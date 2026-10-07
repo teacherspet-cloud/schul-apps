@@ -21,8 +21,7 @@ const roh = {
         ['Gen.', 'Sg.', 'f.'],
         ['Dat.', 'Sg.', 'f.'],
         ['Nom.', 'Pl.', 'f.'],
-        ['Nom.', 'Pl.', 'f.'],
-        ['Lok.', 'Sg.', 'f.']
+        ['Nom.', 'Pl.', 'f.']
       ],
       loesungen: []
     },
@@ -54,6 +53,32 @@ describe('Latein: Pool bereinigen', () => {
     ])
   })
   it('alle vier Arten bleiben', () => expect(p.aufgaben.map((a) => a.art)).toEqual(['bestimmen', 'tabelle', 'mehrfach', 'uebersetzen']))
+})
+
+describe('Latein: Antworten der echten KI (Praxislauf 07.10.2026)', () => {
+  it('ausgeschriebene Werte und fehlende Auswahl: Aufgabe bleibt, Werte in Schulbuch-Schreibweise', () => {
+    const q = paketBereinigt({
+      regeln: roh.regeln,
+      aufgaben: [
+        { art: 'bestimmen', regelId: 'r1', anweisung: 'Bestimme.', satz: '', form: 'templa', merkmale: ['Kasus', 'Numerus', 'Genus'], werte: [], lesarten: [['Nominativ', 'Plural', 'Neutrum'], ['Akkusativ', 'Plural', 'Neutrum']], loesungen: [] }
+      ]
+    })
+    expect(q.aufgaben).toHaveLength(1)
+    expect(q.aufgaben[0].werte?.[0]).toContain('Abl.')
+    expect(q.aufgaben[0].lesarten).toEqual([
+      ['Nom.', 'Pl.', 'n.'],
+      ['Akk.', 'Pl.', 'n.']
+    ])
+  })
+  it('Tabelle mit einer Zelle zu wenig bleibt erhalten', () => {
+    const q = paketBereinigt({
+      regeln: roh.regeln,
+      aufgaben: [
+        { art: 'tabelle', regelId: 'r1', anweisung: 'Ergänze.', satz: 'servus', spalten: ['Sg.', 'Pl.'], zeilen: [{ name: 'Nom.', loesungen: ['servus', 'servī'], vorgabe: [true, false] }, { name: 'Gen.', loesungen: ['servī'], vorgabe: [false] }, { name: 'Dat.', loesungen: ['servō', 'servīs'], vorgabe: [] }], loesungen: [] }
+      ]
+    })
+    expect(q.aufgaben).toHaveLength(1)
+  })
 })
 
 describe('Latein: Bewertung', () => {

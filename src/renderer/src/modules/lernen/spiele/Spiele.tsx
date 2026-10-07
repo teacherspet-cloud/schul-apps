@@ -124,6 +124,9 @@ export const SPIELE_CSS = `
 .vt-such.gefunden { background: var(--vt-gut-bg); border-color: var(--vt-gut-rand); color: var(--vt-gut-text); }
 .vt-such.start { background: var(--vt-a-rand); border-color: var(--vt-a); }
 .vt-such.daneben { background: var(--vt-schlecht-bg); border-color: var(--vt-schlecht-rand); }
+/* Weniger Bewegung (Einstellung der Lernenden „ruhig" bzw. des Geräts, 07.10.2026): Karten drehen nicht, nichts gleitet */
+html.sa-ruhig [data-spiel] *, html.sa-ruhig [data-verbspiel] *, html.sa-ruhig .vt-memory-innen { transition: none !important; animation: none !important; }
+@media (prefers-reduced-motion: reduce) { [data-spiel] *, [data-verbspiel] *, .vt-memory-innen { transition: none !important; animation: none !important; } }
 `
 
 export function Spielwahl({

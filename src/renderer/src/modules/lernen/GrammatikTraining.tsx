@@ -561,7 +561,7 @@ function EntwurfAnsehen({ e, schliessen, fertig }: { e: Entwurf; schliessen: () 
           ))}
         </SimpleGrid>
         <Title order={5}>Aufgaben ({aufgaben.length})</Title>
-        <Table striped verticalSpacing={4}>
+        <Table striped verticalSpacing={4} data-karten>
           <Table.Tbody>
             {aufgaben.map((a) => (
               <Table.Tr key={a.id} data-entwurf-aufgabe>
@@ -659,7 +659,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         {d.fach} · {d.lerngruppe} · {d.paket.aufgaben.length} Aufgaben, {d.paket.regeln.length} Regelkarten
       </Text>
       {d.code && d.link && <Zugang code={d.code} link={d.link} />}
-      <Table striped>
+      <Table striped data-karten>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Name</Table.Th>

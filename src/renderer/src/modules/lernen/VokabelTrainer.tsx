@@ -502,6 +502,8 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
    */
   const uebung = useMemo<Uebung>(() => (v && st ? uebungFuer(st, v) : 'karte'), [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
   const verbKarte = v ? d.verben?.karten.find((k) => k.schluessel.toLowerCase() === verbSchluesselVonWort(v.term)) : undefined
+  // Fach VOR der Antwort (die Nachfrage gilt dem Stand des Wortes, nicht dem Ergebnis dieser Abfrage)
+  const fachVorher = useMemo(() => st?.fach ?? 0, [v?.id, frage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const antworten = async (wert: { antwort?: string; gewusst?: boolean; gezeigt?: string }): Promise<void> => {
     if (!v || laeuft) return
@@ -619,7 +621,7 @@ function Sitzung({ d, woerter, fertig }: { d: Liste; woerter: Vokabel[]; fertig:
       </div>
       {ergebnis && uebung !== 'karte' && <Rueckmeldung e={ergebnis} v={v} sprache={d.sprache} />}
       {/* Unregelmäßige Verben (07.10.2026): ab Fach 2 nach der Antwort noch die Formen */}
-      {ergebnis && verbKarte && (st?.fach ?? 0) >= 2 && d.verben && (
+      {ergebnis && verbKarte && fachVorher >= 2 && d.verben && (
         <StammformenNachfrage key={v.id} karte={verbKarte} sprache={d.verben.sprache} tonSprache={d.sprache} />
       )}
       {ergebnis && (

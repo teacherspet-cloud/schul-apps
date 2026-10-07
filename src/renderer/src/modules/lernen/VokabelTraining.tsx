@@ -510,7 +510,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
             Noch keine – sie erscheinen, sobald genug geübt ist.
           </Text>
         ) : (
-          <Table striped>
+          <Table striped data-karten>
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>Wort</Table.Th>
@@ -537,7 +537,7 @@ function Lernstand({ id, zurueck }: { id: string; zurueck: () => void }): React.
         <Text fw={700} mb="xs">
           Je Lernende/r
         </Text>
-        <Table>
+        <Table data-karten>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Name</Table.Th>

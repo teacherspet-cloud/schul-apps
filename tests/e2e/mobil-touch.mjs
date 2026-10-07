@@ -635,11 +635,21 @@ async function lauf(name, breite, hoehe) {
       el.scrollIntoView({ block: 'center' })
       const gang = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
       for (let n = gang.nextNode(); n; n = gang.nextNode()) {
-        const i = n.data.indexOf('Versammlung')
-        if (i < 0) continue
+        // Silbentrennung (weiche Trennstriche) im Blatt: im Text ohne sie suchen, dann die Stelle zurückrechnen
+        const ohne = n.data.replace(/\u00ad/g, '')
+        const k = ohne.indexOf('Versammlung')
+        if (k < 0) continue
+        let i = -1
+        for (let z = 0, gezaehlt = -1; z < n.data.length; z++) {
+          if (n.data[z] !== '\u00ad') gezaehlt++
+          if (gezaehlt === k + 2) {
+            i = z
+            break
+          }
+        }
         const r = document.createRange()
-        r.setStart(n, i + 2)
-        r.setEnd(n, i + 3)
+        r.setStart(n, i)
+        r.setEnd(n, i + 1)
         const b = r.getBoundingClientRect()
         return { x: b.left + b.width / 2, y: b.top + b.height / 2 }
       }
@@ -654,7 +664,7 @@ async function lauf(name, breite, hoehe) {
         .locator('.textmenue-wort')
         .innerText()
         .catch(() => '')
-      pruefe(wort.includes('Versammlung'), `${name}: das Wort unter dem Finger ist markiert (${wort})`)
+      pruefe(wort.replace(/\u00ad/g, '').includes('Versammlung'), `${name}: das Wort unter dem Finger ist markiert (${wort})`)
       await bild('9-textauswahl')
       await page.keyboard.press('Escape')
       await page.waitForTimeout(300)

@@ -28,9 +28,11 @@ import {
   type Quelle,
   type Stufe
 } from '../shared/vokabelLaufbahn'
+import type { VerbKarte } from '../shared/verbTraining'
 import { kernform, type Vokabel, type WortStand } from '../shared/vokabeltrainer'
 import {
   abfrageAuswerten,
+  standardVerben,
   db,
   fachfarbeDerLehrkraft,
   istOffen,
@@ -172,6 +174,21 @@ async function wegeFuer(ich: NutzerInfo): Promise<Weg[]> {
 }
 
 /** Der gemeinsame Kasten eines Weges: Zugewiesenes, aktueller Abschnitt, Wiederholung aus allem Freien */
+/** Verben der Freigaben eines Wegs zusammen, dazu die Standardliste für die Lehrwerkswörter */
+function verbenDesWegs(w: Weg, woerter: Vokabel[]): { sprache: string; karten: VerbKarte[] } | null {
+  const karten = new Map<string, VerbKarte>()
+  let sprache = w.sprache
+  for (const z of w.zuweisungen) {
+    const v = json_(z.verben, null as { sprache: string; karten: VerbKarte[] } | null)
+    if (!v) continue
+    sprache = v.sprache
+    for (const k of v.karten) karten.set(k.schluessel.toLowerCase(), k)
+  }
+  const std = standardVerben(woerter, w.sprache)
+  for (const k of std?.karten ?? []) if (!karten.has(k.schluessel.toLowerCase())) karten.set(k.schluessel.toLowerCase(), k)
+  return karten.size ? { sprache, karten: [...karten.values()] } : null
+}
+
 function kastenVon(w: Weg, ich: NutzerInfo): { woerter: Vokabel[]; staende: Record<string, WortStand>; ws: VokStand } {
   const ws = wegStand(ich.id, w.key)
   const woerter: Vokabel[] = []
@@ -249,7 +266,9 @@ export function vokabelwegRoute(): (k: Anfrage) => Promise<boolean> {
           farbe: w.farbe,
           rekorde: ws.rekorde ?? {},
           ansehen: ws.ansehen ?? [],
-          weg: leiterKurz(w)
+          weg: leiterKurz(w),
+          // Unregelmäßige Verben (07.10.2026): aus den Freigaben dieses Wegs, sonst aus der Standardliste
+          verben: verbenDesWegs(w, woerter)
         }),
         true
       )

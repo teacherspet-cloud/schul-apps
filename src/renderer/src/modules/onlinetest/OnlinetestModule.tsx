@@ -449,7 +449,7 @@ function Tests({
         </Group>
       )}
       {liste && liste.length > 0 && (
-        <Table striped highlightOnHover data-testliste>
+        <Table striped highlightOnHover data-testliste data-karten>
           <Table.Thead>
             <Table.Tr>
               <SpaltenKopf label="Test" spalte="name" {...kopf} />
@@ -959,7 +959,7 @@ function TestAnsicht({ id, zurueck }: { id: string; zurueck: () => void }): Reac
         </Group>
       </Group>
       <Collapse expanded={listeOffen}>
-        <Table striped highlightOnHover data-namensliste>
+        <Table striped highlightOnHover data-namensliste data-karten>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Name</Table.Th>
@@ -1812,7 +1812,7 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
       {h.tests.length === 0 ? (
         <Text c="dimmed">Noch keine Onlinetests in dieser Lerngruppe.</Text>
       ) : (
-        <Table striped>
+        <Table striped data-karten>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Datum</Table.Th>
@@ -1845,7 +1845,7 @@ function GruppenHistorie({ id, zurueck }: { id: string; zurueck: () => void }): 
         </Table>
       )}
       <Title order={4}>Schülerinnen und Schüler</Title>
-      <Table striped>
+      <Table striped data-karten>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Name</Table.Th>

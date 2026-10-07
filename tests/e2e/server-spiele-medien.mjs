@@ -216,6 +216,67 @@ try {
   const rek = (await (await sm.request.get(`${A}/s/api/vokabeln/liste?id=${vok.id}`, { headers: KOPF })).json()).rekorde
   pruefe(neu.every((id) => rek[id] !== undefined), `Rekorde aller neuen Spiele gespeichert (${Object.keys(rek).length})`)
 
+  // ---------- Stammformen-Nachfrage: „to take" in Fach 2 und heute fällig (Auswahl richtig → Fach 2; Akzentfehler → fast)
+  const ant = (wortId, uebung, antwort) =>
+    sm.request.post(`${A}/s/api/vokabeln/antwort`, { headers: KOPF, data: { id: vok.id, wortId, uebung, antwort } }).then((r) => r.json())
+  const r1 = await ant('v5', 'auswahl', 'nehmen')
+  const r2 = await ant('v5', 'frei', 'to täke')
+  pruefe(r1.stand?.fach === 2 && r2.urteil === 'fast' && r2.stand?.fach === 2, `„to take" in Fach 2 und fällig (${r1.stand?.fach}, ${r2.urteil})`)
+  await s.goto(`${A}/s/v/${vok.id}`)
+  await s.locator('[data-vokabel-start]').click()
+  await s.locator('[data-sitzung]').waitFor()
+  let nachfrage = false
+  for (let i = 0; i < 80 && !nachfrage; i++) {
+    if (await s.locator('[data-stammformen]').isVisible().catch(() => false)) {
+      nachfrage = true
+      break
+    }
+    if (await s.locator('[data-sitzung-fertig]').isVisible().catch(() => false)) break
+    if (await s.locator('[data-weiter]').isVisible().catch(() => false)) {
+      await s.waitForTimeout(300)
+      if (await s.locator('[data-stammformen]').isVisible().catch(() => false)) {
+        nachfrage = true
+        break
+      }
+      await s.locator('[data-weiter]').click()
+      continue
+    }
+    if (await s.locator('[data-option="to take"]').isVisible().catch(() => false)) await s.locator('[data-option="to take"]').click()
+    else if (await s.locator('[data-option]').first().isVisible().catch(() => false)) await s.locator('[data-option]').first().click()
+    else if (await s.locator('[data-buchstabe]').first().isVisible().catch(() => false)) {
+      while ((await s.locator('[data-buchstabe]:not([disabled])').count()) > 0) await s.locator('[data-buchstabe]:not([disabled])').first().click()
+      await s.locator('[data-pruefen]').click()
+    } else if (await s.locator('[data-eingabe]').isVisible().catch(() => false)) {
+      await s.locator('[data-eingabe]').fill('to take')
+      await s.locator('[data-pruefen]').click()
+    } else if (await s.locator('[data-sitzung] .vt-buehne button:not([disabled])').first().isVisible().catch(() => false)) {
+      // Auswahl ohne Kennzeichnung (Wort zur Bedeutung) bzw. Lernkarte
+      if (await s.locator('[data-lernkarte]').isVisible().catch(() => false)) {
+        await s.locator('[data-lernkarte]').click()
+        await s.waitForTimeout(300)
+        await s.locator('[data-karte-gewusst]').click()
+      } else await s.locator('[data-sitzung] .vt-buehne button:not([disabled])').first().click()
+    } else {
+      // Buchstabenlücken o. Ä.: alle Felder füllen
+      const felder = s.locator('[data-sitzung] input:not([disabled])')
+      const n = await felder.count()
+      for (let k = 0; k < n; k++) await felder.nth(k).fill('a')
+      if (await s.locator('[data-pruefen]').isVisible().catch(() => false)) await s.locator('[data-pruefen]').click()
+      else await s.keyboard.press('Enter')
+    }
+    await s.waitForTimeout(400)
+  }
+  if (!nachfrage) await s.screenshot({ path: join(out, '2b-ohne-nachfrage.png'), fullPage: true })
+  pruefe(nachfrage, 'Stammformen-Nachfrage nach der Antwort (Fach 2)')
+  if (nachfrage) {
+    await s.locator('[data-stammform="past"]').fill('took')
+    await s.locator('[data-stammform="pp"]').fill('takn')
+    await s.locator('[data-stammformen-pruefen]').click()
+    await s.waitForTimeout(300)
+    pruefe(await s.locator('[data-stammformen]').getByText('taken').isVisible(), 'Nachfrage zeigt die richtige Form bei einem Fehler')
+    await s.screenshot({ path: join(out, '2b-stammformen.png'), fullPage: true })
+  }
+
   // ---------- Grammatiktraining: Freigabe „Unregelmäßige Verben" (Standardliste) in der Oberfläche
   const p = await lk.newPage()
   await p.goto(A)

@@ -110,8 +110,8 @@ export const LATEIN_REGELN = [
   '- Nur Formen und Wörter, die zum Thema und zum Lernjahr passen; die Fälle kommen in den Lehrwerken schrittweise (erst Nom./Akk., dann Dat., Gen., Abl.), e- und u-Deklination erst im 2.–3. Lernjahr, Passiv im 2. Lernjahr, Futur II spät.',
   '- bestimmen: Einzelform (satz leer) → ALLE Lesarten angeben (rosae = Gen. Sg. f. / Dat. Sg. f. / Nom. Pl. f.). Steht die Form in einem Satz (satz enthält die Form), gilt nur die Lesart im Satz. „werte" nennt je Merkmal die vollständige Auswahl (Kasus: Nom., Gen., Dat., Akk., Abl., Vok. – Vok. nur, wenn behandelt).',
   '- Typische Mehrdeutigkeiten gezielt einbauen: -ae (Gen./Dat. Sg., Nom. Pl.), -is (Dat./Abl. Pl. a/o; Gen. Sg. 3. Dekl.), -a (Nom. Sg. f. vs. Nom./Akk. Pl. n.), -us (o-, u-Dekl., Neutra wie tempus), -um (Akk. Sg. vs. Gen. Pl. 3. Dekl.), -es (Nom./Akk. Pl. 3. Dekl.), -ī (Gen. Sg. vs. Nom. Pl. o-Dekl.); bei Verben Präsens/Futur der kons. Konj. (regit/reget), -ba-/-bi-, -era- (Plusqpf.) vs. eram.',
-  '- tabelle: ein Paradigma – Zeilen Nom., Gen., Dat., Akk., Abl. (Vok. nur, wenn behandelt), Spalten Sg. und Pl.; bei Verben Zeilen 1. Sg. … 3. Pl. Zwei bis vier Zellen vorgeben (vorgabe true), den Rest ausfüllen lassen.',
-  '- umformen: nach Vorgabe („in den Plural", „ins Imperfekt", „ins Passiv"); KNG-Kongruenz: satz „magnus + templum", vorgabe „Gen. Pl.", Lösung „magnōrum templōrum" – auch Paare aus verschiedenen Deklinationen (bonus + rēx, agricola + bonus).',
+  '- tabelle: ein Paradigma – Zeilen Nom., Gen., Dat., Akk., Abl. (Vok. nur, wenn behandelt), Spalten Sg. und Pl.; bei Verben Zeilen 1. Sg. … 3. Pl. Zwei bis vier Zellen vorgeben (vorgabe true), den Rest ausfüllen lassen. satz nennt das Wort mit Nennform (z. B. „servus, -ī m." bzw. „amāre, amō").',
+  '- umformen: nach Vorgabe („in den Plural", „ins Imperfekt", „ins Passiv") – die Vorgabe nennt das Ziel EINDEUTIG (z. B. „in die 3. Pers. Pl."), nie nur „ändere Person und Numerus"; KNG-Kongruenz: satz „magnus + templum", vorgabe „Gen. Pl.", Lösung „magnōrum templōrum" – auch Paare aus verschiedenen Deklinationen (bonus + rēx, agricola + bonus).',
   '- luecke: Endung bzw. Form im Satz ergänzen, vorgabe nennt das Grundwort mit Nennform.',
   '- uebersetzen: kurze lateinische Wortgruppe oder Satz ins Deutsche, bei Kasusfunktionen passend (Abl. instrumenti „mit/durch", Gen. „des/der"); loesungen: mehrere gleichwertige deutsche Fassungen.',
   '- auswahl/mehrfach: z. B. Kasusfunktion benennen, Präposition mit Akk. oder Abl., in + Akk. (wohin?) gegen in + Abl. (wo?), „Welche Formen sind Ablativ?" (mehrfach: alle richtigen in loesungen).',
@@ -178,7 +178,7 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
         'ok = false, wenn die Aufgabe mehrdeutig oder falsch ist und sich nicht durch die Lösungen reparieren lässt.',
         'loesungen/optionen/fehlerWort: die korrigierte Fassung (oder unverändert); grund: kurz, deutsch.',
         latein
-          ? 'LATEIN: Prüfe JEDE lateinische Form auf Richtigkeit (Endung, Stamm, Längen). Bestimmen: Sind ALLE Lesarten genannt (bei Einzelformen) bzw. genau die im Satz passende? lesarten = vollständige, korrigierte Liste. Tabelle: zellen = die korrigierten Formen je Zeile und Spalte. Übersetzen: alle gleichwertigen deutschen Fassungen.'
+          ? 'LATEIN: Prüfe JEDE lateinische Form auf Richtigkeit (Endung, Stamm, Längen). Bestimmen: Sind ALLE Lesarten genannt (bei Einzelformen) bzw. genau die im Satz passende? lesarten = vollständige, korrigierte Liste – je Lesart GENAU ein Wert pro Merkmal, in der Reihenfolge und Schreibweise der Merkmale (z. B. ["1.", "Sg.", "Präs.", "Ind.", "Akt."], nicht "1. Sg."). Tabelle: Formen in [eckigen Klammern] sind vorgegeben, die übrigen füllen die Lernenden aus – das ist eine gültige Aufgabe; zellen = NUR die korrigierten Formen je Zeile (ohne Zeilennamen), eine Zelle je Spalte. Übersetzen: alle gleichwertigen deutschen Fassungen. Umformen/Lücke/Auswahl mit mehreren möglichen Lösungen, die nicht alle genannt sind, oder mit unklarem Ziel: ok = false.'
           : ''
       ]
         .filter(Boolean)
@@ -187,9 +187,13 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
         .map(
           (x, i) =>
             `${i + 1}. [${x.art}] ${x.anweisung}\nSatz: ${x.satz}${x.form ? `\nForm: ${x.form}` : ''}${
-              x.merkmale?.length ? `\nMerkmale: ${x.merkmale.join(' | ')}\nLesarten: ${(x.lesarten ?? []).map((l) => l.join(' ')).join(' / ')}` : ''
+              x.merkmale?.length ? `\nMerkmale: ${JSON.stringify(x.merkmale)}\nLesarten: ${JSON.stringify(x.lesarten ?? [])}` : ''
             }${
-              x.zeilen?.length ? `\nTabelle (${(x.spalten ?? []).join(' | ')}): ${x.zeilen.map((z) => `${z.name}: ${z.loesungen.join(' | ')}`).join('; ')}` : ''
+              x.zeilen?.length
+                ? `\nTabelle (${(x.spalten ?? []).join(' | ')}; [eckige Klammern] = vorgegeben, sonst von den Lernenden auszufüllen): ${x.zeilen
+                    .map((z) => `${z.name}: ${z.loesungen.map((l, j) => (z.vorgabe?.[j] ? `[${l}]` : l)).join(' | ')}`)
+                    .join('; ')}`
+                : ''
             }${x.vorgabe ? `\nVorgabe: ${x.vorgabe}` : ''}${x.optionen?.length ? `\nMöglichkeiten: ${x.optionen.join(' | ')}` : ''}${
               x.fehlerWort ? `\nFehlerwort: ${x.fehlerWort}` : ''
             }${x.teile?.length ? `\nTeile: ${x.teile.join(' | ')}` : ''}\nLösungen: ${x.loesungen.join(' | ')}`
@@ -224,7 +228,8 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
               ...(x.art === 'auswahl' && u.optionen?.length ? { optionen: u.optionen } : {}),
               ...(x.art === 'fehler' && u.fehlerWort ? { fehlerWort: u.fehlerWort } : {}),
               ...(x.art === 'mehrfach' && u.optionen?.length ? { optionen: u.optionen } : {}),
-              ...(x.art === 'bestimmen' && u.lesarten?.length ? { lesarten: u.lesarten } : {}),
+              // Nur übernehmen, wenn jede Lesart je Merkmal einen Wert hat (Praxislauf 07.10.2026: „1. Sg." zusammengezogen)
+              ...(x.art === 'bestimmen' && u.lesarten?.length && u.lesarten.every((l) => l.length === (x.merkmale?.length ?? 0)) ? { lesarten: u.lesarten } : {}),
               ...(x.art === 'tabelle' && u.zellen?.length && x.zeilen
                 ? { zeilen: x.zeilen.map((z, j) => ({ ...z, loesungen: u.zellen![j]?.length === z.loesungen.length ? u.zellen![j] : z.loesungen })) }
                 : {})

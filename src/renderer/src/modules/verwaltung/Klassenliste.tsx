@@ -107,7 +107,7 @@ export function KlassenlisteKarte({ fertig }: { fertig: () => void }): React.JSX
                 Als PDF
               </Button>
             </Group>
-            <Table striped>
+            <Table striped data-karten>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Name</Table.Th>

@@ -303,7 +303,7 @@ function Nutzer({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Eleme
           Testkonten melden sich mit Benutzername und Passwort an (Anmeldeseite › Testkonto). Löschen entfernt das Konto mit allen Daten.
         </Text>
       </Card>
-      <Table striped highlightOnHover>
+      <Table striped highlightOnHover data-karten>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Konto</Table.Th>

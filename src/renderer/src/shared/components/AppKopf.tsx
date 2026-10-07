@@ -105,7 +105,7 @@ export function AppKopf({
    * der Tab-Leiste. Vorher brachen bis zu vier Zeilen Knöpfe über dem Inhalt um.
    */
   if (telefon) {
-    const hatBlatt = suche !== false || Boolean(zusaetze) || Boolean(meine) || Boolean(hauptknopf)
+    const hatBlatt = suche !== false || Boolean(zusaetze) || Boolean(meine)
     return (
       <Paper
         radius="md"
@@ -136,6 +136,12 @@ export function AppKopf({
             </ActionIcon>
           )}
         </Group>
+        {/* Hauptaktion des Programms sichtbar unter dem Titel (07.10.2026: hinter ⋮ fand sie niemand, z. B. „Grammatik freigeben") */}
+        {hauptknopf && (
+          <Group mt={6} gap="xs" className="app-kopf-hauptknopf-telefon" data-app-kopf-hauptknopf>
+            {hauptknopf}
+          </Group>
+        )}
         {(links || rechts) && (
           <div className="app-kopf-zeile app-kopf-zeile-telefon">
             {links && <div style={{ minWidth: 0, overflowX: 'auto' }}>{links}</div>}
@@ -190,7 +196,6 @@ export function AppKopf({
                 {zusaetze}
               </Group>
             )}
-            {hauptknopf}
           </Stack>
         </Drawer>
       </Paper>

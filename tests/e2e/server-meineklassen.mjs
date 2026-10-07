@@ -227,6 +227,10 @@ try {
     p.locator('[data-ablegen-menue] [data-ablegen-art="pdf"]').click()
   ])
   const datei = laden?.suggestedFilename() ?? ''
+  if (!datei) {
+    await p.screenshot({ path: join(out, '5-pdf-fehlt.png'), fullPage: true })
+    console.log('     Hinweise:', await p.locator('.mantine-Notification-root').allInnerTexts().catch(() => []))
+  }
   pruefe(/Wortliste Weather\.pdf$/.test(datei), `Wortliste als PDF gespeichert (${datei || 'kein Download'})`)
   // Geschichte: kein Reiter „Vokabeln & Grammatik"
   await p.locator('[data-fach-leiste] [data-fach="Geschichte"]').click()

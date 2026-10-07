@@ -63,6 +63,8 @@ function viewportSetzen(): void {
   if (!/maximum-scale/.test(meta.content)) meta.content = `${meta.content}, maximum-scale=1`
 }
 
+import { kartenTabellenEinrichten } from './kartenTabellen'
+
 let installiert = false
 
 /** Einmal beim Start: `data-touch` setzen und bei Wechsel (Tastatur/Maus am iPad an- und abstecken) nachführen */
@@ -72,6 +74,9 @@ export function touchModusEinrichten(): void {
   setzen()
   medien(GROB)?.addEventListener('change', setzen)
   if (touchAktiv()) viewportSetzen()
+  // Übersichtstabellen als Kartenliste am Telefon (07.10.2026)
+  if (document.body) kartenTabellenEinrichten()
+  else document.addEventListener('DOMContentLoaded', kartenTabellenEinrichten, { once: true })
 }
 
 /** React: bedient der Finger? (folgt dem Wechsel) */
