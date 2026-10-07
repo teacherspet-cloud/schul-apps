@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-startseite')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -151,6 +152,7 @@ try {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
+  await expertenmodus(p)
   pruefe(await da(p.locator('[data-schnellzugriff-raster]')), 'Startseite: Schnellzugriff')
   pruefe(await da(p.locator('[data-schnellzugriff="reihen"] [data-laufende-reihe]')), 'Laufende Reihe auf der Startseite')
   pruefe(await p.locator('[data-schnellzugriff="tests"]').getByText('geplant').isVisible(), 'Geplanter Onlinetest auf der Startseite')

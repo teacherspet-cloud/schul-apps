@@ -11,7 +11,7 @@
  * Electron-Fassung der Umgebung: main/umgebung.ts. iPad-Fassung: mobil/umgebung.ts.
  */
 import { bildLoeschen, bildSetzen, medienDatei, medienFuer, stimmeSetzen, stimmenLesen, tonLoeschen, tonSetzen } from './services/storage/medienbank'
-import type { TonArt } from '@shared/medienbank'
+import type { Stimmlage, TonArt } from '@shared/medienbank'
 import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
@@ -61,7 +61,7 @@ import { ladeOriginalquelle, sucheOriginalquellen } from './services/sources/mat
 import { ablehnungAufheben, leseAblehnungen, quelleAblehnen } from './services/storage/quellenAblehnungen'
 import { ladeVideo } from './services/sources/video'
 import { deleteMaskottchen, deletePose, listMaskottchen, saveMaskottchen, savePose } from './services/storage/maskottchen'
-import { audioPath, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
+import { audioPath, bibliothekSuchen, bibliothekUebernehmen, listVoices, previewVoice, readAudio, speak } from './services/audio/elevenlabs'
 import { importiereAudio } from './services/audio/importAudio'
 import { deleteTextbook, getTextbook, listTextbooks, saveTextbooks } from './services/storage/textbooks'
 import { deleteVerbList, getVerbList, listVerbLists, saveVerbList } from './services/storage/verbListen'
@@ -480,8 +480,9 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('images:openmoji-svg', (hex: string) => getOpenMojiSvg(hex))
   // In den Oberflächentests mit Attrappe (nie im Betrieb) kommen die Treffer ohne Netz aus der Attrappe
   // Bildart (Pixabay image_type) für Cliparts der Medienbank, 06.10.2026
-  handle('images:online-search', (q: string, source: OnlineImageSource, o?: { bildart?: string }) =>
-    attrappeBildsuche() ?? searchOnline(q, source, getSecret('pixabay'), o?.bildart)
+  handle(
+    'images:online-search',
+    (q: string, source: OnlineImageSource, o?: { bildart?: string }) => attrappeBildsuche() ?? searchOnline(q, source, getSecret('pixabay'), o?.bildart)
   )
   handle('images:fetch', (url: string) => (attrappeAktiv() && url.startsWith('data:image/') ? url : fetchAsDataUrl(url)))
   handle('sources:check-quote', (url: string, quote: string) => checkQuote(url, quote))
@@ -521,7 +522,11 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   )
   handle('medien:datei', (datei: string) => medienDatei(String(datei)))
   handle('medien:stimmen', () => stimmenLesen())
-  handle('medien:stimme-setzen', (sprache: string, stimme: string) => (nurAdmin('Die Standardstimmen'), stimmeSetzen(sprache, stimme)))
+  // Weibliche und männliche Standardstimme je Sprache (07.10.2026)
+  handle(
+    'medien:stimme-setzen',
+    (sprache: string, stimme: string, lage?: Stimmlage) => (nurAdmin('Die Standardstimmen'), stimmeSetzen(sprache, stimme, lage === 'm' ? 'm' : 'w'))
+  )
   handle(
     'medien:bild-setzen',
     (sprache: string, wort: string, b: Parameters<typeof bildSetzen>[2]) => (nurAdmin('Die Beispielbilder'), bildSetzen(sprache, wort, b))
@@ -529,17 +534,24 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   handle('medien:bild-loeschen', (sprache: string, wort: string) => (nurAdmin('Die Beispielbilder'), bildLoeschen(sprache, wort)))
   handle(
     'medien:ton-setzen',
-    (sprache: string, wort: string, art: TonArt, t: Parameters<typeof tonSetzen>[3]) => (nurAdmin('Die Aussprache'), tonSetzen(sprache, wort, art, t))
+    (sprache: string, wort: string, art: TonArt, t: Parameters<typeof tonSetzen>[3], lage?: Stimmlage) => (
+      nurAdmin('Die Aussprache'), tonSetzen(sprache, wort, art, t, lage === 'm' ? 'm' : 'w')
+    )
   )
   handle(
     'medien:ton-loeschen',
-    (sprache: string, wort: string, art: TonArt, satz?: string) => (nurAdmin('Die Aussprache'), tonLoeschen(sprache, wort, art, satz))
+    (sprache: string, wort: string, art: TonArt, satz?: string, lage?: Stimmlage) => (
+      nurAdmin('Die Aussprache'), tonLoeschen(sprache, wort, art, satz, lage === 'm' ? 'm' : 'w')
+    )
   )
   handle('medien:admin', () => istAdmin())
 
   handle('audio:voices', () => listVoices())
   handle('audio:speak', (req: TtsRequest) => speak(req))
   handle('audio:preview', (voiceId: string) => previewVoice(voiceId))
+  // ElevenLabs-Bibliothek nach Sprache und Geschlecht durchsuchen, Stimme ins Konto übernehmen (07.10.2026)
+  handle('audio:bibliothek', (sprache: string, geschlecht: 'female' | 'male') => bibliothekSuchen(String(sprache), geschlecht === 'male' ? 'male' : 'female'))
+  handle('audio:bibliothek-uebernehmen', (owner: string, voiceId: string, name: string) => bibliothekUebernehmen(String(owner), String(voiceId), String(name)))
   handle('audio:read', (fileName: string) => readAudio(fileName))
   // Original-Hördatei (MP3) der Lehrkraft übernehmen, etwa von der Verlags-CD (29.09.2026)
   handle('audio:import', (id: string, daten: Uint8Array) => importiereAudio(id, daten))
@@ -681,12 +693,12 @@ function aiStatus(): AiStatus {
     img === 'none'
       ? ''
       : img === 'anthropic'
-        ? imageAccess === 'subscription'
-          ? ai.subscriptionModels.anthropic
-          : ai.textModels.anthropic
-        : imageAccess === 'subscription'
-          ? ''
-          : ai.imageModels[img]
+      ? imageAccess === 'subscription'
+        ? ai.subscriptionModels.anthropic
+        : ai.textModels.anthropic
+      : imageAccess === 'subscription'
+      ? ''
+      : ai.imageModels[img]
   return {
     textProvider: ai.textProvider,
     textModel: ai.access[ai.textProvider] === 'subscription' ? ai.subscriptionModels[ai.textProvider] : ai.textModels[ai.textProvider],

@@ -117,6 +117,9 @@ export const ERLAUBTE_KANAELE: readonly string[] = [
   'medien:admin',
   'audio:speak',
   'audio:preview',
+  // ElevenLabs-Bibliothek: suchen und Stimme ins eigene Konto übernehmen (07.10.2026)
+  'audio:bibliothek',
+  'audio:bibliothek-uebernehmen',
   'audio:read',
   // Eigene Hördatei vom Gerät hochladen – schreibt nur in den Hörtext-Ordner, Name geprüft (29.09.2026)
   'audio:import',

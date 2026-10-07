@@ -19,7 +19,8 @@ import { REGISTER_KANAELE } from '../src/renderer/src/shared/netzAuftrag'
  */
 // Seit 29.09.2026 stehen die Aufrufe in main/kanaele.ts (gemeinsam für PC und iPad)
 const hauptprozess = readFileSync(resolve(__dirname, '../src/main/kanaele.ts'), 'utf8')
-const vorhandene = new Set([...hauptprozess.matchAll(/handle\('([^']+)'/g)].map((m) => m[1]))
+// Auch umgebrochene Aufrufe („handle(\n  'kanal', …") – so formatiert Prettier lange Zeilen
+const vorhandene = new Set([...hauptprozess.matchAll(/handle\(\s*'([^']+)'/g)].map((m) => m[1]))
 
 describe('Freigaben für den Zugriff aus dem Netz', () => {
   it('gibt nur Aufrufe frei, die es wirklich gibt', () => {

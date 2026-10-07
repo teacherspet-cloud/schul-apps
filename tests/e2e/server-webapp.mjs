@@ -8,6 +8,7 @@
 import { chromium, devices } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-webapp')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -84,6 +85,7 @@ try {
   await p.waitForTimeout(3000)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await expertenmodus(p)
   await p.locator('[data-schnellzugriff-raster]').first().waitFor({ timeout: 10000 })
   pruefe((await p.locator('[data-eigenes-fenster]').count()) === 0, 'Lehrkraft als Web-App: kein „In eigenem Fenster öffnen"')
   const lb = await browser.newContext({ viewport: { width: 1180, height: 820 } })
@@ -93,6 +95,7 @@ try {
   await b.waitForTimeout(3000)
   const sp2 = b.getByRole('button', { name: 'Später einrichten' })
   if (await sp2.isVisible().catch(() => false)) await sp2.click()
+  await expertenmodus(b)
   pruefe(
     await b
       .locator('[data-eigenes-fenster]')

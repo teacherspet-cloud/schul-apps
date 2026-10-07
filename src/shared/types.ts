@@ -433,6 +433,26 @@ export interface TtsVoice {
   usable?: boolean
   /** Warum die Stimme nicht nutzbar ist – für die Anzeige */
   unusableReason?: string
+  /**
+   * Sprachen, für die ElevenLabs die Stimme geprüft hat (`verified_languages`, Kürzel wie „de", 07.10.2026).
+   * Die mitgelieferten Stimmen tragen meist einen englischen Akzent im Etikett, sprechen mit dem mehrsprachigen
+   * Modell aber viele Sprachen – erst diese Angabe zeigt, welche.
+   */
+  languages?: string[]
+  /** Spricht mehrere Sprachen (mehrsprachiges Modell) */
+  multilingual?: boolean
+}
+
+/** Eine Stimme aus der ElevenLabs-Bibliothek (Suche nach Sprache und Geschlecht, 07.10.2026) */
+export interface BibliotheksStimme {
+  voiceId: string
+  publicOwnerId: string
+  name: string
+  gender: string
+  accent: string
+  language: string
+  description: string
+  previewUrl?: string
 }
 
 /**

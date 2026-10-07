@@ -5,6 +5,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-reihe')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -155,6 +156,7 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Unterrichtsreihe"]').click()
   await p.mouse.move(800, 700)
   await p.locator('[data-reihe-karte="Weather around the world"] [data-reihe-oeffnen]').click()

@@ -1,8 +1,8 @@
 /**
  * Medienbank der Vokabeln – Ablage (05.10.2026, Typen und Schlüssel: shared/medienbank.ts).
  *
- *   <Wurzel>/index.json      { "en:park": { bild, ton, saetze } }
- *   <Wurzel>/stimmen.json    Standardstimme je Sprache { "en": "<voiceId>" }
+ *   <Wurzel>/index.json      { "en:park": { bild, ton, saetze, tonM, saetzeM } }  (M = männliche Fassung)
+ *   <Wurzel>/stimmen.json    Standardstimmen je Sprache { "en": { "w": "<voiceId>", "m": "<voiceId>" } }
  *   <Wurzel>/dateien/<24 Hex>.jpg|png|mp3
  *
  * Wurzel: am Server <DATEN>/medienbank – EINMAL für alle (app.getPath('userData') zeigt dort auf den Ordner
@@ -17,8 +17,13 @@ import {
   MEDIEN_DATEI,
   medienSchluessel,
   satzSchluessel,
+  saetzeVon,
   sprachKurz,
+  stimmenNormiert,
+  tonVon,
   type MedienBild,
+  type Stimmen,
+  type Stimmlage,
   type MedienEintrag,
   type MedienKandidat,
   type MedienSicht,
@@ -63,7 +68,8 @@ function index(): Record<string, MedienEintrag> {
 function aendern(schluessel: string, fn: (e: MedienEintrag) => MedienEintrag | null): void {
   const i = lies<Record<string, MedienEintrag>>(indexDatei(), {})
   const neu = fn(i[schluessel] ?? {})
-  if (!neu || (!neu.bild && !neu.ton && !Object.keys(neu.saetze ?? {}).length)) delete i[schluessel]
+  const leer = !neu || (!neu.bild && !neu.ton && !neu.tonM && !Object.keys(neu.saetze ?? {}).length && !Object.keys(neu.saetzeM ?? {}).length)
+  if (!neu || leer) delete i[schluessel]
   else i[schluessel] = neu
   schreibe(indexDatei(), i)
   zwischen = null
@@ -98,14 +104,41 @@ const dataUrlVon = (datei: string): string | undefined => {
  * Einträge zu Wörtern einer Sprache. `mitBildern`: Bilder gleich als data-URL (Vorschau in der Tabelle);
  * `basisUrl`: am Server die Adresse der Dateien (`/medien/<datei>`), dann ohne data-URL.
  */
-export function medienFuer(sprache: string, woerter: string[], opts: { mitBildern?: boolean; basisUrl?: string } = {}): Record<string, MedienSicht> {
+export function medienFuer(
+  sprache: string,
+  woerter: string[],
+  opts: { mitBildern?: boolean; basisUrl?: string; lage?: Stimmlage } = {}
+): Record<string, MedienSicht> {
   const i = index()
   const aus: Record<string, MedienSicht> = {}
   for (const w of woerter.slice(0, 2000)) {
     const e = i[medienSchluessel(sprache, w)]
     if (!e) continue
     const url = (d: string): string | undefined => (opts.basisUrl ? `${opts.basisUrl}${d}` : undefined)
+    const mitUrl = (t: MedienTon): MedienTon & { url?: string } => ({ ...t, ...(opts.basisUrl ? { url: url(t.datei) } : {}) })
+    const saetzeMitUrl = (s: Record<string, MedienTon> | undefined): Record<string, MedienTon & { url?: string }> | undefined =>
+      s && Object.keys(s).length ? Object.fromEntries(Object.entries(s).map(([k, t]) => [k, mitUrl(t)])) : undefined
+    /*
+     * Lernende (07.10.2026): nur ihre Fassung, gleich aufgelöst – `ton`/`saetze` sind die bevorzugte Fassung,
+     * wo sie fehlt, die andere. Ohne `lage` (Lehrkraft) kommen beide Fassungen.
+     */
+    if (opts.lage) {
+      const andere: Stimmlage = opts.lage === 'w' ? 'm' : 'w'
+      const ton = tonVon(e, opts.lage) ?? tonVon(e, andere)
+      const saetze = saetzeMitUrl({ ...(saetzeVon(e, andere) ?? {}), ...(saetzeVon(e, opts.lage) ?? {}) })
+      aus[w] = {
+        ...(e.bild
+          ? { bild: { ...e.bild, ...(opts.basisUrl ? { url: url(e.bild.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(e.bild.datei) } : {}) } }
+          : {}),
+        ...(ton ? { ton: mitUrl(ton) } : {}),
+        ...(saetze ? { saetze } : {})
+      }
+      continue
+    }
+    const saetzeM = saetzeMitUrl(e.saetzeM)
     aus[w] = {
+      ...(e.tonM ? { tonM: mitUrl(e.tonM) } : {}),
+      ...(saetzeM ? { saetzeM } : {}),
       ...(e.bild
         ? { bild: { ...e.bild, ...(opts.basisUrl ? { url: url(e.bild.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(e.bild.datei) } : {}) } }
         : {}),
@@ -168,45 +201,55 @@ export function bildLoeschen(sprache: string, wort: string): void {
   })
 }
 
-export function tonSetzen(sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }): MedienTon {
+/** `lage`: Fassung (weiblich = die bisherigen Felder) */
+export function tonSetzen(sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }, lage: Stimmlage = 'w'): MedienTon {
   const { bytes, endung } = ausDataUrl(t.dataUrl)
   if (endung !== 'mp3') throw new Error('Kein MP3.')
   const datei = neueDatei('mp3')
   writeFileSync(medienDateiPfad(datei), bytes)
   const ton: MedienTon = { datei, stimme: String(t.stimme ?? '').slice(0, 120), text: String(t.text ?? '').slice(0, 600), zeit: Date.now() }
+  const tonFeld = lage === 'm' ? 'tonM' : 'ton'
+  const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(medienSchluessel(sprache, wort), (e) => {
     if (art === 'wort') {
-      weg(e.ton?.datei)
-      return { ...e, ton }
+      weg(e[tonFeld]?.datei)
+      return { ...e, [tonFeld]: ton }
     }
     const k = satzSchluessel(t.text)
-    weg(e.saetze?.[k]?.datei)
-    return { ...e, saetze: { ...(e.saetze ?? {}), [k]: ton } }
+    weg(e[satzFeld]?.[k]?.datei)
+    return { ...e, [satzFeld]: { ...(e[satzFeld] ?? {}), [k]: ton } }
   })
   return ton
 }
 
-export function tonLoeschen(sprache: string, wort: string, art: TonArt, satz?: string): void {
+export function tonLoeschen(sprache: string, wort: string, art: TonArt, satz?: string, lage: Stimmlage = 'w'): void {
+  const tonFeld = lage === 'm' ? 'tonM' : 'ton'
+  const satzFeld = lage === 'm' ? 'saetzeM' : 'saetze'
   aendern(medienSchluessel(sprache, wort), (e) => {
     if (art === 'wort') {
-      weg(e.ton?.datei)
-      const { ton: _t, ...rest } = e
+      weg(e[tonFeld]?.datei)
+      const rest = { ...e }
+      delete rest[tonFeld]
       return rest
     }
     const k = satzSchluessel(satz ?? '')
-    weg(e.saetze?.[k]?.datei)
-    const saetze = { ...(e.saetze ?? {}) }
+    weg(e[satzFeld]?.[k]?.datei)
+    const saetze = { ...(e[satzFeld] ?? {}) }
     delete saetze[k]
-    return { ...e, saetze }
+    return { ...e, [satzFeld]: saetze }
   })
 }
 
-/** Standardstimme je Sprache (Einstellungen › Hörtexte) */
-export const stimmenLesen = (): Record<string, string> => lies<Record<string, string>>(stimmenDatei(), {})
-export function stimmeSetzen(sprache: string, stimme: string): Record<string, string> {
+/** Standardstimmen je Sprache und Fassung (Einstellungen › Bilder und Hörtexte); ältere Dateien: eine Kennung je Sprache */
+export const stimmenLesen = (): Record<string, Stimmen> => stimmenNormiert(lies<unknown>(stimmenDatei(), {}))
+export function stimmeSetzen(sprache: string, stimme: string, lage: Stimmlage = 'w'): Record<string, Stimmen> {
   const s = stimmenLesen()
   const k = sprachKurz(sprache)
-  if (stimme) s[k] = String(stimme).slice(0, 120)
+  const neu: Stimmen = { ...(s[k] ?? {}) }
+  const l: Stimmlage = lage === 'm' ? 'm' : 'w'
+  if (stimme) neu[l] = String(stimme).slice(0, 120)
+  else delete neu[l]
+  if (neu.w || neu.m) s[k] = neu
   else delete s[k]
   schreibe(stimmenDatei(), s)
   return s

@@ -440,6 +440,21 @@ export function SchuelerEinstellungen(): React.JSX.Element {
             data-tempo
           />
         </Zeile>
+        <Zeile
+          titel="Stimme der Aussprache"
+          text="Die aufgenommene Aussprache der Vokabeln gibt es mit weiblicher und männlicher Stimme. Fehlt die gewählte, hörst du die andere."
+        >
+          <SegmentedControl
+            fullWidth
+            value={d.aussprache ?? 'w'}
+            onChange={(v) => aendern({ aussprache: v === 'm' ? 'm' : 'w' })}
+            data={[
+              { value: 'w', label: 'Weiblich' },
+              { value: 'm', label: 'Männlich' }
+            ]}
+            data-aussprache-lage
+          />
+        </Zeile>
         <StimmenWahl stimmen={d.stimmen} setze={(stimmen) => aendern({ stimmen }, true)} />
       </Bereich>
 

@@ -10,7 +10,7 @@
  * WELCHE Aufrufe aus dem Netz überhaupt erlaubt sind, steht NICHT hier, sondern im Server
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
-import type { MedienBild, MedienKandidat, MedienSicht, MedienTon, TonArt } from './medienbank'
+import type { MedienBild, MedienKandidat, MedienSicht, MedienTon, Stimmen, Stimmlage, TonArt } from './medienbank'
 import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
 import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
@@ -64,6 +64,7 @@ import type {
   TtsRequest,
   TtsResult,
   TtsVoice,
+  BibliotheksStimme,
   SavedGrammarTest,
   SavedGrammarTestInput,
   SavedKurztest,
@@ -485,14 +486,16 @@ export function buildApi(call: Call, extras: ApiExtras) {
       eintraege: (sprache: string, woerter: string[]) => call<Record<string, MedienSicht>>('medien:eintraege', sprache, woerter),
       /** Datei als data-URL (Ton, Bild in voller Größe); null, wenn es sie nicht mehr gibt */
       datei: (datei: string) => call<string | null>('medien:datei', datei),
-      stimmen: () => call<Record<string, string>>('medien:stimmen'),
-      stimmeSetzen: (sprache: string, stimme: string) => call<Record<string, string>>('medien:stimme-setzen', sprache, stimme),
+      /** Standardstimmen je Sprache: weibliche und männliche Fassung (07.10.2026) */
+      stimmen: () => call<Record<string, Stimmen>>('medien:stimmen'),
+      stimmeSetzen: (sprache: string, stimme: string, lage: Stimmlage = 'w') => call<Record<string, Stimmen>>('medien:stimme-setzen', sprache, stimme, lage),
       bildSetzen: (sprache: string, wort: string, b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] }) =>
         call<MedienBild>('medien:bild-setzen', sprache, wort, b),
       bildLoeschen: (sprache: string, wort: string) => call<void>('medien:bild-loeschen', sprache, wort),
-      tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }) =>
-        call<MedienTon>('medien:ton-setzen', sprache, wort, art, t),
-      tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string) => call<void>('medien:ton-loeschen', sprache, wort, art, satz),
+      tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }, lage: Stimmlage = 'w') =>
+        call<MedienTon>('medien:ton-setzen', sprache, wort, art, t, lage),
+      tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string, lage: Stimmlage = 'w') =>
+        call<void>('medien:ton-loeschen', sprache, wort, art, satz, lage),
       /** Darf diese Person die Medienbank (und gemeinsame Lehrwerke) bearbeiten? */
       admin: () => call<boolean>('medien:admin')
     },
@@ -501,6 +504,11 @@ export function buildApi(call: Call, extras: ApiExtras) {
       speak: (req: TtsRequest) => call<TtsResult>('audio:speak', req),
       /** Hörprobe einer Stimme als data:-Adresse – kostet kein Kontingent */
       preview: (voiceId: string) => call<string>('audio:preview', voiceId),
+      /** Stimmen der ElevenLabs-Bibliothek zu Sprache und Geschlecht (07.10.2026); `gesperrt` = Grund, warum nicht nutzbar */
+      bibliothek: (sprache: string, geschlecht: 'female' | 'male') =>
+        call<{ stimmen: BibliotheksStimme[]; gesperrt: string }>('audio:bibliothek', sprache, geschlecht),
+      /** Bibliotheksstimme ins ElevenLabs-Konto übernehmen; liefert die Kennung im Konto */
+      bibliothekUebernehmen: (owner: string, voiceId: string, name: string) => call<string>('audio:bibliothek-uebernehmen', owner, voiceId, name),
       /** Gespeicherte Datei erneut laden; null, wenn sie nicht mehr da ist */
       read: (fileName: string) => call<string | null>('audio:read', fileName),
       /** Eigene MP3 (z. B. Original-Hördatei des Verlags) als Aufnahme des Bausteins `id` ablegen (29.09.2026) */

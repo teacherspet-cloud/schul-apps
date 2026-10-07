@@ -121,7 +121,7 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
               <Tabs.Tab value="nutzer">Nutzer</Tabs.Tab>
               <Tabs.Tab value="ki">KI-Zugänge</Tabs.Tab>
               <Tabs.Tab value="iserv">IServ-Anbindung</Tabs.Tab>
-              <Tabs.Tab value="hoertexte">Hörtexte</Tabs.Tab>
+              {/* „Hörtexte" entfernt (07.10.2026, Wunsch der Lehrkraft): eine lange, unübersichtliche Liste aller QR-Freigaben */}
               <Tabs.Tab value="maskottchen">Maskottchen</Tabs.Tab>
               <Tabs.Tab value="server">Server</Tabs.Tab>
             </Tabs.List>
@@ -142,9 +142,6 @@ export default function VerwaltungModule({ active }: { active: boolean }): React
             </Tabs.Panel>
             <Tabs.Panel value="iserv">
               <Iserv d={d} neu={laden} />
-            </Tabs.Panel>
-            <Tabs.Panel value="hoertexte">
-              <Hoertexte />
             </Tabs.Panel>
             <Tabs.Panel value="maskottchen">
               <MaskottchenSettings settings={settings} update={(p) => void update(p)} schule />
@@ -531,60 +528,6 @@ function Iserv({ d, neu }: { d: Uebersicht; neu: () => void }): React.JSX.Elemen
         onChange={(e) => void senden('/server/verwaltung/notzugang', { an: e.currentTarget.checked }).then(neu, (er: unknown) => notifyError(er))}
       />
     </Stack>
-  )
-}
-
-function Hoertexte(): React.JSX.Element {
-  const [liste, setListe] = useState<{ kennung: string; benutzer: string; datei: string; titel: string; erstellt: string; abrufe: number }[] | null>(null)
-  const laden = useCallback(
-    () =>
-      void holen<{ freigaben: NonNullable<typeof liste> }>('/server/verwaltung/hoertexte').then(
-        (d) => setListe(d.freigaben),
-        (e: unknown) => notifyError(e)
-      ),
-    []
-  )
-  useEffect(laden, [laden])
-  if (!liste) return <Loader />
-  return (
-    <Table striped>
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th>Hörtext</Table.Th>
-          <Table.Th>Lehrkraft</Table.Th>
-          <Table.Th>Erstellt</Table.Th>
-          <Table.Th>Abrufe</Table.Th>
-          <Table.Th />
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {liste.map((f) => (
-          <Table.Tr key={f.kennung}>
-            <Table.Td>
-              <a href={`/h/${f.kennung}`} target="_blank" rel="noreferrer">
-                {f.titel || f.datei}
-              </a>
-            </Table.Td>
-            <Table.Td>{f.benutzer}</Table.Td>
-            <Table.Td>{new Date(f.erstellt).toLocaleDateString('de-DE')}</Table.Td>
-            <Table.Td>{f.abrufe}</Table.Td>
-            <Table.Td>
-              <Button
-                size="xs"
-                variant="subtle"
-                color="red"
-                onClick={() =>
-                  window.confirm('Freigabe widerrufen? Der QR-Code auf gedruckten Blättern funktioniert dann nicht mehr.') &&
-                  void senden('/server/verwaltung/hoertext-widerrufen', { kennung: f.kennung }).then(laden, (e: unknown) => notifyError(e))
-                }
-              >
-                Widerrufen
-              </Button>
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
   )
 }
 

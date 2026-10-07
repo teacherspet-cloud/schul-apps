@@ -544,6 +544,8 @@ export function starteServer(opts: ServerOptionen): Promise<Server> {
           kontrast: k0.kontrast === true,
           vorlesen: k0.vorlesen === true,
           tempo: wahl(k0.tempo, ['langsam', 'normal', 'schnell'], 'normal'),
+          // Aufgenommene Aussprache: weibliche oder männliche Fassung (07.10.2026)
+          aussprache: wahl(k0.aussprache, ['w', 'm'], 'w'),
           wochenziel: Math.max(1, Math.min(7, Math.round(Number(k0.wochenziel) || 3))),
           tipps: k0.tipps !== false,
           spiele: k0.spiele !== false,

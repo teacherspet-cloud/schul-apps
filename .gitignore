@@ -11,3 +11,5 @@ recherche/
 electron.vite.config.*.mjs
 win-unpacked.tmp/
 out-client/
+
+.claude/settings.local.json

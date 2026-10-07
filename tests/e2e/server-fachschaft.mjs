@@ -9,6 +9,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-fachschaft')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -131,6 +132,7 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await expertenmodus(p)
   // Seit 03.10.2026 nicht mehr auf der Startseite, sondern in der App „Verwaltung" (Daten und Material)
   await p.locator('.app-leiste .leiste-gruppe-apps [aria-label="Verwaltung"]').click()
   pruefe(

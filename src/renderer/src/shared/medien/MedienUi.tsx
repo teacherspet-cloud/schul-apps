@@ -26,11 +26,11 @@ import {
 } from '@mantine/core'
 import { IconListCheck, IconPhoto, IconPhotoSearch, IconSparkles, IconTrash, IconVolume, IconMessage2 } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
-import { istGanzerSatz, sprachKurz, type MedienKandidat, type MedienSicht, type TonArt } from '@shared/medienbank'
+import { istGanzerSatz, sprachKurz, STIMMLAGE_NAME, type MedienKandidat, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { notifyError, notifySuccess } from '../util'
 import { useLaufendeSchluessel } from '../auftraege'
 import { abspielen, bildKandidaten, kandidatUebernehmen, type Vokabel } from './medienbank'
-import { aufMedienAenderung, medienSchluessel, offeneVokabeln, starteMedienAuftrag, type MedienArt, type MedienZiel } from './medienAuftrag'
+import { aufMedienAenderung, lagenVon, medienSchluessel, offeneVokabeln, starteMedienAuftrag, type MedienArt, type MedienZiel } from './medienAuftrag'
 
 let adminZwischen: Promise<boolean> | null = null
 /** Darf diese Person die Medienbank bearbeiten? (einmal je Sitzung gefragt) */
@@ -97,22 +97,37 @@ export function TonZelle({
   text,
   art,
   admin,
-  erzeugen
+  erzeugen,
+  lage
 }: {
   ton?: { datei: string; url?: string; text: string }
   text: string
   art: TonArt
   admin: boolean
   erzeugen: () => Promise<void>
+  /** Fassung (07.10.2026) – steht klein am Knopf, wenn es zwei gibt */
+  lage?: Stimmlage
 }): React.JSX.Element | null {
   const [laeuft, setLaeuft] = useState(false)
   if (!text.trim()) return null
   if (art === 'satz' && !istGanzerSatz(text)) return null
   const veraltet = ton && ton.text.trim() !== text.trim()
+  const fassung = lage ? ` (${STIMMLAGE_NAME[lage]})` : ''
+  const marke = (knopf: React.JSX.Element): React.JSX.Element =>
+    lage ? (
+      <Group gap={1} wrap="nowrap" data-lage={lage}>
+        {knopf}
+        <Text size="10px" c="dimmed" fw={600}>
+          {lage}
+        </Text>
+      </Group>
+    ) : (
+      knopf
+    )
   if (ton && !veraltet)
-    return (
-      <Tooltip label={art === 'wort' ? 'Aussprache anhören' : 'Beispielsatz anhören'}>
-        <ActionIcon variant="light" onClick={() => spiele(ton)} aria-label={`Aussprache „${text}“ anhören`} data-aussprache={art}>
+    return marke(
+      <Tooltip label={(art === 'wort' ? 'Aussprache anhören' : 'Beispielsatz anhören') + fassung}>
+        <ActionIcon variant="light" onClick={() => spiele(ton)} aria-label={`Aussprache „${text}“ anhören${fassung}`} data-aussprache={art}>
           {art === 'wort' ? <IconVolume size={16} /> : <IconMessage2 size={16} />}
         </ActionIcon>
       </Tooltip>
@@ -123,13 +138,13 @@ export function TonZelle({
         –
       </Text>
     )
-  return (
-    <Tooltip label={veraltet ? 'Der Text hat sich geändert – neu erzeugen' : 'Aussprache von der Sprach-KI erzeugen'}>
+  return marke(
+    <Tooltip label={(veraltet ? 'Der Text hat sich geändert – neu erzeugen' : 'Aussprache von der Sprach-KI erzeugen') + fassung}>
       <ActionIcon
         variant="subtle"
         color={veraltet ? 'orange' : 'gray'}
         loading={laeuft}
-        aria-label={`Aussprache „${text}“ erzeugen`}
+        aria-label={`Aussprache „${text}“ erzeugen${fassung}`}
         data-aussprache-erzeugen={art}
         onClick={() => {
           setLaeuft(true)
@@ -270,17 +285,33 @@ export function BildDialog({
   )
 }
 
-/** Hinweis, wenn für die Aussprache noch keine Stimme gewählt ist */
-function useStandardstimme(sprache: string): string | null {
-  const [stimme, setStimme] = useState<string | null>(null)
+/** Standardstimmen der Sprache (weiblich/männlich) – null, solange unbekannt */
+export function useStandardstimmen(sprache: string): Stimmen | null {
+  const [stimmen, setStimmen] = useState<Stimmen | null>(null)
   const sp = sprachKurz(sprache)
   useEffect(() => {
     void window.api.medien.stimmen().then(
-      (s) => setStimme(s[sp] ?? ''),
-      () => setStimme('')
+      (s) => setStimmen(s[sp] ?? {}),
+      () => setStimmen({})
     )
   }, [sp])
-  return stimme
+  return stimmen
+}
+
+/** Ist eine Bild-KI eingerichtet? */
+function useBildKiDa(): boolean {
+  const [da, setDa] = useState(false)
+  useEffect(() => {
+    let weg = false
+    void window.api.ai
+      .status()
+      .then((s) => !weg && setDa(Boolean(s.hasImageKey)))
+      .catch(() => undefined)
+    return () => {
+      weg = true
+    }
+  }, [])
+  return da
 }
 
 /**
@@ -301,14 +332,16 @@ export function MedienLeiste({
   ziel: MedienZiel
   mehr?: React.ReactNode
 }): React.JSX.Element {
-  const stimme = useStandardstimme(sprache)
+  const stimmen = useStandardstimmen(sprache)
+  const lagen = lagenVon(stimmen ?? undefined)
   const laufend = useLaufendeSchluessel(ziel.docId)
+  const bildKi = useBildKiDa()
   const sp = sprachKurz(sprache)
   const woerter = vokabeln.filter((v) => v.term.trim())
   const ohneBild = offeneVokabeln('bilder', woerter, daten)
-  const ohneTon = offeneVokabeln('aussprache', woerter, daten)
-  const ohneSatz = offeneVokabeln('satz', woerter, daten)
-  const ohneStimme = stimme === ''
+  const ohneTon = offeneVokabeln('aussprache', woerter, daten, lagen.length ? lagen : ['w'])
+  const ohneSatz = offeneVokabeln('satz', woerter, daten, lagen.length ? lagen : ['w'])
+  const ohneStimme = stimmen !== null && !lagen.length
   const start = (art: MedienArt, liste: Vokabel[]): void => void starteMedienAuftrag({ art, sprache: sp, vokabeln: liste, ziel })
   const knopf = (art: MedienArt, label: string, liste: Vokabel[], icon: React.ReactNode, kennung: string, braucheStimme = false): React.JSX.Element => {
     const laeuft = laufend.has(medienSchluessel(art))
@@ -334,6 +367,8 @@ export function MedienLeiste({
           </Badge>
           <Text size="sm">Medienbank für die angezeigten {woerter.length} Wörter:</Text>
           {knopf('bilder', 'Beispielbilder suchen', ohneBild, <IconPhotoSearch size={14} />, 'data-medien-bilder')}
+          {/* Mit eingerichteter Bild-KI (07.10.2026): für Wörter ohne Bild gleich ein KI-Bild erzeugen lassen */}
+          {bildKi && knopf('bildKi', 'Beispielbild von KI generieren lassen', ohneBild, <IconSparkles size={14} />, 'data-medien-bild-ki')}
           {knopf('aussprache', 'Aussprache erzeugen', ohneTon, <IconVolume size={14} />, 'data-medien-aussprache', true)}
           {knopf('satz', 'Satz-Aussprache erzeugen', ohneSatz, <IconMessage2 size={14} />, 'data-medien-satz', true)}
           {mehr}
@@ -377,15 +412,17 @@ export function AbschnitteDialog({
 }): React.JSX.Element {
   const [wahl, setWahl] = useState<string[]>([])
   const [arten, setArten] = useState<MedienArt[]>(['bilder', 'aussprache'])
-  const stimme = useStandardstimme(sprache)
+  const stimmen = useStandardstimmen(sprache)
+  const ohneStimme = stimmen !== null && !lagenVon(stimmen).length
+  const bildKi = useBildKiDa()
   const key = (a: MedienAbschnitt): string => a.ziel.docId
   const alle = wahl.length === abschnitte.length && abschnitte.length > 0
-  const tonOhneStimme = stimme === '' && arten.some((a) => a === 'aussprache' || a === 'satz')
+  const tonOhneStimme = ohneStimme && arten.some((a) => a === 'aussprache' || a === 'satz')
   const starten = (): void => {
     let n = 0
     for (const a of abschnitte.filter((x) => wahl.includes(key(x)))) {
       for (const art of arten) {
-        if (stimme === '' && (art === 'aussprache' || art === 'satz')) continue
+        if (ohneStimme && (art === 'aussprache' || art === 'satz')) continue
         void starteMedienAuftrag({ art, sprache: sprachKurz(sprache), vokabeln: a.vokabeln, ziel: a.ziel })
         n++
       }
@@ -401,6 +438,7 @@ export function AbschnitteDialog({
           {(
             [
               ['bilder', 'Beispielbilder suchen'],
+              ...(bildKi ? [['bildKi', 'Beispielbild von KI']] : []),
               ['aussprache', 'Aussprache'],
               ['satz', 'Satz-Aussprache']
             ] as [MedienArt, string][]

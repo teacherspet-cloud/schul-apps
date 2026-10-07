@@ -9,6 +9,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-medienbank')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -47,9 +48,11 @@ async function lehrwerkOeffnen(p) {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Vokabellisten"]').click()
   await p.waitForTimeout(1200)
-  const reihe = p.getByText('Green Line', { exact: false }).first()
+  // Schulbuchreihen sind anfangs zugeklappt (Reihe aufklappen, dann die Bände)
+  const reihe = p.locator('.module-container:not([hidden]) [data-reihe*="Green Line"] button[aria-expanded="false"]').first()
   if (await reihe.isVisible().catch(() => false)) await reihe.click().catch(() => undefined)
   await p.waitForTimeout(400)
   await p.getByRole('button', { name: 'Vokabeln bearbeiten' }).first().click()
@@ -59,9 +62,10 @@ async function lehrwerkOeffnen(p) {
 
 try {
   await anmelden(verwaltung, admin.benutzer, admin.passwort)
-  // Standardstimme für Englisch (Attrappe)
-  const st = await api(verwaltung, 'medien:stimme-setzen', 'en', 'probe-w')
-  pruefe(st.ok && st.value?.en === 'probe-w', 'Admin setzt die Standardstimme für Englisch')
+  // Standardstimmen für Englisch (Attrappe): weibliche und männliche Fassung (07.10.2026)
+  const st = await api(verwaltung, 'medien:stimme-setzen', 'en', 'probe-w', 'w')
+  const st2 = await api(verwaltung, 'medien:stimme-setzen', 'en', 'probe-m', 'm')
+  pruefe(st.ok && st2.ok && st2.value?.en?.w === 'probe-w' && st2.value?.en?.m === 'probe-m', 'Admin setzt weibliche und männliche Standardstimme für Englisch')
 
   // ---------- Admin
   const p = await verwaltung.newPage()
@@ -82,6 +86,17 @@ try {
   pruefe(await auftragFertig(p, 'Aussprache erzeugen'), 'Aussprache erzeugt')
   await p.waitForTimeout(800)
   pruefe((await p.locator('[data-aussprache="wort"]').count()) >= 1, 'Aussprache-Knöpfe in der Tabelle')
+  pruefe((await p.locator('[data-lage="m"] [data-aussprache="wort"]').count()) >= 1, 'Aussprache auch in männlicher Fassung (eigener Knopf je Fassung)')
+  {
+    // Lernende bekommen ihre Fassung, die andere als Rückfall
+    const q = (lage) => `${A}/s/api/medien?sprache=en&lage=${lage}&w=${encodeURIComponent(woerter[0])}`
+    const w = await (await verwaltung.request.get(q('w'))).json()
+    const m = await (await verwaltung.request.get(q('m'))).json()
+    pruefe(
+      w.medien?.[woerter[0]]?.ton?.stimme === 'probe-w' && m.medien?.[woerter[0]]?.ton?.stimme === 'probe-m',
+      `Lernende hören die gewählte Fassung (w: ${w.medien?.[woerter[0]]?.ton?.stimme}, m: ${m.medien?.[woerter[0]]?.ton?.stimme})`
+    )
+  }
   if (await p.locator('[data-medien-satz]').isEnabled()) {
     await p.locator('[data-medien-satz]').click()
     pruefe(await auftragFertig(p, 'Satz-Aussprache erzeugen'), 'Satz-Aussprache erzeugt')
@@ -190,8 +205,10 @@ try {
   for (const w of woerter) {
     await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)
+    await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort', undefined, 'm').catch(() => undefined)
   }
-  await api(verwaltung, 'medien:stimme-setzen', 'en', '').catch(() => undefined)
+  await api(verwaltung, 'medien:stimme-setzen', 'en', '', 'w').catch(() => undefined)
+  await api(verwaltung, 'medien:stimme-setzen', 'en', '', 'm').catch(() => undefined)
   for (const id of zuLoeschen) await verwaltung.request.post(`${A}/server/verwaltung/nutzer-loeschen`, { headers: KOPF, data: { id } }).catch(() => undefined)
   pruefe(true, `Konten samt Daten gelöscht (${zuLoeschen.length}), Medien entfernt`)
   await browser.close()

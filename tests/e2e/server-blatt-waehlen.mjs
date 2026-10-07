@@ -5,6 +5,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-blatt-waehlen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -64,6 +65,7 @@ try {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Freigegebene Blätter"]').click()
   pruefe(await da(p.locator('[data-freigaben] [data-blatt-waehlen-knopf]')), 'Knopf „Blatt freigeben" in der App')
   await p.locator('[data-blatt-waehlen-knopf]').click()

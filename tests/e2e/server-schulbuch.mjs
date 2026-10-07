@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-schulbuch')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -70,6 +71,7 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await expertenmodus(p)
   pruefe(await p.locator('[data-app-kopf]').first().isVisible(), 'Gemeinsamer Kopf im Arbeitsblatt')
   const karte = p.locator('.mantine-Card-root', { hasText: 'Eigenes Material (optional)' })
   await karte.locator('input[type=file]').setInputFiles(seite)

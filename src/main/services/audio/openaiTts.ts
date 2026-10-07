@@ -42,6 +42,7 @@ export function openAiStimmen(): TtsVoice[] {
     id: `${OPENAI_PRAEFIX}${s.id}`,
     name: `${s.name} (OpenAI)`,
     language: 'multilingual',
+    multilingual: true,
     gender: s.gender,
     description: s.description,
     category: 'openai',

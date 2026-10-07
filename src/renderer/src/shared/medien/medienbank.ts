@@ -12,7 +12,7 @@
  * (bis Klasse 6) sucht die Bildsuche zuerst Cliparts und Illustrationen, Fotos nur als Rückfall.
  */
 import type { OnlineImageHit, OnlineImageSource, StructuredRequest } from '@shared/types'
-import type { MedienKandidat, TonArt } from '@shared/medienbank'
+import type { MedienKandidat, Stimmlage, TonArt } from '@shared/medienbank'
 import { istBegrenzung } from './medienWarten'
 
 export interface Vokabel {
@@ -185,12 +185,12 @@ export async function bildErzeugen(sprache: string, v: Vokabel, lernende?: Lerne
   await window.api.medien.bildSetzen(sprache, v.term, { dataUrl: await verkleinern(d), herkunft: 'ki', nachweis: 'KI-generiert' })
 }
 
-/** Aussprache erzeugen (Standardstimme der Sprache) */
-export async function tonErzeugen(sprache: string, wort: string, art: TonArt, text: string, stimme: string): Promise<void> {
+/** Aussprache erzeugen – `lage`: weibliche oder männliche Fassung (07.10.2026) */
+export async function tonErzeugen(sprache: string, wort: string, art: TonArt, text: string, stimme: string, lage: Stimmlage = 'w'): Promise<void> {
   const id = `vok-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
   const r = await window.api.audio.speak({ id, turns: [{ voiceId: stimme, text }], languageCode: sprache })
   if (!r?.dataUrl) throw new Error('Die Sprach-KI hat keine Aufnahme geliefert.')
-  await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text })
+  await window.api.medien.tonSetzen(sprache, wort, art, { dataUrl: r.dataUrl, stimme, text }, lage)
 }
 
 let laeuft: HTMLAudioElement | null = null

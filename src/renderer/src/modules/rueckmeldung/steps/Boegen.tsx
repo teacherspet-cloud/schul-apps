@@ -1,12 +1,14 @@
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Badge,
   Button,
   Card,
   Container,
   Group,
   Loader,
+  Modal,
   Paper,
   ScrollArea,
   SegmentedControl,
@@ -19,6 +21,8 @@ import {
   Tooltip,
   UnstyledButton
 } from '@mantine/core'
+import { dokumentOeffnenWennBereit, openModule } from '../../../shared/navigation'
+import { ART_TITEL } from '../generation'
 import { bogenUeberschriften } from '../render/texte'
 import {
   IconAlertTriangle,
@@ -35,6 +39,7 @@ import {
   IconRefresh,
   IconSearch,
   IconVolume,
+  IconTrash,
   IconX
 } from '@tabler/icons-react'
 import { useEffect, useState } from 'react'
@@ -117,6 +122,8 @@ export default function Boegen(): React.JSX.Element | null {
   const [suche, setSuche] = useState('')
   const [offen, setOffen] = useState<string[]>(() => ladeOffen(docId))
   const [weitere, setWeitere] = useState(false)
+  // Einzelne Abgabe entfernen (07.10.2026) – mit Rückfrage, Bogen und Abgabe zusammen
+  const [loeschen, setLoeschen] = useState<Abgabe | null>(null)
   // Über „Weitere Abgabe" angelegt: aufgeklappt mit Lader, bis der Bogen da ist
   const [erwartet, setErwartet] = useState<string[]>([])
   const laufend = useLaufendeSchluessel(docId)
@@ -412,7 +419,23 @@ export default function Boegen(): React.JSX.Element | null {
               const schreibt = laufend.has(`rueckmeldung-${docId}`) || laufend.has(trennSchluessel(docId))
               return (
                 <Paper key={a.id} withBorder radius="md" data-rm-zeile={a.kuerzel} data-rm-id={a.id} data-rm-offen={auf || wartet ? 'ja' : 'nein'}>
-                  <BogenKopf r={r} a={a} auf={auf || wartet} umschalten={() => umschalten(a.id)} />
+                  <Group gap={0} wrap="nowrap">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <BogenKopf r={r} a={a} auf={auf || wartet} umschalten={() => umschalten(a.id)} />
+                    </div>
+                    <Tooltip label="Abgabe entfernen">
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        mr={8}
+                        aria-label={`Abgabe von ${a.name.trim() || a.kuerzel} entfernen`}
+                        onClick={() => setLoeschen(a)}
+                        data-rm-abgabe-entfernen
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
                   {/* Zugeklappt wird das Blatt gar nicht gezeichnet – kein Messen, kein Umbruch */}
                   {auf && (
                     <div style={{ padding: '0 12px 12px' }}>
@@ -438,6 +461,33 @@ export default function Boegen(): React.JSX.Element | null {
           </Stack>
         )}
       </Container>
+      <Modal opened={Boolean(loeschen)} onClose={() => setLoeschen(null)} title="Abgabe entfernen?" size="sm" centered data-rm-entfernen-frage>
+        <Stack gap="sm">
+          <Text size="sm">
+            Die Abgabe von „{loeschen ? loeschen.name.trim() || loeschen.kuerzel : ''}“ wird mit ihrer Rückmeldung aus dieser Sammlung entfernt. Das lässt sich
+            nicht rückgängig machen.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setLoeschen(null)}>
+              Abbrechen
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                const id = loeschen?.id
+                if (id) {
+                  update((d) => void (d.abgaben = d.abgaben.filter((x) => x.id !== id)))
+                  setOffen((o) => o.filter((x) => x !== id))
+                }
+                setLoeschen(null)
+              }}
+              data-rm-entfernen-ja
+            >
+              Entfernen
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
       <ExportSperre ids={sperre?.ids ?? null} weiter={() => sperre?.weiter()} schliessen={() => setSperre(null)} />
       <WeitereAbgabe
         offen={weitere}
@@ -472,6 +522,42 @@ interface BogenAktionen {
   /** Abgabe, bei der „Marker setzen" an ist */
   markerBei: string | null
   setMarkerBei: (id: string | null) => void
+}
+
+/**
+ * Zu welchem Material das Feedback ist (07.10.2026, Wunsch der Lehrkraft) – unter dem Titel des geöffneten Bogens.
+ * Stammt die Aufgabe aus einem gespeicherten Material, öffnet ein Klick es in seinem Programm.
+ */
+function MaterialZeile({ r }: { r: Rueckmeldung }): React.JSX.Element | null {
+  const g = r.grundlage
+  const art = g.art === 'frei' ? 'Eigene Aufgabe' : ART_TITEL[g.art]
+  // Eigene Aufgabe ohne Titel: der Anfang der Aufgabenstellung
+  const anfang = g.aufgaben.trim().split(/\r?\n/)[0]?.trim() ?? ''
+  const titel = g.titel.trim() || r.meta.title.trim() || (anfang.length > 70 ? `${anfang.slice(0, 70)} …` : anfang)
+  if (!titel && g.art === 'frei') return null
+  const docId = g.art !== 'frei' ? g.docId : undefined
+  const oeffnen = (): void => {
+    if (!docId || g.art === 'frei') return
+    openModule(g.art)
+    void dokumentOeffnenWennBereit(g.art, docId)
+  }
+  return (
+    <Text size="xs" c="dimmed" mt={4} data-rm-material>
+      Feedback zu: {art}
+      {titel ? ' „' : ''}
+      {titel && docId ? (
+        <Anchor component="button" size="xs" onClick={oeffnen} data-rm-material-oeffnen>
+          {titel}
+        </Anchor>
+      ) : (
+        titel
+      )}
+      {titel ? '“' : ''}
+      {[r.meta.subjectLabel, r.meta.grade ? `Klasse ${r.meta.grade}` : ''].filter(Boolean).length
+        ? ` · ${[r.meta.subjectLabel, r.meta.grade ? `Klasse ${r.meta.grade}` : ''].filter(Boolean).join(', ')}`
+        : ''}
+    </Text>
+  )
 }
 
 /** Die Zeile einer Abgabe: Name, Kürzel, Status, Einstufung, Hinweise – ein Klick klappt auf und zu */
@@ -597,7 +683,9 @@ function BogenInhalt({ a, x }: { a: Abgabe; x: BogenAktionen }): React.JSX.Eleme
               <Tooltip
                 label={
                   bogen.gesamt
-                    ? `Erfüllungsgrad laut Vorschlag: ${bogen.gesamt.anteil} %${summe && summe.moeglich ? ` · ${summe.erreicht} von ${summe.moeglich} Punkten` : ''}${bogen.gesamt.begruendung ? ` – ${bogen.gesamt.begruendung}` : ''}`
+                    ? `Erfüllungsgrad laut Vorschlag: ${bogen.gesamt.anteil} %${
+                        summe && summe.moeglich ? ` · ${summe.erreicht} von ${summe.moeglich} Punkten` : ''
+                      }${bogen.gesamt.begruendung ? ` – ${bogen.gesamt.begruendung}` : ''}`
                     : 'Noch keine Einstufung'
                 }
                 multiline
@@ -682,6 +770,7 @@ function BogenInhalt({ a, x }: { a: Abgabe; x: BogenAktionen }): React.JSX.Eleme
             </Tooltip>
           </Group>
         </Group>
+        <MaterialZeile r={r} />
         {(a.name.trim() || hatAusgleich(a.ausgleich)) && (
           <Text size="xs" c="dimmed" mt={4}>
             {a.name.trim() ? `Auf dem Blatt steht statt „${a.kuerzel}“ der Name – eingesetzt auf diesem Rechner, die KI kennt nur das Kürzel.` : ''}

@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-onlinetest-grammatik')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -51,6 +52,7 @@ try {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Grammatiktest"]').click()
   await p.waitForTimeout(800)
   await p

@@ -52,7 +52,11 @@ const AKZENT: Record<string, string[]> = {
   fr: ['french', 'français'],
   es: ['spanish', 'español', 'castilian', 'mexican'],
   it: ['italian', 'italiano'],
-  de: ['german', 'deutsch', 'austrian', 'swiss']
+  de: ['german', 'deutsch', 'austrian', 'swiss'],
+  nl: ['dutch', 'nederlands', 'flemish'],
+  pl: ['polish', 'polski'],
+  ru: ['russian'],
+  tr: ['turkish']
 }
 
 /**
@@ -126,4 +130,28 @@ export function sichtbareStimmen(
   // Stimmen ohne Akzentangabe bleiben dabei – über sie sagt die Wahl nichts aus
   const sichtbar = opts.akzente?.length ? nachHerkunft.filter((v) => !akzentVon(v) || opts.akzente!.includes(akzentVon(v))) : nachHerkunft
   return { nutzbar, gesperrt, nachSprache, sichtbar, sprachfilterGriff }
+}
+
+/**
+ * Eignung einer Stimme für eine Sprache (Aussprache der Vokabeln, 07.10.2026):
+ * „geprueft" = von ElevenLabs für die Sprache geprüft oder mit passendem Akzent/Sprachetikett,
+ * „mehrsprachig" = spricht mit dem mehrsprachigen Modell auch diese Sprache, „ohne" = eigene Stimme ohne Angabe,
+ * null = passt nicht (z. B. eine rein englische Stimme für Französisch).
+ */
+export function stimmeEignung(v: TtsVoice, sprache: string): 'geprueft' | 'mehrsprachig' | 'ohne' | null {
+  if (v.languages?.includes(sprache)) return 'geprueft'
+  const feld = `${v.language} ${v.description}`.toLowerCase().trim()
+  const woerter = feld.split(/[^a-zäöüß]+/).filter(Boolean)
+  if (woerter.includes(sprache) || (AKZENT[sprache] ?? []).some((w) => feld.includes(w))) return 'geprueft'
+  if (v.multilingual) return 'mehrsprachig'
+  if (!feld && !v.languages?.length) return 'ohne'
+  return null
+}
+
+/** Passt das Geschlecht der Stimme zur Fassung? Stimmen ohne Angabe (oder neutral) passen zu beiden */
+export function passtZurLage(v: TtsVoice, lage: 'w' | 'm'): boolean {
+  const g = (v.gender ?? '').toLowerCase()
+  if (g === 'female' || g === 'weiblich') return lage === 'w'
+  if (g === 'male' || g === 'männlich') return lage === 'm'
+  return true
 }

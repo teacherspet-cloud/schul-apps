@@ -7,6 +7,7 @@
 import { chromium } from 'playwright-core'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-vorschau')
 const A = process.argv[3] ?? 'http://localhost:18491'
@@ -96,6 +97,7 @@ try {
   await p.waitForTimeout(2500)
   const sp = p.getByRole('button', { name: 'Später einrichten' })
   if (await sp.isVisible().catch(() => false)) await sp.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Meine Klassen"]').click()
   await p.locator(`[data-klasse="${K7}"]`).click()
   await p.locator('[data-fach-leiste] [data-fach]').first().waitFor({ timeout: 10000 })

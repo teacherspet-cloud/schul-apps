@@ -8,6 +8,7 @@
 import type { MedienSicht } from '@shared/medienbank'
 import { satzSchluessel } from '@shared/medienbank'
 import { holen } from '../onlinetest/serverApi'
+import { useDarstellung } from '../onlinetest/schuelerDarstellung'
 
 let medien: Record<string, MedienSicht> = {}
 let laeuft: HTMLAudioElement | null = null
@@ -16,7 +17,8 @@ let laeuft: HTMLAudioElement | null = null
 export async function medienLaden(sprache: string, woerter: string[]): Promise<Record<string, MedienSicht>> {
   medien = {}
   if (!woerter.length) return medien
-  const q = new URLSearchParams({ sprache })
+  // Bevorzugte Fassung der Aussprache (07.10.2026) – der Server löst sie auf, mit der anderen als Rückfall
+  const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w' })
   for (const w of woerter.slice(0, 600)) q.append('w', w)
   const d = await holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).catch(() => ({ medien: {} }))
   medien = d.medien ?? {}

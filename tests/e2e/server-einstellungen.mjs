@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-einstellungen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -104,6 +105,7 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Einstellungen"]').click()
   await p.locator('[data-passwort-knopf]').click()
   await p.locator('[data-pw-alt] input, input[data-pw-alt]').first().fill('LehrerPasswort-33')

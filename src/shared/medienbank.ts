@@ -42,18 +42,61 @@ export interface MedienTon {
   zeit: number
 }
 
+/**
+ * Aussprache in zwei Fassungen (07.10.2026, Wunsch der Lehrkraft): weiblich (w) und männlich (m). Die bisherigen
+ * Felder `ton`/`saetze` sind die weibliche Fassung – so bleiben ältere Einträge gültig; die männliche steht in
+ * `tonM`/`saetzeM`. Lernende wählen ihre Fassung, fehlt sie, gilt die andere.
+ */
+export type Stimmlage = 'w' | 'm'
+export const STIMMLAGEN: Stimmlage[] = ['w', 'm']
+export const STIMMLAGE_NAME: Record<Stimmlage, string> = { w: 'weiblich', m: 'männlich' }
+/** Standardstimmen einer Sprache */
+export type Stimmen = Partial<Record<Stimmlage, string>>
+
 export interface MedienEintrag {
   bild?: MedienBild
   ton?: MedienTon
   /** Aussprache von Beispielsätzen, je Satz (Schlüssel: satzSchluessel) */
   saetze?: Record<string, MedienTon>
+  /** Männliche Fassung */
+  tonM?: MedienTon
+  saetzeM?: Record<string, MedienTon>
 }
+
+type TonSicht = MedienTon & { url?: string }
 
 /** Was die Oberfläche je Wort bekommt: Bilder gleich als data-URL, Töne über ihre Datei */
 export interface MedienSicht {
   bild?: Omit<MedienBild, 'datei'> & { datei: string; dataUrl?: string; url?: string }
-  ton?: MedienTon & { url?: string }
-  saetze?: Record<string, MedienTon & { url?: string }>
+  ton?: TonSicht
+  saetze?: Record<string, TonSicht>
+  tonM?: TonSicht
+  saetzeM?: Record<string, TonSicht>
+}
+
+/** Ton bzw. Sätze einer Fassung */
+export const tonVon = <T extends MedienTon>(e: { ton?: T; tonM?: T } | undefined, lage: Stimmlage): T | undefined => (lage === 'm' ? e?.tonM : e?.ton)
+export const saetzeVon = <T extends MedienTon>(
+  e: { saetze?: Record<string, T>; saetzeM?: Record<string, T> } | undefined,
+  lage: Stimmlage
+): Record<string, T> | undefined => (lage === 'm' ? e?.saetzeM : e?.saetze)
+
+/** Gespeicherte Stimmen lesen – früher eine Kennung je Sprache (sie gilt dann als weibliche Fassung) */
+export function stimmenNormiert(roh: unknown): Record<string, Stimmen> {
+  const aus: Record<string, Stimmen> = {}
+  if (!roh || typeof roh !== 'object') return aus
+  for (const [sp, w] of Object.entries(roh as Record<string, unknown>)) {
+    if (typeof w === 'string' && w) aus[sp] = { w }
+    else if (w && typeof w === 'object') {
+      const s: Stimmen = {}
+      for (const l of STIMMLAGEN) {
+        const id = (w as Record<string, unknown>)[l]
+        if (typeof id === 'string' && id) s[l] = id
+      }
+      if (s.w || s.m) aus[sp] = s
+    }
+  }
+  return aus
 }
 
 export type TonArt = 'wort' | 'satz'

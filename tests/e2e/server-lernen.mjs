@@ -6,6 +6,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-lernen')
 const A = process.argv[3] ?? 'http://localhost:18443'
@@ -275,6 +276,7 @@ try {
   await p.waitForTimeout(2500)
   const spaeter = p.getByRole('button', { name: 'Später einrichten' })
   if (await spaeter.isVisible().catch(() => false)) await spaeter.click()
+  await expertenmodus(p)
   await p.locator('.app-leiste [aria-label="Unterrichtsreihe"]').click()
   await p.locator('[data-eingang]').waitFor({ timeout: 15000 })
   await p.screenshot({ path: join(out, '6-eingang.png'), fullPage: true })

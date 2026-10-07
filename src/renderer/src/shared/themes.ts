@@ -398,6 +398,12 @@ function paletteVariables(p: ThemePalette, scheme: 'light' | 'dark'): Record<str
     '--app-bg': bg,
     '--app-surface': p.surface,
     '--app-border': p.border,
+    /*
+     * Rahmen von Karten und Kacheln (07.10.2026): Auf der hellgrauen Arbeitsfläche verschwand der Themen-Rahmen
+     * (Kontrast 1,06–1,14) – Klassenkarten waren nur beim Überfahren zu erkennen. 30 % Textfarbe ergeben
+     * in allen Themen etwa 1,9–2,5; im Dunkelmodus reicht der Rahmen des Themas (ca. 1,4–1,8).
+     */
+    '--app-card-border': scheme === 'light' ? mix(p.border, p.text, 0.3) : p.border,
     '--app-nav-bg': p.nav,
     '--app-nav-solid': solid(p.nav),
     '--app-hero': p.hero,

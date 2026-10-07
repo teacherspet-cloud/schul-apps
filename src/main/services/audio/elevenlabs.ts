@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { writeAtomic } from '../storage/atomar'
 import { merkeVerbrauch } from '../ai/verbrauch'
 import { join, resolve, sep } from 'path'
-import type { TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
+import type { BibliotheksStimme, TtsRequest, TtsResult, TtsSettings, TtsVoice } from '@shared/types'
 import { clampTtsSettings, dialogBloecke, ohneTags, textStuecke } from '@shared/voiceSettings'
 import { getSecret } from '../storage/settings'
 import { abrufe } from '../images/politeFetch'
@@ -228,11 +228,27 @@ async function elevenLabsStimmen(): Promise<TtsVoice[]> {
       is_owner?: boolean
       available_for_tiers?: string[]
       sharing?: { free_users_allowed?: boolean; status?: string } | null
+      verified_languages?: { language?: string }[]
     }[]
   }
   const voices = (data.voices ?? []).map((v) => {
     const { ausBibliothek, usable, unusableReason } = stimmenNutzbarkeit(v, tier)
+    // Geprüfte Sprachen (07.10.2026): sonst sahen mitgelieferte Stimmen wie rein englische aus
+    const languages = [
+      ...new Set(
+        (v.verified_languages ?? [])
+          .map(
+            (l) =>
+              String(l.language ?? '')
+                .toLowerCase()
+                .split(/[-_]/)[0]
+          )
+          .filter(Boolean)
+      )
+    ]
     return {
+      ...(languages.length ? { languages } : {}),
+      ...(languages.length > 1 || v.category === 'premade' ? { multilingual: true } : {}),
       id: v.voice_id,
       name: v.name,
       language: v.labels?.language ?? v.labels?.accent ?? '',
@@ -252,6 +268,63 @@ async function elevenLabsStimmen(): Promise<TtsVoice[]> {
 
 /** Adressen der Hörproben, gemerkt aus dem letzten Abruf der Stimmenliste. */
 const previewUrls = new Map<string, string>()
+
+/**
+ * Stimmen der ElevenLabs-Bibliothek zu Sprache und Geschlecht (07.10.2026, Wunsch der Lehrkraft: „nur englische
+ * Stimmen in der Liste"). Die eigene Liste des Kontos enthält nur mitgelieferte und übernommene Stimmen; native
+ * Sprecherinnen und Sprecher anderer Sprachen stehen in der Bibliothek. Nutzen lassen sie sich über die Schnittstelle
+ * erst nach der Übernahme ins Konto – und nur mit bezahltem Tarif.
+ */
+export async function bibliothekSuchen(sprache: string, geschlecht: 'female' | 'male'): Promise<{ stimmen: BibliotheksStimme[]; gesperrt: string }> {
+  const tier = await accountTier()
+  if (tier.startsWith('free'))
+    return { stimmen: [], gesperrt: 'Im kostenlosen ElevenLabs-Tarif lassen sich Stimmen aus der Bibliothek nicht über die Schnittstelle nutzen.' }
+  const sp = String(sprache ?? '')
+    .toLowerCase()
+    .split(/[-_]/)[0]
+    .slice(0, 8)
+  const res = await request(
+    `/v1/shared-voices?page_size=40&language=${encodeURIComponent(sp)}&gender=${geschlecht === 'male' ? 'male' : 'female'}&sort=usage_character_count_1y`
+  )
+  const data = (await res.json()) as {
+    voices?: {
+      voice_id: string
+      public_owner_id: string
+      name: string
+      gender?: string
+      accent?: string
+      language?: string
+      description?: string
+      preview_url?: string
+    }[]
+  }
+  const stimmen = (data.voices ?? []).map((v) => ({
+    voiceId: v.voice_id,
+    publicOwnerId: v.public_owner_id,
+    name: v.name,
+    gender: v.gender ?? '',
+    accent: v.accent ?? '',
+    language: v.language ?? sp,
+    description: String(v.description ?? '').slice(0, 300),
+    ...(v.preview_url ? { previewUrl: v.preview_url } : {})
+  }))
+  for (const v of stimmen) if (v.previewUrl) previewUrls.set(v.voiceId, v.previewUrl)
+  return { stimmen, gesperrt: '' }
+}
+
+/** Eine Bibliotheksstimme ins Konto übernehmen – danach steht sie in der Stimmenliste und spricht über die Schnittstelle */
+export async function bibliothekUebernehmen(publicOwnerId: string, voiceId: string, name: string): Promise<string> {
+  const id = (s: string): string => {
+    if (!/^[A-Za-z0-9]{6,64}$/.test(String(s ?? ''))) throw new Error('Ungültige Kennung der Stimme.')
+    return s
+  }
+  const res = await request(`/v1/voices/add/${id(publicOwnerId)}/${id(voiceId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ new_name: String(name ?? '').slice(0, 80) || 'Stimme' })
+  })
+  const data = (await res.json()) as { voice_id?: string }
+  return data.voice_id ?? voiceId
+}
 
 /**
  * Hörprobe einer Stimme als data:-Adresse.
@@ -373,7 +446,8 @@ function soloSynthese(req: TtsRequest): Synthese {
           // eleven_multilingual_v2 erkennt die Sprache selbst; language_code wird dort nicht unterstützt
           JSON.stringify({ text, model_id: TTS_MODEL, voice_settings: settingsBody(req.settings), ...rand })
         )
-        if (r) return [{ mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'), zeilen: zeilen.length, zeiten: zeitenAusAusrichtung(r.daten.alignment, texte) }]
+        if (r)
+          return [{ mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'), zeilen: zeilen.length, zeiten: zeitenAusAusrichtung(r.daten.alignment, texte) }]
       }
       const parts: Buffer[] = []
       const ids: string[] = []
@@ -419,7 +493,11 @@ function dialogSynthese(req: TtsRequest): Synthese {
         })
         const r = await mitZeitmarken('/v1/text-to-dialogue/with-timestamps?output_format=mp3_44100_128', body)
         if (r) {
-          teile.push({ mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'), zeilen: block.length, zeiten: zeitenAusDialog(r.daten.voice_segments, block.length) })
+          teile.push({
+            mp3: Buffer.from(r.daten.audio_base64 ?? '', 'base64'),
+            zeilen: block.length,
+            zeiten: zeitenAusDialog(r.daten.voice_segments, block.length)
+          })
           continue
         }
         const res = await request('/v1/text-to-dialogue?output_format=mp3_44100_128', { method: 'POST', body })

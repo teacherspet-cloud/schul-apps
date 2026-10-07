@@ -30,6 +30,8 @@ export interface Darstellung {
   tempo: 'langsam' | 'normal' | 'schnell'
   /** Gewählte Stimme je Sprache („en" → Name der Stimme) – nur auf dem Gerät */
   stimmen: Record<string, string>
+  /** Aufgenommene Aussprache der Vokabeln: weibliche oder männliche Fassung (07.10.2026); fehlt sie, die andere */
+  aussprache: 'w' | 'm'
   // ---------- Lernen (06.10.2026)
   /** Übungstage je Woche */
   wochenziel: number
@@ -57,6 +59,7 @@ export const VORGABE: Darstellung = {
   vorlesen: false,
   tempo: 'normal',
   stimmen: {},
+  aussprache: 'w',
   wochenziel: 3,
   tipps: true,
   spiele: true,

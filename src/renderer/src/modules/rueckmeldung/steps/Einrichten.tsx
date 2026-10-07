@@ -273,6 +273,7 @@ export default function Einrichten(): React.JSX.Element | null {
                       />
                       <DropZone
                         onFiles={(f) => void materialLesen(f, 'aufgabe')}
+                        sammeln
                         accept={MATERIAL_ACCEPT}
                         title={leseAufgabe ?? 'Aufgabenblatt hierher ziehen'}
                         hint="Foto, Scan, PDF, Word oder Text – die KI übernimmt Aufgabe und nötiges Material, den Erwartungshorizont und erkennt Fach und Jahrgang."
@@ -298,6 +299,7 @@ export default function Einrichten(): React.JSX.Element | null {
                     {quelle === 'frei' && (
                       <DropZone
                         onFiles={(f) => void materialLesen(f, 'erwartung')}
+                        sammeln
                         accept={MATERIAL_ACCEPT}
                         title={leseErwartung ?? 'Lösung oder Erwartungshorizont hierher ziehen (optional)'}
                         hint="Wird übertragen und ersetzt den Text darunter"

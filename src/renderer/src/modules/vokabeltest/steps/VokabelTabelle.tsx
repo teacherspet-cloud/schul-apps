@@ -1,6 +1,6 @@
-import { satzSchluessel, sprachKurz, type MedienSicht, type TonArt } from '@shared/medienbank'
+import { saetzeVon, satzSchluessel, sprachKurz, tonVon, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { BildDialog, BildZelle, TonZelle } from '../../../shared/medien/MedienUi'
-import { starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
+import { lagenVon, starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
 import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
@@ -116,7 +116,8 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   const tabelle = useRef<HTMLTableElement>(null)
   // Medienbank: offenes Bild-Pop-up und Standardstimme der Sprache (für einzelne Aussprachen)
   const [bildOffen, setBildOffen] = useState<TabellenZeile | null>(null)
-  const [stimme, setStimme] = useState('')
+  // Standardstimmen der Sprache: weibliche und männliche Fassung (07.10.2026)
+  const [stimmen, setStimmen] = useState<Stimmen>({})
   const medienSprache = medien ? sprachKurz(medien.sprache) : ''
   const medienAdmin = Boolean(medien?.admin)
   const neuLaden = medien?.neuLaden
@@ -127,8 +128,8 @@ export default function VokabelTabelle<T extends TabellenZeile>({
   useEffect(() => {
     if (medienAdmin && medienSprache)
       void window.api.medien.stimmen().then(
-        (s) => setStimme(s[medienSprache] ?? ''),
-        () => setStimme('')
+        (s) => setStimmen(s[medienSprache] ?? {}),
+        () => setStimmen({})
       )
   }, [medienAdmin, medienSprache])
   /*
@@ -136,20 +137,20 @@ export default function VokabelTabelle<T extends TabellenZeile>({
    * Die Zelle dreht, bis er fertig ist; Fehler meldet der Auftrag selbst.
    */
   const tonErzeugenFuer = useCallback(
-    async (wort: string, art: TonArt, text: string): Promise<void> => {
-      if (!stimme) throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte).')
+    async (wort: string, art: TonArt, text: string, lage: Stimmlage = 'w'): Promise<void> => {
+      if (!stimmen[lage]) throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte).')
       const zeile = aktuell.current.zeilen.find((z) => z.term === wort)
       await starteMedienAuftrag({
         art: art === 'wort' ? 'aussprache' : 'satz',
         sprache: medienSprache,
         vokabeln: [{ term: wort, translation: zeile?.translation ?? '', example: art === 'satz' ? text : zeile?.example }],
         ziel: zielRef.current,
-        stimme,
+        lagen: [lage],
         einzeln: true
       })
       neuLaden?.()
     },
-    [stimme, medienSprache, neuLaden]
+    [stimmen, medienSprache, neuLaden]
   )
 
   useEffect(() => {
@@ -259,6 +260,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
                 medienAdmin={medienAdmin}
                 bildOeffnen={setBildOffen}
                 tonErzeugen={tonErzeugenFuer}
+                lagen={lagenVon(stimmen).join(',')}
               />
             ))}
           </Table.Tbody>
@@ -302,7 +304,9 @@ interface ZeilenProps {
   sicht?: MedienSicht
   medienAdmin: boolean
   bildOeffnen: (z: TabellenZeile) => void
-  tonErzeugen: (wort: string, art: TonArt, text: string) => Promise<void>
+  tonErzeugen: (wort: string, art: TonArt, text: string, lage?: Stimmlage) => Promise<void>
+  /** Fassungen mit Standardstimme (weiblich/männlich) – eine Zelle je Fassung */
+  lagen: string
 }
 
 /** Mitwachsende Felder: eng wie eine Eingabezeile, ohne Ziehgriff, Umbruch auch in langen Wörtern */
@@ -333,8 +337,12 @@ const Zeile = memo(function Zeile({
   sicht,
   medienAdmin,
   bildOeffnen,
-  tonErzeugen: tonFuer
+  tonErzeugen: tonFuer,
+  lagen: lagenText
 }: ZeilenProps): React.JSX.Element {
+  // Fassungen der Aussprache (07.10.2026): ohne eingestellte Stimme eine Zelle wie bisher (weiblich = bisherige Felder)
+  const lagen: Stimmlage[] = lagenText ? (lagenText.split(',') as Stimmlage[]) : ['w']
+  const zwei = lagen.length > 1
   const name = v.term.trim() || `Zeile ${nr}`
   const abgefragt = v.include !== false
   // Wort, Beispiel und Nennform/Lesung in der Schrift der Sprache; Deutsch und Hinweis bleiben, wie sie sind
@@ -443,17 +451,35 @@ const Zeile = memo(function Zeile({
             <BildZelle sicht={sicht} wort={v.term} onOeffnen={() => bildOeffnen(v)} />
           </Table.Td>
           <Table.Td>
-            <TonZelle ton={sicht?.ton} text={v.term} art="wort" admin={medienAdmin} erzeugen={() => tonFuer(v.term, 'wort', v.term)} />
+            <Group gap={4} wrap="nowrap">
+              {lagen.map((l) => (
+                <TonZelle
+                  key={l}
+                  ton={tonVon(sicht, l)}
+                  text={v.term}
+                  art="wort"
+                  lage={zwei ? l : undefined}
+                  admin={medienAdmin}
+                  erzeugen={() => tonFuer(v.term, 'wort', v.term, l)}
+                />
+              ))}
+            </Group>
           </Table.Td>
           {mitBeispiel && (
             <Table.Td>
-              <TonZelle
-                ton={v.example ? sicht?.saetze?.[satzSchluessel(v.example)] : undefined}
-                text={v.example ?? ''}
-                art="satz"
-                admin={medienAdmin}
-                erzeugen={() => tonFuer(v.term, 'satz', v.example ?? '')}
-              />
+              <Group gap={4} wrap="nowrap">
+                {lagen.map((l) => (
+                  <TonZelle
+                    key={l}
+                    ton={v.example ? saetzeVon(sicht, l)?.[satzSchluessel(v.example)] : undefined}
+                    text={v.example ?? ''}
+                    art="satz"
+                    lage={zwei ? l : undefined}
+                    admin={medienAdmin}
+                    erzeugen={() => tonFuer(v.term, 'satz', v.example ?? '', l)}
+                  />
+                ))}
+              </Group>
             </Table.Td>
           )}
         </>

@@ -40,7 +40,7 @@ import { zielAdresse } from '../renderer/src/shared/pcAdresse'
 
 export const KANAELE_TEXTE = ['ai:structured', 'ai:websuche'] as const
 export const KANAELE_BILDER = ['ai:image'] as const
-export const KANAELE_HOERTEXTE = ['audio:voices', 'audio:speak', 'audio:preview'] as const
+export const KANAELE_HOERTEXTE = ['audio:voices', 'audio:speak', 'audio:preview', 'audio:bibliothek', 'audio:bibliothek-uebernehmen'] as const
 /** Lange Anfragen, die über das Auftragsregister am PC laufen (wie AUFTRAGS_KANAELE in main/services/lanAuftraege.ts) */
 export const UEBER_REGISTER: readonly string[] = ['ai:structured', 'ai:image', 'ai:websuche', 'audio:speak']
 
@@ -375,7 +375,10 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
 
   async function anmeldenEinmal(v: NetzVerbindung, pin: string): Promise<void> {
     if (!/^\d{6}$/.test(pin)) throw new Error('Die PIN hat sechs Ziffern – sie steht am PC unter Einstellungen › Netzwerk.')
-    if (pin === abgelehntePin) throw new Error('Der PC hat die PIN abgelehnt. Die aktuelle PIN steht am PC unter Einstellungen › Netzwerk; nach dem Eintragen „Verbindung testen" wählen.')
+    if (pin === abgelehntePin)
+      throw new Error(
+        'Der PC hat die PIN abgelehnt. Die aktuelle PIN steht am PC unter Einstellungen › Netzwerk; nach dem Eintragen „Verbindung testen" wählen.'
+      )
     const steuerung = new AbortController()
     const frist = setTimeout(() => steuerung.abort(), KURZ_MS)
     try {
@@ -656,7 +659,14 @@ export function erstellePcKi(o: PcKiOptionen): PcKi {
       ...hier,
       ...(texte
         ? pc
-          ? { textProvider: pc.textProvider, textModel: pc.textModel, textAccess: pc.textAccess, hasTextKey: pc.hasTextKey, economy: pc.economy, textOptions: pc.textOptions }
+          ? {
+              textProvider: pc.textProvider,
+              textModel: pc.textModel,
+              textAccess: pc.textAccess,
+              hasTextKey: pc.hasTextKey,
+              economy: pc.economy,
+              textOptions: pc.textOptions
+            }
           : { hasTextKey: true, textOptions: [] }
         : {}),
       ...(bilder

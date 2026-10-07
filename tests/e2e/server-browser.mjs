@@ -10,6 +10,7 @@
 import { chromium } from 'playwright-core'
 import { mkdirSync } from 'fs'
 import { join, resolve } from 'path'
+import { expertenmodus } from './warten.mjs'
 
 const out = resolve(process.argv[2] ?? 'test-results/server-browser')
 const adresse = process.argv[3] ?? 'http://localhost:18443'
@@ -49,6 +50,7 @@ try {
   pruefe(assistent, 'erste Anmeldung: Einrichtungsassistent erscheint')
   await page.screenshot({ path: join(out, '2-assistent.png') })
   if (assistent) await page.getByRole('button', { name: 'Später einrichten' }).click().catch(() => undefined)
+  if (assistent) await expertenmodus(page)
   await page.waitForTimeout(800)
   await page.reload()
   await page.waitForTimeout(2500)

@@ -13,7 +13,7 @@
  * - Ein Pop-up („Von der KI erzeugen") darf geschlossen werden: Der Auftrag läuft weiter, die Tabelle zeigt das
  *   Bild, sobald es da ist (`medienGeaendert`).
  */
-import { satzSchluessel, sprachKurz, istGanzerSatz, type MedienSicht } from '@shared/medienbank'
+import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonVon, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
 import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehlt, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
@@ -107,8 +107,8 @@ export interface MedienStart {
   sprache: string
   vokabeln: Vokabel[]
   ziel: MedienZiel
-  /** Stimme für die Aussprache – fehlt = Standardstimme der Sprache */
-  stimme?: string
+  /** Nur diese Fassungen der Aussprache – fehlt = alle, für die eine Standardstimme eingestellt ist */
+  lagen?: Stimmlage[]
   /** Nur diese Wörter, auch wenn sie schon Medien haben (einzelne Zelle, Pop-up) – sonst nur, was fehlt */
   einzeln?: boolean
 }
@@ -120,19 +120,52 @@ export interface MedienErgebnis {
   gesamt: number
 }
 
-/** Was einem Wort fehlt – nur das wird in Auftrag gegeben */
-export function offeneVokabeln(art: MedienArt, vokabeln: Vokabel[], daten: Record<string, MedienSicht>): Vokabel[] {
-  const woerter = vokabeln.filter((v) => v.term.trim())
-  if (art === 'bilder' || art === 'bildKi') return woerter.filter((v) => !daten[v.term]?.bild)
-  if (art === 'aussprache') return woerter.filter((v) => !daten[v.term]?.ton || daten[v.term]?.ton?.text.trim() !== v.term.trim())
-  return woerter.filter((v) => istGanzerSatz(v.example) && !daten[v.term]?.saetze?.[satzSchluessel(v.example!)])
+/** Fehlt diesem Wort die Aussprache in dieser Fassung? */
+const tonFehlt = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, lage: Stimmlage): boolean => {
+  if (art === 'aussprache') {
+    const t = tonVon(sicht, lage)
+    return !t || t.text.trim() !== v.term.trim()
+  }
+  return istGanzerSatz(v.example) && !saetzeVon(sicht, lage)?.[satzSchluessel(v.example!)]
 }
 
+/**
+ * Was einem Wort fehlt – nur das wird in Auftrag gegeben. `lagen`: Fassungen der Aussprache, die es geben soll
+ * (eingestellte Standardstimmen, 07.10.2026) – fehlt eine davon, ist das Wort offen.
+ */
+export function offeneVokabeln(art: MedienArt, vokabeln: Vokabel[], daten: Record<string, MedienSicht>, lagen: Stimmlage[] = ['w']): Vokabel[] {
+  const woerter = vokabeln.filter((v) => v.term.trim())
+  if (art === 'bilder' || art === 'bildKi') return woerter.filter((v) => !daten[v.term]?.bild)
+  return woerter.filter((v) => lagen.some((l) => tonFehlt(art, v, daten[v.term], l)))
+}
+
+/** Fassungen, für die eine Standardstimme eingestellt ist */
+export const lagenVon = (s: Stimmen | undefined): Stimmlage[] => STIMMLAGEN.filter((l) => Boolean(s?.[l]))
+
 /** Ein Wort bearbeiten; false = kein passendes Bild gefunden */
-async function eines(art: MedienArt, sp: string, v: Vokabel, stimme: string, lernende: Lernende, k: AuftragsKontext): Promise<boolean> {
+async function eines(
+  art: MedienArt,
+  sp: string,
+  v: Vokabel,
+  stimmen: Stimmen,
+  lagen: Stimmlage[],
+  sicht: MedienSicht | undefined,
+  einzeln: boolean,
+  lernende: Lernende,
+  k: AuftragsKontext
+): Promise<boolean> {
   const ki: Ki = { ai: k.ai, bild: k.bild }
-  if (art === 'aussprache') return await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'wort', v.term, stimme)), true
-  if (art === 'satz') return await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'satz', v.example ?? '', stimme)), true
+  if (art === 'aussprache' || art === 'satz') {
+    // Je Fassung mit eingestellter Stimme – nur die fehlende, außer bei einzelnem Neu-Erzeugen
+    for (const l of lagen) {
+      if (!einzeln && !tonFehlt(art, v, sicht, l)) continue
+      const stimme = stimmen[l]!
+      await beimDienst(k, 'sprache', () =>
+        art === 'aussprache' ? tonErzeugen(sp, v.term, 'wort', v.term, stimme, l) : tonErzeugen(sp, v.term, 'satz', v.example ?? '', stimme, l)
+      )
+    }
+    return true
+  }
   if (art === 'bildKi') return await beimDienst(k, 'bildki', () => bildErzeugen(sp, v, lernende, ki)), true
   const kandidaten = await beimDienst(k, 'bildsuche', () => bildKandidaten(sp, v, lernende))
   if (!kandidaten.length) return false
@@ -177,27 +210,25 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
       }
       try {
         let liste = e.vokabeln.filter((v) => v.term.trim())
-        if (!e.einzeln) {
-          // Frisch nachsehen, was fehlt – inzwischen kann ein anderer Auftrag einiges erledigt haben
-          const daten = await window.api.medien.eintraege(
-            sp,
-            liste.map((v) => v.term)
-          )
-          liste = offeneVokabeln(e.art, liste, daten)
-        }
-        let stimme = e.stimme ?? ''
-        if ((e.art === 'aussprache' || e.art === 'satz') && !stimme) {
-          stimme = (await window.api.medien.stimmen())[sp] ?? ''
-          if (!stimme)
-            throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte › „Aussprache der Vokabeln“).')
-        }
+        const ton = e.art === 'aussprache' || e.art === 'satz'
+        // Weibliche und männliche Fassung (07.10.2026): je eingestellter Standardstimme
+        const stimmen: Stimmen = ton ? (await window.api.medien.stimmen())[sp] ?? {} : {}
+        const lagen = lagenVon(stimmen).filter((l) => !e.lagen || e.lagen.includes(l))
+        if (ton && !lagen.length)
+          throw new Error('Für diese Sprache ist keine Standardstimme eingestellt (Einstellungen › Bilder und Hörtexte › „Aussprache der Vokabeln“).')
+        // Frisch nachsehen, was fehlt – inzwischen kann ein anderer Auftrag einiges erledigt haben
+        const daten = await window.api.medien.eintraege(
+          sp,
+          liste.map((v) => v.term)
+        )
+        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen)
         const erg: MedienErgebnis = { erledigt: 0, leer: 0, fehler: 0, gesamt: liste.length }
         let ersterFehler: unknown = null
         for (const [i, v] of liste.entries()) {
           if (k.signal.aborted) break
           k.melde(`„${v.term}" (${i + 1} von ${liste.length})`, i, liste.length)
           try {
-            if (await eines(e.art, sp, v, stimme, { klasse: e.ziel.klasse }, k)) erg.erledigt++
+            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), { klasse: e.ziel.klasse }, k)) erg.erledigt++
             else erg.leer++
             medienGeaendert(sp)
           } catch (fehler) {
