@@ -12,6 +12,8 @@
  * Nation 2001 zum Zusammenhang von Textabdeckung und Verstehen).
  */
 import type { Textbook, TextbookMeta } from '@shared/types'
+import { bekannteGrammatik, LEHRWERK_GRAMMATIK, type LehrwerkGrammatikPunkt } from './lehrwerkGrammatik'
+import { kapitelFolge } from './lehrwerkThemen'
 
 /** Ab dieser Klasse ist der Lehrwerkswortschatz nur noch eine Orientierung. */
 export const STRICT_UP_TO_GRADE = 7
@@ -31,6 +33,8 @@ export interface KnownVocab {
   /** Band und Unit der Auswahl – daraus liest die App die Themen früherer Units (lehrwerkThemen.ts) */
   buch?: string
   unit?: string
+  /** Erster gewählter Abschnitt („Station 2") – bekannt ist die Grammatik der Stationen davor (07.10.2026) */
+  abschnitt?: string
   /** Frühere Bände derselben Reihe, ältester zuerst */
   fruehereBaende?: string[]
 }
@@ -116,8 +120,58 @@ export async function collectKnownVocab(
     source: `${volumes.length > 1 ? `${volumes[0]} bis ${volumes[volumes.length - 1]}` : volumes[0]}, bis ${unitName}`,
     buch: book.name,
     unit: unitName,
+    ...(sectionNames[0] ? { abschnitt: book.units.find((u) => u.name === unitName)?.sections.find((s) => sectionNames.includes(s.name))?.name } : {}),
     fruehereBaende: earlier.map((b) => b.name)
   }
+}
+
+/**
+ * Bekannte Grammatik zur Lehrwerksstelle (07.10.2026, Liste der Lehrkraft je Station – lehrwerkGrammatik.ts):
+ * was die Lerngruppe kennt, was sie gerade lernt und was noch nicht vorausgesetzt werden darf. Null, wenn für den
+ * Band nichts hinterlegt ist.
+ */
+export function grammatikStand(known: KnownVocab | null | undefined): { bekannt: string[]; neu: string[]; spaeter: string[] } | null {
+  if (!known?.buch || !known.unit || !LEHRWERK_GRAMMATIK[known.buch]) return null
+  const s = bekannteGrammatik(
+    kapitelFolge(known.buch),
+    known.buch,
+    known.unit,
+    known.abschnitt,
+    (known.fruehereBaende ?? []).map((b) => ({ buch: b, kapitel: kapitelFolge(b) }))
+  )
+  const texte = (l: LehrwerkGrammatikPunkt[]): string[] => [...new Set(l.filter((p) => !p.w && p.t.length).map((p) => p.text))]
+  return { bekannt: texte(s.bekannt), neu: texte(s.neu), spaeter: texte(s.spaeter) }
+}
+
+/** Grammatik-Regeln für die Prompts (deutsch) – leer ohne hinterlegte Grammatik */
+export function knownGrammarRulesDe(known: KnownVocab | null | undefined): string {
+  const g = grammatikStand(known)
+  if (!g || (!g.bekannt.length && !g.neu.length)) return ''
+  return [
+    `BEKANNTE GRAMMATIK (${known!.buch}, Niedersachsen, vor ${known!.unit}${known!.abschnitt ? `, ${known!.abschnitt}` : ''}):`,
+    g.bekannt.length ? g.bekannt.join('; ') : '(noch keine)',
+    g.neu.length ? `Wird gerade eingeführt: ${g.neu.join('; ')}` : '',
+    known!.strict
+      ? '- Setze in Texten, Beispielsätzen und Arbeitsanweisungen nur diese Grammatik voraus; die gerade eingeführte nur, wo sie geübt wird.'
+      : '- Baue auf dieser Grammatik auf; darüber hinaus nur, wenn der Inhalt es verlangt.',
+    g.spaeter.length ? `- Noch nicht eingeführt (nicht voraussetzen, außer es ist das Thema des Materials): ${g.spaeter.slice(0, 14).join('; ')}` : ''
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** Dasselbe englisch (Vokabeltest-Prompts) */
+export function knownGrammarRules(known: KnownVocab | null | undefined): string[] {
+  const g = grammatikStand(known)
+  if (!g || (!g.bekannt.length && !g.neu.length)) return []
+  return [
+    `Grammar the class already knows (${known!.buch}, Lower Saxony edition): ${g.bekannt.join('; ') || 'none yet'}.`,
+    ...(g.neu.length ? [`Grammar being introduced right now: ${g.neu.join('; ')}.`] : []),
+    known!.strict
+      ? 'Do not use grammar beyond this in sentences, examples or instructions.'
+      : 'Build on this grammar; go beyond it only where the content requires it.',
+    ...(g.spaeter.length ? [`Not yet introduced (do not presuppose): ${g.spaeter.slice(0, 14).join('; ')}.`] : [])
+  ]
 }
 
 /**
@@ -128,16 +182,18 @@ export function knownVocabRules(known: KnownVocab | null | undefined): string[] 
   if (!known || !known.words.length) return []
   const list = known.words.join(', ')
   const shown = known.words.length < known.total ? `the ${known.words.length} most recently learned of them are listed here` : 'here is the complete list'
-  return known.strict
-    ? [
-        `The class works with ${known.source}. Apart from the words being practised, use ONLY vocabulary the class has already met there (${shown}), plus numbers, names and the most basic function words.`,
-        `Known vocabulary: ${list}`,
-        'If you need a word that is not part of this vocabulary, rewrite the sentence instead.'
-      ]
-    : [
-        `The class works with ${known.source}. Build on the vocabulary already met there (${shown}); go beyond it only where the content requires it.`,
-        `Known vocabulary: ${list}`
-      ]
+  return (
+    known.strict
+      ? [
+          `The class works with ${known.source}. Apart from the words being practised, use ONLY vocabulary the class has already met there (${shown}), plus numbers, names and the most basic function words.`,
+          `Known vocabulary: ${list}`,
+          'If you need a word that is not part of this vocabulary, rewrite the sentence instead.'
+        ]
+      : [
+          `The class works with ${known.source}. Build on the vocabulary already met there (${shown}); go beyond it only where the content requires it.`,
+          `Known vocabulary: ${list}`
+        ]
+  ).concat(knownGrammarRules(known))
 }
 
 /** Dieselben Regeln auf Deutsch – die Prompts für Klassenarbeit und Arbeitsblatt sind deutsch. */
@@ -150,7 +206,8 @@ export function knownVocabRulesDe(known: KnownVocab | null | undefined): string 
     known.strict
       ? '- Verwende außerhalb der geprüften Wörter nur diesen Wortschatz, dazu Zahlen, Namen und die einfachsten Funktionswörter.'
       : '- Bleibe möglichst in diesem Wortschatz; darüber hinaus nur, wenn der Inhalt es verlangt.',
-    known.strict ? '- Brauchst du ein Wort, das nicht dazugehört, formuliere den Satz um.' : ''
+    known.strict ? '- Brauchst du ein Wort, das nicht dazugehört, formuliere den Satz um.' : '',
+    knownGrammarRulesDe(known)
   ]
     .filter(Boolean)
     .join('\n')

@@ -12,6 +12,7 @@
  */
 import { GRAMMAR_TOPICS, einfuehrungsNiveau, defaultSequence, teilformenFuer, topicStart, type GrammarQuery, type GrammarTopic } from './grammar'
 import { LEHRWERK_THEMEN, kapitelFolge } from '../../../shared/lehrwerkThemen'
+import { grammatikStationen, LEHRWERK_GRAMMATIK } from '../../../shared/lehrwerkGrammatik'
 
 /** Kleinbuchstaben, Umlaute ausgeschrieben, Akzente weg – damit „Präsens", „praesens" und „présent" zusammenfinden */
 export function normalisiere(s: string): string {
@@ -313,9 +314,26 @@ export function fruehereBaende(buch: string): string[] {
 }
 
 function eintraegeAus(subjectId: string, band: string, kapitel: string[]): UnitEintrag[] {
-  return kapitel.flatMap((k) =>
-    zerlegeGrammatik(LEHRWERK_THEMEN[band]?.kapitel[k]?.grammatik ?? '').map((phrase) => ({ band, kapitel: k, phrase, ...ordneZu(subjectId, phrase, band) }))
-  )
+  return kapitel.flatMap((k) => {
+    /*
+     * Liste der Lehrkraft (Niedersachsen, je Station, 07.10.2026): fest zugeordnet und damit sicher – die Station steht
+     * mit am Kapitel („Unit 2 · Station 1"); sonst wie bisher die Angabe aus den Planungsmustern über die Zuordnungstabelle.
+     */
+    const stationen = LEHRWERK_GRAMMATIK[band]?.[k]
+    if (stationen) {
+      const gibt = new Set(GRAMMAR_TOPICS.filter((t) => t.subject === subjectId).map((t) => t.id))
+      return grammatikStationen(band, k).flatMap((s) =>
+        stationen[s].map((p) => {
+          const ids = [...new Set(p.t.map((x) => x.split('/')[0]))].filter((id) => gibt.has(id))
+          const ganz = new Set(p.t.filter((x) => !x.includes('/')))
+          // Teilformen nur, wo das Thema nicht ganz gemeint ist
+          const teile = p.t.filter((x) => x.includes('/') && gibt.has(x.split('/')[0]) && !ganz.has(x.split('/')[0]))
+          return { band, kapitel: s ? `${k} · ${s}` : k, phrase: p.w ? `${p.text} (Wiederholung)` : p.text, ids, teile, sicher: ids.length > 0 }
+        })
+      )
+    }
+    return zerlegeGrammatik(LEHRWERK_THEMEN[band]?.kapitel[k]?.grammatik ?? '').map((phrase) => ({ band, kapitel: k, phrase, ...ordneZu(subjectId, phrase, band) }))
+  })
 }
 
 /**
@@ -339,9 +357,11 @@ export function mitUnitAuswahl(eintraege: UnitEintrag[], themen: string[], teilf
   const teile = new Map<string, Set<string>>()
   for (const e of eintraege.filter((x) => x.sicher)) {
     for (const id of e.ids) {
-      if (e.teile.length && e.ids.length === 1) {
+      // Teilformen je Thema (die Liste der Lehrkraft nennt sie auch bei mehreren Themen eines Eintrags, 07.10.2026)
+      const eigene = e.teile.filter((k) => k.startsWith(`${id}/`))
+      if (eigene.length) {
         const s = teile.get(id) ?? new Set<string>()
-        e.teile.forEach((k) => s.add(k))
+        eigene.forEach((k) => s.add(k))
         teile.set(id, s)
       } else ganz.add(id)
     }

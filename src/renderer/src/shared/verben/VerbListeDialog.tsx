@@ -21,6 +21,9 @@ import { notifyError, notifySuccess } from '../util'
 import { newId } from '../../modules/vokabeltest/model/random'
 import { importiereVerbliste } from './import'
 import { dubletten } from './quellen'
+import { BildDialog, BildZelle, useBildKiDa, useMedienAdmin, useMedienbank, useMedienZiel } from '../medien/MedienUi'
+import type { Vokabel } from '../medien/medienbank'
+import { alsVokabel, FormenTonZelle, HinweisTonZelle, VerbMedienLeiste } from './VerbMedien'
 
 const EIGENER = '__eigener__'
 
@@ -50,6 +53,25 @@ export default function VerbListeDialog({
   const [erkannt, setErkannt] = useState<string>('')
   const [speichert, setSpeichert] = useState(false)
   const spalten = VERB_SPALTEN[sprache]
+  /*
+   * Bild und Aussprache je Verb (07.10.2026): aus der Medienbank, unter der Grundform – gemeinsam für alle Bände.
+   * Die Bildstufe richtet sich nach der Klasse des Bandes.
+   */
+  const medienAdmin = useMedienAdmin()
+  const bildKi = useBildKiDa()
+  const bandName = buecher.find((b) => b.id === wahl)?.name ?? listen.find((l) => l.id === wahl)?.name ?? (eigenerName.trim() || 'Verbliste')
+  const medienZiel = useMedienZiel({
+    docId: `verben:${wahl ?? ''}`,
+    titel: `Unregelmäßige Verben – ${bandName}`,
+    klasse: buecher.find((b) => b.id === wahl)?.grade
+  })
+  const verbVokabeln = useMemo(() => zeilen.map((z) => alsVokabel(z, sprache)), [zeilen, sprache])
+  const medien = useMedienbank(
+    sprache,
+    verbVokabeln.map((v) => v.term),
+    medienZiel.stufe
+  )
+  const [bildOffen, setBildOffen] = useState<Vokabel | null>(null)
 
   useEffect(() => {
     if (!opened) return
@@ -150,7 +172,7 @@ export default function VerbListeDialog({
 
   const speichern = async (): Promise<void> => {
     const buch = buecher.find((b) => b.id === wahl)
-    const name = buch?.name ?? (wahl === EIGENER ? eigenerName.trim() : (listen.find((l) => l.id === wahl)?.name ?? ''))
+    const name = buch?.name ?? (wahl === EIGENER ? eigenerName.trim() : listen.find((l) => l.id === wahl)?.name ?? '')
     if (!name) {
       notifyError(new Error('Zuerst den Band wählen oder einen Namen eingeben.'))
       return
@@ -195,7 +217,9 @@ export default function VerbListeDialog({
             placeholder="Band wählen"
             data-verbliste-band
           />
-          {wahl === EIGENER && <TextInput label="Name des Bandes" placeholder="z. B. Découvertes 2" value={eigenerName} onChange={(e) => setEigenerName(e.currentTarget.value)} />}
+          {wahl === EIGENER && (
+            <TextInput label="Name des Bandes" placeholder="z. B. Découvertes 2" value={eigenerName} onChange={(e) => setEigenerName(e.currentTarget.value)} />
+          )}
           <TextInput label="Seite im Buch (optional)" placeholder="z. B. S. 212–214" value={seite} onChange={(e) => setSeite(e.currentTarget.value)} />
         </Group>
 
@@ -234,12 +258,21 @@ export default function VerbListeDialog({
             <Button size="xs" variant="default" leftSection={<IconSortAscendingLetters size={14} />} onClick={sortiere} disabled={zeilen.length < 2}>
               Alphabetisch sortieren
             </Button>
-            <Button size="xs" variant="default" leftSection={<IconPlus size={14} />} onClick={() => setZeilen((z) => [...z, leereZeile()])} data-verbliste-zeile>
+            <Button
+              size="xs"
+              variant="default"
+              leftSection={<IconPlus size={14} />}
+              onClick={() => setZeilen((z) => [...z, leereZeile()])}
+              data-verbliste-zeile
+            >
               Zeile hinzufügen
             </Button>
           </Group>
         </Group>
 
+        {medienAdmin && verbVokabeln.some((v) => v.term) && (
+          <VerbMedienLeiste sprache={sprache} vokabeln={verbVokabeln.filter((v) => v.term)} daten={medien.daten} ziel={medienZiel} bildKi={bildKi} />
+        )}
         <ScrollArea.Autosize mah="50vh">
           <Table withTableBorder withColumnBorders striped={false} className="verbliste-tabelle" data-verbliste-tabelle>
             <Table.Thead>
@@ -249,6 +282,9 @@ export default function VerbListeDialog({
                   <Table.Th key={s.id}>{s.label}</Table.Th>
                 ))}
                 <Table.Th>Hinweis</Table.Th>
+                <Table.Th w={56}>Bild</Table.Th>
+                <Table.Th>Aussprache</Table.Th>
+                <Table.Th>Aussprache Hinweis</Table.Th>
                 <Table.Th w={100} />
               </Table.Tr>
             </Table.Thead>
@@ -285,6 +321,20 @@ export default function VerbListeDialog({
                     />
                   </Table.Td>
                   <Table.Td>
+                    <BildZelle
+                      sicht={medien.daten[verbVokabeln[i]?.term ?? '']}
+                      wort={verbVokabeln[i]?.term ?? ''}
+                      onOeffnen={() => verbVokabeln[i]?.term && setBildOffen(verbVokabeln[i])}
+                      stufe={medienZiel.stufe}
+                    />
+                  </Table.Td>
+                  <Table.Td>
+                    <FormenTonZelle sprache={sprache} zeile={z} verbSprache={sprache} sicht={medien.daten[verbVokabeln[i]?.term ?? '']} admin={medienAdmin} />
+                  </Table.Td>
+                  <Table.Td>
+                    <HinweisTonZelle sprache={sprache} zeile={z} verbSprache={sprache} sicht={medien.daten[verbVokabeln[i]?.term ?? '']} admin={medienAdmin} />
+                  </Table.Td>
+                  <Table.Td>
                     <Group gap={2} wrap="nowrap">
                       <ActionIcon size="sm" variant="subtle" aria-label="Zeile nach oben" onClick={() => verschiebe(i, -1)} disabled={i === 0}>
                         <IconArrowUp size={14} />
@@ -293,7 +343,13 @@ export default function VerbListeDialog({
                         <IconArrowDown size={14} />
                       </ActionIcon>
                       <Tooltip label="Zeile löschen">
-                        <ActionIcon size="sm" variant="subtle" color="red" aria-label="Zeile löschen" onClick={() => setZeilen((alt) => alt.filter((_, j) => j !== i))}>
+                        <ActionIcon
+                          size="sm"
+                          variant="subtle"
+                          color="red"
+                          aria-label="Zeile löschen"
+                          onClick={() => setZeilen((alt) => alt.filter((_, j) => j !== i))}
+                        >
                           <IconTrash size={14} />
                         </ActionIcon>
                       </Tooltip>
@@ -327,12 +383,29 @@ export default function VerbListeDialog({
             <Button variant="default" onClick={onClose}>
               Abbrechen
             </Button>
-            <Button leftSection={<IconDeviceFloppy size={16} />} onClick={() => void speichern()} loading={speichert} disabled={!wahl || !zeilen.length} data-verbliste-speichern>
+            <Button
+              leftSection={<IconDeviceFloppy size={16} />}
+              onClick={() => void speichern()}
+              loading={speichert}
+              disabled={!wahl || !zeilen.length}
+              data-verbliste-speichern
+            >
               Liste speichern
             </Button>
           </Group>
         </Group>
       </Stack>
+      {bildOffen && (
+        <BildDialog
+          sprache={sprache}
+          v={bildOffen}
+          sicht={medien.daten[bildOffen.term]}
+          admin={medienAdmin}
+          ziel={medienZiel}
+          schliessen={() => setBildOffen(null)}
+          geaendert={() => medien.laden()}
+        />
+      )}
     </Modal>
   )
 }

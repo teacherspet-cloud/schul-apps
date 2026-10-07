@@ -101,6 +101,8 @@ export default function VokabellisteModule({ active = true }: { active?: boolean
     }
     // Allgemeiner Medienauftrag ohne Stelle: nur das Programm
     if (id === 'vokabeln') return
+    // Unregelmäßige Verben (07.10.2026): die Liste steht im Dialog beim Lehrwerk – nur ins Programm wechseln
+    if (id.startsWith('verben:')) return
     const alle = await window.api.library.list()
     const liste = alle.find((l) => l.id === id)
     if (!liste) throw new Error('Die Liste gibt es nicht mehr.')

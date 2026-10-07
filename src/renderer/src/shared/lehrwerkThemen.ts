@@ -14,6 +14,8 @@
  * fehlende Angaben bleiben leer.
  */
 
+import { grammatikText, LEHRWERK_GRAMMATIK, QUELLE_NDS } from './lehrwerkGrammatik'
+
 export interface KapitelThema {
   titel: string
   thema?: string
@@ -216,6 +218,20 @@ export const LEHRWERK_THEMEN: Record<string, { quelle: string; kapitel: Record<s
       'Topic 4': { titel: 'Taking on responsibility' },
       'Topic 5': { titel: 'Living and working abroad', thema: 'Auslandsaufenthalt, Bewerbung, Lebenslauf' }
     }
+  }
+}
+
+/*
+ * Grammatik nach der Liste der Lehrkraft (Niedersachsen, je Station – lehrwerkGrammatik.ts, 07.10.2026) ersetzt die
+ * Angabe aus den Klett-Planungsmustern; Kapitel, die nur dort vorkommen (Trailer), kommen ans Ende des Bandes.
+ */
+for (const [buch, kapitel] of Object.entries(LEHRWERK_GRAMMATIK)) {
+  const band = LEHRWERK_THEMEN[buch]
+  if (!band) continue
+  band.quelle = `${band.quelle}; Grammatik: ${QUELLE_NDS}`
+  for (const k of Object.keys(kapitel)) {
+    band.kapitel[k] ??= { titel: k }
+    band.kapitel[k].grammatik = grammatikText(buch, k)
   }
 }
 

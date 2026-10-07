@@ -25,6 +25,10 @@ export interface Vokabel {
   term: string
   translation: string
   example?: string
+  /** Unregelmäßige Verben (07.10.2026): die gesprochenen Formen (infinitive, simple past, past participle) */
+  formen?: string[]
+  /** … und der Hinweis bzw. das Beispiel der Zeile */
+  hinweis?: string
 }
 
 /** Wie die Abläufe die KI erreichen – im Auftrag über dessen Kontext, sonst direkt */

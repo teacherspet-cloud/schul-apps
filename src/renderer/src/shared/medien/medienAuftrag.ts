@@ -64,13 +64,25 @@ export function medienGeaendert(sprache: string): void {
   for (const fn of hoerer) fn(sprachKurz(sprache))
 }
 
-export type MedienArt = 'bilder' | 'aussprache' | 'satz' | 'bildKi'
+export type MedienArt = 'bilder' | 'aussprache' | 'satz' | 'bildKi' | 'formen' | 'hinweis'
 
 const ART_NAME: Record<MedienArt, string> = {
   bilder: 'Beispielbilder suchen',
   aussprache: 'Aussprache erzeugen',
   satz: 'Satz-Aussprache erzeugen',
-  bildKi: 'Beispielbild von der KI'
+  bildKi: 'Beispielbild von der KI',
+  formen: 'Aussprache der Verbformen',
+  hinweis: 'Aussprache der Hinweise'
+}
+
+/*
+ * Unregelmäßige Verben (07.10.2026): Die Formen und der Hinweis einer Zeile liegen als „Sätze" im Eintrag der
+ * Grundform – so teilen alle Bände (und die Vokabellisten) Bild und Aussprache eines Verbs.
+ */
+const fehlendeTexte = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, lage: Stimmlage): string[] => {
+  const texte = art === 'formen' ? v.formen ?? [] : art === 'hinweis' && v.hinweis?.trim() ? [v.hinweis] : []
+  const da = saetzeVon(sicht, lage) ?? {}
+  return [...new Set(texte.map((t) => t.trim()).filter(Boolean))].filter((t) => !da[satzSchluessel(t)])
 }
 
 /** Schlüssel des Auftrags (Knöpfe zeigen „läuft", solange er da ist) */
@@ -124,6 +136,7 @@ export interface MedienErgebnis {
 
 /** Fehlt diesem Wort die Aussprache in dieser Fassung? */
 const tonFehlt = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, lage: Stimmlage): boolean => {
+  if (art === 'formen' || art === 'hinweis') return fehlendeTexte(art, v, sicht, lage).length > 0
   if (art === 'aussprache') {
     const t = tonVon(sicht, lage)
     return !t || t.text.trim() !== v.term.trim()
@@ -165,6 +178,15 @@ async function eines(
   k: AuftragsKontext
 ): Promise<boolean> {
   const ki: Ki = { ai: k.ai, bild: k.bild }
+  if (art === 'formen' || art === 'hinweis') {
+    for (const l of lagen) {
+      const texte = einzeln
+        ? [...new Set((art === 'formen' ? v.formen ?? [] : [v.hinweis ?? '']).map((t) => t.trim()).filter(Boolean))]
+        : fehlendeTexte(art, v, sicht, l)
+      for (const t of texte) await beimDienst(k, 'sprache', () => tonErzeugen(sp, v.term, 'satz', t, stimmen[l]!, l))
+    }
+    return true
+  }
   if (art === 'aussprache' || art === 'satz') {
     // Je Fassung mit eingestellter Stimme – nur die fehlende, außer bei einzelnem Neu-Erzeugen
     for (const l of lagen) {
@@ -227,7 +249,7 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
       }
       try {
         let liste = e.vokabeln.filter((v) => v.term.trim())
-        const ton = e.art === 'aussprache' || e.art === 'satz'
+        const ton = e.art === 'aussprache' || e.art === 'satz' || e.art === 'formen' || e.art === 'hinweis'
         // Weibliche und männliche Fassung (07.10.2026): je eingestellter Standardstimme
         const stimmen: Stimmen = ton ? (await window.api.medien.stimmen())[sp] ?? {} : {}
         const lagen = lagenVon(stimmen).filter((l) => !e.lagen || e.lagen.includes(l))

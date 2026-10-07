@@ -373,7 +373,7 @@ export function useStandardstimmen(sprache: string): Stimmen | null {
 }
 
 /** Ist eine Bild-KI eingerichtet? */
-function useBildKiDa(): boolean {
+export function useBildKiDa(): boolean {
   const [da, setDa] = useState(false)
   useEffect(() => {
     let weg = false

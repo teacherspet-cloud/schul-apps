@@ -236,7 +236,7 @@ describe('Lehrwerk-Themen je Unit', () => {
     expect(unit2?.text).toMatch(/London: Wow!.*London/)
     expect(unit2?.sicher).toBe(true)
     expect(unit2?.quelle).toMatch(/Green Line 2, Unit 2 – Klett/)
-    expect(fach.some((v) => v.text === 'Grammatik aus Unit 3: present perfect, present perfect vs. simple past, somebody/anything …')).toBe(true)
+    expect(fach.some((v) => v.text === 'Grammatik aus Unit 3: present perfect: Aussagen, present perfect: Fragen, Vergleich: present perfect und simple past, Zusammensetzungen mit some und any')).toBe(true)
     // Die gewählte Unit selbst ist kein Vorwissen
     expect(fach.some((v) => v.text.startsWith('Aus Unit 4'))).toBe(false)
   })
@@ -255,7 +255,7 @@ describe('Lehrwerk-Themen je Unit', () => {
     expect(r.vorschlaege.map((v) => v.text)).toEqual(
       expect.arrayContaining([
         'Unit 2: „London: Wow!“ (London; Sehenswürdigkeiten, Tube, Wegbeschreibung)',
-        'Grammatik: going to-Futur, Steigerung der Adjektive'
+        'Grammatik: going to-future: Aussagen, Fragen, Steigerung von Adjektiven'
       ])
     )
   })

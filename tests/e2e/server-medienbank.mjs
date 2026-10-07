@@ -135,6 +135,40 @@ try {
   await p.screenshot({ path: join(out, '3b-bildstufen.png') })
   await p.locator('[data-bildstufe-wahl]').getByText('Kl. 5–6').click()
 
+  // ---------- Unregelmäßige Verben (07.10.2026): Bild und Aussprache aller Formen und des Hinweises, w und m
+  await p.getByRole('button', { name: 'Unregelmäßige Verben' }).click()
+  await p.locator('[data-verbliste-zeile]').waitFor()
+  await p.locator('[data-verbliste-zeile]').click()
+  const reihe = p.locator('[data-verbliste-reihe]').last()
+  await reihe.getByLabel(/^infinitive/).fill('(to) swim')
+  await reihe.getByLabel(/^simple past/).fill('swam')
+  await reihe.getByLabel(/^past participle/).fill('swum')
+  await reihe.getByLabel(/^Hinweis/).fill('I swim every day.')
+  pruefe(await da(p.locator('[data-verb-medien-leiste]')), 'Verbliste: Admin-Leiste für Bilder und Aussprache')
+  await p.locator('[data-verb-medien="formen"]').click()
+  await p.waitForTimeout(500)
+  await p.locator('[data-verb-medien="formen"][data-loading]').waitFor({ state: 'detached', timeout: 90000 }).catch(() => undefined)
+  await p.locator('[data-verb-medien="hinweis"]').click()
+  await p.waitForTimeout(500)
+  await p.locator('[data-verb-medien="hinweis"][data-loading]').waitFor({ state: 'detached', timeout: 90000 }).catch(() => undefined)
+  await p.waitForTimeout(1500)
+  const formenTon = await reihe.locator('[data-verb-formen-ton] [data-verb-ton]').count()
+  const hinweisTon = await reihe.locator('[data-verb-hinweis-ton] [data-verb-ton]').count()
+  pruefe(formenTon === 6 && hinweisTon === 2, `Aussprache der drei Formen und des Hinweises, weiblich und männlich (${formenTon}/6, ${hinweisTon}/2)`)
+  await p.locator('[data-verb-medien="bilder"]').click()
+  await p.waitForTimeout(500)
+  await p.locator('[data-verb-medien="bilder"][data-loading]').waitFor({ state: 'detached', timeout: 90000 }).catch(() => undefined)
+  await p.waitForTimeout(1500)
+  pruefe((await reihe.locator('[data-beispielbild] img').count()) === 1, 'Bild zum Verb')
+  {
+    // Gemeinsam für alle Bände: die Medienbank kennt „swim" mit den Formen
+    const m = (await (await verwaltung.request.get(`${A}/s/api/medien?sprache=en&w=swim`)).json()).medien?.swim
+    pruefe(Boolean(m?.bild && m?.saetze?.['swam'] && m?.saetze?.['swum']), 'Medienbank: Bild und Formen unter der Grundform „swim" (für jeden Band)')
+  }
+  await p.screenshot({ path: join(out, '3c-verben.png') })
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(400)
+
   // ---------- Lehrkraft: nur ansehen
   const lehrer = await (
     await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })
@@ -230,6 +264,11 @@ try {
     await api(verwaltung, 'medien:bild-loeschen', 'en', w, 's3').catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort', undefined, 'm').catch(() => undefined)
+  }
+  for (const w of ['swim']) {
+    await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
+    for (const t of ['to swim', 'swam', 'swum', 'I swim every day.'])
+      for (const l of ['w', 'm']) await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'satz', t, l).catch(() => undefined)
   }
   await api(verwaltung, 'medien:stimme-setzen', 'en', '', 'w').catch(() => undefined)
   await api(verwaltung, 'medien:stimme-setzen', 'en', '', 'm').catch(() => undefined)

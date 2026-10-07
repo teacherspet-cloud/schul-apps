@@ -22,7 +22,6 @@ import {
   zerlegeGrammatik,
   ZUORDNUNG_KENNUNGEN
 } from '../src/renderer/src/modules/arbeitsblatt/didactics/grammatikAuswahl'
-import { LEHRWERK_THEMEN } from '../src/renderer/src/shared/lehrwerkThemen'
 
 const en = GRAMMAR_TOPICS.filter((t) => t.subject === 'englisch')
 const thema = (id: string) => GRAMMAR_TOPICS.find((t) => t.id === id)!
@@ -112,12 +111,11 @@ describe('Lehrwerk-Grammatik je Unit', () => {
   })
 
   it('jede Grammatikangabe der Green-Line-Bände ist sicher oder als Vorschlag zugeordnet', () => {
+    // Seit 07.10.2026 je Station fest zugeordnet (lehrwerkGrammatik.ts); nur „Australisches Englisch" ist keine Grammatik
     for (const buch of lehrwerkeMitGrammatik())
       for (const kap of grammatikKapitel(buch))
-        for (const phrase of zerlegeGrammatik(LEHRWERK_THEMEN[buch].kapitel[kap].grammatik!)) {
-          const z = ordneZu('englisch', phrase, buch)
-          expect(z.ids.length, `${buch} ${kap}: ${phrase}`).toBeGreaterThan(0)
-        }
+        for (const e of unitEintraege('englisch', buch, kap, 'nur'))
+          if (e.phrase !== 'Australisches Englisch') expect(e.ids.length, `${buch} ${kap}: ${e.phrase}`).toBeGreaterThan(0)
   })
 
   it('Kommas in Klammern trennen nicht', () => {
@@ -146,9 +144,9 @@ describe('Lehrwerk-Grammatik je Unit', () => {
 
   it('„Nur Unit" und „Alles bis Unit"', () => {
     const nur = unitEintraege('englisch', 'Green Line 2', 'Unit 2', 'nur')
-    expect(nur.map((e) => e.phrase)).toEqual(['going to-Futur', 'Steigerung der Adjektive'])
+    expect(nur.map((e) => e.phrase)).toEqual(['going to-future: Aussagen, Fragen', 'Steigerung von Adjektiven'])
     const bis = unitEintraege('englisch', 'Green Line 2', 'Unit 2', 'bis')
-    expect(bis.map((e) => e.kapitel)).toEqual(['Welcome back', 'Unit 1', 'Unit 2', 'Unit 2'])
+    expect(bis.map((e) => e.kapitel)).toEqual(['Welcome back', 'Unit 1 · Station 1', 'Unit 1 · Station 3', 'Unit 2 · Station 1', 'Unit 2 · Station 2'])
     const mitBand1 = unitEintraege('englisch', 'Green Line 2', 'Unit 2', 'bis', fruehereBaende('Green Line 2'))
     expect(mitBand1.some((e) => e.band === 'Green Line 1')).toBe(true)
     expect(unitEintraege('englisch', 'Green Line 2', 'Unit 9', 'nur')).toEqual([])
@@ -164,27 +162,33 @@ describe('Lehrwerk-Grammatik je Unit', () => {
     const r = mitUnitAuswahl(gl1, ['en.adj.comparison'], [])
     expect(r.themen).toContain('en.adj.comparison')
     expect(r.themen).toContain('en.verb.present_simple')
-    expect(r.themen).toContain('en.verb.have_got')
-    // simple present: Unit 2 (Aussagen) + Unit 3 (Fragen, Verneinung) → genau diese Teilformen
+    expect(r.themen).toContain('en.verb.there_is')
+    // simple present: Unit 2 (Aussagen) + Unit 3 (Fragen, Kurzantworten, Verneinung) → genau diese Teilformen
     expect(r.teilformen.filter((k) => k.startsWith('en.verb.present_simple/')).sort()).toEqual(
-      ['bejahung', 'fragen', 'schreibung', 'verneinung'].map((x) => `en.verb.present_simple/${x}`)
+      ['bejahung', 'fragen', 'kurzantworten', 'schreibung', 'verneinung'].map((x) => `en.verb.present_simple/${x}`)
     )
-    // Personalpronomen kommt ganz vor (Unit 1) → keine Einschränkung, obwohl Unit 2 nur Objektpronomen nennt
-    expect(r.teilformen.some((k) => k.startsWith('en.pron.personal/'))).toBe(false)
+    // Personalpronomen: Unit 1 Subjektformen, Unit 2 Objektformen → beide Teilformen
+    expect(r.teilformen.filter((k) => k.startsWith('en.pron.personal/')).sort()).toEqual(['en.pron.personal/objekt', 'en.pron.personal/subjekt'])
+    // Possessivbegleiter ganz → ohne Einschränkung
+    expect(r.themen).toContain('en.pron.possessive_det')
+    expect(r.teilformen.some((k) => k.startsWith('en.pron.possessive_det/'))).toBe(false)
     // Schon gewählt ohne Einschränkung bleibt ohne Einschränkung
     const schon = mitUnitAuswahl(gl1, ['en.verb.present_simple'], [])
     expect(schon.teilformen.some((k) => k.startsWith('en.verb.present_simple/'))).toBe(false)
   })
 
   it('unsichere Einträge kommen nicht in die Auswahl', () => {
-    const gl2u4 = unitEintraege('englisch', 'Green Line 2', 'Unit 4', 'nur')
-    const r = mitUnitAuswahl(gl2u4, [], [])
-    expect(r.themen).toEqual(['en.verb.will_future', 'en.cond.type1'])
+    // Ohne Liste der Lehrkraft (Green Line 2, Unit 5 hatte früher nur die Klett-Angabe): über die Zuordnungstabelle
+    expect(ordneZu('englisch', 'Modalverben').sicher).toBe(false)
+    const gl5u1 = unitEintraege('englisch', 'Green Line 5', 'Unit 1', 'nur')
+    const r = mitUnitAuswahl(gl5u1, [], [])
+    expect(r.themen).not.toContain('Australisches Englisch')
+    expect(r.themen).toContain('en.focus.emphasis')
   })
 
   it('Herkunft: aktueller Band vor früheren', () => {
     const k = herkunftKarte('englisch', 'Green Line 3', fruehereBaende('Green Line 3'))
-    expect(k.get('en.verb.pp_vs_past')).toBe('Unit 1')
-    expect(k.get('en.verb.going_to')).toBe('Green Line 2, Unit 2')
+    expect(k.get('en.verb.pp_vs_past')).toBe('Unit 1 · Station 2')
+    expect(k.get('en.verb.going_to')).toBe('Green Line 2, Unit 2 · Station 1')
   })
 })
