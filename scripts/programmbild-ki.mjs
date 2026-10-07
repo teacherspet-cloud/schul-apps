@@ -56,6 +56,10 @@ const MOTIVE = {
   meineklassen:
     'Tile colour: emerald to ocean blue (#20c997 to #1c7ed6). Motif: three simple white person silhouettes (head and shoulders) of different heights standing side by side in front of ' +
     'a white board with a small bar chart of three rising bars (green, yellow, green); a small round golden badge with a white check mark at the upper right of the board.',
+  // 07.10.2026: Grammatiktraining (Lern-App der Lernenden, Kachelfarbe grape wie in der Leiste)
+  grammatiktraining:
+    'Tile colour: grape purple (#cc5de8 to #9c36b5). Motif: three chunky rounded white building blocks lying in a row and snapping together like sentence parts, ' +
+    'each block with a coloured stripe on top (blue, yellow, green) and no letters; above them a small white dumbbell for training and a green check mark badge at the upper right.',
   // 03.10.2026: Vokabelspiele („Spielen mit deinen Wörtern")
   'spiel-memory':
     'Tile colour: coral red (#ff8787 to #e03131). Motif: four white memory cards in a 2 by 2 grid, two of them turned face up showing a matching pair (a small sun symbol on both), two face down with a question mark.',

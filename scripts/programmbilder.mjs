@@ -43,6 +43,7 @@ const IDS = [
   'laufendereihen',
   'freigaben',
   'vokabeltraining',
+  'grammatiktraining',
   'gruppe-unterricht',
   'gruppe-planung',
   'gruppe-pruefung',
