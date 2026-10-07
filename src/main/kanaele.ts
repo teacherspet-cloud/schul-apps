@@ -10,8 +10,8 @@
  *
  * Electron-Fassung der Umgebung: main/umgebung.ts. iPad-Fassung: mobil/umgebung.ts.
  */
-import { bildLoeschen, bildSetzen, medienDatei, medienFuer, stimmeSetzen, stimmenLesen, tonLoeschen, tonSetzen } from './services/storage/medienbank'
-import type { Stimmlage, TonArt } from '@shared/medienbank'
+import { bildLoeschen, bildSetzen, medienDatei, medienFuer, ohneBildMerken, stimmeSetzen, stimmenLesen, tonLoeschen, tonSetzen } from './services/storage/medienbank'
+import { istStufe, type Bildstufe, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { istAdmin, nurAdmin } from './services/rolle'
 import { ABLAGEN, type DokumentEingabe } from './services/storage/dokumente'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
@@ -517,8 +517,8 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
    * Medienbank der Vokabeln (05.10.2026, storage/medienbank.ts): Beispielbild, Aussprache von Wort und
    * Beispielsatz – einmal je Sprache und Wort. Ändern am Server nur Admins (rolle.ts).
    */
-  handle('medien:eintraege', (sprache: string, woerter: string[]) =>
-    medienFuer(sprache, Array.isArray(woerter) ? woerter.map(String) : [], { mitBildern: true })
+  handle('medien:eintraege', (sprache: string, woerter: string[], stufe?: Bildstufe) =>
+    medienFuer(sprache, Array.isArray(woerter) ? woerter.map(String) : [], { mitBildern: true, stufe: istStufe(stufe) ? stufe : 's2' })
   )
   handle('medien:datei', (datei: string) => medienDatei(String(datei)))
   handle('medien:stimmen', () => stimmenLesen())
@@ -529,9 +529,17 @@ export function registriereKanaele(handle: Handle, u: Umgebung): void {
   )
   handle(
     'medien:bild-setzen',
-    (sprache: string, wort: string, b: Parameters<typeof bildSetzen>[2]) => (nurAdmin('Die Beispielbilder'), bildSetzen(sprache, wort, b))
+    (sprache: string, wort: string, b: Parameters<typeof bildSetzen>[2], stufe?: Bildstufe) => (
+      nurAdmin('Die Beispielbilder'), bildSetzen(sprache, wort, b, istStufe(stufe) ? stufe : 's2')
+    )
   )
-  handle('medien:bild-loeschen', (sprache: string, wort: string) => (nurAdmin('Die Beispielbilder'), bildLoeschen(sprache, wort)))
+  handle('medien:bild-loeschen', (sprache: string, wort: string, stufe?: Bildstufe) => (
+    nurAdmin('Die Beispielbilder'), bildLoeschen(sprache, wort, istStufe(stufe) ? stufe : 's2')
+  ))
+  handle('medien:ohne-bild', (sprache: string, wort: string, stufe: Bildstufe) => {
+    nurAdmin('Die Beispielbilder')
+    if (istStufe(stufe)) ohneBildMerken(sprache, wort, stufe)
+  })
   handle(
     'medien:ton-setzen',
     (sprache: string, wort: string, art: TonArt, t: Parameters<typeof tonSetzen>[3], lage?: Stimmlage) => (

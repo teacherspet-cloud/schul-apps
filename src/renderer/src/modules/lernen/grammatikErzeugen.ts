@@ -70,7 +70,7 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
     system: [
       `Du erstellst einen Aufgabenpool für eine Grammatik-Lern-App (${a.fach}, Klasse ${a.jahrgang}${a.niveau ? `, Niveau ${a.niveau}` : ''}).`,
       'Die Lernenden üben selbstständig im Karteikasten-Prinzip; jede Aufgabe muss für sich allein verständlich und EINDEUTIG lösbar sein.',
-      'Regelkarten: 2–4 kurze Regeln zum Thema, Erklärung auf Deutsch, altersgerecht, mit 2–3 Beispielen in der Zielsprache.',
+      'Regelkarten: 2–4 kurze Regeln zum Thema (bei mehreren Themen je Thema 1–3, zusammen höchstens 8), Erklärung auf Deutsch, altersgerecht, mit 2–3 Beispielen in der Zielsprache.',
       'Aufgaben: genau 40, gemischt – etwa 12 Lücke, 8 Auswahl, 8 Umformen, 6 Fehler finden, 6 Satzbau. Alle Regeln abdecken, vom Leichten zum Schweren.',
       'Wortschatz passend zur Klassenstufe; keine Namen realer Personen (fiktive Vornamen sind in Ordnung).',
       'Lücke: genau eine Lücke „___", die Grundform in „vorgabe". Gib ALLE richtigen Formen in „loesungen" an (z. B. Kurz- und Langform).',
@@ -78,7 +78,7 @@ export async function erzeugeGrammatikPaket(a: GrammatikAuftrag, ai: Ai, melde: 
       'Satzbau: „teile" in RICHTIGER Reihenfolge; Satzzeichen hängen am letzten Teil.',
       'Felder, die für eine Aufgabenart nicht gelten, bleiben leer bzw. leere Liste.'
     ].join('\n'),
-    user: `Thema: ${a.thema}\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}${
+    user: `${a.thema.includes(' · ') ? `Themen (gemischt üben, Aufgaben gleichmäßig verteilen; Regelkarten zu jedem Thema): ${a.thema.split(' · ').join('; ')}` : `Thema: ${a.thema}`}\nZielsprache: ${a.sprache}${a.wunsch ? `\nWunsch der Lehrkraft: ${a.wunsch}` : ''}${
       a.teilformen
         ? `\n\n${a.teilformen}\nVerteile die Aufgaben auf die Teilformen zum Bilden; Teilformen „nur erkennen" nur in Auswahl- und Fehler-Aufgaben.`
         : ''

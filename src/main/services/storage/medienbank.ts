@@ -18,6 +18,10 @@ import {
   medienSchluessel,
   satzSchluessel,
   saetzeVon,
+  BILDSTUFEN,
+  bildDerStufe,
+  stufenReihe,
+  type Bildstufe,
   sprachKurz,
   stimmenNormiert,
   tonVon,
@@ -68,7 +72,15 @@ function index(): Record<string, MedienEintrag> {
 function aendern(schluessel: string, fn: (e: MedienEintrag) => MedienEintrag | null): void {
   const i = lies<Record<string, MedienEintrag>>(indexDatei(), {})
   const neu = fn(i[schluessel] ?? {})
-  const leer = !neu || (!neu.bild && !neu.ton && !neu.tonM && !Object.keys(neu.saetze ?? {}).length && !Object.keys(neu.saetzeM ?? {}).length)
+  const leer =
+    !neu ||
+    (!neu.bild &&
+      !Object.keys(neu.bildStufen ?? {}).length &&
+      !neu.ohneBild?.length &&
+      !neu.ton &&
+      !neu.tonM &&
+      !Object.keys(neu.saetze ?? {}).length &&
+      !Object.keys(neu.saetzeM ?? {}).length)
   if (!neu || leer) delete i[schluessel]
   else i[schluessel] = neu
   schreibe(indexDatei(), i)
@@ -107,8 +119,9 @@ const dataUrlVon = (datei: string): string | undefined => {
 export function medienFuer(
   sprache: string,
   woerter: string[],
-  opts: { mitBildern?: boolean; basisUrl?: string; lage?: Stimmlage } = {}
+  opts: { mitBildern?: boolean; basisUrl?: string; lage?: Stimmlage; stufe?: Bildstufe } = {}
 ): Record<string, MedienSicht> {
+  const stufe = opts.stufe ?? 's2'
   const i = index()
   const aus: Record<string, MedienSicht> = {}
   for (const w of woerter.slice(0, 2000)) {
@@ -119,6 +132,15 @@ export function medienFuer(
     const saetzeMitUrl = (s: Record<string, MedienTon> | undefined): Record<string, MedienTon & { url?: string }> | undefined =>
       s && Object.keys(s).length ? Object.fromEntries(Object.entries(s).map(([k, t]) => [k, mitUrl(t)])) : undefined
     /*
+     * Bildstufen (07.10.2026): das Bild der eigenen Stufe, sonst das der nächstliegenden. Für eine Stufe, in der die
+     * KI kein eindeutiges Bild sieht (abstrakte Wörter für Jüngere), bleibt das Bild leer.
+     */
+    const gefunden = e.ohneBild?.includes(stufe) ? undefined : stufenReihe(stufe).find((s) => bildDerStufe(e, s))
+    const b = gefunden ? bildDerStufe(e, gefunden) : undefined
+    const bildTeil: Partial<MedienSicht> = b
+      ? { bild: { ...b, ...(opts.basisUrl ? { url: url(b.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(b.datei) } : {}) }, bildStufe: gefunden }
+      : {}
+    /*
      * Lernende (07.10.2026): nur ihre Fassung, gleich aufgelöst – `ton`/`saetze` sind die bevorzugte Fassung,
      * wo sie fehlt, die andere. Ohne `lage` (Lehrkraft) kommen beide Fassungen.
      */
@@ -127,21 +149,20 @@ export function medienFuer(
       const ton = tonVon(e, opts.lage) ?? tonVon(e, andere)
       const saetze = saetzeMitUrl({ ...(saetzeVon(e, andere) ?? {}), ...(saetzeVon(e, opts.lage) ?? {}) })
       aus[w] = {
-        ...(e.bild
-          ? { bild: { ...e.bild, ...(opts.basisUrl ? { url: url(e.bild.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(e.bild.datei) } : {}) } }
-          : {}),
+        ...bildTeil,
         ...(ton ? { ton: mitUrl(ton) } : {}),
         ...(saetze ? { saetze } : {})
       }
       continue
     }
     const saetzeM = saetzeMitUrl(e.saetzeM)
+    const da = BILDSTUFEN.filter((s) => bildDerStufe(e, s))
     aus[w] = {
       ...(e.tonM ? { tonM: mitUrl(e.tonM) } : {}),
       ...(saetzeM ? { saetzeM } : {}),
-      ...(e.bild
-        ? { bild: { ...e.bild, ...(opts.basisUrl ? { url: url(e.bild.datei) } : opts.mitBildern ? { dataUrl: dataUrlVon(e.bild.datei) } : {}) } }
-        : {}),
+      ...bildTeil,
+      ...(da.length ? { bildStufenDa: da } : {}),
+      ...(e.ohneBild?.length ? { ohneBild: e.ohneBild } : {}),
       ...(e.ton ? { ton: { ...e.ton, ...(opts.basisUrl ? { url: url(e.ton.datei) } : {}) } } : {}),
       ...(e.saetze && Object.keys(e.saetze).length
         ? { saetze: Object.fromEntries(Object.entries(e.saetze).map(([k, t]) => [k, { ...t, ...(opts.basisUrl ? { url: url(t.datei) } : {}) }])) }
@@ -157,7 +178,8 @@ export const medienDatei = (datei: string): string | null => dataUrlVon(datei) ?
 export function bildSetzen(
   sprache: string,
   wort: string,
-  b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] }
+  b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] },
+  stufe: Bildstufe = 's2'
 ): MedienBild {
   const { bytes, endung } = ausDataUrl(b.dataUrl)
   if (endung === 'mp3') throw new Error('Kein Bild.')
@@ -171,11 +193,21 @@ export function bildSetzen(
     zeit: Date.now()
   }
   aendern(medienSchluessel(sprache, wort), (e) => {
-    weg(e.bild?.datei)
+    const vorher = bildDerStufe(e, stufe)
+    weg(vorher?.datei)
     // Kandidaten bleiben, wenn nur umgewählt wurde
-    return { ...e, bild: { ...bild, kandidaten: bild.kandidaten ?? e.bild?.kandidaten } }
+    const neu: MedienBild = { ...bild, kandidaten: bild.kandidaten ?? vorher?.kandidaten }
+    const ohneBild = (e.ohneBild ?? []).filter((s) => s !== stufe)
+    const basis = { ...e, ...(ohneBild.length ? { ohneBild } : {}) }
+    if (!ohneBild.length) delete basis.ohneBild
+    return stufe === 's2' ? { ...basis, bild: neu } : { ...basis, bildStufen: { ...(e.bildStufen ?? {}), [stufe]: neu } }
   })
   return bild
+}
+
+/** Die KI sieht für diese Stufe kein eindeutiges Bild (abstraktes Wort) – merken, damit kein Auftrag es erneut versucht */
+export function ohneBildMerken(sprache: string, wort: string, stufe: Bildstufe): void {
+  aendern(medienSchluessel(sprache, wort), (e) => ({ ...e, ohneBild: [...new Set([...(e.ohneBild ?? []), stufe])] }))
 }
 
 function bereinigeKandidaten(k: MedienKandidat[]): MedienKandidat[] {
@@ -193,11 +225,16 @@ function bereinigeKandidaten(k: MedienKandidat[]): MedienKandidat[] {
     }))
 }
 
-export function bildLoeschen(sprache: string, wort: string): void {
+export function bildLoeschen(sprache: string, wort: string, stufe: Bildstufe = 's2'): void {
   aendern(medienSchluessel(sprache, wort), (e) => {
-    weg(e.bild?.datei)
-    const { bild: _b, ...rest } = e
-    return rest
+    weg(bildDerStufe(e, stufe)?.datei)
+    if (stufe === 's2') {
+      const { bild: _b, ...rest } = e
+      return rest
+    }
+    const bildStufen = { ...(e.bildStufen ?? {}) }
+    delete bildStufen[stufe]
+    return { ...e, bildStufen }
   })
 }
 

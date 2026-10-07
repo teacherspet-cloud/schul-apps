@@ -112,6 +112,29 @@ try {
   await p.screenshot({ path: join(out, '3-bilddialog.png') })
   await p.keyboard.press('Escape')
 
+  // ---------- Bildstufen (07.10.2026): je Altersstufe ein eigenes Bild, sonst das der nächsten Stufe
+  await p.locator('[data-bildstufe-wahl]').getByText('Kl. 7–10').click()
+  await p.waitForTimeout(800)
+  const rueckfall = await p.locator('[data-beispielbild][data-bildstufe="s2"] img').count()
+  pruefe(rueckfall >= 1, `Kl. 7–10: bis dahin das Bild der Stufe 5–6 als Rückfall (${rueckfall})`)
+  pruefe(await da(p.locator('[data-medien-bilder]', { hasText: `(${woerter.length})` })), 'Für Kl. 7–10 sind alle Wörter noch offen')
+  await p.locator('[data-medien-bilder]').click()
+  // Es gibt schon einen fertigen Auftrag gleichen Namens – auf das Ende des laufenden warten (Knopf lädt nicht mehr)
+  await p.waitForTimeout(500)
+  await p.locator('[data-medien-bilder][data-loading]').waitFor({ state: 'detached', timeout: 90000 }).catch(() => undefined)
+  pruefe(await auftragFertig(p, 'Beispielbilder suchen'), 'Bilder für Kl. 7–10 gesucht')
+  await p.waitForTimeout(1200)
+  const eigen = await p.locator('[data-beispielbild][data-bildstufe="s3"] img').count()
+  pruefe(eigen >= 1, `eigene Bilder der Stufe 7–10 (${eigen})`)
+  {
+    const q = (stufe) => `${A}/s/api/medien?sprache=en&stufe=${stufe}&w=${encodeURIComponent(woerter[0])}`
+    const s3 = (await (await verwaltung.request.get(q('s3'))).json()).medien?.[woerter[0]]
+    const s1 = (await (await verwaltung.request.get(q('s1'))).json()).medien?.[woerter[0]]
+    pruefe(s3?.bildStufe === 's3' && s1?.bildStufe === 's2', `Lernende sehen ihre Stufe bzw. die nächste (Kl. 7–10: ${s3?.bildStufe}, Kl. 1–4: ${s1?.bildStufe})`)
+  }
+  await p.screenshot({ path: join(out, '3b-bildstufen.png') })
+  await p.locator('[data-bildstufe-wahl]').getByText('Kl. 5–6').click()
+
   // ---------- Lehrkraft: nur ansehen
   const lehrer = await (
     await verwaltung.request.post(`${A}/server/verwaltung/testkonto`, { headers: KOPF, data: { rolle: 'lehrkraft', name: 'Lea Testlehrerin' } })
@@ -204,6 +227,7 @@ try {
   // Keine Testreste: Medien der Probewörter und die Standardstimme wieder entfernen
   for (const w of woerter) {
     await api(verwaltung, 'medien:bild-loeschen', 'en', w).catch(() => undefined)
+    await api(verwaltung, 'medien:bild-loeschen', 'en', w, 's3').catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort').catch(() => undefined)
     await api(verwaltung, 'medien:ton-loeschen', 'en', w, 'wort', undefined, 'm').catch(() => undefined)
   }

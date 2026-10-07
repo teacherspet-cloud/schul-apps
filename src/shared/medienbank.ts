@@ -53,8 +53,35 @@ export const STIMMLAGE_NAME: Record<Stimmlage, string> = { w: 'weiblich', m: 'm�
 /** Standardstimmen einer Sprache */
 export type Stimmen = Partial<Record<Stimmlage, string>>
 
+/**
+ * Bildstufen (07.10.2026, abgestimmt mit der Lehrkraft nach Recherche): je Wort ein Bild je Altersstufe. Mit dem Alter
+ * steigt der Realismus, nicht der Detailgrad (Mayer, Kohärenz; Sundararajan & Adesope 2020); echte Proportionen in
+ * jeder Stufe (Ganea u. a. 2008); Jugendliche bevorzugen Fotos/realistische Bilder; Abstrakta erst ab Kl. 7 als
+ * typische Szene (Farley u. a. 2012), sonst kein Bild (mehrdeutige Bilder schaden, Boers u. a. 2009).
+ * Das bisherige Feld `bild` ist die Stufe 5–6 (Bestand); die übrigen stehen in `bildStufen`.
+ */
+export type Bildstufe = 's1' | 's2' | 's3' | 's4'
+export const BILDSTUFEN: Bildstufe[] = ['s1', 's2', 's3', 's4']
+export const istStufe = (s: unknown): s is Bildstufe => BILDSTUFEN.includes(s as Bildstufe)
+export const BILDSTUFE_NAME: Record<Bildstufe, string> = { s1: 'Kl. 1–4', s2: 'Kl. 5–6', s3: 'Kl. 7–10', s4: 'Kl. 11–13' }
+/** Stufe zur Klasse; unbekannt = Stufe 5–6 (wie der Bestand) */
+export const stufeVon = (klasse?: number | null): Bildstufe =>
+  !klasse ? 's2' : klasse <= 4 ? 's1' : klasse <= 6 ? 's2' : klasse <= 10 ? 's3' : 's4'
+/** Die nächstliegenden Stufen, wenn die eigene fehlt (gleich weit: zuerst die ältere – kindlicher wirkt eher störend) */
+export const stufenReihe = (s: Bildstufe): Bildstufe[] => {
+  const i = BILDSTUFEN.indexOf(s)
+  return [...BILDSTUFEN].sort((a, b) => Math.abs(BILDSTUFEN.indexOf(a) - i) - Math.abs(BILDSTUFEN.indexOf(b) - i) || BILDSTUFEN.indexOf(b) - BILDSTUFEN.indexOf(a))
+}
+/** Bild genau dieser Stufe */
+export const bildDerStufe = <B>(e: { bild?: B; bildStufen?: Partial<Record<Bildstufe, B>> } | undefined, s: Bildstufe): B | undefined =>
+  s === 's2' ? e?.bild : e?.bildStufen?.[s]
+
 export interface MedienEintrag {
   bild?: MedienBild
+  /** Bilder der Stufen 1–4, 7–10 und 11–13 (Stufe 5–6 = `bild`) */
+  bildStufen?: Partial<Record<Bildstufe, MedienBild>>
+  /** Stufen, für die die KI kein eindeutiges Bild sieht (abstrakte Wörter) – werden nicht erneut versucht */
+  ohneBild?: Bildstufe[]
   ton?: MedienTon
   /** Aussprache von Beispielsätzen, je Satz (Schlüssel: satzSchluessel) */
   saetze?: Record<string, MedienTon>
@@ -67,7 +94,13 @@ type TonSicht = MedienTon & { url?: string }
 
 /** Was die Oberfläche je Wort bekommt: Bilder gleich als data-URL, Töne über ihre Datei */
 export interface MedienSicht {
+  /** Bild der angefragten Stufe – fehlt es, das der nächstliegenden (dann steht deren Stufe in `bildStufe`) */
   bild?: Omit<MedienBild, 'datei'> & { datei: string; dataUrl?: string; url?: string }
+  /** Stufe des gezeigten Bildes */
+  bildStufe?: Bildstufe
+  /** Stufen mit eigenem Bild bzw. ohne eindeutiges Bild (für die Lehrkraft) */
+  bildStufenDa?: Bildstufe[]
+  ohneBild?: Bildstufe[]
   ton?: TonSicht
   saetze?: Record<string, TonSicht>
   tonM?: TonSicht

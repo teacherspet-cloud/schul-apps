@@ -64,6 +64,7 @@ export const SERVER_KANAELE: ReadonlySet<string> = new Set([
   'medien:stimme-setzen',
   'medien:bild-setzen',
   'medien:bild-loeschen',
+  'medien:ohne-bild',
   'medien:ton-setzen',
   'medien:ton-loeschen'
 ])

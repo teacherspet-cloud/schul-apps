@@ -9,7 +9,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { json, type Anfrage } from './http'
 import { medienDateiPfad, medienFuer } from '../main/services/storage/medienbank'
-import { MEDIEN_DATEI } from '../shared/medienbank'
+import { istStufe, MEDIEN_DATEI } from '../shared/medienbank'
 
 const TYP: Record<string, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', mp3: 'audio/mpeg' }
 
@@ -21,7 +21,10 @@ export async function medienRoute(k: Anfrage): Promise<boolean> {
     const woerter = url.searchParams.getAll('w').slice(0, 600)
     // Bevorzugte Fassung der Aussprache (Einstellungen der Lernenden, 07.10.2026) – die andere als Rückfall
     const lage = url.searchParams.get('lage') === 'm' ? 'm' : 'w'
-    return json(res, 200, { medien: medienFuer(sprache, woerter, { basisUrl: '/medien/', lage }) }), true
+    // Bildstufe nach Klasse der Lernenden (07.10.2026; die Seite kennt sie aus der Lerngruppe)
+    const s = url.searchParams.get('stufe')
+    const stufe = istStufe(s) ? s : 's2'
+    return json(res, 200, { medien: medienFuer(sprache, woerter, { basisUrl: '/medien/', lage, stufe }) }), true
   }
   const m = /^\/medien\/([a-f0-9]{24}\.(jpg|png|webp|mp3))$/.exec(url.pathname)
   if (!m || req.method !== 'GET') return false

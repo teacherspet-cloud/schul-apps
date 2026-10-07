@@ -18,6 +18,7 @@ import {
   Loader,
   Modal,
   ScrollArea,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
@@ -26,7 +27,21 @@ import {
 } from '@mantine/core'
 import { IconListCheck, IconPhoto, IconPhotoSearch, IconSparkles, IconTrash, IconVolume, IconMessage2 } from '@tabler/icons-react'
 import { useCallback, useEffect, useState } from 'react'
-import { istGanzerSatz, sprachKurz, STIMMLAGE_NAME, type MedienKandidat, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
+import { create } from 'zustand'
+import {
+  BILDSTUFE_NAME,
+  BILDSTUFEN,
+  istGanzerSatz,
+  sprachKurz,
+  STIMMLAGE_NAME,
+  stufeVon,
+  type Bildstufe,
+  type MedienKandidat,
+  type MedienSicht,
+  type Stimmen,
+  type Stimmlage,
+  type TonArt
+} from '@shared/medienbank'
 import { notifyError, notifySuccess } from '../util'
 import { useLaufendeSchluessel } from '../auftraege'
 import { abspielen, bildKandidaten, kandidatUebernehmen, type Vokabel } from './medienbank'
@@ -43,14 +58,30 @@ export function useMedienAdmin(): boolean {
   return admin
 }
 
-/** Einträge der Medienbank für die Wörter einer Tabelle */
-export function useMedienbank(sprache: string | undefined, woerter: string[]): { daten: Record<string, MedienSicht>; laden: () => void } {
+/*
+ * Bildstufe der Ansicht (07.10.2026): aus der Klasse der Liste bzw. des Lehrwerks, in der Medienleiste umstellbar.
+ * Die Wahl gilt für die Liste bzw. das ganze Lehrwerk, solange das Programm offen ist.
+ */
+const useStufenWahl = create<{ wahl: Record<string, Bildstufe>; setze: (schluessel: string, s: Bildstufe) => void }>((set) => ({
+  wahl: {},
+  setze: (schluessel, s) => set((x) => ({ wahl: { ...x.wahl, [schluessel]: s } }))
+}))
+const wahlSchluessel = (docId: string): string => docId.split('|')[0]
+
+/** Ziel mit Bildstufe (von Hand gewählt oder aus der Klasse) */
+export function useMedienZiel(ziel: MedienZiel): MedienZiel & { stufe: Bildstufe } {
+  const gewaehlt = useStufenWahl((x) => x.wahl[wahlSchluessel(ziel.docId)])
+  return { ...ziel, stufe: gewaehlt ?? stufeVon(ziel.klasse) }
+}
+
+/** Einträge der Medienbank für die Wörter einer Tabelle – Bilder in der Bildstufe `stufe` */
+export function useMedienbank(sprache: string | undefined, woerter: string[], stufe?: Bildstufe): { daten: Record<string, MedienSicht>; laden: () => void } {
   const [daten, setDaten] = useState<Record<string, MedienSicht>>({})
   const schluessel = woerter.filter(Boolean).join('\u0001')
   const laden = useCallback(() => {
     if (!sprache || !schluessel) return setDaten({})
-    void window.api.medien.eintraege(sprachKurz(sprache), schluessel.split('\u0001')).then(setDaten, () => setDaten({}))
-  }, [sprache, schluessel])
+    void window.api.medien.eintraege(sprachKurz(sprache), schluessel.split('\u0001'), stufe).then(setDaten, () => setDaten({}))
+  }, [sprache, schluessel, stufe])
   useEffect(() => laden(), [laden])
   // Medienaufträge im Hintergrund melden jedes erledigte Wort – kurz gesammelt neu laden
   useEffect(() => {
@@ -73,13 +104,43 @@ export const spiele = (q: { datei?: string; url?: string } | undefined): void =>
   if (q) void abspielen(q).catch((e: unknown) => notifyError(e, 'Abspielen nicht möglich'))
 }
 
-/** Zelle „Beispielbild" */
-export function BildZelle({ sicht, wort, onOeffnen }: { sicht?: MedienSicht; wort: string; onOeffnen: () => void }): React.JSX.Element {
+/** Zelle „Beispielbild" – `stufe`: Bildstufe der Ansicht; ein Bild einer anderen Stufe erscheint blass mit deren Namen */
+export function BildZelle({ sicht, wort, onOeffnen, stufe }: { sicht?: MedienSicht; wort: string; onOeffnen: () => void; stufe?: Bildstufe }): React.JSX.Element {
   const b = sicht?.bild
+  const fremd = Boolean(stufe && sicht?.bildStufe && sicht.bildStufe !== stufe)
   return (
-    <UnstyledButton onClick={onOeffnen} aria-label={`Beispielbild zu „${wort}“`} data-beispielbild={wort} disabled={!wort.trim()}>
+    <UnstyledButton
+      onClick={onOeffnen}
+      aria-label={`Beispielbild zu „${wort}“`}
+      data-beispielbild={wort}
+      data-bildstufe={sicht?.bildStufe}
+      disabled={!wort.trim()}
+      title={fremd ? `Bild aus Stufe ${BILDSTUFE_NAME[sicht!.bildStufe!]} – für ${BILDSTUFE_NAME[stufe!]} gibt es noch keins` : undefined}
+      style={{ position: 'relative' }}
+    >
       {b?.dataUrl || b?.url ? (
-        <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" />
+        <>
+          <Image src={b.dataUrl ?? b.url} w={44} h={44} fit="cover" radius={4} alt="" style={fremd ? { opacity: 0.45 } : undefined} />
+          {fremd && (
+            <Text
+              size="9px"
+              fw={700}
+              style={{ position: 'absolute', bottom: 1, left: 1, right: 1, textAlign: 'center', background: 'var(--mantine-color-body)', borderRadius: 3, lineHeight: 1.3 }}
+            >
+              {BILDSTUFE_NAME[sicht!.bildStufe!].replace('Kl. ', '')}
+            </Text>
+          )}
+        </>
+      ) : stufe && sicht?.ohneBild?.includes(stufe) ? (
+        <div
+          style={{ width: 44, height: 44, borderRadius: 4, border: '1px dashed var(--mantine-color-default-border)', display: 'grid', placeItems: 'center' }}
+          title="Für diese Stufe ohne Bild – kein eindeutiges Motiv (abstraktes Wort)"
+          data-ohne-bild
+        >
+          <Text size="10px" c="dimmed">
+            –
+          </Text>
+        </div>
       ) : (
         <div
           style={{ width: 44, height: 44, borderRadius: 4, border: '1px dashed var(--mantine-color-default-border)', display: 'grid', placeItems: 'center' }}
@@ -182,7 +243,10 @@ export function BildDialog({
   const [kandidaten, setKandidaten] = useState<MedienKandidat[]>(sicht?.bild?.kandidaten ?? [])
   // „Von der KI erzeugen" läuft als Auftrag weiter, auch wenn das Pop-up zugeht
   const kiLaeuft = useLaufendeSchluessel(ziel.docId).has(medienSchluessel('bildKi', v.term))
+  const stufe = ziel.stufe ?? stufeVon(ziel.klasse)
   const b = sicht?.bild
+  // Bild einer anderen Stufe (Rückfall) – löschen träfe dann nicht das gezeigte
+  const fremd = Boolean(b && sicht?.bildStufe && sicht.bildStufe !== stufe)
   const tun = async (was: string, fn: () => Promise<unknown>, meldung?: string): Promise<void> => {
     setLaeuft(was)
     try {
@@ -204,22 +268,32 @@ export function BildDialog({
             <Text size="xs" c="dimmed" ta="center">
               {b.herkunft === 'ki' ? 'KI-generiert' : b.nachweis}
             </Text>
+            {fremd && (
+              <Text size="xs" c="orange.8" ta="center" data-bild-fremde-stufe>
+                Bild der Stufe {BILDSTUFE_NAME[sicht!.bildStufe!]} – für {BILDSTUFE_NAME[stufe]} gibt es noch kein eigenes. Lernende dieser Stufe sehen bis dahin dieses.
+              </Text>
+            )}
           </Stack>
         ) : (
           <Text c="dimmed" ta="center" py="lg">
-            Noch kein Beispielbild.
+            {sicht?.ohneBild?.includes(stufe)
+              ? `Für ${BILDSTUFE_NAME[stufe]} ohne Bild: Die KI sieht kein eindeutiges Motiv (abstraktes Wort). Von Hand suchen oder erzeugen geht trotzdem.`
+              : 'Noch kein Beispielbild.'}
           </Text>
         )}
+        <Text size="xs" c="dimmed" ta="center">
+          Bildstufe: {BILDSTUFE_NAME[stufe]}
+        </Text>
         {admin && (
           <>
             <Group justify="center" gap="xs">
-              {b && (
+              {b && !fremd && (
                 <Button
                   color="red"
                   variant="light"
                   leftSection={<IconTrash size={16} />}
                   loading={laeuft === 'loeschen'}
-                  onClick={() => void tun('loeschen', () => window.api.medien.bildLoeschen(sprache, v.term), 'Bild gelöscht.')}
+                  onClick={() => void tun('loeschen', () => window.api.medien.bildLoeschen(sprache, v.term, stufe), 'Bild gelöscht.')}
                   data-bild-loeschen
                 >
                   Löschen
@@ -231,7 +305,7 @@ export function BildDialog({
                 loading={laeuft === 'suchen'}
                 onClick={() =>
                   void tun('suchen', async () => {
-                    const k = await bildKandidaten(sprache, v, { klasse: ziel.klasse })
+                    const k = await bildKandidaten(sprache, v, { klasse: ziel.klasse, stufe })
                     setKandidaten(k)
                     if (!k.length) throw new Error('Die Bildsuche hat nichts gefunden.')
                   })
@@ -263,7 +337,7 @@ export function BildDialog({
                   {kandidaten.map((k) => (
                     <Tooltip key={k.url} label={[k.titel, k.urheber, k.lizenz].filter(Boolean).join(' · ')}>
                       <UnstyledButton
-                        onClick={() => void tun(`k:${k.url}`, () => kandidatUebernehmen(sprache, v.term, k, kandidaten), 'Bild übernommen.')}
+                        onClick={() => void tun(`k:${k.url}`, () => kandidatUebernehmen(sprache, v.term, k, kandidaten, stufe), 'Bild übernommen.')}
                         style={{ position: 'relative' }}
                         data-bild-kandidat
                       >
@@ -338,7 +412,9 @@ export function MedienLeiste({
   const bildKi = useBildKiDa()
   const sp = sprachKurz(sprache)
   const woerter = vokabeln.filter((v) => v.term.trim())
-  const ohneBild = offeneVokabeln('bilder', woerter, daten)
+  const stufe = ziel.stufe ?? stufeVon(ziel.klasse)
+  const setzeStufe = useStufenWahl((x) => x.setze)
+  const ohneBild = offeneVokabeln('bilder', woerter, daten, ['w'], stufe)
   const ohneTon = offeneVokabeln('aussprache', woerter, daten, lagen.length ? lagen : ['w'])
   const ohneSatz = offeneVokabeln('satz', woerter, daten, lagen.length ? lagen : ['w'])
   const ohneStimme = stimmen !== null && !lagen.length
@@ -373,6 +449,19 @@ export function MedienLeiste({
           {knopf('satz', 'Satz-Aussprache erzeugen', ohneSatz, <IconMessage2 size={14} />, 'data-medien-satz', true)}
           {mehr}
         </Group>
+        <Group gap="xs" wrap="wrap">
+          <Text size="sm">Bildstufe:</Text>
+          <SegmentedControl
+            size="xs"
+            value={stufe}
+            onChange={(s) => setzeStufe(wahlSchluessel(ziel.docId), s as Bildstufe)}
+            data={BILDSTUFEN.map((s) => ({ value: s, label: BILDSTUFE_NAME[s] }))}
+            data-bildstufe-wahl
+          />
+          <Text size="xs" c="dimmed">
+            {ziel.klasse ? `aus Klasse ${ziel.klasse}` : 'Klasse unbekannt'} – je Stufe ein eigenes Bild; fehlt es, sehen Lernende das der nächsten Stufe.
+          </Text>
+        </Group>
         {ohneStimme && (
           <Text size="xs" c="orange.8">
             Für die Aussprache fehlt eine Standardstimme für diese Sprache – Einstellungen › Bilder und Hörtexte › „Aussprache der Vokabeln“.
@@ -380,7 +469,14 @@ export function MedienLeiste({
         )}
         <Text size="xs" c="dimmed">
           Läuft im Hintergrund – Fortschritt in der Auftragsleiste unten rechts. Bei ausgelasteten Diensten wartet der Auftrag und macht danach weiter.
-          {ziel.klasse && ziel.klasse <= 6 ? ' Für jüngere Lernende werden zuerst Cliparts gesucht.' : ''}
+          {
+            {
+              s1: ' Kl. 1–4: freundliche Illustrationen mit echten Proportionen, nur konkrete Wörter.',
+              s2: ' Kl. 5–6: halbrealistische Illustrationen, Verben als einfache Szene; abstrakte Wörter bleiben ohne Bild.',
+              s3: ' Kl. 7–10: Fotos bzw. realistische Bilder, Abstrakta als typische Szene.',
+              s4: ' Kl. 11–13: sachliche Fotos; im Zweifel kein Bild.'
+            }[stufe]
+          }
         </Text>
       </Stack>
     </Alert>

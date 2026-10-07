@@ -24,6 +24,7 @@ import { getSettings } from '../main/services/storage/settings'
 import { fachFarbeAus } from '../renderer/src/shared/fachfarben'
 import { alleLernenden, gastName, gehoertZu, lerngruppe, mitgliederVon } from './onlinetest'
 import { iservBereit } from './anmeldung'
+import { jahrgangAus } from '../shared/lernstand'
 import { gastEntfernen } from './gaeste'
 import { registerVergessen } from './namensschutz'
 import {
@@ -157,6 +158,13 @@ export function standSpeichern(zid: string, sid: string, s: VokStand): void {
       'INSERT INTO vok_stand (zuweisung_id, schueler_id, daten, aktualisiert) VALUES (?, ?, ?, ?) ON CONFLICT (zuweisung_id, schueler_id) DO UPDATE SET daten = excluded.daten, aktualisiert = excluded.aktualisiert'
     )
     .run(zid, sid, JSON.stringify(s), Date.now())
+}
+
+/** Klassenstufe der Lernenden zu einer Freigabe – Name der Lerngruppe („7a"), sonst die IServ-Gruppen; null = unbekannt */
+function klasseFuer(z: Pick<Zeile, 'lerngruppe_id'>, ich: NutzerInfo): number | null {
+  const g = z.lerngruppe_id ? lerngruppe(z.lerngruppe_id) : null
+  const aus = [g?.name, ...ich.gruppen.map((x) => x.name)].map((n) => jahrgangAus(n)).find((j) => j && j >= 1 && j <= 13)
+  return aus ?? null
 }
 
 export function vokIstFuer(z: Pick<Zeile, 'lerngruppe_id' | 'schueler'> & { id?: string }, ich: NutzerInfo): boolean {
@@ -444,6 +452,8 @@ export function vokabelRoute(adresse = ''): (k: Anfrage) => Promise<boolean> {
             woerter,
             staende: st.woerter,
             farbe: await fachfarbeDerLehrkraft(z),
+            // Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026): aus der Lerngruppe, sonst aus den eigenen Gruppen
+            klasse: klasseFuer(z, ich),
             rekorde: st.rekorde ?? {},
             ansehen: st.ansehen ?? []
           }),

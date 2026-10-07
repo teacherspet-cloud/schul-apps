@@ -13,9 +13,9 @@
  * - Ein Pop-up („Von der KI erzeugen") darf geschlossen werden: Der Auftrag läuft weiter, die Tabelle zeigt das
  *   Bild, sobald es da ist (`medienGeaendert`).
  */
-import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonVon, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
+import { satzSchluessel, saetzeVon, sprachKurz, istGanzerSatz, STIMMLAGEN, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage } from '@shared/medienbank'
 import { starteAuftrag, type AuftragsKontext } from '../auftraege'
-import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehlt, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
+import { bildErzeugen, bildKandidaten, kandidatUebernehmen, kiWaehltMehr, motivWaehlen, stufeDer, tonErzeugen, type Ki, type Lernende, type Vokabel } from './medienbank'
 import { DIENST_NAME, DienstSperren, MAX_WARTEN_MS, Plaetze, uhrzeitLabel, wartezeit, type Dienst } from './medienWarten'
 
 export const MEDIEN_MODUL = 'vokabelliste'
@@ -27,6 +27,8 @@ export interface MedienZiel {
   titel: string
   /** Klassenstufe der Lernenden (Bildart: Cliparts bis Klasse 6) */
   klasse?: number
+  /** Bildstufe – von Hand gewählt (Medienleiste), sonst aus der Klasse */
+  stufe?: Bildstufe
 }
 
 export const zielListe = (id: string, name: string, klasse?: number): MedienZiel => ({ docId: id, titel: name || 'Vokabelliste', klasse })
@@ -133,9 +135,17 @@ const tonFehlt = (art: MedienArt, v: Vokabel, sicht: MedienSicht | undefined, la
  * Was einem Wort fehlt – nur das wird in Auftrag gegeben. `lagen`: Fassungen der Aussprache, die es geben soll
  * (eingestellte Standardstimmen, 07.10.2026) – fehlt eine davon, ist das Wort offen.
  */
-export function offeneVokabeln(art: MedienArt, vokabeln: Vokabel[], daten: Record<string, MedienSicht>, lagen: Stimmlage[] = ['w']): Vokabel[] {
+export function offeneVokabeln(
+  art: MedienArt,
+  vokabeln: Vokabel[],
+  daten: Record<string, MedienSicht>,
+  lagen: Stimmlage[] = ['w'],
+  stufe: Bildstufe = 's2'
+): Vokabel[] {
   const woerter = vokabeln.filter((v) => v.term.trim())
-  if (art === 'bilder' || art === 'bildKi') return woerter.filter((v) => !daten[v.term]?.bild)
+  // Bildstufen (07.10.2026): offen ist, was in DIESER Stufe kein Bild hat – außer die KI sah dafür kein eindeutiges
+  if (art === 'bilder' || art === 'bildKi')
+    return woerter.filter((v) => !daten[v.term]?.bildStufenDa?.includes(stufe) && !daten[v.term]?.ohneBild?.includes(stufe))
   return woerter.filter((v) => lagen.some((l) => tonFehlt(art, v, daten[v.term], l)))
 }
 
@@ -166,12 +176,19 @@ async function eines(
     }
     return true
   }
-  if (art === 'bildKi') return await beimDienst(k, 'bildki', () => bildErzeugen(sp, v, lernende, ki)), true
+  const stufe = stufeDer(lernende)
+  if (art === 'bildKi') {
+    // Erst das Motiv (und ob es sich für diese Stufe eindeutig zeigen lässt); einzeln angefordert, wird es trotzdem versucht
+    const m = await beimDienst(k, 'ki', () => motivWaehlen(sp, v, lernende, ki))
+    if (!m.eindeutig && !einzeln) return await window.api.medien.ohneBild(sp, v.term, stufe), false
+    return await beimDienst(k, 'bildki', () => bildErzeugen(sp, v, lernende, ki, m.motiv)), true
+  }
   const kandidaten = await beimDienst(k, 'bildsuche', () => bildKandidaten(sp, v, lernende))
   if (!kandidaten.length) return false
-  const i = await beimDienst(k, 'ki', () => kiWaehlt(sp, v, kandidaten, lernende, ki))
-  if (i < 0) return false
-  await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, kandidaten[i], kandidaten))
+  const w = await beimDienst(k, 'ki', () => kiWaehltMehr(sp, v, kandidaten, lernende, ki))
+  if (w.nichtZeigbar && !einzeln) await window.api.medien.ohneBild(sp, v.term, stufe)
+  if (w.i < 0) return false
+  await beimDienst(k, 'bildsuche', () => kandidatUebernehmen(sp, v.term, kandidaten[w.i], kandidaten, stufe))
   return true
 }
 
@@ -221,14 +238,14 @@ export function starteMedienAuftrag(s: MedienStart): Promise<MedienErgebnis | nu
           sp,
           liste.map((v) => v.term)
         )
-        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen)
+        if (!e.einzeln) liste = offeneVokabeln(e.art, liste, daten, lagen, stufeDer({ klasse: e.ziel.klasse, stufe: e.ziel.stufe }))
         const erg: MedienErgebnis = { erledigt: 0, leer: 0, fehler: 0, gesamt: liste.length }
         let ersterFehler: unknown = null
         for (const [i, v] of liste.entries()) {
           if (k.signal.aborted) break
           k.melde(`„${v.term}" (${i + 1} von ${liste.length})`, i, liste.length)
           try {
-            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), { klasse: e.ziel.klasse }, k)) erg.erledigt++
+            if (await eines(e.art, sp, v, stimmen, lagen, daten[v.term], Boolean(e.einzeln), { klasse: e.ziel.klasse, stufe: e.ziel.stufe }, k)) erg.erledigt++
             else erg.leer++
             medienGeaendert(sp)
           } catch (fehler) {

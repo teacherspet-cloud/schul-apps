@@ -253,7 +253,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const { settings } = useAppSettings()
   const [fachId, setFachId] = useState<string | null>(faecher[0]?.id ?? null)
   const [jahrgang, setJahrgang] = useState<number>(6)
-  const [themaId, setThemaId] = useState<string | null>(null)
+  const [themenIds, setThemenIds] = useState<string[]>([])
   const [eigenes, setEigenes] = useState('')
   const [wunsch, setWunsch] = useState('')
   const [art, setArt] = useState<'gruppe' | 'einzeln' | 'code'>('gruppe')
@@ -264,10 +264,13 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
   const { gruppen } = useLerngruppen()
   const alleLernenden = useAlleLernenden()
   const fach = faecher.find((f) => f.id === fachId)
-  // Themenauswahl wie im Arbeitsblatt (GrammatikAuswahl, abgestimmt 06.10.2026) – hier genau ein Thema
+  /*
+   * Themenauswahl wie im Arbeitsblatt (GrammatikAuswahl, abgestimmt 06.10.2026). Seit 07.10.2026 mehrere Themen
+   * (Wunsch der Lehrkraft); mit Band und Unit schlägt die App die Grammatik der Unit gleich vor.
+   */
   const [eigenesAn, setEigenesAn] = useState(false)
-  const gewaehltesThema = !eigenesAn && themaId ? GRAMMAR_TOPICS.find((t) => t.id === themaId && t.subject === fachId) : undefined
-  const thema = eigenesAn ? eigenes.trim() : gewaehltesThema?.label ?? ''
+  const gewaehlteThemen = eigenesAn ? [] : themenIds.map((id) => GRAMMAR_TOPICS.find((t) => t.id === id && t.subject === fachId)).filter((t) => t !== undefined)
+  const thema = eigenesAn ? eigenes.trim() : gewaehlteThemen.map((t) => t.label).join(' · ')
   // Teilformen des Themas (Recherche 06.10.2026): keine gewählt = alle, die zur Klasse passen
   const [teilWahl, setTeilWahl] = useState<string[]>([])
   const query = { subjectId: fachId ?? '', grade: jahrgang, schoolTypeId: settings.defaults?.schoolTypeId, stateId: settings.defaults?.stateId }
@@ -294,7 +297,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
         sprache: fach.sprache,
         jahrgang,
         wunsch: wunsch.trim() || undefined,
-        teilformen: gewaehltesThema ? teilformenAuftrag([gewaehltesThema], query, teilWahl) || undefined : undefined
+        teilformen: gewaehlteThemen.length ? teilformenAuftrag(gewaehlteThemen, query, teilWahl) || undefined : undefined
       },
       sperrt: false,
       fehlerTitel: 'Aufgabenpool konnte nicht erstellt werden',
@@ -319,7 +322,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
               allowDeselect={false}
               data={faecher.map((f) => ({ value: f.id, label: f.label }))}
               value={fachId}
-              onChange={(v) => (setFachId(v), setThemaId(null))}
+              onChange={(v) => (setFachId(v), setThemenIds([]), setTeilWahl([]))}
               data-grammatik-fach
             />
             <NumberInput
@@ -327,7 +330,7 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
               min={1}
               max={13}
               value={jahrgang}
-              onChange={(v) => (setJahrgang(Number(v) || 6), setThemaId(null))}
+              onChange={(v) => setJahrgang(Number(v) || 6)}
               data-grammatik-jahrgang
             />
           </Group>
@@ -335,11 +338,11 @@ function Freigeben({ schliessen }: { schliessen: () => void }): React.JSX.Elemen
             <div data-grammatik-thema>
               <GrammatikAuswahl
                 key={fachId}
-                einzeln
+                unitSofort
                 query={query}
-                wahl={{ themen: themaId ? [themaId] : [], teilformen: teilWahl }}
-                onChange={(w) => (setThemaId(w.themen[0] ?? null), setTeilWahl(w.teilformen))}
-                beschreibung="Ein Thema wählen; ohne Teilform-Auswahl übt die KI alle, die zur Klasse passen – „nur erkennen“ kommt nur in Auswahl- und Fehleraufgaben vor."
+                wahl={{ themen: themenIds, teilformen: teilWahl }}
+                onChange={(w) => (setThemenIds(w.themen), setTeilWahl(w.teilformen))}
+                beschreibung="Ein oder mehrere Themen wählen – mit Band und Unit schlägt die App die Grammatik der Unit vor. Ohne Teilform-Auswahl übt die KI alle, die zur Klasse passen."
               />
             </div>
           )}

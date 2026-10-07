@@ -1,4 +1,4 @@
-import { saetzeVon, satzSchluessel, sprachKurz, tonVon, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
+import { saetzeVon, satzSchluessel, sprachKurz, tonVon, type Bildstufe, type MedienSicht, type Stimmen, type Stimmlage, type TonArt } from '@shared/medienbank'
 import { BildDialog, BildZelle, TonZelle } from '../../../shared/medien/MedienUi'
 import { lagenVon, starteMedienAuftrag, type MedienZiel } from '../../../shared/medien/medienAuftrag'
 import { ActionIcon, Badge, Box, Button, Checkbox, Group, Menu, Table, Text, Textarea, TextInput, Tooltip } from '@mantine/core'
@@ -256,6 +256,7 @@ export default function VokabelTabelle<T extends TabellenZeile>({
                 sprache={sprache}
                 nurLesen={nurLesen}
                 medienAn={Boolean(medien)}
+                bildStufe={medien?.ziel?.stufe}
                 sicht={medien?.daten[z.term]}
                 medienAdmin={medienAdmin}
                 bildOeffnen={setBildOffen}
@@ -301,6 +302,8 @@ interface ZeilenProps {
   nurLesen: boolean
   /** Spalten der Medienbank zeigen – einzelne Werte statt eines Objekts, damit `memo` greift */
   medienAn: boolean
+  /** Bildstufe der Ansicht (07.10.2026) */
+  bildStufe?: Bildstufe
   sicht?: MedienSicht
   medienAdmin: boolean
   bildOeffnen: (z: TabellenZeile) => void
@@ -334,6 +337,7 @@ const Zeile = memo(function Zeile({
   sprache,
   nurLesen,
   medienAn,
+  bildStufe,
   sicht,
   medienAdmin,
   bildOeffnen,
@@ -448,7 +452,7 @@ const Zeile = memo(function Zeile({
       {medienAn && (
         <>
           <Table.Td>
-            <BildZelle sicht={sicht} wort={v.term} onOeffnen={() => bildOeffnen(v)} />
+            <BildZelle sicht={sicht} wort={v.term} onOeffnen={() => bildOeffnen(v)} stufe={bildStufe} />
           </Table.Td>
           <Table.Td>
             <Group gap={4} wrap="nowrap">

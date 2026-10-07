@@ -10,7 +10,7 @@
  * WELCHE Aufrufe aus dem Netz überhaupt erlaubt sind, steht NICHT hier, sondern im Server
  * (main/services/lanServer.ts). Diese Datei beschreibt nur, was es gibt.
  */
-import type { MedienBild, MedienKandidat, MedienSicht, MedienTon, Stimmen, Stimmlage, TonArt } from './medienbank'
+import type { Bildstufe, MedienBild, MedienKandidat, MedienSicht, MedienTon, Stimmen, Stimmlage, TonArt } from './medienbank'
 import { vorhandenName, type BeiVorhanden, type VorhandenWahlFn } from './vorhanden'
 import type { MaskottchenInfo } from './maskottchen'
 import type { LehrplanDatei } from './lehrplan'
@@ -483,15 +483,22 @@ export function buildApi(call: Call, extras: ApiExtras) {
     /** Hörtexte vertonen (ElevenLabs) */
     /** Medienbank der Vokabeln (05.10.2026, shared/medienbank.ts) – ändern am Server nur Admins */
     medien: {
-      eintraege: (sprache: string, woerter: string[]) => call<Record<string, MedienSicht>>('medien:eintraege', sprache, woerter),
+      /** `stufe`: Bildstufe der Lernenden (07.10.2026) – fehlt das Bild dieser Stufe, kommt das der nächstliegenden */
+      eintraege: (sprache: string, woerter: string[], stufe?: Bildstufe) => call<Record<string, MedienSicht>>('medien:eintraege', sprache, woerter, stufe),
       /** Datei als data-URL (Ton, Bild in voller Größe); null, wenn es sie nicht mehr gibt */
       datei: (datei: string) => call<string | null>('medien:datei', datei),
       /** Standardstimmen je Sprache: weibliche und männliche Fassung (07.10.2026) */
       stimmen: () => call<Record<string, Stimmen>>('medien:stimmen'),
       stimmeSetzen: (sprache: string, stimme: string, lage: Stimmlage = 'w') => call<Record<string, Stimmen>>('medien:stimme-setzen', sprache, stimme, lage),
-      bildSetzen: (sprache: string, wort: string, b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] }) =>
-        call<MedienBild>('medien:bild-setzen', sprache, wort, b),
-      bildLoeschen: (sprache: string, wort: string) => call<void>('medien:bild-loeschen', sprache, wort),
+      bildSetzen: (
+        sprache: string,
+        wort: string,
+        b: { dataUrl: string; herkunft: 'suche' | 'ki'; nachweis: string; kandidaten?: MedienKandidat[] },
+        stufe: Bildstufe = 's2'
+      ) => call<MedienBild>('medien:bild-setzen', sprache, wort, b, stufe),
+      bildLoeschen: (sprache: string, wort: string, stufe: Bildstufe = 's2') => call<void>('medien:bild-loeschen', sprache, wort, stufe),
+      /** Die KI sieht für diese Stufe kein eindeutiges Bild (abstraktes Wort) – merken */
+      ohneBild: (sprache: string, wort: string, stufe: Bildstufe) => call<void>('medien:ohne-bild', sprache, wort, stufe),
       tonSetzen: (sprache: string, wort: string, art: TonArt, t: { dataUrl: string; stimme: string; text: string }, lage: Stimmlage = 'w') =>
         call<MedienTon>('medien:ton-setzen', sprache, wort, art, t, lage),
       tonLoeschen: (sprache: string, wort: string, art: TonArt, satz?: string, lage: Stimmlage = 'w') =>

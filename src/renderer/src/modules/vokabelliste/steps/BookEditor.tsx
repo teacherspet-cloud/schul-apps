@@ -15,7 +15,7 @@ import type { VocabRow } from './VocabRow'
 import { istVerbSprache } from '@shared/verben'
 import VerbListeDialog from '../../../shared/verben/VerbListeDialog'
 import { aufServer } from '../../../shared/plattform'
-import { AbschnitteDialog, MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
+import { AbschnitteDialog, MedienLeiste, useMedienAdmin, useMedienbank, useMedienZiel } from '../../../shared/medien/MedienUi'
 import { setzeVokabelAnsicht, zielBuch } from '../../../shared/medien/medienAuftrag'
 
 /** Zeile in einen Lehrwerks-Eintrag überführen: getrimmt und ohne leere Felder. */
@@ -73,10 +73,6 @@ export default function BookEditor({
   const admin = useMedienAdmin()
   const gemeinsam = aufServer() && Boolean(book?.builtIn)
   const gesperrt = gemeinsam && !admin
-  const medien = useMedienbank(
-    book?.language,
-    rows.map((r) => r.term)
-  )
   useEffect(() => {
     window.api.textbooks
       .list()
@@ -122,7 +118,14 @@ export default function BookEditor({
   }, [start?.n])
 
   // Diese Stelle ist gerade zu sehen – „Öffnen" in der Auftragsleiste wechselt dann nur ins Programm
-  const medienZiel = book ? zielBuch(book.id, book.name, unit, section, book.grade) : null
+  // Bildstufe (07.10.2026): aus der Klasse des Bandes, in der Medienleiste umstellbar
+  const zielMitStufe = useMedienZiel(zielBuch(book?.id ?? '', book?.name ?? '', unit, section, book?.grade))
+  const medienZiel = book ? zielMitStufe : null
+  const medien = useMedienbank(
+    book?.language,
+    rows.map((r) => r.term),
+    zielMitStufe.stufe
+  )
   const ansicht = medienZiel?.docId ?? null
   useEffect(() => {
     if (!aktiv || !ansicht) return
@@ -426,7 +429,7 @@ export default function BookEditor({
                   translation: e.translation,
                   example: e.example
                 })),
-                ziel: zielBuch(book.id, book.name, u.name, s.name, book.grade)
+                ziel: { ...zielBuch(book.id, book.name, u.name, s.name, book.grade), stufe: zielMitStufe.stufe }
               }))
             )}
           />

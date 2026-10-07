@@ -6,7 +6,7 @@
  * Eine Sitzung trainiert EINE Liste; deshalb genügt ein Zwischenspeicher für die gerade geladene.
  */
 import type { MedienSicht } from '@shared/medienbank'
-import { satzSchluessel } from '@shared/medienbank'
+import { satzSchluessel, stufeVon } from '@shared/medienbank'
 import { holen } from '../onlinetest/serverApi'
 import { useDarstellung } from '../onlinetest/schuelerDarstellung'
 
@@ -14,11 +14,12 @@ let medien: Record<string, MedienSicht> = {}
 let laeuft: HTMLAudioElement | null = null
 
 /** Medien zu den Wörtern einer Liste laden (am Server); liefert sie auch zurück */
-export async function medienLaden(sprache: string, woerter: string[]): Promise<Record<string, MedienSicht>> {
+export async function medienLaden(sprache: string, woerter: string[], klasse?: number | null): Promise<Record<string, MedienSicht>> {
   medien = {}
   if (!woerter.length) return medien
   // Bevorzugte Fassung der Aussprache (07.10.2026) – der Server löst sie auf, mit der anderen als Rückfall
-  const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w' })
+  // Bildstufe nach Klasse (07.10.2026) – der Server liefert das Bild dieser Stufe, sonst das der nächstliegenden
+  const q = new URLSearchParams({ sprache, lage: useDarstellung.getState().d.aussprache === 'm' ? 'm' : 'w', stufe: stufeVon(klasse) })
   for (const w of woerter.slice(0, 600)) q.append('w', w)
   const d = await holen<{ medien: Record<string, MedienSicht> }>(`/s/api/medien?${q.toString()}`).catch(() => ({ medien: {} }))
   medien = d.medien ?? {}

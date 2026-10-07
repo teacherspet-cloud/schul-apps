@@ -17,7 +17,7 @@ import { TextbookPicker } from '../../vokabeltest/steps/TextbookPicker'
 import VokabelTabelle, { leereZeile, ZUSATZ } from '../../vokabeltest/steps/VokabelTabelle'
 import { EinfuegenFenster, PruefFenster } from '../../vokabeltest/steps/VokabelUebernahme'
 import type { VocabRow } from './VocabRow'
-import { MedienLeiste, useMedienAdmin, useMedienbank } from '../../../shared/medien/MedienUi'
+import { MedienLeiste, useMedienAdmin, useMedienbank, useMedienZiel } from '../../../shared/medien/MedienUi'
 import { setzeVokabelAnsicht, zielListe } from '../../../shared/medien/medienAuftrag'
 
 /** Eine leere Liste bekommt gleich eine Zeile zum Eintippen */
@@ -57,13 +57,14 @@ export default function ListEditor({
   const [language, setLanguage] = useState(list.language ?? 'en')
   // Medienbank (05.10.2026): Bild und Aussprache je Wort, gemeinsam für alle Listen und Lehrwerke
   const medienAdmin = useMedienAdmin()
+  const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
+  // Ziel der Medienaufträge (06.10.2026): „Öffnen" in der Auftragsleiste führt zu dieser Liste; die Klasse steuert die Bildstufe
+  const medienZiel = useMedienZiel(zielListe(list.id, name, grade || undefined))
   const medien = useMedienbank(
     language,
-    rows.map((r) => r.term)
+    rows.map((r) => r.term),
+    medienZiel.stufe
   )
-  const [grade, setGrade] = useState<number | ''>(list.grade ?? '')
-  // Ziel der Medienaufträge (06.10.2026): „Öffnen" in der Auftragsleiste führt zu dieser Liste; die Klasse steuert die Bildart
-  const medienZiel = zielListe(list.id, name, grade || undefined)
   useEffect(() => {
     if (!aktiv) return
     setzeVokabelAnsicht(list.id)

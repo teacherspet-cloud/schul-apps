@@ -19,7 +19,7 @@ import {
 import { NurExperte, useAlleOptionen } from '../../../shared/components/NurExperte'
 import { useElementSize } from '@mantine/hooks'
 import { IconSearch, IconStar, IconStarFilled } from '@tabler/icons-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   abweichungsHinweis,
   defaultSequence,
@@ -77,6 +77,7 @@ export default function GrammatikAuswahl({
   lehrwerk,
   einzeln = false,
   teilformenWaehlbar = true,
+  unitSofort = false,
   beschreibung
 }: {
   query: GrammarQuery
@@ -88,6 +89,12 @@ export default function GrammatikAuswahl({
   einzeln?: boolean
   /** false = Teilformen nur zur Orientierung zeigen (Klassenarbeit speichert nur den Themennamen) */
   teilformenWaehlbar?: boolean
+  /**
+   * Grammatik der Unit gleich übernehmen (Grammatiktraining, 07.10.2026): Sobald Band und Unit feststehen – auch das
+   * zuletzt gewählte beim Öffnen –, sind die sicher zugeordneten Themen der Unit vorgeschlagen. Beim Wechsel der Unit
+   * werden die Vorschläge der vorigen ersetzt; von Hand Gewähltes bleibt.
+   */
+  unitSofort?: boolean
   beschreibung?: string
 }): React.JSX.Element {
   const fach = query.subjectId
@@ -164,6 +171,32 @@ export default function GrammatikAuswahl({
     const basisTeile = einzeln ? [] : ohneTeile(t.id)
     setze({ themen: basisThemen, teilformen: keys && !gleich ? [...basisTeile, ...keys] : basisTeile }, themen.includes(t.id) ? undefined : t.id)
   }
+  // Vorschläge der Unit (unitSofort): welche Themen zuletzt automatisch dazukamen
+  const vorgeschlagen = useRef<string[]>([])
+  useEffect(() => {
+    if (!unitSofort || einzeln || !buch || !unit) return
+    const liste = unitEintraege(fach, buch, unit, 'nur', [])
+    const alt = vorgeschlagen.current
+    const basis = {
+      themen: themen.filter((id) => !alt.includes(id)),
+      teilformen: teilformen.filter((k) => !alt.some((id) => k.startsWith(`${id}/`)))
+    }
+    const neu = mitUnitAuswahl(liste, basis.themen, basis.teilformen)
+    vorgeschlagen.current = neu.themen.filter((id) => !basis.themen.includes(id))
+    const unsicher = liste.filter((e) => !e.sicher).length
+    setUnitModus('nur')
+    setUnitHinweis(
+      liste.length
+        ? `${vorgeschlagen.current.length ? `${vorgeschlagen.current.length} ${vorgeschlagen.current.length === 1 ? 'Thema' : 'Themen'} aus ${buch}, ${unit} vorgeschlagen` : `Für ${unit} ist keine sicher zugeordnete Grammatik hinterlegt`}${
+            unsicher ? ` · ${unsicher} Angabe${unsicher === 1 ? '' : 'n'} nicht sicher zugeordnet – mit „?" markiert, bitte selbst wählen` : ''
+          }. Weitere Themen in der Liste dazuwählen oder abwählen.`
+        : `Für ${unit} ist keine Grammatik hinterlegt.`
+    )
+    setze(neu)
+    if (neu.themen[0]) setFokus(neu.themen[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei neuem Band bzw. neuer Unit
+  }, [unitSofort, buch, unit])
+
   const unitWahl = (modus: 'bis' | 'nur'): void => {
     if (!buch || !unit) return
     setUnitModus(modus)
@@ -574,6 +607,7 @@ function ThemaZeile({
       py={3}
       onClick={oeffnen}
       data-thema={t.id}
+      data-gewaehlt={gewaehlt || undefined}
       data-fokus={fokus || undefined}
       style={{ cursor: 'pointer', borderRadius: 4, background: fokus ? 'var(--mantine-primary-color-light)' : undefined }}
     >

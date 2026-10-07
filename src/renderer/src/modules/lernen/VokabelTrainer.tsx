@@ -84,6 +84,8 @@ interface Liste {
   ansehen?: string[]
   /** Fachfarbe des Kopfbands (Einstellung der Lehrkraft) */
   farbe?: string | null
+  /** Klasse der Lernenden (Bildstufe der Beispielbilder, 07.10.2026) */
+  klasse?: number | null
   /** Vokabelweg (03.10.2026): die Freischalt-Leiter */
   weg?: WegKurz
 }
@@ -205,7 +207,8 @@ export default function VokabelTrainer({ id }: { id: string }): React.JSX.Elemen
         // Medienbank: Aussprache und Beispielbilder (05.10.2026) – ein fehlendes Bild kommt aus der Medienbank
         const m = await medienLaden(
           liste.sprache,
-          liste.woerter.map((w) => w.term)
+          liste.woerter.map((w) => w.term),
+          liste.klasse
         )
         setD({ ...liste, woerter: liste.woerter.map((w) => (w.bild || !m[w.term]?.bild?.url ? w : { ...w, bild: m[w.term]!.bild!.url })) })
       },
